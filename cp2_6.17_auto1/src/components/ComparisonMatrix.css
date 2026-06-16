@@ -1,0 +1,178 @@
+.matrix-page {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--neutral-bg);
+  position: relative;
+}
+
+.share-header {
+  background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+  color: white;
+  padding: 24px 32px;
+}
+
+.share-header-content h1 {
+  font-size: 24px;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+
+.share-header-content .project-desc {
+  opacity: 0.9;
+  margin-bottom: 8px;
+}
+
+.share-header-content .project-meta {
+  opacity: 0.8;
+  font-size: 13px;
+}
+
+.matrix-layout {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+.solutions-sidebar {
+  width: 350px;
+  background: var(--neutral-light);
+  border-right: 1px solid var(--neutral-border);
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+}
+
+.sidebar-header {
+  padding: 20px;
+  border-bottom: 1px solid var(--neutral-border);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.sidebar-header h2 {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.solutions-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.solution-item {
+  padding: 16px;
+}
+
+.solution-item-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.solution-item-index {
+  width: 24px;
+  height: 24px;
+  background: var(--primary-color);
+  color: white;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+.solution-item-header h3 {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary);
+  flex: 1;
+}
+
+.solution-version {
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.solution-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.solution-pros,
+.solution-cons {
+  margin-top: 12px;
+}
+
+.solution-pros h4,
+.solution-cons h4 {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-bottom: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.solution-pros ul,
+.solution-cons ul {
+  list-style: none;
+  padding: 0;
+}
+
+.solution-pros li,
+.solution-cons li {
+  font-size: 13px;
+  color: var(--text-primary);
+  padding: 4px 0;
+  line-height: 1.5;
+}
+
+.solution-pros li {
+  color: var(--success-color);
+}
+
+.solution-cons li {
+  color: var(--danger-color);
+}
+
+.sidebar-footer {
+  padding: 16px 20px;
+  border-top: 1px solid var(--neutral-border);
+  background: white;
+}
+
+.w-full {
+  width: 100%;
+}
+
+.matrix-content {
+  flex: 1;
+  overflow: auto;
+  padding: 24px 32px;
+}
+
+.matrix-header {
+  margin-bottom: 24px;
+}
+
+.matrix-header h1 {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 8px;
+}
+
+.matrix-header p {
+  color: var(--text-secondary);
