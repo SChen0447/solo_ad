@@ -1,0 +1,133 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  font-family: '"Noto Serif SC"', serif;
+  line-height: 1.6;
+  font-weight: 400;
+  color-scheme: dark;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f0f1a 100%);
+  color: #ffffff;
+}
+
+#root {
+  width: 100%;
+  min-height: 100vh;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(233, 69, 96, 0.4);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(233, 69, 96, 0.6);
+}
+
+@layer components {
+  .poem-line {
+    @apply transition-all duration-300 ease-in-out cursor-pointer;
+    @apply hover:bg-white/5 rounded-lg px-3 py-2;
+  }
+
+  .poem-line-active {
+    @apply bg-gradient-to-r from-highlight/20 to-transparent;
+    @apply border-l-4 border-highlight;
+    @apply text-highlight font-semibold;
+    animation: lineHighlight 0.5s ease-out;
+  }
+
+  .btn-primary {
+    @apply bg-accent hover:bg-accent-hover text-white font-semibold;
+    @apply px-6 py-3 rounded-lg transition-all duration-200;
+    @apply hover:scale-[1.02] hover:shadow-lg hover:shadow-accent/30;
+    @apply active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  .btn-secondary {
+    @apply bg-white/10 hover:bg-white/20 text-white font-medium;
+    @apply px-4 py-2 rounded-lg transition-all duration-200;
+    @apply border border-white/20 hover:border-white/40;
+  }
+
+  .style-btn {
+    @apply px-4 py-2 rounded-lg transition-all duration-200;
+    @apply border border-white/20 bg-white/5;
+    @apply hover:bg-white/10 hover:border-accent/50;
+  }
+
+  .style-btn-active {
+    @apply bg-accent/20 border-accent text-accent;
+  }
+
+  .slider-track {
+    @apply appearance-none w-full h-2 rounded-full;
+    @apply bg-white/10 outline-none cursor-pointer;
+  }
+
+  .slider-track::-webkit-slider-thumb {
+    @apply appearance-none w-5 h-5 rounded-full;
+    @apply bg-accent cursor-pointer transition-transform;
+    @apply hover:scale-110 hover:shadow-lg hover:shadow-accent/50;
+  }
+
+  .card {
+    @apply bg-white/5 backdrop-blur-sm rounded-xl;
+    @apply border border-white/10 shadow-xl;
+  }
+
+  .glow-text {
+    text-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
+  }
+}
+
+@keyframes lineHighlight {
+  0% {
+    background-position: -100% 0;
+  }
+  100% {
+    background-position: 0 0;
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    opacity: 0.3;
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0.3;
+  }
+}
+
+.line-tooltip {
+  animation: fadeInOut 2s ease-in-out;
+}
+
+@keyframes fadeInOut {
+  0%, 100% { opacity: 0; transform: translateY(10px); }
+  20%, 80% { opacity: 1; transform: translateY(0); }
+}
