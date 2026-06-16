@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>3D 分子结构查看器</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif;
+      background: #0a0e27;
+      color: #fff;
+    }
+
+    #app {
+      width: 100%;
+      height: 100%;
+      position: relative;
+    }
+
+    #canvas-container {
+      width: 100%;
+      height: 100%;
+    }
+
+    .navbar {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 60px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 24px;
+      background: rgba(10, 14, 39, 0.6);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border-bottom: 1px solid rgba(74, 158, 255, 0.2);
+      z-index: 100;
+    }
+
+    .app-title {
+      font-size: 20px;
+      font-weight: 600;
+      color: #fff;
+      letter-spacing: 1px;
+    }
+
+    .navbar-right {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .molecule-select {
+      padding: 8px 16px;
+      font-size: 14px;
+      background: rgba(74, 158, 255, 0.15);
+      border: 1px solid rgba(74, 158, 255, 0.4);
+      border-radius: 6px;
+      color: #fff;
+      cursor: pointer;
+      outline: none;
+      transition: all 0.2s ease;
+    }
+
+    .molecule-select:hover {
+      background: rgba(74, 158, 255, 0.25);
+      border-color: #4a9eff;
+    }
+
+    .molecule-select option {
+      background: #0a0e27;
+      color: #fff;
+    }
+
+    .reset-btn {
+      padding: 8px 20px;
+      font-size: 14px;
+      background: rgba(74, 158, 255, 0.2);
+      border: 1px solid rgba(74, 158, 255, 0.5);
+      border-radius: 6px;
+      color: #fff;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .reset-btn:hover {
+      background: rgba(74, 158, 255, 0.35);
+      border-color: #4a9eff;
+    }
+
+    .reset-btn:active {
+      background: rgba(74, 158, 255, 0.5);
+    }
+
+    .zoom-indicator {
+      position: fixed;
+      bottom: 24px;
+      left: 24px;
+      padding: 8px 14px;
+      background: rgba(255, 255, 255, 0.1);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      border-radius: 6px;
+      font-size: 14px;
+      color: rgba(255, 255, 255, 0.8);
+      pointer-events: none;
+      z-index: 50;
+      opacity: 0;
+      transition: opacity 0.3s ease;
+    }
+
+    .zoom-indicator.visible {
+      opacity: 1;
+    }
+
+    .atom-info-panel {
+      position: fixed;
+      bottom: -120px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 360px;
+      padding: 20px 24px;
+      background: rgba(10, 14, 39, 0.85);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(74, 158, 255, 0.3);
+      border-radius: 12px 12px 0 0;
+      z-index: 80;
+      transition: bottom 0.3s ease;
+    }
+
+    .atom-info-panel.visible {
+      bottom: 0;
+    }
+
+    .atom-info-title {
+      font-size: 16px;
+      font-weight: 600;
+      color: #4a9eff;
+      margin-bottom: 12px;
+    }
+
+    .atom-info-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 4px 0;
+      font-size: 13px;
+      color: rgba(255, 255, 255, 0.8);
+    }
+
+    .atom-info-label {
+      color: rgba(255, 255, 255, 0.5);
+    }
+
+    .atom-info-value {
+      font-family: 'Consolas', 'Monaco', monospace;
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <nav class="navbar">
+      <div class="app-title">🔬 3D 分子结构查看器</div>
+      <div class="navbar-right">
+        <select class="molecule-select" id="moleculeSelect">
+          <option value="water">水分子 (H₂O)</option>
+          <option value="co2">二氧化碳 (CO₂)</option>
+          <option value="benzene">苯环 (C₆H₆)</option>
+        </select>
+        <button class="reset-btn" id="resetBtn">重置视角</button>
+      </div>
+    </nav>
+
+    <div id="canvas-container"></div>
+
+    <div class="zoom-indicator" id="zoomIndicator">缩放: 1.00x</div>
+
+    <div class="atom-info-panel" id="atomInfoPanel">
+      <div class="atom-info-title" id="atomName">—</div>
+      <div class="atom-info-row">
+        <span class="atom-info-label">原子编号:</span>
+        <span class="atom-info-value" id="atomIndex">—</span>
+      </div>
+      <div class="atom-info-row">
+        <span class="atom-info-label">X 坐标:</span>
+        <span class="atom-info-value" id="atomX">—</span>
+      </div>
+      <div class="atom-info-row">
+        <span class="atom-info-label">Y 坐标:</span>
+        <span class="atom-info-value" id="atomY">—</span>
+      </div>
+      <div class="atom-info-row">
+        <span class="atom-info-label">Z 坐标:</span>
+        <span class="atom-info-value" id="atomZ">—</span>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
