@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>银河系沙盒 - Galaxy Sandbox</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif;
+      background: #0a0a2e;
+      color: #ffffff;
+      overflow: hidden;
+      min-width: 1024px;
+      max-width: 1920px;
+      margin: 0 auto;
+    }
+
+    #app-container {
+      position: relative;
+      width: 100vw;
+      height: 100vh;
+      min-width: 1024px;
+      max-width: 1920px;
+      overflow: hidden;
+    }
+
+    #canvas-container {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(135deg, #0a0a2e 0%, #050518 100%);
+    }
+
+    .glass-panel {
+      background: rgba(10, 10, 46, 0.7);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      border: 1px solid rgba(79, 195, 247, 0.3);
+      border-radius: 12px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    }
+
+    #event-log {
+      position: absolute;
+      left: 20px;
+      top: 80px;
+      width: 280px;
+      max-height: calc(100vh - 120px);
+      padding: 16px;
+      overflow-y: auto;
+      z-index: 10;
+    }
+
+    #event-log h3 {
+      color: #4fc3f7;
+      font-size: 16px;
+      margin-bottom: 12px;
+      text-shadow: 0 0 10px rgba(79, 195, 247, 0.5);
+    }
+
+    #event-list {
+      list-style: none;
+      font-size: 12px;
+    }
+
+    #event-list li {
+      padding: 8px;
+      margin-bottom: 6px;
+      border-left: 2px solid #4fc3f7;
+      background: rgba(79, 195, 247, 0.1);
+      border-radius: 0 4px 4px 0;
+      animation: slideIn 0.3s ease;
+    }
+
+    #event-list li .timestamp {
+      color: #888;
+      font-size: 10px;
+      display: block;
+      margin-bottom: 2px;
+    }
+
+    #info-panel {
+      position: absolute;
+      right: 20px;
+      top: 80px;
+      width: 260px;
+      padding: 16px;
+      z-index: 10;
+    }
+
+    #info-panel h3 {
+      color: #4fc3f7;
+      font-size: 16px;
+      margin-bottom: 12px;
+      text-shadow: 0 0 10px rgba(79, 195, 247, 0.5);
+    }
+
+    #info-panel .info-row {
+      margin-bottom: 10px;
+      font-size: 13px;
+    }
+
+    #info-panel .info-label {
+      color: #888;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    #info-panel .info-value {
+      font-family: 'Consolas', 'Monaco', monospace;
+      color: #fff;
+      font-size: 14px;
+      margin-top: 2px;
+    }
+
+    #control-panel {
+      position: absolute;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      gap: 12px;
+      z-index: 10;
+    }
+
+    .btn {
+      padding: 10px 24px;
+      border: none;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      background: #4fc3f7;
+      color: #0a0a2e;
+      box-shadow: 0 0 15px rgba(79, 195, 247, 0.4);
+    }
+
+    .btn:hover {
+      box-shadow: 0 0 25px rgba(79, 195, 247, 0.7);
+      transform: translateY(-2px);
+    }
+
+    .btn.paused {
+      background: #ff7043;
+      box-shadow: 0 0 15px rgba(255, 112, 67, 0.4);
+    }
+
+    .btn.paused:hover {
+      box-shadow: 0 0 25px rgba(255, 112, 67, 0.7);
+    }
+
+    #create-modal {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%) scale(0.9);
+      width: 400px;
+      padding: 24px;
+      z-index: 100;
+      opacity: 0;
+      visibility: hidden;
+      transition: all 0.3s ease;
+    }
+
+    #create-modal.active {
+      opacity: 1;
+      visibility: visible;
+      transform: translate(-50%, -50%) scale(1);
+    }
+
+    #create-modal h2 {
+      color: #4fc3f7;
+      margin-bottom: 20px;
+      text-align: center;
+      text-shadow: 0 0 10px rgba(79, 195, 247, 0.5);
+    }
+
+    .form-group {
+      margin-bottom: 16px;
+    }
+
+    .form-group label {
+      display: block;
+      color: #888;
+      font-size: 12px;
+      margin-bottom: 6px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .type-selector {
+      display: flex;
+      gap: 8px;
+    }
+
+    .type-btn {
+      flex: 1;
+      padding: 10px;
+      border: 2px solid rgba(79, 195, 247, 0.3);
+      background: rgba(79, 195, 247, 0.1);
+      color: #fff;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      font-size: 13px;
+    }
+
+    .type-btn.active {
+      border-color: #4fc3f7;
+      background: rgba(79, 195, 247, 0.3);
+      box-shadow: 0 0 15px rgba(79, 195, 247, 0.4);
+    }
+
+    input[type="range"] {
+      width: 100%;
+      height: 6px;
+      background: rgba(79, 195, 247, 0.2);
+      border-radius: 3px;
+      outline: none;
+      -webkit-appearance: none;
+    }
+
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 18px;
+      height: 18px;
+      background: #4fc3f7;
+      border-radius: 50%;
+      cursor: pointer;
+      box-shadow: 0 0 10px rgba(79, 195, 247, 0.6);
+    }
+
+    input[type="color"] {
+      width: 100%;
+      height: 40px;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      background: transparent;
+    }
+
+    .direction-picker {
+      position: relative;
+      width: 100%;
+      height: 120px;
+      background: rgba(79, 195, 247, 0.1);
+      border-radius: 8px;
+      border: 2px solid rgba(79, 195, 247, 0.3);
+    }
+
+    .direction-arrow {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 60px;
+      height: 2px;
+      background: #4fc3f7;
+      transform-origin: left center;
+      box-shadow: 0 0 10px rgba(79, 195, 247, 0.6);
+    }
+
+    .direction-arrow::after {
+      content: '';
+      position: absolute;
+      right: -8px;
+      top: -5px;
+      border: 6px solid transparent;
+      border-left-color: #4fc3f7;
+    }
+
+    .modal-actions {
+      display: flex;
+      gap: 12px;
+      margin-top: 20px;
+    }
+
+    .modal-actions .btn {
+      flex: 1;
+    }
+
+    .btn.cancel {
+      background: transparent;
+      color: #888;
+      border: 1px solid #888;
+      box-shadow: none;
+    }
+
+    .btn.cancel:hover {
+      color: #fff;
+      border-color: #fff;
+    }
+
+    .body-label {
+      position: absolute;
+      padding: 4px 8px;
+      background: rgba(10, 10, 46, 0.8);
+      border: 1px solid rgba(79, 195, 247, 0.5);
+      border-radius: 4px;
+      font-size: 11px;
+      color: #4fc3f7;
+      pointer-events: none;
+      z-index: 5;
+      opacity: 0;
+      transition: opacity 0.2s ease;
+      white-space: nowrap;
+    }
+
+    .body-label.visible {
+      opacity: 1;
+    }
+
+    @keyframes slideIn {
+      from {
+        opacity: 0;
+        transform: translateX(-20px);
+      }
+      to {
+        opacity: 1;
+        transform: translateX(0);
+      }
+    }
+
+    #modal-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.6);
+      z-index: 99;
+      opacity: 0;
+      visibility: hidden;
+      transition: all 0.3s ease;
+    }
+
+    #modal-overlay.active {
+      opacity: 1;
+      visibility: visible;
+    }
+
+    #fps-counter {
+      position: absolute;
+      bottom: 20px;
+      right: 20px;
+      padding: 8px 12px;
+      font-family: 'Consolas', monospace;
+      font-size: 12px;
+      color: #4fc3f7;
+      z-index: 10;
+    }
+
+    #body-count {
+      position: absolute;
+      bottom: 20px;
+      left: 20px;
+      padding: 8px 12px;
+      font-family: 'Consolas', monospace;
+      font-size: 12px;
+      color: #4fc3f7;
+      z-index: 10;
+    }
+  </style>
+</head>
+<body>
+  <div id="app-container">
+    <div id="canvas-container"></div>
+
+    <div id="control-panel">
+      <button id="btn-toggle" class="btn">启动模拟</button>
+      <button id="btn-reset" class="btn cancel">重置</button>
+    </div>
+
+    <div id="event-log" class="glass-panel">
+      <h3>事件日志</h3>
+      <ul id="event-list"></ul>
+    </div>
+
+    <div id="info-panel" class="glass-panel">
+      <h3>天体信息</h3>
+      <div class="info-row">
+        <span class="info-label">名称</span>
+        <div class="info-value" id="info-name">-</div>
+      </div>
+      <div class="info-row">
+        <span class="info-label">类型</span>
+        <div class="info-value" id="info-type">-</div>
+      </div>
+      <div class="info-row">
+        <span class="info-label">坐标 (x, y)</span>
+        <div class="info-value" id="info-pos">-</div>
+      </div>
+      <div class="info-row">
+        <span class="info-label">速度 (vx, vy)</span>
+        <div class="info-value" id="info-vel">-</div>
+      </div>
+      <div class="info-row">
+        <span class="info-label">质量</span>
+        <div class="info-value" id="info-mass">-</div>
+      </div>
+    </div>
+
+    <div id="modal-overlay"></div>
+    <div id="create-modal" class="glass-panel">
+      <h2>创建天体</h2>
+      <div class="form-group">
+        <label>天体类型</label>
+        <div class="type-selector">
+          <button class="type-btn active" data-type="star">恒星</button>
+          <button class="type-btn" data-type="planet">行星</button>
+          <button class="type-btn" data-type="blackhole">黑洞</button>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>质量: <span id="mass-value">100</span></label>
+        <input type="range" id="mass-slider" min="1" max="1000" value="100">
+      </div>
+      <div class="form-group">
+        <label>速率: <span id="speed-value">50</span></label>
+        <input type="range" id="speed-slider" min="0" max="200" value="50">
+      </div>
+      <div class="form-group">
+        <label>速度方向</label>
+        <div class="direction-picker" id="direction-picker">
+          <div class="direction-arrow" id="direction-arrow"></div>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>颜色</label>
+        <input type="color" id="color-picker" value="#ffcc00">
+      </div>
+      <div class="modal-actions">
+        <button class="btn cancel" id="btn-cancel">取消</button>
+        <button class="btn" id="btn-confirm">确认创建</button>
+      </div>
+    </div>
+
+    <div id="fps-counter" class="glass-panel">FPS: 60</div>
+    <div id="body-count" class="glass-panel">天体数: 0 / 500</div>
+  </div>
+
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
