@@ -1,0 +1,22 @@
+{
+  "name": "city-heatmap-3d",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "three": "^0.160.0",
+    "axios": "^1.6.2",
+    "lil-gui": "^0.19.1",
+    "@tweenjs/tween.js": "^21.0.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.3",
+    "vite": "^5.0.10",
+    "@types/three": "^0.160.0"
+  }
+}

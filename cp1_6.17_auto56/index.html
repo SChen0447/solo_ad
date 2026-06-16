@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>智慧城市3D热力图分析系统</title>
+  <link rel="stylesheet" href="src/style.css" />
+</head>
+<body>
+  <div id="app">
+    <div id="scene-container"></div>
+    
+    <div id="legend-bar">
+      <div class="legend-title">热力值</div>
+      <div class="legend-gradient"></div>
+      <div class="legend-labels">
+        <span>0</span>
+        <span>50</span>
+        <span>100</span>
+      </div>
+    </div>
+
+    <div id="info-popup" class="hidden">
+      <div class="popup-header">建筑详情</div>
+      <div class="popup-content">
+        <div class="info-row"><span class="label">建筑ID:</span><span class="value" id="building-id">-</span></div>
+        <div class="info-row"><span class="label">高度:</span><span class="value" id="building-height">-</span></div>
+        <div class="info-row energy-row"><span class="label">能耗:</span><span class="value" id="building-energy">-</span></div>
+        <div class="info-row traffic-row"><span class="label">交通:</span><span class="value" id="building-traffic">-</span></div>
+        <div class="info-row green-row"><span class="label">绿化:</span><span class="value" id="building-green">-</span></div>
+      </div>
+    </div>
+
+    <div id="panel-toggle" class="panel-toggle-hidden">
+      <button id="toggle-btn">☰</button>
+    </div>
+
+    <div id="control-panel">
+      <div class="panel-header">
+        <h2>控制面板</h2>
+        <button id="close-panel" class="close-btn">×</button>
+      </div>
+
+      <div class="card">
+        <div class="card-header">图层控制</div>
+        <div class="card-content">
+          <div class="layer-item">
+            <div class="layer-header">
+              <label class="switch">
+                <input type="checkbox" id="layer-energy" checked />
+                <span class="slider"></span>
+              </label>
+              <span class="layer-label">能耗热力图</span>
+            </div>
+            <div class="slider-container">
+              <label>透明度</label>
+              <input type="range" id="opacity-energy" min="0.1" max="1" step="0.05" value="0.7" class="opacity-slider" />
+              <span class="slider-value" id="opacity-energy-value">0.7</span>
+            </div>
+            <div class="slider-container">
+              <label>影响半径</label>
+              <input type="range" id="radius-energy" min="10" max="100" step="5" value="40" class="radius-slider" />
+              <span class="slider-value" id="radius-energy-value">40</span>
+            </div>
+          </div>
+
+          <div class="layer-item">
+            <div class="layer-header">
+              <label class="switch">
+                <input type="checkbox" id="layer-traffic" checked />
+                <span class="slider"></span>
+              </label>
+              <span class="layer-label">交通流量</span>
+            </div>
+            <div class="slider-container">
+              <label>透明度</label>
+              <input type="range" id="opacity-traffic" min="0.1" max="1" step="0.05" value="0.7" class="opacity-slider" />
+              <span class="slider-value" id="opacity-traffic-value">0.7</span>
+            </div>
+            <div class="slider-container">
+              <label>影响半径</label>
+              <input type="range" id="radius-traffic" min="10" max="100" step="5" value="40" class="radius-slider" />
+              <span class="slider-value" id="radius-traffic-value">40</span>
+            </div>
+          </div>
+
+          <div class="layer-item">
+            <div class="layer-header">
+              <label class="switch">
+                <input type="checkbox" id="layer-green" checked />
+                <span class="slider"></span>
+              </label>
+              <span class="layer-label">绿化覆盖</span>
+            </div>
+            <div class="slider-container">
+              <label>透明度</label>
+              <input type="range" id="opacity-green" min="0.1" max="1" step="0.05" value="0.7" class="opacity-slider" />
+              <span class="slider-value" id="opacity-green-value">0.7</span>
+            </div>
+            <div class="slider-container">
+              <label>影响半径</label>
+              <input type="range" id="radius-green" min="10" max="100" step="5" value="40" class="radius-slider" />
+              <span class="slider-value" id="radius-green-value">40</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">视角预设</div>
+        <div class="card-content">
+          <div class="button-group">
+            <button class="view-btn" data-view="top">俯视图</button>
+            <button class="view-btn" data-view="front">正视图</button>
+            <button class="view-btn" data-view="side">侧视图</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">性能信息</div>
+        <div class="card-content">
+          <div class="info-row"><span class="label">FPS:</span><span class="value" id="fps-counter">-</span></div>
+          <div class="info-row"><span class="label">建筑数量:</span><span class="value" id="building-count">-</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
