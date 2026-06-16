@@ -1,0 +1,96 @@
+.leaderboard {
+  @include glass-effect;
+  margin: 12px;
+  padding: 12px;
+  max-height: 320px;
+  overflow-y: auto;
+
+  @media (max-width: $breakpoint-desktop) {
+    font-size: 13px;
+    margin: 8px;
+    padding: 8px;
+  }
+}
+
+.leaderboard-header {
+  display: grid;
+  grid-template-columns: 60px 1fr 80px 100px;
+  padding: 8px 12px;
+  font-size: 13px;
+  color: $text-secondary;
+  border-bottom: 1px solid $glass-border;
+  margin-bottom: 4px;
+
+  @media (max-width: $breakpoint-desktop) {
+    grid-template-columns: 50px 1fr 60px 80px;
+    font-size: 11px;
+  }
+}
+
+.leaderboard-body {
+  display: flex;
+  flex-direction: column;
+}
+
+.leaderboard-empty {
+  text-align: center;
+  padding: 24px;
+  color: $text-secondary;
+  font-size: 14px;
+}
+
+.leaderboard-row {
+  display: grid;
+  grid-template-columns: 60px 1fr 80px 100px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  transition: background-color 0.3s;
+  align-items: center;
+
+  @media (max-width: $breakpoint-desktop) {
+    grid-template-columns: 50px 1fr 60px 80px;
+    font-size: 11px;
+    padding: 6px 8px;
+  }
+
+  &.flash-up {
+    animation: flashGreen 0.6s ease;
+  }
+
+  &.flash-down {
+    animation: flashRed 0.6s ease;
+  }
+
+  &.scale-anim {
+    animation: scaleUp 0.4s ease;
+  }
+}
+
+.row-rank {
+  font-weight: 700;
+  color: $accent-gold;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.crown-icon {
+  font-size: 14px;
+}
+
+.row-nickname {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.row-count {
+  color: $text-secondary;
+  text-align: right;
+}
+
+.row-value {
+  color: $accent-gold;
+  text-align: right;
+  font-weight: 600;
+}
