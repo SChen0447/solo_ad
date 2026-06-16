@@ -1,0 +1,197 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+:root {
+  --coral-orange: #ff7f50;
+  --coral-orange-dark: #e66a3d;
+  --cream-white: #fffaf0;
+  --deep-gray: #333333;
+  --light-gray: #f7f7f7;
+  --medium-gray: #e0e0e0;
+  --text-secondary: #666666;
+  --success-green: #52c41a;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC',
+    'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+  background-color: var(--cream-white);
+  color: var(--deep-gray);
+  line-height: 1.6;
+}
+
+button {
+  cursor: pointer;
+  border: none;
+  outline: none;
+  font-family: inherit;
+}
+
+input,
+select,
+textarea {
+  font-family: inherit;
+  outline: none;
+}
+
+.coral-gradient-btn {
+  background: linear-gradient(135deg, var(--coral-orange) 0%, var(--coral-orange-dark) 100%);
+  color: white;
+  border-radius: 8px;
+  padding: 10px 24px;
+  font-size: 14px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 8px rgba(255, 127, 80, 0.3);
+}
+
+.coral-gradient-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 16px rgba(255, 127, 80, 0.4);
+}
+
+.coral-gradient-btn:active {
+  transform: translateY(0);
+}
+
+@keyframes borderFlash {
+  0% { box-shadow: 0 0 0 0 rgba(255, 127, 80, 0.7); }
+  50% { box-shadow: 0 0 0 8px rgba(255, 127, 80, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(255, 127, 80, 0); }
+}
+
+.border-flash {
+  animation: borderFlash 0.5s ease-out;
+}
+
+@keyframes spinScale {
+  0% { transform: rotate(0deg) scale(1); }
+  50% { transform: rotate(180deg) scale(1.3); }
+  100% { transform: rotate(360deg) scale(1); }
+}
+
+.checkbox-animate {
+  animation: spinScale 0.4s ease-out;
+}
+
+@keyframes strikeThrough {
+  from { text-decoration-color: transparent; }
+  to { text-decoration-color: var(--text-secondary); }
+}
+
+.strikethrough {
+  text-decoration: line-through;
+  text-decoration-thickness: 2px;
+  animation: strikeThrough 0.3s ease-out forwards;
+  opacity: 0.6;
+}
+
+@keyframes pageFlip {
+  0% { transform: perspective(600px) rotateY(0deg); }
+  50% { transform: perspective(600px) rotateY(-10deg) scale(0.95); }
+  100% { transform: perspective(600px) rotateY(0deg); }
+}
+
+.page-flip {
+  animation: pageFlip 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.fade-in {
+  animation: fadeIn 0.3s ease-out;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--light-gray);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--coral-orange);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--coral-orange-dark);
+}
+
+.recipe-card-hover {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.recipe-card-hover:hover {
+  transform: translateY(-6px);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.12);
+}
+.recipe-card-hover:hover .card-image {
+  transform: scale(1.05);
+}
+.card-image {
+  transition: transform 0.4s ease;
+}
+
+.dragging-ghost {
+  opacity: 0.5 !important;
+  background: rgba(255, 127, 80, 0.1) !important;
+  transform: rotate(3deg);
+}
+
+.drop-indicator {
+  outline: 2px dashed var(--coral-orange) !important;
+  outline-offset: 2px;
+}
+
+.confetti-dot {
+  position: absolute;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  pointer-events: none;
+  animation: confettiBurst 0.5s ease-out forwards;
+}
+
+@keyframes confettiBurst {
+  0% {
+    opacity: 1;
+    transform: translate(0, 0) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(var(--tx), var(--ty)) scale(0.2);
+  }
+}
+
+.meal-cell {
+  transition: all 0.2s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+}
+.meal-cell:hover {
+  transform: scale(1.02);
+  box-shadow: 0 4px 16px rgba(255, 127, 80, 0.15);
+}
+.meal-cell.has-recipe {
+  cursor: grab;
+}
+.meal-cell.has-recipe:active {
+  cursor: grabbing;
+}
+
+@media (max-width: 1200px) {
+  .masonry-grid { column-count: 3 !important; }
+}
+@media (max-width: 900px) {
+  .masonry-grid { column-count: 2 !important; }
+}
+@media (max-width: 600px) {
+  .masonry-grid { column-count: 1 !important; }
+}
