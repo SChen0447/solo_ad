@@ -1,0 +1,94 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background: #0B0C10;
+  color: #fff;
+  overflow: hidden;
+}
+
+#root {
+  width: 100%;
+  height: 100vh;
+}
+
+.app {
+  width: 100%;
+  height: 100vh;
+}
+
+.card:hover {
+  transform: translateY(-5px);
+}
+
+.card-disabled {
+  opacity: 0.5;
+  cursor: not-allowed !important;
+}
+
+.card-selected {
+  z-index: 100;
+}
+
+.end-turn-btn:hover:not(:disabled) {
+  transform: scale(1.05);
+}
+
+.end-turn-btn:active:not(:disabled) {
+  transform: scale(0.95);
+}
+
+.player-info.targetable:hover {
+  transform: scale(1.02);
+  box-shadow: 0 0 30px rgba(255, 215, 0, 0.6);
+}
+
+.healing-particles {
+  pointer-events: none;
+}
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-5px) translateY(-2px); }
+  75% { transform: translateX(5px) translateY(2px); }
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
+@keyframes floatUp {
+  0% {
+    opacity: 0;
+    transform: translateY(0) scale(0.5);
+  }
+  20% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-60px) scale(1);
+  }
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@media (max-width: 1280px) {
+  .hand-area {
+    gap: 8px !important;
+  }
+  
+  .hand-area .card {
+    transform: scale(0.8);
+  }
+}
