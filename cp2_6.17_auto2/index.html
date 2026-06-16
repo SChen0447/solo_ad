@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Global Wind Explorer</title>
+  <link rel="stylesheet" href="/src/styles.css" />
+</head>
+<body>
+  <div id="app">
+    <canvas id="canvas"></canvas>
+
+    <div class="title">Global Wind Explorer</div>
+
+    <div class="month-buttons">
+      <button class="month-btn active" data-month="january">January</button>
+      <button class="month-btn" data-month="july">July</button>
+    </div>
+
+    <div class="speed-control">
+      <span class="speed-label">Speed</span>
+      <input type="range" id="speedSlider" min="0.1" max="5" step="0.1" value="1" />
+      <span class="speed-value" id="speedValue">1.0x</span>
+    </div>
+
+    <div class="info-card" id="infoCard" style="display: none;">
+      <div class="info-card-title">Wind Analysis</div>
+      <div class="info-row">
+        <span class="info-label">Latitude:</span>
+        <span class="info-value" id="infoLat">--</span>
+      </div>
+      <div class="info-row">
+        <span class="info-label">Longitude:</span>
+        <span class="info-value" id="infoLon">--</span>
+      </div>
+      <div class="info-row">
+        <span class="info-label">Avg Speed:</span>
+        <span class="info-value" id="infoSpeed">-- m/s</span>
+      </div>
+      <div class="info-row">
+        <span class="info-label">Dominant Dir:</span>
+        <span class="info-value" id="infoDir">--</span>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>

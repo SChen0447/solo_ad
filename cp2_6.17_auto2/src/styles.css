@@ -1,0 +1,247 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  overflow: hidden;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: radial-gradient(ellipse at center, #0a0a2e 0%, #1a1a3e 100%);
+  color: #ffffff;
+}
+
+#app {
+  width: 100vw;
+  height: 100vh;
+  position: relative;
+}
+
+#canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.title {
+  position: fixed;
+  top: 24px;
+  left: 24px;
+  font-size: 36px;
+  font-weight: 600;
+  color: #ffffff;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+  z-index: 100;
+  pointer-events: none;
+  letter-spacing: -0.5px;
+}
+
+.month-buttons {
+  position: fixed;
+  top: 24px;
+  right: 24px;
+  display: flex;
+  gap: 8px;
+  z-index: 100;
+}
+
+.month-btn {
+  width: 80px;
+  height: 36px;
+  border: 1px solid rgba(255, 255, 255, 0.33);
+  border-radius: 18px;
+  background: transparent;
+  color: #ffffff;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-family: inherit;
+}
+
+.month-btn:hover {
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.month-btn.active {
+  background: rgba(255, 255, 255, 0.13);
+  border-color: rgba(255, 255, 255, 0.67);
+}
+
+.speed-control {
+  position: fixed;
+  bottom: 32px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  z-index: 100;
+  background: rgba(10, 10, 46, 0.6);
+  padding: 12px 20px;
+  border-radius: 24px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(10px);
+}
+
+.speed-label {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.7);
+  white-space: nowrap;
+}
+
+#speedSlider {
+  width: 300px;
+  height: 6px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.13);
+  outline: none;
+  -webkit-appearance: none;
+  appearance: none;
+  cursor: pointer;
+}
+
+#speedSlider::-webkit-slider-runnable-track {
+  height: 6px;
+  border-radius: 3px;
+  background: linear-gradient(to right, #00bfff, #ff4500);
+}
+
+#speedSlider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #ffffff;
+  cursor: pointer;
+  margin-top: -5px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+  transition: transform 0.15s ease;
+}
+
+#speedSlider::-webkit-slider-thumb:hover {
+  transform: scale(1.1);
+}
+
+#speedSlider::-moz-range-track {
+  height: 6px;
+  border-radius: 3px;
+  background: linear-gradient(to right, #00bfff, #ff4500);
+}
+
+#speedSlider::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #ffffff;
+  cursor: pointer;
+  border: none;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+}
+
+.speed-value {
+  font-size: 14px;
+  font-weight: 500;
+  color: #ffffff;
+  min-width: 48px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.info-card {
+  position: fixed;
+  top: 80px;
+  right: 24px;
+  width: 240px;
+  background: rgba(10, 10, 46, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  padding: 16px;
+  color: #ffffff;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.6);
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  backdrop-filter: blur(10px);
+  opacity: 0;
+  transform: translateY(10px);
+  transition: opacity 0.2s ease, transform 0.2s ease;
+  pointer-events: none;
+}
+
+.info-card.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.info-card-title {
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 4px;
+  color: #00bfff;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+
+.info-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 13px;
+}
+
+.info-label {
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.info-value {
+  font-weight: 500;
+  color: #ffffff;
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 768px) {
+  .title {
+    font-size: 24px;
+    top: 16px;
+    left: 16px;
+  }
+
+  .month-buttons {
+    top: auto;
+    bottom: 100px;
+    right: 50%;
+    transform: translateX(50%);
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .month-btn {
+    width: 100px;
+    height: 32px;
+    font-size: 13px;
+  }
+
+  .speed-control {
+    bottom: 20px;
+    width: calc(100% - 32px);
+    max-width: 300px;
+  }
+
+  #speedSlider {
+    width: 200px;
+    flex: 1;
+  }
+
+  .info-card {
+    top: auto;
+    bottom: 180px;
+    right: 16px;
+    left: 16px;
+    width: auto;
+    max-width: 280px;
+  }
+}
