@@ -1,6 +1,6 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react'
 import * as THREE from 'three'
-import { SonarPingSystem, type EchoRing, type PointCloudPoint } from './SonarPing'
+import { SonarPingSystem, type EchoRing, type PointCloudPoint, type HitParticle, type HitKind } from './SonarPing'
 import { TargetMarkerApi, type TargetMarkerData, type TargetType, TARGET_COLORS } from '../dashboard/TargetMarker'
 import { sonarApi } from '../../services/sonarApi'
 
@@ -11,6 +11,8 @@ interface SonarSceneProps {
   onTargetAdded: (target: TargetMarkerData) => void
   selectedTarget: TargetMarkerData | null
   onTargetFocusComplete: () => void
+  highlightTargetId: string | null
+  onHighlightComplete: () => void
 }
 
 const TERRAIN_SIZE = 100
@@ -49,6 +51,8 @@ const SonarScene: React.FC<SonarSceneProps> = ({
   onTargetAdded,
   selectedTarget,
   onTargetFocusComplete,
+  highlightTargetId,
+  onHighlightComplete,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null)
   const sceneRef = useRef<THREE.Scene | null>(null)
@@ -62,6 +66,8 @@ const SonarScene: React.FC<SonarSceneProps> = ({
   const echoRingsRef = useRef<EchoRing[]>([])
   const targetsGroupRef = useRef<THREE.Group | null>(null)
   const targetMarkersRef = useRef<Map<string, THREE.Group>>(new Map())
+  const hitParticlesRef = useRef<HitParticle[]>([])
+  const targetMarkerMaterialsRef = useRef<Map<string, { original: THREE.MeshStandardMaterial; glow: THREE.MeshBasicMaterial; baseScale: THREE.Vector3 }>>(new Map())
 
   const cameraAngleRef = useRef({ theta: Math.PI / 4, phi: Math.PI / 3, radius: 25 })
   const cameraVelocityRef = useRef({ theta: 0, phi: 0 })
@@ -74,6 +80,8 @@ const SonarScene: React.FC<SonarSceneProps> = ({
   const lastMouseRef = useRef({ x: 0, y: 0 })
   const clockRef = useRef(new THREE.Clock())
   const focusAnimationRef = useRef<{ active: boolean; startTime: number; duration: number; startPos: THREE.Vector3; startAngle: { theta: number; phi: number; radius: number }; endPos: THREE.Vector3; endAngle: { theta: number; phi: number; radius: number } } | null>(null)
+  const waterPulseRef = useRef<{ active: boolean; startTime: number; duration: number } | null>(null)
+  const blinkAnimationRef = useRef<{ active: boolean; startTime: number; duration: number; targetId: string } | null>(null)
 
   const [showMarkerDialog, setShowMarkerDialog] = useState(false)
   const [markerPosition, setMarkerPosition] = useState<{ x: number; y: number; z: number } | null>(null)
@@ -284,10 +292,13 @@ const SonarScene: React.FC<SonarSceneProps> = ({
       updateShip(delta)
       updateCamera(delta, elapsed)
       updateWater(elapsed)
+      updateWaterOpacity(elapsed)
       updateSonar(delta, elapsed)
       updateEchoRings(elapsed)
       updateScanCone(elapsed)
       updateFocusAnimation(elapsed)
+      updateHitParticles(elapsed)
+      updateBlinkAnimation(elapsed)
 
       if (rendererRef.current && sceneRef.current && cameraRef.current) {
         rendererRef.current.render(sceneRef.current, cameraRef.current)
@@ -345,6 +356,17 @@ const SonarScene: React.FC<SonarSceneProps> = ({
       }
     }
   }, [selectedTarget])
+
+  useEffect(() => {
+    if (highlightTargetId && targetMarkersRef.current.has(highlightTargetId)) {
+      blinkAnimationRef.current = {
+        active: true,
+        startTime: clockRef.current.elapsedTime,
+        duration: 3.0,
+        targetId: highlightTargetId,
+      }
+    }
+  }, [highlightTargetId])
 
   const loadTargets = async () => {
     try {
@@ -438,6 +460,12 @@ const SonarScene: React.FC<SonarSceneProps> = ({
     glow.position.y = 0.5
     group.add(glow)
 
+    targetMarkerMaterialsRef.current.set(target.id, {
+      original: mainMaterial,
+      glow: glowMaterial,
+      baseScale: group.scale.clone(),
+    })
+
     return group
   }
 
@@ -523,7 +551,18 @@ const SonarScene: React.FC<SonarSceneProps> = ({
   const updateSonar = async (delta: number, elapsed: number) => {
     if (!shipRef.current || !cameraRef.current) return
 
+    const prevLastPing = sonarSystemRef.current.getLastPingTime()
     sonarSystemRef.current.update(delta)
+    const newLastPing = sonarSystemRef.current.getLastPingTime()
+
+    if (newLastPing !== prevLastPing) {
+      waterPulseRef.current = {
+        active: true,
+        startTime: elapsed,
+        duration: 0.6,
+      }
+    }
+
     const now = Date.now()
 
     if (now - lastSonarFetchRef.current >= 1000) {
@@ -543,12 +582,38 @@ const SonarScene: React.FC<SonarSceneProps> = ({
         )
         rebuildPointCloud()
 
-        for (const point of response.points.slice(0, 3)) {
+        for (let idx = 0; idx < Math.min(response.points.length, 5); idx++) {
+          const point = response.points[idx]
           const pos = new THREE.Vector3(point.x, point.y, point.z)
+
           const ring = sonarSystemRef.current.createEchoRing(pos, elapsed)
           echoRingsRef.current.push(ring)
           if (sceneRef.current) {
             sceneRef.current.add(ring.mesh)
+          }
+
+          let hitKind: HitKind = 'terrain'
+          const nearbyTarget = targets.find(t => {
+            const dx = t.x - point.x
+            const dy = t.y - point.y
+            const dz = t.z - point.z
+            return Math.sqrt(dx * dx + dy * dy + dz * dz) < 2.0
+          })
+          if (nearbyTarget) {
+            hitKind = nearbyTarget.type
+          }
+
+          const burst = sonarSystemRef.current.createHitBurst(
+            pos,
+            elapsed,
+            hitKind,
+            hitKind === 'terrain' ? 8 : 14
+          )
+          for (const particle of burst) {
+            hitParticlesRef.current.push(particle)
+            if (sceneRef.current) {
+              sceneRef.current.add(particle.mesh)
+            }
           }
         }
       } catch (e) {
@@ -622,6 +687,80 @@ const SonarScene: React.FC<SonarSceneProps> = ({
     }
 
     updateCameraPosition()
+  }
+
+  const updateWaterOpacity = (elapsed: number) => {
+    if (!waterMeshRef.current) return
+    const baseOpacity = 0.4
+
+    if (waterPulseRef.current?.active) {
+      const pulse = waterPulseRef.current
+      const t = (elapsed - pulse.startTime) / pulse.duration
+      if (t >= 1) {
+        waterPulseRef.current.active = false
+        ;(waterMeshRef.current.material as THREE.MeshStandardMaterial).opacity = baseOpacity
+      } else {
+        const pulseCurve = Math.exp(-t * 6)
+        const opacity = baseOpacity - pulseCurve * 0.2
+        ;(waterMeshRef.current.material as THREE.MeshStandardMaterial).opacity = Math.max(0.2, opacity)
+      }
+    } else {
+      ;(waterMeshRef.current.material as THREE.MeshStandardMaterial).opacity = baseOpacity
+    }
+  }
+
+  const updateHitParticles = (elapsed: number) => {
+    const particles = hitParticlesRef.current
+    for (let i = particles.length - 1; i >= 0; i--) {
+      const alive = sonarSystemRef.current.updateHitParticle(particles[i], elapsed)
+      if (!alive && sceneRef.current) {
+        sceneRef.current.remove(particles[i].mesh)
+        particles[i].mesh.geometry.dispose()
+        ;(particles[i].mesh.material as THREE.Material).dispose()
+        particles.splice(i, 1)
+      }
+    }
+  }
+
+  const updateBlinkAnimation = (elapsed: number) => {
+    const anim = blinkAnimationRef.current
+    if (!anim?.active) return
+
+    const t = (elapsed - anim.startTime) / anim.duration
+    if (t >= 1) {
+      anim.active = false
+      const materialInfo = targetMarkerMaterialsRef.current.get(anim.targetId)
+      const markerGroup = targetMarkersRef.current.get(anim.targetId)
+      if (materialInfo) {
+        materialInfo.original.emissiveIntensity = 0.15
+        materialInfo.glow.opacity = 0.15
+      }
+      if (markerGroup && materialInfo) {
+        markerGroup.scale.copy(materialInfo.baseScale)
+      }
+      onHighlightComplete()
+      return
+    }
+
+    const materialInfo = targetMarkerMaterialsRef.current.get(anim.targetId)
+    const markerGroup = targetMarkersRef.current.get(anim.targetId)
+    if (!materialInfo || !markerGroup) return
+
+    const blinkCount = 3
+    const blinkProgress = (t * blinkCount) % 1
+    const isVisible = blinkProgress < 0.5
+    const blinkPulse = Math.sin(blinkProgress * Math.PI * 2) * 0.5 + 0.5
+
+    if (isVisible) {
+      materialInfo.original.emissiveIntensity = 0.15 + blinkPulse * 0.85
+      materialInfo.glow.opacity = 0.15 + blinkPulse * 0.55
+      const scale = materialInfo.baseScale.x * (1 + blinkPulse * 0.25)
+      markerGroup.scale.setScalar(scale)
+    } else {
+      materialInfo.original.emissiveIntensity = 0.02
+      materialInfo.glow.opacity = 0.02
+      markerGroup.scale.copy(materialInfo.baseScale)
+    }
   }
 
   const handleMarkerConfirm = useCallback(async () => {

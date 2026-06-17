@@ -1,5 +1,6 @@
 import * as THREE from 'three'
 import type { SonarPoint } from '../../services/sonarApi'
+import type { TargetType } from '../dashboard/TargetMarker'
 
 export interface EchoRing {
   position: THREE.Vector3
@@ -15,6 +16,17 @@ export interface PointCloudPoint {
   createdAt: number
 }
 
+export interface HitParticle {
+  position: THREE.Vector3
+  velocity: THREE.Vector3
+  startTime: number
+  duration: number
+  mesh: THREE.Mesh
+  isTargetHit: boolean
+}
+
+export type HitKind = 'terrain' | TargetType
+
 export class SonarPingSystem {
   private scanAngle: number = 0
   private scanSpeed: number = 60
@@ -22,9 +34,23 @@ export class SonarPingSystem {
   private pingInterval: number = 3000
   private maxPoints: number = 1500
   private cameraDistance: number = 25
+  private lastPingTriggerTime: number = -1
+  private waterPulseTime: number = -1
 
   public getScanAngle(): number {
     return this.scanAngle
+  }
+
+  public getLastPingTime(): number {
+    return this.lastPingTime
+  }
+
+  public shouldTriggerWaterPulse(currentElapsed: number): boolean {
+    if (this.lastPingTime !== this.waterPulseTime) {
+      this.waterPulseTime = this.lastPingTime
+      return true
+    }
+    return false
   }
 
   public update(deltaTime: number): void {
@@ -140,5 +166,86 @@ export class SonarPingSystem {
     }
 
     return newPoints
+  }
+
+  private getHitColor(kind: HitKind): THREE.Color {
+    if (kind === 'terrain') {
+      return new THREE.Color(0x87cefa)
+    }
+    switch (kind) {
+      case 'shipwreck':
+        return new THREE.Color(0xff6347)
+      case 'coral':
+        return new THREE.Color(0xffa07a)
+      case 'unidentified':
+        return new THREE.Color(0xff8c00)
+      default:
+        return new THREE.Color(0xff6347)
+    }
+  }
+
+  public createHitBurst(
+    position: THREE.Vector3,
+    currentTime: number,
+    kind: HitKind = 'terrain',
+    particleCount: number = 12
+  ): HitParticle[] {
+    const particles: HitParticle[] = []
+    const baseColor = this.getHitColor(kind)
+    const isTargetHit = kind !== 'terrain'
+
+    for (let i = 0; i < particleCount; i++) {
+      const theta = Math.random() * Math.PI * 2
+      const phi = Math.random() * Math.PI * 0.5
+      const speed = 1.5 + Math.random() * 2.0
+      const velocity = new THREE.Vector3(
+        Math.sin(phi) * Math.cos(theta) * speed,
+        Math.cos(phi) * speed * 0.8,
+        Math.sin(phi) * Math.sin(theta) * speed
+      )
+
+      const size = 0.08 + Math.random() * 0.12
+      const geometry = new THREE.SphereGeometry(size, 8, 8)
+      const colorVariation = new THREE.Color(baseColor)
+      colorVariation.offsetHSL((Math.random() - 0.5) * 0.05, 0, (Math.random() - 0.5) * 0.1)
+      const material = new THREE.MeshBasicMaterial({
+        color: colorVariation,
+        transparent: true,
+        opacity: 1.0,
+      })
+      const mesh = new THREE.Mesh(geometry, material)
+      mesh.position.copy(position)
+
+      particles.push({
+        position: position.clone(),
+        velocity,
+        startTime: currentTime,
+        duration: 1.5,
+        mesh,
+        isTargetHit,
+      })
+    }
+
+    return particles
+  }
+
+  public updateHitParticle(particle: HitParticle, currentTime: number): boolean {
+    const elapsed = currentTime - particle.startTime
+    if (elapsed >= particle.duration) {
+      return false
+    }
+
+    const t = elapsed / particle.duration
+    particle.velocity.y -= 3.0 * 0.016
+    particle.position.add(particle.velocity.clone().multiplyScalar(0.016))
+    particle.mesh.position.copy(particle.position)
+
+    const opacity = Math.max(0, 1 - t * 1.2)
+    ;(particle.mesh.material as THREE.MeshBasicMaterial).opacity = opacity
+
+    const scale = Math.max(0.3, 1 - t * 0.6)
+    particle.mesh.scale.setScalar(scale)
+
+    return true
   }
 }

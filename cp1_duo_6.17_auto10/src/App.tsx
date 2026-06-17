@@ -9,6 +9,7 @@ export interface AppState {
   targets: TargetMarkerData[]
   shipPosition: { x: number; z: number }
   selectedTarget: TargetMarkerData | null
+  highlightTargetId: string | null
 }
 
 export default function App() {
@@ -18,6 +19,7 @@ export default function App() {
     targets: [],
     shipPosition: { x: 0, z: 0 },
     selectedTarget: null,
+    highlightTargetId: null,
   })
 
   const updateSonarData = useCallback((depth: number, temp: number) => {
@@ -63,6 +65,20 @@ export default function App() {
     }))
   }, [])
 
+  const highlightTarget = useCallback((targetId: string) => {
+    setAppState(prev => ({
+      ...prev,
+      highlightTargetId: targetId,
+    }))
+  }, [])
+
+  const clearHighlightTarget = useCallback(() => {
+    setAppState(prev => ({
+      ...prev,
+      highlightTargetId: null,
+    }))
+  }, [])
+
   return (
     <div style={{ width: '100%', height: '100%', position: 'relative' }}>
       <SonarScene
@@ -72,6 +88,8 @@ export default function App() {
         onTargetAdded={addTarget}
         selectedTarget={appState.selectedTarget}
         onTargetFocusComplete={clearSelectedTarget}
+        highlightTargetId={appState.highlightTargetId}
+        onHighlightComplete={clearHighlightTarget}
       />
       <SidePanel
         currentDepth={appState.currentDepth}
@@ -79,6 +97,7 @@ export default function App() {
         targets={appState.targets}
         shipPosition={appState.shipPosition}
         onTargetClick={focusTarget}
+        onHighlightClick={highlightTarget}
       />
     </div>
   )

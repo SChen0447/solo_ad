@@ -9,6 +9,7 @@ interface SidePanelProps {
   targets: TargetMarkerData[]
   shipPosition: { x: number; z: number }
   onTargetClick: (target: TargetMarkerData) => void
+  onHighlightClick: (targetId: string) => void
 }
 
 const SidePanel: React.FC<SidePanelProps> = ({
@@ -17,6 +18,7 @@ const SidePanel: React.FC<SidePanelProps> = ({
   targets,
   shipPosition,
   onTargetClick,
+  onHighlightClick,
 }) => {
   const sortedTargets = useMemo(() => {
     return [...targets].sort((a, b) => b.createdAt - a.createdAt)
@@ -210,8 +212,10 @@ const SidePanel: React.FC<SidePanelProps> = ({
               return (
                 <div
                   key={target.id}
-                  style={targetItemStyle}
-                  onClick={() => onTargetClick(target)}
+                  style={{
+                    ...targetItemStyle,
+                    padding: '10px 12px 10px 12px',
+                  }}
                   onMouseEnter={e => {
                     e.currentTarget.style.backgroundColor = 'rgba(0, 191, 255, 0.15)'
                     e.currentTarget.style.borderColor = 'rgba(0, 191, 255, 0.4)'
@@ -223,8 +227,60 @@ const SidePanel: React.FC<SidePanelProps> = ({
                     e.currentTarget.style.transform = 'translateX(0)'
                   }}
                 >
-                  <div style={targetNameStyle}>{target.name}</div>
-                  <div style={targetMetaStyle}>
+                  <div
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      marginBottom: '3px',
+                    }}
+                  >
+                    <div
+                      onClick={() => onTargetClick(target)}
+                      style={{ ...targetNameStyle, cursor: 'pointer', flex: 1 }}
+                    >
+                      {target.name}
+                    </div>
+                    <button
+                      onClick={e => {
+                        e.stopPropagation()
+                        onHighlightClick(target.id)
+                      }}
+                      title="在场景中高亮此目标"
+                      style={{
+                        padding: '3px 8px',
+                        borderRadius: '6px',
+                        border: '1px solid rgba(255, 193, 7, 0.4)',
+                        backgroundColor: 'rgba(255, 193, 7, 0.15)',
+                        color: '#FFD700',
+                        fontFamily: "'JetBrains Mono', monospace",
+                        fontSize: '10px',
+                        cursor: 'pointer',
+                        transition: 'all 0.3s ease-in-out',
+                        marginLeft: '8px',
+                      }}
+                      onMouseEnter={e => {
+                        e.currentTarget.style.backgroundColor = 'rgba(255, 193, 7, 0.35)'
+                        e.currentTarget.style.borderColor = 'rgba(255, 193, 7, 0.7)'
+                      }}
+                      onMouseLeave={e => {
+                        e.currentTarget.style.backgroundColor = 'rgba(255, 193, 7, 0.15)'
+                        e.currentTarget.style.borderColor = 'rgba(255, 193, 7, 0.4)'
+                      }}
+                      onMouseDown={e => {
+                        e.currentTarget.style.transform = 'scale(0.95)'
+                      }}
+                      onMouseUp={e => {
+                        e.currentTarget.style.transform = 'scale(1)'
+                      }}
+                    >
+                      ✦ 高亮
+                    </button>
+                  </div>
+                  <div
+                    onClick={() => onTargetClick(target)}
+                    style={{ ...targetMetaStyle, cursor: 'pointer' }}
+                  >
                     <span>{TARGET_LABELS[target.type]}</span>
                     <span>距离 {distance.toFixed(1)}m</span>
                   </div>
