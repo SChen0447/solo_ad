@@ -1,18 +1,72 @@
 import * as THREE from 'three';
 import type { ScalarDataset } from '../types';
-import { valueToColor, TEMPERATURE_COLORMAP, gridToWorld, clamp } from '../utils/interpolation';
+import { valueToColor, TEMPERATURE_COLORMAP, gridToWorld, clamp, getGridIndex } from '../utils/interpolation';
+
+const temperatureVertexShader = `
+  varying vec3 vWorldPosition;
+  varying vec3 vLocalPosition;
+  void main() {
+    vLocalPosition = position * 0.5 + 0.5;
+    vec4 worldPosition = modelMatrix * vec4(position, 1.0);
+    vWorldPosition = worldPosition.xyz;
+    gl_Position = projectionMatrix * viewMatrix * worldPosition;
+  }
+`;
+
+const temperatureFragmentShader = `
+  precision highp float;
+  precision highp sampler3D;
+  
+  uniform sampler3D uVolume;
+  uniform float uOpacity;
+  uniform float uMinValue;
+  uniform float uMaxValue;
+  uniform vec3 uVolumeBoundsMin;
+  uniform vec3 uVolumeBoundsMax;
+  
+  varying vec3 vLocalPosition;
+  
+  vec3 colormap(float t) {
+    t = clamp(t, 0.0, 1.0);
+    vec3 c0 = vec3(0.0, 0.259, 0.616);
+    vec3 c1 = vec3(0.165, 0.478, 1.0);
+    vec3 c2 = vec3(0.498, 0.749, 1.0);
+    vec3 c3 = vec3(1.0, 0.8, 0.4);
+    vec3 c4 = vec3(1.0, 0.4, 0.2);
+    vec3 c5 = vec3(0.741, 0.0, 0.149);
+    
+    if (t < 0.2) return mix(c0, c1, t / 0.2);
+    else if (t < 0.4) return mix(c1, c2, (t - 0.2) / 0.2);
+    else if (t < 0.6) return mix(c2, c3, (t - 0.4) / 0.2);
+    else if (t < 0.8) return mix(c3, c4, (t - 0.6) / 0.2);
+    else return mix(c4, c5, (t - 0.8) / 0.2);
+  }
+  
+  void main() {
+    float value = texture(uVolume, vLocalPosition).r;
+    float normalizedValue = (value - uMinValue) / (uMaxValue - uMinValue);
+    vec3 color = colormap(normalizedValue);
+    float alpha = uOpacity * smoothstep(0.0, 0.3, normalizedValue);
+    gl_FragColor = vec4(color, alpha);
+  }
+`;
 
 export class FieldRenderer {
   private scene: THREE.Scene;
+  private camera: THREE.Camera;
   private temperatureGroup: THREE.Group;
   private pressureGroup: THREE.Group;
   private temperatureOpacity: number = 0.6;
   private pressureOpacity: number = 0.5;
   private temperatureVisible: boolean = true;
   private pressureVisible: boolean = true;
+  private temperatureData: ScalarDataset | null = null;
+  private volumeTextures: Map<string, THREE.Data3DTexture> = new Map();
+  private sliceMaterials: THREE.ShaderMaterial[] = [];
 
-  constructor(scene: THREE.Scene) {
+  constructor(scene: THREE.Scene, camera: THREE.Camera) {
     this.scene = scene;
+    this.camera = camera;
     this.temperatureGroup = new THREE.Group();
     this.pressureGroup = new THREE.Group();
     this.scene.add(this.temperatureGroup);
@@ -21,30 +75,52 @@ export class FieldRenderer {
 
   setTemperatureOpacity(opacity: number): void {
     this.temperatureOpacity = opacity;
-    this.temperatureGroup.traverse((obj) => {
-      if (obj instanceof THREE.Mesh && obj.material instanceof THREE.Material) {
-        (obj.material as THREE.MeshBasicMaterial).opacity = opacity;
-      }
-    });
+    for (const mat of this.sliceMaterials) {
+      mat.uniforms.uOpacity.value = this.temperatureVisible ? opacity : 0;
+    }
   }
 
   setPressureOpacity(opacity: number): void {
     this.pressureOpacity = opacity;
     this.pressureGroup.traverse((obj) => {
       if (obj instanceof THREE.Mesh && obj.material instanceof THREE.Material) {
-        (obj.material as THREE.MeshBasicMaterial).opacity = opacity;
+        (obj.material as THREE.MeshBasicMaterial).opacity = this.pressureVisible ? opacity : 0;
       }
     });
   }
 
   setTemperatureVisible(visible: boolean): void {
     this.temperatureVisible = visible;
-    this.animateOpacity(this.temperatureGroup, visible ? this.temperatureOpacity : 0, 500);
+    const targetOpacity = visible ? this.temperatureOpacity : 0;
+    this.animateShaderOpacity(this.sliceMaterials, targetOpacity, 500);
   }
 
   setPressureVisible(visible: boolean): void {
     this.pressureVisible = visible;
     this.animateOpacity(this.pressureGroup, visible ? this.pressureOpacity : 0, 500);
+  }
+
+  private animateShaderOpacity(
+    materials: THREE.ShaderMaterial[],
+    targetOpacity: number,
+    duration: number
+  ): void {
+    const startTime = performance.now();
+    const startOpacities = materials.map((m) => m.uniforms.uOpacity.value);
+
+    const animate = () => {
+      const elapsed = performance.now() - startTime;
+      const t = clamp(elapsed / duration, 0, 1);
+      const eased = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+
+      for (let i = 0; i < materials.length; i++) {
+        materials[i].uniforms.uOpacity.value =
+          startOpacities[i] + (targetOpacity - startOpacities[i]) * eased;
+      }
+
+      if (t < 1) requestAnimationFrame(animate);
+    };
+    animate();
   }
 
   private animateOpacity(group: THREE.Group, targetOpacity: number, duration: number): void {
@@ -69,7 +145,7 @@ export class FieldRenderer {
           const t = clamp(elapsed / duration, 0, 1);
           const eased = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
           mat.opacity = startOpacity + (targetOpacity - startOpacity) * eased;
-          mat.transparent = mat.opacity < 1;
+          mat.transparent = true;
           if (t < 1) allDone = false;
         }
       });
@@ -78,7 +154,44 @@ export class FieldRenderer {
     animate();
   }
 
+  update(): void {
+    this.sortSlicesByCamera();
+  }
+
+  private sortSlicesByCamera(): void {
+    if (!this.temperatureData) return;
+    const center = new THREE.Vector3(
+      (this.temperatureData.bounds.min[0] + this.temperatureData.bounds.max[0]) / 2,
+      (this.temperatureData.bounds.min[1] + this.temperatureData.bounds.max[1]) / 2,
+      (this.temperatureData.bounds.min[2] + this.temperatureData.bounds.max[2]) / 2
+    );
+
+    const cameraDir = new THREE.Vector3();
+    this.camera.getWorldDirection(cameraDir);
+
+    const viewDir = cameraDir.clone().negate();
+    const absX = Math.abs(viewDir.x);
+    const absY = Math.abs(viewDir.y);
+    const absZ = Math.abs(viewDir.z);
+
+    let primaryAxis: 'x' | 'y' | 'z' = 'z';
+    if (absX >= absY && absX >= absZ) primaryAxis = 'x';
+    else if (absY >= absX && absY >= absZ) primaryAxis = 'y';
+
+    const children = [...this.temperatureGroup.children];
+    children.sort((a, b) => {
+      const distA = a.position.clone().sub(center).dot(viewDir);
+      const distB = b.position.clone().sub(center).dot(viewDir);
+      return distA - distB;
+    });
+
+    for (let i = 0; i < children.length; i++) {
+      this.temperatureGroup.attach(children[i]);
+    }
+  }
+
   loadTemperature(dataset: ScalarDataset): void {
+    this.temperatureData = dataset;
     while (this.temperatureGroup.children.length > 0) {
       const child = this.temperatureGroup.children[0];
       this.temperatureGroup.remove(child);
@@ -87,36 +200,80 @@ export class FieldRenderer {
         if (child.material instanceof THREE.Material) child.material.dispose();
       }
     }
+    this.sliceMaterials = [];
 
+    const { nx, ny, nz } = dataset.gridSize;
     const minVal = Math.min(...dataset.values);
     const maxVal = Math.max(...dataset.values);
-    const { nx, ny, nz } = dataset.gridSize;
-    const step = 1;
 
-    for (let iz = 0; iz < nz; iz += step) {
-      for (let iy = 0; iy < ny; iy += step) {
-        for (let ix = 0; ix < nx; ix += step) {
-          const idx = iz * nx * ny + iy * nx + ix;
-          const val = dataset.values[idx];
-          const color = valueToColor(val, minVal, maxVal, TEMPERATURE_COLORMAP);
-          const [wx, wy, wz] = gridToWorld(ix, iy, iz, dataset.bounds, dataset.gridSize);
+    const data = new Float32Array(nx * ny * nz);
+    for (let i = 0; i < dataset.values.length; i++) {
+      data[i] = dataset.values[i];
+    }
 
-          const dx = (dataset.bounds.max[0] - dataset.bounds.min[0]) / (nx - 1) * 0.9;
-          const dy = (dataset.bounds.max[1] - dataset.bounds.min[1]) / (ny - 1) * 0.9;
-          const dz = (dataset.bounds.max[2] - dataset.bounds.min[2]) / (nz - 1) * 0.9;
+    const volumeTexture = new THREE.Data3DTexture(data, nx, ny, nz);
+    volumeTexture.format = THREE.RedFormat;
+    volumeTexture.type = THREE.FloatType;
+    volumeTexture.minFilter = THREE.LinearFilter;
+    volumeTexture.magFilter = THREE.LinearFilter;
+    volumeTexture.wrapS = THREE.ClampToEdgeWrapping;
+    volumeTexture.wrapT = THREE.ClampToEdgeWrapping;
+    volumeTexture.wrapR = THREE.ClampToEdgeWrapping;
+    volumeTexture.needsUpdate = true;
+    this.volumeTextures.set('temperature', volumeTexture);
 
-          const geometry = new THREE.BoxGeometry(dx, dy, dz);
-          const material = new THREE.MeshBasicMaterial({
-            color: new THREE.Color(color[0], color[1], color[2]),
-            transparent: true,
-            opacity: this.temperatureVisible ? this.temperatureOpacity : 0,
-            depthWrite: false
-          });
+    const width = dataset.bounds.max[0] - dataset.bounds.min[0];
+    const height = dataset.bounds.max[1] - dataset.bounds.min[1];
+    const depth = dataset.bounds.max[2] - dataset.bounds.min[2];
+    const centerX = (dataset.bounds.min[0] + dataset.bounds.max[0]) / 2;
+    const centerY = (dataset.bounds.min[1] + dataset.bounds.max[1]) / 2;
+    const centerZ = (dataset.bounds.min[2] + dataset.bounds.max[2]) / 2;
 
-          const cube = new THREE.Mesh(geometry, material);
-          cube.position.set(wx, wy, wz);
-          this.temperatureGroup.add(cube);
+    const numSlices = 32;
+
+    for (let axis of ['x', 'y', 'z'] as const) {
+      for (let i = 0; i < numSlices; i++) {
+        const t = (i / (numSlices - 1) - 0.5) * 2;
+        let geometry: THREE.PlaneGeometry;
+        let position: [number, number, number];
+        let rotation: [number, number, number];
+
+        if (axis === 'x') {
+          geometry = new THREE.PlaneGeometry(height, depth, 1, 1);
+          position = [centerX + t * width * 0.5, centerY, centerZ];
+          rotation = [0, Math.PI / 2, 0];
+        } else if (axis === 'y') {
+          geometry = new THREE.PlaneGeometry(width, depth, 1, 1);
+          position = [centerX, centerY + t * height * 0.5, centerZ];
+          rotation = [-Math.PI / 2, 0, 0];
+        } else {
+          geometry = new THREE.PlaneGeometry(width, height, 1, 1);
+          position = [centerX, centerY, centerZ + t * depth * 0.5];
+          rotation = [0, 0, 0];
         }
+
+        const material = new THREE.ShaderMaterial({
+          uniforms: {
+            uVolume: { value: volumeTexture },
+            uOpacity: { value: this.temperatureVisible ? this.temperatureOpacity : 0 },
+            uMinValue: { value: minVal },
+            uMaxValue: { value: maxVal },
+            uVolumeBoundsMin: { value: new THREE.Vector3(...dataset.bounds.min) },
+            uVolumeBoundsMax: { value: new THREE.Vector3(...dataset.bounds.max) }
+          },
+          vertexShader: temperatureVertexShader,
+          fragmentShader: temperatureFragmentShader,
+          transparent: true,
+          depthWrite: false,
+          side: THREE.DoubleSide,
+          blending: THREE.AdditiveBlending
+        });
+
+        const mesh = new THREE.Mesh(geometry, material);
+        mesh.position.set(...position);
+        mesh.rotation.set(...rotation);
+        this.temperatureGroup.add(mesh);
+        this.sliceMaterials.push(material);
       }
     }
   }
@@ -132,7 +289,6 @@ export class FieldRenderer {
     }
 
     const isovalues = dataset.isovalues ?? [0.5];
-    const { nx, ny, nz } = dataset.gridSize;
 
     for (const iso of isovalues) {
       const positions: number[] = [];
@@ -168,7 +324,7 @@ export class FieldRenderer {
     for (let iz = 0; iz < nz - 1; iz++) {
       for (let iy = 0; iy < ny - 1; iy++) {
         for (let ix = 0; ix < nx - 1; ix++) {
-          const idx000 = iz * nx * ny + iy * nx + ix;
+          const idx000 = getGridIndex(ix, iy, iz, dataset.gridSize);
           const idx100 = idx000 + 1;
           const idx010 = idx000 + nx;
           const idx110 = idx010 + 1;
