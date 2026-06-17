@@ -2,13 +2,19 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { AudioEngine, InputSource, AudioFileInfo, AudioData } from './audio-engine';
 import { VisualizationManager, ViewType, ViewConfig } from './visualizations';
 import { ControlsPanel } from './controls-panel';
-import { InfoBar } from './info-bar';
+import { InfoBar, InfoBarHandle, InfoBarData } from './info-bar';
 import './styles.css';
 
 const defaultViewConfigs: Record<ViewType, ViewConfig> = {
   waveform: { scale: 1, refreshRate: 60, colorMap: 'cyan-blue' },
   spectrum: { scale: 1, refreshRate: 60, colorMap: 'purple-red' },
   waterfall: { scale: 1, refreshRate: 60, colorMap: 'purple-red' }
+};
+
+const initialInfoBarData: InfoBarData = {
+  peakFrequency: 0,
+  peakAmplitude: 0,
+  averageLoudness: 0
 };
 
 function App() {
@@ -18,21 +24,25 @@ function App() {
   const waveformCanvasRef = useRef<HTMLCanvasElement>(null);
   const spectrumCanvasRef = useRef<HTMLCanvasElement>(null);
   const waterfallContainerRef = useRef<HTMLDivElement>(null);
+  const infoBarRef = useRef<InfoBarHandle | null>(null);
 
   const [currentSource, setCurrentSource] = useState<InputSource>('none');
   const [fileInfo, setFileInfo] = useState<AudioFileInfo | null>(null);
   const [viewConfigs, setViewConfigs] = useState<Record<ViewType, ViewConfig>>(defaultViewConfigs);
-  const [isPanelOpen, setIsPanelOpen] = useState(true);
+  const [isPanelOpen, setIsPanelOpen] = useState(() => typeof window !== 'undefined' ? window.innerWidth > 768 : true);
   const [isTransitioning, setIsTransitioning] = useState(false);
-  const [audioData, setAudioData] = useState<AudioData>({
-    timeDomain: new Float32Array(512),
-    frequency: new Uint8Array(256),
-    peakFrequency: 0,
-    peakAmplitude: 0,
-    averageLoudness: 0
-  });
   const [error, setError] = useState<string | null>(null);
   const [activeSettings, setActiveSettings] = useState<ViewType | null>(null);
+
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth > 768) {
+        setIsPanelOpen(true);
+      }
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   useEffect(() => {
     const engine = new AudioEngine({
@@ -50,9 +60,15 @@ function App() {
         setFileInfo(info);
       },
       onData: (data) => {
-        setAudioData(data);
         if (visualizationManagerRef.current) {
           visualizationManagerRef.current.updateData(data);
+        }
+        if (infoBarRef.current) {
+          infoBarRef.current.updateData({
+            peakFrequency: data.peakFrequency,
+            peakAmplitude: data.peakAmplitude,
+            averageLoudness: data.averageLoudness
+          });
         }
       },
       onError: (err) => {
@@ -174,6 +190,10 @@ function App() {
         onOpenSettings={handleOpenSettings}
       />
 
+      {isPanelOpen && (
+        <div className="mobile-overlay" onClick={handleTogglePanel} />
+      )}
+
       <main className={`main-content ${isPanelOpen ? 'panel-open' : ''}`}>
         <header className="app-header">
           <h1>音律实验台</h1>
@@ -231,9 +251,8 @@ function App() {
       </main>
 
       <InfoBar
-        peakFrequency={audioData.peakFrequency}
-        peakAmplitude={audioData.peakAmplitude}
-        averageLoudness={audioData.averageLoudness}
+        initialData={initialInfoBarData}
+        infoBarRef={infoBarRef}
       />
     </div>
   );

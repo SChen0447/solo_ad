@@ -75,15 +75,17 @@ input, select {
 .controls-panel {
   width: 280px;
   height: 100%;
-  background: linear-gradient(180deg, rgba(30, 30, 48, 0.85) 0%, rgba(42, 42, 61, 0.85) 100%);
-  backdrop-filter: blur(12px);
-  border-right: 1px solid rgba(0, 204, 255, 0.1);
+  background: linear-gradient(180deg, rgba(30, 30, 48, 0.55) 0%, rgba(42, 42, 61, 0.55) 100%);
+  -webkit-backdrop-filter: blur(12px) saturate(180%);
+  backdrop-filter: blur(12px) saturate(180%);
+  border-right: 1px solid rgba(0, 204, 255, 0.15);
   display: flex;
   flex-direction: column;
   padding: 24px 20px;
   position: relative;
   z-index: 1000;
   transition: transform 0.3s ease;
+  box-shadow: 4px 0 24px rgba(0, 0, 0, 0.3);
 }
 
 .panel-header {
@@ -706,9 +708,14 @@ input, select {
   box-shadow: 0 0 10px rgba(0, 255, 136, 0.5);
 }
 
+.mobile-overlay {
+  display: none;
+}
+
 @media (max-width: 768px) {
   .hamburger-btn {
     display: flex;
+    z-index: 1002;
   }
 
   .controls-panel {
@@ -716,20 +723,35 @@ input, select {
     top: 0;
     left: 0;
     width: 280px;
+    max-width: 85vw;
     transform: translateX(-100%);
     box-shadow: 0 0 40px rgba(0, 0, 0, 0.5);
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    z-index: 1001;
+    height: 100vh;
   }
 
   .controls-panel.open {
     transform: translateX(0);
   }
 
-  .main-content {
-    padding: 70px 16px 100px;
+  .mobile-overlay {
+    display: block;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    z-index: 1000;
+    animation: fadeIn 0.2s ease;
   }
 
-  .main-content.panel-open {
-    padding-left: 16px;
+  .main-content {
+    padding: 70px 16px 100px;
+    padding-left: 16px !important;
   }
 
   .app-header h1 {
@@ -751,6 +773,7 @@ input, select {
     left: 12px;
     padding: 12px 16px;
     gap: 12px;
+    z-index: 500;
   }
 
   .value-number {
@@ -759,5 +782,15 @@ input, select {
 
   .loudness-bar-container {
     width: 80px;
+  }
+}
+
+@media (min-width: 769px) {
+  .hamburger-btn {
+    display: none !important;
+  }
+
+  .mobile-overlay {
+    display: none !important;
   }
 }

@@ -58,6 +58,9 @@ export class VisualizationManager {
   private isDragging: boolean = false;
   private previousMousePosition: { x: number; y: number } = { x: 0, y: 0 };
   private cameraRotation: { x: number; y: number } = { x: 0.5, y: 0 };
+  private spectrumLastRenderTime: number = 0;
+  private threeJSLastRenderTime: number = 0;
+  private threeJSFrameInterval: number = 1000 / 60;
 
   constructor() {
     this.spectrumPeakData = new Array(this.barCount).fill(0);
@@ -250,8 +253,11 @@ export class VisualizationManager {
       }
     }
 
-    if (this.renderer && this.scene && this.camera) {
-      this.renderer.render(this.scene, this.camera);
+    if (now - this.threeJSLastRenderTime >= this.threeJSFrameInterval) {
+      if (this.renderer && this.scene && this.camera) {
+        this.renderer.render(this.scene, this.camera);
+      }
+      this.threeJSLastRenderTime = now - (now % this.threeJSFrameInterval);
     }
 
     this.animationFrameId = requestAnimationFrame(this.animate);
@@ -321,6 +327,13 @@ export class VisualizationManager {
     const height = rect.height;
     const config = this.configs.spectrum;
 
+    const now = performance.now();
+    const deltaTime = this.spectrumLastRenderTime === 0 ? 0.016 : (now - this.spectrumLastRenderTime) / 1000;
+    this.spectrumLastRenderTime = now;
+
+    const fallTime = 0.1;
+    const fallRate = height / fallTime;
+
     ctx.clearRect(0, 0, width, height);
 
     const freqData = this.currentAudioData.frequency;
@@ -349,15 +362,14 @@ export class VisualizationManager {
 
       if (barHeight > this.spectrumPeakData[i]) {
         this.spectrumPeakData[i] = barHeight;
-        this.spectrumPeakDecay[i] = 0;
       } else {
-        this.spectrumPeakDecay[i] += 0.016;
-        this.spectrumPeakData[i] = Math.max(0, this.spectrumPeakData[i] - this.spectrumPeakDecay[i] * 60);
+        this.spectrumPeakData[i] = Math.max(0, this.spectrumPeakData[i] - fallRate * deltaTime);
       }
 
       if (this.spectrumPeakData[i] > 0) {
         ctx.fillStyle = `hsla(${hue}, ${saturation}%, ${lightness + 20}%, 0.8)`;
-        ctx.fillRect(x, height - this.spectrumPeakData[i] - 3, barWidth, 3);
+        const peakY = Math.max(0, height - this.spectrumPeakData[i] - 3);
+        ctx.fillRect(x, peakY, barWidth, 3);
       }
     }
   }
