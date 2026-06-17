@@ -20,6 +20,14 @@ interface CanvasProps {
 const MIN_SCALE = 0.5;
 const MAX_SCALE = 4;
 
+function hexToRgba(hex: string, alpha: number): string {
+  const h = hex.replace('#', '');
+  const r = parseInt(h.substring(0, 2), 16);
+  const g = parseInt(h.substring(2, 4), 16);
+  const b = parseInt(h.substring(4, 6), 16);
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
 const Canvas: React.FC<CanvasProps> = ({
   elements,
   tool,
@@ -260,9 +268,10 @@ const Canvas: React.FC<CanvasProps> = ({
       
       if (clickedEl && selectedId === clickedEl.id) {
         const handles = getResizeHandles(clickedEl);
+        const handleHitRadius = 8 / viewport.scale;
         for (const handle of handles) {
           const dist = Math.sqrt((worldPos.x - handle.x) ** 2 + (worldPos.y - handle.y) ** 2);
-          if (dist < 10 / viewport.scale) {
+          if (dist < handleHitRadius) {
             setIsResizing(true);
             setResizeHandle(handle.position);
             setDrawStart(worldPos);
@@ -298,12 +307,22 @@ const Canvas: React.FC<CanvasProps> = ({
   const getResizeHandles = (el: CanvasElement) => {
     if (el.type !== 'sticky') return [];
     const handles = [];
-    const positions = ['nw', 'ne', 'se', 'sw'] as const;
-    for (const pos of positions) {
-      let x = el.x, y = el.y;
-      if (pos.includes('e')) x += el.width;
-      if (pos.includes('s')) y += el.height;
-      handles.push({ x, y, position: pos });
+    const cx = el.x + el.width / 2;
+    const cy = el.y + el.height / 2;
+    const hw = el.width / 2;
+    const hh = el.height / 2;
+    const corners = [
+      { position: 'nw', dx: -1, dy: -1 },
+      { position: 'ne', dx: 1, dy: -1 },
+      { position: 'se', dx: 1, dy: 1 },
+      { position: 'sw', dx: -1, dy: 1 },
+    ] as const;
+    for (const corner of corners) {
+      handles.push({
+        x: cx + corner.dx * hw,
+        y: cy + corner.dy * hh,
+        position: corner.position,
+      });
     }
     return handles;
   };
@@ -411,17 +430,39 @@ const Canvas: React.FC<CanvasProps> = ({
       setEditingText(clickedEl.text);
       setOriginalText(clickedEl.text);
       onSelect(clickedEl.id);
-      setTimeout(() => {
-        if (textareaRef.current) {
-          textareaRef.current.focus();
-          textareaRef.current.select();
-        }
-      }, 0);
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          if (textareaRef.current) {
+            textareaRef.current.focus();
+            textareaRef.current.select();
+          }
+        });
+      });
     }
   };
 
   const handleTextChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setEditingText(e.target.value);
+  };
+
+  const handleTextKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      e.stopPropagation();
+      if (editingStickyId) {
+        onUpdateElement(editingStickyId, { text: editingText } as Partial<CanvasElement>);
+        setEditingStickyId(null);
+      }
+    }
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      e.stopPropagation();
+      if (editingStickyId) {
+        setEditingText(originalText);
+        onUpdateElement(editingStickyId, { text: originalText } as Partial<CanvasElement>);
+        setEditingStickyId(null);
+      }
+    }
   };
 
   const handleTextBlur = () => {
@@ -596,9 +637,9 @@ const Canvas: React.FC<CanvasProps> = ({
     
     if (isHovered && !selected && !isEditing) {
       ctx.save();
-      ctx.shadowColor = color + '4D';
-      ctx.shadowBlur = 15 / viewport.scale;
-      ctx.strokeStyle = color + '4D';
+      ctx.shadowColor = hexToRgba(color, 0.3);
+      ctx.shadowBlur = 15;
+      ctx.strokeStyle = hexToRgba(color, 0.3);
       ctx.lineWidth = 2 / viewport.scale;
       drawStickyShape(ctx, el.x, el.y, el.width, el.height, el.shape);
       ctx.restore();
@@ -610,7 +651,7 @@ const Canvas: React.FC<CanvasProps> = ({
       ctx.strokeStyle = color;
       ctx.lineWidth = 2 / viewport.scale;
     } else if (isHovered && !isEditing) {
-      ctx.strokeStyle = color + '4D';
+      ctx.strokeStyle = hexToRgba(color, 0.3);
       ctx.lineWidth = 1.5 / viewport.scale;
     } else {
       ctx.strokeStyle = 'rgba(0, 0, 0, 0.1)';
@@ -627,10 +668,10 @@ const Canvas: React.FC<CanvasProps> = ({
 
     if (selected && !isEditing) {
       const handles = getResizeHandles(el);
-      const handleRadius = 4 / viewport.scale;
+      const handleRadius = 4;
       ctx.fillStyle = color;
       ctx.strokeStyle = '#fff';
-      ctx.lineWidth = 1.5 / viewport.scale;
+      ctx.lineWidth = 1.5;
       for (const handle of handles) {
         ctx.beginPath();
         ctx.arc(handle.x, handle.y, handleRadius, 0, Math.PI * 2);
@@ -812,6 +853,7 @@ const Canvas: React.FC<CanvasProps> = ({
           ref={textareaRef}
           value={editingText}
           onChange={handleTextChange}
+          onKeyDown={handleTextKeyDown}
           onBlur={handleTextBlur}
           autoFocus
           style={{
