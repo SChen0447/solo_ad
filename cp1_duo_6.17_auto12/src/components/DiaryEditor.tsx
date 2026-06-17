@@ -461,7 +461,11 @@ export const DiaryEditor: React.FC<DiaryEditorProps> = ({ onSave, onClose, initi
                   type="text"
                   value={musicSearchQuery}
                   onChange={handleMusicSearchInput}
-                  onFocus={() => musicResults.length > 0 && setShowMusicResults(true)}
+                  onFocus={(e) => {
+                    if (musicResults.length > 0) setShowMusicResults(true);
+                    e.target.style.borderColor = '#64B5F6';
+                    e.target.style.boxShadow = '0 0 0 3px rgba(100, 181, 246, 0.2)';
+                  }}
                   placeholder="搜索歌曲或歌手..."
                   style={{
                     width: '100%',
@@ -474,10 +478,6 @@ export const DiaryEditor: React.FC<DiaryEditorProps> = ({ onSave, onClose, initi
                     backdropFilter: 'blur(10px)',
                     outline: 'none',
                     transition: 'all 0.2s'
-                  }}
-                  onFocus={(e) => {
-                    e.target.style.borderColor = '#64B5F6';
-                    e.target.style.boxShadow = '0 0 0 3px rgba(100, 181, 246, 0.2)';
                   }}
                   onBlur={(e) => {
                     e.target.style.borderColor = 'rgba(255, 255, 255, 0.18)';

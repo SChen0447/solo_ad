@@ -12,6 +12,7 @@ const App: React.FC = () => {
   const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
   const [isMobile, setIsMobile] = useState(false);
   const [activeNav, setActiveNav] = useState('timeline');
+  const [showYearDropdown, setShowYearDropdown] = useState(false);
 
   const availableYears = Array.from(
     new Set(entries.map(e => new Date(e.date).getFullYear()))
@@ -30,6 +31,18 @@ const App: React.FC = () => {
     window.addEventListener('resize', checkMobile);
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
+
+  useEffect(() => {
+    if (!showYearDropdown) return;
+    const handler = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (!target.closest('.year-selector-wrapper') && !target.closest('.year-dropdown')) {
+        setShowYearDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [showYearDropdown]);
 
   const loadDiaries = useCallback(async (year?: number, month?: number) => {
     setLoading(true);
@@ -191,35 +204,33 @@ const App: React.FC = () => {
           
           <div style={{ flex: 1 }} />
           
-          <div className="year-selector-wrapper" style={{ position: 'relative', width: '100%' }}>
-            <select
-              value={selectedYear}
-              onChange={(e) => setSelectedYear(Number(e.target.value))}
-              style={{
-                width: '44px',
-                height: '44px',
-                borderRadius: '50%',
-                backgroundColor: 'rgba(255, 255, 255, 0.05)',
-                border: 'none',
-                color: '#E0E0E0',
-                fontSize: '10px',
-                fontWeight: 600,
-                textAlign: 'center',
-                cursor: 'pointer',
-                appearance: 'none',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                padding: 0
-              }}
+          <div 
+            className="year-selector-wrapper"
+            style={{ position: 'relative', width: '100%', display: 'flex', justifyContent: 'center' }}
+          >
+            <button
+              onClick={() => setShowYearDropdown(!showYearDropdown)}
+              className="year-selector-btn"
               title={`${selectedYear}年`}
             >
-              {availableYears.map(year => (
-                <option key={year} value={year}>
-                  {year}
-                </option>
-              ))}
-            </select>
+              {String(selectedYear).slice(-2)}
+            </button>
+            {showYearDropdown && (
+              <div className="year-dropdown">
+                {availableYears.map(year => (
+                  <button
+                    key={year}
+                    className={`year-dropdown-item ${year === selectedYear ? 'active' : ''}`}
+                    onClick={() => {
+                      setSelectedYear(year);
+                      setShowYearDropdown(false);
+                    }}
+                  >
+                    {year}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
           
           <NavItem icon="⚙️" label="设置" id="settings" onClick={() => setActiveNav('settings')} />
@@ -314,12 +325,13 @@ const App: React.FC = () => {
           </div>
         </header>
 
-        <div style={{ flex: 1 }}>
+        <div style={{ flex: 1, animation: 'pageFadeIn 0.3s ease-out' }}>
           {activeNav === 'timeline' || activeNav === 'search' ? (
             <Timeline
               entries={filteredEntries}
               onLoadMore={handleLoadMore}
               loading={loading}
+              onSearch={handleSearch}
             />
           ) : (
             <div 
@@ -393,32 +405,30 @@ const App: React.FC = () => {
           <NavItem icon="📅" label="时间线" id="timeline" onClick={() => setActiveNav('timeline')} />
           <NavItem icon="🔍" label="搜索" id="search" onClick={() => setActiveNav('search')} />
           <div style={{ width: '56px' }} />
-          <div className="year-selector-wrapper" style={{ position: 'relative' }}>
-            <select
-              value={selectedYear}
-              onChange={(e) => setSelectedYear(Number(e.target.value))}
-              style={{
-                width: '40px',
-                height: '40px',
-                borderRadius: '50%',
-                backgroundColor: 'rgba(255, 255, 255, 0.05)',
-                border: 'none',
-                color: '#E0E0E0',
-                fontSize: '9px',
-                fontWeight: 600,
-                textAlign: 'center',
-                cursor: 'pointer',
-                appearance: 'none',
-                padding: 0
-              }}
+          <div style={{ position: 'relative' }}>
+            <button
+              onClick={() => setShowYearDropdown(!showYearDropdown)}
+              className="year-selector-btn-mobile"
               title={`${selectedYear}年`}
             >
-              {availableYears.map(year => (
-                <option key={year} value={year}>
-                  {year.toString().slice(-2)}
-                </option>
-              ))}
-            </select>
+              {String(selectedYear).slice(-2)}
+            </button>
+            {showYearDropdown && (
+              <div className="year-dropdown year-dropdown-mobile">
+                {availableYears.map(year => (
+                  <button
+                    key={year}
+                    className={`year-dropdown-item ${year === selectedYear ? 'active' : ''}`}
+                    onClick={() => {
+                      setSelectedYear(year);
+                      setShowYearDropdown(false);
+                    }}
+                  >
+                    {year}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
           <NavItem icon="⚙️" label="设置" id="settings" onClick={() => setActiveNav('settings')} />
         </nav>
@@ -449,14 +459,110 @@ const App: React.FC = () => {
         *::-webkit-scrollbar-thumb:hover {
           background: #444;
         }
-        
-        select {
+
+        .year-selector-btn {
+          width: 44px;
+          height: 44px;
+          border-radius: 50%;
+          background: rgba(255, 255, 255, 0.05);
+          border: 1px solid rgba(255, 255, 255, 0.12);
+          color: #64B5F6;
+          font-size: 13px;
+          font-weight: 700;
           text-align: center;
-          text-align-last: center;
+          cursor: pointer;
+          transition: all 0.2s;
+          padding: 0;
+          display: flex;
+          align-items: center;
+          justify-content: center;
         }
-        select option {
-          background-color: #2A2A2A;
-          color: #E0E0E0;
+        .year-selector-btn:hover {
+          background: rgba(100, 181, 246, 0.15);
+          border-color: rgba(100, 181, 246, 0.4);
+        }
+
+        .year-selector-btn-mobile {
+          width: 40px;
+          height: 40px;
+          border-radius: 50%;
+          background: rgba(255, 255, 255, 0.05);
+          border: 1px solid rgba(255, 255, 255, 0.12);
+          color: #64B5F6;
+          font-size: 11px;
+          font-weight: 700;
+          text-align: center;
+          cursor: pointer;
+          padding: 0;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+
+        .year-dropdown {
+          position: absolute;
+          left: 50%;
+          transform: translateX(-50%);
+          bottom: calc(100% + 8px);
+          background: #2A2A2A;
+          border: 1px solid rgba(255, 255, 255, 0.1);
+          border-radius: 10px;
+          padding: 6px;
+          min-width: 80px;
+          box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+          z-index: 200;
+          animation: dropdownFadeIn 0.2s ease-out;
+        }
+
+        .year-dropdown-mobile {
+          bottom: calc(100% + 8px);
+          left: 50%;
+          transform: translateX(-50%);
+        }
+
+        .year-dropdown-item {
+          display: block;
+          width: 100%;
+          padding: 8px 16px;
+          background: none;
+          border: none;
+          color: #B0BEC5;
+          font-size: 13px;
+          cursor: pointer;
+          border-radius: 6px;
+          transition: all 0.15s;
+          text-align: center;
+        }
+        .year-dropdown-item:hover {
+          background: rgba(100, 181, 246, 0.15);
+          color: #64B5F6;
+        }
+        .year-dropdown-item.active {
+          background: rgba(100, 181, 246, 0.2);
+          color: #64B5F6;
+          font-weight: 600;
+        }
+
+        @keyframes dropdownFadeIn {
+          from {
+            opacity: 0;
+            transform: translateX(-50%) translateY(8px);
+          }
+          to {
+            opacity: 1;
+            transform: translateX(-50%) translateY(0);
+          }
+        }
+
+        @keyframes pageFadeIn {
+          from {
+            opacity: 0;
+            transform: translateY(12px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
         }
       `}</style>
     </div>

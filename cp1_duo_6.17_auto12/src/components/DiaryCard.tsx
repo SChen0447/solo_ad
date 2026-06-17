@@ -15,16 +15,16 @@ const genreColors: Record<string, string> = {
 };
 
 const genreBgTints: Record<string, string> = {
-  pop: 'rgba(255, 171, 145, 0.08)',
-  rock: 'rgba(165, 214, 167, 0.08)',
-  electronic: 'rgba(144, 202, 249, 0.08)',
-  classical: 'rgba(206, 147, 216, 0.08)',
-  default: 'rgba(224, 224, 224, 0.04)'
+  pop: 'rgba(255, 171, 145, 0.15)',
+  rock: 'rgba(165, 214, 167, 0.15)',
+  electronic: 'rgba(144, 202, 249, 0.15)',
+  classical: 'rgba(206, 147, 216, 0.15)',
+  default: 'rgba(224, 224, 224, 0.06)'
 };
 
 const weekdayColors: string[] = [
   '#FFCCBC',
-  '#DCEDC8',
+  '#C8E6C9',
   '#B3E5FC',
   '#F8BBD0',
   '#FFF9C4',

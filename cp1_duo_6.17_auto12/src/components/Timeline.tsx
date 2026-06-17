@@ -14,14 +14,22 @@ const monthNames = [
   '七月', '八月', '九月', '十月', '十一月', '十二月'
 ];
 
-const getMonthColor = (month: number): string => {
-  const s = { r: 26, g: 35, b: 126 };
-  const e = { r: 66, g: 165, b: 245 };
+const getMonthGradient = (month: number): string => {
   const t = (month - 1) / 11;
-  const r = Math.round(s.r + (e.r - s.r) * t);
-  const g = Math.round(s.g + (e.g - s.g) * t);
-  const b = Math.round(s.b + (e.b - s.b) * t);
+  const r = Math.round(26 + (66 - 26) * t);
+  const g = Math.round(35 + (165 - 35) * t);
+  const b = Math.round(126 + (245 - 126) * t);
   return `rgb(${r}, ${g}, ${b})`;
+};
+
+const getMonthGradientCSS = (month: number): string => {
+  const t = (month - 1) / 11;
+  const r1 = 26, g1 = 35, b1 = 126;
+  const r2 = Math.round(26 + (66 - 26) * t);
+  const g2 = Math.round(35 + (165 - 35) * t);
+  const b2 = Math.round(126 + (245 - 126) * t);
+  const r3 = 66, g3 = 165, b3 = 245;
+  return `linear-gradient(90deg, rgb(${r1}, ${g1}, ${b1}), rgb(${r2}, ${g2}, ${b2}), rgb(${r3}, ${g3}, ${b3}))`;
 };
 
 const groupByMonth = (entries: DiaryEntry[]): MonthGroup[] => {
@@ -132,7 +140,7 @@ export const Timeline: React.FC<TimelineProps> = ({ entries, onLoadMore, loading
             <button
               key={`${g.year}-${g.month}`}
               className="timeline-month-chip"
-              style={{ color: getMonthColor(g.month), borderColor: getMonthColor(g.month) + '40' }}
+              style={{ color: getMonthGradient(g.month), borderColor: getMonthGradient(g.month) + '40' }}
               onClick={() => scrollToMonth(g.year, g.month)}
             >
               {g.month}月
@@ -165,7 +173,15 @@ export const Timeline: React.FC<TimelineProps> = ({ entries, onLoadMore, loading
                 className="timeline-month-group"
                 style={{ position: 'absolute', top: pos.top, left: 0, right: 0 }}
               >
-                <h2 className="timeline-month-header" style={{ color: getMonthColor(group.month) }}>
+                <h2
+                  className="timeline-month-header"
+                  style={{
+                    background: getMonthGradientCSS(group.month),
+                    WebkitBackgroundClip: 'text',
+                    WebkitTextFillColor: 'transparent',
+                    backgroundClip: 'text'
+                  }}
+                >
                   {group.year}年 {monthNames[group.month - 1]}
                 </h2>
                 <div>
