@@ -24,9 +24,13 @@ function snapToGrid(value: number): number {
   return Math.round(value / GRID_SIZE) * GRID_SIZE;
 }
 
-function easeOutElastic(t: number): number {
-  const p = 0.3;
-  return Math.pow(2, -10 * t) * Math.sin((t - p / 4) * (2 * Math.PI) / p) + 1;
+function lightenColor(hex: string, percent: number): string {
+  const num = parseInt(hex.replace('#', ''), 16);
+  const amt = Math.round(2.55 * percent);
+  const R = Math.min(255, (num >> 16) + amt);
+  const G = Math.min(255, ((num >> 8) & 0x00FF) + amt);
+  const B = Math.min(255, (num & 0x0000FF) + amt);
+  return `#${((1 << 24) + (R << 16) + (G << 8) + B).toString(16).slice(1)}`;
 }
 
 function NoteBoard({
@@ -44,19 +48,19 @@ function NoteBoard({
   onCreatePoll,
 }: NoteBoardProps) {
   const boardRef = useRef<HTMLDivElement>(null);
+  const noteRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   const [draggingNote, setDraggingNote] = useState<string | null>(null);
-  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+  const dragOffsetRef = useRef({ x: 0, y: 0 });
+  const dragPosRef = useRef({ x: 0, y: 0 });
+  const rafIdRef = useRef<number | null>(null);
   const [editingNote, setEditingNote] = useState<string | null>(null);
   const [editContent, setEditContent] = useState('');
   const [deletingNote, setDeletingNote] = useState<string | null>(null);
-  const [hoveredGroup, setHoveredGroup] = useState<string | null>(null);
+  const [snappingNote, setSnappingNote] = useState<string | null>(null);
   const [showPollCreator, setShowPollCreator] = useState(false);
   const [pollQuestion, setPollQuestion] = useState('');
   const [pollOptions, setPollOptions] = useState(['', '']);
   const [isMobile, setIsMobile] = useState(false);
-  const [animatingNote, setAnimatingNote] = useState<string | null>(null);
-
-  const animationRefs = useRef<Map<string, { rafId: number; startTime: number; startX: number; startY: number; targetX: number; targetY: number }>>(new Map());
 
   useEffect(() => {
     const checkMobile = () => setIsMobile(window.innerWidth < 768);
@@ -78,29 +82,47 @@ function NoteBoard({
     [getNotesByGroup]
   );
 
+  const updateDragPosition = useCallback(() => {
+    if (!draggingNote) return;
+
+    const noteEl = noteRefs.current.get(draggingNote);
+    if (noteEl) {
+      noteEl.style.left = `${dragPosRef.current.x}px`;
+      noteEl.style.top = `${dragPosRef.current.y}px`;
+    }
+
+    rafIdRef.current = requestAnimationFrame(updateDragPosition);
+  }, [draggingNote]);
+
   const handleMouseDown = useCallback(
     (e: React.MouseEvent, noteId: string) => {
       if (editingNote) return;
+      if (deletingNote === noteId) return;
       e.preventDefault();
+      e.stopPropagation();
+
       const note = notes.find((n) => n.id === noteId);
       if (!note) return;
 
       const boardRect = boardRef.current?.getBoundingClientRect();
       if (!boardRect) return;
 
-      setDraggingNote(noteId);
-      setDragOffset({
+      const noteEl = noteRefs.current.get(noteId);
+      if (noteEl) {
+        noteEl.classList.add('dragging');
+        noteEl.classList.remove('snapping');
+      }
+
+      dragOffsetRef.current = {
         x: e.clientX - boardRect.left - note.x,
         y: e.clientY - boardRect.top - note.y,
-      });
+      };
+      dragPosRef.current = { x: note.x, y: note.y };
 
-      const anim = animationRefs.current.get(noteId);
-      if (anim) {
-        cancelAnimationFrame(anim.rafId);
-        animationRefs.current.delete(noteId);
-      }
+      setDraggingNote(noteId);
+      setSnappingNote(null);
     },
-    [notes, editingNote]
+    [notes, editingNote, deletingNote]
   );
 
   const handleMouseMove = useCallback(
@@ -108,16 +130,21 @@ function NoteBoard({
       if (!draggingNote || !boardRef.current) return;
 
       const boardRect = boardRef.current.getBoundingClientRect();
-      const newX = e.clientX - boardRect.left - dragOffset.x;
-      const newY = e.clientY - boardRect.top - dragOffset.y;
+      const newX = e.clientX - boardRect.left - dragOffsetRef.current.x;
+      const newY = e.clientY - boardRect.top - dragOffsetRef.current.y;
 
-      onUpdateNote(draggingNote, { x: newX, y: newY, groupId: null });
+      dragPosRef.current = { x: newX, y: newY };
     },
-    [draggingNote, dragOffset, onUpdateNote]
+    [draggingNote]
   );
 
   const handleMouseUp = useCallback(() => {
     if (!draggingNote) return;
+
+    if (rafIdRef.current) {
+      cancelAnimationFrame(rafIdRef.current);
+      rafIdRef.current = null;
+    }
 
     const note = notes.find((n) => n.id === draggingNote);
     if (!note) {
@@ -125,14 +152,20 @@ function NoteBoard({
       return;
     }
 
+    const currentX = dragPosRef.current.x;
+    const currentY = dragPosRef.current.y;
+
     let targetGroupId: string | null = null;
+    let targetX: number;
+    let targetY: number;
+
     for (const group of groups) {
       const groupHeight = calculateGroupHeight(group.id);
       if (
-        note.x >= group.x &&
-        note.x <= group.x + group.width &&
-        note.y >= group.y &&
-        note.y <= group.y + groupHeight
+        currentX >= group.x &&
+        currentX <= group.x + group.width &&
+        currentY >= group.y &&
+        currentY <= group.y + groupHeight
       ) {
         targetGroupId = group.id;
         break;
@@ -140,90 +173,65 @@ function NoteBoard({
     }
 
     if (targetGroupId) {
-      const groupNotes = getNotesByGroup(targetGroupId);
+      const groupNotes = getNotesByGroup(targetGroupId).filter((n) => n.id !== draggingNote);
       const group = groups.find((g) => g.id === targetGroupId);
       if (group) {
         const index = groupNotes.length;
         const columns = 2;
         const col = index % columns;
         const row = Math.floor(index / columns);
-        const targetX = group.x + 20 + col * (NOTE_WIDTH + 15);
-        const targetY = group.y + GROUP_HEADER_HEIGHT + 15 + row * 140;
-
-        animateNoteTo(draggingNote, note.x, note.y, targetX, targetY, () => {
-          onUpdateNote(draggingNote, {
-            x: targetX,
-            y: targetY,
-            groupId: targetGroupId,
-          });
-        });
+        targetX = group.x + 20 + col * (NOTE_WIDTH + 15);
+        targetY = group.y + GROUP_HEADER_HEIGHT + 15 + row * 140;
+      } else {
+        targetX = snapToGrid(currentX);
+        targetY = snapToGrid(currentY);
       }
     } else {
-      const snappedX = snapToGrid(note.x);
-      const snappedY = snapToGrid(note.y);
-
-      if (snappedX !== note.x || snappedY !== note.y) {
-        animateNoteTo(draggingNote, note.x, note.y, snappedX, snappedY, () => {
-          onUpdateNote(draggingNote, { x: snappedX, y: snappedY, groupId: null });
-        });
-      }
+      targetX = snapToGrid(currentX);
+      targetY = snapToGrid(currentY);
     }
+
+    const noteEl = noteRefs.current.get(draggingNote);
+    if (noteEl) {
+      noteEl.classList.remove('dragging');
+      noteEl.classList.add('snapping');
+      noteEl.style.left = `${targetX}px`;
+      noteEl.style.top = `${targetY}px`;
+    }
+
+    setSnappingNote(draggingNote);
+
+    setTimeout(() => {
+      onUpdateNote(draggingNote, {
+        x: targetX,
+        y: targetY,
+        groupId: targetGroupId,
+      });
+      setSnappingNote(null);
+      const el = noteRefs.current.get(draggingNote);
+      if (el) {
+        el.classList.remove('snapping');
+      }
+    }, 200);
 
     setDraggingNote(null);
-    setHoveredGroup(null);
   }, [draggingNote, notes, groups, calculateGroupHeight, getNotesByGroup, onUpdateNote]);
-
-  const animateNoteTo = (
-    noteId: string,
-    startX: number,
-    startY: number,
-    targetX: number,
-    targetY: number,
-    onComplete?: () => void
-  ) => {
-    const existing = animationRefs.current.get(noteId);
-    if (existing) {
-      cancelAnimationFrame(existing.rafId);
-    }
-
-    setAnimatingNote(noteId);
-    const startTime = performance.now();
-    const duration = 200;
-
-    const animate = (currentTime: number) => {
-      const elapsed = currentTime - startTime;
-      const t = Math.min(elapsed / duration, 1);
-      const easedT = easeOutElastic(t);
-
-      const currentX = startX + (targetX - startX) * easedT;
-      const currentY = startY + (targetY - startY) * easedT;
-
-      onUpdateNote(noteId, { x: currentX, y: currentY });
-
-      if (t < 1) {
-        const rafId = requestAnimationFrame(animate);
-        animationRefs.current.set(noteId, { rafId, startTime, startX, startY, targetX, targetY });
-      } else {
-        animationRefs.current.delete(noteId);
-        setAnimatingNote(null);
-        if (onComplete) onComplete();
-      }
-    };
-
-    const rafId = requestAnimationFrame(animate);
-    animationRefs.current.set(noteId, { rafId, startTime, startX, startY, targetX, targetY });
-  };
 
   useEffect(() => {
     if (draggingNote) {
+      rafIdRef.current = requestAnimationFrame(updateDragPosition);
       window.addEventListener('mousemove', handleMouseMove);
       window.addEventListener('mouseup', handleMouseUp);
     }
     return () => {
+      if (rafIdRef.current) {
+        cancelAnimationFrame(rafIdRef.current);
+        rafIdRef.current = null;
+      }
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mouseup', handleMouseUp);
     };
-  }, [draggingNote, handleMouseMove, handleMouseUp]);
+  }, [draggingNote, updateDragPosition, handleMouseMove, handleMouseUp]);
 
   const handleDoubleClick = useCallback(
     (note: Note) => {
@@ -244,10 +252,18 @@ function NoteBoard({
   const handleDeleteClick = useCallback(
     (e: React.MouseEvent, noteId: string) => {
       e.stopPropagation();
+      e.preventDefault();
+
+      const noteEl = noteRefs.current.get(noteId);
+      if (noteEl) {
+        noteEl.classList.add('deleting');
+      }
       setDeletingNote(noteId);
+
       setTimeout(() => {
         onDeleteNote(noteId);
         setDeletingNote(null);
+        noteRefs.current.delete(noteId);
       }, 300);
     },
     [onDeleteNote]
@@ -256,6 +272,8 @@ function NoteBoard({
   const handleBoardDoubleClick = useCallback(
     (e: React.MouseEvent) => {
       if (editingNote) return;
+      if ((e.target as HTMLElement).closest('.note-item')) return;
+
       const boardRect = boardRef.current?.getBoundingClientRect();
       if (!boardRect) return;
 
@@ -319,17 +337,31 @@ function NoteBoard({
     return poll.options.reduce((max, opt) => (opt.votes > max.votes ? opt : max), poll.options[0]);
   };
 
+  const setNoteRef = useCallback((noteId: string) => (el: HTMLDivElement | null) => {
+    if (el) {
+      noteRefs.current.set(noteId, el);
+    } else {
+      noteRefs.current.delete(noteId);
+    }
+  }, []);
+
   const renderNote = (note: Note) => {
     const isEditing = editingNote === note.id;
     const isDeleting = deletingNote === note.id;
     const isDragging = draggingNote === note.id;
-    const isAnimating = animatingNote === note.id;
+    const isSnapping = snappingNote === note.id;
+
+    const noteClasses = ['note-item'];
+    if (isDragging) noteClasses.push('dragging');
+    if (isSnapping) noteClasses.push('snapping');
+    if (isDeleting) noteClasses.push('deleting');
 
     return (
       <div
         key={note.id}
+        ref={setNoteRef(note.id)}
+        className={noteClasses.join(' ')}
         style={{
-          position: 'absolute',
           left: note.x,
           top: note.y,
           width: NOTE_WIDTH,
@@ -341,10 +373,8 @@ function NoteBoard({
             ? '0 12px 32px rgba(0, 0, 0, 0.4)'
             : '0 4px 12px rgba(0, 0, 0, 0.2)',
           cursor: isEditing ? 'text' : 'grab',
-          zIndex: isDragging ? 1000 : isAnimating ? 500 : 1,
+          zIndex: isDragging ? 1000 : isSnapping ? 500 : 1,
           minHeight: '80px',
-          animation: isDeleting ? 'shrinkRotate 0.3s ease forwards' : 'none',
-          transition: !isDragging && !isAnimating ? 'box-shadow 0.2s ease' : 'none',
           userSelect: 'none',
         }}
         onMouseDown={(e) => handleMouseDown(e, note.id)}
@@ -369,6 +399,7 @@ function NoteBoard({
             justifyContent: 'center',
             opacity: 0.8,
             transition: 'opacity 0.2s ease, transform 0.2s ease',
+            lineHeight: 1,
           }}
           onClick={(e) => handleDeleteClick(e, note.id)}
           onMouseEnter={(e) => {
@@ -433,11 +464,11 @@ function NoteBoard({
   const renderGroups = () => {
     return groups.map((group) => {
       const groupHeight = calculateGroupHeight(group.id);
-      const isHovered = hoveredGroup === group.id;
 
       return (
         <div
           key={group.id}
+          className="group-area"
           style={{
             position: 'absolute',
             left: group.x,
@@ -447,13 +478,9 @@ function NoteBoard({
             backgroundColor: `${group.color}15`,
             borderRadius: '12px',
             border: `2px solid ${group.color}`,
-            borderColor: isHovered ? '#ffffff' : group.color,
-            transition: 'border-color 0.2s ease, background-color 0.2s ease',
             padding: '10px',
             overflow: 'visible',
           }}
-          onMouseEnter={() => setHoveredGroup(group.id)}
-          onMouseLeave={() => setHoveredGroup(null)}
         >
           <div
             style={{
@@ -495,19 +522,15 @@ function NoteBoard({
     return (
       <div
         style={{
-          position: isMobile ? 'relative' : 'absolute',
-          [isMobile ? 'bottom' : 'top']: isMobile ? '70px' : '70px',
-          [isMobile ? 'left' : 'right']: isMobile ? '20px' : '20px',
-          [isMobile ? 'right' : 'width']: isMobile ? '20px' : '320px',
-          maxHeight: isMobile ? '40vh' : 'calc(100vh - 200px)',
+          width: isMobile ? '100%' : '320px',
+          maxHeight: isMobile ? 'none' : 'calc(100vh - 200px)',
           backgroundColor: 'rgba(40, 40, 60, 0.95)',
           backdropFilter: 'blur(10px)',
-          borderRadius: '16px',
+          borderRadius: isMobile ? '0' : '16px',
           padding: '20px',
-          boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3)',
-          border: '1px solid rgba(255, 255, 255, 0.1)',
+          boxShadow: isMobile ? 'none' : '0 8px 32px rgba(0, 0, 0, 0.3)',
+          border: isMobile ? 'none' : '1px solid rgba(255, 255, 255, 0.1)',
           overflowY: 'auto',
-          zIndex: 100,
           animation: 'fadeIn 0.3s ease',
         }}
       >
@@ -571,6 +594,7 @@ function NoteBoard({
                             textAlign: 'left',
                             overflow: 'hidden',
                             transition: 'all 0.2s ease',
+                            width: '100%',
                           }}
                           onMouseEnter={(e) => {
                             if (!hasVoted && poll.isActive) {
@@ -586,20 +610,21 @@ function NoteBoard({
                           }}
                         >
                           <div
-                            style={{
-                              position: 'absolute',
-                              left: 0,
-                              top: 0,
-                              height: '100%',
-                              width: `${percentage}%`,
-                              background: 'linear-gradient(90deg, #4A90D9, #50C878)',
-                              transition: 'width 0.5s ease',
-                              opacity: 0.3,
-                            }}
+                            className="vote-progress-fill"
+                            style={{ width: `${percentage}%` }}
                           />
-                          <span style={{ position: 'relative', zIndex: 1 }}>{option.text}</span>
+                          <span style={{ position: 'relative', zIndex: 1, display: 'block' }}>{option.text}</span>
                           {hasVoted && (
-                            <span style={{ position: 'relative', zIndex: 1, float: 'right', fontSize: '12px', color: '#50C878' }}>
+                            <span
+                              style={{
+                                position: 'relative',
+                                zIndex: 1,
+                                float: 'right',
+                                fontSize: '12px',
+                                color: '#50C878',
+                                marginTop: '-18px',
+                              }}
+                            >
                               {option.votes}票 ({percentage.toFixed(0)}%)
                             </span>
                           )}
@@ -700,10 +725,9 @@ function NoteBoard({
                               minHeight: '4px',
                               background: isWinner
                                 ? 'linear-gradient(180deg, #FFD700, #FFA500)'
-                                : `linear-gradient(180deg, #4A90D9, #50C878)`,
+                                : 'linear-gradient(180deg, #4A90D9, #50C878)',
                               borderRadius: '4px 4px 0 0',
                               transition: 'height 0.8s cubic-bezier(0.34, 1.56, 0.64, 1)',
-                              animation: `barGrow 0.8s cubic-bezier(0.34, 1.56, 0.64, 1) forwards`,
                               ['--final-height' as any]: `${height}%`,
                             }}
                           />
@@ -798,6 +822,8 @@ function NoteBoard({
             maxWidth: '450px',
             boxShadow: '0 20px 60px rgba(0, 0, 0, 0.5)',
             animation: 'fadeIn 0.3s ease',
+            maxHeight: '85vh',
+            overflowY: 'auto',
           }}
           onClick={(e) => e.stopPropagation()}
         >
@@ -1016,60 +1042,78 @@ function NoteBoard({
           flexDirection: 'column',
           overflow: 'hidden',
           position: 'relative',
+          minHeight: 0,
         }}
       >
-        <div
-          ref={boardRef}
-          onDoubleClick={handleBoardDoubleClick}
-          style={{
-            flex: 1,
-            position: 'relative',
-            overflow: 'auto',
-            backgroundImage: `
-              radial-gradient(circle, rgba(255,255,255,0.03) 1px, transparent 1px)
-            `,
-            backgroundSize: `${GRID_SIZE}px ${GRID_SIZE}px`,
-            cursor: editingNote ? 'text' : 'crosshair',
-          }}
-        >
-          {renderGroups()}
-
+        <div style={{ flex: 1, display: 'flex', position: 'relative', minHeight: 0 }}>
           <div
+            ref={boardRef}
+            onDoubleClick={handleBoardDoubleClick}
             style={{
-              position: 'absolute',
-              left: 0,
-              right: 0,
-              top: calculateGroupHeight('group-1') + 40,
-              height: '1px',
-              borderTop: '1px dashed rgba(255, 255, 255, 0.15)',
-              pointerEvents: 'none',
+              flex: 1,
+              position: 'relative',
+              overflow: 'auto',
+              backgroundImage: `
+                radial-gradient(circle, rgba(255,255,255,0.03) 1px, transparent 1px)
+              `,
+              backgroundSize: `${GRID_SIZE}px ${GRID_SIZE}px`,
+              cursor: editingNote ? 'text' : 'crosshair',
             }}
-          />
+          >
+            {renderGroups()}
 
-          {notes.map(renderNote)}
-
-          {ungroupedNotes.length === 0 && !editingNote && (
             <div
               style={{
                 position: 'absolute',
-                top: '50%',
-                left: '50%',
-                transform: 'translate(-50%, -50%)',
-                color: 'rgba(255, 255, 255, 0.3)',
-                fontSize: '16px',
-                textAlign: 'center',
+                left: 0,
+                right: 0,
+                top: calculateGroupHeight('group-1') + 40,
+                height: '1px',
+                borderTop: '1px dashed rgba(255, 255, 255, 0.15)',
                 pointerEvents: 'none',
               }}
-            >
-              双击空白处创建便签
-              <div style={{ fontSize: '13px', marginTop: '8px' }}>
-                或点击顶部色球快速创建
+            />
+
+            {notes.map(renderNote)}
+
+            {ungroupedNotes.length === 0 && !editingNote && (
+              <div
+                style={{
+                  position: 'absolute',
+                  top: '50%',
+                  left: '50%',
+                  transform: 'translate(-50%, -50%)',
+                  color: 'rgba(255, 255, 255, 0.3)',
+                  fontSize: '16px',
+                  textAlign: 'center',
+                  pointerEvents: 'none',
+                }}
+              >
+                双击空白处创建便签
+                <div style={{ fontSize: '13px', marginTop: '8px' }}>
+                  或点击顶部色球快速创建
+                </div>
               </div>
+            )}
+          </div>
+
+          {!isMobile && polls.length > 0 && (
+            <div
+              style={{
+                position: 'absolute',
+                top: '20px',
+                right: '20px',
+                zIndex: 50,
+              }}
+            >
+              {renderPollPanel()}
             </div>
           )}
         </div>
 
-        {!isMobile && renderPollPanel()}
+        {isMobile && polls.length > 0 && (
+          <div className="mobile-poll-container">{renderPollPanel()}</div>
+        )}
 
         <div
           style={{
@@ -1123,8 +1167,6 @@ function NoteBoard({
             便签: {notes.length} 张 | 投票: {polls.length} 个
           </div>
         </div>
-
-        {isMobile && renderPollPanel()}
       </div>
 
       {renderPollCreator()}
