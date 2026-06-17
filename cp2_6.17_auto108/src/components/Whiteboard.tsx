@@ -41,6 +41,8 @@ const FONT_FAMILY = '-apple-system, BlinkMacSystemFont, sans-serif';
 export default function Whiteboard({ socket, roomCode }: WhiteboardProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const canvasWrapperRef = useRef<HTMLDivElement>(null);
+
   const [isDrawing, setIsDrawing] = useState(false);
   const [color, setColor] = useState(COLORS[0]);
   const [lineWidth, setLineWidth] = useState(2);
@@ -49,6 +51,7 @@ export default function Whiteboard({ socket, roomCode }: WhiteboardProps) {
   const [textInput, setTextInput] = useState('');
   const [textPos, setTextPos] = useState<{ x: number; y: number } | null>(null);
   const [showTextModal, setShowTextModal] = useState(false);
+
   const [draggingTextId, setDraggingTextId] = useState<string | null>(null);
   const [dragOffset, setDragOffset] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const [tempDraggingPos, setTempDraggingPos] = useState<{ x: number; y: number } | null>(null);
@@ -87,8 +90,8 @@ export default function Whiteboard({ socket, roomCode }: WhiteboardProps) {
       const item = allDrawings[i];
       if (item.type === 'text') {
         const textWidth = measureTextWidth(item.text);
-        const halfW = textWidth / 2 + 8;
-        const halfH = FONT_SIZE / 2 + 6;
+        const halfW = textWidth / 2 + 10;
+        const halfH = FONT_SIZE / 2 + 8;
         if (
           x >= item.x - halfW &&
           x <= item.x + halfW &&
@@ -263,6 +266,7 @@ export default function Whiteboard({ socket, roomCode }: WhiteboardProps) {
         y: coords.y - hitText.y,
       });
       setTempDraggingPos({ x: hitText.x, y: hitText.y });
+      e.preventDefault();
       return;
     }
 
@@ -276,10 +280,9 @@ export default function Whiteboard({ socket, roomCode }: WhiteboardProps) {
     const coords = getCanvasCoords(e);
 
     if (draggingTextId) {
-      setTempDraggingPos({
-        x: coords.x - dragOffset.x,
-        y: coords.y - dragOffset.y,
-      });
+      const newX = coords.x - dragOffset.x;
+      const newY = coords.y - dragOffset.y;
+      setTempDraggingPos({ x: newX, y: newY });
       return;
     }
 
@@ -354,7 +357,7 @@ export default function Whiteboard({ socket, roomCode }: WhiteboardProps) {
       x: textPos.x,
       y: textPos.y,
       text: textInput.trim(),
-      color,
+      color: color,
       id: uuidv4(),
     };
     setDrawings((prev) => [...prev, textDrawing]);
@@ -377,32 +380,42 @@ export default function Whiteboard({ socket, roomCode }: WhiteboardProps) {
   };
 
   const getModalPosition = () => {
-    if (!textPos || !containerRef.current) return { left: 0, top: 0 };
+    if (!textPos || !canvasWrapperRef.current) return { left: 0, top: 0 };
     const canvas = canvasRef.current;
     if (!canvas) return { left: 0, top: 0 };
-    const rect = canvas.getBoundingClientRect();
-    const scaleX = rect.width / (canvas.width / window.devicePixelRatio);
-    const scaleY = rect.height / (canvas.height / window.devicePixelRatio);
 
-    const modalWidth = 220;
-    const modalHeight = 90;
+    const wrapperRect = canvasWrapperRef.current.getBoundingClientRect();
+    const canvasRect = canvas.getBoundingClientRect();
+
+    const scaleX = canvasRect.width / (canvas.width / window.devicePixelRatio);
+    const scaleY = canvasRect.height / (canvas.height / window.devicePixelRatio);
+
+    const canvasX = textPos.x * scaleX;
+    const canvasY = textPos.y * scaleY;
+
+    const relativeX = canvasX + (canvasRect.left - wrapperRect.left);
+    const relativeY = canvasY + (canvasRect.top - wrapperRect.top);
+
+    const modalWidth = 240;
+    const modalHeight = 100;
     const offsetX = 10;
     const offsetY = -modalHeight - 10;
 
-    let left = textPos.x * scaleX + offsetX;
-    let top = textPos.y * scaleY + offsetY;
+    let left = relativeX + offsetX;
+    let top = relativeY + offsetY;
 
-    if (left + modalWidth > rect.width) {
-      left = textPos.x * scaleX - modalWidth - offsetX;
+    if (left + modalWidth > wrapperRect.width) {
+      left = relativeX - modalWidth - offsetX;
     }
-    if (top < 0) {
-      top = textPos.y * scaleY + 20;
+    if (top < 5) {
+      top = relativeY + 20;
     }
-    if (top + modalHeight > rect.height) {
-      top = rect.height - modalHeight - 10;
+    if (top + modalHeight > wrapperRect.height - 5) {
+      top = wrapperRect.height - modalHeight - 10;
     }
+    if (left < 5) left = 5;
 
-    return { left: Math.max(5, left), top: Math.max(5, top) };
+    return { left, top };
   };
 
   const modalPos = getModalPosition();
@@ -444,7 +457,7 @@ export default function Whiteboard({ socket, roomCode }: WhiteboardProps) {
           🗑️ 清空
         </button>
       </div>
-      <div style={styles.canvasWrapper}>
+      <div ref={canvasWrapperRef} style={styles.canvasWrapper}>
         <canvas
           ref={canvasRef}
           onMouseDown={handleMouseDown}
@@ -477,7 +490,7 @@ export default function Whiteboard({ socket, roomCode }: WhiteboardProps) {
                 e.stopPropagation();
               }}
               placeholder="输入文字..."
-              style={{ ...styles.textInput, color }}
+              style={{ ...styles.textInput, color: color }}
               onClick={(e) => e.stopPropagation()}
             />
             <div style={styles.textModalBtns}>
@@ -569,26 +582,25 @@ const styles: Record<string, React.CSSProperties> = {
   },
   textModal: {
     position: 'absolute',
-    backgroundColor: 'rgba(30, 30, 50, 0.92)',
-    backdropFilter: 'blur(8px)',
-    padding: '10px',
+    backgroundColor: 'rgba(20, 20, 45, 0.92)',
+    backdropFilter: 'blur(10px)',
+    padding: '12px',
     borderRadius: '10px',
-    boxShadow: '0 6px 20px rgba(0,0,0,0.5)',
+    boxShadow: '0 8px 24px rgba(0,0,0,0.5)',
     display: 'flex',
     flexDirection: 'column',
-    gap: '8px',
+    gap: '10px',
     zIndex: 10,
-    border: '1px solid rgba(255,255,255,0.1)',
+    border: '1px solid rgba(255,255,255,0.15)',
   },
   textInput: {
-    padding: '8px 12px',
-    borderRadius: '6px',
-    border: '1px solid rgba(255,255,255,0.15)',
-    backgroundColor: 'rgba(0,0,0,0.25)',
-    color: '#fff',
+    padding: '10px 14px',
+    borderRadius: '8px',
+    border: '1px solid rgba(255,255,255,0.2)',
+    backgroundColor: 'rgba(0,0,0,0.3)',
     fontSize: '14px',
     outline: 'none',
-    width: '200px',
+    width: '220px',
     fontWeight: 500,
   },
   textModalBtns: {
@@ -597,11 +609,11 @@ const styles: Record<string, React.CSSProperties> = {
   },
   modalBtn: {
     flex: 1,
-    padding: '6px 12px',
+    padding: '8px 14px',
     borderRadius: '6px',
     border: 'none',
     color: '#fff',
-    fontSize: '12px',
+    fontSize: '13px',
     cursor: 'pointer',
     transition: 'filter 0.2s',
     fontWeight: 500,

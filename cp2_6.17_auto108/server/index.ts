@@ -1,15 +1,11 @@
-import express from 'express';
-import http from 'http';
+import express = require('express');
+import http = require('http');
 import { Server, Socket } from 'socket.io';
-import cors from 'cors';
-import multer from 'multer';
+import cors = require('cors');
+import multer = require('multer');
 import { v4 as uuidv4 } from 'uuid';
-import fs from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+import fs = require('fs');
+import path = require('path');
 
 const app = express();
 const server = http.createServer(app);

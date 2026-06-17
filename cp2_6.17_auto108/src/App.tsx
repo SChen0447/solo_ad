@@ -185,8 +185,8 @@ function RoomView({
         </div>
       </div>
 
-      <div style={styles.mainContent}>
-        <div style={styles.leftArea}>
+      <div className="main-content" style={styles.mainContent}>
+        <div className="left-area" style={styles.leftArea}>
           {socket && (
             <Whiteboard socket={socket} roomCode={roomCode} nickname={nickname} />
           )}
@@ -199,7 +199,7 @@ function RoomView({
             />
           )}
         </div>
-        <div style={styles.rightPanel}>
+        <div className="right-panel" style={styles.rightPanel}>
           {socket && (
             <TodoList
               socket={socket}
@@ -415,7 +415,6 @@ const styles: Record<string, React.CSSProperties> = {
     gap: '16px',
     padding: '16px',
     overflow: 'hidden',
-    className: 'main-content',
   },
   leftArea: {
     flex: 1,
@@ -423,11 +422,9 @@ const styles: Record<string, React.CSSProperties> = {
     flexDirection: 'column',
     gap: '16px',
     minWidth: 0,
-    className: 'left-area',
   },
   rightPanel: {
     width: '300px',
     flexShrink: 0,
-    className: 'right-panel',
   },
 };
