@@ -1,8 +1,71 @@
 import axios, { AxiosRequestConfig, AxiosError } from 'axios';
-import { ApiConfig, ApiResult } from '../types';
-import { transformApiResponse } from '../utils/dataUtils';
+import { ApiConfig, ApiResult, CACHE_DURATION_OPTIONS, CacheDuration } from '../types';
+import { transformApiResponse, generateCacheKey } from '../utils/dataUtils';
 
 const TIMEOUT = 15000;
+
+interface CacheEntry {
+  data: unknown;
+  timestamp: number;
+  duration: CacheDuration;
+}
+
+function getCacheDurationMinutes(duration: CacheDuration): number {
+  const option = CACHE_DURATION_OPTIONS.find(opt => opt.value === duration);
+  return option ? option.minutes : 0;
+}
+
+function getCache(config: ApiConfig): ApiResult | null {
+  const durationMinutes = getCacheDurationMinutes(config.cacheDuration);
+  if (durationMinutes === 0) return null;
+  
+  const cacheKey = generateCacheKey(config);
+  
+  try {
+    const cachedStr = localStorage.getItem(cacheKey);
+    if (!cachedStr) return null;
+    
+    const cached: CacheEntry = JSON.parse(cachedStr);
+    const now = Date.now();
+    const expiresAt = cached.timestamp + durationMinutes * 60 * 1000;
+    
+    if (now > expiresAt) {
+      localStorage.removeItem(cacheKey);
+      return null;
+    }
+    
+    const { tableData, chartData } = transformApiResponse(cached.data);
+    return {
+      configId: config.id,
+      status: 'success',
+      data: tableData,
+      chartData: chartData,
+      raw: cached.data,
+      fromCache: true,
+      cachedAt: cached.timestamp
+    };
+  } catch {
+    return null;
+  }
+}
+
+function setCache(config: ApiConfig, data: unknown): void {
+  const durationMinutes = getCacheDurationMinutes(config.cacheDuration);
+  if (durationMinutes === 0) return;
+  
+  const cacheKey = generateCacheKey(config);
+  const cacheEntry: CacheEntry = {
+    data,
+    timestamp: Date.now(),
+    duration: config.cacheDuration
+  };
+  
+  try {
+    localStorage.setItem(cacheKey, JSON.stringify(cacheEntry));
+  } catch {
+    console.warn('无法保存缓存，可能是存储空间不足');
+  }
+}
 
 function buildHeaders(headers: { key: string; value: string }[]): Record<string, string> {
   const result: Record<string, string> = {};
@@ -25,6 +88,11 @@ function buildParams(params: { key: string; value: string }[]): Record<string, s
 }
 
 async function executeSingleRequest(config: ApiConfig): Promise<ApiResult> {
+  const cachedResult = getCache(config);
+  if (cachedResult) {
+    return cachedResult;
+  }
+
   const result: ApiResult = {
     configId: config.id,
     status: 'loading'
@@ -43,10 +111,14 @@ async function executeSingleRequest(config: ApiConfig): Promise<ApiResult> {
     const response = await axios.request(requestConfig);
     const { tableData, chartData } = transformApiResponse(response.data);
     
+    setCache(config, response.data);
+    
     result.status = 'success';
     result.data = tableData;
     result.chartData = chartData;
     result.raw = response.data;
+    result.fromCache = false;
+    result.cachedAt = Date.now();
 
     return result;
   } catch (error) {

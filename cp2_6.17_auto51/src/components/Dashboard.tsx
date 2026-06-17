@@ -93,6 +93,21 @@ const Dashboard: React.FC = () => {
               >
                 <div className="result-column-header">
                   <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    {result.fromCache && (
+                      <span
+                        title={result.cachedAt ? `缓存时间: ${new Date(result.cachedAt).toLocaleString()}` : '来自缓存'}
+                        style={{
+                          fontSize: '16px',
+                          color: '#888',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '4px'
+                        }}
+                      >
+                        <span style={{ opacity: 0.7 }}>⏰</span>
+                        <span style={{ fontSize: '12px' }}>缓存</span>
+                      </span>
+                    )}
                     <div className="result-column-title">{config.name}</div>
                     <div className="query-status">
                       <span className={`status-dot ${statusInfo.dotClass}`} />

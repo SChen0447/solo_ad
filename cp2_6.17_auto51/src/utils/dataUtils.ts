@@ -1,4 +1,4 @@
-import { TableRow, ChartDataPoint } from '../types';
+import { TableRow, ChartDataPoint, ApiConfig } from '../types';
 
 export function isObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -123,4 +123,31 @@ export function formatValue(value: string | number | boolean | null): string {
   if (typeof value === 'boolean') return value ? '是' : '否';
   if (typeof value === 'number') return value.toLocaleString();
   return String(value);
+}
+
+export function generateHash(str: string): string {
+  let hash = 5381;
+  for (let i = 0; i < str.length; i++) {
+    hash = ((hash << 5) + hash) + str.charCodeAt(i);
+    hash = hash & hash;
+  }
+  return Math.abs(hash).toString(36);
+}
+
+export function generateCacheKey(config: ApiConfig): string {
+  const headersStr = config.headers
+    .filter(h => h.key.trim())
+    .sort((a, b) => a.key.localeCompare(b.key))
+    .map(h => `${h.key}:${h.value}`)
+    .join('|');
+  
+  const paramsStr = config.params
+    .filter(p => p.key.trim())
+    .sort((a, b) => a.key.localeCompare(b.key))
+    .map(p => `${p.key}=${p.value}`)
+    .join('&');
+  
+  const keyStr = `${config.method}|${config.url}|${headersStr}|${paramsStr}`;
+  
+  return `api_cache_${generateHash(keyStr)}`;
 }

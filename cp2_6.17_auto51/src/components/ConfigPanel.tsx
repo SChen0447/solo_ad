@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { ApiConfig, HttpMethod, HeaderParam, QueryParam } from '../types';
+import { ApiConfig, HttpMethod, HeaderParam, QueryParam, CacheDuration, CACHE_DURATION_OPTIONS } from '../types';
 
 interface ApiCardProps {
   config: ApiConfig;
@@ -39,6 +39,10 @@ const ApiCard: React.FC<ApiCardProps> = ({
 
   const handleMethodChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     updateConfig(config.id, { method: e.target.value as HttpMethod });
+  };
+
+  const handleCacheDurationChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    updateConfig(config.id, { cacheDuration: e.target.value as CacheDuration });
   };
 
   const handleHeaderKeyChange = (idx: number, key: string) => {
@@ -173,6 +177,22 @@ const ApiCard: React.FC<ApiCardProps> = ({
                 placeholder="https://api.example.com/data"
               />
             </div>
+          </div>
+
+          <div>
+            <div className="form-label">缓存有效期</div>
+            <select
+              className="select-field"
+              value={config.cacheDuration}
+              onChange={handleCacheDurationChange}
+              style={{ width: '100%' }}
+            >
+              {CACHE_DURATION_OPTIONS.map(opt => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
           </div>
 
           <div>

@@ -13,7 +13,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       url: 'https://jsonplaceholder.typicode.com/posts?_limit=5',
       method: 'GET',
       headers: [],
-      params: []
+      params: [],
+      cacheDuration: 'none'
     }
   ]);
   
@@ -29,7 +30,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       url: '',
       method: 'GET' as HttpMethod,
       headers: [],
-      params: []
+      params: [],
+      cacheDuration: 'none'
     };
     setConfigs(prev => [...prev, newConfig]);
     setExpandedCards(prev => new Set(prev).add(newConfig.id));
@@ -111,6 +113,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       url: cfg.url,
       method: cfg.method,
       params: cfg.params,
+      cacheDuration: cfg.cacheDuration,
       headers: cfg.headers.map(h => ({ key: h.key, value: '' }))
     }));
     
@@ -141,6 +144,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             name: item.name || '未命名API',
             url: item.url || '',
             method: (item.method as HttpMethod) || 'GET',
+            cacheDuration: item.cacheDuration || 'none',
             headers: Array.isArray(item.headers) ? item.headers.map(h => ({ key: h?.key || '', value: '' })) : [],
             params: Array.isArray(item.params) ? item.params.map(p => ({ key: p?.key || '', value: p?.value || '' })) : []
           }));

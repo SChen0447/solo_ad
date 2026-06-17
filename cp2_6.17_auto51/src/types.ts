@@ -2,6 +2,16 @@ export type HttpMethod = 'GET' | 'POST';
 
 export type ChartType = 'bar' | 'line' | 'pie';
 
+export type CacheDuration = 'none' | '1min' | '5min' | '15min' | '30min';
+
+export const CACHE_DURATION_OPTIONS: { value: CacheDuration; label: string; minutes: number }[] = [
+  { value: 'none', label: '不缓存', minutes: 0 },
+  { value: '1min', label: '1分钟', minutes: 1 },
+  { value: '5min', label: '5分钟', minutes: 5 },
+  { value: '15min', label: '15分钟', minutes: 15 },
+  { value: '30min', label: '30分钟', minutes: 30 }
+];
+
 export interface QueryParam {
   key: string;
   value: string;
@@ -19,6 +29,7 @@ export interface ApiConfig {
   method: HttpMethod;
   headers: HeaderParam[];
   params: QueryParam[];
+  cacheDuration: CacheDuration;
 }
 
 export interface TableRow {
@@ -37,6 +48,8 @@ export interface ApiResult {
   chartData?: ChartDataPoint[];
   error?: string;
   raw?: unknown;
+  fromCache?: boolean;
+  cachedAt?: number;
 }
 
 export interface AppState {
