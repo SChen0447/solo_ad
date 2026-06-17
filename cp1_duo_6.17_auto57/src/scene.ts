@@ -26,6 +26,12 @@ interface Particle {
   sprite: Phaser.GameObjects.Arc;
 }
 
+interface Footprint {
+  sprite: Phaser.GameObjects.Arc;
+  life: number;
+  maxLife: number;
+}
+
 export class GameScene extends Phaser.Scene {
   private mapData!: MapData;
   private player!: Phaser.GameObjects.Arc;
@@ -42,6 +48,7 @@ export class GameScene extends Phaser.Scene {
   private minimapGraphics!: Phaser.GameObjects.Graphics;
   private minimapContainer!: Phaser.GameObjects.Container;
   private minimapBorder!: Phaser.GameObjects.Rectangle;
+  private minimapGlow!: Phaser.GameObjects.Rectangle;
   private minimapScale: number = 0.25;
   private minimapDirty: boolean = true;
 
@@ -53,6 +60,7 @@ export class GameScene extends Phaser.Scene {
 
   private chests: Chest[] = [];
   private particles: Particle[] = [];
+  private footprints: Footprint[] = [];
 
   private keys!: {
     w: Phaser.Input.Keyboard.Key;
@@ -111,7 +119,7 @@ export class GameScene extends Phaser.Scene {
         display: flex;
         align-items: center;
         padding: 0 20px;
-        gap: 15px;
+        gap: 35px;
         font-family: 'Segoe UI', sans-serif;
         position: relative;
         z-index: 100;
@@ -161,6 +169,12 @@ export class GameScene extends Phaser.Scene {
       this.generateBtn.style.background = '#1a5276';
       this.generateBtn.style.transform = 'scale(1)';
     });
+    this.generateBtn.addEventListener('mousedown', () => {
+      this.generateBtn.style.transform = 'scale(0.95)';
+    });
+    this.generateBtn.addEventListener('mouseup', () => {
+      this.generateBtn.style.transform = 'scale(1.05)';
+    });
     this.generateBtn.addEventListener('click', () => {
       const seed = this.seedInput.value ? parseInt(this.seedInput.value) : Date.now();
       this.generateMapWithSeed(seed);
@@ -191,6 +205,20 @@ export class GameScene extends Phaser.Scene {
     const minimapDisplayHeight = this.worldHeight * this.minimapScale;
     const centerX = gameWidth - minimapDisplayWidth / 2 - 15;
     const centerY = minimapDisplayHeight / 2 + 15;
+
+    this.minimapGlow = this.add
+      .rectangle(
+        centerX,
+        centerY,
+        minimapDisplayWidth + 20,
+        minimapDisplayHeight + 20,
+        0xffd700,
+        0
+      )
+      .setScrollFactor(0)
+      .setDepth(88);
+    this.minimapGlow.setStrokeStyle(3, 0xffd700, 0);
+    this.minimapGlow.setAlpha(0);
 
     this.minimapBorder = this.add
       .rectangle(
@@ -224,12 +252,60 @@ export class GameScene extends Phaser.Scene {
     );
 
     this.minimapBorder.on('pointerover', () => {
-      this.minimapContainer.setScale(1.2);
-      this.minimapBorder.setScale(1.2);
+      this.tweens.add({
+        targets: this.minimapContainer,
+        scale: 1.5,
+        duration: 200,
+        ease: 'Cubic.easeOut',
+      });
+      this.tweens.add({
+        targets: this.minimapBorder,
+        scale: 1.5,
+        duration: 200,
+        ease: 'Cubic.easeOut',
+      });
+      this.tweens.add({
+        targets: this.minimapGlow,
+        scale: 1.5,
+        alpha: 0.6,
+        duration: 200,
+        ease: 'Cubic.easeOut',
+        onUpdate: (tween) => {
+          const progress = tween.progress;
+          this.minimapGlow.setStrokeStyle(3 + progress * 5, 0xffd700, progress * 0.8);
+          this.minimapGlow.setFillStyle(0xffd700, progress * 0.1);
+        },
+      });
     });
     this.minimapBorder.on('pointerout', () => {
-      this.minimapContainer.setScale(1);
-      this.minimapBorder.setScale(1);
+      this.tweens.add({
+        targets: this.minimapContainer,
+        scale: 1,
+        duration: 200,
+        ease: 'Cubic.easeOut',
+      });
+      this.tweens.add({
+        targets: this.minimapBorder,
+        scale: 1,
+        duration: 200,
+        ease: 'Cubic.easeOut',
+      });
+      this.tweens.add({
+        targets: this.minimapGlow,
+        scale: 1,
+        alpha: 0,
+        duration: 200,
+        ease: 'Cubic.easeOut',
+        onUpdate: (tween) => {
+          const progress = 1 - tween.progress;
+          this.minimapGlow.setStrokeStyle(3 + progress * 5, 0xffd700, progress * 0.8);
+          this.minimapGlow.setFillStyle(0xffd700, progress * 0.1);
+        },
+        onComplete: () => {
+          this.minimapGlow.setStrokeStyle(3, 0xffd700, 0);
+          this.minimapGlow.setFillStyle(0xffd700, 0);
+        },
+      });
     });
   }
 
@@ -303,6 +379,11 @@ export class GameScene extends Phaser.Scene {
     this.initExploredArray();
     this.calculateTotalFloorTiles();
     this.placeChests();
+
+    for (const fp of this.footprints) {
+      fp.sprite.destroy();
+    }
+    this.footprints = [];
 
     if (this.graphics) {
       this.graphics.destroy();
@@ -746,9 +827,45 @@ export class GameScene extends Phaser.Scene {
         });
 
         this.showPickupToast();
+        this.showChestPlusOne(chest.sprite.x, chest.sprite.y);
         this.minimapDirty = true;
       }
     }
+  }
+
+  private showChestPlusOne(worldX: number, worldY: number): void {
+    const cam = this.camera;
+    const screenX = (worldX - cam.scrollX) * cam.zoom;
+    const screenY = (worldY - cam.scrollY) * cam.zoom;
+
+    const plusOne = this.add
+      .text(screenX, screenY - 20, '+1', {
+        fontFamily: "'Segoe UI', sans-serif",
+        fontSize: '24px',
+        color: '#ffd700',
+        fontStyle: 'bold',
+        stroke: '#b8860b',
+        strokeThickness: 2,
+      })
+      .setOrigin(0.5)
+      .setDepth(200)
+      .setScrollFactor(0);
+
+    const targetX = this.scale.width - 60;
+    const targetY = 60;
+
+    this.tweens.add({
+      targets: plusOne,
+      x: targetX,
+      y: targetY,
+      scale: { from: 1, to: 0.6 },
+      alpha: { from: 1, to: 0 },
+      duration: 1200,
+      ease: 'Cubic.easeIn',
+      onComplete: () => {
+        plusOne.destroy();
+      },
+    });
   }
 
   private showPickupToast(): void {
@@ -894,6 +1011,7 @@ export class GameScene extends Phaser.Scene {
     this.handleInput();
     this.updatePlayerMovement(delta);
     this.updateParticles(delta);
+    this.updateFootprints(delta);
 
     if (this.minimapDirty) {
       this.renderMinimap();
@@ -939,6 +1057,48 @@ export class GameScene extends Phaser.Scene {
     this.isMoving = true;
     this.moveProgress = 0;
     this.createStepParticles();
+    this.createFootprint(this.playerGridX, this.playerGridY);
+  }
+
+  private createFootprint(gridX: number, gridY: number): void {
+    const px = gridX * TILE_SIZE + TILE_SIZE / 2;
+    const py = gridY * TILE_SIZE + TILE_SIZE / 2;
+
+    const fpSprite = this.add.arc(
+      px,
+      py,
+      TILE_SIZE * 0.2,
+      0,
+      360,
+      false,
+      0xe94560
+    );
+    fpSprite.setDepth(8);
+    fpSprite.setAlpha(0.5);
+
+    this.footprints.push({
+      sprite: fpSprite,
+      life: 0,
+      maxLife: 3000,
+    });
+  }
+
+  private updateFootprints(delta: number): void {
+    for (let i = this.footprints.length - 1; i >= 0; i--) {
+      const fp = this.footprints[i];
+      fp.life += delta;
+
+      if (fp.life >= fp.maxLife) {
+        fp.sprite.destroy();
+        this.footprints.splice(i, 1);
+        continue;
+      }
+
+      const progress = fp.life / fp.maxLife;
+      const alpha = 0.5 * (1 - progress);
+      fp.sprite.setAlpha(alpha);
+      fp.sprite.setScale(1 - progress * 0.5);
+    }
   }
 
   private canMoveTo(x: number, y: number): boolean {
