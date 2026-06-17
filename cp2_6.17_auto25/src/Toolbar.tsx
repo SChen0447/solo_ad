@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import React, { useRef, useState } from 'react';
 import type { Tool } from './types';
 import { BRUSH_COLORS, BRUSH_WIDTHS } from './types';
 
@@ -24,6 +24,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
   onAddText,
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [toolbarHovered, setToolbarHovered] = useState(false);
 
   const handleImageClick = () => {
     setActiveTool('image');
@@ -58,7 +59,11 @@ export const Toolbar: React.FC<ToolbarProps> = ({
 
   return (
     <>
-      <div style={toolbarStyle}>
+      <div
+        style={{ ...toolbarStyle, background: toolbarHovered ? '#2c2c3e' : 'rgba(30,30,40,0.8)' }}
+        onMouseEnter={() => setToolbarHovered(true)}
+        onMouseLeave={() => setToolbarHovered(false)}
+      >
         <button
           title="上传图片"
           onClick={handleImageClick}
