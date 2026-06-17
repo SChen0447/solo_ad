@@ -72,8 +72,12 @@ class AeroFlowApp {
     this.particleSystem = new ParticleSystem(this.scene, this.params, this.objectManager);
     this.controlPanel = new ControlPanel(this.params);
     this.recorder = new Recorder(this.renderer.domElement);
+    
+    this.recorder.setGetParticleStateCallback(() => this.particleSystem.getParticleState());
+    this.recorder.setParticleStateCallback((state) => this.particleSystem.setPlaybackState(state));
 
     this.setupEvents();
+    this.controlPanel.loadPresetsFromBackend();
     this.animate();
   }
 
