@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import { X, Edit2, Trash2, Calendar, Link as LinkIcon } from 'lucide-react';
 import { useStore } from '../store/useStore';
-import { TAG_COLORS } from '../types';
+import { getStableTagColor } from '../utils/colors';
 
 const InspirationDetail: React.FC = () => {
   const {
@@ -18,10 +18,7 @@ const InspirationDetail: React.FC = () => {
   }, [inspirations, selectedInspirationId]);
 
   const getTagColor = (tagName: string) => {
-    const tag = tags.find(t => t.name === tagName);
-    if (tag) return tag.color;
-    const hash = tagName.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
-    return TAG_COLORS[hash % TAG_COLORS.length];
+    return getStableTagColor(tagName);
   };
 
   const formatDate = (dateStr: string) => {

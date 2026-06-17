@@ -2,6 +2,7 @@ import React, { useState, useCallback, useMemo } from 'react';
 import { Star } from 'lucide-react';
 import type { Inspiration, Tag } from '../types';
 import { useStore } from '../store/useStore';
+import { getStableTagColor } from '../utils/colors';
 
 interface InspirationCardProps {
   inspiration: Inspiration;
@@ -9,18 +10,13 @@ interface InspirationCardProps {
   onClick: () => void;
 }
 
-const TAG_COLORS = ['#ff6b6b', '#4ecdc4', '#ffe66d', '#a29bfe'];
-
 const InspirationCard: React.FC<InspirationCardProps> = ({ inspiration, tags, onClick }) => {
   const [pulsingId, setPulsingId] = useState<string | null>(null);
   const toggleFavorite = useStore(state => state.toggleFavorite);
 
   const getTagColor = useCallback((tagName: string) => {
-    const tag = tags.find(t => t.name === tagName);
-    if (tag) return tag.color;
-    const hash = tagName.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
-    return TAG_COLORS[hash % TAG_COLORS.length];
-  }, [tags]);
+    return getStableTagColor(tagName);
+  }, []);
 
   const handleFavoriteClick = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
