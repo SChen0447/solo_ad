@@ -3,6 +3,7 @@ export interface ColorItem {
   name: string;
   value: string;
   label: string;
+  locked: boolean;
 }
 
 export interface Theme {
@@ -15,4 +16,5 @@ export interface Theme {
 
 export type ColorAction =
   | { type: 'SET_COLOR'; payload: { id: string; value: string } }
+  | { type: 'TOGGLE_LOCK'; payload: { id: string } }
   | { type: 'SET_ALL_COLORS'; payload: ColorItem[] };

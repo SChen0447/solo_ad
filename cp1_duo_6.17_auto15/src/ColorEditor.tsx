@@ -1,9 +1,10 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useCallback } from 'react';
 import { ColorItem } from './types';
 
 interface ColorEditorProps {
   color: ColorItem;
   onChange: (id: string, value: string) => void;
+  onToggleLock: (id: string) => void;
 }
 
 function hexToHsl(hex: string): { h: number; s: number; l: number } {
@@ -61,28 +62,61 @@ function generateHueGradient(s: number, l: number): string {
   return `linear-gradient(to right, ${stops.join(', ')})`;
 }
 
-const ColorEditor: React.FC<ColorEditorProps> = ({ color, onChange }) => {
+const LockIcon: React.FC<{ locked: boolean }> = ({ locked }) => (
+  <svg
+    width="16"
+    height="16"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke={locked ? '#FFD700' : '#999'}
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    style={{ transition: 'stroke 0.3s ease' }}
+  >
+    {locked ? (
+      <>
+        <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+        <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+      </>
+    ) : (
+      <>
+        <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+        <path d="M7 11V7a5 5 0 0 1 9.9-1" />
+      </>
+    )}
+  </svg>
+);
+
+const ColorEditor: React.FC<ColorEditorProps> = ({ color, onChange, onToggleLock }) => {
   const hsl = useMemo(() => hexToHsl(color.value), [color.value]);
   const recommendedColors = useMemo(() => generateRecommendedColors(color.value), [color.value]);
   const hueGradient = useMemo(() => generateHueGradient(hsl.s, hsl.l), [hsl.s, hsl.l]);
 
-  const handleHueChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleHueChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    if (color.locked) return;
     const newH = parseInt(e.target.value, 10);
     const newHex = hslToHex(newH, hsl.s, hsl.l);
     onChange(color.id, newHex);
-  };
+  }, [color.id, color.locked, hsl.s, hsl.l, onChange]);
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    if (color.locked) return;
     let val = e.target.value;
     if (!val.startsWith('#')) val = '#' + val;
     if (/^#[0-9A-Fa-f]{6}$/.test(val)) {
       onChange(color.id, val);
     }
-  };
+  }, [color.id, color.locked, onChange]);
 
-  const handleRecommendClick = (hex: string) => {
+  const handleRecommendClick = useCallback((hex: string) => {
+    if (color.locked) return;
     onChange(color.id, hex);
-  };
+  }, [color.id, color.locked, onChange]);
+
+  const handleLockClick = useCallback(() => {
+    onToggleLock(color.id);
+  }, [color.id, onToggleLock]);
 
   const sliderStyle: React.CSSProperties = {
     '--slider-gradient': hueGradient,
@@ -91,36 +125,69 @@ const ColorEditor: React.FC<ColorEditorProps> = ({ color, onChange }) => {
 
   return (
     <div style={{
-      backgroundColor: '#ffffff',
+      backgroundColor: color.locked ? '#FFFBF0' : '#ffffff',
       borderRadius: '8px',
       padding: '16px',
       marginBottom: '12px',
-      boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
+      boxShadow: color.locked ? '0 1px 3px rgba(255, 215, 0, 0.2)' : '0 1px 3px rgba(0,0,0,0.08)',
+      border: color.locked ? '1px solid #FFD700' : '1px solid transparent',
       transition: 'all 0.4s ease',
+      position: 'relative',
     }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
-        <span style={{ fontWeight: 600, fontSize: '14px', color: '#333' }}>{color.label}</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <span style={{ fontWeight: 600, fontSize: '14px', color: color.locked ? '#B8860B' : '#333', transition: 'color 0.3s ease' }}>
+            {color.label}
+          </span>
+          <button
+            onClick={handleLockClick}
+            title={color.locked ? '点击解锁' : '点击锁定'}
+            style={{
+              background: 'none',
+              border: 'none',
+              cursor: 'pointer',
+              padding: '2px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              borderRadius: '4px',
+              transition: 'background-color 0.2s ease',
+            }}
+            onMouseEnter={(e) => {
+              (e.currentTarget as HTMLButtonElement).style.backgroundColor = color.locked ? '#FFF4CC' : '#f0f0f0';
+            }}
+            onMouseLeave={(e) => {
+              (e.currentTarget as HTMLButtonElement).style.backgroundColor = 'transparent';
+            }}
+          >
+            <LockIcon locked={color.locked} />
+          </button>
+        </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <div style={{
             width: '24px',
             height: '24px',
             borderRadius: '50%',
             backgroundColor: color.value,
-            border: '2px solid #eee',
-            transition: 'background-color 0.4s ease',
+            border: color.locked ? '2px solid #FFD700' : '2px solid #eee',
+            transition: 'all 0.4s ease',
           }} />
           <input
             type="text"
             value={color.value}
             onChange={handleInputChange}
+            readOnly={color.locked}
             style={{
               width: '80px',
               padding: '4px 8px',
               fontSize: '12px',
-              border: '1px solid #ddd',
+              border: color.locked ? '1px solid #FFD700' : '1px solid #ddd',
               borderRadius: '4px',
               fontFamily: 'monospace',
               textTransform: 'uppercase',
+              backgroundColor: color.locked ? '#FFF8E0' : '#fff',
+              cursor: color.locked ? 'not-allowed' : 'text',
+              transition: 'all 0.3s ease',
             }}
           />
         </div>
@@ -133,6 +200,7 @@ const ColorEditor: React.FC<ColorEditorProps> = ({ color, onChange }) => {
           max="360"
           value={hsl.h}
           onChange={handleHueChange}
+          disabled={color.locked}
           style={{
             width: '100%',
             height: '8px',
@@ -140,8 +208,10 @@ const ColorEditor: React.FC<ColorEditorProps> = ({ color, onChange }) => {
             background: `var(--slider-gradient, ${hueGradient})`,
             appearance: 'none',
             WebkitAppearance: 'none',
-            cursor: 'pointer',
+            cursor: color.locked ? 'not-allowed' : 'pointer',
+            opacity: color.locked ? 0.5 : 1,
             ...sliderStyle,
+            transition: 'opacity 0.3s ease',
           }}
         />
         <style>{`
@@ -157,6 +227,9 @@ const ColorEditor: React.FC<ColorEditorProps> = ({ color, onChange }) => {
             cursor: pointer;
             transition: background-color 0.4s ease;
           }
+          input[type="range"]:disabled::-webkit-slider-thumb {
+            cursor: not-allowed;
+          }
           input[type="range"]::-moz-range-thumb {
             width: 18px;
             height: 18px;
@@ -167,6 +240,9 @@ const ColorEditor: React.FC<ColorEditorProps> = ({ color, onChange }) => {
             cursor: pointer;
             transition: background-color 0.4s ease;
           }
+          input[type="range"]:disabled::-moz-range-thumb {
+            cursor: not-allowed;
+          }
         `}</style>
       </div>
 
@@ -175,23 +251,29 @@ const ColorEditor: React.FC<ColorEditorProps> = ({ color, onChange }) => {
           <button
             key={idx}
             onClick={() => handleRecommendClick(recColor)}
-            title={recColor}
+            title={color.locked ? '颜色已锁定' : recColor}
+            disabled={color.locked}
             style={{
               width: '28px',
               height: '28px',
               borderRadius: '50%',
               backgroundColor: recColor,
-              border: '2px solid #fff',
-              boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
-              cursor: 'pointer',
+              border: color.locked ? '2px solid #ccc' : '2px solid #fff',
+              boxShadow: color.locked ? 'none' : '0 1px 3px rgba(0,0,0,0.2)',
+              cursor: color.locked ? 'not-allowed' : 'pointer',
               padding: 0,
-              transition: 'transform 0.2s ease, box-shadow 0.2s ease',
+              opacity: color.locked ? 0.4 : 1,
+              transition: 'all 0.2s ease',
             }}
             onMouseEnter={(e) => {
-              (e.target as HTMLButtonElement).style.transform = 'scale(1.15)';
+              if (!color.locked) {
+                (e.target as HTMLButtonElement).style.transform = 'scale(1.15)';
+              }
             }}
             onMouseLeave={(e) => {
-              (e.target as HTMLButtonElement).style.transform = 'scale(1)';
+              if (!color.locked) {
+                (e.target as HTMLButtonElement).style.transform = 'scale(1)';
+              }
             }}
           />
         ))}

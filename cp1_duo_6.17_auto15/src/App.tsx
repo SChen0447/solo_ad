@@ -5,15 +5,15 @@ import ThemePreview from './ThemePreview';
 import { ColorItem } from './types';
 
 const defaultColors: ColorItem[] = [
-  { id: 'primary', name: 'primary', label: '主色', value: '#1976D2' },
-  { id: 'secondary', name: 'secondary', label: '辅色', value: '#9C27B0' },
-  { id: 'background', name: 'background', label: '背景色', value: '#F5F5F5' },
-  { id: 'text', name: 'text', label: '文字色', value: '#333333' },
-  { id: 'buttonHover', name: 'buttonHover', label: '按钮交互色', value: '#1565C0' },
-  { id: 'surface', name: 'surface', label: '卡片色', value: '#FFFFFF' },
-  { id: 'border', name: 'border', label: '边框色', value: '#DDDDDD' },
-  { id: 'navBg', name: 'navBg', label: '导航栏色', value: '#333333' },
-  { id: 'alertBg', name: 'alertBg', label: '提示条色', value: '#FFF3CD' },
+  { id: 'primary', name: 'primary', label: '主色', value: '#1976D2', locked: false },
+  { id: 'secondary', name: 'secondary', label: '辅色', value: '#9C27B0', locked: false },
+  { id: 'background', name: 'background', label: '背景色', value: '#F5F5F5', locked: false },
+  { id: 'text', name: 'text', label: '文字色', value: '#333333', locked: false },
+  { id: 'buttonHover', name: 'buttonHover', label: '按钮交互色', value: '#1565C0', locked: false },
+  { id: 'surface', name: 'surface', label: '卡片色', value: '#FFFFFF', locked: false },
+  { id: 'border', name: 'border', label: '边框色', value: '#DDDDDD', locked: false },
+  { id: 'navBg', name: 'navBg', label: '导航栏色', value: '#333333', locked: false },
+  { id: 'alertBg', name: 'alertBg', label: '提示条色', value: '#FFF3CD', locked: false },
 ];
 
 const App: React.FC = () => {

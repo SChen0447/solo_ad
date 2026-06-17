@@ -122,12 +122,14 @@ const ThemeManager: React.FC<ThemeManagerProps> = ({ currentColors, onLoadTheme 
 
   const renderThumbnail = (colors: ColorItem[], size: 'small' | 'large' = 'small') => {
     const displayColors = colors.slice(0, 5);
+    const height = size === 'large' ? '24px' : '16px';
     return (
       <div style={{
         display: 'flex',
-        height: size === 'large' ? '24px' : '16px',
+        height,
         borderRadius: '4px',
         overflow: 'hidden',
+        position: 'relative',
       }}>
         {displayColors.map((c, idx) => (
           <div
@@ -136,8 +138,26 @@ const ThemeManager: React.FC<ThemeManagerProps> = ({ currentColors, onLoadTheme 
               flex: 1,
               backgroundColor: c.value,
               transition: 'background-color 0.4s ease',
+              position: 'relative',
             }}
-          />
+          >
+            {c.locked && (
+              <span
+                style={{
+                  position: 'absolute',
+                  top: '-2px',
+                  right: '-2px',
+                  fontSize: size === 'large' ? '10px' : '8px',
+                  lineHeight: 1,
+                  textShadow: '0 1px 2px rgba(0,0,0,0.3)',
+                  zIndex: 10,
+                }}
+                title={`${c.label} 已锁定`}
+              >
+                🔒
+              </span>
+            )}
+          </div>
         ))}
       </div>
     );

@@ -13,8 +13,18 @@ function colorReducer(state: ColorItem[], action: ColorAction): ColorItem[] {
       return state.map(c =>
         c.id === action.payload.id ? { ...c, value: action.payload.value } : c
       );
+    case 'TOGGLE_LOCK':
+      return state.map(c =>
+        c.id === action.payload.id ? { ...c, locked: !c.locked } : c
+      );
     case 'SET_ALL_COLORS':
-      return action.payload;
+      return state.map(c => {
+        const newColor = action.payload.find(nc => nc.id === c.id);
+        if (newColor) {
+          return c.locked ? c : { ...newColor, locked: c.locked };
+        }
+        return c;
+      });
     default:
       return state;
   }
@@ -27,6 +37,10 @@ const ColorEditorPanel: React.FC<ColorEditorPanelProps> = ({ initialColors, onCo
 
   const handleColorChange = useCallback((id: string, value: string) => {
     dispatch({ type: 'SET_COLOR', payload: { id, value } });
+  }, []);
+
+  const handleToggleLock = useCallback((id: string) => {
+    dispatch({ type: 'TOGGLE_LOCK', payload: { id } });
   }, []);
 
   useEffect(() => {
@@ -83,6 +97,7 @@ const ColorEditorPanel: React.FC<ColorEditorPanelProps> = ({ initialColors, onCo
           key={color.id}
           color={color}
           onChange={handleColorChange}
+          onToggleLock={handleToggleLock}
         />
       ))}
     </div>
