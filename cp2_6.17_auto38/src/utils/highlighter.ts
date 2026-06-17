@@ -12,6 +12,9 @@ const COLOR_ATTRIBUTE_VALUE = '#ce9178';
 const COLOR_PROPERTY = '#9cdcfe';
 const COLOR_SELECTOR = '#d7ba7d';
 const COLOR_REGEX = '#d16969';
+const COLOR_ENTITY = '#569cd6';
+const COLOR_PSEUDO = '#d7ba7d';
+const COLOR_AT_RULE = '#c586c0';
 
 const JS_KEYWORDS = [
   'break','case','catch','continue','debugger','default','delete','do','else',
@@ -34,18 +37,18 @@ const CSS_KEYWORDS = [
   'visible','scroll','bold','normal','italic','underline','pointer','default',
   'cover','contain','row','column','wrap','nowrap','space-between','space-around',
   'space-evenly','start','end','stretch','baseline','from','to',
-  'relative','absolute','fixed','sticky','static','inherit',
   'serif','sans-serif','monospace','cursive','fantasy',
-  'repeat','minmax','auto','fit-content','max-content','min-content',
+  'repeat','minmax','fit-content','max-content','min-content',
   'ease','ease-in','ease-out','ease-in-out','linear','step-start','step-end',
   'infinite','alternate','reverse','forwards','backwards','both','running','paused',
-  'column','row','grid','flex','block','inline-block','inline','none',
-  'dashed','dotted','solid','double','groove','ridge','inset','outset','none','hidden',
-  'left','right','center','justify','start','end',
-  'capitalize','uppercase','lowercase','none',
-  'italic','oblique','normal',
-  'thin','medium','thick',
-  'small','medium','large','x-large','xx-large','smaller','larger',
+  'inline-block','inline-flex','inline-grid',
+  'double','groove','ridge','inset','outset',
+  'justify','capitalize','uppercase','lowercase',
+  'oblique','thin','medium','thick',
+  'small','large','x-large','xx-large','smaller','larger',
+  'collapse','separate','fixed','local',
+  'rotate','scale','translate','skew','matrix','perspective',
+  'currentColor','disc','circle','square','decimal',
 ];
 
 interface Token {
@@ -180,32 +183,48 @@ function buildJsTsRules(): Rule[] {
 function buildHtmlRules(): Rule[] {
   return [
     {
-      pattern: /<!DOCTYPE\s+[^>]+>/gi,
-      color: COLOR_KEYWORD,
-    },
-    {
-      pattern: /<!--[\s\S]*?-->/g,
+      pattern: /&lt;!--[\s\S]*?--&gt;/g,
       color: COLOR_COMMENT,
     },
     {
-      pattern: /<\/?[\w-]+/g,
+      pattern: /&lt;!DOCTYPE\s+[^&]+&gt;/gi,
+      color: COLOR_KEYWORD,
+    },
+    {
+      pattern: /&lt;\/[A-Z][\w-]*/g,
       color: COLOR_TAG,
     },
     {
-      pattern: /\/?>/g,
+      pattern: /&lt;[A-Z][\w-]*/g,
       color: COLOR_TAG,
     },
     {
-      pattern: /\b([\w-]+)(?=\s*=\s*["']?)/g,
+      pattern: /&lt;\/[\w-]+/g,
+      color: COLOR_TAG,
+    },
+    {
+      pattern: /&lt;[\w-]+/g,
+      color: COLOR_TAG,
+    },
+    {
+      pattern: /\/?&gt;/g,
+      color: COLOR_TAG,
+    },
+    {
+      pattern: /\b([\w-]+)(?=\s*=\s*["&])/g,
       color: COLOR_ATTR,
     },
     {
-      pattern: /"([^"\\]|\\.)*"/g,
+      pattern: /"(?:[^"\\]|\\.)*"/g,
       color: COLOR_ATTRIBUTE_VALUE,
     },
     {
       pattern: /'([^'\\]|\\.)*'/g,
       color: COLOR_ATTRIBUTE_VALUE,
+    },
+    {
+      pattern: /&amp;[\w#]+;/g,
+      color: COLOR_ENTITY,
     },
     {
       pattern: /\b\d+%?\b/g,
@@ -221,20 +240,24 @@ function buildCssRules(): Rule[] {
       color: COLOR_COMMENT,
     },
     {
-      pattern: /@[\w-]+/g,
-      color: COLOR_KEYWORD,
+      pattern: /@(?:media|keyframes|import|font-face|supports|charset|namespace|page|layer|container)\b/g,
+      color: COLOR_AT_RULE,
     },
     {
-      pattern: /#[a-zA-Z_][\w-]*\s*\{/g,
+      pattern: /#[a-zA-Z_][\w-]*(?=\s*[,{\s])/g,
       color: COLOR_SELECTOR,
     },
     {
-      pattern: /\.[a-zA-Z_][\w-]*\s*\{/g,
+      pattern: /\.[a-zA-Z_][\w-]*(?=\s*[,{:\s])/g,
       color: COLOR_SELECTOR,
     },
     {
-      pattern: /[a-zA-Z][\w-]*\s*\{/g,
+      pattern: /[a-zA-Z][\w-]*(?=\s*\{)/g,
       color: COLOR_SELECTOR,
+    },
+    {
+      pattern: /::?[a-zA-Z-]+/g,
+      color: COLOR_PSEUDO,
     },
     {
       pattern: /\[[^\]]+\]/g,
@@ -257,7 +280,7 @@ function buildCssRules(): Rule[] {
       color: COLOR_KEYWORD,
     },
     {
-      pattern: /\b\d+\.?\d*(?:px|em|rem|%|vh|vw|vmin|vmax|s|ms|deg|rad|fr|ch|ex|lh|rlh|cqw|cqh|cqi|cqb|cqmin|cqmax)?\b/gi,
+      pattern: /\b\d+\.?\d*(?:px|em|rem|%|vh|vw|vmin|vmax|s|ms|deg|rad|fr|ch|ex|lh|rlh|cqw|cqh|cqi|cqb|cqmin|cqmax|dvh|svh|lvh)?\b/gi,
       color: COLOR_NUMBER,
     },
     {

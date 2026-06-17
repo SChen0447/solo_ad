@@ -1,14 +1,10 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import SideBySideView from '@/components/SideBySideView';
-import { compare, getMergedCode, type DiffResult } from '@/utils/diffEngine';
-import type { SupportedLanguage } from '@/utils/highlighter';
-
-const LANGUAGES: { value: SupportedLanguage; label: string }[] = [
-  { value: 'javascript', label: 'JavaScript' },
-  { value: 'typescript', label: 'TypeScript' },
-  { value: 'html', label: 'HTML' },
-  { value: 'css', label: 'CSS' },
-];
+import Toolbar from '@/components/Toolbar';
+import EditorPane from '@/components/EditorPane';
+import HelpModal from '@/components/HelpModal';
+import { compare, getMergedCode } from '@/utils/diffEngine';
+import type { DiffResult, SupportedLanguage } from '@/types';
 
 function useDebounce<T extends (...args: never[]) => void>(
   fn: T,
@@ -27,6 +23,27 @@ function useDebounce<T extends (...args: never[]) => void>(
   );
 }
 
+const HELP_CONTENT = (
+  <>
+    <h2>使用帮助</h2>
+    <ul>
+      <li>在左侧文本框输入或粘贴旧版代码</li>
+      <li>在右侧文本框输入或粘贴新版代码</li>
+      <li>输入代码后系统自动进行差异对比（防抖300ms）</li>
+      <li>
+        <span style={{ color: '#2d6a4f' }}>绿色背景</span>：新增行　
+        <span style={{ color: '#c0392b' }}>红色背景</span>：删除行　
+        <span style={{ color: '#e67e22' }}>黄色背景</span>：修改行
+      </li>
+      <li>点击高亮行可查看差异说明气泡</li>
+      <li>工具栏可切换语言、复制代码版本</li>
+      <li>拖拽中间分隔线可调整左右区域宽度</li>
+      <li>合并版规则：保留未修改行 + 新增/修改行，忽略删除行</li>
+      <li>按 ESC 键或点击遮罩层可关闭弹窗</li>
+    </ul>
+  </>
+);
+
 export default function App() {
   const [leftCode, setLeftCode] = useState('');
   const [rightCode, setRightCode] = useState('');
@@ -38,11 +55,14 @@ export default function App() {
   const [isDragging, setIsDragging] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
+  const leftTextareaRef = useRef<HTMLTextAreaElement>(null);
+  const rightTextareaRef = useRef<HTMLTextAreaElement>(null);
+  const isSyncingScroll = useRef(false);
+
   const runCompare = useCallback(
     (left: string, right: string) => {
       if (left.trim() && right.trim()) {
-        const result = compare(left, right);
-        setDiffResult(result);
+        setDiffResult(compare(left, right));
       } else {
         setDiffResult(null);
       }
@@ -69,10 +89,6 @@ export default function App() {
     },
     [leftCode, debouncedCompare]
   );
-
-  const leftTextareaRef = useRef<HTMLTextAreaElement>(null);
-  const rightTextareaRef = useRef<HTMLTextAreaElement>(null);
-  const isSyncingScroll = useRef(false);
 
   const handleLeftScroll = useCallback(
     (e: React.UIEvent<HTMLTextAreaElement>) => {
@@ -131,11 +147,10 @@ export default function App() {
   }, [rightCode, copyToClipboard]);
 
   const handleCopyMerged = useCallback(() => {
-    const merged = getMergedCode(leftCode, rightCode);
-    copyToClipboard(merged);
+    copyToClipboard(getMergedCode(leftCode, rightCode));
   }, [leftCode, rightCode, copyToClipboard]);
 
-  const handleMouseDown = useCallback(
+  const handleDividerMouseDown = useCallback(
     (e: React.MouseEvent) => {
       e.preventDefault();
       setIsDragging(true);
@@ -146,6 +161,9 @@ export default function App() {
   useEffect(() => {
     if (!isDragging) return;
 
+    document.body.style.userSelect = 'none';
+    document.body.style.webkitUserSelect = 'none';
+
     const handleMouseMove = (e: MouseEvent) => {
       if (!containerRef.current) return;
       const rect = containerRef.current.getBoundingClientRect();
@@ -155,18 +173,33 @@ export default function App() {
 
     const handleMouseUp = () => {
       setIsDragging(false);
+      document.body.style.userSelect = '';
+      document.body.style.webkitUserSelect = '';
+    };
+
+    const handleMouseLeave = () => {
+      setIsDragging(false);
+      document.body.style.userSelect = '';
+      document.body.style.webkitUserSelect = '';
     };
 
     document.addEventListener('mousemove', handleMouseMove);
     document.addEventListener('mouseup', handleMouseUp);
+    document.addEventListener('mouseleave', handleMouseLeave);
     return () => {
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
+      document.removeEventListener('mouseleave', handleMouseLeave);
+      document.body.style.userSelect = '';
+      document.body.style.webkitUserSelect = '';
     };
   }, [isDragging]);
 
   useEffect(() => {
     if (!isDragging) return;
+
+    document.body.style.userSelect = 'none';
+    document.body.style.webkitUserSelect = 'none';
 
     const handleTouchMove = (e: TouchEvent) => {
       if (!containerRef.current) return;
@@ -177,6 +210,8 @@ export default function App() {
 
     const handleTouchEnd = () => {
       setIsDragging(false);
+      document.body.style.userSelect = '';
+      document.body.style.webkitUserSelect = '';
     };
 
     document.addEventListener('touchmove', handleTouchMove);
@@ -184,79 +219,47 @@ export default function App() {
     return () => {
       document.removeEventListener('touchmove', handleTouchMove);
       document.removeEventListener('touchend', handleTouchEnd);
+      document.body.style.userSelect = '';
+      document.body.style.webkitUserSelect = '';
     };
   }, [isDragging]);
 
   return (
     <div className="app-container">
-      <header className="toolbar">
-        <div className="toolbar-left">
-          <select
-            className="language-select"
-            value={language}
-            onChange={(e) => setLanguage(e.target.value as SupportedLanguage)}
-          >
-            {LANGUAGES.map((lang) => (
-              <option key={lang.value} value={lang.value}>
-                {lang.label}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div className="toolbar-right">
-          <button className="toolbar-btn" onClick={handleCopyLeft}>
-            <span className="btn-icon">←</span>
-            <span className="btn-text">复制左版</span>
-          </button>
-          <button className="toolbar-btn" onClick={handleCopyRight}>
-            <span className="btn-icon">→</span>
-            <span className="btn-text">复制右版</span>
-          </button>
-          <button className="toolbar-btn" onClick={handleCopyMerged}>
-            <span className="btn-icon">↔</span>
-            <span className="btn-text">复制合并版</span>
-          </button>
-        </div>
-      </header>
+      <Toolbar
+        language={language}
+        onLanguageChange={setLanguage}
+        onCopyLeft={handleCopyLeft}
+        onCopyRight={handleCopyRight}
+        onCopyMerged={handleCopyMerged}
+      />
 
       <div className="editor-container" ref={containerRef}>
-        <div
-          className="editor-pane"
+        <EditorPane
+          title="旧版本"
+          value={leftCode}
+          onChange={handleLeftChange}
+          onScroll={handleLeftScroll}
+          placeholder="在此粘贴或输入旧版代码..."
+          ref={leftTextareaRef}
           style={{ width: `${splitRatio * 100}%` }}
-        >
-          <div className="pane-header">旧版本</div>
-          <textarea
-            ref={leftTextareaRef}
-            className="code-textarea"
-            value={leftCode}
-            onChange={handleLeftChange}
-            onScroll={handleLeftScroll}
-            placeholder="在此粘贴或输入旧版代码..."
-            spellCheck={false}
-          />
-        </div>
-
-        <div
-          className={`divider ${isDragging ? 'divider-active' : ''}`}
-          onMouseDown={handleMouseDown}
-          onTouchStart={handleMouseDown}
         />
 
         <div
-          className="editor-pane"
+          className={`divider ${isDragging ? 'divider-active' : ''}`}
+          onMouseDown={handleDividerMouseDown}
+          onTouchStart={handleDividerMouseDown}
+        />
+
+        <EditorPane
+          title="新版本"
+          value={rightCode}
+          onChange={handleRightChange}
+          onScroll={handleRightScroll}
+          placeholder="在此粘贴或输入新版代码..."
+          ref={rightTextareaRef}
           style={{ width: `${(1 - splitRatio) * 100}%` }}
-        >
-          <div className="pane-header">新版本</div>
-          <textarea
-            ref={rightTextareaRef}
-            className="code-textarea"
-            value={rightCode}
-            onChange={handleRightChange}
-            onScroll={handleRightScroll}
-            placeholder="在此粘贴或输入新版代码..."
-            spellCheck={false}
-          />
-        </div>
+        />
       </div>
 
       {diffResult && (
@@ -266,9 +269,7 @@ export default function App() {
         </div>
       )}
 
-      {copyToast && (
-        <div className="copy-toast">复制成功</div>
-      )}
+      {copyToast && <div className="copy-toast">复制成功</div>}
 
       <button
         className="help-btn"
@@ -278,33 +279,9 @@ export default function App() {
         &lt;/&gt;
       </button>
 
-      {showHelp && (
-        <div className="modal-overlay" onClick={() => setShowHelp(false)}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-            <h2>使用帮助</h2>
-            <ul>
-              <li>在左侧文本框输入或粘贴旧版代码</li>
-              <li>在右侧文本框输入或粘贴新版代码</li>
-              <li>输入代码后系统自动进行差异对比（防抖300ms）</li>
-              <li>
-                <span style={{ color: '#2d6a4f' }}>绿色背景</span>：新增行　
-                <span style={{ color: '#c0392b' }}>红色背景</span>：删除行　
-                <span style={{ color: '#e67e22' }}>黄色背景</span>：修改行
-              </li>
-              <li>点击高亮行可查看差异说明气泡</li>
-              <li>工具栏可切换语言、复制代码版本</li>
-              <li>拖拽中间分隔线可调整左右区域宽度</li>
-              <li>合并版规则：保留未修改行 + 新增/修改行，忽略删除行</li>
-            </ul>
-            <button
-              className="modal-close-btn"
-              onClick={() => setShowHelp(false)}
-            >
-              知道了
-            </button>
-          </div>
-        </div>
-      )}
+      <HelpModal visible={showHelp} onClose={() => setShowHelp(false)}>
+        {HELP_CONTENT}
+      </HelpModal>
     </div>
   );
 }

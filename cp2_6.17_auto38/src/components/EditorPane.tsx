@@ -6,15 +6,16 @@ interface EditorPaneProps {
   onChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => void;
   onScroll?: (e: React.UIEvent<HTMLTextAreaElement>) => void;
   placeholder?: string;
+  style?: React.CSSProperties;
 }
 
 const EditorPane = forwardRef<HTMLTextAreaElement, EditorPaneProps>(
   function EditorPane(
-    { title, value, onChange, onScroll, placeholder },
+    { title, value, onChange, onScroll, placeholder, style },
     ref
   ) {
     return (
-      <div className="editor-pane">
+      <div className="editor-pane" style={style}>
         <div className="pane-header">{title}</div>
         <textarea
           ref={ref}

@@ -34,7 +34,7 @@ interface DiffPanelProps {
   bubble: BubbleState;
   onLineClick: (e: React.MouseEvent, line: DiffLine) => void;
   scrollRef: React.RefObject<HTMLDivElement | null>;
-  onScroll: (scrollTop: number) => void;
+  onScroll: (source: 'left' | 'right', scrollTop: number, scrollDirection: number) => void;
   isSyncScrolling: React.MutableRefObject<boolean>;
 }
 
@@ -48,13 +48,18 @@ const DiffPanel = React.memo(function DiffPanel({
   onScroll,
   isSyncScrolling,
 }: DiffPanelProps) {
+  const prevScrollTop = useRef(0);
+
   const handleScroll = useCallback(
     (e: React.UIEvent<HTMLDivElement>) => {
       if (isSyncScrolling.current) return;
       const target = e.currentTarget;
-      onScroll(target.scrollTop);
+      const currentTop = target.scrollTop;
+      const direction = currentTop - prevScrollTop.current;
+      prevScrollTop.current = currentTop;
+      onScroll(side, currentTop, direction);
     },
-    [onScroll, isSyncScrolling]
+    [onScroll, side, isSyncScrolling]
   );
 
   return (
@@ -110,7 +115,7 @@ export default function SideBySideView({ diffResult, language }: SideBySideViewP
   const rightScrollRef = useRef<HTMLDivElement>(null);
   const isSyncScrolling = useRef(false);
   const scrollRafId = useRef<number | null>(null);
-  const lastScrollSide = useRef<'left' | 'right' | null>(null);
+  const lastScrollDirection = useRef<number>(0);
 
   const [leftBubble, setLeftBubble] = useState<BubbleState>({
     visible: false,
@@ -127,41 +132,46 @@ export default function SideBySideView({ diffResult, language }: SideBySideViewP
 
   const bubbleTimerRef = useRef<ReturnType<typeof setTimeout>>();
 
-  const syncScroll = useCallback((source: 'left' | 'right', scrollTop: number) => {
-    if (scrollRafId.current) {
-      cancelAnimationFrame(scrollRafId.current);
-    }
-
-    scrollRafId.current = requestAnimationFrame(() => {
-      isSyncScrolling.current = true;
-      lastScrollSide.current = source;
-
-      const targetEl = source === 'left' ? rightScrollRef.current : leftScrollRef.current;
-      if (targetEl) {
-        const maxScroll = targetEl.scrollHeight - targetEl.clientHeight;
-        const clampedTop = Math.max(0, Math.min(scrollTop, maxScroll));
-        targetEl.scrollTop = clampedTop;
+  const syncScroll = useCallback(
+    (source: 'left' | 'right', scrollTop: number, scrollDirection: number) => {
+      if (scrollRafId.current) {
+        cancelAnimationFrame(scrollRafId.current);
       }
 
+      if (scrollDirection !== 0 && lastScrollDirection.current !== 0) {
+        if (
+          (scrollDirection > 0 && lastScrollDirection.current < 0) ||
+          (scrollDirection < 0 && lastScrollDirection.current > 0)
+        ) {
+          lastScrollDirection.current = scrollDirection;
+          return;
+        }
+      }
+      lastScrollDirection.current = scrollDirection;
+
       scrollRafId.current = requestAnimationFrame(() => {
-        isSyncScrolling.current = false;
-        lastScrollSide.current = null;
+        isSyncScrolling.current = true;
+
+        const targetEl = source === 'left' ? rightScrollRef.current : leftScrollRef.current;
+        if (targetEl) {
+          const maxScroll = targetEl.scrollHeight - targetEl.clientHeight;
+          const clampedTop = Math.max(0, Math.min(scrollTop, maxScroll));
+          targetEl.scrollTop = clampedTop;
+        }
+
+        const innerRafId = requestAnimationFrame(() => {
+          isSyncScrolling.current = false;
+          scrollRafId.current = null;
+        });
+        scrollRafId.current = innerRafId;
       });
-
-      scrollRafId.current = null;
-    });
-  }, []);
-
-  const handleLeftScroll = useCallback(
-    (scrollTop: number) => {
-      syncScroll('left', scrollTop);
     },
-    [syncScroll]
+    []
   );
 
-  const handleRightScroll = useCallback(
-    (scrollTop: number) => {
-      syncScroll('right', scrollTop);
+  const handleScroll = useCallback(
+    (source: 'left' | 'right', scrollTop: number, scrollDirection: number) => {
+      syncScroll(source, scrollTop, scrollDirection);
     },
     [syncScroll]
   );
@@ -170,9 +180,11 @@ export default function SideBySideView({ diffResult, language }: SideBySideViewP
     return () => {
       if (scrollRafId.current) {
         cancelAnimationFrame(scrollRafId.current);
+        scrollRafId.current = null;
       }
       if (bubbleTimerRef.current) {
         clearTimeout(bubbleTimerRef.current);
+        bubbleTimerRef.current = undefined;
       }
     };
   }, []);
@@ -212,6 +224,7 @@ export default function SideBySideView({ diffResult, language }: SideBySideViewP
       bubbleTimerRef.current = setTimeout(() => {
         setLeftBubble((prev) => ({ ...prev, visible: false }));
         setRightBubble((prev) => ({ ...prev, visible: false }));
+        bubbleTimerRef.current = undefined;
       }, 2000);
     },
     []
@@ -238,7 +251,7 @@ export default function SideBySideView({ diffResult, language }: SideBySideViewP
         bubble={leftBubble}
         onLineClick={handleLeftLineClick}
         scrollRef={leftScrollRef}
-        onScroll={handleLeftScroll}
+        onScroll={handleScroll}
         isSyncScrolling={isSyncScrolling}
       />
       <DiffPanel
@@ -248,7 +261,7 @@ export default function SideBySideView({ diffResult, language }: SideBySideViewP
         bubble={rightBubble}
         onLineClick={handleRightLineClick}
         scrollRef={rightScrollRef}
-        onScroll={handleRightScroll}
+        onScroll={handleScroll}
         isSyncScrolling={isSyncScrolling}
       />
     </div>
