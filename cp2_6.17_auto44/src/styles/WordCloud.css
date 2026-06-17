@@ -1,0 +1,92 @@
+.wordcloud-section {
+  padding: 24px;
+}
+
+.wordcloud-container {
+  position: relative;
+  width: 100%;
+  min-height: 300px;
+  overflow: hidden;
+}
+
+.wordcloud-word {
+  position: absolute;
+  cursor: pointer;
+  font-weight: 600;
+  white-space: nowrap;
+  opacity: 0;
+  transform: scale(0.5);
+  animation: wordCloudFadeIn 0.5s ease forwards;
+  transition: all 0.3s ease;
+  user-select: none;
+}
+
+.wordcloud-word:hover {
+  filter: brightness(1.2);
+  text-shadow: 0 0 10px currentColor;
+  z-index: 10;
+}
+
+@keyframes wordCloudFadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.5);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.discussion-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.discussion-item {
+  padding: 16px;
+  background-color: #0d1117;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+}
+
+.discussion-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.discussion-author {
+  font-weight: 600;
+  color: #58a6ff;
+  font-size: 14px;
+}
+
+.discussion-date {
+  font-size: 12px;
+  color: #666;
+}
+
+.discussion-content {
+  font-size: 14px;
+  color: #e0e0e0;
+  line-height: 1.6;
+}
+
+.empty-discussions {
+  text-align: center;
+  color: #666;
+  padding: 40px 0;
+}
+
+@media (max-width: 768px) {
+  .wordcloud-container {
+    min-height: 250px;
+  }
+
+  .discussion-item {
+    padding: 12px;
+  }
+}
