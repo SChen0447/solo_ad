@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>粒子特效编辑器 - 实时预览沙盒</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #0f0f1a;
+      color: #e0e0e0;
+    }
+
+    .app {
+      display: flex;
+      width: 100%;
+      height: 100vh;
+      padding: 16px;
+      gap: 16px;
+    }
+
+    .controls-panel {
+      width: 320px;
+      flex-shrink: 0;
+      background: #1e1e2e;
+      border-radius: 12px;
+      padding: 20px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .controls-panel h1 {
+      font-size: 18px;
+      color: #ff6b6b;
+      margin-bottom: 4px;
+    }
+
+    .controls-panel .subtitle {
+      font-size: 12px;
+      color: #888;
+      margin-bottom: 12px;
+    }
+
+    .control-group {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .control-group label {
+      font-size: 13px;
+      color: #aaa;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .control-group label .value {
+      color: #ff6b6b;
+      font-weight: 600;
+      font-variant-numeric: tabular-nums;
+    }
+
+    input[type="range"] {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 100%;
+      height: 6px;
+      background: #333344;
+      border-radius: 3px;
+      outline: none;
+      position: relative;
+    }
+
+    input[type="range"]::-webkit-slider-runnable-track {
+      width: 100%;
+      height: 6px;
+      background: #333344;
+      border-radius: 3px;
+    }
+
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 16px;
+      height: 16px;
+      background: #fff;
+      border-radius: 50%;
+      cursor: pointer;
+      margin-top: -5px;
+      transition: transform 0.15s ease;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+    }
+
+    input[type="range"]::-webkit-slider-thumb:active {
+      transform: scale(0.95);
+    }
+
+    input[type="range"]::-moz-range-track {
+      width: 100%;
+      height: 6px;
+      background: #333344;
+      border-radius: 3px;
+    }
+
+    input[type="range"]::-moz-range-thumb {
+      width: 16px;
+      height: 16px;
+      background: #fff;
+      border-radius: 50%;
+      cursor: pointer;
+      transition: transform 0.15s ease;
+    }
+
+    input[type="range"]::-moz-range-thumb:active {
+      transform: scale(0.95);
+    }
+
+    .slider-fill {
+      position: absolute;
+      top: 0;
+      left: 0;
+      height: 6px;
+      background: #ff6b6b;
+      border-radius: 3px;
+      pointer-events: none;
+    }
+
+    .slider-wrapper {
+      position: relative;
+    }
+
+    .section-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: #ddd;
+      margin-bottom: 4px;
+      padding-bottom: 6px;
+      border-bottom: 1px solid #333344;
+    }
+
+    .color-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .color-picker-wrapper {
+      position: relative;
+      flex: 1;
+    }
+
+    .color-picker-trigger {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: #2a2a3a;
+      padding: 8px 12px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: background 0.2s ease;
+      border: 1px solid #333344;
+    }
+
+    .color-picker-trigger:hover {
+      background: #333344;
+    }
+
+    .color-swatch {
+      width: 24px;
+      height: 24px;
+      border-radius: 4px;
+      border: 2px solid #555;
+      flex-shrink: 0;
+    }
+
+    .color-hex {
+      font-size: 12px;
+      color: #ccc;
+      font-family: 'Courier New', monospace;
+    }
+
+    .color-picker-popup {
+      position: absolute;
+      top: calc(100% + 8px);
+      left: 0;
+      z-index: 100;
+      background: #1e1e2e;
+      padding: 12px;
+      border-radius: 8px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
+      border: 1px solid #333344;
+      display: none;
+    }
+
+    .color-picker-popup.open {
+      display: block;
+    }
+
+    .color-canvas {
+      width: 160px;
+      height: 160px;
+      border-radius: 8px;
+      cursor: crosshair;
+      margin-bottom: 8px;
+    }
+
+    .color-input-row {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+    }
+
+    .color-input-row input {
+      flex: 1;
+      background: #2a2a3a;
+      border: 1px solid #333344;
+      color: #fff;
+      padding: 6px 8px;
+      border-radius: 4px;
+      font-family: 'Courier New', monospace;
+      font-size: 12px;
+      outline: none;
+    }
+
+    .color-input-row input:focus {
+      border-color: #ff6b6b;
+    }
+
+    .scene-buttons {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .scene-btn {
+      width: 80px;
+      height: 28px;
+      border: none;
+      border-radius: 6px;
+      background: #333;
+      color: #fff;
+      font-size: 12px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .scene-btn:hover {
+      background: #444;
+    }
+
+    .scene-btn.active {
+      background: #ff6b6b;
+    }
+
+    .toggle-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .toggle-switch {
+      position: relative;
+      width: 44px;
+      height: 24px;
+      background: #333;
+      border-radius: 12px;
+      cursor: pointer;
+      transition: background 0.2s ease;
+    }
+
+    .toggle-switch.on {
+      background: #ff6b6b;
+    }
+
+    .toggle-switch::after {
+      content: '';
+      position: absolute;
+      top: 2px;
+      left: 2px;
+      width: 20px;
+      height: 20px;
+      background: #fff;
+      border-radius: 50%;
+      transition: transform 0.2s ease;
+    }
+
+    .toggle-switch.on::after {
+      transform: translateX(20px);
+    }
+
+    .canvas-wrapper {
+      flex: 1;
+      position: relative;
+      border-radius: 12px;
+      overflow: hidden;
+      background: linear-gradient(180deg, #2a2a3a 0%, #0f0f1a 100%);
+    }
+
+    #particle-canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+
+    .stats-overlay {
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 4px;
+      pointer-events: none;
+      font-family: 'Courier New', monospace;
+      font-size: 13px;
+    }
+
+    .stat-item {
+      background: rgba(0, 0, 0, 0.5);
+      padding: 4px 10px;
+      border-radius: 4px;
+      color: #6eff9a;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .stat-item.warning {
+      color: #ff6b6b;
+      animation: blink 0.5s ease-in-out infinite;
+    }
+
+    @keyframes blink {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+
+    @media (max-width: 768px) {
+      .app {
+        flex-direction: column;
+        padding: 8px;
+        gap: 8px;
+      }
+
+      .controls-panel {
+        width: 100%;
+        max-height: 45vh;
+      }
+
+      .canvas-wrapper {
+        flex: 1;
+        min-height: 300px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <aside class="controls-panel" id="controls-panel">
+      <div>
+        <h1>✨ 粒子特效编辑器</h1>
+        <p class="subtitle">实时预览沙盒 · 物理场景联动</p>
+      </div>
+    </aside>
+    <div class="canvas-wrapper">
+      <canvas id="particle-canvas"></canvas>
+      <div class="stats-overlay" id="stats-overlay">
+        <div class="stat-item" id="fps-stat">FPS: 60</div>
+        <div class="stat-item" id="particle-stat">粒子: 0 / 5000</div>
+      </div>
+    </div>
+  </div>
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
