@@ -1,12 +1,17 @@
 import Phaser from 'phaser';
 import { ShipData } from '../data/FleetManager';
+import { fleetManager } from '../data/FleetManager';
 
 interface BattleShip {
   id: string;
   sprite: Phaser.GameObjects.Graphics;
+  selectionRing: Phaser.GameObjects.Graphics | null;
   data: ShipData;
   velocity: { x: number; y: number };
   lastFireTime: number;
+  lastTrailTime: number;
+  trailParticles: { sprite: Phaser.GameObjects.Graphics; life: number; maxLife: number }[];
+  ringAngle: number;
 }
 
 export class BattleScene extends Phaser.Scene {
@@ -15,6 +20,7 @@ export class BattleScene extends Phaser.Scene {
   private bullets: { sprite: Phaser.GameObjects.Graphics; vx: number; vy: number; damage: number; faction: string; life: number }[] = [];
   private particles: Phaser.GameObjects.Particles.ParticleEmitter[] = [];
   private battleTime: number = 0;
+  private selectedShipId: string | null = null;
 
   constructor() {
     super('BattleScene');
@@ -23,6 +29,12 @@ export class BattleScene extends Phaser.Scene {
   create(): void {
     this.battleTime = 0;
     this.bullets = [];
+    this.selectedShipId = null;
+
+    fleetManager.subscribe(() => {
+      const selected = fleetManager.getSelectedShip();
+      this.selectedShipId = selected ? selected.id : null;
+    });
   }
 
   init(data: { playerShips: ShipData[]; enemyShips: ShipData[] }): void {
@@ -33,6 +45,8 @@ export class BattleScene extends Phaser.Scene {
   update(time: number, delta: number): void {
     this.battleTime += delta;
     this.updateShips(delta);
+    this.updateSelectionRings(delta);
+    this.updateTrailParticles(delta);
     this.updateBullets(delta);
     this.checkCollisions();
     this.checkBattleEnd();
@@ -48,12 +62,24 @@ export class BattleScene extends Phaser.Scene {
       const sprite = this.add.graphics();
       this.drawWarship(sprite, startX, y, 0x44ff88, ship.stars);
 
-      this.playerShips.push({
+      const shipObj: BattleShip = {
         id: ship.id,
         sprite,
+        selectionRing: null,
         data: { ...ship, x: startX, y },
         velocity: { x: 0, y: 0 },
-        lastFireTime: 0
+        lastFireTime: 0,
+        lastTrailTime: 0,
+        trailParticles: [],
+        ringAngle: 0
+      };
+      this.playerShips.push(shipObj);
+
+      sprite.setInteractive(new Phaser.Geom.Circle(0, 0, 25), Phaser.Geom.Circle.Contains);
+      sprite.on('pointerdown', () => {
+        if (shipObj.data.hull > 0) {
+          fleetManager.setSelectedShip(ship.id);
+        }
       });
     });
   }
@@ -72,9 +98,13 @@ export class BattleScene extends Phaser.Scene {
       this.enemyShips.push({
         id: ship.id,
         sprite,
+        selectionRing: null,
         data: { ...ship, x: startX, y },
         velocity: { x: 0, y: 0 },
-        lastFireTime: 0
+        lastFireTime: 0,
+        lastTrailTime: 0,
+        trailParticles: [],
+        ringAngle: 0
       });
     });
   }
@@ -126,9 +156,9 @@ export class BattleScene extends Phaser.Scene {
           ship.velocity.y *= 0.95;
         }
 
-        if (dist < 250 && now - ship.lastFireTime > 1500) {
+        if (dist < 250 && this.battleTime - ship.lastFireTime > 1500) {
           this.fireBullet(ship, nearest);
-          ship.lastFireTime = now;
+          ship.lastFireTime = this.battleTime;
         }
       }
 
@@ -136,6 +166,12 @@ export class BattleScene extends Phaser.Scene {
       ship.data.y += ship.velocity.y * (delta / 1000);
       ship.sprite.x = ship.data.x;
       ship.sprite.y = ship.data.y;
+
+      const isMoving = Math.abs(ship.velocity.x) > 5 || Math.abs(ship.velocity.y) > 5;
+      if ((isMoving || nearest) && this.battleTime - ship.lastTrailTime > 70) {
+        ship.lastTrailTime = this.battleTime;
+        this.spawnBattleTrail(ship, 0x4488ff);
+      }
     }
 
     for (const enemy of this.enemyShips) {
@@ -155,9 +191,9 @@ export class BattleScene extends Phaser.Scene {
           enemy.velocity.y *= 0.95;
         }
 
-        if (dist < 280 && now - enemy.lastFireTime > 2000) {
+        if (dist < 280 && this.battleTime - enemy.lastFireTime > 2000) {
           this.fireBullet(enemy, nearest);
-          enemy.lastFireTime = now;
+          enemy.lastFireTime = this.battleTime;
         }
       }
 
@@ -165,6 +201,12 @@ export class BattleScene extends Phaser.Scene {
       enemy.data.y += enemy.velocity.y * (delta / 1000);
       enemy.sprite.x = enemy.data.x;
       enemy.sprite.y = enemy.data.y;
+
+      const isMoving = Math.abs(enemy.velocity.x) > 5 || Math.abs(enemy.velocity.y) > 5;
+      if ((isMoving || nearest) && this.battleTime - enemy.lastTrailTime > 70) {
+        enemy.lastTrailTime = this.battleTime;
+        this.spawnBattleTrail(enemy, 0xff4444);
+      }
     }
   }
 
@@ -340,6 +382,103 @@ export class BattleScene extends Phaser.Scene {
         duration: 1000,
         onComplete: () => p.destroy()
       });
+    }
+  }
+
+  private updateSelectionRings(delta: number): void {
+    for (const ship of this.playerShips) {
+      const isSelected = this.selectedShipId === ship.id && ship.data.hull > 0;
+
+      if (isSelected && !ship.selectionRing) {
+        ship.selectionRing = this.add.graphics();
+        ship.selectionRing.setDepth(2);
+      } else if (!isSelected && ship.selectionRing) {
+        ship.selectionRing.destroy();
+        ship.selectionRing = null;
+      }
+
+      if (ship.selectionRing && isSelected) {
+        ship.ringAngle += delta * 0.0015;
+        const ring = ship.selectionRing;
+        ring.clear();
+
+        const cx = ship.data.x;
+        const cy = ship.data.y;
+        const radius = 32;
+        const segments = 40;
+
+        ring.lineStyle(2, 0x88ccff, 0.5);
+        ring.beginPath();
+        for (let i = 0; i <= segments; i++) {
+          const t = (i / segments) * Math.PI * 2 + ship.ringAngle;
+          const wobble = Math.sin(t * 3) * 2;
+          const x = cx + Math.cos(t) * (radius + wobble);
+          const y = cy + Math.sin(t) * (radius + wobble);
+          if (i === 0) {
+            ring.moveTo(x, y);
+          } else {
+            ring.lineTo(x, y);
+          }
+        }
+        ring.closePath();
+        ring.strokePath();
+
+        ring.lineStyle(1, 0xaaddff, 0.3);
+        ring.beginPath();
+        for (let i = 0; i <= segments; i++) {
+          const t = (i / segments) * Math.PI * 2 - ship.ringAngle * 0.7;
+          const wobble = Math.cos(t * 2) * 3;
+          const x = cx + Math.cos(t) * (radius + 6 + wobble);
+          const y = cy + Math.sin(t) * (radius + 6 + wobble);
+          if (i === 0) {
+            ring.moveTo(x, y);
+          } else {
+            ring.lineTo(x, y);
+          }
+        }
+        ring.closePath();
+        ring.strokePath();
+      }
+    }
+  }
+
+  private spawnBattleTrail(ship: BattleShip, color: number): void {
+    if (ship.trailParticles.length >= 15) {
+      const oldest = ship.trailParticles.shift();
+      if (oldest) oldest.sprite.destroy();
+    }
+
+    const p = this.add.graphics();
+    p.setDepth(1);
+    const angle = Math.atan2(ship.velocity.y, ship.velocity.x) + Math.PI;
+    const offsetX = Math.cos(angle) * 15;
+    const offsetY = Math.sin(angle) * 15;
+    p.x = ship.data.x + offsetX + (Math.random() - 0.5) * 4;
+    p.y = ship.data.y + offsetY + (Math.random() - 0.5) * 4;
+    p.fillStyle(color, 0.6);
+    p.fillCircle(0, 0, 2 + Math.random() * 2);
+
+    ship.trailParticles.push({
+      sprite: p,
+      life: 0,
+      maxLife: 400
+    });
+  }
+
+  private updateTrailParticles(delta: number): void {
+    const allShips = [...this.playerShips, ...this.enemyShips];
+    for (const ship of allShips) {
+      for (let i = ship.trailParticles.length - 1; i >= 0; i--) {
+        const particle = ship.trailParticles[i];
+        particle.life += delta;
+        const t = particle.life / particle.maxLife;
+        particle.sprite.alpha = Math.max(0, 1 - t);
+        particle.sprite.scale = Math.max(0.1, 1 - t * 0.7);
+        if (particle.life >= particle.maxLife) {
+          particle.sprite.destroy();
+          ship.trailParticles.splice(i, 1);
+        }
+      }
     }
   }
 
