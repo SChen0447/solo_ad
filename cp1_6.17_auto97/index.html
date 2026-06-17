@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <title>平衡球大冒险</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #0d0d2b;
+      font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif;
+      color: #ffffff;
+    }
+    #app {
+      width: 100%;
+      height: 100%;
+      position: relative;
+    }
+    canvas {
+      display: block;
+      touch-action: none;
+    }
+    #ui-panel {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      padding: 16px 24px;
+      background: rgba(20, 30, 60, 0.35);
+      backdrop-filter: blur(15px);
+      -webkit-backdrop-filter: blur(15px);
+      border-radius: 16px;
+      border: 1px solid rgba(0, 255, 200, 0.25);
+      box-shadow: 0 0 20px rgba(0, 255, 200, 0.15), inset 0 0 30px rgba(0, 100, 150, 0.1);
+      text-align: right;
+      min-width: 180px;
+      z-index: 10;
+    }
+    .timer-label, .speed-label {
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      color: rgba(0, 255, 200, 0.8);
+      text-shadow: 0 0 8px rgba(0, 255, 200, 0.5);
+      margin-bottom: 4px;
+    }
+    .timer-value {
+      font-size: 32px;
+      font-weight: 700;
+      font-family: 'Courier New', monospace;
+      color: #ffffff;
+      -webkit-text-stroke: 1px #00ffc8;
+      text-shadow: 0 0 15px rgba(0, 255, 200, 0.6);
+      margin-bottom: 12px;
+    }
+    .speed-container {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 8px;
+    }
+    .flame-icon {
+      font-size: 20px;
+      filter: drop-shadow(0 0 6px #00ff88);
+    }
+    .speed-value {
+      font-size: 22px;
+      font-weight: 700;
+      color: #00ff88;
+      text-shadow: 0 0 12px rgba(0, 255, 136, 0.7);
+    }
+    #damage-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      opacity: 0;
+      box-shadow: inset 0 0 150px 50px rgba(255, 40, 60, 0.6);
+      transition: opacity 0.1s ease-out;
+      z-index: 5;
+    }
+    #start-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: rgba(13, 13, 43, 0.85);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      z-index: 100;
+      transition: opacity 0.5s ease;
+    }
+    #start-overlay.hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
+    .game-title {
+      font-size: 56px;
+      font-weight: 900;
+      background: linear-gradient(135deg, #00ffc8, #8800ff, #ff00aa);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      text-shadow: 0 0 60px rgba(0, 255, 200, 0.3);
+      margin-bottom: 24px;
+      letter-spacing: 4px;
+    }
+    .game-subtitle {
+      font-size: 18px;
+      color: rgba(255, 255, 255, 0.7);
+      margin-bottom: 40px;
+      text-align: center;
+      line-height: 1.8;
+      max-width: 600px;
+    }
+    .start-btn {
+      padding: 18px 48px;
+      font-size: 20px;
+      font-weight: 700;
+      color: #0d0d2b;
+      background: linear-gradient(135deg, #00ffc8, #00aaff);
+      border: none;
+      border-radius: 50px;
+      cursor: pointer;
+      letter-spacing: 2px;
+      box-shadow: 0 0 40px rgba(0, 255, 200, 0.5);
+      transition: all 0.3s ease;
+      font-family: inherit;
+    }
+    .start-btn:hover {
+      transform: scale(1.05);
+      box-shadow: 0 0 60px rgba(0, 255, 200, 0.7);
+    }
+    .controls-hint {
+      margin-top: 32px;
+      padding: 16px 24px;
+      font-size: 14px;
+      color: rgba(0, 255, 200, 0.7);
+      background: rgba(0, 255, 200, 0.08);
+      border: 1px solid rgba(0, 255, 200, 0.2);
+      border-radius: 12px;
+      line-height: 1.8;
+    }
+    #win-panel {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%) scale(0.8);
+      padding: 40px 60px;
+      background: rgba(20, 30, 60, 0.5);
+      backdrop-filter: blur(15px);
+      -webkit-backdrop-filter: blur(15px);
+      border-radius: 24px;
+      border: 2px solid rgba(0, 255, 200, 0.5);
+      box-shadow: 0 0 60px rgba(0, 255, 200, 0.3);
+      text-align: center;
+      opacity: 0;
+      pointer-events: none;
+      transition: all 0.5s ease;
+      z-index: 50;
+    }
+    #win-panel.show {
+      opacity: 1;
+      transform: translate(-50%, -50%) scale(1);
+      pointer-events: all;
+    }
+    .win-title {
+      font-size: 42px;
+      font-weight: 900;
+      background: linear-gradient(135deg, #ffdd00, #ff00aa);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      margin-bottom: 16px;
+    }
+    .win-time {
+      font-size: 24px;
+      color: #00ffc8;
+      text-shadow: 0 0 10px rgba(0, 255, 200, 0.5);
+      margin-bottom: 24px;
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <div id="damage-overlay"></div>
+    <div id="ui-panel">
+      <div class="timer-label">TIME</div>
+      <div class="timer-value" id="timer">00:00</div>
+      <div class="speed-label">SPEED BOOST</div>
+      <div class="speed-container">
+        <span class="flame-icon">🔥</span>
+        <span class="speed-value" id="speed-multiplier">1.0x</span>
+      </div>
+    </div>
+    <div id="start-overlay">
+      <h1 class="game-title">平衡球大冒险</h1>
+      <p class="game-subtitle">
+        控制金属小球穿越梦幻迷宫<br/>
+        收集彩色光球获得加速，小心旋转栅栏和浮动平台<br/>
+        从起点出发，抵达发光的终点！
+      </p>
+      <button class="start-btn" id="start-btn">开 始 游 戏</button>
+      <div class="controls-hint">
+        🎮 桌面端：使用 ↑ ↓ ← → 方向键 或 W A S D 控制小球倾斜<br/>
+        📱 移动端：倾斜你的设备（重力感应）来控制小球滚动
+      </div>
+    </div>
+    <div id="win-panel">
+      <div class="win-title">🎉 恭喜通关！🎉</div>
+      <div class="win-time">用时：<span id="final-time">00:00</span></div>
+      <button class="start-btn" id="restart-btn">再 玩 一 次</button>
+    </div>
+  </div>
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
