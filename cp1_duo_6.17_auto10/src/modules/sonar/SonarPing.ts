@@ -25,6 +25,21 @@ export interface HitParticle {
   isTargetHit: boolean
 }
 
+export interface PulseWave {
+  origin: THREE.Vector3
+  startTime: number
+  duration: number
+  maxRadius: number
+  mesh: THREE.Mesh
+}
+
+export interface FlashParticle {
+  position: THREE.Vector3
+  startTime: number
+  duration: number
+  mesh: THREE.Mesh
+}
+
 export type HitKind = 'terrain' | TargetType
 
 export class SonarPingSystem {
@@ -36,6 +51,7 @@ export class SonarPingSystem {
   private cameraDistance: number = 25
   private lastPingTriggerTime: number = -1
   private waterPulseTime: number = -1
+  private lastPingEventTime: number = -1
 
   public getScanAngle(): number {
     return this.scanAngle
@@ -245,6 +261,97 @@ export class SonarPingSystem {
 
     const scale = Math.max(0.3, 1 - t * 0.6)
     particle.mesh.scale.setScalar(scale)
+
+    return true
+  }
+
+  public checkAndMarkPing(): boolean {
+    const now = performance.now() / 1000
+    if (this.lastPingEventTime !== this.lastPingTime) {
+      this.lastPingEventTime = this.lastPingTime
+      return true
+    }
+    return false
+  }
+
+  public createPulseWave(origin: THREE.Vector3, currentTime: number): PulseWave {
+    const maxRadius = 25
+    const geometry = new THREE.RingGeometry(0.1, 0.3, 64)
+    const material = new THREE.MeshBasicMaterial({
+      color: 0x00bfff,
+      transparent: true,
+      opacity: 0.8,
+      side: THREE.DoubleSide,
+    })
+    const mesh = new THREE.Mesh(geometry, material)
+    mesh.position.copy(origin)
+    mesh.rotation.x = -Math.PI / 2
+
+    return {
+      origin: origin.clone(),
+      startTime: currentTime,
+      duration: 2.5,
+      maxRadius,
+      mesh,
+    }
+  }
+
+  public updatePulseWave(wave: PulseWave, currentTime: number): boolean {
+    const elapsed = currentTime - wave.startTime
+    if (elapsed >= wave.duration) {
+      return false
+    }
+
+    const t = elapsed / wave.duration
+    const radius = t * wave.maxRadius
+    const opacity = Math.max(0, 0.8 * (1 - t))
+
+    const newGeometry = new THREE.RingGeometry(Math.max(0.1, radius - 0.15), radius, 64)
+    wave.mesh.geometry.dispose()
+    wave.mesh.geometry = newGeometry
+
+    const color = new THREE.Color(0x00bfff)
+    color.lerp(new THREE.Color(0x000033), t * 0.7)
+    ;(wave.mesh.material as THREE.MeshBasicMaterial).color = color
+    ;(wave.mesh.material as THREE.MeshBasicMaterial).opacity = opacity
+
+    return true
+  }
+
+  public createFlashParticle(position: THREE.Vector3, currentTime: number): FlashParticle {
+    const geometry = new THREE.SphereGeometry(0.6, 24, 24)
+    const material = new THREE.MeshBasicMaterial({
+      color: 0xffffff,
+      transparent: true,
+      opacity: 1.0,
+    })
+    const mesh = new THREE.Mesh(geometry, material)
+    mesh.position.copy(position)
+
+    return {
+      position: position.clone(),
+      startTime: currentTime,
+      duration: 0.5,
+      mesh,
+    }
+  }
+
+  public updateFlashParticle(flash: FlashParticle, currentTime: number): boolean {
+    const elapsed = currentTime - flash.startTime
+    if (elapsed >= flash.duration) {
+      return false
+    }
+
+    const t = elapsed / flash.duration
+    const intensity = Math.pow(1 - t, 2)
+
+    const scale = 1 + t * 2.5
+    flash.mesh.scale.setScalar(scale)
+
+    const color = new THREE.Color()
+    color.lerpColors(new THREE.Color(0xffffff), new THREE.Color(0x00bfff), t)
+    ;(flash.mesh.material as THREE.MeshBasicMaterial).color = color
+    ;(flash.mesh.material as THREE.MeshBasicMaterial).opacity = intensity
 
     return true
   }

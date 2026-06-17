@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react'
+import React, { useMemo, useState, useEffect, useRef } from 'react'
 import type { TargetMarkerData } from './TargetMarker'
 import { TARGET_LABELS, TargetMarkerApi } from './TargetMarker'
 import { sonarApi } from '../../services/sonarApi'
@@ -20,6 +20,23 @@ const SidePanel: React.FC<SidePanelProps> = ({
   onTargetClick,
   onHighlightClick,
 }) => {
+  const [depthFlash, setDepthFlash] = useState(false)
+  const prevDepthRef = useRef(currentDepth)
+  const flashTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+
+  useEffect(() => {
+    if (currentDepth !== prevDepthRef.current) {
+      prevDepthRef.current = currentDepth
+      setDepthFlash(true)
+      if (flashTimeoutRef.current) {
+        clearTimeout(flashTimeoutRef.current)
+      }
+      flashTimeoutRef.current = setTimeout(() => {
+        setDepthFlash(false)
+      }, 400)
+    }
+  }, [currentDepth])
+
   const sortedTargets = useMemo(() => {
     return [...targets].sort((a, b) => b.createdAt - a.createdAt)
   }, [targets])
@@ -157,11 +174,46 @@ const SidePanel: React.FC<SidePanelProps> = ({
       <div>
         <div style={sectionTitleStyle}>探测数据</div>
 
-        <div style={dataBoxStyle}>
-          <div style={labelStyle}>当前深度 (m)</div>
-          <div style={valueStyle}>
+        <div
+          style={{
+            ...dataBoxStyle,
+            transition: 'all 0.3s ease-in-out',
+            backgroundColor: depthFlash ? 'rgba(0, 191, 255, 0.2)' : 'rgba(0, 0, 0, 0.25)',
+            borderColor: depthFlash ? 'rgba(0, 191, 255, 0.6)' : 'rgba(0, 191, 255, 0.1)',
+            boxShadow: depthFlash ? '0 0 20px rgba(0, 191, 255, 0.3)' : 'none',
+          }}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+            <div style={labelStyle}>当前深度 (m)</div>
+            <div
+              style={{
+                width: '8px',
+                height: '8px',
+                borderRadius: '50%',
+                backgroundColor: depthFlash ? '#00BFFF' : '#335577',
+                boxShadow: depthFlash ? '0 0 8px #00BFFF, 0 0 16px #00BFFF' : 'none',
+                transition: 'all 0.2s ease-in-out',
+              }}
+              title={depthFlash ? '声纳扫描中' : '等待脉冲'}
+            />
+          </div>
+          <div
+            style={{
+              ...valueStyle,
+              color: depthFlash ? '#00FFFF' : '#ffffff',
+              textShadow: depthFlash ? '0 0 10px rgba(0, 255, 255, 0.6)' : 'none',
+              transition: 'all 0.3s ease-in-out',
+            }}
+          >
             {String(Math.floor(currentDepth)).padStart(3, '0')}
-            <span style={{ fontSize: '14px', color: '#88aacc', marginLeft: '4px' }}>
+            <span
+              style={{
+                fontSize: '14px',
+                color: depthFlash ? '#00CCCC' : '#88aacc',
+                marginLeft: '4px',
+                transition: 'all 0.3s ease-in-out',
+              }}
+            >
               .{String(Math.floor((currentDepth % 1) * 10)).padStart(1, '0')}
             </span>
           </div>

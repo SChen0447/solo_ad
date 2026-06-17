@@ -1,6 +1,6 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react'
 import * as THREE from 'three'
-import { SonarPingSystem, type EchoRing, type PointCloudPoint, type HitParticle, type HitKind } from './SonarPing'
+import { SonarPingSystem, type EchoRing, type PointCloudPoint, type HitParticle, type HitKind, type PulseWave, type FlashParticle } from './SonarPing'
 import { TargetMarkerApi, type TargetMarkerData, type TargetType, TARGET_COLORS } from '../dashboard/TargetMarker'
 import { sonarApi } from '../../services/sonarApi'
 
@@ -67,6 +67,8 @@ const SonarScene: React.FC<SonarSceneProps> = ({
   const targetsGroupRef = useRef<THREE.Group | null>(null)
   const targetMarkersRef = useRef<Map<string, THREE.Group>>(new Map())
   const hitParticlesRef = useRef<HitParticle[]>([])
+  const pulseWavesRef = useRef<PulseWave[]>([])
+  const flashParticlesRef = useRef<FlashParticle[]>([])
   const targetMarkerMaterialsRef = useRef<Map<string, { original: THREE.MeshStandardMaterial; glow: THREE.MeshBasicMaterial; baseScale: THREE.Vector3 }>>(new Map())
 
   const cameraAngleRef = useRef({ theta: Math.PI / 4, phi: Math.PI / 3, radius: 25 })
@@ -299,6 +301,8 @@ const SonarScene: React.FC<SonarSceneProps> = ({
       updateFocusAnimation(elapsed)
       updateHitParticles(elapsed)
       updateBlinkAnimation(elapsed)
+      updatePulseWaves(elapsed)
+      updateFlashParticles(elapsed)
 
       if (rendererRef.current && sceneRef.current && cameraRef.current) {
         rendererRef.current.render(sceneRef.current, cameraRef.current)
@@ -561,12 +565,18 @@ const SonarScene: React.FC<SonarSceneProps> = ({
         startTime: elapsed,
         duration: 0.6,
       }
-    }
 
-    const now = Date.now()
+      if (shipRef.current && sceneRef.current) {
+        const waveOrigin = new THREE.Vector3(
+          shipRef.current.position.x,
+          shipRef.current.position.y - 0.8,
+          shipRef.current.position.z
+        )
+        const wave = sonarSystemRef.current.createPulseWave(waveOrigin, elapsed)
+        pulseWavesRef.current.push(wave)
+        sceneRef.current.add(wave.mesh)
+      }
 
-    if (now - lastSonarFetchRef.current >= 1000) {
-      lastSonarFetchRef.current = now
       const shipPos = shipRef.current.position
       const scanAngle = sonarSystemRef.current.getScanAngle()
 
@@ -590,6 +600,74 @@ const SonarScene: React.FC<SonarSceneProps> = ({
           echoRingsRef.current.push(ring)
           if (sceneRef.current) {
             sceneRef.current.add(ring.mesh)
+          }
+
+          if (sceneRef.current) {
+            const flash = sonarSystemRef.current.createFlashParticle(pos, elapsed)
+            flashParticlesRef.current.push(flash)
+            sceneRef.current.add(flash.mesh)
+          }
+
+          let hitKind: HitKind = 'terrain'
+          const nearbyTarget = targets.find(t => {
+            const dx = t.x - point.x
+            const dy = t.y - point.y
+            const dz = t.z - point.z
+            return Math.sqrt(dx * dx + dy * dy + dz * dz) < 2.0
+          })
+          if (nearbyTarget) {
+            hitKind = nearbyTarget.type
+          }
+
+          const burst = sonarSystemRef.current.createHitBurst(
+            pos,
+            elapsed,
+            hitKind,
+            hitKind === 'terrain' ? 8 : 14
+          )
+          for (const particle of burst) {
+            hitParticlesRef.current.push(particle)
+            if (sceneRef.current) {
+              sceneRef.current.add(particle.mesh)
+            }
+          }
+        }
+      } catch (e) {
+        console.error('Sonar update failed:', e)
+      }
+    }
+
+    const now = Date.now()
+    if (now - lastSonarFetchRef.current >= 1000) {
+      lastSonarFetchRef.current = now
+      const shipPos = shipRef.current.position
+      const scanAngle = sonarSystemRef.current.getScanAngle()
+
+      try {
+        const response = await sonarApi.simulateSonar(shipPos.x, shipPos.z, 20, scanAngle, 45)
+
+        const cameraPos = cameraRef.current.position
+        pointCloudDataRef.current = sonarSystemRef.current.processSonarPoints(
+          response.points,
+          pointCloudDataRef.current,
+          cameraPos
+        )
+        rebuildPointCloud()
+
+        for (let idx = 0; idx < Math.min(response.points.length, 5); idx++) {
+          const point = response.points[idx]
+          const pos = new THREE.Vector3(point.x, point.y, point.z)
+
+          const ring = sonarSystemRef.current.createEchoRing(pos, elapsed)
+          echoRingsRef.current.push(ring)
+          if (sceneRef.current) {
+            sceneRef.current.add(ring.mesh)
+          }
+
+          if (sceneRef.current) {
+            const flash = sonarSystemRef.current.createFlashParticle(pos, elapsed)
+            flashParticlesRef.current.push(flash)
+            sceneRef.current.add(flash.mesh)
           }
 
           let hitKind: HitKind = 'terrain'
@@ -760,6 +838,32 @@ const SonarScene: React.FC<SonarSceneProps> = ({
       materialInfo.original.emissiveIntensity = 0.02
       materialInfo.glow.opacity = 0.02
       markerGroup.scale.copy(materialInfo.baseScale)
+    }
+  }
+
+  const updatePulseWaves = (elapsed: number) => {
+    const waves = pulseWavesRef.current
+    for (let i = waves.length - 1; i >= 0; i--) {
+      const alive = sonarSystemRef.current.updatePulseWave(waves[i], elapsed)
+      if (!alive && sceneRef.current) {
+        sceneRef.current.remove(waves[i].mesh)
+        waves[i].mesh.geometry.dispose()
+        ;(waves[i].mesh.material as THREE.Material).dispose()
+        waves.splice(i, 1)
+      }
+    }
+  }
+
+  const updateFlashParticles = (elapsed: number) => {
+    const flashes = flashParticlesRef.current
+    for (let i = flashes.length - 1; i >= 0; i--) {
+      const alive = sonarSystemRef.current.updateFlashParticle(flashes[i], elapsed)
+      if (!alive && sceneRef.current) {
+        sceneRef.current.remove(flashes[i].mesh)
+        flashes[i].mesh.geometry.dispose()
+        ;(flashes[i].mesh.material as THREE.Material).dispose()
+        flashes.splice(i, 1)
+      }
     }
   }
 
