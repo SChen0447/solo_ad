@@ -1,4 +1,12 @@
-import type { Package, CreatePackageRequest, CreatePackageResponse, ClaimRequest, ClaimResponse } from '../types';
+import type {
+  CreatePackageRequest,
+  CreatePackageResponse,
+  ClaimRequest,
+  ClaimResponse,
+  GetPackagesQuery,
+  GetPackagesResponse,
+  NotifyResponse
+} from '../types';
 
 const API_BASE_URL = '/api';
 
@@ -10,9 +18,21 @@ const handleResponse = async (response: Response) => {
   return response.json();
 };
 
+const buildQueryString = (params: Record<string, any>): string => {
+  const searchParams = new URLSearchParams();
+  Object.entries(params).forEach(([key, value]) => {
+    if (value !== undefined && value !== null && value !== '') {
+      searchParams.append(key, String(value));
+    }
+  });
+  const queryString = searchParams.toString();
+  return queryString ? `?${queryString}` : '';
+};
+
 export const api = {
-  getPackages: async (): Promise<Package[]> => {
-    const response = await fetch(`${API_BASE_URL}/packages`);
+  getPackages: async (query?: GetPackagesQuery): Promise<GetPackagesResponse> => {
+    const queryString = buildQueryString(query || {});
+    const response = await fetch(`${API_BASE_URL}/packages${queryString}`);
     return handleResponse(response);
   },
 
@@ -34,6 +54,16 @@ export const api = {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(data),
+    });
+    return handleResponse(response);
+  },
+
+  notifyOwner: async (packageId: string): Promise<NotifyResponse> => {
+    const response = await fetch(`${API_BASE_URL}/packages/${packageId}/notify`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
     });
     return handleResponse(response);
   },

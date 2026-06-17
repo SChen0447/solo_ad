@@ -10,6 +10,7 @@ export interface Package {
   status: PackageStatus;
   createdAt: number;
   pickedAt: number | null;
+  lastNotifiedAt: number | null;
 }
 
 export interface GetPackagesQuery {
@@ -54,4 +55,10 @@ export interface ClaimResponse {
   success: boolean;
   message: string;
   package: Package;
+}
+
+export interface NotifyResponse {
+  success: boolean;
+  message: string;
+  lastNotifiedAt: number;
 }

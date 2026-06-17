@@ -82,7 +82,8 @@ app.post('/api/packages', (req, res) => {
       pickupCode,
       status: 'pending',
       createdAt: Date.now(),
-      pickedAt: null
+      pickedAt: null,
+      lastNotifiedAt: null
     };
 
     packages.push(newPackage);
@@ -136,6 +137,35 @@ app.post('/api/claim', (req, res) => {
     });
   } catch (error) {
     res.status(500).json({ error: '取件失败' });
+  }
+});
+
+app.post('/api/packages/:id/notify', (req, res) => {
+  try {
+    const { id } = req.params;
+    const pkgIndex = packages.findIndex(p => p.id === id);
+
+    if (pkgIndex === -1) {
+      return res.status(404).json({ error: '包裹不存在' });
+    }
+
+    const pkg = packages[pkgIndex];
+    const notifiedAt = Date.now();
+
+    packages[pkgIndex] = {
+      ...pkg,
+      lastNotifiedAt: notifiedAt
+    };
+
+    console.log(`[通知] 已向 ${pkg.recipientName}(${pkg.phone}) 发送取件通知，包裹编号: ${pkg.id}，取件码: ${pkg.pickupCode}`);
+
+    res.json({
+      success: true,
+      message: '通知发送成功',
+      lastNotifiedAt: notifiedAt
+    });
+  } catch (error) {
+    res.status(500).json({ error: '通知发送失败' });
   }
 });
 
