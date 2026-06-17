@@ -80,7 +80,7 @@
       border-bottom: 1px solid rgba(0, 229, 255, 0.1);
     }
 
-    .control-group:last-child {
+    .control-group.last {
       margin-bottom: 0;
       padding-bottom: 0;
       border-bottom: none;
@@ -103,6 +103,7 @@
       gap: 8px;
       width: 100%;
       padding: 10px 16px;
+      margin-top: 0;
       background: rgba(0, 229, 255, 0.1);
       border: 1px solid rgba(0, 229, 255, 0.4);
       border-radius: 6px;
@@ -118,13 +119,15 @@
       background: rgba(0, 229, 255, 0.2);
       border-color: #00e5ff;
       box-shadow: 0 4px 20px rgba(0, 229, 255, 0.3);
-      transform: translateY(-1px);
+      margin-top: -1px;
+      margin-bottom: 1px;
     }
 
     .file-upload-btn.selected {
       background: rgba(74, 222, 128, 0.15);
       border-color: rgba(74, 222, 128, 0.5);
       color: #4ade80;
+      animation: btnPulse 0.5s ease-out;
     }
 
     .file-upload-btn.selected:hover {
@@ -132,21 +135,23 @@
       box-shadow: 0 4px 20px rgba(74, 222, 128, 0.35);
     }
 
+    @keyframes btnPulse {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.02); }
+    }
+
     .file-upload-btn .file-icon {
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      font-size: 16px;
-      transition: transform 0.2s ease;
+      width: 16px;
+      height: 16px;
+      flex-shrink: 0;
     }
 
-    .file-upload-btn.selected .file-icon {
-      animation: filePulse 0.5s ease-out;
-    }
-
-    @keyframes filePulse {
-      0%, 100% { transform: scale(1); }
-      50% { transform: scale(1.15); }
+    .file-upload-btn .file-icon svg {
+      width: 100%;
+      height: 100%;
     }
 
     .file-upload-btn .file-name {
@@ -161,9 +166,19 @@
       display: none;
     }
 
-    select {
+    .custom-select {
+      position: relative;
+      width: 100%;
+      margin-top: 0;
+    }
+
+    .custom-select-trigger {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
       width: 100%;
       padding: 8px 12px;
+      padding-right: 36px;
       background: rgba(20, 20, 50, 0.9);
       border: 1px solid rgba(0, 229, 255, 0.3);
       border-radius: 6px;
@@ -172,36 +187,81 @@
       font-family: 'Inter', sans-serif;
       cursor: pointer;
       transition: all 0.2s ease;
-      outline: none;
-      appearance: none;
-      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%2300e5ff' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
-      background-repeat: no-repeat;
-      background-position: right 12px center;
-      padding-right: 36px;
+      user-select: none;
+      position: relative;
     }
 
-    select:hover {
+    .custom-select-trigger:hover {
       border-color: rgba(0, 229, 255, 0.6);
-      transform: translateY(-1px);
+      margin-top: -1px;
+      margin-bottom: 1px;
       box-shadow: 0 4px 12px rgba(0, 229, 255, 0.15);
     }
 
-    select:focus {
+    .custom-select.open .custom-select-trigger {
       border-color: #00e5ff;
       box-shadow: 0 0 12px rgba(0, 229, 255, 0.3);
     }
 
-    select option {
-      background: #1a1a3e;
-      color: #d0d0e0;
-      padding: 8px 12px;
-      font-size: 14px;
+    .custom-select-trigger::after {
+      content: '';
+      position: absolute;
+      right: 12px;
+      top: 50%;
+      width: 0;
+      height: 0;
+      border-left: 5px solid transparent;
+      border-right: 5px solid transparent;
+      border-top: 6px solid #00e5ff;
+      transform: translateY(-50%);
+      transition: transform 0.2s ease;
     }
 
-    select option:hover,
-    select option:checked {
+    .custom-select.open .custom-select-trigger::after {
+      transform: translateY(-50%) rotate(180deg);
+    }
+
+    .custom-select-options {
+      position: absolute;
+      top: calc(100% + 4px);
+      left: 0;
+      right: 0;
+      background: #1a1a3e;
+      border: 1px solid rgba(0, 229, 255, 0.3);
+      border-radius: 6px;
+      overflow: hidden;
+      opacity: 0;
+      visibility: hidden;
+      transform: translateY(-4px);
+      transition: all 0.2s ease;
+      z-index: 10;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+    }
+
+    .custom-select.open .custom-select-options {
+      opacity: 1;
+      visibility: visible;
+      transform: translateY(0);
+    }
+
+    .custom-select-option {
+      padding: 10px 14px;
+      font-size: 14px;
+      color: #d0d0e0;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      font-family: 'Inter', sans-serif;
+    }
+
+    .custom-select-option:hover {
+      background: rgba(0, 229, 255, 0.15);
+      color: #00e5ff;
+    }
+
+    .custom-select-option.selected {
       background: rgba(0, 229, 255, 0.2);
       color: #00e5ff;
+      font-weight: 500;
     }
 
     .checkbox-group {
@@ -218,12 +278,14 @@
       transition: all 0.2s ease;
       padding: 4px 6px;
       border-radius: 4px;
+      margin-top: 0;
     }
 
     .checkbox-item:hover {
       color: #00e5ff;
-      transform: translateY(-1px);
       background: rgba(0, 229, 255, 0.05);
+      margin-top: -1px;
+      margin-bottom: 1px;
     }
 
     .checkbox-item input[type="checkbox"] {
@@ -266,11 +328,13 @@
       padding: 4px 2px;
       transition: all 0.2s ease;
       border-radius: 4px;
+      margin-top: 0;
     }
 
     .slider-container:hover {
       background: rgba(0, 229, 255, 0.03);
-      transform: translateY(-1px);
+      margin-top: -1px;
+      margin-bottom: 1px;
     }
 
     .slider-value {
@@ -298,11 +362,13 @@
       cursor: pointer;
       box-shadow: 0 0 8px rgba(0, 229, 255, 0.5);
       transition: all 0.2s ease;
+      margin-top: -1px;
     }
 
     input[type="range"]::-webkit-slider-thumb:hover {
-      transform: scale(1.2) translateY(-1px);
-      box-shadow: 0 4px 16px rgba(0, 229, 255, 0.6);
+      box-shadow: 0 2px 12px rgba(0, 229, 255, 0.6);
+      width: 16px;
+      height: 16px;
     }
 
     .reset-btn {
@@ -321,18 +387,16 @@
       align-items: center;
       justify-content: center;
       gap: 6px;
+      margin-top: 0;
     }
 
     .reset-btn:hover {
       border-color: #00e5ff;
       color: #00e5ff;
       background: rgba(0, 229, 255, 0.08);
-      transform: translateY(-1px);
+      margin-top: -1px;
+      margin-bottom: 1px;
       box-shadow: 0 4px 16px rgba(0, 229, 255, 0.2);
-    }
-
-    .reset-btn:active {
-      transform: translateY(0);
     }
 
     .info-panel {
@@ -513,7 +577,14 @@
     <div class="control-group">
       <label>数据文件</label>
       <label class="file-upload-btn" id="fileUploadBtn">
-        <span class="file-icon">📁</span>
+        <span class="file-icon" id="fileIcon">
+          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M14 2H6C4.9 2 4 2.9 4 4V20C4 21.1 4.9 22 6 22H18C19.1 22 20 21.1 20 20V8L14 2Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M14 2V8H20" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M12 18V12" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M9 15L12 12L15 15" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </span>
         <span class="file-name" id="fileNameDisplay">上传 CSV 文件</span>
         <input type="file" id="fileInput" accept=".csv" />
       </label>
@@ -521,11 +592,16 @@
 
     <div class="control-group">
       <label>Z轴时域指标</label>
-      <select id="metricSelect">
-        <option value="sdnn">SDNN (标准差)</option>
-        <option value="rmssd">RMSSD (均方根)</option>
-        <option value="pnn50">pNN50 (%)</option>
-      </select>
+      <div class="custom-select" id="metricSelect">
+        <div class="custom-select-trigger" data-value="sdnn">
+          <span class="custom-select-label">SDNN (标准差)</span>
+        </div>
+        <div class="custom-select-options">
+          <div class="custom-select-option selected" data-value="sdnn">SDNN (标准差)</div>
+          <div class="custom-select-option" data-value="rmssd">RMSSD (均方根)</div>
+          <div class="custom-select-option" data-value="pnn50">pNN50 (%)</div>
+        </div>
+      </div>
     </div>
 
     <div class="control-group">
@@ -554,8 +630,14 @@
       </div>
     </div>
 
-    <div class="control-group">
-      <button class="reset-btn" id="resetViewBtn">🔄 重置视角</button>
+    <div class="control-group last">
+      <button class="reset-btn" id="resetViewBtn">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M3 12C3 7 7 3 12 3C17 3 21 7 21 12C21 17 17 21 12 21" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M3 4V9H8" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        重置视角
+      </button>
     </div>
   </div>
 

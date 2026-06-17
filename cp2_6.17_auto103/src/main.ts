@@ -126,9 +126,8 @@ class HRVVisualizerApp {
     const fileInput = document.getElementById('fileInput') as HTMLInputElement;
     fileInput.addEventListener('change', this.onFileSelect.bind(this));
 
-    const metricSelect = document.getElementById('metricSelect') as HTMLSelectElement;
-    metricSelect.addEventListener('change', (e) => {
-      this.currentMetric = (e.target as HTMLSelectElement).value as TimeDomainMetric;
+    this.setupCustomSelect('metricSelect', (value: string) => {
+      this.currentMetric = value as TimeDomainMetric;
       this.updatePlots();
     });
 
@@ -175,24 +174,67 @@ class HRVVisualizerApp {
 
     const uploadBtn = document.getElementById('fileUploadBtn') as HTMLElement;
     const fileNameDisplay = document.getElementById('fileNameDisplay') as HTMLElement;
-    const fileIcon = uploadBtn.querySelector('.file-icon') as HTMLElement;
 
     if (file) {
+      uploadBtn.classList.remove('selected');
+      void uploadBtn.offsetWidth;
       uploadBtn.classList.add('selected');
       fileNameDisplay.textContent = `已选择: ${file.name}`;
-      if (fileIcon) {
-        fileIcon.textContent = '📄';
-      }
 
       const result = await DataParser.parseCSVFile(file, this.windowStep);
       this.handleAnalysisResult(result);
     } else {
       uploadBtn.classList.remove('selected');
       fileNameDisplay.textContent = '上传 CSV 文件';
-      if (fileIcon) {
-        fileIcon.textContent = '📁';
-      }
     }
+  }
+
+  private setupCustomSelect(selectId: string, onChange: (value: string) => void): void {
+    const selectEl = document.getElementById(selectId);
+    if (!selectEl) return;
+
+    const trigger = selectEl.querySelector('.custom-select-trigger') as HTMLElement;
+    const options = selectEl.querySelectorAll('.custom-select-option');
+    const labelEl = trigger.querySelector('.custom-select-label') as HTMLElement;
+
+    const closeAllSelects = (excludeEl?: HTMLElement) => {
+      document.querySelectorAll('.custom-select.open').forEach((el) => {
+        if (el !== excludeEl) {
+          el.classList.remove('open');
+        }
+      });
+    };
+
+    trigger.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const isOpen = selectEl.classList.contains('open');
+      closeAllSelects();
+      if (!isOpen) {
+        selectEl.classList.add('open');
+      }
+    });
+
+    options.forEach((option) => {
+      const optEl = option as HTMLElement;
+      optEl.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const value = optEl.dataset.value || '';
+        const label = optEl.textContent || '';
+
+        trigger.dataset.value = value;
+        labelEl.textContent = label;
+
+        options.forEach((o) => o.classList.remove('selected'));
+        optEl.classList.add('selected');
+
+        selectEl.classList.remove('open');
+        onChange(value);
+      });
+    });
+
+    document.addEventListener('click', () => {
+      closeAllSelects();
+    });
   }
 
   private async reanalyzeData(): Promise<void> {
