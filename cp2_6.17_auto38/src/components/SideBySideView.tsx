@@ -1,17 +1,10 @@
-import React, { useRef, useCallback, useMemo } from 'react';
-import type { DiffLine, DiffResult } from '@/utils/diffEngine';
-import { highlight, type SupportedLanguage } from '@/utils/highlighter';
+import React, { useRef, useCallback, useMemo, useEffect, useState } from 'react';
+import type { DiffLine, DiffResult, SupportedLanguage, BubbleState } from '@/types';
+import { highlight } from '@/utils/highlighter';
 
 interface SideBySideViewProps {
   diffResult: DiffResult | null;
   language: SupportedLanguage;
-}
-
-interface BubbleState {
-  visible: boolean;
-  x: number;
-  y: number;
-  text: string;
 }
 
 const STATUS_BG: Record<string, string> = {
@@ -34,7 +27,18 @@ const STATUS_BUBBLE: Record<string, string> = {
   changed: '此行在新版本中被修改',
 };
 
-function DiffPanel({
+interface DiffPanelProps {
+  lines: DiffLine[];
+  side: 'left' | 'right';
+  language: SupportedLanguage;
+  bubble: BubbleState;
+  onLineClick: (e: React.MouseEvent, line: DiffLine) => void;
+  scrollRef: React.RefObject<HTMLDivElement | null>;
+  onScroll: (scrollTop: number) => void;
+  isSyncScrolling: React.MutableRefObject<boolean>;
+}
+
+const DiffPanel = React.memo(function DiffPanel({
   lines,
   side,
   language,
@@ -42,17 +46,19 @@ function DiffPanel({
   onLineClick,
   scrollRef,
   onScroll,
-}: {
-  lines: DiffLine[];
-  side: 'left' | 'right';
-  language: SupportedLanguage;
-  bubble: BubbleState;
-  onLineClick: (e: React.MouseEvent, line: DiffLine) => void;
-  scrollRef: React.RefObject<HTMLDivElement | null>;
-  onScroll: (e: React.UIEvent<HTMLDivElement>) => void;
-}) {
+  isSyncScrolling,
+}: DiffPanelProps) {
+  const handleScroll = useCallback(
+    (e: React.UIEvent<HTMLDivElement>) => {
+      if (isSyncScrolling.current) return;
+      const target = e.currentTarget;
+      onScroll(target.scrollTop);
+    },
+    [onScroll, isSyncScrolling]
+  );
+
   return (
-    <div className="diff-panel" ref={scrollRef} onScroll={onScroll}>
+    <div className="diff-panel" ref={scrollRef} onScroll={handleScroll}>
       <table className="diff-table">
         <tbody>
           {lines.map((line, idx) => {
@@ -97,20 +103,22 @@ function DiffPanel({
       )}
     </div>
   );
-}
+});
 
 export default function SideBySideView({ diffResult, language }: SideBySideViewProps) {
   const leftScrollRef = useRef<HTMLDivElement>(null);
   const rightScrollRef = useRef<HTMLDivElement>(null);
-  const isSyncingScroll = useRef(false);
+  const isSyncScrolling = useRef(false);
+  const scrollRafId = useRef<number | null>(null);
+  const lastScrollSide = useRef<'left' | 'right' | null>(null);
 
-  const [leftBubble, setLeftBubble] = React.useState<BubbleState>({
+  const [leftBubble, setLeftBubble] = useState<BubbleState>({
     visible: false,
     x: 0,
     y: 0,
     text: '',
   });
-  const [rightBubble, setRightBubble] = React.useState<BubbleState>({
+  const [rightBubble, setRightBubble] = useState<BubbleState>({
     visible: false,
     x: 0,
     y: 0,
@@ -119,22 +127,77 @@ export default function SideBySideView({ diffResult, language }: SideBySideViewP
 
   const bubbleTimerRef = useRef<ReturnType<typeof setTimeout>>();
 
+  const syncScroll = useCallback((source: 'left' | 'right', scrollTop: number) => {
+    if (scrollRafId.current) {
+      cancelAnimationFrame(scrollRafId.current);
+    }
+
+    scrollRafId.current = requestAnimationFrame(() => {
+      isSyncScrolling.current = true;
+      lastScrollSide.current = source;
+
+      const targetEl = source === 'left' ? rightScrollRef.current : leftScrollRef.current;
+      if (targetEl) {
+        const maxScroll = targetEl.scrollHeight - targetEl.clientHeight;
+        const clampedTop = Math.max(0, Math.min(scrollTop, maxScroll));
+        targetEl.scrollTop = clampedTop;
+      }
+
+      scrollRafId.current = requestAnimationFrame(() => {
+        isSyncScrolling.current = false;
+        lastScrollSide.current = null;
+      });
+
+      scrollRafId.current = null;
+    });
+  }, []);
+
+  const handleLeftScroll = useCallback(
+    (scrollTop: number) => {
+      syncScroll('left', scrollTop);
+    },
+    [syncScroll]
+  );
+
+  const handleRightScroll = useCallback(
+    (scrollTop: number) => {
+      syncScroll('right', scrollTop);
+    },
+    [syncScroll]
+  );
+
+  useEffect(() => {
+    return () => {
+      if (scrollRafId.current) {
+        cancelAnimationFrame(scrollRafId.current);
+      }
+      if (bubbleTimerRef.current) {
+        clearTimeout(bubbleTimerRef.current);
+      }
+    };
+  }, []);
+
   const handleLineClick = useCallback(
     (side: 'left' | 'right') => (e: React.MouseEvent, line: DiffLine) => {
       if (bubbleTimerRef.current) clearTimeout(bubbleTimerRef.current);
 
-      const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-      const panelRect = (e.currentTarget as HTMLElement)
-        .closest('.diff-panel')
-        ?.getBoundingClientRect();
+      const target = e.currentTarget as HTMLElement;
+      const panelEl = target.closest('.diff-panel');
+      if (!panelEl) return;
 
-      const x = e.clientX - (panelRect?.left ?? 0);
-      const y = rect.top - (panelRect?.top ?? 0) - 36;
+      const targetRect = target.getBoundingClientRect();
+      const panelRect = panelEl.getBoundingClientRect();
+      const x = e.clientX - panelRect.left;
+
+      let y = targetRect.top - panelRect.top - 36;
+      if (y < 0) {
+        y = targetRect.bottom - panelRect.top + 4;
+      }
 
       const bubbleState: BubbleState = {
         visible: true,
         x,
-        y: y < 0 ? rect.bottom - (panelRect?.top ?? 0) + 4 : y,
+        y,
         text: STATUS_BUBBLE[line.status] ?? '',
       };
 
@@ -150,38 +213,6 @@ export default function SideBySideView({ diffResult, language }: SideBySideViewP
         setLeftBubble((prev) => ({ ...prev, visible: false }));
         setRightBubble((prev) => ({ ...prev, visible: false }));
       }, 2000);
-    },
-    []
-  );
-
-  const handleLeftScroll = useCallback(
-    (e: React.UIEvent<HTMLDivElement>) => {
-      if (isSyncingScroll.current) return;
-      isSyncingScroll.current = true;
-      const target = e.currentTarget;
-      if (rightScrollRef.current) {
-        rightScrollRef.current.scrollTop = target.scrollTop;
-        rightScrollRef.current.scrollLeft = target.scrollLeft;
-      }
-      requestAnimationFrame(() => {
-        isSyncingScroll.current = false;
-      });
-    },
-    []
-  );
-
-  const handleRightScroll = useCallback(
-    (e: React.UIEvent<HTMLDivElement>) => {
-      if (isSyncingScroll.current) return;
-      isSyncingScroll.current = true;
-      const target = e.currentTarget;
-      if (leftScrollRef.current) {
-        leftScrollRef.current.scrollTop = target.scrollTop;
-        leftScrollRef.current.scrollLeft = target.scrollLeft;
-      }
-      requestAnimationFrame(() => {
-        isSyncingScroll.current = false;
-      });
     },
     []
   );
@@ -208,6 +239,7 @@ export default function SideBySideView({ diffResult, language }: SideBySideViewP
         onLineClick={handleLeftLineClick}
         scrollRef={leftScrollRef}
         onScroll={handleLeftScroll}
+        isSyncScrolling={isSyncScrolling}
       />
       <DiffPanel
         lines={rightLines}
@@ -217,6 +249,7 @@ export default function SideBySideView({ diffResult, language }: SideBySideViewP
         onLineClick={handleRightLineClick}
         scrollRef={rightScrollRef}
         onScroll={handleRightScroll}
+        isSyncScrolling={isSyncScrolling}
       />
     </div>
   );

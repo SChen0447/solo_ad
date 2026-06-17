@@ -1,21 +1,5 @@
 import * as Diff from 'diff';
-
-export type DiffLineStatus = 'added' | 'removed' | 'changed' | 'unchanged';
-
-export interface DiffLine {
-  lineNumber: number;
-  status: DiffLineStatus;
-  text: string;
-  leftText?: string;
-  rightText?: string;
-  leftLineNumber?: number;
-  rightLineNumber?: number;
-}
-
-export interface DiffResult {
-  leftLines: DiffLine[];
-  rightLines: DiffLine[];
-}
+import type { DiffLineStatus, DiffLine, DiffResult } from '@/types';
 
 export function compare(textA: string, textB: string): DiffResult {
   const changes = Diff.diffLines(textA, textB);
@@ -110,33 +94,27 @@ function alignChangedLines(leftLines: DiffLine[], rightLines: DiffLine[]): void 
 }
 
 export function getMergedCode(leftCode: string, rightCode: string): string {
-  const { leftLines, rightLines } = compare(leftCode, rightCode);
-  const result: string[] = [];
+  const changes = Diff.diffLines(leftCode, rightCode);
+  const resultLines: string[] = [];
 
-  let ri = 0;
-  for (const leftLine of leftLines) {
-    if (leftLine.status === 'unchanged') {
-      result.push(leftLine.text);
-    } else if (leftLine.status === 'changed') {
-      while (ri < rightLines.length && rightLines[ri].status !== 'changed') {
-        if (rightLines[ri].status === 'added') {
-          result.push(rightLines[ri].text);
-        }
-        ri++;
-      }
-      if (ri < rightLines.length && rightLines[ri].status === 'changed') {
-        result.push(rightLines[ri].text);
-        ri++;
-      }
+  for (const change of changes) {
+    if (change.removed) {
+      continue;
+    }
+
+    const rawValue = change.value.endsWith('\n')
+      ? change.value.slice(0, -1)
+      : change.value;
+
+    if (rawValue === '' && change.value === '') {
+      continue;
+    }
+
+    const lines = rawValue.split('\n');
+    for (const line of lines) {
+      resultLines.push(line);
     }
   }
 
-  while (ri < rightLines.length) {
-    if (rightLines[ri].status === 'added' || rightLines[ri].status === 'changed') {
-      result.push(rightLines[ri].text);
-    }
-    ri++;
-  }
-
-  return result.join('\n');
+  return resultLines.join('\n');
 }
