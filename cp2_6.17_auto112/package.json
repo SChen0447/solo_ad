@@ -1,0 +1,16 @@
+{
+  "name": "eco-simulator",
+  "version": "1.0.0",
+  "description": "生态模拟器 - 模拟生物种群在共享资源环境中的生存与竞争",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.0",
+    "vite": "^5.2.0",
+    "vitest": "^1.6.0"
+  }
+}
