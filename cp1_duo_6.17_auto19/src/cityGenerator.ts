@@ -77,8 +77,14 @@ function createRoundabout(
   return circle;
 }
 
-export function generateCity(params: CityParams): THREE.Object3D[] {
+export interface CityResult {
+  objects: THREE.Object3D[];
+  buildings: THREE.Group[];
+}
+
+export function generateCity(params: CityParams): CityResult {
   const objects: THREE.Object3D[] = [];
+  const buildings: THREE.Group[] = [];
   
   const gridSize = Math.floor(params.gridSize);
   const blockSize = 40;
@@ -253,9 +259,10 @@ export function generateCity(params: CityParams): THREE.Object3D[] {
       
       const building = createBuilding(buildingParams);
       objects.push(building);
+      buildings.push(building);
       buildingCount++;
     }
   }
   
-  return objects;
+  return { objects, buildings };
 }

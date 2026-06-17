@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { generateCity, CityParams } from './cityGenerator';
 import { UIController } from './uiController';
+import { updateBuildingWindows } from './buildingFactory';
 
 class CityGeneratorApp {
   private scene: THREE.Scene;
@@ -10,7 +11,9 @@ class CityGeneratorApp {
   private controls: OrbitControls;
   private uiController: UIController;
   private cityObjects: THREE.Object3D[] = [];
+  private cityBuildings: THREE.Group[] = [];
   private cityGroup: THREE.Group;
+  private elapsedTime: number = 0;
   
   private isAutoMode: boolean = false;
   private autoPath: THREE.Vector3[] = [];
@@ -236,8 +239,7 @@ class CityGeneratorApp {
   }
 
   private updateCity(params: CityParams): void {
-    for (const obj of this.cityObjects) {
-      this.cityGroup.remove(obj);
+    this.cityGroup.traverse((obj) => {
       if (obj instanceof THREE.Mesh) {
         obj.geometry.dispose();
         if (Array.isArray(obj.material)) {
@@ -246,11 +248,19 @@ class CityGeneratorApp {
           obj.material.dispose();
         }
       }
+    });
+    
+    while (this.cityGroup.children.length > 0) {
+      this.cityGroup.remove(this.cityGroup.children[0]);
     }
     
     this.cityObjects = [];
+    this.cityBuildings = [];
     
-    this.cityObjects = generateCity(params);
+    const result = generateCity(params);
+    this.cityObjects = result.objects;
+    this.cityBuildings = result.buildings;
+    
     for (const obj of this.cityObjects) {
       this.cityGroup.add(obj);
     }
@@ -290,6 +300,7 @@ class CityGeneratorApp {
     
     const deltaTime = time - this.lastTime;
     this.lastTime = time;
+    this.elapsedTime += deltaTime / 1000;
     
     if (this.isTransitioning) {
       this.updateTransition(deltaTime);
@@ -299,10 +310,17 @@ class CityGeneratorApp {
       this.controls.update();
     }
     
+    this.updateBuildingWindows();
     this.updateFPS(deltaTime);
     this.updateCameraInfo();
     
     this.renderer.render(this.scene, this.camera);
+  }
+  
+  private updateBuildingWindows(): void {
+    for (const building of this.cityBuildings) {
+      updateBuildingWindows(building, this.elapsedTime);
+    }
   }
 
   private onResize(): void {
