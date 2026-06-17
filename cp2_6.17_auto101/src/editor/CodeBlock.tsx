@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import { EditorState, StateEffect, Extension } from '@codemirror/state';
+import { EditorState, Compartment } from '@codemirror/state';
 import { EditorView, keymap, lineNumbers, highlightActiveLine } from '@codemirror/view';
 import { defaultKeymap } from '@codemirror/commands';
 import { javascript } from '@codemirror/lang-javascript';
@@ -70,7 +70,62 @@ const darkTheme = EditorView.theme({
   }
 }, { dark: true });
 
-const reconfigureEffect = StateEffect.define<Extension>();
+const languageCompartment = new Compartment();
+
+const formatOutput = (rawOutput: string): { text: string; isJson: boolean } => {
+  if (!rawOutput) return { text: '', isJson: false };
+
+  const trimmed = rawOutput.trim();
+
+  if ((trimmed.startsWith('{') && trimmed.endsWith('}')) ||
+      (trimmed.startsWith('[') && trimmed.endsWith(']'))) {
+    try {
+      const parsed = JSON.parse(trimmed);
+      return {
+        text: JSON.stringify(parsed, null, 2),
+        isJson: true
+      };
+    } catch {
+      return { text: rawOutput, isJson: false };
+    }
+  }
+
+  const objectPattern = /^\[object\s+\w+\]$/;
+  if (objectPattern.test(trimmed)) {
+    return {
+      text: `⚠ 输出为对象引用: ${trimmed}\n提示: 使用 console.log(JSON.stringify(obj)) 来查看对象内容`,
+      isJson: false
+    };
+  }
+
+  return { text: rawOutput, isJson: false };
+};
+
+const JsonHighlightedOutput: React.FC<{ text: string }> = ({ text }) => {
+  const highlighted = text.replace(
+    /("(?:\\.|[^"\\])*")\s*:/g,
+    '<span class="json-key">$1</span>:'
+  ).replace(
+    /:\s*("(?:\\.|[^"\\])*")/g,
+    ': <span class="json-string">$1</span>'
+  ).replace(
+    /:\s*(\d+(?:\.\d+)?)/g,
+    ': <span class="json-number">$1</span>'
+  ).replace(
+    /:\s*(true|false)/g,
+    ': <span class="json-boolean">$1</span>'
+  ).replace(
+    /:\s*(null)/g,
+    ': <span class="json-null">$1</span>'
+  );
+
+  return (
+    <pre
+      className="json-output"
+      dangerouslySetInnerHTML={{ __html: highlighted }}
+    />
+  );
+};
 
 export const CodeBlock: React.FC<CodeBlockProps> = ({ block, onUpdate, onDelete }) => {
   const editorRef = useRef<HTMLDivElement>(null);
@@ -101,7 +156,7 @@ export const CodeBlock: React.FC<CodeBlockProps> = ({ block, onUpdate, onDelete 
         keymap.of(defaultKeymap),
         lineNumbers(),
         highlightActiveLine(),
-        getLanguageExtension(language),
+        languageCompartment.of(getLanguageExtension(language)),
         syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
         darkTheme,
         updateListener
@@ -124,27 +179,15 @@ export const CodeBlock: React.FC<CodeBlockProps> = ({ block, onUpdate, onDelete 
   useEffect(() => {
     if (!viewRef.current) return;
 
-    const updateListener = EditorView.updateListener.of((update) => {
-      if (update.docChanged) {
-        const newCode = update.state.doc.toString();
-        handleCodeChange(newCode);
-      }
-    });
-
-    viewRef.current.dispatch({
-      effects: reconfigureEffect.of([
-        keymap.of(defaultKeymap),
-        lineNumbers(),
-        highlightActiveLine(),
-        getLanguageExtension(language),
-        syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
-        darkTheme,
-        updateListener
-      ])
-    });
+    const currentLang = viewRef.current.state.field(languageCompartment, false);
+    if (currentLang !== undefined) {
+      viewRef.current.dispatch({
+        effects: languageCompartment.reconfigure(getLanguageExtension(language))
+      });
+    }
 
     onUpdate({ language });
-  }, [language, handleCodeChange, onUpdate]);
+  }, [language, onUpdate]);
 
   const handleRun = async () => {
     if (isRunning) return;
@@ -180,6 +223,9 @@ export const CodeBlock: React.FC<CodeBlockProps> = ({ block, onUpdate, onDelete 
     setLanguage(e.target.value as Language);
   };
 
+  const formatted = formatOutput(output);
+  const hasOutput = output || error;
+
   return (
     <div className="code-block-card">
       <div className="code-block-header">
@@ -204,7 +250,7 @@ export const CodeBlock: React.FC<CodeBlockProps> = ({ block, onUpdate, onDelete 
             className={`run-button ${isRunning ? 'loading' : ''}`}
             onClick={handleRun}
             disabled={isRunning}
-            title="运行代码"
+            title={isRunning ? '代码运行中...' : '运行代码'}
           >
             {isRunning ? (
               <span className="spinner"></span>
@@ -241,15 +287,17 @@ export const CodeBlock: React.FC<CodeBlockProps> = ({ block, onUpdate, onDelete 
         </div>
       </div>
       <div ref={editorRef} className="codemirror-container" />
-      {(output || error) && (
-        <div className={`output-area ${error ? 'has-error' : ''}`}>
-          <pre>
-            {error ? (
+      {hasOutput && (
+        <div className={`output-area ${error ? 'has-error' : ''} ${formatted.isJson ? 'has-json' : ''}`}>
+          {error ? (
+            <pre>
               <span className="error-text">{error}</span>
-            ) : (
-              <span>{output}</span>
-            )}
-          </pre>
+            </pre>
+          ) : formatted.isJson ? (
+            <JsonHighlightedOutput text={formatted.text} />
+          ) : (
+            <pre>{formatted.text}</pre>
+          )}
         </div>
       )}
     </div>

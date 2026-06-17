@@ -156,3 +156,38 @@
 .error-text {
   color: #ef4444 !important;
 }
+
+.output-area.has-json pre {
+  color: #cbd5e1;
+}
+
+.output-area .json-output {
+  margin: 0;
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-size: 13px;
+  line-height: 1.6;
+  color: #cbd5e1;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.output-area .json-output .json-key {
+  color: #93c5fd;
+}
+
+.output-area .json-output .json-string {
+  color: #86efac;
+}
+
+.output-area .json-output .json-number {
+  color: #fbbf24;
+}
+
+.output-area .json-output .json-boolean {
+  color: #c084fc;
+}
+
+.output-area .json-output .json-null {
+  color: #94a3b8;
+  font-style: italic;
+}
