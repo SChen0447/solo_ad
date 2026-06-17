@@ -159,7 +159,7 @@ export const CodeOutput: React.FC<CodeOutputProps> = React.memo(({ params }) => 
           font-size: 12px;
           font-weight: 500;
           cursor: pointer;
-          transition: all 0.2s ease;
+          transition: background-color 0.2s ease, color 0.2s ease, transform 0.2s ease;
           white-space: nowrap;
           min-width: 80px;
         }
@@ -171,19 +171,7 @@ export const CodeOutput: React.FC<CodeOutputProps> = React.memo(({ params }) => 
         .copy-btn.copied {
           background-color: #22c55e;
           color: #fff;
-          animation: copy-feedback 0.2s ease;
-        }
-
-        @keyframes copy-feedback {
-          0% {
-            transform: scale(1);
-          }
-          50% {
-            transform: scale(1.05);
-          }
-          100% {
-            transform: scale(1);
-          }
+          transition: background-color 0.2s ease, color 0.2s ease, transform 0.2s ease;
         }
 
         .code-content {

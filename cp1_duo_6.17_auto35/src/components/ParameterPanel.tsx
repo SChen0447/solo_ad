@@ -1,4 +1,4 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useMemo } from 'react';
 import type { TypographyParams } from '../utils/textSample';
 import { FONT_OPTIONS, SLIDER_CONFIG, ALIGN_OPTIONS } from '../utils/textSample';
 
@@ -16,10 +16,31 @@ interface SliderProps {
   max: number;
   step: number;
   unit: string;
-  gradientFrom: string;
-  gradientTo: string;
+  hueStart: number;
+  hueEnd: number;
   onChange: (value: number) => void;
 }
+
+const hslToHex = (h: number, s: number, l: number): string => {
+  const c = (1 - Math.abs(2 * l - 1)) * s;
+  const x = c * (1 - Math.abs(((h / 60) % 2) - 1));
+  const m = l - c / 2;
+  let r = 0, g = 0, b = 0;
+
+  if (0 <= h && h < 60) { r = c; g = x; b = 0; }
+  else if (60 <= h && h < 120) { r = x; g = c; b = 0; }
+  else if (120 <= h && h < 180) { r = 0; g = c; b = x; }
+  else if (180 <= h && h < 240) { r = 0; g = x; b = c; }
+  else if (240 <= h && h < 300) { r = x; g = 0; b = c; }
+  else if (300 <= h && h < 360) { r = c; g = 0; b = x; }
+
+  const toHex = (n: number) => {
+    const hex = Math.round((n + m) * 255).toString(16);
+    return hex.length === 1 ? '0' + hex : hex;
+  };
+
+  return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+};
 
 const Slider: React.FC<SliderProps> = ({
   label,
@@ -28,12 +49,23 @@ const Slider: React.FC<SliderProps> = ({
   max,
   step,
   unit,
-  gradientFrom,
-  gradientTo,
+  hueStart,
+  hueEnd,
   onChange
 }) => {
-  const percentage = ((value - min) / (max - min)) * 100;
-  const gradientId = `gradient-${label.replace(/\s/g, '-')}`;
+  const percentage = useMemo(() => ((value - min) / (max - min)) * 100, [value, min, max]);
+
+  const dynamicGradient = useMemo(() => {
+    const currentHue = hueStart + (hueEnd - hueStart) * (percentage / 100);
+    const startColor = hslToHex(hueStart, 0.7, 0.35);
+    const endColor = hslToHex(currentHue, 0.8, 0.55);
+    return `linear-gradient(to right, ${startColor} 0%, ${endColor} ${percentage}%, #0f3460 ${percentage}%, #0f3460 100%)`;
+  }, [percentage, hueStart, hueEnd]);
+
+  const thumbColor = useMemo(() => {
+    const currentHue = hueStart + (hueEnd - hueStart) * (percentage / 100);
+    return hslToHex(currentHue, 0.85, 0.6);
+  }, [percentage, hueStart, hueEnd]);
 
   const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     onChange(parseFloat(e.target.value));
@@ -57,17 +89,10 @@ const Slider: React.FC<SliderProps> = ({
           onChange={handleChange}
           className="custom-slider"
           style={{
-            background: `linear-gradient(to right, ${gradientFrom} 0%, ${gradientTo} ${percentage}%, #0f3460 ${percentage}%, #0f3460 100%)`
+            background: dynamicGradient,
+            ['--thumb-color' as string]: thumbColor
           }}
         />
-        <svg style={{ position: 'absolute', width: 0, height: 0 }}>
-          <defs>
-            <linearGradient id={gradientId} x1="0%" y1="0%" x2="100%" y2="0%">
-              <stop offset="0%" stopColor={gradientFrom} />
-              <stop offset="100%" stopColor={gradientTo} />
-            </linearGradient>
-          </defs>
-        </svg>
       </div>
     </div>
   );
@@ -132,8 +157,8 @@ export const ParameterPanel: React.FC<ParameterPanelProps> = ({
               max={SLIDER_CONFIG.fontSize.max}
               step={SLIDER_CONFIG.fontSize.step}
               unit="px"
-              gradientFrom="#0f3460"
-              gradientTo="#e94560"
+              hueStart={210}
+              hueEnd={340}
               onChange={(v) => handleSliderChange('fontSize', v)}
             />
           </div>
@@ -147,8 +172,8 @@ export const ParameterPanel: React.FC<ParameterPanelProps> = ({
               max={SLIDER_CONFIG.lineHeight.max}
               step={SLIDER_CONFIG.lineHeight.step}
               unit=""
-              gradientFrom="#0f3460"
-              gradientTo="#e94560"
+              hueStart={180}
+              hueEnd={300}
               onChange={(v) => handleSliderChange('lineHeight', v)}
             />
           </div>
@@ -162,8 +187,8 @@ export const ParameterPanel: React.FC<ParameterPanelProps> = ({
               max={SLIDER_CONFIG.letterSpacing.max}
               step={SLIDER_CONFIG.letterSpacing.step}
               unit="em"
-              gradientFrom="#0f3460"
-              gradientTo="#e94560"
+              hueStart={30}
+              hueEnd={280}
               onChange={(v) => handleSliderChange('letterSpacing', v)}
             />
           </div>
@@ -192,8 +217,8 @@ export const ParameterPanel: React.FC<ParameterPanelProps> = ({
               max={SLIDER_CONFIG.containerWidth.max}
               step={SLIDER_CONFIG.containerWidth.step}
               unit="px"
-              gradientFrom="#0f3460"
-              gradientTo="#e94560"
+              hueStart={140}
+              hueEnd={200}
               onChange={(v) => handleSliderChange('containerWidth', v)}
             />
           </div>
@@ -364,7 +389,7 @@ export const ParameterPanel: React.FC<ParameterPanelProps> = ({
           border-radius: 4px;
           outline: none;
           cursor: pointer;
-          transition: background 0.1s ease;
+          transition: background 0.15s ease;
         }
 
         .custom-slider::-webkit-slider-thumb {
@@ -373,25 +398,26 @@ export const ParameterPanel: React.FC<ParameterPanelProps> = ({
           width: 18px;
           height: 18px;
           border-radius: 50%;
-          background: #e94560;
+          background: var(--thumb-color, #e94560);
           cursor: pointer;
-          box-shadow: 0 2px 8px rgba(233, 69, 96, 0.4);
-          transition: transform 0.2s ease, box-shadow 0.2s ease;
+          box-shadow: 0 2px 8px var(--thumb-color, rgba(233, 69, 96, 0.4));
+          transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.15s ease;
         }
 
         .custom-slider::-webkit-slider-thumb:hover {
           transform: scale(1.2);
-          box-shadow: 0 4px 12px rgba(233, 69, 96, 0.6);
+          box-shadow: 0 4px 14px var(--thumb-color, rgba(233, 69, 96, 0.6));
         }
 
         .custom-slider::-moz-range-thumb {
           width: 18px;
           height: 18px;
           border-radius: 50%;
-          background: #e94560;
+          background: var(--thumb-color, #e94560);
           cursor: pointer;
           border: none;
-          box-shadow: 0 2px 8px rgba(233, 69, 96, 0.4);
+          box-shadow: 0 2px 8px var(--thumb-color, rgba(233, 69, 96, 0.4));
+          transition: background 0.15s ease;
         }
 
         .align-buttons {

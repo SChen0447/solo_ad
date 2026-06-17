@@ -17,33 +17,45 @@ const calculateLineStats = (element: HTMLElement, text: string): LineStats => {
     return { lineCount: 0, avgCharsPerLine: 0 };
   }
 
-  const range = document.createRange();
-  const textNode = element.firstChild;
-  if (!textNode) {
-    return { lineCount: 0, avgCharsPerLine: 0 };
-  }
+  try {
+    const range = document.createRange();
+    range.selectNodeContents(element);
+    const rects = range.getClientRects();
 
-  let lineCount = 0;
-  let prevBottom: number | null = null;
+    let lineCount = 0;
+    let lastBottom = -Infinity;
 
-  for (let i = 0; i < text.length; i++) {
-    try {
-      range.setStart(textNode, i);
-      const rect = range.getBoundingClientRect();
-
-      if (prevBottom === null || rect.bottom > prevBottom + 1) {
+    for (let i = 0; i < rects.length; i++) {
+      const rect = rects[i];
+      if (rect.height > 0 && Math.abs(rect.bottom - lastBottom) > 1) {
         lineCount++;
-        prevBottom = rect.bottom;
+        lastBottom = rect.bottom;
       }
-    } catch {
-      break;
     }
+
+    if (lineCount === 0) {
+      const lineHeight = parseFloat(getComputedStyle(element).lineHeight) || 
+        parseFloat(getComputedStyle(element).fontSize) * 1.6;
+      lineCount = Math.max(1, Math.round(element.offsetHeight / lineHeight));
+    }
+
+    const totalChars = text.replace(/\s/g, '').length;
+    const avgCharsPerLine = lineCount > 0 ? totalChars / lineCount : 0;
+
+    return { lineCount, avgCharsPerLine };
+  } catch {
+    const lineHeight = params => {
+      const el = element as HTMLElement;
+      const style = getComputedStyle(el);
+      const lh = parseFloat(style.lineHeight);
+      const fs = parseFloat(style.fontSize);
+      return isNaN(lh) ? fs * 1.6 : lh;
+    };
+    const lh = lineHeight(null);
+    const lineCount = Math.max(1, Math.round(element.offsetHeight / lh));
+    const totalChars = text.replace(/\s/g, '').length;
+    return { lineCount, avgCharsPerLine: lineCount > 0 ? totalChars / lineCount : 0 };
   }
-
-  const totalChars = text.replace(/\s/g, '').length;
-  const avgCharsPerLine = lineCount > 0 ? totalChars / lineCount : 0;
-
-  return { lineCount, avgCharsPerLine };
 };
 
 export const PreviewArea: React.FC<PreviewAreaProps> = React.memo(({ params, text = TEXT_SAMPLE }) => {
@@ -64,33 +76,43 @@ export const PreviewArea: React.FC<PreviewAreaProps> = React.memo(({ params, tex
     letterSpacing: `${params.letterSpacing}em`,
     textAlign: params.textAlign,
     maxWidth: `${params.containerWidth}px`,
-    transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
+    width: `${params.containerWidth}px`,
+    transition: 'font-family 0.3s ease, font-size 0.3s ease, line-height 0.3s ease, letter-spacing 0.3s ease, text-align 0.3s ease'
   }), [fontFamily, params]);
 
-  useEffect(() => {
-    if (!textRef.current) return;
+  const updateStats = useMemo(() => () => {
+    if (textRef.current) {
+      const stats = calculateLineStats(textRef.current, text);
+      setLineStats(stats);
+    }
+  }, [text]);
 
-    const updateStats = () => {
-      if (textRef.current) {
-        const stats = calculateLineStats(textRef.current, text);
-        setLineStats(stats);
-      }
+  useEffect(() => {
+    let rafId1: number;
+    let rafId2: number;
+    let timerId: ReturnType<typeof setTimeout>;
+
+    rafId1 = requestAnimationFrame(updateStats);
+    rafId2 = requestAnimationFrame(() => {
+      requestAnimationFrame(updateStats);
+    });
+    timerId = setTimeout(updateStats, 400);
+
+    return () => {
+      cancelAnimationFrame(rafId1);
+      cancelAnimationFrame(rafId2);
+      clearTimeout(timerId);
+    };
+  }, [params, text, updateStats]);
+
+  useEffect(() => {
+    const handleResize = () => {
+      requestAnimationFrame(updateStats);
     };
 
-    const rafId = requestAnimationFrame(updateStats);
-    return () => cancelAnimationFrame(rafId);
-  }, [params, text]);
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      if (textRef.current) {
-        const stats = calculateLineStats(textRef.current, text);
-        setLineStats(stats);
-      }
-    }, 350);
-
-    return () => clearTimeout(timer);
-  }, [params, text]);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [updateStats]);
 
   return (
     <div className="preview-area">
