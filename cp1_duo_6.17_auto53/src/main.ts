@@ -17,7 +17,6 @@ import {
 } from './gameLoop'
 import {
   setupKeyboardInput,
-  collectRingEffect,
   collisionFlashEffect,
   updateVehicleOrientation
 } from './playerController'
@@ -42,6 +41,8 @@ import {
   type UIControls,
   type LeaderboardRecord
 } from './ui'
+import { generateEnergyRings, createRecommendedPath, type EnergyRing } from './energyRing'
+import * as THREE from 'three'
 
 interface GameState {
   sceneSetup: SceneSetupResult | null
@@ -102,23 +103,13 @@ function createCallbacks(): GameCallbacks {
       }
     },
     onRingCollected: (collected: number, total: number) => {
-      if (game.hudState && game.sceneSetup) {
+      if (game.hudState) {
         updateRingDisplay(
           game.hudState.ringValueElement,
           game.hudState.ringProgressElement,
           collected,
           total
         )
-        const lastCollected = game.sceneSetup.rings
-          .filter(r => r.collected)
-          .pop()
-        if (lastCollected) {
-          collectRingEffect(
-            game.sceneSetup.vehicle,
-            game.sceneSetup.scene,
-            lastCollected.position
-          )
-        }
       }
     },
     onCollision: () => {
@@ -149,12 +140,14 @@ async function handleFinish(timeMs: number): Promise<void> {
 
   const submitResult = await submitRecord(timeMs)
 
-  let localRecords = saveLocalRecord(timeMs)
+  const localRecords = saveLocalRecord(timeMs)
 
   let leaderboard: LeaderboardRecord[]
   if (submitResult && submitResult.success) {
     const serverLeaderboard = await fetchLeaderboard()
-    leaderboard = serverLeaderboard.length > 0 ? serverLeaderboard : localRecords.slice(0, 3)
+    leaderboard = serverLeaderboard.length > 0
+      ? serverLeaderboard
+      : localRecords.slice(0, 3)
   } else {
     leaderboard = localRecords.slice(0, 3)
   }
@@ -162,10 +155,71 @@ async function handleFinish(timeMs: number): Promise<void> {
   showFinishScreen(game.uiControls, timeMs, leaderboard)
 }
 
+function resetRings(): void {
+  if (!game.sceneSetup) return
+
+  const { scene, islands, recommendedLine, recommendedArrows } = game.sceneSetup
+
+  for (const ring of game.sceneSetup.rings) {
+    scene.remove(ring.mesh)
+    ring.mesh.traverse((child) => {
+      if (child instanceof THREE.Mesh) {
+        child.geometry.dispose()
+        if (Array.isArray(child.material)) {
+          child.material.forEach((m) => m.dispose())
+        } else {
+          child.material.dispose()
+        }
+      }
+    })
+  }
+
+  scene.remove(recommendedLine)
+  recommendedLine.geometry.dispose()
+  ;(recommendedLine.material as THREE.Material).dispose()
+
+  for (const arrow of recommendedArrows) {
+    scene.remove(arrow)
+    arrow.traverse((child) => {
+      if (child instanceof THREE.Mesh) {
+        child.geometry.dispose()
+        ;(child.material as THREE.Material).dispose()
+      }
+    })
+  }
+
+  const ringCounts = [4, 3, 4, 3, 5, 3, 4, 3, 4, 0]
+  const newRings: EnergyRing[] = generateEnergyRings(islands, ringCounts)
+  for (const ring of newRings) {
+    scene.add(ring.mesh)
+  }
+
+  const { line: newLine, arrows: newArrows } = createRecommendedPath(islands, newRings)
+  scene.add(newLine)
+  for (const arrow of newArrows) {
+    scene.add(arrow)
+  }
+
+  game.sceneSetup.rings = newRings
+  game.sceneSetup.recommendedLine = newLine
+  game.sceneSetup.recommendedArrows = newArrows
+}
+
 function startGame(): void {
-  if (!game.sceneSetup || !game.cameraState || !game.physicsState || !game.minimapState) {
+  if (
+    !game.sceneSetup ||
+    !game.cameraState ||
+    !game.physicsState ||
+    !game.minimapState
+  ) {
     console.error('游戏未初始化')
     return
+  }
+
+  if (game.animationFrameId !== null) {
+    cancelAnimationFrame(game.animationFrameId)
+    game.animationFrameId = null
+    game.loopState.running = false
   }
 
   game.hasFinished.value = false
@@ -182,14 +236,13 @@ function startGame(): void {
   game.physicsState.right.set(1, 0, 0)
   game.physicsState.speed = 0
   game.physicsState.boostMultiplier = 1.0
+  game.physicsState.boostEndTime = 0
   game.physicsState.isColliding = false
+  game.physicsState.collisionEndTime = 0
   game.physicsState.isFlashing = false
+  game.physicsState.flashEndTime = 0
 
-  for (const ring of game.sceneSetup.rings) {
-    ring.collected = false
-    ring.mesh.visible = true
-    ;(ring.mesh as any).userData.collected = false
-  }
+  resetRings()
 
   if (game.hudState) {
     updateSpeedDisplay(game.hudState.speedElement, 0)
@@ -246,6 +299,7 @@ function runGameLoop(callbacks: GameCallbacks): void {
       game.sceneSetup.islands,
       game.sceneSetup.rings,
       game.sceneSetup.vehicle,
+      game.sceneSetup.recommendedArrows,
       callbacks,
       game.hasFinished
     )
@@ -293,7 +347,10 @@ function setupEventListeners(): void {
     startGame()
   })
   game.cleanupFns.push(() => {
-    game.uiControls.restartBtn.removeEventListener('click', startGame)
+    game.uiControls.restartBtn.removeEventListener('click', () => {
+      hideFinishScreen(game.uiControls)
+      startGame()
+    })
   })
 }
 

@@ -4,6 +4,7 @@ import type { IslandData } from './terrainGenerator'
 import type { EnergyRing } from './energyRing'
 import { updateThirdPersonCamera } from './cameraControl'
 import { updateRingsAnimation } from './energyRing'
+import { checkIslandCollisions, checkRingCollisions } from './playerController'
 
 export interface GameLoopState {
   running: boolean
@@ -162,14 +163,34 @@ export function updatePlayerPhysics(
   }
 
   if (input.up) {
-    const pitchAxis = new THREE.Vector3().crossVectors(physics.forward, physics.up).normalize()
-    rotateAroundAxis(physics.forward, pitchAxis, -physics.pitchSpeed * turnFactor * deltaTime)
-    rotateAroundAxis(physics.up, pitchAxis, -physics.pitchSpeed * turnFactor * deltaTime)
+    const pitchAxis = new THREE.Vector3()
+      .crossVectors(physics.forward, physics.up)
+      .normalize()
+    rotateAroundAxis(
+      physics.forward,
+      pitchAxis,
+      -physics.pitchSpeed * turnFactor * deltaTime
+    )
+    rotateAroundAxis(
+      physics.up,
+      pitchAxis,
+      -physics.pitchSpeed * turnFactor * deltaTime
+    )
   }
   if (input.down) {
-    const pitchAxis = new THREE.Vector3().crossVectors(physics.forward, physics.up).normalize()
-    rotateAroundAxis(physics.forward, pitchAxis, physics.pitchSpeed * turnFactor * deltaTime)
-    rotateAroundAxis(physics.up, pitchAxis, physics.pitchSpeed * turnFactor * deltaTime)
+    const pitchAxis = new THREE.Vector3()
+      .crossVectors(physics.forward, physics.up)
+      .normalize()
+    rotateAroundAxis(
+      physics.forward,
+      pitchAxis,
+      physics.pitchSpeed * turnFactor * deltaTime
+    )
+    rotateAroundAxis(
+      physics.up,
+      pitchAxis,
+      physics.pitchSpeed * turnFactor * deltaTime
+    )
   }
 
   physics.forward.normalize()
@@ -202,72 +223,6 @@ function rotateAroundAxis(
   vector.applyQuaternion(quat)
 }
 
-export function checkCollisions(
-  physics: PlayerPhysicsState,
-  islands: IslandData[],
-  currentTime: number,
-  onCollision: () => void
-): void {
-  if (physics.isColliding) return
-
-  for (const island of islands) {
-    const dx = physics.position.x - island.position.x
-    const dz = physics.position.z - island.position.z
-    const dy = physics.position.y - island.position.y
-
-    const horizontalDist = Math.sqrt(dx * dx + dz * dz)
-    const verticalHalfSize = island.size * 0.55
-
-    if (
-      horizontalDist < island.collisionRadius &&
-      Math.abs(dy) < verticalHalfSize
-    ) {
-      physics.speed = 0
-      physics.isColliding = true
-      physics.collisionEndTime = currentTime + 300
-      physics.isFlashing = true
-      physics.flashEndTime = currentTime + 500
-
-      const pushDir = new THREE.Vector3(dx, dy * 0.5, dz).normalize()
-      physics.position.add(pushDir.multiplyScalar(island.collisionRadius * 0.25))
-
-      onCollision()
-      break
-    }
-  }
-}
-
-export function checkRingCollection(
-  physics: PlayerPhysicsState,
-  rings: EnergyRing[],
-  currentTime: number,
-  onRingCollected: (collected: number, total: number) => void
-): { collected: boolean; boost: boolean } {
-  let result = { collected: false, boost: false }
-
-  for (let i = 0; i < rings.length; i++) {
-    const ring = rings[i]
-    if (ring.collected) continue
-
-    const dist = physics.position.distanceTo(ring.position)
-    if (dist < ring.radius + 5) {
-      ring.collected = true
-      ring.mesh.visible = false
-      ;(ring.mesh as any).userData.collected = true
-
-      physics.boostMultiplier = 1.6
-      physics.boostEndTime = currentTime + 3000
-
-      const collected = rings.filter(r => r.collected).length
-      onRingCollected(collected, rings.length)
-      result = { collected: true, boost: true }
-      break
-    }
-  }
-
-  return result
-}
-
 export function checkFinishLine(
   physics: PlayerPhysicsState,
   islands: IslandData[],
@@ -278,7 +233,7 @@ export function checkFinishLine(
 ): boolean {
   if (hasFinished) return true
 
-  const finishIsland = islands.find(i => i.isFinish)
+  const finishIsland = islands.find((i) => i.isFinish)
   if (!finishIsland) return false
 
   const dx = physics.position.x - finishIsland.position.x
@@ -296,6 +251,24 @@ export function checkFinishLine(
   return false
 }
 
+export function updateRecommendedPath(
+  arrows: THREE.Group[],
+  time: number
+): void {
+  for (let i = 0; i < arrows.length; i++) {
+    const arrow = arrows[i]
+    const pulse = 0.85 + Math.sin(time * 0.003 + i * 0.5) * 0.15
+    arrow.scale.setScalar(pulse)
+
+    arrow.children.forEach((child) => {
+      if (child instanceof THREE.Mesh) {
+        const mat = child.material as THREE.MeshBasicMaterial
+        mat.opacity = 0.3 + Math.sin(time * 0.003 + i * 0.5) * 0.15
+      }
+    })
+  }
+}
+
 export function gameLoopStep(
   loopState: GameLoopState,
   physics: PlayerPhysicsState,
@@ -306,6 +279,7 @@ export function gameLoopStep(
   islands: IslandData[],
   rings: EnergyRing[],
   vehicleGroup: THREE.Group,
+  recommendedArrows: THREE.Group[],
   callbacks: GameCallbacks,
   hasFinished: { value: boolean }
 ): void {
@@ -327,8 +301,16 @@ export function gameLoopStep(
   }
 
   updatePlayerPhysics(physics, input, deltaTime, currentTime)
-  checkCollisions(physics, islands, currentTime, callbacks.onCollision)
-  checkRingCollection(physics, rings, currentTime, callbacks.onRingCollected)
+
+  checkIslandCollisions(physics, islands, currentTime, callbacks.onCollision)
+
+  checkRingCollisions(
+    physics,
+    rings,
+    scene,
+    currentTime,
+    callbacks.onRingCollected
+  )
 
   const finished = checkFinishLine(
     physics,
@@ -343,22 +325,16 @@ export function gameLoopStep(
     loopState.paused = true
   }
 
-  vehicleGroup.position.copy(physics.position)
-  const lookTarget = physics.position.clone().add(physics.forward)
-  const upVector = physics.up.clone()
-  vehicleGroup.lookAt(lookTarget)
-  vehicleGroup.rotateX(Math.PI / 2)
-  vehicleGroup.up.copy(upVector)
+  const speedKmh = Math.round(Math.abs(physics.speed) * 3.6)
+  callbacks.onSpeedChange(speedKmh)
 
-  const flame = vehicleGroup.getObjectByName('engineFlame')
-  const innerFlame = vehicleGroup.getObjectByName('innerFlame')
-  if (flame && innerFlame) {
-    const flameScale = 0.6 + (physics.speed / physics.maxSpeed) * 1.5 + (Math.random() * 0.2 - 0.1)
-    flame.scale.set(flameScale * 0.6, flameScale * 0.6, flameScale)
-    innerFlame.scale.set(flameScale * 0.4, flameScale * 0.4, flameScale * 0.8)
-    ;(flame as THREE.Mesh).visible = physics.speed > 5
-    ;(innerFlame as THREE.Mesh).visible = physics.speed > 5
+  if (!hasFinished.value) {
+    callbacks.onTimerUpdate(loopState.elapsedTime)
   }
+
+  updateRingsAnimation(rings, loopState.elapsedTime)
+
+  updateRecommendedPath(recommendedArrows, loopState.elapsedTime)
 
   updateThirdPersonCamera(
     cameraState,
@@ -367,15 +343,6 @@ export function gameLoopStep(
     physics.up,
     deltaTime
   )
-
-  updateRingsAnimation(rings, loopState.elapsedTime)
-
-  const speedKmh = Math.round(Math.abs(physics.speed) * 3.6)
-  callbacks.onSpeedChange(speedKmh)
-
-  if (!hasFinished.value) {
-    callbacks.onTimerUpdate(loopState.elapsedTime)
-  }
 
   renderer.render(scene, cameraState.camera)
 }

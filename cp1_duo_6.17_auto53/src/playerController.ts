@@ -1,19 +1,27 @@
 import * as THREE from 'three'
 import type { InputState, PlayerPhysicsState } from './gameLoop'
+import type { IslandData } from './terrainGenerator'
+import type { EnergyRing } from './energyRing'
+
+export const VEHICLE_BOUNDS = {
+  length: 10,
+  width: 6,
+  height: 3
+}
 
 export function setupKeyboardInput(inputState: InputState): () => void {
   const keyMap: Record<string, keyof InputState> = {
-    'KeyW': 'forward',
-    'ArrowUp': 'forward',
-    'KeyS': 'backward',
-    'ArrowDown': 'backward',
-    'KeyA': 'left',
-    'ArrowLeft': 'left',
-    'KeyD': 'right',
-    'ArrowRight': 'right',
-    'Space': 'up',
-    'ShiftLeft': 'down',
-    'ShiftRight': 'down'
+    KeyW: 'forward',
+    ArrowUp: 'forward',
+    KeyS: 'backward',
+    ArrowDown: 'backward',
+    KeyA: 'left',
+    ArrowLeft: 'left',
+    KeyD: 'right',
+    ArrowRight: 'right',
+    Space: 'up',
+    ShiftLeft: 'down',
+    ShiftRight: 'down'
   }
 
   const pressedKeys = new Set<string>()
@@ -39,7 +47,7 @@ export function setupKeyboardInput(inputState: InputState): () => void {
 
   const handleWindowBlur = (): void => {
     pressedKeys.clear()
-    ;(Object.keys(inputState) as Array<keyof InputState>).forEach(k => {
+    ;(Object.keys(inputState) as Array<keyof InputState>).forEach((k) => {
       inputState[k] = false
     })
   }
@@ -83,16 +91,168 @@ export function updateVehicleOrientation(
   vehicleGroup.rotation.x = Math.PI / 2 + newPitch
 }
 
-export function collectRingEffect(
-  _vehicleGroup: THREE.Group,
+export function collectRing(
+  ring: EnergyRing,
   scene: THREE.Scene,
-  position: THREE.Vector3
+  physics: PlayerPhysicsState,
+  currentTime: number
 ): void {
-  const particleCount = 20
+  if (ring.collected) return
+
+  ring.collected = true
+
+  scene.remove(ring.mesh)
+  ring.mesh.traverse((child) => {
+    if (child instanceof THREE.Mesh) {
+      child.geometry.dispose()
+      if (Array.isArray(child.material)) {
+        child.material.forEach((m) => m.dispose())
+      } else {
+        child.material.dispose()
+      }
+    }
+  })
+
+  physics.boostMultiplier = 1.6
+  physics.boostEndTime = currentTime + 3000
+
+  createCollectParticles(scene, ring.position)
+}
+
+export function checkRingCollisions(
+  physics: PlayerPhysicsState,
+  rings: EnergyRing[],
+  scene: THREE.Scene,
+  currentTime: number,
+  onRingCollected: (collected: number, total: number) => void
+): boolean {
+  let collected = false
+
+  for (const ring of rings) {
+    if (ring.collected) continue
+
+    if (isVehicleCollidingWithRing(physics, ring)) {
+      collectRing(ring, scene, physics, currentTime)
+      collected = true
+
+      const collectedCount = rings.filter((r) => r.collected).length
+      onRingCollected(collectedCount, rings.length)
+      break
+    }
+  }
+
+  return collected
+}
+
+function isVehicleCollidingWithRing(
+  physics: PlayerPhysicsState,
+  ring: EnergyRing
+): boolean {
+  const ringRadius = ring.radius
+  const vehicleRadius = Math.max(VEHICLE_BOUNDS.length, VEHICLE_BOUNDS.width) * 0.5
+  const collisionRadius = ringRadius + vehicleRadius
+
+  const dist = physics.position.distanceTo(ring.position)
+  return dist < collisionRadius
+}
+
+export function checkIslandCollisions(
+  physics: PlayerPhysicsState,
+  islands: IslandData[],
+  currentTime: number,
+  onCollision: () => void
+): boolean {
+  if (physics.isColliding) return false
+
+  for (const island of islands) {
+    if (isVehicleCollidingWithIsland(physics, island)) {
+      physics.speed = 0
+      physics.isColliding = true
+      physics.collisionEndTime = currentTime + 300
+      physics.isFlashing = true
+      physics.flashEndTime = currentTime + 500
+
+      pushVehicleAwayFromIsland(physics, island)
+
+      onCollision()
+      return true
+    }
+  }
+
+  return false
+}
+
+function isVehicleCollidingWithIsland(
+  physics: PlayerPhysicsState,
+  island: IslandData
+): boolean {
+  const halfLength = VEHICLE_BOUNDS.length * 0.5
+  const halfWidth = VEHICLE_BOUNDS.width * 0.5
+  const halfHeight = VEHICLE_BOUNDS.height * 0.5
+
+  const forward = physics.forward.clone().normalize()
+  const right = physics.right.clone().normalize()
+  const up = physics.up.clone().normalize()
+
+  const vehicleCorners: THREE.Vector3[] = []
+  for (let l = -1; l <= 1; l += 2) {
+    for (let w = -1; w <= 1; w += 2) {
+      for (let h = -1; h <= 1; h += 2) {
+        const corner = physics.position
+          .clone()
+          .add(forward.multiplyScalar(l * halfLength))
+          .add(right.multiplyScalar(w * halfWidth))
+          .add(up.multiplyScalar(h * halfHeight))
+        vehicleCorners.push(corner)
+      }
+    }
+  }
+
+  const islandHeight = island.size * 0.6
+  const islandTop = island.position.y + islandHeight * 0.5
+  const islandBottom = island.position.y - islandHeight * 0.5
+
+  for (const corner of vehicleCorners) {
+    const dx = corner.x - island.position.x
+    const dz = corner.z - island.position.z
+    const horizontalDist = Math.sqrt(dx * dx + dz * dz)
+
+    if (
+      horizontalDist < island.collisionRadius * 0.92 &&
+      corner.y > islandBottom - 5 &&
+      corner.y < islandTop + 5
+    ) {
+      return true
+    }
+  }
+
+  return false
+}
+
+function pushVehicleAwayFromIsland(
+  physics: PlayerPhysicsState,
+  island: IslandData
+): void {
+  const dx = physics.position.x - island.position.x
+  const dz = physics.position.z - island.position.z
+  const horizontalDist = Math.sqrt(dx * dx + dz * dz)
+
+  if (horizontalDist > 0.001) {
+    const pushDistance = island.collisionRadius * 0.15
+    const pushX = (dx / horizontalDist) * pushDistance
+    const pushZ = (dz / horizontalDist) * pushDistance
+    physics.position.x += pushX
+    physics.position.z += pushZ
+  }
+}
+
+function createCollectParticles(scene: THREE.Scene, position: THREE.Vector3): void {
+  const particleCount = 25
   const particles = new THREE.Group()
 
   for (let i = 0; i < particleCount; i++) {
-    const geom = new THREE.SphereGeometry(0.3 + Math.random() * 0.4, 6, 6)
+    const size = 0.2 + Math.random() * 0.5
+    const geom = new THREE.SphereGeometry(size, 6, 6)
     const mat = new THREE.MeshBasicMaterial({
       color: Math.random() > 0.5 ? 0xffd700 : 0xffaa00,
       transparent: true,
@@ -101,17 +261,17 @@ export function collectRingEffect(
     const particle = new THREE.Mesh(geom, mat)
 
     const angle = Math.random() * Math.PI * 2
-    const radius = Math.random() * 3
+    const radius = Math.random() * 4
     particle.position.set(
       position.x + Math.cos(angle) * radius,
-      position.y + (Math.random() - 0.5) * 4,
+      position.y + (Math.random() - 0.5) * 6,
       position.z + Math.sin(angle) * radius
     )
     ;(particle as any).userData = {
       velocity: new THREE.Vector3(
-        (Math.random() - 0.5) * 30,
-        Math.random() * 25 + 10,
-        (Math.random() - 0.5) * 30
+        (Math.random() - 0.5) * 35,
+        Math.random() * 30 + 15,
+        (Math.random() - 0.5) * 35
       ),
       life: 1.0
     }
@@ -123,17 +283,25 @@ export function collectRingEffect(
   let startTime = performance.now()
   const animateParticles = () => {
     const elapsed = (performance.now() - startTime) / 1000
-    if (elapsed > 1.0) {
+    if (elapsed > 1.2) {
       scene.remove(particles)
+      particles.traverse((child) => {
+        if (child instanceof THREE.Mesh) {
+          child.geometry.dispose()
+          ;(child.material as THREE.Material).dispose()
+        }
+      })
       return
     }
 
-    particles.children.forEach(child => {
+    const dt = 0.016
+    particles.children.forEach((child) => {
       const particle = child as THREE.Mesh
       const data = (particle as any).userData
-      particle.position.add(data.velocity.clone().multiplyScalar(0.016))
-      data.velocity.y -= 30 * 0.016
-      ;(particle.material as THREE.MeshBasicMaterial).opacity = Math.max(0, 1 - elapsed)
+      particle.position.add(data.velocity.clone().multiplyScalar(dt))
+      data.velocity.y -= 35 * dt
+      ;(particle.material as THREE.MeshBasicMaterial).opacity = Math.max(0, 1 - elapsed / 1.2)
+      particle.scale.setScalar(Math.max(0.1, 1 - elapsed * 0.8))
     })
 
     requestAnimationFrame(animateParticles)
@@ -145,40 +313,42 @@ export function collisionFlashEffect(
   bodyMeshes: THREE.Mesh[],
   duration: number = 500
 ): void {
-  const originalMaterials: THREE.MeshStandardMaterial[] = []
+  const originalEmissives: { color: THREE.Color; intensity: number }[] = []
 
-  bodyMeshes.forEach(mesh => {
+  bodyMeshes.forEach((mesh) => {
     const mat = mesh.material as THREE.MeshStandardMaterial
-    originalMaterials.push(mat.clone())
+    originalEmissives.push({
+      color: mat.emissive.clone(),
+      intensity: mat.emissiveIntensity
+    })
 
     mat.emissive = new THREE.Color(0xff2200)
     mat.emissiveIntensity = 1.5
   })
 
   const startTime = performance.now()
-  const flashInterval = 80
-  let visible = true
+  const flashInterval = 70
 
   const flash = () => {
     const elapsed = performance.now() - startTime
     if (elapsed >= duration) {
       bodyMeshes.forEach((mesh, i) => {
         const mat = mesh.material as THREE.MeshStandardMaterial
-        mat.emissive.copy(originalMaterials[i].emissive)
-        mat.emissiveIntensity = originalMaterials[i].emissiveIntensity
+        mat.emissive.copy(originalEmissives[i].color)
+        mat.emissiveIntensity = originalEmissives[i].intensity
         mesh.visible = true
       })
       return
     }
 
     const phase = Math.floor(elapsed / flashInterval) % 2
-    visible = phase === 0
+    const visible = phase === 0
 
-    bodyMeshes.forEach(mesh => {
+    bodyMeshes.forEach((mesh) => {
       mesh.visible = visible
     })
 
-    setTimeout(flash, flashInterval / 2)
+    setTimeout(flash, flashInterval)
   }
 
   setTimeout(flash, 10)
