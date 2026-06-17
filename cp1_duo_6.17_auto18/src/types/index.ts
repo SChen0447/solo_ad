@@ -22,4 +22,4 @@ export interface ApiResponse<T> {
   error?: string;
 }
 
-export type PreviewShape = 'background' | 'circle' | 'text' | 'border';
+export type PreviewShape = 'background' | 'circle' | 'text' | 'border' | 'stripes';

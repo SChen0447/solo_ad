@@ -1,6 +1,6 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import type { ColorStop } from '../types';
-import { generateGradientString, generateId, clamp } from '../utils/gradientUtils';
+import { generateGradientString, generateId, clamp, generateRandomGradient } from '../utils/gradientUtils';
 import ColorPicker from './ColorPicker';
 
 interface GradientEditorProps {
@@ -174,16 +174,61 @@ const GradientEditor: React.FC<GradientEditorProps> = ({ stops, angle, onChange 
     [stops, onChange]
   );
 
+  const handleRandomize = useCallback(() => {
+    const { stops: newStops, angle: newAngle } = generateRandomGradient();
+    onChange(newStops, newAngle);
+    setActiveStopId(null);
+    setShowColorPicker(false);
+  }, [onChange]);
+
   const activeStop = stops.find((s) => s.id === activeStopId);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
       <div style={{ position: 'relative' }}>
-        <div style={{ fontSize: '14px', fontWeight: 600, color: '#333', marginBottom: '10px' }}>
-          渐变轨道
-          <span style={{ fontSize: '12px', color: '#999', marginLeft: '8px' }}>
-            点击添加色标 · 最多8个
-          </span>
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            marginBottom: '10px',
+          }}
+        >
+          <div style={{ fontSize: '14px', fontWeight: 600, color: '#333' }}>
+            渐变轨道
+            <span style={{ fontSize: '12px', color: '#999', marginLeft: '8px' }}>
+              点击添加色标 · 最多8个
+            </span>
+          </div>
+          <button
+            onClick={handleRandomize}
+            style={{
+              padding: '6px 14px',
+              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+              color: '#fff',
+              border: 'none',
+              borderRadius: '6px',
+              fontSize: '12px',
+              fontWeight: 500,
+              cursor: 'pointer',
+              transition: 'all 0.3s ease',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              boxShadow: '0 2px 6px rgba(102, 126, 234, 0.3)',
+            }}
+            onMouseEnter={(e) => {
+              (e.currentTarget as HTMLButtonElement).style.transform = 'translateY(-1px)';
+              (e.currentTarget as HTMLButtonElement).style.boxShadow = '0 4px 12px rgba(102, 126, 234, 0.4)';
+            }}
+            onMouseLeave={(e) => {
+              (e.currentTarget as HTMLButtonElement).style.transform = 'translateY(0)';
+              (e.currentTarget as HTMLButtonElement).style.boxShadow = '0 2px 6px rgba(102, 126, 234, 0.3)';
+            }}
+          >
+            <span style={{ fontSize: '14px' }}>✨</span>
+            随机生成
+          </button>
         </div>
 
         <div

@@ -12,10 +12,14 @@ const shapeLabels: Record<PreviewShape, string> = {
   circle: '圆形遮罩',
   text: '文字填充',
   border: '边框渐变',
+  stripes: '渐变条纹',
 };
+
+type StripeDirection = 'horizontal' | 'vertical';
 
 const PreviewPanel: React.FC<PreviewPanelProps> = ({ gradient, webkitGradient }) => {
   const [shape, setShape] = useState<PreviewShape>('background');
+  const [stripeDirection, setStripeDirection] = useState<StripeDirection>('horizontal');
 
   const renderPreview = useCallback(() => {
     switch (shape) {
@@ -26,7 +30,6 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ gradient, webkitGradient })
               width: '100%',
               height: '100%',
               background: gradient,
-              background: webkitGradient,
               borderRadius: '8px',
             }}
           />
@@ -52,7 +55,6 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ gradient, webkitGradient })
                 height: '150px',
                 borderRadius: '50%',
                 background: gradient,
-                background: webkitGradient,
                 boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
               }}
             />
@@ -88,10 +90,6 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ gradient, webkitGradient })
                 fontWeight="bold"
                 fontFamily="Arial, sans-serif"
                 fill="url(#text-gradient)"
-                style={{
-                  background: gradient,
-                  background: webkitGradient,
-                }}
               >
                 CSS
               </text>
@@ -118,7 +116,6 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ gradient, webkitGradient })
                 padding: '16px 40px',
                 borderRadius: '50px',
                 background: gradient,
-                background: webkitGradient,
               }}
             >
               <div
@@ -137,41 +134,135 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ gradient, webkitGradient })
           </div>
         );
 
+      case 'stripes':
+        const stripeCount = 8;
+        const stripes = [];
+        for (let i = 0; i < stripeCount; i++) {
+          const offset = (i / stripeCount) * 100;
+          stripes.push(
+            <div
+              key={i}
+              style={{
+                flex: stripeDirection === 'horizontal' ? '1' : '0 0 auto',
+                width: stripeDirection === 'vertical' ? `${100 / stripeCount}%` : '100%',
+                height: stripeDirection === 'horizontal' ? 'auto' : '100%',
+                background: gradient,
+                backgroundSize: stripeDirection === 'horizontal'
+                  ? '100% 200%'
+                  : '200% 100%',
+                backgroundPosition: stripeDirection === 'horizontal'
+                  ? `0 ${offset * 2}%`
+                  : `${offset * 2}% 0`,
+              }}
+            />
+          );
+        }
+        return (
+          <div
+            style={{
+              width: '100%',
+              height: '100%',
+              display: 'flex',
+              flexDirection: stripeDirection === 'horizontal' ? 'column' : 'row',
+              gap: '4px',
+              padding: '8px',
+              background: '#f5f5f5',
+              borderRadius: '8px',
+              boxSizing: 'border-box',
+            }}
+          >
+            {stripes}
+          </div>
+        );
+
       default:
         return null;
     }
-  }, [shape, gradient, webkitGradient]);
+  }, [shape, gradient, webkitGradient, stripeDirection]);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', height: '100%' }}>
       <div
         style={{
           display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
+          flexDirection: 'column',
+          gap: '8px',
         }}
       >
-        <div style={{ fontSize: '14px', fontWeight: 600, color: '#333' }}>实时预览</div>
-        <div style={{ display: 'flex', gap: '4px' }}>
-          {(Object.keys(shapeLabels) as PreviewShape[]).map((s) => (
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+          }}
+        >
+          <div style={{ fontSize: '14px', fontWeight: 600, color: '#333' }}>实时预览</div>
+          <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+            {(Object.keys(shapeLabels) as PreviewShape[]).map((s) => (
+              <button
+                key={s}
+                onClick={() => setShape(s)}
+                style={{
+                  padding: '6px 10px',
+                  border: shape === s ? '1px solid #1890ff' : '1px solid #d9d9d9',
+                  background: shape === s ? '#e6f7ff' : '#fff',
+                  color: shape === s ? '#1890ff' : '#666',
+                  borderRadius: '6px',
+                  fontSize: '12px',
+                  cursor: 'pointer',
+                  transition: 'all 0.3s ease',
+                }}
+              >
+                {shapeLabels[s]}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {shape === 'stripes' && (
+          <div
+            style={{
+              display: 'flex',
+              gap: '6px',
+              alignItems: 'center',
+              padding: '6px 10px',
+              background: '#fafafa',
+              borderRadius: '6px',
+            }}
+          >
+            <span style={{ fontSize: '12px', color: '#666' }}>条纹方向：</span>
             <button
-              key={s}
-              onClick={() => setShape(s)}
+              onClick={() => setStripeDirection('horizontal')}
               style={{
-                padding: '6px 12px',
-                border: shape === s ? '1px solid #1890ff' : '1px solid #d9d9d9',
-                background: shape === s ? '#e6f7ff' : '#fff',
-                color: shape === s ? '#1890ff' : '#666',
-                borderRadius: '6px',
-                fontSize: '12px',
+                padding: '4px 10px',
+                border: stripeDirection === 'horizontal' ? '1px solid #1890ff' : '1px solid #d9d9d9',
+                background: stripeDirection === 'horizontal' ? '#e6f7ff' : '#fff',
+                color: stripeDirection === 'horizontal' ? '#1890ff' : '#666',
+                borderRadius: '4px',
+                fontSize: '11px',
                 cursor: 'pointer',
                 transition: 'all 0.3s ease',
               }}
             >
-              {shapeLabels[s]}
+              水平
             </button>
-          ))}
-        </div>
+            <button
+              onClick={() => setStripeDirection('vertical')}
+              style={{
+                padding: '4px 10px',
+                border: stripeDirection === 'vertical' ? '1px solid #1890ff' : '1px solid #d9d9d9',
+                background: stripeDirection === 'vertical' ? '#e6f7ff' : '#fff',
+                color: stripeDirection === 'vertical' ? '#1890ff' : '#666',
+                borderRadius: '4px',
+                fontSize: '11px',
+                cursor: 'pointer',
+                transition: 'all 0.3s ease',
+              }}
+            >
+              垂直
+            </button>
+          </div>
+        )}
       </div>
 
       <Resizable
