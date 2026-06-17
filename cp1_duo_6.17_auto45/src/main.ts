@@ -4,6 +4,8 @@ import GUI from 'lil-gui';
 import { createBuilding } from './building';
 import { createSunController, sunPathByMonth, SunController } from './sunControl';
 import { createShadowAnalyzer, ShadowAnalyzer } from './shadowAnalyzer';
+import { createSkyboxEnvironment, createGrassTexture, createGrassRoughnessMap } from './textures';
+import { createLightIndicator, LightIndicator } from './lightIndicator';
 
 let renderer: THREE.WebGLRenderer;
 let scene: THREE.Scene;
@@ -17,6 +19,8 @@ let shadowAnalyzer: ShadowAnalyzer;
 let ground: THREE.Mesh;
 let gui: GUI;
 let clock: THREE.Clock;
+let envMap: THREE.CubeTexture;
+let lightIndicator: LightIndicator;
 
 const monthNames = [
   '1月', '2月', '3月', '4月', '5月', '6月',
@@ -26,7 +30,8 @@ const monthNames = [
 const params = {
   month: '6月',
   sunAltitude: 0,
-  sunAzimuth: 0
+  sunAzimuth: 0,
+  showLightIndicator: true
 };
 
 function init(): void {
@@ -34,6 +39,10 @@ function init(): void {
   if (!container) return;
 
   scene = new THREE.Scene();
+
+  envMap = createSkyboxEnvironment();
+  scene.environment = envMap;
+  scene.background = envMap;
 
   camera = new THREE.PerspectiveCamera(
     60,
@@ -77,7 +86,7 @@ function init(): void {
 
   createGround();
 
-  building = createBuilding();
+  building = createBuilding({ envMap });
   building.position.y = 0;
   building.traverse((child) => {
     if (child instanceof THREE.Mesh) {
@@ -87,10 +96,13 @@ function init(): void {
   });
   scene.add(building);
 
+  lightIndicator = createLightIndicator(scene);
+
   sunController = createSunController(scene, camera, renderer, Math.PI / 4, Math.PI / 3);
   sunController.onDirectionChange((direction: THREE.Vector3) => {
     updateLightDirection(direction);
     shadowAnalyzer.update(direction, building);
+    updateLightIndicator();
   });
 
   shadowAnalyzer = createShadowAnalyzer(scene);
@@ -119,29 +131,15 @@ function createGround(): void {
   const groundGeometry = new THREE.PlaneGeometry(groundSize, groundSize);
   groundGeometry.rotateX(-Math.PI / 2);
 
-  const canvas = document.createElement('canvas');
-  canvas.width = 256;
-  canvas.height = 256;
-  const ctx = canvas.getContext('2d');
-  if (ctx) {
-    const tileSize = 32;
-    for (let y = 0; y < 256; y += tileSize) {
-      for (let x = 0; x < 256; x += tileSize) {
-        const isEven = ((x / tileSize) + (y / tileSize)) % 2 === 0;
-        ctx.fillStyle = isEven ? '#2d5a27' : '#2a5223';
-        ctx.fillRect(x, y, tileSize, tileSize);
-      }
-    }
-  }
-
-  const groundTexture = new THREE.CanvasTexture(canvas);
-  groundTexture.wrapS = THREE.RepeatWrapping;
-  groundTexture.wrapT = THREE.RepeatWrapping;
-  groundTexture.repeat.set(4, 4);
+  const grassTexture = createGrassTexture();
+  const grassRoughness = createGrassRoughnessMap();
+  grassTexture.repeat.set(6, 6);
+  grassRoughness.repeat.set(6, 6);
 
   const groundMaterial = new THREE.MeshStandardMaterial({
-    map: groundTexture,
-    roughness: 0.9,
+    map: grassTexture,
+    roughnessMap: grassRoughness,
+    roughness: 0.95,
     metalness: 0.0
   });
 
@@ -155,6 +153,13 @@ function updateLightDirection(direction: THREE.Vector3): void {
   directionalLight.position.copy(direction).multiplyScalar(-lightDistance);
   directionalLight.target.position.set(0, 0, 0);
   directionalLight.target.updateMatrixWorld();
+}
+
+function updateLightIndicator(): void {
+  if (lightIndicator && sunController) {
+    const buildingCenter = new THREE.Vector3(0, 2.5, 0);
+    lightIndicator.update(sunController.sunMesh.position, buildingCenter);
+  }
 }
 
 function setupGUI(): void {
@@ -189,6 +194,14 @@ function setupGUI(): void {
     .name('方位角')
     .onChange((value: number) => {
       sunController.setSunAngles(params.sunAltitude, value, false);
+    });
+
+  gui.add(params, 'showLightIndicator')
+    .name('显示光照方向')
+    .onChange((value: boolean) => {
+      if (lightIndicator) {
+        lightIndicator.setVisible(value);
+      }
     });
 
   (window as any).__sunAngleControllers = { altController, aziController };
@@ -299,6 +312,10 @@ function animate(): void {
 
   sunController.update(delta);
   controls.update();
+
+  if (params.showLightIndicator && lightIndicator) {
+    updateLightIndicator();
+  }
 
   renderer.render(scene, camera);
 }
