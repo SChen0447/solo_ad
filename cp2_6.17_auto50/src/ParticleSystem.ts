@@ -11,6 +11,8 @@ const MAX_PARTICLE_SIZE = 0.3;
 const MIN_LIGHTNESS = 0.3;
 const MAX_LIGHTNESS = 0.9;
 const PULSE_AMPLITUDE = 0.5;
+const SPECTRUM_BINS = 64;
+const PARTICLES_PER_BIN = Math.floor(PARTICLE_COUNT / SPECTRUM_BINS);
 
 export class ParticleSystem {
   private scene: THREE.Scene;
@@ -20,16 +22,19 @@ export class ParticleSystem {
   private positions: Float32Array;
   private colors: Float32Array;
   private basePositions: Float32Array;
-  private sizes: Float32Array;
-  private baseSizes: Float32Array;
+  private baseHues: Float32Array;
+  private spectrumBinIndices: Uint32Array;
+  private spectrumBaseHeights: Float32Array;
+  private spectrumBaseX: Float32Array;
+  private spectrumBaseZ: Float32Array;
   private mode: VisualizationMode = 'pulse';
   private time: number = 0;
   private smoothedLowFreq: number = 0;
   private smoothedMidFreq: number = 0;
   private smoothedHighFreq: number = 0;
   private smoothedAvgFreq: number = 0;
-  private baseHues: Float32Array;
-  private waveformOffsets: Float32Array;
+  private spectrumBandEnergies: Float32Array;
+  private color: THREE.Color;
 
   constructor(scene: THREE.Scene) {
     this.scene = scene;
@@ -38,10 +43,13 @@ export class ParticleSystem {
     this.positions = new Float32Array(PARTICLE_COUNT * 3);
     this.colors = new Float32Array(PARTICLE_COUNT * 3);
     this.basePositions = new Float32Array(PARTICLE_COUNT * 3);
-    this.sizes = new Float32Array(PARTICLE_COUNT);
-    this.baseSizes = new Float32Array(PARTICLE_COUNT);
     this.baseHues = new Float32Array(PARTICLE_COUNT);
-    this.waveformOffsets = new Float32Array(PARTICLE_COUNT);
+    this.spectrumBinIndices = new Uint32Array(PARTICLE_COUNT);
+    this.spectrumBaseHeights = new Float32Array(PARTICLE_COUNT);
+    this.spectrumBaseX = new Float32Array(PARTICLE_COUNT);
+    this.spectrumBaseZ = new Float32Array(PARTICLE_COUNT);
+    this.spectrumBandEnergies = new Float32Array(SPECTRUM_BINS);
+    this.color = new THREE.Color();
 
     this.initializeParticles();
 
@@ -51,7 +59,7 @@ export class ParticleSystem {
     this.material = new THREE.PointsMaterial({
       size: BASE_PARTICLE_SIZE,
       vertexColors: true,
-      sizeAttenuation: true,
+      sizeAttenuation: false,
       transparent: true,
       opacity: 0.9,
     });
@@ -80,19 +88,22 @@ export class ParticleSystem {
       this.positions[i3 + 1] = y;
       this.positions[i3 + 2] = z;
 
-      const distRatio = r / SPHERE_RADIUS;
-      const hue = 240 + distRatio * 60;
+      const normalizedY = (y / SPHERE_RADIUS + 1) / 2;
+      const hue = 240 + normalizedY * 60;
       this.baseHues[i] = hue;
 
-      const color = new THREE.Color().setHSL(hue / 360, 0.8, 0.6);
-      this.colors[i3] = color.r;
-      this.colors[i3 + 1] = color.g;
-      this.colors[i3 + 2] = color.b;
+      this.color.setHSL(hue / 360, 1.0, 0.5);
+      this.colors[i3] = this.color.r;
+      this.colors[i3 + 1] = this.color.g;
+      this.colors[i3 + 2] = this.color.b;
 
-      this.sizes[i] = BASE_PARTICLE_SIZE;
-      this.baseSizes[i] = BASE_PARTICLE_SIZE;
-
-      this.waveformOffsets[i] = Math.random() * Math.PI * 2;
+      const binIndex = Math.floor(i / PARTICLES_PER_BIN);
+      const clampedBinIndex = Math.min(binIndex, SPECTRUM_BINS - 1);
+      this.spectrumBinIndices[i] = clampedBinIndex;
+      this.spectrumBaseHeights[i] = Math.random();
+      const binCenterX = (clampedBinIndex / (SPECTRUM_BINS - 1)) * 10 - 5;
+      this.spectrumBaseX[i] = binCenterX + (Math.random() - 0.5) * 0.12;
+      this.spectrumBaseZ[i] = (Math.random() - 0.5) * 0.8;
     }
   }
 
@@ -134,24 +145,28 @@ export class ParticleSystem {
     const pulse = this.smoothedMidFreq * PULSE_AMPLITUDE;
     const baseScale = 1 + pulse;
 
+    const positions = this.positions;
+    const basePositions = this.basePositions;
+
     for (let i = 0; i < PARTICLE_COUNT; i++) {
       const i3 = i * 3;
-
-      this.positions[i3] = this.basePositions[i3] * baseScale;
-      this.positions[i3 + 1] = this.basePositions[i3 + 1] * baseScale;
-      this.positions[i3 + 2] = this.basePositions[i3 + 2] * baseScale;
+      positions[i3] = basePositions[i3] * baseScale;
+      positions[i3 + 1] = basePositions[i3 + 1] * baseScale;
+      positions[i3 + 2] = basePositions[i3 + 2] * baseScale;
     }
   }
 
   private updateWaveformMode(analysisData: AudioAnalysisData | null): void {
     const waveAmplitude = this.smoothedMidFreq * 1.5;
+    const positions = this.positions;
+    const basePositions = this.basePositions;
 
     for (let i = 0; i < PARTICLE_COUNT; i++) {
       const i3 = i * 3;
 
-      const baseX = this.basePositions[i3];
-      const baseY = this.basePositions[i3 + 1];
-      const baseZ = this.basePositions[i3 + 2];
+      const baseX = basePositions[i3];
+      const baseY = basePositions[i3 + 1];
+      const baseZ = basePositions[i3 + 2];
 
       const normalizedX = (baseX / SPHERE_RADIUS + 1) / 2;
 
@@ -164,66 +179,70 @@ export class ParticleSystem {
 
       const waveOffset = waveValue * waveAmplitude;
 
-      this.positions[i3] = baseX;
-      this.positions[i3 + 1] = baseY + waveOffset;
-      this.positions[i3 + 2] = baseZ;
+      positions[i3] = baseX;
+      positions[i3 + 1] = baseY + waveOffset;
+      positions[i3 + 2] = baseZ;
     }
   }
 
   private updateSpectrumMode(analysisData: AudioAnalysisData | null): void {
-    const freqBands = 32;
+    const positions = this.positions;
 
-    for (let i = 0; i < PARTICLE_COUNT; i++) {
-      const i3 = i * 3;
+    if (analysisData) {
+      const freqData = analysisData.frequencyData;
+      const binSize = Math.floor(freqData.length / SPECTRUM_BINS);
 
-      const baseY = this.basePositions[i3 + 1];
-      const normalizedY = (baseY / SPHERE_RADIUS + 1) / 2;
-
-      const bandIndex = Math.floor(normalizedY * freqBands);
-      const clampedBand = Math.min(Math.max(bandIndex, 0), freqBands - 1);
-
-      let bandEnergy = 0;
-      if (analysisData) {
-        const freqData = analysisData.frequencyData;
-        const startIdx = Math.floor((clampedBand / freqBands) * freqData.length);
-        const endIdx = Math.floor(((clampedBand + 1) / freqBands) * freqData.length);
-
+      for (let bin = 0; bin < SPECTRUM_BINS; bin++) {
+        const startIdx = bin * binSize;
+        const endIdx = startIdx + binSize;
         let sum = 0;
         for (let j = startIdx; j < endIdx && j < freqData.length; j++) {
           sum += freqData[j];
         }
-        bandEnergy = sum / Math.max(endIdx - startIdx, 1) / 255;
+        this.spectrumBandEnergies[bin] = sum / binSize / 255;
       }
+    } else {
+      this.spectrumBandEnergies.fill(0);
+    }
 
-      const heightOffset = bandEnergy * 2 * (baseY > 0 ? 1 : -1);
+    const binIndices = this.spectrumBinIndices;
+    const baseHeights = this.spectrumBaseHeights;
+    const baseX = this.spectrumBaseX;
+    const baseZ = this.spectrumBaseZ;
+    const bandEnergies = this.spectrumBandEnergies;
 
-      this.positions[i3] = this.basePositions[i3];
-      this.positions[i3 + 1] = baseY + heightOffset;
-      this.positions[i3 + 2] = this.basePositions[i3 + 2];
+    for (let i = 0; i < PARTICLE_COUNT; i++) {
+      const i3 = i * 3;
+      const bin = binIndices[i];
+      const energy = bandEnergies[bin];
+      const maxHeight = energy * 6;
+      const y = baseHeights[i] * maxHeight;
+
+      positions[i3] = baseX[i];
+      positions[i3 + 1] = y;
+      positions[i3 + 2] = baseZ[i];
     }
   }
 
   private updateColors(): void {
     const lightness = MIN_LIGHTNESS + this.smoothedHighFreq * (MAX_LIGHTNESS - MIN_LIGHTNESS);
+    const colors = this.colors;
+    const baseHues = this.baseHues;
+    const colorObj = this.color;
 
     for (let i = 0; i < PARTICLE_COUNT; i++) {
       const i3 = i * 3;
-      const hue = this.baseHues[i];
+      const hue = baseHues[i];
 
-      const color = new THREE.Color().setHSL(hue / 360, 0.85, lightness);
-      this.colors[i3] = color.r;
-      this.colors[i3 + 1] = color.g;
-      this.colors[i3 + 2] = color.b;
+      colorObj.setHSL(hue / 360, 1.0, lightness);
+      colors[i3] = colorObj.r;
+      colors[i3 + 1] = colorObj.g;
+      colors[i3 + 2] = colorObj.b;
     }
   }
 
   private updateSizes(): void {
     const sizeMultiplier = MIN_PARTICLE_SIZE + this.smoothedLowFreq * (MAX_PARTICLE_SIZE - MIN_PARTICLE_SIZE);
-
-    for (let i = 0; i < PARTICLE_COUNT; i++) {
-      this.sizes[i] = this.baseSizes[i] * (sizeMultiplier / BASE_PARTICLE_SIZE);
-    }
-
     this.material.size = sizeMultiplier;
   }
 

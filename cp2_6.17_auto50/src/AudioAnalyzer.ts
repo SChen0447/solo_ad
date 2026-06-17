@@ -40,7 +40,12 @@ export class AudioAnalyzer {
     this.timeDomainData = new Uint8Array(new ArrayBuffer(bufferLength));
 
     const arrayBuffer = await file.arrayBuffer();
-    this.audioBuffer = await this.audioContext.decodeAudioData(arrayBuffer);
+    try {
+      this.audioBuffer = await this.audioContext.decodeAudioData(arrayBuffer);
+    } catch (e) {
+      this.cleanup();
+      throw e;
+    }
   }
 
   play(): void {
@@ -50,6 +55,8 @@ export class AudioAnalyzer {
       this.audioContext.resume();
     }
 
+    this.stopSource();
+
     this.source = this.audioContext.createBufferSource();
     this.source.buffer = this.audioBuffer;
     this.source.connect(this.analyser);
@@ -58,6 +65,7 @@ export class AudioAnalyzer {
     this.source.onended = () => {
       if (this.isPlaying) {
         this.isPlaying = false;
+        this.stopSource();
         if (this.onEnded) this.onEnded();
       }
     };
@@ -69,13 +77,26 @@ export class AudioAnalyzer {
     this.animate();
   }
 
+  private stopSource(): void {
+    if (this.source) {
+      try {
+        this.source.onended = null;
+        this.source.stop();
+      } catch (e) {
+      }
+      try {
+        this.source.disconnect();
+      } catch (e) {
+      }
+      this.source = null;
+    }
+  }
+
   pause(): void {
     if (!this.source || !this.audioContext || !this.isPlaying) return;
 
     this.pausedAt = this.audioContext.currentTime - this.startTime;
-    this.source.stop();
-    this.source.disconnect();
-    this.source = null;
+    this.stopSource();
     this.isPlaying = false;
 
     if (this.animationId !== null) {
@@ -152,14 +173,21 @@ export class AudioAnalyzer {
 
   cleanup(): void {
     this.pause();
+    this.stopSource();
 
     if (this.analyser) {
-      this.analyser.disconnect();
+      try {
+        this.analyser.disconnect();
+      } catch (e) {
+      }
       this.analyser = null;
     }
 
     if (this.audioContext) {
-      this.audioContext.close();
+      try {
+        this.audioContext.close();
+      } catch (e) {
+      }
       this.audioContext = null;
     }
 
