@@ -302,8 +302,8 @@ html, body, #root {
 }
 
 .line-num-active {
-  background-color: #4A90D9;
-  color: #fff;
+  background-color: #cce5ff;
+  color: #004085;
   font-weight: 600;
 }
 

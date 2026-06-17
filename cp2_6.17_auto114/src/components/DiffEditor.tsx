@@ -24,6 +24,7 @@ function CodeEditor({ code, onChange, language, label, onScroll, externalScroll,
   const gutterRef = useRef<HTMLDivElement>(null);
   const backdropRef = useRef<HTMLDivElement>(null);
   const [currentLine, setCurrentLine] = useState(1);
+  const [focused, setFocused] = useState(false);
 
   const lines = useMemo(() => code.split('\n'), [code]);
   const lineCount = lines.length;
@@ -84,7 +85,10 @@ function CodeEditor({ code, onChange, language, label, onScroll, externalScroll,
         }
       });
     }
-  }, [code, onChange]);
+    if (e.key === 'ArrowUp' || e.key === 'ArrowDown' || e.key === 'Home' || e.key === 'End' || e.key === 'PageUp' || e.key === 'PageDown') {
+      requestAnimationFrame(() => updateCursorLine());
+    }
+  }, [code, onChange, updateCursorLine]);
 
   return (
     <div className="editor-panel" id={id}>
@@ -94,7 +98,7 @@ function CodeEditor({ code, onChange, language, label, onScroll, externalScroll,
           {Array.from({ length: lineCount }, (_, i) => (
             <div
               key={i}
-              className={`line-num${i + 1 === currentLine ? ' line-num-active' : ''}`}
+              className={`line-num${focused && i + 1 === currentLine ? ' line-num-active' : ''}`}
             >
               {i + 1}
             </div>
@@ -116,6 +120,8 @@ function CodeEditor({ code, onChange, language, label, onScroll, externalScroll,
             onClick={updateCursorLine}
             onKeyDown={handleKeyDown}
             onSelect={updateCursorLine}
+            onFocus={() => { setFocused(true); updateCursorLine(); }}
+            onBlur={() => setFocused(false)}
             spellCheck={false}
             autoComplete="off"
             autoCorrect="off"
