@@ -9,10 +9,12 @@ interface RecipeCardProps {
   isFavorite: boolean;
   onClick: () => void;
   onToggleFavorite: (e: React.MouseEvent) => void;
+  compact?: boolean;
 }
 
-const RecipeCard: React.FC<RecipeCardProps> = ({ title, image, time, isFavorite, onClick, onToggleFavorite }) => {
+const RecipeCard: React.FC<RecipeCardProps> = ({ title, image, time, isFavorite, onClick, onToggleFavorite, compact = false }) => {
   const [animating, setAnimating] = useState(false);
+  const [hovered, setHovered] = useState(false);
 
   const handleFavorite = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -21,30 +23,30 @@ const RecipeCard: React.FC<RecipeCardProps> = ({ title, image, time, isFavorite,
     setTimeout(() => setAnimating(false), 250);
   };
 
+  const cardHeight = compact ? 260 : 320;
+  const imgHeight = compact ? 140 : 160;
+
   return (
     <div
       onClick={onClick}
-      className="group cursor-pointer"
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
       style={{
         width: 240,
-        height: 320,
+        height: cardHeight,
+        marginTop: hovered ? -6 : 0,
+        marginBottom: hovered ? 6 : 0,
         borderRadius: 20,
         background: '#ffffff',
         border: '1px solid #e5e7eb',
         overflow: 'hidden',
         position: 'relative',
-        transition: 'transform 0.35s ease-out, box-shadow 0.35s ease-out',
-      }}
-      onMouseEnter={e => {
-        (e.currentTarget as HTMLDivElement).style.transform = 'translateY(-6px)';
-        (e.currentTarget as HTMLDivElement).style.boxShadow = '0 10px 30px rgba(0,0,0,0.12)';
-      }}
-      onMouseLeave={e => {
-        (e.currentTarget as HTMLDivElement).style.transform = 'translateY(0)';
-        (e.currentTarget as HTMLDivElement).style.boxShadow = 'none';
+        cursor: 'pointer',
+        boxShadow: hovered ? '0 10px 30px rgba(0,0,0,0.12)' : 'none',
+        transition: 'margin-top 0.35s ease-out, margin-bottom 0.35s ease-out, box-shadow 0.35s ease-out',
       }}
     >
-      <div style={{ width: 240, height: 160, overflow: 'hidden' }}>
+      <div style={{ width: 240, height: imgHeight, overflow: 'hidden' }}>
         <img
           src={image}
           alt={title}
@@ -52,10 +54,10 @@ const RecipeCard: React.FC<RecipeCardProps> = ({ title, image, time, isFavorite,
           loading="lazy"
         />
       </div>
-      <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <div style={{ padding: compact ? '12px' : '16px', display: 'flex', flexDirection: 'column', gap: compact ? 4 : 8 }}>
         <h3
           style={{
-            fontSize: 18,
+            fontSize: compact ? 15 : 18,
             fontWeight: 700,
             color: '#1f2937',
             lineHeight: 1.3,
@@ -66,7 +68,7 @@ const RecipeCard: React.FC<RecipeCardProps> = ({ title, image, time, isFavorite,
         >
           {title}
         </h3>
-        <span style={{ fontSize: 14, color: '#6b7280' }}>
+        <span style={{ fontSize: compact ? 12 : 14, color: '#6b7280' }}>
           ⏱ {time} 分钟
         </span>
       </div>
