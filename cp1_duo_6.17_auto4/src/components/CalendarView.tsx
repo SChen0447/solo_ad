@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import {
   startOfMonth, endOfMonth, startOfWeek, endOfWeek,
   eachDayOfInterval, isSameMonth, isSameDay,
@@ -14,12 +14,35 @@ interface CalendarViewProps {
   onEmotionFilter: (emotion: EmotionType) => void
 }
 
-const WEEKDAYS = ['日', '一', '二', '三', '四', '五', '六']
+const WEEKDAYS_FULL = ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六']
+const WEEKDAYS_MOBILE = ['日', '一', '二', '三', '四', '五', '六']
+
+function getViewportSize() {
+  if (typeof window === 'undefined') return 'desktop'
+  const width = window.innerWidth
+  if (width < 768) return 'mobile'
+  if (width < 1024) return 'tablet'
+  return 'desktop'
+}
 
 function CalendarView({ notes, onEmotionFilter }: CalendarViewProps) {
   const [currentMonth, setCurrentMonth] = useState(new Date())
   const [selectedDate, setSelectedDate] = useState<Date | null>(null)
   const [isFlipping, setIsFlipping] = useState(false)
+  const [viewportSize, setViewportSize] = useState<'mobile' | 'tablet' | 'desktop'>('desktop')
+
+  useEffect(() => {
+    setViewportSize(getViewportSize())
+    const handleResize = () => {
+      setViewportSize(getViewportSize())
+    }
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [])
+
+  const weekdays = viewportSize === 'mobile' ? WEEKDAYS_MOBILE : WEEKDAYS_FULL.map(d => d.charAt(2))
+
+  const minCellHeight = viewportSize === 'mobile' ? '52px' : viewportSize === 'tablet' ? '72px' : '90px'
 
   const calendarDays = useMemo(() => {
     const monthStart = startOfMonth(currentMonth)
@@ -85,7 +108,9 @@ function CalendarView({ notes, onEmotionFilter }: CalendarViewProps) {
   }
 
   const selectedDateNotes = selectedDate
-    ? notesByDate.get(format(selectedDate, 'yyyy-MM-dd')) || []
+    ? [...(notesByDate.get(format(selectedDate, 'yyyy-MM-dd')) || [])].sort(
+        (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+      )
     : []
 
   const handleDayClick = (day: Date) => {
@@ -97,45 +122,50 @@ function CalendarView({ notes, onEmotionFilter }: CalendarViewProps) {
   }
 
   return (
-    <div className="calendar-container">
+    <div className={`calendar-container calendar-${viewportSize}`}>
       <div className="calendar-header">
         <div className="calendar-nav">
           <button className="nav-btn" onClick={goToPrevMonth} title="上个月">
-            ◀
+            {viewportSize === 'mobile' ? '‹' : '◀'}
           </button>
           <h2 className="calendar-title">
-            {format(currentMonth, 'yyyy年MM月', { locale: zhCN })}
+            {viewportSize === 'mobile'
+              ? format(currentMonth, 'yyyy/MM', { locale: zhCN })
+              : format(currentMonth, 'yyyy年MM月', { locale: zhCN })
+            }
           </h2>
           <button className="nav-btn" onClick={goToNextMonth} title="下个月">
-            ▶
+            {viewportSize === 'mobile' ? '›' : '▶'}
           </button>
         </div>
         <button className="today-btn" onClick={goToToday}>
-          今天
+          {viewportSize === 'mobile' ? '今' : '今天'}
         </button>
       </div>
 
-      <div className="calendar-legend">
-        <span className="legend-label">便签数量：</span>
-        <span className="legend-item">
-          <span className="legend-color" style={{ background: '#A8E6CF' }}></span>
-          少
-        </span>
-        <span className="legend-item">
-          <span className="legend-color" style={{ background: '#FFEAA7' }}></span>
-          中
-        </span>
-        <span className="legend-item">
-          <span className="legend-color" style={{ background: '#FF6B6B' }}></span>
-          多
-        </span>
-      </div>
+      {viewportSize !== 'mobile' && (
+        <div className="calendar-legend">
+          <span className="legend-label">便签数量：</span>
+          <span className="legend-item">
+            <span className="legend-color" style={{ background: '#A8E6CF' }}></span>
+            少
+          </span>
+          <span className="legend-item">
+            <span className="legend-color" style={{ background: '#FFEAA7' }}></span>
+            中
+          </span>
+          <span className="legend-item">
+            <span className="legend-color" style={{ background: '#FF6B6B' }}></span>
+            多
+          </span>
+        </div>
+      )}
 
       <div className={`calendar-grid ${isFlipping ? 'flipping' : ''}`}>
         <div className="weekdays-row">
-          {WEEKDAYS.map((day, idx) => (
+          {weekdays.map((day, idx) => (
             <div
-              key={day}
+              key={idx}
               className={`weekday-cell ${idx === 0 || idx === 6 ? 'weekend' : ''}`}
             >
               {day}
@@ -154,7 +184,8 @@ function CalendarView({ notes, onEmotionFilter }: CalendarViewProps) {
           return (
             <div
               key={index}
-              className={`day-cell
+              style={{ minHeight: minCellHeight }}
+              className={`day-cell viewport-${viewportSize}
                 ${!inCurrentMonth ? 'other-month' : ''}
                 ${isToday(day) ? 'today' : ''}
                 ${isSelected ? 'selected' : ''}
@@ -230,25 +261,28 @@ function CalendarView({ notes, onEmotionFilter }: CalendarViewProps) {
               {selectedDateNotes.length > 0 ? (
                 <div className="timeline-notes">
                   <div className="timeline-line"></div>
-                  {selectedDateNotes.map((note, idx) => (
-                    <div
-                      key={note.id}
-                      className={`timeline-item fade-in`}
-                      style={{ animationDelay: `${idx * 80}ms` }}
-                    >
-                      <div className="timeline-marker"></div>
-                      <div className="timeline-time">
-                        {format(new Date(note.createdAt), 'HH:mm')}
+                  {selectedDateNotes.map((note, idx) => {
+                    const isFirstNote = idx === 0
+                    return (
+                      <div
+                        key={note.id}
+                        className={`timeline-item fade-in ${isFirstNote ? 'timeline-first' : ''}`}
+                        style={{ animationDelay: `${idx * 80}ms` }}
+                      >
+                        <div className={`timeline-marker ${isFirstNote ? 'marker-first' : ''}`}></div>
+                        <div className="timeline-time">
+                          {format(new Date(note.createdAt), 'HH:mm')}
+                          {isFirstNote && <span className="first-badge">最早</span>}
+                        </div>
+                        <div className={`timeline-card-wrapper ${isFirstNote ? 'card-highlighted' : ''}`}>
+                          <NoteCard
+                            note={note}
+                            onEmotionClick={onEmotionFilter}
+                          />
+                        </div>
                       </div>
-                      <div className="timeline-card-wrapper">
-                        <NoteCard
-                          note={note}
-                          onEmotionClick={onEmotionFilter}
-                          highlighted={idx === 0}
-                        />
-                      </div>
-                    </div>
-                  ))}
+                    )
+                  })}
                 </div>
               ) : (
                 <div className="empty-day">

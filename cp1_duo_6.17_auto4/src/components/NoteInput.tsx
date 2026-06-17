@@ -162,6 +162,7 @@ function NoteInput({ onNoteCreated }: NoteInputProps) {
     if (!analyserRef.current) return
     const bufferLength = analyserRef.current.frequencyBinCount
     const dataArray = new Uint8Array(bufferLength)
+    const lastWaveformRef = useRef<number[]>(new Array(40).fill(8))
 
     const draw = () => {
       if (!analyserRef.current || !isRecording || isPaused) return
@@ -171,23 +172,32 @@ function NoteInput({ onNoteCreated }: NoteInputProps) {
       const newWaveform: number[] = []
       for (let i = 0; i < 40; i++) {
         const value = dataArray[i * step] || 0
-        newWaveform.push(Math.max(3, (value / 255) * 60))
+        const height = Math.max(3, (value / 255) * 60)
+        newWaveform.push(height)
       }
+      lastWaveformRef.current = [...newWaveform]
       setWaveformData(newWaveform)
     }
 
-    if (isPaused) {
-      setWaveformData(new Array(40).fill(8))
-    } else {
-      draw()
-    }
+    draw()
   }
 
   const pauseRecording = () => {
     if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
       mediaRecorderRef.current.pause()
       setIsPaused(true)
-      if (recordingTimerRef.current) clearInterval(recordingTimerRef.current)
+      if (recordingTimerRef.current) {
+        clearInterval(recordingTimerRef.current)
+        recordingTimerRef.current = null
+      }
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current)
+        animationFrameRef.current = null
+      }
+      setWaveformData(prev => {
+        const frozen = [...prev]
+        return frozen.map(h => Math.max(h, 6))
+      })
     }
   }
 
@@ -198,7 +208,25 @@ function NoteInput({ onNoteCreated }: NoteInputProps) {
       recordingTimerRef.current = window.setInterval(() => {
         setRecordingTime(prev => prev + 1)
       }, 1000)
-      animateWaveform()
+      if (analyserRef.current) {
+        const bufferLength = analyserRef.current.frequencyBinCount
+        const dataArray = new Uint8Array(bufferLength)
+        const draw = () => {
+          if (!analyserRef.current || !isRecording) return
+          const isPausedCheck = mediaRecorderRef.current?.state === 'paused'
+          if (isPausedCheck) return
+          animationFrameRef.current = requestAnimationFrame(draw)
+          analyserRef.current.getByteFrequencyData(dataArray)
+          const step = Math.floor(bufferLength / 40)
+          const newWaveform: number[] = []
+          for (let i = 0; i < 40; i++) {
+            const value = dataArray[i * step] || 0
+            newWaveform.push(Math.max(3, (value / 255) * 60))
+          }
+          setWaveformData(newWaveform)
+        }
+        draw()
+      }
     }
   }
 

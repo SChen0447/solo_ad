@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { format } from 'date-fns'
 import type { Note, EmotionType } from '../types'
 import { zhCN } from 'date-fns/locale'
@@ -34,8 +34,28 @@ const emotionBgColors: Record<EmotionType, string> = {
   surprised: '#DDA0DD'
 }
 
+function getViewportSize() {
+  if (typeof window === 'undefined') return 'desktop'
+  const width = window.innerWidth
+  if (width < 768) return 'mobile'
+  if (width < 1024) return 'tablet'
+  return 'desktop'
+}
+
 function NoteCard({ note, onEmotionClick, highlighted = false }: NoteCardProps) {
   const [isExpanded, setIsExpanded] = useState(false)
+  const [viewportSize, setViewportSize] = useState<'mobile' | 'tablet' | 'desktop'>('desktop')
+
+  useEffect(() => {
+    setViewportSize(getViewportSize())
+    const handleResize = () => {
+      setViewportSize(getViewportSize())
+    }
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [])
+
+  const collapsedLines = viewportSize === 'mobile' ? 3 : 4
 
   const formatDate = (dateStr: string) => {
     try {
@@ -84,23 +104,28 @@ function NoteCard({ note, onEmotionClick, highlighted = false }: NoteCardProps) 
 
   const typeInfo = getTypeLabel()
 
+  const expandThreshold = viewportSize === 'mobile' ? 80 : 100
+  const maxImageHeight = viewportSize === 'mobile' ? '150px' : viewportSize === 'tablet' ? '180px' : '220px'
+
   return (
     <div
-      className={`note-card ${highlighted ? 'highlighted' : ''} ${isExpanded ? 'expanded' : ''}`}
+      className={`note-card viewport-${viewportSize} ${highlighted ? 'highlighted' : ''} ${isExpanded ? 'expanded' : ''}`}
       style={{ borderTopColor: emotionBgColors[note.emotion] }}
     >
       <div className="card-header">
         <div className="card-meta">
           <span className="type-badge">
             <span>{typeInfo.icon}</span>
-            <span>{typeInfo.label}</span>
+            {viewportSize !== 'mobile' && <span>{typeInfo.label}</span>}
           </span>
-          <span className="card-time" title={formatDate(note.createdAt)}>
-            {getRelativeTime(note.createdAt)}
-          </span>
+          {viewportSize !== 'mobile' && (
+            <span className="card-time" title={formatDate(note.createdAt)}>
+              {getRelativeTime(note.createdAt)}
+            </span>
+          )}
         </div>
         <button
-          className="emotion-btn"
+          className={`emotion-btn layout-${viewportSize}`}
           onClick={(e) => {
             e.stopPropagation()
             onEmotionClick(note.emotion)
@@ -108,17 +133,23 @@ function NoteCard({ note, onEmotionClick, highlighted = false }: NoteCardProps) 
           title={`点击筛选「${emotionLabels[note.emotion]}」便签`}
         >
           <span className="emoji">{emotionEmojis[note.emotion]}</span>
-          <span className="emotion-label">{emotionLabels[note.emotion]}</span>
+          {viewportSize === 'desktop' && (
+            <span className="emotion-label">{emotionLabels[note.emotion]}</span>
+          )}
         </button>
       </div>
 
       <div className="card-body" onClick={() => setIsExpanded(!isExpanded)}>
         {note.type === 'image' && note.imageUrl && (
-          <div className="card-image-container">
+          <div
+            className="card-image-container"
+            style={{ maxHeight: maxImageHeight }}
+          >
             <img
               src={note.imageUrl}
               alt="便签图片"
               className="card-image"
+              loading="lazy"
             />
           </div>
         )}
@@ -126,9 +157,14 @@ function NoteCard({ note, onEmotionClick, highlighted = false }: NoteCardProps) 
         {note.type === 'voice' && (
           <div className="card-voice">
             {note.voiceUrl ? (
-              <audio controls src={note.voiceUrl} className="card-audio" />
+              <audio
+                controls
+                src={note.voiceUrl}
+                className="card-audio"
+                preload={viewportSize === 'desktop' ? 'metadata' : 'none'}
+              />
             ) : (
-                note.voiceDuration && (
+              note.voiceDuration && (
                 <div className="voice-placeholder">
                   🎵 {formatDuration(note.voiceDuration)}
                 </div>
@@ -137,27 +173,37 @@ function NoteCard({ note, onEmotionClick, highlighted = false }: NoteCardProps) 
           </div>
         )}
 
-        <p className={`card-content ${isExpanded ? '' : 'collapsed'}`}>
+        <p
+          className={`card-content ${isExpanded ? '' : 'collapsed'}`}
+          style={!isExpanded ? ({ ['--collapsed-lines' as any]: collapsedLines } as React.CSSProperties) : {}}
+        >
           {note.content}
         </p>
 
-        {!isExpanded && note.content.length > 100 && (
+        {!isExpanded && note.content.length > expandThreshold && (
           <div className="expand-hint">点击展开详情 ▼</div>
         )}
-        {isExpanded && note.content.length > 100 && (
+        {isExpanded && note.content.length > expandThreshold && (
           <div className="expand-hint">点击收起 ▲</div>
         )}
       </div>
 
       <div className="card-footer">
+        {viewportSize === 'mobile' && (
+          <div className="card-time-mobile" title={formatDate(note.createdAt)}>
+            🕐 {getRelativeTime(note.createdAt)}
+          </div>
+        )}
         {note.location && (
-        <div className="card-location">
+          <div className="card-location">
             📍 {note.location}
           </div>
-      )}
-        <div className="card-full-time">
-          🕐 {formatDate(note.createdAt)}
-        </div>
+        )}
+        {viewportSize !== 'mobile' && (
+          <div className="card-full-time">
+            🕐 {formatDate(note.createdAt)}
+          </div>
+        )}
       </div>
     </div>
   )

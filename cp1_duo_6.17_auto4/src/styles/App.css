@@ -64,7 +64,7 @@
   border-radius: 12px;
   background: #fff;
   font-size: 14px;
-  transition: all 0.3s ease;
+  transition: all 0.3s ease-in-out;
   box-shadow: 0 2px 8px var(--color-shadow);
 }
 
@@ -95,7 +95,7 @@
   border-radius: 8px;
   background: transparent;
   font-size: 18px;
-  transition: all 0.3s ease;
+  transition: all 0.3s ease-in-out;
 }
 
 .toggle-btn:hover {
@@ -141,7 +141,7 @@
   border-radius: 20px;
   background: #fff;
   font-size: 13px;
-  transition: all 0.3s ease;
+  transition: all 0.3s ease-in-out;
   box-shadow: 0 1px 4px var(--color-shadow);
 }
 
@@ -184,7 +184,7 @@
   font-size: 14px;
   padding: 0;
   opacity: 0.6;
-  transition: opacity 0.3s ease;
+  transition: opacity 0.3s ease-in-out;
 }
 
 .filter-active-tag button:hover {
