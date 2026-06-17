@@ -22,7 +22,9 @@ export interface Enemy {
   spawned: boolean;
 }
 
-export type WaveType = 'line' | 'v' | 'diamond';
+export type WaveType = 'line' | 'v' | 'diamond' | 'circle' | 'scatter';
+
+const RANDOM_COLORS = ['#ff3366', '#ff9933', '#ffff33', '#cc66ff', '#ff66cc'];
 
 export class EnemyWave {
   enemies: Enemy[] = [];
@@ -36,40 +38,94 @@ export class EnemyWave {
   waveTimer: number;
   allSpawned: boolean;
   destroyedCount: number;
+  isRandom: boolean;
+  scorePerEnemy: number;
 
-  constructor(waveType: WaveType, canvasWidth: number) {
+  constructor(
+    waveType: WaveType,
+    canvasWidth: number,
+    options?: {
+      count?: number;
+      color?: string;
+      speed?: number;
+      size?: number;
+      isRandom?: boolean;
+      scorePerEnemy?: number;
+    }
+  ) {
     this.waveType = waveType;
     this.waveTimer = 0;
     this.allSpawned = false;
     this.destroyedCount = 0;
     this.centerX = canvasWidth / 2;
-    this.centerY = -50;
+    this.centerY = -80;
+    this.isRandom = options?.isRandom ?? false;
+    this.scorePerEnemy = options?.scorePerEnemy ?? 100;
+
+    const count = options?.count;
+    this.color = options?.color ?? '#ff3366';
+    this.speed = options?.speed ?? 1.5;
+    this.size = options?.size ?? 25;
 
     switch (waveType) {
       case 'line':
-        this.speed = 1.5;
-        this.color = '#ff3366';
-        this.size = 25;
-        this.createLineFormation();
+        this.createLineFormation(count ?? 5);
         break;
       case 'v':
-        this.speed = 2;
-        this.color = '#ff9933';
-        this.size = 25;
-        this.createVFormation();
+        this.createVFormation(count ?? 7);
         break;
       case 'diamond':
-        this.speed = 2.5;
-        this.color = '#ffff33';
-        this.size = 25;
-        this.createDiamondFormation();
+        this.createDiamondFormation(count ?? 9);
+        break;
+      case 'circle':
+        this.createCircleFormation(count ?? 8);
+        break;
+      case 'scatter':
+        this.createScatterFormation(count ?? 6, canvasWidth);
         break;
     }
   }
 
-  createLineFormation() {
-    const count = 5;
-    const spacing = 60;
+  static createRandom(canvasWidth: number): EnemyWave {
+    const waveTypes: WaveType[] = ['line', 'v', 'diamond', 'circle', 'scatter'];
+    const waveType = waveTypes[Math.floor(Math.random() * waveTypes.length)];
+
+    let count: number;
+    switch (waveType) {
+      case 'line':
+        count = 3 + Math.floor(Math.random() * 6);
+        break;
+      case 'v':
+        count = 5 + Math.floor(Math.random() * 5);
+        break;
+      case 'diamond':
+        count = 5 + Math.floor(Math.random() * 5);
+        break;
+      case 'circle':
+        count = 6 + Math.floor(Math.random() * 7);
+        break;
+      case 'scatter':
+      default:
+        count = 4 + Math.floor(Math.random() * 7);
+        break;
+    }
+
+    const color = RANDOM_COLORS[Math.floor(Math.random() * RANDOM_COLORS.length)];
+    const speed = 1.0 + Math.random() * 2.0;
+    const size = 20 + Math.random() * 10;
+
+    return new EnemyWave(waveType, canvasWidth, {
+      count,
+      color,
+      speed,
+      size,
+      isRandom: true,
+      scorePerEnemy: 150
+    });
+  }
+
+  createLineFormation(count: number) {
+    const spacing = Math.min(60, (this.widthForCount(count) - 20) / count);
     for (let i = 0; i < count; i++) {
       this.enemies.push({
         x: 0,
@@ -80,19 +136,19 @@ export class EnemyWave {
         alive: true,
         formationOffsetX: (i - (count - 1) / 2) * spacing,
         formationOffsetY: 0,
-        spawnDelay: i * 200,
+        spawnDelay: i * 150,
         spawned: false
       });
     }
   }
 
-  createVFormation() {
-    const count = 7;
-    const spacing = 50;
+  createVFormation(count: number) {
+    const spacing = 45;
+    const rows = Math.ceil((-1 + Math.sqrt(1 + 8 * count)) / 2);
     let idx = 0;
-    for (let row = 0; row < 4; row++) {
+    for (let row = 0; row < rows && idx < count; row++) {
       const rowCount = row === 0 ? 1 : 2;
-      for (let col = 0; col < rowCount; col++) {
+      for (let col = 0; col < rowCount && idx < count; col++) {
         const offsetX = row === 0 ? 0 : (col === 0 ? -1 : 1) * row * spacing;
         this.enemies.push({
           x: 0,
@@ -103,7 +159,7 @@ export class EnemyWave {
           alive: true,
           formationOffsetX: offsetX,
           formationOffsetY: row * spacing,
-          spawnDelay: idx * 150,
+          spawnDelay: idx * 120,
           spawned: false
         });
         idx++;
@@ -111,23 +167,88 @@ export class EnemyWave {
     }
   }
 
-  createDiamondFormation() {
-    const count = 9;
-    const spacing = 50;
+  createDiamondFormation(count: number) {
+    const spacing = 45;
+    const half = Math.floor(Math.sqrt(count));
     const positions: { x: number; y: number }[] = [];
-    positions.push({ x: 0, y: -2 * spacing });
-    for (let i = -1; i <= 1; i++) {
-      positions.push({ x: i * spacing, y: -spacing });
-    }
-    for (let i = -2; i <= 2; i++) {
-      positions.push({ x: i * spacing, y: 0 });
-    }
-    for (let i = -1; i <= 1; i++) {
-      positions.push({ x: i * spacing, y: spacing });
-    }
-    positions.push({ x: 0, y: 2 * spacing });
 
-    for (let i = 0; i < positions.length && i < count; i++) {
+    for (let i = -half; i <= half; i++) {
+      for (let j = -half; j <= half; j++) {
+        if (Math.abs(i) + Math.abs(j) <= half) {
+          positions.push({ x: i * spacing, y: j * spacing });
+        }
+      }
+    }
+
+    const sorted = positions.sort((a, b) => Math.abs(a.x) + Math.abs(a.y) - (Math.abs(b.x) + Math.abs(b.y)));
+
+    for (let i = 0; i < Math.min(sorted.length, count); i++) {
+      this.enemies.push({
+        x: 0,
+        y: 0,
+        size: this.size,
+        color: this.color,
+        speed: this.speed,
+        alive: true,
+        formationOffsetX: sorted[i].x,
+        formationOffsetY: sorted[i].y,
+        spawnDelay: i * 80,
+        spawned: false
+      });
+    }
+  }
+
+  createCircleFormation(count: number) {
+    const radius = Math.min(120, 40 + count * 8);
+    for (let i = 0; i < count; i++) {
+      const angle = (Math.PI * 2 * i) / count - Math.PI / 2;
+      this.enemies.push({
+        x: 0,
+        y: 0,
+        size: this.size,
+        color: this.color,
+        speed: this.speed,
+        alive: true,
+        formationOffsetX: Math.cos(angle) * radius,
+        formationOffsetY: Math.sin(angle) * radius,
+        spawnDelay: i * 100,
+        spawned: false
+      });
+    }
+  }
+
+  createScatterFormation(count: number, canvasWidth: number) {
+    const positions: { x: number; y: number }[] = [];
+    const minDist = 40;
+    const maxAttempts = 200;
+    const spreadWidth = Math.min(canvasWidth * 0.7, 300 + count * 20);
+    const spreadHeight = 80 + count * 8;
+
+    for (let i = 0; i < count && positions.length < count; i++) {
+      let attempts = 0;
+      while (attempts < maxAttempts) {
+        const x = (Math.random() - 0.5) * spreadWidth;
+        const y = (Math.random() - 0.5) * spreadHeight;
+
+        let valid = true;
+        for (const p of positions) {
+          const dx = x - p.x;
+          const dy = y - p.y;
+          if (Math.sqrt(dx * dx + dy * dy) < minDist) {
+            valid = false;
+            break;
+          }
+        }
+
+        if (valid) {
+          positions.push({ x, y });
+          break;
+        }
+        attempts++;
+      }
+    }
+
+    for (let i = 0; i < positions.length; i++) {
       this.enemies.push({
         x: 0,
         y: 0,
@@ -137,10 +258,14 @@ export class EnemyWave {
         alive: true,
         formationOffsetX: positions[i].x,
         formationOffsetY: positions[i].y,
-        spawnDelay: i * 100,
+        spawnDelay: i * 180,
         spawned: false
       });
     }
+  }
+
+  private widthForCount(count: number): number {
+    return 600;
   }
 
   update(deltaTime: number, canvasHeight: number) {

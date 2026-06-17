@@ -21,7 +21,8 @@ const App: React.FC = () => {
     score: 0,
     enemiesDestroyed: 0,
     lives: 3,
-    gameOver: false
+    gameOver: false,
+    waveNumber: 0
   });
   const [showEditor, setShowEditor] = useState(true);
 
@@ -73,13 +74,13 @@ const App: React.FC = () => {
 
   const startGame = () => {
     setBulletConfig(DEFAULT_BULLET_CONFIG);
-    setStats({ score: 0, enemiesDestroyed: 0, lives: 3, gameOver: false });
+    setStats({ score: 0, enemiesDestroyed: 0, lives: 3, gameOver: false, waveNumber: 0 });
     setShowEditor(true);
     setGameState('playing');
   };
 
   const restartGame = () => {
-    setStats({ score: 0, enemiesDestroyed: 0, lives: 3, gameOver: false });
+    setStats({ score: 0, enemiesDestroyed: 0, lives: 3, gameOver: false, waveNumber: 0 });
     if (engineRef.current) {
       engineRef.current.reset();
       engineRef.current.start();
@@ -89,7 +90,7 @@ const App: React.FC = () => {
   };
 
   const goToEditor = () => {
-    setStats({ score: 0, enemiesDestroyed: 0, lives: 3, gameOver: false });
+    setStats({ score: 0, enemiesDestroyed: 0, lives: 3, gameOver: false, waveNumber: 0 });
     setShowEditor(true);
     if (engineRef.current) {
       engineRef.current.reset();
@@ -318,6 +319,16 @@ const App: React.FC = () => {
                 }}
               >
                 击落敌机: <span style={{ color: '#00ff88' }}>{stats.enemiesDestroyed}</span>
+              </div>
+              <div
+                style={{
+                  color: '#ffffff',
+                  fontFamily: 'monospace',
+                  fontSize: 18,
+                  textShadow: '0 0 6px rgba(204, 102, 255, 0.5)'
+                }}
+              >
+                到达波次: <span style={{ color: '#cc66ff' }}>{stats.waveNumber}</span>
               </div>
             </div>
 

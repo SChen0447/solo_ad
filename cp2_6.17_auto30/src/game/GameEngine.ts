@@ -1,6 +1,12 @@
 import { Player, Bullet, BulletConfig } from './Player';
 import { EnemyWave, WaveType } from './EnemyWave';
 
+const FIXED_WAVES: { type: WaveType; color: string; speed: number; size: number; count: number }[] = [
+  { type: 'line', color: '#ff3366', speed: 1.5, size: 25, count: 5 },
+  { type: 'v', color: '#ff9933', speed: 2, size: 25, count: 7 },
+  { type: 'diamond', color: '#ffff33', speed: 2.5, size: 25, count: 9 }
+];
+
 export interface Star {
   x: number;
   y: number;
@@ -14,6 +20,7 @@ export interface GameStats {
   enemiesDestroyed: number;
   lives: number;
   gameOver: boolean;
+  waveNumber: number;
 }
 
 export class GameEngine {
@@ -33,12 +40,14 @@ export class GameEngine {
   lastTime: number = 0;
   animationId: number = 0;
   waveIndex: number = 0;
+  waveNumber: number = 0;
   waveSpawnTimer: number = 0;
   waveSpawnInterval: number = 5000;
   waveTypes: WaveType[] = ['line', 'v', 'diamond'];
   onStatsChange?: (stats: GameStats) => void;
   mouseX: number;
   mouseY: number;
+  inRandomMode: boolean = false;
 
   constructor(canvas: HTMLCanvasElement, bulletConfig: BulletConfig) {
     this.canvas = canvas;
@@ -96,7 +105,10 @@ export class GameEngine {
     this.enemiesDestroyed = 0;
     this.gameOver = false;
     this.waveIndex = 0;
+    this.waveNumber = 0;
     this.waveSpawnTimer = 0;
+    this.waveSpawnInterval = 5000;
+    this.inRandomMode = false;
     this.initStars();
     this.emitStats();
   }
@@ -107,9 +119,33 @@ export class GameEngine {
         score: this.score,
         enemiesDestroyed: this.enemiesDestroyed,
         lives: this.player.lives,
-        gameOver: this.gameOver
+        gameOver: this.gameOver,
+        waveNumber: this.waveNumber
       });
     }
+  }
+
+  spawnNextWave() {
+    this.waveNumber++;
+
+    if (this.waveNumber <= FIXED_WAVES.length) {
+      const fixed = FIXED_WAVES[this.waveNumber - 1];
+      this.waves.push(new EnemyWave(fixed.type, this.width, {
+        count: fixed.count,
+        color: fixed.color,
+        speed: fixed.speed,
+        size: fixed.size,
+        isRandom: false,
+        scorePerEnemy: 100
+      }));
+      this.waveSpawnInterval = 5000;
+    } else {
+      this.inRandomMode = true;
+      this.waves.push(EnemyWave.createRandom(this.width));
+      this.waveSpawnInterval = 2000 + Math.random() * 3000;
+    }
+
+    this.emitStats();
   }
 
   loop = () => {
@@ -155,9 +191,7 @@ export class GameEngine {
     this.waveSpawnTimer += deltaTime;
     if (this.waveSpawnTimer >= this.waveSpawnInterval || this.waves.length === 0) {
       this.waveSpawnTimer = 0;
-      const waveType = this.waveTypes[this.waveIndex % this.waveTypes.length];
-      this.waves.push(new EnemyWave(waveType, this.width));
-      this.waveIndex++;
+      this.spawnNextWave();
     }
 
     for (const wave of this.waves) {
@@ -188,7 +222,7 @@ export class GameEngine {
           if (dist < enemy.size / 2 + bullet.radius) {
             this.bullets.splice(bi, 1);
             if (wave.hitEnemy(ei)) {
-              this.score += 100;
+              this.score += wave.scorePerEnemy;
               this.enemiesDestroyed++;
               this.emitStats();
             }
@@ -308,10 +342,16 @@ export class GameEngine {
     ctx.strokeText(scoreText, 15, 15);
     ctx.fillText(scoreText, 15, 15);
 
+    ctx.font = '16px monospace';
+    ctx.shadowColor = '#00ff88';
+    const waveText = `波次: ${this.waveNumber}`;
+    ctx.strokeText(waveText, 15, 42);
+    ctx.fillText(waveText, 15, 42);
+
     ctx.shadowBlur = 0;
     for (let i = 0; i < this.player.maxLives; i++) {
       const x = 15 + i * 24;
-      const y = 45;
+      const y = 70;
       const active = i < this.player.lives;
       this.drawHeart(ctx, x, y, 16, active ? '#ff3366' : '#444444');
     }
