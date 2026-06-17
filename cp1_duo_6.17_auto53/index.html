@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>云岛飞行竞速</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif;
+    }
+
+    body {
+      background: linear-gradient(180deg, #0d0221 0%, #1a0a3e 100%);
+    }
+
+    #game-canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+
+    #start-screen {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: linear-gradient(180deg, #0d0221 0%, #1a0a3e 100%);
+      z-index: 1000;
+      transition: opacity 0.6s ease;
+    }
+
+    #start-screen.hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .game-title {
+      font-size: 72px;
+      font-weight: 800;
+      color: #fff;
+      text-shadow: 
+        0 0 20px rgba(138, 43, 226, 0.8),
+        0 0 40px rgba(138, 43, 226, 0.6),
+        0 0 60px rgba(138, 43, 226, 0.4),
+        0 0 80px rgba(138, 43, 226, 0.2);
+      margin-bottom: 20px;
+      letter-spacing: 8px;
+      animation: glow 2s ease-in-out infinite alternate;
+    }
+
+    @keyframes glow {
+      from {
+        text-shadow: 
+          0 0 20px rgba(138, 43, 226, 0.8),
+          0 0 40px rgba(138, 43, 226, 0.6),
+          0 0 60px rgba(138, 43, 226, 0.4);
+      }
+      to {
+        text-shadow: 
+          0 0 30px rgba(186, 85, 255, 0.9),
+          0 0 60px rgba(186, 85, 255, 0.7),
+          0 0 90px rgba(186, 85, 255, 0.5),
+          0 0 120px rgba(186, 85, 255, 0.3);
+      }
+    }
+
+    .game-subtitle {
+      font-size: 20px;
+      color: rgba(255, 255, 255, 0.7);
+      margin-bottom: 60px;
+      letter-spacing: 4px;
+    }
+
+    .start-btn {
+      padding: 18px 64px;
+      font-size: 22px;
+      font-weight: 600;
+      color: #fff;
+      background: linear-gradient(135deg, #6b21a8 0%, #3b0764 100%);
+      border: 2px solid rgba(186, 85, 255, 0.6);
+      border-radius: 50px;
+      cursor: pointer;
+      letter-spacing: 4px;
+      box-shadow: 
+        0 0 30px rgba(138, 43, 226, 0.5),
+        inset 0 0 20px rgba(138, 43, 226, 0.3);
+      transition: all 0.3s ease;
+    }
+
+    .start-btn:hover {
+      transform: translateY(-3px) scale(1.05);
+      box-shadow: 
+        0 0 50px rgba(138, 43, 226, 0.8),
+        inset 0 0 30px rgba(138, 43, 226, 0.5);
+      border-color: rgba(186, 85, 255, 0.9);
+    }
+
+    .start-btn:active {
+      transform: translateY(-1px) scale(1.02);
+    }
+
+    .controls-hint {
+      position: absolute;
+      bottom: 40px;
+      color: rgba(255, 255, 255, 0.5);
+      font-size: 14px;
+      letter-spacing: 2px;
+    }
+
+    #hud {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 100;
+      display: none;
+    }
+
+    #hud.visible {
+      display: block;
+    }
+
+    .hud-panel {
+      position: absolute;
+      background: rgba(26, 10, 62, 0.45);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(138, 43, 226, 0.3);
+      border-radius: 12px;
+      padding: 16px 20px;
+      color: #fff;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+    }
+
+    .hud-top-left {
+      top: 24px;
+      left: 24px;
+      min-width: 260px;
+    }
+
+    .hud-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 12px;
+    }
+
+    .hud-item:last-child {
+      margin-bottom: 0;
+    }
+
+    .hud-label {
+      font-size: 13px;
+      color: rgba(255, 255, 255, 0.7);
+      letter-spacing: 1px;
+    }
+
+    .hud-value {
+      font-size: 18px;
+      font-weight: 700;
+      color: #fff;
+      text-shadow: 0 0 10px rgba(138, 43, 226, 0.6);
+    }
+
+    .progress-bar {
+      width: 100%;
+      height: 10px;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 5px;
+      overflow: hidden;
+      margin-top: 6px;
+    }
+
+    .progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #3b82f6 0%, #8b5cf6 100%);
+      border-radius: 5px;
+      transition: width 0.3s ease;
+      box-shadow: 0 0 10px rgba(139, 92, 246, 0.5);
+    }
+
+    .minimap-container {
+      position: absolute;
+      bottom: 24px;
+      right: 24px;
+      width: 200px;
+      height: 200px;
+      background: rgba(26, 10, 62, 0.45);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(138, 43, 226, 0.3);
+      border-radius: 12px;
+      padding: 8px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+    }
+
+    .minimap-canvas {
+      width: 100%;
+      height: 100%;
+      border-radius: 8px;
+    }
+
+    .hud-top-right {
+      top: 24px;
+      right: 24px;
+      min-width: 160px;
+      text-align: center;
+    }
+
+    .timer-value {
+      font-size: 28px;
+      font-weight: 800;
+      font-family: 'Courier New', monospace;
+      color: #fff;
+      text-shadow: 0 0 15px rgba(138, 43, 226, 0.8);
+      letter-spacing: 2px;
+    }
+
+    .timer-label {
+      font-size: 12px;
+      color: rgba(255, 255, 255, 0.6);
+      letter-spacing: 2px;
+      margin-bottom: 4px;
+    }
+
+    #finish-screen {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: rgba(13, 2, 33, 0.9);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      z-index: 500;
+    }
+
+    #finish-screen.visible {
+      display: flex;
+    }
+
+    .finish-title {
+      font-size: 56px;
+      font-weight: 800;
+      color: #ffd700;
+      text-shadow: 
+        0 0 20px rgba(255, 215, 0, 0.8),
+        0 0 40px rgba(255, 215, 0, 0.6);
+      margin-bottom: 12px;
+      letter-spacing: 6px;
+    }
+
+    .finish-time {
+      font-size: 36px;
+      color: #fff;
+      margin-bottom: 40px;
+      font-family: 'Courier New', monospace;
+    }
+
+    .leaderboard {
+      display: flex;
+      gap: 24px;
+      margin-bottom: 48px;
+    }
+
+    .leaderboard-card {
+      width: 180px;
+      padding: 24px 20px;
+      border-radius: 12px;
+      background: linear-gradient(145deg, #2a1a4a 0%, #1a0a3e 100%);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .leaderboard-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: repeating-linear-gradient(
+        90deg,
+        transparent,
+        transparent 2px,
+        rgba(255, 255, 255, 0.03) 2px,
+        rgba(255, 255, 255, 0.03) 4px
+      );
+      pointer-events: none;
+    }
+
+    .leaderboard-card::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 3px;
+      background: linear-gradient(90deg, transparent, #b8860b, #ffd700, #b8860b, transparent);
+    }
+
+    .card-rank {
+      font-size: 32px;
+      font-weight: 900;
+      text-align: center;
+      margin-bottom: 8px;
+      background: linear-gradient(180deg, #ffd700 0%, #b8860b 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .card-time {
+      font-size: 22px;
+      font-weight: 700;
+      color: #fff;
+      text-align: center;
+      margin-bottom: 4px;
+      font-family: 'Courier New', monospace;
+    }
+
+    .card-date {
+      font-size: 11px;
+      color: rgba(255, 255, 255, 0.5);
+      text-align: center;
+      letter-spacing: 1px;
+    }
+
+    .leaderboard-card.gold {
+      border: 2px solid #ffd700;
+      box-shadow: 0 0 30px rgba(255, 215, 0, 0.4);
+      transform: translateY(-10px) scale(1.05);
+    }
+
+    .leaderboard-card.silver {
+      border: 2px solid #c0c0c0;
+      box-shadow: 0 0 25px rgba(192, 192, 192, 0.3);
+    }
+
+    .leaderboard-card.bronze {
+      border: 2px solid #cd7f32;
+      box-shadow: 0 0 25px rgba(205, 127, 50, 0.3);
+    }
+
+    .restart-btn {
+      padding: 14px 48px;
+      font-size: 18px;
+      font-weight: 600;
+      color: #fff;
+      background: linear-gradient(135deg, #6b21a8 0%, #3b0764 100%);
+      border: 2px solid rgba(186, 85, 255, 0.6);
+      border-radius: 40px;
+      cursor: pointer;
+      letter-spacing: 3px;
+      pointer-events: auto;
+      box-shadow: 0 0 25px rgba(138, 43, 226, 0.5);
+      transition: all 0.3s ease;
+    }
+
+    .restart-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 0 40px rgba(138, 43, 226, 0.7);
+    }
+
+    .warning-flash {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      background: radial-gradient(circle, transparent 40%, rgba(255, 0, 68, 0.4) 100%);
+      opacity: 0;
+      z-index: 200;
+      transition: opacity 0.1s ease;
+    }
+
+    .warning-flash.active {
+      opacity: 1;
+      animation: flashWarning 0.5s ease;
+    }
+
+    @keyframes flashWarning {
+      0%, 100% { opacity: 0; }
+      20% { opacity: 1; }
+      40% { opacity: 0.3; }
+      60% { opacity: 0.9; }
+      80% { opacity: 0.4; }
+    }
+  </style>
+</head>
+<body>
+  <div id="start-screen">
+    <h1 class="game-title">云岛飞行竞速</h1>
+    <p class="game-subtitle">CLOUD ISLAND RACING</p>
+    <button class="start-btn" id="start-btn">开 始 游 戏</button>
+    <p class="controls-hint">WASD 控制飞行 · 收集能量环 · 抵达终点光环</p>
+  </div>
+
+  <canvas id="game-canvas"></canvas>
+
+  <div id="hud">
+    <div class="hud-panel hud-top-left">
+      <div class="hud-item">
+        <span class="hud-label">飞行速度</span>
+        <span class="hud-value" id="speed-value">0 KM/H</span>
+      </div>
+      <div class="hud-item">
+        <span class="hud-label">当前圈数</span>
+        <span class="hud-value" id="lap-value">1 / 1</span>
+      </div>
+      <div class="hud-item" style="flex-direction: column; align-items: flex-start;">
+        <div style="width: 100%; display: flex; justify-content: space-between;">
+          <span class="hud-label">能量环收集</span>
+          <span class="hud-value" id="ring-value" style="font-size: 14px;">0 / 0</span>
+        </div>
+        <div class="progress-bar">
+          <div class="progress-fill" id="ring-progress" style="width: 0%;"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="hud-panel hud-top-right">
+      <div class="timer-label">计 时</div>
+      <div class="timer-value" id="timer-value">00:00.00</div>
+    </div>
+
+    <div class="minimap-container">
+      <canvas class="minimap-canvas" id="minimap" width="184" height="184"></canvas>
+    </div>
+  </div>
+
+  <div class="warning-flash" id="warning-flash"></div>
+
+  <div id="finish-screen">
+    <h2 class="finish-title">🏁 完 赛 🏁</h2>
+    <div class="finish-time" id="finish-time">00:00.00</div>
+    <div class="leaderboard" id="leaderboard"></div>
+    <button class="restart-btn" id="restart-btn">再 来 一 局</button>
+  </div>
+
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
