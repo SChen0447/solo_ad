@@ -4,7 +4,7 @@ import bodyParser from 'body-parser';
 import { v4 as uuidv4 } from 'uuid';
 
 const app = express();
-const PORT = 3002;
+const PORT = 9876;
 
 app.use(cors());
 app.use(bodyParser.json());
@@ -260,11 +260,26 @@ app.post('/api/favorites', (req, res) => {
       }
     });
     return res.json({ success: true });
+  } else if (action === 'clear') {
+    favoritesStore = [];
+    return res.json({ success: true, cleared: true });
   }
 
   res.status(400).json({ error: 'Invalid action' });
 });
 
-app.listen(PORT, () => {
-  console.log(`🎵 Music recommendation server running on http://localhost:${PORT}`);
-});
+function startServer(port: number) {
+  const server = app.listen(port, () => {
+    console.log(`🎵 Music recommendation server running on http://localhost:${port}`);
+  }).on('error', (err: any) => {
+    if (err.code === 'EADDRINUSE') {
+      console.log(`Port ${port} is in use, trying ${port + 1}...`);
+      startServer(port + 1);
+    } else {
+      throw err;
+    }
+  });
+  return server;
+}
+
+startServer(PORT);

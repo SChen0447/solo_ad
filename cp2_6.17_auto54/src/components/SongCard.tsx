@@ -157,13 +157,14 @@ export default function SongCard({
               handleLike();
             }}
             style={{
-              background: 'none',
-              border: 'none',
+              background: feedback === 'like' ? 'rgba(46, 213, 115, 0.2)' : 'none',
+              border: feedback === 'like' ? '1px solid #2ED573' : 'none',
+              borderRadius: '50%',
               cursor: 'pointer',
-              padding: '2px',
+              padding: feedback === 'like' ? '2px 3px' : '2px',
               fontSize: '20px',
-              width: '20px',
-              height: '20px',
+              width: feedback === 'like' ? '26px' : '20px',
+              height: feedback === 'like' ? '26px' : '20px',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -171,9 +172,10 @@ export default function SongCard({
               transform: likeAnimating ? 'scale(1.3)' : feedback === 'like' ? 'scale(1.1)' : 'scale(1)',
               filter: feedback === 'like' ? 'none' : 'grayscale(60%)',
               opacity: feedback === 'like' ? 1 : 0.6,
+              color: '#2ED573',
             }}
           >
-            👍
+            {feedback === 'like' ? '👍' : '👍'}
           </button>
           <button
             onClick={(e) => {
@@ -181,13 +183,14 @@ export default function SongCard({
               handleDislike();
             }}
             style={{
-              background: 'none',
-              border: 'none',
+              background: feedback === 'dislike' ? 'rgba(255, 107, 107, 0.2)' : 'none',
+              border: feedback === 'dislike' ? '1px solid #FF6B6B' : 'none',
+              borderRadius: '50%',
               cursor: 'pointer',
-              padding: '2px',
+              padding: feedback === 'dislike' ? '2px 3px' : '2px',
               fontSize: '20px',
-              width: '20px',
-              height: '20px',
+              width: feedback === 'dislike' ? '26px' : '20px',
+              height: feedback === 'dislike' ? '26px' : '20px',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -199,9 +202,10 @@ export default function SongCard({
                 : 'scale(1)',
               filter: feedback === 'dislike' ? 'none' : 'grayscale(60%)',
               opacity: feedback === 'dislike' ? 1 : 0.6,
+              color: '#FF6B6B',
             }}
           >
-            👎
+            {feedback === 'dislike' ? '👎' : '👎'}
           </button>
         </div>
       </div>

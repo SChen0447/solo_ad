@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import MoodSelector from './components/MoodSelector';
 import SongCard from './components/SongCard';
 import PlaylistSidebar from './components/PlaylistSidebar';
@@ -10,6 +10,9 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [favorites, setFavorites] = useState<Favorite[]>([]);
   const [feedbackMap, setFeedbackMap] = useState<Record<string, 'like' | 'dislike'>>({});
+  const [nowPlaying, setNowPlaying] = useState<Song | null>(null);
+  const [showNowPlaying, setShowNowPlaying] = useState(false);
+  const playTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const fetchFavorites = useCallback(async () => {
     try {
@@ -46,6 +49,7 @@ function App() {
   const handleMoodSelect = useCallback(
     (mood: MoodType) => {
       setSelectedMood(mood);
+      setFeedbackMap({});
       fetchRecommendations(mood);
     },
     [fetchRecommendations]
@@ -101,6 +105,19 @@ function App() {
     [fetchFavorites]
   );
 
+  const handleClearFavorites = useCallback(async () => {
+    try {
+      await fetch('/api/favorites', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ song: { id: 'clear' }, action: 'clear' }),
+      });
+      fetchFavorites();
+    } catch (e) {
+      console.error('Failed to clear favorites:', e);
+    }
+  }, [fetchFavorites]);
+
   const handleReorderFavorites = useCallback(async (orderIds: string[]) => {
     try {
       await fetch('/api/favorites', {
@@ -113,6 +130,27 @@ function App() {
       console.error('Failed to reorder favorites:', e);
     }
   }, [fetchFavorites]);
+
+  const handlePlaySong = useCallback((song: Song) => {
+    setNowPlaying(song);
+    setShowNowPlaying(true);
+
+    if (playTimeoutRef.current) {
+      clearTimeout(playTimeoutRef.current);
+    }
+
+    playTimeoutRef.current = setTimeout(() => {
+      setShowNowPlaying(false);
+    }, 3000);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (playTimeoutRef.current) {
+        clearTimeout(playTimeoutRef.current);
+      }
+    };
+  }, []);
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh' }}>
@@ -220,14 +258,88 @@ function App() {
         favorites={favorites}
         onRemove={handleRemoveFavorite}
         onReorder={handleReorderFavorites}
+        onClear={handleClearFavorites}
+        onPlay={handlePlaySong}
         themeColor={selectedMood ? getMoodGradient(selectedMood)[0] : '#6C5CE7'}
       />
+
+      {showNowPlaying && nowPlaying && (
+        <div
+          style={{
+            position: 'fixed',
+            top: '50%',
+            left: '50%',
+            transform: 'translate(-50%, -50%)',
+            zIndex: 300,
+            background: 'rgba(45, 45, 68, 0.95)',
+            backdropFilter: 'blur(10px)',
+            padding: '32px 48px',
+            borderRadius: '20px',
+            boxShadow: '0 20px 60px rgba(0,0,0,0.5)',
+            animation: 'nowPlayingPop 0.3s ease-out',
+            textAlign: 'center',
+            minWidth: '300px',
+          }}
+        >
+          <div
+            style={{
+              width: '160px',
+              height: '160px',
+              borderRadius: '16px',
+              background: `linear-gradient(135deg, ${nowPlaying.gradient[0]}, ${nowPlaying.gradient[1]})`,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: '72px',
+              margin: '0 auto 20px auto',
+              boxShadow: '0 8px 24px rgba(0,0,0,0.3)',
+              animation: 'pulseGlow 2s ease-in-out infinite',
+            }}
+          >
+            🎵
+          </div>
+          <div style={{ fontSize: '12px', color: 'rgba(255,255,255,0.5)', marginBottom: '8px' }}>
+            ▶ 正在播放
+          </div>
+          <div
+            style={{
+              fontSize: '20px',
+              fontWeight: 600,
+              color: 'white',
+              marginBottom: '6px',
+            }}
+          >
+            {nowPlaying.title}
+          </div>
+          <div style={{ fontSize: '14px', color: 'rgba(255,255,255,0.6)' }}>
+            {nowPlaying.artist}
+          </div>
+        </div>
+      )}
 
       <style>{`
         @keyframes staggerIn {
           to {
             opacity: 1;
             transform: translateY(0);
+          }
+        }
+        @keyframes nowPlayingPop {
+          0% {
+            opacity: 0;
+            transform: translate(-50%, -50%) scale(0.8);
+          }
+          100% {
+            opacity: 1;
+            transform: translate(-50%, -50%) scale(1);
+          }
+        }
+        @keyframes pulseGlow {
+          0%, 100% {
+            box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+          }
+          50% {
+            box-shadow: 0 8px 32px rgba(108, 92, 231, 0.5);
           }
         }
         @media (max-width: 960px) {

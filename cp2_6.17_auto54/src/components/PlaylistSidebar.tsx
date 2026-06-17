@@ -1,16 +1,19 @@
 import { useState, useRef } from 'react';
-import type { Favorite } from '../types';
+import type { Favorite, Song } from '../types';
 
 interface Props {
   favorites: Favorite[];
   onRemove: (song: Favorite['song']) => void;
   onReorder: (orderIds: string[]) => void;
+  onClear: () => void;
+  onPlay: (song: Song) => void;
   themeColor: string;
 }
 
-export default function PlaylistSidebar({ favorites, onRemove, onReorder, themeColor }: Props) {
+export default function PlaylistSidebar({ favorites, onRemove, onReorder, onClear, onPlay, themeColor }: Props) {
   const [draggedId, setDraggedId] = useState<string | null>(null);
   const [dragOverId, setDragOverId] = useState<string | null>(null);
+  const [showConfirm, setShowConfirm] = useState(false);
   const dragOverIdx = useRef<number>(-1);
 
   const handleDragStart = (e: React.DragEvent, id: string) => {
@@ -60,6 +63,16 @@ export default function PlaylistSidebar({ favorites, onRemove, onReorder, themeC
     dragOverIdx.current = -1;
   };
 
+  const handleClearClick = () => {
+    if (favorites.length === 0) return;
+    setShowConfirm(true);
+  };
+
+  const handleConfirmClear = () => {
+    onClear();
+    setShowConfirm(false);
+  };
+
   return (
     <>
       <div
@@ -85,9 +98,37 @@ export default function PlaylistSidebar({ favorites, onRemove, onReorder, themeC
           }}
         />
         <div style={{ padding: '20px 20px 12px 20px', flexShrink: 0 }}>
-          <h3 style={{ fontSize: '18px', fontWeight: 600, marginBottom: '4px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
+          <h3 style={{ fontSize: '18px', fontWeight: 600 }}>
             📋 我的收藏
+            <span style={{ fontSize: '14px', color: 'rgba(255,255,255,0.6)', marginLeft: '6px', fontWeight: 400 }}>
+              ({favorites.length})
+            </span>
           </h3>
+          <button
+            onClick={handleClearClick}
+            style={{
+              background: 'none',
+              border: 'none',
+              color: favorites.length > 0 ? '#FF6B6B' : 'rgba(255,255,255,0.3)',
+              fontSize: '13px',
+              cursor: favorites.length > 0 ? 'pointer' : 'not-allowed',
+              padding: '4px 8px',
+              borderRadius: '4px',
+              transition: 'all 0.2s ease-out',
+            }}
+            onMouseEnter={(e) => {
+              if (favorites.length > 0) {
+                (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255, 107, 107, 0.2)';
+              }
+            }}
+            onMouseLeave={(e) => {
+              (e.currentTarget as HTMLButtonElement).style.background = 'transparent';
+            }}
+          >
+            清空全部
+          </button>
+          </div>
           <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.5)' }}>
             共 {favorites.length} 首歌曲
           </p>
@@ -163,18 +204,53 @@ export default function PlaylistSidebar({ favorites, onRemove, onReorder, themeC
                       minWidth: 0,
                     }}
                   >
-                    <div
-                      style={{
-                        fontSize: '13px',
-                        fontWeight: 500,
-                        color: 'white',
-                        whiteSpace: 'nowrap',
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        marginBottom: '2px',
-                      }}
-                    >
-                      {fav.song.title}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <div
+                        style={{
+                          fontSize: '13px',
+                          fontWeight: 500,
+                          color: 'white',
+                          whiteSpace: 'nowrap',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          marginBottom: '2px',
+                          flex: 1,
+                        }}
+                      >
+                        {fav.song.title}
+                      </div>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onPlay(fav.song);
+                        }}
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          color: '#A29BFE',
+                          cursor: 'pointer',
+                          padding: '2px',
+                          borderRadius: '50%',
+                          width: '20px',
+                          height: '20px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontSize: '12px',
+                          transition: 'all 0.2s ease-out',
+                          flexShrink: 0,
+                        }}
+                        onMouseEnter={(e) => {
+                          (e.currentTarget as HTMLButtonElement).style.background = 'rgba(162, 155, 254, 0.2)';
+                          (e.currentTarget as HTMLButtonElement).style.transform = 'scale(1.2)';
+                        }}
+                        onMouseLeave={(e) => {
+                          (e.currentTarget as HTMLButtonElement).style.background = 'transparent';
+                          (e.currentTarget as HTMLButtonElement).style.transform = 'scale(1)';
+                        }}
+                      >
+                        ▶
+                      </button>
                     </div>
                     <div
                       style={{
@@ -311,6 +387,74 @@ export default function PlaylistSidebar({ favorites, onRemove, onReorder, themeC
           ))
         )}
       </div>
+
+      {showConfirm && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(0,0,0,0.6)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 200,
+          }}
+          onClick={() => setShowConfirm(false)}
+        >
+          <div
+            style={{
+              background: '#2d2d44',
+              padding: '32px',
+              borderRadius: '16px',
+              minWidth: '320px',
+              boxShadow: '0 20px 60px rgba(0,0,0,0.5)',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h4 style={{ fontSize: '18px', marginBottom: '12px', color: 'white' }}>
+              确认操作
+            </h4>
+            <p style={{ fontSize: '14px', color: 'rgba(255,255,255,0.7)', marginBottom: '24px' }}>
+              确定要清空所有收藏歌曲吗？
+            </p>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
+              <button
+                onClick={() => setShowConfirm(false)}
+                style={{
+                  padding: '8px 20px',
+                  background: 'rgba(255,255,255,0.1)',
+                  border: 'none',
+                  borderRadius: '8px',
+                  color: 'white',
+                  fontSize: '14px',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease-out',
+                }}
+              >
+                取消
+              </button>
+              <button
+                onClick={handleConfirmClear}
+                style={{
+                  padding: '8px 20px',
+                  background: '#FF6B6B',
+                  border: 'none',
+                  borderRadius: '8px',
+                  color: 'white',
+                  fontSize: '14px',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease-out',
+                }}
+              >
+                确定
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <style>{`
         @media (max-width: 960px) {
