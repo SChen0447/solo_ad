@@ -82,7 +82,8 @@ class App {
       (event, data) => this.eventBus.emit(event, data)
     );
 
-    this.navigation = new Navigation(this.camera, this.renderer.domElement);
+    this.navigation = new Navigation(this.camera);
+    this.navigation.setMotionBlurElement(this.renderer.domElement);
 
     this.ui = new UI(
       (event, data) => this.eventBus.emit(event, data),
@@ -310,7 +311,7 @@ class App {
     const time = this.clock.getElapsedTime();
 
     this.navigation.update(delta);
-    this.cityBuilder.update(time);
+    this.cityBuilder.update(delta);
 
     this.renderer.render(this.scene, this.camera);
 

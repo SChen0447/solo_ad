@@ -400,8 +400,6 @@ export class CityBuilder {
   }
 
   handleClick(mouse: THREE.Vector2, camera: THREE.Camera): void {
-    if (this.isDragging) return;
-
     this.raycaster.setFromCamera(mouse, camera);
 
     if (this.placingType !== null) {
@@ -517,7 +515,7 @@ export class CityBuilder {
     return meshes;
   }
 
-  update(time: number): void {
+  update(delta: number): void {
     const now = performance.now();
     const toDelete: string[] = [];
 
@@ -560,11 +558,11 @@ export class CityBuilder {
     });
 
     if (this.selectedId) {
-      this.pulsePhase += 0.016;
+      this.pulsePhase += delta * (2 * Math.PI) / 1.5;
       const entry = this.meshMap.get(this.selectedId);
       if (entry && entry.outline) {
         const mat = entry.outline.material as THREE.LineBasicMaterial;
-        mat.opacity = 0.6 + 0.4 * (0.5 + 0.5 * Math.sin(this.pulsePhase * (2 * Math.PI) / 1.5));
+        mat.opacity = 0.6 + 0.4 * (0.5 + 0.5 * Math.sin(this.pulsePhase));
       }
     }
   }

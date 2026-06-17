@@ -5,7 +5,7 @@ export default defineConfig({
   publicDir: 'public',
   build: {
     target: 'es2020',
-    minify: 'terser',
+    minify: 'esbuild',
     rollupOptions: {
       output: {
         manualChunks: {
