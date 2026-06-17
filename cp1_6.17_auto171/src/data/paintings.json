@@ -1,0 +1,186 @@
+{
+  "exhibitions": [
+    {
+      "id": "renaissance",
+      "name": "文艺复兴",
+      "nameEn": "RENAISSANCE",
+      "startZ": 0,
+      "endZ": 30,
+      "color": "#8B4513"
+    },
+    {
+      "id": "impressionism",
+      "name": "印象派",
+      "nameEn": "IMPRESSIONISM",
+      "startZ": 30,
+      "endZ": 60,
+      "color": "#4682B4"
+    },
+    {
+      "id": "modern",
+      "name": "现代艺术",
+      "nameEn": "MODERN ART",
+      "startZ": 60,
+      "endZ": 90,
+      "color": "#9370DB"
+    }
+  ],
+  "paintings": [
+    {
+      "id": 1,
+      "title": "蒙娜丽莎",
+      "titleEn": "Mona Lisa",
+      "author": "列奥纳多·达·芬奇",
+      "year": 1503,
+      "exhibitionId": "renaissance",
+      "description": "这幅画以其神秘的微笑和精湛的晕涂法技法闻名于世，是文艺复兴时期最具代表性的肖像画作品。",
+      "wall": "left",
+      "position": 5,
+      "thumbnailUrl": "https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=Renaissance%20oil%20painting%20Mona%20Lisa%20style%20portrait%20woman%20mysterious%20smile%20classical%20art&image_size=square_hd",
+      "highResUrl": "https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=Renaissance%20oil%20painting%20Mona%20Lisa%20style%20portrait%20woman%20mysterious%20smile%20classical%20art%20high%20detail&image_size=portrait_4_3"
+    },
+    {
+      "id": 2,
+      "title": "最后的晚餐",
+      "titleEn": "The Last Supper",
+      "author": "列奥纳多·达·芬奇",
+      "year": 1498,
+      "exhibitionId": "renaissance",
+      "description": "描绘耶稣与十二门徒共进最后一次晚餐的场景，以其精妙的构图和人物表情刻画而著称。",
+      "wall": "right",
+      "position": 5,
+      "thumbnailUrl": "https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=Renaissance%20oil%20painting%20The%20Last%20Supper%20Jesus%20disciples%20dining%20hall%20classical%20religious%20art&image_size=landscape_4_3",
+      "highResUrl": "https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=Renaissance%20oil%20painting%20The%20Last%20Supper%20Jesus%20disciples%20dining%20hall%20classical%20religious%20art%20high%20detail&image_size=landscape_16_9"
+    },
+    {
+      "id": 3,
+      "title": "创世纪",
+      "titleEn": "The Creation of Adam",
+      "author": "米开朗基罗",
+      "year": 1512,
+      "exhibitionId": "renaissance",
+      "description": "西斯廷教堂天顶画的一部分，描绘上帝赋予亚当生命的经典瞬间，双手相触的画面成为艺术史上最著名的意象之一。",
+      "wall": "left",
+      "position": 12,
+      "thumbnailUrl": "https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=Renaissance%20fresco%20painting%20Creation%20of%20Adam%20Michelangelo%20style%20God%20touching%20finger%20heaven%20clouds&image_size=landscape_4_3",
+      "highResUrl": "https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=Renaissance%20fresco%20painting%20Creation%20of%20Adam%20Michelangelo%20style%20God%20touching%20finger%20heaven%20clouds%20high%20detail&image_size=landscape_16_9"
+    },
+    {
+      "id": 4,
+      "title": "大卫雕像草图",
+      "titleEn": "Study of David",
+      "author": "米开朗基罗",
+      "year": 1501,
+      "exhibitionId": "renaissance",
+      "description": "为大卫雕像创作的素描手稿，展现了艺术家对人体解剖学的深刻理解和精湛的绘画技巧。",
+      "wall": "right",
+      "position": 12,
+      "thumbnailUrl": "https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=Renaissance%20sketch%20drawing%20David%20sculpture%20study%20Michelangelo%20style%20human%20figure%20anatomy&image_size=portrait_4_3",
+      "highResUrl": "https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=Renaissance%20sketch%20drawing%20David%20sculpture%20study%20Michelangelo%20style%20human%20figure%20anatomy%20high%20detail&image_size=portrait_16_9"
+    },
+    {
+      "id": 5,
+      "title": "日出印象",
+      "titleEn": "Impression, Sunrise",
+      "author": "克劳德·莫奈",
+      "year": 1872,
+      "exhibitionId": "impressionism",
+      "description": "印象派运动的开山之作，以松散的笔触和对光影瞬间变化的捕捉，展现了勒阿弗尔港口的日出景象。",
+      "wall": "left",
+      "position": 35,
+      "thumbnailUrl": "https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=Impressionist%20oil%20painting%20sunrise%20harbor%20Monet%20style%20loose%20brushstrokes%20orange%20sun%20reflection%20water&image_size=landscape_4_3",
+      "highResUrl": "https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=Impressionist%20oil%20painting%20sunrise%20harbor%20Monet%20style%20loose%20brushstrokes%20orange%20sun%20reflection%20water%20high%20detail&image_size=landscape_16_9"
+    },
+    {
+      "id": 6,
+      "title": "睡莲池",
+      "titleEn": "Water Lilies",
+      "author": "克劳德·莫奈",
+      "year": 1906,
+      "exhibitionId": "impressionism",
+      "description": "莫奈晚年在吉维尼花园创作的系列作品之一，以梦幻般的色彩和光影描绘了池塘中睡莲的美丽景象。",
+      "wall": "right",
+      "position": 35,
+      "thumbnailUrl": "https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=Impressionist%20oil%20painting%20water%20lilies%20pond%20Monet%20style%20reflections%20green%20purple%20flowers&image_size=square_hd",
+      "highResUrl": "https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=Impressionist%20oil%20painting%20water%20lilies%20pond%20Monet%20style%20reflections%20green%20purple%20flowers%20high%20detail&image_size=square_hd"
+    },
+    {
+      "id": 7,
+      "title": "星月夜",
+      "titleEn": "Starry Night",
+      "author": "文森特·梵高",
+      "year": 1889,
+      "exhibitionId": "impressionism",
+      "description": "梵高在法国圣雷米精神病院期间创作的杰作，以旋转的笔触和强烈的色彩表达了内心的情感与宇宙的浩瀚。",
+      "wall": "left",
+      "position": 42,
+      "thumbnailUrl": "https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=Post%20Impressionist%20oil%20painting%20starry%20night%20Van%20Gogh%20style%20swirling%20sky%20village%20cypress%20tree&image_size=landscape_4_3",
+      "highResUrl": "https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=Post%20Impressionist%20oil%20painting%20starry%20night%20Van%20Gogh%20style%20swirling%20sky%20village%20cypress%20tree%20high%20detail&image_size=landscape_16_9"
+    },
+    {
+      "id": 8,
+      "title": "向日葵",
+      "titleEn": "Sunflowers",
+      "author": "文森特·梵高",
+      "year": 1888,
+      "exhibitionId": "impressionism",
+      "description": "梵高为迎接好友高更的到来而创作的系列作品，以浓烈的黄色调展现了向日葵蓬勃的生命力。",
+      "wall": "right",
+      "position": 42,
+      "thumbnailUrl": "https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=Post%20Impressionist%20oil%20painting%20sunflowers%20Van%20Gogh%20style%20yellow%20vase%20thick%20brushstrokes&image_size=portrait_4_3",
+      "highResUrl": "https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=Post%20Impressionist%20oil%20painting%20sunflowers%20Van%20Gogh%20style%20yellow%20vase%20thick%20brushstrokes%20high%20detail&image_size=portrait_16_9"
+    },
+    {
+      "id": 9,
+      "title": "呐喊",
+      "titleEn": "The Scream",
+      "author": "爱德华·蒙克",
+      "year": 1893,
+      "exhibitionId": "modern",
+      "description": "表现主义的标志性作品，以扭曲的形象和浓烈的色彩表达了现代人内心深处的焦虑与恐惧。",
+      "wall": "left",
+      "position": 65,
+      "thumbnailUrl": "https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=Expressionist%20art%20The%20Scream%20Munch%20style%20screaming%20figure%20swirling%20orange%20sky%20bridge&image_size=portrait_4_3",
+      "highResUrl": "https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=Expressionist%20art%20The%20Scream%20Munch%20style%20screaming%20figure%20swirling%20orange%20sky%20bridge%20high%20detail&image_size=portrait_16_9"
+    },
+    {
+      "id": 10,
+      "title": "记忆的永恒",
+      "titleEn": "The Persistence of Memory",
+      "author": "萨尔瓦多·达利",
+      "year": 1931,
+      "exhibitionId": "modern",
+      "description": "超现实主义的经典之作，以融化的时钟等荒诞意象探索了时间、梦境与潜意识的奥秘。",
+      "wall": "right",
+      "position": 65,
+      "thumbnailUrl": "https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=Surrealist%20painting%20melting%20clocks%20Dali%20style%20desert%20landscape%20dream%20fantasy&image_size=landscape_4_3",
+      "highResUrl": "https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=Surrealist%20painting%20melting%20clocks%20Dali%20style%20desert%20landscape%20dream%20fantasy%20high%20detail&image_size=landscape_16_9"
+    },
+    {
+      "id": 11,
+      "title": "格尔尼卡",
+      "titleEn": "Guernica",
+      "author": "巴勃罗·毕加索",
+      "year": 1937,
+      "exhibitionId": "modern",
+      "description": "立体主义大师毕加索为控诉西班牙内战中德军轰炸格尔尼卡小镇的暴行而创作的反战巨作。",
+      "wall": "left",
+      "position": 72,
+      "thumbnailUrl": "https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=Cubist%20painting%20Guernica%20Picasso%20style%20black%20white%20gray%20war%20suffering%20cubism&image_size=landscape_4_3",
+      "highResUrl": "https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=Cubist%20painting%20Guernica%20Picasso%20style%20black%20white%20gray%20war%20suffering%20cubism%20high%20detail&image_size=landscape_16_9"
+    },
+    {
+      "id": 12,
+      "title": "亚维农少女",
+      "titleEn": "Les Demoiselles d'Avignon",
+      "author": "巴勃罗·毕加索",
+      "year": 1907,
+      "exhibitionId": "modern",
+      "description": "开创立体主义先河的革命性作品，以几何化的形体和多视角的表现彻底改变了现代绘画的发展方向。",
+      "wall": "right",
+      "position": 72,
+      "thumbnailUrl": "https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=Cubist%20painting%20Les%20Demoiselles%20dAvignon%20Picasso%20style%20geometric%20figures%20abstract%20faces&image_size=portrait_4_3",
+      "highResUrl": "https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=Cubist%20painting%20Les%20Demoiselles%20dAvignon%20Picasso%20style%20geometric%20figures%20abstract%20faces%20high%20detail&image_size=portrait_16_9"
+    }
+  ]
+}
