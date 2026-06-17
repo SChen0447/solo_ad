@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HRV 三维可视化分析系统</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: linear-gradient(135deg, #08081a 0%, #0f0f2a 100%);
+      color: #d0d0e0;
+      font-size: 14px;
+    }
+
+    #app {
+      width: 100%;
+      height: 100%;
+      position: relative;
+    }
+
+    #canvas-container {
+      position: absolute;
+      left: 0;
+      top: 0;
+      width: calc(100vw - 320px);
+      height: 100vh;
+    }
+
+    #canvas-container canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+
+    .control-panel {
+      position: fixed;
+      top: 80px;
+      right: 20px;
+      width: 280px;
+      background: rgba(10, 10, 30, 0.85);
+      border-radius: 12px;
+      padding: 20px;
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      z-index: 100;
+    }
+
+    .panel-title {
+      font-size: 16px;
+      font-weight: 600;
+      color: #00e5ff;
+      margin-bottom: 16px;
+      letter-spacing: 0.5px;
+    }
+
+    .panel-section {
+      margin-bottom: 20px;
+    }
+
+    .panel-label {
+      font-size: 12px;
+      color: #9090b0;
+      margin-bottom: 8px;
+      display: block;
+    }
+
+    .upload-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      padding: 10px 16px;
+      background: rgba(0, 229, 255, 0.1);
+      border: 1px solid rgba(0, 229, 255, 0.3);
+      border-radius: 6px;
+      color: #00e5ff;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .upload-btn:hover {
+      background: rgba(0, 229, 255, 0.2);
+      border-color: #00e5ff;
+      box-shadow: 0 0 20px rgba(0, 229, 255, 0.3);
+    }
+
+    .upload-btn input {
+      display: none;
+    }
+
+    select {
+      width: 100%;
+      padding: 8px 12px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 6px;
+      color: #d0d0e0;
+      font-size: 13px;
+      font-family: 'Inter', sans-serif;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%239090b0' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 10px center;
+    }
+
+    select:hover {
+      border-color: rgba(0, 229, 255, 0.5);
+    }
+
+    select:focus {
+      outline: none;
+      border-color: #00e5ff;
+      box-shadow: 0 0 0 2px rgba(0, 229, 255, 0.2);
+    }
+
+    .checkbox-group {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .checkbox-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .checkbox-item:hover {
+      color: #00e5ff;
+    }
+
+    .checkbox-item input {
+      appearance: none;
+      width: 16px;
+      height: 16px;
+      border: 1px solid rgba(255, 255, 255, 0.3);
+      border-radius: 4px;
+      background: rgba(255, 255, 255, 0.05);
+      cursor: pointer;
+      transition: all 0.2s ease;
+      position: relative;
+    }
+
+    .checkbox-item input:checked {
+      background: #00e5ff;
+      border-color: #00e5ff;
+    }
+
+    .checkbox-item input:checked::after {
+      content: '';
+      position: absolute;
+      left: 4px;
+      top: 1px;
+      width: 4px;
+      height: 8px;
+      border: solid #08081a;
+      border-width: 0 2px 2px 0;
+      transform: rotate(45deg);
+    }
+
+    .reset-btn {
+      width: 100%;
+      padding: 10px 16px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 6px;
+      color: #d0d0e0;
+      font-size: 13px;
+      font-family: 'Inter', sans-serif;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .reset-btn:hover {
+      background: rgba(255, 255, 255, 0.1);
+      border-color: rgba(255, 255, 255, 0.3);
+      color: #fff;
+    }
+
+    .slider-container {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .slider-value {
+      font-size: 12px;
+      color: #00e5ff;
+      text-align: right;
+    }
+
+    input[type="range"] {
+      -webkit-appearance: none;
+      width: 100%;
+      height: 4px;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 2px;
+      outline: none;
+    }
+
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 14px;
+      height: 14px;
+      background: #00e5ff;
+      border-radius: 50%;
+      cursor: pointer;
+      box-shadow: 0 0 10px rgba(0, 229, 255, 0.5);
+      transition: all 0.2s ease;
+    }
+
+    input[type="range"]::-webkit-slider-thumb:hover {
+      transform: scale(1.2);
+      box-shadow: 0 0 15px rgba(0, 229, 255, 0.8);
+    }
+
+    .info-panel {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      width: 300px;
+      height: 200px;
+      background: rgba(20, 20, 50, 0.9);
+      border: 1px solid #333;
+      border-radius: 8px;
+      padding: 14px;
+      overflow-y: auto;
+      z-index: 100;
+      backdrop-filter: blur(5px);
+    }
+
+    .info-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: #00e5ff;
+      margin-bottom: 10px;
+      padding-bottom: 6px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .data-list {
+      font-family: 'Courier New', monospace;
+      font-size: 12px;
+      line-height: 1.6;
+      color: #a0a0c0;
+    }
+
+    .data-item {
+      display: flex;
+      justify-content: space-between;
+      padding: 2px 0;
+    }
+
+    .data-item .idx {
+      color: #606090;
+    }
+
+    .data-item .val {
+      color: #00e5ff;
+    }
+
+    .stats-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 4px 0;
+      border-bottom: 1px dashed rgba(255, 255, 255, 0.05);
+    }
+
+    .stats-row:last-child {
+      border-bottom: none;
+    }
+
+    .stats-label {
+      color: #9090b0;
+    }
+
+    .stats-value {
+      color: #4ade80;
+      font-weight: 500;
+    }
+
+    .tooltip {
+      position: fixed;
+      background: rgba(10, 10, 30, 0.95);
+      border: 1px solid rgba(0, 229, 255, 0.4);
+      border-radius: 6px;
+      padding: 10px 14px;
+      font-size: 12px;
+      color: #d0d0e0;
+      pointer-events: none;
+      z-index: 200;
+      backdrop-filter: blur(5px);
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+      display: none;
+    }
+
+    .tooltip .tip-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 20px;
+      padding: 2px 0;
+    }
+
+    .tooltip .tip-label {
+      color: #9090b0;
+    }
+
+    .tooltip .tip-value {
+      color: #00e5ff;
+      font-family: 'Courier New', monospace;
+    }
+
+    .empty-state {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      color: #606090;
+      font-size: 12px;
+    }
+
+    ::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 3px;
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: rgba(0, 229, 255, 0.3);
+      border-radius: 3px;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+      background: rgba(0, 229, 255, 0.5);
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <div id="canvas-container"></div>
+
+    <div class="control-panel">
+      <div class="panel-title">HRV 分析控制台</div>
+
+      <div class="panel-section">
+        <label class="panel-label">数据导入</label>
+        <label class="upload-btn">
+          <span>上传 CSV 文件</span>
+          <input type="file" id="fileInput" accept=".csv">
+        </label>
+      </div>
+
+      <div class="panel-section">
+        <label class="panel-label">时域指标 (Z轴)</label>
+        <select id="metricSelect">
+          <option value="SDNN">SDNN - 全部窦性心搏标准差</option>
+          <option value="RMSSD">RMSSD - 相邻间期差值均方根</option>
+          <option value="pNN50">pNN50 - 相差&gt;50ms百分比</option>
+        </select>
+      </div>
+
+      <div class="panel-section">
+        <label class="panel-label">频段显示</label>
+        <div class="checkbox-group">
+          <label class="checkbox-item">
+            <input type="checkbox" id="vlfToggle" checked>
+            <span>VLF (0.003-0.04Hz)</span>
+          </label>
+          <label class="checkbox-item">
+            <input type="checkbox" id="lfToggle" checked>
+            <span>LF (0.04-0.15Hz)</span>
+          </label>
+          <label class="checkbox-item">
+            <input type="checkbox" id="hfToggle" checked>
+            <span>HF (0.15-0.4Hz)</span>
+          </label>
+        </div>
+      </div>
+
+      <div class="panel-section">
+        <label class="panel-label">时间窗步长</label>
+        <div class="slider-container">
+          <input type="range" id="windowStep" min="16" max="64" step="16" value="32">
+          <div class="slider-value"><span id="stepValue">32</span> 个心跳</div>
+        </div>
+      </div>
+
+      <div class="panel-section">
+        <button class="reset-btn" id="resetView">重置视角</button>
+      </div>
+    </div>
+
+    <div class="info-panel" id="infoPanel">
+      <div class="info-title">数据预览</div>
+      <div id="dataContent">
+        <div class="empty-state">请上传 CSV 文件以查看数据</div>
+      </div>
+    </div>
+
+    <div class="tooltip" id="tooltip"></div>
+  </div>
+
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
