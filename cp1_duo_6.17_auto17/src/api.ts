@@ -115,6 +115,18 @@ export const getHistoryData = async (
   end: string,
   accounts: Account[]
 ): Promise<{ barData: HistoryData[]; lineData: HistoryData[] }> => {
+  try {
+    const params = new URLSearchParams()
+    params.set('start', start)
+    params.set('end', end)
+    const res = await fetch(`${BASE_URL}/history?${params.toString()}`)
+    if (res.ok) {
+      const data = await res.json()
+      if (data.barData && data.lineData) {
+        return { barData: data.barData, lineData: data.lineData }
+      }
+    }
+  } catch {}
   return generateMockHistoryData(start, end, accounts)
 }
 

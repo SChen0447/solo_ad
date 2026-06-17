@@ -86,10 +86,10 @@ const CalendarGantt: React.FC<Props> = ({
     return { days, startDate: start, endDate: new Date(last) }
   }, [viewMonth])
 
-  const taskMap = useMemo(() => {
+  const taskMap: Map<string, Map<string, Task[]>> = useMemo(() => {
     const map = new Map<string, Map<string, Task[]>>()
     tasks.forEach(t => {
-      if (!map.has(t.accountId)) map.set(t.accountId, new Map())
+      if (!map.has(t.accountId)) map.set(t.accountId, new Map<string, Task[]>())
       const accMap = map.get(t.accountId)!
       if (!accMap.has(t.date)) accMap.set(t.date, [])
       accMap.get(t.date)!.push(t)
@@ -389,7 +389,7 @@ const CalendarGantt: React.FC<Props> = ({
                       </div>
                       {days.map((d, i) => {
                         const dateStr = d.toISOString().split('T')[0]
-                        const dayTasks = accMap.get(dateStr) || []
+                        const dayTasks: Task[] = accMap.get(dateStr) || []
                         const conflict = dayTasks.length > 1
                         return (
                           <div
