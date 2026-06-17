@@ -189,7 +189,7 @@ export class Tower extends Phaser.GameObjects.Container {
     bullet.setStrokeStyle(1, 0xffffff);
     projectile.add(bullet);
 
-    if (this.type === 'magic' && this.glowSprite) {
+    if (this.type === 'magic') {
       const glow = this.scene.add.arc(0, 0, 12, 0, 360, false, 0xa855f7, 0.5);
       projectile.add(glow);
     }
@@ -234,7 +234,7 @@ export class Tower extends Phaser.GameObjects.Container {
       const slowAmount: number = (proj as any).slowAmount;
       const slowDuration: number = (proj as any).slowDuration;
 
-      if (target && !target.isDead) {
+      if (target && !target.isDead && target.active) {
         const distance = Phaser.Math.Distance.Between(
           proj.x, proj.y,
           target.x, target.y
@@ -251,10 +251,12 @@ export class Tower extends Phaser.GameObjects.Container {
           }
           toRemove.push(i);
           proj.destroy();
+          continue;
         }
       } else {
         toRemove.push(i);
         proj.destroy();
+        continue;
       }
 
       if (proj.x < -50 || proj.x > 2000 || proj.y < -50 || proj.y > 1200) {
@@ -315,49 +317,35 @@ export class Tower extends Phaser.GameObjects.Container {
   }
 
   private playUpgradeEffect(): void {
-    const particleCount = 20;
-    const particles: Phaser.GameObjects.Rectangle[] = [];
-
-    for (let i = 0; i < particleCount; i++) {
-      const angle = (i / particleCount) * Math.PI * 2;
-      const speed = 100 + Math.random() * 100;
-      const particle = this.scene.add.rectangle(this.x, this.y, 6, 6, 0xffd700);
-      particle.setStrokeStyle(1, 0xffffff);
-      (particle as any).vx = Math.cos(angle) * speed;
-      (particle as any).vy = Math.sin(angle) * speed;
-      particles.push(particle);
+    if (!this.scene.textures.exists('particle_glow')) {
+      const gfx = this.scene.add.graphics();
+      gfx.fillStyle(0xffd700, 1);
+      gfx.fillCircle(5, 5, 5);
+      gfx.generateTexture('particle_glow', 10, 10);
+      gfx.destroy();
     }
 
-    const startTime = this.scene.time.now;
-    const duration = 300;
+    const particles = this.scene.add.particles(this.x, this.y, 'particle_glow', {
+      lifespan: 300,
+      speed: { min: 80, max: 180 },
+      scale: { start: 1, end: 0 },
+      quantity: 20,
+      tint: [0xffd700, 0xffaa00, 0xffffff],
+      emitting: false
+    });
 
-    const updateParticles = () => {
-      const elapsed = this.scene.time.now - startTime;
-      const progress = Math.min(1, elapsed / duration);
+    particles.setDepth(100);
+    particles.explode(20);
 
-      for (const particle of particles) {
-        const vx = (particle as any).vx;
-        const vy = (particle as any).vy;
-        particle.x += vx * 0.016;
-        particle.y += vy * 0.016;
-        particle.setAlpha(1 - progress);
-        particle.setScale(1 - progress * 0.5);
+    this.scene.time.delayedCall(400, () => {
+      if (particles && particles.active) {
+        particles.destroy();
       }
-
-      if (progress < 1) {
-        requestAnimationFrame(updateParticles);
-      } else {
-        for (const particle of particles) {
-          particle.destroy();
-        }
-      }
-    };
-
-    updateParticles();
+    });
   }
 
   sell(): number {
-    const totalCost = this.config.cost + 
+    const totalCost = this.config.cost +
       (this.level >= 1 ? this.config.levels[0].upgradeCost : 0) +
       (this.level >= 2 ? this.config.levels[1].upgradeCost : 0);
     const refund = Math.floor(totalCost * 0.5);

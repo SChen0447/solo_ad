@@ -46,9 +46,9 @@ export class Enemy extends Phaser.GameObjects.Container {
   public reward: number;
   public isDead: boolean = false;
   public reachedEnd: boolean = false;
+  public pendingDestroy: boolean = false;
 
   private path: Phaser.Curves.Path;
-  private pathIndex: number = 0;
   private pathProgress: number = 0;
   private velocity: Phaser.Math.Vector2;
   private slowEffect: number = 0;
@@ -93,7 +93,7 @@ export class Enemy extends Phaser.GameObjects.Container {
   }
 
   update(time: number, delta: number): void {
-    if (this.isDead || this.reachedEnd) return;
+    if (this.isDead || this.reachedEnd || this.pendingDestroy) return;
 
     if (this.slowTimer > 0) {
       this.slowTimer -= delta;
@@ -122,7 +122,7 @@ export class Enemy extends Phaser.GameObjects.Container {
   }
 
   takeDamage(damage: number): void {
-    if (this.isDead) return;
+    if (this.isDead || this.pendingDestroy) return;
 
     this.health -= damage;
     this.updateHealthBar();
@@ -133,6 +133,8 @@ export class Enemy extends Phaser.GameObjects.Container {
   }
 
   applySlow(slowAmount: number, duration: number): void {
+    if (this.isDead || this.pendingDestroy) return;
+
     if (slowAmount > this.slowEffect) {
       this.slowEffect = slowAmount;
     }
@@ -154,9 +156,12 @@ export class Enemy extends Phaser.GameObjects.Container {
   }
 
   private die(): void {
+    if (this.isDead || this.pendingDestroy) return;
+
     this.isDead = true;
-    this.sprite.setAlpha(0.5);
+    this.pendingDestroy = true;
     this.setActive(false);
+    this.velocity.set(0, 0);
 
     this.scene.tweens.add({
       targets: this,
@@ -165,9 +170,24 @@ export class Enemy extends Phaser.GameObjects.Container {
       duration: 200,
       ease: 'Quad.easeIn',
       onComplete: () => {
-        this.destroy();
+        if (this.scene && this.active) {
+          this.removeFromDisplayList();
+          this.destroy();
+        }
       }
     });
+  }
+
+  forceDestroy(): void {
+    if (!this.pendingDestroy && !this.isDead) {
+      this.isDead = true;
+    }
+    this.pendingDestroy = true;
+    this.setActive(false);
+    if (this.scene) {
+      this.removeFromDisplayList();
+      this.destroy();
+    }
   }
 
   getReward(): number {

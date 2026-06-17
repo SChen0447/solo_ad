@@ -21,16 +21,17 @@ export class BattleScene extends Phaser.Scene {
   private towers: Tower[] = [];
   private enemies: Enemy[] = [];
   private grid: (Tower | null)[][] = [];
+  private occupiedCells: Set<string> = new Set();
 
   private path!: Phaser.Curves.Path;
   private pathCells: Set<string> = new Set();
 
   private selectedTowerType: TowerType | null = null;
   private selectedTower: Tower | null = null;
-  private hoveredCell: { x: number; y: number } | null = null;
 
   private graphics!: Phaser.GameObjects.Graphics;
   private hoverGraphics!: Phaser.GameObjects.Graphics;
+  private pathGraphics!: Phaser.GameObjects.Graphics;
 
   private goldText!: Phaser.GameObjects.Text;
   private livesText!: Phaser.GameObjects.Text;
@@ -40,6 +41,7 @@ export class BattleScene extends Phaser.Scene {
 
   private towerPanel!: Phaser.GameObjects.Container;
   private infoPanel!: Phaser.GameObjects.Container;
+  private topBar!: Phaser.GameObjects.Container;
 
   private audioContext!: AudioContext | null;
 
@@ -48,11 +50,12 @@ export class BattleScene extends Phaser.Scene {
   }
 
   preload(): void {
-    // 使用程序生成的图形，无需预加载资源
+    // 使用程序生成的图形和纹理
   }
 
   create(): void {
     this.initAudio();
+    this.generateTextures();
     this.initGrid();
     this.createPath();
     this.createBackground();
@@ -68,10 +71,23 @@ export class BattleScene extends Phaser.Scene {
     }
   }
 
+  private generateTextures(): void {
+    if (!this.textures.exists('particle_glow')) {
+      const gfx = this.add.graphics();
+      gfx.fillStyle(0xffd700, 1);
+      gfx.fillCircle(5, 5, 5);
+      gfx.generateTexture('particle_glow', 10, 10);
+      gfx.destroy();
+    }
+  }
+
   private playSound(frequency: number, duration: number, type: OscillatorType = 'sine', volume: number = 0.3): void {
     if (!this.audioContext) return;
 
     try {
+      if (this.audioContext.state === 'suspended') {
+        this.audioContext.resume();
+      }
       const oscillator = this.audioContext.createOscillator();
       const gainNode = this.audioContext.createGain();
 
@@ -87,7 +103,7 @@ export class BattleScene extends Phaser.Scene {
       oscillator.start(this.audioContext.currentTime);
       oscillator.stop(this.audioContext.currentTime + duration);
     } catch (e) {
-      // 忽略音频错误
+      // ignore
     }
   }
 
@@ -115,31 +131,28 @@ export class BattleScene extends Phaser.Scene {
         this.grid[y][x] = null;
       }
     }
+    this.occupiedCells = new Set();
   }
 
   private createPath(): void {
     const startX = GRID_OFFSET_X - CELL_SIZE;
     const endX = GRID_OFFSET_X + GRID_SIZE * CELL_SIZE + CELL_SIZE;
 
-    this.path = new Phaser.Curves.Path();
-
     const pathPoints = [
-      { x: startX, y: GRID_OFFSET_Y + CELL_SIZE * 1.5 },
-      { x: GRID_OFFSET_X + CELL_SIZE * 1, y: GRID_OFFSET_Y + CELL_SIZE * 1.5 },
-      { x: GRID_OFFSET_X + CELL_SIZE * 1, y: GRID_OFFSET_Y + CELL_SIZE * 3.5 },
-      { x: GRID_OFFSET_X + CELL_SIZE * 3, y: GRID_OFFSET_Y + CELL_SIZE * 3.5 },
-      { x: GRID_OFFSET_X + CELL_SIZE * 3, y: GRID_OFFSET_Y + CELL_SIZE * 0.5 },
-      { x: GRID_OFFSET_X + CELL_SIZE * 5, y: GRID_OFFSET_Y + CELL_SIZE * 0.5 },
-      { x: GRID_OFFSET_X + CELL_SIZE * 5, y: GRID_OFFSET_Y + CELL_SIZE * 5.5 },
-      { x: GRID_OFFSET_X + CELL_SIZE * 7, y: GRID_OFFSET_Y + CELL_SIZE * 5.5 },
-      { x: GRID_OFFSET_X + CELL_SIZE * 7, y: GRID_OFFSET_Y + CELL_SIZE * 2.5 },
-      { x: endX, y: GRID_OFFSET_Y + CELL_SIZE * 2.5 }
+      new Phaser.Math.Vector2(startX, GRID_OFFSET_Y + CELL_SIZE * 1.5),
+      new Phaser.Math.Vector2(GRID_OFFSET_X + CELL_SIZE * 1, GRID_OFFSET_Y + CELL_SIZE * 1.5),
+      new Phaser.Math.Vector2(GRID_OFFSET_X + CELL_SIZE * 1, GRID_OFFSET_Y + CELL_SIZE * 3.5),
+      new Phaser.Math.Vector2(GRID_OFFSET_X + CELL_SIZE * 3, GRID_OFFSET_Y + CELL_SIZE * 3.5),
+      new Phaser.Math.Vector2(GRID_OFFSET_X + CELL_SIZE * 3, GRID_OFFSET_Y + CELL_SIZE * 0.5),
+      new Phaser.Math.Vector2(GRID_OFFSET_X + CELL_SIZE * 5, GRID_OFFSET_Y + CELL_SIZE * 0.5),
+      new Phaser.Math.Vector2(GRID_OFFSET_X + CELL_SIZE * 5, GRID_OFFSET_Y + CELL_SIZE * 5.5),
+      new Phaser.Math.Vector2(GRID_OFFSET_X + CELL_SIZE * 7, GRID_OFFSET_Y + CELL_SIZE * 5.5),
+      new Phaser.Math.Vector2(GRID_OFFSET_X + CELL_SIZE * 7, GRID_OFFSET_Y + CELL_SIZE * 2.5),
+      new Phaser.Math.Vector2(endX, GRID_OFFSET_Y + CELL_SIZE * 2.5)
     ];
 
-    this.path.moveTo(pathPoints[0].x, pathPoints[0].y);
-    for (let i = 1; i < pathPoints.length; i++) {
-      this.path.lineTo(pathPoints[i].x, pathPoints[i].y);
-    }
+    this.path = new Phaser.Curves.Path(pathPoints[0].x, pathPoints[0].y);
+    this.path.splineTo(pathPoints.slice(1));
 
     for (let y = 0; y < GRID_SIZE; y++) {
       for (let x = 0; x < GRID_SIZE; x++) {
@@ -167,16 +180,16 @@ export class BattleScene extends Phaser.Scene {
 
   private createBackground(): void {
     const bgGraphics = this.add.graphics();
-
-    const gradient = bgGraphics.fillGradientStyle(
-      0x1a1a2e, 0x1a1a2e,
-      0x16213e, 0x16213e,
-      1
-    );
+    bgGraphics.fillGradientStyle(0x1a1a2e, 0x1a1a2e, 0x16213e, 0x16213e, 1);
     bgGraphics.fillRect(0, 0, this.scale.width, this.scale.height);
+    bgGraphics.setDepth(0);
 
     this.graphics = this.add.graphics();
+    this.graphics.setDepth(1);
     this.hoverGraphics = this.add.graphics();
+    this.hoverGraphics.setDepth(5);
+    this.pathGraphics = this.add.graphics();
+    this.pathGraphics.setDepth(1);
 
     this.drawGrid();
     this.drawPath();
@@ -203,11 +216,34 @@ export class BattleScene extends Phaser.Scene {
   }
 
   private drawPath(): void {
-    this.graphics.lineStyle(CELL_SIZE * 0.6, 0x2d3748, 0.8);
-    this.path.draw(this.graphics);
+    this.pathGraphics.lineStyle(CELL_SIZE * 0.6, 0x2d3748, 0.8);
+    this.path.draw(this.pathGraphics);
 
-    this.graphics.lineStyle(4, 0x4a5568, 1);
-    this.path.draw(this.graphics);
+    this.pathGraphics.lineStyle(4, 0x4a5568, 1);
+    this.path.draw(this.pathGraphics);
+
+    const arrowPoints = [
+      { x: GRID_OFFSET_X - CELL_SIZE * 0.8, y: GRID_OFFSET_Y + CELL_SIZE * 1.5 },
+    ];
+    const endPt = this.path.getEndPoint();
+
+    const startGfx = this.add.graphics();
+    startGfx.setDepth(2);
+    startGfx.fillStyle(0x22c55e, 0.8);
+    startGfx.fillTriangle(
+      arrowPoints[0].x - 15, arrowPoints[0].y - 20,
+      arrowPoints[0].x - 15, arrowPoints[0].y + 20,
+      arrowPoints[0].x + 15, arrowPoints[0].y
+    );
+
+    const endGfx = this.add.graphics();
+    endGfx.setDepth(2);
+    endGfx.fillStyle(0xef4444, 0.8);
+    endGfx.fillTriangle(
+      endPt.x + 15, endPt.y - 20,
+      endPt.x + 15, endPt.y + 20,
+      endPt.x - 15, endPt.y
+    );
   }
 
   private createUI(): void {
@@ -218,35 +254,75 @@ export class BattleScene extends Phaser.Scene {
   }
 
   private createTopBar(): void {
+    this.topBar = this.add.container(0, 0);
+    this.topBar.setDepth(50);
+
     const barGraphics = this.add.graphics();
-    barGraphics.fillStyle(0x0f172a, 0.9);
+    barGraphics.fillStyle(0x0f172a, 0.95);
     barGraphics.fillRect(0, 0, this.scale.width, 80);
     barGraphics.lineStyle(2, 0x334155, 1);
     barGraphics.lineBetween(0, 80, this.scale.width, 80);
+    this.topBar.add(barGraphics);
 
-    const textStyle = {
+    const textStyle: Phaser.Types.GameObjects.Text.TextStyle = {
       fontFamily: 'Courier New, monospace',
       fontSize: '28px',
       color: '#ffffff',
       fontStyle: 'bold'
     };
 
-    this.livesText = this.add.text(40, 40, `生命: ${this.lives}`, textStyle);
+    const heartIcon = this.add.text(40, 40, 'HP', {
+      fontFamily: 'Courier New, monospace',
+      fontSize: '20px',
+      color: '#ef4444',
+      fontStyle: 'bold'
+    });
+    heartIcon.setOrigin(0, 0.5);
+    heartIcon.setShadow(2, 2, '#000000', 4);
+    this.topBar.add(heartIcon);
+
+    this.livesText = this.add.text(90, 40, `${this.lives}`, textStyle);
     this.livesText.setOrigin(0, 0.5);
     this.livesText.setShadow(2, 2, '#000000', 4);
+    this.livesText.setColor('#ef4444');
+    this.topBar.add(this.livesText);
 
-    this.goldText = this.add.text(300, 40, `金币: ${this.gold}`, textStyle);
+    const coinIcon = this.add.text(220, 40, 'G', {
+      fontFamily: 'Courier New, monospace',
+      fontSize: '22px',
+      color: '#ffd700',
+      fontStyle: 'bold'
+    });
+    coinIcon.setOrigin(0, 0.5);
+    coinIcon.setShadow(2, 2, '#000000', 4);
+    this.topBar.add(coinIcon);
+
+    this.goldText = this.add.text(260, 40, `${this.gold}`, textStyle);
     this.goldText.setOrigin(0, 0.5);
     this.goldText.setShadow(2, 2, '#000000', 4);
     this.goldText.setColor('#ffd700');
+    this.topBar.add(this.goldText);
 
-    this.waveText = this.add.text(this.scale.width / 2, 40, `波数: ${this.wave}`, textStyle);
-    this.waveText.setOrigin(0.5, 0.5);
+    const waveIcon = this.add.text(this.scale.width / 2 - 60, 40, 'WAVE', {
+      fontFamily: 'Courier New, monospace',
+      fontSize: '18px',
+      color: '#60a5fa',
+      fontStyle: 'bold'
+    });
+    waveIcon.setOrigin(0, 0.5);
+    waveIcon.setShadow(2, 2, '#000000', 4);
+    this.topBar.add(waveIcon);
+
+    this.waveText = this.add.text(this.scale.width / 2 + 20, 40, `${this.wave}`, textStyle);
+    this.waveText.setOrigin(0, 0.5);
     this.waveText.setShadow(2, 2, '#000000', 4);
+    this.waveText.setColor('#60a5fa');
+    this.topBar.add(this.waveText);
   }
 
   private createTowerPanel(): void {
     this.towerPanel = this.add.container(0, this.scale.height - 120);
+    this.towerPanel.setDepth(50);
 
     const panelBg = this.add.graphics();
     panelBg.fillStyle(0x0f172a, 0.95);
@@ -257,63 +333,92 @@ export class BattleScene extends Phaser.Scene {
 
     const towerTypes: TowerType[] = ['arrow', 'cannon', 'magic'];
     const towerNames = ['箭塔', '炮塔', '魔法塔'];
+    const towerDescs = ['快速/中伤', '范围/慢速', '高伤/减速'];
     const towerColors = [0x60a5fa, 0xf97316, 0xa855f7];
 
-    const startX = this.scale.width / 2 - 200;
+    const startX = this.scale.width / 2 - 300;
 
     towerTypes.forEach((type, index) => {
       const config = TOWER_CONFIGS[type];
-      const x = startX + index * 200;
+      const x = startX + index * 220;
 
-      const card = this.add.container(x, 60);
+      const card = this.add.container(x + 110, 60);
 
       const cardBg = this.add.graphics();
       cardBg.fillStyle(0x1e293b, 1);
-      cardBg.fillRoundedRect(-70, -45, 140, 90, 8);
+      cardBg.fillRoundedRect(-90, -48, 180, 96, 8);
       cardBg.lineStyle(3, 0x475569, 1);
-      cardBg.strokeRoundedRect(-70, -45, 140, 90, 8);
+      cardBg.strokeRoundedRect(-90, -48, 180, 96, 8);
       card.add(cardBg);
 
-      const icon = this.add.rectangle(0, -15, 36, 36, towerColors[index]);
+      const icon = this.add.rectangle(-50, -5, 36, 36, towerColors[index]);
       icon.setStrokeStyle(2, 0xffffff);
       card.add(icon);
 
-      const nameText = this.add.text(0, 20, towerNames[index], {
+      if (type === 'arrow') {
+        const arrowIcon = this.add.rectangle(-50, -10, 6, 16, 0xffffff);
+        card.add(arrowIcon);
+      } else if (type === 'cannon') {
+        const cannonIcon = this.add.rectangle(-50, -8, 12, 18, 0x333333);
+        card.add(cannonIcon);
+      } else {
+        const magicIcon = this.add.arc(-50, -5, 10, 0, 360, false, 0xa855f7, 0.6);
+        card.add(magicIcon);
+      }
+
+      const nameText = this.add.text(10, -20, towerNames[index], {
         fontFamily: 'Courier New, monospace',
-        fontSize: '18px',
+        fontSize: '20px',
         color: '#ffffff',
         fontStyle: 'bold'
       });
       nameText.setOrigin(0.5);
       card.add(nameText);
 
-      const costText = this.add.text(0, 40, `${config.cost}金币`, {
+      const descText = this.add.text(10, 5, towerDescs[index], {
         fontFamily: 'Courier New, monospace',
-        fontSize: '14px',
-        color: '#ffd700'
+        fontSize: '13px',
+        color: '#94a3b8'
+      });
+      descText.setOrigin(0.5);
+      card.add(descText);
+
+      const costText = this.add.text(10, 28, `${config.cost}G`, {
+        fontFamily: 'Courier New, monospace',
+        fontSize: '16px',
+        color: '#ffd700',
+        fontStyle: 'bold'
       });
       costText.setOrigin(0.5);
       card.add(costText);
 
-      card.setSize(140, 90);
+      card.setSize(180, 96);
       card.setInteractive({ useHandCursor: true });
 
       card.on('pointerover', () => {
         if (this.selectedTowerType !== type) {
+          cardBg.clear();
+          cardBg.fillStyle(0x1e293b, 1);
+          cardBg.fillRoundedRect(-90, -48, 180, 96, 8);
           cardBg.lineStyle(3, 0x94a3b8, 1);
+          cardBg.strokeRoundedRect(-90, -48, 180, 96, 8);
         }
       });
 
       card.on('pointerout', () => {
         if (this.selectedTowerType !== type) {
+          cardBg.clear();
+          cardBg.fillStyle(0x1e293b, 1);
+          cardBg.fillRoundedRect(-90, -48, 180, 96, 8);
           cardBg.lineStyle(3, 0x475569, 1);
+          cardBg.strokeRoundedRect(-90, -48, 180, 96, 8);
         }
       });
 
       card.on('pointerdown', () => {
         this.tweens.add({
           targets: card,
-          y: 50,
+          y: 48,
           duration: 150,
           ease: 'Quad.easeOut',
           yoyo: true
@@ -332,6 +437,7 @@ export class BattleScene extends Phaser.Scene {
   private createInfoPanel(): void {
     this.infoPanel = this.add.container(this.scale.width - 300, 100);
     this.infoPanel.setVisible(false);
+    this.infoPanel.setDepth(60);
 
     const panelBg = this.add.graphics();
     panelBg.fillStyle(0x0f172a, 0.95);
@@ -420,7 +526,7 @@ export class BattleScene extends Phaser.Scene {
     upgradeBtn.strokeRoundedRect(20, 200, 110, 50, 6);
     this.infoPanel.add(upgradeBtn);
 
-    const upgradeText = this.add.text(75, 225, '升级', {
+    const upgradeText = this.add.text(75, 218, '升级', {
       fontFamily: 'Courier New, monospace',
       fontSize: '16px',
       color: '#ffffff',
@@ -429,7 +535,7 @@ export class BattleScene extends Phaser.Scene {
     upgradeText.setOrigin(0.5);
     this.infoPanel.add(upgradeText);
 
-    const upgradeCost = this.add.text(75, 242, '50金币', {
+    const upgradeCost = this.add.text(75, 238, '50金币', {
       fontFamily: 'Courier New, monospace',
       fontSize: '12px',
       color: '#ffd700'
@@ -453,7 +559,7 @@ export class BattleScene extends Phaser.Scene {
     sellBtn.strokeRoundedRect(150, 200, 110, 50, 6);
     this.infoPanel.add(sellBtn);
 
-    const sellText = this.add.text(205, 225, '出售', {
+    const sellText = this.add.text(205, 218, '出售', {
       fontFamily: 'Courier New, monospace',
       fontSize: '16px',
       color: '#ffffff',
@@ -462,7 +568,7 @@ export class BattleScene extends Phaser.Scene {
     sellText.setOrigin(0.5);
     this.infoPanel.add(sellText);
 
-    const sellValue = this.add.text(205, 242, '+0金币', {
+    const sellValue = this.add.text(205, 238, '+0金币', {
       fontFamily: 'Courier New, monospace',
       fontSize: '12px',
       color: '#22c55e'
@@ -477,10 +583,11 @@ export class BattleScene extends Phaser.Scene {
     sellBtnArea.on('pointerdown', () => this.sellSelectedTower());
     this.infoPanel.add(sellBtnArea);
 
-    const closeBtn = this.add.text(260, 10, '✕', {
+    const closeBtn = this.add.text(260, 10, 'X', {
       fontFamily: 'Courier New, monospace',
-      fontSize: '20px',
-      color: '#94a3b8'
+      fontSize: '22px',
+      color: '#94a3b8',
+      fontStyle: 'bold'
     });
     closeBtn.setOrigin(1, 0);
     closeBtn.setInteractive({ useHandCursor: true });
@@ -492,25 +599,32 @@ export class BattleScene extends Phaser.Scene {
     const btnX = this.scale.width / 2;
     const btnY = this.scale.height - 200;
 
+    const btnContainer = this.add.container(btnX, btnY);
+    btnContainer.setDepth(50);
+
     const btnGraphics = this.add.graphics();
     btnGraphics.fillStyle(0x3b82f6, 1);
-    btnGraphics.fillRoundedRect(btnX - 100, btnY - 30, 200, 60, 10);
+    btnGraphics.fillRoundedRect(-100, -28, 200, 56, 10);
     btnGraphics.lineStyle(3, 0x2563eb, 1);
-    btnGraphics.strokeRoundedRect(btnX - 100, btnY - 30, 200, 60, 10);
+    btnGraphics.strokeRoundedRect(-100, -28, 200, 56, 10);
+    btnContainer.add(btnGraphics);
 
-    this.startWaveText = this.add.text(btnX, btnY, '开始下一波', {
+    this.startWaveText = this.add.text(0, 0, '开始下一波', {
       fontFamily: 'Courier New, monospace',
       fontSize: '24px',
       color: '#ffffff',
       fontStyle: 'bold'
     });
     this.startWaveText.setOrigin(0.5);
+    btnContainer.add(this.startWaveText);
 
-    const btnArea = this.add.zone(btnX - 100, btnY - 30, 200, 60);
+    const btnArea = this.add.zone(-100, -28, 200, 56);
     btnArea.setOrigin(0);
     btnArea.setInteractive({ useHandCursor: true });
     btnArea.on('pointerdown', () => this.startWave());
+    btnContainer.add(btnArea);
 
+    (this.startWaveText as any).btnContainer = btnContainer;
     (this.startWaveText as any).btnGraphics = btnGraphics;
     (this.startWaveText as any).btnArea = btnArea;
   }
@@ -544,6 +658,7 @@ export class BattleScene extends Phaser.Scene {
 
   private canPlaceTower(gridX: number, gridY: number): boolean {
     if (this.pathCells.has(`${gridX},${gridY}`)) return false;
+    if (this.occupiedCells.has(`${gridX},${gridY}`)) return false;
     if (this.grid[gridY][gridX] !== null) return false;
     return true;
   }
@@ -553,15 +668,12 @@ export class BattleScene extends Phaser.Scene {
 
     this.hoverGraphics.clear();
 
-    if (!gridPos) {
-      this.hoveredCell = null;
-      return;
-    }
-
-    this.hoveredCell = gridPos;
+    if (!gridPos) return;
 
     const worldPos = this.getWorldPosition(gridPos.x, gridPos.y);
     const canPlace = this.canPlaceTower(gridPos.x, gridPos.y);
+    const isOccupied = this.occupiedCells.has(`${gridPos.x},${gridPos.y}`);
+    const isPath = this.pathCells.has(`${gridPos.x},${gridPos.y}`);
 
     if (this.selectedTowerType !== null) {
       if (canPlace) {
@@ -577,14 +689,32 @@ export class BattleScene extends Phaser.Scene {
         this.hoverGraphics.lineStyle(2, 0x00ff88, 0.5);
         this.hoverGraphics.strokeCircle(worldPos.x, worldPos.y, config.levels[0].range);
       } else {
-        this.hoverGraphics.fillStyle(0xff0000, 0.3);
+        this.hoverGraphics.fillStyle(isOccupied ? 0xff0000 : 0xff4444, 0.3);
         this.hoverGraphics.fillRect(
           GRID_OFFSET_X + gridPos.x * CELL_SIZE,
           GRID_OFFSET_Y + gridPos.y * CELL_SIZE,
           CELL_SIZE,
           CELL_SIZE
         );
+
+        if (isOccupied) {
+          this.hoverGraphics.lineStyle(2, 0xff0000, 0.6);
+          this.hoverGraphics.strokeRect(
+            GRID_OFFSET_X + gridPos.x * CELL_SIZE + 2,
+            GRID_OFFSET_Y + gridPos.y * CELL_SIZE + 2,
+            CELL_SIZE - 4,
+            CELL_SIZE - 4
+          );
+        }
       }
+    } else if (isOccupied) {
+      this.hoverGraphics.fillStyle(0xffffff, 0.1);
+      this.hoverGraphics.fillRect(
+        GRID_OFFSET_X + gridPos.x * CELL_SIZE,
+        GRID_OFFSET_Y + gridPos.y * CELL_SIZE,
+        CELL_SIZE,
+        CELL_SIZE
+      );
     }
   }
 
@@ -604,6 +734,21 @@ export class BattleScene extends Phaser.Scene {
       this.selectTower(existingTower);
     } else if (this.selectedTowerType !== null && this.canPlaceTower(gridPos.x, gridPos.y)) {
       this.placeTower(gridPos.x, gridPos.y, this.selectedTowerType);
+    } else if (this.selectedTowerType !== null && !this.canPlaceTower(gridPos.x, gridPos.y)) {
+      const isOccupied = this.occupiedCells.has(`${gridPos.x},${gridPos.y}`);
+      if (isOccupied) {
+        this.showFloatingText(
+          GRID_OFFSET_X + gridPos.x * CELL_SIZE + CELL_SIZE / 2,
+          GRID_OFFSET_Y + gridPos.y * CELL_SIZE + CELL_SIZE / 2,
+          '已占用', 0xff0000
+        );
+      } else {
+        this.showFloatingText(
+          GRID_OFFSET_X + gridPos.x * CELL_SIZE + CELL_SIZE / 2,
+          GRID_OFFSET_Y + gridPos.y * CELL_SIZE + CELL_SIZE / 2,
+          '不可放置', 0xff4444
+        );
+      }
     } else {
       this.deselectTower();
     }
@@ -627,10 +772,16 @@ export class BattleScene extends Phaser.Scene {
       const bg = (card as any).bg;
       const type = (card as any).type;
 
+      bg.clear();
+      bg.fillStyle(0x1e293b, 1);
+      bg.fillRoundedRect(-90, -48, 180, 96, 8);
+
       if (type === this.selectedTowerType) {
         bg.lineStyle(3, 0xffd700, 1);
+        bg.strokeRoundedRect(-90, -48, 180, 96, 8);
       } else {
         bg.lineStyle(3, 0x475569, 1);
+        bg.strokeRoundedRect(-90, -48, 180, 96, 8);
       }
     });
   }
@@ -639,15 +790,21 @@ export class BattleScene extends Phaser.Scene {
     const config = TOWER_CONFIGS[type];
 
     if (this.gold < config.cost) {
-      this.showFloatingText(this.goldText.x, this.goldText.y, '金币不足!', 0xff0000);
+      this.showFloatingText(this.goldText.x + 50, this.goldText.y, '金币不足!', 0xff0000);
+      return;
+    }
+
+    if (!this.canPlaceTower(gridX, gridY)) {
       return;
     }
 
     const worldPos = this.getWorldPosition(gridX, gridY);
     const tower = new Tower(this, worldPos.x, worldPos.y - 100, type, gridX, gridY);
+    tower.setDepth(10);
 
     this.towers.push(tower);
     this.grid[gridY][gridX] = tower;
+    this.occupiedCells.add(`${gridX},${gridY}`);
 
     this.tweens.add({
       targets: tower,
@@ -707,21 +864,31 @@ export class BattleScene extends Phaser.Scene {
     levelText.setText(`${tower.getLevel() + 1}`);
     damageText.setText(`${Math.floor(tower.getDamage())}`);
     rangeText.setText(`${Math.floor(tower.getRange())}`);
-    fireRateText.setText(`${(1 / tower.getFireRate()).toFixed(1)}/秒`);
+    fireRateText.setText(`${(1 / tower.getFireRate()).toFixed(1)}/s`);
 
     if (tower.canUpgrade()) {
       const upgradeCost = tower.getUpgradeCost();
-      upgradeCostText.setText(`${upgradeCost}金币`);
+      upgradeCostText.setText(`${upgradeCost}G`);
       upgradeBtnArea.setInteractive();
+
+      upgradeBtn.clear();
       upgradeBtn.fillStyle(this.gold >= upgradeCost ? 0x22c55e : 0x6b7280, 1);
+      upgradeBtn.fillRoundedRect(20, 200, 110, 50, 6);
+      upgradeBtn.lineStyle(2, this.gold >= upgradeCost ? 0x16a34a : 0x4b5563, 1);
+      upgradeBtn.strokeRoundedRect(20, 200, 110, 50, 6);
     } else {
-      upgradeCostText.setText('已满级');
+      upgradeCostText.setText('MAX');
       upgradeBtnArea.disableInteractive();
+
+      upgradeBtn.clear();
       upgradeBtn.fillStyle(0x6b7280, 1);
+      upgradeBtn.fillRoundedRect(20, 200, 110, 50, 6);
+      upgradeBtn.lineStyle(2, 0x4b5563, 1);
+      upgradeBtn.strokeRoundedRect(20, 200, 110, 50, 6);
     }
 
     const sellValue = this.calculateSellValue(tower);
-    sellValueText.setText(`+${sellValue}金币`);
+    sellValueText.setText(`+${sellValue}G`);
   }
 
   private calculateSellValue(tower: Tower): number {
@@ -741,7 +908,7 @@ export class BattleScene extends Phaser.Scene {
     const upgradeCost = this.selectedTower.getUpgradeCost();
 
     if (this.gold < upgradeCost) {
-      this.showFloatingText(this.goldText.x, this.goldText.y, '金币不足!', 0xff0000);
+      this.showFloatingText(this.goldText.x + 50, this.goldText.y, '金币不足!', 0xff0000);
       return;
     }
 
@@ -765,18 +932,19 @@ export class BattleScene extends Phaser.Scene {
 
     this.showFloatingText(towerPos.x, towerPos.y - 30, `+${refund}`, 0xffd700);
 
-    const startPos = new Phaser.Math.Vector2(towerPos.x, towerPos.y - 30);
-    const endPos = new Phaser.Math.Vector2(this.goldText.x + 50, this.goldText.y);
-
-    const coinIcon = this.add.text(towerPos.x, towerPos.y - 30, '💰', {
-      fontSize: '24px'
+    const coinIcon = this.add.text(towerPos.x, towerPos.y - 30, '+G', {
+      fontFamily: 'Courier New, monospace',
+      fontSize: '20px',
+      color: '#ffd700',
+      fontStyle: 'bold'
     });
     coinIcon.setOrigin(0.5);
+    coinIcon.setDepth(55);
 
     this.tweens.add({
       targets: coinIcon,
-      x: endPos.x,
-      y: endPos.y,
+      x: this.goldText.x + 50,
+      y: this.goldText.y,
       duration: 500,
       ease: 'Quad.easeIn',
       onComplete: () => {
@@ -785,6 +953,7 @@ export class BattleScene extends Phaser.Scene {
     });
 
     this.grid[tower.gridY][tower.gridX] = null;
+    this.occupiedCells.delete(`${tower.gridX},${tower.gridY}`);
     const index = this.towers.indexOf(tower);
     if (index > -1) {
       this.towers.splice(index, 1);
@@ -805,6 +974,7 @@ export class BattleScene extends Phaser.Scene {
     });
     floatingText.setOrigin(0.5);
     floatingText.setShadow(1, 1, '#000000', 2);
+    floatingText.setDepth(55);
 
     this.tweens.add({
       targets: floatingText,
@@ -819,7 +989,7 @@ export class BattleScene extends Phaser.Scene {
   }
 
   private updateGoldText(): void {
-    this.goldText.setText(`金币: ${this.gold}`);
+    this.goldText.setText(`${this.gold}`);
 
     if (this.selectedTower) {
       this.updateInfoPanel();
@@ -827,11 +997,11 @@ export class BattleScene extends Phaser.Scene {
   }
 
   private updateLivesText(): void {
-    this.livesText.setText(`生命: ${this.lives}`);
+    this.livesText.setText(`${this.lives}`);
   }
 
   private updateWaveText(): void {
-    this.waveText.setText(`波数: ${this.wave}`);
+    this.waveText.setText(`${this.wave}`);
   }
 
   private startWave(): void {
@@ -846,16 +1016,20 @@ export class BattleScene extends Phaser.Scene {
 
     const btnGraphics = (this.startWaveText as any).btnGraphics;
     const btnArea = (this.startWaveText as any).btnArea;
+
+    btnGraphics.clear();
     btnGraphics.fillStyle(0x6b7280, 1);
+    btnGraphics.fillRoundedRect(-100, -28, 200, 56, 10);
+    btnGraphics.lineStyle(3, 0x4b5563, 1);
+    btnGraphics.strokeRoundedRect(-100, -28, 200, 56, 10);
     btnArea.disableInteractive();
-    this.startWaveText.setText(`第 ${this.wave} 波进行中...`);
+    this.startWaveText.setText(`第 ${this.wave} 波`);
 
     this.spawnWave(enemyCount);
   }
 
   private spawnWave(enemyCount: number): void {
     const isBossWave = this.wave % 20 === 0;
-    let spawnDelay = 0;
 
     if (isBossWave) {
       this.time.delayedCall(500, () => {
@@ -863,7 +1037,7 @@ export class BattleScene extends Phaser.Scene {
       });
 
       for (let i = 0; i < enemyCount - 1; i++) {
-        spawnDelay = 1000 + i * 800;
+        const spawnDelay = 1000 + i * 800;
         this.time.delayedCall(spawnDelay, () => {
           if (!this.gameOver) {
             this.spawnEnemy('normal');
@@ -872,7 +1046,7 @@ export class BattleScene extends Phaser.Scene {
       }
     } else {
       for (let i = 0; i < enemyCount; i++) {
-        spawnDelay = i * 800;
+        const spawnDelay = i * 800;
         this.time.delayedCall(spawnDelay, () => {
           if (!this.gameOver) {
             const rand = Math.random();
@@ -889,12 +1063,15 @@ export class BattleScene extends Phaser.Scene {
 
     const startPoint = this.path.getStartPoint();
     const enemy = new Enemy(this, startPoint.x, startPoint.y, type, this.path);
+    enemy.setDepth(8);
     this.enemies.push(enemy);
   }
 
   private onEnemyReachedEnd(enemy: Enemy): void {
     this.lives--;
     this.updateLivesText();
+
+    this.showFloatingText(enemy.x, enemy.y - 20, '-1 HP', 0xef4444);
 
     if (this.lives <= 0) {
       this.endGame(false);
@@ -919,6 +1096,7 @@ export class BattleScene extends Phaser.Scene {
     const overlay = this.add.graphics();
     overlay.fillStyle(0x000000, 0.7);
     overlay.fillRect(0, 0, this.scale.width, this.scale.height);
+    overlay.setDepth(100);
 
     this.gameOverText = this.add.text(centerX, centerY - 50, victory ? '胜利!' : '游戏结束', {
       fontFamily: 'Courier New, monospace',
@@ -928,6 +1106,7 @@ export class BattleScene extends Phaser.Scene {
     });
     this.gameOverText.setOrigin(0.5);
     this.gameOverText.setShadow(4, 4, '#000000', 8);
+    this.gameOverText.setDepth(101);
 
     const scoreText = this.add.text(centerX, centerY + 30, `坚持了 ${this.wave} 波`, {
       fontFamily: 'Courier New, monospace',
@@ -936,6 +1115,7 @@ export class BattleScene extends Phaser.Scene {
     });
     scoreText.setOrigin(0.5);
     scoreText.setShadow(2, 2, '#000000', 4);
+    scoreText.setDepth(101);
 
     const restartText = this.add.text(centerX, centerY + 100, '点击重新开始', {
       fontFamily: 'Courier New, monospace',
@@ -944,6 +1124,7 @@ export class BattleScene extends Phaser.Scene {
     });
     restartText.setOrigin(0.5);
     restartText.setInteractive({ useHandCursor: true });
+    restartText.setDepth(101);
     restartText.on('pointerdown', () => {
       this.scene.restart();
     });
@@ -954,22 +1135,31 @@ export class BattleScene extends Phaser.Scene {
 
     for (let i = this.enemies.length - 1; i >= 0; i--) {
       const enemy = this.enemies[i];
+
+      if (enemy.isDead || enemy.pendingDestroy) {
+        if (!enemy.pendingDestroy) {
+          this.onEnemyKilled(enemy);
+        }
+        enemy.forceDestroy();
+        this.enemies.splice(i, 1);
+        this.enemiesRemaining--;
+        continue;
+      }
+
       enemy.update(time, delta);
 
       if (enemy.reachedEnd) {
         this.onEnemyReachedEnd(enemy);
-        enemy.destroy();
-        this.enemies.splice(i, 1);
-        this.enemiesRemaining--;
-      } else if (enemy.isDead && !enemy.active) {
-        this.onEnemyKilled(enemy);
+        enemy.forceDestroy();
         this.enemies.splice(i, 1);
         this.enemiesRemaining--;
       }
     }
 
+    const aliveEnemies = this.enemies.filter(e => !e.isDead && !e.reachedEnd && !e.pendingDestroy);
+
     for (const tower of this.towers) {
-      tower.update(time, delta, this.enemies);
+      tower.update(time, delta, aliveEnemies);
     }
 
     if (this.isWaveActive && this.enemiesRemaining <= 0 && this.enemies.length === 0) {
@@ -977,7 +1167,12 @@ export class BattleScene extends Phaser.Scene {
 
       const btnGraphics = (this.startWaveText as any).btnGraphics;
       const btnArea = (this.startWaveText as any).btnArea;
+
+      btnGraphics.clear();
       btnGraphics.fillStyle(0x3b82f6, 1);
+      btnGraphics.fillRoundedRect(-100, -28, 200, 56, 10);
+      btnGraphics.lineStyle(3, 0x2563eb, 1);
+      btnGraphics.strokeRoundedRect(-100, -28, 200, 56, 10);
       btnArea.setInteractive();
       this.startWaveText.setText('开始下一波');
     }
