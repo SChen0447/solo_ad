@@ -8,7 +8,7 @@
 
 body {
   background-color: #FFF8E7;
-  font-family: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Microsoft YaHei', sans-serif;
+  font-family: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Microsoft YaHei', 'PingFang SC', sans-serif;
   color: #2D3436;
   min-height: 100vh;
   transition: background-color 0.8s ease-in-out;
@@ -20,6 +20,7 @@ body {
 
 ::-webkit-scrollbar {
   width: 6px;
+  height: 6px;
 }
 
 ::-webkit-scrollbar-track {
@@ -31,36 +32,46 @@ body {
   border-radius: 3px;
 }
 
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(0,0,0,0.25);
+}
+
 @keyframes bounce-ball {
   0%, 100% { transform: translateY(0); }
   50% { transform: translateY(-20px); }
 }
 
 @keyframes pulse-gold {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(255, 215, 0, 0); }
-  50% { box-shadow: 0 0 20px 8px rgba(255, 215, 0, 0.6); }
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(255, 215, 0, 0);
+    opacity: 0;
+  }
+  50% {
+    box-shadow: 0 0 24px 10px rgba(255, 215, 0, 0.75);
+    opacity: 1;
+  }
 }
 
-@keyframes slide-in-bottom {
+@keyframes slide-in-left {
   from {
-    transform: translateY(20px);
+    transform: translateX(-16px);
     opacity: 0;
   }
   to {
-    transform: translateY(0);
+    transform: translateX(0);
     opacity: 1;
   }
 }
 
 @keyframes pop-scale {
   0% { transform: scale(1); }
-  50% { transform: scale(1.3); }
+  50% { transform: scale(1.35); }
   100% { transform: scale(1); }
 }
 
 @keyframes shimmer-gold {
   0% { background-color: inherit; }
-  50% { background-color: #FFD700; }
+  50% { background-color: rgba(255, 215, 0, 0.3); }
   100% { background-color: inherit; }
 }
 
@@ -76,9 +87,9 @@ body {
 }
 
 @keyframes countdown-pulse {
-  0% { transform: scale(1); }
-  50% { transform: scale(1.05); }
-  100% { transform: scale(1); }
+  0% { transform: translate(-50%, -50%) scale(1); }
+  50% { transform: translate(-50%, -50%) scale(1.12); }
+  100% { transform: translate(-50%, -50%) scale(1); }
 }
 
 @keyframes float-up {
@@ -92,17 +103,86 @@ body {
   }
 }
 
+@keyframes glow-pulse {
+  0%, 100% {
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.25),
+      0 4px 12px rgba(0, 0, 0, 0.08);
+  }
+  50% {
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.4),
+      0 4px 20px rgba(78, 205, 196, 0.12);
+  }
+}
+
+@keyframes score-number-pop {
+  0% {
+    transform: scale(1);
+    color: #4ECDC4;
+  }
+  50% {
+    transform: scale(1.5);
+    color: #FFD700;
+  }
+  100% {
+    transform: scale(1);
+    color: #4ECDC4;
+  }
+}
+
+@keyframes avatar-bounce {
+  0% { transform: scale(1) translateY(0); }
+  25% { transform: scale(1.3) translateY(-6px); }
+  50% { transform: scale(1.2) translateY(-4px); }
+  75% { transform: scale(1.1) translateY(-2px); }
+  100% { transform: scale(1) translateY(0); }
+}
+
+@keyframes correct-highlight {
+  0% { background-color: rgba(78, 205, 196, 0.12); }
+  50% { background-color: rgba(78, 205, 196, 0.3); }
+  100% { background-color: rgba(78, 205, 196, 0.12); }
+}
+
+@keyframes wrong-highlight {
+  0% { background-color: rgba(255, 107, 107, 0.1); }
+  50% { background-color: rgba(255, 107, 107, 0.25); }
+  100% { background-color: rgba(255, 107, 107, 0.1); }
+}
+
 .score-pop {
-  animation: pop-scale 0.3s ease-out, shimmer-gold 0.3s ease-out;
+  animation: pop-scale 0.3s ease-out;
+}
+
+.score-gold-glow {
+  animation: pulse-gold 0.3s ease-out;
+}
+
+.avatar-pop {
+  animation: avatar-bounce 0.3s ease-out;
 }
 
 .log-slide-in {
-  animation: slide-in-bottom 0.4s ease-out;
+  animation: slide-in-left 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+}
+
+.log-correct {
+  animation: correct-highlight 0.6s ease-in-out;
+}
+
+.log-wrong {
+  animation: wrong-highlight 0.6s ease-in-out;
 }
 
 .fade-in-up {
-  animation: fade-in-up 0.5s ease-out;
+  animation: fade-in-up 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+  opacity: 0;
 }
+
+.bounce-ball-1 { animation: bounce-ball 0.8s ease-in-out infinite; }
+.bounce-ball-2 { animation: bounce-ball 0.8s ease-in-out 0.15s infinite; }
+.bounce-ball-3 { animation: bounce-ball 0.8s ease-in-out 0.3s infinite; }
 
 .btn-hover {
   transition: transform 0.2s ease, box-shadow 0.2s ease;
@@ -111,12 +191,12 @@ body {
 
 .btn-hover:hover {
   transform: translateY(-3px);
-  box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+  box-shadow: 0 10px 24px rgba(0,0,0,0.12);
 }
 
 .btn-hover:active {
   transform: translateY(-1px);
-  box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+  box-shadow: 0 4px 14px rgba(0,0,0,0.08);
 }
 
 .glass-panel {
@@ -127,18 +207,24 @@ body {
 }
 
 .score-panel-bg {
-  background: rgba(0, 0, 0, 0.05);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
+  background: rgba(0, 0, 0, 0.08);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.35),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.02),
+    -4px 0 20px rgba(0, 0, 0, 0.04);
+  animation: glow-pulse 3s ease-in-out infinite;
 }
 
 .card {
   background: white;
   border-radius: 12px;
-  box-shadow: 0 4px 15px rgba(0,0,0,0.06);
+  box-shadow: 0 6px 20px rgba(0,0,0,0.06);
   border: 1px solid rgba(0,0,0,0.04);
+  transition: box-shadow 0.3s ease;
 }
 
-.bounce-ball-1 { animation: bounce-ball 0.8s ease-in-out infinite; }
-.bounce-ball-2 { animation: bounce-ball 0.8s ease-in-out 0.15s infinite; }
-.bounce-ball-3 { animation: bounce-ball 0.8s ease-in-out 0.3s infinite; }
+.card:hover {
+  box-shadow: 0 10px 30px rgba(0,0,0,0.08);
+}

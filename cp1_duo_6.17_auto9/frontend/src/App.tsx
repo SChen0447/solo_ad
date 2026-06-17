@@ -358,25 +358,56 @@ export default function App() {
           {state.roundLogs.length === 0 && (
             <div style={{ color: '#aaa', fontSize: 12, fontStyle: 'italic' }}>游戏还没有进行任何回合...</div>
           )}
-          {state.roundLogs.map((log, i) => (
-            <div key={i} className="log-slide-in" style={{
-              padding: '6px 12px',
-              marginBottom: 4,
-              borderRadius: 8,
-              background: 'rgba(255,255,255,0.7)',
-              fontSize: 13,
-              color: '#555',
-              animationDelay: `${i * 0.05}s`,
-            }}>
+          {state.roundLogs.map((log, i) => {
+            const hasCorrect = log.correctGuessers.length > 0;
+            const staggerOffset = (i % 3) * 4;
+            return (
+            <div
+              key={i}
+              className={`log-slide-in ${hasCorrect ? 'log-correct' : 'log-wrong'}`}
+              style={{
+                padding: '8px 14px',
+                marginBottom: 5,
+                borderRadius: 10,
+                background: hasCorrect
+                  ? 'linear-gradient(90deg, rgba(78,205,196,0.16) 0%, rgba(78,205,196,0.06) 100%)'
+                  : 'linear-gradient(90deg, rgba(255,107,107,0.13) 0%, rgba(255,107,107,0.04) 100%)',
+                fontSize: 13,
+                color: '#555',
+                opacity: 0,
+                animationDelay: `${i * 0.08}s`,
+                borderLeft: `4px solid ${hasCorrect ? '#4ECDC4' : '#FF6B6B'}`,
+                transform: `translateX(-${staggerOffset}px)`,
+                boxShadow: hasCorrect
+                  ? '0 2px 8px rgba(78,205,196,0.12)'
+                  : '0 2px 8px rgba(255,107,107,0.1)',
+              }}
+            >
               <span style={{ fontWeight: 600, color: '#2D3436' }}>第{log.round}轮</span>
               {' · '}
               <span>{log.describerNickname}出题</span>
               {' · '}
               <span style={{ color: '#4ECDC4', fontWeight: 600 }}>{log.keyword}</span>
               {' · '}
-              <span>{log.correctGuessers.length > 0 ? `${log.correctGuessers.join('、')} ${log.correctGuessers.length}人猜对` : '无人猜对'}</span>
+              <span>
+                {log.correctGuessers.length > 0
+                  ? <>
+                      <span style={{ color: '#4ECDC4', fontWeight: 600 }}>✓</span>
+                      {' '}
+                      {log.correctGuessers.join('、')}
+                      {' '}
+                      {log.correctGuessers.length}人猜对
+                    </>
+                  : <>
+                      <span style={{ color: '#FF6B6B', fontWeight: 600 }}>✗</span>
+                      {' '}
+                      无人猜对
+                    </>
+                }
+              </span>
             </div>
-          ))}
+          );
+          })}
           <div ref={logEndRef} />
         </div>
       </div>
