@@ -73,6 +73,7 @@ export class Tower {
   getX(): number { return this.x; }
   getY(): number { return this.y; }
   getAnimationScale(): number { return this.animationScale; }
+  getTarget(): Enemy | null { return this.target; }
 
   canUpgrade(): boolean {
     return this.level < MAX_TOWER_LEVEL;

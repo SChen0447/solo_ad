@@ -610,8 +610,28 @@ class Game {
     }
 
     this.drawProjectiles();
+    this.drawTargetLines();
     this.drawBuildPreview();
     this.drawTowerActionButtons();
+  }
+
+  private drawTargetLines(): void {
+    for (const tower of this.towers) {
+      const target = tower.getTarget();
+      if (!target || !target.isAlive()) continue;
+
+      const cfg = tower.getConfig();
+      this.ctx.save();
+      this.ctx.strokeStyle = cfg.color + 'aa';
+      this.ctx.lineWidth = 1.5;
+      this.ctx.setLineDash([4, 4]);
+      this.ctx.beginPath();
+      this.ctx.moveTo(tower.getX(), tower.getY());
+      this.ctx.lineTo(target.getX(), target.getY());
+      this.ctx.stroke();
+      this.ctx.setLineDash([]);
+      this.ctx.restore();
+    }
   }
 
   private gameLoop = (currentTime: number): void => {
