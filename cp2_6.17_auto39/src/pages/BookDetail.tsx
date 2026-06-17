@@ -24,6 +24,8 @@ const BookDetail: React.FC = () => {
   const [noteContent, setNoteContent] = useState('');
   const [editorMode, setEditorMode] = useState<'edit' | 'preview'>('edit');
   const [editingNote, setEditingNote] = useState<Note | null>(null);
+  const [isComposing, setIsComposing] = useState(false);
+  const [displayWordCount, setDisplayWordCount] = useState(0);
 
   const [sentimentFilter, setSentimentFilter] = useState<SentimentFilter>('all');
 
@@ -165,6 +167,7 @@ const BookDetail: React.FC = () => {
         }
       }
       setNoteContent('');
+      setDisplayWordCount(0);
       setEditingNote(null);
       setEditorMode('edit');
     } catch (error) {
@@ -175,6 +178,7 @@ const BookDetail: React.FC = () => {
   const handleEditNote = (note: Note) => {
     setEditingNote(note);
     setNoteContent(note.content);
+    setDisplayWordCount(note.content.length);
     setEditorMode('edit');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -196,6 +200,7 @@ const BookDetail: React.FC = () => {
   const handleCancelEdit = () => {
     setEditingNote(null);
     setNoteContent('');
+    setDisplayWordCount(0);
     setEditorMode('edit');
   };
 
@@ -234,7 +239,7 @@ const BookDetail: React.FC = () => {
   const filterButtons: { key: SentimentFilter; label: string; count: number; color: string }[] = [
     { key: 'all', label: '全部', count: notes.length, color: '#64ffda' },
     { key: 'positive', label: '正面', count: sentimentCounts.positive, color: '#4caf50' },
-    { key: 'neutral', label: '中性', count: sentimentCounts.neutral, color: '#9e9e9e' },
+    { key: 'neutral', label: '中性', count: sentimentCounts.neutral, color: '#808080' },
     { key: 'negative', label: '负面', count: sentimentCounts.negative, color: '#f44336' }
   ];
 
@@ -313,7 +318,19 @@ const BookDetail: React.FC = () => {
                 className="editor-textarea"
                 placeholder="在这里写下您的读书笔记，支持Markdown格式..."
                 value={noteContent}
-                onChange={(e) => setNoteContent(e.target.value)}
+                onChange={(e) => {
+                  setNoteContent(e.target.value);
+                  if (!isComposing) {
+                    setDisplayWordCount(e.target.value.length);
+                  }
+                }}
+                onCompositionStart={() => setIsComposing(true)}
+                onCompositionUpdate={() => setIsComposing(true)}
+                onCompositionEnd={(e) => {
+                  setIsComposing(false);
+                  setNoteContent(e.currentTarget.value);
+                  setDisplayWordCount(e.currentTarget.value.length);
+                }}
               />
               <div
                 style={{
@@ -325,7 +342,7 @@ const BookDetail: React.FC = () => {
                   pointerEvents: 'none'
                 }}
               >
-                {noteContent.length} 字
+                {displayWordCount} 字
               </div>
             </div>
           ) : (

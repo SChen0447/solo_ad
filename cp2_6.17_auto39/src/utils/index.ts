@@ -1,6 +1,12 @@
 import { marked } from 'marked';
 import { Sentiment } from '../types';
 
+// 否定词列表 - 用于检测关键词前是否有否定修饰
+// 匹配逻辑：检测关键词前是否有否定词（允许中间有1个字符的间隔）
+const negationWords = ['不', '没', '无', '非', '否', '别', 'not', 'no', 'never', 'none'];
+
+// 正面情感关键词 - 表达积极、赞赏、喜爱等正面情感
+// 匹配注意：如关键词前出现否定词（如"不感动"），则不计入正面得分
 const positiveKeywords = [
   '喜欢', '爱', '棒', '好', '精彩', '出色', '优秀', '完美', '感动', '温暖',
   '开心', '快乐', '幸福', '满足', '享受', '推荐', '值得', '经典', '深刻',
@@ -13,6 +19,8 @@ const positiveKeywords = [
   'touching', 'moving', 'heartwarming', 'insightful'
 ];
 
+// 中性情感关键词 - 表达客观描述、记录、引用等中性行为
+// 匹配注意：中性词不受否定词影响，直接计入中性得分
 const neutralKeywords = [
   '记录', '概述', '引用', '摘录', '摘抄', '摘要', '总结', '归纳', '整理',
   '笔记', '标注', '标记', '划线', '内容', '描述', '说明', '介绍', '提到',
@@ -21,6 +29,8 @@ const neutralKeywords = [
   'note', 'summary', 'quote', 'reference', 'record', 'chapter', 'section'
 ];
 
+// 负面情感关键词 - 表达消极、不满、批评等负面情感
+// 匹配注意：如关键词前出现否定词（如"不糟糕"），则不计入负面得分
 const negativeKeywords = [
   '讨厌', '恨', '差', '坏', '糟糕', '失望', '难过', '悲伤', '痛苦', '愤怒',
   '无聊', '浪费', '后悔', '不值', '差劲', '烂', '垃圾', '可怕', '绝望',
@@ -33,35 +43,53 @@ const negativeKeywords = [
   'disappointed', 'confused', 'messy', 'weak', 'poor'
 ];
 
+// 检测关键词前是否有否定词
+const hasNegationBefore = (content: string, matchIndex: number): boolean => {
+  const checkStart = Math.max(0, matchIndex - 3);
+  const beforeText = content.substring(checkStart, matchIndex);
+  
+  for (const negation of negationWords) {
+    if (beforeText.includes(negation)) {
+      return true;
+    }
+  }
+  return false;
+};
+
+// 计算关键词匹配次数（排除否定词前置的情况）
+const countKeywordMatches = (
+  content: string,
+  keywords: string[],
+  checkNegation: boolean = true
+): number => {
+  let count = 0;
+  
+  keywords.forEach(keyword => {
+    const regex = new RegExp(keyword, 'gi');
+    let match;
+    
+    while ((match = regex.exec(content)) !== null) {
+      if (checkNegation && hasNegationBefore(content, match.index)) {
+        continue;
+      }
+      count++;
+    }
+  });
+  
+  return count;
+};
+
 export const analyzeSentiment = (content: string): Sentiment => {
   const lowerContent = content.toLowerCase();
-  let positiveScore = 0;
-  let negativeScore = 0;
-  let neutralScore = 0;
-
-  positiveKeywords.forEach(keyword => {
-    const regex = new RegExp(keyword, 'gi');
-    const matches = lowerContent.match(regex);
-    if (matches) {
-      positiveScore += matches.length;
-    }
-  });
-
-  negativeKeywords.forEach(keyword => {
-    const regex = new RegExp(keyword, 'gi');
-    const matches = lowerContent.match(regex);
-    if (matches) {
-      negativeScore += matches.length;
-    }
-  });
-
-  neutralKeywords.forEach(keyword => {
-    const regex = new RegExp(keyword, 'gi');
-    const matches = lowerContent.match(regex);
-    if (matches) {
-      neutralScore += matches.length;
-    }
-  });
+  
+  // 正面情感得分：检测正面关键词，排除否定词前置的情况（如"不感动"）
+  const positiveScore = countKeywordMatches(lowerContent, positiveKeywords, true);
+  
+  // 负面情感得分：检测负面关键词，排除否定词前置的情况（如"不糟糕"）
+  const negativeScore = countKeywordMatches(lowerContent, negativeKeywords, true);
+  
+  // 中性情感得分：检测中性关键词，不考虑否定词
+  const neutralScore = countKeywordMatches(lowerContent, neutralKeywords, false);
 
   const maxScore = Math.max(positiveScore, negativeScore, neutralScore);
   if (maxScore === 0) {
