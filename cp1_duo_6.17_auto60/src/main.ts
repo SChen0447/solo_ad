@@ -1,6 +1,6 @@
 import { SceneModule } from './scene/SceneModule';
 import { TransformControlsModule } from './controls/TransformControlsModule';
-import { useTransformStore } from './store/useTransformStore';
+import { transformStore } from './store/useTransformStore';
 
 function init(): void {
   const container = document.getElementById('canvas-container');
@@ -9,7 +9,7 @@ function init(): void {
     return;
   }
 
-  useTransformStore.getState();
+  transformStore.getState();
 
   const sceneModule = new SceneModule(container);
   const controlsModule = new TransformControlsModule(sceneModule);

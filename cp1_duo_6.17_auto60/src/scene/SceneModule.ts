@@ -1,10 +1,18 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { ModelPreset, TransformParams, computeCombinedMatrix } from '../types';
-import { useTransformStore } from '../store/useTransformStore';
+import { transformStore } from '../store/useTransformStore';
 
 const LERP_DURATION = 300;
 const MODEL_TRANSITION_DURATION = 1000;
+
+function easeOutCubic(t: number): number {
+  return 1 - Math.pow(1 - t, 3);
+}
+
+function easeInOutCubic(t: number): number {
+  return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+}
 
 type InterpolationState = {
   startParams: TransformParams;
@@ -42,7 +50,6 @@ export class SceneModule {
     this.modelTransition = { phase: 'idle', startTime: 0, fromModel: null, toModel: null };
 
     this.scene = new THREE.Scene();
-    this.scene.background = new THREE.Color(0x0a0a2e);
 
     const w = container.clientWidth;
     const h = container.clientHeight;
@@ -50,10 +57,10 @@ export class SceneModule {
     this.camera.position.set(5, 4, 7);
     this.camera.lookAt(0, 0, 0);
 
-    this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+    this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     this.renderer.setSize(w, h);
-    this.renderer.setClearColor(0x0a0a2e);
+    this.renderer.setClearColor(0x000000, 0);
     container.appendChild(this.renderer.domElement);
 
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
@@ -84,7 +91,7 @@ export class SceneModule {
     this.scene.add(this.wireframeGroup);
 
     this.loadModel(ModelPreset.Cube);
-    this.applyTransformImmediate(useTransformStore.getState().params);
+    this.applyTransformImmediate(transformStore.getState().params);
 
     window.addEventListener('resize', this.onResize);
 
@@ -251,6 +258,17 @@ export class SceneModule {
   switchModel(model: ModelPreset): void {
     if (model === this.currentModel && this.modelTransition.phase === 'idle') return;
     const now = performance.now();
+    if (this.modelTransition.phase === 'fadeOut' || this.modelTransition.phase === 'fadeIn') {
+      if (this.modelTransition.toModel) {
+        this.loadModel(this.modelTransition.toModel);
+        this.currentModel = this.modelTransition.toModel;
+        const storeParams = transformStore.getState().params;
+        this.applyTransformImmediate(storeParams);
+      }
+      this.modelGroup.scale.setScalar(1);
+      this.wireframeGroup.scale.setScalar(1);
+      this.setModelOpacity(1);
+    }
     this.modelTransition = {
       phase: 'fadeOut',
       startTime: now,
@@ -289,26 +307,28 @@ export class SceneModule {
 
     if (this.interp.active) {
       const elapsed = now - this.interp.startTime;
-      const t = Math.min(elapsed / LERP_DURATION, 1);
+      const rawT = Math.min(elapsed / LERP_DURATION, 1);
+      const t = easeOutCubic(rawT);
       const currentParams = this.lerpParams(this.interp.startParams, this.interp.targetParams, t);
       this.applyMatrixFromParams(currentParams);
-      if (t >= 1) {
+      if (rawT >= 1) {
         this.interp.active = false;
       }
     }
 
     if (this.modelTransition.phase === 'fadeOut') {
       const elapsed = now - this.modelTransition.startTime;
-      const t = Math.min(elapsed / MODEL_TRANSITION_DURATION, 1);
+      const rawT = Math.min(elapsed / MODEL_TRANSITION_DURATION, 1);
+      const t = easeInOutCubic(rawT);
       const s = 1 - t;
       this.modelGroup.scale.setScalar(Math.max(s, 0.001));
       this.wireframeGroup.scale.setScalar(Math.max(s, 0.001));
       this.setModelOpacity(1 - t);
-      if (t >= 1) {
+      if (rawT >= 1) {
         if (this.modelTransition.toModel) {
           this.loadModel(this.modelTransition.toModel);
           this.currentModel = this.modelTransition.toModel;
-          const storeParams = useTransformStore.getState().params;
+          const storeParams = transformStore.getState().params;
           this.applyTransformImmediate(storeParams);
         }
         this.modelTransition.phase = 'fadeIn';
@@ -318,11 +338,12 @@ export class SceneModule {
 
     if (this.modelTransition.phase === 'fadeIn') {
       const elapsed = now - this.modelTransition.startTime;
-      const t = Math.min(elapsed / MODEL_TRANSITION_DURATION, 1);
-      this.modelGroup.scale.setScalar(t);
-      this.wireframeGroup.scale.setScalar(t);
+      const rawT = Math.min(elapsed / MODEL_TRANSITION_DURATION, 1);
+      const t = easeOutCubic(rawT);
+      this.modelGroup.scale.setScalar(Math.max(t, 0.001));
+      this.wireframeGroup.scale.setScalar(Math.max(t, 0.001));
       this.setModelOpacity(t);
-      if (t >= 1) {
+      if (rawT >= 1) {
         this.modelGroup.scale.setScalar(1);
         this.wireframeGroup.scale.setScalar(1);
         this.modelTransition.phase = 'idle';

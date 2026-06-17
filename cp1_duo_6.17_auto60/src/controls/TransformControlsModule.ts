@@ -1,4 +1,4 @@
-import { useTransformStore } from '../store/useTransformStore';
+import { transformStore } from '../store/useTransformStore';
 import { TransformParams, ModelPreset, PARAM_CONFIG } from '../types';
 import { SceneModule } from '../scene/SceneModule';
 
@@ -55,10 +55,15 @@ export class TransformControlsModule {
     }
   }
 
+  private clampParam(key: ParamKey, value: number): number {
+    const config = PARAM_CONFIG[key];
+    return Math.max(config.min, Math.min(config.max, value));
+  }
+
   private onParamChange(key: ParamKey, value: number): void {
-    const store = useTransformStore.getState();
-    store.setParams({ [key]: value });
-    this.sceneModule.applyTransform(useTransformStore.getState().params);
+    const clamped = this.clampParam(key, value);
+    transformStore.getState().setParams({ [key]: clamped });
+    this.sceneModule.applyTransform(transformStore.getState().params);
   }
 
   private initModelButtons(): void {
@@ -71,7 +76,7 @@ export class TransformControlsModule {
         buttons.forEach((b) => b.classList.remove('active'));
         btn.classList.add('active');
 
-        useTransformStore.getState().setActiveModel(model);
+        transformStore.getState().setActiveModel(model);
         this.sceneModule.switchModel(model);
       });
     });
@@ -83,7 +88,7 @@ export class TransformControlsModule {
     if (!toggle || !display) return;
 
     toggle.addEventListener('change', () => {
-      useTransformStore.getState().toggleMatrix();
+      transformStore.getState().toggleMatrix();
       if (toggle.checked) {
         display.classList.add('visible');
       } else {
@@ -113,7 +118,7 @@ export class TransformControlsModule {
       this.prevMatrix.push(prevRow);
     }
 
-    this.updateMatrixDisplay(useTransformStore.getState().combinedMatrix);
+    this.updateMatrixDisplay(transformStore.getState().combinedMatrix);
   }
 
   private initDrawerToggle(): void {
@@ -127,7 +132,7 @@ export class TransformControlsModule {
   }
 
   private subscribeToStore(): void {
-    useTransformStore.subscribe((state) => {
+    transformStore.subscribe((state) => {
       this.updateMatrixDisplay(state.combinedMatrix);
     });
   }
@@ -160,7 +165,7 @@ export class TransformControlsModule {
   }
 
   syncFromStore(): void {
-    const { params } = useTransformStore.getState();
+    const { params } = transformStore.getState();
     const keys: ParamKey[] = ['translateX', 'rotateY', 'scale', 'shearX'];
 
     for (const key of keys) {
@@ -171,3 +176,4 @@ export class TransformControlsModule {
     }
   }
 }
+
