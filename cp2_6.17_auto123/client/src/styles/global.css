@@ -657,12 +657,14 @@ a {
 }
 
 .folder-header {
-  margin-bottom: 24px;
+  margin-bottom: 16px;
 }
 
 .folder-header h1 {
   font-size: 24px;
+  font-weight: 700;
   margin-bottom: 4px;
+  color: var(--text-primary);
 }
 
 .folder-header p {
@@ -689,6 +691,8 @@ a {
   top: 50%;
   transform: translateY(-50%);
   color: var(--text-secondary);
+  font-size: 14px;
+  z-index: 1;
 }
 
 .search-box input {
@@ -716,6 +720,13 @@ a {
   display: flex;
   flex-direction: column;
   background: var(--white);
+  box-shadow: var(--shadow-md);
+  transition: all 0.3s ease;
+}
+
+.card-item:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
 }
 
 .card-info {
@@ -795,20 +806,26 @@ a {
 .card-actions {
   display: flex;
   border-top: 1px solid var(--gray-200);
+  padding: 8px 12px;
+  gap: 8px;
 }
 
 .card-btn {
-  flex: 1;
-  padding: 12px 8px;
+  padding: 10px 12px;
   font-size: 13px;
   color: var(--text-secondary);
   background: transparent;
   border: none;
+  border-radius: 8px;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 4px;
+  gap: 6px;
   transition: all 0.2s ease;
+}
+
+.card-btn:first-child {
+  margin-right: auto;
 }
 
 .card-btn:hover {
@@ -818,10 +835,6 @@ a {
 
 .card-btn.delete:hover {
   color: #ef4444;
-}
-
-.card-btn:first-child {
-  border-right: 1px solid var(--gray-200);
 }
 
 .empty-state {
