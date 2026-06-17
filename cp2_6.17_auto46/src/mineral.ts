@@ -44,7 +44,12 @@ const MINERAL_CONFIG: Record<MineralType, { score: number; r: number; g: number;
   gold: { score: 25, r: 255, g: 204, b: 0, glowColor: 'rgba(255,204,0,0.3)' },
 };
 
-export function createMineral(canvasW: number, canvasH: number, existingMinerals: Mineral[]): Mineral {
+export function createMineral(
+  canvasW: number,
+  canvasH: number,
+  existingMinerals: Mineral[],
+  avoidPoints: Array<{ x: number; y: number; minDist: number }> = []
+): Mineral {
   const typeRoll = Math.random();
   const type: MineralType = typeRoll < 0.45 ? 'red' : typeRoll < 0.78 ? 'blue' : 'gold';
   const cfg = MINERAL_CONFIG[type];
@@ -56,11 +61,23 @@ export function createMineral(canvasW: number, canvasH: number, existingMinerals
     x = 40 + Math.random() * (canvasW - 80);
     y = 40 + Math.random() * (canvasH - 80);
     attempts++;
-  } while (attempts < 20 && existingMinerals.some(m => {
-    const ddx = m.x - x;
-    const ddy = m.y - y;
-    return Math.sqrt(ddx * ddx + ddy * ddy) < 50;
-  }));
+
+    const tooCloseToMineral = existingMinerals.some(m => {
+      const ddx = m.x - x;
+      const ddy = m.y - y;
+      return Math.sqrt(ddx * ddx + ddy * ddy) < 50;
+    });
+    if (tooCloseToMineral) continue;
+
+    const tooCloseToAvoid = avoidPoints.some(pt => {
+      const ddx = pt.x - x;
+      const ddy = pt.y - y;
+      return Math.sqrt(ddx * ddx + ddy * ddy) < pt.minDist;
+    });
+    if (tooCloseToAvoid) continue;
+
+    break;
+  } while (attempts < 50);
 
   return {
     x,
@@ -75,10 +92,15 @@ export function createMineral(canvasW: number, canvasH: number, existingMinerals
   };
 }
 
-export function generateMinerals(count: number, canvasW: number, canvasH: number): Mineral[] {
+export function generateMinerals(
+  count: number,
+  canvasW: number,
+  canvasH: number,
+  avoidPoints: Array<{ x: number; y: number; minDist: number }> = []
+): Mineral[] {
   const minerals: Mineral[] = [];
   for (let i = 0; i < count; i++) {
-    minerals.push(createMineral(canvasW, canvasH, minerals));
+    minerals.push(createMineral(canvasW, canvasH, minerals, avoidPoints));
   }
   return minerals;
 }

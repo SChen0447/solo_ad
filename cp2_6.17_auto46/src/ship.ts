@@ -22,6 +22,7 @@ export interface LaserState {
   ringRadius: number;
   ringAlpha: number;
   width: number;
+  hitChecked: boolean;
 }
 
 export interface ShipState {
@@ -35,6 +36,7 @@ export interface ShipState {
   laserLevel: number;
   particles: Particle[];
   laser: LaserState;
+  laserCooldown: number;
   mouseX: number;
   mouseY: number;
   mouseDown: boolean;
@@ -62,7 +64,9 @@ export function createShip(canvasW: number, canvasH: number): ShipState {
       ringRadius: 0,
       ringAlpha: 0,
       width: 4,
+      hitChecked: false,
     },
+    laserCooldown: 0,
     mouseX: canvasW / 2,
     mouseY: canvasH / 2,
     mouseDown: false,
@@ -94,20 +98,21 @@ export function updateShip(ship: ShipState, dt: number, keys: Set<string>, canva
   ship.angle = Math.atan2(ship.mouseY - ship.y, ship.mouseX - ship.x);
 
   if (dx !== 0 || dy !== 0) {
-    for (let i = 0; i < 2; i++) {
-      const backAngle = ship.angle + Math.PI + (Math.random() - 0.5) * 0.8;
-      const spd = 1.5 + Math.random() * 2;
+    for (let i = 0; i < 8; i++) {
+      const backAngle = ship.angle + Math.PI + (Math.random() - 0.5) * 1.0;
+      const spd = 1.5 + Math.random() * 2.5;
+      const lifeRatio = Math.random() * 0.3 + 0.7;
       ship.particles.push({
-        x: ship.x - Math.cos(ship.angle) * 18,
-        y: ship.y - Math.sin(ship.angle) * 18,
+        x: ship.x - Math.cos(ship.angle) * (16 + Math.random() * 4),
+        y: ship.y - Math.sin(ship.angle) * (16 + Math.random() * 4),
         vx: Math.cos(backAngle) * spd,
         vy: Math.sin(backAngle) * spd,
-        life: 0.6,
-        maxLife: 0.6,
+        life: 0.6 * lifeRatio,
+        maxLife: 0.6 * lifeRatio,
         r: 255,
-        g: Math.floor(120 + Math.random() * 80),
-        b: 0,
-        size: 2 + Math.random() * 2,
+        g: Math.floor(100 + Math.random() * 100),
+        b: Math.floor(Math.random() * 40),
+        size: 2 + Math.random() * 3,
       });
     }
   }
@@ -125,8 +130,8 @@ export function updateShip(ship: ShipState, dt: number, keys: Set<string>, canva
   if (ship.laser.active) {
     ship.laser.timer -= dt;
     if (ship.laser.timer <= 0) {
-      ship.laser.ringRadius += dt * 120;
-      ship.laser.ringAlpha -= dt * 3;
+      ship.laser.ringRadius += dt * 160;
+      ship.laser.ringAlpha -= dt * 2.5;
       if (ship.laser.ringAlpha <= 0) {
         ship.laser.active = false;
         ship.laser.ringAlpha = 0;
@@ -134,8 +139,13 @@ export function updateShip(ship: ShipState, dt: number, keys: Set<string>, canva
     }
   }
 
-  if (ship.mouseDown && !ship.laser.active) {
+  if (ship.laserCooldown > 0) {
+    ship.laserCooldown -= dt;
+  }
+
+  if (ship.mouseDown && ship.laserCooldown <= 0) {
     fireLaser(ship);
+    ship.laserCooldown = 0.18;
   }
 }
 
@@ -145,13 +155,14 @@ export function fireLaser(ship: ShipState): void {
     active: true,
     x: ship.x + Math.cos(ship.angle) * 20,
     y: ship.y + Math.sin(ship.angle) * 20,
-    targetX: ship.x + Math.cos(ship.angle) * 500,
-    targetY: ship.y + Math.sin(ship.angle) * 500,
+    targetX: ship.x + Math.cos(ship.angle) * 800,
+    targetY: ship.y + Math.sin(ship.angle) * 800,
     timer: 0.15,
     duration: 0.15,
     ringRadius: 20 * (1 + (ship.laserLevel - 1) * 0.15),
     ringAlpha: 0.8,
     width: laserWidth,
+    hitChecked: false,
   };
 }
 
@@ -239,9 +250,15 @@ export function drawShip(ctx: CanvasRenderingContext2D, ship: ShipState): void {
 
 export function getLaserHitPoint(ship: ShipState): { x: number; y: number; radius: number } | null {
   if (!ship.laser.active) return null;
-  return {
-    x: ship.laser.targetX,
-    y: ship.laser.targetY,
-    radius: 20 * (1 + (ship.laserLevel - 1) * 0.15),
-  };
+  if (ship.laser.hitChecked) return null;
+  if (ship.laser.timer <= 0) return null;
+  if (ship.laser.timer > ship.laser.duration - 0.01) {
+    ship.laser.hitChecked = true;
+    return {
+      x: ship.laser.targetX,
+      y: ship.laser.targetY,
+      radius: 20 * (1 + (ship.laserLevel - 1) * 0.15),
+    };
+  }
+  return null;
 }
