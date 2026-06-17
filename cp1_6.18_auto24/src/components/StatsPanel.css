@@ -1,0 +1,198 @@
+.stats-panel {
+  position: fixed;
+  bottom: 0;
+  left: 60px;
+  right: 0;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(10px);
+  border-top: 1px solid #e8e5e0;
+  box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.08);
+  transform: translateY(calc(100% - 48px));
+  transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  z-index: 90;
+}
+
+.stats-panel.open {
+  transform: translateY(0);
+}
+
+.stats-toggle {
+  width: 100%;
+  height: 48px;
+  border: none;
+  background: #faf8f5;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 14px;
+  color: #666;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', sans-serif;
+  transition: all 0.2s ease;
+}
+
+.stats-toggle:hover {
+  background: #f0ede8;
+  color: #333;
+}
+
+.toggle-icon {
+  font-size: 12px;
+  transition: transform 0.3s ease;
+}
+
+.stats-panel.open .toggle-icon {
+  transform: rotate(180deg);
+}
+
+.stats-content {
+  padding: 0 32px 24px;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.stats-grid {
+  display: flex;
+  gap: 40px;
+  margin-bottom: 24px;
+  padding-top: 20px;
+}
+
+.stat-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.stat-value {
+  font-family: 'Georgia', 'Noto Serif SC', serif;
+  font-size: 28px;
+  font-weight: 700;
+  color: #1a3a2f;
+}
+
+.stat-label {
+  font-size: 13px;
+  color: #888;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', sans-serif;
+}
+
+.stats-charts {
+  display: grid;
+  grid-template-columns: 1fr 2fr;
+  gap: 40px;
+}
+
+.chart-section h4 {
+  font-family: 'Georgia', 'Noto Serif SC', serif;
+  font-size: 14px;
+  color: #555;
+  margin: 0 0 16px 0;
+  font-weight: 500;
+}
+
+.pie-chart-container {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.pie-legend {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: #666;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', sans-serif;
+}
+
+.legend-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+.bar-chart-container {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-around;
+  height: 100px;
+  gap: 8px;
+}
+
+.bar-item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.bar-wrapper {
+  width: 100%;
+  height: 80px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+.bar {
+  width: 70%;
+  max-width: 32px;
+  background: linear-gradient(180deg, #4caf50, #2e7d32);
+  border-radius: 4px 4px 0 0;
+  position: relative;
+  min-height: 4px;
+  animation: barGrow 0.6s ease-out forwards;
+  transform-origin: bottom;
+  transform: scaleY(0);
+}
+
+@keyframes barGrow {
+  from {
+    transform: scaleY(0);
+  }
+  to {
+    transform: scaleY(1);
+  }
+}
+
+.bar-value {
+  position: absolute;
+  top: -18px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 11px;
+  color: #666;
+  font-weight: 500;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+.bar-label {
+  font-size: 11px;
+  color: #999;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+@media (max-width: 768px) {
+  .stats-panel {
+    left: 50px;
+  }
+  
+  .stats-grid {
+    gap: 24px;
+    flex-wrap: wrap;
+  }
+  
+  .stats-charts {
+    grid-template-columns: 1fr;
+    gap: 24px;
+  }
+}
