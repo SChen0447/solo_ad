@@ -27,7 +27,7 @@ class CommandPanel {
   private onPathCalculated: ((path: number[]) => void) | null = null;
   private draggedShipId: string | null = null;
   private searchKeyword = '';
-  private starFilter = 0;
+  private starFilter = 3;
 
   constructor() {
     this.fleetListEl = document.getElementById('fleet-list')!;
@@ -37,9 +37,11 @@ class CommandPanel {
     this.setupFilterBar();
     this.setupMobileToggles();
     this.renderCommandPanel();
+    this.renderFleetList();
     this.startPolling();
     this.startLogPolling();
     fleetManager.onLogsChange(() => this.renderTaskLogs());
+    fleetManager.queryTaskLogs();
   }
 
   setOnShipSelect(cb: (id: string | null) => void): void {
@@ -65,7 +67,7 @@ class CommandPanel {
           <option value="0">全部星级</option>
           <option value="1">1★ 及以上</option>
           <option value="2">2★ 及以上</option>
-          <option value="3">3★ 及以上</option>
+          <option value="3" selected>3★ 及以上</option>
           <option value="4">4★ 及以上</option>
           <option value="5">5★ 仅</option>
         </select>
@@ -214,8 +216,8 @@ class CommandPanel {
 
     const stars = '★'.repeat(ship.stars) + '☆'.repeat(5 - ship.stars);
     const hpPct = ship.max_hp > 0 ? (ship.hp / ship.max_hp * 100) : 0;
-    const fpPct = ((ship.firepower - 50) / 100 * 100);
-    const spPct = ((ship.speed - 100) / 200 * 100);
+    const fpPct = ((ship.firepower - 50) / 100) * 100;
+    const spPct = ((ship.speed - 100) / 200) * 100;
 
     let statusClass = 'status-idle';
     if (ship.status === 'moving') statusClass = 'status-moving';
@@ -315,6 +317,9 @@ class CommandPanel {
   private renderShipDetail(ship: Ship): string {
     const systems = fleetManager.getStarSystems();
     const currentSys = systems.find(s => s.id === ship.system_id);
+    const hpPct = ship.max_hp > 0 ? (ship.hp / ship.max_hp * 100) : 0;
+    const fpPct = ((ship.firepower - 50) / 100) * 100;
+    const spPct = ((ship.speed - 100) / 200 * 100);
     return `
       <div class="ship-detail">
         <div class="detail-row">
@@ -325,17 +330,26 @@ class CommandPanel {
           <span class="detail-label">星级</span>
           <span class="detail-value star-gold">${'★'.repeat(ship.stars)}${'☆'.repeat(5 - ship.stars)}</span>
         </div>
-        <div class="detail-row">
+        <div class="detail-row detail-bar-row">
           <span class="detail-label">耐久</span>
-          <span class="detail-value">${ship.hp} / ${ship.max_hp}</span>
+          <div class="detail-bar">
+            <div class="stat-bar-fill bar-hp" style="width:${hpPct}%"></div>
+          </div>
+          <span class="detail-bar-val">${ship.hp}/${ship.max_hp}</span>
         </div>
-        <div class="detail-row">
+        <div class="detail-row detail-bar-row">
           <span class="detail-label">火力</span>
-          <span class="detail-value">${ship.firepower}</span>
+          <div class="detail-bar">
+            <div class="stat-bar-fill bar-fire" style="width:${fpPct}%"></div>
+          </div>
+          <span class="detail-bar-val">${ship.firepower}</span>
         </div>
-        <div class="detail-row">
+        <div class="detail-row detail-bar-row">
           <span class="detail-label">速度</span>
-          <span class="detail-value">${ship.speed}</span>
+          <div class="detail-bar">
+            <div class="stat-bar-fill bar-speed" style="width:${spPct}%"></div>
+          </div>
+          <span class="detail-bar-val">${ship.speed}</span>
         </div>
         <div class="detail-row">
           <span class="detail-label">当前坐标</span>
