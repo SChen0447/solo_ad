@@ -33,6 +33,8 @@ class StarSandbox {
 
   private lastMouseX: number = 0;
   private lastMouseY: number = 0;
+  private lastClientX: number = 0;
+  private lastClientY: number = 0;
 
   private stars!: THREE.Points;
 
@@ -61,7 +63,7 @@ class StarSandbox {
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     this.container.appendChild(this.renderer.domElement);
 
-    this.physicsEngine = new PhysicsEngine(this.scene, 0.5);
+    this.physicsEngine = new PhysicsEngine(this.scene, { gravityConstant: 0.5 });
     this.toolbar = new Toolbar();
     this.infoPanel = new InfoPanel();
 
@@ -152,7 +154,7 @@ class StarSandbox {
     canvas.addEventListener('contextmenu', (e) => e.preventDefault());
 
     this.toolbar.on('gravity:change', (value: number) => {
-      this.physicsEngine.gravityConstant = value;
+      this.physicsEngine.setGravityConstant(value);
     });
 
     this.toolbar.on('simulation:pause', (paused: boolean) => {
@@ -259,9 +261,14 @@ class StarSandbox {
 
     this.lastMouseX = e.clientX;
     this.lastMouseY = e.clientY;
+    this.lastClientX = e.clientX;
+    this.lastClientY = e.clientY;
   }
 
   private onMouseMove(e: MouseEvent): void {
+    this.lastClientX = e.clientX;
+    this.lastClientY = e.clientY;
+
     if (this.isCreating) {
       this.createCurrentPos = this.getWorldPosition(e.clientX, e.clientY);
       this.updatePreviewLine();
@@ -433,6 +440,14 @@ class StarSandbox {
 
     if (!this.isPaused) {
       this.physicsEngine.update(deltaTime);
+    }
+
+    if (this.isCreating && this.createStartPos) {
+      const worldPos = this.getWorldPosition(this.lastClientX, this.lastClientY);
+      if (worldPos) {
+        this.createCurrentPos = worldPos;
+        this.updatePreviewLine();
+      }
     }
 
     this.stars.rotation.y += deltaTime * 0.005;

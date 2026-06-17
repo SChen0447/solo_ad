@@ -12,6 +12,22 @@ export interface BodyConfig {
   velocity: { x: number; y: number; z: number };
 }
 
+interface HaloParticleData {
+  baseRadius: number;
+  theta: number;
+  phi: number;
+  rotationSpeed: number;
+  orbitalSpeed: number;
+  pulseAmplitude: number;
+  pulseSpeed: number;
+  pulsePhase: number;
+  color: THREE.Color;
+  baseOpacity: number;
+  size: number;
+  bornTime: number;
+  lifetime: number;
+}
+
 export class AstroBody {
   public id: string;
   public type: BodyType;
@@ -28,10 +44,12 @@ export class AstroBody {
 
   private static bodyCount = 0;
 
-  private haloBasePositions?: Float32Array;
-  private haloSizes?: Float32Array;
+  private haloParticleData: HaloParticleData[] = [];
+  private haloBasePositions: Float32Array | null = null;
+  private haloColors: Float32Array | null = null;
   private haloPulsePhase: number = 0;
   private glowPulsePhase: number = 0;
+  private elapsedTime: number = 0;
 
   constructor(config: BodyConfig, scene: THREE.Scene) {
     this.id = config.id || `body_${Date.now()}_${AstroBody.bodyCount++}`;
@@ -78,8 +96,8 @@ export class AstroBody {
         color: colorObj,
         emissive: colorObj,
         emissiveIntensity: 1.5,
-        roughness: 0.2,
-        metalness: 0.1,
+        roughness: 0.15,
+        metalness: 0.05,
       });
     } else {
       material = new THREE.MeshStandardMaterial({
@@ -95,33 +113,65 @@ export class AstroBody {
     return mesh;
   }
 
+  private createHaloParticleData(): HaloParticleData {
+    const baseColors = [
+      new THREE.Color('#FFF4B8'),
+      new THREE.Color('#FFE066'),
+      new THREE.Color('#FFD93D'),
+      new THREE.Color('#FFC857'),
+      new THREE.Color('#FFFFFF'),
+      new THREE.Color('#FFEAA7'),
+    ];
+
+    const theta = Math.random() * Math.PI * 2;
+    const phi = Math.acos(2 * Math.random() - 1);
+    const baseRadius = this.radius * (1.6 + Math.random() * 1.2);
+
+    return {
+      baseRadius,
+      theta,
+      phi,
+      rotationSpeed: (Math.random() - 0.5) * 0.5,
+      orbitalSpeed: 0.3 + Math.random() * 0.8,
+      pulseAmplitude: 0.1 + Math.random() * 0.3,
+      pulseSpeed: 1.0 + Math.random() * 2.5,
+      pulsePhase: Math.random() * Math.PI * 2,
+      color: baseColors[Math.floor(Math.random() * baseColors.length)].clone(),
+      baseOpacity: 0.4 + Math.random() * 0.5,
+      size: 0.05 + Math.random() * 0.15,
+      bornTime: this.elapsedTime + Math.random() * 2,
+      lifetime: 3 + Math.random() * 5,
+    };
+  }
+
   private createStarEffects(): void {
-    const glowGeometry = new THREE.SphereGeometry(this.radius * 1.6, 32, 32);
+    const glowGeometry = new THREE.SphereGeometry(this.radius * 1.7, 32, 32);
     const glowMaterial = new THREE.MeshBasicMaterial({
       color: new THREE.Color(this.color),
       transparent: true,
       opacity: 0.35,
       side: THREE.BackSide,
       blending: THREE.AdditiveBlending,
+      depthWrite: false,
     });
     this.glowMesh = new THREE.Mesh(glowGeometry, glowMaterial);
     this.glowMesh.position.copy(this.position);
 
     const particleCount = 100;
     const positions = new Float32Array(particleCount * 3);
-    this.haloBasePositions = new Float32Array(particleCount * 3);
-    this.haloSizes = new Float32Array(particleCount);
+    const colors = new Float32Array(particleCount * 3);
 
-    const haloColor = new THREE.Color('#FFF4B8');
+    this.haloBasePositions = new Float32Array(particleCount * 3);
+    this.haloColors = new Float32Array(particleCount * 3);
+    this.haloParticleData = [];
 
     for (let i = 0; i < particleCount; i++) {
-      const theta = Math.random() * Math.PI * 2;
-      const phi = Math.acos(2 * Math.random() - 1);
-      const r = this.radius * (1.7 + Math.random() * 1.0);
+      const data = this.createHaloParticleData();
+      this.haloParticleData.push(data);
 
-      const x = r * Math.sin(phi) * Math.cos(theta);
-      const y = r * Math.sin(phi) * Math.sin(theta);
-      const z = r * Math.cos(phi);
+      const x = data.baseRadius * Math.sin(data.phi) * Math.cos(data.theta);
+      const y = data.baseRadius * Math.sin(data.phi) * Math.sin(data.theta);
+      const z = data.baseRadius * Math.cos(data.phi);
 
       positions[i * 3] = x;
       positions[i * 3 + 1] = y;
@@ -131,22 +181,52 @@ export class AstroBody {
       this.haloBasePositions[i * 3 + 1] = y;
       this.haloBasePositions[i * 3 + 2] = z;
 
-      this.haloSizes[i] = 0.05 + Math.random() * 0.15;
+      colors[i * 3] = data.color.r;
+      colors[i * 3 + 1] = data.color.g;
+      colors[i * 3 + 2] = data.color.b;
+
+      this.haloColors[i * 3] = data.color.r;
+      this.haloColors[i * 3 + 1] = data.color.g;
+      this.haloColors[i * 3 + 2] = data.color.b;
     }
 
     const particleGeometry = new THREE.BufferGeometry();
     particleGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    particleGeometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+
     const particleMaterial = new THREE.PointsMaterial({
-      color: haloColor,
-      size: 0.15,
+      size: 0.18,
       transparent: true,
-      opacity: 0.75,
+      opacity: 0.85,
       blending: THREE.AdditiveBlending,
       sizeAttenuation: true,
+      vertexColors: true,
+      depthWrite: false,
     });
 
     this.haloParticles = new THREE.Points(particleGeometry, particleMaterial);
     this.haloParticles.position.copy(this.position);
+  }
+
+  private respawnHaloParticle(index: number): void {
+    const data = this.createHaloParticleData();
+    this.haloParticleData[index] = data;
+
+    const x = data.baseRadius * Math.sin(data.phi) * Math.cos(data.theta);
+    const y = data.baseRadius * Math.sin(data.phi) * Math.sin(data.theta);
+    const z = data.baseRadius * Math.cos(data.phi);
+
+    if (this.haloBasePositions) {
+      this.haloBasePositions[index * 3] = x;
+      this.haloBasePositions[index * 3 + 1] = y;
+      this.haloBasePositions[index * 3 + 2] = z;
+    }
+
+    if (this.haloColors) {
+      this.haloColors[index * 3] = data.color.r;
+      this.haloColors[index * 3 + 1] = data.color.g;
+      this.haloColors[index * 3 + 2] = data.color.b;
+    }
   }
 
   public applyForce(force: THREE.Vector3): void {
@@ -154,6 +234,7 @@ export class AstroBody {
   }
 
   public update(deltaTime: number): void {
+    this.elapsedTime += deltaTime;
     this.velocity.add(this.acceleration.clone().multiplyScalar(deltaTime));
     this.position.add(this.velocity.clone().multiplyScalar(deltaTime));
     this.mesh.position.copy(this.position);
@@ -163,36 +244,64 @@ export class AstroBody {
       this.glowMesh.rotation.y += deltaTime * 0.15;
 
       this.glowPulsePhase += deltaTime * 1.5;
-      const glowScale = 1 + Math.sin(this.glowPulsePhase) * 0.15;
+      const glowScale = 1 + Math.sin(this.glowPulsePhase) * 0.2;
       this.glowMesh.scale.setScalar(glowScale);
-      (this.glowMesh.material as THREE.MeshBasicMaterial).opacity = 0.25 + Math.sin(this.glowPulsePhase * 0.7) * 0.15;
+      (this.glowMesh.material as THREE.MeshBasicMaterial).opacity =
+        0.2 + Math.sin(this.glowPulsePhase * 0.7) * 0.2;
     }
 
-    if (this.haloParticles && this.haloBasePositions && this.haloSizes) {
+    if (this.haloParticles && this.haloBasePositions && this.haloColors && this.haloParticleData.length > 0) {
       this.haloParticles.position.copy(this.position);
-      this.haloParticles.rotation.y += deltaTime * 0.08;
-      this.haloParticles.rotation.x += deltaTime * 0.05;
+      this.haloParticles.rotation.y += deltaTime * 0.06;
+      this.haloParticles.rotation.x += deltaTime * 0.03;
 
-      this.haloPulsePhase += deltaTime * 2.0;
+      this.haloPulsePhase += deltaTime;
 
       const positionAttr = this.haloParticles.geometry.getAttribute('position') as THREE.BufferAttribute;
+      const colorAttr = this.haloParticles.geometry.getAttribute('color') as THREE.BufferAttribute;
       const positions = positionAttr.array as Float32Array;
-      const particleCount = positions.length / 3;
+      const colors = colorAttr.array as Float32Array;
+      const particleCount = this.haloParticleData.length;
+
+      let avgSize = 0;
 
       for (let i = 0; i < particleCount; i++) {
-        const phaseOffset = i * 0.37;
-        const pulse = 1 + Math.sin(this.haloPulsePhase + phaseOffset) * 0.25;
+        const data = this.haloParticleData[i];
+        const age = this.elapsedTime - data.bornTime;
+        const lifeT = (age % data.lifetime) / data.lifetime;
+
+        data.theta += data.orbitalSpeed * deltaTime * 0.3;
+        data.phi += data.rotationSpeed * deltaTime * 0.1;
+
+        const pulse = 1 + Math.sin(this.haloPulsePhase * data.pulseSpeed + data.pulsePhase) * data.pulseAmplitude;
+        const r = data.baseRadius * pulse;
+
         const idx = i * 3;
-        positions[idx] = this.haloBasePositions[idx] * pulse;
-        positions[idx + 1] = this.haloBasePositions[idx + 1] * pulse;
-        positions[idx + 2] = this.haloBasePositions[idx + 2] * pulse;
+        positions[idx] = r * Math.sin(data.phi) * Math.cos(data.theta);
+        positions[idx + 1] = r * Math.sin(data.phi) * Math.sin(data.theta);
+        positions[idx + 2] = r * Math.cos(data.phi);
+
+        const fadeInOut = lifeT < 0.2
+          ? lifeT / 0.2
+          : lifeT > 0.8
+            ? (1 - lifeT) / 0.2
+            : 1;
+
+        const dim = 0.6 + 0.4 * Math.sin(this.haloPulsePhase * 1.5 + data.pulsePhase);
+        colors[idx] = data.color.r * fadeInOut * dim;
+        colors[idx + 1] = data.color.g * fadeInOut * dim;
+        colors[idx + 2] = data.color.b * fadeInOut * dim;
+
+        avgSize += data.size * (0.8 + 0.4 * Math.sin(this.haloPulsePhase * data.pulseSpeed * 0.5 + data.pulsePhase));
       }
+
       positionAttr.needsUpdate = true;
+      colorAttr.needsUpdate = true;
 
       const mat = this.haloParticles.material as THREE.PointsMaterial;
-      const sizePulse = 1 + Math.sin(this.haloPulsePhase * 0.8) * 0.3;
-      mat.size = 0.15 * sizePulse;
-      mat.opacity = 0.6 + Math.sin(this.haloPulsePhase * 0.5) * 0.2;
+      avgSize /= particleCount;
+      mat.size = avgSize * (1 + Math.sin(this.haloPulsePhase * 0.5) * 0.25);
+      mat.opacity = 0.65 + 0.25 * Math.sin(this.haloPulsePhase * 0.4);
     }
 
     if (this.type === 'planet') {
@@ -200,7 +309,7 @@ export class AstroBody {
     } else if (this.type === 'star') {
       this.mesh.rotation.y += deltaTime * 0.2;
       const starMat = this.mesh.material as THREE.MeshStandardMaterial;
-      starMat.emissiveIntensity = 1.3 + Math.sin(this.glowPulsePhase * 0.5) * 0.3;
+      starMat.emissiveIntensity = 1.2 + Math.sin(this.glowPulsePhase * 0.5) * 0.4;
     }
 
     this.acceleration.set(0, 0, 0);

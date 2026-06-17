@@ -101,7 +101,7 @@ export class Toolbar {
       const progress = Math.min(elapsed / duration, 1);
       const easeProgress = 1 - Math.pow(1 - progress, 3);
       const currentValue = from + (to - from) * easeProgress;
-      element.textContent = currentValue.toFixed(1);
+      element.textContent = currentValue.toFixed(2);
       if (progress < 1) {
         requestAnimationFrame(animate);
       }
