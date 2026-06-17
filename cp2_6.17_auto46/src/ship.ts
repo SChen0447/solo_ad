@@ -35,11 +35,17 @@ export interface ShipState {
   shieldLevel: number;
   laserLevel: number;
   particles: Particle[];
+  trailParticles: Particle[];
   laser: LaserState;
   laserCooldown: number;
   mouseX: number;
   mouseY: number;
   mouseDown: boolean;
+  prevX: number;
+  prevY: number;
+  moveDx: number;
+  moveDy: number;
+  trailSpawnTimer: number;
 }
 
 export function createShip(canvasW: number, canvasH: number): ShipState {
@@ -53,6 +59,7 @@ export function createShip(canvasW: number, canvasH: number): ShipState {
     shieldLevel: 1,
     laserLevel: 1,
     particles: [],
+    trailParticles: [],
     laser: {
       active: false,
       x: 0,
@@ -70,6 +77,11 @@ export function createShip(canvasW: number, canvasH: number): ShipState {
     mouseX: canvasW / 2,
     mouseY: canvasH / 2,
     mouseDown: false,
+    prevX: canvasW / 2,
+    prevY: canvasH / 2,
+    moveDx: 0,
+    moveDy: 0,
+    trailSpawnTimer: 0,
   };
 }
 
@@ -84,12 +96,21 @@ export function updateShip(ship: ShipState, dt: number, keys: Set<string>, canva
   if (keys.has('a') || keys.has('arrowleft')) dx -= 1;
   if (keys.has('d') || keys.has('arrowright')) dx += 1;
 
+  let moving = false;
   if (dx !== 0 || dy !== 0) {
     const len = Math.sqrt(dx * dx + dy * dy);
     dx /= len;
     dy /= len;
+    ship.moveDx = dx;
+    ship.moveDy = dy;
+    moving = true;
+    ship.prevX = ship.x;
+    ship.prevY = ship.y;
     ship.x += dx * speed * dt * 60;
     ship.y += dy * speed * dt * 60;
+  } else {
+    ship.moveDx = 0;
+    ship.moveDy = 0;
   }
 
   ship.x = Math.max(20, Math.min(canvasW - 20, ship.x));
@@ -97,14 +118,18 @@ export function updateShip(ship: ShipState, dt: number, keys: Set<string>, canva
 
   ship.angle = Math.atan2(ship.mouseY - ship.y, ship.mouseX - ship.x);
 
-  if (dx !== 0 || dy !== 0) {
-    for (let i = 0; i < 8; i++) {
-      const backAngle = ship.angle + Math.PI + (Math.random() - 0.5) * 1.0;
-      const spd = 1.5 + Math.random() * 2.5;
+  const distPerSec = Math.sqrt(Math.pow(ship.x - ship.prevX, 2) + Math.pow(ship.y - ship.prevY, 2)) / Math.max(dt, 0.001);
+
+  if (moving) {
+    const flameCount = 12;
+    const moveAngle = Math.atan2(ship.moveDy, ship.moveDx);
+    for (let i = 0; i < flameCount; i++) {
+      const backAngle = moveAngle + Math.PI + (Math.random() - 0.5) * 1.2;
+      const spd = 1.5 + Math.random() * 3;
       const lifeRatio = Math.random() * 0.3 + 0.7;
       ship.particles.push({
-        x: ship.x - Math.cos(ship.angle) * (16 + Math.random() * 4),
-        y: ship.y - Math.sin(ship.angle) * (16 + Math.random() * 4),
+        x: ship.x - Math.cos(moveAngle) * (14 + Math.random() * 6),
+        y: ship.y - Math.sin(moveAngle) * (14 + Math.random() * 6),
         vx: Math.cos(backAngle) * spd,
         vy: Math.sin(backAngle) * spd,
         life: 0.6 * lifeRatio,
@@ -115,6 +140,52 @@ export function updateShip(ship: ShipState, dt: number, keys: Set<string>, canva
         size: 2 + Math.random() * 3,
       });
     }
+  } else {
+    const flameCount = 8;
+    for (let i = 0; i < flameCount; i++) {
+      const backAngle = ship.angle + Math.PI + (Math.random() - 0.5) * 1.0;
+      const spd = 0.5 + Math.random() * 1;
+      const lifeRatio = Math.random() * 0.3 + 0.7;
+      ship.particles.push({
+        x: ship.x - Math.cos(ship.angle) * (16 + Math.random() * 3),
+        y: ship.y - Math.sin(ship.angle) * (16 + Math.random() * 3),
+        vx: Math.cos(backAngle) * spd,
+        vy: Math.sin(backAngle) * spd,
+        life: 0.6 * lifeRatio,
+        maxLife: 0.6 * lifeRatio,
+        r: 255,
+        g: Math.floor(100 + Math.random() * 100),
+        b: Math.floor(Math.random() * 40),
+        size: 1.5 + Math.random() * 2,
+      });
+    }
+  }
+
+  const TRAIL_SPEED_THRESHOLD = 50;
+  if (distPerSec > TRAIL_SPEED_THRESHOLD) {
+    const speedFactor = (distPerSec - TRAIL_SPEED_THRESHOLD) / 150;
+    const spawnInterval = Math.max(0.008, 0.05 - speedFactor * 0.04);
+    ship.trailSpawnTimer -= dt;
+    while (ship.trailSpawnTimer <= 0) {
+      ship.trailSpawnTimer += spawnInterval;
+      const moveAngle = Math.atan2(ship.moveDy, ship.moveDx);
+      const tailX = ship.x - Math.cos(moveAngle) * 12;
+      const tailY = ship.y - Math.sin(moveAngle) * 12;
+      ship.trailParticles.push({
+        x: tailX + (Math.random() - 0.5) * 4,
+        y: tailY + (Math.random() - 0.5) * 4,
+        vx: -Math.cos(moveAngle) * 0.5 + (Math.random() - 0.5) * 0.5,
+        vy: -Math.sin(moveAngle) * 0.5 + (Math.random() - 0.5) * 0.5,
+        life: 1.2,
+        maxLife: 1.2,
+        r: 0,
+        g: 229,
+        b: 255,
+        size: 2,
+      });
+    }
+  } else {
+    ship.trailSpawnTimer = 0;
   }
 
   for (let i = ship.particles.length - 1; i >= 0; i--) {
@@ -124,6 +195,16 @@ export function updateShip(ship: ShipState, dt: number, keys: Set<string>, canva
     p.life -= dt;
     if (p.life <= 0) {
       ship.particles.splice(i, 1);
+    }
+  }
+
+  for (let i = ship.trailParticles.length - 1; i >= 0; i--) {
+    const p = ship.trailParticles[i];
+    p.x += p.vx * dt * 60;
+    p.y += p.vy * dt * 60;
+    p.life -= dt;
+    if (p.life <= 0) {
+      ship.trailParticles.splice(i, 1);
     }
   }
 
@@ -167,6 +248,18 @@ export function fireLaser(ship: ShipState): void {
 }
 
 export function drawShip(ctx: CanvasRenderingContext2D, ship: ShipState): void {
+  for (const p of ship.trailParticles) {
+    const alpha = Math.max(0, p.life / p.maxLife);
+    const size = p.size * alpha;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, size, 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(${p.r},${p.g},${p.b},${alpha})`;
+    ctx.shadowColor = `rgba(${p.r},${p.g},${p.b},${alpha * 0.6})`;
+    ctx.shadowBlur = 4;
+    ctx.fill();
+    ctx.shadowBlur = 0;
+  }
+
   for (const p of ship.particles) {
     const alpha = Math.max(0, p.life / p.maxLife);
     ctx.beginPath();
