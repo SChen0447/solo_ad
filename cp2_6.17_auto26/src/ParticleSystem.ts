@@ -16,16 +16,11 @@ export class ParticleSystem {
     const minSize = 2;
     const maxSize = 10;
     const clampedSize = Math.max(minSize, Math.min(maxSize, size));
-    const t = (clampedSize - minSize) / (maxSize - minSize);
-    const degMin = 30;
-    const degMax = 90;
-    const degSpeed = degMax - t * (degMax - degMin);
+    const inverseRatio = (1 / clampedSize) * 10;
     const [rangeMin, rangeMax] = baseRange;
-    const rangeDeg = (rangeMax - rangeMin) / 2;
-    const centerDeg = (rangeMin + rangeMax) / 2;
-    const scaledDeg = centerDeg + (degSpeed - 60) * (rangeDeg / 30);
-    const jitter = (Math.random() - 0.5) * 15;
-    const finalDeg = scaledDeg + jitter;
+    const baseSpeed = rangeMin + (rangeMax - rangeMin) * Math.min(1, (inverseRatio - 1) / 4);
+    const jitter = (Math.random() - 0.5) * (rangeMax - rangeMin) * 0.2;
+    const finalDeg = baseSpeed + jitter;
     const rad = (finalDeg * Math.PI) / 180;
     const sign = Math.random() < 0.5 ? -1 : 1;
     return rad * sign;
@@ -37,7 +32,7 @@ export class ParticleSystem {
 
     if (material === 'wood') {
       const debrisCount = Math.floor(5 + Math.random() * 4);
-      const woodColors = ['#c9b99a', '#b8a88a'];
+      const woodColors = ['#c9b99a', '#b8a88a', '#d4c4a8', '#a89878'];
       for (let i = 0; i < debrisCount; i++) {
         const size = 3 + Math.random() * 2;
         const angle = Math.random() * Math.PI * 2;
@@ -55,7 +50,7 @@ export class ParticleSystem {
           shape: 'circle',
           opacity: 1,
           rotation: Math.random() * Math.PI * 2,
-          rotationSpeed: this.rotationSpeedFromSize(size, [30, 90]),
+          rotationSpeed: this.rotationSpeedFromSize(size, [30, 120]),
           rotateStartTime: maxLife - 0.3,
           gravityScale: 0.5,
         });
@@ -64,7 +59,7 @@ export class ParticleSystem {
       for (let i = 0; i < sliverCount; i++) {
         let width = 2 + Math.random() * 4;
         let height = 2 + Math.random() * 4;
-        while (Math.abs(width - height) < 0.5) {
+        while (Math.abs(width - height) < 0.8) {
           width = 2 + Math.random() * 4;
           height = 2 + Math.random() * 4;
         }
@@ -86,7 +81,7 @@ export class ParticleSystem {
           shape: 'rect',
           opacity: 1,
           rotation: Math.random() * Math.PI * 2,
-          rotationSpeed: this.rotationSpeedFromSize(size, [30, 90]),
+          rotationSpeed: this.rotationSpeedFromSize(size, [40, 130]),
           rotateStartTime: maxLife - 0.3,
           gravityScale: 0.5,
         });
@@ -101,10 +96,12 @@ export class ParticleSystem {
         const angle = impactAngle + angleOffset;
         const speed = (200 + Math.random() * 250) * energyScale;
         const maxLife = 0.6;
+        const vx0 = Math.cos(angle) * speed;
+        const vy0 = Math.sin(angle) * speed;
         created.push({
           x, y,
-          vx: Math.cos(angle) * speed,
-          vy: Math.sin(angle) * speed,
+          vx: vx0,
+          vy: vy0,
           size,
           color: sparkColors[Math.floor(Math.random() * sparkColors.length)],
           colorEnd: '#ff6600',
@@ -114,7 +111,7 @@ export class ParticleSystem {
           shape: 'circle',
           opacity: 1,
           rotation: Math.random() * Math.PI * 2,
-          rotationSpeed: this.rotationSpeedFromSize(size, [60, 150]),
+          rotationSpeed: this.rotationSpeedFromSize(size, [60, 180]),
           trail: [],
           trailLength: 10 + Math.floor(Math.random() * 3),
           gravityScale: 1.0,
@@ -246,16 +243,21 @@ export class ParticleSystem {
   update(dt: number): void {
     const gravity = 220;
     for (const p of this.particles) {
-      p.vy += gravity * (p.gravityScale ?? 1) * dt;
-
-      if (p.type === 'droplet' && p.swingAmplitude !== undefined && p.swingSpeed !== undefined && p.startX !== undefined) {
-        p.startX += p.vx * dt;
-        const elapsed = p.maxLife - p.life;
-        p.x = p.startX + Math.sin((elapsed + (p.swingPhase ?? 0)) * (p.swingSpeed ?? 3) * Math.PI) * (p.swingAmplitude ?? 4);
-        p.y += p.vy * dt;
-      } else {
+      if (p.type === 'spark') {
+        p.vy += gravity * (p.gravityScale ?? 1) * dt;
         p.x += p.vx * dt;
         p.y += p.vy * dt;
+      } else {
+        p.vy += gravity * (p.gravityScale ?? 1) * dt;
+        if (p.type === 'droplet' && p.swingAmplitude !== undefined && p.swingSpeed !== undefined && p.startX !== undefined) {
+          p.startX += p.vx * dt;
+          const elapsed = p.maxLife - p.life;
+          p.x = p.startX + Math.sin((elapsed + (p.swingPhase ?? 0)) * (p.swingSpeed ?? 3) * Math.PI) * (p.swingAmplitude ?? 4);
+          p.y += p.vy * dt;
+        } else {
+          p.x += p.vx * dt;
+          p.y += p.vy * dt;
+        }
       }
 
       p.life -= dt;
@@ -374,7 +376,7 @@ export class ParticleSystem {
       } else if (p.type === 'shard' && p.points) {
         ctx.globalAlpha = p.opacity;
         ctx.shadowColor = '#ffffff';
-        ctx.shadowBlur = p.size * (p.glowIntensity ?? 0.4) * 3;
+        ctx.shadowBlur = p.size * (p.glowIntensity ?? 0.4) * 4;
         ctx.translate(p.x, p.y);
         ctx.rotate(p.rotation);
         ctx.beginPath();
@@ -387,12 +389,20 @@ export class ParticleSystem {
         ctx.fillStyle = p.color;
         ctx.fill();
         ctx.shadowBlur = 0;
-        ctx.strokeStyle = 'rgba(255,255,255,0.85)';
-        ctx.lineWidth = 1.0;
+        ctx.shadowColor = 'transparent';
+        ctx.save();
+        ctx.shadowColor = 'rgba(255,255,255,0.9)';
+        ctx.shadowBlur = 3 + (p.glowIntensity ?? 0.4) * 4;
+        ctx.strokeStyle = 'rgba(255,255,255,0.9)';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+        ctx.restore();
+        ctx.strokeStyle = 'rgba(180,220,255,0.5)';
+        ctx.lineWidth = 0.8;
         ctx.stroke();
         if (pts.length >= 2) {
-          ctx.strokeStyle = 'rgba(255,255,255,0.9)';
-          ctx.lineWidth = 0.8;
+          ctx.strokeStyle = 'rgba(255,255,255,0.95)';
+          ctx.lineWidth = 1.0;
           ctx.beginPath();
           const idx = Math.floor((p.rotation * 3) % (pts.length - 1));
           const a = pts[idx];
