@@ -39,13 +39,17 @@ export class Controls {
 
   private render(): void {
     this.container.innerHTML = `
-      <div>
+      <div class="panel-header">
         <h1>✨ 粒子特效编辑器</h1>
         <p class="subtitle">实时预览沙盒 · 物理场景联动</p>
       </div>
 
-      <div class="control-group">
-        <div class="section-title">物理场景</div>
+      <div class="section-card">
+        <div class="section-header">
+          <span class="section-icon">🌐</span>
+          <span class="section-title">物理场景</span>
+        </div>
+        <div class="section-divider"></div>
         <div class="scene-buttons" id="scene-buttons">
           ${SCENES.map(s => `
             <button class="scene-btn ${this.currentConfig.sceneType === s.type ? 'active' : ''}" 
@@ -54,37 +58,56 @@ export class Controls {
         </div>
       </div>
 
-      <div class="control-group">
-        <div class="section-title">粒子参数</div>
-        ${this.renderSlider({
-          key: 'emissionRate', label: '发射率', min: 1, max: 100, step: 1,
-          unit: '个/秒', value: this.currentConfig.emissionRate as number
-        })}
-        ${this.renderSlider({
-          key: 'initialSpeed', label: '初始速度', min: 0, max: 500, step: 5,
-          unit: 'px/s', value: this.currentConfig.initialSpeed as number
-        })}
-        ${this.renderSlider({
-          key: 'lifetime', label: '生命周期', min: 0.5, max: 5, step: 0.1,
-          unit: '秒', value: this.currentConfig.lifetime as number
-        })}
-        ${this.renderSlider({
-          key: 'particleSize', label: '粒子大小', min: 2, max: 20, step: 1,
-          unit: 'px', value: this.currentConfig.particleSize as number
-        })}
+      <div class="section-card">
+        <div class="section-header">
+          <span class="section-icon">⚡</span>
+          <span class="section-title">粒子参数</span>
+        </div>
+        <div class="section-divider"></div>
+        <div class="sliders-container">
+          ${this.renderSlider({
+            key: 'emissionRate', label: '发射率', min: 1, max: 100, step: 1,
+            unit: '个/秒', value: this.currentConfig.emissionRate as number
+          })}
+          ${this.renderSlider({
+            key: 'initialSpeed', label: '初始速度', min: 0, max: 500, step: 5,
+            unit: 'px/s', value: this.currentConfig.initialSpeed as number
+          })}
+          ${this.renderSlider({
+            key: 'lifetime', label: '生命周期', min: 0.5, max: 5, step: 0.1,
+            unit: '秒', value: this.currentConfig.lifetime as number
+          })}
+          ${this.renderSlider({
+            key: 'particleSize', label: '粒子大小', min: 2, max: 20, step: 1,
+            unit: 'px', value: this.currentConfig.particleSize as number
+          })}
+        </div>
       </div>
 
-      <div class="control-group">
-        <div class="section-title">颜色渐变</div>
-        ${this.renderColorPicker('start', '起始色', this.currentConfig.startColor)}
-        <div style="height: 8px;"></div>
-        ${this.renderColorPicker('end', '结束色', this.currentConfig.endColor)}
+      <div class="section-card">
+        <div class="section-header">
+          <span class="section-icon">🎨</span>
+          <span class="section-title">颜色设置</span>
+        </div>
+        <div class="section-divider"></div>
+        <div class="colors-row">
+          ${this.renderColorPicker('start', '起始色', this.currentConfig.startColor)}
+          <div class="color-arrow">→</div>
+          ${this.renderColorPicker('end', '结束色', this.currentConfig.endColor)}
+        </div>
       </div>
 
-      <div class="control-group">
-        <div class="section-title">碰撞设置</div>
+      <div class="section-card">
+        <div class="section-header">
+          <span class="section-icon">💥</span>
+          <span class="section-title">碰撞设置</span>
+        </div>
+        <div class="section-divider"></div>
         <div class="toggle-row">
-          <label style="display: flex; align-items: center; gap: 8px;">粒子间碰撞</label>
+          <label class="toggle-label">
+            <span class="toggle-text">粒子间碰撞</span>
+            <span class="toggle-desc">启用后粒子之间相互弹开</span>
+          </label>
           <div class="toggle-switch ${this.currentConfig.particleCollision ? 'on' : ''}" id="collision-toggle"></div>
         </div>
       </div>
@@ -97,11 +120,11 @@ export class Controls {
     const percent = ((def.value - def.min) / (def.max - def.min)) * 100;
     const displayValue = def.step < 1 ? def.value.toFixed(1) : def.value;
     return `
-      <div class="control-group">
-        <label>
-          <span>${def.label}</span>
-          <span class="value" data-value-for="${def.key}">${displayValue} ${def.unit}</span>
-        </label>
+      <div class="slider-item">
+        <div class="slider-header">
+          <span class="slider-label">${def.label}</span>
+          <span class="slider-value" data-value-for="${def.key}">${displayValue} <span class="slider-unit">${def.unit}</span></span>
+        </div>
         <div class="slider-wrapper">
           <div class="slider-fill" data-fill-for="${def.key}" style="width: ${percent}%"></div>
           <input type="range" 
@@ -117,19 +140,17 @@ export class Controls {
 
   private renderColorPicker(which: 'start' | 'end', label: string, color: string): string {
     return `
-      <div class="control-group">
-        <label style="margin-bottom: 4px;">${label}</label>
-        <div class="color-row">
-          <div class="color-picker-wrapper">
-            <div class="color-picker-trigger" data-color-trigger="${which}">
-              <div class="color-swatch" data-swatch="${which}" style="background: ${color};"></div>
-              <span class="color-hex" data-hex="${which}">${color.toUpperCase()}</span>
-            </div>
-            <div class="color-picker-popup" data-popup="${which}">
-              <canvas class="color-canvas" data-canvas="${which}" width="160" height="160"></canvas>
-              <div class="color-input-row">
-                <input type="text" data-hex-input="${which}" value="${color.toUpperCase()}" maxlength="7" />
-              </div>
+      <div class="color-card">
+        <div class="color-card-label">${label}</div>
+        <div class="color-picker-wrapper">
+          <div class="color-picker-trigger" data-color-trigger="${which}">
+            <div class="color-swatch" data-swatch="${which}" style="background: ${color};"></div>
+          </div>
+          <div class="color-hex" data-hex="${which}">${color.toUpperCase()}</div>
+          <div class="color-picker-popup" data-popup="${which}">
+            <canvas class="color-canvas" data-canvas="${which}" width="160" height="160"></canvas>
+            <div class="color-input-row">
+              <input type="text" data-hex-input="${which}" value="${color.toUpperCase()}" maxlength="7" />
             </div>
           </div>
         </div>
@@ -150,10 +171,11 @@ export class Controls {
         if (fill) fill.style.width = `${percent}%`;
         const step = parseFloat(slider.step);
         const display = step < 1 ? val.toFixed(1) : val.toString();
-        const unit = slider.closest('.control-group')?.querySelector(`[data-value-for="${key}"]`) as HTMLElement;
+        const sliderItem = slider.closest('.slider-item');
+        const unit = sliderItem?.querySelector(`[data-value-for="${key}"]`) as HTMLElement;
         if (unit) {
-          const unitText = unit.textContent?.split(' ').slice(1).join(' ') || '';
-          unit.textContent = `${display} ${unitText}`;
+          const unitText = unit.querySelector('.slider-unit')?.textContent || '';
+          unit.innerHTML = `${display} <span class="slider-unit">${unitText}</span>`;
         }
         this.currentConfig[key] = val as never;
         this.onConfigChange({ [key]: val } as Partial<EmitterConfig>);

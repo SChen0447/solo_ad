@@ -5,7 +5,6 @@ import { Controls } from './controls';
 class ParticleApp {
   private emitter: Emitter;
   private renderer: Renderer;
-  private _controls: Controls;
   private fpsStat: HTMLElement;
   private particleStat: HTMLElement;
 
@@ -13,7 +12,6 @@ class ParticleApp {
   private fpsAccumulator: number = 0;
   private fpsFrames: number = 0;
   private currentFps: number = 60;
-  private _rafId: number = 0;
 
   constructor() {
     const canvas = document.getElementById('particle-canvas') as HTMLCanvasElement;
@@ -25,7 +23,7 @@ class ParticleApp {
     this.renderer = new Renderer(canvas);
 
     const initialConfig: EmitterConfig = this.emitter.getConfig();
-    this._controls = new Controls(controlsPanel, initialConfig, (config) => {
+    new Controls(controlsPanel, initialConfig, (config) => {
       this.emitter.setConfig(config);
     });
 
@@ -49,9 +47,9 @@ class ParticleApp {
       this.render();
       this.updateStats(dt);
 
-      this._rafId = requestAnimationFrame(loop);
+      requestAnimationFrame(loop);
     };
-    this._rafId = requestAnimationFrame(loop);
+    requestAnimationFrame(loop);
   }
 
   private update(dt: number): void {
