@@ -1,0 +1,239 @@
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  font-family: 'Roboto Mono', monospace;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+button {
+  font-family: 'Roboto Mono', monospace;
+}
+
+button:active:not(:disabled) {
+  transform: scale(0.95);
+  transition: transform 0.05s ease-out;
+}
+
+button:hover:not(:disabled) {
+  border-color: #4CAF50 !important;
+}
+
+.unit-highlight {
+  animation: pulse-border 0.5s ease-in-out infinite;
+}
+
+@keyframes pulse-border {
+  0%, 100% {
+    filter: drop-shadow(0 0 2px #FFD600);
+  }
+  50% {
+    filter: drop-shadow(0 0 8px #FFFFFF);
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes fade-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes shake {
+  0%, 100% {
+    transform: translateX(0);
+  }
+  25% {
+    transform: translateX(-2px);
+  }
+  75% {
+    transform: translateX(2px);
+  }
+}
+
+.shake-animation {
+  animation: shake 0.1s ease-in-out;
+}
+
+.fade-in {
+  animation: fade-in 1s ease-in-out;
+}
+
+.fade-out {
+  animation: fade-out 1s ease-in-out;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #5a6a5a;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #4CAF50;
+}
+
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 6px;
+  background: rgba(0, 0, 0, 0.4);
+  border-radius: 3px;
+  outline: none;
+}
+
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  background: #4CAF50;
+  border-radius: 50%;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+input[type="range"]::-webkit-slider-thumb:hover {
+  transform: scale(1.2);
+  box-shadow: 0 0 8px rgba(76, 175, 80, 0.6);
+}
+
+input[type="range"]::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  background: #4CAF50;
+  border-radius: 50%;
+  cursor: pointer;
+  border: none;
+}
+
+.unit-destroyed {
+  animation: unit-fade-out 1s ease-out forwards;
+}
+
+@keyframes unit-fade-out {
+  0% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.5;
+    transform: scale(1.1);
+  }
+  100% {
+    opacity: 0.3;
+    transform: scale(0.8);
+  }
+}
+
+@keyframes flash {
+  0%, 100% {
+    opacity: 0;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+.attack-flash {
+  animation: flash 0.3s ease-out;
+}
+
+.map-fade-enter {
+  animation: map-fade-in 1s ease-in-out;
+}
+
+@keyframes map-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.map-fade-exit {
+  animation: map-fade-out 1s ease-in-out;
+}
+
+@keyframes map-fade-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+.modal-overlay {
+  animation: fade-in 0.3s ease-out;
+}
+
+.modal-content {
+  animation: modal-pop-in 0.3s ease-out;
+}
+
+@keyframes modal-pop-in {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.battle-report {
+  animation: slide-in-left 0.3s ease-out;
+}
+
+@keyframes slide-in-left {
+  from {
+    opacity: 0;
+    transform: translateX(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@media (max-width: 800px) {
+  .app-container {
+    flex-direction: column;
+  }
+
+  .panel {
+    width: 100%;
+    max-height: 200px;
+  }
+
+  .map-container {
+    min-height: 400px;
+  }
+}
