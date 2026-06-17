@@ -18,6 +18,10 @@ interface Particle {
   baseColor: string;
   currentColor: string;
   size: number;
+  baseSize: number;
+  hueOffset: number;
+  homeX: number;
+  homeY: number;
   shape: 'circle' | 'line';
   angle: number;
   life: number;
@@ -89,6 +93,10 @@ function easeOutQuad(t: number): number {
   return 1 - (1 - t) * (1 - t);
 }
 
+function easeInOutSine(t: number): number {
+  return -(Math.cos(Math.PI * t) - 1) / 2;
+}
+
 export class ParticleAnimation {
   private canvas: HTMLCanvasElement;
   private ctx: CanvasRenderingContext2D;
@@ -116,7 +124,12 @@ export class ParticleAnimation {
   private pulseDuration = 2000;
 
   private haloRotation = 0;
-  private haloRotationSpeed = (Math.PI * 2) / 60 / 60;
+  private haloBaseSpeed = (Math.PI * 2) / 60 / 60;
+
+  private breathPeriod = 5000;
+
+  private springStrength = 0.015;
+  private damping = 0.95;
 
   private time = 0;
   private lastFrameTime = 0;
@@ -184,15 +197,22 @@ export class ParticleAnimation {
       }
 
       const isLine = Math.random() < lineRatio;
+      const baseSize = isLine ? Math.random() * 15 + 5 : Math.random() * 3 + 1;
+      const px = Math.random() * this.width;
+      const py = Math.random() * this.height;
 
       this.particles.push({
-        x: Math.random() * this.width,
-        y: Math.random() * this.height,
+        x: px,
+        y: py,
         vx: 0,
         vy: 0,
         baseColor: colors[colorIndex],
         currentColor: colors[colorIndex],
-        size: isLine ? Math.random() * 15 + 5 : Math.random() * 3 + 1,
+        size: baseSize,
+        baseSize,
+        hueOffset: (Math.random() - 0.5) * 30,
+        homeX: px,
+        homeY: py,
         shape: isLine ? 'line' : 'circle',
         angle: Math.random() * Math.PI * 2,
         life: Math.random() * 100,
@@ -270,6 +290,13 @@ export class ParticleAnimation {
         particle.vx += (dx / dist) * force;
         particle.vy += (dy / dist) * force;
       }
+    } else {
+      const springX = (particle.homeX - particle.x) * this.springStrength;
+      const springY = (particle.homeY - particle.y) * this.springStrength;
+      particle.vx += springX;
+      particle.vy += springY;
+      particle.vx *= this.damping;
+      particle.vy *= this.damping;
     }
 
     particle.vx *= this.mouseVelocityDecay;
@@ -313,8 +340,12 @@ export class ParticleAnimation {
 
     particle.life++;
     if (particle.life > particle.maxLife) {
-      particle.x = Math.random() * this.width;
-      particle.y = Math.random() * this.height;
+      const nx = Math.random() * this.width;
+      const ny = Math.random() * this.height;
+      particle.x = nx;
+      particle.y = ny;
+      particle.homeX = nx;
+      particle.homeY = ny;
       particle.vx = 0;
       particle.vy = 0;
       particle.life = 0;
@@ -322,8 +353,22 @@ export class ParticleAnimation {
   }
 
   private drawParticle(particle: Particle): void {
-    const alpha = 0.55 + 0.45 * Math.sin(particle.life / particle.maxLife * Math.PI);
-    const color = chroma(particle.currentColor).alpha(alpha).css();
+    const breathPhase = (this.time % this.breathPeriod) / this.breathPeriod;
+    const breath = Math.sin(breathPhase * Math.PI * 2);
+    const breathSize = 1 + breath * 0.25;
+    const breathAlpha = 0.85 + breath * 0.15;
+
+    const lifeAlpha = 0.55 + 0.45 * Math.sin(particle.life / particle.maxLife * Math.PI);
+    const finalAlpha = Math.max(0, Math.min(1, lifeAlpha * breathAlpha));
+
+    const baseColor = chroma(particle.currentColor);
+    const hsl = baseColor.hsl();
+    const h = ((hsl[0] ?? 0) + particle.hueOffset + 360) % 360;
+    const s = hsl[1];
+    const l = hsl[2];
+    const color = chroma.hsl(h, s, l).alpha(finalAlpha).css();
+
+    const drawSize = particle.baseSize * breathSize;
 
     this.ctx.fillStyle = color;
     this.ctx.strokeStyle = color;
@@ -331,15 +376,15 @@ export class ParticleAnimation {
 
     if (particle.shape === 'circle') {
       this.ctx.beginPath();
-      this.ctx.arc(particle.x, particle.y, particle.size, 0, Math.PI * 2);
+      this.ctx.arc(particle.x, particle.y, drawSize, 0, Math.PI * 2);
       this.ctx.fill();
     } else {
       this.ctx.save();
       this.ctx.translate(particle.x, particle.y);
       this.ctx.rotate(particle.angle);
       this.ctx.beginPath();
-      this.ctx.moveTo(-particle.size / 2, 0);
-      this.ctx.lineTo(particle.size / 2, 0);
+      this.ctx.moveTo(-drawSize / 2, 0);
+      this.ctx.lineTo(drawSize / 2, 0);
       this.ctx.stroke();
       this.ctx.restore();
     }
@@ -394,7 +439,10 @@ export class ParticleAnimation {
       }
     }
 
-    this.haloRotation += this.haloRotationSpeed * deltaTime;
+    const haloPhase = (this.time % 60000) / 60000;
+    const speedEnvelope = Math.sin(haloPhase * Math.PI);
+    const speedModulation = 0.25 + 0.75 * easeInOutSine(speedEnvelope);
+    this.haloRotation += this.haloBaseSpeed * deltaTime * speedModulation;
 
     this.ctx.fillStyle = 'rgba(26, 26, 46, 0.14)';
     this.ctx.fillRect(0, 0, this.width, this.height);

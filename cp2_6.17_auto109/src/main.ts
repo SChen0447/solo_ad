@@ -449,3 +449,20 @@ init().catch((error) => {
   console.error('Initialization failed:', error);
   elements.loading.classList.add('hidden');
 });
+
+declare global {
+  interface Window {
+    __currentArtwork: typeof currentArtwork;
+    __currentAnalysis: typeof currentAnalysis;
+  }
+}
+
+Object.defineProperty(window, '__currentArtwork', {
+  get: () => currentArtwork,
+  configurable: true,
+});
+
+Object.defineProperty(window, '__currentAnalysis', {
+  get: () => currentAnalysis,
+  configurable: true,
+});

@@ -405,9 +405,9 @@ function buildFlowField(
 
 function analyzeCompositionCanny(
   edgeData: number[][],
-  edgeMagnitude: number[][],
+  _edgeMagnitude: number[][],
   edgeDirection: number[][],
-  grayData: number[][]
+  _grayData: number[][]
 ): ArtworkAnalysis['composition'] {
   const height = edgeData.length;
   const width = edgeData[0].length;
