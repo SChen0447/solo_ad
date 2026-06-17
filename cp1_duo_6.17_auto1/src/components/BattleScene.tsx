@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useAppStore } from '../store'
-import { BattleTurn, DamageNumber } from '../types'
+import { BattleTurn, CombatCharacter, DamageNumber } from '../types'
 
 interface Particle {
   id: number
@@ -100,24 +100,26 @@ export default function BattleScene() {
 
     const log = turn.logs[currentLogIndex]
     const actionTimer = setTimeout(() => {
-      if (log.damage && log.damage > 0) {
-        const defenderState = turn.characterStates.find(c => c.name === log.defender)
+      const logDamage = log.damage
+      if (logDamage && logDamage > 0) {
+        const defenderState = turn.characterStates.find((c: CombatCharacter) => c.name === log.defender)
         if (defenderState) {
           triggerShake(defenderState.id)
-          addDamageNumber(log.damage, defenderState.id, log.isCrit, false)
+          addDamageNumber(logDamage, defenderState.id, log.isCrit, false)
           setDisplayHp(prev => ({
             ...prev,
-            [defenderState.id]: Math.max(0, (prev[defenderState.id] ?? defenderState.maxHp) - log.damage)
+            [defenderState.id]: Math.max(0, (prev[defenderState.id] ?? defenderState.maxHp) - logDamage)
           }))
         }
       }
-      if (log.healing && log.healing > 0) {
-        const attackerState = turn.characterStates.find(c => c.name === log.attacker)
+      const logHealing = log.healing
+      if (logHealing && logHealing > 0) {
+        const attackerState = turn.characterStates.find((c: CombatCharacter) => c.name === log.attacker)
         if (attackerState) {
-          addDamageNumber(log.healing, attackerState.id, false, true)
+          addDamageNumber(logHealing, attackerState.id, false, true)
           setDisplayHp(prev => ({
             ...prev,
-            [attackerState.id]: Math.min(attackerState.maxHp, (prev[attackerState.id] ?? attackerState.maxHp) + log.healing)
+            [attackerState.id]: Math.min(attackerState.maxHp, (prev[attackerState.id] ?? attackerState.maxHp) + logHealing)
           }))
         }
       }

@@ -1,13 +1,13 @@
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { useAppStore } from '../store'
-import { BaseStats, Equipment, EquipmentSlotType } from '../types'
+import { useAppStore, CharId } from '../store'
+import { BaseStats, Equipment, EquipmentSlotType, Skill } from '../types'
 import { generateEquipmentPool, slotNames } from '../data/equipmentPool'
 import { getActiveSkills, getPassiveSkills } from '../data/skillPool'
 import EquipmentSlot from './EquipmentSlot'
 
 interface CharacterPanelProps {
-  charId: 'char1' | 'char2'
+  charId: CharId
   title: string
   accentColor: string
 }
@@ -70,16 +70,18 @@ export default function CharacterPanel({ charId, title, accentColor }: Character
     updateCharacterBaseStats(charId, { [key]: clamped })
   }
 
-  const handleEquipmentDragStart = (e: React.DragEvent, equipment: Equipment) => {
-    e.dataTransfer.setData('equipment', JSON.stringify(equipment))
-    e.dataTransfer.effectAllowed = 'copy'
+  const handleEquipmentDragStart = (e: any, equipment: Equipment) => {
+    if (e.dataTransfer) {
+      e.dataTransfer.setData('equipment', JSON.stringify(equipment))
+      e.dataTransfer.effectAllowed = 'copy'
+    }
   }
 
   const slots: EquipmentSlotType[] = ['weapon', 'armor', 'ring', 'boots']
 
   return (
     <motion.div
-      initial={{ opacity: 0, x: charId === 'char1' ? -30 : 30 }}
+      initial={{ opacity: 0, x: charId === 'character1' ? -30 : 30 }}
       animate={{ opacity: 1, x: 0 }}
       transition={{ duration: 0.4 }}
       className="glass-panel"

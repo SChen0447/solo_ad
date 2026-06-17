@@ -11,6 +11,7 @@ import {
 import { skillPool } from '../data/skillPool'
 
 export type AppView = 'edit' | 'battle' | 'result'
+export type CharId = 'character1' | 'character2'
 
 interface AppState {
   view: AppView
@@ -19,11 +20,11 @@ interface AppState {
   battleTurns: BattleTurn[]
   battleResult: BattleResult | null
   setView: (view: AppView) => void
-  updateCharacterBaseStats: (charId: 'char1' | 'char2', stats: Partial<BaseStats>) => void
-  equipItem: (charId: 'char1' | 'char2', slot: EquipmentSlotType, equipment: Equipment) => void
-  unequipItem: (charId: 'char1' | 'char2', slot: EquipmentSlotType) => void
-  setActiveSkill: (charId: 'char1' | 'char2', index: number, skill: Skill | null) => void
-  setPassiveSkill: (charId: 'char1' | 'char2', skill: Skill | null) => void
+  updateCharacterBaseStats: (charId: CharId, stats: Partial<BaseStats>) => void
+  equipItem: (charId: CharId, slot: EquipmentSlotType, equipment: Equipment) => void
+  unequipItem: (charId: CharId, slot: EquipmentSlotType) => void
+  setActiveSkill: (charId: CharId, index: number, skill: Skill | null) => void
+  setPassiveSkill: (charId: CharId, skill: Skill | null) => void
   setBattleData: (turns: BattleTurn[], result: BattleResult) => void
   resetBattle: () => void
 }
@@ -58,57 +59,70 @@ export const useAppStore = create<AppState>((set) => ({
   setView: (view) => set({ view }),
 
   updateCharacterBaseStats: (charId, stats) =>
-    set((state) => ({
-      [charId]: {
-        ...state[charId],
-        baseStats: {
-          ...state[charId].baseStats,
-          ...stats
+    set((state) => {
+      const char = state[charId]
+      return {
+        [charId]: {
+          ...char,
+          baseStats: {
+            ...char.baseStats,
+            ...stats
+          }
         }
       }
-    })),
+    }),
 
   equipItem: (charId, slot, equipment) =>
-    set((state) => ({
-      [charId]: {
-        ...state[charId],
-        equipment: {
-          ...state[charId].equipment,
-          [slot]: equipment
+    set((state) => {
+      const char = state[charId]
+      return {
+        [charId]: {
+          ...char,
+          equipment: {
+            ...char.equipment,
+            [slot]: equipment
+          }
         }
       }
-    })),
+    }),
 
   unequipItem: (charId, slot) =>
-    set((state) => ({
-      [charId]: {
-        ...state[charId],
-        equipment: {
-          ...state[charId].equipment,
-          [slot]: null
+    set((state) => {
+      const char = state[charId]
+      return {
+        [charId]: {
+          ...char,
+          equipment: {
+            ...char.equipment,
+            [slot]: null
+          }
         }
       }
-    })),
+    }),
 
   setActiveSkill: (charId, index, skill) =>
     set((state) => {
-      const skills = [...state[charId].activeSkills]
+      const char = state[charId]
+      const skills = [...char.activeSkills]
       skills[index] = skill
       return {
         [charId]: {
-          ...state[charId],
+          ...char,
           activeSkills: skills
         }
       }
     }),
 
   setPassiveSkill: (charId, skill) =>
-    set((state) => ({
-      [charId]: {
-        ...state[charId],
-        passiveSkill: skill
+    set((state) => {
+      const char = state[charId]
+      return {
+        [charId]: {
+          ...char,
+          passiveSkill: skill
+        }
       }
-    })),
+    }),
 
   setBattleData: (turns, result) =>
     set({

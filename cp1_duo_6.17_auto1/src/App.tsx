@@ -54,8 +54,8 @@ export default function App() {
               marginBottom: '24px'
             }}
           >
-            <CharacterPanel charId="char1" title="角色A" accentColor="#3498DB" />
-            <CharacterPanel charId="char2" title="角色B" accentColor="#E74C3C" />
+            <CharacterPanel charId="character1" title="角色A" accentColor="#3498DB" />
+            <CharacterPanel charId="character2" title="角色B" accentColor="#E74C3C" />
           </motion.div>
         )}
 

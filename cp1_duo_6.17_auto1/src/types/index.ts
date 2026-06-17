@@ -134,3 +134,9 @@ export interface DamageNumber {
   isHeal: boolean
   createdAt: number
 }
+
+export interface BattleTurn {
+  turn: number
+  logs: BattleLogEntry[]
+  characterStates: CombatCharacter[]
+}

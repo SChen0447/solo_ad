@@ -1,19 +1,72 @@
-import { useMemo } from 'react'
-import { motion } from 'framer-motion'
+import { useState, useMemo } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
 import { useAppStore } from '../store'
 import { BattleResult as BattleResultType } from '../types'
 import { simulateBattle } from '../engine/BattleEngine'
 
-const gradeColors: Record<string, string> = {
-  S: 'linear-gradient(135deg, #FFD700, #FFA500)',
-  A: 'linear-gradient(135deg, #90EE90, #32CD32)',
-  B: 'linear-gradient(135deg, #87CEEB, #4169E1)',
-  C: 'linear-gradient(135deg, #DDA0DD, #9370DB)',
-  D: 'linear-gradient(135deg, #CD853F, #8B4513)'
+const gradeStyles: Record<string, { bg: string; textColor: string; sparkle?: boolean }> = {
+  S: {
+    bg: 'linear-gradient(135deg, #FFD700 0%, #FFA500 50%, #FF8C00 100%)',
+    textColor: '#1a1a2e',
+    sparkle: true
+  },
+  A: {
+    bg: 'linear-gradient(135deg, #E8E8E8 0%, #C0C0C0 50%, #A8A8A8 100%)',
+    textColor: '#1a1a2e'
+  },
+  B: {
+    bg: 'linear-gradient(135deg, #CD7F32 0%, #B87333 50%, #8B4513 100%)',
+    textColor: '#ffffff'
+  },
+  C: {
+    bg: 'linear-gradient(135deg, #A0A0A0 0%, #808080 50%, #606060 100%)',
+    textColor: '#ffffff'
+  },
+  D: {
+    bg: 'linear-gradient(135deg, #808080 0%, #606060 50%, #404040 100%)',
+    textColor: '#ffffff'
+  }
+}
+
+interface SkillInfo {
+  displayName: string
+  icon: string
+  type: 'damage' | 'heal' | 'shield' | 'buff'
+}
+
+const skillInfoMap: Record<string, SkillInfo> = {
+  'fireball': { displayName: '火球术', icon: '🔥', type: 'damage' },
+  'heal-wave': { displayName: '治疗波', icon: '💚', type: 'heal' },
+  'shield': { displayName: '护盾', icon: '🛡️', type: 'shield' },
+  'power-strike': { displayName: '强力打击', icon: '💥', type: 'damage' },
+  'lightning-bolt': { displayName: '闪电链', icon: '⚡', type: 'damage' },
+  'ice-blast': { displayName: '冰霜爆发', icon: '❄️', type: 'damage' },
+  'rage': { displayName: '狂暴', icon: '😤', type: 'damage' },
+  'holy-light': { displayName: '圣光术', icon: '✨', type: 'heal' },
+  'basic-attack': { displayName: '普通攻击', icon: '👊', type: 'damage' },
+  'deadly-blow': { displayName: '致命一击', icon: '🎯', type: 'damage' },
+  'passive-regen': { displayName: '生命回复', icon: '💗', type: 'buff' },
+  'passive-thorns': { displayName: '荆棘反伤', icon: '🌹', type: 'buff' }
+}
+
+function getSkillIcon(skillId: string): string {
+  const info = skillInfoMap[skillId]
+  if (!info) return '⚔️'
+  if (info.type === 'damage') return '⚔️'
+  if (info.type === 'heal') return '❤️'
+  if (info.type === 'shield') return '🛡️'
+  return '✨'
+}
+
+function getSkillDisplayName(skillId: string): string {
+  const info = skillInfoMap[skillId]
+  if (!info) return skillId
+  return `${info.icon} ${info.displayName}`
 }
 
 export default function BattleResult() {
   const { battleResult, character1, character2, resetBattle, setBattleData, setView } = useAppStore()
+  const [copied, setCopied] = useState(false)
 
   if (!battleResult) {
     return (
@@ -24,11 +77,53 @@ export default function BattleResult() {
   }
 
   const winner = battleResult.characters.find(c => c.id === battleResult.winnerId)
+  const grade = battleResult.grade
+  const gradeStyle = gradeStyles[grade] || gradeStyles.D
 
   const handleRebattle = () => {
     const { turns, result } = simulateBattle(character1, character2)
     setBattleData(turns, result)
     setView('battle')
+  }
+
+  const handleShare = async () => {
+    const c1 = battleResult.characters[0]
+    const c2 = battleResult.characters[1]
+    const winnerName = winner?.name || '平局'
+
+    const text = `⚔️ 战斗结果报告
+━━━━━━━━━━━━━━━━━━━━━━
+🏆 胜者：${winnerName}
+⭐ 综合评分：${grade}级 (${battleResult.score}分)
+⏱️ 总回合数：${battleResult.totalTurns}
+━━━━━━━━━━━━━━━━━━━━━━
+📊 ${c1.name}：
+  ❤️ 剩余生命：${c1.finalHp}/${c1.maxHp}
+  ⚔️ 总输出：${c1.totalDamage}
+  💚 总治疗：${c1.totalHealing}
+  💥 暴击：${c1.critHits}次 | 🌀 闪避：${c1.dodges}次
+━━━━━━━━━━━━━━━━━━━━━━
+📊 ${c2.name}：
+  ❤️ 剩余生命：${c2.finalHp}/${c2.maxHp}
+  ⚔️ 总输出：${c2.totalDamage}
+  💚 总治疗：${c2.totalHealing}
+  💥 暴击：${c2.critHits}次 | 🌀 闪避：${c2.dodges}次
+━━━━━━━━━━━━━━━━━━━━━━`
+
+    try {
+      await navigator.clipboard.writeText(text)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1500)
+    } catch {
+      const textarea = document.createElement('textarea')
+      textarea.value = text
+      document.body.appendChild(textarea)
+      textarea.select()
+      document.execCommand('copy')
+      document.body.removeChild(textarea)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1500)
+    }
   }
 
   return (
@@ -37,25 +132,143 @@ export default function BattleResult() {
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
-        style={{ textAlign: 'center', marginBottom: 32 }}
+        style={{ textAlign: 'center', marginBottom: 24 }}
       >
-        <motion.div
-          initial={{ scale: 0 }}
-          animate={{ scale: 1 }}
-          transition={{ type: 'spring', stiffness: 200, delay: 0.2 }}
-          style={{
-            display: 'inline-block',
-            padding: '8px 24px',
-            background: gradeColors[battleResult.grade] || gradeColors.D,
-            borderRadius: 12,
-            marginBottom: 12
-          }}
-        >
-          <span style={{ fontSize: 42, fontWeight: 900, color: '#1a1a2e' }}>
-            {battleResult.grade}
-          </span>
-        </motion.div>
-        <div style={{ fontSize: 14, color: 'rgba(255,255,255,0.6)', marginBottom: 8 }}>
+        <div style={{ position: 'relative', height: 80, marginBottom: 16 }}>
+          <AnimatePresence mode="wait">
+            {winner && (
+              <motion.div
+                key="trophy"
+                initial={{ y: 100, opacity: 0, rotate: 0 }}
+                animate={{ y: 0, opacity: 1, rotate: 360 }}
+                exit={{ y: -100, opacity: 0 }}
+                transition={{ duration: 0.5, type: 'spring', stiffness: 120, damping: 14 }}
+                style={{
+                  position: 'absolute',
+                  left: '50%',
+                  top: '50%',
+                  transform: 'translate(-50%, -50%)',
+                  fontSize: 64
+                }}
+              >
+                🏆
+              </motion.div>
+            )}
+            {!winner && (
+              <motion.div
+                key="tie"
+                initial={{ y: -50, opacity: 0 }}
+                animate={{
+                  y: 0,
+                  opacity: 1,
+                  x: [0, -8, 8, -8, 8, 0]
+                }}
+                transition={{
+                  opacity: { duration: 0.3 },
+                  y: { duration: 0.4 },
+                  x: { duration: 0.5, delay: 0.3 }
+                }}
+                style={{
+                  position: 'absolute',
+                  left: '50%',
+                  top: '50%',
+                  transform: 'translate(-50%, -50%)',
+                  fontSize: 56,
+                  filter: 'grayscale(60%)'
+                }}
+              >
+                🛡️
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+
+        <div style={{ position: 'relative', display: 'inline-block', marginBottom: 12 }}>
+          <motion.div
+            key={grade}
+            initial={{ scale: 0 }}
+            animate={{ scale: 1 }}
+            transition={{ type: 'spring', stiffness: 300, damping: 15, duration: 0.3 }}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: 90,
+              height: 90,
+              borderRadius: '50%',
+              background: gradeStyle.bg,
+              boxShadow: `0 8px 32px rgba(0,0,0,0.4), 0 0 60px ${grade === 'S' ? 'rgba(255,215,0,0.4)' : 'rgba(255,255,255,0.1)'}`,
+              position: 'relative',
+              overflow: 'hidden'
+            }}
+          >
+            {gradeStyle.sparkle && (
+              <>
+                <motion.div
+                  animate={{
+                    opacity: [0, 1, 0],
+                    scale: [0.5, 1.2, 0.5],
+                    rotate: [0, 180, 360]
+                  }}
+                  transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
+                  style={{
+                    position: 'absolute',
+                    top: 8,
+                    left: 12,
+                    fontSize: 16
+                  }}
+                >
+                  ✨
+                </motion.div>
+                <motion.div
+                  animate={{
+                    opacity: [0, 1, 0],
+                    scale: [0.5, 1.2, 0.5],
+                    rotate: [0, -180, -360]
+                  }}
+                  transition={{ duration: 2.5, repeat: Infinity, ease: 'easeInOut', delay: 0.5 }}
+                  style={{
+                    position: 'absolute',
+                    bottom: 10,
+                    right: 10,
+                    fontSize: 14
+                  }}
+                >
+                  ⭐
+                </motion.div>
+                <motion.div
+                  animate={{
+                    opacity: [0, 1, 0],
+                    scale: [0.3, 1, 0.3]
+                  }}
+                  transition={{ duration: 1.8, repeat: Infinity, ease: 'easeInOut', delay: 1 }}
+                  style={{
+                    position: 'absolute',
+                    top: 16,
+                    right: 16,
+                    fontSize: 10
+                  }}
+                >
+                  ✦
+                </motion.div>
+              </>
+            )}
+            <span
+              style={{
+                fontSize: 48,
+                fontWeight: 900,
+                color: gradeStyle.textColor,
+                letterSpacing: 2,
+                zIndex: 2,
+                textShadow: grade === 'S' ? '0 2px 8px rgba(255,165,0,0.6)' : 'none'
+              }}
+            >
+              {grade}
+            </span>
+          </motion.div>
+        </div>
+
+        <div style={{ fontSize: 14, color: 'rgba(255,255,255,0.6)', marginBottom: 6 }}>
           综合评分
         </div>
         <div style={{ fontSize: 28, fontWeight: 700, color: '#FFD700' }}>
@@ -65,7 +278,7 @@ export default function BattleResult() {
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          transition={{ delay: 0.4 }}
+          transition={{ delay: 0.5 }}
           style={{ marginTop: 16, fontSize: 20 }}
         >
           {winner ? (
@@ -142,7 +355,7 @@ export default function BattleResult() {
         initial={{ opacity: 0, scale: 0.9 }}
         animate={{ opacity: 1, scale: 1 }}
         transition={{ delay: 0.5 }}
-        style={{ display: 'flex', justifyContent: 'center', gap: 16 }}
+        style={{ display: 'flex', justifyContent: 'center', gap: 16, flexWrap: 'wrap' }}
       >
         <motion.button
           className="btn btn-primary"
@@ -153,6 +366,28 @@ export default function BattleResult() {
         >
           🔄 重新战斗
         </motion.button>
+        <AnimatePresence mode="wait">
+          <motion.button
+            key={copied ? 'copied' : 'copy'}
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.9 }}
+            className="btn"
+            whileHover={{ scale: 1.05, y: -2 }}
+            whileTap={{ scale: 0.95 }}
+            onClick={handleShare}
+            disabled={copied}
+            style={{
+              padding: '12px 28px',
+              fontSize: 15,
+              background: copied
+                ? 'linear-gradient(135deg, #11998e 0%, #38ef7d 100%)'
+                : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
+            }}
+          >
+            {copied ? '✅ 已复制' : '📋 分享战绩'}
+          </motion.button>
+        </AnimatePresence>
         <motion.button
           className="btn btn-secondary"
           whileHover={{ scale: 1.05, y: -2 }}
@@ -318,6 +553,7 @@ function SkillUsageChart({ result }: { result: BattleResultType }) {
       {allSkillIds.map(skillId => {
         const usages = result.characters.map(c => c.skillUsage[skillId] || 0)
         const charNames = result.characters.map(c => c.name)
+        const typeIcon = getSkillIcon(skillId)
 
         return (
           <div key={skillId} style={{ marginBottom: 8 }}>
@@ -350,10 +586,14 @@ function SkillUsageChart({ result }: { result: BattleResultType }) {
                         fontSize: 12,
                         fontWeight: 600,
                         color: 'white',
-                        textShadow: '1px 1px 2px rgba(0,0,0,0.8)'
+                        textShadow: '1px 1px 2px rgba(0,0,0,0.8)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 4
                       }}
                     >
-                      {count}
+                      <span style={{ fontSize: 11 }}>{typeIcon}</span>
+                      <span>{count}</span>
                     </div>
                   </div>
                 </div>
@@ -364,22 +604,4 @@ function SkillUsageChart({ result }: { result: BattleResultType }) {
       })}
     </div>
   )
-}
-
-function getSkillDisplayName(skillId: string): string {
-  const names: Record<string, string> = {
-    'fireball': '🔥 火球术',
-    'heal-wave': '💚 治疗波',
-    'shield': '🛡️ 护盾',
-    'power-strike': '💥 强力打击',
-    'lightning-bolt': '⚡ 闪电链',
-    'ice-blast': '❄️ 冰霜爆发',
-    'rage': '😤 狂暴',
-    'holy-light': '✨ 圣光术',
-    'basic-attack': '👊 普通攻击',
-    'deadly-blow': '🎯 致命一击',
-    'passive-regen': '💗 生命回复(被动)',
-    'passive-thorns': '🌹 荆棘反伤(被动)'
-  }
-  return names[skillId] || skillId
 }
