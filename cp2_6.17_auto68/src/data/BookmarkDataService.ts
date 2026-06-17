@@ -20,13 +20,13 @@ class BookmarkDataService {
     return [...this.bookmarks].sort((a, b) => a.createdAt - b.createdAt);
   }
 
-  add(input: { title: string; url: string; tags: string[] }): Bookmark {
+  add(input: { title: string; url: string; tags: string[]; createdAt?: number }): Bookmark {
     const bookmark: Bookmark = {
       id: uuidv4(),
       title: input.title,
       url: input.url,
       tags: input.tags.slice(0, 5),
-      createdAt: Date.now(),
+      createdAt: input.createdAt ?? Date.now(),
     };
     this.bookmarks.push(bookmark);
     return bookmark;
@@ -38,7 +38,9 @@ class BookmarkDataService {
 
   getByTimeRange(range: TimeRange): Bookmark[] {
     return this.bookmarks
-      .filter((b) => b.createdAt >= range.start && b.createdAt <= range.end)
+      .filter((b) => {
+        return b.createdAt >= range.start && b.createdAt <= range.end;
+      })
       .sort((a, b) => a.createdAt - b.createdAt);
   }
 
@@ -57,26 +59,76 @@ class BookmarkDataService {
   importFromHtml(html: string): Bookmark[] {
     const parser = new DOMParser();
     const doc = parser.parseFromString(html, 'text/html');
-    const links = doc.querySelectorAll('a');
+
+    const folderStack: string[] = [];
     const imported: Bookmark[] = [];
+    const self = this;
 
-    links.forEach((link) => {
-      const title = link.textContent?.trim() || '';
-      const url = link.getAttribute('href') || '';
-      if (!url || url.startsWith('javascript:') || url.startsWith('place:')) return;
+    function traverseNodes(root: Element): void {
+      const children = Array.from(root.children);
+      for (const child of children) {
+        if (child.tagName === 'DT') {
+          const dt = child as HTMLElement;
+          const h3 = dt.querySelector('h3');
+          const dl = dt.querySelector('dl');
+          const a = dt.querySelector('a');
 
-      const bookmark: Bookmark = {
-        id: uuidv4(),
-        title: title || url,
-        url,
-        tags: [],
-        createdAt: link.getAttribute('add_date')
-          ? parseInt(link.getAttribute('add_date')!, 10) * 1000
-          : Date.now(),
-      };
-      this.bookmarks.push(bookmark);
-      imported.push(bookmark);
-    });
+          if (h3 && dl) {
+            const folderName = h3.textContent?.trim() || '';
+            if (folderName) {
+              folderStack.push(folderName);
+            }
+            traverseNodes(dl);
+            if (folderName) {
+              folderStack.pop();
+            }
+          } else if (a) {
+            const title = a.textContent?.trim() || '';
+            const url = a.getAttribute('href') || '';
+            if (!url || url.startsWith('javascript:') || url.startsWith('place:')) continue;
+
+            const addDate = a.getAttribute('add_date');
+            const tags: string[] = [...folderStack];
+
+            const bookmark: Bookmark = {
+              id: uuidv4(),
+              title: title || url,
+              url,
+              tags: tags.slice(0, 5),
+              createdAt: addDate ? parseInt(addDate, 10) * 1000 : Date.now(),
+            };
+            self.bookmarks.push(bookmark);
+            imported.push(bookmark);
+          }
+        } else if (child.tagName === 'DL') {
+          traverseNodes(child);
+        }
+      }
+    }
+
+    const firstDl = doc.querySelector('dl');
+    if (firstDl) {
+      traverseNodes(firstDl);
+    } else {
+      const links = doc.querySelectorAll('a');
+      links.forEach((link) => {
+        const title = link.textContent?.trim() || '';
+        const url = link.getAttribute('href') || '';
+        if (!url || url.startsWith('javascript:') || url.startsWith('place:')) return;
+
+        const bookmark: Bookmark = {
+          id: uuidv4(),
+          title: title || url,
+          url,
+          tags: [],
+          createdAt: link.getAttribute('add_date')
+            ? parseInt(link.getAttribute('add_date')!, 10) * 1000
+            : Date.now(),
+        };
+        this.bookmarks.push(bookmark);
+        imported.push(bookmark);
+      });
+    }
 
     return imported;
   }

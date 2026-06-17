@@ -1,10 +1,15 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import type { Bookmark } from '@/data/BookmarkDataService';
 
 interface BookmarkGridProps {
   bookmarks: Bookmark[];
   onTagFilter: (tag: string) => void;
   onDelete: (id: string) => void;
+}
+
+interface DisplayCard extends Bookmark {
+  isEntering: boolean;
+  isExiting: boolean;
 }
 
 function formatTimestamp(ts: number): string {
@@ -25,69 +30,93 @@ function truncate(str: string, max: number): string {
   return str.length > max ? str.slice(0, max) + '...' : str;
 }
 
-interface CardState {
-  id: string;
-  exiting: boolean;
-}
+const EXIT_ANIMATION_DURATION = 200;
 
 export default function BookmarkGrid({ bookmarks, onTagFilter, onDelete }: BookmarkGridProps) {
-  const [cardStates, setCardStates] = useState<Map<string, CardState>>(new Map());
-  const prevIds = useRef<Set<string>>(new Set());
+  const [displayCards, setDisplayCards] = useState<DisplayCard[]>([]);
+  const prevIdsRef = useRef<Set<string>>(new Set());
+  const exitTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+
+  const clearExitTimer = useCallback((id: string) => {
+    const timer = exitTimersRef.current.get(id);
+    if (timer) {
+      clearTimeout(timer);
+      exitTimersRef.current.delete(id);
+    }
+  }, []);
 
   useEffect(() => {
     const currentIds = new Set(bookmarks.map((b) => b.id));
-    const newStates = new Map<string, CardState>();
+    const bookmarkMap = new Map(bookmarks.map((b) => [b.id, b]));
 
-    bookmarks.forEach((bm) => {
-      if (!prevIds.current.has(bm.id)) {
-        newStates.set(bm.id, { id: bm.id, exiting: false });
-      } else {
-        const existing = cardStates.get(bm.id);
-        newStates.set(bm.id, existing || { id: bm.id, exiting: false });
-      }
-    });
+    setDisplayCards((prev) => {
+      const prevIds = new Set(prev.map((c) => c.id));
+      const result: DisplayCard[] = [];
 
-    prevIds.current.forEach((id) => {
-      if (!currentIds.has(id) && !newStates.has(id)) {
-        const existing = cardStates.get(id);
-        if (existing && !existing.exiting) {
-          newStates.set(id, { id, exiting: true });
+      for (const bm of bookmarks) {
+        const prevCard = prev.find((c) => c.id === bm.id);
+        if (prevCard) {
+          result.push({ ...bm, isEntering: prevCard.isEntering, isExiting: false });
+        } else {
+          result.push({ ...bm, isEntering: true, isExiting: false });
+          requestAnimationFrame(() => {
+            setDisplayCards((curr) =>
+              curr.map((c) => (c.id === bm.id ? { ...c, isEntering: false } : c))
+            );
+          });
         }
       }
+
+      for (const card of prev) {
+        if (!currentIds.has(card.id) && !card.isExiting) {
+          result.push({ ...card, isExiting: true });
+          clearExitTimer(card.id);
+          const timer = setTimeout(() => {
+            setDisplayCards((curr) => curr.filter((c) => c.id !== card.id));
+            exitTimersRef.current.delete(card.id);
+          }, EXIT_ANIMATION_DURATION);
+          exitTimersRef.current.set(card.id, timer);
+        }
+        if (card.isExiting && !currentIds.has(card.id)) {
+          result.push(card);
+        }
+      }
+
+      return result.sort((a, b) => {
+        if (a.isExiting !== b.isExiting) return a.isExiting ? 1 : -1;
+        return b.createdAt - a.createdAt;
+      });
     });
 
-    setCardStates(newStates);
-  }, [bookmarks]);
+    prevIdsRef.current = currentIds;
+  }, [bookmarks, clearExitTimer]);
 
-  const handleDelete = (id: string) => {
-    if (window.confirm('确定要删除这个书签吗？')) {
-      setCardStates((prev) => {
-        const next = new Map(prev);
-        next.set(id, { id, exiting: true });
-        return next;
-      });
-      setTimeout(() => onDelete(id), 200);
-    }
-  };
+  useEffect(() => {
+    return () => {
+      exitTimersRef.current.forEach((timer) => clearTimeout(timer));
+      exitTimersRef.current.clear();
+    };
+  }, []);
 
-  const displayBookmarks = bookmarks.filter((bm) => {
-    const state = cardStates.get(bm.id);
-    return state && !state.exiting;
-  });
+  const handleDelete = useCallback(
+    (id: string) => {
+      if (!window.confirm('确定要删除这个书签吗？')) return;
 
-  const exitingIds = Array.from(cardStates.entries())
-    .filter(([, s]) => s.exiting)
-    .map(([, s]) => s.id);
+      setDisplayCards((prev) =>
+        prev.map((c) => (c.id === id ? { ...c, isExiting: true } : c))
+      );
+      clearExitTimer(id);
+      const timer = setTimeout(() => {
+        setDisplayCards((curr) => curr.filter((c) => c.id !== id));
+        exitTimersRef.current.delete(id);
+        onDelete(id);
+      }, EXIT_ANIMATION_DURATION);
+      exitTimersRef.current.set(id, timer);
+    },
+    [onDelete, clearExitTimer]
+  );
 
-  const allDisplayItems = [
-    ...displayBookmarks.map((bm) => ({ ...bm, isExiting: false })),
-    ...exitingIds
-      .map((id) => bookmarks.find((b) => b.id === id))
-      .filter((b): b is Bookmark => !!b)
-      .map((bm) => ({ ...bm, isExiting: true })),
-  ];
-
-  if (bookmarks.length === 0 && exitingIds.length === 0) {
+  if (displayCards.length === 0) {
     return (
       <div className="bookmark-grid-empty">
         <div style={{ fontSize: 48, marginBottom: 16 }}>📌</div>
@@ -98,33 +127,45 @@ export default function BookmarkGrid({ bookmarks, onTagFilter, onDelete }: Bookm
 
   return (
     <div className="bookmark-grid">
-      {allDisplayItems.map((bm) => (
+      {displayCards.map((card) => (
         <div
-          key={bm.id}
-          className={`bookmark-card ${bm.isExiting ? 'card-exit' : 'card-enter'}`}
-          onClick={() => !bm.isExiting && window.open(bm.url, '_blank')}
+          key={card.id}
+          className={`bookmark-card ${card.isEntering ? 'card-enter' : ''} ${card.isExiting ? 'card-exit' : ''}`}
+          onClick={() => !card.isExiting && window.open(card.url, '_blank')}
         >
           <div className="card-favicon">
             <img
-              src={`https://www.google.com/s2/favicons?domain=${getDomain(bm.url)}&sz=32`}
+              src={`https://www.google.com/s2/favicons?domain=${getDomain(card.url)}&sz=32`}
               alt=""
               width={24}
               height={24}
               style={{ borderRadius: 4 }}
               onError={(e) => {
-                (e.target as HTMLImageElement).style.display = 'none';
+                const target = e.target as HTMLImageElement;
+                target.style.display = 'none';
+                const parent = target.parentElement;
+                if (parent) {
+                  parent.textContent = card.url.charAt(0).toUpperCase();
+                  parent.style.display = 'flex';
+                  parent.style.alignItems = 'center';
+                  parent.style.justifyContent = 'center';
+                  parent.style.fontSize = 16;
+                  parent.style.fontWeight = 700;
+                  parent.style.color = '#6C63FF';
+                  parent.style.background = 'rgba(108,99,255,0.1)';
+                }
               }}
             />
           </div>
-          <div className="card-title" title={bm.title}>
-            {truncate(bm.title, 30)}
+          <div className="card-title" title={card.title}>
+            {truncate(card.title, 30)}
           </div>
-          <div className="card-url" title={bm.url}>
-            {truncate(bm.url, 40)}
+          <div className="card-url" title={card.url}>
+            {truncate(card.url, 40)}
           </div>
-          <div className="card-time">{formatTimestamp(bm.createdAt)}</div>
+          <div className="card-time">{formatTimestamp(card.createdAt)}</div>
           <div className="card-tags">
-            {bm.tags.map((tag) => (
+            {card.tags.map((tag) => (
               <span
                 key={tag}
                 className="card-tag"
@@ -141,7 +182,7 @@ export default function BookmarkGrid({ bookmarks, onTagFilter, onDelete }: Bookm
             className="card-delete"
             onClick={(e) => {
               e.stopPropagation();
-              handleDelete(bm.id);
+              handleDelete(card.id);
             }}
             title="删除书签"
           >

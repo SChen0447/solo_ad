@@ -10,10 +10,10 @@ interface TimelinePanelProps {
 
 function interpolateColor(t: number): string {
   const r1 = 108, g1 = 99, b1 = 255;
-  const r2 = 224, g2 = 64, b3 = 251;
+  const r2 = 224, g2 = 64, b2 = 251;
   const r = Math.round(r1 + (r2 - r1) * t);
   const g = Math.round(g1 + (g2 - g1) * t);
-  const b = Math.round(b1 + (b3 - b1) * t);
+  const b = Math.round(b1 + (b2 - b1) * t);
   return `rgb(${r},${g},${b})`;
 }
 
@@ -23,9 +23,15 @@ function formatTimestamp(ts: number): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
+const PADDING = 60;
+const NODE_RADIUS = 3;
+const NODE_HOVER_RADIUS = 5;
+const AXIS_Y = 50;
+
 export default function TimelinePanel({ bookmarks, timeRange, filteredIds, onTimeRangeChange }: TimelinePanelProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [tooltip, setTooltip] = useState<{ x: number; y: number; title: string; time: string } | null>(null);
   const dragState = useRef<{ isDragging: boolean; startX: number; startOffset: number }>({
     isDragging: false,
@@ -34,26 +40,12 @@ export default function TimelinePanel({ bookmarks, timeRange, filteredIds, onTim
   });
   const offsetRef = useRef(0);
   const [offset, setOffset] = useState(0);
-  const animFrameRef = useRef<number>(0);
-
-  const PADDING = 60;
-  const NODE_RADIUS = 3;
-  const NODE_HOVER_RADIUS = 5;
-  const AXIS_Y = 50;
 
   const timeToX = useCallback(
     (ts: number, width: number) => {
       const range = timeRange.end - timeRange.start;
       if (range === 0) return PADDING;
       return PADDING + ((ts - timeRange.start) / range) * (width - PADDING * 2);
-    },
-    [timeRange]
-  );
-
-  const xToTime = useCallback(
-    (x: number, width: number) => {
-      const range = timeRange.end - timeRange.start;
-      return timeRange.start + ((x - PADDING) / (width - PADDING * 2)) * range;
     },
     [timeRange]
   );
@@ -75,11 +67,10 @@ export default function TimelinePanel({ bookmarks, timeRange, filteredIds, onTim
     ctx.scale(dpr, dpr);
 
     const w = rect.width;
-    const h = rect.height;
 
-    ctx.clearRect(0, 0, w, h);
+    ctx.clearRect(0, 0, w, rect.height);
     ctx.fillStyle = '#2A2A2E';
-    ctx.fillRect(0, 0, w, h);
+    ctx.fillRect(0, 0, w, rect.height);
 
     ctx.strokeStyle = '#555';
     ctx.lineWidth = 1;
@@ -95,37 +86,59 @@ export default function TimelinePanel({ bookmarks, timeRange, filteredIds, onTim
     const maxTime = sorted[sorted.length - 1].createdAt;
     const timeSpan = maxTime - minTime || 1;
 
-    const prevX: number[] = [];
-    sorted.forEach((bm, i) => {
+    let prevX: number | null = null;
+    sorted.forEach((bm) => {
       const x = timeToX(bm.createdAt, w) + offset;
-      if (x < PADDING - 10 || x > w - PADDING + 10) return;
+      if (x < PADDING - 20 || x > w - PADDING + 20) return;
 
-      if (prevX.length > 0) {
+      if (prevX !== null) {
         ctx.strokeStyle = '#555';
         ctx.lineWidth = 1;
         ctx.beginPath();
-        ctx.moveTo(prevX[prevX.length - 1], AXIS_Y);
+        ctx.moveTo(prevX, AXIS_Y);
         ctx.lineTo(x, AXIS_Y);
         ctx.stroke();
       }
-      prevX.push(x);
+      prevX = x;
+    });
 
-      const t = i / Math.max(sorted.length - 1, 1);
-      const isFiltered = filteredIds && !filteredIds.has(bm.id);
+    sorted.forEach((bm) => {
+      const x = timeToX(bm.createdAt, w) + offset;
+      if (x < PADDING - 20 || x > w - PADDING + 20) return;
+
+      const t = timeSpan === 0 ? 0 : (bm.createdAt - minTime) / timeSpan;
+      const isFilteredOut = filteredIds && !filteredIds.has(bm.id);
+      const isHovered = hoveredId === bm.id;
       const color = interpolateColor(t);
+      const radius = isHovered ? NODE_HOVER_RADIUS : NODE_RADIUS;
 
       ctx.beginPath();
-      ctx.arc(x, AXIS_Y, NODE_RADIUS, 0, Math.PI * 2);
-      ctx.fillStyle = isFiltered ? '#555' : color;
-      ctx.globalAlpha = isFiltered ? 0.3 : 1;
+      ctx.arc(x, AXIS_Y, radius, 0, Math.PI * 2);
+      ctx.fillStyle = isFilteredOut ? '#555' : color;
+      ctx.globalAlpha = isFilteredOut ? 0.3 : 1;
       ctx.fill();
       ctx.globalAlpha = 1;
+
+      if (isHovered && !isFilteredOut) {
+        ctx.beginPath();
+        ctx.arc(x, AXIS_Y, radius + 2, 0, Math.PI * 2);
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 2;
+        ctx.globalAlpha = 0.5;
+        ctx.stroke();
+        ctx.globalAlpha = 1;
+      }
     });
-  }, [bookmarks, timeToX, offset, filteredIds]);
+  }, [bookmarks, timeToX, offset, filteredIds, hoveredId]);
 
   useEffect(() => {
-    animFrameRef.current = requestAnimationFrame(draw);
-    return () => cancelAnimationFrame(animFrameRef.current);
+    let raf = 0;
+    const loop = () => {
+      draw();
+      raf = requestAnimationFrame(loop);
+    };
+    raf = requestAnimationFrame(loop);
+    return () => cancelAnimationFrame(raf);
   }, [draw]);
 
   useEffect(() => {
@@ -136,6 +149,8 @@ export default function TimelinePanel({ bookmarks, timeRange, filteredIds, onTim
 
   const handleMouseDown = (e: React.MouseEvent) => {
     dragState.current = { isDragging: true, startX: e.clientX, startOffset: offsetRef.current };
+    setHoveredId(null);
+    setTooltip(null);
     e.preventDefault();
   };
 
@@ -149,9 +164,8 @@ export default function TimelinePanel({ bookmarks, timeRange, filteredIds, onTim
         return;
       }
 
-      const canvas = canvasRef.current;
       const container = containerRef.current;
-      if (!canvas || !container) return;
+      if (!container) return;
       const rect = container.getBoundingClientRect();
       const mx = e.clientX - rect.left;
       const my = e.clientY - rect.top;
@@ -161,13 +175,14 @@ export default function TimelinePanel({ bookmarks, timeRange, filteredIds, onTim
       for (const bm of sorted) {
         const x = timeToX(bm.createdAt, rect.width) + offset;
         const dist = Math.sqrt((mx - x) ** 2 + (my - AXIS_Y) ** 2);
-        if (dist <= NODE_HOVER_RADIUS + 4) {
+        if (dist <= NODE_HOVER_RADIUS + 6) {
           found = { x, y: AXIS_Y, bm };
           break;
         }
       }
 
       if (found) {
+        setHoveredId(found.bm.id);
         setTooltip({
           x: found.x,
           y: found.y - 16,
@@ -175,6 +190,7 @@ export default function TimelinePanel({ bookmarks, timeRange, filteredIds, onTim
           time: formatTimestamp(found.bm.createdAt),
         });
       } else {
+        setHoveredId(null);
         setTooltip(null);
       }
     },
@@ -202,6 +218,7 @@ export default function TimelinePanel({ bookmarks, timeRange, filteredIds, onTim
   }, [timeRange, onTimeRangeChange]);
 
   const handleMouseLeave = () => {
+    setHoveredId(null);
     setTooltip(null);
     if (dragState.current.isDragging) {
       dragState.current.isDragging = false;
@@ -227,7 +244,7 @@ export default function TimelinePanel({ bookmarks, timeRange, filteredIds, onTim
       onMouseLeave={handleMouseLeave}
     >
       <canvas ref={canvasRef} style={{ display: 'block' }} />
-      {tooltip && (
+      {tooltip && hoveredId && (
         <div
           className="timeline-tooltip"
           style={{
@@ -244,6 +261,7 @@ export default function TimelinePanel({ bookmarks, timeRange, filteredIds, onTim
             whiteSpace: 'nowrap',
             pointerEvents: 'none',
             zIndex: 10,
+            transition: 'opacity 0.2s ease-out',
           }}
         >
           <div style={{ fontWeight: 600, marginBottom: 2 }}>{tooltip.title}</div>
