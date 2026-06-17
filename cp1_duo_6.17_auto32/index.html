@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>神经突触信号传递模拟器</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif;
+    }
+
+    body {
+      background: linear-gradient(135deg, #0d0221 0%, #1a0a3e 100%);
+    }
+
+    #app {
+      width: 100vw;
+      height: 100vh;
+      position: relative;
+    }
+
+    #start-screen {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      background: linear-gradient(135deg, #0d0221 0%, #1a0a3e 100%);
+      z-index: 100;
+      transition: opacity 0.8s ease;
+    }
+
+    #start-screen.hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .title {
+      font-size: 3.5rem;
+      font-weight: 700;
+      color: #fff;
+      text-shadow: 0 0 20px rgba(120, 80, 255, 0.8), 0 0 40px rgba(120, 80, 255, 0.4);
+      margin-bottom: 1rem;
+      letter-spacing: 4px;
+      text-align: center;
+    }
+
+    .subtitle {
+      font-size: 1.2rem;
+      color: rgba(200, 180, 255, 0.8);
+      margin-bottom: 3rem;
+      letter-spacing: 2px;
+    }
+
+    .start-btn {
+      padding: 16px 48px;
+      font-size: 1.2rem;
+      font-weight: 600;
+      color: #fff;
+      background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+      border: none;
+      border-radius: 50px;
+      cursor: pointer;
+      box-shadow: 0 4px 20px rgba(99, 102, 241, 0.5), 0 0 40px rgba(139, 92, 246, 0.3);
+      transition: all 0.3s ease;
+      letter-spacing: 2px;
+    }
+
+    .start-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 30px rgba(99, 102, 241, 0.7), 0 0 60px rgba(139, 92, 246, 0.5);
+    }
+
+    .start-btn:active {
+      transform: translateY(0);
+    }
+
+    .instructions {
+      margin-top: 2.5rem;
+      color: rgba(180, 160, 220, 0.7);
+      font-size: 0.95rem;
+      text-align: center;
+      line-height: 1.8;
+    }
+
+    #canvas-container {
+      width: 100%;
+      height: 100%;
+    }
+
+    canvas {
+      display: block;
+    }
+
+    #info-panel {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      background: rgba(0, 0, 0, 0.6);
+      border-radius: 8px;
+      padding: 16px 20px;
+      color: #fff;
+      font-size: 14px;
+      z-index: 10;
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(139, 92, 246, 0.3);
+      min-width: 200px;
+    }
+
+    #info-panel h3 {
+      font-size: 14px;
+      color: #a78bfa;
+      margin-bottom: 12px;
+      border-bottom: 1px solid rgba(139, 92, 246, 0.3);
+      padding-bottom: 8px;
+    }
+
+    .info-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin: 8px 0;
+    }
+
+    .info-label {
+      color: rgba(200, 180, 255, 0.8);
+    }
+
+    .info-value {
+      color: #fff;
+      font-weight: 600;
+    }
+
+    .status-active {
+      color: #34d399 !important;
+    }
+
+    .status-warning {
+      color: #fbbf24 !important;
+    }
+
+    .status-info {
+      color: #60a5fa !important;
+    }
+
+    .lil-gui {
+      --background-color: rgba(20, 10, 40, 0.85) !important;
+      --widget-color: rgba(60, 40, 100, 0.8) !important;
+      --focus-color: #8b5cf6 !important;
+      --hover-color: rgba(80, 60, 120, 0.8) !important;
+      --font-color: #e9d5ff !important;
+      --title-background-color: rgba(139, 92, 246, 0.3) !important;
+      --title-color: #fff !important;
+      --number-color: #a78bfa !important;
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <div id="start-screen">
+      <h1 class="title">神经突触信号传递模拟器</h1>
+      <p class="subtitle">Neural Synapse Signal Transmission Simulator</p>
+      <button class="start-btn" id="start-btn">开 始 模 拟</button>
+      <div class="instructions">
+        🖱️ 鼠标拖拽旋转视角 &nbsp;|&nbsp; 滚轮缩放<br>
+        👆 点击发送神经元胞体 或 按 空格键 触发信号传递
+      </div>
+    </div>
+    <div id="canvas-container"></div>
+    <div id="info-panel" style="display: none;">
+      <h3>🧬 信号状态监控</h3>
+      <div class="info-row">
+        <span class="info-label">传递阶段:</span>
+        <span class="info-value" id="status-phase">等待</span>
+      </div>
+      <div class="info-row">
+        <span class="info-label">传递次数:</span>
+        <span class="info-value" id="status-count">0</span>
+      </div>
+      <div class="info-row">
+        <span class="info-label">成功率:</span>
+        <span class="info-value" id="status-rate">100%</span>
+      </div>
+    </div>
+  </div>
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
