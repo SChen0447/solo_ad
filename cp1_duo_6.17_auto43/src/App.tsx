@@ -49,7 +49,7 @@ function App() {
         <div style={{
           display: 'flex',
           alignItems: 'center',
-          justifyContent: 'space-between',
+          justifyContent: 'center',
           padding: '12px 16px',
           backgroundColor: '#16213e',
           borderBottom: '1px solid #0f3460',
@@ -63,38 +63,21 @@ function App() {
           }}>
             Typography Lab
           </h1>
-          <button
-            onClick={togglePanel}
-            style={{
-              padding: '6px 12px',
-              borderRadius: '6px',
-              border: 'none',
-              backgroundColor: '#0f3460',
-              color: '#eaeaea',
-              cursor: 'pointer',
-              fontSize: '13px',
-              transition: 'background 0.2s'
-            }}
-          >
-            {panelCollapsed ? '展开参数' : '收起参数'}
-          </button>
         </div>
 
-        {!panelCollapsed && (
-          <div style={{
-            height: '45vh',
-            overflow: 'hidden',
-            borderBottom: '1px solid #0f3460',
-            flexShrink: 0
-          }}>
-            <ParameterPanel
-              params={params}
-              onParamsChange={handleParamsChange}
-              collapsed={false}
-              onToggleCollapse={togglePanel}
-            />
-          </div>
-        )}
+        <div style={{
+          height: '38vh',
+          overflow: 'hidden',
+          borderBottom: '1px solid #0f3460',
+          flexShrink: 0
+        }}>
+          <ParameterPanel
+            params={params}
+            onParamsChange={handleParamsChange}
+            collapsed={false}
+            onToggleCollapse={() => {}}
+          />
+        </div>
 
         <div style={{
           flex: 1,
@@ -108,7 +91,7 @@ function App() {
           </div>
 
           <div style={{
-            height: '40vh',
+            height: '38vh',
             borderTop: '1px solid #0f3460',
             flexShrink: 0,
             display: 'flex'

@@ -36,13 +36,17 @@ function lerpColor(color1: string, color2: string, t: number): string {
   return `rgb(${r}, ${g}, ${b})`;
 }
 
+const BLUE_START = '#4ea8de';
+const BLUE_END = '#1a4e8a';
+const BLUE_HIGHLIGHT = '#4ea8de';
+
 const ParameterPanel: React.FC<ParameterPanelProps> = ({
   params,
   onParamsChange,
   collapsed,
   onToggleCollapse
 }) => {
-  const { fontOptions, loadingFont, loadFont, isFontLoaded } = useGoogleFonts();
+  const { fontOptions, loadingFont, loadFont, isFontLoaded, fontNotes } = useGoogleFonts();
 
   const chineseFonts = useMemo(() => fontOptions.filter(f => f.category === 'chinese'), [fontOptions]);
   const englishFonts = useMemo(() => fontOptions.filter(f => f.category === 'english'), [fontOptions]);
@@ -57,99 +61,74 @@ const ParameterPanel: React.FC<ParameterPanelProps> = ({
     loadFont(fontFamily);
   }, [updateParam, loadFont]);
 
-  const getSliderGradient = useCallback((type: 'fontSize' | 'lineHeight' | 'letterSpacing' | 'containerWidth') => {
-    let value = 0;
-    let min = 0;
-    let max = 1;
-    let startColor = '#e94560';
-    let endColor = '#e94560';
-
-    switch (type) {
-      case 'fontSize':
-        value = params.fontSize;
-        min = 12;
-        max = 80;
-        startColor = '#4ea8de';
-        endColor = '#e94560';
-        break;
-      case 'lineHeight':
-        value = params.lineHeight;
-        min = 1.0;
-        max = 2.5;
-        startColor = '#5390d9';
-        endColor = '#80ed99';
-        break;
-      case 'letterSpacing':
-        value = params.letterSpacing;
-        min = -0.1;
-        max = 0.5;
-        startColor = '#ff6b6b';
-        endColor = '#4ecdc4';
-        break;
-      case 'containerWidth':
-        value = params.containerWidth;
-        min = 320;
-        max = 1280;
-        startColor = '#7209b7';
-        endColor = '#f72585';
-        break;
-    }
-
-    const percentage = ((value - min) / (max - min)) * 100;
-    const trackColor = lerpColor(startColor, endColor, (value - min) / (max - min));
+  const getSliderGradient = useCallback((value: number, min: number, max: number) => {
+    const percentage = Math.max(0, Math.min(100, ((value - min) / (max - min)) * 100));
+    const t = (value - min) / (max - min);
+    const trackColor = lerpColor(BLUE_START, BLUE_END, t);
 
     return {
-      background: `linear-gradient(to right, ${trackColor} 0%, ${trackColor} ${percentage}%, #0f3460 ${percentage}%, #0f3460 100%)`,
-      thumbColor: trackColor
+      background: `linear-gradient(to right, ${trackColor} 0%, ${trackColor} ${percentage}%, #0f3460 ${percentage}%, #0f3460 100%)`
     };
-  }, [params.fontSize, params.lineHeight, params.letterSpacing, params.containerWidth]);
+  }, []);
 
-  const fontSizeStyle = useMemo(() => getSliderGradient('fontSize'), [getSliderGradient]);
-  const lineHeightStyle = useMemo(() => getSliderGradient('lineHeight'), [getSliderGradient]);
-  const letterSpacingStyle = useMemo(() => getSliderGradient('letterSpacing'), [getSliderGradient]);
-  const containerWidthStyle = useMemo(() => getSliderGradient('containerWidth'), [getSliderGradient]);
+  const fontSizeStyle = useMemo(() => getSliderGradient(params.fontSize, 12, 80), [params.fontSize, getSliderGradient]);
+  const lineHeightStyle = useMemo(() => getSliderGradient(params.lineHeight, 1.0, 2.5), [params.lineHeight, getSliderGradient]);
+  const letterSpacingStyle = useMemo(() => getSliderGradient(params.letterSpacing, -0.1, 0.5), [params.letterSpacing, getSliderGradient]);
+  const containerWidthStyle = useMemo(() => getSliderGradient(params.containerWidth, 320, 1280), [params.containerWidth, getSliderGradient]);
 
   const renderFontButton = (font: typeof fontOptions[0]) => {
     const isSelected = params.fontFamily === font.value;
     const isLoading = loadingFont === font.value;
     const loaded = isFontLoaded(font.value);
+    const note = fontNotes[font.name];
 
     return (
-      <button
-        key={font.value}
-        onClick={() => handleFontChange(font.value)}
-        style={{
-          position: 'relative' as const,
-          padding: '10px 12px',
-          borderRadius: '8px',
-          border: isSelected ? '2px solid #e94560' : '2px solid transparent',
-          backgroundColor: '#0f3460',
-          color: '#eaeaea',
-          cursor: 'pointer',
-          fontSize: '13px',
-          fontFamily: loaded ? `'${font.value}', sans-serif` : 'system-ui, sans-serif',
-          transition: 'all 0.3s ease',
-          boxShadow: isSelected ? '0 2px 8px rgba(233, 69, 96, 0.3)' : 'none',
-          opacity: isLoading ? 0.7 : 1,
-          overflow: 'hidden'
-        }}
-      >
-        {isLoading && (
-          <span
-            style={{
-              position: 'absolute',
-              top: 0,
-              left: 0,
-              height: '100%',
-              width: '30%',
-              background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.15), transparent)',
-              animation: 'shimmer 1s infinite',
-              pointerEvents: 'none'
-            }}
-          />
+      <div key={font.value} style={{ display: 'flex', flexDirection: 'column' }}>
+        <button
+          onClick={() => handleFontChange(font.value)}
+          style={{
+            position: 'relative' as const,
+            padding: '10px 12px',
+            borderRadius: '8px',
+            border: isSelected ? '2px solid #e94560' : '2px solid transparent',
+            backgroundColor: '#0f3460',
+            color: '#eaeaea',
+            cursor: 'pointer',
+            fontSize: '13px',
+            fontFamily: loaded ? `'${font.value}', sans-serif` : 'system-ui, sans-serif',
+            transition: 'all 0.3s ease',
+            boxShadow: isSelected ? '0 2px 8px rgba(233, 69, 96, 0.3)' : 'none',
+            opacity: isLoading ? 0.7 : 1,
+            overflow: 'hidden'
+          }}
+        >
+          {isLoading && (
+            <span
+              style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                height: '100%',
+                width: '30%',
+                background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.15), transparent)',
+                animation: 'shimmer 1s infinite',
+                pointerEvents: 'none'
+              }}
+            />
+          )}
+          <span style={{ position: 'relative', zIndex: 1 }}>{font.name}</span>
+        </button>
+        {note && isSelected && (
+          <span style={{
+            fontSize: '10px',
+            color: '#8892b0',
+            marginTop: '4px',
+            lineHeight: 1.3
+          }}>
+            {note}
+          </span>
         )}
-        <span style={{ position: 'relative', zIndex: 1 }}>{font.name}</span>
-      </button>
+      </div>
     );
   };
 
@@ -242,7 +221,7 @@ const ParameterPanel: React.FC<ParameterPanelProps> = ({
                 width: '12px',
                 height: '12px',
                 border: '2px solid #0f3460',
-                borderTopColor: '#e94560',
+                borderTopColor: BLUE_HIGHLIGHT,
                 borderRadius: '50%',
                 animation: 'spin 0.8s linear infinite'
               }} />
@@ -254,7 +233,7 @@ const ParameterPanel: React.FC<ParameterPanelProps> = ({
         <div style={{ marginBottom: '20px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
             <label style={{ color: '#eaeaea', fontSize: '14px', fontWeight: 500 }}>字号</label>
-            <span style={{ color: '#e94560', fontSize: '14px', fontWeight: 600 }}>{params.fontSize}px</span>
+            <span style={{ color: BLUE_HIGHLIGHT, fontSize: '14px', fontWeight: 600 }}>{params.fontSize}px</span>
           </div>
           <input
             type="range"
@@ -272,7 +251,6 @@ const ParameterPanel: React.FC<ParameterPanelProps> = ({
               outline: 'none',
               cursor: 'pointer'
             }}
-            className="slider-font-size"
           />
           <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '4px' }}>
             <span style={{ color: '#8892b0', fontSize: '11px' }}>12px</span>
@@ -283,7 +261,7 @@ const ParameterPanel: React.FC<ParameterPanelProps> = ({
         <div style={{ marginBottom: '20px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
             <label style={{ color: '#eaeaea', fontSize: '14px', fontWeight: 500 }}>行高</label>
-            <span style={{ color: '#80ed99', fontSize: '14px', fontWeight: 600 }}>{params.lineHeight.toFixed(1)}</span>
+            <span style={{ color: BLUE_HIGHLIGHT, fontSize: '14px', fontWeight: 600 }}>{params.lineHeight.toFixed(1)}</span>
           </div>
           <input
             type="range"
@@ -301,7 +279,6 @@ const ParameterPanel: React.FC<ParameterPanelProps> = ({
               outline: 'none',
               cursor: 'pointer'
             }}
-            className="slider-line-height"
           />
           <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '4px' }}>
             <span style={{ color: '#8892b0', fontSize: '11px' }}>1.0</span>
@@ -312,7 +289,7 @@ const ParameterPanel: React.FC<ParameterPanelProps> = ({
         <div style={{ marginBottom: '20px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
             <label style={{ color: '#eaeaea', fontSize: '14px', fontWeight: 500 }}>字间距</label>
-            <span style={{ color: '#4ecdc4', fontSize: '14px', fontWeight: 600 }}>{params.letterSpacing.toFixed(2)}em</span>
+            <span style={{ color: BLUE_HIGHLIGHT, fontSize: '14px', fontWeight: 600 }}>{params.letterSpacing.toFixed(2)}em</span>
           </div>
           <input
             type="range"
@@ -330,7 +307,6 @@ const ParameterPanel: React.FC<ParameterPanelProps> = ({
               outline: 'none',
               cursor: 'pointer'
             }}
-            className="slider-letter-spacing"
           />
           <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '4px' }}>
             <span style={{ color: '#8892b0', fontSize: '11px' }}>-0.1em</span>
@@ -373,7 +349,7 @@ const ParameterPanel: React.FC<ParameterPanelProps> = ({
         <div style={{ marginBottom: '20px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
             <label style={{ color: '#eaeaea', fontSize: '14px', fontWeight: 500 }}>容器宽度</label>
-            <span style={{ color: '#f72585', fontSize: '14px', fontWeight: 600 }}>{params.containerWidth}px</span>
+            <span style={{ color: BLUE_HIGHLIGHT, fontSize: '14px', fontWeight: 600 }}>{params.containerWidth}px</span>
           </div>
           <input
             type="range"
@@ -391,7 +367,6 @@ const ParameterPanel: React.FC<ParameterPanelProps> = ({
               outline: 'none',
               cursor: 'pointer'
             }}
-            className="slider-container-width"
           />
           <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '4px' }}>
             <span style={{ color: '#8892b0', fontSize: '11px' }}>320px</span>

@@ -41,38 +41,35 @@ const PreviewArea: React.FC<PreviewAreaProps> = React.memo(({ params, text }) =>
 
     try {
       const range = document.createRange();
-      let lineCount = 1;
-      let lastTop: number | null = null;
+      range.selectNodeContents(element);
+      const rects = range.getClientRects();
 
-      const allText = textContent.replace(/\n/g, ' ');
-      const chars = Array.from(allText);
+      let lineCount = 0;
+      let lastTop = -Infinity;
 
-      for (let i = 0; i < chars.length; i++) {
-        try {
-          if (element.firstChild) {
-            range.setStart(element.firstChild, Math.min(i, element.firstChild.textContent?.length || 0));
-            const rect = range.getBoundingClientRect();
-
-            if (lastTop !== null && rect.top > lastTop + 1) {
-              lineCount++;
-            }
-            lastTop = rect.top;
-          }
-        } catch (e) {
-          break;
+      for (let i = 0; i < rects.length; i++) {
+        const rect = rects[i];
+        if (rect.height === 0) continue;
+        if (Math.abs(rect.top - lastTop) > 1) {
+          lineCount++;
+          lastTop = rect.top;
         }
       }
 
-      const totalChars = chars.filter(c => c !== ' ' && c !== '\n').length;
-      const avgCharsPerLine = lineCount > 0 ? Math.round(totalChars / lineCount) : 0;
+      if (lineCount === 0) {
+        lineCount = 1;
+      }
+
+      const totalChars = textContent.replace(/\s/g, '').length;
+      const avgCharsPerLine = Math.round(totalChars / lineCount);
 
       setLineStats({ lines: lineCount, avgCharsPerLine });
     } catch (err) {
       const lineHeightPx = params.fontSize * params.lineHeight;
-      const approximateLines = Math.ceil(element.scrollHeight / lineHeightPx);
+      const approximateLines = Math.max(1, Math.ceil(element.scrollHeight / lineHeightPx));
       const totalChars = textContent.replace(/\s/g, '').length;
       const avgCharsPerLine = approximateLines > 0 ? Math.round(totalChars / approximateLines) : 0;
-      
+
       setLineStats({ lines: approximateLines, avgCharsPerLine });
     }
   }, [params.fontSize, params.lineHeight]);
@@ -80,9 +77,15 @@ const PreviewArea: React.FC<PreviewAreaProps> = React.memo(({ params, text }) =>
   useEffect(() => {
     const timer = setTimeout(computeLineStats, 50);
 
-    const resizeObserver = new ResizeObserver(() => {
-      computeLineStats();
-    });
+    let rafId: number;
+    const debouncedCompute = () => {
+      cancelAnimationFrame(rafId);
+      rafId = requestAnimationFrame(() => {
+        computeLineStats();
+      });
+    };
+
+    const resizeObserver = new ResizeObserver(debouncedCompute);
 
     if (textRef.current) {
       resizeObserver.observe(textRef.current);
@@ -90,6 +93,7 @@ const PreviewArea: React.FC<PreviewAreaProps> = React.memo(({ params, text }) =>
 
     return () => {
       clearTimeout(timer);
+      cancelAnimationFrame(rafId);
       resizeObserver.disconnect();
     };
   }, [computeLineStats, params, text]);

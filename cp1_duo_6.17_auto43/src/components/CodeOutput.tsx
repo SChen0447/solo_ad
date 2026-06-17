@@ -55,8 +55,6 @@ const CodeOutput: React.FC<CodeOutputProps> = ({ params }) => {
     }
   };
 
-  const buttonBgColor = copied ? '#4CAF50' : '#e94560';
-
   return (
     <div style={{
       display: 'flex',
@@ -135,19 +133,15 @@ const CodeOutput: React.FC<CodeOutputProps> = ({ params }) => {
             padding: '10px 16px',
             borderRadius: '8px',
             border: 'none',
-            backgroundColor: buttonBgColor,
+            backgroundColor: copied ? '#4CAF50' : '#e94560',
             color: '#fff',
             cursor: 'pointer',
             fontSize: '14px',
             fontWeight: 600,
-            transition: 'background 0.2s ease',
-            boxShadow: copied
-              ? '0 2px 8px rgba(76, 175, 80, 0.4)'
-              : '0 2px 8px rgba(233, 69, 96, 0.3)',
-            transform: copied ? 'scale(0.98)' : 'scale(1)'
+            transition: 'background 0.2s ease'
           }}
         >
-          {copied ? '✓ 已复制' : '一键复制'}
+          {copied ? '已复制' : '一键复制'}
         </button>
       </div>
 
