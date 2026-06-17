@@ -7,6 +7,8 @@ export function useBoard() {
   const { state, dispatch } = useAppContext();
   const [draggedCardId, setDraggedCardId] = useState<string | null>(null);
   const [dragOverColumn, setDragOverColumn] = useState<ColumnType | null>(null);
+  const [dragOverIndex, setDragOverIndex] = useState<number>(0);
+  const [justDroppedCardId, setJustDroppedCardId] = useState<string | null>(null);
 
   const activeWorkbench = useMemo((): Workbench | undefined => {
     return state.workbenches.find(w => w.id === state.activeWorkbenchId);
@@ -72,13 +74,18 @@ export function useBoard() {
     setDraggedCardId(cardId);
   }, []);
 
-  const handleDragEnd = useCallback(() => {
+  const handleDragEnd = useCallback((cardId: string) => {
+    setJustDroppedCardId(cardId);
     setDraggedCardId(null);
     setDragOverColumn(null);
+    setTimeout(() => {
+      setJustDroppedCardId(null);
+    }, 250);
   }, []);
 
-  const handleDragOver = useCallback((columnId: ColumnType) => {
+  const handleDragOver = useCallback((columnId: ColumnType, index: number) => {
     setDragOverColumn(columnId);
+    setDragOverIndex(index);
   }, []);
 
   const findCardColumn = useCallback(
@@ -100,6 +107,8 @@ export function useBoard() {
     activeWorkbenchId: state.activeWorkbenchId,
     draggedCardId,
     dragOverColumn,
+    dragOverIndex,
+    justDroppedCardId,
     getColumnCards,
     moveCard,
     addCardToColumn,
