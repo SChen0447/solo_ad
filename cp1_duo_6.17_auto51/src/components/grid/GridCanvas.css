@@ -1,0 +1,63 @@
+.grid-canvas-container {
+  flex: 1;
+  min-width: 600px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  padding: 20px;
+  min-height: 500px;
+}
+
+.grid-canvas {
+  background: rgba(26, 26, 38, 0.6);
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  cursor: crosshair;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+}
+
+.grid-canvas:active {
+  cursor: grabbing;
+}
+
+.grid-context-menu {
+  position: fixed;
+  background: #2a2a3a;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 4px;
+  z-index: 1000;
+  min-width: 120px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  animation: fadeInMenu 0.15s ease;
+}
+
+@keyframes fadeInMenu {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.context-menu-item {
+  padding: 8px 12px;
+  font-size: 13px;
+  color: #e0e0e0;
+  cursor: pointer;
+  border-radius: 6px;
+  transition: background 0.15s ease;
+}
+
+.context-menu-item:hover {
+  background: rgba(59, 130, 246, 0.2);
+}
+
+.context-menu-item.danger:hover {
+  background: rgba(239, 68, 68, 0.2);
+  color: #ef4444;
+}

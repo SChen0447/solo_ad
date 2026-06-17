@@ -1,0 +1,173 @@
+[
+  {
+    "id": "wave-easy",
+    "name": "新手试炼",
+    "difficulty": "easy",
+    "enemies": [
+      {
+        "id": "goblin-1",
+        "name": "哥布林战士",
+        "maxHp": 400,
+        "attack": 60,
+        "defense": 20,
+        "speed": 40,
+        "avatar": "👺",
+        "startPosition": { "x": 7, "y": 2 }
+      },
+      {
+        "id": "goblin-2",
+        "name": "哥布林弓手",
+        "maxHp": 300,
+        "attack": 70,
+        "defense": 15,
+        "speed": 50,
+        "avatar": "🏹",
+        "startPosition": { "x": 7, "y": 4 }
+      },
+      {
+        "id": "goblin-3",
+        "name": "哥布林战士",
+        "maxHp": 400,
+        "attack": 60,
+        "defense": 20,
+        "speed": 35,
+        "avatar": "👹",
+        "startPosition": { "x": 6, "y": 3 }
+      }
+    ]
+  },
+  {
+    "id": "wave-normal",
+    "name": "兽人入侵",
+    "difficulty": "normal",
+    "enemies": [
+      {
+        "id": "orc-1",
+        "name": "兽人战士",
+        "maxHp": 700,
+        "attack": 100,
+        "defense": 50,
+        "speed": 35,
+        "avatar": "👹",
+        "startPosition": { "x": 7, "y": 1 }
+      },
+      {
+        "id": "orc-2",
+        "name": "兽人萨满",
+        "maxHp": 500,
+        "attack": 130,
+        "defense": 30,
+        "speed": 45,
+        "avatar": "🧟",
+        "startPosition": { "x": 7, "y": 3 }
+      },
+      {
+        "id": "orc-3",
+        "name": "兽人战士",
+        "maxHp": 700,
+        "attack": 100,
+        "defense": 50,
+        "speed": 35,
+        "avatar": "👹",
+        "startPosition": { "x": 7, "y": 5 }
+      },
+      {
+        "id": "wolf-1",
+        "name": "座狼",
+        "maxHp": 450,
+        "attack": 90,
+        "defense": 25,
+        "speed": 70,
+        "avatar": "🐺",
+        "startPosition": { "x": 6, "y": 2 }
+      },
+      {
+        "id": "wolf-2",
+        "name": "座狼",
+        "maxHp": 450,
+        "attack": 90,
+        "defense": 25,
+        "speed": 70,
+        "avatar": "🐺",
+        "startPosition": { "x": 6, "y": 4 }
+      }
+    ]
+  },
+  {
+    "id": "wave-hard",
+    "name": "魔王降临",
+    "difficulty": "hard",
+    "enemies": [
+      {
+        "id": "demon-lord",
+        "name": "魔王",
+        "maxHp": 2000,
+        "attack": 180,
+        "defense": 80,
+        "speed": 40,
+        "avatar": "😈",
+        "startPosition": { "x": 7, "y": 3 }
+      },
+      {
+        "id": "demon-1",
+        "name": "恶魔卫士",
+        "maxHp": 900,
+        "attack": 130,
+        "defense": 60,
+        "speed": 45,
+        "avatar": "👿",
+        "startPosition": { "x": 6, "y": 1 }
+      },
+      {
+        "id": "demon-2",
+        "name": "恶魔卫士",
+        "maxHp": 900,
+        "attack": 130,
+        "defense": 60,
+        "speed": 45,
+        "avatar": "👿",
+        "startPosition": { "x": 6, "y": 5 }
+      },
+      {
+        "id": "imp-1",
+        "name": "小恶魔",
+        "maxHp": 400,
+        "attack": 100,
+        "defense": 20,
+        "speed": 80,
+        "avatar": "😈",
+        "startPosition": { "x": 5, "y": 2 }
+      },
+      {
+        "id": "imp-2",
+        "name": "小恶魔",
+        "maxHp": 400,
+        "attack": 100,
+        "defense": 20,
+        "speed": 80,
+        "avatar": "😈",
+        "startPosition": { "x": 5, "y": 4 }
+      },
+      {
+        "id": "skeleton-1",
+        "name": "骷髅兵",
+        "maxHp": 350,
+        "attack": 80,
+        "defense": 30,
+        "speed": 50,
+        "avatar": "💀",
+        "startPosition": { "x": 7, "y": 0 }
+      },
+      {
+        "id": "skeleton-2",
+        "name": "骷髅兵",
+        "maxHp": 350,
+        "attack": 80,
+        "defense": 30,
+        "speed": 50,
+        "avatar": "💀",
+        "startPosition": { "x": 7, "y": 6 }
+      }
+    ]
+  }
+]
