@@ -1,4 +1,4 @@
-import { Particle, RGB, PhysicsForce } from './particle';
+import { Particle, RGB, PhysicsForce, Boundary } from './particle';
 
 export type PhysicsScene = 'gravity' | 'wind' | 'vortex';
 
@@ -16,8 +16,9 @@ export interface EmitterStats {
   reducedRate: boolean;
 }
 
-const MAX_POOL_SIZE = 5000;
-const WARNING_THRESHOLD = 4500;
+export const MAX_POOL_SIZE = 5000;
+export const WARNING_THRESHOLD = 4500;
+export const REDUCTION_THRESHOLD = 5000;
 
 export class Emitter {
   private pool: Particle[] = [];
@@ -64,36 +65,35 @@ export class Emitter {
   }
 
   public update(dt: number): Particle[] {
-    const activeParticles: Particle[] = [];
     let activeCount = 0;
 
     for (const p of this.pool) {
       if (p.active) {
         p.update(dt, this.getPhysicsForce());
         activeCount++;
-        activeParticles.push(p);
       }
     }
 
-    const effectiveRate = activeCount > WARNING_THRESHOLD
+    const effectiveRate = activeCount > REDUCTION_THRESHOLD
       ? this.config.emissionRate / 3
       : this.config.emissionRate;
 
     this.emissionAccumulator += effectiveRate * dt;
+
     while (this.emissionAccumulator >= 1) {
-      this.emissionAccumulator -= 1;
-      this.emitParticle(activeCount);
-      if (activeCount < MAX_POOL_SIZE) {
-        activeCount++;
+      if (activeCount >= MAX_POOL_SIZE) {
+        this.emissionAccumulator = 0;
+        break;
       }
+      this.emissionAccumulator -= 1;
+      this.emitParticle();
+      activeCount++;
     }
 
     return this.pool.filter(p => p.active);
   }
 
-  private emitParticle(currentActive: number): void {
-    if (currentActive >= MAX_POOL_SIZE) return;
-
+  private emitParticle(): void {
     const particle = this.pool.find(p => !p.active);
     if (!particle) return;
 
@@ -143,7 +143,17 @@ export class Emitter {
     const activeCount = this.pool.filter(p => p.active).length;
     return {
       activeCount,
-      reducedRate: activeCount > WARNING_THRESHOLD
+      reducedRate: activeCount > REDUCTION_THRESHOLD
+    };
+  }
+
+  public getBoundary(): Boundary {
+    const border = 8;
+    return {
+      left: border,
+      right: this.canvasWidth - border,
+      top: border,
+      bottom: this.canvasHeight - border
     };
   }
 }

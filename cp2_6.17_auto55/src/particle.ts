@@ -12,6 +12,13 @@ export interface PhysicsForce {
   centerY?: number;
 }
 
+export interface Boundary {
+  left: number;
+  right: number;
+  top: number;
+  bottom: number;
+}
+
 export class Particle {
   public x: number = 0;
   public y: number = 0;
@@ -22,9 +29,10 @@ export class Particle {
   public size: number = 4;
   public startColor: RGB = { r: 255, g: 107, b: 107 };
   public endColor: RGB = { r: 255, g: 255, b: 255 };
-  public isFlashing: boolean = false;
-  public flashTimer: number = 0;
+  public colorFlashTimer: number = 0;
   public active: boolean = false;
+
+  private static readonly BOUNCE_ELASTICITY = 0.7;
 
   public reset(
     x: number,
@@ -45,8 +53,7 @@ export class Particle {
     this.size = size;
     this.startColor = startColor;
     this.endColor = endColor;
-    this.isFlashing = false;
-    this.flashTimer = 0;
+    this.colorFlashTimer = 0;
     this.active = true;
   }
 
@@ -59,10 +66,10 @@ export class Particle {
       return;
     }
 
-    if (this.isFlashing) {
-      this.flashTimer -= dt;
-      if (this.flashTimer <= 0) {
-        this.isFlashing = false;
+    if (this.colorFlashTimer > 0) {
+      this.colorFlashTimer -= dt;
+      if (this.colorFlashTimer < 0) {
+        this.colorFlashTimer = 0;
       }
     }
 
@@ -72,8 +79,7 @@ export class Particle {
     if (force.type === 'vortex' && force.centerX !== undefined && force.centerY !== undefined) {
       const dx = this.x - force.centerX;
       const dy = this.y - force.centerY;
-      const distSq = dx * dx + dy * dy;
-      const dist = Math.sqrt(distSq) + 0.001;
+      const dist = Math.sqrt(dx * dx + dy * dy) + 0.001;
       const angularSpeed = 2.5;
       const tangentX = -dy / dist;
       const tangentY = dx / dist;
@@ -88,8 +94,41 @@ export class Particle {
     this.y += this.vy * dt;
   }
 
+  public handleBoundaryCollision(boundary: Boundary): boolean {
+    if (!this.active) return false;
+
+    let collided = false;
+    const radius = this.size / 2;
+
+    if (this.x - radius < boundary.left) {
+      this.x = boundary.left + radius;
+      this.vx = -this.vx * Particle.BOUNCE_ELASTICITY;
+      collided = true;
+    } else if (this.x + radius > boundary.right) {
+      this.x = boundary.right - radius;
+      this.vx = -this.vx * Particle.BOUNCE_ELASTICITY;
+      collided = true;
+    }
+
+    if (this.y - radius < boundary.top) {
+      this.y = boundary.top + radius;
+      this.vy = -this.vy * Particle.BOUNCE_ELASTICITY;
+      collided = true;
+    } else if (this.y + radius > boundary.bottom) {
+      this.y = boundary.bottom - radius;
+      this.vy = -this.vy * Particle.BOUNCE_ELASTICITY;
+      collided = true;
+    }
+
+    if (collided) {
+      this.colorFlashTimer = 0.1;
+    }
+
+    return collided;
+  }
+
   public getCurrentColor(): RGB {
-    if (this.isFlashing) {
+    if (this.colorFlashTimer > 0) {
       return { r: 255, g: 255, b: 255 };
     }
     const t = 1 - this.life / this.maxLife;
@@ -103,10 +142,5 @@ export class Particle {
   public getAlpha(): number {
     const t = this.life / this.maxLife;
     return Math.max(0, Math.min(1, t));
-  }
-
-  public triggerFlash(duration: number = 0.1): void {
-    this.isFlashing = true;
-    this.flashTimer = duration;
   }
 }
