@@ -55,38 +55,57 @@ const RetroBoard: React.FC<RetroBoardProps> = ({ team, author, cards, onCardAdde
   const handleDragStart = (e: React.DragEvent, card: Card) => {
     setDraggedCard(card)
     e.dataTransfer.effectAllowed = 'move'
+    e.dataTransfer.dropEffect = 'move'
     e.dataTransfer.setData('text/plain', card.id)
-    const target = e.target as HTMLElement
-    target.style.opacity = '0.5'
+    e.dataTransfer.setData('cardId', card.id)
+    const target = e.currentTarget as HTMLElement
+    if (target) {
+      e.dataTransfer.setDragImage(target, 20, 20)
+    }
   }
 
-  const handleDragEnd = (e: React.DragEvent) => {
-    const target = e.target as HTMLElement
-    target.style.opacity = '1'
+  const handleDragEnd = () => {
     setDraggedCard(null)
     setDragOverColumn(null)
   }
 
   const handleDragOver = (e: React.DragEvent, column: CardColumn) => {
     e.preventDefault()
+    e.stopPropagation()
     e.dataTransfer.dropEffect = 'move'
     if (dragOverColumn !== column) {
       setDragOverColumn(column)
     }
   }
 
-  const handleDragLeave = (column: CardColumn) => {
-    if (dragOverColumn === column) {
-      setDragOverColumn(null)
+  const handleDragLeave = (e: React.DragEvent, column: CardColumn) => {
+    e.preventDefault()
+    e.stopPropagation()
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
+    const x = e.clientX
+    const y = e.clientY
+    if (
+      x < rect.left ||
+      x > rect.right ||
+      y < rect.top ||
+      y > rect.bottom
+    ) {
+      if (dragOverColumn === column) {
+        setDragOverColumn(null)
+      }
     }
   }
 
   const handleDrop = async (e: React.DragEvent, column: CardColumn) => {
     e.preventDefault()
+    e.stopPropagation()
     setDragOverColumn(null)
-    if (!draggedCard || draggedCard.column === column) return
+    const cardId = e.dataTransfer.getData('text/plain') || e.dataTransfer.getData('cardId')
+    if (!cardId) return
+    const card = cards.find(c => c.id === cardId)
+    if (!card || card.column === column) return
     try {
-      const updated = await updateCardColumn(draggedCard.id, column)
+      const updated = await updateCardColumn(cardId, column)
       onCardUpdated(updated)
     } catch (err) {
       console.error('Failed to update card column:', err)
@@ -126,7 +145,7 @@ const RetroBoard: React.FC<RetroBoardProps> = ({ team, author, cards, onCardAdde
                 minHeight: 'calc(100vh - 128px)'
               }}
               onDragOver={(e) => handleDragOver(e, col.key)}
-              onDragLeave={() => handleDragLeave(col.key)}
+              onDragLeave={(e) => handleDragLeave(e, col.key)}
               onDrop={(e) => handleDrop(e, col.key)}
             >
               <div

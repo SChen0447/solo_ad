@@ -81,7 +81,13 @@ const RetroCard: React.FC<RetroCardProps> = ({ card, onUpdate, onDragStart }) =>
         userSelect: 'none'
       }}
       draggable
-      onDragStart={(e) => onDragStart(e, card)}
+      onDragStart={(e) => {
+        onDragStart(e, card)
+        ;(e.currentTarget as HTMLElement).style.opacity = '0.5'
+      }}
+      onDragEnd={(e) => {
+        ;(e.currentTarget as HTMLElement).style.opacity = '1'
+      }}
       onDoubleClick={handleDoubleClick}
       onMouseEnter={(e) => {
         if (!isEditing) {
