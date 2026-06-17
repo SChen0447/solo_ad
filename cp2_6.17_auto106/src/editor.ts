@@ -4,8 +4,7 @@ import {
   GRID_HEIGHT,
   CellType,
   getCurrentMap,
-  setCell,
-  getCell
+  setCell
 } from './mazeData';
 
 import { forceRender, resetPlayer, resetGame } from './game';
@@ -17,6 +16,13 @@ let onMapChange: (() => void) | null = null;
 
 let selectedGridX: number = -1;
 let selectedGridY: number = -1;
+
+let flashGridX: number = -1;
+let flashGridY: number = -1;
+let flashStartTime: number = 0;
+const FLASH_DURATION = 200;
+let animationFrameId: number = 0;
+let isAnimating: boolean = false;
 
 const cellColors: Record<number, string> = {
   [CellType.EMPTY]: '#e0e0e0',
@@ -105,6 +111,19 @@ export function render(): void {
         ctx.lineWidth = 2;
         ctx.strokeRect(px + 1, py + 1, CELL_SIZE - 2, CELL_SIZE - 2);
       }
+
+      if (x === flashGridX && y === flashGridY) {
+        const elapsed = performance.now() - flashStartTime;
+        const progress = Math.min(elapsed / FLASH_DURATION, 1);
+        const alpha = Math.max(0, 1 - progress) * 0.6;
+
+        ctx.fillStyle = `rgba(255, 127, 80, ${alpha})`;
+        ctx.fillRect(px + 1, py + 1, CELL_SIZE - 2, CELL_SIZE - 2);
+
+        ctx.strokeStyle = `rgba(255, 255, 255, ${alpha})`;
+        ctx.lineWidth = 2;
+        ctx.strokeRect(px + 2, py + 2, CELL_SIZE - 4, CELL_SIZE - 4);
+      }
     }
   }
 
@@ -147,7 +166,7 @@ function handleCanvasClick(e: MouseEvent): void {
   }
 }
 
-function showCellTypePanel(clientX: number, clientY: number, canvasRect: DOMRect): void {
+function showCellTypePanel(clientX: number, clientY: number, _canvasRect: DOMRect): void {
   const wrapperRect = canvas.parentElement!.getBoundingClientRect();
   const panelWidth = 200;
   const panelHeight = 60;
@@ -176,13 +195,39 @@ function hideCellTypePanel(): void {
   render();
 }
 
+function triggerFlash(x: number, y: number): void {
+  flashGridX = x;
+  flashGridY = y;
+  flashStartTime = performance.now();
+
+  if (!isAnimating) {
+    isAnimating = true;
+    flashAnimationLoop();
+  }
+}
+
+function flashAnimationLoop(): void {
+  const elapsed = performance.now() - flashStartTime;
+
+  if (elapsed >= FLASH_DURATION) {
+    flashGridX = -1;
+    flashGridY = -1;
+    isAnimating = false;
+    render();
+    return;
+  }
+
+  render();
+  animationFrameId = requestAnimationFrame(flashAnimationLoop);
+}
+
 function handleTypeSelect(e: Event): void {
   const target = e.target as HTMLElement;
   const cellType = parseInt(target.dataset.type || '0', 10);
 
   if (selectedGridX >= 0 && selectedGridY >= 0) {
     setCellValue(selectedGridX, selectedGridY, cellType);
-    render();
+    triggerFlash(selectedGridX, selectedGridY);
     forceRender();
     resetPlayer();
     resetGame();
@@ -200,6 +245,13 @@ function setCellValue(x: number, y: number, value: number): void {
 }
 
 export function refreshEditor(): void {
+  if (animationFrameId) {
+    cancelAnimationFrame(animationFrameId);
+    animationFrameId = 0;
+  }
+  isAnimating = false;
+  flashGridX = -1;
+  flashGridY = -1;
   hideCellTypePanel();
   render();
 }
