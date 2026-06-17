@@ -16,14 +16,10 @@ function main(): void {
   const sunSimulator = new SunSimulator(ctx);
   new UIController(terrainManager, sunSimulator);
 
-  let lastTime = performance.now();
-
   function animate(): void {
     requestAnimationFrame(animate);
 
     const now = performance.now();
-    const dt = (now - lastTime) / 1000;
-    lastTime = now;
 
     terrainManager.updateAnimations(now);
     ctx.controls.update();

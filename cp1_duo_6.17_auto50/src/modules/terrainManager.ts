@@ -6,7 +6,6 @@ export type SkylineMode = 'center-decay' | 'linear-rise' | 'jagged-wave' | 'unif
 
 interface ControlPoint {
   mesh: THREE.Mesh;
-  baseY: number;
   targetHeight: number;
   currentHeight: number;
   animStart: number;
@@ -17,6 +16,7 @@ interface Building {
   mesh: THREE.Mesh;
   gridX: number;
   gridZ: number;
+  baseHeight: number;
   targetHeight: number;
   currentHeight: number;
   animStart: number;
@@ -25,16 +25,17 @@ interface Building {
 
 interface Snapshot {
   heights: Float32Array;
+  positions: Float32Array;
 }
 
 const EASE_DURATION = 500;
 const CONTROL_POINT_RADIUS = 1.2;
-const BUILDING_SIZE = 3.2;
-const BUILDING_GAP = 0.4;
+const BUILDING_SIZE = 3.0;
+const BUILDING_GAP = 0.6;
 const BUILDING_STEP = BUILDING_SIZE + BUILDING_GAP;
-const GRID_ROWS = 10;
-const GRID_COLS = 14;
-const PLANNING_SIZE = 80;
+const GRID_ROWS = 12;
+const GRID_COLS = 12;
+const PLANNING_SIZE = 60;
 const HEIGHT_MIN = 0;
 const HEIGHT_MAX = 50;
 
@@ -51,100 +52,108 @@ export class TerrainManager {
   private dragControls: DragControls | null = null;
   private orbitEnabled = true;
   private snapshot: Snapshot | null = null;
-  private comparisonGroup: THREE.Group | null = null;
+  private comparisonGroupA: THREE.Group | null = null;
+  private comparisonGroupB: THREE.Group | null = null;
   private isCompareMode = false;
 
-  private onFrameCallback: ((dt: number) => void) | null = null;
+  private controls: any;
 
   constructor(ctx: SceneContext) {
     this.scene = ctx.scene;
     this.camera = ctx.camera;
     this.renderer = ctx.renderer;
+    this.controls = ctx.controls;
 
     this.createPlanningArea();
     this.createControlPoints();
     this.createBuildings();
     this.setupDragControls();
-
-    ctx.onFrame = (dt: number) => {
-      this.updateAnimations(performance.now());
-    };
   }
 
   private createPlanningArea(): void {
-    const borderGeo = new THREE.BufferGeometry();
-    const half = PLANNING_SIZE / 2;
-    const h = 0.15;
-    const verts = new Float32Array([
-      -half, h, -half, half, h, -half, half, h, half, -half, h, half,
-    ]);
-    borderGeo.setAttribute('position', new THREE.BufferAttribute(verts, 3));
-    borderGeo.setIndex([0, 1, 2, 0, 2, 3]);
-    borderGeo.computeVertexNormals();
-    const borderMat = new THREE.MeshStandardMaterial({
-      color: 0x15152a,
-      roughness: 0.9,
-      metalness: 0.1,
+    const geo = new THREE.PlaneGeometry(PLANNING_SIZE, PLANNING_SIZE, 1, 1);
+    const mat = new THREE.MeshStandardMaterial({
+      color: 0x121226,
+      roughness: 0.95,
+      metalness: 0.05,
       transparent: true,
-      opacity: 0.5,
+      opacity: 0.7,
     });
-    const borderMesh = new THREE.Mesh(borderGeo, borderMat);
-    borderMesh.receiveShadow = true;
-    this.scene.add(borderMesh);
+    const plane = new THREE.Mesh(geo, mat);
+    plane.rotation.x = -Math.PI / 2;
+    plane.position.y = 0.02;
+    plane.receiveShadow = true;
+    this.scene.add(plane);
+
+    const edgeGeo = new THREE.EdgesGeometry(
+      new THREE.BoxGeometry(PLANNING_SIZE, 0.2, PLANNING_SIZE)
+    );
+    const edgeMat = new THREE.LineBasicMaterial({
+      color: 0x3366aa,
+      transparent: true,
+      opacity: 0.3,
+    });
+    const edges = new THREE.LineSegments(edgeGeo, edgeMat);
+    edges.position.y = 0.1;
+    this.scene.add(edges);
   }
 
   private createControlPoints(): void {
     const positions = [
-      { x: -25, z: -25 },
-      { x: 0, z: -25 },
-      { x: 25, z: -25 },
-      { x: -25, z: 0 },
+      { x: -18, z: -18 },
+      { x: 0, z: -18 },
+      { x: 18, z: -18 },
+      { x: -18, z: 0 },
       { x: 0, z: 0 },
-      { x: 25, z: 0 },
-      { x: -25, z: 25 },
-      { x: 0, z: 25 },
-      { x: 25, z: 25 },
+      { x: 18, z: 0 },
+      { x: -18, z: 18 },
+      { x: 0, z: 18 },
+      { x: 18, z: 18 },
     ];
-
-    const cpMat = new THREE.MeshPhongMaterial({
-      color: 0x3388ff,
-      transparent: true,
-      opacity: 0.55,
-      emissive: 0x1155aa,
-      emissiveIntensity: 0.3,
-      shininess: 80,
-    });
 
     for (const pos of positions) {
       const h = 20;
       const geo = new THREE.CylinderGeometry(
         CONTROL_POINT_RADIUS,
         CONTROL_POINT_RADIUS,
-        Math.max(h, 0.1),
-        16,
+        1,
+        24,
         1
       );
-      const mesh = new THREE.Mesh(geo, cpMat.clone());
+      const mat = new THREE.MeshStandardMaterial({
+        color: 0x3388ff,
+        transparent: true,
+        opacity: 0.5,
+        emissive: 0x2266cc,
+        emissiveIntensity: 0.2,
+        roughness: 0.4,
+        metalness: 0.3,
+      });
+      const mesh = new THREE.Mesh(geo, mat);
       mesh.position.set(pos.x, h / 2, pos.z);
-      mesh.castShadow = true;
-      mesh.receiveShadow = true;
+      mesh.scale.y = h;
+      mesh.castShadow = false;
+      mesh.receiveShadow = false;
       this.scene.add(mesh);
 
-      const ringGeo = new THREE.RingGeometry(CONTROL_POINT_RADIUS + 0.3, CONTROL_POINT_RADIUS + 0.7, 32);
+      const ringGeo = new THREE.RingGeometry(
+        CONTROL_POINT_RADIUS + 0.4,
+        CONTROL_POINT_RADIUS + 0.9,
+        36
+      );
       const ringMat = new THREE.MeshBasicMaterial({
         color: 0x5599ff,
         transparent: true,
-        opacity: 0.4,
+        opacity: 0.35,
         side: THREE.DoubleSide,
       });
       const ring = new THREE.Mesh(ringGeo, ringMat);
       ring.rotation.x = -Math.PI / 2;
-      ring.position.set(pos.x, 0.05, pos.z);
+      ring.position.set(pos.x, 0.03, pos.z);
       this.scene.add(ring);
 
       this.controlPoints.push({
         mesh,
-        baseY: h / 2,
         targetHeight: h,
         currentHeight: h,
         animStart: 0,
@@ -163,14 +172,15 @@ export class TerrainManager {
         const z = startZ + row * BUILDING_STEP;
         const h = this.computeInterpolatedHeight(x, z);
 
-        const geo = new THREE.BoxGeometry(BUILDING_SIZE, Math.max(h, 0.1), BUILDING_SIZE);
+        const geo = new THREE.BoxGeometry(BUILDING_SIZE, 1, BUILDING_SIZE);
         const mat = new THREE.MeshStandardMaterial({
           color: 0x8888aa,
           roughness: 0.7,
-          metalness: 0.3,
+          metalness: 0.25,
         });
         const mesh = new THREE.Mesh(geo, mat);
         mesh.position.set(x, h / 2, z);
+        mesh.scale.y = h;
         mesh.castShadow = true;
         mesh.receiveShadow = true;
         this.scene.add(mesh);
@@ -179,6 +189,7 @@ export class TerrainManager {
           mesh,
           gridX: x,
           gridZ: z,
+          baseHeight: 1,
           targetHeight: h,
           currentHeight: h,
           animStart: 0,
@@ -195,13 +206,14 @@ export class TerrainManager {
     for (const cp of this.controlPoints) {
       const dx = bx - cp.mesh.position.x;
       const dz = bz - cp.mesh.position.z;
-      const dist = Math.sqrt(dx * dx + dz * dz);
-      const w = 1 / (dist * dist + 1);
+      const distSq = dx * dx + dz * dz;
+      const w = 1 / (distSq + 4);
       totalWeight += w;
       weightedHeight += w * cp.targetHeight;
     }
 
-    return totalWeight > 0 ? weightedHeight / totalWeight : 0;
+    const result = totalWeight > 0 ? weightedHeight / totalWeight : 0;
+    return THREE.MathUtils.clamp(result, HEIGHT_MIN, HEIGHT_MAX);
   }
 
   private setupDragControls(): void {
@@ -211,14 +223,22 @@ export class TerrainManager {
 
     this.dragControls.addEventListener('dragstart', () => {
       this.orbitEnabled = false;
+      this.controls.enabled = false;
     });
 
     this.dragControls.addEventListener('drag', (event) => {
       const obj = event.object as THREE.Mesh;
-      obj.position.x = THREE.MathUtils.clamp(obj.position.x, -PLANNING_SIZE / 2, PLANNING_SIZE / 2);
-      obj.position.z = THREE.MathUtils.clamp(obj.position.z, -PLANNING_SIZE / 2, PLANNING_SIZE / 2);
+      const half = PLANNING_SIZE / 2;
 
-      const h = THREE.MathUtils.clamp(obj.position.y * 2, HEIGHT_MIN, HEIGHT_MAX);
+      obj.position.x = THREE.MathUtils.clamp(obj.position.x, -half, half);
+      obj.position.z = THREE.MathUtils.clamp(obj.position.z, -half, half);
+
+      const h = THREE.MathUtils.clamp(
+        obj.scale.y > 0 ? obj.scale.y : obj.position.y * 2,
+        HEIGHT_MIN,
+        HEIGHT_MAX
+      );
+      obj.scale.y = h;
       obj.position.y = h / 2;
 
       const cp = this.controlPoints.find((c) => c.mesh === obj);
@@ -232,6 +252,7 @@ export class TerrainManager {
 
     this.dragControls.addEventListener('dragend', () => {
       this.orbitEnabled = true;
+      this.controls.enabled = true;
     });
   }
 
@@ -252,7 +273,7 @@ export class TerrainManager {
         const t = Math.min(elapsed / EASE_DURATION, 1);
         const eased = easeInOut(t);
         cp.currentHeight = cp.animFrom + (cp.targetHeight - cp.animFrom) * eased;
-        cp.mesh.scale.y = Math.max(cp.currentHeight / cp.baseY, 0.01);
+        cp.mesh.scale.y = Math.max(cp.currentHeight, 0.01);
         cp.mesh.position.y = cp.currentHeight / 2;
       }
     }
@@ -263,8 +284,8 @@ export class TerrainManager {
         const t = Math.min(elapsed / EASE_DURATION, 1);
         const eased = easeInOut(t);
         b.currentHeight = b.animFrom + (b.targetHeight - b.animFrom) * eased;
-        const h = Math.max(b.currentHeight, 0.1);
-        b.mesh.scale.y = h / b.currentHeight > 0.001 ? h / (b.mesh.geometry as THREE.BoxGeometry).parameters.height : 0.01;
+        const h = Math.max(b.currentHeight, 0.05);
+        b.mesh.scale.y = h;
         b.mesh.position.y = h / 2;
       }
     }
@@ -285,19 +306,19 @@ export class TerrainManager {
 
       switch (mode) {
         case 'center-decay': {
-          const ratio = 1 - (distFromCenter / maxDist) * 0.8;
+          const ratio = 1 - (distFromCenter / maxDist) * 0.85;
           cp.targetHeight = HEIGHT_MAX * ratio;
           break;
         }
         case 'linear-rise': {
-          const ratio = (px + half) / (PLANNING_SIZE);
+          const ratio = (px + half) / PLANNING_SIZE;
           cp.targetHeight = HEIGHT_MIN + (HEIGHT_MAX - HEIGHT_MIN) * ratio;
           break;
         }
         case 'jagged-wave': {
-          const wave = Math.sin(px * 0.1) * Math.cos(pz * 0.1) * 0.5 + 0.5;
-          const rand = 0.7 + Math.random() * 0.6;
-          cp.targetHeight = HEIGHT_MAX * wave * rand;
+          const wave = Math.sin(px * 0.12) * Math.cos(pz * 0.12) * 0.5 + 0.5;
+          const noise = 0.7 + ((px * 13.7 + pz * 23.1) % 1) * 0.6;
+          cp.targetHeight = HEIGHT_MAX * wave * noise;
           break;
         }
         case 'uniform': {
@@ -314,10 +335,17 @@ export class TerrainManager {
 
   saveSnapshot(): void {
     const heights = new Float32Array(this.buildings.length);
+    const positions = new Float32Array(this.controlPoints.length * 3);
     for (let i = 0; i < this.buildings.length; i++) {
       heights[i] = this.buildings[i].currentHeight;
     }
-    this.snapshot = { heights };
+    for (let i = 0; i < this.controlPoints.length; i++) {
+      const cp = this.controlPoints[i];
+      positions[i * 3] = cp.mesh.position.x;
+      positions[i * 3 + 1] = cp.mesh.position.z;
+      positions[i * 3 + 2] = cp.currentHeight;
+    }
+    this.snapshot = { heights, positions };
   }
 
   hasSnapshot(): boolean {
@@ -338,65 +366,125 @@ export class TerrainManager {
     if (!this.snapshot) return;
     this.isCompareMode = true;
 
-    this.comparisonGroup = new THREE.Group();
+    const offset = PLANNING_SIZE / 2 + 5;
+
+    this.comparisonGroupA = new THREE.Group();
+    this.comparisonGroupB = new THREE.Group();
 
     const blueMat = new THREE.MeshStandardMaterial({
       color: 0x3388ff,
       transparent: true,
       opacity: 0.5,
       roughness: 0.6,
-      metalness: 0.3,
+      metalness: 0.2,
+      side: THREE.DoubleSide,
+      depthWrite: false,
     });
 
     for (let i = 0; i < this.buildings.length; i++) {
       const b = this.buildings[i];
-      const h = Math.max(this.snapshot.heights[i], 0.1);
-      const geo = new THREE.BoxGeometry(BUILDING_SIZE * 0.95, h, BUILDING_SIZE * 0.95);
-      const mesh = new THREE.Mesh(geo, blueMat.clone());
-      mesh.position.set(b.gridX - 2, h / 2, b.gridZ);
-      this.comparisonGroup.add(mesh);
+      const h = Math.max(this.snapshot.heights[i], 0.05);
+      const geo = new THREE.BoxGeometry(BUILDING_SIZE, 1, BUILDING_SIZE);
+      const mesh = new THREE.Mesh(geo, blueMat);
+      mesh.position.set(b.gridX - offset, h / 2, b.gridZ);
+      mesh.scale.y = h;
+      mesh.castShadow = false;
+      mesh.receiveShadow = false;
+      this.comparisonGroupA.add(mesh);
     }
+
+    const labelA = this.createLabel('方案A', 0x3388ff);
+    labelA.position.set(-offset, 0.5, -PLANNING_SIZE / 2 - 2);
+    this.comparisonGroupA.add(labelA);
 
     const orangeMat = new THREE.MeshStandardMaterial({
       color: 0xff8833,
       transparent: true,
       opacity: 0.5,
       roughness: 0.6,
-      metalness: 0.3,
+      metalness: 0.2,
+      side: THREE.DoubleSide,
+      depthWrite: false,
     });
 
     for (const b of this.buildings) {
-      const h = Math.max(b.currentHeight, 0.1);
-      const geo = new THREE.BoxGeometry(BUILDING_SIZE * 0.95, h, BUILDING_SIZE * 0.95);
-      const mesh = new THREE.Mesh(geo, orangeMat.clone());
-      mesh.position.set(b.gridX + 2, h / 2, b.gridZ);
-      this.comparisonGroup.add(mesh);
+      const h = Math.max(b.currentHeight, 0.05);
+      const geo = new THREE.BoxGeometry(BUILDING_SIZE, 1, BUILDING_SIZE);
+      const mesh = new THREE.Mesh(geo, orangeMat);
+      mesh.position.set(b.gridX + offset, h / 2, b.gridZ);
+      mesh.scale.y = h;
+      mesh.castShadow = false;
+      mesh.receiveShadow = false;
+      this.comparisonGroupB.add(mesh);
     }
 
-    this.scene.add(this.comparisonGroup);
+    const labelB = this.createLabel('方案B (当前)', 0xff8833);
+    labelB.position.set(offset, 0.5, -PLANNING_SIZE / 2 - 2);
+    this.comparisonGroupB.add(labelB);
+
+    this.scene.add(this.comparisonGroupA);
+    this.scene.add(this.comparisonGroupB);
 
     for (const b of this.buildings) {
       b.mesh.visible = false;
     }
+    for (const cp of this.controlPoints) {
+      cp.mesh.visible = false;
+    }
+  }
+
+  private createLabel(text: string, _color: number): THREE.Mesh {
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d')!;
+    canvas.width = 256;
+    canvas.height = 64;
+
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 28px Inter, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(text, 128, 32);
+
+    const texture = new THREE.CanvasTexture(canvas);
+    const mat = new THREE.MeshBasicMaterial({
+      map: texture,
+      transparent: true,
+      side: THREE.DoubleSide,
+    });
+    const geo = new THREE.PlaneGeometry(8, 2);
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.lookAt(this.camera.position);
+    return mesh;
   }
 
   private exitCompare(): void {
     this.isCompareMode = false;
-    if (this.comparisonGroup) {
-      this.scene.remove(this.comparisonGroup);
-      this.comparisonGroup.traverse((child) => {
-        if (child instanceof THREE.Mesh) {
-          child.geometry.dispose();
-          if (child.material instanceof THREE.Material) {
-            child.material.dispose();
+
+    [this.comparisonGroupA, this.comparisonGroupB].forEach((group) => {
+      if (group) {
+        this.scene.remove(group);
+        group.traverse((child) => {
+          if (child instanceof THREE.Mesh) {
+            child.geometry.dispose();
+            if (child.material instanceof THREE.Material) {
+              if ((child.material as any).map) {
+                (child.material as any).map.dispose();
+              }
+              child.material.dispose();
+            }
           }
-        }
-      });
-      this.comparisonGroup = null;
-    }
+        });
+      }
+    });
+
+    this.comparisonGroupA = null;
+    this.comparisonGroupB = null;
 
     for (const b of this.buildings) {
       b.mesh.visible = true;
+    }
+    for (const cp of this.controlPoints) {
+      cp.mesh.visible = true;
     }
   }
 

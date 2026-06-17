@@ -1,19 +1,21 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 
+export const SHADOW_MAP_WIDTH = 1024;
+export const SHADOW_MAP_HEIGHT = 1024;
+
 export interface SceneContext {
   scene: THREE.Scene;
   camera: THREE.PerspectiveCamera;
   renderer: THREE.WebGLRenderer;
   controls: OrbitControls;
-  onFrame: (dt: number) => void;
 }
 
 export function initScene(container: HTMLElement): SceneContext {
   const scene = new THREE.Scene();
 
   scene.background = new THREE.Color(0x0b0b1a);
-  scene.fog = new THREE.FogExp2(0x0b0b1a, 0.003);
+  scene.fog = new THREE.FogExp2(0x0b0b1a, 0.004);
 
   const camera = new THREE.PerspectiveCamera(
     50,
@@ -21,7 +23,7 @@ export function initScene(container: HTMLElement): SceneContext {
     0.1,
     1000
   );
-  camera.position.set(80, 60, 100);
+  camera.position.set(70, 50, 90);
   camera.lookAt(0, 0, 0);
 
   const renderer = new THREE.WebGLRenderer({
@@ -31,8 +33,10 @@ export function initScene(container: HTMLElement): SceneContext {
   });
   renderer.setSize(container.clientWidth, container.clientHeight);
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1.0;
   container.appendChild(renderer.domElement);
@@ -45,7 +49,7 @@ export function initScene(container: HTMLElement): SceneContext {
   controls.maxPolarAngle = Math.PI / 2.05;
   controls.target.set(0, 5, 0);
 
-  const ambientLight = new THREE.AmbientLight(0x303050, 0.6);
+  const ambientLight = new THREE.AmbientLight(0x303050, 0.5);
   scene.add(ambientLight);
 
   const hemisphereLight = new THREE.HemisphereLight(0x4466aa, 0x111122, 0.3);
@@ -55,7 +59,7 @@ export function initScene(container: HTMLElement): SceneContext {
   gridHelper.position.y = 0.01;
   scene.add(gridHelper);
 
-  const groundGeo = new THREE.PlaneGeometry(200, 200);
+  const groundGeo = new THREE.PlaneGeometry(300, 300);
   const groundMat = new THREE.MeshStandardMaterial({
     color: 0x0e0e1e,
     roughness: 0.95,
@@ -66,20 +70,6 @@ export function initScene(container: HTMLElement): SceneContext {
   ground.receiveShadow = true;
   scene.add(ground);
 
-  const callbacks: Array<(dt: number) => void> = [];
-
-  const onFrame = (dt: number) => {
-    for (const cb of callbacks) cb(dt);
-  };
-
-  const ctx: SceneContext = {
-    scene,
-    camera,
-    renderer,
-    controls,
-    onFrame,
-  };
-
   const handleResize = () => {
     const w = container.clientWidth;
     const h = container.clientHeight;
@@ -89,5 +79,5 @@ export function initScene(container: HTMLElement): SceneContext {
   };
   window.addEventListener('resize', handleResize);
 
-  return ctx;
+  return { scene, camera, renderer, controls };
 }
