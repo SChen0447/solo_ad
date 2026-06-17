@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { Routes, Route, Link, NavLink } from 'react-router-dom';
 
 import EditorPanel from './components/EditorPanel';
 import ConflictVisualizer from './components/ConflictVisualizer';
@@ -130,7 +131,7 @@ const EXAMPLES: ExampleData[] = [
   }
 ];
 
-const App: React.FC = () => {
+const HomePage: React.FC = () => {
   const [html, setHtml] = useState('');
   const [css, setCss] = useState('');
   const [conflicts, setConflicts] = useState<Conflict[]>([]);
@@ -215,6 +216,27 @@ const App: React.FC = () => {
           <span className="logo-icon">⚡</span>
           <span className="logo-text">CSS Conflict Analyzer</span>
         </div>
+
+        <nav className="header-nav">
+          <NavLink
+            to="/"
+            end
+            className={({ isActive }) =>
+              `nav-link ${isActive ? 'active' : ''}`
+            }
+          >
+            🏠 主页
+          </NavLink>
+          <NavLink
+            to="/about"
+            className={({ isActive }) =>
+              `nav-link ${isActive ? 'active' : ''}`
+            }
+          >
+            ℹ️ 关于
+          </NavLink>
+        </nav>
+
         <div className="header-info">
           {conflicts.length > 0 && (
             <span className="result-badge">
@@ -285,6 +307,107 @@ const App: React.FC = () => {
         </div>
       </div>
     </div>
+  );
+};
+
+const AboutPage: React.FC = () => {
+  return (
+    <div className="app-container">
+      <header className="app-header">
+        <div className="header-logo">
+          <span className="logo-icon">⚡</span>
+          <span className="logo-text">CSS Conflict Analyzer</span>
+        </div>
+
+        <nav className="header-nav">
+          <NavLink
+            to="/"
+            end
+            className={({ isActive }) =>
+              `nav-link ${isActive ? 'active' : ''}`
+            }
+          >
+            🏠 主页
+          </NavLink>
+          <NavLink
+            to="/about"
+            className={({ isActive }) =>
+              `nav-link ${isActive ? 'active' : ''}`
+            }
+          >
+            ℹ️ 关于
+          </NavLink>
+        </nav>
+
+        <div className="header-info" />
+      </header>
+
+      <div className="about-page">
+        <div className="about-card">
+          <h1 className="about-title">关于本工具</h1>
+          <p className="about-desc">
+            CSS选择器冲突排查与修复提案生成工具，帮助开发者快速定位CSS样式冲突，
+            并智能生成无副作用的修复方案。
+          </p>
+
+          <div className="feature-grid">
+            <div className="feature-item">
+              <div className="feature-icon">🔍</div>
+              <h3>智能检测</h3>
+              <p>自动分析CSS选择器特异性与覆盖冲突</p>
+            </div>
+            <div className="feature-item">
+              <div className="feature-icon">🌳</div>
+              <h3>可视化定位</h3>
+              <p>DOM树中高亮冲突节点，一目了然</p>
+            </div>
+            <div className="feature-item">
+              <div className="feature-icon">🔧</div>
+              <h3>一键修复</h3>
+              <p>生成Diff格式修复建议，支持一键复制</p>
+            </div>
+            <div className="feature-item">
+              <div className="feature-icon">⚡</div>
+              <h3>极速响应</h3>
+              <p>1.5秒内完成解析与检测，毫秒级交互</p>
+            </div>
+          </div>
+
+          <div className="about-actions">
+            <Link to="/" className="back-home-btn">
+              ← 返回主页开始使用
+            </Link>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const NotFoundPage: React.FC = () => {
+  return (
+    <div className="app-container">
+      <div className="not-found-page">
+        <div className="not-found-card">
+          <div className="not-found-icon">😵</div>
+          <h1 className="not-found-title">404 页面未找到</h1>
+          <p className="not-found-desc">你访问的页面不存在，请检查URL是否正确</p>
+          <Link to="/" className="back-home-btn">
+            ← 返回主页
+          </Link>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const App: React.FC = () => {
+  return (
+    <Routes>
+      <Route path="/" element={<HomePage />} />
+      <Route path="/about" element={<AboutPage />} />
+      <Route path="*" element={<NotFoundPage />} />
+    </Routes>
   );
 };
 

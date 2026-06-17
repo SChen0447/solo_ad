@@ -85,9 +85,22 @@
     </div>
     <script>
       function startApp() {
-        window.__APP_STARTED__ = true;
         const rootEl = document.getElementById('root');
         rootEl.innerHTML = '';
+        if (typeof window.__mountReactApp === 'function') {
+          window.__mountReactApp();
+        } else {
+          window.__APP_STARTED__ = true;
+          var checkInterval = setInterval(function() {
+            if (typeof window.__mountReactApp === 'function') {
+              clearInterval(checkInterval);
+              window.__mountReactApp();
+            }
+          }, 50);
+          setTimeout(function() {
+            clearInterval(checkInterval);
+          }, 5000);
+        }
       }
     </script>
     <script type="module" src="/src/main.tsx"></script>
