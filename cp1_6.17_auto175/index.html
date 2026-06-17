@@ -1,0 +1,540 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="description" content="森林呼吸 - 3D交互式生态景观模拟器" />
+  <title>森林呼吸 | Forest Breathing</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700&display=swap" rel="stylesheet">
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      font-family: 'Noto Sans SC', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: radial-gradient(ellipse at center, #1A2E1A 0%, #0D1B2A 100%);
+      color: #E8F5E9;
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    #app {
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+    }
+
+    #canvas-container {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+    }
+
+    #loading-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 9999;
+      background: radial-gradient(ellipse at center, #1A2E1A 0%, #0D1B2A 100%);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 24px;
+      opacity: 1;
+      transition: opacity 1s ease-out;
+    }
+
+    #loading-overlay.hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .loading-title {
+      font-size: 32px;
+      font-weight: 300;
+      letter-spacing: 8px;
+      color: #A5D6A7;
+      text-shadow: 0 0 20px rgba(165, 214, 167, 0.3);
+    }
+
+    .loading-subtitle {
+      font-size: 14px;
+      font-weight: 300;
+      letter-spacing: 4px;
+      color: #66BB6A;
+      opacity: 0.8;
+    }
+
+    .loading-spinner {
+      width: 48px;
+      height: 48px;
+      border: 2px solid rgba(102, 187, 106, 0.2);
+      border-top-color: #66BB6A;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .glass-panel {
+      position: fixed;
+      background: linear-gradient(135deg, rgba(255, 140, 0, 0.08) 0%, rgba(30, 144, 255, 0.08) 100%);
+      backdrop-filter: blur(20px) saturate(180%);
+      -webkit-backdrop-filter: blur(20px) saturate(180%);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 20px;
+      box-shadow: 
+        0 8px 32px rgba(0, 0, 0, 0.3),
+        inset 0 1px 0 rgba(255, 255, 255, 0.05);
+      transition: box-shadow 0.3s ease, border-color 0.3s ease;
+    }
+
+    .glass-panel:hover {
+      border-color: rgba(102, 187, 106, 0.3);
+      box-shadow: 
+        0 8px 32px rgba(0, 0, 0, 0.3),
+        0 0 20px rgba(102, 187, 106, 0.15),
+        inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    }
+
+    #control-panel {
+      top: 24px;
+      right: 24px;
+      width: 320px;
+      max-height: calc(100vh - 48px);
+      padding: 24px;
+      overflow-y: auto;
+      z-index: 100;
+    }
+
+    #control-panel::-webkit-scrollbar {
+      width: 4px;
+    }
+
+    #control-panel::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    #control-panel::-webkit-scrollbar-thumb {
+      background: rgba(102, 187, 106, 0.3);
+      border-radius: 2px;
+    }
+
+    .panel-title {
+      font-size: 18px;
+      font-weight: 500;
+      letter-spacing: 2px;
+      margin-bottom: 20px;
+      color: #C8E6C9;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .panel-title-icon {
+      width: 24px;
+      height: 24px;
+      opacity: 0.9;
+    }
+
+    .slider-group {
+      margin-bottom: 22px;
+      position: relative;
+    }
+
+    .slider-label {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+      font-size: 13px;
+      color: #A5D6A7;
+      font-weight: 400;
+    }
+
+    .slider-value {
+      font-variant-numeric: tabular-nums;
+      font-weight: 500;
+      color: #81C784;
+      padding: 2px 10px;
+      background: rgba(129, 199, 132, 0.1);
+      border-radius: 12px;
+      font-size: 12px;
+    }
+
+    .slider-wrapper {
+      position: relative;
+      height: 28px;
+      display: flex;
+      align-items: center;
+    }
+
+    input[type="range"] {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 100%;
+      height: 6px;
+      border-radius: 3px;
+      background: linear-gradient(90deg, var(--slider-fill-color, #66BB6A) 0%, var(--slider-fill-color, #66BB6A) var(--slider-progress, 50%), rgba(255,255,255,0.08) var(--slider-progress, 50%), rgba(255,255,255,0.08) 100%);
+      outline: none;
+      cursor: pointer;
+      transition: box-shadow 0.3s ease;
+    }
+
+    input[type="range"]:hover {
+      box-shadow: 0 0 12px var(--slider-glow-color, rgba(102, 187, 106, 0.5));
+    }
+
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: #fff;
+      box-shadow: 
+        0 2px 8px rgba(0,0,0,0.3),
+        0 0 0 2px var(--slider-fill-color, #66BB6A),
+        0 0 0 4px rgba(255,255,255,0.1);
+      cursor: pointer;
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    input[type="range"]::-webkit-slider-thumb:hover {
+      transform: scale(1.15);
+      box-shadow: 
+        0 2px 12px rgba(0,0,0,0.4),
+        0 0 0 2px var(--slider-fill-color, #66BB6A),
+        0 0 0 6px var(--slider-glow-color, rgba(102, 187, 106, 0.2));
+    }
+
+    input[type="range"]::-moz-range-thumb {
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: #fff;
+      border: 2px solid var(--slider-fill-color, #66BB6A);
+      box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+      cursor: pointer;
+    }
+
+    .temp-gradient-bar {
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: -4px;
+      height: 2px;
+      border-radius: 1px;
+      background: linear-gradient(90deg, #1E90FF 0%, #66BB6A 50%, #FF8C00 100%);
+      opacity: 0.6;
+    }
+
+    .reset-btn {
+      width: 100%;
+      padding: 12px 20px;
+      margin-top: 8px;
+      border: 1px solid rgba(102, 187, 106, 0.3);
+      background: linear-gradient(135deg, rgba(102, 187, 106, 0.15) 0%, rgba(30, 144, 255, 0.1) 100%);
+      color: #A5D6A7;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 2px;
+      border-radius: 12px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      font-family: inherit;
+    }
+
+    .reset-btn:hover {
+      background: linear-gradient(135deg, rgba(102, 187, 106, 0.25) 0%, rgba(30, 144, 255, 0.2) 100%);
+      border-color: rgba(102, 187, 106, 0.6);
+      color: #C8E6C9;
+      box-shadow: 
+        0 4px 20px rgba(102, 187, 106, 0.2),
+        0 0 0 1px rgba(102, 187, 106, 0.3) inset;
+      transform: translateY(-1px);
+    }
+
+    .reset-btn:active {
+      transform: translateY(0);
+    }
+
+    #metrics-panel {
+      left: 24px;
+      bottom: 24px;
+      width: 300px;
+      padding: 20px 22px;
+      z-index: 100;
+    }
+
+    .metrics-title {
+      font-size: 14px;
+      font-weight: 500;
+      letter-spacing: 2px;
+      margin-bottom: 16px;
+      color: #B2DFDB;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .metric-item {
+      margin-bottom: 14px;
+    }
+
+    .metric-item:last-child {
+      margin-bottom: 0;
+    }
+
+    .metric-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 6px;
+      font-size: 12px;
+    }
+
+    .metric-name {
+      color: #80CBC4;
+      opacity: 0.9;
+    }
+
+    .metric-value {
+      font-variant-numeric: tabular-nums;
+      font-weight: 600;
+      font-size: 13px;
+      color: #4DB6AC;
+    }
+
+    .metric-bar {
+      width: 100%;
+      height: 6px;
+      background: rgba(255, 255, 255, 0.06);
+      border-radius: 3px;
+      overflow: hidden;
+    }
+
+    .metric-fill {
+      height: 100%;
+      border-radius: 3px;
+      background: linear-gradient(90deg, #26A69A 0%, #66BB6A 100%);
+      transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+      box-shadow: 0 0 8px rgba(102, 187, 106, 0.4);
+    }
+
+    .metric-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-top: 16px;
+      padding-top: 16px;
+      border-top: 1px solid rgba(255, 255, 255, 0.06);
+    }
+
+    .metric-chip {
+      padding: 10px 12px;
+      background: rgba(77, 182, 172, 0.08);
+      border-radius: 10px;
+      border: 1px solid rgba(77, 182, 172, 0.15);
+      transition: all 0.3s ease;
+    }
+
+    .metric-chip:hover {
+      border-color: rgba(77, 182, 172, 0.4);
+      box-shadow: 0 0 12px rgba(77, 182, 172, 0.2);
+    }
+
+    .metric-chip-label {
+      font-size: 10px;
+      letter-spacing: 1px;
+      color: #80CBC4;
+      opacity: 0.7;
+      margin-bottom: 4px;
+    }
+
+    .metric-chip-value {
+      font-size: 16px;
+      font-weight: 600;
+      color: #4DB6AC;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .metric-chip-value small {
+      font-size: 11px;
+      font-weight: 400;
+      opacity: 0.7;
+      margin-left: 2px;
+    }
+
+    .fade-in {
+      animation: fadeIn 1s ease-out forwards;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    #control-panel { animation-delay: 0.2s; animation-fill-mode: both; }
+    #metrics-panel { animation-delay: 0.4s; animation-fill-mode: both; }
+
+    @media (max-width: 768px) {
+      #control-panel {
+        top: auto;
+        right: 0;
+        left: 0;
+        bottom: 0;
+        width: 100%;
+        max-height: 45vh;
+        border-radius: 20px 20px 0 0;
+        padding: 20px;
+      }
+
+      #metrics-panel {
+        left: 16px;
+        right: 16px;
+        bottom: calc(45vh + 16px);
+        width: auto;
+        padding: 16px;
+      }
+
+      .metric-grid {
+        gap: 8px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div id="loading-overlay">
+    <div class="loading-spinner"></div>
+    <div class="loading-title">森 林 呼 吸</div>
+    <div class="loading-subtitle">F O R E S T &nbsp; B R E A T H I N G</div>
+  </div>
+
+  <div id="app">
+    <div id="canvas-container"></div>
+
+    <div id="control-panel" class="glass-panel fade-in">
+      <div class="panel-title">
+        <svg class="panel-title-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 2L4 7v6c0 5 3.5 9 8 10 4.5-1 8-5 8-10V7l-8-5z"/>
+          <path d="M12 22V12"/>
+          <path d="M4 12h16"/>
+        </svg>
+        环境控制
+      </div>
+
+      <div class="slider-group" data-param="light">
+        <div class="slider-label">
+          <span>☀️ 光照强度</span>
+          <span class="slider-value" id="light-value">60%</span>
+        </div>
+        <div class="slider-wrapper">
+          <input type="range" id="light-slider" min="0" max="100" value="60" step="1"
+                 style="--slider-fill-color:#FFD54F;--slider-glow-color:rgba(255,213,79,0.5);--slider-progress:60%;" />
+        </div>
+      </div>
+
+      <div class="slider-group" data-param="rain">
+        <div class="slider-label">
+          <span>🌧️ 降雨强度</span>
+          <span class="slider-value" id="rain-value">50%</span>
+        </div>
+        <div class="slider-wrapper">
+          <input type="range" id="rain-slider" min="0" max="100" value="50" step="1"
+                 style="--slider-fill-color:#4FC3F7;--slider-glow-color:rgba(79,195,247,0.5);--slider-progress:50%;" />
+        </div>
+      </div>
+
+      <div class="slider-group" data-param="wind">
+        <div class="slider-label">
+          <span>🍃 风力强度</span>
+          <span class="slider-value" id="wind-value">20%</span>
+        </div>
+        <div class="slider-wrapper">
+          <input type="range" id="wind-slider" min="0" max="100" value="20" step="1"
+                 style="--slider-fill-color:#81C784;--slider-glow-color:rgba(129,199,132,0.5);--slider-progress:20%;" />
+        </div>
+      </div>
+
+      <div class="slider-group" data-param="temp">
+        <div class="slider-label">
+          <span>🌡️ 环境温度</span>
+          <span class="slider-value" id="temp-value">22°C</span>
+        </div>
+        <div class="slider-wrapper">
+          <input type="range" id="temp-slider" min="-10" max="40" value="22" step="1"
+                 style="--slider-fill-color:linear-gradient(90deg,#1E90FF,#FF8C00);--slider-progress:64%;" />
+          <div class="temp-gradient-bar"></div>
+        </div>
+      </div>
+
+      <button class="reset-btn" id="reset-btn">重 置 默 认</button>
+    </div>
+
+    <div id="metrics-panel" class="glass-panel fade-in">
+      <div class="metrics-title">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
+        </svg>
+        实时生态指标
+      </div>
+
+      <div class="metric-item">
+        <div class="metric-header">
+          <span class="metric-name">🌿 生态健康度</span>
+          <span class="metric-value" id="health-value">0</span>
+        </div>
+        <div class="metric-bar">
+          <div class="metric-fill" id="health-fill" style="width:0%;background:linear-gradient(90deg,#EF5350 0%,#FFD54F 50%,#66BB6A 100%);"></div>
+        </div>
+      </div>
+
+      <div class="metric-item">
+        <div class="metric-header">
+          <span class="metric-name">🦋 生物多样性</span>
+          <span class="metric-value" id="biodiversity-value">0</span>
+        </div>
+        <div class="metric-bar">
+          <div class="metric-fill" id="biodiversity-fill" style="width:0%;background:linear-gradient(90deg,#AB47BC 0%,#26A69A 100%);"></div>
+        </div>
+      </div>
+
+      <div class="metric-item">
+        <div class="metric-header">
+          <span class="metric-name">🌱 生长活跃度</span>
+          <span class="metric-value" id="growth-value">0</span>
+        </div>
+        <div class="metric-bar">
+          <div class="metric-fill" id="growth-fill" style="width:0%;"></div>
+        </div>
+      </div>
+
+      <div class="metric-grid">
+        <div class="metric-chip">
+          <div class="metric-chip-label">💧 湿度指数</div>
+          <div class="metric-chip-value" id="humidity-value">0<small>%</small></div>
+        </div>
+        <div class="metric-chip">
+          <div class="metric-chip-label">🌳 树木数量</div>
+          <div class="metric-chip-value" id="tree-count-value">0</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
