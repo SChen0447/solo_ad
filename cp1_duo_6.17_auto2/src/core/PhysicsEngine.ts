@@ -1,0 +1,270 @@
+import * as THREE from 'three';
+import { AstroBody, mergeBodies } from './AstroBody';
+
+export interface CollisionEvent {
+  body1: AstroBody;
+  body2: AstroBody;
+  position: THREE.Vector3;
+}
+
+export interface ExplosionParticle {
+  mesh: THREE.Mesh;
+  velocity: THREE.Vector3;
+  life: number;
+  maxLife: number;
+}
+
+type SpatialBucket = Map<string, AstroBody[]>;
+
+export class PhysicsEngine {
+  public gravityConstant: number = 0.5;
+  private bodies: AstroBody[] = [];
+  private scene: THREE.Scene;
+  private explosions: ExplosionParticle[] = [];
+  private bucketSize: number = 20;
+
+  constructor(scene: THREE.Scene, gravityConstant: number = 0.5) {
+    this.scene = scene;
+    this.gravityConstant = gravityConstant;
+  }
+
+  public addBody(body: AstroBody): void {
+    this.bodies.push(body);
+  }
+
+  public removeBody(body: AstroBody): void {
+    const index = this.bodies.indexOf(body);
+    if (index !== -1) {
+      body.dispose(this.scene);
+      this.bodies.splice(index, 1);
+    }
+  }
+
+  public clearAll(): void {
+    for (const body of this.bodies) {
+      body.dispose(this.scene);
+    }
+    this.bodies = [];
+    this.clearExplosions();
+  }
+
+  public getBodies(): AstroBody[] {
+    return this.bodies;
+  }
+
+  public setBodies(bodies: AstroBody[]): void {
+    this.clearAll();
+    this.bodies = bodies;
+  }
+
+  public update(deltaTime: number): CollisionEvent[] {
+    const collisions: CollisionEvent[] = [];
+
+    if (deltaTime > 0.05) deltaTime = 0.05;
+
+    this.calculateGravity();
+    this.detectCollisions(collisions);
+
+    for (const body of this.bodies) {
+      body.update(deltaTime);
+    }
+
+    this.handleCollisions(collisions);
+    this.updateExplosions(deltaTime);
+
+    return collisions;
+  }
+
+  private calculateGravity(): void {
+    const G = this.gravityConstant * 50;
+    const n = this.bodies.length;
+
+    for (let i = 0; i < n; i++) {
+      for (let j = i + 1; j < n; j++) {
+        const bodyA = this.bodies[i];
+        const bodyB = this.bodies[j];
+
+        const direction = new THREE.Vector3()
+          .subVectors(bodyB.position, bodyA.position);
+        const distanceSq = direction.lengthSq();
+
+        if (distanceSq < 0.1) continue;
+
+        const distance = Math.sqrt(distanceSq);
+        const forceMagnitude = (G * bodyA.mass * bodyB.mass) / distanceSq;
+
+        const force = direction.normalize().multiplyScalar(forceMagnitude);
+
+        bodyA.applyForce(force);
+        bodyB.applyForce(force.clone().negate());
+      }
+    }
+  }
+
+  private buildSpatialBuckets(): SpatialBucket {
+    const buckets: SpatialBucket = new Map();
+
+    for (const body of this.bodies) {
+      const key = this.getBucketKey(body.position);
+      if (!buckets.has(key)) {
+        buckets.set(key, []);
+      }
+      buckets.get(key)!.push(body);
+    }
+
+    return buckets;
+  }
+
+  private getBucketKey(position: THREE.Vector3): string {
+    const bx = Math.floor(position.x / this.bucketSize);
+    const by = Math.floor(position.y / this.bucketSize);
+    const bz = Math.floor(position.z / this.bucketSize);
+    return `${bx},${by},${bz}`;
+  }
+
+  private getNeighborBucketKeys(position: THREE.Vector3): string[] {
+    const keys: string[] = [];
+    const bx = Math.floor(position.x / this.bucketSize);
+    const by = Math.floor(position.y / this.bucketSize);
+    const bz = Math.floor(position.z / this.bucketSize);
+
+    for (let dx = -1; dx <= 1; dx++) {
+      for (let dy = -1; dy <= 1; dy++) {
+        for (let dz = -1; dz <= 1; dz++) {
+          keys.push(`${bx + dx},${by + dy},${bz + dz}`);
+        }
+      }
+    }
+
+    return keys;
+  }
+
+  private detectCollisions(collisions: CollisionEvent[]): void {
+    const buckets = this.buildSpatialBuckets();
+    const checked = new Set<string>();
+
+    for (const body of this.bodies) {
+      const neighborKeys = this.getNeighborBucketKeys(body.position);
+
+      for (const key of neighborKeys) {
+        const bucket = buckets.get(key);
+        if (!bucket) continue;
+
+        for (const other of bucket) {
+          if (body === other) continue;
+
+          const pairKey = [body.id, other.id].sort().join('|');
+          if (checked.has(pairKey)) continue;
+          checked.add(pairKey);
+
+          const distance = body.position.distanceTo(other.position);
+          const minDistance = body.radius + other.radius;
+
+          if (distance < minDistance) {
+            collisions.push({
+              body1: body,
+              body2: other,
+              position: body.position.clone().add(other.position).multiplyScalar(0.5),
+            });
+          }
+        }
+      }
+    }
+  }
+
+  private handleCollisions(collisions: CollisionEvent[]): void {
+    const processed = new Set<string>();
+
+    for (const collision of collisions) {
+      const key = [collision.body1.id, collision.body2.id].sort().join('|');
+      if (processed.has(key)) continue;
+
+      if (!this.bodies.includes(collision.body1) || !this.bodies.includes(collision.body2)) {
+        continue;
+      }
+
+      processed.add(key);
+
+      this.createExplosion(collision.position, collision.body1.color, collision.body2.color);
+
+      const merged = mergeBodies(collision.body1, collision.body2, this.scene);
+
+      this.removeBody(collision.body1);
+      this.removeBody(collision.body2);
+
+      this.bodies.push(merged);
+    }
+  }
+
+  private createExplosion(position: THREE.Vector3, color1: string, color2: string): void {
+    const particleCount = 50;
+
+    for (let i = 0; i < particleCount; i++) {
+      const geometry = new THREE.SphereGeometry(0.1 + Math.random() * 0.15, 8, 8);
+      const useColor1 = Math.random() > 0.5;
+      const material = new THREE.MeshBasicMaterial({
+        color: useColor1 ? new THREE.Color(color1) : new THREE.Color(color2),
+        transparent: true,
+        opacity: 1,
+      });
+
+      const mesh = new THREE.Mesh(geometry, material);
+      mesh.position.copy(position);
+
+      const theta = Math.random() * Math.PI * 2;
+      const phi = Math.acos(2 * Math.random() - 1);
+      const speed = 2 + Math.random() * 8;
+
+      const velocity = new THREE.Vector3(
+        Math.sin(phi) * Math.cos(theta) * speed,
+        Math.sin(phi) * Math.sin(theta) * speed,
+        Math.cos(phi) * speed
+      );
+
+      this.scene.add(mesh);
+      this.explosions.push({
+        mesh,
+        velocity,
+        life: 0.5,
+        maxLife: 0.5,
+      });
+    }
+  }
+
+  private updateExplosions(deltaTime: number): void {
+    for (let i = this.explosions.length - 1; i >= 0; i--) {
+      const particle = this.explosions[i];
+      particle.life -= deltaTime;
+
+      if (particle.life <= 0) {
+        this.scene.remove(particle.mesh);
+        particle.mesh.geometry.dispose();
+        (particle.mesh.material as THREE.Material).dispose();
+        this.explosions.splice(i, 1);
+        continue;
+      }
+
+      particle.mesh.position.add(particle.velocity.clone().multiplyScalar(deltaTime));
+      particle.velocity.multiplyScalar(0.96);
+
+      const material = particle.mesh.material as THREE.MeshBasicMaterial;
+      material.opacity = particle.life / particle.maxLife;
+
+      const scale = 0.5 + (particle.life / particle.maxLife) * 0.5;
+      particle.mesh.scale.setScalar(scale);
+    }
+  }
+
+  private clearExplosions(): void {
+    for (const particle of this.explosions) {
+      this.scene.remove(particle.mesh);
+      particle.mesh.geometry.dispose();
+      (particle.mesh.material as THREE.Material).dispose();
+    }
+    this.explosions = [];
+  }
+
+  public getBodyCount(): number {
+    return this.bodies.length;
+  }
+}
