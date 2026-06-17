@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>迷宫探索者</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      background-color: #1a202c;
+      color: #fff;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 20px;
+      min-width: 768px;
+    }
+
+    #app {
+      width: 800px;
+      max-width: 100%;
+    }
+
+    .game-header {
+      background-color: #1e3a5f;
+      border-radius: 8px;
+      padding: 12px 20px;
+      margin-bottom: 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 20px;
+      font-weight: 600;
+    }
+
+    .game-header .info-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .game-container {
+      display: flex;
+      gap: 20px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    .game-canvas-wrapper {
+      position: relative;
+    }
+
+    #gameCanvas {
+      display: block;
+      background-color: #e0e0e0;
+      border-radius: 8px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+    }
+
+    .game-over-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(0, 0, 0, 0.7);
+      display: none;
+      justify-content: center;
+      align-items: center;
+      flex-direction: column;
+      border-radius: 8px;
+      z-index: 10;
+    }
+
+    .game-over-overlay.show {
+      display: flex;
+    }
+
+    .game-over-title {
+      font-size: 36px;
+      font-weight: bold;
+      color: #0f0;
+      margin-bottom: 16px;
+    }
+
+    .game-over-stats {
+      font-size: 20px;
+      margin-bottom: 24px;
+      text-align: center;
+      line-height: 1.8;
+    }
+
+    .sidebar {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      min-width: 200px;
+    }
+
+    .btn-group {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .btn {
+      padding: 12px 20px;
+      font-size: 16px;
+      font-weight: 600;
+      border: none;
+      border-radius: 12px;
+      background-color: #333;
+      color: #fff;
+      cursor: pointer;
+      transition: background-color 0.2s ease;
+    }
+
+    .btn:hover {
+      background-color: #ff7f50;
+    }
+
+    .btn.active {
+      background-color: #ff7f50;
+    }
+
+    .editor-section {
+      display: none;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .editor-section.show {
+      display: flex;
+    }
+
+    .editor-title {
+      font-size: 18px;
+      font-weight: 600;
+      color: #ff7f50;
+    }
+
+    .editor-canvas-wrapper {
+      background-color: #2d3748;
+      border-radius: 8px;
+      padding: 10px;
+    }
+
+    #editorCanvas {
+      display: block;
+      cursor: pointer;
+      border-radius: 4px;
+    }
+
+    .legend {
+      background-color: #2d3748;
+      border-radius: 8px;
+      padding: 12px;
+      font-size: 14px;
+    }
+
+    .legend-title {
+      font-weight: 600;
+      margin-bottom: 8px;
+      color: #ff7f50;
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 6px;
+    }
+
+    .legend-color {
+      width: 20px;
+      height: 20px;
+      border-radius: 4px;
+      flex-shrink: 0;
+    }
+
+    .level-selector-label {
+      font-size: 14px;
+      font-weight: 600;
+      color: #a0aec0;
+      margin-bottom: 4px;
+    }
+
+    .level-selector {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .level-btn {
+      flex: 1;
+      min-width: 60px;
+    }
+
+    .hint-text {
+      font-size: 12px;
+      color: #a0aec0;
+      line-height: 1.5;
+    }
+
+    .cell-type-panel {
+      position: absolute;
+      display: none;
+      background-color: #2d3748;
+      border: 2px solid #4a5568;
+      border-radius: 12px;
+      padding: 10px;
+      z-index: 100;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+    }
+
+    .cell-type-panel.show {
+      display: flex;
+      gap: 8px;
+    }
+
+    .cell-type-btn {
+      width: 44px;
+      height: 44px;
+      border: 2px solid transparent;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+    }
+
+    .cell-type-btn:hover {
+      border-color: #ff7f50;
+      transform: scale(1.05);
+    }
+
+    .cell-type-btn.empty { background-color: #e0e0e0; }
+    .cell-type-btn.wall { background-color: #444; }
+    .cell-type-btn.exit { background-color: #0f0; }
+    .cell-type-btn.gem { background-color: #e53e3e; }
+
+    .cell-type-btn.gem::after {
+      content: '';
+      width: 20px;
+      height: 20px;
+      background: radial-gradient(circle, #ff6b6b 0%, #e53e3e 60%, #c53030 100%);
+      border-radius: 50%;
+    }
+
+    .cell-type-label {
+      position: absolute;
+      bottom: -20px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 11px;
+      color: #fff;
+      white-space: nowrap;
+    }
+
+    @media (max-width: 768px) {
+      body {
+        min-width: 100%;
+        padding: 10px;
+      }
+
+      #app {
+        width: 100%;
+      }
+
+      .game-header {
+        font-size: 16px;
+        padding: 10px 12px;
+      }
+
+      .game-container {
+        flex-direction: column;
+        align-items: center;
+        gap: 16px;
+      }
+
+      #gameCanvas,
+      #editorCanvas {
+        width: 100% !important;
+        height: auto !important;
+        max-width: 480px;
+        aspect-ratio: 1 / 1;
+      }
+
+      .sidebar {
+        width: 100%;
+        max-width: 480px;
+        min-width: unset;
+      }
+
+      .game-over-title {
+        font-size: 28px;
+      }
+
+      .game-over-stats {
+        font-size: 16px;
+      }
+
+      .editor-canvas-wrapper {
+        padding: 6px;
+      }
+    }
+
+    @media (max-width: 480px) {
+      .game-header {
+        font-size: 14px;
+        padding: 8px 10px;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      .game-header .info-item {
+        gap: 4px;
+      }
+
+      .btn {
+        padding: 10px 14px;
+        font-size: 14px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <div class="game-header">
+      <div class="info-item">
+        <span>关卡:</span>
+        <span id="levelDisplay">1</span>
+      </div>
+      <div class="info-item">
+        <span>分数:</span>
+        <span id="scoreDisplay">0</span>
+      </div>
+      <div class="info-item">
+        <span>时间:</span>
+        <span id="timerDisplay">0.00s</span>
+      </div>
+    </div>
+
+    <div class="game-container">
+      <div class="game-canvas-wrapper">
+        <canvas id="gameCanvas" width="640" height="640"></canvas>
+        <div class="game-over-overlay" id="gameOverOverlay">
+          <div class="game-over-title">🎉 通关成功！</div>
+          <div class="game-over-stats">
+            <div>用时: <span id="finalTime">0.00s</span></div>
+            <div>得分: <span id="finalScore">0</span></div>
+          </div>
+          <button class="btn" id="nextLevelBtn">下一关</button>
+        </div>
+      </div>
+
+      <div class="sidebar">
+        <div class="btn-group">
+          <div class="level-selector-label">选择关卡</div>
+          <div class="level-selector">
+            <button class="btn level-btn active" data-level="0">关卡1</button>
+            <button class="btn level-btn" data-level="1">关卡2</button>
+            <button class="btn level-btn" data-level="2">关卡3</button>
+          </div>
+          <button class="btn" id="resetBtn">重新开始</button>
+          <button class="btn" id="editorToggleBtn">编辑器模式</button>
+        </div>
+
+        <div class="editor-section" id="editorSection">
+          <div class="editor-title">地图编辑器</div>
+          <div class="editor-canvas-wrapper" style="position: relative;">
+            <canvas id="editorCanvas" width="640" height="640"></canvas>
+            <div class="cell-type-panel" id="cellTypePanel">
+              <button class="cell-type-btn empty" data-type="0" title="空地"></button>
+              <button class="cell-type-btn wall" data-type="1" title="墙壁"></button>
+              <button class="cell-type-btn exit" data-type="2" title="出口"></button>
+              <button class="cell-type-btn gem" data-type="3" title="宝石"></button>
+            </div>
+          </div>
+          <div class="legend">
+            <div class="legend-title">图例说明</div>
+            <div class="legend-item">
+              <div class="legend-color" style="background-color: #e0e0e0;"></div>
+              <span>空地</span>
+            </div>
+            <div class="legend-item">
+              <div class="legend-color" style="background-color: #444;"></div>
+              <span>墙壁</span>
+            </div>
+            <div class="legend-item">
+              <div class="legend-color" style="background-color: #0f0;"></div>
+              <span>出口</span>
+            </div>
+            <div class="legend-item">
+              <div class="legend-color" style="background-color: #e53e3e;"></div>
+              <span>宝石</span>
+            </div>
+          </div>
+          <p class="hint-text">点击格子弹出选择面板，直接选择要设置的格子类型</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
