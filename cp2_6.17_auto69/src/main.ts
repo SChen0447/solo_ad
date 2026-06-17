@@ -1,4 +1,7 @@
 import * as THREE from 'three';
+import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
+import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js';
 import { CityDataStore, BuildingType, BuildingData } from './cityData';
 import { CityBuilder } from './cityBuilder';
 import { Navigation } from './navigation';
@@ -24,10 +27,50 @@ class EventBus {
   }
 }
 
+const BlurShader = {
+  uniforms: {
+    tDiffuse: { value: null as THREE.Texture | null },
+    blurStrength: { value: 0.0 },
+    resolution: { value: new THREE.Vector2(1, 1) },
+  },
+  vertexShader: `
+    varying vec2 vUv;
+    void main() {
+      vUv = uv;
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+    }
+  `,
+  fragmentShader: `
+    uniform sampler2D tDiffuse;
+    uniform float blurStrength;
+    uniform vec2 resolution;
+    varying vec2 vUv;
+
+    void main() {
+      vec4 sum = vec4(0.0);
+      float total = 0.0;
+      float strength = blurStrength * 0.0012;
+      vec2 texel = 1.0 / resolution;
+
+      for (int x = -3; x <= 3; x++) {
+        for (int y = -3; y <= 3; y++) {
+          vec2 offset = vec2(float(x), float(y)) * texel * strength;
+          float weight = exp(-(float(x*x) + float(y*y)) / (2.0 * max(strength, 0.01)));
+          sum += texture2D(tDiffuse, vUv + offset) * weight;
+          total += weight;
+        }
+      }
+      gl_FragColor = sum / max(total, 0.0001);
+    }
+  `,
+};
+
 class App {
   private scene: THREE.Scene;
   private camera: THREE.PerspectiveCamera;
   private renderer: THREE.WebGLRenderer;
+  private composer!: EffectComposer;
+  private blurPass!: ShaderPass;
   private clock = new THREE.Clock();
 
   private eventBus = new EventBus();
@@ -40,10 +83,15 @@ class App {
   private mouse = new THREE.Vector2();
   private isMouseDown = false;
   private mouseDownPos = new THREE.Vector2();
+  private didDrag = false;
   private shiftKey = false;
 
   private fpsFrames = 0;
   private fpsTime = 0;
+
+  private blurVelocity = 0;
+  private lastCamPos = new THREE.Vector3();
+  private lastCamQuat = new THREE.Quaternion();
 
   constructor() {
     const container = document.getElementById('app')!;
@@ -69,6 +117,7 @@ class App {
     this.renderer.domElement.style.zIndex = '0';
     container.appendChild(this.renderer.domElement);
 
+    this.setupComposer();
     this.setupScene();
     this.setupLighting();
     this.setupSkybox();
@@ -83,7 +132,6 @@ class App {
     );
 
     this.navigation = new Navigation(this.camera);
-    this.navigation.setMotionBlurElement(this.renderer.domElement);
 
     this.ui = new UI(
       (event, data) => this.eventBus.emit(event, data),
@@ -95,7 +143,23 @@ class App {
 
     window.addEventListener('resize', () => this.onResize());
 
+    this.lastCamPos.copy(this.camera.position);
+    this.lastCamQuat.copy(this.camera.quaternion);
+
     this.animate();
+  }
+
+  private setupComposer(): void {
+    this.composer = new EffectComposer(this.renderer);
+    this.composer.setSize(window.innerWidth, window.innerHeight);
+
+    const renderPass = new RenderPass(this.scene, this.camera);
+    this.composer.addPass(renderPass);
+
+    this.blurPass = new ShaderPass(BlurShader);
+    this.blurPass.uniforms.resolution.value.set(window.innerWidth, window.innerHeight);
+    this.blurPass.uniforms.blurStrength.value = 0;
+    this.composer.addPass(this.blurPass);
   }
 
   private setupScene(): void {
@@ -223,6 +287,7 @@ class App {
       }
       if (e.button === 0) {
         this.isMouseDown = true;
+        this.didDrag = false;
         this.shiftKey = e.shiftKey;
         this.mouseDownPos.set(e.clientX, e.clientY);
 
@@ -240,6 +305,11 @@ class App {
       this.navigation.handleMouseMove(e);
 
       if (this.isMouseDown && this.cityBuilder.getSelectedId()) {
+        const dist = Math.hypot(
+          e.clientX - this.mouseDownPos.x,
+          e.clientY - this.mouseDownPos.y
+        );
+        if (dist > 3) this.didDrag = true;
         this.cityBuilder.updateDrag(this.mouse, this.camera);
       }
     });
@@ -251,26 +321,25 @@ class App {
           e.clientY - this.mouseDownPos.y
         );
 
-        if (dist < 5) {
+        if (!this.didDrag && dist < 5) {
           this.cityBuilder.handleClick(this.mouse, this.camera);
         }
 
         this.cityBuilder.endDrag();
         this.isMouseDown = false;
-
-        if (!this.shiftKey) {
-          this.ui.hideRotationTooltip();
-        }
+        this.didDrag = false;
+        this.ui.hideRotationTooltip();
       }
       this.navigation.handleMouseUp(e);
     });
 
     canvas.addEventListener('wheel', (e) => {
       e.preventDefault();
-      if (this.cityBuilder.getSelectedId() && this.cityBuilder.getPlacingType() === null) {
+      if (this.cityBuilder.getPlacingType() === null && this.cityBuilder.getSelectedId()) {
         this.cityBuilder.handleScroll(e.deltaY);
+      } else {
+        this.navigation.handleWheel(e.deltaY);
       }
-      this.navigation.handleWheel(e.deltaY);
     }, { passive: false });
 
     canvas.addEventListener('contextmenu', (e) => {
@@ -284,36 +353,53 @@ class App {
         this.ui.clearPlacingType();
         this.cityBuilder.deselectBuilding();
       }
-      if (e.key === 'Delete') {
-        this.cityBuilder.deleteSelected();
+      if (e.key === 'Delete' || e.key === 'Backspace') {
+        if (!(e.target instanceof HTMLInputElement)) {
+          e.preventDefault();
+          this.cityBuilder.deleteSelected();
+        }
       }
     });
 
     document.addEventListener('keyup', (e) => {
       this.navigation.handleKeyUp(e.key);
     });
-
-    document.addEventListener('pointerlockchange', () => {
-      this.navigation.handlePointerLockChange();
-    });
   }
 
   private onResize(): void {
-    this.camera.aspect = window.innerWidth / window.innerHeight;
+    const w = window.innerWidth;
+    const h = window.innerHeight;
+    this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();
-    this.renderer.setSize(window.innerWidth, window.innerHeight);
+    this.renderer.setSize(w, h);
+    this.composer.setSize(w, h);
+    this.blurPass.uniforms.resolution.value.set(w, h);
+  }
+
+  private updateMotionBlur(delta: number): void {
+    if (this.navigation.getMode() === 'firstPerson') {
+      const posDiff = this.camera.position.distanceTo(this.lastCamPos);
+      const quatDiff = 1 - Math.abs(this.camera.quaternion.dot(this.lastCamQuat));
+      const targetBlur = Math.min(1.0, (posDiff * 20 + quatDiff * 150) / Math.max(delta, 0.001)) * 0.3;
+      this.blurVelocity += (targetBlur - this.blurVelocity) * 0.2;
+    } else {
+      this.blurVelocity += (0 - this.blurVelocity) * 0.15;
+    }
+    this.blurPass.uniforms.blurStrength.value = this.blurVelocity;
+    this.lastCamPos.copy(this.camera.position);
+    this.lastCamQuat.copy(this.camera.quaternion);
   }
 
   private animate(): void {
     requestAnimationFrame(() => this.animate());
 
     const delta = this.clock.getDelta();
-    const time = this.clock.getElapsedTime();
 
     this.navigation.update(delta);
     this.cityBuilder.update(delta);
+    this.updateMotionBlur(delta);
 
-    this.renderer.render(this.scene, this.camera);
+    this.composer.render();
 
     this.fpsFrames++;
     this.fpsTime += delta;

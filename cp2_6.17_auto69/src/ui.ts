@@ -253,13 +253,21 @@ export class UI {
   }
 
   private createUndoButton(): void {
-    this.undoButton = document.createElement('button');
-    this.undoButton.textContent = '↩️';
-    this.undoButton.title = '撤销删除';
-    this.undoButton.style.cssText = `
+    const wrapper = document.createElement('div');
+    wrapper.style.cssText = `
       position: fixed;
       bottom: 20px;
       right: 20px;
+      z-index: 200;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    `;
+
+    this.undoButton = document.createElement('button');
+    this.undoButton.textContent = '↩️';
+    this.undoButton.title = '撤销删除 (最多3次)';
+    this.undoButton.style.cssText = `
       width: 48px;
       height: 48px;
       border-radius: 50%;
@@ -268,19 +276,52 @@ export class UI {
       color: #ffffff;
       font-size: 20px;
       cursor: pointer;
-      z-index: 200;
-      transition: background 0.2s;
+      transition: background 0.2s, transform 0.15s, opacity 0.2s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
     `;
     this.undoButton.addEventListener('mouseenter', () => {
       this.undoButton.style.background = 'rgba(255,255,255,0.25)';
+      this.undoButton.style.transform = 'scale(1.05)';
     });
     this.undoButton.addEventListener('mouseleave', () => {
       this.undoButton.style.background = 'rgba(255,255,255,0.1)';
+      this.undoButton.style.transform = 'scale(1)';
+    });
+    this.undoButton.addEventListener('mousedown', () => {
+      this.undoButton.style.transform = 'scale(0.95)';
+    });
+    this.undoButton.addEventListener('mouseup', () => {
+      this.undoButton.style.transform = 'scale(1.05)';
     });
     this.undoButton.addEventListener('click', () => {
       this.emit('undoDelete');
     });
-    this.container.appendChild(this.undoButton);
+
+    const badge = document.createElement('div');
+    badge.id = 'undo-count-badge';
+    badge.textContent = '0';
+    badge.style.cssText = `
+      min-width: 22px;
+      height: 22px;
+      padding: 0 6px;
+      border-radius: 11px;
+      background: rgba(0, 188, 212, 0.8);
+      color: #ffffff;
+      font-size: 12px;
+      font-weight: bold;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.2s;
+    `;
+
+    wrapper.appendChild(this.undoButton);
+    wrapper.appendChild(badge);
+    this.container.appendChild(wrapper);
   }
 
   private createRotationTooltip(): void {
@@ -418,6 +459,7 @@ export class UI {
     const input = document.createElement('input');
     input.type = type;
     input.value = value;
+    input.step = type === 'number' ? '0.1' : 'any';
     input.style.cssText = `
       flex: 1;
       padding: 4px 8px;
@@ -427,13 +469,20 @@ export class UI {
       color: #ffffff;
       font-size: 13px;
       outline: none;
-      transition: border-color 0.2s;
+      transition: border-color 0.2s, box-shadow 0.2s;
+      width: 100%;
+      box-sizing: border-box;
     `;
     input.addEventListener('focus', () => {
       input.style.borderColor = '#00bcd4';
+      input.style.boxShadow = '0 0 0 2px rgba(0,188,212,0.2)';
     });
     input.addEventListener('blur', () => {
       input.style.borderColor = '#444';
+      input.style.boxShadow = 'none';
+    });
+    input.addEventListener('input', () => {
+      onChange(input.value);
     });
     input.addEventListener('change', () => {
       onChange(input.value);
@@ -493,6 +542,18 @@ export class UI {
 
   updateFPS(fps: number): void {
     this.fpsElement.textContent = `FPS: ${fps}`;
+  }
+
+  updateUndoCount(count: number): void {
+    const badge = document.getElementById('undo-count-badge') as HTMLElement | null;
+    if (badge) {
+      badge.textContent = String(count);
+      badge.style.opacity = count > 0 ? '1' : '0';
+    }
+    if (this.undoButton) {
+      this.undoButton.style.opacity = count > 0 ? '1' : '0.4';
+      this.undoButton.style.pointerEvents = count > 0 ? 'auto' : 'none';
+    }
   }
 
   showRotationTooltip(angle: number): void {
