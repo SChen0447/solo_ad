@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>赛博涂鸦</title>
+  <link rel="stylesheet" href="/src/style.css" />
+</head>
+<body>
+  <div id="app">
+    <div class="toolbar" id="toolbar"></div>
+    <div class="canvas-container" id="canvasContainer">
+      <canvas id="mainCanvas"></canvas>
+      <canvas id="overlayCanvas"></canvas>
+    </div>
+    <div class="sidebar" id="sidebar">
+      <div class="color-picker-wrapper">
+        <canvas id="colorWheel" width="200" height="200"></canvas>
+        <div class="brightness-slider-wrapper">
+          <label>亮度</label>
+          <input type="range" id="brightnessSlider" min="0" max="100" value="100" />
+        </div>
+      </div>
+      <div class="brush-size-wrapper">
+        <label>笔触粗细</label>
+        <input type="range" id="brushSizeSlider" min="1" max="20" value="2" />
+        <div class="brush-preview" id="brushPreview"></div>
+      </div>
+      <div class="record-controls">
+        <button id="recordBtn" class="record-btn" title="录制">
+          <span class="record-dot"></span>
+        </button>
+        <button id="playBtn" class="play-btn" title="回放" disabled>
+          <span class="play-triangle"></span>
+        </button>
+        <div class="speed-selector">
+          <label>速度</label>
+          <select id="speedSelect">
+            <option value="1">1x</option>
+            <option value="1.5">1.5x</option>
+            <option value="2">2x</option>
+          </select>
+        </div>
+      </div>
+    </div>
+    <div class="progress-bar-wrapper" id="progressBarWrapper">
+      <div class="progress-track">
+        <div class="progress-fill" id="progressFill"></div>
+      </div>
+    </div>
+  </div>
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
