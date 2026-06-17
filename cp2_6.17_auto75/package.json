@@ -5,8 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "concurrently \"npm run server\" \"npm run client\"",
-    "server": "node --no-warnings --loader ts-node/esm server/server.ts",
-    "client": "vite --strictPort",
+    "prebuild-server": "npx tsc -p tsconfig.server.json",
+    "server": "npx tsc -p tsconfig.server.json && node dist-server/server.js",
+    "client": "vite --port 5173 --strictPort",
     "build": "tsc && vite build",
     "preview": "vite preview"
   },

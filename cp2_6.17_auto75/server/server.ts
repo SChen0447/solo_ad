@@ -2,8 +2,100 @@ import express, { Request, Response } from 'express';
 import { createServer } from 'http';
 import { Server, Socket } from 'socket.io';
 import { v4 as uuidv4 } from 'uuid';
-import type { DrawElement, DrawEvent, InitSyncMessage, UserInfo, Snapshot } from '../src/types';
 import cors from 'cors';
+
+interface Point {
+  x: number;
+  y: number;
+}
+
+interface Path {
+  id: string;
+  type: 'path';
+  points: Point[];
+  color: string;
+  width: number;
+  userId: string;
+  userName: string;
+}
+
+interface Rect {
+  id: string;
+  type: 'rect';
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  color: string;
+  userId: string;
+  userName: string;
+}
+
+interface Text {
+  id: string;
+  type: 'text';
+  x: number;
+  y: number;
+  content: string;
+  color: string;
+  fontSize: number;
+  userId: string;
+  userName: string;
+}
+
+interface StickyNote {
+  id: string;
+  type: 'sticky';
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  content: string;
+  color: string;
+  bgColor: string;
+  userId: string;
+  userName: string;
+}
+
+interface ImageElement {
+  id: string;
+  type: 'image';
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  imageData: string;
+  userId: string;
+  userName: string;
+}
+
+type DrawElement = Path | Rect | Text | StickyNote | ImageElement;
+
+interface DrawEvent {
+  type: 'draw' | 'update' | 'delete';
+  element: DrawElement;
+  roomId: string;
+  userId: string;
+}
+
+interface InitSyncMessage {
+  type: 'init';
+  elements: DrawElement[];
+  roomId: string;
+}
+
+interface UserInfo {
+  id: string;
+  name: string;
+  color: string;
+}
+
+interface Snapshot {
+  id: string;
+  timestamp: number;
+  elements: DrawElement[];
+  thumbnail?: string;
+}
 
 const app = express();
 const httpServer = createServer(app);
@@ -71,6 +163,18 @@ io.on('connection', (socket: Socket) => {
 
     const onlineUsers = Array.from(room.users.values());
     io.to(roomId).emit('onlineUsers', onlineUsers);
+  });
+
+  socket.on('requestInitSync', (data: { roomId: string }) => {
+    const room = rooms.get(data.roomId);
+    if (room) {
+      const initMessage: InitSyncMessage = {
+        type: 'init',
+        elements: getElementsArray(room),
+        roomId: data.roomId
+      };
+      socket.emit('init', initMessage);
+    }
   });
 
   socket.on('draw', (data: DrawEvent) => {

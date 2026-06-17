@@ -71,6 +71,14 @@ export class CollaborationModule {
     this.socket.on('userLeft', (userId: string) => {
       this.onUserLeft?.(userId);
     });
+
+    this.socket.on('onlineUsers', (users: UserInfo[]) => {
+      users.forEach(user => {
+        if (user.id !== this.userInfo.id) {
+          this.onUserJoined?.(user);
+        }
+      });
+    });
   }
 
   private joinRoom(): void {
@@ -81,6 +89,11 @@ export class CollaborationModule {
     });
   }
 
+  public requestInitSync(): void {
+    if (!this.socket || !this.isConnected) return;
+    this.socket.emit('requestInitSync', { roomId: this.roomId });
+  }
+
   public disconnect(): void {
     if (this.socket) {
       this.socket.off('connect');
@@ -89,6 +102,7 @@ export class CollaborationModule {
       this.socket.off('init');
       this.socket.off('userJoined');
       this.socket.off('userLeft');
+      this.socket.off('onlineUsers');
       this.socket.disconnect();
       this.socket = null;
     }
@@ -97,40 +111,40 @@ export class CollaborationModule {
 
   public sendDrawEvent(element: DrawElement): void {
     if (!this.socket || !this.isConnected) return;
-    
+
     const event: DrawEvent = {
       type: 'draw',
       element,
       roomId: this.roomId,
       userId: this.userInfo.id
     };
-    
+
     this.socket.emit('draw', event);
   }
 
   public sendUpdateEvent(element: DrawElement): void {
     if (!this.socket || !this.isConnected) return;
-    
+
     const event: DrawEvent = {
       type: 'update',
       element,
       roomId: this.roomId,
       userId: this.userInfo.id
     };
-    
+
     this.socket.emit('draw', event);
   }
 
   public sendDeleteEvent(elementId: string): void {
     if (!this.socket || !this.isConnected) return;
-    
+
     const event: DrawEvent = {
       type: 'delete',
       element: { id: elementId } as DrawElement,
       roomId: this.roomId,
       userId: this.userInfo.id
     };
-    
+
     this.socket.emit('draw', event);
   }
 

@@ -21,6 +21,33 @@
         width: 100vw;
         height: 100vh;
       }
+      .tool-btn {
+        transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+        background-color: transparent;
+      }
+      .tool-btn:hover {
+        background-color: rgba(255,255,255,0.08);
+      }
+      .tool-btn-active {
+        background-color: rgba(255,255,255,0.15) !important;
+        transform: scale(1.1);
+      }
+      .tool-btn-active .tool-indicator {
+        opacity: 1;
+      }
+      ::-webkit-scrollbar {
+        width: 6px;
+      }
+      ::-webkit-scrollbar-track {
+        background: transparent;
+      }
+      ::-webkit-scrollbar-thumb {
+        background: rgba(255,255,255,0.2);
+        border-radius: 3px;
+      }
+      ::-webkit-scrollbar-thumb:hover {
+        background: rgba(255,255,255,0.3);
+      }
     </style>
   </head>
   <body>

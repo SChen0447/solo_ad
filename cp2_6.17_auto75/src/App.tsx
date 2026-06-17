@@ -32,7 +32,7 @@ const App: React.FC = () => {
     setRoomId(room);
 
     const userId = localStorage.getItem('board_user_id') || uuidv4();
-    const userName = localStorage.getItem('board_user_name') || `用户${Math.floor(Math.random() * 1000)}`;
+    const userName = localStorage.getItem('board_user_name') || `\u7528\u6237${Math.floor(Math.random() * 1000)}`;
     const userColorIndex = parseInt(localStorage.getItem('board_user_color') || String(Math.floor(Math.random() * COLOR_PALETTE.length)));
     const userColor = COLOR_PALETTE[userColorIndex % COLOR_PALETTE.length];
 
@@ -65,7 +65,10 @@ const App: React.FC = () => {
     if (rendererRef.current) {
       rendererRef.current.setElements(elements);
     }
-    setIsHistoryMode(true);
+  }, []);
+
+  const handleHistoryModeChange = useCallback((isHistory: boolean) => {
+    setIsHistoryMode(isHistory);
   }, []);
 
   const handleUserJoined = useCallback((user: UserInfo) => {
@@ -100,7 +103,8 @@ const App: React.FC = () => {
 
     const historyService = new HistoryService({
       roomId,
-      onSnapshotRestore: handleSnapshotRestore
+      onSnapshotRestore: handleSnapshotRestore,
+      onHistoryModeChange: handleHistoryModeChange
     });
     historyServiceRef.current = historyService;
 
@@ -116,7 +120,7 @@ const App: React.FC = () => {
       collaboration.disconnect();
       historyService.destroy();
     };
-  }, [userInfo, roomId, handleLocalDraw, handleRemoteDraw, handleInitSync, handleSnapshotRestore, handleUserJoined, handleUserLeft]);
+  }, [userInfo, roomId, handleLocalDraw, handleRemoteDraw, handleInitSync, handleSnapshotRestore, handleHistoryModeChange, handleUserJoined, handleUserLeft]);
 
   useEffect(() => {
     if (rendererRef.current) {
@@ -138,6 +142,7 @@ const App: React.FC = () => {
 
   const handleToolClick = (tool: ToolType) => {
     setCurrentTool(tool);
+    setColorPickerVisible(false);
   };
 
   const handleImageUploadClick = () => {
@@ -164,17 +169,12 @@ const App: React.FC = () => {
   const handleRestoreSnapshot = async (snapshotId: string) => {
     if (historyServiceRef.current) {
       await historyServiceRef.current.restoreSnapshot(snapshotId);
-      setIsHistoryMode(true);
     }
   };
 
   const handleExitHistoryMode = () => {
     if (historyServiceRef.current) {
       historyServiceRef.current.exitHistoryMode();
-      setIsHistoryMode(false);
-      if (collaborationRef.current && rendererRef.current) {
-        collaborationRef.current.connect();
-      }
     }
   };
 
@@ -199,11 +199,11 @@ const App: React.FC = () => {
   };
 
   const tools: { type: ToolType; icon: string; label: string }[] = [
-    { type: 'pen', icon: '✏️', label: '钢笔' },
-    { type: 'rect', icon: '⬜', label: '矩形' },
-    { type: 'text', icon: 'T', label: '文字' },
-    { type: 'sticky', icon: '📝', label: '便签' },
-    { type: 'image', icon: '🖼️', label: '图片' }
+    { type: 'pen', icon: '\u270F\uFE0F', label: '\u94A2\u7B14' },
+    { type: 'rect', icon: '\u2B1C', label: '\u77E9\u5F62' },
+    { type: 'text', icon: 'T', label: '\u6587\u5B57' },
+    { type: 'sticky', icon: '\uD83D\uDCDD', label: '\u4FBF\u7B7E' },
+    { type: 'image', icon: '\uD83D\uDDBC\uFE0F', label: '\u56FE\u7247' }
   ];
 
   const penWidths = [2, 4, 6];
@@ -211,7 +211,7 @@ const App: React.FC = () => {
   if (!userInfo) {
     return (
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', color: 'white' }}>
-        加载中...
+        ...
       </div>
     );
   }
@@ -219,14 +219,11 @@ const App: React.FC = () => {
   return (
     <div style={styles.container}>
       <div style={styles.toolbar}>
-        {tools.map((tool, index) => (
+        {tools.map((tool) => (
           <div
             key={tool.type}
-            style={{
-              ...styles.toolButton,
-              ...(currentTool === tool.type ? styles.toolButtonActive : {}),
-              animationDelay: `${index * 0.05}s`
-            }}
+            className={`tool-btn ${currentTool === tool.type ? 'tool-btn-active' : ''}`}
+            style={styles.toolButton}
             onClick={() => tool.type === 'image' ? handleImageUploadClick() : handleToolClick(tool.type)}
             title={tool.label}
           >
@@ -245,7 +242,7 @@ const App: React.FC = () => {
                 backgroundColor: penColor
               }}
               onClick={() => setColorPickerVisible(!colorPickerVisible)}
-              title="选择颜色"
+              title="\u9009\u62E9\u989C\u8272"
             />
             {colorPickerVisible && (
               <div style={styles.colorPicker}>
@@ -299,22 +296,21 @@ const App: React.FC = () => {
         <div style={styles.divider} />
 
         <div
+          className={`tool-btn ${showHistoryPanel ? 'tool-btn-active' : ''}`}
           style={styles.toolButton}
           onClick={handleManualSave}
-          title="手动保存快照"
+          title="\u624B\u52A8\u4FDD\u5B58\u5FEB\u7167"
         >
-          <span style={styles.toolIcon}>💾</span>
+          <span style={styles.toolIcon}>{'\uD83D\uDCBE'}</span>
         </div>
 
         <div
-          style={{
-            ...styles.toolButton,
-            ...(showHistoryPanel ? styles.toolButtonActive : {})
-          }}
+          className={`tool-btn ${showHistoryPanel ? 'tool-btn-active' : ''}`}
+          style={styles.toolButton}
           onClick={() => setShowHistoryPanel(!showHistoryPanel)}
-          title="历史版本"
+          title="\u5386\u53F2\u7248\u672C"
         >
-          <span style={styles.toolIcon}>📜</span>
+          <span style={styles.toolIcon}>{'\uD83D\uDCDC'}</span>
         </div>
       </div>
 
@@ -334,18 +330,18 @@ const App: React.FC = () => {
       {showHistoryPanel && (
         <div style={styles.historyPanel}>
           <div style={styles.historyHeader}>
-            <h3 style={styles.historyTitle}>历史版本</h3>
+            <h3 style={styles.historyTitle}>{"\u5386\u53F2\u7248\u672C"}</h3>
             <button
               style={styles.refreshButton}
               onClick={handleRefreshSnapshots}
             >
-              刷新
+              {"\u5237\u65B0"}
             </button>
           </div>
           <div style={styles.historyList}>
             {snapshots.length === 0 ? (
               <div style={styles.emptyHistory}>
-                暂无历史快照
+                {"\u6682\u65E0\u5386\u53F2\u5FEB\u7167"}
               </div>
             ) : (
               snapshots.map((snapshot, index) => (
@@ -360,7 +356,7 @@ const App: React.FC = () => {
                   {snapshot.thumbnail && (
                     <img
                       src={snapshot.thumbnail}
-                      alt="缩略图"
+                      alt="thumbnail"
                       style={styles.thumbnail}
                     />
                   )}
@@ -369,7 +365,7 @@ const App: React.FC = () => {
                       {formatTimestamp(snapshot.timestamp)}
                     </div>
                     <div style={styles.historyCount}>
-                      {snapshot.elements.length} 个元素
+                      {snapshot.elements.length} {"\u4E2A\u5143\u7D20"}
                     </div>
                   </div>
                 </div>
@@ -382,10 +378,10 @@ const App: React.FC = () => {
       {isHistoryMode && (
         <div style={styles.historyOverlay} onClick={handleExitHistoryMode}>
           <div style={styles.historyOverlayContent} onClick={(e) => e.stopPropagation()}>
-            <h3 style={styles.overlayTitle}>历史视图模式</h3>
-            <p style={styles.overlayText}>当前正在查看历史版本，点击任意位置退出</p>
+            <h3 style={styles.overlayTitle}>{"\u5386\u53F2\u89C6\u56FE\u6A21\u5F0F"}</h3>
+            <p style={styles.overlayText}>{"\u5F53\u524D\u6B63\u5728\u67E5\u770B\u5386\u53F2\u7248\u672C\uFF0C\u70B9\u51FB\u4EFB\u610F\u4F4D\u7F6E\u9000\u51FA"}</p>
             <button style={styles.exitButton} onClick={handleExitHistoryMode}>
-              退出历史视图
+              {"\u9000\u51FA\u5386\u53F2\u89C6\u56FE"}
             </button>
           </div>
         </div>
@@ -393,7 +389,7 @@ const App: React.FC = () => {
 
       <div style={styles.statusBar}>
         <div style={styles.roomInfo}>
-          <span style={styles.roomLabel}>房间:</span>
+          <span style={styles.roomLabel}>{"\u623F\u95F4:"}</span>
           <span style={styles.roomId}>{roomId}</span>
         </div>
         <div style={styles.connectionStatus}>
@@ -402,7 +398,7 @@ const App: React.FC = () => {
             backgroundColor: isConnected ? '#4caf50' : '#f44336'
           }} />
           <span style={styles.statusText}>
-            {isConnected ? '已连接' : '未连接'}
+            {isConnected ? '\u5DF2\u8FDE\u63A5' : '\u672A\u8FDE\u63A5'}
           </span>
         </div>
         <div style={styles.userInfoBar}>
@@ -414,7 +410,7 @@ const App: React.FC = () => {
         </div>
         {onlineUsers.length > 0 && (
           <div style={styles.onlineUsers}>
-            <span style={styles.onlineLabel}>在线:</span>
+            <span style={styles.onlineLabel}>{"\u5728\u7EBF:"}</span>
             {onlineUsers.map(user => (
               <div
                 key={user.id}
@@ -432,7 +428,7 @@ const App: React.FC = () => {
       </div>
 
       <div style={styles.helpTip}>
-        <span>💡 按住 Alt + 鼠标左键 或 鼠标中键 可以平移画布 | 滚轮缩放 (0.1x - 5x)</span>
+        <span>{"\uD83D\uDCA1 \u6309\u4F4F Alt + \u9F20\u6807\u5DE6\u952E \u6216 \u9F20\u6807\u4E2D\u952E \u53EF\u4EE5\u5E73\u79FB\u753B\u5E03 | \u6EDA\u8F6E\u7F29\u653E (0.1x - 5x)"}</span>
       </div>
     </div>
   );
@@ -471,12 +467,8 @@ const styles: Record<string, React.CSSProperties> = {
     justifyContent: 'center',
     borderRadius: '8px',
     cursor: 'pointer',
-    transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+    transition: 'all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1)',
     backgroundColor: 'transparent'
-  },
-  toolButtonActive: {
-    backgroundColor: 'rgba(255,255,255,0.15)',
-    transform: 'scale(1.1)'
   },
   toolIndicator: {
     position: 'absolute',
@@ -486,12 +478,14 @@ const styles: Record<string, React.CSSProperties> = {
     width: '3px',
     height: '24px',
     backgroundColor: '#4fc3f7',
-    borderRadius: '0 3px 3px 0'
+    borderRadius: '0 3px 3px 0',
+    transition: 'opacity 0.2s ease'
   },
   toolIcon: {
     fontSize: '18px',
     color: '#ffffff',
-    userSelect: 'none'
+    userSelect: 'none',
+    pointerEvents: 'none'
   },
   divider: {
     width: '32px',

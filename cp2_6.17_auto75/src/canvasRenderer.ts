@@ -47,6 +47,11 @@ export class CanvasRenderer {
   private currentRect: { x: number; y: number; width: number; height: number } | null = null;
   private tempElement: DrawElement | null = null;
 
+  private pendingImageData: string | null = null;
+  private pendingImageSize: { width: number; height: number } | null = null;
+
+  private imageCache = new Map<string, HTMLImageElement>();
+
   private animationFrameId: number | null = null;
   private needsRender: boolean = true;
 
@@ -116,6 +121,12 @@ export class CanvasRenderer {
     if (e.button !== 0) return;
 
     const worldPos = this.getWorldPos(e.clientX, e.clientY);
+
+    if (this.tool === 'image' && this.pendingImageData && this.pendingImageSize) {
+      this.placeImage(worldPos);
+      return;
+    }
+
     this.isDrawing = true;
 
     switch (this.tool) {
@@ -280,7 +291,7 @@ export class CanvasRenderer {
   }
 
   private createTextElement(pos: Point): void {
-    const content = prompt('输入文字内容:');
+    const content = prompt("\u8F93\u5165\u6587\u5B57\u5185\u5BB9:");
     if (content) {
       const text: Text = {
         id: uuidv4(),
@@ -300,7 +311,7 @@ export class CanvasRenderer {
   }
 
   private createStickyNote(pos: Point): void {
-    const content = prompt('输入便签内容:');
+    const content = prompt("\u8F93\u5165\u4FBF\u7B7E\u5185\u5BB9:");
     if (content) {
       const sticky: StickyNote = {
         id: uuidv4(),
@@ -327,28 +338,57 @@ export class CanvasRenderer {
       const imageData = e.target?.result as string;
       const img = new Image();
       img.onload = () => {
-        const centerX = CANVAS_WIDTH / 2;
-        const centerY = CANVAS_HEIGHT / 2;
         const maxSize = 300;
         const scale = Math.min(maxSize / img.width, maxSize / img.height, 1);
-        const image: ImageElement = {
-          id: uuidv4(),
-          type: 'image',
-          x: centerX - (img.width * scale) / 2,
-          y: centerY - (img.height * scale) / 2,
-          width: img.width * scale,
-          height: img.height * scale,
-          imageData,
-          userId: this.userInfo.id,
-          userName: this.userInfo.name
-        };
-        this.elements.push(image);
-        this.onLocalDraw(image);
-        this.needsRender = true;
+        this.pendingImageData = imageData;
+        this.pendingImageSize = { width: img.width * scale, height: img.height * scale };
+        this.tool = 'image';
+        this.canvas.style.cursor = 'copy';
+      };
+      img.onerror = () => {
+        console.error("Failed to load image for placement");
       };
       img.src = imageData;
     };
     reader.readAsDataURL(file);
+  }
+
+  private placeImage(pos: Point): void {
+    if (!this.pendingImageData || !this.pendingImageSize) return;
+    const image: ImageElement = {
+      id: uuidv4(),
+      type: 'image',
+      x: pos.x - this.pendingImageSize.width / 2,
+      y: pos.y - this.pendingImageSize.height / 2,
+      width: this.pendingImageSize.width,
+      height: this.pendingImageSize.height,
+      imageData: this.pendingImageData,
+      userId: this.userInfo.id,
+      userName: this.userInfo.name
+    };
+    this.elements.push(image);
+    this.onLocalDraw(image);
+    this.pendingImageData = null;
+    this.pendingImageSize = null;
+    this.canvas.style.cursor = 'crosshair';
+    this.needsRender = true;
+  }
+
+  private getOrLoadImage(src: string): HTMLImageElement | null {
+    if (this.imageCache.has(src)) {
+      return this.imageCache.get(src)!;
+    }
+    const img = new Image();
+    img.onload = () => {
+      this.needsRender = true;
+    };
+    img.onerror = () => {
+      this.imageCache.set(src + '__error', img);
+      this.needsRender = true;
+    };
+    img.src = src;
+    this.imageCache.set(src, img);
+    return null;
   }
 
   public handleRemoteDraw(element: DrawElement): void {
@@ -380,6 +420,10 @@ export class CanvasRenderer {
 
   public setTool(tool: ToolType): void {
     this.tool = tool;
+    if (tool !== 'image') {
+      this.pendingImageData = null;
+      this.pendingImageSize = null;
+    }
   }
 
   public getTool(): ToolType {
@@ -392,6 +436,10 @@ export class CanvasRenderer {
 
   public setPenWidth(width: number): void {
     this.penWidth = width;
+  }
+
+  public hasPendingImage(): boolean {
+    return this.pendingImageData !== null;
   }
 
   private startRenderLoop(): void {
@@ -428,6 +476,17 @@ export class CanvasRenderer {
     if (this.tempElement) {
       ctx.globalAlpha = 0.7;
       this.drawElement(ctx, this.tempElement);
+      ctx.globalAlpha = 1;
+    }
+
+    if (this.tool === 'image' && this.pendingImageData && this.pendingImageSize) {
+      ctx.globalAlpha = 0.5;
+      const mouseX = this.lastMousePos.x;
+      const mouseY = this.lastMousePos.y;
+      const worldPos = this.getWorldPos(mouseX, mouseY);
+      ctx.fillStyle = '#cccccc';
+      this.roundRect(ctx, worldPos.x - this.pendingImageSize.width / 2, worldPos.y - this.pendingImageSize.height / 2, this.pendingImageSize.width, this.pendingImageSize.height, 4);
+      ctx.fill();
       ctx.globalAlpha = 1;
     }
 
@@ -508,28 +567,47 @@ export class CanvasRenderer {
     this.drawAuthorLabel(ctx, text.x, text.y - text.fontSize - 15, text.userName);
   }
 
+  private roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number): void {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.lineTo(x + w - r, y);
+    ctx.arcTo(x + w, y, x + w, y + r, r);
+    ctx.lineTo(x + w, y + h - r);
+    ctx.arcTo(x + w, y + h, x + w - r, y + h, r);
+    ctx.lineTo(x + r, y + h);
+    ctx.arcTo(x, y + h, x, y + h - r, r);
+    ctx.lineTo(x, y + r);
+    ctx.arcTo(x, y, x + r, y, r);
+    ctx.closePath();
+  }
+
   private drawStickyNote(ctx: CanvasRenderingContext2D, sticky: StickyNote): void {
+    const radius = 8;
+
+    ctx.save();
+    ctx.fillStyle = 'rgba(0,0,0,0.1)';
+    this.roundRect(ctx, sticky.x + 4, sticky.y + 4, sticky.width, sticky.height, radius);
+    ctx.fill();
+    ctx.restore();
+
     ctx.fillStyle = sticky.bgColor;
+    this.roundRect(ctx, sticky.x, sticky.y, sticky.width, sticky.height, radius);
+    ctx.fill();
+
     ctx.strokeStyle = '#cccccc';
     ctx.lineWidth = 1;
-    
-    const shadowOffset = 4;
-    ctx.fillStyle = 'rgba(0,0,0,0.1)';
-    ctx.fillRect(sticky.x + shadowOffset, sticky.y + shadowOffset, sticky.width, sticky.height);
-    
-    ctx.fillStyle = sticky.bgColor;
-    ctx.fillRect(sticky.x, sticky.y, sticky.width, sticky.height);
-    ctx.strokeRect(sticky.x, sticky.y, sticky.width, sticky.height);
+    this.roundRect(ctx, sticky.x, sticky.y, sticky.width, sticky.height, radius);
+    ctx.stroke();
 
     ctx.fillStyle = sticky.color;
-    ctx.font = '14px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+    ctx.font = "14px -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif";
     const padding = 10;
     const maxWidth = sticky.width - padding * 2;
     const lineHeight = 20;
     const words = sticky.content.split('');
     let line = '';
     let y = sticky.y + padding + 14;
-    
+
     for (const word of words) {
       const testLine = line + word;
       const metrics = ctx.measureText(testLine);
@@ -544,35 +622,63 @@ export class CanvasRenderer {
     }
     ctx.fillText(line, sticky.x + padding, y);
 
-    this.drawAuthorLabel(ctx, sticky.x + sticky.width, sticky.y, sticky.userName);
+    ctx.font = "10px -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif";
+    ctx.fillStyle = '#999999';
+    const authorMetrics = ctx.measureText(sticky.userName);
+    ctx.fillText(sticky.userName, sticky.x + sticky.width - authorMetrics.width - 6, sticky.y + 14);
   }
 
   private drawImage(ctx: CanvasRenderingContext2D, image: ImageElement): void {
-    const img = new Image();
-    img.src = image.imageData;
-    if (img.complete) {
-      ctx.drawImage(img, image.x, image.y, image.width, image.height);
+    const cached = this.imageCache.get(image.imageData);
+    const isError = this.imageCache.has(image.imageData + '__error');
+
+    if (isError) {
+      ctx.fillStyle = '#e0e0e0';
+      this.roundRect(ctx, image.x, image.y, image.width, image.height, 4);
+      ctx.fill();
+      ctx.strokeStyle = '#cccccc';
+      ctx.lineWidth = 1;
+      this.roundRect(ctx, image.x, image.y, image.width, image.height, 4);
+      ctx.stroke();
+
+      ctx.fillStyle = '#999999';
+      ctx.font = "14px -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif";
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText("\u56FE\u7247\u52A0\u8F7D\u5931\u8D25", image.x + image.width / 2, image.y + image.height / 2);
+      ctx.textAlign = 'start';
+      ctx.textBaseline = 'alphabetic';
+    } else if (cached && cached.complete && cached.naturalWidth > 0) {
+      ctx.drawImage(cached, image.x, image.y, image.width, image.height);
+      ctx.strokeStyle = '#cccccc';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(image.x, image.y, image.width, image.height);
     } else {
-      img.onload = () => {
-        this.needsRender = true;
-      };
+      this.getOrLoadImage(image.imageData);
+
+      ctx.fillStyle = '#f0f0f0';
+      this.roundRect(ctx, image.x, image.y, image.width, image.height, 4);
+      ctx.fill();
+      ctx.strokeStyle = '#cccccc';
+      ctx.lineWidth = 1;
+      this.roundRect(ctx, image.x, image.y, image.width, image.height, 4);
+      ctx.stroke();
     }
-    ctx.strokeStyle = '#cccccc';
-    ctx.lineWidth = 1;
-    ctx.strokeRect(image.x, image.y, image.width, image.height);
+
     this.drawAuthorLabel(ctx, image.x + image.width, image.y, image.userName);
   }
 
   private drawAuthorLabel(ctx: CanvasRenderingContext2D, x: number, y: number, author: string): void {
-    ctx.font = '10px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+    ctx.font = "10px -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif";
     const metrics = ctx.measureText(author);
     const padding = 4;
     const labelWidth = metrics.width + padding * 2;
     const labelHeight = 16;
-    
+
     ctx.fillStyle = 'rgba(150, 150, 150, 0.9)';
-    ctx.fillRect(x - labelWidth, y - labelHeight, labelWidth, labelHeight);
-    
+    this.roundRect(ctx, x - labelWidth, y - labelHeight, labelWidth, labelHeight, 3);
+    ctx.fill();
+
     ctx.fillStyle = '#ffffff';
     ctx.fillText(author, x - labelWidth + padding, y - labelHeight + 12);
   }
@@ -582,16 +688,16 @@ export class CanvasRenderer {
     thumbCanvas.width = 200;
     thumbCanvas.height = 200;
     const thumbCtx = thumbCanvas.getContext('2d')!;
-    
+
     const scale = 200 / CANVAS_WIDTH;
     thumbCtx.fillStyle = BG_COLOR;
     thumbCtx.fillRect(0, 0, 200, 200);
     thumbCtx.scale(scale, scale);
-    
+
     for (const element of this.elements) {
       this.drawElement(thumbCtx, element);
     }
-    
+
     return thumbCanvas.toDataURL('image/png');
   }
 }
