@@ -9,24 +9,65 @@ interface TimelinePanelProps {
   selectedTag: string | null;
 }
 
+const PADDING_LEFT = 50;
+const PADDING_RIGHT = 50;
+const MIN_BREAKPOINTS = 10;
+
 export function TimelinePanel({ bookmarks, onTimeRangeChange, selectedTag }: TimelinePanelProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [dragStartX, setDragStartX] = useState(0);
-  const [scrollLeft, setScrollLeft] = useState(0);
+  const translateXRef = useRef(0);
+  const [translateX, setTranslateX] = useState(0);
+  const [containerWidth, setContainerWidth] = useState(0);
+  const [contentWidth, setContentWidth] = useState(0);
   const [hoveredBookmark, setHoveredBookmark] = useState<Bookmark | null>(null);
   const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 });
+  const rafRef = useRef<number | null>(null);
+  const lastTimeRangeRef = useRef<TimeRange | null>(null);
+  const onTimeRangeChangeRef = useRef(onTimeRangeChange);
 
-  const minTime = bookmarks.length > 0 ? Math.min(...bookmarks.map(b => b.timestamp)) : Date.now() - 86400000 * 30;
-  const maxTime = bookmarks.length > 0 ? Math.max(...bookmarks.map(b => b.timestamp)) : Date.now();
+  useEffect(() => {
+    onTimeRangeChangeRef.current = onTimeRangeChange;
+  }, [onTimeRangeChange]);
+
+  const sortedBookmarks = [...bookmarks].sort((a, b) => a.timestamp - b.timestamp);
+
+  const minTime = sortedBookmarks.length > 0
+    ? sortedBookmarks[0].timestamp - 86400000
+    : Date.now() - 86400000 * 30;
+  const maxTime = sortedBookmarks.length > 0
+    ? sortedBookmarks[sortedBookmarks.length - 1].timestamp + 86400000
+    : Date.now();
   const timeSpan = maxTime - minTime || 86400000;
 
-  const visibleWidth = containerRef.current?.clientWidth || 1200;
-  const totalWidth = Math.max(visibleWidth, visibleWidth + bookmarks.length * 30);
-  const pixelsPerMs = (totalWidth - 100) / timeSpan;
+  useEffect(() => {
+    const updateWidth = () => {
+      if (containerRef.current) {
+        const width = containerRef.current.clientWidth;
+        setContainerWidth(width);
+        const calculatedContentWidth = Math.max(width, sortedBookmarks.length * 40 + PADDING_LEFT + PADDING_RIGHT);
+        setContentWidth(calculatedContentWidth);
+      }
+    };
+
+    updateWidth();
+    window.addEventListener('resize', updateWidth);
+    return () => window.removeEventListener('resize', updateWidth);
+  }, [sortedBookmarks.length]);
+
+  useEffect(() => {
+    const calculatedContentWidth = Math.max(
+      containerWidth,
+      sortedBookmarks.length * 40 + PADDING_LEFT + PADDING_RIGHT
+    );
+    setContentWidth(calculatedContentWidth);
+  }, [sortedBookmarks.length, containerWidth]);
+
+  const pixelsPerMs = (contentWidth - PADDING_LEFT - PADDING_RIGHT) / timeSpan;
 
   const getXPosition = useCallback((timestamp: number) => {
-    return 50 + (timestamp - minTime) * pixelsPerMs;
+    return PADDING_LEFT + (timestamp - minTime) * pixelsPerMs;
   }, [minTime, pixelsPerMs]);
 
   const getNodeColor = useCallback((timestamp: number) => {
@@ -39,48 +80,81 @@ export function TimelinePanel({ bookmarks, onTimeRangeChange, selectedTag }: Tim
     return `rgb(${r}, ${g}, ${b})`;
   }, [minTime, timeSpan]);
 
-  const updateVisibleTimeRange = useCallback(() => {
-    if (!containerRef.current) return;
-    const visibleStart = scrollLeft;
-    const visibleEnd = scrollLeft + visibleWidth;
-    const startTime = minTime + (visibleStart - 50) / pixelsPerMs;
-    const endTime = minTime + (visibleEnd - 50) / pixelsPerMs;
-    onTimeRangeChange({
+  const updateVisibleTimeRange = useCallback((currentTranslate: number) => {
+    if (containerWidth === 0 || contentWidth === 0) return;
+
+    const visibleStartX = -currentTranslate;
+    const visibleEndX = -currentTranslate + containerWidth;
+
+    const startTime = minTime + (visibleStartX - PADDING_LEFT) / pixelsPerMs;
+    const endTime = minTime + (visibleEndX - PADDING_LEFT) / pixelsPerMs;
+
+    const newRange: TimeRange = {
       start: Math.max(startTime, minTime),
       end: Math.min(endTime, maxTime),
-    });
-  }, [scrollLeft, visibleWidth, minTime, maxTime, pixelsPerMs, onTimeRangeChange]);
+    };
 
-  useEffect(() => {
-    updateVisibleTimeRange();
-  }, [updateVisibleTimeRange]);
-
-  useEffect(() => {
-    if (containerRef.current) {
-      containerRef.current.scrollLeft = scrollLeft;
+    const last = lastTimeRangeRef.current;
+    if (last && Math.abs(last.start - newRange.start) < 1000 && Math.abs(last.end - newRange.end) < 1000) {
+      return;
     }
-  }, [scrollLeft]);
+
+    lastTimeRangeRef.current = newRange;
+    onTimeRangeChangeRef.current(newRange);
+  }, [containerWidth, contentWidth, minTime, maxTime, pixelsPerMs]);
+
+  useEffect(() => {
+    updateVisibleTimeRange(translateX);
+  }, [translateX, updateVisibleTimeRange]);
 
   const handleMouseDown = (e: React.MouseEvent) => {
+    e.preventDefault();
     setIsDragging(true);
-    setDragStartX(e.clientX - scrollLeft);
+    setDragStartX(e.clientX - translateXRef.current);
   };
 
-  const handleMouseMove = (e: React.MouseEvent) => {
+  const handleMouseMove = useCallback((e: MouseEvent) => {
     if (!isDragging) return;
-    const newScrollLeft = dragStartX - e.clientX;
-    const maxScroll = totalWidth - visibleWidth;
-    setScrollLeft(Math.max(0, Math.min(newScrollLeft, maxScroll)));
-  };
 
-  const handleMouseUp = () => {
-    setIsDragging(false);
-  };
+    if (rafRef.current) {
+      cancelAnimationFrame(rafRef.current);
+    }
 
-  const handleMouseLeave = () => {
+    rafRef.current = requestAnimationFrame(() => {
+      let newTranslateX = e.clientX - dragStartX;
+
+      const maxTranslate = 0;
+      const minTranslate = -(contentWidth - containerWidth);
+
+      newTranslateX = Math.max(minTranslate, Math.min(maxTranslate, newTranslateX));
+
+      translateXRef.current = newTranslateX;
+      setTranslateX(newTranslateX);
+      rafRef.current = null;
+    });
+  }, [isDragging, dragStartX, contentWidth, containerWidth]);
+
+  const handleMouseUp = useCallback(() => {
     setIsDragging(false);
-    setHoveredBookmark(null);
-  };
+    if (rafRef.current) {
+      cancelAnimationFrame(rafRef.current);
+      rafRef.current = null;
+    }
+  }, []);
+
+  useEffect(() => {
+    if (isDragging) {
+      window.addEventListener('mousemove', handleMouseMove);
+      window.addEventListener('mouseup', handleMouseUp);
+      window.addEventListener('mouseleave', handleMouseUp);
+    }
+
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+      window.removeEventListener('mouseleave', handleMouseUp);
+    };
+  }, [isDragging, handleMouseMove, handleMouseUp]);
 
   const handleNodeMouseEnter = (e: React.MouseEvent, bookmark: Bookmark) => {
     setHoveredBookmark(bookmark);
@@ -88,8 +162,8 @@ export function TimelinePanel({ bookmarks, onTimeRangeChange, selectedTag }: Tim
     const containerRect = containerRef.current?.getBoundingClientRect();
     if (containerRect) {
       setTooltipPos({
-        x: rect.left - containerRect.left + scrollLeft + 3,
-        y: rect.top - containerRect.top - 10,
+        x: rect.left - containerRect.left + rect.width / 2,
+        y: rect.top - containerRect.top - 8,
       });
     }
   };
@@ -103,32 +177,43 @@ export function TimelinePanel({ bookmarks, onTimeRangeChange, selectedTag }: Tim
     return bookmark.tags.includes(selectedTag);
   };
 
-  const sortedBookmarks = [...bookmarks].sort((a, b) => a.timestamp - b.timestamp);
+  const axisY = 50;
 
   return (
-    <div className="timeline-container" ref={containerRef}>
-      <div
-        className={`timeline-scroll ${isDragging ? 'dragging' : ''}`}
-        onMouseDown={handleMouseDown}
-        onMouseMove={handleMouseMove}
-        onMouseUp={handleMouseUp}
-        onMouseLeave={handleMouseLeave}
-        style={{ width: totalWidth, cursor: isDragging ? 'grabbing' : 'grab' }}
+    <div
+      className="timeline-container"
+      ref={containerRef}
+      onMouseDown={handleMouseDown}
+      style={{ cursor: isDragging ? 'grabbing' : 'grab' }}
+    >
+      <svg
+        className={`timeline-svg ${isDragging ? 'dragging' : ''}`}
+        width={contentWidth}
+        height="100"
+        style={{ transform: `translateX(${translateX}px)` }}
       >
-        <div className="timeline-axis" />
+        <line
+          x1={PADDING_LEFT}
+          y1={axisY}
+          x2={contentWidth - PADDING_RIGHT}
+          y2={axisY}
+          stroke="#555"
+          strokeWidth="2"
+        />
 
-        {sortedBookmarks.length > 1 && sortedBookmarks.slice(0, -1).map((bookmark, index) => {
+        {sortedBookmarks.length > 1 && sortedBookmarks.map((bookmark, index) => {
+          if (index === sortedBookmarks.length - 1) return null;
           const nextBookmark = sortedBookmarks[index + 1];
           const x1 = getXPosition(bookmark.timestamp);
           const x2 = getXPosition(nextBookmark.timestamp);
           const visible = isBookmarkVisible(bookmark) && isBookmarkVisible(nextBookmark);
           return (
             <line
-              key={`line-${bookmark.id}-${nextBookmark.id}`}
+              key={`line-${bookmark.id}`}
               x1={x1}
-              y1="50"
+              y1={axisY}
               x2={x2}
-              y2="50"
+              y2={axisY}
               stroke={visible ? '#555' : 'transparent'}
               strokeWidth="2"
             />
@@ -140,33 +225,61 @@ export function TimelinePanel({ bookmarks, onTimeRangeChange, selectedTag }: Tim
           const color = getNodeColor(bookmark.timestamp);
           const visible = isBookmarkVisible(bookmark);
           return (
-            <div
+            <circle
               key={bookmark.id}
+              cx={x}
+              cy={axisY}
+              r={3}
+              fill={visible ? color : '#555'}
               className={`timeline-node ${visible ? '' : 'dimmed'}`}
-              style={{
-                left: x,
-                top: '50%',
-                backgroundColor: visible ? color : '#555',
-              }}
               onMouseEnter={(e) => handleNodeMouseEnter(e, bookmark)}
               onMouseLeave={handleNodeMouseLeave}
             />
           );
         })}
 
-        {hoveredBookmark && (
-          <div
-            className="timeline-tooltip"
-            style={{
-              left: tooltipPos.x,
-              top: tooltipPos.y,
-            }}
-          >
-            <div className="tooltip-title">{hoveredBookmark.title}</div>
-            <div className="tooltip-time">{formatTimestamp(hoveredBookmark.timestamp)}</div>
-          </div>
-        )}
-      </div>
+        {MIN_BREAKPOINTS > 0 && Array.from({ length: MIN_BREAKPOINTS + 1 }).map((_, i) => {
+          const ratio = i / MIN_BREAKPOINTS;
+          const timestamp = minTime + timeSpan * ratio;
+          const x = PADDING_LEFT + (contentWidth - PADDING_LEFT - PADDING_RIGHT) * ratio;
+          const date = new Date(timestamp);
+          const label = `${date.getMonth() + 1}/${date.getDate()}`;
+          return (
+            <g key={`tick-${i}`}>
+              <line
+                x1={x}
+                y1={axisY - 4}
+                x2={x}
+                y2={axisY + 4}
+                stroke="#666"
+                strokeWidth="1"
+              />
+              <text
+                x={x}
+                y={axisY + 18}
+                textAnchor="middle"
+                fill="#888"
+                fontSize="10"
+              >
+                {label}
+              </text>
+            </g>
+          );
+        })}
+      </svg>
+
+      {hoveredBookmark && (
+        <div
+          className="timeline-tooltip"
+          style={{
+            left: tooltipPos.x,
+            top: tooltipPos.y,
+          }}
+        >
+          <div className="tooltip-title">{hoveredBookmark.title}</div>
+          <div className="tooltip-time">{formatTimestamp(hoveredBookmark.timestamp)}</div>
+        </div>
+      )}
     </div>
   );
 }

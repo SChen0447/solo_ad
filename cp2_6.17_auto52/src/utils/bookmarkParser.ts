@@ -4,6 +4,54 @@ export interface ParsedBookmark {
   title: string;
   url: string;
   timestamp?: number;
+  folder?: string;
+}
+
+function traverseDL(dlElement: Element, currentFolder: string, bookmarks: ParsedBookmark[]): void {
+  const children = dlElement.children;
+
+  for (let i = 0; i < children.length; i++) {
+    const child = children[i];
+
+    if (child.tagName === 'DT') {
+      const dtElement = child as HTMLElement;
+
+      const h3 = dtElement.querySelector('h3');
+      if (h3) {
+        const folderName = h3.textContent?.trim() || '';
+        const nextSibling = dtElement.nextElementSibling;
+        if (nextSibling && nextSibling.tagName === 'DL') {
+          const newFolder = currentFolder ? `${currentFolder}/${folderName}` : folderName;
+          traverseDL(nextSibling, newFolder, bookmarks);
+        }
+        continue;
+      }
+
+      const link = dtElement.querySelector('a');
+      if (link) {
+        const href = link.getAttribute('href');
+        const title = link.textContent?.trim() || href || '';
+        const addDate = link.getAttribute('add_date');
+
+        if (href && (href.startsWith('http://') || href.startsWith('https://'))) {
+          const bookmark: ParsedBookmark = {
+            title: title || href,
+            url: href,
+          };
+
+          if (addDate) {
+            bookmark.timestamp = parseInt(addDate, 10) * 1000;
+          }
+
+          if (currentFolder) {
+            bookmark.folder = currentFolder;
+          }
+
+          bookmarks.push(bookmark);
+        }
+      }
+    }
+  }
 }
 
 export function parseBookmarksHTML(html: string): ParsedBookmark[] {
@@ -11,26 +59,32 @@ export function parseBookmarksHTML(html: string): ParsedBookmark[] {
   const doc = parser.parseFromString(html, 'text/html');
   const bookmarks: ParsedBookmark[] = [];
 
-  const links = doc.querySelectorAll('a');
+  const dlElements = doc.querySelectorAll('dl');
 
-  links.forEach((link) => {
-    const href = link.getAttribute('href');
-    const title = link.textContent?.trim() || href || '';
-    const addDate = link.getAttribute('add_date');
+  if (dlElements.length > 0) {
+    traverseDL(dlElements[0], '', bookmarks);
+  } else {
+    const links = doc.querySelectorAll('a');
 
-    if (href && (href.startsWith('http://') || href.startsWith('https://'))) {
-      const bookmark: ParsedBookmark = {
-        title: title || href,
-        url: href,
-      };
+    links.forEach((link) => {
+      const href = link.getAttribute('href');
+      const title = link.textContent?.trim() || href || '';
+      const addDate = link.getAttribute('add_date');
 
-      if (addDate) {
-        bookmark.timestamp = parseInt(addDate, 10) * 1000;
+      if (href && (href.startsWith('http://') || href.startsWith('https://'))) {
+        const bookmark: ParsedBookmark = {
+          title: title || href,
+          url: href,
+        };
+
+        if (addDate) {
+          bookmark.timestamp = parseInt(addDate, 10) * 1000;
+        }
+
+        bookmarks.push(bookmark);
       }
-
-      bookmarks.push(bookmark);
-    }
-  });
+    });
+  }
 
   return bookmarks;
 }

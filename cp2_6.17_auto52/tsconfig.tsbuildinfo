@@ -1,0 +1,1 @@
+{"root":["./src/app.tsx","./src/main.tsx","./src/vite-env.d.ts","./src/components/bookmarkgrid.tsx","./src/components/filterbar.tsx","./src/components/timelinepanel.tsx","./src/data/bookmarkdataservice.ts","./src/types/bookmark.ts","./src/utils/bookmarkparser.ts"],"version":"5.8.3"}

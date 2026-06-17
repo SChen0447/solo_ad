@@ -2,52 +2,33 @@
   width: 100%;
   height: 100px;
   background-color: #2A2A2E;
-  overflow-x: hidden;
-  overflow-y: hidden;
-  position: relative;
-}
-
-.timeline-scroll {
-  height: 100%;
+  overflow: hidden;
   position: relative;
   user-select: none;
-  display: flex;
-  align-items: center;
-  min-width: 100%;
 }
 
-.timeline-scroll.dragging {
-  cursor: grabbing !important;
+.timeline-svg {
+  transition: none;
+  will-change: transform;
+  pointer-events: none;
 }
 
-.timeline-axis {
-  position: absolute;
-  top: 50%;
-  left: 0;
-  right: 0;
-  height: 2px;
-  background-color: #555;
-  transform: translateY(-50%);
-}
-
-.timeline-node {
-  position: absolute;
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  transform: translate(-50%, -50%);
+.timeline-svg .timeline-node {
   cursor: pointer;
-  transition: width 0.3s ease-out, height 0.3s ease-out, background-color 0.3s ease-out, opacity 0.3s ease-out;
-  z-index: 2;
+  pointer-events: auto;
+  transition: r 0.3s ease-out, fill 0.3s ease-out, opacity 0.3s ease-out;
 }
 
-.timeline-node:hover {
-  width: 10px;
-  height: 10px;
+.timeline-svg .timeline-node:hover {
+  r: 5;
 }
 
-.timeline-node.dimmed {
+.timeline-svg .timeline-node.dimmed {
   opacity: 0.3;
+}
+
+.timeline-svg.dragging {
+  cursor: grabbing;
 }
 
 .timeline-tooltip {
