@@ -22,8 +22,12 @@ interface RoomCanvasProps {
 }
 
 interface GuideLine {
-  x1: number; y1: number; x2: number; y2: number;
-  furnitureId: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  isVertical: boolean;
+  distance: number;
 }
 
 interface SnapInfo {
@@ -34,25 +38,28 @@ interface SnapInfo {
 
 const FurnitureBlock = memo(function FurnitureBlock({
   item,
-  isBeingDragged,
+  isAnimating,
   onDelete,
   onMouseDown,
 }: {
   item: FurnitureItem;
-  isBeingDragged: boolean;
+  isAnimating: boolean;
   onDelete: () => void;
-  onMouseDown: (e: React.MouseEvent, offsetX: number, offsetY: number) => void;
+  onMouseDown: (e: React.MouseEvent, el: HTMLElement, offsetX: number, offsetY: number) => void;
 }) {
   const handleMouseDown = (e: React.MouseEvent) => {
-    const rect = e.currentTarget.getBoundingClientRect();
+    if (isAnimating) return;
+    const el = e.currentTarget as HTMLElement;
+    const rect = el.getBoundingClientRect();
     const offsetX = e.clientX - rect.left;
     const offsetY = e.clientY - rect.top;
-    onMouseDown(e, offsetX, offsetY);
+    onMouseDown(e, el, offsetX, offsetY);
   };
 
   return (
     <div
       className="furniture-item"
+      data-furniture-id={item.id}
       style={{
         position: 'absolute',
         left: item.x,
@@ -61,21 +68,21 @@ const FurnitureBlock = memo(function FurnitureBlock({
         height: item.height,
         backgroundColor: item.color,
         borderRadius: '2px',
-        cursor: 'grab',
-        boxShadow: isBeingDragged
-          ? '0 10px 24px rgba(0,0,0,0.35)'
-          : '0 2px 4px rgba(0,0,0,0.2)',
-        transform: `rotate(${item.rotation}deg) scale(${isBeingDragged ? 1.05 : 1})`,
+        cursor: isAnimating ? 'default' : 'grab',
+        boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
+        transform: `rotate(${item.rotation}deg)`,
         transformOrigin: 'center center',
-        transition: 'transform 0.15s ease, box-shadow 0.15s ease, filter 0.2s ease, opacity 0.15s ease',
-        willChange: 'transform',
+        transition: 'left 0.15s cubic-bezier(0.25, 0.46, 0.45, 0.94), top 0.15s cubic-bezier(0.25, 0.46, 0.45, 0.94), box-shadow 0.15s ease, filter 0.2s ease',
+        willChange: 'transform, left, top',
         userSelect: 'none',
-        opacity: isBeingDragged ? 0.35 : 1,
-        zIndex: isBeingDragged ? 2 : 1,
+        zIndex: 1,
+        pointerEvents: isAnimating ? 'none' : 'auto',
       }}
       onMouseDown={handleMouseDown}
       onTouchStart={(e) => {
-        const rect = e.currentTarget.getBoundingClientRect();
+        if (isAnimating) return;
+        const el = e.currentTarget as HTMLElement;
+        const rect = el.getBoundingClientRect();
         const touch = e.touches[0];
         const offsetX = touch.clientX - rect.left;
         const offsetY = touch.clientY - rect.top;
@@ -84,7 +91,7 @@ const FurnitureBlock = memo(function FurnitureBlock({
           clientY: touch.clientY,
           bubbles: true,
         });
-        onMouseDown(mouseEvent as unknown as React.MouseEvent, offsetX, offsetY);
+        onMouseDown(mouseEvent as unknown as React.MouseEvent, el, offsetX, offsetY);
       }}
     >
       <span
@@ -191,6 +198,30 @@ function easeOutCubic(t: number): number {
   return 1 - Math.pow(1 - t, 3);
 }
 
+const applyFurnitureDragStyles = (el: HTMLElement) => {
+  el.dataset.origTransform = el.style.transform;
+  el.dataset.origBoxShadow = el.style.boxShadow;
+  el.dataset.origZIndex = el.style.zIndex;
+  el.dataset.origOpacity = el.style.opacity;
+  el.style.transform = `${el.dataset.origTransform || ''} scale(1.05)`;
+  el.style.boxShadow = '0 12px 28px rgba(0,0,0,0.35)';
+  el.style.zIndex = '50';
+  el.style.opacity = '0.85';
+  el.style.transition = 'transform 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease';
+};
+
+const restoreFurnitureDragStyles = (el: HTMLElement) => {
+  el.style.transform = el.dataset.origTransform || '';
+  el.style.boxShadow = el.dataset.origBoxShadow || '';
+  el.style.zIndex = el.dataset.origZIndex || '';
+  el.style.opacity = el.dataset.origOpacity || '';
+  el.style.transition = '';
+  delete el.dataset.origTransform;
+  delete el.dataset.origBoxShadow;
+  delete el.dataset.origZIndex;
+  delete el.dataset.origOpacity;
+};
+
 const computeAlignmentGuides = (
   dragX: number,
   dragY: number,
@@ -198,8 +229,8 @@ const computeAlignmentGuides = (
   dragH: number,
   furniture: FurnitureItem[],
   excludeId: string | null
-): GuideLine[] => {
-  const guides: GuideLine[] = [];
+): GuideLine | null => {
+  let closest: GuideLine | null = null;
   const dragLeft = dragX;
   const dragRight = dragX + dragW;
   const dragTop = dragY;
@@ -216,33 +247,47 @@ const computeAlignmentGuides = (
     const fCenterX = item.x + item.width / 2;
     const fCenterY = item.y + item.height / 2;
 
-    const edges: { dist: number; type: string; gx1: number; gy1: number; gx2: number; gy2: number }[] = [];
+    const candidates: { dist: number; isVertical: boolean; pos: number; start: number; end: number }[] = [];
 
-    edges.push({ dist: Math.abs(dragLeft - fLeft), type: 'left-left', gx1: fLeft, gy1: Math.min(fTop, dragTop) - 5, gx2: fLeft, gy2: Math.max(fBottom, dragBottom) + 5 });
-    edges.push({ dist: Math.abs(dragLeft - fRight), type: 'left-right', gx1: fRight, gy1: Math.min(fTop, dragTop) - 5, gx2: fRight, gy2: Math.max(fBottom, dragBottom) + 5 });
-    edges.push({ dist: Math.abs(dragRight - fLeft), type: 'right-left', gx1: fLeft, gy1: Math.min(fTop, dragTop) - 5, gx2: fLeft, gy2: Math.max(fBottom, dragBottom) + 5 });
-    edges.push({ dist: Math.abs(dragRight - fRight), type: 'right-right', gx1: fRight, gy1: Math.min(fTop, dragTop) - 5, gx2: fRight, gy2: Math.max(fBottom, dragBottom) + 5 });
-    edges.push({ dist: Math.abs(dragTop - fTop), type: 'top-top', gx1: Math.min(fLeft, dragLeft) - 5, gy1: fTop, gx2: Math.max(fRight, dragRight) + 5, gy2: fTop });
-    edges.push({ dist: Math.abs(dragTop - fBottom), type: 'top-bottom', gx1: Math.min(fLeft, dragLeft) - 5, gy1: fBottom, gx2: Math.max(fRight, dragRight) + 5, gy2: fBottom });
-    edges.push({ dist: Math.abs(dragBottom - fTop), type: 'bottom-top', gx1: Math.min(fLeft, dragLeft) - 5, gy1: fTop, gx2: Math.max(fRight, dragRight) + 5, gy2: fTop });
-    edges.push({ dist: Math.abs(dragBottom - fBottom), type: 'bottom-bottom', gx1: Math.min(fLeft, dragLeft) - 5, gy1: fBottom, gx2: Math.max(fRight, dragRight) + 5, gy2: fBottom });
-    edges.push({ dist: Math.abs(dragCenterX - fCenterX), type: 'centerX', gx1: fCenterX, gy1: Math.min(fTop, dragTop) - 5, gx2: fCenterX, gy2: Math.max(fBottom, dragBottom) + 5 });
-    edges.push({ dist: Math.abs(dragCenterY - fCenterY), type: 'centerY', gx1: Math.min(fLeft, dragLeft) - 5, gy1: fCenterY, gx2: Math.max(fRight, dragRight) + 5, gy2: fCenterY });
+    candidates.push({ dist: Math.abs(dragLeft - fLeft), isVertical: true, pos: fLeft, start: Math.min(fTop, dragTop) - 5, end: Math.max(fBottom, dragBottom) + 5 });
+    candidates.push({ dist: Math.abs(dragLeft - fRight), isVertical: true, pos: fRight, start: Math.min(fTop, dragTop) - 5, end: Math.max(fBottom, dragBottom) + 5 });
+    candidates.push({ dist: Math.abs(dragRight - fLeft), isVertical: true, pos: fLeft, start: Math.min(fTop, dragTop) - 5, end: Math.max(fBottom, dragBottom) + 5 });
+    candidates.push({ dist: Math.abs(dragRight - fRight), isVertical: true, pos: fRight, start: Math.min(fTop, dragTop) - 5, end: Math.max(fBottom, dragBottom) + 5 });
+    candidates.push({ dist: Math.abs(dragTop - fTop), isVertical: false, pos: fTop, start: Math.min(fLeft, dragLeft) - 5, end: Math.max(fRight, dragRight) + 5 });
+    candidates.push({ dist: Math.abs(dragTop - fBottom), isVertical: false, pos: fBottom, start: Math.min(fLeft, dragLeft) - 5, end: Math.max(fRight, dragRight) + 5 });
+    candidates.push({ dist: Math.abs(dragBottom - fTop), isVertical: false, pos: fTop, start: Math.min(fLeft, dragLeft) - 5, end: Math.max(fRight, dragRight) + 5 });
+    candidates.push({ dist: Math.abs(dragBottom - fBottom), isVertical: false, pos: fBottom, start: Math.min(fLeft, dragLeft) - 5, end: Math.max(fRight, dragRight) + 5 });
+    candidates.push({ dist: Math.abs(dragCenterX - fCenterX), isVertical: true, pos: fCenterX, start: Math.min(fTop, dragTop) - 5, end: Math.max(fBottom, dragBottom) + 5 });
+    candidates.push({ dist: Math.abs(dragCenterY - fCenterY), isVertical: false, pos: fCenterY, start: Math.min(fLeft, dragLeft) - 5, end: Math.max(fRight, dragRight) + 5 });
 
-    for (const edge of edges) {
-      if (edge.dist <= ALIGN_THRESHOLD) {
-        guides.push({
-          x1: edge.gx1,
-          y1: edge.gy1,
-          x2: edge.gx2,
-          y2: edge.gy2,
-          furnitureId: item.id,
-        });
+    for (const c of candidates) {
+      if (c.dist <= ALIGN_THRESHOLD) {
+        if (!closest || c.dist < closest.distance) {
+          if (c.isVertical) {
+            closest = {
+              x: c.pos,
+              y: c.start,
+              width: 1,
+              height: c.end - c.start,
+              isVertical: true,
+              distance: c.dist,
+            };
+          } else {
+            closest = {
+              x: c.start,
+              y: c.pos,
+              width: c.end - c.start,
+              height: 1,
+              isVertical: false,
+              distance: c.dist,
+            };
+          }
+        }
       }
     }
   }
 
-  return guides;
+  return closest;
 };
 
 const computeWallSnap = (
@@ -307,19 +352,28 @@ export const RoomCanvas: React.FC<RoomCanvasProps> = ({
   const [movingFurnitureId, setMovingFurnitureId] = useState<string | null>(null);
   const [moveOffset, setMoveOffset] = useState({ x: 0, y: 0 });
   const [originalPosition, setOriginalPosition] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
-  const [guides, setGuides] = useState<GuideLine[]>([]);
+  const [guides, setGuides] = useState<GuideLine | null>(null);
   const [wallSnap, setWallSnap] = useState<SnapInfo | null>(null);
+  const [animatingIds, setAnimatingIds] = useState<Set<string>>(new Set());
+  const [snappedIds, setSnappedIds] = useState<Set<string>>(new Set());
 
-  const [dropAnimState, setDropAnimState] = useState<{
-    running: boolean;
-    data: DragData | null;
-    fromX: number; fromY: number;
-    toX: number; toY: number;
-    w: number; h: number;
-    color: string;
-    startTime: number;
-  } | null>(null);
+  const draggingElementRef = useRef<HTMLElement | null>(null);
+  const dropGhostRef = useRef<HTMLDivElement>(null);
+  const dropAnimTimerRef = useRef<number | null>(null);
   const dropAnimRef = useRef<number | null>(null);
+
+  const isSnappedToWall = useCallback((x: number, y: number, w: number, h: number): boolean => {
+    const leftWall = WALL_THICKNESS;
+    const rightWall = layout.canvasWidth - WALL_THICKNESS;
+    const topWall = WALL_THICKNESS;
+    const bottomWall = layout.canvasHeight - WALL_THICKNESS;
+    return (
+      Math.abs(x - leftWall) < 1 ||
+      Math.abs(rightWall - (x + w)) < 1 ||
+      Math.abs(y - topWall) < 1 ||
+      Math.abs(bottomWall - (y + h)) < 1
+    );
+  }, [layout]);
 
   const getDragDimensions = useCallback((): { w: number; h: number } | null => {
     if (!dragData) return null;
@@ -370,15 +424,20 @@ export const RoomCanvas: React.FC<RoomCanvasProps> = ({
       y = Math.max(padding, Math.min(y, layout.canvasHeight - padding - dims.h));
     }
 
-    const newGuides = computeAlignmentGuides(x, y, dims.w, dims.h, furniture,
+    const newGuide = computeAlignmentGuides(x, y, dims.w, dims.h, furniture,
       dragData.type === 'move' ? dragData.furnitureId : null);
-    setGuides(newGuides);
+    setGuides(newGuide);
 
     return { x, y, dims };
   }, [dragData, moveOffset, layout, furniture, getDragDimensions]);
 
   const handleDrop = useCallback(
     (data: DragData, position: { x: number; y: number }) => {
+      if (draggingElementRef.current) {
+        restoreFurnitureDragStyles(draggingElementRef.current);
+        draggingElementRef.current = null;
+      }
+
       const dims = data.type === 'furniture'
         ? { w: data.furniture.width, h: data.furniture.height }
         : (() => {
@@ -390,7 +449,7 @@ export const RoomCanvas: React.FC<RoomCanvasProps> = ({
         setDragData(null);
         setMovingFurnitureId(null);
         setOriginalPosition(null);
-        setGuides([]);
+        setGuides(null);
         setWallSnap(null);
         return;
       }
@@ -414,54 +473,78 @@ export const RoomCanvas: React.FC<RoomCanvasProps> = ({
         toY = Math.max(padding, Math.min(toY, layout.canvasHeight - padding - dims.h));
       }
 
-      const color = data.type === 'furniture'
-        ? data.furniture.color
-        : (furniture.find(f => f.id === data.furnitureId)?.color ?? '#8b7355');
-
       setDragPosition(null);
-      setGuides([]);
+      setGuides(null);
       setWallSnap(null);
-      setDropAnimState({
-        running: true,
-        data,
-        fromX, fromY,
-        toX, toY,
-        w: dims.w, h: dims.h,
-        color,
-        startTime: performance.now(),
-      });
 
-      const animate = (now: number) => {
-        setDropAnimState(prev => {
-          if (!prev) return null;
-          const elapsed = now - prev.startTime;
-          const progress = Math.min(1, elapsed / DROP_ANIMATION_MS);
-          const eased = easeOutCubic(progress);
-          if (progress < 1) {
-            dropAnimRef.current = requestAnimationFrame(animate);
-            return { ...prev };
-          }
-          dropAnimRef.current = null;
-          const d = prev.data!;
-          if (d.type === 'furniture') {
-            if (isInRoomBounds(prev.toX, prev.toY, prev.w, prev.h, layout)) {
-              const newFurniture: FurnitureItem = {
-                id: uuidv4(),
-                ...d.furniture,
-                x: prev.toX,
-                y: prev.toY,
-              };
-              onFurnitureAdd(newFurniture);
-            }
-          } else {
-            if (isInRoomBounds(prev.toX, prev.toY, prev.w, prev.h, layout)) {
-              onFurnitureMove(d.furnitureId, prev.toX, prev.toY);
-            }
-          }
-          return null;
+      if (data.type === 'move') {
+        const furnitureId = data.furnitureId;
+        setAnimatingIds(prev => {
+          const next = new Set(prev);
+          next.add(furnitureId);
+          return next;
         });
-      };
-      dropAnimRef.current = requestAnimationFrame(animate);
+
+        const el = canvasRef.current?.querySelector(`[data-furniture-id="${furnitureId}"]`) as HTMLElement | null;
+        if (el) {
+          el.style.transition = 'none';
+          el.style.left = `${fromX}px`;
+          el.style.top = `${fromY}px`;
+          void el.offsetWidth;
+          el.style.transition = '';
+        }
+
+        onFurnitureMove(furnitureId, toX, toY);
+
+        if (dropAnimTimerRef.current) {
+          window.clearTimeout(dropAnimTimerRef.current);
+        }
+        dropAnimTimerRef.current = window.setTimeout(() => {
+          setAnimatingIds(prev => {
+            const next = new Set(prev);
+            next.delete(furnitureId);
+            return next;
+          });
+          dropAnimTimerRef.current = null;
+        }, DROP_ANIMATION_MS);
+      } else {
+        const color = data.furniture.color;
+        const ghost = dropGhostRef.current;
+        if (ghost) {
+          ghost.style.display = 'block';
+          ghost.style.left = `${fromX}px`;
+          ghost.style.top = `${fromY}px`;
+          ghost.style.width = `${dims.w}px`;
+          ghost.style.height = `${dims.h}px`;
+          ghost.style.backgroundColor = color;
+          ghost.style.transition = 'none';
+          void ghost.offsetWidth;
+          ghost.style.transition = 'left 0.15s cubic-bezier(0.25, 0.46, 0.45, 0.94), top 0.15s cubic-bezier(0.25, 0.46, 0.45, 0.94)';
+          requestAnimationFrame(() => {
+            ghost.style.left = `${toX}px`;
+            ghost.style.top = `${toY}px`;
+          });
+        }
+
+        if (dropAnimTimerRef.current) {
+          window.clearTimeout(dropAnimTimerRef.current);
+        }
+        dropAnimTimerRef.current = window.setTimeout(() => {
+          if (ghost) {
+            ghost.style.display = 'none';
+          }
+          if (isInRoomBounds(toX, toY, dims.w, dims.h, layout)) {
+            const newFurniture: FurnitureItem = {
+              id: uuidv4(),
+              ...data.furniture,
+              x: toX,
+              y: toY,
+            };
+            onFurnitureAdd(newFurniture);
+          }
+          dropAnimTimerRef.current = null;
+        }, DROP_ANIMATION_MS);
+      }
 
       setDragData(null);
       setMovingFurnitureId(null);
@@ -472,6 +555,9 @@ export const RoomCanvas: React.FC<RoomCanvasProps> = ({
 
   useEffect(() => {
     return () => {
+      if (dropAnimTimerRef.current) {
+        window.clearTimeout(dropAnimTimerRef.current);
+      }
       if (dropAnimRef.current) cancelAnimationFrame(dropAnimRef.current);
     };
   }, []);
@@ -504,9 +590,14 @@ export const RoomCanvas: React.FC<RoomCanvasProps> = ({
   }, [furniture]);
 
   const handleFurnitureMouseDown = useCallback(
-    (itemId: string, e: React.MouseEvent, offsetX: number, offsetY: number) => {
+    (itemId: string, e: React.MouseEvent, el: HTMLElement, offsetX: number, offsetY: number) => {
+      if (animatingIds.has(itemId)) return;
       e.preventDefault();
       e.stopPropagation();
+
+      applyFurnitureDragStyles(el);
+      draggingElementRef.current = el;
+
       setMovingFurnitureId(itemId);
       setMoveOffset({ x: offsetX, y: offsetY });
 
@@ -523,10 +614,10 @@ export const RoomCanvas: React.FC<RoomCanvasProps> = ({
           detail: dragData,
           bubbles: true,
         });
-        e.currentTarget.dispatchEvent(event);
+        el.dispatchEvent(event);
       }
     },
-    [furniture]
+    [furniture, animatingIds]
   );
 
   const handleWallClick = useCallback(
@@ -571,17 +662,6 @@ export const RoomCanvas: React.FC<RoomCanvasProps> = ({
   const floorPattern = getFloorPattern(layout.floor);
 
   const computedDrag = dragPosition && dragData ? computeDragXY(dragPosition) : null;
-
-  const dropAnimProgress = dropAnimState ? easeOutCubic(
-    Math.min(1, (performance.now() - dropAnimState.startTime) / DROP_ANIMATION_MS)
-  ) : 0;
-
-  const dropAnimX = dropAnimState
-    ? dropAnimState.fromX + (dropAnimState.toX - dropAnimState.fromX) * dropAnimProgress
-    : 0;
-  const dropAnimY = dropAnimState
-    ? dropAnimState.fromY + (dropAnimState.toY - dropAnimState.fromY) * dropAnimProgress
-    : 0;
 
   return (
     <div
@@ -642,20 +722,22 @@ export const RoomCanvas: React.FC<RoomCanvasProps> = ({
           }}
         >
           {renderGrid()}
-          {guides.map((g, i) => (
-            <line
-              key={`guide-${i}`}
-              x1={g.x1}
-              y1={g.y1}
-              x2={g.x2}
-              y2={g.y2}
-              stroke="#2563eb"
-              strokeWidth="1.5"
-              strokeDasharray="4 3"
-              opacity="0.85"
-            />
-          ))}
         </svg>
+
+        {guides && (
+          <div
+            style={{
+              position: 'absolute',
+              left: guides.x,
+              top: guides.y,
+              width: guides.width,
+              height: guides.height,
+              backgroundColor: '#8b5e3c',
+              pointerEvents: 'none',
+              zIndex: 20,
+            }}
+          />
+        )}
 
         <div
           style={{
@@ -713,10 +795,37 @@ export const RoomCanvas: React.FC<RoomCanvasProps> = ({
           <FurnitureBlock
             key={item.id}
             item={item}
-            isBeingDragged={movingFurnitureId === item.id}
+            isAnimating={animatingIds.has(item.id)}
             onDelete={() => onFurnitureDelete(item.id)}
-            onMouseDown={(e, offsetX, offsetY) => handleFurnitureMouseDown(item.id, e, offsetX, offsetY)}
+            onMouseDown={(e, el, ox, oy) => handleFurnitureMouseDown(item.id, e, el, ox, oy)}
           />
+        ))}
+
+        {furniture.filter(item =>
+          item.id !== movingFurnitureId && isSnappedToWall(item.x, item.y, item.width, item.height)
+        ).map((item) => (
+          <div
+            key={`snap-${item.id}`}
+            style={{
+              position: 'absolute',
+              left: item.x + item.width / 2 - 8,
+              top: item.y + item.height / 2 - 8,
+              width: '16px',
+              height: '16px',
+              fontSize: '16px',
+              fontWeight: 700,
+              color: '#4caf50',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              pointerEvents: 'none',
+              zIndex: 5,
+              lineHeight: 1,
+              textShadow: '0 0 4px rgba(255,255,255,0.8)',
+            }}
+          >
+            ✓
+          </div>
         ))}
 
         {isDragOver && computedDrag && (
@@ -744,51 +853,40 @@ export const RoomCanvas: React.FC<RoomCanvasProps> = ({
           <div
             style={{
               position: 'absolute',
-              left: wallSnap.checkX - 10,
-              top: wallSnap.checkY - 10,
-              width: '20px',
-              height: '20px',
-              borderRadius: '50%',
-              backgroundColor: '#22c55e',
-              color: 'white',
-              fontSize: '13px',
+              left: computedDrag.x + computedDrag.dims.w / 2 - 8,
+              top: computedDrag.y + computedDrag.dims.h / 2 - 8,
+              width: '16px',
+              height: '16px',
+              fontSize: '16px',
               fontWeight: 700,
+              color: '#4caf50',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               pointerEvents: 'none',
-              boxShadow: '0 2px 6px rgba(34, 197, 94, 0.5)',
               zIndex: 100,
-              animation: 'snapPulse 0.6s ease-in-out infinite',
+              lineHeight: 1,
+              textShadow: '0 0 4px rgba(255,255,255,0.8)',
             }}
           >
             ✓
           </div>
         )}
 
-        {dropAnimState && (
-          <div
-            style={{
-              position: 'absolute',
-              left: dropAnimX,
-              top: dropAnimY,
-              width: dropAnimState.w,
-              height: dropAnimState.h,
-              backgroundColor: dropAnimState.color,
-              borderRadius: '2px',
-              opacity: 0.85,
-              pointerEvents: 'none',
-              boxShadow: '0 8px 20px rgba(0,0,0,0.25)',
-              zIndex: 60,
-            }}
-          />
-        )}
+        <div
+          ref={dropGhostRef}
+          style={{
+            position: 'absolute',
+            display: 'none',
+            borderRadius: '2px',
+            opacity: 0.85,
+            pointerEvents: 'none',
+            boxShadow: '0 8px 20px rgba(0,0,0,0.25)',
+            zIndex: 60,
+          }}
+        />
 
         <style>{`
-          @keyframes snapPulse {
-            0%, 100% { transform: scale(1); opacity: 1; }
-            50% { transform: scale(1.15); opacity: 0.85; }
-          }
         `}</style>
       </div>
     </div>

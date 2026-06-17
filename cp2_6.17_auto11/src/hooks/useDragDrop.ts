@@ -7,6 +7,28 @@ interface DragState {
   position: { x: number; y: number };
 }
 
+const applyDragStyles = (el: HTMLElement) => {
+  el.dataset.origTransform = el.style.transform;
+  el.dataset.origBoxShadow = el.style.boxShadow;
+  el.dataset.origTransition = el.style.transition;
+  el.dataset.origZIndex = el.style.zIndex;
+  el.style.transform = 'scale(1.05)';
+  el.style.boxShadow = '0 12px 28px rgba(0,0,0,0.35)';
+  el.style.transition = 'transform 0.15s ease, box-shadow 0.15s ease';
+  el.style.zIndex = '1000';
+};
+
+const restoreDragStyles = (el: HTMLElement) => {
+  el.style.transform = el.dataset.origTransform || '';
+  el.style.boxShadow = el.dataset.origBoxShadow || '';
+  el.style.transition = el.dataset.origTransition || '';
+  el.style.zIndex = el.dataset.origZIndex || '';
+  delete el.dataset.origTransform;
+  delete el.dataset.origBoxShadow;
+  delete el.dataset.origTransition;
+  delete el.dataset.origZIndex;
+};
+
 export const useDrag = <T extends DragData>(
   elementRef: React.RefObject<HTMLElement>,
   data: T
@@ -43,6 +65,7 @@ export const useDrag = <T extends DragData>(
       animationId: null,
     };
 
+    applyDragStyles(target);
     setIsDragging(true);
 
     const customEvent = new CustomEvent<DragData>('dnd:start', {
@@ -52,18 +75,30 @@ export const useDrag = <T extends DragData>(
     target.dispatchEvent(customEvent);
   }, [elementRef, data]);
 
+  const onDragEnd = useCallback(() => {
+    const target = elementRef.current;
+    if (target) {
+      restoreDragStyles(target);
+    }
+    setIsDragging(false);
+  }, [elementRef]);
+
   useEffect(() => {
     const element = elementRef.current;
     if (!element) return;
 
     element.addEventListener('mousedown', onDragStart);
     element.addEventListener('touchstart', onDragStart, { passive: false });
+    document.addEventListener('mouseup', onDragEnd);
+    document.addEventListener('touchend', onDragEnd);
 
     return () => {
       element.removeEventListener('mousedown', onDragStart);
       element.removeEventListener('touchstart', onDragStart);
+      document.removeEventListener('mouseup', onDragEnd);
+      document.removeEventListener('touchend', onDragEnd);
     };
-  }, [elementRef, onDragStart]);
+  }, [elementRef, onDragStart, onDragEnd]);
 
   return {
     isDragging,
