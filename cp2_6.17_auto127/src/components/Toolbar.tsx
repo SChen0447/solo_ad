@@ -10,6 +10,7 @@ interface ToolbarProps {
   onExport: (format: 'html' | 'txt') => void;
   onLeave: () => void;
   isConnected: boolean;
+  saveStatus: 'saved' | 'unsaved' | 'saving';
 }
 
 const Toolbar: React.FC<ToolbarProps> = ({
@@ -19,7 +20,8 @@ const Toolbar: React.FC<ToolbarProps> = ({
   currentUserId,
   onExport,
   onLeave,
-  isConnected
+  isConnected,
+  saveStatus
 }) => {
   const handleCopyRoomCode = () => {
     navigator.clipboard.writeText(roomCode);
@@ -214,6 +216,39 @@ const Toolbar: React.FC<ToolbarProps> = ({
       }} />
 
       <UserList users={users} currentUserId={currentUserId} />
+
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: '6px',
+        padding: '6px 12px',
+        borderRadius: '8px',
+        background: saveStatus === 'saved' ? '#f0fdf4' : saveStatus === 'saving' ? '#fffbeb' : '#fef2f2',
+        transition: 'all 0.3s'
+      }} title={
+        saveStatus === 'saved' 
+          ? '所有更改已保存到本地' 
+          : saveStatus === 'saving' 
+            ? '正在保存...' 
+            : '有未保存的更改，30秒后自动保存'
+      }>
+        <div style={{
+          width: '8px',
+          height: '8px',
+          borderRadius: '50%',
+          background: saveStatus === 'saved' ? '#22c55e' : saveStatus === 'saving' ? '#eab308' : '#f59e0b',
+          animation: saveStatus === 'saving' ? 'pulse 1s infinite' : 'none',
+          transition: 'all 0.3s'
+        }} />
+        <span style={{
+          fontSize: '13px',
+          fontWeight: 500,
+          color: saveStatus === 'saved' ? '#15803d' : saveStatus === 'saving' ? '#a16207' : '#b45309',
+          transition: 'all 0.3s'
+        }}>
+          {saveStatus === 'saved' ? '已保存' : saveStatus === 'saving' ? '保存中' : '未保存'}
+        </span>
+      </div>
 
       <button
         onClick={onLeave}

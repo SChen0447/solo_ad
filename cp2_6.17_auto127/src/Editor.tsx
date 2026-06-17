@@ -5,6 +5,8 @@ import Toolbar from './components/Toolbar';
 import StatusBar from './components/StatusBar';
 import CommentSidebar from './components/CommentSidebar';
 import CommentModal from './components/CommentModal';
+import DraftRestoreModal from './components/DraftRestoreModal';
+import { saveDraft, getDraft, removeDraft, DraftData } from './utils/draftStorage';
 
 interface EditorProps {
   roomCode: string;
@@ -61,15 +63,21 @@ const Editor: React.FC<EditorProps> = ({
   const [isUpdatingFromRemote, setIsUpdatingFromRemote] = useState(false);
   const [highlightedCommentId, setHighlightedCommentId] = useState<string | null>(null);
   const cursorUpdateThrottleRef = useRef<number | null>(null);
+  const [saveStatus, setSaveStatus] = useState<'saved' | 'unsaved' | 'saving'>('saved');
+  const [isDirty, setIsDirty] = useState(false);
+  const [detectedDraft, setDetectedDraft] = useState<DraftData | null>(null);
+  const autoSaveTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const lastSavedContentRef = useRef<string>(initialContent);
+  const AUTO_SAVE_INTERVAL = 30000;
 
   const getNodePath = useCallback((node: Node): number[] => {
     const path: number[] = [];
     let current: Node | null = node;
     while (current && current.parentElement && current.parentElement !== editorRef.current) {
-      const parent = current.parentElement;
+      const parent: ParentNode = current.parentElement;
       const index = Array.from(parent.childNodes).indexOf(current as ChildNode);
       path.unshift(index);
-      current = parent;
+      current = current.parentElement;
     }
     return path;
   }, []);
@@ -203,6 +211,11 @@ const Editor: React.FC<EditorProps> = ({
     return html.replace(/<[^>]*>/g, '').length;
   };
 
+  const markAsDirty = useCallback(() => {
+    setIsDirty(true);
+    setSaveStatus('unsaved');
+  }, []);
+
   const handleFormat = useCallback((command: string, value?: string) => {
     editorRef.current?.focus();
     if (command === 'formatBlock') {
@@ -214,8 +227,9 @@ const Editor: React.FC<EditorProps> = ({
       const newContent = editorRef.current.innerHTML;
       setContent(newContent);
       sendContentUpdate(newContent);
+      markAsDirty();
     }
-  }, [sendContentUpdate]);
+  }, [sendContentUpdate, markAsDirty]);
 
   const handleInput = useCallback(() => {
     if (isUpdatingFromRemote || !editorRef.current) return;
@@ -223,7 +237,8 @@ const Editor: React.FC<EditorProps> = ({
     setContent(newContent);
     sendContentUpdate(newContent);
     sendCursorPosition();
-  }, [isUpdatingFromRemote, sendContentUpdate, sendCursorPosition]);
+    markAsDirty();
+  }, [isUpdatingFromRemote, sendContentUpdate, sendCursorPosition, markAsDirty]);
 
   const handleSelectionChange = useCallback(() => {
     sendCursorPosition();
@@ -321,9 +336,51 @@ const Editor: React.FC<EditorProps> = ({
   }, [content, roomCode]);
 
   const handleLeave = useCallback(() => {
+    if (isDirty && editorRef.current) {
+      saveDraft(roomCode, user.id, editorRef.current.innerHTML);
+    }
     disconnect();
     onLeave();
-  }, [disconnect, onLeave]);
+  }, [disconnect, onLeave, roomCode, user.id, isDirty]);
+
+  const performAutoSave = useCallback(() => {
+    if (!editorRef.current || !isDirty) return;
+
+    const currentContent = editorRef.current.innerHTML;
+    if (currentContent === lastSavedContentRef.current) {
+      setIsDirty(false);
+      setSaveStatus('saved');
+      return;
+    }
+
+    setSaveStatus('saving');
+    saveDraft(roomCode, user.id, currentContent);
+    lastSavedContentRef.current = currentContent;
+    setIsDirty(false);
+    setSaveStatus('saved');
+  }, [roomCode, user.id, isDirty]);
+
+  const handleRestoreDraft = useCallback(() => {
+    if (!detectedDraft || !editorRef.current) return;
+    
+    setIsUpdatingFromRemote(true);
+    setContent(detectedDraft.content);
+    editorRef.current.innerHTML = detectedDraft.content;
+    lastSavedContentRef.current = detectedDraft.content;
+    removeDraft(roomCode, user.id);
+    setDetectedDraft(null);
+    setIsDirty(false);
+    setSaveStatus('saved');
+    
+    setTimeout(() => setIsUpdatingFromRemote(false), 0);
+  }, [detectedDraft, roomCode, user.id]);
+
+  const handleDiscardDraft = useCallback(() => {
+    if (detectedDraft) {
+      removeDraft(roomCode, user.id);
+    }
+    setDetectedDraft(null);
+  }, [detectedDraft, roomCode, user.id]);
 
   const highlightCommentText = useCallback((commentId: string | null) => {
     if (!editorRef.current) return;
@@ -660,6 +717,36 @@ const Editor: React.FC<EditorProps> = ({
     };
   }, [highlightedCommentId, highlightCommentText]);
 
+  useEffect(() => {
+    const existingDraft = getDraft(roomCode, user.id);
+    if (existingDraft && existingDraft.content !== initialContent) {
+      const draftText = existingDraft.content.replace(/<[^>]*>/g, '').trim();
+      const initialText = initialContent.replace(/<[^>]*>/g, '').trim();
+      if (draftText.length > initialText.length) {
+        setDetectedDraft(existingDraft);
+      }
+    }
+
+    autoSaveTimerRef.current = setInterval(() => {
+      performAutoSave();
+    }, AUTO_SAVE_INTERVAL);
+
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (isDirty && editorRef.current) {
+        saveDraft(roomCode, user.id, editorRef.current.innerHTML);
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+
+    return () => {
+      if (autoSaveTimerRef.current) {
+        clearInterval(autoSaveTimerRef.current);
+      }
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [roomCode, user.id, initialContent, performAutoSave, isDirty]);
+
   const isTablet = typeof window !== 'undefined' && window.innerWidth < 1024;
 
   return (
@@ -692,6 +779,7 @@ const Editor: React.FC<EditorProps> = ({
           onExport={handleExport}
           onLeave={handleLeave}
           isConnected={isConnected}
+          saveStatus={saveStatus}
         />
 
         <div style={{
@@ -802,6 +890,14 @@ const Editor: React.FC<EditorProps> = ({
           setSelectedTextForComment('');
         }}
       />
+
+      {detectedDraft && (
+        <DraftRestoreModal
+          draft={detectedDraft}
+          onRestore={handleRestoreDraft}
+          onDiscard={handleDiscardDraft}
+        />
+      )}
     </div>
   );
 };

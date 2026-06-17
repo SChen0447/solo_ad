@@ -249,7 +249,7 @@ wss.on('connection', (ws) => {
           if (cursor) {
             cursor.selection = message.selection;
             cursor.position = message.position;
-            cursor.serialifiedSelection = message.serializedSelection;
+            cursor.serializedSelection = message.serializedSelection;
             
             broadcastToRoom(room, {
               type: 'cursor-update',
@@ -259,7 +259,7 @@ wss.on('connection', (ws) => {
                 color: cursor.color,
                 selection: cursor.selection,
                 position: cursor.position,
-                serializedSelection: cursor.serialifiedSelection
+                serializedSelection: cursor.serializedSelection
               }
             }, currentUser.id);
           }
@@ -375,7 +375,7 @@ wss.on('connection', (ws) => {
   });
 });
 
-const PORT = process.env.PORT || 3100;
+const PORT = process.env.PORT || 4000;
 server.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
