@@ -1,0 +1,524 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>三维几何变换交互式教学工具</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Orbitron:wght@500;700&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    :root {
+      --panel-width: 280px;
+      --bg-dark: #0a0a2e;
+      --bg-mid: #1a1a4e;
+      --track-start: #3a3a6e;
+      --track-end: #5a5a9e;
+      --text-primary: #ffffff;
+      --text-secondary: #b0b0d0;
+      --input-bg: rgba(10, 10, 46, 0.7);
+      --highlight: #6c6cff;
+      --font-display: 'Orbitron', sans-serif;
+      --font-body: 'Inter', sans-serif;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      font-family: var(--font-body);
+      background: linear-gradient(135deg, var(--bg-dark), var(--bg-mid));
+      color: var(--text-primary);
+    }
+
+    #app {
+      display: flex;
+      width: 100%;
+      height: 100%;
+      position: relative;
+    }
+
+    #canvas-container {
+      flex: 1;
+      position: relative;
+      overflow: hidden;
+    }
+
+    #canvas-container canvas {
+      display: block;
+      width: 100% !important;
+      height: 100% !important;
+    }
+
+    /* Control Panel */
+    #control-panel {
+      width: var(--panel-width);
+      min-width: var(--panel-width);
+      height: 100%;
+      background: rgba(255, 255, 255, 0.1);
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
+      padding: 20px;
+      overflow-y: auto;
+      z-index: 10;
+      border-right: 1px solid rgba(255, 255, 255, 0.08);
+      transition: transform 0.3s ease, opacity 0.3s ease;
+    }
+
+    #control-panel .panel-title {
+      font-family: var(--font-display);
+      font-size: 18px;
+      font-weight: 700;
+      letter-spacing: 1px;
+      margin-bottom: 20px;
+      color: var(--text-primary);
+      text-transform: uppercase;
+    }
+
+    .param-group {
+      margin-bottom: 8px;
+      padding: 12px 0;
+    }
+
+    .param-group label {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--text-secondary);
+      margin-bottom: 8px;
+    }
+
+    .param-group label .param-icon {
+      width: 20px;
+      height: 20px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      margin-right: 6px;
+      font-size: 12px;
+      border-radius: 4px;
+      background: rgba(108, 108, 255, 0.2);
+    }
+
+    .param-group label .param-name {
+      flex: 1;
+    }
+
+    .param-group input[type="number"] {
+      width: 64px;
+      background: var(--input-bg);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 4px;
+      color: var(--text-primary);
+      font-family: var(--font-body);
+      font-size: 14px;
+      padding: 4px 8px;
+      text-align: center;
+      outline: none;
+      transition: border-color 0.2s, transform 0.1s;
+    }
+
+    .param-group input[type="number"]:hover {
+      border-color: var(--highlight);
+      transform: scale(1.05);
+    }
+
+    .param-group input[type="number"]:focus {
+      border-color: var(--highlight);
+    }
+
+    .param-group input[type="number"]:active {
+      transform: scale(0.95);
+    }
+
+    /* Custom Slider */
+    .param-group input[type="range"] {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 100%;
+      height: 6px;
+      border-radius: 3px;
+      background: linear-gradient(90deg, var(--track-start), var(--track-end));
+      outline: none;
+      cursor: pointer;
+      transition: transform 0.1s;
+    }
+
+    .param-group input[type="range"]:hover {
+      transform: scale(1.05);
+    }
+
+    .param-group input[type="range"]:active {
+      transform: scale(0.95);
+    }
+
+    .param-group input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: #ffffff;
+      cursor: pointer;
+      box-shadow: 0 0 4px rgba(0, 0, 0, 0.3);
+      transition: box-shadow 0.2s;
+    }
+
+    .param-group input[type="range"]::-webkit-slider-thumb:hover {
+      box-shadow: 0 0 8px rgba(108, 108, 255, 0.6), 0 0 2px rgba(255, 255, 255, 0.8);
+    }
+
+    .param-group input[type="range"]::-moz-range-thumb {
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: #ffffff;
+      cursor: pointer;
+      border: none;
+      box-shadow: 0 0 4px rgba(0, 0, 0, 0.3);
+      transition: box-shadow 0.2s;
+    }
+
+    .param-group input[type="range"]::-moz-range-thumb:hover {
+      box-shadow: 0 0 8px rgba(108, 108, 255, 0.6), 0 0 2px rgba(255, 255, 255, 0.8);
+    }
+
+    /* Model selector */
+    .model-selector {
+      margin-top: 16px;
+      padding-top: 16px;
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .model-selector .section-label {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text-secondary);
+      margin-bottom: 10px;
+    }
+
+    .model-buttons {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .model-btn {
+      flex: 1;
+      min-width: calc(50% - 3px);
+      padding: 8px 4px;
+      background: var(--input-bg);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 6px;
+      color: var(--text-secondary);
+      font-family: var(--font-body);
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s;
+      text-align: center;
+    }
+
+    .model-btn:hover {
+      border-color: var(--highlight);
+      color: var(--text-primary);
+      transform: scale(1.05);
+    }
+
+    .model-btn:active {
+      transform: scale(0.95);
+    }
+
+    .model-btn.active {
+      background: rgba(108, 108, 255, 0.25);
+      border-color: var(--highlight);
+      color: var(--text-primary);
+    }
+
+    /* Matrix toggle */
+    .matrix-toggle {
+      margin-top: 16px;
+      padding-top: 16px;
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .matrix-toggle .section-label {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text-secondary);
+    }
+
+    .toggle-switch {
+      position: relative;
+      width: 40px;
+      height: 22px;
+      cursor: pointer;
+      transition: transform 0.1s;
+    }
+
+    .toggle-switch:hover {
+      transform: scale(1.05);
+    }
+
+    .toggle-switch:active {
+      transform: scale(0.95);
+    }
+
+    .toggle-switch input {
+      display: none;
+    }
+
+    .toggle-track {
+      position: absolute;
+      inset: 0;
+      background: rgba(255, 255, 255, 0.15);
+      border-radius: 11px;
+      transition: background 0.2s;
+    }
+
+    .toggle-switch input:checked + .toggle-track {
+      background: rgba(108, 108, 255, 0.5);
+    }
+
+    .toggle-knob {
+      position: absolute;
+      top: 3px;
+      left: 3px;
+      width: 16px;
+      height: 16px;
+      background: #ffffff;
+      border-radius: 50%;
+      transition: transform 0.2s;
+      pointer-events: none;
+    }
+
+    .toggle-switch input:checked ~ .toggle-knob {
+      transform: translateX(18px);
+    }
+
+    /* Matrix Display */
+    #matrix-display {
+      position: absolute;
+      top: 16px;
+      right: 16px;
+      z-index: 10;
+      background: rgba(255, 255, 255, 0.08);
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 8px;
+      padding: 12px;
+      opacity: 0;
+      transform: translateY(-8px);
+      transition: opacity 0.3s, transform 0.3s;
+      pointer-events: none;
+    }
+
+    #matrix-display.visible {
+      opacity: 1;
+      transform: translateY(0);
+      pointer-events: auto;
+    }
+
+    #matrix-display .matrix-title {
+      font-family: var(--font-display);
+      font-size: 11px;
+      font-weight: 500;
+      letter-spacing: 1px;
+      color: var(--text-secondary);
+      margin-bottom: 8px;
+      text-transform: uppercase;
+    }
+
+    #matrix-display .matrix-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 3px;
+    }
+
+    #matrix-display .matrix-cell {
+      width: 56px;
+      height: 28px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--input-bg);
+      border-radius: 3px;
+      font-family: 'JetBrains Mono', 'Fira Code', monospace;
+      font-size: 11px;
+      color: var(--text-primary);
+      border: 1px solid transparent;
+      transition: background 0.2s, border-color 0.2s;
+    }
+
+    #matrix-display .matrix-cell.highlight {
+      background: rgba(108, 108, 255, 0.3);
+      border-color: var(--highlight);
+    }
+
+    /* Mobile drawer toggle */
+    #drawer-toggle {
+      display: none;
+      position: absolute;
+      bottom: 16px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 48px;
+      height: 48px;
+      background: rgba(255, 255, 255, 0.1);
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 50%;
+      color: var(--text-primary);
+      font-size: 20px;
+      cursor: pointer;
+      z-index: 20;
+      align-items: center;
+      justify-content: center;
+      transition: transform 0.2s;
+    }
+
+    #drawer-toggle:hover {
+      transform: translateX(-50%) scale(1.05);
+    }
+
+    #drawer-toggle:active {
+      transform: translateX(-50%) scale(0.95);
+    }
+
+    /* Responsive */
+    @media (max-width: 767px) {
+      #app {
+        flex-direction: column;
+      }
+
+      #control-panel {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        width: 100%;
+        min-width: unset;
+        height: auto;
+        max-height: 60vh;
+        border-right: none;
+        border-top: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 16px 16px 0 0;
+        transform: translateY(100%);
+        z-index: 30;
+      }
+
+      #control-panel.open {
+        transform: translateY(0);
+      }
+
+      #drawer-toggle {
+        display: flex;
+      }
+
+      #matrix-display {
+        top: 8px;
+        right: 8px;
+      }
+    }
+
+    @media (min-width: 768px) and (max-width: 1024px) {
+      #control-panel {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 240px;
+        min-width: 240px;
+        height: auto;
+        max-height: 100%;
+        border-radius: 0 12px 12px 0;
+        border-right: 1px solid rgba(255, 255, 255, 0.08);
+      }
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <div id="canvas-container"></div>
+
+    <div id="control-panel">
+      <div class="panel-title">变换控制</div>
+
+      <div class="param-group" data-param="translateX">
+        <label>
+          <span class="param-icon">↔</span>
+          <span class="param-name">平移 X</span>
+          <input type="number" id="input-translateX" min="-5" max="5" step="0.1" value="0" />
+        </label>
+        <input type="range" id="slider-translateX" min="-5" max="5" step="0.1" value="0" />
+      </div>
+
+      <div class="param-group" data-param="rotateY">
+        <label>
+          <span class="param-icon">↻</span>
+          <span class="param-name">旋转 Y</span>
+          <input type="number" id="input-rotateY" min="0" max="360" step="1" value="0" />
+        </label>
+        <input type="range" id="slider-rotateY" min="0" max="360" step="1" value="0" />
+      </div>
+
+      <div class="param-group" data-param="scale">
+        <label>
+          <span class="param-icon">⤢</span>
+          <span class="param-name">缩放</span>
+          <input type="number" id="input-scale" min="0.5" max="2" step="0.01" value="1" />
+        </label>
+        <input type="range" id="slider-scale" min="0.5" max="2" step="0.01" value="1" />
+      </div>
+
+      <div class="param-group" data-param="shearX">
+        <label>
+          <span class="param-icon">⤓</span>
+          <span class="param-name">错切 X</span>
+          <input type="number" id="input-shearX" min="-1" max="1" step="0.01" value="0" />
+        </label>
+        <input type="range" id="slider-shearX" min="-1" max="1" step="0.01" value="0" />
+      </div>
+
+      <div class="model-selector">
+        <div class="section-label">预设模型</div>
+        <div class="model-buttons">
+          <button class="model-btn active" data-model="cube">立方体</button>
+          <button class="model-btn" data-model="icosahedron">二十面体</button>
+          <button class="model-btn" data-model="torusKnot">环面结</button>
+          <button class="model-btn" data-model="compound">多面体组合</button>
+        </div>
+      </div>
+
+      <div class="matrix-toggle">
+        <span class="section-label">叠加变换矩阵</span>
+        <label class="toggle-switch">
+          <input type="checkbox" id="toggle-matrix" checked />
+          <span class="toggle-track"></span>
+          <span class="toggle-knob"></span>
+        </label>
+      </div>
+    </div>
+
+    <div id="matrix-display" class="visible">
+      <div class="matrix-title">组合变换矩阵</div>
+      <div class="matrix-grid" id="matrix-grid"></div>
+    </div>
+
+    <button id="drawer-toggle">☰</button>
+  </div>
+
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
