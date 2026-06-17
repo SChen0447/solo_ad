@@ -1,16 +1,11 @@
-"use strict";
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
-Object.defineProperty(exports, "__esModule", { value: true });
-const express_1 = __importDefault(require("express"));
-const http_1 = require("http");
-const socket_io_1 = require("socket.io");
-const uuid_1 = require("uuid");
-const cors_1 = __importDefault(require("cors"));
-const app = (0, express_1.default)();
-const httpServer = (0, http_1.createServer)(app);
-const io = new socket_io_1.Server(httpServer, {
+import express from 'express';
+import { createServer } from 'http';
+import { Server } from 'socket.io';
+import { v4 as uuidv4 } from 'uuid';
+import cors from 'cors';
+const app = express();
+const httpServer = createServer(app);
+const io = new Server(httpServer, {
     cors: {
         origin: '*',
         methods: ['GET', 'POST']
@@ -18,8 +13,8 @@ const io = new socket_io_1.Server(httpServer, {
 });
 const PORT = 3001;
 const MAX_SNAPSHOTS = 50;
-app.use((0, cors_1.default)());
-app.use(express_1.default.json({ limit: '50mb' }));
+app.use(cors());
+app.use(express.json({ limit: '50mb' }));
 const rooms = new Map();
 function getOrCreateRoom(roomId) {
     if (!rooms.has(roomId)) {
@@ -113,7 +108,7 @@ app.post('/api/board/:roomId/snapshot', (req, res) => {
             room.elements.set(el.id, el);
         });
         const snapshot = {
-            id: (0, uuid_1.v4)(),
+            id: uuidv4(),
             timestamp: Date.now(),
             elements: [...elements],
             thumbnail
