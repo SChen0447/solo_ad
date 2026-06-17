@@ -159,7 +159,11 @@ export function simulateBattle(
 
       attacker.skillUsage[skill.id] = (attacker.skillUsage[skill.id] || 0) + 1
       if (skill.cooldown > 0) {
-        attacker.skillCooldowns[skill.id] = skill.cooldown
+        const effectiveCooldown = Math.max(
+          1,
+          Math.ceil(skill.cooldown * (1 - attacker.cooldownReduction / 100))
+        )
+        attacker.skillCooldowns[skill.id] = effectiveCooldown
       }
 
       if (result.isDodge) {
@@ -237,10 +241,9 @@ export function simulateBattle(
   }
 
   const winner = winnerId ? (winnerId === c1.id ? c1 : c2) : null
-  const loser = winnerId ? (winnerId === c1.id ? c2 : c1) : null
 
   let score = 50
-  if (winner && loser) {
+  if (winner) {
     const hpRatio = winner.currentHp / winner.maxHp
     score += hpRatio * 30
 

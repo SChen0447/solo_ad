@@ -149,9 +149,18 @@ function randomInRange(min: number, max: number): number {
   return Math.round((Math.random() * (max - min) + min) * 10) / 10
 }
 
-function generateRandomSubStats(): SubStat[] {
+function fisherYatesShuffle<T>(array: T[]): T[] {
+  const result = [...array]
+  for (let i = result.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1))
+    ;[result[i], result[j]] = [result[j], result[i]]
+  }
+  return result
+}
+
+export function generateRandomSubStats(): SubStat[] {
   const types: SubStatType[] = ['critDamage', 'dodgeRate', 'lifeSteal', 'cooldownReduction']
-  const shuffled = [...types].sort(() => Math.random() - 0.5)
+  const shuffled = fisherYatesShuffle(types)
   const selected = shuffled.slice(0, 2)
   return selected.map(type => ({
     type,

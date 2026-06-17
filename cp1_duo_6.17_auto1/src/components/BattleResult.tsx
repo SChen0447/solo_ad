@@ -24,7 +24,6 @@ export default function BattleResult() {
   }
 
   const winner = battleResult.characters.find(c => c.id === battleResult.winnerId)
-  const loser = battleResult.characters.find(c => c.id !== battleResult.winnerId)
 
   const handleRebattle = () => {
     const { turns, result } = simulateBattle(character1, character2)

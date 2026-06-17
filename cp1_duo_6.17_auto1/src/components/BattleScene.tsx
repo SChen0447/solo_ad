@@ -31,17 +31,6 @@ export default function BattleScene() {
     }))
   }, [])
 
-  const initialState = useMemo(() => {
-    if (battleTurns.length > 0 && battleTurns[0].characterStates) {
-      const states = battleTurns[0].characterStates
-      return {
-        [states[0].id]: states[0].maxHp,
-        [states[1].id]: states[1].maxHp
-      }
-    }
-    return {}
-  }, [battleTurns])
-
   useEffect(() => {
     if (battleTurns.length > 0) {
       const states = battleTurns[0].characterStates

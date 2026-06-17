@@ -137,7 +137,15 @@ export default function CharacterPanel({ charId, title, accentColor }: Character
                     <span style={{ width: 70, fontSize: 13, color: 'rgba(255,255,255,0.8)' }}>
                       {config.label}
                     </span>
-                    <div style={{ flex: 1, position: 'relative', height: 24 }}>
+                    <div
+                      style={{
+                        flex: 1,
+                        position: 'relative',
+                        height: 24,
+                        ['--slider-color' as any]: trackColor
+                      }}
+                      className="stat-slider-container"
+                    >
                       <motion.input
                         type="range"
                         min={config.min}
@@ -145,6 +153,7 @@ export default function CharacterPanel({ charId, title, accentColor }: Character
                         value={value}
                         onChange={(e) => handleStatChange(config.key, Number(e.target.value))}
                         transition={{ type: 'tween', duration: 0.5, ease: 'easeOut' }}
+                        className="stat-slider"
                         style={{
                           width: '100%',
                           height: 6,
@@ -156,27 +165,6 @@ export default function CharacterPanel({ charId, title, accentColor }: Character
                           cursor: 'pointer'
                         }}
                       />
-                      <style>{`
-                        input[type="range"]::-webkit-slider-thumb {
-                          -webkit-appearance: none;
-                          appearance: none;
-                          width: 16px;
-                          height: 16px;
-                          border-radius: 50%;
-                          background: ${trackColor};
-                          cursor: pointer;
-                          box-shadow: 0 2px 8px rgba(0,0,0,0.4);
-                          border: 2px solid white;
-                        }
-                        input[type="range"]::-moz-range-thumb {
-                          width: 16px;
-                          height: 16px;
-                          border-radius: 50%;
-                          background: ${trackColor};
-                          cursor: pointer;
-                          border: 2px solid white;
-                        }
-                      `}</style>
                     </div>
                     <input
                       type="number"

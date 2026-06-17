@@ -150,12 +150,11 @@ export function selectBestSkill(character: CombatCharacter): Skill {
 }
 
 export function reduceCooldowns(character: CombatCharacter): void {
-  const cdReduction = 1 - character.cooldownReduction / 100
   for (const skillId in character.skillCooldowns) {
     if (character.skillCooldowns[skillId] > 0) {
       character.skillCooldowns[skillId] = Math.max(
         0,
-        character.skillCooldowns[skillId] - cdReduction
+        character.skillCooldowns[skillId] - 1
       )
     }
   }
