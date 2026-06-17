@@ -32,7 +32,36 @@ const checkOverduePackages = () => {
 
 app.get('/api/packages', (req, res) => {
   checkOverduePackages();
-  res.json(packages);
+
+  const page = parseInt(req.query.page) || 1;
+  const limit = parseInt(req.query.limit) || 10;
+  const status = req.query.status;
+
+  let filteredPackages = [...packages];
+
+  if (status) {
+    filteredPackages = filteredPackages.filter(pkg => pkg.status === status);
+  }
+
+  filteredPackages.sort((a, b) => b.createdAt - a.createdAt);
+
+  const total = filteredPackages.length;
+  const totalPages = Math.ceil(total / limit);
+  const startIndex = (page - 1) * limit;
+  const endIndex = startIndex + limit;
+  const paginatedPackages = filteredPackages.slice(startIndex, endIndex);
+
+  res.json({
+    data: paginatedPackages,
+    pagination: {
+      page,
+      limit,
+      total,
+      totalPages,
+      hasNext: page < totalPages,
+      hasPrev: page > 1
+    }
+  });
 });
 
 app.post('/api/packages', (req, res) => {

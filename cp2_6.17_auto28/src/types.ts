@@ -12,6 +12,26 @@ export interface Package {
   pickedAt: number | null;
 }
 
+export interface GetPackagesQuery {
+  page?: number;
+  limit?: number;
+  status?: PackageStatus;
+}
+
+export interface PaginationInfo {
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
+  hasNext: boolean;
+  hasPrev: boolean;
+}
+
+export interface GetPackagesResponse {
+  data: Package[];
+  pagination: PaginationInfo;
+}
+
 export interface CreatePackageRequest {
   recipientName: string;
   phone: string;
