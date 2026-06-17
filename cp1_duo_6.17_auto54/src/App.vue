@@ -7,7 +7,7 @@
       :palette="palette"
       :selectedColor="selectedColor"
       :presets="presetPalettes"
-      @change-tool="currentTool = $event"
+      @change-tool="handleToolChange"
       @change-brush-size="brushSize = $event"
       @change-grid-size="handleGridSizeChange"
       @select-color="selectedColor = $event"
@@ -76,6 +76,7 @@ import { exportSpritesheet, exportGif } from './utils/exportSprite'
 const isMobile = ref(false)
 
 const currentTool = ref<ToolType>('pencil')
+const previousTool = ref<ToolType>('pencil')
 const brushSize = ref<BrushSize>(1)
 const gridSize = ref<GridSize>(16)
 
@@ -176,7 +177,16 @@ function reorderFrames(fromIndex: number, toIndex: number) {
 function handlePickColor(color: string) {
   if (palette.value.includes(color)) {
     selectedColor.value = color
-    currentTool.value = 'pencil'
+    currentTool.value = previousTool.value
+  }
+}
+
+function handleToolChange(tool: ToolType) {
+  if (tool !== currentTool.value) {
+    if (tool === 'picker') {
+      previousTool.value = currentTool.value
+    }
+    currentTool.value = tool
   }
 }
 

@@ -7,7 +7,7 @@ export interface Frame {
 }
 
 export type ToolType = 'pencil' | 'eraser' | 'fill' | 'picker';
-export type BrushSize = 1 | 3;
+export type BrushSize = 1 | 2 | 3;
 export type GridSize = 16 | 32;
 
 export interface PalettePreset {
@@ -90,23 +90,58 @@ export function drawBrush(
   const rows = pixels.length;
   const cols = pixels[0].length;
 
-  if (size === 1) {
-    if (cx >= 0 && cx < cols && cy >= 0 && cy < rows) {
-      result[cy][cx] = color;
-    }
-    return result;
-  }
-
-  const half = Math.floor(size / 2);
-  for (let dy = -half; dy <= half; dy++) {
-    for (let dx = -half; dx <= half; dx++) {
-      const x = cx + dx;
-      const y = cy + dy;
+  const startOffset = Math.floor((size - 1) / 2);
+  for (let dy = 0; dy < size; dy++) {
+    for (let dx = 0; dx < size; dx++) {
+      const x = cx - startOffset + dx;
+      const y = cy - startOffset + dy;
       if (x >= 0 && x < cols && y >= 0 && y < rows) {
         result[y][x] = color;
       }
     }
   }
+  return result;
+}
+
+export function drawLine(
+  pixels: PixelData,
+  x0: number,
+  y0: number,
+  x1: number,
+  y1: number,
+  color: string | null,
+  size: BrushSize
+): PixelData {
+  let result = pixels;
+
+  const dx = Math.abs(x1 - x0);
+  const dy = Math.abs(y1 - y0);
+  const sx = x0 < x1 ? 1 : -1;
+  const sy = y0 < y1 ? 1 : -1;
+  let err = dx - dy;
+
+  let x = x0;
+  let y = y0;
+  let safety = 0;
+  const maxSteps = dx + dy + 2;
+
+  while (safety < maxSteps) {
+    safety++;
+    result = drawBrush(result, x, y, color, size);
+
+    if (x === x1 && y === y1) break;
+
+    const e2 = 2 * err;
+    if (e2 > -dy) {
+      err -= dy;
+      x += sx;
+    }
+    if (e2 < dx) {
+      err += dx;
+      y += sy;
+    }
+  }
+
   return result;
 }
 

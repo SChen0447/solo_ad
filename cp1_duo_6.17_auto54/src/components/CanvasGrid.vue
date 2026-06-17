@@ -86,7 +86,7 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, nextTick } from 'vue'
 import type { Frame, ToolType, BrushSize, GridSize } from '../utils/animationEngine'
-import { floodFill, drawBrush, clonePixels } from '../utils/animationEngine'
+import { floodFill, drawBrush, drawLine, clonePixels } from '../utils/animationEngine'
 import { generateThumbnail, renderFrameToCanvas } from '../utils/exportSprite'
 
 const props = defineProps<{
@@ -116,6 +116,7 @@ const gridRef = ref<HTMLCanvasElement | null>(null)
 const framesListRef = ref<HTMLDivElement | null>(null)
 
 const isDrawing = ref(false)
+const lastDrawPos = ref<{ x: number; y: number } | null>(null)
 const dragIndex = ref<number | null>(null)
 const dragOverIndex = ref<number | null>(null)
 
@@ -196,21 +197,46 @@ function handleMouseDown(e: MouseEvent) {
   if (x < 0 || x >= props.gridSize || y < 0 || y >= props.gridSize) return
 
   isDrawing.value = true
+  lastDrawPos.value = { x, y }
   applyToolAt(x, y)
 }
 
 function handleMouseMove(e: MouseEvent) {
   if (!isDrawing.value) return
   const { x, y } = getPixelCoords(e)
-  if (x < 0 || x >= props.gridSize || y < 0 || y >= props.gridSize) return
+  if (x < 0 || x >= props.gridSize || y < 0 || y >= props.gridSize) {
+    lastDrawPos.value = null
+    return
+  }
 
   if (props.currentTool === 'pencil' || props.currentTool === 'eraser') {
-    applyToolAt(x, y)
+    if (lastDrawPos.value && (lastDrawPos.value.x !== x || lastDrawPos.value.y !== y)) {
+      const color = props.currentTool === 'pencil' ? props.selectedColor : null
+      drawLineTo(x, y, color)
+    }
+    lastDrawPos.value = { x, y }
   }
 }
 
 function handleMouseUp() {
   isDrawing.value = false
+  lastDrawPos.value = null
+}
+
+function drawLineTo(x: number, y: number, color: string | null) {
+  const frame = currentFrame.value
+  if (!frame || !lastDrawPos.value) return
+
+  const newPixels = drawLine(
+    frame.pixels,
+    lastDrawPos.value.x,
+    lastDrawPos.value.y,
+    x,
+    y,
+    color,
+    props.brushSize
+  )
+  emit('update-frame', props.currentFrameIndex, newPixels)
 }
 
 function applyToolAt(x: number, y: number) {

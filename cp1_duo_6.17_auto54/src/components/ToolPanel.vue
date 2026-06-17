@@ -102,7 +102,7 @@ const emit = defineEmits<{
 }>()
 
 const gridSizes: GridSize[] = [16, 32]
-const brushSizes: BrushSize[] = [1, 3]
+const brushSizes: BrushSize[] = [1, 2, 3]
 
 const scalingTool = ref<ToolType | null>(null)
 const bouncingIndex = ref<number | null>(null)
