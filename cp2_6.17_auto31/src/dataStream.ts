@@ -30,6 +30,8 @@ export const METRIC_LABELS: Record<keyof MetricData, string> = {
   network: 'NET',
 };
 
+export const HISTORY_SIZE = 20;
+
 function clamp(v: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, v));
 }
@@ -44,6 +46,7 @@ export class DataStream {
   private _thresholds: Thresholds = { ...DEFAULT_THRESHOLDS };
   private _intervalId: ReturnType<typeof setInterval> | null = null;
   private _listeners: Array<(data: MetricData, thresholds: Thresholds) => void> = [];
+  private _history: MetricData[] = [];
 
   get data(): MetricData {
     return { ...this._data };
@@ -51,6 +54,10 @@ export class DataStream {
 
   get thresholds(): Thresholds {
     return { ...this._thresholds };
+  }
+
+  get history(): MetricData[] {
+    return [...this._history];
   }
 
   onUpdate(listener: (data: MetricData, thresholds: Thresholds) => void): () => void {
@@ -68,18 +75,28 @@ export class DataStream {
   reset(): void {
     this._thresholds = { ...DEFAULT_THRESHOLDS };
     this._data = { cpu: 45, memory: 35, network: 25 };
+    this._history = [];
     this._notify();
   }
 
   start(): void {
     if (this._intervalId !== null) return;
+    this._pushHistory();
     this._notify();
     this._intervalId = setInterval(() => {
       this._data.cpu = generateValue(this._data.cpu);
       this._data.memory = generateValue(this._data.memory);
       this._data.network = generateValue(this._data.network);
+      this._pushHistory();
       this._notify();
     }, 500);
+  }
+
+  private _pushHistory(): void {
+    this._history.push({ ...this._data });
+    if (this._history.length > HISTORY_SIZE) {
+      this._history.shift();
+    }
   }
 
   stop(): void {

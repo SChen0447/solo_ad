@@ -96,7 +96,8 @@ export default function App() {
     stream.onUpdate((newData, newThresholds) => {
       setData({ ...newData });
       setThresholds({ ...newThresholds });
-      scene.updateData(newData, newThresholds);
+      const hist = stream.history;
+      scene.updateData(newData, newThresholds, hist);
 
       const now = Date.now();
       let anySustained = false;
@@ -172,7 +173,7 @@ export default function App() {
         padding: '0 12px', overflowX: 'auto', zIndex: 100,
       }
     : {
-        position: 'fixed', top: '16px', left: '16px', width: '240px',
+        position: 'fixed', top: '16px', left: '16px', width: '260px',
         background: 'rgba(20,20,30,0.85)', borderRadius: '12px',
         border: '1px solid #446', padding: '16px', zIndex: 100,
       };
@@ -185,7 +186,13 @@ export default function App() {
         {isMobile ? (
           <>
             {METRIC_KEYS.map(key => (
-              <div key={key} style={{ display: 'flex', alignItems: 'center', gap: '4px', minWidth: '160px', flexShrink: 0 }}>
+              <div key={key} style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: '180px', flexShrink: 0 }}>
+                <div style={{
+                  width: '8px', height: '8px', borderRadius: '50%', flexShrink: 0,
+                  background: alerts[key] ? '#ff3333' : METRIC_COLORS[key],
+                  boxShadow: `0 0 4px ${alerts[key] ? '#ff3333' : METRIC_COLORS[key]}`,
+                  animation: alerts[key] ? 'dotFlash 0.3s infinite' : 'none',
+                }} />
                 <span style={{ color: METRIC_COLORS[key], fontSize: '12px', fontFamily: 'monospace', whiteSpace: 'nowrap' }}>
                   {METRIC_LABELS[key]} {thresholds[key]}
                 </span>
@@ -213,9 +220,17 @@ export default function App() {
             {METRIC_KEYS.map(key => (
               <div key={key} style={{ marginBottom: '12px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-                  <span style={{ color: METRIC_COLORS[key], fontSize: '13px', fontFamily: 'monospace', textShadow: `0 0 6px ${METRIC_COLORS[key]}` }}>
-                    {METRIC_LABELS[key]}
-                  </span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <div style={{
+                      width: '10px', height: '10px', borderRadius: '50%',
+                      background: alerts[key] ? '#ff3333' : METRIC_COLORS[key],
+                      boxShadow: `0 0 6px ${alerts[key] ? '#ff3333' : METRIC_COLORS[key]}`,
+                      animation: alerts[key] ? 'dotFlash 0.3s infinite' : 'none',
+                    }} />
+                    <span style={{ color: METRIC_COLORS[key], fontSize: '13px', fontFamily: 'monospace', textShadow: `0 0 6px ${METRIC_COLORS[key]}` }}>
+                      {METRIC_LABELS[key]}
+                    </span>
+                  </div>
                   <span style={{ color: '#aab', fontSize: '12px', fontFamily: 'monospace' }}>
                     {thresholds[key]}
                   </span>
@@ -272,6 +287,10 @@ export default function App() {
         @keyframes flash {
           0%, 100% { opacity: 1; }
           50% { opacity: 0.3; }
+        }
+        @keyframes dotFlash {
+          0%, 100% { opacity: 1; box-shadow: 0 0 6px #ff3333; }
+          50% { opacity: 0.3; box-shadow: 0 0 2px #ff3333; }
         }
         input[type="range"] {
           -webkit-appearance: none;

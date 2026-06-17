@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { CSS2DRenderer, CSS2DObject } from 'three/examples/jsm/renderers/CSS2DRenderer.js';
-import { MetricData, Thresholds, METRIC_KEYS, METRIC_COLORS, METRIC_LABELS } from './dataStream';
+import { MetricData, Thresholds, METRIC_KEYS, METRIC_COLORS, METRIC_LABELS, HISTORY_SIZE } from './dataStream';
 
 const PILLAR_RADIUS = 0.3;
 const MAX_HEIGHT = 5;
@@ -11,6 +11,8 @@ const RING_TUBE = 0.02;
 const PILLAR_X: Record<keyof MetricData, number> = { cpu: -3, memory: 0, network: 3 };
 const FLASH_PERIOD = 0.3;
 const LERP_SPEED = 15;
+const CHART_WIDTH = 320;
+const CHART_HEIGHT = 180;
 
 interface PillarGroup {
   key: keyof MetricData;
@@ -40,6 +42,10 @@ export class MonitorScene {
   private clock: THREE.Clock;
   private animId = 0;
   private container: HTMLElement;
+  private chartPanel: HTMLDivElement;
+  private chartCanvas: HTMLCanvasElement;
+  private chartCtx: CanvasRenderingContext2D;
+  private history: MetricData[] = [];
 
   constructor(container: HTMLElement) {
     this.container = container;
@@ -74,6 +80,7 @@ export class MonitorScene {
     this.addLights();
     this.addGrid();
     this.addPillars();
+    this.addChartPanel();
 
     window.addEventListener('resize', this.onResize);
     this.animate();
@@ -184,7 +191,149 @@ export class MonitorScene {
     });
   }
 
-  updateData(data: MetricData, thresholds: Thresholds): void {
+  private addChartPanel(): void {
+    const panel = document.createElement('div');
+    panel.style.cssText = `
+      position: fixed;
+      bottom: 16px;
+      right: 16px;
+      width: ${CHART_WIDTH}px;
+      height: ${CHART_HEIGHT}px;
+      background: rgba(20, 20, 30, 0.85);
+      border: 1px solid #446;
+      border-radius: 12px;
+      padding: 8px;
+      z-index: 50;
+      pointer-events: none;
+      box-shadow: 0 0 20px rgba(102, 102, 255, 0.2);
+    `;
+
+    const title = document.createElement('div');
+    title.style.cssText = `
+      color: #aabbff;
+      font-size: 11px;
+      font-family: monospace;
+      margin-bottom: 4px;
+      text-shadow: 0 0 4px #6666ff;
+    `;
+    title.textContent = '◈ DATA TREND';
+    panel.appendChild(title);
+
+    const canvas = document.createElement('canvas');
+    canvas.width = CHART_WIDTH - 16;
+    canvas.height = CHART_HEIGHT - 28;
+    canvas.style.width = '100%';
+    canvas.style.height = `calc(100% - 16px)`;
+    panel.appendChild(canvas);
+
+    const legend = document.createElement('div');
+    legend.style.cssText = `
+      position: absolute;
+      top: 8px;
+      right: 10px;
+      display: flex;
+      gap: 8px;
+      font-size: 10px;
+      font-family: monospace;
+    `;
+    METRIC_KEYS.forEach(key => {
+      const item = document.createElement('span');
+      item.style.cssText = `color: ${METRIC_COLORS[key]}; text-shadow: 0 0 4px ${METRIC_COLORS[key]};`;
+      item.textContent = METRIC_LABELS[key];
+      legend.appendChild(item);
+    });
+    panel.appendChild(legend);
+
+    this.container.appendChild(panel);
+
+    this.chartPanel = panel;
+    this.chartCanvas = canvas;
+    this.chartCtx = canvas.getContext('2d')!;
+    this.drawChart();
+  }
+
+  private drawChart(): void {
+    const ctx = this.chartCtx;
+    const w = this.chartCanvas.width;
+    const h = this.chartCanvas.height;
+    const padL = 28;
+    const padR = 6;
+    const padT = 4;
+    const padB = 18;
+    const chartW = w - padL - padR;
+    const chartH = h - padT - padB;
+
+    ctx.clearRect(0, 0, w, h);
+
+    ctx.strokeStyle = 'rgba(100, 100, 130, 0.3)';
+    ctx.lineWidth = 1;
+    for (let i = 0; i <= 4; i++) {
+      const y = padT + (chartH / 4) * i;
+      ctx.beginPath();
+      ctx.moveTo(padL, y);
+      ctx.lineTo(w - padR, y);
+      ctx.stroke();
+    }
+
+    ctx.fillStyle = 'rgba(160, 160, 190, 0.7)';
+    ctx.font = '9px monospace';
+    ctx.textAlign = 'right';
+    ctx.textBaseline = 'middle';
+    for (let i = 0; i <= 4; i++) {
+      const val = 100 - i * 25;
+      const y = padT + (chartH / 4) * i;
+      ctx.fillText(String(val), padL - 4, y);
+    }
+
+    const hist = this.history;
+    const n = hist.length;
+    if (n < 2) {
+      ctx.fillStyle = 'rgba(160, 160, 190, 0.5)';
+      ctx.font = '10px monospace';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('waiting for data...', w / 2, h / 2);
+      return;
+    }
+
+    const xStep = chartW / (HISTORY_SIZE - 1);
+
+    METRIC_KEYS.forEach(key => {
+      const color = METRIC_COLORS[key];
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 2;
+      ctx.shadowColor = color;
+      ctx.shadowBlur = 4;
+      ctx.beginPath();
+      hist.forEach((d, i) => {
+        const x = padL + i * xStep + (HISTORY_SIZE - n) * xStep;
+        const y = padT + chartH - (d[key] / 100) * chartH;
+        if (i === 0) {
+          ctx.moveTo(x, y);
+        } else {
+          ctx.lineTo(x, y);
+        }
+      });
+      ctx.stroke();
+      ctx.shadowBlur = 0;
+    });
+
+    ctx.fillStyle = 'rgba(160, 160, 190, 0.7)';
+    ctx.font = '8px monospace';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    const labelStep = Math.max(1, Math.floor(n / 5));
+    const visibleLabels = Math.min(5, n);
+    for (let i = 0; i < visibleLabels; i++) {
+      const idx = Math.floor(i * (n - 1) / Math.max(1, visibleLabels - 1));
+      const x = padL + idx * xStep + (HISTORY_SIZE - n) * xStep;
+      const secondsAgo = ((n - 1 - idx) * 0.5).toFixed(1);
+      ctx.fillText(`${secondsAgo}s`, x, padT + chartH + 2);
+    }
+  }
+
+  updateData(data: MetricData, thresholds: Thresholds, history: MetricData[]): void {
+    this.history = history;
     this.pillars.forEach(p => {
       const v = data[p.key];
       const t = thresholds[p.key];
@@ -194,6 +343,7 @@ export class MonitorScene {
       p.thresholdLine.position.y = p.thresholdHeight;
       p.valueDiv.textContent = v.toFixed(1);
     });
+    this.drawChart();
   }
 
   private onResize = (): void => {
@@ -263,6 +413,9 @@ export class MonitorScene {
     }
     if (this.labelRenderer.domElement.parentNode) {
       this.container.removeChild(this.labelRenderer.domElement);
+    }
+    if (this.chartPanel && this.chartPanel.parentNode) {
+      this.container.removeChild(this.chartPanel);
     }
   }
 }
