@@ -1,5 +1,6 @@
 from flask import Flask, jsonify, request
 from flask_cors import CORS
+from datetime import datetime
 
 app = Flask(__name__)
 CORS(app)
@@ -181,7 +182,7 @@ themes = [
     }
 ]
 
-favorites = set()
+favorites = []
 
 
 @app.route('/api/components', methods=['GET'])
@@ -196,22 +197,34 @@ def get_themes():
 
 @app.route('/api/favorites', methods=['GET'])
 def get_favorites():
-    return jsonify(list(favorites))
+    return jsonify(favorites)
 
 
 @app.route('/api/favorites', methods=['POST'])
-def toggle_favorite():
+def add_favorite():
     data = request.get_json()
-    component_id = data.get('id')
+    component_id = data.get('component_id')
     if component_id is None:
-        return jsonify({'success': False, 'error': 'Missing component id'}), 400
-    if component_id in favorites:
-        favorites.remove(component_id)
-        is_favorite = False
-    else:
-        favorites.add(component_id)
-        is_favorite = True
-    return jsonify({'success': True, 'id': component_id, 'isFavorite': is_favorite})
+        return jsonify({'success': False, 'error': 'Missing component_id'}), 400
+    for fav in favorites:
+        if fav['component_id'] == component_id:
+            return jsonify({'success': False, 'error': 'Already favorited'}), 409
+    favorite = {
+        'component_id': component_id,
+        'created_at': datetime.now().isoformat()
+    }
+    favorites.append(favorite)
+    return jsonify({'success': True, 'favorite': favorite}), 201
+
+
+@app.route('/api/favorites/<int:component_id>', methods=['DELETE'])
+def remove_favorite(component_id):
+    global favorites
+    original_len = len(favorites)
+    favorites = [fav for fav in favorites if fav['component_id'] != component_id]
+    if len(favorites) == original_len:
+        return jsonify({'success': False, 'error': 'Favorite not found'}), 404
+    return jsonify({'success': True, 'component_id': component_id})
 
 
 if __name__ == '__main__':

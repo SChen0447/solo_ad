@@ -15,6 +15,11 @@ export interface Theme {
   fontFamily: string;
 }
 
+export interface FavoriteItem {
+  component_id: number;
+  created_at: string;
+}
+
 export type CategoryType = 'all' | 'button' | 'card' | 'input' | 'modal';
 
 export const defaultComponents: ComponentItem[] = [

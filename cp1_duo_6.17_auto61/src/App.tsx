@@ -4,7 +4,7 @@ import ThemeSelector from './ThemeSelector';
 import FilterBar from './FilterBar';
 import GalleeryList from './GalleeryList';
 import ThemePreviewFloat from './ThemePreviewFloat';
-import { ComponentItem, Theme, CategoryType, defaultTheme } from './componentData';
+import { ComponentItem, Theme, CategoryType, FavoriteItem, defaultTheme } from './componentData';
 
 function App() {
   const [components, setComponents] = useState<ComponentItem[]>([]);
@@ -12,8 +12,11 @@ function App() {
   const [selectedTheme, setSelectedTheme] = useState<Theme>(defaultTheme);
   const [selectedCategory, setSelectedCategory] = useState<CategoryType>('all');
   const [searchQuery, setSearchQuery] = useState('');
-  const [favorites, setFavorites] = useState<number[]>([]);
+  const [favorites, setFavorites] = useState<FavoriteItem[]>([]);
+  const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
   const [loading, setLoading] = useState(true);
+
+  const favoriteIds = favorites.map((fav) => fav.component_id);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -57,20 +60,34 @@ function App() {
     setSearchQuery(query);
   }, []);
 
-  const handleToggleFavorite = useCallback(async (componentId: number) => {
+  const handleShowFavoritesChange = useCallback((show: boolean) => {
+    setShowFavoritesOnly(show);
+  }, []);
+
+  const handleAddFavorite = useCallback(async (componentId: number) => {
     try {
-      const response = await axios.post('/api/favorites', { id: componentId });
+      const response = await axios.post('/api/favorites', { component_id: componentId });
       if (response.data.success) {
-        setFavorites((prev) =>
-          response.data.isFavorite
-            ? [...prev, componentId]
-            : prev.filter((id) => id !== componentId)
-        );
+        setFavorites((prev) => [...prev, response.data.favorite]);
         return true;
       }
       return false;
     } catch (error) {
-      console.error('Failed to toggle favorite:', error);
+      console.error('Failed to add favorite:', error);
+      return false;
+    }
+  }, []);
+
+  const handleRemoveFavorite = useCallback(async (componentId: number) => {
+    try {
+      const response = await axios.delete(`/api/favorites/${componentId}`);
+      if (response.data.success) {
+        setFavorites((prev) => prev.filter((fav) => fav.component_id !== componentId));
+        return true;
+      }
+      return false;
+    } catch (error) {
+      console.error('Failed to remove favorite:', error);
       return false;
     }
   }, []);
@@ -81,7 +98,8 @@ function App() {
       searchQuery === '' ||
       comp.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       comp.tags.some((tag) => tag.toLowerCase().includes(searchQuery.toLowerCase()));
-    return matchesCategory && matchesSearch;
+    const matchesFavorites = !showFavoritesOnly || favoriteIds.includes(comp.id);
+    return matchesCategory && matchesSearch && matchesFavorites;
   });
 
   if (loading) {
@@ -110,6 +128,8 @@ function App() {
             searchQuery={searchQuery}
             onSearchChange={handleSearchChange}
             primaryColor={selectedTheme.primaryColor}
+            showFavoritesOnly={showFavoritesOnly}
+            onShowFavoritesChange={handleShowFavoritesChange}
           />
         </div>
       </header>
@@ -117,8 +137,9 @@ function App() {
         <GalleeryList
           components={filteredComponents}
           theme={selectedTheme}
-          favorites={favorites}
-          onToggleFavorite={handleToggleFavorite}
+          favoriteIds={favoriteIds}
+          onAddFavorite={handleAddFavorite}
+          onRemoveFavorite={handleRemoveFavorite}
         />
       </main>
       <ThemePreviewFloat theme={selectedTheme} />

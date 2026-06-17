@@ -6,6 +6,8 @@ interface FilterBarProps {
   searchQuery: string;
   onSearchChange: (query: string) => void;
   primaryColor: string;
+  showFavoritesOnly: boolean;
+  onShowFavoritesChange: (show: boolean) => void;
 }
 
 const categories: { value: CategoryType; label: string }[] = [
@@ -21,7 +23,9 @@ function FilterBar({
   onCategoryChange,
   searchQuery,
   onSearchChange,
-  primaryColor
+  primaryColor,
+  showFavoritesOnly,
+  onShowFavoritesChange
 }: FilterBarProps) {
   return (
     <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
@@ -64,6 +68,44 @@ function FilterBar({
           />
         </svg>
       </div>
+      <label
+        className="flex items-center gap-2 cursor-pointer select-none"
+        style={{ transition: 'all 0.2s ease' }}
+      >
+        <button
+          role="switch"
+          aria-checked={showFavoritesOnly}
+          onClick={() => onShowFavoritesChange(!showFavoritesOnly)}
+          className="relative inline-flex h-6 w-11 items-center rounded-full"
+          style={{
+            backgroundColor: showFavoritesOnly ? primaryColor : '#d1d5db',
+            transition: 'background-color 0.2s ease'
+          }}
+        >
+          <span
+            className="inline-block h-4 w-4 transform rounded-full bg-white"
+            style={{
+              transform: showFavoritesOnly ? 'translateX(24px)' : 'translateX(4px)',
+              transition: 'transform 0.2s ease',
+              boxShadow: '0 1px 3px rgba(0,0,0,0.2)'
+            }}
+          />
+        </button>
+        <span className="text-sm text-gray-700 whitespace-nowrap">
+          <svg
+            className="inline w-4 h-4 mr-0.5 -mt-0.5"
+            viewBox="0 0 24 24"
+            fill={showFavoritesOnly ? primaryColor : 'none'}
+            stroke={showFavoritesOnly ? primaryColor : '#6b7280'}
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
+          </svg>
+          只看收藏
+        </span>
+      </label>
     </div>
   );
 }

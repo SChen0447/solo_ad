@@ -5,8 +5,9 @@ import { ComponentItem, Theme } from './componentData';
 interface GalleeryListProps {
   components: ComponentItem[];
   theme: Theme;
-  favorites: number[];
-  onToggleFavorite: (id: number) => Promise<boolean>;
+  favoriteIds: number[];
+  onAddFavorite: (id: number) => Promise<boolean>;
+  onRemoveFavorite: (id: number) => Promise<boolean>;
 }
 
 function generateCodeSnippet(component: ComponentItem): string {
@@ -16,7 +17,7 @@ function generateCodeSnippet(component: ComponentItem): string {
   return `<${component.name.replace(/\s+/g, '')} ${propsStr} />`;
 }
 
-function GalleeryList({ components, theme, favorites, onToggleFavorite }: GalleeryListProps) {
+function GalleeryList({ components, theme, favoriteIds, onAddFavorite, onRemoveFavorite }: GalleeryListProps) {
   const [animatingId, setAnimatingId] = useState<number | null>(null);
   const [failedId, setFailedId] = useState<number | null>(null);
   const [copiedId, setCopiedId] = useState<number | null>(null);
@@ -24,7 +25,13 @@ function GalleeryList({ components, theme, favorites, onToggleFavorite }: Gallee
   const handleFavoriteClick = async (id: number) => {
     setAnimatingId(id);
     setFailedId(null);
-    const success = await onToggleFavorite(id);
+    const isFavorite = favoriteIds.includes(id);
+    let success: boolean;
+    if (isFavorite) {
+      success = await onRemoveFavorite(id);
+    } else {
+      success = await onAddFavorite(id);
+    }
     if (!success) {
       setFailedId(id);
     }
@@ -75,7 +82,7 @@ function GalleeryList({ components, theme, favorites, onToggleFavorite }: Gallee
   return (
     <div className="gallery-grid">
       {components.map((component) => {
-        const isFavorite = favorites.includes(component.id);
+        const isFavorite = favoriteIds.includes(component.id);
         const isAnimating = animatingId === component.id;
         const hasFailed = failedId === component.id;
         const isCopied = copiedId === component.id;
@@ -92,8 +99,10 @@ function GalleeryList({ components, theme, favorites, onToggleFavorite }: Gallee
               onClick={() => handleFavoriteClick(component.id)}
               role="button"
               tabIndex={0}
+              aria-label={isFavorite ? '取消收藏' : '添加收藏'}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
                   handleFavoriteClick(component.id);
                 }
               }}
