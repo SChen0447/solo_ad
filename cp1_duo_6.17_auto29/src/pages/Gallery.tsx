@@ -112,15 +112,47 @@ const PoemCard = ({ poem, palette, texture, font, isNew, onClick }: {
 
   const shadowBase = hexToRgba(palette.primary, 0.18)
   const shadowHover = hexToRgba(palette.primary, 0.5)
+
+  const bgNormal = `linear-gradient(135deg, ${palette.background} 0%, ${palette.secondary} 100%)`
+  const bgHover = `linear-gradient(135deg, ${palette.primary} 0%, ${palette.accent} 100%)`
+
   const cardStyle: React.CSSProperties = {
-    background: `linear-gradient(135deg, ${palette.background} 0%, ${palette.secondary} 100%)`,
+    background: hovered ? bgHover : bgNormal,
+    backgroundSize: '100% 100%',
     color: palette.text,
     fontFamily: font.family,
     transform: hovered ? 'translateY(-6px)' : 'translateY(0)',
     boxShadow: hovered
       ? `0 6px 12px ${shadowBase}, 0 16px 48px ${shadowHover}`
       : `0 2px 6px ${shadowBase}, 0 4px 16px ${hexToRgba(palette.primary, 0.12)}`,
-    transition: 'transform 0.3s ease, box-shadow 0.3s ease',
+    border: `2px solid ${hovered ? palette.accent : 'rgba(255, 255, 255, 0.2)'}`,
+    transition: 'transform 0.3s ease, box-shadow 0.3s ease, background 0.4s ease, border-color 0.4s ease',
+  }
+
+  const poetTagStyle: React.CSSProperties = {
+    display: 'inline-block',
+    padding: '2px 8px',
+    borderRadius: 4,
+    backgroundColor: hexToRgba(palette.primary, 0.6),
+    color: '#ffffff',
+    fontSize: 12,
+    fontWeight: 500,
+    marginTop: 8,
+  }
+
+  const favoriteBtnStyle: React.CSSProperties = {
+    background: hovered ? 'rgba(255, 255, 255, 0.25)' : 'rgba(255, 255, 255, 0.15)',
+    color: palette.accent,
+    fontSize: 16,
+    fontWeight: 600,
+    width: 'auto',
+    minWidth: 48,
+    height: 36,
+    padding: '0 10px',
+    gap: 4,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
   }
 
   return (
@@ -142,16 +174,20 @@ const PoemCard = ({ poem, palette, texture, font, isNew, onClick }: {
         }}
       />
       <div className="poem-card-header">
-        <div>
-          <div className="poem-card-title">{poem.title}</div>
-          <div className="poem-card-poet">{poem.poet}</div>
+        <div style={{ flex: 1, paddingRight: 12, minWidth: 0 }}>
+          <div className="poem-card-title" style={{ overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' as const }}>
+            {poem.title}
+          </div>
+          <div style={poetTagStyle}>{poem.poet}</div>
         </div>
         <button
           className={`favorite-btn ${beating ? 'heartbeat' : ''}`}
+          style={favoriteBtnStyle}
           onClick={handleFavorite}
           aria-label="收藏"
         >
-          ♥ {favorites}
+          <span>♥</span>
+          <span style={{ fontSize: 16, fontWeight: 600 }}>{favorites}</span>
         </button>
       </div>
       <div className="poem-card-content">
