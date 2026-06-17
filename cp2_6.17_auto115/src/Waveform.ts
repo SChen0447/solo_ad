@@ -87,7 +87,6 @@ export class WaveformRenderer {
     const waveBottom = height - waveTop;
     const waveHeight = waveBottom - waveTop;
     const centerY = (waveTop + waveBottom) / 2;
-    const maxAmplitude = waveHeight / 2;
 
     const channelData = this.audioBuffer.getChannelData(0);
     const samples = channelData.length;
@@ -123,7 +122,7 @@ export class WaveformRenderer {
 
       const x = i * (barWidth + gap);
       const normalizedRange = (max - min);
-      const barHeight = Math.max(normalizedRange * maxAmplitude, 1);
+      const barHeight = Math.max((normalizedRange / 2) * waveHeight, 1);
       const y = centerY - barHeight / 2;
 
       ctx.fillRect(x, y, barWidth, barHeight);
@@ -164,18 +163,23 @@ export class WaveformRenderer {
       const timeText = formatTime(marker.time);
       ctx.fillText(timeText, x, height - textOffset - triangleSize);
 
-      if (forExport && marker.note) {
+      if (forExport && marker.note && marker.note.trim().length > 0) {
         const noteX = x;
         const noteY = height - 50 - triangleSize;
         const padding = 8;
-        const maxWidth = 200;
+        const maxTextWidth = 200;
         
         ctx.font = '14px sans-serif';
         ctx.textBaseline = 'alphabetic';
-        const textMetrics = ctx.measureText(marker.note);
-        const textWidth = Math.min(textMetrics.width, maxWidth);
-        const bubbleWidth = textWidth + padding * 2;
-        const bubbleHeight = 30;
+        
+        const lines = wrapText(ctx, marker.note, maxTextWidth);
+        const lineHeight = 18;
+        const textBlockHeight = lines.length * lineHeight;
+        const bubbleWidth = Math.min(
+          Math.max(...lines.map(l => ctx.measureText(l).width)) + padding * 2,
+          maxTextWidth + padding * 2
+        );
+        const bubbleHeight = textBlockHeight + padding * 2;
         const bubbleX = noteX - bubbleWidth / 2;
         const bubbleY = noteY - bubbleHeight - 5;
 
@@ -186,8 +190,10 @@ export class WaveformRenderer {
 
         ctx.fillStyle = '#ffffff';
         ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText(marker.note, noteX, bubbleY + bubbleHeight / 2);
+        ctx.textBaseline = 'top';
+        lines.forEach((line, idx) => {
+          ctx.fillText(line, noteX, bubbleY + padding + idx * lineHeight);
+        });
       }
     });
   }
@@ -349,7 +355,6 @@ export class WaveformRenderer {
     const waveBottom = height - waveTop;
     const waveHeight = waveBottom - waveTop;
     const centerY = (waveTop + waveBottom) / 2;
-    const maxAmplitude = waveHeight / 2;
 
     const channelData = originalBuffer.getChannelData(0);
     const samples = channelData.length;
@@ -385,7 +390,7 @@ export class WaveformRenderer {
 
       const x = i * (barWidth + gap);
       const normalizedRange = (max - min);
-      const barHeight = Math.max(normalizedRange * maxAmplitude, 1);
+      const barHeight = Math.max((normalizedRange / 2) * waveHeight, 1);
       const y = centerY - barHeight / 2;
 
       ctx.fillRect(x, y, barWidth, barHeight);
@@ -402,10 +407,18 @@ export class WaveformRenderer {
     this.renderWaveform();
   }
 
-  getTimeFromPosition(x: number): number {
+  getTimeFromPosition(clientX: number): number {
     if (!this.audioBuffer) return 0;
     const rect = this.canvas.getBoundingClientRect();
-    const ratio = (x - rect.left) / rect.width;
+    const canvasX = clientX - rect.left;
+    const ratio = canvasX / rect.width;
+    return Math.max(0, Math.min(ratio * this.audioBuffer.duration, this.audioBuffer.duration));
+  }
+
+  getTimeFromCanvasX(canvasX: number): number {
+    if (!this.audioBuffer) return 0;
+    const rect = this.canvas.getBoundingClientRect();
+    const ratio = canvasX / rect.width;
     return Math.max(0, Math.min(ratio * this.audioBuffer.duration, this.audioBuffer.duration));
   }
 
@@ -435,6 +448,26 @@ function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, width: n
   ctx.lineTo(x, y + radius);
   ctx.quadraticCurveTo(x, y, x + radius, y);
   ctx.closePath();
+}
+
+function wrapText(ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string[] {
+  const lines: string[] = [];
+  let currentLine = '';
+
+  for (let i = 0; i < text.length; i++) {
+    const testLine = currentLine + text[i];
+    const metrics = ctx.measureText(testLine);
+    if (metrics.width > maxWidth && currentLine.length > 0) {
+      lines.push(currentLine);
+      currentLine = text[i];
+    } else {
+      currentLine = testLine;
+    }
+  }
+  if (currentLine) {
+    lines.push(currentLine);
+  }
+  return lines.length > 0 ? lines : [text];
 }
 
 export async function decodeAudioFile(file: File): Promise<AudioBuffer> {

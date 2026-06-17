@@ -34,6 +34,17 @@ const App: React.FC = () => {
   const [, forceUpdate] = useState(0);
 
   useEffect(() => {
+    if (isMobile && sidebarOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [isMobile, sidebarOpen]);
+
+  useEffect(() => {
     const checkMobile = () => {
       setIsMobile(window.innerWidth < 768);
     };
@@ -183,10 +194,12 @@ const App: React.FC = () => {
   }, [handleFileUpload]);
 
   const handleCanvasDoubleClick = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (!waveformRef.current || !uploadedFile) return;
+    if (!waveformRef.current || !uploadedFile || !canvasRef.current) return;
     if (isDraggingMarkerRef.current) return;
 
-    const time = waveformRef.current.getTimeFromPosition(e.clientX);
+    const rect = canvasRef.current.getBoundingClientRect();
+    const canvasX = e.clientX - rect.left;
+    const time = waveformRef.current.getTimeFromCanvasX(canvasX);
     const marker = markerManagerRef.current.addMarker(time);
     
     if (marker) {
@@ -198,9 +211,11 @@ const App: React.FC = () => {
   }, [uploadedFile]);
 
   const handleCanvasMouseDown = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (!waveformRef.current || !uploadedFile) return;
+    if (!waveformRef.current || !uploadedFile || !canvasRef.current) return;
 
-    const time = waveformRef.current.getTimeFromPosition(e.clientX);
+    const rect = canvasRef.current.getBoundingClientRect();
+    const canvasX = e.clientX - rect.left;
+    const time = waveformRef.current.getTimeFromCanvasX(canvasX);
     mouseDownPosRef.current = {
       x: e.clientX,
       y: e.clientY,
@@ -216,7 +231,7 @@ const App: React.FC = () => {
   }, [uploadedFile, duration]);
 
   const handleCanvasMouseMove = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (!waveformRef.current || !uploadedFile || !mouseDownPosRef.current) return;
+    if (!waveformRef.current || !uploadedFile || !mouseDownPosRef.current || !canvasRef.current) return;
 
     const dx = Math.abs(e.clientX - mouseDownPosRef.current.x);
     const dy = Math.abs(e.clientY - mouseDownPosRef.current.y);
@@ -225,26 +240,27 @@ const App: React.FC = () => {
       const draggingId = markerManagerRef.current.getDraggingMarkerId();
       if (draggingId) {
         isDraggingMarkerRef.current = true;
-        const time = waveformRef.current.getTimeFromPosition(e.clientX);
-        markerManagerRef.current.dragMove(time);
-        if (waveformRef.current) {
-          setCurrentTime(time);
-        }
+        const rect = canvasRef.current.getBoundingClientRect();
+        const canvasX = e.clientX - rect.left;
+        const time = waveformRef.current.getTimeFromCanvasX(canvasX);
+        markerManagerRef.current.dragMove(time, duration);
+        setCurrentTime(time);
       }
     }
-  }, [uploadedFile]);
+  }, [uploadedFile, duration]);
 
   const handleCanvasMouseUp = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (!waveformRef.current || !uploadedFile) return;
+    if (!waveformRef.current || !uploadedFile || !canvasRef.current) return;
 
-    const draggingId = markerManagerRef.current.dragEnd();
+    const rect = canvasRef.current.getBoundingClientRect();
+    const canvasX = e.clientX - rect.left;
+    const time = waveformRef.current.getTimeFromCanvasX(canvasX);
+    const draggingId = markerManagerRef.current.dragEnd(duration);
     
     if (draggingId && isDraggingMarkerRef.current) {
-      const time = waveformRef.current.getTimeFromPosition(e.clientX);
       setCurrentTime(time);
       forceUpdate(n => n + 1);
     } else if (mouseDownPosRef.current && !isDraggingMarkerRef.current) {
-      const time = waveformRef.current.getTimeFromPosition(e.clientX);
       waveformRef.current.seek(time);
       setCurrentTime(time);
     }
@@ -254,15 +270,15 @@ const App: React.FC = () => {
     setTimeout(() => {
       isDraggingMarkerRef.current = false;
     }, 50);
-  }, [uploadedFile]);
+  }, [uploadedFile, duration]);
 
   const handleCanvasMouseLeave = useCallback(() => {
     if (mouseDownPosRef.current && markerManagerRef.current.getDraggingMarkerId()) {
-      markerManagerRef.current.dragEnd();
+      markerManagerRef.current.dragEnd(duration);
     }
     mouseDownPosRef.current = null;
     isDraggingMarkerRef.current = false;
-  }, []);
+  }, [duration]);
 
   const handlePlayPause = useCallback(() => {
     if (!waveformRef.current || !uploadedFile) return;

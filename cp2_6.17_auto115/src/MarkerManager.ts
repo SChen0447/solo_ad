@@ -126,20 +126,28 @@ export class MarkerManager {
     return true;
   }
 
-  dragMove(time: number): boolean {
+  dragMove(time: number, maxDuration: number = Infinity): boolean {
     if (!this.draggingMarkerId) return false;
     
     const marker = this.getMarker(this.draggingMarkerId);
     if (!marker) return false;
 
-    marker.time = Math.max(0, time);
+    marker.time = Math.max(0, Math.min(time, maxDuration));
     this.markers.sort((a, b) => a.time - b.time);
     this.notifyChange();
     return true;
   }
 
-  dragEnd(): string | null {
+  dragEnd(maxDuration: number = Infinity): string | null {
     const id = this.draggingMarkerId;
+    if (id) {
+      const marker = this.getMarker(id);
+      if (marker) {
+        marker.time = Math.max(0, Math.min(marker.time, maxDuration));
+        this.markers.sort((a, b) => a.time - b.time);
+        this.notifyChange();
+      }
+    }
     this.draggingMarkerId = null;
     return id;
   }
