@@ -1,9 +1,11 @@
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { Search, Plus, BookOpen } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import RecipeCard from '@/components/RecipeCard';
 import FavoriteCarousel from '@/components/FavoriteCarousel';
 import { useRecipeStore } from '@/store/recipeStore';
+
+const DEBOUNCE_DELAY = 300; // 防抖延迟 0.3 秒
 
 function Home() {
   const navigate = useNavigate();
@@ -12,21 +14,26 @@ function Home() {
 
   const [searchTerm, setSearchTerm] = useState('');
   const [debouncedTerm, setDebouncedTerm] = useState('');
-  const timerRef = useRef<number | null>(null);
+  const debounceTimerRef = useRef<number | null>(null);
+
+  const clearDebounceTimer = useCallback(() => {
+    if (debounceTimerRef.current !== null) {
+      clearTimeout(debounceTimerRef.current);
+      debounceTimerRef.current = null;
+    }
+  }, []);
 
   useEffect(() => {
-    if (timerRef.current) {
-      clearTimeout(timerRef.current);
-    }
-    timerRef.current = window.setTimeout(() => {
+    clearDebounceTimer();
+    debounceTimerRef.current = window.setTimeout(() => {
       setDebouncedTerm(searchTerm);
-    }, 300);
-    return () => {
-      if (timerRef.current) {
-        clearTimeout(timerRef.current);
-      }
-    };
-  }, [searchTerm]);
+    }, DEBOUNCE_DELAY);
+    return clearDebounceTimer;
+  }, [searchTerm, clearDebounceTimer]);
+
+  useEffect(() => {
+    return clearDebounceTimer;
+  }, [clearDebounceTimer]);
 
   const filteredRecipes = useMemo(() => {
     if (!debouncedTerm.trim()) return recipes;

@@ -34,8 +34,7 @@ const RecipeCard: React.FC<RecipeCardProps> = ({ title, image, time, isFavorite,
       style={{
         width: 240,
         height: cardHeight,
-        marginTop: hovered ? -6 : 0,
-        marginBottom: hovered ? 6 : 0,
+        top: hovered ? -6 : 0,
         borderRadius: 20,
         background: '#ffffff',
         border: '1px solid #e5e7eb',
@@ -43,7 +42,7 @@ const RecipeCard: React.FC<RecipeCardProps> = ({ title, image, time, isFavorite,
         position: 'relative',
         cursor: 'pointer',
         boxShadow: hovered ? '0 10px 30px rgba(0,0,0,0.12)' : 'none',
-        transition: 'margin-top 0.35s ease-out, margin-bottom 0.35s ease-out, box-shadow 0.35s ease-out',
+        transition: 'top 0.35s ease-out, box-shadow 0.35s ease-out',
       }}
     >
       <div style={{ width: 240, height: imgHeight, overflow: 'hidden' }}>

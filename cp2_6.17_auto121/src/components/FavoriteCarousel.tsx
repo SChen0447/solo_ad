@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import React, { useRef, useState, useEffect, useCallback } from 'react';
 import { ChevronLeft, ChevronRight, Heart } from 'lucide-react';
 import type { Recipe } from '@/types';
 import { useNavigate } from 'react-router-dom';
@@ -10,14 +10,38 @@ interface FavoriteCarouselProps {
 const FavoriteCarousel: React.FC<FavoriteCarouselProps> = ({ favorites }) => {
   const scrollRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(true);
+
+  const updateScrollState = useCallback(() => {
+    if (!scrollRef.current) return;
+    const { scrollLeft, scrollWidth, clientWidth } = scrollRef.current;
+    setCanScrollLeft(scrollLeft > 10);
+    setCanScrollRight(scrollLeft < scrollWidth - clientWidth - 10);
+  }, []);
+
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    updateScrollState();
+    el.addEventListener('scroll', updateScrollState);
+    const observer = new ResizeObserver(updateScrollState);
+    observer.observe(el);
+    return () => {
+      el.removeEventListener('scroll', updateScrollState);
+      observer.disconnect();
+    };
+  }, [favorites, updateScrollState]);
 
   const scroll = (direction: 'left' | 'right') => {
     if (!scrollRef.current) return;
+    const { scrollLeft, scrollWidth, clientWidth } = scrollRef.current;
     const scrollAmount = 260;
-    scrollRef.current.scrollBy({
-      left: direction === 'left' ? -scrollAmount : scrollAmount,
-      behavior: 'smooth',
-    });
+    let target = direction === 'left' ? scrollLeft - scrollAmount : scrollLeft + scrollAmount;
+    const maxScroll = scrollWidth - clientWidth;
+    if (target < 0) target = 0;
+    if (target > maxScroll) target = maxScroll;
+    scrollRef.current.scrollTo({ left: target, behavior: 'smooth' });
   };
 
   if (favorites.length === 0) return null;
@@ -33,6 +57,7 @@ const FavoriteCarousel: React.FC<FavoriteCarouselProps> = ({ favorites }) => {
       <div style={{ position: 'relative' }}>
         <button
           onClick={() => scroll('left')}
+          disabled={!canScrollLeft}
           style={{
             position: 'absolute',
             left: -12,
@@ -42,22 +67,25 @@ const FavoriteCarousel: React.FC<FavoriteCarouselProps> = ({ favorites }) => {
             width: 40,
             height: 40,
             borderRadius: '50%',
-            background: '#fff',
+            background: canScrollLeft ? '#fff' : '#f9fafb',
             border: '1px solid #e5e7eb',
-            boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+            boxShadow: canScrollLeft ? '0 2px 8px rgba(0,0,0,0.1)' : 'none',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            cursor: 'pointer',
+            cursor: canScrollLeft ? 'pointer' : 'not-allowed',
             transition: 'all 0.2s',
-            color: '#374151',
+            color: canScrollLeft ? '#374151' : '#d1d5db',
+            opacity: canScrollLeft ? 1 : 0.5,
           }}
           onMouseEnter={e => {
-            (e.currentTarget as HTMLButtonElement).style.background = '#f3f4f6';
-            (e.currentTarget as HTMLButtonElement).style.transform = 'translateY(-50%) scale(1.1)';
+            if (canScrollLeft) {
+              (e.currentTarget as HTMLButtonElement).style.background = '#f3f4f6';
+              (e.currentTarget as HTMLButtonElement).style.transform = 'translateY(-50%) scale(1.1)';
+            }
           }}
           onMouseLeave={e => {
-            (e.currentTarget as HTMLButtonElement).style.background = '#fff';
+            (e.currentTarget as HTMLButtonElement).style.background = canScrollLeft ? '#fff' : '#f9fafb';
             (e.currentTarget as HTMLButtonElement).style.transform = 'translateY(-50%) scale(1)';
           }}
         >
@@ -127,6 +155,7 @@ const FavoriteCarousel: React.FC<FavoriteCarouselProps> = ({ favorites }) => {
 
         <button
           onClick={() => scroll('right')}
+          disabled={!canScrollRight}
           style={{
             position: 'absolute',
             right: -12,
@@ -136,22 +165,25 @@ const FavoriteCarousel: React.FC<FavoriteCarouselProps> = ({ favorites }) => {
             width: 40,
             height: 40,
             borderRadius: '50%',
-            background: '#fff',
+            background: canScrollRight ? '#fff' : '#f9fafb',
             border: '1px solid #e5e7eb',
-            boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+            boxShadow: canScrollRight ? '0 2px 8px rgba(0,0,0,0.1)' : 'none',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            cursor: 'pointer',
+            cursor: canScrollRight ? 'pointer' : 'not-allowed',
             transition: 'all 0.2s',
-            color: '#374151',
+            color: canScrollRight ? '#374151' : '#d1d5db',
+            opacity: canScrollRight ? 1 : 0.5,
           }}
           onMouseEnter={e => {
-            (e.currentTarget as HTMLButtonElement).style.background = '#f3f4f6';
-            (e.currentTarget as HTMLButtonElement).style.transform = 'translateY(-50%) scale(1.1)';
+            if (canScrollRight) {
+              (e.currentTarget as HTMLButtonElement).style.background = '#f3f4f6';
+              (e.currentTarget as HTMLButtonElement).style.transform = 'translateY(-50%) scale(1.1)';
+            }
           }}
           onMouseLeave={e => {
-            (e.currentTarget as HTMLButtonElement).style.background = '#fff';
+            (e.currentTarget as HTMLButtonElement).style.background = canScrollRight ? '#fff' : '#f9fafb';
             (e.currentTarget as HTMLButtonElement).style.transform = 'translateY(-50%) scale(1)';
           }}
         >

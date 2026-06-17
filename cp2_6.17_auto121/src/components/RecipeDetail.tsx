@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
-import { ArrowLeft, ShoppingCart, X } from 'lucide-react';
+import React, { useState, useMemo } from 'react';
+import { ArrowLeft, ShoppingCart, X, RotateCcw } from 'lucide-react';
 import type { Recipe } from '@/types';
+import { useRecipeStore } from '@/store/recipeStore';
 
 interface RecipeDetailProps {
   recipe: Recipe;
@@ -9,15 +10,21 @@ interface RecipeDetailProps {
 
 const RecipeDetail: React.FC<RecipeDetailProps> = ({ recipe, onBack }) => {
   const [showModal, setShowModal] = useState(false);
-  const [checkedItems, setCheckedItems] = useState<Set<string>>(new Set());
+  const toggleChecked = useRecipeStore(state => state.toggleChecked);
+  const isChecked = useRecipeStore(state => state.isChecked);
+  const clearCheckedForRecipe = useRecipeStore(state => state.clearCheckedForRecipe);
+  const checkedItems = useRecipeStore(state => state.checkedItems);
+
+  const itemKeys = useMemo(() => {
+    return recipe.ingredients.map((_, i) => `${recipe.id}-${i}`);
+  }, [recipe.id, recipe.ingredients]);
 
   const toggleCheck = (key: string) => {
-    setCheckedItems(prev => {
-      const next = new Set(prev);
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
-      return next;
-    });
+    toggleChecked(key);
+  };
+
+  const handleClearAll = () => {
+    clearCheckedForRecipe(recipe.id);
   };
 
   return (
@@ -173,21 +180,52 @@ const RecipeDetail: React.FC<RecipeDetailProps> = ({ recipe, onBack }) => {
             }}
             onClick={e => e.stopPropagation()}
           >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
               <h3 style={{ fontSize: 20, fontWeight: 700, color: '#1f2937' }}>
                 🛒 购物清单
               </h3>
-              <button
-                onClick={() => setShowModal(false)}
-                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af' }}
-              >
-                <X size={20} />
-              </button>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button
+                  onClick={handleClearAll}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    cursor: 'pointer',
+                    color: '#9ca3af',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 4,
+                    fontSize: 13,
+                    padding: '6px 10px',
+                    borderRadius: 8,
+                    transition: 'all 0.2s',
+                  }}
+                  onMouseEnter={e => {
+                    (e.currentTarget as HTMLButtonElement).style.background = '#f3f4f6';
+                    (e.currentTarget as HTMLButtonElement).style.color = '#374151';
+                  }}
+                  onMouseLeave={e => {
+                    (e.currentTarget as HTMLButtonElement).style.background = 'transparent';
+                    (e.currentTarget as HTMLButtonElement).style.color = '#9ca3af';
+                  }}
+                >
+                  <RotateCcw size={14} /> 重置
+                </button>
+                <button
+                  onClick={() => setShowModal(false)}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af', padding: 6 }}
+                >
+                  <X size={20} />
+                </button>
+              </div>
             </div>
+            <p style={{ fontSize: 13, color: '#9ca3af', marginBottom: 12 }}>
+              点击勾选已购买的食材，状态会自动保存
+            </p>
             <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
               {recipe.ingredients.map((ing, i) => {
-                const key = `${i}-${ing.name}`;
-                const checked = checkedItems.has(key);
+                const key = `${recipe.id}-${i}`;
+                const checked = isChecked(key);
                 return (
                   <li
                     key={key}

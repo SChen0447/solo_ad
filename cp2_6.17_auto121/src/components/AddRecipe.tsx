@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { ArrowLeft, Plus, Trash2, GripVertical, ChefHat, ListOrdered, Image as ImageIcon } from 'lucide-react';
 import type { Ingredient, RecipeStep, Recipe } from '@/types';
@@ -30,6 +30,46 @@ const AddRecipe: React.FC<AddRecipeProps> = ({ onClose }) => {
 
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
+
+  const touchStartY = useRef<number>(0);
+  const touchDraggedIndex = useRef<number | null>(null);
+  const touchItemRefs = useRef<(HTMLDivElement | null)[]>([]);
+
+  const handleTouchStart = (e: React.TouchEvent, index: number) => {
+    touchStartY.current = e.touches[0].clientY;
+    touchDraggedIndex.current = index;
+    setDraggedIndex(index);
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (touchDraggedIndex.current === null) return;
+    e.preventDefault();
+    const currentY = e.touches[0].clientY;
+    const refs = touchItemRefs.current.filter(Boolean) as HTMLDivElement[];
+    for (let i = 0; i < refs.length; i++) {
+      const rect = refs[i].getBoundingClientRect();
+      if (currentY >= rect.top && currentY <= rect.bottom) {
+        if (i !== touchDraggedIndex.current) {
+          setDragOverIndex(i);
+        }
+        break;
+      }
+    }
+  };
+
+  const handleTouchEnd = () => {
+    if (touchDraggedIndex.current !== null && dragOverIndex !== null && touchDraggedIndex.current !== dragOverIndex) {
+      const next = [...steps];
+      const [removed] = next.splice(touchDraggedIndex.current, 1);
+      next.splice(dragOverIndex, 0, removed);
+      const reordered = next.map((s, i) => ({ ...s, order: i + 1 }));
+      setSteps(reordered);
+    }
+    touchDraggedIndex.current = null;
+    touchStartY.current = 0;
+    setDraggedIndex(null);
+    setDragOverIndex(null);
+  };
 
   const addIngredient = () => {
     setIngredients([...ingredients, { name: '', amount: '' }]);
@@ -384,12 +424,16 @@ const AddRecipe: React.FC<AddRecipeProps> = ({ onClose }) => {
           {steps.map((stepItem, i) => (
             <div
               key={i}
+              ref={el => { touchItemRefs.current[i] = el; }}
               draggable
               onDragStart={e => handleDragStart(e, i)}
               onDragOver={e => handleDragOver(e, i)}
               onDragLeave={handleDragLeave}
               onDrop={e => handleDrop(e, i)}
               onDragEnd={handleDragEnd}
+              onTouchStart={e => handleTouchStart(e, i)}
+              onTouchMove={handleTouchMove}
+              onTouchEnd={handleTouchEnd}
               style={{
                 display: 'flex',
                 gap: 10,
@@ -400,6 +444,7 @@ const AddRecipe: React.FC<AddRecipeProps> = ({ onClose }) => {
                 border: `1px solid ${dragOverIndex === i ? '#3b82f6' : '#e5e7eb'}`,
                 opacity: draggedIndex === i ? 0.5 : 1,
                 transition: 'background 0.2s, border-color 0.2s',
+                touchAction: 'none',
               }}
             >
               <div

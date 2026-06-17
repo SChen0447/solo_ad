@@ -2,8 +2,11 @@ import { create } from 'zustand';
 import type { Recipe } from '@/types';
 
 const STORAGE_KEY = 'recipe-binder-recipes';
+const CHECKED_KEY = 'recipe-binder-checked';
 
-const loadFromStorage = (): Recipe[] => {
+type CheckedMap = Record<string, boolean>;
+
+const loadRecipesFromStorage = (): Recipe[] => {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) return JSON.parse(raw);
@@ -13,11 +16,29 @@ const loadFromStorage = (): Recipe[] => {
   return getDefaultRecipes();
 };
 
-const saveToStorage = (recipes: Recipe[]) => {
+const saveRecipesToStorage = (recipes: Recipe[]) => {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(recipes));
   } catch {
     console.warn('Failed to save recipes to localStorage');
+  }
+};
+
+const loadCheckedFromStorage = (): CheckedMap => {
+  try {
+    const raw = localStorage.getItem(CHECKED_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch {
+    console.warn('Failed to load checked items from localStorage');
+  }
+  return {};
+};
+
+const saveCheckedToStorage = (checked: CheckedMap) => {
+  try {
+    localStorage.setItem(CHECKED_KEY, JSON.stringify(checked));
+  } catch {
+    console.warn('Failed to save checked items to localStorage');
   }
 };
 
@@ -95,18 +116,23 @@ const getDefaultRecipes = (): Recipe[] => {
 
 interface RecipeState {
   recipes: Recipe[];
+  checkedItems: CheckedMap;
   addRecipe: (recipe: Recipe) => void;
   toggleFavorite: (id: string) => void;
   getRecipe: (id: string) => Recipe | undefined;
+  toggleChecked: (key: string) => void;
+  isChecked: (key: string) => boolean;
+  clearCheckedForRecipe: (recipeId: string) => void;
 }
 
 export const useRecipeStore = create<RecipeState>((set, get) => ({
-  recipes: loadFromStorage(),
+  recipes: loadRecipesFromStorage(),
+  checkedItems: loadCheckedFromStorage(),
 
   addRecipe: (recipe: Recipe) => {
     set(state => {
       const next = [recipe, ...state.recipes];
-      saveToStorage(next);
+      saveRecipesToStorage(next);
       return { recipes: next };
     });
   },
@@ -116,12 +142,37 @@ export const useRecipeStore = create<RecipeState>((set, get) => ({
       const next = state.recipes.map(r =>
         r.id === id ? { ...r, isFavorite: !r.isFavorite } : r
       );
-      saveToStorage(next);
+      saveRecipesToStorage(next);
       return { recipes: next };
     });
   },
 
   getRecipe: (id: string) => {
     return get().recipes.find(r => r.id === id);
+  },
+
+  toggleChecked: (key: string) => {
+    set(state => {
+      const next = { ...state.checkedItems };
+      if (next[key]) delete next[key];
+      else next[key] = true;
+      saveCheckedToStorage(next);
+      return { checkedItems: next };
+    });
+  },
+
+  isChecked: (key: string) => {
+    return !!get().checkedItems[key];
+  },
+
+  clearCheckedForRecipe: (recipeId: string) => {
+    set(state => {
+      const next = { ...state.checkedItems };
+      Object.keys(next).forEach(key => {
+        if (key.startsWith(`${recipeId}-`)) delete next[key];
+      });
+      saveCheckedToStorage(next);
+      return { checkedItems: next };
+    });
   },
 }));
