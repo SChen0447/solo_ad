@@ -68,6 +68,35 @@ interface CoinObj {
   collected: boolean;
   graphic: Phaser.GameObjects.Graphics;
   angle: number;
+  /** 收集动画时间（ms），0 表示未触发 */
+  pickupAnimT: number;
+  /** 收集动画总时长 */
+  pickupAnimDur: number;
+  /** 收集动画起点像素坐标 */
+  pickupFromX: number;
+  pickupFromY: number;
+}
+
+/** 金币收集时的粒子数据 */
+interface CoinBurstParticle {
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  life: number;
+  totalLife: number;
+  size: number;
+  color: number;
+  graphic: Phaser.GameObjects.Graphics;
+}
+
+/** 出口庆祝特效状态 */
+interface VictoryFX {
+  running: boolean;
+  t: number;
+  duration: number;
+  haloGraphic: Phaser.GameObjects.Graphics | null;
+  textObj: Phaser.GameObjects.Text | null;
 }
 
 interface AIObj {
@@ -108,6 +137,11 @@ const MOVE_DURATION = 140;
 const AI_MOVE_DURATION_BASE = 210;
 const AI_MOVE_DURATION_CHASE = 140;
 
+const COIN_PICKUP_DURATION = 300;
+const COIN_BURST_DURATION = 300;
+const COIN_BURST_PARTICLES = 14;
+const VICTORY_DURATION = 1500;
+
 export class GameScene extends Phaser.Scene {
   public readonly events: Phaser.Events.EventEmitter;
 
@@ -143,6 +177,15 @@ export class GameScene extends Phaser.Scene {
   private totalCoins: number = 0;
   private lastFrameTime: number = 0;
   private frameBudgetWarned: boolean = false;
+
+  private coinBurstParticles: CoinBurstParticle[] = [];
+  private victoryFX: VictoryFX = {
+    running: false,
+    t: 0,
+    duration: VICTORY_DURATION,
+    haloGraphic: null,
+    textObj: null,
+  };
 
   constructor(scoreMgr: ScoreManager) {
     super({ key: 'GameScene' });
@@ -183,9 +226,20 @@ export class GameScene extends Phaser.Scene {
     this.coins.forEach((c) => c.graphic?.destroy());
     this.ais.forEach((a) => a.graphic?.destroy());
     this.remotePlayers.forEach((rp) => rp.graphic?.destroy());
+    this.coinBurstParticles.forEach((p) => p.graphic?.destroy());
+    if (this.victoryFX.haloGraphic) this.victoryFX.haloGraphic.destroy();
+    if (this.victoryFX.textObj) this.victoryFX.textObj.destroy();
     this.coins = [];
     this.ais = [];
     this.remotePlayers.clear();
+    this.coinBurstParticles = [];
+    this.victoryFX = {
+      running: false,
+      t: 0,
+      duration: VICTORY_DURATION,
+      haloGraphic: null,
+      textObj: null,
+    };
 
     this.seed = seed ?? Math.floor(Math.random() * 0x7fffffff);
 
@@ -326,7 +380,16 @@ export class GameScene extends Phaser.Scene {
     for (const pos of m.coins) {
       const g = this.add.graphics();
       g.setDepth(5);
-      this.coins.push({ pos, collected: false, graphic: g, angle: 0 });
+      this.coins.push({
+        pos,
+        collected: false,
+        graphic: g,
+        angle: 0,
+        pickupAnimT: 0,
+        pickupAnimDur: COIN_PICKUP_DURATION,
+        pickupFromX: 0,
+        pickupFromY: 0,
+      });
     }
   }
 
@@ -353,6 +416,166 @@ export class GameScene extends Phaser.Scene {
     g.fillPoints(points2, true);
     g.lineStyle(1.5, 0xffffff, 0.8);
     g.strokePoints(points2, true);
+  }
+
+  /**
+   * 触发金币收集动画（缩小+上飘+金白粒子爆发），时长 0.3s
+   */
+  private triggerCoinPickupFX(coin: CoinObj) {
+    const { px, py } = this.gridToPx(coin.pos.x, coin.pos.y);
+    coin.pickupFromX = px;
+    coin.pickupFromY = py;
+    coin.pickupAnimT = 0.001;
+    coin.graphic.setDepth(20);
+    this.spawnCoinBurst(px, py);
+  }
+
+  /**
+   * 金白粒子爆发
+   */
+  private spawnCoinBurst(cx: number, cy: number) {
+    const colors = [0xffd700, 0xfff176, 0xffffff, 0xffe45c, 0xffffff];
+    for (let i = 0; i < COIN_BURST_PARTICLES; i++) {
+      const angle = (i / COIN_BURST_PARTICLES) * Math.PI * 2 + Math.random() * 0.4;
+      const speed = 0.06 + Math.random() * 0.12;
+      const life = COIN_BURST_DURATION * (0.7 + Math.random() * 0.4);
+      const size = 2 + Math.random() * 4;
+      const color = colors[Math.floor(Math.random() * colors.length)];
+      const g = this.add.graphics();
+      g.setDepth(21);
+      this.coinBurstParticles.push({
+        x: cx,
+        y: cy,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed,
+        life,
+        totalLife: life,
+        size,
+        color,
+        graphic: g,
+      });
+    }
+  }
+
+  private updateCoinBurstParticles(delta: number) {
+    for (let i = this.coinBurstParticles.length - 1; i >= 0; i--) {
+      const p = this.coinBurstParticles[i];
+      p.life -= delta;
+      if (p.life <= 0) {
+        p.graphic.destroy();
+        this.coinBurstParticles.splice(i, 1);
+        continue;
+      }
+      p.x += p.vx * delta;
+      p.y += p.vy * delta;
+      p.vy += 0.0003 * delta;
+      const t = Phaser.Math.Clamp(p.life / p.totalLife, 0, 1);
+      const alpha = Phaser.Math.Easing.Quadratic.Out(t);
+      const r = p.size * (0.4 + 0.6 * t);
+      p.graphic.clear();
+      p.graphic.fillStyle(p.color, alpha);
+      p.graphic.fillCircle(p.x, p.y, r);
+    }
+  }
+
+  /**
+   * 触发出口庆祝特效（光环+文字动画，1.5秒）
+   * 完成后调用 onComplete 回调（用于延迟打开结算面板）
+   */
+  private triggerVictoryFX(onComplete: () => void) {
+    if (this.victoryFX.running) {
+      onComplete();
+      return;
+    }
+    const { width, height } = this.scale;
+
+    const halo = this.add.graphics();
+    halo.setDepth(50);
+
+    const fontSize = Math.max(32, Math.min(72, Math.floor(width / 10)));
+    const text = this.add
+      .text(width / 2, height / 2, '逃脱成功！', {
+        fontFamily: '"Segoe UI", "PingFang SC", sans-serif',
+        fontSize: `${fontSize}px`,
+        fontStyle: 'bold',
+        color: '#ffffff',
+        stroke: '#8a2be2',
+        strokeThickness: 6,
+        align: 'center',
+      })
+      .setOrigin(0.5)
+      .setDepth(55)
+      .setAlpha(0);
+
+    text.setShadow(0, 0, '#8a2be2', 20, true, true);
+
+    this.victoryFX = {
+      running: true,
+      t: 0,
+      duration: VICTORY_DURATION,
+      haloGraphic: halo,
+      textObj: text,
+    };
+
+    this.time.delayedCall(VICTORY_DURATION, () => {
+      onComplete();
+    });
+  }
+
+  private updateVictoryFX(delta: number) {
+    if (!this.victoryFX.running) return;
+    const v = this.victoryFX;
+    v.t = Math.min(v.t + delta, v.duration);
+    const tNorm = v.t / v.duration;
+
+    const { width, height } = this.scale;
+    const cx = width / 2;
+    const cy = height / 2;
+    const maxR = Math.max(width, height) * 0.75;
+
+    const halo = v.haloGraphic!;
+    halo.clear();
+
+    if (tNorm < 0.7) {
+      const ht = tNorm / 0.7;
+      const r = Phaser.Math.Easing.Quadratic.Out(ht) * maxR;
+      const alpha = 1 - Phaser.Math.Easing.Quadratic.In(ht);
+
+      for (let ring = 0; ring < 3; ring++) {
+        const ringT = Phaser.Math.Clamp(ht - ring * 0.15, 0, 1);
+        if (ringT <= 0) continue;
+        const rr = Phaser.Math.Easing.Quadratic.Out(ringT) * r;
+        const ringAlpha = alpha * (1 - ring * 0.25);
+        const color = ring === 0 ? 0x8a2be2 : ring === 1 ? 0x4b6bff : 0xc77dff;
+        halo.lineStyle(Math.max(4, 20 * (1 - ringT)), color, ringAlpha);
+        halo.beginPath();
+        halo.arc(cx, cy, rr, 0, Math.PI * 2);
+        halo.strokePath();
+
+        halo.fillStyle(color, ringAlpha * 0.08);
+        halo.beginPath();
+        halo.arc(cx, cy, rr, 0, Math.PI * 2);
+        halo.fillPath();
+      }
+    }
+
+    const txt = v.textObj!;
+    if (tNorm < 0.35) {
+      const at = tNorm / 0.35;
+      const ease = Phaser.Math.Easing.Back.Out(at);
+      txt.setAlpha(at);
+      txt.setScale(0.4 + 0.6 * ease);
+      txt.y = cy + 20 * (1 - ease);
+    } else if (tNorm < 0.75) {
+      txt.setAlpha(1);
+      txt.setScale(1);
+      txt.y = cy;
+    } else {
+      const at = (tNorm - 0.75) / 0.25;
+      txt.setAlpha(1 - at);
+      txt.setScale(1 + 0.15 * at);
+      txt.y = cy - 30 * at;
+    }
   }
 
   // ============== AI ==============
@@ -555,17 +778,24 @@ export class GameScene extends Phaser.Scene {
   // ============== 主循环 ==============
 
   update(_time: number, delta: number) {
-    if (!this.running || this.gameOver || !this.maze) return;
+    if (!this.maze) return;
 
     const frameStart = performance.now();
 
-    this.emitEvent('update:time', this.scoreMgr.getElapsedMs());
+    if (this.running && !this.gameOver) {
+      this.emitEvent('update:time', this.scoreMgr.getElapsedMs());
 
-    this.updatePlayer(delta);
-    this.updateCoins(delta);
-    this.updateAIs(delta);
-    this.updateRemotePlayers(delta);
-    this.checkCollisions();
+      this.updatePlayer(delta);
+      this.updateCoins(delta);
+      this.updateAIs(delta);
+      this.updateRemotePlayers(delta);
+      this.checkCollisions();
+    } else {
+      this.updateCoins(delta);
+    }
+
+    this.updateCoinBurstParticles(delta);
+    this.updateVictoryFX(delta);
 
     const frameDur = performance.now() - frameStart;
     if (!this.frameBudgetWarned && frameDur > 2) {
@@ -634,10 +864,34 @@ export class GameScene extends Phaser.Scene {
 
   private updateCoins(delta: number) {
     for (const coin of this.coins) {
-      if (coin.collected) {
+      if (coin.collected && coin.pickupAnimT <= 0) {
         coin.graphic.visible = false;
         continue;
       }
+
+      if (coin.pickupAnimT > 0) {
+        coin.pickupAnimT += delta;
+        const dur = coin.pickupAnimDur;
+        if (coin.pickupAnimT >= dur) {
+          coin.pickupAnimT = 0;
+          coin.graphic.visible = false;
+          continue;
+        }
+        const t = Phaser.Math.Clamp(coin.pickupAnimT / dur, 0, 1);
+        const ease = Phaser.Math.Easing.Cubic.Out(t);
+        const scale = 1 - t;
+        const dy = -ease * this.tileSize * 0.6;
+        const alpha = 1 - Phaser.Math.Easing.Quadratic.In(t);
+        const px = coin.pickupFromX;
+        const py = coin.pickupFromY + dy;
+        const sz = this.tileSize * scale;
+        coin.graphic.setAlpha(alpha);
+        coin.angle = (coin.angle + (delta / 200) * 360) % 360;
+        this.drawCoin(coin.graphic, px, py, sz, coin.angle);
+        continue;
+      }
+
+      coin.graphic.setAlpha(1);
       coin.angle = (coin.angle + (delta / 500) * 360) % 360;
       const { px, py } = this.gridToPx(coin.pos.x, coin.pos.y);
       this.drawCoin(coin.graphic, px, py, this.tileSize, coin.angle);
@@ -762,6 +1016,7 @@ export class GameScene extends Phaser.Scene {
     for (const coin of this.coins) {
       if (!coin.collected && coin.pos.x === p.gridX && coin.pos.y === p.gridY) {
         coin.collected = true;
+        this.triggerCoinPickupFX(coin);
         this.scoreMgr.addCoin();
         const collected = this.scoreMgr.getCoins();
         this.emitEvent('update:coins', collected);
@@ -784,10 +1039,14 @@ export class GameScene extends Phaser.Scene {
       }
     }
 
-    // ---- 出口（网格级） ----
+    // ---- 出口（网格级）：先播放庆祝特效再结算 ----
     const m = this.maze;
     if (p.gridX === m.exit.x && p.gridY === m.exit.y) {
-      this.triggerGameOver(true);
+      this.running = false;
+      this.scoreMgr.stopTiming();
+      this.triggerVictoryFX(() => {
+        this.triggerGameOver(true);
+      });
     }
   }
 
@@ -826,7 +1085,10 @@ export class GameScene extends Phaser.Scene {
     if (this.gameOver) return;
     this.gameOver = true;
     this.running = false;
-    const timeMs = this.scoreMgr.stopTiming();
+    if (this.scoreMgr.isRunning()) {
+      this.scoreMgr.stopTiming();
+    }
+    const timeMs = this.scoreMgr.getElapsedMs();
     const coins = this.scoreMgr.getCoins();
 
     let result: SubmitResult | null = null;
