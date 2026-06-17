@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <title>星际矿工 - Space Miner</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+    }
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #0a0e27;
+      font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif;
+      touch-action: none;
+    }
+    #game-container {
+      position: relative;
+      width: 100vw;
+      height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    #game-canvas {
+      display: block;
+      background: linear-gradient(180deg, #0a0e27 0%, #121845 100%);
+    }
+    #mobile-controls {
+      position: absolute;
+      bottom: 20px;
+      left: 0;
+      right: 0;
+      display: none;
+      justify-content: space-between;
+      padding: 0 20px;
+      pointer-events: none;
+      z-index: 10;
+    }
+    .control-group {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      pointer-events: auto;
+    }
+    .control-row {
+      display: flex;
+      justify-content: center;
+      gap: 8px;
+    }
+    .control-btn {
+      width: 60px;
+      height: 60px;
+      border-radius: 50%;
+      background: rgba(100, 150, 255, 0.25);
+      border: 2px solid rgba(100, 150, 255, 0.6);
+      color: #fff;
+      font-size: 20px;
+      font-weight: bold;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      user-select: none;
+      backdrop-filter: blur(8px);
+    }
+    .control-btn:active {
+      background: rgba(100, 150, 255, 0.5);
+      transform: scale(0.95);
+    }
+    #fire-btn {
+      width: 80px;
+      height: 80px;
+      background: rgba(255, 100, 100, 0.3);
+      border-color: rgba(255, 100, 100, 0.7);
+      font-size: 14px;
+      align-self: flex-end;
+    }
+    #fire-btn:active {
+      background: rgba(255, 100, 100, 0.6);
+    }
+    @media (max-width: 768px) {
+      #mobile-controls {
+        display: flex;
+      }
+    }
+    #start-screen {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(10, 14, 39, 0.95);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 20;
+      color: #fff;
+    }
+    #start-screen h1 {
+      font-size: 48px;
+      background: linear-gradient(135deg, #64b5f6, #ce93d8);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      margin-bottom: 20px;
+      text-shadow: 0 0 40px rgba(100, 181, 246, 0.5);
+    }
+    #start-screen p {
+      font-size: 16px;
+      color: #a0a8c8;
+      margin: 8px 0;
+    }
+    #start-btn {
+      margin-top: 40px;
+      padding: 16px 48px;
+      font-size: 20px;
+      background: linear-gradient(135deg, #42a5f5, #7e57c2);
+      color: #fff;
+      border: none;
+      border-radius: 30px;
+      cursor: pointer;
+      box-shadow: 0 4px 20px rgba(66, 165, 245, 0.5);
+      transition: all 0.3s;
+    }
+    #start-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 30px rgba(66, 165, 245, 0.7);
+    }
+    #game-over {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(10, 14, 39, 0.95);
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 20;
+      color: #fff;
+    }
+    #game-over h2 {
+      font-size: 40px;
+      color: #ef5350;
+      margin-bottom: 16px;
+    }
+    #game-over p {
+      font-size: 24px;
+      color: #ffd54f;
+      margin-bottom: 30px;
+    }
+    #restart-btn {
+      padding: 14px 40px;
+      font-size: 18px;
+      background: linear-gradient(135deg, #66bb6a, #42a5f5);
+      color:fff;
+      border: none;
+      border-radius: 25px;
+      cursor: pointer;
+      box-shadow: 0 4px 20px rgba(102, 187, 106, 0.5);
+    }
+  </style>
+</head>
+<body>
+  <div id="game-container">
+    <canvas id="game-canvas"></canvas>
+    <div id="mobile-controls">
+      <div class="control-group">
+        <div class="control-row">
+          <div class="control-btn" data-key="KeyW">↑</div>
+        </div>
+        <div class="control-row">
+          <div class="control-btn" data-key="KeyA">←</div>
+          <div class="control-btn" data-key="KeyS">↓</div>
+          <div class="control-btn" data-key="KeyD">→</div>
+        </div>
+      </div>
+      <div class="control-group">
+        <div class="control-btn" id="fire-btn" data-key="Space">发射</div>
+      </div>
+    </div>
+    <div id="start-screen">
+      <h1>✨ 星际矿工 ✨</h1>
+      <p>WASD 移动飞船 | 空格键 发射激光炮</p>
+      <p>采集矿石赚取分数，躲避小行星和敌舰！</p>
+      <p>💎 彩色矿石 = 分数 | 🟡 黄色矿石 = 燃料</p>
+      <button id="start-btn">开始游戏</button>
+    </div>
+    <div id="game-over">
+      <h2>游戏结束</h2>
+      <p>最终得分：<span id="final-score">0</span></p>
+      <button id="restart-btn">重新开始</button>
+    </div>
+  </div>
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>

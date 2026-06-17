@@ -1,0 +1,14 @@
+{
+  "name": "space-miner",
+  "version": "1.0.0",
+  "description": "星际矿工 - 太空采矿小游戏",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.0",
+    "vite": "^5.0.0"
+  }
+}
