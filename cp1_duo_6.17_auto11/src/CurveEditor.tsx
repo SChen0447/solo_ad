@@ -235,6 +235,18 @@ const CurveEditor: React.FC<CurveEditorProps> = ({ curve, onChange }) => {
     onChange(newCurve);
   };
 
+  const handleStepChange = (key: keyof BezierCurve, delta: number) => {
+    const newCurve = { ...curve };
+    let newValue = newCurve[key] + delta;
+    if (key === 'p1x' || key === 'p2x') {
+      newValue = Math.max(0, Math.min(1, newValue));
+    } else {
+      newValue = Math.max(-0.5, Math.min(1.5, newValue));
+    }
+    newCurve[key] = Math.round(newValue * 1000) / 1000;
+    onChange(newCurve);
+  };
+
   return (
     <div style={styles.container}>
       <h3 style={styles.title}>曲线编辑</h3>
@@ -251,54 +263,40 @@ const CurveEditor: React.FC<CurveEditorProps> = ({ curve, onChange }) => {
         />
       </div>
       <div style={styles.paramsGrid}>
-        <div style={styles.paramItem}>
-          <label style={styles.paramLabel}>P1.x</label>
-          <input
-            type="number"
-            step="0.001"
-            min="0"
-            max="1"
-            value={curve.p1x.toFixed(3)}
-            onChange={(e) => handleInputChange('p1x', e.target.value)}
-            style={styles.paramInput}
-          />
-        </div>
-        <div style={styles.paramItem}>
-          <label style={styles.paramLabel}>P1.y</label>
-          <input
-            type="number"
-            step="0.001"
-            min="-0.5"
-            max="1.5"
-            value={curve.p1y.toFixed(3)}
-            onChange={(e) => handleInputChange('p1y', e.target.value)}
-            style={styles.paramInput}
-          />
-        </div>
-        <div style={styles.paramItem}>
-          <label style={styles.paramLabel}>P2.x</label>
-          <input
-            type="number"
-            step="0.001"
-            min="0"
-            max="1"
-            value={curve.p2x.toFixed(3)}
-            onChange={(e) => handleInputChange('p2x', e.target.value)}
-            style={styles.paramInput}
-          />
-        </div>
-        <div style={styles.paramItem}>
-          <label style={styles.paramLabel}>P2.y</label>
-          <input
-            type="number"
-            step="0.001"
-            min="-0.5"
-            max="1.5"
-            value={curve.p2y.toFixed(3)}
-            onChange={(e) => handleInputChange('p2y', e.target.value)}
-            style={styles.paramInput}
-          />
-        </div>
+        {(['p1x', 'p1y', 'p2x', 'p2y'] as const).map((key) => (
+          <div key={key} style={styles.paramItem}>
+            <label style={styles.paramLabel}>
+              {key === 'p1x' ? 'P1.x' : key === 'p1y' ? 'P1.y' : key === 'p2x' ? 'P2.x' : 'P2.y'}
+            </label>
+            <div style={styles.inputWrapper}>
+              <input
+                type="number"
+                step="0.001"
+                min={key === 'p1x' || key === 'p2x' ? 0 : -0.5}
+                max={key === 'p1x' || key === 'p2x' ? 1 : 1.5}
+                value={curve[key].toFixed(3)}
+                onChange={(e) => handleInputChange(key, e.target.value)}
+                style={styles.paramInput}
+              />
+              <div style={styles.stepButtons}>
+                <button
+                  type="button"
+                  style={styles.stepButton}
+                  onClick={() => handleStepChange(key, 0.01)}
+                >
+                  +
+                </button>
+                <button
+                  type="button"
+                  style={styles.stepButton}
+                  onClick={() => handleStepChange(key, -0.01)}
+                >
+                  −
+                </button>
+              </div>
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   );
@@ -344,6 +342,11 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: '12px',
     color: '#a0a0c0'
   },
+  inputWrapper: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '4px'
+  },
   paramInput: {
     backgroundColor: '#0f0f23',
     border: '1px solid #2a2a4e',
@@ -352,7 +355,31 @@ const styles: Record<string, React.CSSProperties> = {
     color: '#e0e0e0',
     fontSize: '14px',
     fontFamily: 'monospace',
-    outline: 'none'
+    outline: 'none',
+    flex: 1,
+    minWidth: 0
+  },
+  stepButtons: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '2px'
+  },
+  stepButton: {
+    width: '22px',
+    height: '18px',
+    backgroundColor: '#2a2a4e',
+    border: '1px solid #3a3a5e',
+    borderRadius: '3px',
+    color: '#a0a0c0',
+    fontSize: '11px',
+    fontWeight: 600,
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 0,
+    lineHeight: 1,
+    transition: 'all 0.15s ease'
   }
 };
 

@@ -4,8 +4,10 @@ import { BezierCurve, AnimationType } from './types';
 interface AnimationPreviewProps {
   curve: BezierCurve;
   animationType: AnimationType;
+  speed: number;
   onAnimationEnd?: () => void;
   autoPlay?: boolean;
+  onSpeedChange?: (speed: number) => void;
 }
 
 const PREVIEW_SIZE = 400;
@@ -36,13 +38,18 @@ const cubicBezier = (t: number, p1x: number, p1y: number, p2x: number, p2y: numb
   return sampleCurveY(x);
 };
 
-const AnimationPreview: React.FC<AnimationPreviewProps> = ({ curve, animationType, onAnimationEnd, autoPlay }) => {
+const AnimationPreview: React.FC<AnimationPreviewProps> = ({ curve, animationType, speed, onAnimationEnd, autoPlay, onSpeedChange }) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [progress, setProgress] = useState(0);
   const animationRef = useRef<number>();
   const startTimeRef = useRef<number>();
   const pausedProgressRef = useRef(0);
   const hasAutoPlayedRef = useRef(false);
+  const speedRef = useRef(speed);
+
+  useEffect(() => {
+    speedRef.current = speed;
+  }, [speed]);
 
   const getElementStyle = useCallback((progress: number): React.CSSProperties => {
     const easedProgress = cubicBezier(progress, curve.p1x, curve.p1y, curve.p2x, curve.p2y);
@@ -70,12 +77,15 @@ const AnimationPreview: React.FC<AnimationPreviewProps> = ({ curve, animationTyp
   }, [curve, animationType]);
 
   const animate = useCallback((timestamp: number) => {
+    const currentSpeed = speedRef.current;
+    const scaledDuration = ANIMATION_DURATION / currentSpeed;
+
     if (!startTimeRef.current) {
-      startTimeRef.current = timestamp - pausedProgressRef.current * ANIMATION_DURATION;
+      startTimeRef.current = timestamp - pausedProgressRef.current * scaledDuration;
     }
 
     const elapsed = timestamp - startTimeRef.current;
-    const currentProgress = Math.min(elapsed / ANIMATION_DURATION, 1);
+    const currentProgress = Math.min(elapsed / scaledDuration, 1);
 
     setProgress(currentProgress);
 
@@ -153,6 +163,23 @@ const AnimationPreview: React.FC<AnimationPreviewProps> = ({ curve, animationTyp
         </div>
         <span style={styles.progressText}>{(progress * 100).toFixed(0)}%</span>
       </div>
+
+      <div style={styles.speedControl}>
+        <label style={styles.speedLabel}>播放速度</label>
+        <div style={styles.speedSliderWrapper}>
+          <input
+            type="range"
+            min="0.5"
+            max="3"
+            step="0.1"
+            value={speed}
+            onChange={(e) => onSpeedChange?.(parseFloat(e.target.value))}
+            style={styles.speedSlider}
+          />
+          <span style={styles.speedValue}>{speed.toFixed(1)}x</span>
+        </div>
+      </div>
+
       <div style={styles.controls}>
         <button style={styles.playButton} onClick={handlePlayPause}>
           {isPlaying ? '暂停' : '播放'}
@@ -222,6 +249,39 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: '12px',
     color: '#a0a0c0',
     minWidth: '40px',
+    textAlign: 'right',
+    fontFamily: 'monospace'
+  },
+  speedControl: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '6px',
+    width: PREVIEW_SIZE
+  },
+  speedLabel: {
+    fontSize: '12px',
+    color: '#a0a0c0'
+  },
+  speedSliderWrapper: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '12px'
+  },
+  speedSlider: {
+    flex: 1,
+    height: '6px',
+    appearance: 'none',
+    WebkitAppearance: 'none',
+    backgroundColor: '#2a2a4e',
+    borderRadius: '3px',
+    outline: 'none',
+    cursor: 'pointer'
+  },
+  speedValue: {
+    fontSize: '13px',
+    color: '#667eea',
+    fontWeight: 600,
+    minWidth: '42px',
     textAlign: 'right',
     fontFamily: 'monospace'
   },

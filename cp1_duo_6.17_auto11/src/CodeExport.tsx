@@ -4,6 +4,7 @@ import { BezierCurve, AnimationType } from './types';
 interface CodeExportProps {
   curve: BezierCurve;
   animationType: AnimationType;
+  speed: number;
 }
 
 const ANIMATION_PROPERTIES: Record<AnimationType, string> = {
@@ -13,12 +14,12 @@ const ANIMATION_PROPERTIES: Record<AnimationType, string> = {
   opacity: 'opacity'
 };
 
-const CodeExport: React.FC<CodeExportProps> = ({ curve, animationType }) => {
+const CodeExport: React.FC<CodeExportProps> = ({ curve, animationType, speed }) => {
   const [copied, setCopied] = useState(false);
 
   const property = ANIMATION_PROPERTIES[animationType];
   const bezierValue = `cubic-bezier(${curve.p1x.toFixed(3)}, ${curve.p1y.toFixed(3)}, ${curve.p2x.toFixed(3)}, ${curve.p2y.toFixed(3)})`;
-  const cssCode = `transition: ${property} 2s ${bezierValue};`;
+  const cssCode = `/* 预览速度: ${speed.toFixed(1)}x, 基础时长: 2s, 实际时长: ${(2 / speed).toFixed(2)}s */\ntransition: ${property} 2s ${bezierValue};`;
 
   const handleCopy = async () => {
     try {
@@ -52,6 +53,11 @@ const CodeExport: React.FC<CodeExportProps> = ({ curve, animationType }) => {
         <div style={styles.codeContent}>
           <pre style={styles.codePre}>
             <code style={styles.code}>
+              <div>
+                <span style={styles.comment}>
+                  {'/* 预览速度: '}{speed.toFixed(1)}x{', 基础时长: 2s, 实际时长: '}{(2 / speed).toFixed(2)}s{' */'}
+                </span>
+              </div>
               <span style={styles.property}>transition</span>
               <span style={styles.colon}>:</span>{' '}
               <span style={styles.value}>{property}</span>{' '}
@@ -169,6 +175,9 @@ const styles: Record<string, React.CSSProperties> = {
   },
   property: {
     color: '#ff79c6'
+  },
+  comment: {
+    color: '#6272a4'
   },
   colon: {
     color: '#e0e0e0'

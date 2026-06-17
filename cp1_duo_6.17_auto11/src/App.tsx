@@ -10,6 +10,7 @@ const App: React.FC = () => {
   const [selectedPreset, setSelectedPreset] = useState<string>('ease');
   const [isMobile, setIsMobile] = useState(false);
   const [autoPlay, setAutoPlay] = useState(false);
+  const [speed, setSpeed] = useState<number>(1);
 
   useEffect(() => {
     const checkMobile = () => {
@@ -121,6 +122,8 @@ const App: React.FC = () => {
           <AnimationPreview
             curve={curve}
             animationType={animationType}
+            speed={speed}
+            onSpeedChange={setSpeed}
             autoPlay={autoPlay}
           />
         </div>
@@ -132,7 +135,7 @@ const App: React.FC = () => {
           ...styles.rightPanel,
           ...(isMobile ? styles.panelMobile : {})
         }}>
-          <CodeExport curve={curve} animationType={animationType} />
+          <CodeExport curve={curve} animationType={animationType} speed={speed} />
         </div>
       </div>
 
