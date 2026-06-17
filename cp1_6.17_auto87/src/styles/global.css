@@ -1,0 +1,86 @@
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes flashRed {
+  0%, 100% {
+    background-color: #fff1f0;
+  }
+  25%, 75% {
+    background-color: #ffccc7;
+  }
+  50% {
+    background-color: #ffa39e;
+  }
+}
+
+@keyframes ripple {
+  0% {
+    transform: scale(0);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(4);
+    opacity: 0;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  background-color: #f0f2f5;
+}
+
+.ant-btn {
+  position: relative;
+  overflow: hidden;
+}
+
+.ant-btn::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0;
+  height: 0;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.4);
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+.ant-btn:active::after {
+  animation: ripple 0.4s ease-out;
+  width: 60px;
+  height: 60px;
+}
+
+.ant-card {
+  border-radius: 8px;
+}
+
+.ant-menu-horizontal {
+  border-bottom: none !important;
+}
+
+.ant-menu-item-selected {
+  background-color: #e6f7ff !important;
+}
+
+pre {
+  margin: 0;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
