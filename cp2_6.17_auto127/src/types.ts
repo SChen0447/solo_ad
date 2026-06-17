@@ -11,12 +11,21 @@ export interface Selection {
   focusPath: number[];
 }
 
+export interface SerializedSelection {
+  anchorPath: number[];
+  anchorOffset: number;
+  focusPath: number[];
+  focusOffset: number;
+  isCollapsed: boolean;
+}
+
 export interface UserCursor {
   userId: string;
   nickname: string;
   color: string;
   selection: Selection | null;
   position: { top: number; left: number } | null;
+  serializedSelection?: SerializedSelection | null;
 }
 
 export interface Comment {
@@ -28,6 +37,10 @@ export interface Comment {
   startOffset: number;
   endOffset: number;
   text: string;
+  anchorXPath: string;
+  focusXPath: string;
+  anchorNodeOffset: number;
+  focusNodeOffset: number;
   createdAt: number;
 }
 

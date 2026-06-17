@@ -15,6 +15,14 @@ interface EditorProps {
   onLeave: () => void;
 }
 
+interface SerializedSelection {
+  anchorPath: number[];
+  anchorOffset: number;
+  focusPath: number[];
+  focusOffset: number;
+  isCollapsed: boolean;
+}
+
 const Editor: React.FC<EditorProps> = ({
   roomCode,
   user,
@@ -51,6 +59,7 @@ const Editor: React.FC<EditorProps> = ({
   const [selectedRange, setSelectedRange] = useState<Range | null>(null);
   const [activeCommentId, setActiveCommentId] = useState<string | null>(null);
   const [isUpdatingFromRemote, setIsUpdatingFromRemote] = useState(false);
+  const [highlightedCommentId, setHighlightedCommentId] = useState<string | null>(null);
   const cursorUpdateThrottleRef = useRef<number | null>(null);
 
   const getNodePath = useCallback((node: Node): number[] => {
@@ -58,11 +67,9 @@ const Editor: React.FC<EditorProps> = ({
     let current: Node | null = node;
     while (current && current.parentElement && current.parentElement !== editorRef.current) {
       const parent = current.parentElement;
-      if (parent) {
-        const index = Array.from(parent.childNodes).indexOf(current as ChildNode);
-        path.unshift(index);
-      }
-      current = current.parentElement;
+      const index = Array.from(parent.childNodes).indexOf(current as ChildNode);
+      path.unshift(index);
+      current = parent;
     }
     return path;
   }, []);
@@ -71,26 +78,82 @@ const Editor: React.FC<EditorProps> = ({
     if (!editorRef.current) return null;
     let current: Node = editorRef.current;
     for (const index of path) {
-      if (current.childNodes[index]) {
-        current = current.childNodes[index];
-      } else {
-        return null;
-      }
+      if (!current.childNodes || index >= current.childNodes.length) return null;
+      current = current.childNodes[index];
     }
     return current;
   }, []);
 
-  const getSelectionInfo = useCallback((): { selection: Selection | null; position: { top: number; left: number } | null } => {
+  const serializeSelection = useCallback((): SerializedSelection | null => {
+    const sel = window.getSelection();
+    if (!sel || sel.rangeCount === 0 || !editorRef.current) return null;
+
+    const range = sel.getRangeAt(0);
+    if (!editorRef.current.contains(range.startContainer)) return null;
+
+    return {
+      anchorPath: getNodePath(sel.anchorNode!),
+      anchorOffset: sel.anchorOffset,
+      focusPath: getNodePath(sel.focusNode!),
+      focusOffset: sel.focusOffset,
+      isCollapsed: sel.isCollapsed
+    };
+  }, [getNodePath]);
+
+  const deserializeSelection = useCallback((serialized: SerializedSelection): Range | null => {
+    if (!editorRef.current) return null;
+
+    const anchorNode = getNodeFromPath(serialized.anchorPath);
+    const focusNode = getNodeFromPath(serialized.focusPath);
+
+    if (!anchorNode || !focusNode) return null;
+
+    try {
+      const range = document.createRange();
+      const maxAnchorOffset = anchorNode.nodeType === Node.TEXT_NODE
+        ? (anchorNode.textContent?.length ?? 0)
+        : anchorNode.childNodes.length;
+      const maxFocusOffset = focusNode.nodeType === Node.TEXT_NODE
+        ? (focusNode.textContent?.length ?? 0)
+        : focusNode.childNodes.length;
+
+      const anchorOffset = Math.min(serialized.anchorOffset, maxAnchorOffset);
+      const focusOffset = Math.min(serialized.focusOffset, maxFocusOffset);
+
+      range.setStart(anchorNode, anchorOffset);
+      range.setEnd(focusNode, focusOffset);
+      return range;
+    } catch {
+      return null;
+    }
+  }, [getNodeFromPath]);
+
+  const getRectsForSelection = useCallback((serialized: SerializedSelection): DOMRectList | null => {
+    const range = deserializeSelection(serialized);
+    if (!range) return null;
+    try {
+      return range.getClientRects();
+    } catch {
+      return null;
+    }
+  }, [deserializeSelection]);
+
+  const getSelectionInfo = useCallback((): {
+    selection: Selection | null;
+    position: { top: number; left: number } | null;
+    serializedSelection: SerializedSelection | null;
+  } => {
     const sel = window.getSelection();
     if (!sel || sel.rangeCount === 0 || !editorRef.current) {
-      return { selection: null, position: null };
+      return { selection: null, position: null, serializedSelection: null };
     }
 
     const range = sel.getRangeAt(0);
     if (!editorRef.current.contains(range.startContainer)) {
-      return { selection: null, position: null };
+      return { selection: null, position: null, serializedSelection: null };
     }
 
+    const serialized = serializeSelection();
     const selection: Selection = {
       anchorOffset: sel.anchorOffset,
       focusOffset: sel.focusOffset,
@@ -105,24 +168,25 @@ const Editor: React.FC<EditorProps> = ({
       left: rect.left - editorRect.left
     };
 
-    return { selection, position };
-  }, [getNodePath]);
+    return { selection, position, serializedSelection: serialized };
+  }, [getNodePath, serializeSelection]);
 
   const sendCursorPosition = useCallback(() => {
     if (cursorUpdateThrottleRef.current) {
       clearTimeout(cursorUpdateThrottleRef.current);
     }
-    
+
     cursorUpdateThrottleRef.current = window.setTimeout(() => {
-      const { selection, position } = getSelectionInfo();
+      const { selection, position, serializedSelection } = getSelectionInfo();
       if (selection || position) {
         sendCursorUpdate({
           userId: user.id,
           nickname: user.nickname,
           color: user.color,
           selection,
-          position
-        });
+          position,
+          serializedSelection
+        } as UserCursor & { serializedSelection: SerializedSelection | null });
       }
     }, 50);
   }, [getSelectionInfo, sendCursorUpdate, user]);
@@ -163,14 +227,13 @@ const Editor: React.FC<EditorProps> = ({
 
   const handleSelectionChange = useCallback(() => {
     sendCursorPosition();
-    
+
     const sel = window.getSelection();
     if (sel && sel.rangeCount > 0 && !sel.isCollapsed) {
       const range = sel.getRangeAt(0);
       if (editorRef.current && editorRef.current.contains(range.startContainer)) {
         const text = range.toString().trim();
         if (text.length > 0) {
-          const rect = range.getBoundingClientRect();
           setSelectedTextForComment(text);
           setSelectedRange(range.cloneRange());
         }
@@ -191,41 +254,56 @@ const Editor: React.FC<EditorProps> = ({
     }
   }, []);
 
-  const handleAddComment = useCallback((commentContent: string) => {
-    if (!selectedRange || !selectedTextForComment) return;
-
-    const range = selectedRange;
+  const getTextOffsetInEditor = useCallback((node: Node, offset: number): number => {
+    if (!editorRef.current) return 0;
     const preRange = document.createRange();
-    preRange.selectNodeContents(editorRef.current!);
-    preRange.setEnd(range.startContainer, range.startOffset);
-    const startOffset = preRange.toString().length;
-    const endOffset = startOffset + selectedTextForComment.length;
+    preRange.selectNodeContents(editorRef.current);
+    try {
+      preRange.setEnd(node, offset);
+    } catch {
+      return 0;
+    }
+    return preRange.toString().length;
+  }, []);
+
+  const handleAddComment = useCallback((commentContent: string) => {
+    if (!selectedRange || !selectedTextForComment || !editorRef.current) return;
+
+    const startOffset = getTextOffsetInEditor(selectedRange.startContainer, selectedRange.startOffset);
+    const endOffset = getTextOffsetInEditor(selectedRange.endContainer, selectedRange.endOffset);
+    const anchorXPath = getNodePath(selectedRange.startContainer).join('/');
+    const focusXPath = getNodePath(selectedRange.endContainer).join('/');
 
     sendCommentAdd({
       content: commentContent,
       startOffset,
       endOffset,
-      text: selectedTextForComment
+      text: selectedTextForComment,
+      anchorXPath,
+      focusXPath,
+      anchorNodeOffset: selectedRange.startOffset,
+      focusNodeOffset: selectedRange.endOffset
     });
 
     setIsCommentModalOpen(false);
     setSelectedRange(null);
     setSelectedTextForComment('');
     window.getSelection()?.removeAllRanges();
-  }, [selectedRange, selectedTextForComment, sendCommentAdd]);
+  }, [selectedRange, selectedTextForComment, sendCommentAdd, getTextOffsetInEditor, getNodePath]);
 
   const handleExport = useCallback((format: 'html' | 'txt') => {
+    const currentContent = editorRef.current?.innerHTML || content;
     let exportContent: string;
     let filename: string;
     let mimeType: string;
 
     if (format === 'html') {
-      exportContent = `<!DOCTYPE html>\n<html>\n<head>\n<meta charset="UTF-8">\n<title>${roomCode} - 故事</title>\n</head>\n<body>\n${content}\n</body>\n</html>`;
+      exportContent = `<!DOCTYPE html>\n<html>\n<head>\n<meta charset="UTF-8">\n<title>${roomCode} - 故事</title>\n<style>body{font-family:Inter,sans-serif;max-width:800px;margin:40px auto;padding:0 20px;line-height:1.8;color:#1f2937}h1{font-size:2em}h2{font-size:1.5em}h3{font-size:1.25em}p{margin-bottom:0.5em}</style>\n</head>\n<body>\n${currentContent}\n</body>\n</html>`;
       filename = `story_${roomCode}.html`;
       mimeType = 'text/html';
     } else {
       const tempDiv = document.createElement('div');
-      tempDiv.innerHTML = content;
+      tempDiv.innerHTML = currentContent;
       exportContent = tempDiv.textContent || tempDiv.innerText || '';
       filename = `story_${roomCode}.txt`;
       mimeType = 'text/plain';
@@ -247,6 +325,70 @@ const Editor: React.FC<EditorProps> = ({
     onLeave();
   }, [disconnect, onLeave]);
 
+  const highlightCommentText = useCallback((commentId: string | null) => {
+    if (!editorRef.current) return;
+
+    const existingHighlights = editorRef.current.querySelectorAll('.comment-highlight');
+    existingHighlights.forEach(el => {
+      const parent = el.parentNode;
+      while (el.firstChild) {
+        parent?.insertBefore(el.firstChild, el);
+      }
+      parent?.removeChild(el);
+    });
+
+    setHighlightedCommentId(commentId);
+
+    if (!commentId) return;
+
+    const comment = comments.find(c => c.id === commentId);
+    if (!comment) return;
+
+    try {
+      const walker = document.createTreeWalker(
+        editorRef.current,
+        NodeFilter.SHOW_TEXT,
+        null
+      );
+
+      let currentOffset = 0;
+      const textNodes: { node: Text; start: number; end: number }[] = [];
+
+      while (walker.nextNode()) {
+        const node = walker.currentNode as Text;
+        const length = node.textContent?.length ?? 0;
+        textNodes.push({ node, start: currentOffset, end: currentOffset + length });
+        currentOffset += length;
+      }
+
+      const startOffset = comment.startOffset;
+      const endOffset = comment.endOffset;
+
+      for (const { node, start, end } of textNodes) {
+        if (end <= startOffset || start >= endOffset) continue;
+
+        const relStart = Math.max(startOffset - start, 0);
+        const relEnd = Math.min(endOffset - start, node.textContent?.length ?? 0);
+
+        if (relStart >= relEnd) continue;
+
+        try {
+          const range = document.createRange();
+          range.setStart(node, relStart);
+          range.setEnd(node, relEnd);
+
+          const span = document.createElement('span');
+          span.className = 'comment-highlight active';
+          range.surroundContents(span);
+        } catch {
+          // cross-element wraps are not supported with surroundContents
+        }
+      }
+    } catch {
+      // ignore
+    }
+  }, [comments]);
+
   useEffect(() => {
     connect(roomCode, user);
 
@@ -258,29 +400,33 @@ const Editor: React.FC<EditorProps> = ({
   useEffect(() => {
     const cleanupContentUpdate = onContentUpdate((newContent, userId) => {
       if (userId === user.id) return;
-      
+
       setIsUpdatingFromRemote(true);
       setContent(newContent);
-      
+
       if (editorRef.current) {
         const sel = window.getSelection();
-        let savedRange: Range | null = null;
-        
+        let savedSerializedSelection: SerializedSelection | null = null;
+
         if (sel && sel.rangeCount > 0 && editorRef.current.contains(sel.anchorNode!)) {
-          savedRange = sel.getRangeAt(0).cloneRange();
+          savedSerializedSelection = serializeSelection();
         }
-        
+
         editorRef.current.innerHTML = newContent;
-        
-        if (savedRange) {
-          try {
-            sel?.removeAllRanges();
-            sel?.addRange(savedRange);
-          } catch (e) {
+
+        if (savedSerializedSelection) {
+          const restoredRange = deserializeSelection(savedSerializedSelection);
+          if (restoredRange) {
+            try {
+              sel?.removeAllRanges();
+              sel?.addRange(restoredRange);
+            } catch {
+              // selection restore failed, ignore
+            }
           }
         }
       }
-      
+
       setTimeout(() => setIsUpdatingFromRemote(false), 0);
     });
 
@@ -308,7 +454,7 @@ const Editor: React.FC<EditorProps> = ({
       } else {
         setUsers([...newUsers, user]);
       }
-      
+
       setOtherCursors(prev => {
         const next = new Map(prev);
         next.forEach((_, userId) => {
@@ -346,7 +492,7 @@ const Editor: React.FC<EditorProps> = ({
       cleanupUsersUpdate();
       cleanupInit();
     };
-  }, [onContentUpdate, onCursorUpdate, onCommentAdd, onCommentDelete, onUsersUpdate, onInit, user]);
+  }, [onContentUpdate, onCursorUpdate, onCommentAdd, onCommentDelete, onUsersUpdate, onInit, user, serializeSelection, deserializeSelection]);
 
   useEffect(() => {
     document.addEventListener('selectionchange', handleSelectionChange);
@@ -357,40 +503,117 @@ const Editor: React.FC<EditorProps> = ({
 
   const renderOtherCursors = () => {
     return Array.from(otherCursors.values()).map((cursor) => {
-      if (!cursor.position) return null;
-      
-      const isCollapsed = cursor.selection && 
-        cursor.selection.anchorOffset === cursor.selection.focusOffset &&
-        JSON.stringify(cursor.selection.anchorPath) === JSON.stringify(cursor.selection.focusPath);
+      if (!cursor.selection) return null;
 
-      return (
-        <React.Fragment key={cursor.userId}>
-          {isCollapsed && (
+      const serializedSel: SerializedSelection | null =
+        (cursor as UserCursor & { serializedSelection?: SerializedSelection | null }).serializedSelection ?? null;
+
+      if (serializedSel) {
+        const rects = getRectsForSelection(serializedSel);
+        if (!rects || rects.length === 0) return null;
+
+        const editorRect = editorRef.current?.getBoundingClientRect();
+        if (!editorRect) return null;
+
+        if (serializedSel.isCollapsed) {
+          const rect = rects[0];
+          return (
             <div
+              key={cursor.userId}
               className="other-cursor"
               style={{
                 backgroundColor: cursor.color,
-                top: cursor.position.top,
-                left: cursor.position.left,
-                height: '20px'
+                top: rect.top - editorRect.top,
+                left: rect.left - editorRect.left,
+                height: rect.height || 20
               }}
               data-name={cursor.nickname}
             />
-          )}
-          
-          {!isCollapsed && cursor.position && (
+          );
+        } else {
+          const elements: React.ReactNode[] = [];
+          for (let i = 0; i < rects.length; i++) {
+            const rect = rects[i];
+            if (rect.width < 1 && rect.height < 1) continue;
+            elements.push(
+              <div
+                key={`${cursor.userId}-sel-${i}`}
+                className="other-selection"
+                style={{
+                  backgroundColor: cursor.color,
+                  top: rect.top - editorRect.top,
+                  left: rect.left - editorRect.left,
+                  width: rect.width,
+                  height: rect.height
+                }}
+              />
+            );
+          }
+
+          const lastRect = rects[rects.length - 1];
+          elements.push(
             <div
-              className="other-selection"
+              key={`${cursor.userId}-cursor`}
+              className="other-cursor"
               style={{
                 backgroundColor: cursor.color,
-                top: cursor.position.top,
-                left: cursor.position.left,
-                width: '100px',
-                height: '20px',
-                opacity: 0.3
+                top: lastRect.top - editorRect.top,
+                left: lastRect.right - editorRect.left,
+                height: lastRect.height || 20
               }}
+              data-name={cursor.nickname}
             />
-          )}
+          );
+
+          return <React.Fragment key={cursor.userId}>{elements}</React.Fragment>;
+        }
+      }
+
+      if (!cursor.position) return null;
+
+      const isCollapsed = cursor.selection &&
+        cursor.selection.anchorOffset === cursor.selection.focusOffset &&
+        JSON.stringify(cursor.selection.anchorPath) === JSON.stringify(cursor.selection.focusPath);
+
+      if (isCollapsed) {
+        return (
+          <div
+            key={cursor.userId}
+            className="other-cursor"
+            style={{
+              backgroundColor: cursor.color,
+              top: cursor.position.top,
+              left: cursor.position.left,
+              height: 20
+            }}
+            data-name={cursor.nickname}
+          />
+        );
+      }
+
+      return (
+        <React.Fragment key={cursor.userId}>
+          <div
+            className="other-selection"
+            style={{
+              backgroundColor: cursor.color,
+              top: cursor.position.top,
+              left: cursor.position.left,
+              width: 100,
+              height: 20,
+              opacity: 0.3
+            }}
+          />
+          <div
+            className="other-cursor"
+            style={{
+              backgroundColor: cursor.color,
+              top: cursor.position.top,
+              left: cursor.position.left + 100,
+              height: 20
+            }}
+            data-name={cursor.nickname}
+          />
         </React.Fragment>
       );
     });
@@ -427,6 +650,15 @@ const Editor: React.FC<EditorProps> = ({
       document.removeEventListener('keyup', updateFloatingButton);
     };
   }, []);
+
+  useEffect(() => {
+    if (highlightedCommentId) {
+      highlightCommentText(highlightedCommentId);
+    }
+    return () => {
+      highlightCommentText(null);
+    };
+  }, [highlightedCommentId, highlightCommentText]);
 
   const isTablet = typeof window !== 'undefined' && window.innerWidth < 1024;
 
@@ -517,7 +749,8 @@ const Editor: React.FC<EditorProps> = ({
               fontSize: '13px',
               fontWeight: 500,
               boxShadow: '0 4px 12px rgba(99, 102, 241, 0.4)',
-              zIndex: 1000
+              zIndex: 1000,
+              transition: 'transform 0.15s'
             }}
             onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.05)'}
             onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
@@ -537,7 +770,10 @@ const Editor: React.FC<EditorProps> = ({
             onDelete={sendCommentDelete}
             currentUserId={user.id}
             activeCommentId={activeCommentId}
-            onHoverComment={setActiveCommentId}
+            onHoverComment={(id) => {
+              setActiveCommentId(id);
+              highlightCommentText(id);
+            }}
           />
         </div>
       )}
@@ -548,7 +784,10 @@ const Editor: React.FC<EditorProps> = ({
           onDelete={sendCommentDelete}
           currentUserId={user.id}
           activeCommentId={activeCommentId}
-          onHoverComment={setActiveCommentId}
+          onHoverComment={(id) => {
+            setActiveCommentId(id);
+            highlightCommentText(id);
+          }}
         />
       )}
 

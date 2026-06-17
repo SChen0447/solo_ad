@@ -23,12 +23,21 @@ interface Selection {
   focusPath: number[];
 }
 
+interface SerializedSelection {
+  anchorPath: number[];
+  anchorOffset: number;
+  focusPath: number[];
+  focusOffset: number;
+  isCollapsed: boolean;
+}
+
 interface UserCursor {
   userId: string;
   nickname: string;
   color: string;
   selection: Selection | null;
   position: { top: number; left: number } | null;
+  serializedSelection?: SerializedSelection | null;
 }
 
 interface Comment {
@@ -40,6 +49,10 @@ interface Comment {
   startOffset: number;
   endOffset: number;
   text: string;
+  anchorXPath: string;
+  focusXPath: string;
+  anchorNodeOffset: number;
+  focusNodeOffset: number;
   createdAt: number;
 }
 
@@ -236,6 +249,7 @@ wss.on('connection', (ws) => {
           if (cursor) {
             cursor.selection = message.selection;
             cursor.position = message.position;
+            cursor.serialifiedSelection = message.serializedSelection;
             
             broadcastToRoom(room, {
               type: 'cursor-update',
@@ -244,7 +258,8 @@ wss.on('connection', (ws) => {
                 nickname: cursor.nickname,
                 color: cursor.color,
                 selection: cursor.selection,
-                position: cursor.position
+                position: cursor.position,
+                serializedSelection: cursor.serialifiedSelection
               }
             }, currentUser.id);
           }
@@ -263,9 +278,13 @@ wss.on('connection', (ws) => {
             nickname: currentUser.nickname,
             color: currentUser.color,
             content: message.content.substring(0, 200),
-            startOffset: message.startOffset,
-            endOffset: message.endOffset,
-            text: message.text,
+            startOffset: message.startOffset || 0,
+            endOffset: message.endOffset || 0,
+            text: message.text || '',
+            anchorXPath: message.anchorXPath || '',
+            focusXPath: message.focusXPath || '',
+            anchorNodeOffset: message.anchorNodeOffset || 0,
+            focusNodeOffset: message.focusNodeOffset || 0,
             createdAt: Date.now()
           };
           
@@ -356,7 +375,7 @@ wss.on('connection', (ws) => {
   });
 });
 
-const PORT = process.env.PORT || 3002;
+const PORT = process.env.PORT || 3100;
 server.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });

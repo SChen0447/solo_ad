@@ -1,12 +1,18 @@
 import React, { createContext, useContext, useRef, useCallback, useEffect, useState } from 'react';
-import { User, UserCursor, Comment, WebSocketMessage } from '../types';
+import { User, UserCursor, Comment, WebSocketMessage, SerializedSelection } from '../types';
+
+interface PendingContentUpdate {
+  content: string;
+  userId: string;
+  receivedAt: number;
+}
 
 interface WebSocketContextType {
   isConnected: boolean;
   connect: (roomCode: string, user: User) => void;
   disconnect: () => void;
   sendContentUpdate: (content: string) => void;
-  sendCursorUpdate: (cursor: UserCursor) => void;
+  sendCursorUpdate: (cursor: UserCursor & { serializedSelection?: SerializedSelection | null }) => void;
   sendCommentAdd: (comment: Omit<Comment, 'id' | 'userId' | 'nickname' | 'color' | 'createdAt'>) => void;
   sendCommentDelete: (commentId: string) => void;
   onContentUpdate: (handler: (content: string, userId: string) => void) => () => void;
@@ -39,6 +45,36 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const commentDeleteHandlersRef = useRef<Set<(commentId: string) => void>>(new Set());
   const usersUpdateHandlersRef = useRef<Set<(users: User[]) => void>>(new Set());
   const initHandlersRef = useRef<Set<(data: { content: string; comments: Comment[]; users: User[]; cursors: UserCursor[] }) => void>>(new Set());
+
+  const pendingContentUpdatesRef = useRef<Map<string, PendingContentUpdate>>(new Map());
+  const contentFlushTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const CONTENT_MERGE_WINDOW = 50;
+
+  const flushContentUpdates = useCallback(() => {
+    const pending = pendingContentUpdatesRef.current;
+    if (pending.size === 0) return;
+
+    pending.forEach((update, userId) => {
+      contentUpdateHandlersRef.current.forEach(handler => 
+        handler(update.content, userId)
+      );
+    });
+
+    pending.clear();
+    contentFlushTimerRef.current = null;
+  }, []);
+
+  const queueContentUpdate = useCallback((content: string, userId: string) => {
+    pendingContentUpdatesRef.current.set(userId, {
+      content,
+      userId,
+      receivedAt: Date.now()
+    });
+
+    if (!contentFlushTimerRef.current) {
+      contentFlushTimerRef.current = setTimeout(flushContentUpdates, CONTENT_MERGE_WINDOW);
+    }
+  }, [flushContentUpdates]);
 
   const connect = useCallback((roomCode: string, user: User) => {
     if (wsRef.current) {
@@ -77,9 +113,7 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
             );
             break;
           case 'content-update':
-            contentUpdateHandlersRef.current.forEach(handler => 
-              handler(message.content, message.userId)
-            );
+            queueContentUpdate(message.content, message.userId);
             break;
           case 'cursor-update':
             cursorUpdateHandlersRef.current.forEach(handler => handler(message.cursor));
@@ -107,7 +141,7 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       console.error('WebSocket error:', error);
       setIsConnected(false);
     };
-  }, []);
+  }, [queueContentUpdate]);
 
   const disconnect = useCallback(() => {
     if (wsRef.current) {
@@ -155,13 +189,14 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     }
   }, []);
 
-  const sendCursorUpdate = useCallback((cursor: UserCursor) => {
+  const sendCursorUpdate = useCallback((cursor: UserCursor & { serializedSelection?: SerializedSelection | null }) => {
     if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return;
     
     wsRef.current.send(JSON.stringify({
       type: 'cursor-update',
       selection: cursor.selection,
-      position: cursor.position
+      position: cursor.position,
+      serializedSelection: cursor.serializedSelection
     }));
   }, []);
 
@@ -201,6 +236,9 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   useEffect(() => {
     return () => {
       disconnect();
+      if (contentFlushTimerRef.current) {
+        clearTimeout(contentFlushTimerRef.current);
+      }
     };
   }, [disconnect]);
 

@@ -203,7 +203,7 @@ const CommentSidebar: React.FC<CommentSidebarProps> = ({
                   fontSize: '12px',
                   color: '#6b7280',
                   fontStyle: 'italic',
-                  borderLeft: '2px solid #e5e7eb'
+                  borderLeft: `2px solid ${comment.color}`
                 }}>
                   "{comment.text.length > 50 ? comment.text.substring(0, 50) + '...' : comment.text}"
                 </div>
