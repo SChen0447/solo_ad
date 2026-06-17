@@ -1,0 +1,101 @@
+{
+  "cards": [
+    {
+      "id": "mr_001",
+      "title": "实现用户登录模块 JWT 认证",
+      "description": "添加登录接口，使用 bcrypt 密码哈希 + JWT token 鉴权，token 有效期 24 小时，包含 refresh token 机制。",
+      "sourceBranch": "feature/auth-jwt",
+      "targetBranch": "main",
+      "labels": ["feature"],
+      "creator": "张伟",
+      "status": "pending",
+      "comments": [
+        {
+          "id": "cmt_001",
+          "author": "李娜",
+          "content": "@张伟 整体结构不错，建议检查一下 token 刷新逻辑中的并发问题",
+          "mentions": ["张伟"],
+          "reactions": { "👍": ["王芳"], "❤️": [], "😄": [] },
+          "createdAt": "2026-06-17T10:30:00Z"
+        }
+      ],
+      "createdAt": "2026-06-17T09:00:00Z",
+      "updatedAt": "2026-06-17T10:30:00Z"
+    },
+    {
+      "id": "mr_002",
+      "title": "修复首页商品列表分页 Bug",
+      "description": "修复第 2 页后页码显示错误，以及切换页码时滚动条未归零的问题。",
+      "sourceBranch": "fix/pagination-scroll",
+      "targetBranch": "develop",
+      "labels": ["fix"],
+      "creator": "王芳",
+      "status": "reviewing",
+      "comments": [],
+      "createdAt": "2026-06-17T11:20:00Z",
+      "updatedAt": "2026-06-17T14:00:00Z"
+    },
+    {
+      "id": "mr_003",
+      "title": "更新 API 文档 v2.3",
+      "description": "新增订单接口文档，补充错误码说明，添加请求示例。",
+      "sourceBranch": "docs/api-v2.3",
+      "targetBranch": "main",
+      "labels": ["docs"],
+      "creator": "赵强",
+      "status": "merged",
+      "comments": [
+        {
+          "id": "cmt_002",
+          "author": "李娜",
+          "content": "文档结构清晰，已合并 👍",
+          "mentions": [],
+          "reactions": { "👍": ["赵强", "张伟"], "❤️": ["王芳"], "😄": [] },
+          "createdAt": "2026-06-16T16:00:00Z"
+        }
+      ],
+      "createdAt": "2026-06-16T14:30:00Z",
+      "updatedAt": "2026-06-16T16:30:00Z"
+    },
+    {
+      "id": "mr_004",
+      "title": "重构数据库连接池模块",
+      "description": "将现有单例连接改为连接池模式，支持最大 20 连接，空闲超时 30s 自动释放。提升并发查询性能。",
+      "sourceBranch": "refactor/db-pool",
+      "targetBranch": "main",
+      "labels": ["refactor"],
+      "creator": "李明",
+      "status": "pending",
+      "comments": [],
+      "createdAt": "2026-06-18T08:15:00Z",
+      "updatedAt": "2026-06-18T08:15:00Z"
+    },
+    {
+      "id": "mr_005",
+      "title": "新增购物车批量删除功能",
+      "description": "支持勾选多个商品一次性删除，添加二次确认弹窗。API 使用 DELETE /api/cart/batch 接收 ids 数组。",
+      "sourceBranch": "feature/cart-batch-delete",
+      "targetBranch": "develop",
+      "labels": ["feature"],
+      "creator": "张伟",
+      "status": "reviewing",
+      "comments": [
+        {
+          "id": "cmt_003",
+          "author": "赵强",
+          "content": "功能没问题，以下代码建议优化一下错误处理：",
+          "mentions": [],
+          "reactions": { "👍": ["张伟"], "❤️": [], "😄": [] },
+          "codeSnippet": {
+            "id": "snip_001",
+            "language": "javascript",
+            "code": "// 原代码\nconst result = await db.query(sql);\nreturn result.rows;\n\n// 建议添加 try-catch\n// 并返回明确的错误信息给前端"
+          },
+          "createdAt": "2026-06-18T09:45:00Z"
+        }
+      ],
+      "createdAt": "2026-06-17T20:00:00Z",
+      "updatedAt": "2026-06-18T09:45:00Z"
+    }
+  ]
+}
