@@ -1,9 +1,10 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { CardData, CategoryData } from '../utils/websocket';
+import { CardData } from '../utils/websocket';
 
 interface CardProps {
   card: CardData;
-  category: CategoryData;
+  categoryColor: string;
+  categoryId: string;
   isDragging?: boolean;
   isSourceGhost?: boolean;
   onEdit?: (cardId: string, updates: Partial<Omit<CardData, 'id' | 'createdAt' | 'createdBy'>>) => void;
@@ -13,7 +14,8 @@ interface CardProps {
 
 export const Card: React.FC<CardProps> = ({
   card,
-  category,
+  categoryColor,
+  categoryId,
   isDragging = false,
   isSourceGhost = false,
   onEdit,
@@ -21,6 +23,7 @@ export const Card: React.FC<CardProps> = ({
   onDragStart,
 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
+  const [notesExpanded, setNotesExpanded] = useState(false);
   const [title, setTitle] = useState(card.title);
   const [notes, setNotes] = useState(card.notes);
   const [tagInput, setTagInput] = useState('');
@@ -93,7 +96,7 @@ export const Card: React.FC<CardProps> = ({
       ref={cardRef}
       className={`card-wrapper ${isDragging ? 'card-dragging' : ''} ${isSourceGhost ? 'card-ghost' : ''}`}
       style={{
-        backgroundColor: category.color,
+        backgroundColor: categoryColor,
         opacity: isSourceGhost ? 0.3 : 1,
         transition: isDragging ? 'none' : 'transform 0.15s ease, box-shadow 0.15s ease, opacity 0.2s ease',
       }}
@@ -200,8 +203,23 @@ export const Card: React.FC<CardProps> = ({
             <div className="card-notes-counter">{notes.length}/200</div>
           </div>
         ) : card.notes ? (
-          <div className="card-notes-preview" title={card.notes}>
-            {card.notes.length > 60 ? card.notes.substring(0, 60) + '...' : card.notes}
+          <div className="card-notes-container">
+            <div
+              className={`card-notes-preview ${notesExpanded ? 'card-notes-preview-expanded' : 'card-notes-preview-collapsed'}`}
+              title={!notesExpanded && card.notes.length > 60 ? card.notes : undefined}
+            >
+              {card.notes}
+            </div>
+            <button
+              className="card-notes-toggle"
+              onClick={(e) => {
+                e.stopPropagation();
+                setNotesExpanded((prev) => !prev);
+              }}
+              title={notesExpanded ? '收起备注' : '展开备注'}
+            >
+              {notesExpanded ? '▽' : '△'}
+            </button>
           </div>
         ) : null}
       </div>
@@ -301,9 +319,11 @@ export const Card: React.FC<CardProps> = ({
           color: #333;
           font-weight: 500;
           line-height: 1.4;
-          word-break: break-word;
           margin-bottom: 8px;
           padding-right: 50px;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
         }
 
         .card-edit-area {
@@ -388,6 +408,11 @@ export const Card: React.FC<CardProps> = ({
           border-style: solid;
         }
 
+        .card-notes-container {
+          position: relative;
+          margin-top: 4px;
+        }
+
         .card-notes-preview {
           font-size: 12px;
           color: #666;
@@ -396,6 +421,46 @@ export const Card: React.FC<CardProps> = ({
           padding: 6px 8px;
           border-radius: 6px;
           word-break: break-word;
+          transition: max-height 0.2s ease;
+        }
+
+        .card-notes-preview-collapsed {
+          display: -webkit-box;
+          -webkit-line-clamp: 2;
+          -webkit-box-orient: vertical;
+          overflow: hidden;
+        }
+
+        .card-notes-preview-expanded {
+        }
+
+        .card-notes-toggle {
+          position: absolute;
+          bottom: 4px;
+          right: 4px;
+          width: 20px;
+          height: 20px;
+          border: none;
+          border-radius: 4px;
+          background: rgba(0, 0, 0, 0.08);
+          color: #888;
+          font-size: 9px;
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          transition: all 0.15s ease;
+          opacity: 0;
+          padding: 0;
+        }
+
+        .card-notes-container:hover .card-notes-toggle {
+          opacity: 1;
+        }
+
+        .card-notes-toggle:hover {
+          background: rgba(59, 130, 246, 0.2);
+          color: #3b82f6;
         }
 
         .card-notes-input {
