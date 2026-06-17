@@ -1,0 +1,68 @@
+{
+  "name": "滨海相沉积型",
+  "description": "海陆交互相，多砂层",
+  "type": "stratum_preset",
+  "version": "1.0",
+  "drills": [
+    {
+      "name": "ZK001",
+      "x": -6,
+      "z": -6,
+      "strata": [
+        { "name": "海相淤泥", "depth": 2.0, "color": "#2F4F4F" },
+        { "name": "粉细砂层", "depth": 4.5, "color": "#F5DEB3" },
+        { "name": "黏土层", "depth": 7.0, "color": "#CD853F" },
+        { "name": "中粗砂层", "depth": 9.0, "color": "#DEB887" },
+        { "name": "基岩", "depth": 10.0, "color": "#696969" }
+      ]
+    },
+    {
+      "name": "ZK002",
+      "x": 2,
+      "z": -5,
+      "strata": [
+        { "name": "海相淤泥", "depth": 1.5, "color": "#2F4F4F" },
+        { "name": "粉细砂层", "depth": 4.0, "color": "#F5DEB3" },
+        { "name": "黏土层", "depth": 6.0, "color": "#CD853F" },
+        { "name": "中粗砂层", "depth": 8.5, "color": "#DEB887" },
+        { "name": "基岩", "depth": 10.0, "color": "#696969" }
+      ]
+    },
+    {
+      "name": "ZK003",
+      "x": 6,
+      "z": 0,
+      "strata": [
+        { "name": "陆相沉积", "depth": 2.5, "color": "#D2B48C" },
+        { "name": "粉细砂层", "depth": 5.0, "color": "#F5DEB3" },
+        { "name": "海陆过渡层", "depth": 7.5, "color": "#BC8F8F" },
+        { "name": "中粗砂层", "depth": 9.5, "color": "#DEB887" },
+        { "name": "基岩", "depth": 10.0, "color": "#696969" }
+      ]
+    },
+    {
+      "name": "ZK004",
+      "x": 0,
+      "z": 5,
+      "strata": [
+        { "name": "海相淤泥", "depth": 1.0, "color": "#2F4F4F" },
+        { "name": "粉细砂层", "depth": 3.5, "color": "#F5DEB3" },
+        { "name": "黏土层", "depth": 5.5, "color": "#CD853F" },
+        { "name": "细砂层", "depth": 8.0, "color": "#F5DEB3" },
+        { "name": "基岩", "depth": 10.0, "color": "#696969" }
+      ]
+    },
+    {
+      "name": "ZK005",
+      "x": -5,
+      "z": 3,
+      "strata": [
+        { "name": "海相淤泥", "depth": 1.8, "color": "#2F4F4F" },
+        { "name": "粉细砂层", "depth": 4.2, "color": "#F5DEB3" },
+        { "name": "黏土层", "depth": 6.8, "color": "#CD853F" },
+        { "name": "中粗砂层", "depth": 8.8, "color": "#DEB887" },
+        { "name": "基岩", "depth": 10.0, "color": "#696969" }
+      ]
+    }
+  ]
+}

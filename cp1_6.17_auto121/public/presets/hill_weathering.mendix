@@ -1,0 +1,56 @@
+{
+  "name": "丘陵风化型",
+  "description": "风化壳发育，基岩较浅",
+  "type": "stratum_preset",
+  "version": "1.0",
+  "drills": [
+    {
+      "name": "ZK001",
+      "x": -6,
+      "z": -4,
+      "strata": [
+        { "name": "腐殖土层", "depth": 1.0, "color": "#8B4513" },
+        { "name": "残积层", "depth": 3.5, "color": "#A0522D" },
+        { "name": "全风化岩", "depth": 5.5, "color": "#8B7355" },
+        { "name": "强风化岩", "depth": 7.5, "color": "#696969" },
+        { "name": "基岩", "depth": 10.0, "color": "#4a4a4a" }
+      ]
+    },
+    {
+      "name": "ZK002",
+      "x": 2,
+      "z": -6,
+      "strata": [
+        { "name": "腐殖土层", "depth": 0.8, "color": "#8B4513" },
+        { "name": "残积层", "depth": 3.0, "color": "#A0522D" },
+        { "name": "全风化岩", "depth": 5.0, "color": "#8B7355" },
+        { "name": "强风化岩", "depth": 7.0, "color": "#696969" },
+        { "name": "基岩", "depth": 10.0, "color": "#4a4a4a" }
+      ]
+    },
+    {
+      "name": "ZK003",
+      "x": 4,
+      "z": 3,
+      "strata": [
+        { "name": "腐殖土层", "depth": 1.2, "color": "#8B4513" },
+        { "name": "残积层", "depth": 4.0, "color": "#A0522D" },
+        { "name": "全风化岩", "depth": 6.0, "color": "#8B7355" },
+        { "name": "强风化岩", "depth": 8.0, "color": "#696969" },
+        { "name": "基岩", "depth": 10.0, "color": "#4a4a4a" }
+      ]
+    },
+    {
+      "name": "ZK004",
+      "x": -4,
+      "z": 5,
+      "strata": [
+        { "name": "腐殖土层", "depth": 1.5, "color": "#8B4513" },
+        { "name": "残积层", "depth": 3.8, "color": "#A0522D" },
+        { "name": "全风化岩", "depth": 5.8, "color": "#8B7355" },
+        { "name": "强风化岩", "depth": 7.8, "color": "#696969" },
+        { "name": "基岩", "depth": 10.0, "color": "#4a4a4a" }
+      ]
+    }
+  ]
+}

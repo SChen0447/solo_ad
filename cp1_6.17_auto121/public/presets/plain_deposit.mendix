@@ -1,0 +1,52 @@
+{
+  "name": "平原沉积型",
+  "description": "典型河流冲积平原，土层较厚",
+  "type": "stratum_preset",
+  "version": "1.0",
+  "drills": [
+    {
+      "name": "ZK001",
+      "x": -5,
+      "z": -5,
+      "strata": [
+        { "name": "表土层", "depth": 2.5, "color": "#D4A574" },
+        { "name": "黏土层", "depth": 6.0, "color": "#CD853F" },
+        { "name": "粉砂层", "depth": 8.5, "color": "#DAA520" },
+        { "name": "基岩层", "depth": 10.0, "color": "#696969" }
+      ]
+    },
+    {
+      "name": "ZK002",
+      "x": 3,
+      "z": -3,
+      "strata": [
+        { "name": "表土层", "depth": 2.2, "color": "#D4A574" },
+        { "name": "黏土层", "depth": 5.5, "color": "#CD853F" },
+        { "name": "粉砂层", "depth": 8.0, "color": "#DAA520" },
+        { "name": "基岩层", "depth": 10.0, "color": "#696969" }
+      ]
+    },
+    {
+      "name": "ZK003",
+      "x": -2,
+      "z": 4,
+      "strata": [
+        { "name": "表土层", "depth": 3.0, "color": "#D4A574" },
+        { "name": "黏土层", "depth": 6.5, "color": "#CD853F" },
+        { "name": "粉砂层", "depth": 9.0, "color": "#DAA520" },
+        { "name": "基岩层", "depth": 10.0, "color": "#696969" }
+      ]
+    },
+    {
+      "name": "ZK004",
+      "x": 5,
+      "z": 5,
+      "strata": [
+        { "name": "表土层", "depth": 2.8, "color": "#D4A574" },
+        { "name": "黏土层", "depth": 5.8, "color": "#CD853F" },
+        { "name": "粉砂层", "depth": 8.2, "color": "#DAA520" },
+        { "name": "基岩层", "depth": 10.0, "color": "#696969" }
+      ]
+    }
+  ]
+}

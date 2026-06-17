@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>3D地层剖面可视化系统</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      font-family: "Microsoft YaHei", "微软雅黑", sans-serif;
+    }
+
+    #app {
+      width: 100%;
+      height: 100%;
+      position: relative;
+    }
+
+    #canvas-container {
+      width: 100%;
+      height: 100%;
+      position: absolute;
+      top: 0;
+      left: 0;
+    }
+
+    .mode-switcher {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      display: flex;
+      background: rgba(255, 255, 255, 0.85);
+      border-radius: 30px;
+      padding: 4px;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.15);
+      z-index: 100;
+    }
+
+    .mode-btn {
+      padding: 10px 20px;
+      border: none;
+      background: transparent;
+      color: #555;
+      font-size: 14px;
+      font-family: "Microsoft YaHei", "微软雅黑", sans-serif;
+      cursor: pointer;
+      border-radius: 25px;
+      transition: all 0.3s ease;
+      white-space: nowrap;
+    }
+
+    .mode-btn.active {
+      background: #1e3a8a;
+      color: white;
+      box-shadow: 0 2px 8px rgba(30, 58, 138, 0.4);
+    }
+
+    .mode-btn:hover:not(.active) {
+      background: #e5e7eb;
+    }
+
+    .preset-panel {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      width: 220px;
+      background: rgba(255, 255, 255, 0.85);
+      border-radius: 12px;
+      padding: 16px;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.15);
+      z-index: 100;
+      max-height: calc(100vh - 40px);
+      overflow-y: auto;
+    }
+
+    .preset-panel h3 {
+      font-size: 16px;
+      color: #333;
+      margin-bottom: 12px;
+      font-weight: 600;
+    }
+
+    .preset-card {
+      background: linear-gradient(135deg, #d4a574 0%, #8b5a2b 100%);
+      border-radius: 8px;
+      padding: 12px;
+      margin-bottom: 10px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+    }
+
+    .preset-card:hover {
+      transform: scale(1.02);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    }
+
+    .preset-card-title {
+      color: white;
+      font-size: 14px;
+      font-weight: 600;
+      margin-bottom: 4px;
+    }
+
+    .preset-card-desc {
+      color: rgba(255, 255, 255, 0.85);
+      font-size: 12px;
+      line-height: 1.4;
+    }
+
+    .edit-panel {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 360px;
+      background: rgba(255, 255, 255, 0.25);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 255, 255, 0.4);
+      border-radius: 16px;
+      padding: 20px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+      z-index: 200;
+      display: none;
+    }
+
+    .edit-panel.show {
+      display: block;
+      animation: fadeIn 0.3s ease;
+    }
+
+    @keyframes fadeIn {
+      from {
+        opacity: 0;
+        transform: translate(-50%, -50%) scale(0.95);
+      }
+      to {
+        opacity: 1;
+        transform: translate(-50%, -50%) scale(1);
+      }
+    }
+
+    .edit-panel-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+    }
+
+    .edit-panel-title {
+      font-size: 16px;
+      font-weight: 600;
+      color: #333;
+    }
+
+    .edit-panel-close {
+      width: 28px;
+      height: 28px;
+      border: none;
+      background: rgba(0, 0, 0, 0.1);
+      border-radius: 50%;
+      cursor: pointer;
+      font-size: 18px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s;
+    }
+
+    .edit-panel-close:hover {
+      background: rgba(0, 0, 0, 0.2);
+    }
+
+    .stratum-table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    .stratum-table th {
+      text-align: left;
+      padding: 8px;
+      font-size: 13px;
+      color: #555;
+      font-weight: 600;
+      border-bottom: 2px solid rgba(0, 0, 0, 0.1);
+    }
+
+    .stratum-table td {
+      padding: 8px;
+      border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+    }
+
+    .stratum-table input {
+      width: 100%;
+      padding: 6px 10px;
+      border: 1px solid #d1d5db;
+      border-radius: 8px;
+      font-size: 13px;
+      font-family: "Microsoft YaHei", "微软雅黑", sans-serif;
+      transition: border-color 0.2s;
+      background: rgba(255, 255, 255, 0.8);
+    }
+
+    .stratum-table input:focus {
+      outline: none;
+      border-color: #60a5fa;
+    }
+
+    .stratum-table input:hover {
+      border-color: #93c5fd;
+    }
+
+    .color-preview {
+      width: 24px;
+      height: 24px;
+      border-radius: 4px;
+      border: 1px solid rgba(0, 0, 0, 0.2);
+      cursor: pointer;
+    }
+
+    .btn-delete-stratum {
+      padding: 4px 8px;
+      border: 1px solid #fca5a5;
+      background: rgba(254, 202, 202, 0.5);
+      color: #dc2626;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 12px;
+      transition: all 0.2s;
+    }
+
+    .btn-delete-stratum:hover {
+      background: #fecaca;
+    }
+
+    .edit-panel-footer {
+      margin-top: 16px;
+      display: flex;
+      gap: 10px;
+    }
+
+    .btn-add-stratum, .btn-delete-drill {
+      flex: 1;
+      padding: 10px;
+      border: 1px solid #d1d5db;
+      background: rgba(255, 255, 255, 0.8);
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 13px;
+      font-family: "Microsoft YaHei", "微软雅黑", sans-serif;
+      transition: all 0.2s;
+    }
+
+    .btn-add-stratum:hover {
+      border-color: #93c5fd;
+      background: rgba(239, 246, 255, 0.8);
+    }
+
+    .btn-delete-drill {
+      border-color: #fca5a5;
+      color: #dc2626;
+      background: rgba(254, 202, 202, 0.3);
+    }
+
+    .btn-delete-drill:hover {
+      background: rgba(254, 202, 202, 0.5);
+    }
+
+    .tip-text {
+      position: absolute;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(0, 0, 0, 0.6);
+      color: white;
+      padding: 10px 20px;
+      border-radius: 20px;
+      font-size: 13px;
+      z-index: 50;
+      pointer-events: none;
+    }
+
+    @media (max-width: 768px) {
+      .mode-switcher {
+        top: 10px;
+        right: 10px;
+      }
+
+      .mode-btn {
+        padding: 8px 14px;
+        font-size: 12px;
+      }
+
+      .preset-panel {
+        top: 60px;
+        left: 10px;
+        width: 180px;
+        padding: 12px;
+      }
+
+      .preset-card {
+        padding: 10px;
+      }
+
+      .preset-card-title {
+        font-size: 13px;
+      }
+
+      .preset-card-desc {
+        font-size: 11px;
+      }
+
+      .edit-panel {
+        width: 100%;
+        height: 100%;
+        top: 0;
+        left: 0;
+        transform: none;
+        border-radius: 0;
+        padding: 20px;
+      }
+
+      .edit-panel.show {
+        animation: slideUp 0.3s ease;
+      }
+
+      @keyframes slideUp {
+        from {
+          transform: translateY(100%);
+          opacity: 0;
+        }
+        to {
+          transform: translateY(0);
+          opacity: 1;
+        }
+      }
+
+      .tip-text {
+        font-size: 11px;
+        padding: 8px 14px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <div id="canvas-container"></div>
+
+    <div class="mode-switcher">
+      <button class="mode-btn active" data-mode="drill">仅钻孔柱状图</button>
+      <button class="mode-btn" data-mode="both">钻孔+插值地层</button>
+      <button class="mode-btn" data-mode="stratum">仅插值地层</button>
+    </div>
+
+    <div class="preset-panel">
+      <h3>预设钻孔数据</h3>
+      <div class="preset-card" data-preset="0">
+        <div class="preset-card-title">平原沉积型</div>
+        <div class="preset-card-desc">典型河流冲积平原，土层较厚</div>
+      </div>
+      <div class="preset-card" data-preset="1">
+        <div class="preset-card-title">丘陵风化型</div>
+        <div class="preset-card-desc">风化壳发育，基岩较浅</div>
+      </div>
+      <div class="preset-card" data-preset="2">
+        <div class="preset-card-title">河谷侵蚀型</div>
+        <div class="preset-card-desc">河谷阶地，沉积层变化大</div>
+      </div>
+      <div class="preset-card" data-preset="3">
+        <div class="preset-card-title">岩溶地区型</div>
+        <div class="preset-card-desc">石灰岩地区，存在溶洞</div>
+      </div>
+      <div class="preset-card" data-preset="4">
+        <div class="preset-card-title">滨海相沉积型</div>
+        <div class="preset-card-desc">海陆交互相，多砂层</div>
+      </div>
+    </div>
+
+    <div class="edit-panel" id="edit-panel">
+      <div class="edit-panel-header">
+        <span class="edit-panel-title" id="edit-panel-title">钻孔ZK001</span>
+        <button class="edit-panel-close" id="edit-panel-close">×</button>
+      </div>
+      <table class="stratum-table">
+        <thead>
+          <tr>
+            <th>层名</th>
+            <th>深度(m)</th>
+            <th>颜色</th>
+            <th>操作</th>
+          </tr>
+        </thead>
+        <tbody id="stratum-list">
+        </tbody>
+      </table>
+      <div class="edit-panel-footer">
+        <button class="btn-add-stratum" id="btn-add-stratum">+ 添加地层</button>
+        <button class="btn-delete-drill" id="btn-delete-drill">删除钻孔</button>
+      </div>
+    </div>
+
+    <div class="tip-text">左键点击地形添加钻孔 | 拖拽旋转视角 | 滚轮缩放 | 中键平移</div>
+  </div>
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>

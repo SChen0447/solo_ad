@@ -1,0 +1,62 @@
+{
+  "name": "岩溶地区型",
+  "description": "石灰岩地区，存在溶洞",
+  "type": "stratum_preset",
+  "version": "1.0",
+  "drills": [
+    {
+      "name": "ZK001",
+      "x": -6,
+      "z": -5,
+      "strata": [
+        { "name": "红黏土层", "depth": 3.0, "color": "#B22222" },
+        { "name": "石灰岩层", "depth": 6.0, "color": "#F5F5DC" },
+        { "name": "溶洞充填", "depth": 7.5, "color": "#8B7355" },
+        { "name": "石灰岩", "depth": 10.0, "color": "#F5F5DC" }
+      ]
+    },
+    {
+      "name": "ZK002",
+      "x": 0,
+      "z": -6,
+      "strata": [
+        { "name": "红黏土层", "depth": 2.5, "color": "#B22222" },
+        { "name": "石灰岩层", "depth": 5.5, "color": "#F5F5DC" },
+        { "name": "溶洞", "depth": 6.5, "color": "#2F4F4F" },
+        { "name": "石灰岩", "depth": 10.0, "color": "#F5F5DC" }
+      ]
+    },
+    {
+      "name": "ZK003",
+      "x": 5,
+      "z": -3,
+      "strata": [
+        { "name": "红黏土层", "depth": 3.5, "color": "#B22222" },
+        { "name": "石灰岩层", "depth": 6.5, "color": "#F5F5DC" },
+        { "name": "溶洞充填", "depth": 8.0, "color": "#8B7355" },
+        { "name": "石灰岩", "depth": 10.0, "color": "#F5F5DC" }
+      ]
+    },
+    {
+      "name": "ZK004",
+      "x": 3,
+      "z": 5,
+      "strata": [
+        { "name": "红黏土层", "depth": 2.0, "color": "#B22222" },
+        { "name": "石灰岩层", "depth": 5.0, "color": "#F5F5DC" },
+        { "name": "石灰岩", "depth": 10.0, "color": "#F5F5DC" }
+      ]
+    },
+    {
+      "name": "ZK005",
+      "x": -4,
+      "z": 3,
+      "strata": [
+        { "name": "红黏土层", "depth": 2.8, "color": "#B22222" },
+        { "name": "石灰岩层", "depth": 5.8, "color": "#F5F5DC" },
+        { "name": "溶洞", "depth": 7.2, "color": "#2F4F4F" },
+        { "name": "石灰岩", "depth": 10.0, "color": "#F5F5DC" }
+      ]
+    }
+  ]
+}

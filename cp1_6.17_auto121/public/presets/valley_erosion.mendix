@@ -1,0 +1,63 @@
+{
+  "name": "河谷侵蚀型",
+  "description": "河谷阶地，沉积层变化大",
+  "type": "stratum_preset",
+  "version": "1.0",
+  "drills": [
+    {
+      "name": "ZK001",
+      "x": -7,
+      "z": -3,
+      "strata": [
+        { "name": "河漫滩沉积", "depth": 1.5, "color": "#D2B48C" },
+        { "name": "砂砾石层", "depth": 4.0, "color": "#BC8F8F" },
+        { "name": "粉质黏土", "depth": 7.0, "color": "#CD853F" },
+        { "name": "基岩", "depth": 10.0, "color": "#696969" }
+      ]
+    },
+    {
+      "name": "ZK002",
+      "x": -2,
+      "z": -5,
+      "strata": [
+        { "name": "河漫滩沉积", "depth": 2.0, "color": "#D2B48C" },
+        { "name": "砂砾石层", "depth": 5.0, "color": "#BC8F8F" },
+        { "name": "粉质黏土", "depth": 8.0, "color": "#CD853F" },
+        { "name": "基岩", "depth": 10.0, "color": "#696969" }
+      ]
+    },
+    {
+      "name": "ZK003",
+      "x": 4,
+      "z": -2,
+      "strata": [
+        { "name": "阶地沉积", "depth": 3.0, "color": "#D2B48C" },
+        { "name": "古土壤层", "depth": 4.5, "color": "#8B4513" },
+        { "name": "砂砾石层", "depth": 6.5, "color": "#BC8F8F" },
+        { "name": "基岩", "depth": 10.0, "color": "#696969" }
+      ]
+    },
+    {
+      "name": "ZK004",
+      "x": 6,
+      "z": 4,
+      "strata": [
+        { "name": "阶地沉积", "depth": 3.5, "color": "#D2B48C" },
+        { "name": "古土壤层", "depth": 5.0, "color": "#8B4513" },
+        { "name": "砂砾石层", "depth": 7.5, "color": "#BC8F8F" },
+        { "name": "粉质黏土", "depth": 9.0, "color": "#CD853F" },
+        { "name": "基岩", "depth": 10.0, "color": "#696969" }
+      ]
+    },
+    {
+      "name": "ZK005",
+      "x": -5,
+      "z": 5,
+      "strata": [
+        { "name": "河漫滩沉积", "depth": 1.0, "color": "#D2B48C" },
+        { "name": "砂砾石层", "depth": 3.5, "color": "#BC8F8F" },
+        { "name": "基岩", "depth": 10.0, "color": "#696969" }
+      ]
+    }
+  ]
+}
