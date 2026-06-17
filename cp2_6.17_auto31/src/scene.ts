@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { CSS2DRenderer, CSS2DObject } from 'three/examples/jsm/renderers/CSS2DRenderer.js';
-import { MetricData, Thresholds, METRIC_KEYS, METRIC_COLORS, METRIC_LABELS, HISTORY_SIZE } from './dataStream';
+import { MetricData, Thresholds, METRIC_KEYS, METRIC_COLORS, METRIC_LABELS, HISTORY_SIZE, HistoryPoint, FLASH_PERIOD } from './dataStream';
 
 const PILLAR_RADIUS = 0.3;
 const MAX_HEIGHT = 5;
@@ -9,7 +9,6 @@ const SPHERE_RADIUS = 0.2;
 const RING_RADIUS = 0.6;
 const RING_TUBE = 0.02;
 const PILLAR_X: Record<keyof MetricData, number> = { cpu: -3, memory: 0, network: 3 };
-const FLASH_PERIOD = 0.3;
 const LERP_SPEED = 15;
 const CHART_WIDTH = 320;
 const CHART_HEIGHT = 180;
@@ -45,11 +44,15 @@ export class MonitorScene {
   private chartPanel: HTMLDivElement;
   private chartCanvas: HTMLCanvasElement;
   private chartCtx: CanvasRenderingContext2D;
-  private history: MetricData[] = [];
+  private history: HistoryPoint[] = [];
+  private flashOn = false;
+  private flashTimer = 0;
+  private onFlashChange: ((on: boolean) => void) | null = null;
 
-  constructor(container: HTMLElement) {
+  constructor(container: HTMLElement, onFlashChange?: (on: boolean) => void) {
     this.container = container;
     this.clock = new THREE.Clock();
+    if (onFlashChange) this.onFlashChange = onFlashChange;
 
     this.scene = new THREE.Scene();
     this.scene.background = this.createGradient();
@@ -61,6 +64,10 @@ export class MonitorScene {
     this.renderer = new THREE.WebGLRenderer({ antialias: true });
     this.renderer.setSize(container.clientWidth, container.clientHeight);
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    this.renderer.domElement.style.position = 'absolute';
+    this.renderer.domElement.style.top = '0';
+    this.renderer.domElement.style.left = '0';
+    this.renderer.domElement.style.zIndex = '0';
     container.appendChild(this.renderer.domElement);
 
     this.labelRenderer = new CSS2DRenderer();
@@ -69,6 +76,7 @@ export class MonitorScene {
     this.labelRenderer.domElement.style.top = '0';
     this.labelRenderer.domElement.style.left = '0';
     this.labelRenderer.domElement.style.pointerEvents = 'none';
+    this.labelRenderer.domElement.style.zIndex = '1';
     container.appendChild(this.labelRenderer.domElement);
 
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
@@ -203,9 +211,11 @@ export class MonitorScene {
       border: 1px solid #446;
       border-radius: 12px;
       padding: 8px;
-      z-index: 50;
+      z-index: 10;
       pointer-events: none;
       box-shadow: 0 0 20px rgba(102, 102, 255, 0.2);
+      max-width: calc(100vw - 32px);
+      box-sizing: border-box;
     `;
 
     const title = document.createElement('div');
@@ -296,6 +306,9 @@ export class MonitorScene {
       return;
     }
 
+    const nowMs = hist[n - 1].timestamp;
+    const startMs = hist[0].timestamp;
+    const totalSpan = Math.max(1, nowMs - startMs);
     const xStep = chartW / (HISTORY_SIZE - 1);
 
     METRIC_KEYS.forEach(key => {
@@ -305,9 +318,10 @@ export class MonitorScene {
       ctx.shadowColor = color;
       ctx.shadowBlur = 4;
       ctx.beginPath();
-      hist.forEach((d, i) => {
-        const x = padL + i * xStep + (HISTORY_SIZE - n) * xStep;
-        const y = padT + chartH - (d[key] / 100) * chartH;
+      hist.forEach((pt, i) => {
+        const rel = (pt.timestamp - startMs) / totalSpan;
+        const x = padL + rel * chartW + (HISTORY_SIZE - n) * xStep;
+        const y = padT + chartH - (pt.data[key] / 100) * chartH;
         if (i === 0) {
           ctx.moveTo(x, y);
         } else {
@@ -322,17 +336,18 @@ export class MonitorScene {
     ctx.font = '8px monospace';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'top';
-    const labelStep = Math.max(1, Math.floor(n / 5));
     const visibleLabels = Math.min(5, n);
     for (let i = 0; i < visibleLabels; i++) {
       const idx = Math.floor(i * (n - 1) / Math.max(1, visibleLabels - 1));
-      const x = padL + idx * xStep + (HISTORY_SIZE - n) * xStep;
-      const secondsAgo = ((n - 1 - idx) * 0.5).toFixed(1);
+      const pt = hist[idx];
+      const rel = (pt.timestamp - startMs) / totalSpan;
+      const x = padL + rel * chartW + (HISTORY_SIZE - n) * xStep;
+      const secondsAgo = ((nowMs - pt.timestamp) / 1000).toFixed(1);
       ctx.fillText(`${secondsAgo}s`, x, padT + chartH + 2);
     }
   }
 
-  updateData(data: MetricData, thresholds: Thresholds, history: MetricData[]): void {
+  updateData(data: MetricData, thresholds: Thresholds, history: HistoryPoint[]): void {
     this.history = history;
     this.pillars.forEach(p => {
       const v = data[p.key];
@@ -362,6 +377,13 @@ export class MonitorScene {
 
     this.controls.update();
 
+    this.flashTimer += dt;
+    const newFlashOn = Math.floor(this.flashTimer / FLASH_PERIOD) % 2 === 0;
+    if (newFlashOn !== this.flashOn) {
+      this.flashOn = newFlashOn;
+      if (this.onFlashChange) this.onFlashChange(this.flashOn);
+    }
+
     this.pillars.forEach(p => {
       const f = 1 - Math.exp(-LERP_SPEED * dt);
       p.currentHeight += (p.targetHeight - p.currentHeight) * f;
@@ -382,10 +404,8 @@ export class MonitorScene {
       sm.emissive.copy(p.currentColor);
 
       if (p.isOverThreshold) {
-        p.flashTimer += dt;
-        const on = Math.floor(p.flashTimer / FLASH_PERIOD) % 2 === 0;
-        pm.emissiveIntensity = on ? 1.5 : 0.2;
-        sm.emissiveIntensity = on ? 2.0 : 0.3;
+        pm.emissiveIntensity = this.flashOn ? 1.5 : 0.2;
+        sm.emissiveIntensity = this.flashOn ? 2.0 : 0.3;
       } else {
         p.flashTimer = 0;
         pm.emissiveIntensity = 0.5;

@@ -4,6 +4,11 @@ export interface MetricData {
   network: number;
 }
 
+export interface HistoryPoint {
+  data: MetricData;
+  timestamp: number;
+}
+
 export interface Thresholds {
   cpu: number;
   memory: number;
@@ -31,6 +36,7 @@ export const METRIC_LABELS: Record<keyof MetricData, string> = {
 };
 
 export const HISTORY_SIZE = 20;
+export const FLASH_PERIOD = 0.3;
 
 function clamp(v: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, v));
@@ -46,7 +52,7 @@ export class DataStream {
   private _thresholds: Thresholds = { ...DEFAULT_THRESHOLDS };
   private _intervalId: ReturnType<typeof setInterval> | null = null;
   private _listeners: Array<(data: MetricData, thresholds: Thresholds) => void> = [];
-  private _history: MetricData[] = [];
+  private _history: HistoryPoint[] = [];
 
   get data(): MetricData {
     return { ...this._data };
@@ -56,7 +62,7 @@ export class DataStream {
     return { ...this._thresholds };
   }
 
-  get history(): MetricData[] {
+  get history(): HistoryPoint[] {
     return [...this._history];
   }
 
@@ -93,7 +99,7 @@ export class DataStream {
   }
 
   private _pushHistory(): void {
-    this._history.push({ ...this._data });
+    this._history.push({ data: { ...this._data }, timestamp: Date.now() });
     if (this._history.length > HISTORY_SIZE) {
       this._history.shift();
     }

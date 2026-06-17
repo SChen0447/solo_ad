@@ -60,6 +60,8 @@ export default function App() {
   const [sustainedAlert, setSustainedAlert] = useState(false);
   const [warningVisible, setWarningVisible] = useState(false);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  const [isVeryNarrow, setIsVeryNarrow] = useState(window.innerWidth < 400);
+  const [flashOn, setFlashOn] = useState(true);
 
   const onSliderChange = useCallback((key: keyof Thresholds, value: number) => {
     setThresholds(prev => {
@@ -79,7 +81,10 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    const handleResize = () => setIsMobile(window.innerWidth < 768);
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 768);
+      setIsVeryNarrow(window.innerWidth < 400);
+    };
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
@@ -87,7 +92,7 @@ export default function App() {
   useEffect(() => {
     if (!containerRef.current) return;
 
-    const scene = new MonitorScene(containerRef.current);
+    const scene = new MonitorScene(containerRef.current, (on) => setFlashOn(on));
     sceneRef.current = scene;
 
     const stream = new DataStream();
@@ -167,15 +172,22 @@ export default function App() {
   const panelStyle: React.CSSProperties = isMobile
     ? {
         position: 'fixed', bottom: 0, left: 0, right: 0,
-        height: '60px', background: 'rgba(20,20,30,0.85)',
+        height: isVeryNarrow ? '56px' : '60px',
+        background: 'rgba(20,20,30,0.92)',
         borderRadius: '12px 12px 0 0', border: '1px solid #446',
-        display: 'flex', alignItems: 'center', gap: '12px',
-        padding: '0 12px', overflowX: 'auto', zIndex: 100,
+        display: 'flex', alignItems: 'center', gap: isVeryNarrow ? '8px' : '12px',
+        padding: isVeryNarrow ? '0 8px' : '0 12px',
+        overflowX: 'auto', overflowY: 'hidden',
+        zIndex: 100,
+        WebkitOverflowScrolling: 'touch',
       }
     : {
-        position: 'fixed', top: '16px', left: '16px', width: '260px',
+        position: 'fixed', top: '16px', left: '16px',
+        width: isVeryNarrow ? 'calc(100vw - 32px)' : '260px',
+        maxWidth: 'calc(100vw - 32px)',
         background: 'rgba(20,20,30,0.85)', borderRadius: '12px',
         border: '1px solid #446', padding: '16px', zIndex: 100,
+        boxSizing: 'border-box',
       };
 
   return (
@@ -186,28 +198,32 @@ export default function App() {
         {isMobile ? (
           <>
             {METRIC_KEYS.map(key => (
-              <div key={key} style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: '180px', flexShrink: 0 }}>
+              <div key={key} style={{ display: 'flex', alignItems: 'center', gap: isVeryNarrow ? '4px' : '6px', minWidth: isVeryNarrow ? '150px' : '180px', flexShrink: 0 }}>
                 <div style={{
-                  width: '8px', height: '8px', borderRadius: '50%', flexShrink: 0,
+                  width: isVeryNarrow ? '7px' : '8px', height: isVeryNarrow ? '7px' : '8px',
+                  borderRadius: '50%', flexShrink: 0,
                   background: alerts[key] ? '#ff3333' : METRIC_COLORS[key],
-                  boxShadow: `0 0 4px ${alerts[key] ? '#ff3333' : METRIC_COLORS[key]}`,
-                  animation: alerts[key] ? 'dotFlash 0.3s infinite' : 'none',
+                  boxShadow: alerts[key]
+                    ? (flashOn ? '0 0 6px #ff3333' : '0 0 2px #ff3333')
+                    : `0 0 4px ${METRIC_COLORS[key]}`,
+                  opacity: alerts[key] ? (flashOn ? 1 : 0.3) : 1,
+                  transition: 'opacity 0.05s linear',
                 }} />
-                <span style={{ color: METRIC_COLORS[key], fontSize: '12px', fontFamily: 'monospace', whiteSpace: 'nowrap' }}>
+                <span style={{ color: METRIC_COLORS[key], fontSize: isVeryNarrow ? '11px' : '12px', fontFamily: 'monospace', whiteSpace: 'nowrap' }}>
                   {METRIC_LABELS[key]} {thresholds[key]}
                 </span>
                 <input
                   type="range" min={0} max={100} step={1}
                   value={thresholds[key]}
                   onChange={e => onSliderChange(key, Number(e.target.value))}
-                  style={{ width: '80px', accentColor: '#6666ff', cursor: 'pointer' }}
+                  style={{ width: isVeryNarrow ? '60px' : '80px', accentColor: '#6666ff', cursor: 'pointer', flexShrink: 0 }}
                 />
               </div>
             ))}
             <button onClick={onReset} style={{
               background: '#cc3333', color: 'white', border: 'none',
-              borderRadius: '8px', padding: '4px 12px', cursor: 'pointer',
-              fontSize: '12px', whiteSpace: 'nowrap', flexShrink: 0,
+              borderRadius: '8px', padding: isVeryNarrow ? '3px 10px' : '4px 12px', cursor: 'pointer',
+              fontSize: isVeryNarrow ? '11px' : '12px', whiteSpace: 'nowrap', flexShrink: 0,
             }}>
               RESET
             </button>
@@ -224,8 +240,11 @@ export default function App() {
                     <div style={{
                       width: '10px', height: '10px', borderRadius: '50%',
                       background: alerts[key] ? '#ff3333' : METRIC_COLORS[key],
-                      boxShadow: `0 0 6px ${alerts[key] ? '#ff3333' : METRIC_COLORS[key]}`,
-                      animation: alerts[key] ? 'dotFlash 0.3s infinite' : 'none',
+                      boxShadow: alerts[key]
+                        ? (flashOn ? '0 0 6px #ff3333' : '0 0 2px #ff3333')
+                        : `0 0 6px ${METRIC_COLORS[key]}`,
+                      opacity: alerts[key] ? (flashOn ? 1 : 0.3) : 1,
+                      transition: 'opacity 0.05s linear',
                     }} />
                     <span style={{ color: METRIC_COLORS[key], fontSize: '13px', fontFamily: 'monospace', textShadow: `0 0 6px ${METRIC_COLORS[key]}` }}>
                       {METRIC_LABELS[key]}
@@ -287,10 +306,6 @@ export default function App() {
         @keyframes flash {
           0%, 100% { opacity: 1; }
           50% { opacity: 0.3; }
-        }
-        @keyframes dotFlash {
-          0%, 100% { opacity: 1; box-shadow: 0 0 6px #ff3333; }
-          50% { opacity: 0.3; box-shadow: 0 0 2px #ff3333; }
         }
         input[type="range"] {
           -webkit-appearance: none;
