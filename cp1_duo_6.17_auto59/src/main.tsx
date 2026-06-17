@@ -4,29 +4,21 @@ import { BrowserRouter } from 'react-router-dom';
 import App from './App';
 import './styles.css';
 
-declare global {
-  interface Window {
-    __mountReactApp: () => void;
-    __APP_STARTED__: boolean;
-    __reactRoot: ReactDOM.Root | null;
-  }
-}
+const APP_MOUNT_EVENT = 'css-analyzer:mount';
 
 function mountApp() {
-  if (window.__reactRoot) {
-    return;
-  }
-
   const rootElement = document.getElementById('root');
   if (!rootElement) {
     console.error('Root element #root not found');
     return;
   }
 
-  window.__APP_STARTED__ = true;
+  if (rootElement.dataset.reactMounted === 'true') {
+    return;
+  }
+  rootElement.dataset.reactMounted = 'true';
 
   const root = ReactDOM.createRoot(rootElement);
-  window.__reactRoot = root;
 
   root.render(
     <React.StrictMode>
@@ -39,8 +31,17 @@ function mountApp() {
   console.log('[CSS Conflict Analyzer] React application mounted successfully');
 }
 
-window.__mountReactApp = mountApp;
+document.addEventListener(APP_MOUNT_EVENT, mountApp, { once: true });
 
-if (window.__APP_STARTED__) {
-  mountApp();
+function checkAutoMount() {
+  const rootElement = document.getElementById('root');
+  if (rootElement && rootElement.dataset.pendingMount === 'true') {
+    document.dispatchEvent(new CustomEvent(APP_MOUNT_EVENT));
+  }
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', checkAutoMount);
+} else {
+  checkAutoMount();
 }

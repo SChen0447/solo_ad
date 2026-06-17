@@ -1,6 +1,5 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { Routes, Route, Link, NavLink } from 'react-router-dom';
-
+import React from 'react';
+import { Routes, Route } from 'react-router-dom';
 import EditorPanel from './components/EditorPanel';
 import ConflictVisualizer from './components/ConflictVisualizer';
 import { ConflictAnalyzer } from './services/conflictAnalyzer';
@@ -132,27 +131,26 @@ const EXAMPLES: ExampleData[] = [
 ];
 
 const HomePage: React.FC = () => {
-  const [html, setHtml] = useState('');
-  const [css, setCss] = useState('');
-  const [conflicts, setConflicts] = useState<Conflict[]>([]);
-  const [selectedConflictId, setSelectedConflictId] = useState<string | null>(null);
-  const [fixProposal, setFixProposal] = useState<FixProposal | null>(null);
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [leftPanelWidth, setLeftPanelWidth] = useState(55);
+  const [html, setHtml] = React.useState('');
+  const [css, setCss] = React.useState('');
+  const [conflicts, setConflicts] = React.useState<Conflict[]>([]);
+  const [selectedConflictId, setSelectedConflictId] = React.useState<string | null>(null);
+  const [fixProposal, setFixProposal] = React.useState<FixProposal | null>(null);
+  const [isAnalyzing, setIsAnalyzing] = React.useState(false);
+  const [leftPanelWidth, setLeftPanelWidth] = React.useState(55);
 
-  useEffect(() => {
+  React.useEffect(() => {
     const savedHtml = localStorage.getItem('css-analyzer-html');
     const savedCss = localStorage.getItem('css-analyzer-css');
     if (savedHtml) setHtml(savedHtml);
     if (savedCss) setCss(savedCss);
-
     if (!savedHtml && !savedCss && EXAMPLES.length > 0) {
       setHtml(EXAMPLES[0].html);
       setCss(EXAMPLES[0].css);
     }
   }, []);
 
-  useEffect(() => {
+  React.useEffect(() => {
     const debounceTimer = setTimeout(() => {
       localStorage.setItem('css-analyzer-html', html);
       localStorage.setItem('css-analyzer-css', css);
@@ -160,25 +158,18 @@ const HomePage: React.FC = () => {
     return () => clearTimeout(debounceTimer);
   }, [html, css]);
 
-  const handleAnalyze = useCallback(async () => {
+  const handleAnalyze = React.useCallback(async () => {
     if (!html.trim() || !css.trim()) {
       alert('请输入HTML和CSS内容');
       return;
     }
-
     setIsAnalyzing(true);
     setConflicts([]);
     setFixProposal(null);
     setSelectedConflictId(null);
-
     try {
-      const startTime = performance.now();
       const result = await ConflictAnalyzer.analyze(html, css);
-      const endTime = performance.now();
-      console.log(`冲突检测耗时: ${(endTime - startTime).toFixed(2)}ms`);
-
       setConflicts(result);
-
       if (result.length > 0) {
         const proposal = await RepairGenerator.generateRepair(result, css);
         setFixProposal(proposal);
@@ -191,7 +182,7 @@ const HomePage: React.FC = () => {
     }
   }, [html, css]);
 
-  const handleLoadExample = useCallback((index: number) => {
+  const handleLoadExample = React.useCallback((index: number) => {
     if (EXAMPLES[index]) {
       setHtml(EXAMPLES[index].html);
       setCss(EXAMPLES[index].css);
@@ -201,13 +192,38 @@ const HomePage: React.FC = () => {
     }
   }, []);
 
-  const handleCopyFixedCss = useCallback((_text: string) => {
-  }, []);
+  const handleCopyFixedCss = React.useCallback((_text: string) => {}, []);
 
   const exampleOptions = EXAMPLES.map(ex => ({
     name: ex.name,
     description: ex.description
   }));
+
+  const onDividerMouseDown = React.useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    const startX = e.clientX;
+    const startWidth = leftPanelWidth;
+    const container = e.currentTarget.parentElement;
+    if (!container) return;
+    const containerWidth = container.getBoundingClientRect().width;
+    const onMove = (moveE: MouseEvent) => {
+      const delta = moveE.clientX - startX;
+      const newWidth = startWidth + (delta / containerWidth) * 100;
+      if (newWidth >= 35 && newWidth <= 75) {
+        setLeftPanelWidth(newWidth);
+      }
+    };
+    const onUp = () => {
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+  }, [leftPanelWidth]);
 
   return (
     <div className="app-container">
@@ -216,27 +232,6 @@ const HomePage: React.FC = () => {
           <span className="logo-icon">⚡</span>
           <span className="logo-text">CSS Conflict Analyzer</span>
         </div>
-
-        <nav className="header-nav">
-          <NavLink
-            to="/"
-            end
-            className={({ isActive }) =>
-              `nav-link ${isActive ? 'active' : ''}`
-            }
-          >
-            🏠 主页
-          </NavLink>
-          <NavLink
-            to="/about"
-            className={({ isActive }) =>
-              `nav-link ${isActive ? 'active' : ''}`
-            }
-          >
-            ℹ️ 关于
-          </NavLink>
-        </nav>
-
         <div className="header-info">
           {conflicts.length > 0 && (
             <span className="result-badge">
@@ -245,7 +240,6 @@ const HomePage: React.FC = () => {
           )}
         </div>
       </header>
-
       <div className="app-body">
         <div className="panel-left" style={{ width: `${leftPanelWidth}%` }}>
           <EditorPanel
@@ -259,41 +253,9 @@ const HomePage: React.FC = () => {
             onLoadExample={handleLoadExample}
           />
         </div>
-
-        <div
-          className="panel-divider"
-          onMouseDown={(e) => {
-            e.preventDefault();
-            const startX = e.clientX;
-            const startWidth = leftPanelWidth;
-            const container = e.currentTarget.parentElement;
-            if (!container) return;
-            const containerWidth = container.getBoundingClientRect().width;
-
-            const onMove = (moveE: MouseEvent) => {
-              const delta = moveE.clientX - startX;
-              const newWidth = startWidth + (delta / containerWidth) * 100;
-              if (newWidth >= 35 && newWidth <= 75) {
-                setLeftPanelWidth(newWidth);
-              }
-            };
-
-            const onUp = () => {
-              document.removeEventListener('mousemove', onMove);
-              document.removeEventListener('mouseup', onUp);
-              document.body.style.cursor = '';
-              document.body.style.userSelect = '';
-            };
-
-            document.addEventListener('mousemove', onMove);
-            document.addEventListener('mouseup', onUp);
-            document.body.style.cursor = 'col-resize';
-            document.body.style.userSelect = 'none';
-          }}
-        >
+        <div className="panel-divider" onMouseDown={onDividerMouseDown}>
           <div className="divider-line" />
         </div>
-
         <div className="panel-right" style={{ width: `${100 - leftPanelWidth}%` }}>
           <ConflictVisualizer
             htmlValue={html}
@@ -310,103 +272,54 @@ const HomePage: React.FC = () => {
   );
 };
 
-const AboutPage: React.FC = () => {
-  return (
-    <div className="app-container">
-      <header className="app-header">
-        <div className="header-logo">
-          <span className="logo-icon">⚡</span>
-          <span className="logo-text">CSS Conflict Analyzer</span>
-        </div>
-
-        <nav className="header-nav">
-          <NavLink
-            to="/"
-            end
-            className={({ isActive }) =>
-              `nav-link ${isActive ? 'active' : ''}`
-            }
-          >
-            🏠 主页
-          </NavLink>
-          <NavLink
-            to="/about"
-            className={({ isActive }) =>
-              `nav-link ${isActive ? 'active' : ''}`
-            }
-          >
-            ℹ️ 关于
-          </NavLink>
-        </nav>
-
-        <div className="header-info" />
-      </header>
-
-      <div className="about-page">
-        <div className="about-card">
-          <h1 className="about-title">关于本工具</h1>
-          <p className="about-desc">
-            CSS选择器冲突排查与修复提案生成工具，帮助开发者快速定位CSS样式冲突，
-            并智能生成无副作用的修复方案。
-          </p>
-
-          <div className="feature-grid">
-            <div className="feature-item">
-              <div className="feature-icon">🔍</div>
-              <h3>智能检测</h3>
-              <p>自动分析CSS选择器特异性与覆盖冲突</p>
-            </div>
-            <div className="feature-item">
-              <div className="feature-icon">🌳</div>
-              <h3>可视化定位</h3>
-              <p>DOM树中高亮冲突节点，一目了然</p>
-            </div>
-            <div className="feature-item">
-              <div className="feature-icon">🔧</div>
-              <h3>一键修复</h3>
-              <p>生成Diff格式修复建议，支持一键复制</p>
-            </div>
-            <div className="feature-item">
-              <div className="feature-icon">⚡</div>
-              <h3>极速响应</h3>
-              <p>1.5秒内完成解析与检测，毫秒级交互</p>
-            </div>
-          </div>
-
-          <div className="about-actions">
-            <Link to="/" className="back-home-btn">
-              ← 返回主页开始使用
-            </Link>
-          </div>
-        </div>
+const PlaceholderPage: React.FC<{ title: string; desc: string }> = ({ title, desc }) => (
+  <div className="app-container">
+    <div style={{
+      flex: 1,
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: 40
+    }}>
+      <div style={{
+        background: 'white',
+        borderRadius: 16,
+        padding: 48,
+        boxShadow: '0 4px 24px rgba(0,0,0,0.08)',
+        maxWidth: 520,
+        textAlign: 'center',
+        border: '1px solid #d1d5db'
+      }}>
+        <div style={{ fontSize: 64, marginBottom: 16 }}>�</div>
+        <h1 style={{ fontSize: 28, fontWeight: 700, color: '#1f2937', marginBottom: 12 }}>{title}</h1>
+        <p style={{ fontSize: 16, color: '#6b7280', lineHeight: 1.7 }}>{desc}</p>
       </div>
     </div>
-  );
-};
-
-const NotFoundPage: React.FC = () => {
-  return (
-    <div className="app-container">
-      <div className="not-found-page">
-        <div className="not-found-card">
-          <div className="not-found-icon">😵</div>
-          <h1 className="not-found-title">404 页面未找到</h1>
-          <p className="not-found-desc">你访问的页面不存在，请检查URL是否正确</p>
-          <Link to="/" className="back-home-btn">
-            ← 返回主页
-          </Link>
-        </div>
-      </div>
-    </div>
-  );
-};
+  </div>
+);
 
 const App: React.FC = () => {
   return (
     <Routes>
       <Route path="/" element={<HomePage />} />
-      <Route path="/about" element={<AboutPage />} />
-      <Route path="*" element={<NotFoundPage />} />
+      <Route
+        path="/about"
+        element={
+          <PlaceholderPage
+            title="关于页面"
+            desc="这是一个路由占位页面，用于验证 React Router 配置是否正常工作。"
+          />
+        }
+      />
+      <Route
+        path="*"
+        element={
+          <PlaceholderPage
+            title="404 Not Found"
+            desc="路由占位页面，你访问的路径尚未配置对应组件。"
+          />
+        }
+      />
     </Routes>
   );
 };

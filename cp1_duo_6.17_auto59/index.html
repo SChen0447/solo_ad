@@ -80,29 +80,26 @@
           <span>CSS Conflict Analyzer</span>
         </div>
         <p class="tagline">快速定位CSS选择器冲突，智能生成修复方案</p>
-        <button class="entry-button" onclick="startApp()">启动工具</button>
+        <button class="entry-button" id="startBtn">启动工具</button>
       </div>
     </div>
-    <script>
-      function startApp() {
-        const rootEl = document.getElementById('root');
-        rootEl.innerHTML = '';
-        if (typeof window.__mountReactApp === 'function') {
-          window.__mountReactApp();
-        } else {
-          window.__APP_STARTED__ = true;
-          var checkInterval = setInterval(function() {
-            if (typeof window.__mountReactApp === 'function') {
-              clearInterval(checkInterval);
-              window.__mountReactApp();
-            }
-          }, 50);
-          setTimeout(function() {
-            clearInterval(checkInterval);
-          }, 5000);
-        }
-      }
-    </script>
     <script type="module" src="/src/main.tsx"></script>
+    <script>
+      (function() {
+        var APP_MOUNT_EVENT = 'css-analyzer:mount';
+        var startBtn = document.getElementById('startBtn');
+
+        function startApp() {
+          var rootEl = document.getElementById('root');
+          rootEl.innerHTML = '';
+          rootEl.dataset.pendingMount = 'true';
+          document.dispatchEvent(new CustomEvent(APP_MOUNT_EVENT));
+        }
+
+        if (startBtn) {
+          startBtn.addEventListener('click', startApp);
+        }
+      })();
+    </script>
   </body>
 </html>
