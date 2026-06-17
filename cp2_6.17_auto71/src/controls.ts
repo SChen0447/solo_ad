@@ -11,6 +11,8 @@ interface SliderDef {
   step: number;
   unit: string;
   value: number;
+  hasReset?: boolean;
+  defaultValue?: number;
 }
 
 const SCENES: { type: PhysicsSceneType; label: string }[] = [
@@ -67,11 +69,13 @@ export class Controls {
         <div class="sliders-container">
           ${this.renderSlider({
             key: 'emissionRate', label: '发射率', min: 1, max: 100, step: 1,
-            unit: '个/秒', value: this.currentConfig.emissionRate as number
+            unit: '个/秒', value: this.currentConfig.emissionRate as number,
+            hasReset: true, defaultValue: 50
           })}
           ${this.renderSlider({
             key: 'initialSpeed', label: '初始速度', min: 0, max: 500, step: 5,
-            unit: 'px/s', value: this.currentConfig.initialSpeed as number
+            unit: 'px/s', value: this.currentConfig.initialSpeed as number,
+            hasReset: true, defaultValue: 200
           })}
           ${this.renderSlider({
             key: 'lifetime', label: '生命周期', min: 0.5, max: 5, step: 0.1,
@@ -94,6 +98,10 @@ export class Controls {
           ${this.renderColorPicker('start', '起始色', this.currentConfig.startColor)}
           <div class="color-arrow">→</div>
           ${this.renderColorPicker('end', '结束色', this.currentConfig.endColor)}
+        </div>
+        <div class="gradient-preview" data-gradient-preview>
+          <div class="gradient-bar" style="background: linear-gradient(90deg, ${this.currentConfig.startColor} 0%, ${this.currentConfig.endColor} 100%);"></div>
+          <div class="gradient-label">渐变预览</div>
         </div>
       </div>
 
@@ -119,20 +127,30 @@ export class Controls {
   private renderSlider(def: SliderDef): string {
     const percent = ((def.value - def.min) / (def.max - def.min)) * 100;
     const displayValue = def.step < 1 ? def.value.toFixed(1) : def.value;
+    const resetBtn = def.hasReset && def.defaultValue !== undefined
+      ? `<button class="slider-reset-btn" data-reset="${def.key}" title="恢复默认值">↺</button>`
+      : '';
     return `
-      <div class="slider-item">
+      <div class="slider-item" data-slider-item="${def.key}">
         <div class="slider-header">
           <span class="slider-label">${def.label}</span>
-          <span class="slider-value" data-value-for="${def.key}">${displayValue} <span class="slider-unit">${def.unit}</span></span>
+          <div class="slider-header-right">
+            <span class="slider-value" data-value-for="${def.key}">${displayValue} <span class="slider-unit">${def.unit}</span></span>
+            ${resetBtn}
+          </div>
         </div>
         <div class="slider-wrapper">
-          <div class="slider-fill" data-fill-for="${def.key}" style="width: ${percent}%"></div>
+          <div class="slider-fill slider-fill-animated" data-fill-for="${def.key}" style="width: ${percent}%"></div>
           <input type="range" 
                  data-key="${def.key}"
                  min="${def.min}" 
                  max="${def.max}" 
                  step="${def.step}" 
                  value="${def.value}" />
+          <div class="slider-bubble" data-bubble-for="${def.key}">
+            <span class="slider-bubble-value">${displayValue}</span>
+            <span class="slider-bubble-unit">${def.unit}</span>
+          </div>
         </div>
       </div>
     `;
@@ -161,13 +179,55 @@ export class Controls {
   private bindEvents(): void {
     const sliders = this.container.querySelectorAll<HTMLInputElement>('input[type="range"][data-key]');
     sliders.forEach(slider => {
+      const key = slider.dataset.key as keyof EmitterConfig;
+      const bubble = this.container.querySelector(`[data-bubble-for="${key}"]`) as HTMLElement;
+      const fill = this.container.querySelector(`[data-fill-for="${key}"]`) as HTMLElement;
+
+      const updateBubblePosition = () => {
+        if (!bubble) return;
+        const min = parseFloat(slider.min);
+        const max = parseFloat(slider.max);
+        const val = parseFloat(slider.value);
+        const percent = (val - min) / (max - min);
+        const sliderWidth = slider.offsetWidth;
+        const thumbWidth = 16;
+        const bubbleWidth = bubble.offsetWidth;
+        const x = percent * (sliderWidth - thumbWidth) + thumbWidth / 2 - bubbleWidth / 2;
+        bubble.style.left = `${x}px`;
+      };
+
+      const showBubble = () => {
+        if (bubble) {
+          bubble.classList.add('visible');
+          updateBubblePosition();
+        }
+        if (fill) {
+          fill.classList.remove('slider-fill-animated');
+        }
+      };
+
+      const hideBubble = () => {
+        if (bubble) {
+          bubble.classList.remove('visible');
+        }
+        if (fill) {
+          requestAnimationFrame(() => {
+            fill.classList.add('slider-fill-animated');
+          });
+        }
+      };
+
+      slider.addEventListener('mousedown', showBubble);
+      slider.addEventListener('touchstart', showBubble);
+      slider.addEventListener('mouseup', hideBubble);
+      slider.addEventListener('touchend', hideBubble);
+      slider.addEventListener('mouseleave', hideBubble);
+
       slider.addEventListener('input', () => {
-        const key = slider.dataset.key as keyof EmitterConfig;
         const val = parseFloat(slider.value);
         const min = parseFloat(slider.min);
         const max = parseFloat(slider.max);
         const percent = ((val - min) / (max - min)) * 100;
-        const fill = this.container.querySelector(`[data-fill-for="${key}"]`) as HTMLElement;
         if (fill) fill.style.width = `${percent}%`;
         const step = parseFloat(slider.step);
         const display = step < 1 ? val.toFixed(1) : val.toString();
@@ -177,8 +237,46 @@ export class Controls {
           const unitText = unit.querySelector('.slider-unit')?.textContent || '';
           unit.innerHTML = `${display} <span class="slider-unit">${unitText}</span>`;
         }
+        if (bubble) {
+          const bubbleValue = bubble.querySelector('.slider-bubble-value');
+          if (bubbleValue) bubbleValue.textContent = display;
+          updateBubblePosition();
+        }
         this.currentConfig[key] = val as never;
         this.onConfigChange({ [key]: val } as Partial<EmitterConfig>);
+      });
+    });
+
+    const resetBtns = this.container.querySelectorAll<HTMLButtonElement>('[data-reset]');
+    resetBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        const key = btn.dataset.reset as keyof EmitterConfig;
+        const slider = this.container.querySelector<HTMLInputElement>(`input[data-key="${key}"]`);
+        if (!slider) return;
+
+        const defaultValue = parseFloat(slider.defaultValue);
+        slider.value = defaultValue.toString();
+
+        const min = parseFloat(slider.min);
+        const max = parseFloat(slider.max);
+        const percent = ((defaultValue - min) / (max - min)) * 100;
+        const fill = this.container.querySelector(`[data-fill-for="${key}"]`) as HTMLElement;
+        if (fill) fill.style.width = `${percent}%`;
+
+        const step = parseFloat(slider.step);
+        const display = step < 1 ? defaultValue.toFixed(1) : defaultValue.toString();
+        const sliderItem = slider.closest('.slider-item');
+        const unit = sliderItem?.querySelector(`[data-value-for="${key}"]`) as HTMLElement;
+        if (unit) {
+          const unitText = unit.querySelector('.slider-unit')?.textContent || '';
+          unit.innerHTML = `${display} <span class="slider-unit">${unitText}</span>`;
+        }
+
+        btn.classList.add('reset-flash');
+        setTimeout(() => btn.classList.remove('reset-flash'), 300);
+
+        this.currentConfig[key] = defaultValue as never;
+        this.onConfigChange({ [key]: defaultValue } as Partial<EmitterConfig>);
       });
     });
 
@@ -300,6 +398,14 @@ export class Controls {
     if (hexLabel) hexLabel.textContent = color.toUpperCase();
     const hexInput = this.container.querySelector<HTMLInputElement>(`[data-hex-input="${which}"]`);
     if (hexInput) hexInput.value = color.toUpperCase();
+
+    const gradientBar = this.container.querySelector<HTMLElement>('[data-gradient-preview] .gradient-bar');
+    if (gradientBar) {
+      const startColor = this.currentConfig.startColor;
+      const endColor = this.currentConfig.endColor;
+      gradientBar.style.background = `linear-gradient(90deg, ${startColor} 0%, ${endColor} 100%)`;
+    }
+
     this.onConfigChange({ [key]: color } as Partial<EmitterConfig>);
   }
 
