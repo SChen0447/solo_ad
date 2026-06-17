@@ -221,22 +221,9 @@ export const CanvasBoard = forwardRef<CanvasBoardHandle, CanvasBoardProps>(funct
 
     onEmotionChange(emotion)
 
-    let lastX = 0
-    let lastY = 0
-    let found = false
-    for (let i = strokesRef.current.length - 1; i >= 0; i--) {
-      const stroke = strokesRef.current[i]
-      if (stroke.points.length > 0) {
-        const last = stroke.points[stroke.points.length - 1]
-        lastX = last.x
-        lastY = last.y
-        found = true
-        break
-      }
-    }
-
-    if (found && particleEngineRef.current) {
-      particleEngineRef.current.trigger(lastX, lastY, emotion)
+    const validStrokes = strokesRef.current.filter(s => s.points.length > 0)
+    if (validStrokes.length > 0 && particleEngineRef.current) {
+      particleEngineRef.current.trigger(validStrokes, emotion)
     }
   }, [flushPendingPoints, onEmotionChange])
 

@@ -1,4 +1,7 @@
 import type { EmotionResult } from './EmotionMapper'
+import type { Stroke, StrokePoint } from './Analyzer'
+
+type ParticleShape = 'circle' | 'line'
 
 interface Particle {
   x: number
@@ -10,11 +13,21 @@ interface Particle {
   size: number
   color: string
   alpha: number
+  baseAlpha: number
   life: number
   maxLife: number
   phase: number
   amplitude: number
   frequency: number
+  strokeId: number
+  shape: ParticleShape
+  rotation: number
+  angularVelocity: number
+  lineLength: number
+  lineAngle: number
+  flickerStart: number
+  flickerCount: number
+  flickerPhase: number
 }
 
 export class ParticleEngine {
@@ -46,30 +59,54 @@ export class ParticleEngine {
     }
   }
 
-  trigger(originX: number, originY: number, emotion: EmotionResult): void {
+  trigger(strokes: Stroke[], emotion: EmotionResult): void {
+    const allPoints: { point: StrokePoint; strokeId: number }[] = []
+    for (let s = 0; s < strokes.length; s++) {
+      const stroke = strokes[s]
+      for (let p = 0; p < stroke.points.length; p++) {
+        allPoints.push({ point: stroke.points[p], strokeId: s })
+      }
+    }
+    if (allPoints.length === 0) return
+
+    const totalPoints = allPoints.length
     const count = 30 + Math.floor(Math.random() * 51)
     const duration = 2000 + Math.random() * 1000
+    const flickerStartMs = duration - 500
 
     for (let i = 0; i < count; i++) {
+      const sampled = allPoints[Math.floor(Math.random() * totalPoints)]
+      const point = sampled.point
       const angle = Math.random() * Math.PI * 2
       const speed = 20 + Math.random() * 60
       const size = 3 + Math.random() * 5
+      const shape: ParticleShape = Math.random() < 0.55 ? 'circle' : 'line'
 
       this.particles.push({
-        x: originX,
-        y: originY,
-        originX,
-        originY,
+        x: point.x,
+        y: point.y,
+        originX: point.x,
+        originY: point.y,
         vx: Math.cos(angle) * speed,
         vy: Math.sin(angle) * speed,
         size,
         color: emotion.color,
         alpha: 1,
+        baseAlpha: 1,
         life: 0,
         maxLife: duration,
         phase: Math.random() * Math.PI * 2,
         amplitude: 3 + Math.random() * 8,
-        frequency: 1 + Math.random() * 2
+        frequency: 1 + Math.random() * 2,
+        strokeId: sampled.strokeId,
+        shape,
+        rotation: Math.random() * Math.PI * 2,
+        angularVelocity: (0.01 + Math.random() * 0.04) * (Math.random() < 0.5 ? 1 : -1),
+        lineLength: 4 + Math.random() * 8,
+        lineAngle: Math.random() * Math.PI * 2,
+        flickerStart: flickerStartMs,
+        flickerCount: 2 + Math.floor(Math.random() * 2),
+        flickerPhase: Math.random() * Math.PI
       })
     }
 
@@ -126,8 +163,22 @@ export class ParticleEngine {
       p.vx *= 0.98
       p.vy *= 0.98
 
+      p.rotation += p.angularVelocity
+      p.lineAngle += p.angularVelocity * 0.5
+
       const lifeRatio = p.life / p.maxLife
-      p.alpha = 1 - easeOutCubic(lifeRatio)
+      let alpha = 1 - easeOutCubic(lifeRatio)
+
+      const remaining = p.maxLife - p.life
+      if (remaining < 500 && remaining > 0) {
+        const flickerProgress = (500 - remaining) / 500
+        const flickerCycles = p.flickerCount * 2
+        const wave = Math.sin(flickerProgress * flickerCycles * Math.PI + p.flickerPhase)
+        const flickerIntensity = flickerProgress
+        alpha = alpha * (0.35 + 0.65 * (0.5 + 0.5 * wave) * (1 - flickerIntensity) + 0.5 * flickerIntensity)
+      }
+
+      p.alpha = Math.max(0, Math.min(1, alpha))
     }
   }
 
@@ -146,7 +197,11 @@ export class ParticleEngine {
         const dist = Math.sqrt(dx * dx + dy * dy)
 
         if (dist < 80) {
-          const alpha = (1 - dist / 80) * 0.6 * Math.min(p1.alpha, p2.alpha)
+          const sameStroke = p1.strokeId === p2.strokeId
+          const baseAlphaMult = sameStroke ? 0.6 : 0.3
+          const alpha = (1 - dist / 80) * baseAlphaMult * Math.min(p1.alpha, p2.alpha)
+          if (alpha <= 0.005) continue
+
           this.ctx.beginPath()
           this.ctx.moveTo(p1.x, p1.y)
           this.ctx.lineTo(p2.x, p2.y)
@@ -158,10 +213,46 @@ export class ParticleEngine {
     }
 
     for (const p of this.particles) {
-      this.ctx.beginPath()
-      this.ctx.arc(p.x, p.y, p.size * p.alpha, 0, Math.PI * 2)
-      this.ctx.fillStyle = hexToRgba(p.color, p.alpha)
-      this.ctx.fill()
+      if (p.alpha <= 0.01) continue
+      const ctx = this.ctx
+      ctx.save()
+      ctx.translate(p.x, p.y)
+      ctx.rotate(p.rotation)
+      ctx.globalAlpha = p.alpha
+
+      if (p.shape === 'circle') {
+        ctx.beginPath()
+        ctx.arc(0, 0, p.size, 0, Math.PI * 2)
+        ctx.fillStyle = hexToRgba(p.color, 1)
+        ctx.fill()
+
+        if (p.size > 4) {
+          ctx.beginPath()
+          ctx.arc(-p.size * 0.25, -p.size * 0.25, p.size * 0.3, 0, Math.PI * 2)
+          ctx.fillStyle = 'rgba(255,255,255,0.35)'
+          ctx.fill()
+        }
+      } else {
+        const half = p.lineLength / 2
+        const thickness = Math.max(1, p.size * 0.5)
+        ctx.rotate(p.lineAngle)
+        ctx.strokeStyle = hexToRgba(p.color, 1)
+        ctx.lineWidth = thickness
+        ctx.lineCap = 'round'
+        ctx.beginPath()
+        ctx.moveTo(-half, 0)
+        ctx.lineTo(half, 0)
+        ctx.stroke()
+
+        ctx.strokeStyle = 'rgba(255,255,255,0.4)'
+        ctx.lineWidth = thickness * 0.3
+        ctx.beginPath()
+        ctx.moveTo(-half * 0.8, -thickness * 0.15)
+        ctx.lineTo(half * 0.8, -thickness * 0.15)
+        ctx.stroke()
+      }
+
+      ctx.restore()
     }
   }
 
