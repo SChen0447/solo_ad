@@ -1,4 +1,4 @@
-import type { TerrainManager, SkylineMode } from './terrainManager';
+import type { TerrainManager, SkylineMode, BuildingSnapshot } from './terrainManager';
 import type { SunSimulator } from './sunSimulator';
 
 export class UIController {
@@ -7,6 +7,10 @@ export class UIController {
   private panel!: HTMLElement;
   private isCollapsed = false;
   private isCompareMode = false;
+  private snapshot: BuildingSnapshot | null = null;
+
+  private readonly COLOR_SCHEME_A = 0x3388ff;
+  private readonly COLOR_SCHEME_B = 0xff8833;
 
   constructor(terrainManager: TerrainManager, sunSimulator: SunSimulator) {
     this.terrainManager = terrainManager;
@@ -386,7 +390,7 @@ export class UIController {
     const compareBtn = document.getElementById('compare-btn') as HTMLButtonElement;
 
     snapshotBtn?.addEventListener('click', () => {
-      this.terrainManager.saveSnapshot();
+      this.saveSnapshot();
       if (compareBtn) compareBtn.disabled = false;
       if (snapshotBtn) {
         snapshotBtn.textContent = '快照已保存 ✓';
@@ -399,11 +403,35 @@ export class UIController {
     });
 
     compareBtn?.addEventListener('click', () => {
-      if (!this.terrainManager.hasSnapshot()) return;
-      this.isCompareMode = !this.isCompareMode;
-      this.terrainManager.toggleCompare();
+      if (!this.hasSnapshot()) return;
+      this.toggleCompare();
       compareBtn.classList.toggle('active', this.isCompareMode);
       compareBtn.textContent = this.isCompareMode ? '退出对比' : '对比模式';
     });
+  }
+
+  private saveSnapshot(): void {
+    this.snapshot = this.terrainManager.getCurrentSnapshot();
+  }
+
+  private hasSnapshot(): boolean {
+    return this.snapshot !== null;
+  }
+
+  private toggleCompare(): boolean {
+    if (this.isCompareMode) {
+      this.terrainManager.hideComparison();
+      this.isCompareMode = false;
+      return false;
+    } else if (this.snapshot) {
+      this.terrainManager.showComparison(
+        this.snapshot,
+        this.COLOR_SCHEME_A,
+        this.COLOR_SCHEME_B
+      );
+      this.isCompareMode = true;
+      return true;
+    }
+    return false;
   }
 }

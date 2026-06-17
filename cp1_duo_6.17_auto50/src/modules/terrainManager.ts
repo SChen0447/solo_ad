@@ -23,11 +23,6 @@ interface Building {
   animFrom: number;
 }
 
-interface Snapshot {
-  heights: Float32Array;
-  positions: Float32Array;
-}
-
 const EASE_DURATION = 500;
 const CONTROL_POINT_RADIUS = 1.2;
 const BUILDING_SIZE = 3.0;
@@ -38,6 +33,11 @@ const GRID_COLS = 12;
 const PLANNING_SIZE = 60;
 const HEIGHT_MIN = 0;
 const HEIGHT_MAX = 50;
+
+export interface BuildingSnapshot {
+  heights: Float32Array;
+  positions: Float32Array;
+}
 
 function easeInOut(t: number): number {
   return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
@@ -51,10 +51,8 @@ export class TerrainManager {
   private buildings: Building[] = [];
   private dragControls: DragControls | null = null;
   private orbitEnabled = true;
-  private snapshot: Snapshot | null = null;
   private comparisonGroupA: THREE.Group | null = null;
   private comparisonGroupB: THREE.Group | null = null;
-  private isCompareMode = false;
 
   private controls: any;
 
@@ -124,10 +122,8 @@ export class TerrainManager {
         color: 0x3388ff,
         transparent: true,
         opacity: 0.5,
-        emissive: 0x2266cc,
-        emissiveIntensity: 0.2,
-        roughness: 0.4,
-        metalness: 0.3,
+        roughness: 0.7,
+        metalness: 0.1,
       });
       const mesh = new THREE.Mesh(geo, mat);
       mesh.position.set(pos.x, h / 2, pos.z);
@@ -200,16 +196,26 @@ export class TerrainManager {
   }
 
   private computeInterpolatedHeight(bx: number, bz: number): number {
-    let totalWeight = 0;
-    let weightedHeight = 0;
+    const distances: { dist: number; height: number }[] = [];
 
     for (const cp of this.controlPoints) {
       const dx = bx - cp.mesh.position.x;
       const dz = bz - cp.mesh.position.z;
       const distSq = dx * dx + dz * dz;
-      const w = 1 / (distSq + 4);
+      distances.push({ dist: Math.sqrt(distSq), height: cp.targetHeight });
+    }
+
+    distances.sort((a, b) => a.dist - b.dist);
+
+    const nearestCount = Math.min(3, distances.length);
+    let totalWeight = 0;
+    let weightedHeight = 0;
+
+    for (let i = 0; i < nearestCount; i++) {
+      const d = distances[i];
+      const w = 1 / (d.dist * d.dist + 1);
       totalWeight += w;
-      weightedHeight += w * cp.targetHeight;
+      weightedHeight += w * d.height;
     }
 
     const result = totalWeight > 0 ? weightedHeight / totalWeight : 0;
@@ -333,7 +339,7 @@ export class TerrainManager {
     this.updateBuildingTargets();
   }
 
-  saveSnapshot(): void {
+  getCurrentSnapshot(): BuildingSnapshot {
     const heights = new Float32Array(this.buildings.length);
     const positions = new Float32Array(this.controlPoints.length * 3);
     for (let i = 0; i < this.buildings.length; i++) {
@@ -345,34 +351,21 @@ export class TerrainManager {
       positions[i * 3 + 1] = cp.mesh.position.z;
       positions[i * 3 + 2] = cp.currentHeight;
     }
-    this.snapshot = { heights, positions };
+    return { heights, positions };
   }
 
-  hasSnapshot(): boolean {
-    return this.snapshot !== null;
-  }
-
-  toggleCompare(): boolean {
-    if (this.isCompareMode) {
-      this.exitCompare();
-      return false;
-    } else {
-      this.enterCompare();
-      return true;
+  showComparison(snapshotA: BuildingSnapshot, colorA: number, colorB: number): void {
+    if (this.comparisonGroupA || this.comparisonGroupB) {
+      this.hideComparison();
     }
-  }
-
-  private enterCompare(): void {
-    if (!this.snapshot) return;
-    this.isCompareMode = true;
 
     const offset = PLANNING_SIZE / 2 + 5;
 
     this.comparisonGroupA = new THREE.Group();
     this.comparisonGroupB = new THREE.Group();
 
-    const blueMat = new THREE.MeshStandardMaterial({
-      color: 0x3388ff,
+    const matA = new THREE.MeshStandardMaterial({
+      color: colorA,
       transparent: true,
       opacity: 0.5,
       roughness: 0.6,
@@ -383,9 +376,9 @@ export class TerrainManager {
 
     for (let i = 0; i < this.buildings.length; i++) {
       const b = this.buildings[i];
-      const h = Math.max(this.snapshot.heights[i], 0.05);
+      const h = Math.max(snapshotA.heights[i], 0.05);
       const geo = new THREE.BoxGeometry(BUILDING_SIZE, 1, BUILDING_SIZE);
-      const mesh = new THREE.Mesh(geo, blueMat);
+      const mesh = new THREE.Mesh(geo, matA);
       mesh.position.set(b.gridX - offset, h / 2, b.gridZ);
       mesh.scale.y = h;
       mesh.castShadow = false;
@@ -393,12 +386,12 @@ export class TerrainManager {
       this.comparisonGroupA.add(mesh);
     }
 
-    const labelA = this.createLabel('方案A', 0x3388ff);
+    const labelA = this.createLabel('方案A', colorA);
     labelA.position.set(-offset, 0.5, -PLANNING_SIZE / 2 - 2);
     this.comparisonGroupA.add(labelA);
 
-    const orangeMat = new THREE.MeshStandardMaterial({
-      color: 0xff8833,
+    const matB = new THREE.MeshStandardMaterial({
+      color: colorB,
       transparent: true,
       opacity: 0.5,
       roughness: 0.6,
@@ -410,7 +403,7 @@ export class TerrainManager {
     for (const b of this.buildings) {
       const h = Math.max(b.currentHeight, 0.05);
       const geo = new THREE.BoxGeometry(BUILDING_SIZE, 1, BUILDING_SIZE);
-      const mesh = new THREE.Mesh(geo, orangeMat);
+      const mesh = new THREE.Mesh(geo, matB);
       mesh.position.set(b.gridX + offset, h / 2, b.gridZ);
       mesh.scale.y = h;
       mesh.castShadow = false;
@@ -418,7 +411,7 @@ export class TerrainManager {
       this.comparisonGroupB.add(mesh);
     }
 
-    const labelB = this.createLabel('方案B (当前)', 0xff8833);
+    const labelB = this.createLabel('方案B (当前)', colorB);
     labelB.position.set(offset, 0.5, -PLANNING_SIZE / 2 - 2);
     this.comparisonGroupB.add(labelB);
 
@@ -457,9 +450,7 @@ export class TerrainManager {
     return mesh;
   }
 
-  private exitCompare(): void {
-    this.isCompareMode = false;
-
+  hideComparison(): void {
     [this.comparisonGroupA, this.comparisonGroupB].forEach((group) => {
       if (group) {
         this.scene.remove(group);
@@ -486,6 +477,10 @@ export class TerrainManager {
     for (const cp of this.controlPoints) {
       cp.mesh.visible = true;
     }
+  }
+
+  hasComparison(): boolean {
+    return this.comparisonGroupA !== null && this.comparisonGroupB !== null;
   }
 
   getOrbitEnabled(): boolean {
