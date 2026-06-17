@@ -45,7 +45,7 @@ function createWindowMaterial(color: number): THREE.MeshStandardMaterial {
     metalness: 0.6,
     transparent: true,
     opacity: 0.7,
-    emissive: new THREE.Color(color),
+    emissive: new THREE.Color(0x4488ff),
     emissiveIntensity: 0.15
   });
 }
@@ -66,7 +66,8 @@ function addEdgeOutline(
     color,
     linewidth: 1,
     transparent: true,
-    opacity: 0.6
+    opacity: 0.6,
+    depthWrite: false
   });
   const lineSegments = new THREE.LineSegments(edges, lineMaterial);
   lineSegments.position.copy(position);
@@ -140,7 +141,7 @@ function addGroundGrid(group: THREE.Group, config: BuildingConfig): void {
   const gridMaterial = gridHelper.material as THREE.Material;
   gridMaterial.transparent = true;
   gridMaterial.opacity = 0.3;
-  gridHelper.position.y = -0.01;
+  gridHelper.position.y = -0.05;
   group.add(gridHelper);
 
   const circleRadius = Math.max(config.width, config.depth) * 1.2;
@@ -153,15 +154,26 @@ function addGroundGrid(group: THREE.Group, config: BuildingConfig): void {
   });
   const circleMesh = new THREE.Mesh(circleGeo, circleMat);
   circleMesh.rotation.x = -Math.PI / 2;
-  circleMesh.position.y = -0.01;
+  circleMesh.position.y = -0.05;
   group.add(circleMesh);
 }
 
+class SeededPRNG {
+  private state: number;
+
+  constructor(seed: number) {
+    this.state = seed % 2147483647;
+    if (this.state <= 0) this.state += 2147483646;
+  }
+
+  next(): number {
+    this.state = (this.state * 16807) % 2147483647;
+    return (this.state - 1) / 2147483646;
+  }
+}
+
 function addSurroundingObjects(group: THREE.Group, config: BuildingConfig, seed: number = 42): void {
-  const pseudoRandom = (index: number): number => {
-    const x = Math.sin(seed * 9301 + index * 49297 + 233280) * 49297;
-    return x - Math.floor(x);
-  };
+  const rng = new SeededPRNG(seed);
 
   const count = 8;
   const minDist = Math.max(config.width, config.depth) * 0.9;
@@ -170,15 +182,15 @@ function addSurroundingObjects(group: THREE.Group, config: BuildingConfig, seed:
   const greenShades = [0x2d5a27, 0x3a7d32, 0x4a8c3f, 0x5a9b4e, 0x2e7d32, 0x388e3c, 0x43a047, 0x66bb6a];
 
   for (let i = 0; i < count; i++) {
-    const angle = pseudoRandom(i) * Math.PI * 2;
-    const dist = minDist + pseudoRandom(i + 100) * (maxDist - minDist);
+    const angle = rng.next() * Math.PI * 2;
+    const dist = minDist + rng.next() * (maxDist - minDist);
     const x = Math.cos(angle) * dist;
     const z = Math.sin(angle) * dist;
 
-    const height = 0.5 + pseudoRandom(i + 200) * 1.5;
-    const objectWidth = 0.4 + pseudoRandom(i + 300) * 0.6;
-    const objectDepth = 0.4 + pseudoRandom(i + 400) * 0.6;
-    const colorIndex = Math.floor(pseudoRandom(i + 500) * greenShades.length);
+    const height = 0.5 + rng.next() * 1.5;
+    const objectWidth = 0.4 + rng.next() * 0.6;
+    const objectDepth = 0.4 + rng.next() * 0.6;
+    const colorIndex = Math.floor(rng.next() * greenShades.length);
     const color = greenShades[colorIndex];
 
     const cubeGeo = new THREE.BoxGeometry(objectWidth, height, objectDepth);
@@ -223,12 +235,11 @@ export function generateBuilding(customConfig?: Partial<BuildingConfig>): THREE.
   }
 
   const roofThickness = 0.15;
-  const roofOverhang = 0.4;
-  const roofGeo = new THREE.BoxGeometry(
-    config.width + roofOverhang * 2,
-    roofThickness,
-    config.depth + roofOverhang * 2
-  );
+  const roofOverhangWidth = 0.4;
+  const roofOverhangDepth = 0.4;
+  const roofWidth = config.width + roofOverhangWidth * 2;
+  const roofDepth = config.depth + roofOverhangDepth * 2;
+  const roofGeo = new THREE.BoxGeometry(roofWidth, roofThickness, roofDepth);
   const roofMesh = new THREE.Mesh(roofGeo, roofMat);
   roofMesh.position.y = totalWallHeight + roofThickness / 2;
   applyShadowProperties(roofMesh);
@@ -295,7 +306,7 @@ export function createGround(size: number = 50): THREE.Mesh {
   });
   const groundMesh = new THREE.Mesh(groundGeometry, groundMaterial);
   groundMesh.rotation.x = -Math.PI / 2;
-  groundMesh.position.y = -0.01;
+  groundMesh.position.y = -0.05;
   groundMesh.receiveShadow = true;
   return groundMesh;
 }
