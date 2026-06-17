@@ -130,6 +130,16 @@ export class GameScene extends Phaser.Scene {
 
   minimapGraphics!: Phaser.GameObjects.Graphics;
 
+  stars: { x: number; y: number; size: number; baseAlpha: number; alpha: number }[] = [];
+  starGraphics!: Phaser.GameObjects.Graphics;
+  starUpdateTimer = 0;
+  particlePool: Phaser.GameObjects.Graphics[] = [];
+  maxParticles = 50;
+
+  frameTimeAccumulator = 0;
+  targetFPS = 60;
+  skipFrame = false;
+
   constructor() {
     super({ key: 'GameScene' });
   }
@@ -153,33 +163,43 @@ export class GameScene extends Phaser.Scene {
   }
 
   createStarField() {
-    this.starField = this.add.graphics();
+    this.starGraphics = this.add.graphics();
+    this.starGraphics.setDepth(0);
+
     const count = 600;
     for (let i = 0; i < count; i++) {
-      const x = Phaser.Math.Between(0, this.worldWidth);
-      const y = Phaser.Math.Between(0, this.worldHeight);
-      const size = Math.random() * 2 + 0.5;
-      const alpha = Math.random() * 0.6 + 0.3;
-      this.starField.fillStyle(0xffffff, alpha);
-      this.starField.fillCircle(x, y, size);
+      this.stars.push({
+        x: Phaser.Math.Between(0, this.worldWidth),
+        y: Phaser.Math.Between(0, this.worldHeight),
+        size: Math.random() * 2 + 0.5,
+        baseAlpha: Math.random() * 0.6 + 0.3,
+        alpha: Math.random() * 0.6 + 0.3,
+      });
     }
-    this.starField.setDepth(0);
+
+    this.redrawStarField();
 
     this.time.addEvent({
-      delay: 100,
+      delay: 150,
       loop: true,
       callback: () => {
-        const twinkleCount = 5;
+        const twinkleCount = 12;
         for (let i = 0; i < twinkleCount; i++) {
-          const x = Phaser.Math.Between(0, this.worldWidth);
-          const y = Phaser.Math.Between(0, this.worldHeight);
-          const size = Math.random() * 2 + 0.5;
-          const alpha = Math.random() * 0.6 + 0.3;
-          this.starField.fillStyle(0xffffff, alpha);
-          this.starField.fillCircle(x, y, size);
+          const idx = Phaser.Math.Between(0, this.stars.length - 1);
+          const star = this.stars[idx];
+          star.alpha = Math.max(0.1, Math.min(0.9, star.baseAlpha + (Math.random() - 0.5) * 0.4));
         }
+        this.redrawStarField();
       },
     });
+  }
+
+  redrawStarField() {
+    this.starGraphics.clear();
+    for (const star of this.stars) {
+      this.starGraphics.fillStyle(0xffffff, star.alpha);
+      this.starGraphics.fillCircle(star.x, star.y, star.size);
+    }
   }
 
   createNebulaLayer() {
@@ -513,28 +533,28 @@ export class GameScene extends Phaser.Scene {
     const shipX = this.ship.x;
     const shipY = this.ship.y;
 
-    const oreDot = this.add.graphics();
+    const oreDot = this.getParticleFromPool();
     oreDot.fillStyle(cfg.color, 1);
     oreDot.fillCircle(0, 0, 6);
+    oreDot.fillStyle(0xffffff, 0.5);
+    oreDot.fillCircle(-2, -2, 2);
     oreDot.setPosition(worldX, worldY);
-    oreDot.setDepth(15);
 
     const midX = (worldX + shipX) / 2;
     const midY = Math.min(worldY, shipY) - 60;
 
+    const anim = { t: 0 };
     this.tweens.add({
-      targets: oreDot,
-      x: shipX,
-      y: shipY,
+      targets: anim,
+      t: 1,
       duration: 600,
       ease: 'Power2',
-      onUpdate: (tween) => {
-        const t = tween.getValue() / (tween.data?.[0]?.end || 1);
-        const safeT = Math.min(Math.max(t, 0), 1);
+      onUpdate: () => {
+        const safeT = Math.min(Math.max(anim.t, 0), 1);
         oreDot.x = (1 - safeT) * (1 - safeT) * worldX + 2 * (1 - safeT) * safeT * midX + safeT * safeT * shipX;
         oreDot.y = (1 - safeT) * (1 - safeT) * worldY + 2 * (1 - safeT) * safeT * midY + safeT * safeT * shipY;
       },
-      onComplete: () => oreDot.destroy(),
+      onComplete: () => this.returnParticleToPool(oreDot),
     });
   }
 
@@ -684,6 +704,7 @@ export class GameScene extends Phaser.Scene {
   setupCamera() {
     this.cameras.main.startFollow(this.ship, true, 0.08, 0.08);
     this.cameras.main.setBounds(0, 0, this.worldWidth, this.worldHeight);
+    this.cameras.main.setZoom(0.8);
 
     this.input.on('wheel', (_pointer: Phaser.Input.Pointer, _gameObjects: any[], _dx: number, dy: number) => {
       const zoom = this.cameras.main.zoom;
@@ -719,12 +740,47 @@ export class GameScene extends Phaser.Scene {
     });
   }
 
+  getParticleFromPool(): Phaser.GameObjects.Graphics {
+    for (const p of this.particlePool) {
+      if (!p.active) {
+        p.setActive(true).setVisible(true);
+        return p;
+      }
+    }
+
+    if (this.particlePool.length >= this.maxParticles) {
+      const oldest = this.particlePool.shift();
+      if (oldest) {
+        oldest.clear();
+        oldest.setActive(true).setVisible(true);
+        this.particlePool.push(oldest);
+        return oldest;
+      }
+    }
+
+    const gfx = this.add.graphics().setDepth(15).setActive(false).setVisible(false);
+    this.particlePool.push(gfx);
+    return gfx;
+  }
+
+  returnParticleToPool(gfx: Phaser.GameObjects.Graphics) {
+    gfx.clear();
+    gfx.setActive(false).setVisible(false);
+  }
+
   update(_time: number, delta: number) {
-    this.handleShipMovement(delta);
-    this.checkProximity();
-    this.updateAutoSave(delta);
-    this.updateMarket(delta);
-    this.updateDockingRing();
+    this.frameTimeAccumulator += delta;
+    const frameInterval = 1000 / this.targetFPS;
+
+    if (this.frameTimeAccumulator >= frameInterval) {
+      this.frameTimeAccumulator -= frameInterval;
+
+      this.handleShipMovement(delta);
+      this.checkProximity();
+      this.updateAutoSave(delta);
+      this.updateMarket(delta);
+      this.updateDockingRing();
+    }
   }
 
   handleShipMovement(_delta: number) {
@@ -756,22 +812,25 @@ export class GameScene extends Phaser.Scene {
   }
 
   checkProximity() {
-    this.isNearStation = Phaser.Math.Distance.Between(
-      this.ship.x, this.ship.y,
-      this.stationX, this.stationY
-    ) < 120;
+    const shipX = this.ship.x;
+    const shipY = this.ship.y;
 
-    for (const ast of this.asteroids) {
-      const dist = Phaser.Math.Distance.Between(this.ship.x, this.ship.y, ast.x, ast.y);
-      if (dist < ast.radius + 40 && !this.isDocked) {
-        this.dockToAsteroid(ast);
-        return;
+    this.isNearStation = Phaser.Math.Distance.Between(shipX, shipY, this.stationX, this.stationY) < 120;
+
+    if (!this.isDocked) {
+      for (const ast of this.asteroids) {
+        const distSq = (shipX - ast.x) * (shipX - ast.x) + (shipY - ast.y) * (shipY - ast.y);
+        const dockDist = ast.radius + 40;
+        if (distSq < dockDist * dockDist) {
+          this.dockToAsteroid(ast);
+          return;
+        }
       }
-    }
-
-    if (this.isDocked && this.dockedAsteroid) {
-      const dist = Phaser.Math.Distance.Between(this.ship.x, this.ship.y, this.dockedAsteroid.x, this.dockedAsteroid.y);
-      if (dist > this.dockedAsteroid.radius + 80) {
+    } else if (this.dockedAsteroid) {
+      const ast = this.dockedAsteroid;
+      const distSq = (shipX - ast.x) * (shipX - ast.x) + (shipY - ast.y) * (shipY - ast.y);
+      const undockDist = ast.radius + 80;
+      if (distSq > undockDist * undockDist) {
         this.undockFromAsteroid();
       }
     }

@@ -34,6 +34,18 @@ export class UIController extends Phaser.Scene {
   animatedValues: Map<string, { current: number; target: number; text: Phaser.GameObjects.Text }> = new Map();
   smelterProgressBars: Phaser.GameObjects.Graphics[] = [];
   smelterLabels: Phaser.GameObjects.Text[] = [];
+  smelterSlotGfx: Phaser.GameObjects.Graphics[] = [];
+  smelterEmitters: Phaser.GameObjects.Particles.ParticleEmitter[] = [];
+  leaderboardEntries: Phaser.GameObjects.Text[] = [];
+
+  shortcutKeys!: { U: Phaser.Input.Keyboard.Key; M: Phaser.Input.Keyboard.Key; L: Phaser.Input.Keyboard.Key; F: Phaser.Input.Keyboard.Key };
+
+  draggedOre: { ore: OreType; sprite: Phaser.GameObjects.Graphics } | null = null;
+  smelterSlotRects: { x: number; y: number; w: number; h: number }[] = [];
+
+  techTreeNodes: Map<string, { graphics: Phaser.GameObjects.Graphics; shine?: Phaser.GameObjects.Graphics; glow?: Phaser.GameObjects.Graphics }> = new Map();
+  techTreeLines: Map<string, Phaser.GameObjects.Graphics> = new Map();
+  lastUnlockedNodeId: string | null = null;
 
   constructor() {
     super({ key: 'UIController' });
@@ -41,6 +53,7 @@ export class UIController extends Phaser.Scene {
 
   create() {
     this.gameScene = this.scene.get('GameScene') as GameScene;
+    this.initShortcutKeys();
     this.createHUD();
     this.createMarketTicker();
     this.createMinimap();
@@ -52,7 +65,18 @@ export class UIController extends Phaser.Scene {
     this.createNotification();
     this.createProximityLabels();
     this.setupEvents();
+    this.setupDragAndDrop();
     this.scale.on('resize', this.handleResize, this);
+  }
+
+  initShortcutKeys() {
+    if (!this.input.keyboard) return;
+    this.shortcutKeys = {
+      U: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.U),
+      M: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.M),
+      L: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.L),
+      F: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.F),
+    };
   }
 
   createHUD() {
@@ -115,18 +139,18 @@ export class UIController extends Phaser.Scene {
 
   createUpgradePanel() {
     this.upgradePanel = this.add.container(0, 0).setDepth(200).setScrollFactor(0).setVisible(false).setAlpha(0);
-    const pw = 600, ph = 480;
+    const pw = 640, ph = 520;
     const px = (this.scale.width - pw) / 2, py = this.scale.height - ph - 20;
 
     const panelBg = this.add.graphics();
-    panelBg.fillStyle(0x1a1a2e, 0.95);
+    panelBg.fillStyle(0x1a1a2e, 0.97);
     panelBg.fillRoundedRect(0, 0, pw, ph, 12);
     panelBg.lineStyle(2, 0x00d4ff, 0.7);
     panelBg.strokeRoundedRect(0, 0, pw, ph, 12);
     this.upgradePanel.add(panelBg);
 
     this.upgradePanel.add(
-      this.add.text(pw / 2, 20, '⚡ 科技树', { fontSize: '22px', color: '#00d4ff', fontFamily: 'sans-serif' }).setOrigin(0.5, 0)
+      this.add.text(pw / 2, 20, '⚡ 科技树', { fontSize: '24px', color: '#00d4ff', fontFamily: 'sans-serif', fontStyle: 'bold' }).setOrigin(0.5, 0)
     );
 
     const closeBtn = this.add.text(pw - 24, 12, '✕', { fontSize: '20px', color: '#ff6666', fontFamily: 'sans-serif' }).setInteractive({ useHandCursor: true });
@@ -134,51 +158,120 @@ export class UIController extends Phaser.Scene {
     this.upgradePanel.add(closeBtn);
 
     const nodes = this.gameScene.upgradeNodes;
-    const colWidth = pw / 4, rowHeight = 110;
+    const colWidth = pw / 4, rowHeight = 120;
+
+    this.techTreeNodes.clear();
+    this.techTreeLines.clear();
 
     for (const node of nodes) {
-      const nx = 40 + node.col * colWidth, ny = 60 + node.row * rowHeight;
+      const nx = 40 + node.col * colWidth, ny = 70 + node.row * rowHeight;
 
       for (const reqId of node.requires) {
         const req = nodes.find(n => n.id === reqId);
         if (req) {
+          const lineId = `${req.id}_${node.id}`;
           const line = this.add.graphics();
-          line.lineStyle(2, node.unlocked ? 0x00d4ff : 0x334466, node.unlocked ? 0.8 : 0.3);
+          const fromX = 40 + req.col * colWidth + (colWidth - 30) / 2;
+          const fromY = 70 + req.row * rowHeight + 80;
+          const toX = nx + (colWidth - 30) / 2;
+          const toY = ny;
+
+          const isUnlockedPath = node.unlocked || req.unlocked;
+          line.lineStyle(isUnlockedPath ? 3 : 2, isUnlockedPath ? 0x00d4ff : 0x334466, isUnlockedPath ? 0.9 : 0.3);
           line.beginPath();
-          line.moveTo(40 + req.col * colWidth + (colWidth - 30) / 2, 60 + req.row * rowHeight + 80);
-          line.lineTo(nx + (colWidth - 30) / 2, ny);
+          line.moveTo(fromX, fromY);
+          line.lineTo(toX, toY);
           line.strokePath();
           line.setDepth(-1);
           this.upgradePanel.add(line);
+          this.techTreeLines.set(lineId, line);
+
+          if (isUnlockedPath) {
+            this.tweens.add({
+              targets: line,
+              alpha: { from: 0.5, to: 1 },
+              duration: 1500,
+              yoyo: true,
+              repeat: -1,
+            });
+          }
         }
       }
 
       const nodeGfx = this.add.graphics();
-      nodeGfx.fillStyle(node.unlocked ? 0x004466 : 0x222244, 0.9);
-      nodeGfx.fillRoundedRect(nx, ny, colWidth - 30, 80, 8);
-      nodeGfx.lineStyle(2, node.unlocked ? 0x00d4ff : 0x334466, node.unlocked ? 1 : 0.5);
-      nodeGfx.strokeRoundedRect(nx, ny, colWidth - 30, 80, 8);
+      const nodeWidth = colWidth - 30, nodeHeight = 80;
+
+      const fillColor = node.unlocked ? 0x004466 : 0x222244;
+      const strokeColor = node.unlocked ? 0x00d4ff : 0x334466;
+      nodeGfx.fillStyle(fillColor, 0.95);
+      nodeGfx.fillRoundedRect(nx, ny, nodeWidth, nodeHeight, 8);
+      nodeGfx.lineStyle(2, strokeColor, node.unlocked ? 1 : 0.5);
+      nodeGfx.strokeRoundedRect(nx, ny, nodeWidth, nodeHeight, 8);
       this.upgradePanel.add(nodeGfx);
 
+      const glowGfx = this.add.graphics();
+      glowGfx.fillStyle(0x00d4ff, 0.0);
+      glowGfx.fillRoundedRect(nx - 4, ny - 4, nodeWidth + 8, nodeHeight + 8, 10);
+      glowGfx.setDepth(-2);
+      this.upgradePanel.add(glowGfx);
+
       if (node.unlocked) {
-        this.tweens.add({ targets: nodeGfx, alpha: { from: 0.7, to: 1 }, duration: 800, yoyo: true, repeat: -1 });
+        this.tweens.add({
+          targets: glowGfx,
+          fillAlpha: { from: 0.1, to: 0.25 },
+          duration: 800,
+          yoyo: true,
+          repeat: -1,
+        });
       }
 
-      this.upgradePanel.add(this.add.text(nx + 8, ny + 8, node.name, { fontSize: '13px', color: node.unlocked ? '#00d4ff' : '#667788', fontFamily: 'sans-serif' }));
-      this.upgradePanel.add(this.add.text(nx + 8, ny + 30, `费用: ${node.cost}`, { fontSize: '12px', color: '#ffcc00', fontFamily: 'sans-serif' }));
-      this.upgradePanel.add(this.add.text(nx + 8, ny + 52, node.unlocked ? '✓ 已解锁' : '未解锁', { fontSize: '11px', color: node.unlocked ? '#44ff88' : '#556677', fontFamily: 'sans-serif' }));
+      let shineGfx: Phaser.GameObjects.Graphics | undefined;
+      if (node.unlocked) {
+        shineGfx = this.add.graphics();
+        shineGfx.fillStyle(0x00d4ff, 0);
+        shineGfx.fillRoundedRect(nx, ny, nodeWidth, nodeHeight, 8);
+        shineGfx.setDepth(2);
+        this.upgradePanel.add(shineGfx);
+
+        const shineTween = this.tweens.add({
+          targets: shineGfx,
+          fillAlpha: { from: 0, to: 0.4 },
+          duration: 1200,
+          yoyo: true,
+          repeat: -1,
+          delay: Math.random() * 1000,
+        });
+
+        if (this.lastUnlockedNodeId === node.id) {
+          shineTween.stop();
+          shineTween.restart();
+          this.cameras.main.flash(500, 0, 84, 102, false);
+        }
+      }
+
+      this.techTreeNodes.set(node.id, { graphics: nodeGfx, shine: shineGfx, glow: glowGfx });
+
+      this.upgradePanel.add(this.add.text(nx + 8, ny + 8, node.name, { fontSize: '13px', color: node.unlocked ? '#00d4ff' : '#667788', fontFamily: 'sans-serif', fontStyle: node.unlocked ? 'bold' : 'normal' }));
+      this.upgradePanel.add(this.add.text(nx + 8, ny + 30, `💰 ${node.cost}`, { fontSize: '12px', color: '#ffcc00', fontFamily: 'sans-serif' }));
+
+      const statusColor = node.unlocked ? '#44ff88' : '#556677';
+      const statusText = node.unlocked ? '✓ 已解锁' : '🔒 未解锁';
+      this.upgradePanel.add(this.add.text(nx + 8, ny + 52, statusText, { fontSize: '11px', color: statusColor, fontFamily: 'sans-serif' }));
 
       if (!node.unlocked) {
         const btn = this.add.graphics();
         btn.fillStyle(0x00d4ff, 0.2);
-        btn.fillRoundedRect(nx + 4, ny + 64, colWidth - 38, 14, 4);
-        btn.setInteractive(new Phaser.Geom.Rectangle(nx + 4, ny + 64, colWidth - 38, 14), Phaser.Geom.Rectangle.Contains, { useHandCursor: true });
-        btn.on('pointerdown', () => this.gameScene.purchaseUpgrade(node.id));
+        btn.fillRoundedRect(nx + 4, ny + 64, nodeWidth - 8, 12, 4);
+        btn.setInteractive(new Phaser.Geom.Rectangle(nx + 4, ny + 64, nodeWidth - 8, 12), Phaser.Geom.Rectangle.Contains, { useHandCursor: true });
+        btn.on('pointerdown', () => {
+          this.lastUnlockedNodeId = node.id;
+          this.gameScene.purchaseUpgrade(node.id);
+        });
         btn.on('pointerover', () => btn.setAlpha(1));
         btn.on('pointerout', () => btn.setAlpha(0.5));
         btn.setAlpha(0.5);
         this.upgradePanel.add(btn);
-        this.upgradePanel.add(this.add.text(nx + (colWidth - 30) / 2, ny + 71, '解锁', { fontSize: '10px', color: '#00d4ff', fontFamily: 'sans-serif' }).setOrigin(0.5, 0));
+        this.upgradePanel.add(this.add.text(nx + nodeWidth / 2, ny + 70, '🔓 解锁', { fontSize: '10px', color: '#00d4ff', fontFamily: 'sans-serif' }).setOrigin(0.5, 0));
       }
     }
 
@@ -187,7 +280,7 @@ export class UIController extends Phaser.Scene {
 
   createSmelterPanel() {
     this.smelterPanel = this.add.container(0, 0).setDepth(200).setScrollFactor(0).setVisible(false).setAlpha(0);
-    const pw = 500, ph = 200;
+    const pw = 680, ph = 260;
     const px = (this.scale.width - pw) / 2, py = this.scale.height - ph - 20;
 
     const panelBg = this.add.graphics();
@@ -203,31 +296,64 @@ export class UIController extends Phaser.Scene {
     closeBtn.on('pointerdown', () => this.toggleSmelterPanel());
     this.smelterPanel.add(closeBtn);
 
+    this.smelterPanel.add(this.add.text(20, 50, '拖拽矿石至此:', { fontSize: '13px', color: '#88aacc', fontFamily: 'sans-serif' }));
+
     const slotWidth = 65;
     const startX = (pw - 6 * slotWidth - 5 * 8) / 2;
+    const slotY = 80;
+
+    this.smelterSlotRects = [];
+
+    const fireTexture = this.make.graphics({ x: 0, y: 0, add: false });
+    fireTexture.fillStyle(0xff6600, 1);
+    fireTexture.fillCircle(6, 6, 6);
+    fireTexture.fillStyle(0xffff00, 0.6);
+    fireTexture.fillCircle(6, 4, 3);
+    fireTexture.generateTexture('fireParticle', 12, 12);
+    fireTexture.destroy();
 
     for (let i = 0; i < 6; i++) {
-      const sx = startX + i * (slotWidth + 8), sy = 50;
+      const sx = startX + i * (slotWidth + 8);
       const slotGfx = this.add.graphics();
       slotGfx.fillStyle(0x222244, 0.8);
-      slotGfx.fillRoundedRect(sx, sy, slotWidth, 70, 6);
+      slotGfx.fillRoundedRect(sx, slotY, slotWidth, 80, 6);
       slotGfx.lineStyle(1, 0x334466, 0.6);
-      slotGfx.strokeRoundedRect(sx, sy, slotWidth, 70, 6);
+      slotGfx.strokeRoundedRect(sx, slotY, slotWidth, 80, 6);
+      slotGfx.setInteractive(new Phaser.Geom.Rectangle(sx, slotY, slotWidth, 80), Phaser.Geom.Rectangle.Contains, { useHandCursor: true });
+      slotGfx.setData('slotIndex', i);
       this.smelterPanel.add(slotGfx);
+      this.smelterSlotGfx.push(slotGfx);
+
+      this.smelterSlotRects.push({ x: sx, y: slotY, w: slotWidth, h: 80 });
 
       const pb = this.add.graphics();
       this.smelterPanel.add(pb);
       this.smelterProgressBars.push(pb);
 
-      const label = this.add.text(sx + slotWidth / 2, sy + 35, '空', { fontSize: '12px', color: '#556677', fontFamily: 'sans-serif' }).setOrigin(0.5);
+      const label = this.add.text(sx + slotWidth / 2, slotY + 35, '空', { fontSize: '12px', color: '#556677', fontFamily: 'sans-serif' }).setOrigin(0.5);
       this.smelterPanel.add(label);
       this.smelterLabels.push(label);
 
-      const smeltBtn = this.add.text(sx + slotWidth / 2, sy + 55, '熔炼', { fontSize: '11px', color: '#00d4ff', fontFamily: 'sans-serif' }).setOrigin(0.5).setInteractive({ useHandCursor: true });
+      const smeltBtn = this.add.text(sx + slotWidth / 2, slotY + 60, '熔炼', { fontSize: '11px', color: '#00d4ff', fontFamily: 'sans-serif' }).setOrigin(0.5).setInteractive({ useHandCursor: true });
       smeltBtn.on('pointerdown', () => this.gameScene.startSmelting(i));
       this.smelterPanel.add(smeltBtn);
+
+      const emitter = this.add.particles(0, 0, 'fireParticle', {
+        speed: { min: 15, max: 40 },
+        lifespan: 600,
+        alpha: { start: 0.8, end: 0 },
+        scale: { start: 0.8, end: 0.1 },
+        blendMode: 'ADD',
+        emitting: false,
+        quantity: 3,
+        follow: this.smelterPanel,
+        followOffset: { x: sx + slotWidth / 2, y: slotY + 80 },
+      });
+      emitter.setDepth(201);
+      this.smelterEmitters.push(emitter);
     }
 
+    this.smelterPanel.add(this.add.text(20, ph - 30, '拖拽矿石到槽位 | 点击熔炼按钮开始', { fontSize: '11px', color: '#556677', fontFamily: 'sans-serif' }));
     this.smelterPanel.setPosition(px, py);
   }
 
@@ -300,8 +426,11 @@ export class UIController extends Phaser.Scene {
 
     this.leaderboardPanel.add(this.add.text(20, 50, '排名        玩家          金币         矿石', { fontSize: '12px', color: '#667788', fontFamily: 'sans-serif' }));
 
+    this.leaderboardEntries = [];
     for (let i = 0; i < 8; i++) {
-      this.leaderboardPanel.add(this.add.text(20, 74 + i * 30, `${i + 1}.  ---  ---  ---`, { fontSize: '13px', color: '#aabbcc', fontFamily: 'sans-serif' }));
+      const entry = this.add.text(20, 74 + i * 30, `${i + 1}.  ---  ---  ---`, { fontSize: '13px', color: '#aabbcc', fontFamily: 'sans-serif' });
+      this.leaderboardPanel.add(entry);
+      this.leaderboardEntries.push(entry);
     }
 
     this.leaderboardPanel.setPosition(px, py);
@@ -384,6 +513,12 @@ export class UIController extends Phaser.Scene {
       }
     });
 
+    this.game.events.on('smelter-started', (slotIndex: number) => {
+      if (this.smelterEmitters[slotIndex]) {
+        this.smelterEmitters[slotIndex].start();
+      }
+    });
+
     this.game.events.on('smelter-progress', (slotIndex: number, progress: number) => {
       this.updateSmelterProgress(slotIndex, progress);
     });
@@ -392,6 +527,7 @@ export class UIController extends Phaser.Scene {
       this.smelterLabels[slotIndex]?.setText('空');
       this.smelterLabels[slotIndex]?.setColor('#556677');
       if (this.smelterProgressBars[slotIndex]) this.smelterProgressBars[slotIndex].clear();
+      if (this.smelterEmitters[slotIndex]) this.smelterEmitters[slotIndex].stop();
       this.showNotification(`熔炼完成！获得 ${value} 金币`);
     });
 
@@ -453,13 +589,59 @@ export class UIController extends Phaser.Scene {
     if (!pb) return;
 
     const slotWidth = 65;
-    const startX = (500 - 6 * slotWidth - 5 * 8) / 2;
+    const startX = (680 - 6 * slotWidth - 5 * 8) / 2;
     const sx = startX + slotIndex * (slotWidth + 8);
-    const sy = 50;
+    const sy = 80;
+    const slotHeight = 80;
 
     pb.clear();
+    const fillHeight = slotHeight * progress;
     pb.fillStyle(0xff6600, 0.6);
-    pb.fillRoundedRect(sx + 2, sy + 65 * (1 - progress), slotWidth - 4, 65 * progress, 3);
+    pb.fillRoundedRect(sx + 2, sy + slotHeight - fillHeight, slotWidth - 4, fillHeight, 3);
+  }
+
+  updateMinimap() {
+    if (!this.gameScene.ship || !this.minimapGfx) return;
+    this.minimapGfx.clear();
+
+    const mapSize = 140;
+    const scaleX = mapSize / this.gameScene.worldWidth;
+    const scaleY = mapSize / this.gameScene.worldHeight;
+
+    for (const ast of this.gameScene.asteroids) {
+      const mx = ast.x * scaleX;
+      const my = ast.y * scaleY;
+      this.minimapGfx.fillStyle(0x445566, 0.8);
+      this.minimapGfx.fillCircle(mx, my, 3);
+    }
+
+    const sx = this.gameScene.ship.x * scaleX;
+    const sy = this.gameScene.ship.y * scaleY;
+    this.minimapGfx.fillStyle(0x00d4ff, 1);
+    this.minimapGfx.fillCircle(sx, sy, 4);
+
+    const shipAngle = this.gameScene.shipBody.rotation;
+    this.minimapGfx.lineStyle(1, 0x00d4ff, 1);
+    this.minimapGfx.beginPath();
+    this.minimapGfx.moveTo(sx, sy);
+    this.minimapGfx.lineTo(
+      sx + Math.cos(shipAngle - Math.PI / 2) * 8,
+      sy + Math.sin(shipAngle - Math.PI / 2) * 8
+    );
+    this.minimapGfx.strokePath();
+
+    const stationX = this.gameScene.stationX * scaleX;
+    const stationY = this.gameScene.stationY * scaleY;
+    this.minimapGfx.fillStyle(0xffcc00, 0.8);
+    this.minimapGfx.fillCircle(stationX, stationY, 4);
+  }
+
+  handleResize() {
+  }
+
+  update() {
+    this.updateMinimap();
+    this.checkKeyboardShortcuts();
   }
 
   showAsteroidPanel(asteroid: Asteroid) {
@@ -528,68 +710,94 @@ export class UIController extends Phaser.Scene {
     this.createUpgradePanel();
   }
 
+  setupDragAndDrop() {
+    this.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
+      if (!this.smelterPanelVisible || this.draggedOre) return;
+      const cargo = this.gameScene.cargo;
+      if (cargo.length === 0) return;
+
+      const oreToDrag = cargo[0];
+      const cfg = ORE_CONFIGS.find(c => c.type === oreToDrag)!;
+
+      const sprite = this.add.graphics();
+      sprite.fillStyle(cfg.color, 1);
+      sprite.fillCircle(0, 0, 12);
+      sprite.fillStyle(0xffffff, 0.5);
+      sprite.fillCircle(-3, -3, 4);
+      sprite.setPosition(pointer.x, pointer.y);
+      sprite.setDepth(400);
+      sprite.setScrollFactor(0);
+
+      this.draggedOre = { ore: oreToDrag, sprite };
+    });
+
+    this.input.on('pointermove', (pointer: Phaser.Input.Pointer) => {
+      if (this.draggedOre) {
+        this.draggedOre.sprite.setPosition(pointer.x, pointer.y);
+      }
+    });
+
+    this.input.on('pointerup', (pointer: Phaser.Input.Pointer) => {
+      if (!this.draggedOre) return;
+
+      let placed = false;
+      if (this.smelterPanelVisible) {
+        const panelX = this.smelterPanel.x;
+        const panelY = this.smelterPanel.y;
+        for (let i = 0; i < this.smelterSlotRects.length; i++) {
+          const rect = this.smelterSlotRects[i];
+          const absX = rect.x + panelX;
+          const absY = rect.y + panelY;
+          if (
+            pointer.x >= absX && pointer.x <= absX + rect.w &&
+            pointer.y >= absY && pointer.y <= absY + rect.h
+          ) {
+            this.gameScene.placeOreInSmelter(i, this.draggedOre.ore);
+            const slot = this.gameScene.smelterSlots[i];
+            if (slot.ore) {
+              const cfg = ORE_CONFIGS.find(c => c.type === slot.ore)!;
+              this.smelterLabels[i].setText(cfg.label);
+              this.smelterLabels[i].setColor('#aabbcc');
+              placed = true;
+            }
+            break;
+          }
+        }
+      }
+
+      this.draggedOre.sprite.destroy();
+      this.draggedOre = null;
+    });
+  }
+
   updateLeaderboard(data: any[]) {
-    const entries = this.leaderboardPanel.getAll('type', 'Text') as Phaser.GameObjects.Text[];
-    let entryIdx = 0;
-    for (const item of entries) {
-      if (entryIdx >= 8) break;
-      const rank = entryIdx + 1;
-      const name = item.name || '---';
-      const credits = item.credits || 0;
-      const ore = item.totalOreMined || 0;
-      entries[entryIdx].setText(`${rank}.  ${name}  ${credits}  ${ore}`);
-      entryIdx++;
+    for (let i = 0; i < this.leaderboardEntries.length; i++) {
+      const entry = this.leaderboardEntries[i];
+      if (i < data.length) {
+        const d = data[i];
+        const name = d.name || '---';
+        const credits = d.credits || 0;
+        const ore = d.totalOreMined || 0;
+        entry.setText(`${i + 1}.  ${name}  ${credits}  ${ore}`);
+      } else {
+        entry.setText(`${i + 1}.  ---  ---  ---`);
+      }
     }
-  }
-
-  handleResize() {
-    // Panels are positioned once; for a full implementation, reposition on resize
-  }
-
-  update() {
-    this.updateMinimap();
-    this.checkKeyboardShortcuts();
-  }
-
-  updateMinimap() {
-    if (!this.gameScene.ship || !this.minimapGfx) return;
-    this.minimapGfx.clear();
-
-    const mapSize = 140;
-    const scaleX = mapSize / this.gameScene.worldWidth;
-    const scaleY = mapSize / this.gameScene.worldHeight;
-
-    for (const ast of this.gameScene.asteroids) {
-      const mx = ast.x * scaleX;
-      const my = ast.y * scaleY;
-      this.minimapGfx.fillStyle(0x445566, 0.8);
-      this.minimapGfx.fillCircle(mx, my, 3);
-    }
-
-    const sx = this.gameScene.ship.x * scaleX;
-    const sy = this.gameScene.ship.y * scaleY;
-    this.minimapGfx.fillStyle(0x00d4ff, 1);
-    this.minimapGfx.fillCircle(sx, sy, 4);
-
-    const stationX = this.gameScene.stationX * scaleX;
-    const stationY = this.gameScene.stationY * scaleY;
-    this.minimapGfx.fillStyle(0xffcc00, 0.8);
-    this.minimapGfx.fillCircle(stationX, stationY, 4);
   }
 
   checkKeyboardShortcuts() {
-    if (!this.input.keyboard) return;
+    if (!this.shortcutKeys) return;
 
-    if (Phaser.Input.Keyboard.JustDown(this.input.keyboard.addKey('U'))) {
+    if (Phaser.Input.Keyboard.JustDown(this.shortcutKeys.U)) {
       this.toggleUpgradePanel();
     }
-    if (Phaser.Input.Keyboard.JustDown(this.input.keyboard.addKey('M'))) {
+    if (Phaser.Input.Keyboard.JustDown(this.shortcutKeys.M)) {
       this.toggleMarketPanel();
     }
-    if (Phaser.Input.Keyboard.JustDown('L' as any)) {
+    if (Phaser.Input.Keyboard.JustDown(this.shortcutKeys.L)) {
       this.toggleLeaderboardPanel();
     }
-    if (Phaser.Input.Keyboard.JustDown('F' as any)) {
+    if (Phaser.Input.Keyboard.JustDown(this.shortcutKeys.F)) {
       this.toggleSmelterPanel();
     }
   }
