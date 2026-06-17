@@ -18,6 +18,11 @@ const InspirationCollection = ({ collection, onCollectionChange }: Props) => {
   const [tagDraft, setTagDraft] = useState('');
   const noteRef = useRef<HTMLTextAreaElement>(null);
 
+  const [selectMode, setSelectMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [copyTipId, setCopyTipId] = useState<string | null>(null);
+
   const allTags = useMemo(() => {
     const set = new Set<string>();
     collection.forEach((item) => item.tags.forEach((t) => set.add(t)));
@@ -36,6 +41,11 @@ const InspirationCollection = ({ collection, onCollectionChange }: Props) => {
     return list;
   }, [collection, filterTag, sortOrder]);
 
+  const filteredIds = useMemo(() => new Set(filtered.map((i) => i.id)), [filtered]);
+
+  const allSelectedInView =
+    filtered.length > 0 && filtered.every((i) => selectedIds.has(i.id));
+
   useEffect(() => {
     setAnimKey((k) => k + 1);
   }, [filterTag, sortOrder, collection.length]);
@@ -45,6 +55,13 @@ const InspirationCollection = ({ collection, onCollectionChange }: Props) => {
       noteRef.current.focus();
     }
   }, [editingId]);
+
+  useEffect(() => {
+    if (!selectMode) {
+      setSelectedIds(new Set());
+      setShowDeleteConfirm(false);
+    }
+  }, [selectMode]);
 
   const startEdit = (item: InspirationItem) => {
     setEditingId(item.id);
@@ -107,6 +124,94 @@ const InspirationCollection = ({ collection, onCollectionChange }: Props) => {
     setEditTagsInput(editTagsInput.filter((x) => x !== t));
   };
 
+  const toggleSelect = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (allSelectedInView) {
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        filteredIds.forEach((id) => next.delete(id));
+        return next;
+      });
+    } else {
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        filteredIds.forEach((id) => next.add(id));
+        return next;
+      });
+    }
+  };
+
+  const batchDelete = async () => {
+    const ids = Array.from(selectedIds);
+    try {
+      for (const id of ids) {
+        await fetch(`/api/inspiration/collection/${id}`, { method: 'DELETE' });
+      }
+      onCollectionChange();
+      setSelectedIds(new Set());
+      setShowDeleteConfirm(false);
+      if (selectedIds.size === filtered.length) {
+        setSelectMode(false);
+      }
+    } catch (err) {
+      console.error('批量删除失败:', err);
+    }
+  };
+
+  const batchExport = () => {
+    const items = collection.filter((i) => selectedIds.has(i.id));
+    const data = items.map((item) => ({
+      id: item.id,
+      text: item.text,
+      note: item.note,
+      tags: item.tags,
+      createdAt: new Date(item.timestamp).toISOString(),
+    }));
+    const jsonStr = JSON.stringify(data, null, 2);
+    const blob = new Blob([jsonStr], { type: 'application/json;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `灵感收藏_${new Date().toISOString().slice(0, 10)}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  const shareItem = async (item: InspirationItem) => {
+    const text = `💡 ${item.text}\n\n📝 备注：${item.note || '（无）'}\n🏷️ 标签：${item.tags.length ? item.tags.map((t) => '#' + t).join(' ') : '（无）'}`;
+    try {
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(text);
+      } else {
+        const textarea = document.createElement('textarea');
+        textarea.value = text;
+        textarea.style.position = 'fixed';
+        textarea.style.left = '-9999px';
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textarea);
+      }
+      setCopyTipId(item.id);
+      setTimeout(() => setCopyTipId((prev) => (prev === item.id ? null : prev)), 1500);
+    } catch (err) {
+      console.error('复制失败:', err);
+    }
+  };
+
   const formatDate = (ts: number) => {
     const d = new Date(ts);
     const y = d.getFullYear();
@@ -124,6 +229,7 @@ const InspirationCollection = ({ collection, onCollectionChange }: Props) => {
           display: flex;
           flex-direction: column;
           gap: 24px;
+          position: relative;
         }
         .collection-header {
           display: flex;
@@ -148,6 +254,39 @@ const InspirationCollection = ({ collection, onCollectionChange }: Props) => {
           background: rgba(139, 92, 246, 0.2);
           color: #c4b5fd;
         }
+
+        .header-actions {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+        }
+
+        .select-mode-btn {
+          padding: 9px 18px;
+          border-radius: 12px;
+          font-size: 14px;
+          font-weight: 500;
+          transition: all 0.3s ease;
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+        }
+        .select-mode-btn.normal {
+          background: rgba(139, 92, 246, 0.15);
+          color: #c4b5fd;
+          border: 1px solid rgba(139, 92, 246, 0.3);
+        }
+        .select-mode-btn.normal:hover {
+          background: rgba(139, 92, 246, 0.28);
+          color: #fff;
+          transform: translateY(-1px);
+        }
+        .select-mode-btn.active {
+          background: linear-gradient(135deg, #6b46c1 0%, #a855f7 100%);
+          color: #fff;
+          box-shadow: 0 4px 12px rgba(139, 92, 246, 0.35);
+        }
+        .select-mode-btn.active:hover { transform: translateY(-1px); box-shadow: 0 6px 18px rgba(139, 92, 246, 0.45); }
 
         .filter-bar {
           display: flex;
@@ -188,10 +327,52 @@ const InspirationCollection = ({ collection, onCollectionChange }: Props) => {
         .filter-select:hover { border-color: #6b7280; }
         .filter-select:focus { border-color: #8b5cf6; box-shadow: 0 0 0 3px rgba(139,92,246,0.2); }
 
+        .select-all-wrap {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          margin-left: auto;
+        }
+        .select-all-label {
+          font-size: 13px;
+          color: #9ca3af;
+          cursor: pointer;
+          user-select: none;
+        }
+        .custom-checkbox {
+          width: 18px;
+          height: 18px;
+          border-radius: 5px;
+          border: 2px solid #4b5563;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          background: #374151;
+          transition: all 0.2s ease;
+          cursor: pointer;
+          flex-shrink: 0;
+        }
+        .custom-checkbox.checked {
+          background: #8b5cf6;
+          border-color: #8b5cf6;
+        }
+        .custom-checkbox.indeterminate {
+          background: #8b5cf6;
+          border-color: #8b5cf6;
+        }
+        .custom-check-svg {
+          width: 12px;
+          height: 12px;
+          stroke: #fff;
+          stroke-width: 3;
+          fill: none;
+        }
+
         .grid-container {
           display: grid;
           grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
           gap: 24px;
+          padding-bottom: 100px;
         }
 
         @keyframes staggerFadeIn {
@@ -219,6 +400,45 @@ const InspirationCollection = ({ collection, onCollectionChange }: Props) => {
           border-color: rgba(139, 92, 246, 0.35);
           box-shadow: 0 12px 32px rgba(0,0,0,0.3);
         }
+        .collect-card.selected {
+          border-color: #8b5cf6;
+          box-shadow: 0 0 0 2px rgba(139, 92, 246, 0.5), 0 12px 32px rgba(139, 92, 246, 0.25);
+        }
+
+        .card-checkbox {
+          position: absolute;
+          top: 12px;
+          left: 12px;
+          z-index: 10;
+          width: 22px;
+          height: 22px;
+          border-radius: 6px;
+          border: 2px solid rgba(255,255,255,0.3);
+          background: rgba(42, 42, 62, 0.9);
+          backdrop-filter: blur(4px);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          transition: all 0.25s ease;
+          cursor: pointer;
+        }
+        .card-checkbox.checked {
+          background: #8b5cf6;
+          border-color: #8b5cf6;
+          transform: scale(1.05);
+        }
+        .card-checkbox:hover {
+          border-color: #c4b5fd;
+        }
+
+        @keyframes popIn {
+          0% { opacity: 0; transform: scale(0.6); }
+          60% { opacity: 1; transform: scale(1.15); }
+          100% { transform: scale(1); }
+        }
+        .card-checkbox.checked .custom-check-svg {
+          animation: popIn 0.3s ease;
+        }
 
         .card-text {
           color: #fff;
@@ -231,6 +451,7 @@ const InspirationCollection = ({ collection, onCollectionChange }: Props) => {
           overflow: hidden;
           flex-shrink: 0;
         }
+        .select-mode .card-text { padding-left: 32px; }
 
         .card-note-wrap {
           flex: 1;
@@ -310,6 +531,7 @@ const InspirationCollection = ({ collection, onCollectionChange }: Props) => {
           font-size: 12px;
           font-weight: 500;
           transition: all 0.2s ease;
+          cursor: pointer;
         }
         .edit-btn.save { background: #8b5cf6; color: #fff; }
         .edit-btn.save:hover { background: #7c3aed; }
@@ -333,6 +555,7 @@ const InspirationCollection = ({ collection, onCollectionChange }: Props) => {
           display: inline-flex;
           align-items: center;
           gap: 4px;
+          cursor: pointer;
         }
         .card-tag:hover { transform: scale(1.05); }
         .card-tag-rm {
@@ -374,9 +597,35 @@ const InspirationCollection = ({ collection, onCollectionChange }: Props) => {
           justify-content: center;
           color: #6b7280;
           transition: all 0.2s ease;
+          position: relative;
         }
         .icon-btn:hover { background: rgba(139,92,246,0.2); color: #c4b5fd; }
         .icon-btn.del:hover { background: rgba(239,68,68,0.2); color: #fca5a5; }
+        .icon-btn.share { position: relative; }
+        .icon-btn.share:hover { background: rgba(52, 211, 153, 0.2); color: #6ee7b7; }
+
+        .copy-toast {
+          position: absolute;
+          bottom: 100%;
+          right: 0;
+          margin-bottom: 8px;
+          padding: 6px 12px;
+          background: #10b981;
+          color: #fff;
+          font-size: 12px;
+          font-weight: 500;
+          border-radius: 8px;
+          white-space: nowrap;
+          pointer-events: none;
+          opacity: 0;
+          transform: translateY(4px);
+          transition: all 0.25s ease;
+          box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
+        }
+        .copy-toast.show {
+          opacity: 1;
+          transform: translateY(0);
+        }
 
         .empty-state {
           grid-column: 1 / -1;
@@ -388,6 +637,138 @@ const InspirationCollection = ({ collection, onCollectionChange }: Props) => {
         .empty-title { font-size: 18px; font-weight: 600; color: #9ca3af; margin-bottom: 8px; }
         .empty-desc { font-size: 14px; line-height: 1.6; }
 
+        .floating-bar {
+          position: fixed;
+          bottom: 30px;
+          left: 50%;
+          transform: translateX(-50%) translateY(20px);
+          display: flex;
+          align-items: center;
+          gap: 14px;
+          padding: 14px 22px;
+          background: rgba(30, 30, 46, 0.95);
+          backdrop-filter: blur(12px);
+          border: 1px solid rgba(139, 92, 246, 0.3);
+          border-radius: 16px;
+          box-shadow: 0 12px 40px rgba(0,0,0,0.5);
+          z-index: 1000;
+          opacity: 0;
+          pointer-events: none;
+          transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .floating-bar.show {
+          opacity: 1;
+          pointer-events: auto;
+          transform: translateX(-50%) translateY(0);
+        }
+        .selected-info {
+          font-size: 14px;
+          color: #d1d5db;
+          padding-right: 10px;
+          border-right: 1px solid rgba(255,255,255,0.1);
+        }
+        .selected-info strong { color: #fbbf24; font-weight: 600; margin: 0 2px; }
+
+        .batch-btn {
+          padding: 9px 18px;
+          border-radius: 10px;
+          font-size: 14px;
+          font-weight: 500;
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          transition: all 0.3s ease;
+        }
+        .batch-btn.export {
+          background: rgba(52, 211, 153, 0.15);
+          color: #6ee7b7;
+          border: 1px solid rgba(52, 211, 153, 0.3);
+        }
+        .batch-btn.export:hover { background: rgba(52, 211, 153, 0.3); color: #fff; transform: translateY(-1px); }
+        .batch-btn.delete {
+          background: rgba(239, 68, 68, 0.15);
+          color: #fca5a5;
+          border: 1px solid rgba(239, 68, 68, 0.3);
+        }
+        .batch-btn.delete:hover { background: rgba(239, 68, 68, 0.3); color: #fff; transform: translateY(-1px); }
+        .batch-btn.exit {
+          background: rgba(107, 114, 128, 0.2);
+          color: #d1d5db;
+          border: 1px solid rgba(107, 114, 128, 0.3);
+        }
+        .batch-btn.exit:hover { background: rgba(107, 114, 128, 0.4); color: #fff; }
+
+        .modal-overlay {
+          position: fixed;
+          inset: 0;
+          background: rgba(0, 0, 0, 0.65);
+          backdrop-filter: blur(4px);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          z-index: 2000;
+          opacity: 0;
+          pointer-events: none;
+          transition: opacity 0.25s ease;
+        }
+        .modal-overlay.show {
+          opacity: 1;
+          pointer-events: auto;
+        }
+        .modal-box {
+          background: #2a2a3e;
+          border: 1px solid rgba(139, 92, 246, 0.25);
+          border-radius: 16px;
+          padding: 28px;
+          width: 90%;
+          max-width: 400px;
+          box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+          transform: scale(0.9) translateY(10px);
+          transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .modal-overlay.show .modal-box {
+          transform: scale(1) translateY(0);
+        }
+        .modal-title {
+          font-size: 18px;
+          font-weight: 700;
+          color: #fff;
+          margin-bottom: 10px;
+          display: flex;
+          align-items: center;
+          gap: 10px;
+        }
+        .modal-desc {
+          font-size: 14px;
+          color: #9ca3af;
+          line-height: 1.6;
+          margin-bottom: 22px;
+        }
+        .modal-actions {
+          display: flex;
+          gap: 10px;
+          justify-content: flex-end;
+        }
+        .modal-btn {
+          padding: 9px 20px;
+          border-radius: 10px;
+          font-size: 14px;
+          font-weight: 500;
+          transition: all 0.25s ease;
+          cursor: pointer;
+        }
+        .modal-btn.cancel {
+          background: rgba(107, 114, 128, 0.3);
+          color: #d1d5db;
+        }
+        .modal-btn.cancel:hover { background: rgba(107, 114, 128, 0.5); }
+        .modal-btn.danger {
+          background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+          color: #fff;
+          box-shadow: 0 4px 12px rgba(239, 68, 68, 0.35);
+        }
+        .modal-btn.danger:hover { box-shadow: 0 6px 18px rgba(239, 68, 68, 0.5); transform: translateY(-1px); }
+
         @media (max-width: 768px) {
           .grid-container {
             grid-template-columns: 1fr;
@@ -395,6 +776,16 @@ const InspirationCollection = ({ collection, onCollectionChange }: Props) => {
           .filter-bar { flex-direction: column; align-items: stretch; }
           .filter-group { justify-content: space-between; }
           .filter-select { flex: 1; }
+          .select-all-wrap { margin-left: 0; }
+          .floating-bar {
+            bottom: 16px;
+            width: calc(100% - 32px);
+            padding: 12px 16px;
+            gap: 8px;
+            flex-wrap: wrap;
+          }
+          .selected-info { border-right: none; padding-right: 0; font-size: 13px; }
+          .batch-btn { flex: 1; justify-content: center; padding: 8px 12px; font-size: 13px; }
         }
       `}</style>
 
@@ -403,6 +794,18 @@ const InspirationCollection = ({ collection, onCollectionChange }: Props) => {
           <div className="collection-title">
             📚 我的收藏
             <span className="collection-count">{collection.length} 条灵感</span>
+          </div>
+
+          <div className="header-actions">
+            {collection.length > 0 && (
+              <button
+                className={`select-mode-btn ${selectMode ? 'active' : 'normal'}`}
+                onClick={() => setSelectMode(!selectMode)}
+              >
+                <span>☑️</span>
+                {selectMode ? '取消选择' : '选择模式'}
+              </button>
+            )}
           </div>
         </div>
 
@@ -448,9 +851,29 @@ const InspirationCollection = ({ collection, onCollectionChange }: Props) => {
               </button>
             </div>
           )}
+
+          {selectMode && (
+            <div className="select-all-wrap">
+              <div
+                className={`custom-checkbox ${allSelectedInView ? 'checked' : selectedIds.size > 0 && !allSelectedInView ? 'indeterminate' : ''}`}
+                onClick={toggleSelectAll}
+              >
+                {allSelectedInView ? (
+                  <svg className="custom-check-svg" viewBox="0 0 24 24">
+                    <polyline points="20 6 9 17 4 12" />
+                  </svg>
+                ) : selectedIds.size > 0 && !allSelectedInView ? (
+                  <svg width="10" height="2" fill="#fff"><rect width="10" height="2" /></svg>
+                ) : null}
+              </div>
+              <span className="select-all-label" onClick={toggleSelectAll}>
+                {allSelectedInView ? '取消全选' : '全选当前视图'}
+              </span>
+            </div>
+          )}
         </div>
 
-        <div className="grid-container" key={animKey}>
+        <div className={`grid-container ${selectMode ? 'select-mode' : ''}`} key={animKey}>
           {filtered.length === 0 ? (
             <div className="empty-state">
               <div className="empty-emoji">
@@ -469,9 +892,25 @@ const InspirationCollection = ({ collection, onCollectionChange }: Props) => {
             filtered.map((item, idx) => (
               <div
                 key={item.id}
-                className="collect-card"
+                className={`collect-card ${selectedIds.has(item.id) ? 'selected' : ''}`}
                 style={{ animationDelay: `${Math.min(idx * 40, 2000)}ms` }}
               >
+                {selectMode && (
+                  <div
+                    className={`card-checkbox ${selectedIds.has(item.id) ? 'checked' : ''}`}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      toggleSelect(item.id);
+                    }}
+                  >
+                    {selectedIds.has(item.id) && (
+                      <svg className="custom-check-svg" viewBox="0 0 24 24">
+                        <polyline points="20 6 9 17 4 12" />
+                      </svg>
+                    )}
+                  </div>
+                )}
+
                 <div className="card-text">{item.text}</div>
 
                 <div className="card-note-wrap">
@@ -555,6 +994,22 @@ const InspirationCollection = ({ collection, onCollectionChange }: Props) => {
                       <span className="card-date">{formatDate(item.timestamp)}</span>
                       <div className="card-actions">
                         <button
+                          className="icon-btn share"
+                          onClick={() => shareItem(item)}
+                          title="分享（复制到剪贴板）"
+                        >
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <circle cx="18" cy="5" r="3" />
+                            <circle cx="6" cy="12" r="3" />
+                            <circle cx="18" cy="19" r="3" />
+                            <line x1="8.59" y1="13.51" x2="15.42" y2="17.49" />
+                            <line x1="15.41" y1="6.51" x2="8.59" y2="10.49" />
+                          </svg>
+                          <div className={`copy-toast ${copyTipId === item.id ? 'show' : ''}`}>
+                            ✓ 已复制
+                          </div>
+                        </button>
+                        <button
                           className="icon-btn"
                           onClick={() => startEdit(item)}
                           title="编辑"
@@ -583,6 +1038,45 @@ const InspirationCollection = ({ collection, onCollectionChange }: Props) => {
               </div>
             ))
           )}
+        </div>
+
+        <div className={`floating-bar ${selectMode && selectedIds.size > 0 ? 'show' : ''}`}>
+          <div className="selected-info">
+            已选中 <strong>{selectedIds.size}</strong> 条灵感
+          </div>
+          <button className="batch-btn export" onClick={batchExport}>
+            <span>📤</span>
+            批量导出
+          </button>
+          <button className="batch-btn delete" onClick={() => setShowDeleteConfirm(true)}>
+            <span>🗑️</span>
+            批量删除
+          </button>
+          <button className="batch-btn exit" onClick={() => setSelectMode(false)}>
+            退出
+          </button>
+        </div>
+
+        <div className={`modal-overlay ${showDeleteConfirm ? 'show' : ''}`} onClick={() => setShowDeleteConfirm(false)}>
+          <div className="modal-box" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-title">
+              <span>⚠️</span>
+              确认批量删除
+            </div>
+            <div className="modal-desc">
+              确定要删除选中的 <strong style={{ color: '#fca5a5' }}>{selectedIds.size} 条</strong> 灵感吗？
+              <br />
+              删除后无法恢复，请谨慎操作。
+            </div>
+            <div className="modal-actions">
+              <button className="modal-btn cancel" onClick={() => setShowDeleteConfirm(false)}>
+                取消
+              </button>
+              <button className="modal-btn danger" onClick={batchDelete}>
+                确认删除
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     </>

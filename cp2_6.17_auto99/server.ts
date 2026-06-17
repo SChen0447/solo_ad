@@ -4,7 +4,7 @@ import bodyParser from 'body-parser';
 import { v4 as uuidv4 } from 'uuid';
 
 const app = express();
-const PORT = 4396;
+const PORT = 5678;
 
 app.use(cors());
 app.use(bodyParser.json());
