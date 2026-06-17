@@ -16,6 +16,11 @@ export interface FileStats {
   typeDistribution: Record<string, number>
 }
 
+export interface TrendItem {
+  date: string
+  count: number
+}
+
 export interface SearchParams {
   fileTypes?: string[]
   tags?: string[]
@@ -79,4 +84,8 @@ export async function searchFiles(params: SearchParams): Promise<ArchiveFile[]> 
 
 export async function fetchStats(): Promise<FileStats> {
   return request<FileStats>('/files/stats')
+}
+
+export async function fetchTrend(): Promise<TrendItem[]> {
+  return request<TrendItem[]>('/files/stats/trend')
 }

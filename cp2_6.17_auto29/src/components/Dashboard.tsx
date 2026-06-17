@@ -1,5 +1,5 @@
+import { useEffect } from 'react'
 import { useArchiveStore } from '@/store'
-import type { FileStats } from '@/api'
 import { FileText, TrendingUp } from 'lucide-react'
 
 const TYPE_COLORS: Record<string, string> = {
@@ -18,8 +18,146 @@ const TYPE_LABELS: Record<string, string> = {
   jpg: 'JPG',
 }
 
+function formatDateMMDD(dateStr: string): string {
+  const parts = dateStr.split('-')
+  return `${parts[1]}-${parts[2]}`
+}
+
+function TrendChart({ trend }: { trend: { date: string; count: number }[] }) {
+  const hasData = trend.some((d) => d.count > 0)
+
+  if (!hasData) {
+    return (
+      <div className="trend-chart">
+        <div className="trend-empty">暂无数据</div>
+        <style>{`
+          .trend-chart {
+            height: 150px;
+            background: #ffffff80;
+            border-radius: 8px;
+            padding: 12px;
+            margin-top: 12px;
+          }
+          .trend-empty {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            color: #999;
+            font-size: 14px;
+          }
+        `}</style>
+      </div>
+    )
+  }
+
+  const maxCount = Math.max(...trend.map((d) => d.count), 1)
+  const chartW = 500
+  const chartH = 100
+  const padLeft = 30
+  const padBottom = 24
+  const padTop = 8
+  const plotW = chartW - padLeft - 8
+  const plotH = chartH - padTop - padBottom
+  const stepX = plotW / (trend.length - 1 || 1)
+
+  const points = trend.map((d, i) => ({
+    x: padLeft + i * stepX,
+    y: padTop + plotH - (d.count / maxCount) * plotH,
+    label: formatDateMMDD(d.date),
+    count: d.count,
+  }))
+
+  const linePath = points.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x},${p.y}`).join(' ')
+
+  const yTicks = maxCount <= 5
+    ? Array.from({ length: maxCount + 1 }, (_, i) => i)
+    : [0, Math.round(maxCount / 2), maxCount]
+
+  return (
+    <div className="trend-chart">
+      <svg
+        viewBox={`0 0 ${chartW} ${chartH}`}
+        preserveAspectRatio="xMidYMid meet"
+        style={{ width: '100%', height: '100%' }}
+      >
+        {yTicks.map((tick) => {
+          const y = padTop + plotH - (tick / maxCount) * plotH
+          return (
+            <g key={tick}>
+              <line
+                x1={padLeft}
+                y1={y}
+                x2={chartW - 8}
+                y2={y}
+                stroke="#d4c9b3"
+                strokeWidth={0.5}
+                strokeDasharray="3,3"
+              />
+              <text
+                x={padLeft - 4}
+                y={y + 3}
+                textAnchor="end"
+                fill="#8b7a6a"
+                fontSize={9}
+              >
+                {tick}
+              </text>
+            </g>
+          )
+        })}
+        <path
+          d={linePath}
+          fill="none"
+          stroke="#8b7a6a"
+          strokeWidth={2}
+          strokeLinejoin="round"
+          strokeLinecap="round"
+        />
+        {points.map((p, i) => (
+          <g key={i}>
+            <circle cx={p.x} cy={p.y} r={3} fill="#8b7a6a" />
+            <text
+              x={p.x}
+              y={chartH - 4}
+              textAnchor="middle"
+              fill="#8b7a6a"
+              fontSize={9}
+            >
+              {p.label}
+            </text>
+          </g>
+        ))}
+      </svg>
+      <style>{`
+        .trend-chart {
+          height: 150px;
+          background: #ffffff80;
+          border-radius: 8px;
+          padding: 12px;
+          margin-top: 12px;
+        }
+        .trend-empty {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          height: 100%;
+          color: #999;
+          font-size: 14px;
+        }
+      `}</style>
+    </div>
+  )
+}
+
 export default function Dashboard() {
   const stats = useArchiveStore((s) => s.stats)
+  const trend = useArchiveStore((s) => s.trend)
+  const loadTrend = useArchiveStore((s) => s.loadTrend)
+
+  useEffect(() => {
+    loadTrend()
+  }, [loadTrend])
 
   return (
     <div className="dashboard-container">
@@ -58,6 +196,7 @@ export default function Dashboard() {
               )
             })}
           </div>
+          <TrendChart trend={trend} />
         </div>
         <div className="dashboard-summary">
           <div className="summary-total">
@@ -74,7 +213,6 @@ export default function Dashboard() {
 
       <style>{`
         .dashboard-container {
-          height: 200px;
           border-radius: 12px;
           background: linear-gradient(to right, #f5f0e1, #e8d9c8);
           padding: 20px 28px;
@@ -83,7 +221,6 @@ export default function Dashboard() {
         .dashboard-inner {
           display: flex;
           gap: 32px;
-          height: 100%;
         }
         .dashboard-chart {
           flex: 1;
@@ -101,7 +238,6 @@ export default function Dashboard() {
           margin-bottom: 8px;
         }
         .chart-bars {
-          flex: 1;
           display: flex;
           align-items: flex-end;
           gap: 20px;
@@ -123,7 +259,7 @@ export default function Dashboard() {
         .chart-bar {
           width: 40px;
           min-height: 4px;
-          border-radius: 4px 4px 0 0;
+          border-radius: 0 0 4px 4px;
           transition: height 0.5s ease;
         }
         .chart-bar-count {
@@ -177,8 +313,6 @@ export default function Dashboard() {
 
         @media (max-width: 768px) {
           .dashboard-container {
-            height: auto;
-            min-height: 160px;
             padding: 16px;
           }
           .dashboard-inner {

@@ -1,8 +1,9 @@
 import { create } from 'zustand'
-import type { ArchiveFile, FileStats, SearchParams } from '@/api'
+import type { ArchiveFile, FileStats, SearchParams, TrendItem } from '@/api'
 import {
   fetchFiles,
   fetchStats,
+  fetchTrend,
   searchFiles,
   uploadFile as apiUploadFile,
   updateFile as apiUpdateFile,
@@ -12,6 +13,7 @@ import {
 interface ArchiveStore {
   files: ArchiveFile[]
   stats: FileStats
+  trend: TrendItem[]
   searchResults: ArchiveFile[]
   searchLoading: boolean
   currentFile: ArchiveFile | null
@@ -20,6 +22,7 @@ interface ArchiveStore {
 
   loadFiles: () => Promise<void>
   loadStats: () => Promise<void>
+  loadTrend: () => Promise<void>
   uploadFile: (file: File) => Promise<void>
   updateFile: (
     id: string,
@@ -41,6 +44,7 @@ const defaultStats: FileStats = {
 export const useArchiveStore = create<ArchiveStore>((set, get) => ({
   files: [],
   stats: defaultStats,
+  trend: [],
   searchResults: [],
   searchLoading: false,
   currentFile: null,
@@ -65,10 +69,19 @@ export const useArchiveStore = create<ArchiveStore>((set, get) => ({
     }
   },
 
+  loadTrend: async () => {
+    try {
+      const trend = await fetchTrend()
+      set({ trend })
+    } catch (e) {
+      console.error('Failed to load trend:', e)
+    }
+  },
+
   uploadFile: async (file: File) => {
     try {
       await apiUploadFile(file)
-      await Promise.all([get().loadFiles(), get().loadStats()])
+      await Promise.all([get().loadFiles(), get().loadStats(), get().loadTrend()])
     } catch (e) {
       console.error('Failed to upload file:', e)
       throw e

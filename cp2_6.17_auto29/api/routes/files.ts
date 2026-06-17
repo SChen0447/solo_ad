@@ -90,6 +90,21 @@ router.post(
   }
 )
 
+router.get('/files/stats/trend', (_req: Request, res: Response): void => {
+  const trend: { date: string; count: number }[] = []
+  const now = new Date()
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date(now)
+    d.setDate(d.getDate() - i)
+    const dateStr = d.toISOString().split('T')[0]
+    const count = files.filter(
+      (f) => f.uploadTime.split('T')[0] === dateStr
+    ).length
+    trend.push({ date: dateStr, count })
+  }
+  res.json(trend)
+})
+
 router.get('/files/stats', (_req: Request, res: Response): void => {
   const today = new Date().toISOString().split('T')[0]
   const todayCount = files.filter(
