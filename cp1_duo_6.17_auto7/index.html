@@ -262,14 +262,28 @@
       width: 260px;
       z-index: 5;
       padding: 24px;
-      background: var(--glass-bg);
-      backdrop-filter: blur(10px);
-      -webkit-backdrop-filter: blur(10px);
-      border: 1px solid var(--glass-border);
+      background: rgba(255, 255, 255, 0.05);
+      backdrop-filter: blur(var(--panel-blur, 10px));
+      -webkit-backdrop-filter: blur(var(--panel-blur, 10px));
+      border: 1px solid rgba(255, 255, 255, var(--panel-border-alpha, 0.08));
       border-radius: 16px;
       opacity: 0;
-      transition: opacity 0.5s ease;
+      transition: opacity 0.5s ease, border-color 0.4s ease;
       box-shadow: 0 0 1px rgba(255, 255, 255, 0.13), inset 0 0 1px rgba(255, 255, 255, 0.05);
+    }
+
+    #control-panel::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      border-radius: 16px;
+      background: radial-gradient(
+        circle at var(--mx, 50%) var(--my, 50%),
+        rgba(123, 47, 255, var(--panel-spot, 0.06)),
+        transparent 60%
+      );
+      pointer-events: none;
+      transition: opacity 0.3s ease;
     }
 
     #control-panel.visible {
@@ -289,6 +303,7 @@
 
     .control-group {
       margin-bottom: 20px;
+      position: relative;
     }
 
     .control-group:last-child {
@@ -308,6 +323,64 @@
       color: var(--accent-purple);
       font-family: 'Orbitron', sans-serif;
       font-size: 0.7rem;
+      transition: transform 0.15s ease;
+    }
+
+    .control-value.bump {
+      animation: valueBump 0.15s ease;
+    }
+
+    @keyframes valueBump {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.1); }
+      100% { transform: scale(1); }
+    }
+
+    .slider-container {
+      position: relative;
+    }
+
+    .slider-tooltip {
+      position: absolute;
+      top: -28px;
+      transform: translateX(-50%);
+      padding: 3px 8px;
+      background: linear-gradient(135deg, rgba(123, 47, 255, 0.9), rgba(180, 100, 255, 0.9));
+      color: white;
+      font-family: 'Orbitron', sans-serif;
+      font-size: 0.65rem;
+      border-radius: 6px;
+      white-space: nowrap;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s ease;
+      box-shadow: 0 4px 12px rgba(123, 47, 255, 0.4);
+      z-index: 10;
+    }
+
+    .slider-tooltip.visible {
+      opacity: 1;
+    }
+
+    .slider-tooltip.bump {
+      animation: tooltipBump 0.15s ease;
+    }
+
+    @keyframes tooltipBump {
+      0% { transform: translateX(-50%) scale(1); }
+      50% { transform: translateX(-50%) scale(1.1); }
+      100% { transform: translateX(-50%) scale(1); }
+    }
+
+    .slider-tooltip::after {
+      content: '';
+      position: absolute;
+      bottom: -4px;
+      left: 50%;
+      transform: translateX(-50%);
+      border-left: 4px solid transparent;
+      border-right: 4px solid transparent;
+      border-top: 4px solid rgba(180, 100, 255, 0.9);
     }
 
     input[type="range"] {
@@ -355,6 +428,7 @@
     }
 
     .gradient-btn {
+      position: relative;
       padding: 8px 0;
       border: 1px solid var(--glass-border);
       border-radius: 8px;
@@ -364,6 +438,20 @@
       font-family: 'Inter', sans-serif;
       cursor: pointer;
       transition: all 0.25s ease;
+      overflow: hidden;
+    }
+
+    .gradient-btn::after {
+      content: '';
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      height: 2px;
+      border-radius: 0 0 8px 8px;
+      transform: scaleX(0);
+      transform-origin: center;
+      transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1), background 0.6s ease, box-shadow 0.4s ease;
     }
 
     .gradient-btn:hover {
@@ -372,10 +460,44 @@
     }
 
     .gradient-btn.active {
-      border-color: var(--accent-purple);
       color: var(--text-primary);
-      background: rgba(123, 47, 255, 0.15);
-      box-shadow: 0 0 12px rgba(123, 47, 255, 0.2);
+      background: rgba(255, 255, 255, 0.04);
+    }
+
+    .gradient-btn.active::after {
+      transform: scaleX(1);
+    }
+
+    .gradient-btn[data-gradient="aurora"].active {
+      border-color: rgba(123, 47, 255, 0.6);
+    }
+    .gradient-btn[data-gradient="aurora"].active::after {
+      background: linear-gradient(90deg, #0A0A2E, #7B2FFF, #FF6B35);
+      box-shadow: 0 0 10px rgba(123, 47, 255, 0.6), 0 0 4px rgba(255, 107, 53, 0.4);
+    }
+
+    .gradient-btn[data-gradient="lava"].active {
+      border-color: rgba(255, 69, 0, 0.6);
+    }
+    .gradient-btn[data-gradient="lava"].active::after {
+      background: linear-gradient(90deg, #1A0000, #FF4500, #FFD700);
+      box-shadow: 0 0 10px rgba(255, 69, 0, 0.6), 0 0 4px rgba(255, 215, 0, 0.4);
+    }
+
+    .gradient-btn[data-gradient="ocean"].active {
+      border-color: rgba(0, 105, 148, 0.6);
+    }
+    .gradient-btn[data-gradient="ocean"].active::after {
+      background: linear-gradient(90deg, #000020, #006994, #00FFCC);
+      box-shadow: 0 0 10px rgba(0, 105, 148, 0.6), 0 0 4px rgba(0, 255, 204, 0.4);
+    }
+
+    .gradient-btn[data-gradient="neon"].active {
+      border-color: rgba(255, 0, 255, 0.6);
+    }
+    .gradient-btn[data-gradient="neon"].active::after {
+      background: linear-gradient(90deg, #0D0221, #FF00FF, #00FFFF);
+      box-shadow: 0 0 10px rgba(255, 0, 255, 0.6), 0 0 4px rgba(0, 255, 255, 0.4);
     }
 
     .mode-buttons {
@@ -536,7 +658,10 @@
           <span>粒子扩散半径</span>
           <span class="control-value" id="val-radius">15.0</span>
         </div>
-        <input type="range" id="slider-radius" min="5" max="30" step="0.5" value="15" />
+        <div class="slider-container">
+          <input type="range" id="slider-radius" min="5" max="30" step="0.5" value="15" />
+          <span class="slider-tooltip" id="tip-radius">15.0</span>
+        </div>
       </div>
 
       <div class="control-group">
@@ -544,7 +669,10 @@
           <span>粒子大小缩放</span>
           <span class="control-value" id="val-size">1.0</span>
         </div>
-        <input type="range" id="slider-size" min="0.5" max="3.0" step="0.1" value="1.0" />
+        <div class="slider-container">
+          <input type="range" id="slider-size" min="0.5" max="3.0" step="0.1" value="1.0" />
+          <span class="slider-tooltip" id="tip-size">1.0</span>
+        </div>
       </div>
 
       <div class="control-group">
@@ -552,7 +680,10 @@
           <span>旋转速度 (°/秒)</span>
           <span class="control-value" id="val-rotation">30</span>
         </div>
-        <input type="range" id="slider-rotation" min="0" max="180" step="1" value="30" />
+        <div class="slider-container">
+          <input type="range" id="slider-rotation" min="0" max="180" step="1" value="30" />
+          <span class="slider-tooltip" id="tip-rotation">30</span>
+        </div>
       </div>
 
       <div class="control-group">
@@ -570,7 +701,10 @@
           <span>粒子数量</span>
           <span class="control-value" id="val-particles">6000</span>
         </div>
-        <input type="range" id="slider-particles" min="1000" max="10000" step="500" value="6000" />
+        <div class="slider-container">
+          <input type="range" id="slider-particles" min="1000" max="10000" step="500" value="6000" />
+          <span class="slider-tooltip" id="tip-particles">6000</span>
+        </div>
       </div>
 
       <div class="control-group">

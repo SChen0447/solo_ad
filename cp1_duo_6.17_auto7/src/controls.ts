@@ -4,19 +4,21 @@ export type ParamsChangeCallback = (params: Partial<VisualizerParams>) => void;
 export type PlayToggleCallback = () => void;
 export type SeekCallback = (fraction: number) => void;
 
+interface SliderConfig {
+  slider: HTMLInputElement;
+  tooltip: HTMLElement;
+  valueLabel: HTMLElement;
+  formatter: (v: number) => string;
+  paramKey: keyof VisualizerParams;
+  lastValue: number;
+}
+
 export class Controls {
   private onParamsChange: ParamsChangeCallback | null = null;
   private onPlayToggle: PlayToggleCallback | null = null;
   private onSeek: SeekCallback | null = null;
 
-  private sliderRadius: HTMLInputElement;
-  private sliderSize: HTMLInputElement;
-  private sliderRotation: HTMLInputElement;
-  private sliderParticles: HTMLInputElement;
-  private valRadius: HTMLElement;
-  private valSize: HTMLElement;
-  private valRotation: HTMLElement;
-  private valParticles: HTMLElement;
+  private sliders: Map<string, SliderConfig> = new Map();
   private gradientBtns: NodeListOf<HTMLButtonElement>;
   private modeBtns: NodeListOf<HTMLButtonElement>;
   private btnPlay: HTMLButtonElement;
@@ -28,15 +30,64 @@ export class Controls {
   private togglePanel: HTMLButtonElement;
   private controlPanel: HTMLElement;
 
+  private targetBlur = 10;
+  private currentBlur = 10;
+  private targetBorderAlpha = 0.08;
+  private currentBorderAlpha = 0.08;
+  private targetSpot = 0.06;
+  private currentSpot = 0.06;
+
+  private hideTooltipTimers: Map<string, number> = new Map();
+
   constructor() {
-    this.sliderRadius = document.getElementById('slider-radius') as HTMLInputElement;
-    this.sliderSize = document.getElementById('slider-size') as HTMLInputElement;
-    this.sliderRotation = document.getElementById('slider-rotation') as HTMLInputElement;
-    this.sliderParticles = document.getElementById('slider-particles') as HTMLInputElement;
-    this.valRadius = document.getElementById('val-radius')!;
-    this.valSize = document.getElementById('val-size')!;
-    this.valRotation = document.getElementById('val-rotation')!;
-    this.valParticles = document.getElementById('val-particles')!;
+    const sliderRadius = document.getElementById('slider-radius') as HTMLInputElement;
+    const sliderSize = document.getElementById('slider-size') as HTMLInputElement;
+    const sliderRotation = document.getElementById('slider-rotation') as HTMLInputElement;
+    const sliderParticles = document.getElementById('slider-particles') as HTMLInputElement;
+
+    const valRadius = document.getElementById('val-radius')!;
+    const valSize = document.getElementById('val-size')!;
+    const valRotation = document.getElementById('val-rotation')!;
+    const valParticles = document.getElementById('val-particles')!;
+
+    const tipRadius = document.getElementById('tip-radius')!;
+    const tipSize = document.getElementById('tip-size')!;
+    const tipRotation = document.getElementById('tip-rotation')!;
+    const tipParticles = document.getElementById('tip-particles')!;
+
+    this.sliders.set('radius', {
+      slider: sliderRadius,
+      tooltip: tipRadius,
+      valueLabel: valRadius,
+      formatter: (v) => v.toFixed(1),
+      paramKey: 'spreadRadius',
+      lastValue: parseFloat(sliderRadius.value),
+    });
+    this.sliders.set('size', {
+      slider: sliderSize,
+      tooltip: tipSize,
+      valueLabel: valSize,
+      formatter: (v) => v.toFixed(1),
+      paramKey: 'sizeScale',
+      lastValue: parseFloat(sliderSize.value),
+    });
+    this.sliders.set('rotation', {
+      slider: sliderRotation,
+      tooltip: tipRotation,
+      valueLabel: valRotation,
+      formatter: (v) => v.toFixed(0),
+      paramKey: 'rotationSpeed',
+      lastValue: parseFloat(sliderRotation.value),
+    });
+    this.sliders.set('particles', {
+      slider: sliderParticles,
+      tooltip: tipParticles,
+      valueLabel: valParticles,
+      formatter: (v) => v.toFixed(0),
+      paramKey: 'particleCount',
+      lastValue: parseFloat(sliderParticles.value),
+    });
+
     this.gradientBtns = document.querySelectorAll('.gradient-btn');
     this.modeBtns = document.querySelectorAll('.mode-btn');
     this.btnPlay = document.getElementById('btn-play') as HTMLButtonElement;
@@ -54,32 +105,79 @@ export class Controls {
     this.bindPlayButton();
     this.bindProgressBar();
     this.bindTogglePanel();
+    this.bindPanelDynamicGlass();
+    this.startPanelAnimation();
+
+    this.sliders.forEach((cfg) => {
+      this.positionTooltip(cfg);
+    });
   }
 
   private bindSliders(): void {
-    this.sliderRadius.addEventListener('input', () => {
-      const val = parseFloat(this.sliderRadius.value);
-      this.valRadius.textContent = val.toFixed(1);
-      this.emitParams({ spreadRadius: val });
-    });
+    this.sliders.forEach((cfg, key) => {
+      const { slider, tooltip, valueLabel, formatter, paramKey } = cfg;
 
-    this.sliderSize.addEventListener('input', () => {
-      const val = parseFloat(this.sliderSize.value);
-      this.valSize.textContent = val.toFixed(1);
-      this.emitParams({ sizeScale: val });
-    });
+      const handleInput = () => {
+        const val = parseFloat(slider.value);
+        const text = formatter(val);
 
-    this.sliderRotation.addEventListener('input', () => {
-      const val = parseInt(this.sliderRotation.value, 10);
-      this.valRotation.textContent = val.toString();
-      this.emitParams({ rotationSpeed: val });
-    });
+        tooltip.textContent = text;
+        valueLabel.textContent = text;
 
-    this.sliderParticles.addEventListener('input', () => {
-      const val = parseInt(this.sliderParticles.value, 10);
-      this.valParticles.textContent = val.toString();
-      this.emitParams({ particleCount: val });
+        if (val !== cfg.lastValue) {
+          cfg.lastValue = val;
+          this.bumpElement(tooltip);
+          this.bumpElement(valueLabel);
+        }
+
+        this.positionTooltip(cfg);
+
+        const params: Partial<VisualizerParams> = {};
+        (params as Record<string, number>)[paramKey] = val;
+        this.emitParams(params);
+      };
+
+      const showTooltip = () => {
+        const existingTimer = this.hideTooltipTimers.get(key);
+        if (existingTimer !== undefined) {
+          window.clearTimeout(existingTimer);
+          this.hideTooltipTimers.delete(key);
+        }
+        tooltip.classList.add('visible');
+        this.positionTooltip(cfg);
+      };
+
+      const hideTooltip = () => {
+        const timer = window.setTimeout(() => {
+          tooltip.classList.remove('visible');
+          this.hideTooltipTimers.delete(key);
+        }, 800);
+        this.hideTooltipTimers.set(key, timer);
+      };
+
+      slider.addEventListener('input', handleInput);
+      slider.addEventListener('pointerdown', showTooltip);
+      slider.addEventListener('pointermove', showTooltip);
+      slider.addEventListener('pointerup', hideTooltip);
+      slider.addEventListener('pointerleave', hideTooltip);
     });
+  }
+
+  private positionTooltip(cfg: SliderConfig): void {
+    const { slider, tooltip } = cfg;
+    const val = parseFloat(slider.value);
+    const min = parseFloat(slider.min);
+    const max = parseFloat(slider.max);
+    const fraction = Math.max(0, Math.min(1, (val - min) / (max - min)));
+    const percent = fraction * 100;
+    tooltip.style.left = `${percent}%`;
+  }
+
+  private bumpElement(el: HTMLElement): void {
+    el.classList.remove('bump');
+    void el.offsetWidth;
+    el.classList.add('bump');
+    window.setTimeout(() => el.classList.remove('bump'), 160);
   }
 
   private bindGradientButtons(): void {
@@ -128,6 +226,60 @@ export class Controls {
     this.togglePanel.addEventListener('click', () => {
       this.controlPanel.classList.toggle('collapsed');
     });
+  }
+
+  private bindPanelDynamicGlass(): void {
+    let breath = 0;
+
+    const tickBreath = () => {
+      breath += 0.02;
+      const breathOffset = Math.sin(breath) * 0.5;
+      this.targetSpot = 0.06 + breathOffset * 0.015;
+      requestAnimationFrame(tickBreath);
+    };
+    tickBreath();
+
+    this.controlPanel.addEventListener('pointerenter', () => {
+      this.targetBlur = 12;
+      this.targetBorderAlpha = 0.12;
+    });
+
+    this.controlPanel.addEventListener('pointerleave', () => {
+      this.targetBlur = 10;
+      this.targetBorderAlpha = 0.08;
+    });
+
+    this.controlPanel.addEventListener('pointermove', (e) => {
+      const rect = this.controlPanel.getBoundingClientRect();
+      const x = ((e.clientX - rect.left) / rect.width) * 100;
+      const y = ((e.clientY - rect.top) / rect.height) * 100;
+      this.controlPanel.style.setProperty('--mx', `${x}%`);
+      this.controlPanel.style.setProperty('--my', `${y}%`);
+
+      const cx = rect.width / 2;
+      const cy = rect.height / 2;
+      const dist = Math.hypot(e.clientX - rect.left - cx, e.clientY - rect.top - cy);
+      const maxDist = Math.hypot(cx, cy);
+      const proximity = 1 - dist / maxDist;
+      this.targetBlur = 10 + proximity * 2;
+      this.targetBorderAlpha = 0.08 + proximity * 0.06;
+      this.targetSpot = 0.06 + proximity * 0.06;
+    });
+  }
+
+  private startPanelAnimation(): void {
+    const animate = () => {
+      requestAnimationFrame(animate);
+
+      this.currentBlur += (this.targetBlur - this.currentBlur) * 0.08;
+      this.currentBorderAlpha += (this.targetBorderAlpha - this.currentBorderAlpha) * 0.08;
+      this.currentSpot += (this.targetSpot - this.currentSpot) * 0.08;
+
+      this.controlPanel.style.setProperty('--panel-blur', `${this.currentBlur.toFixed(2)}px`);
+      this.controlPanel.style.setProperty('--panel-border-alpha', this.currentBorderAlpha.toFixed(3));
+      this.controlPanel.style.setProperty('--panel-spot', this.currentSpot.toFixed(3));
+    };
+    animate();
   }
 
   private emitParams(params: Partial<VisualizerParams>): void {

@@ -1,0 +1,2 @@
+﻿src/controls.ts(33,11): error TS6133: 'panelAnimId' is declared but its value is never read.
+src/controls.ts(271,12): error TS2322: Type '() => void' is not assignable to type 'void'.
