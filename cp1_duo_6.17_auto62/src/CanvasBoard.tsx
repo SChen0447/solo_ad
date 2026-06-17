@@ -22,17 +22,24 @@ const CARD_VERTICAL_PADDING = 80;
 const TOP_PADDING = 80;
 const GRID_SIZE_MM = 3;
 const GRID_SIZE_PX = Math.round(GRID_SIZE_MM * 3.78);
+const SMOOTHING_TIME = 0.1;
 
 interface DragState {
   cardId: string;
-  startX: number;
-  startY: number;
   offsetX: number;
   offsetY: number;
-  currentX: number;
-  currentY: number;
   originalSwimlaneId: string;
   originalPosition: number;
+}
+
+interface TargetPosition {
+  x: number;
+  y: number;
+}
+
+interface RenderedPosition {
+  x: number;
+  y: number;
 }
 
 const StoryCardComponent: React.FC<{
@@ -167,6 +174,10 @@ const StoryCardComponent: React.FC<{
   );
 };
 
+const lerpFactor = (dt: number, tau: number): number => {
+  return 1 - Math.exp(-dt / tau);
+};
+
 const CanvasBoard: React.FC<CanvasBoardProps> = ({
   swimlanes,
   cards,
@@ -181,12 +192,62 @@ const CanvasBoard: React.FC<CanvasBoardProps> = ({
   const [scrollLeft, setScrollLeft] = useState(0);
   const [scrollTop, setScrollTop] = useState(0);
   const [dragState, setDragState] = useState<DragState | null>(null);
-  const [smoothedDrag, setSmoothedDrag] = useState<{ x: number; y: number } | null>(null);
+  const [, setRenderTick] = useState(0);
   const [hoveredDropZone, setHoveredDropZone] = useState<{ swimlaneId: string; position: number } | null>(null);
   const [newSwimlanePreview, setNewSwimlanePreview] = useState<string | null>(null);
 
-  const animationFrameRef = useRef<number | null>(null);
+  const targetPosRef = useRef<TargetPosition>({ x: 0, y: 0 });
+  const renderedPosRef = useRef<RenderedPosition>({ x: 0, y: 0 });
+  const lastFrameTimeRef = useRef<number>(0);
+  const rafIdRef = useRef<number | null>(null);
   const lastCursorEmitRef = useRef<number>(0);
+  const mouseRawRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
+
+  const animationLoop = useCallback((timestamp: number) => {
+    if (!lastFrameTimeRef.current) {
+      lastFrameTimeRef.current = timestamp;
+    }
+    const dt = Math.min((timestamp - lastFrameTimeRef.current) / 1000, 0.05);
+    lastFrameTimeRef.current = timestamp;
+
+    const factor = lerpFactor(dt, SMOOTHING_TIME);
+    const newX = renderedPosRef.current.x + (targetPosRef.current.x - renderedPosRef.current.x) * factor;
+    const newY = renderedPosRef.current.y + (targetPosRef.current.y - renderedPosRef.current.y) * factor;
+
+    renderedPosRef.current = { x: newX, y: newY };
+    setRenderTick((t) => t + 1);
+
+    const dx = Math.abs(targetPosRef.current.x - renderedPosRef.current.x);
+    const dy = Math.abs(targetPosRef.current.y - renderedPosRef.current.y);
+
+    if (dx < 0.3 && dy < 0.3) {
+      renderedPosRef.current = { ...targetPosRef.current };
+    }
+
+    rafIdRef.current = requestAnimationFrame(animationLoop);
+  }, []);
+
+  const startSmoothLoop = useCallback((initialX: number, initialY: number) => {
+    targetPosRef.current = { x: initialX, y: initialY };
+    renderedPosRef.current = { x: initialX, y: initialY };
+    lastFrameTimeRef.current = 0;
+
+    if (rafIdRef.current !== null) {
+      cancelAnimationFrame(rafIdRef.current);
+    }
+    rafIdRef.current = requestAnimationFrame(animationLoop);
+  }, [animationLoop]);
+
+  const stopSmoothLoop = useCallback(() => {
+    if (rafIdRef.current !== null) {
+      cancelAnimationFrame(rafIdRef.current);
+      rafIdRef.current = null;
+    }
+  }, []);
+
+  useEffect(() => {
+    return () => stopSmoothLoop();
+  }, [stopSmoothLoop]);
 
   const sortedSwimlanes = useMemo(
     () => [...swimlanes].sort((a, b) => a.position - b.position),
@@ -227,7 +288,7 @@ const CanvasBoard: React.FC<CanvasBoardProps> = ({
 
   const totalContentWidth = useMemo(() => {
     const last = swimlaneLayouts[swimlaneLayouts.length - 1];
-    return last ? last.x + last.width + 400 : 2000;
+    return last ? last.x + last.width + 800 : 2000;
   }, [swimlaneLayouts]);
 
   const totalContentHeight = useMemo(() => {
@@ -239,7 +300,7 @@ const CanvasBoard: React.FC<CanvasBoardProps> = ({
       const height = rows * (estimatedRowHeight + CARD_VERTICAL_GAP) + CARD_VERTICAL_GAP * 2 + TOP_PADDING + CARD_VERTICAL_PADDING;
       maxHeight = Math.max(maxHeight, height);
     });
-    return Math.max(maxHeight, window.innerHeight + 200);
+    return Math.max(maxHeight, window.innerHeight + 400);
   }, [swimlaneLayouts, sortedCardsByLane]);
 
   const estimateCardHeight = useCallback((card: StoryCard) => {
@@ -255,109 +316,110 @@ const CanvasBoard: React.FC<CanvasBoardProps> = ({
     setScrollTop(target.scrollTop);
   }, []);
 
+  const detectDropZone = useCallback((e: MouseEvent) => {
+    const containerRect = containerRef.current?.getBoundingClientRect();
+    if (!containerRect) return { foundLane: null, foundPosition: 0, inEmptyZone: true, dropX: 0, dropY: 0 };
+
+    const scrollL = containerRef.current?.scrollLeft || 0;
+    const scrollT = containerRef.current?.scrollTop || 0;
+    const dropX = e.clientX - containerRect.left + scrollL - SWIMLANE_HEADER_WIDTH;
+    const dropY = e.clientY - containerRect.top + scrollT - TOP_PADDING;
+
+    let foundLane: SwimLane | null = null;
+    let foundPosition = 0;
+    let inEmptyZone = true;
+
+    for (const layout of swimlaneLayouts) {
+      const laneContentX = layout.x + SWIMLANE_HEADER_WIDTH;
+      const laneContentWidth = layout.width - SWIMLANE_HEADER_WIDTH;
+      const laneContentEnd = laneContentX + laneContentWidth;
+
+      const withinXRange = dropX >= laneContentX - 40 && dropX <= laneContentEnd + 40;
+      const withinYRange = dropY >= -60 && dropY <= window.innerHeight + 200;
+
+      if (withinXRange && withinYRange) {
+        foundLane = layout.lane;
+        inEmptyZone = false;
+
+        if (dropY > 0) {
+          const estimatedRowHeight = 172;
+          const columnWidth = CARD_WIDTH + CARD_GAP;
+          const colIdx = Math.max(0, Math.min(
+            layout.columns - 1,
+            Math.floor((dropX - laneContentX - SWIMLANE_CONTENT_PADDING + CARD_GAP) / columnWidth)
+          ));
+          const rowIdx = Math.max(0, Math.floor(
+            (dropY - CARD_VERTICAL_GAP - 20) / (estimatedRowHeight + CARD_VERTICAL_GAP)
+          ));
+          const laneCards = sortedCardsByLane[layout.lane.id] || [];
+          const estPosition = rowIdx * Math.max(1, layout.columns) + colIdx;
+          foundPosition = Math.min(estPosition, laneCards.length);
+        }
+        break;
+      }
+    }
+
+    return { foundLane, foundPosition, inEmptyZone, dropX, dropY };
+  }, [swimlaneLayouts, sortedCardsByLane]);
+
   const handleMouseMove = useCallback((e: MouseEvent) => {
+    mouseRawRef.current = { x: e.clientX, y: e.clientY };
+
     const now = Date.now();
     if (now - lastCursorEmitRef.current > 50) {
       lastCursorEmitRef.current = now;
       const containerRect = containerRef.current?.getBoundingClientRect();
       if (containerRect) {
-        const x = e.clientX - containerRect.left + (containerRef.current?.scrollLeft || 0);
-        const y = e.clientY - containerRect.top + (containerRef.current?.scrollTop || 0);
+        const scrollL = containerRef.current?.scrollLeft || 0;
+        const scrollT = containerRef.current?.scrollTop || 0;
+        const x = e.clientX - containerRect.left + scrollL;
+        const y = e.clientY - containerRect.top + scrollT;
         onCursorMove(x, y, dragState?.cardId || null);
       }
     }
 
     if (dragState) {
-      const newX = e.clientX - dragState.offsetX;
-      const newY = e.clientY - dragState.offsetY;
+      const rawX = e.clientX - dragState.offsetX;
+      const rawY = e.clientY - dragState.offsetY;
+      targetPosRef.current = { x: rawX, y: rawY };
 
-      if (animationFrameRef.current) {
-        cancelAnimationFrame(animationFrameRef.current);
-      }
+      const { foundLane, foundPosition, inEmptyZone, dropX, dropY } = detectDropZone(e);
 
-      animationFrameRef.current = requestAnimationFrame(() => {
-        setSmoothedDrag((prev) => {
-          if (!prev) return { x: newX, y: newY };
-          const ease = 0.35;
-          return {
-            x: prev.x + (newX - prev.x) * ease,
-            y: prev.y + (newY - prev.y) * ease,
-          };
-        });
-      });
+      const isTrulyEmpty = inEmptyZone && (dropX > 0 || dropY > 0) && e.clientY > 0;
 
-      setDragState((prev) => (prev ? { ...prev, currentX: newX, currentY: newY } : null));
-
-      const containerRect = containerRef.current?.getBoundingClientRect();
-      if (containerRect) {
-        const dropX = e.clientX - containerRect.left + (containerRef.current?.scrollLeft || 0) - SWIMLANE_HEADER_WIDTH;
-        const dropY = e.clientY - containerRect.top + (containerRef.current?.scrollTop || 0) - TOP_PADDING;
-
-        let foundLane: SwimLane | null = null;
-        let foundPosition = 0;
-        let inEmptyZone = true;
-
-        for (const layout of swimlaneLayouts) {
-          const laneContentX = layout.x + SWIMLANE_HEADER_WIDTH;
-          const laneContentWidth = layout.width - SWIMLANE_HEADER_WIDTH;
-
-          if (dropX >= laneContentX - 20 && dropX <= laneContentX + laneContentWidth + 20) {
-            foundLane = layout.lane;
-            inEmptyZone = false;
-
-            if (dropY > 0) {
-              const estimatedRowHeight = 172;
-              const columnWidth = CARD_WIDTH + CARD_GAP;
-              const colIdx = Math.max(0, Math.min(layout.columns - 1, Math.floor((dropX - laneContentX - SWIMLANE_CONTENT_PADDING + CARD_GAP) / columnWidth)));
-              const rowIdx = Math.max(0, Math.floor((dropY - CARD_VERTICAL_GAP - 20) / (estimatedRowHeight + CARD_VERTICAL_GAP)));
-              const laneCards = sortedCardsByLane[layout.lane.id] || [];
-              const maxColCards = Math.ceil(laneCards.length / Math.max(1, layout.columns));
-              const estPosition = rowIdx * layout.columns + colIdx;
-              foundPosition = Math.min(estPosition, laneCards.length);
-            }
-            break;
-          }
-        }
-
-        if (inEmptyZone && dropX > 0) {
-          const nextLaneNum = sortedSwimlanes.length + 1;
-          setNewSwimlanePreview(`第${nextLaneNum}周冲刺`);
-          setHoveredDropZone({ swimlaneId: '__new__', position: 0 });
+      if (isTrulyEmpty) {
+        setNewSwimlanePreview('新冲刺');
+        setHoveredDropZone({ swimlaneId: '__new__', position: 0 });
+      } else {
+        setNewSwimlanePreview(null);
+        if (foundLane) {
+          setHoveredDropZone({ swimlaneId: foundLane.id, position: foundPosition });
         } else {
-          setNewSwimlanePreview(null);
-          if (foundLane) {
-            setHoveredDropZone({ swimlaneId: foundLane.id, position: foundPosition });
-          } else {
-            setHoveredDropZone(null);
-          }
+          setHoveredDropZone(null);
         }
       }
     }
-  }, [dragState, onCursorMove, swimlaneLayouts, sortedCardsByLane, sortedSwimlanes]);
+  }, [dragState, onCursorMove, detectDropZone]);
 
   const handleMouseUp = useCallback(() => {
-    if (animationFrameRef.current) {
-      cancelAnimationFrame(animationFrameRef.current);
-      animationFrameRef.current = null;
-    }
+    stopSmoothLoop();
 
     if (dragState) {
       if (hoveredDropZone) {
         if (hoveredDropZone.swimlaneId === '__new__') {
           const newLaneId = `new_lane_${Date.now()}`;
-          onCardMove(dragState.cardId, newLaneId, 0, newSwimlanePreview || '新泳道');
+          onCardMove(dragState.cardId, newLaneId, 0, newSwimlanePreview || '新冲刺');
         } else {
           onCardMove(dragState.cardId, hoveredDropZone.swimlaneId, hoveredDropZone.position);
         }
       }
 
       setDragState(null);
-      setSmoothedDrag(null);
       setHoveredDropZone(null);
       setNewSwimlanePreview(null);
       onDraggingChange(null);
     }
-  }, [dragState, hoveredDropZone, newSwimlanePreview, onCardMove, onDraggingChange]);
+  }, [dragState, hoveredDropZone, newSwimlanePreview, onCardMove, onDraggingChange, stopSmoothLoop]);
 
   useEffect(() => {
     if (dragState) {
@@ -373,26 +435,32 @@ const CanvasBoard: React.FC<CanvasBoardProps> = ({
   const createCardDragHandler = useCallback((card: StoryCard) => {
     return (e: React.MouseEvent) => {
       e.preventDefault();
+      e.stopPropagation();
       const target = e.currentTarget as HTMLElement;
       const rect = target.getBoundingClientRect();
 
+      const offsetX = e.clientX - rect.left;
+      const offsetY = e.clientY - rect.top;
+      const initialX = rect.left;
+      const initialY = rect.top;
+
+      mouseRawRef.current = { x: e.clientX, y: e.clientY };
+      startSmoothLoop(initialX, initialY);
+
       setDragState({
         cardId: card.id,
-        startX: e.clientX,
-        startY: e.clientY,
-        offsetX: e.clientX - rect.left,
-        offsetY: e.clientY - rect.top,
-        currentX: rect.left,
-        currentY: rect.top,
+        offsetX,
+        offsetY,
         originalSwimlaneId: card.swimlaneId,
         originalPosition: card.position,
       });
-      setSmoothedDrag({ x: rect.left, y: rect.top });
       onDraggingChange(card.id);
     };
-  }, [onDraggingChange]);
+  }, [onDraggingChange, startSmoothLoop]);
 
   const draggingCard = dragState ? cards.find((c) => c.id === dragState.cardId) : null;
+  const renderedX = renderedPosRef.current.x;
+  const renderedY = renderedPosRef.current.y;
 
   return (
     <div
@@ -549,6 +617,7 @@ const CanvasBoard: React.FC<CanvasBoardProps> = ({
                             fontSize: 13,
                             fontWeight: 600,
                             order: idx * 2,
+                            animation: 'pulseDrop 1.5s ease-in-out infinite',
                           }}>
                             ← 放置卡片
                           </div>
@@ -581,6 +650,7 @@ const CanvasBoard: React.FC<CanvasBoardProps> = ({
                       fontSize: 13,
                       fontWeight: 600,
                       order: 9998,
+                      animation: 'pulseDrop 1.5s ease-in-out infinite',
                     }}>
                       ↓ 放置卡片
                     </div>
@@ -609,35 +679,40 @@ const CanvasBoard: React.FC<CanvasBoardProps> = ({
         {newSwimlanePreview && (
           <div style={{
             position: 'absolute',
-            left: swimlaneLayouts.length > 0 ? swimlaneLayouts[swimlaneLayouts.length - 1].x + swimlaneLayouts[swimlaneLayouts.length - 1].width + 40 : 40,
+            left: swimlaneLayouts.length > 0
+              ? swimlaneLayouts[swimlaneLayouts.length - 1].x + swimlaneLayouts[swimlaneLayouts.length - 1].width + 60
+              : 60,
             top: TOP_PADDING,
-            padding: '20px 24px',
-            background: 'rgba(59, 130, 246, 0.12)',
-            backdropFilter: 'blur(8px)',
-            WebkitBackdropFilter: 'blur(8px)',
-            borderRadius: 14,
+            padding: '24px 28px',
+            background: 'rgba(59, 130, 246, 0.15)',
+            backdropFilter: 'blur(12px)',
+            WebkitBackdropFilter: 'blur(12px)',
+            borderRadius: 16,
             border: '2px dashed #3b82f6',
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
-            gap: 8,
-            minWidth: 180,
+            gap: 10,
+            minWidth: 200,
+            animation: 'glow 1.2s ease-in-out infinite',
+            zIndex: 50,
           }}>
-            <div style={{ fontSize: 28 }}>🆕</div>
-            <div style={{ fontSize: 14, fontWeight: 700, color: '#3b82f6' }}>
+            <div style={{ fontSize: 32 }}>🆕</div>
+            <div style={{ fontSize: 15, fontWeight: 700, color: '#3b82f6' }}>
               创建新泳道
             </div>
-            <div style={{ fontSize: 12, color: '#6b7280' }}>
-              {newSwimlanePreview}
+            <div style={{ fontSize: 13, color: '#1f2937', fontWeight: 600 }}>
+              「{newSwimlanePreview}」
             </div>
-            <div style={{ fontSize: 11, color: '#9ca3af', textAlign: 'center' }}>
-              松开鼠标放置卡片并创建泳道
+            <div style={{ fontSize: 11, color: '#6b7280', textAlign: 'center', lineHeight: 1.5 }}>
+              松开鼠标放置卡片<br/>并自动创建新泳道
             </div>
           </div>
         )}
 
         {Object.entries(remoteCursors).map(([userId, cursor]) => {
           if (userId === currentUserId) return null;
+          const isDragging = !!cursor.draggingCardId;
           return (
             <div
               key={userId}
@@ -647,52 +722,62 @@ const CanvasBoard: React.FC<CanvasBoardProps> = ({
                 top: cursor.y - 1,
                 zIndex: 500,
                 pointerEvents: 'none',
-                transition: 'left 0.15s cubic-bezier(0.16, 1, 0.3, 1), top 0.15s cubic-bezier(0.16, 1, 0.3, 1)',
+                transition: 'left 0.12s cubic-bezier(0.16, 1, 0.3, 1), top 0.12s cubic-bezier(0.16, 1, 0.3, 1)',
+                willChange: 'left, top',
               }}
             >
-              <svg width="22" height="22" viewBox="0 0 22 22" style={{ filter: `drop-shadow(0 2px 4px ${cursor.color}60)` }}>
+              <svg width="24" height="24" viewBox="0 0 24 24" style={{
+                filter: `drop-shadow(0 3px 6px ${cursor.color}60)`,
+                animation: isDragging ? 'pulseCursor 1s ease-in-out infinite' : 'none',
+              }}>
                 <path
-                  d="M2 2 L2 18 L7 13 L11 20 L14 19 L10 12 L17 12 Z"
+                  d="M2 2 L2 20 L6 14 L10 22 L13 21 L12 13 L19 13 Z"
                   fill={cursor.color}
                   stroke="white"
                   strokeWidth="1.5"
+                  strokeLinejoin="round"
                 />
+                {isDragging && (
+                  <circle cx="12" cy="12" r="3" fill="white" opacity="0.8" />
+                )}
               </svg>
               <div style={{
                 position: 'absolute',
-                left: 18,
-                top: 18,
-                padding: '3px 8px',
+                left: 20,
+                top: 20,
+                padding: '3px 9px',
                 background: cursor.color,
                 color: '#fff',
                 fontSize: 10,
                 fontWeight: 600,
                 borderRadius: 6,
                 whiteSpace: 'nowrap',
-                boxShadow: '0 2px 6px rgba(0, 0, 0, 0.15)',
+                boxShadow: `0 3px 10px ${cursor.color}40`,
+                letterSpacing: 0.3,
               }}>
                 {cursor.userName}
-                {cursor.draggingCardId && ' 🔄'}
+                {isDragging && <span style={{ marginLeft: 4 }}>✋</span>}
               </div>
             </div>
           );
         })}
 
-        {dragState && draggingCard && smoothedDrag && (
+        {dragState && draggingCard && (
           <div style={{
             position: 'fixed',
             left: 0,
             top: 0,
             pointerEvents: 'none',
             zIndex: 9999,
-            opacity: 0.92,
-            transform: 'rotate(2deg)',
+            opacity: 0.93,
+            transform: 'rotate(2.5deg)',
             willChange: 'transform',
           }}>
             <div style={{
               position: 'absolute',
-              left: smoothedDrag.x,
-              top: smoothedDrag.y,
+              left: renderedX,
+              top: renderedY,
+              transition: 'none',
             }}>
               <StoryCardComponent
                 card={draggingCard}
@@ -705,6 +790,25 @@ const CanvasBoard: React.FC<CanvasBoardProps> = ({
           </div>
         )}
       </div>
+
+      <style>{`
+        @keyframes pulseDrop {
+          0%, 100% { opacity: 0.6; transform: scale(0.98); }
+          50% { opacity: 1; transform: scale(1.01); }
+        }
+        @keyframes glow {
+          0%, 100% {
+            box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.3);
+          }
+          50% {
+            box-shadow: 0 0 0 12px rgba(59, 130, 246, 0);
+          }
+        }
+        @keyframes pulseCursor {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0.75; }
+        }
+      `}</style>
     </div>
   );
 };

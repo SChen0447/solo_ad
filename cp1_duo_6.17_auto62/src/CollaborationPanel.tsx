@@ -165,14 +165,25 @@ const CollaborationPanel: React.FC<CollaborationPanelProps> = ({
                   }} />
                   <div style={{
                     position: 'absolute',
-                    left: -4,
-                    top: -4,
-                    width: 10,
-                    height: 10,
-                    borderRadius: '50%',
-                    background: user.color,
-                    boxShadow: `0 0 0 2px #fff, 0 0 6px ${user.color}80`,
-                  }} />
+                    left: -6,
+                    top: -6,
+                    width: 16,
+                    height: 16,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    filter: `drop-shadow(0 1px 3px ${user.color}80)`,
+                  }}>
+                    <svg width="16" height="16" viewBox="0 0 24 24">
+                      <path
+                        d="M2 2 L2 20 L6 14 L10 22 L13 21 L12 13 L19 13 Z"
+                        fill={user.color}
+                        stroke="white"
+                        strokeWidth="1.8"
+                        strokeLinejoin="round"
+                      />
+                    </svg>
+                  </div>
                 </div>
 
                 <div style={{ flex: 1, minWidth: 0 }}>

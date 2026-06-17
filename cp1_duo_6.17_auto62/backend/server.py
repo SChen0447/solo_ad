@@ -153,6 +153,9 @@ def handle_card_move(data):
         'userId': data.get('userId'),
         'userName': data.get('userName'),
         'color': data.get('color'),
+        'x': data.get('x'),
+        'y': data.get('y'),
+        'timestamp': data.get('timestamp') or datetime.now().isoformat(),
     }, room=ROOM_NAME)
 
 
@@ -323,6 +326,9 @@ def api_move_card(card_id):
             'userId': data.get('userId', 'system'),
             'userName': data.get('userName', 'System'),
             'color': data.get('color', '#3b82f6'),
+            'x': data.get('x'),
+            'y': data.get('y'),
+            'timestamp': data.get('timestamp') or datetime.now().isoformat(),
         }, room=ROOM_NAME)
         return jsonify(card)
     except Exception as e:
