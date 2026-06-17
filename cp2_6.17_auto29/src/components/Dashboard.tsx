@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import { useArchiveStore } from '@/store'
-import { FileText, TrendingUp } from 'lucide-react'
+import { FileText, TrendingUp, HardDrive, FolderOpen } from 'lucide-react'
 
 const TYPE_COLORS: Record<string, string> = {
   pdf: '#e74c3c',
@@ -21,6 +21,13 @@ const TYPE_LABELS: Record<string, string> = {
 function formatDateMMDD(dateStr: string): string {
   const parts = dateStr.split('-')
   return `${parts[1]}-${parts[2]}`
+}
+
+function formatStorageSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes}B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)}KB`
+  if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)}MB`
+  return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)}GB`
 }
 
 function TrendChart({ trend }: { trend: { date: string; count: number }[] }) {
@@ -153,11 +160,14 @@ function TrendChart({ trend }: { trend: { date: string; count: number }[] }) {
 export default function Dashboard() {
   const stats = useArchiveStore((s) => s.stats)
   const trend = useArchiveStore((s) => s.trend)
+  const summary = useArchiveStore((s) => s.summary)
   const loadTrend = useArchiveStore((s) => s.loadTrend)
+  const loadSummary = useArchiveStore((s) => s.loadSummary)
 
   useEffect(() => {
     loadTrend()
-  }, [loadTrend])
+    loadSummary()
+  }, [loadTrend, loadSummary])
 
   return (
     <div className="dashboard-container">
@@ -197,6 +207,35 @@ export default function Dashboard() {
             })}
           </div>
           <TrendChart trend={trend} />
+          <div className="summary-cards">
+            <div className="summary-card">
+              <div className="summary-card-icon">
+                <FolderOpen size={18} />
+              </div>
+              <div className="summary-card-content">
+                <span className="summary-card-label">总文件数</span>
+                <span className="summary-card-value">{summary.totalCount}<span className="summary-card-unit">个</span></span>
+              </div>
+            </div>
+            <div className="summary-card">
+              <div className="summary-card-icon">
+                <HardDrive size={18} />
+              </div>
+              <div className="summary-card-content">
+                <span className="summary-card-label">总存储容量</span>
+                <span className="summary-card-value">{formatStorageSize(summary.totalSize)}</span>
+              </div>
+            </div>
+            <div className="summary-card">
+              <div className="summary-card-icon">
+                <TrendingUp size={18} />
+              </div>
+              <div className="summary-card-content">
+                <span className="summary-card-label">近7日新增</span>
+                <span className="summary-card-value">{summary.recentCount}<span className="summary-card-unit">个</span></span>
+              </div>
+            </div>
+          </div>
         </div>
         <div className="dashboard-summary">
           <div className="summary-total">
@@ -310,6 +349,49 @@ export default function Dashboard() {
           font-size: 13px;
           color: #8b7a6a;
         }
+        .summary-cards {
+          display: flex;
+          gap: 12px;
+          margin-top: 12px;
+        }
+        .summary-card {
+          flex: 1;
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          background: rgba(255, 255, 255, 0.6);
+          border-radius: 8px;
+          padding: 12px 16px;
+        }
+        .summary-card-icon {
+          color: #8b7a6a;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          flex-shrink: 0;
+        }
+        .summary-card-content {
+          display: flex;
+          flex-direction: column;
+          gap: 2px;
+          min-width: 0;
+        }
+        .summary-card-label {
+          font-size: 14px;
+          color: #999;
+        }
+        .summary-card-value {
+          font-size: 24px;
+          font-weight: 700;
+          color: #5a4a3a;
+          line-height: 1.2;
+        }
+        .summary-card-unit {
+          font-size: 14px;
+          font-weight: 400;
+          color: #8b7a6a;
+          margin-left: 2px;
+        }
 
         @media (max-width: 768px) {
           .dashboard-container {
@@ -324,6 +406,9 @@ export default function Dashboard() {
           }
           .summary-total-number {
             font-size: 32px;
+          }
+          .summary-cards {
+            flex-direction: column;
           }
         }
       `}</style>

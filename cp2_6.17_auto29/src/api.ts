@@ -21,6 +21,12 @@ export interface TrendItem {
   count: number
 }
 
+export interface SummaryData {
+  totalCount: number
+  totalSize: number
+  recentCount: number
+}
+
 export interface SearchParams {
   fileTypes?: string[]
   tags?: string[]
@@ -88,4 +94,8 @@ export async function fetchStats(): Promise<FileStats> {
 
 export async function fetchTrend(): Promise<TrendItem[]> {
   return request<TrendItem[]>('/files/stats/trend')
+}
+
+export async function fetchSummary(): Promise<SummaryData> {
+  return request<SummaryData>('/files/stats/summary')
 }

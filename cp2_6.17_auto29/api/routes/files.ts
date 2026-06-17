@@ -90,6 +90,23 @@ router.post(
   }
 )
 
+router.get('/files/stats/summary', (_req: Request, res: Response): void => {
+  const totalCount = files.length
+  const totalSize = files.reduce((sum, f) => sum + f.fileSize, 0)
+
+  const now = new Date()
+  const sevenDaysAgo = new Date(now)
+  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
+  const sevenDaysAgoStr = sevenDaysAgo.toISOString()
+  const recentCount = files.filter((f) => f.uploadTime >= sevenDaysAgoStr).length
+
+  res.json({
+    totalCount,
+    totalSize,
+    recentCount,
+  })
+})
+
 router.get('/files/stats/trend', (_req: Request, res: Response): void => {
   const trend: { date: string; count: number }[] = []
   const now = new Date()
