@@ -12,6 +12,8 @@ socketio = SocketIO(app, cors_allowed_origins="*")
 
 rooms: Dict[str, Dict[str, Any]] = {}
 scoreboard: Dict[str, Dict[str, int]] = {}
+player_rooms: Dict[str, str] = {}
+game_states: Dict[str, Dict[str, Any]] = {}
 
 RUNE_TYPES = ['fire', 'ice', 'thunder', 'shadow', 'light', 'nature']
 
@@ -240,29 +242,561 @@ def update_scoreboard():
 
 @socketio.on('connect')
 def handle_connect():
-    print('Client connected')
+    print(f'Client connected: {request.sid}')
 
 
 @socketio.on('disconnect')
 def handle_disconnect():
-    print('Client disconnected')
+    print(f'Client disconnected: {request.sid}')
+    player_id = request.sid
+    if player_id in player_rooms:
+        room_id = player_rooms[player_id]
+        if room_id in rooms:
+            room = rooms[room_id]
+            if player_id in room['players']:
+                del room['players'][player_id]
+                emit('player_left', {'player_id': player_id}, room=room_id)
+                if len(room['players']) == 0:
+                    del rooms[room_id]
+                    if room_id in game_states:
+                        del game_states[room_id]
+        del player_rooms[player_id]
 
 
 @socketio.on('join_room')
 def handle_join_room(data):
     room_id = data.get('room_id')
+    player_id = data.get('player_id', request.sid)
+    player_name = data.get('player_name', '玩家')
+    
+    if room_id not in rooms:
+        emit('error', {'message': '房间不存在'})
+        return
+    
+    room = rooms[room_id]
+    if len(room['players']) >= 2 and player_id not in room['players']:
+        emit('error', {'message': '房间已满'})
+        return
+    
+    join_room(room_id)
+    player_rooms[player_id] = room_id
+    
+    room['players'][player_id] = {
+        'id': player_id,
+        'name': player_name,
+        'runes': [],
+        'deck': [],
+        'hand': [],
+        'hero': None,
+        'ready': False
+    }
+    
+    emit('player_joined', {
+        'player_id': player_id,
+        'player_name': player_name,
+        'players': list(room['players'].keys())
+    }, room=room_id)
+    
+    emit('room_state', {
+        'room_id': room_id,
+        'status': room['status'],
+        'players': room['players'],
+        'current_player': room.get('current_player'),
+        'turn': room.get('turn', 0)
+    }, to=request.sid)
+
+
+@socketio.on('select_runes')
+def handle_select_runes(data):
+    room_id = data.get('room_id')
     player_id = data.get('player_id')
-    if room_id in rooms:
-        join_room(room_id)
-        emit('player_joined', {'player_id': player_id}, room=room_id)
+    runes = data.get('runes', [])
+    
+    if room_id not in rooms:
+        emit('error', {'message': '房间不存在'})
+        return
+    
+    room = rooms[room_id]
+    if player_id not in room['players']:
+        emit('error', {'message': '你不在这个房间里'})
+        return
+    
+    if len(runes) != 3:
+        emit('error', {'message': '必须选择3个符文'})
+        return
+    
+    for rune in runes:
+        if rune not in RUNE_TYPES:
+            emit('error', {'message': f'无效符文: {rune}'})
+            return
+    
+    player = room['players'][player_id]
+    player['runes'] = runes
+    player['ready'] = True
+    
+    hero_stats = calculate_hero_stats(runes)
+    deck = generate_deck(runes)
+    player['hero_stats'] = hero_stats
+    player['deck'] = deck
+    
+    emit('runes_selected', {
+        'player_id': player_id,
+        'runes': runes,
+        'hero_stats': hero_stats
+    }, room=room_id)
+    
+    all_ready = all(p.get('ready', False) for p in room['players'].values())
+    
+    if all_ready and len(room['players']) == 2:
+        room['status'] = 'playing'
+        room['turn'] = 1
+        player_ids = list(room['players'].keys())
+        room['current_player'] = player_ids[0]
+        
+        game_state = initialize_game_state(room)
+        game_states[room_id] = game_state
+        
+        emit('game_started', {
+            'room_id': room_id,
+            'game_state': game_state
+        }, room=room_id)
+
+
+def initialize_game_state(room: Dict[str, Any]) -> Dict[str, Any]:
+    players = room['players']
+    player_ids = list(players.keys())
+    
+    game_state = {
+        'turn': 1,
+        'current_player': player_ids[0],
+        'phase': 'battle',
+        'players': {},
+        'event_log': []
+    }
+    
+    for idx, pid in enumerate(player_ids):
+        player_data = players[pid]
+        deck = player_data.get('deck', [])
+        hero_stats = player_data.get('hero_stats', {})
+        
+        initial_hand = deck[:4]
+        remaining_deck = deck[4:]
+        
+        battlefield = []
+        for row in range(3):
+            battlefield.append([])
+            for col in range(3):
+                battlefield[row].append({
+                    'row': row,
+                    'col': col,
+                    'creature': None,
+                    'frozen': False,
+                    'highlight': False
+                })
+        
+        game_state['players'][pid] = {
+            'id': pid,
+            'is_player': idx == 0,
+            'hero': {
+                'runes': player_data.get('runes', []),
+                'attack': hero_stats.get('attack', 0),
+                'defense': hero_stats.get('defense', 0),
+                'health': hero_stats.get('health', 30),
+                'max_health': hero_stats.get('health', 30),
+                'mana': hero_stats.get('mana', 1),
+                'max_mana': hero_stats.get('mana', 1),
+                'mana_per_turn': hero_stats.get('mana', 1)
+            },
+            'deck': remaining_deck,
+            'hand': initial_hand,
+            'discard_pile': [],
+            'battlefield': battlefield
+        }
+    
+    return game_state
 
 
 @socketio.on('game_action')
 def handle_game_action(data):
     room_id = data.get('room_id')
+    player_id = data.get('player_id')
     action = data.get('action')
-    if room_id in rooms:
-        emit('game_action', action, room=room_id, include_self=False)
+    action_type = action.get('type') if action else None
+    
+    if not room_id or not player_id or not action:
+        emit('error', {'message': '缺少必要参数'})
+        return
+    
+    if room_id not in rooms or room_id not in game_states:
+        emit('error', {'message': '房间不存在'})
+        return
+    
+    room = rooms[room_id]
+    game_state = game_states[room_id]
+    
+    if game_state['current_player'] != player_id:
+        emit('error', {'message': '不是你的回合'})
+        return
+    
+    is_valid = validate_action(game_state, player_id, action)
+    
+    if not is_valid['valid']:
+        emit('action_invalid', {
+            'action': action,
+            'reason': is_valid.get('reason', '无效操作')
+        }, to=request.sid)
+        return
+    
+    result = execute_action(game_state, player_id, action)
+    
+    if result.get('success', False):
+        events = result.get('events', [])
+        
+        emit('game_state_update', {
+            'game_state': game_state,
+            'events': events,
+            'action': action
+        }, room=room_id)
+        
+        if game_state.get('phase') == 'ended':
+            room['status'] = 'ended'
+            winner = game_state.get('winner')
+            if winner:
+                if winner in scoreboard:
+                    scoreboard[winner]['wins'] += 1
+                else:
+                    scoreboard[winner] = {'wins': 1, 'losses': 0}
+                
+                loser = [pid for pid in game_state['players'].keys() if pid != winner][0]
+                if loser in scoreboard:
+                    scoreboard[loser]['losses'] += 1
+                else:
+                    scoreboard[loser] = {'wins': 0, 'losses': 1}
+            
+            emit('game_ended', {
+                'winner': winner,
+                'game_state': game_state
+            }, room=room_id)
+
+
+def validate_action(game_state: Dict[str, Any], player_id: str, action: Dict[str, Any]) -> Dict[str, Any]:
+    action_type = action.get('type')
+    
+    if game_state['phase'] != 'battle':
+        return {'valid': False, 'reason': '游戏不在进行中'}
+    
+    player_state = game_state['players'].get(player_id)
+    if not player_state:
+        return {'valid': False, 'reason': '玩家不存在'}
+    
+    if action_type == 'play_card':
+        card_id = action.get('card_id')
+        card = next((c for c in player_state['hand'] if c.get('instance_id') == card_id), None)
+        if not card:
+            return {'valid': False, 'reason': '卡牌不存在'}
+        
+        if player_state['hero']['mana'] < card.get('cost', 0):
+            return {'valid': False, 'reason': '法力值不足'}
+        
+        return {'valid': True}
+    
+    elif action_type == 'end_turn':
+        return {'valid': True}
+    
+    elif action_type == 'creature_attack':
+        creature_id = action.get('creature_id')
+        for row in player_state['battlefield']:
+            for cell in row:
+                if cell['creature'] and cell['creature']['instance_id'] == creature_id:
+                    creature = cell['creature']
+                    if creature.get('frozen', False):
+                        return {'valid': False, 'reason': '生物被冻结'}
+                    if not creature.get('can_attack', False):
+                        return {'valid': False, 'reason': '生物本回合无法攻击'}
+                    return {'valid': True}
+        return {'valid': False, 'reason': '生物不存在'}
+    
+    elif action_type == 'draw_card':
+        if len(player_state['deck']) == 0:
+            return {'valid': False, 'reason': '牌堆已空'}
+        if len(player_state['hand']) >= 7:
+            return {'valid': False, 'reason': '手牌已满'}
+        return {'valid': True}
+    
+    return {'valid': False, 'reason': '未知操作'}
+
+
+def execute_action(game_state: Dict[str, Any], player_id: str, action: Dict[str, Any]) -> Dict[str, Any]:
+    action_type = action.get('type')
+    events = []
+    
+    if action_type == 'play_card':
+        card_id = action.get('card_id')
+        position = action.get('position')
+        target_is_hero = action.get('target_is_hero', False)
+        
+        player_state = game_state['players'][player_id]
+        card_index = next((i for i, c in enumerate(player_state['hand']) if c.get('instance_id') == card_id), -1)
+        
+        if card_index == -1:
+            return {'success': False}
+        
+        card = player_state['hand'].pop(card_index)
+        player_state['hero']['mana'] -= card['cost']
+        player_state['discard_pile'].append(card)
+        
+        events.append({
+            'type': 'card_played',
+            'data': {'player': player_id, 'card': card},
+            'timestamp': int(time.time() * 1000)
+        })
+        
+        if card.get('type') == 'creature' and position:
+            row, col = position['row'], position['col']
+            cell = player_state['battlefield'][row][col]
+            
+            if not cell['creature'] and not cell['frozen']:
+                creature = {
+                    'instance_id': card['instance_id'],
+                    'card_id': card['id'],
+                    'name': card['name'],
+                    'attack': card.get('attack', 0),
+                    'health': card.get('health', 1),
+                    'max_health': card.get('health', 1),
+                    'element': card['element'],
+                    'rarity': card['rarity'],
+                    'frozen': False,
+                    'position': position,
+                    'owner': player_id,
+                    'can_attack': False
+                }
+                cell['creature'] = creature
+                
+                events.append({
+                    'type': 'creature_summoned',
+                    'data': {'player': player_id, 'creature': creature, 'position': position},
+                    'timestamp': int(time.time() * 1000)
+                })
+        
+        elif card.get('type') == 'spell':
+            events.append({
+                'type': 'spell_cast',
+                'data': {'player': player_id, 'card': card},
+                'timestamp': int(time.time() * 1000)
+            })
+            
+            opponent_id = next(pid for pid in game_state['players'] if pid != player_id)
+            opponent_state = game_state['players'][opponent_id]
+            
+            if card.get('damage'):
+                if target_is_hero:
+                    damage = max(0, card['damage'] - opponent_state['hero']['defense'])
+                    opponent_state['hero']['health'] = max(0, opponent_state['hero']['health'] - damage)
+                    
+                    events.append({
+                        'type': 'hero_attacked',
+                        'data': {'player': opponent_id, 'damage': damage},
+                        'timestamp': int(time.time() * 1000)
+                    })
+                
+                elif position:
+                    row, col = position['row'], position['col']
+                    cell = opponent_state['battlefield'][row][col]
+                    if cell['creature']:
+                        cell['creature']['health'] -= card['damage']
+                        
+                        events.append({
+                            'type': 'damage_dealt',
+                            'data': {'target': 'creature', 'creature_id': cell['creature']['instance_id'], 'damage': card['damage']},
+                            'timestamp': int(time.time() * 1000)
+                        })
+                        
+                        if cell['creature']['health'] <= 0:
+                            events.append({
+                                'type': 'creature_died',
+                                'data': {'creature': cell['creature']},
+                                'timestamp': int(time.time() * 1000)
+                            })
+                            cell['creature'] = None
+                
+                if card.get('target_all'):
+                    for row in range(3):
+                        for col in range(3):
+                            cell = opponent_state['battlefield'][row][col]
+                            if cell['creature']:
+                                cell['creature']['health'] -= card['damage']
+                                if cell['creature']['health'] <= 0:
+                                    events.append({
+                                        'type': 'creature_died',
+                                        'data': {'creature': cell['creature']},
+                                        'timestamp': int(time.time() * 1000)
+                                    })
+                                    cell['creature'] = None
+            
+            if card.get('heal'):
+                player_state['hero']['health'] = min(
+                    player_state['hero']['max_health'],
+                    player_state['hero']['health'] + card['heal']
+                )
+                events.append({
+                    'type': 'heal_performed',
+                    'data': {'player': player_id, 'amount': card['heal']},
+                    'timestamp': int(time.time() * 1000)
+                })
+            
+            if card.get('freeze') and position:
+                row, col = position['row'], position['col']
+                cell = opponent_state['battlefield'][row][col]
+                cell['frozen'] = True
+                if cell['creature']:
+                    cell['creature']['frozen'] = True
+                events.append({
+                    'type': 'cell_frozen',
+                    'data': {'position': position, 'player': opponent_id},
+                    'timestamp': int(time.time() * 1000)
+                })
+    
+    elif action_type == 'end_turn':
+        next_player = next(pid for pid in game_state['players'] if pid != player_id)
+        
+        events.append({
+            'type': 'turn_end',
+            'data': {'player': player_id},
+            'timestamp': int(time.time() * 1000)
+        })
+        
+        game_state['current_player'] = next_player
+        game_state['turn'] += 1
+        
+        next_state = game_state['players'][next_player]
+        next_state['hero']['max_mana'] = min(10, next_state['hero']['max_mana'] + 1)
+        next_state['hero']['mana'] = next_state['hero']['max_mana']
+        
+        if next_state['deck'] and len(next_state['hand']) < 7:
+            drawn_card = next_state['deck'].pop(0)
+            next_state['hand'].append(drawn_card)
+            events.append({
+                'type': 'card_drawn',
+                'data': {'player': next_player, 'card': drawn_card},
+                'timestamp': int(time.time() * 1000)
+            })
+        
+        for row in range(3):
+            for col in range(3):
+                cell = next_state['battlefield'][row][col]
+                cell['frozen'] = False
+                if cell['creature']:
+                    cell['creature']['frozen'] = False
+                    cell['creature']['can_attack'] = True
+        
+        events.append({
+            'type': 'turn_start',
+            'data': {'turn': game_state['turn'], 'player': next_player},
+            'timestamp': int(time.time() * 1000)
+        })
+    
+    elif action_type == 'creature_attack':
+        creature_id = action.get('creature_id')
+        target_position = action.get('target_position')
+        target_is_hero = action.get('target_is_hero', False)
+        
+        player_state = game_state['players'][player_id]
+        opponent_id = next(pid for pid in game_state['players'] if pid != player_id)
+        opponent_state = game_state['players'][opponent_id]
+        
+        attacker = None
+        for row in range(3):
+            for col in range(3):
+                cell = player_state['battlefield'][row][col]
+                if cell['creature'] and cell['creature']['instance_id'] == creature_id:
+                    attacker = cell['creature']
+                    break
+            if attacker:
+                break
+        
+        if not attacker:
+            return {'success': False}
+        
+        if target_is_hero:
+            damage = max(0, attacker['attack'] - opponent_state['hero']['defense'])
+            opponent_state['hero']['health'] = max(0, opponent_state['hero']['health'] - damage)
+            
+            events.append({
+                'type': 'hero_attacked',
+                'data': {'player': opponent_id, 'damage': damage, 'attacker': attacker['name']},
+                'timestamp': int(time.time() * 1000)
+            })
+        
+        elif target_position:
+            row, col = target_position['row'], target_position['col']
+            cell = opponent_state['battlefield'][row][col]
+            if cell['creature']:
+                target = cell['creature']
+                
+                events.append({
+                    'type': 'creature_attacked',
+                    'data': {'attacker': attacker, 'target': target},
+                    'timestamp': int(time.time() * 1000)
+                })
+                
+                target['health'] -= attacker['attack']
+                attacker['health'] -= target['attack']
+                
+                if target['health'] <= 0:
+                    events.append({
+                        'type': 'creature_died',
+                        'data': {'creature': target},
+                        'timestamp': int(time.time() * 1000)
+                    })
+                    cell['creature'] = None
+                
+                if attacker['health'] <= 0:
+                    for r in range(3):
+                        for c in range(3):
+                            acell = player_state['battlefield'][r][c]
+                            if acell['creature'] and acell['creature']['instance_id'] == creature_id:
+                                events.append({
+                                    'type': 'creature_died',
+                                    'data': {'creature': attacker},
+                                    'timestamp': int(time.time() * 1000)
+                                })
+                                acell['creature'] = None
+                                break
+        
+        attacker['can_attack'] = False
+    
+    check_win_condition(game_state, events)
+    
+    game_state['event_log'].extend(events)
+    
+    return {'success': True, 'events': events}
+
+
+def check_win_condition(game_state: Dict[str, Any], events: List[Dict[str, Any]]):
+    for player_id, player_state in game_state['players'].items():
+        if player_state['hero']['health'] <= 0:
+            game_state['phase'] = 'ended'
+            winner = next(pid for pid in game_state['players'] if pid != player_id)
+            game_state['winner'] = winner
+            
+            events.append({
+                'type': 'game_end',
+                'data': {'winner': winner},
+                'timestamp': int(time.time() * 1000)
+            })
+            break
+
+
+@socketio.on('request_state')
+def handle_request_state(data):
+    room_id = data.get('room_id')
+    player_id = data.get('player_id')
+    
+    if room_id in game_states:
+        emit('game_state_update', {
+            'game_state': game_states[room_id],
+            'events': []
+        }, to=request.sid)
 
 
 @socketio.on('start_game')
@@ -270,8 +804,18 @@ def handle_start_game(data):
     room_id = data.get('room_id')
     if room_id in rooms:
         room = rooms[room_id]
-        room['status'] = 'playing'
-        emit('game_started', room, room=room_id)
+        
+        all_ready = all(p.get('ready', False) for p in room['players'].values())
+        if all_ready and len(room['players']) == 2:
+            room['status'] = 'playing'
+            
+            game_state = initialize_game_state(room)
+            game_states[room_id] = game_state
+            
+            emit('game_started', {
+                'room_id': room_id,
+                'game_state': game_state
+            }, room=room_id)
 
 
 if __name__ == '__main__':

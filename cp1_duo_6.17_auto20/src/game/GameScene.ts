@@ -13,8 +13,6 @@ import {
 
 const GRID_ROWS = 3;
 const GRID_COLS = 3;
-const CELL_SIZE = 80;
-const CELL_GAP = 8;
 
 export class GameScene extends Phaser.Scene {
   private battleEngine!: BattleEngine;
@@ -26,10 +24,15 @@ export class GameScene extends Phaser.Scene {
   private particlesGroup!: Phaser.GameObjects.Group;
   private uiGroup!: Phaser.GameObjects.Group;
   
+  private cellSize = 80;
+  private cellGap = 8;
+  
   private playerBattlefieldX = 0;
   private playerBattlefieldY = 0;
   private enemyBattlefieldX = 0;
   private enemyBattlefieldY = 0;
+  
+  private heroSizeScale = 1;
   
   private selectedCard: Card | null = null;
   private selectedCreature: CreatureOnBoard | null = null;
@@ -60,7 +63,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   create() {
-    const { width, height } = this.scale;
+    this.calculateLayout();
     
     this.gridGroup = this.add.group();
     this.playerHeroGroup = this.add.group();
@@ -68,11 +71,6 @@ export class GameScene extends Phaser.Scene {
     this.creaturesGroup = this.add.group();
     this.particlesGroup = this.add.group();
     this.uiGroup = this.add.group();
-    
-    this.playerBattlefieldX = width * 0.25;
-    this.playerBattlefieldY = height * 0.55;
-    this.enemyBattlefieldX = width * 0.75;
-    this.enemyBattlefieldY = height * 0.55;
     
     this.createBackground();
     this.createBattlefield();
@@ -85,6 +83,74 @@ export class GameScene extends Phaser.Scene {
     this.updateBattlefield();
     
     this.cameras.main.setBackgroundColor('#1a0f1e');
+    
+    this.scale.on('resize', this.handleResize, this);
+  }
+
+  private calculateLayout() {
+    const { width, height } = this.scale;
+    
+    const minDimension = Math.min(width, height);
+    
+    this.cellSize = Math.floor(minDimension * 0.1);
+    this.cellSize = Math.max(50, Math.min(this.cellSize, 100));
+    this.cellGap = Math.floor(this.cellSize * 0.1);
+    
+    this.heroSizeScale = this.cellSize / 80;
+    
+    const availableWidth = width * 0.7;
+    const gridWidth = GRID_COLS * this.cellSize + (GRID_COLS - 1) * this.cellGap;
+    
+    if (gridWidth * 2 + 100 > availableWidth) {
+      const scale = (availableWidth - 100) / (gridWidth * 2);
+      this.cellSize = Math.floor(this.cellSize * scale);
+      this.cellGap = Math.floor(this.cellSize * 0.1);
+      this.heroSizeScale = this.cellSize / 80;
+    }
+    
+    const totalGridWidth = GRID_COLS * this.cellSize + (GRID_COLS - 1) * this.cellGap;
+    
+    this.playerBattlefieldX = width * 0.25;
+    this.playerBattlefieldY = height * 0.5;
+    this.enemyBattlefieldX = width * 0.75;
+    this.enemyBattlefieldY = height * 0.5;
+    
+    const maxGridY = height * 0.7;
+    const minGridY = height * 0.25;
+    const gridHeight = GRID_ROWS * this.cellSize + (GRID_ROWS - 1) * this.cellGap;
+    
+    if (this.playerBattlefieldY + gridHeight / 2 > maxGridY) {
+      this.playerBattlefieldY = maxGridY - gridHeight / 2;
+      this.enemyBattlefieldY = maxGridY - gridHeight / 2;
+    }
+    if (this.playerBattlefieldY - gridHeight / 2 < minGridY) {
+      this.playerBattlefieldY = minGridY + gridHeight / 2;
+      this.enemyBattlefieldY = minGridY + gridHeight / 2;
+    }
+  }
+
+  private handleResize() {
+    this.calculateLayout();
+    this.rebuildScene();
+  }
+
+  private rebuildScene() {
+    this.gridGroup.clear(true);
+    this.playerHeroGroup.clear(true);
+    this.enemyHeroGroup.clear(true);
+    this.creaturesGroup.clear(true);
+    this.uiGroup.clear(true);
+    this.particlesGroup.clear(true);
+    
+    this.createBackground();
+    this.createBattlefield();
+    this.createHeroModels();
+    this.createTurnTimer();
+    this.createEndTurnButton();
+    this.setupInputHandlers();
+    
+    this.updateBattlefield();
+    this.updateHeroUI();
   }
 
   private createBackground() {
@@ -99,11 +165,12 @@ export class GameScene extends Phaser.Scene {
     bgGradient.fillRect(0, 0, width, height);
     
     const runePatterns = ['✦', '◇', '○', '△', '☽'];
-    for (let i = 0; i < 20; i++) {
+    const patternCount = Math.floor((width * height) / 20000);
+    for (let i = 0; i < Math.min(patternCount, 30); i++) {
       const x = Phaser.Math.Between(0, width);
       const y = Phaser.Math.Between(0, height);
       const rune = runePatterns[Phaser.Math.Between(0, runePatterns.length - 1)];
-      const size = Phaser.Math.Between(12, 30);
+      const size = Phaser.Math.Between(12, Math.floor(this.cellSize * 0.4));
       
       const text = this.add.text(x, y, rune, {
         fontFamily: 'Georgia',
@@ -114,27 +181,25 @@ export class GameScene extends Phaser.Scene {
       text.setOrigin(0.5);
     }
     
-    const cornerSize = 60;
+    const cornerSize = Math.floor(this.cellSize * 0.7);
     const cornerColor = 0xc9a847;
+    const cornerPadding = Math.floor(this.cellSize * 0.2);
     
     const corners = [
-      { x: 20, y: 20, angle: 0 },
-      { x: width - 20, y: 20, angle: 90 },
-      { x: width - 20, y: height - 20, angle: 180 },
-      { x: 20, y: height - 20, angle: 270 }
+      { x: cornerPadding, y: cornerPadding, angle: 0 },
+      { x: width - cornerPadding, y: cornerPadding, angle: 90 },
+      { x: width - cornerPadding, y: height - cornerPadding, angle: 180 },
+      { x: cornerPadding, y: height - cornerPadding, angle: 270 }
     ];
     
     corners.forEach(corner => {
       const g = this.add.graphics();
       g.lineStyle(2, cornerColor, 0.6);
       g.beginPath();
-      g.moveTo(corner.x - 20, corner.y);
+      g.moveTo(corner.x - cornerSize / 3, corner.y);
       g.lineTo(corner.x, corner.y);
-      g.lineTo(corner.x, corner.y + 20);
+      g.lineTo(corner.x, corner.y + cornerSize / 3);
       g.strokePath();
-      g.angle = corner.angle;
-      g.x = corner.x;
-      g.y = corner.y;
     });
   }
 
@@ -142,13 +207,14 @@ export class GameScene extends Phaser.Scene {
     this.createGrid(this.playerBattlefieldX, this.playerBattlefieldY, 'player');
     this.createGrid(this.enemyBattlefieldX, this.enemyBattlefieldY, 'enemy');
     
+    const vsFontSize = Math.floor(this.cellSize * 0.6);
     const vsText = this.add.text(
       this.scale.width / 2,
-      this.scale.height * 0.55,
+      this.playerBattlefieldY,
       'VS',
       {
         fontFamily: 'Georgia',
-        fontSize: '48px',
+        fontSize: `${vsFontSize}px`,
         color: '#c9a847',
         fontStyle: 'bold'
       }
@@ -156,24 +222,52 @@ export class GameScene extends Phaser.Scene {
     vsText.setOrigin(0.5);
     vsText.setAlpha(0.8);
     this.uiGroup.add(vsText);
+    
+    const playerLabel = this.add.text(
+      this.playerBattlefieldX,
+      this.playerBattlefieldY - (GRID_ROWS * this.cellSize + (GRID_ROWS - 1) * this.cellGap) / 2 - 30,
+      '我方战场',
+      {
+        fontFamily: 'Georgia',
+        fontSize: `${Math.floor(this.cellSize * 0.2)}px`,
+        color: '#4a90d9',
+        fontStyle: 'bold'
+      }
+    );
+    playerLabel.setOrigin(0.5);
+    this.uiGroup.add(playerLabel);
+    
+    const enemyLabel = this.add.text(
+      this.enemyBattlefieldX,
+      this.enemyBattlefieldY - (GRID_ROWS * this.cellSize + (GRID_ROWS - 1) * this.cellGap) / 2 - 30,
+      '敌方战场',
+      {
+        fontFamily: 'Georgia',
+        fontSize: `${Math.floor(this.cellSize * 0.2)}px`,
+        color: '#d94a4a',
+        fontStyle: 'bold'
+      }
+    );
+    enemyLabel.setOrigin(0.5);
+    this.uiGroup.add(enemyLabel);
   }
 
   private createGrid(centerX: number, centerY: number, owner: 'player' | 'enemy') {
-    const totalWidth = GRID_COLS * CELL_SIZE + (GRID_COLS - 1) * CELL_GAP;
-    const totalHeight = GRID_ROWS * CELL_SIZE + (GRID_ROWS - 1) * CELL_GAP;
+    const totalWidth = GRID_COLS * this.cellSize + (GRID_COLS - 1) * this.cellGap;
+    const totalHeight = GRID_ROWS * this.cellSize + (GRID_ROWS - 1) * this.cellGap;
     const startX = centerX - totalWidth / 2;
     const startY = centerY - totalHeight / 2;
     
     for (let row = 0; row < GRID_ROWS; row++) {
       for (let col = 0; col < GRID_COLS; col++) {
-        const x = startX + col * (CELL_SIZE + CELL_GAP);
-        const y = startY + row * (CELL_SIZE + CELL_GAP);
+        const x = startX + col * (this.cellSize + this.cellGap);
+        const y = startY + row * (this.cellSize + this.cellGap);
         
         const cellBg = this.add.rectangle(
-          x + CELL_SIZE / 2,
-          y + CELL_SIZE / 2,
-          CELL_SIZE,
-          CELL_SIZE,
+          x + this.cellSize / 2,
+          y + this.cellSize / 2,
+          this.cellSize,
+          this.cellSize,
           0x2c1a3a,
           0.6
         );
@@ -191,14 +285,16 @@ export class GameScene extends Phaser.Scene {
   private createHeroModels() {
     const { height } = this.scale;
     
+    const heroXOffset = this.scale.width * 0.08;
+    
     this.createHeroModel(
-      this.scale.width * 0.12,
+      heroXOffset,
       height * 0.5,
       'player'
     );
     
     this.createHeroModel(
-      this.scale.width * 0.88,
+      this.scale.width - heroXOffset,
       height * 0.5,
       'enemy'
     );
@@ -207,83 +303,104 @@ export class GameScene extends Phaser.Scene {
   private createHeroModel(x: number, y: number, owner: 'player' | 'enemy') {
     const group = owner === 'player' ? this.playerHeroGroup : this.enemyHeroGroup;
     const state = this.battleState[owner];
+    const scale = this.heroSizeScale;
+    
+    const bodyWidth = 70 * scale;
+    const bodyHeight = 90 * scale;
+    const headRadius = 25 * scale;
     
     const heroBody = this.add.graphics();
     heroBody.fillStyle(owner === 'player' ? 0x4a90d9 : 0xd94a4a, 0.9);
-    heroBody.fillRoundedRect(x - 35, y - 25, 70, 90, 10);
+    heroBody.fillRoundedRect(x - bodyWidth / 2, y - bodyHeight / 2 + 20 * scale, bodyWidth, bodyHeight, 10 * scale);
     heroBody.lineStyle(3, 0xc9a847, 0.8);
-    heroBody.strokeRoundedRect(x - 35, y - 25, 70, 90, 10);
+    heroBody.strokeRoundedRect(x - bodyWidth / 2, y - bodyHeight / 2 + 20 * scale, bodyWidth, bodyHeight, 10 * scale);
     group.add(heroBody);
     
-    const heroHead = this.add.circle(x, y - 45, 25, owner === 'player' ? 0xf0d5b0 : 0xf0b0b0);
+    const heroHead = this.add.circle(x, y - 45 * scale, headRadius, owner === 'player' ? 0xf0d5b0 : 0xf0b0b0);
     heroHead.setStrokeStyle(2, 0xc9a847, 0.8);
     group.add(heroHead);
     
-    const eyeOffset = owner === 'player' ? 8 : -8;
-    const leftEye = this.add.circle(x - 8 + eyeOffset, y - 48, 4, 0x333333);
-    const rightEye = this.add.circle(x + 8 + eyeOffset, y - 48, 4, 0x333333);
+    const eyeOffsetX = owner === 'player' ? 8 * scale : -8 * scale;
+    const eyeY = y - 48 * scale;
+    const eyeSize = 4 * scale;
+    const leftEye = this.add.circle(x - 8 * scale + eyeOffsetX, eyeY, eyeSize, 0x333333);
+    const rightEye = this.add.circle(x + 8 * scale + eyeOffsetX, eyeY, eyeSize, 0x333333);
     group.add(leftEye);
     group.add(rightEye);
     
     const crown = this.add.graphics();
     crown.fillStyle(0xc9a847, 1);
     crown.beginPath();
-    crown.moveTo(x - 20, y - 65);
-    crown.lineTo(x - 10, y - 80);
-    crown.lineTo(x, y - 70);
-    crown.lineTo(x + 10, y - 80);
-    crown.lineTo(x + 20, y - 65);
+    crown.moveTo(x - 20 * scale, y - 65 * scale);
+    crown.lineTo(x - 10 * scale, y - 80 * scale);
+    crown.lineTo(x, y - 70 * scale);
+    crown.lineTo(x + 10 * scale, y - 80 * scale);
+    crown.lineTo(x + 20 * scale, y - 65 * scale);
     crown.closePath();
     crown.fillPath();
     group.add(crown);
     
-    const healthBarBg = this.add.rectangle(x, y + 80, 80, 12, 0x333333, 0.8);
+    const healthBarWidth = 80 * scale;
+    const healthBarHeight = 12 * scale;
+    const healthBarY = y + 80 * scale;
+    
+    const healthBarBg = this.add.rectangle(x, healthBarY, healthBarWidth, healthBarHeight, 0x333333, 0.8);
     healthBarBg.setStrokeStyle(1, 0xc9a847, 0.5);
     group.add(healthBarBg);
     
-    const healthBar = this.add.rectangle(x - 38, y + 80, 76, 8, 0x22c55e, 1);
+    const healthBar = this.add.rectangle(x - healthBarWidth / 2 + 2, healthBarY, healthBarWidth - 4, healthBarHeight - 4, 0x22c55e, 1);
     healthBar.setOrigin(0, 0.5);
     healthBar.setData('type', 'health_bar');
+    healthBar.setData('max_width', healthBarWidth - 4);
     group.add(healthBar);
     
-    const healthText = this.add.text(x, y + 80, `${state.hero.health}/${state.hero.max_health}`, {
+    const healthFontSize = Math.floor(10 * scale);
+    const healthText = this.add.text(x, healthBarY, `${state.hero.health}/${state.hero.max_health}`, {
       fontFamily: 'Georgia',
-      fontSize: '10px',
+      fontSize: `${healthFontSize}px`,
       color: '#ffffff'
     });
     healthText.setOrigin(0.5);
     healthText.setData('type', 'health_text');
     group.add(healthText);
     
-    const manaBarBg = this.add.rectangle(x, y + 100, 80, 10, 0x333333, 0.8);
+    const manaBarWidth = 80 * scale;
+    const manaBarHeight = 10 * scale;
+    const manaBarY = y + 100 * scale;
+    
+    const manaBarBg = this.add.rectangle(x, manaBarY, manaBarWidth, manaBarHeight, 0x333333, 0.8);
     manaBarBg.setStrokeStyle(1, 0x38bdf8, 0.5);
     group.add(manaBarBg);
     
-    const manaBar = this.add.rectangle(x - 38, y + 100, 76, 6, 0x38bdf8, 1);
+    const manaBar = this.add.rectangle(x - manaBarWidth / 2 + 2, manaBarY, manaBarWidth - 4, manaBarHeight - 4, 0x38bdf8, 1);
     manaBar.setOrigin(0, 0.5);
     manaBar.setData('type', 'mana_bar');
+    manaBar.setData('max_width', manaBarWidth - 4);
     group.add(manaBar);
     
-    const manaText = this.add.text(x, y + 100, `${state.hero.mana}/${state.hero.max_mana}`, {
+    const manaFontSize = Math.floor(9 * scale);
+    const manaText = this.add.text(x, manaBarY, `${state.hero.mana}/${state.hero.max_mana}`, {
       fontFamily: 'Georgia',
-      fontSize: '9px',
+      fontSize: `${manaFontSize}px`,
       color: '#ffffff'
     });
     manaText.setOrigin(0.5);
     manaText.setData('type', 'mana_text');
     group.add(manaText);
     
-    const heroName = this.add.text(x, y + 118, owner === 'player' ? '你' : '对手', {
+    const nameFontSize = Math.floor(14 * scale);
+    const heroName = this.add.text(x, y + 118 * scale, owner === 'player' ? '你' : '对手', {
       fontFamily: 'Georgia',
-      fontSize: '14px',
+      fontSize: `${nameFontSize}px`,
       color: '#e8d5b7'
     });
     heroName.setOrigin(0.5);
     group.add(heroName);
     
-    const runeIcons = this.add.text(x, y + 135, state.hero.runes.map(r => this.getRuneIcon(r)).join(' '), {
+    const runeFontSize = Math.floor(16 * scale);
+    const runeIcons = this.add.text(x, y + 135 * scale, state.hero.runes.map(r => this.getRuneIcon(r)).join(' '), {
       fontFamily: 'Georgia',
-      fontSize: '16px',
+      fontSize: `${runeFontSize}px`,
       color: '#c9a847'
     });
     runeIcons.setOrigin(0.5);
@@ -305,15 +422,17 @@ export class GameScene extends Phaser.Scene {
 
   private createTurnTimer() {
     const centerX = this.scale.width / 2;
-    const centerY = 50;
+    const centerY = Math.max(40, this.cellSize * 0.5);
+    const radius = Math.floor(this.cellSize * 0.4);
     
-    const timerBg = this.add.circle(centerX, centerY, 30, 0x1a0f1e, 0.9);
+    const timerBg = this.add.circle(centerX, centerY, radius, 0x1a0f1e, 0.9);
     timerBg.setStrokeStyle(3, 0xc9a847, 0.8);
     this.uiGroup.add(timerBg);
     
+    const timerFontSize = Math.floor(this.cellSize * 0.3);
     const timerText = this.add.text(centerX, centerY, '15', {
       fontFamily: 'Georgia',
-      fontSize: '20px',
+      fontSize: `${timerFontSize}px`,
       color: '#e8d5b7',
       fontStyle: 'bold'
     });
@@ -321,9 +440,10 @@ export class GameScene extends Phaser.Scene {
     timerText.setData('type', 'timer_text');
     this.uiGroup.add(timerText);
     
-    const turnText = this.add.text(centerX, centerY + 50, '你的回合', {
+    const turnFontSize = Math.floor(this.cellSize * 0.2);
+    const turnText = this.add.text(centerX, centerY + radius + 20, '你的回合', {
       fontFamily: 'Georgia',
-      fontSize: '16px',
+      fontSize: `${turnFontSize}px`,
       color: '#c9a847'
     });
     turnText.setOrigin(0.5);
@@ -333,17 +453,21 @@ export class GameScene extends Phaser.Scene {
 
   private createEndTurnButton() {
     const x = this.scale.width / 2;
-    const y = this.scale.height - 50;
+    const y = this.scale.height - Math.max(40, this.cellSize * 0.6);
     
-    const button = this.add.rectangle(x, y, 120, 40, 0xc9a847, 0.9);
+    const buttonWidth = Math.max(100, this.cellSize * 1.5);
+    const buttonHeight = Math.max(35, this.cellSize * 0.5);
+    
+    const button = this.add.rectangle(x, y, buttonWidth, buttonHeight, 0xc9a847, 0.9);
     button.setStrokeStyle(2, 0xf0d58d, 1);
     button.setInteractive({ useHandCursor: true });
     button.setData('type', 'end_turn_button');
     this.uiGroup.add(button);
     
+    const buttonFontSize = Math.floor(this.cellSize * 0.22);
     const buttonText = this.add.text(x, y, '结束回合', {
       fontFamily: 'Georgia',
-      fontSize: '16px',
+      fontSize: `${buttonFontSize}px`,
       color: '#1a0f1e',
       fontStyle: 'bold'
     });
@@ -391,7 +515,6 @@ export class GameScene extends Phaser.Scene {
       });
       
       gameObject.on('pointerout', () => {
-        const owner = gameObject.getData('owner') as string;
         const highlight = gameObject.getData('highlight') as boolean;
         gameObject.setStrokeStyle(2, 0xc9a847, highlight ? 0.8 : 0.4);
         gameObject.setFillStyle(0x2c1a3a, highlight ? 0.9 : 0.6);
@@ -560,17 +683,11 @@ export class GameScene extends Phaser.Scene {
         case 'hero_attacked':
           this.onHeroAttacked(event);
           break;
-        case 'damage_dealt':
-          break;
         case 'spell_cast':
           this.onSpellCast(event);
           break;
         case 'game_end':
           this.onGameEnd(event);
-          break;
-        case 'heal_performed':
-          break;
-        case 'cell_frozen':
           break;
       }
     }
@@ -601,19 +718,19 @@ export class GameScene extends Phaser.Scene {
   }
 
   private onTurnEnd(_event: BattleEvent) {
-    // Turn end visual feedback
   }
 
   private onCardDrawn(_event: BattleEvent) {
-    // Card drawn animation handled by React component
   }
 
   private onCardPlayed(event: BattleEvent) {
     const card = event.data.card as Card;
     const player = event.data.player as 'player' | 'enemy';
     
-    const x = player === 'player' ? this.scale.width * 0.25 : this.scale.width * 0.75;
-    const y = this.scale.height * 0.85;
+    const x = player === 'player' ? this.playerBattlefieldX : this.enemyBattlefieldX;
+    const y = player === 'player' 
+      ? this.playerBattlefieldY + (GRID_ROWS * this.cellSize + (GRID_ROWS - 1) * this.cellGap) / 2 + 20
+      : this.enemyBattlefieldY - (GRID_ROWS * this.cellSize + (GRID_ROWS - 1) * this.cellGap) / 2 - 20;
     
     this.createCardPlayEffect(x, y, card.element);
   }
@@ -623,19 +740,10 @@ export class GameScene extends Phaser.Scene {
     const position = event.data.position as { row: number; col: number };
     const player = event.data.player as 'player' | 'enemy';
     
-    const centerX = player === 'player' ? this.playerBattlefieldX : this.enemyBattlefieldX;
-    const centerY = player === 'player' ? this.playerBattlefieldY : this.enemyBattlefieldY;
+    const pos = this.getGridCellPosition(position.row, position.col, player);
     
-    const totalWidth = GRID_COLS * CELL_SIZE + (GRID_COLS - 1) * CELL_GAP;
-    const totalHeight = GRID_ROWS * CELL_SIZE + (GRID_ROWS - 1) * CELL_GAP;
-    const startX = centerX - totalWidth / 2;
-    const startY = centerY - totalHeight / 2;
-    
-    const cellX = startX + position.col * (CELL_SIZE + CELL_GAP) + CELL_SIZE / 2;
-    const cellY = startY + position.row * (CELL_SIZE + CELL_GAP) + CELL_SIZE / 2;
-    
-    this.spawnCreatureVisual(cellX, cellY, creature);
-    this.createSummonParticles(cellX, cellY, creature.element);
+    this.spawnCreatureVisual(pos.x, pos.y, creature);
+    this.createSummonParticles(pos.x, pos.y, creature.element);
   }
 
   private onCreatureAttacked(event: BattleEvent) {
@@ -675,45 +783,69 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
+  private getGridCellPosition(row: number, col: number, owner: 'player' | 'enemy'): { x: number; y: number } {
+    const centerX = owner === 'player' ? this.playerBattlefieldX : this.enemyBattlefieldX;
+    const centerY = owner === 'player' ? this.playerBattlefieldY : this.enemyBattlefieldY;
+    
+    const totalWidth = GRID_COLS * this.cellSize + (GRID_COLS - 1) * this.cellGap;
+    const totalHeight = GRID_ROWS * this.cellSize + (GRID_ROWS - 1) * this.cellGap;
+    const startX = centerX - totalWidth / 2;
+    const startY = centerY - totalHeight / 2;
+    
+    return {
+      x: startX + col * (this.cellSize + this.cellGap) + this.cellSize / 2,
+      y: startY + row * (this.cellSize + this.cellGap) + this.cellSize / 2
+    };
+  }
+
   private spawnCreatureVisual(x: number, y: number, creature: CreatureOnBoard) {
     const elementColor = Phaser.Display.Color.HexStringToColor(ELEMENT_COLORS[creature.element]).color;
     const rarityColor = Phaser.Display.Color.HexStringToColor(RARITY_COLORS[creature.rarity]).color;
     
+    const creatureSize = this.cellSize * 0.7;
+    
     const creatureSprite = this.add.graphics();
     
     creatureSprite.fillStyle(elementColor, 0.9);
-    creatureSprite.fillRoundedRect(x - 28, y - 28, 56, 56, 8);
+    creatureSprite.fillRoundedRect(-creatureSize / 2, -creatureSize / 2, creatureSize, creatureSize, 8);
     
     creatureSprite.lineStyle(3, rarityColor, 1);
-    creatureSprite.strokeRoundedRect(x - 28, y - 28, 56, 56, 8);
+    creatureSprite.strokeRoundedRect(-creatureSize / 2, -creatureSize / 2, creatureSize, creatureSize, 8);
     
     const icon = this.getRuneIcon(creature.element);
-    const iconText = this.add.text(x, y - 5, icon, {
+    const iconFontSize = Math.floor(this.cellSize * 0.35);
+    const iconText = this.add.text(0, -5, icon, {
       fontFamily: 'Georgia',
-      fontSize: '28px'
+      fontSize: `${iconFontSize}px`
     });
     iconText.setOrigin(0.5);
     
-    const nameText = this.add.text(x, y + 15, creature.name, {
+    const nameFontSize = Math.floor(this.cellSize * 0.12);
+    const nameText = this.add.text(0, creatureSize / 2 - 10, creature.name, {
       fontFamily: 'Georgia',
-      fontSize: '10px',
+      fontSize: `${nameFontSize}px`,
       color: '#e8d5b7'
     });
     nameText.setOrigin(0.5);
     
-    const attackBg = this.add.circle(x - 18, y + 35, 10, 0x333333, 0.9);
-    const attackText = this.add.text(x - 18, y + 35, creature.attack.toString(), {
+    const statSize = Math.floor(this.cellSize * 0.2);
+    const statOffset = creatureSize * 0.3;
+    const statY = creatureSize / 2 + statSize + 5;
+    
+    const attackBg = this.add.circle(-statOffset, statY, statSize, 0x333333, 0.9);
+    const attackFontSize = Math.floor(this.cellSize * 0.18);
+    const attackText = this.add.text(-statOffset, statY, creature.attack.toString(), {
       fontFamily: 'Georgia',
-      fontSize: '12px',
+      fontSize: `${attackFontSize}px`,
       color: '#fbbf24',
       fontStyle: 'bold'
     });
     attackText.setOrigin(0.5);
     
-    const healthBg = this.add.circle(x + 18, y + 35, 10, 0x333333, 0.9);
-    const healthText = this.add.text(x + 18, y + 35, creature.health.toString(), {
+    const healthBg = this.add.circle(statOffset, statY, statSize, 0x333333, 0.9);
+    const healthText = this.add.text(statOffset, statY, creature.health.toString(), {
       fontFamily: 'Georgia',
-      fontSize: '12px',
+      fontSize: `${attackFontSize}px`,
       color: '#22c55e',
       fontStyle: 'bold'
     });
@@ -761,28 +893,36 @@ export class GameScene extends Phaser.Scene {
 
   private createCardPlayEffect(x: number, y: number, element: RuneType) {
     const color = ELEMENT_COLORS[element];
-    this.createParticles(x, y, color, 20, 500);
+    const count = Math.floor(this.cellSize * 0.25);
+    this.createParticles(x, y, color, count, 500);
   }
 
   private createSummonParticles(x: number, y: number, element: RuneType) {
     const color = ELEMENT_COLORS[element];
-    this.createParticles(x, y, color, 30, 800);
+    const count = Math.floor(this.cellSize * 0.35);
+    this.createParticles(x, y, color, count, 800);
   }
 
   private createSpellEffect(x: number, y: number, element: RuneType) {
     const color = ELEMENT_COLORS[element];
-    this.createParticles(x, y, color, 40, 1000);
+    const count = Math.floor(this.cellSize * 0.5);
+    this.createParticles(x, y, color, count, 1000);
   }
 
   private createParticles(x: number, y: number, colorHex: string, count: number, duration: number) {
     const color = Phaser.Display.Color.HexStringToColor(colorHex);
+    const minSize = Math.max(2, this.cellSize * 0.04);
+    const maxSize = Math.max(5, this.cellSize * 0.1);
+    const minDist = this.cellSize * 0.4;
+    const maxDist = this.cellSize * 1.2;
     
     for (let i = 0; i < count; i++) {
-      const particle = this.add.circle(x, y, Phaser.Math.Between(3, 8), color.color, 1);
+      const size = Phaser.Math.Between(minSize, maxSize);
+      const particle = this.add.circle(x, y, size, color.color, 1);
       this.particlesGroup.add(particle);
       
       const angle = Phaser.Math.FloatBetween(0, Math.PI * 2);
-      const distance = Phaser.Math.Between(30, 100);
+      const distance = Phaser.Math.Between(minDist, maxDist);
       const targetX = x + Math.cos(angle) * distance;
       const targetY = y + Math.sin(angle) * distance;
       
@@ -809,9 +949,6 @@ export class GameScene extends Phaser.Scene {
     
     const attackerVisual = this.findCreatureVisual(attacker.instance_id);
     if (attackerVisual) {
-      const originalX = attackerVisual.x;
-      const originalY = attackerVisual.y;
-      
       this.tweens.add({
         targets: attackerVisual,
         x: targetPos.x,
@@ -828,7 +965,8 @@ export class GameScene extends Phaser.Scene {
   }
 
   private createHitEffect(x: number, y: number) {
-    const hitFlash = this.add.circle(x, y, 30, 0xffffff, 0.8);
+    const hitRadius = this.cellSize * 0.4;
+    const hitFlash = this.add.circle(x, y, hitRadius, 0xffffff, 0.8);
     this.particlesGroup.add(hitFlash);
     
     this.tweens.add({
@@ -842,7 +980,7 @@ export class GameScene extends Phaser.Scene {
       }
     });
     
-    this.createParticles(x, y, '#fbbf24', 15, 400);
+    this.createParticles(x, y, '#fbbf24', Math.floor(this.cellSize * 0.2), 400);
   }
 
   private createDeathEffect(creature: CreatureOnBoard) {
@@ -864,16 +1002,17 @@ export class GameScene extends Phaser.Scene {
       });
     }
     
-    this.createParticles(pos.x, pos.y, '#ef4444', 25, 600);
+    this.createParticles(pos.x, pos.y, '#ef4444', Math.floor(this.cellSize * 0.3), 600);
   }
 
   private createHeroDamageEffect(player: 'player' | 'enemy', damage: number) {
-    const x = player === 'player' ? this.scale.width * 0.12 : this.scale.width * 0.88;
-    const y = this.scale.height * 0.4;
+    const heroX = player === 'player' ? this.scale.width * 0.08 : this.scale.width * 0.92;
+    const heroY = this.scale.height * 0.4;
     
-    const damageText = this.add.text(x, y, `-${damage}`, {
+    const damageFontSize = Math.floor(this.cellSize * 0.4);
+    const damageText = this.add.text(heroX, heroY, `-${damage}`, {
       fontFamily: 'Georgia',
-      fontSize: '32px',
+      fontSize: `${damageFontSize}px`,
       color: '#ef4444',
       fontStyle: 'bold'
     });
@@ -882,7 +1021,7 @@ export class GameScene extends Phaser.Scene {
     
     this.tweens.add({
       targets: damageText,
-      y: y - 50,
+      y: heroY - this.cellSize * 0.6,
       alpha: 0,
       duration: 1000,
       ease: 'Cubic.easeOut',
@@ -907,16 +1046,17 @@ export class GameScene extends Phaser.Scene {
 
   private screenShake() {
     const camera = this.cameras.main;
+    const shakeIntensity = Math.max(2, this.cellSize * 0.04);
     
     this.tweens.add({
       targets: camera,
       x: {
         getStart: () => camera.x,
-        getEnd: () => camera.x + 3
+        getEnd: () => camera.x + shakeIntensity
       },
       y: {
         getStart: () => camera.y,
-        getEnd: () => camera.y - 2
+        getEnd: () => camera.y - shakeIntensity * 0.7
       },
       duration: 50,
       yoyo: true,
@@ -930,19 +1070,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   private getCreaturePosition(creature: CreatureOnBoard): { x: number; y: number } | null {
-    const player = creature.owner;
-    const centerX = player === 'player' ? this.playerBattlefieldX : this.enemyBattlefieldX;
-    const centerY = player === 'player' ? this.playerBattlefieldY : this.enemyBattlefieldY;
-    
-    const totalWidth = GRID_COLS * CELL_SIZE + (GRID_COLS - 1) * CELL_GAP;
-    const totalHeight = GRID_ROWS * CELL_SIZE + (GRID_ROWS - 1) * CELL_GAP;
-    const startX = centerX - totalWidth / 2;
-    const startY = centerY - totalHeight / 2;
-    
-    return {
-      x: startX + creature.position.col * (CELL_SIZE + CELL_GAP) + CELL_SIZE / 2,
-      y: startY + creature.position.row * (CELL_SIZE + CELL_GAP) + CELL_SIZE / 2
-    };
+    return this.getGridCellPosition(creature.position.row, creature.position.col, creature.owner);
   }
 
   private findCreatureVisual(instanceId: string): Phaser.GameObjects.Container | null {
@@ -997,18 +1125,8 @@ export class GameScene extends Phaser.Scene {
         for (let col = 0; col < GRID_COLS; col++) {
           const cell = battlefield[row][col];
           if (cell.creature && !existingCreatures.has(cell.creature.instance_id)) {
-            const centerX = owner === 'player' ? this.playerBattlefieldX : this.enemyBattlefieldX;
-            const centerY = owner === 'player' ? this.playerBattlefieldY : this.enemyBattlefieldY;
-            
-            const totalWidth = GRID_COLS * CELL_SIZE + (GRID_COLS - 1) * CELL_GAP;
-            const totalHeight = GRID_ROWS * CELL_SIZE + (GRID_ROWS - 1) * CELL_GAP;
-            const startX = centerX - totalWidth / 2;
-            const startY = centerY - totalHeight / 2;
-            
-            const cellX = startX + col * (CELL_SIZE + CELL_GAP) + CELL_SIZE / 2;
-            const cellY = startY + row * (CELL_SIZE + CELL_GAP) + CELL_SIZE / 2;
-            
-            this.spawnCreatureVisual(cellX, cellY, cell.creature);
+            const pos = this.getGridCellPosition(row, col, owner);
+            this.spawnCreatureVisual(pos.x, pos.y, cell.creature);
           }
         }
       }
@@ -1029,8 +1147,9 @@ export class GameScene extends Phaser.Scene {
       
       if (type === 'health_bar') {
         const bar = child as Phaser.GameObjects.Rectangle;
+        const maxWidth = child.getData('max_width') as number;
         const healthPercent = state.hero.health / state.hero.max_health;
-        bar.width = 76 * healthPercent;
+        bar.width = maxWidth * healthPercent;
         
         let color: number;
         if (healthPercent > 0.6) {
@@ -1050,8 +1169,9 @@ export class GameScene extends Phaser.Scene {
       
       if (type === 'mana_bar') {
         const bar = child as Phaser.GameObjects.Rectangle;
+        const maxWidth = child.getData('max_width') as number;
         const manaPercent = state.hero.max_mana > 0 ? state.hero.mana / state.hero.max_mana : 0;
-        bar.width = 76 * manaPercent;
+        bar.width = maxWidth * manaPercent;
       }
       
       if (type === 'mana_text') {
@@ -1147,13 +1267,14 @@ export class GameScene extends Phaser.Scene {
   }
 
   public update() {
-    // Per-frame update logic if needed
   }
 
   public destroyScene() {
     if (this.turnTimerEvent) {
       this.turnTimerEvent.remove();
     }
+    
+    this.scale.off('resize', this.handleResize, this);
     
     this.gridGroup.clear(true);
     this.playerHeroGroup.clear(true);
