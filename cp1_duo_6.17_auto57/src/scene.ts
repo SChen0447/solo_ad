@@ -38,11 +38,15 @@ export class GameScene extends Phaser.Scene {
   private moveProgress: number = 0;
 
   private graphics!: Phaser.GameObjects.Graphics;
+  private minimapRenderTexture!: Phaser.GameObjects.RenderTexture;
   private minimapGraphics!: Phaser.GameObjects.Graphics;
   private minimapContainer!: Phaser.GameObjects.Container;
+  private minimapBorder!: Phaser.GameObjects.Rectangle;
   private minimapScale: number = 0.25;
+  private minimapDirty: boolean = true;
 
   private explored: boolean[][] = [];
+  private visible: boolean[][] = [];
   private exploredTiles: number = 0;
   private totalFloorTiles: number = 0;
   private lastMilestone: number = 0;
@@ -64,7 +68,7 @@ export class GameScene extends Phaser.Scene {
   private mapFadeTween!: Phaser.Tweens.Tween | null;
   private haloGraphics!: Phaser.GameObjects.Graphics;
 
-  private victoryModal!: Phaser.GameObjects.Container | null;
+  private victoryModalElement: HTMLDivElement | null = null;
 
   private camera!: Phaser.Cameras.Scene2D.Camera;
   private worldWidth: number = MAP_WIDTH * TILE_SIZE;
@@ -89,9 +93,9 @@ export class GameScene extends Phaser.Scene {
     };
 
     this.createUI();
-    this.generateMapWithSeed(Date.now());
     this.createMinimap();
     this.createHaloEffect();
+    this.generateMapWithSeed(Date.now());
   }
 
   private createUI(): void {
@@ -99,13 +103,52 @@ export class GameScene extends Phaser.Scene {
     const gameWidth = this.scale.width;
     const gameHeight = this.scale.height;
 
-    this.add.dom(gameWidth / 2, gameHeight - barHeight / 2).createFromHTML(`
-      <div style="width: ${gameWidth}px; height: ${barHeight}px; background: rgba(0,0,0,0.6); display: flex; align-items: center; padding: 0 20px; gap: 15px; font-family: 'Segoe UI', sans-serif;">
-        <input type="text" id="seed-input" placeholder="输入种子值" style="padding: 8px; border-radius: 8px; border: 2px solid white; background: rgba(255,255,255,0.1); color: white; font-family: 'Segoe UI', sans-serif; width: 150px; outline: none;">
-        <button id="generate-btn" style="padding: 8px 20px; background: #1a5276; color: white; border: none; border-radius: 6px; cursor: pointer; font-family: 'Segoe UI', sans-serif; transition: all 0.2s ease;">生成地图</button>
-        <span id="progress-label" style="color: white; font-family: 'Segoe UI', sans-serif;">探索进度: 0%</span>
+    const uiContainer = this.add.dom(gameWidth / 2, gameHeight - barHeight / 2).createFromHTML(`
+      <div id="game-ui-bar" style="
+        width: ${gameWidth}px;
+        height: ${barHeight}px;
+        background: rgba(0,0,0,0.6);
+        display: flex;
+        align-items: center;
+        padding: 0 20px;
+        gap: 15px;
+        font-family: 'Segoe UI', sans-serif;
+        position: relative;
+        z-index: 100;
+      ">
+        <input type="text" id="seed-input" placeholder="输入种子值"
+          style="
+            padding: 8px;
+            border-radius: 8px;
+            border: 2px solid white;
+            background: rgba(255,255,255,0.1);
+            color: white;
+            font-family: 'Segoe UI', sans-serif;
+            width: 150px;
+            outline: none;
+          "
+        />
+        <button id="generate-btn"
+          style="
+            padding: 8px 20px;
+            background: #1a5276;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-family: 'Segoe UI', sans-serif;
+            transition: all 0.2s ease;
+          "
+        >生成地图</button>
+        <span id="progress-label"
+          style="
+            color: white;
+            font-family: 'Segoe UI', sans-serif;
+          "
+        >探索进度: 0%</span>
       </div>
     `);
+    uiContainer.setDepth(100);
 
     this.seedInput = document.getElementById('seed-input') as HTMLInputElement;
     this.generateBtn = document.getElementById('generate-btn') as HTMLButtonElement;
@@ -138,48 +181,56 @@ export class GameScene extends Phaser.Scene {
       })
       .setOrigin(1, 0.5)
       .setScrollFactor(0)
-      .setDepth(100);
+      .setDepth(101);
   }
 
   private createMinimap(): void {
     const gameWidth = this.scale.width;
-    const minimapWidth = this.worldWidth * this.minimapScale;
-    const minimapHeight = this.worldHeight * this.minimapScale;
 
-    this.minimapGraphics = this.add.graphics();
-    this.minimapGraphics.setScrollFactor(0);
+    const minimapDisplayWidth = this.worldWidth * this.minimapScale;
+    const minimapDisplayHeight = this.worldHeight * this.minimapScale;
+    const centerX = gameWidth - minimapDisplayWidth / 2 - 15;
+    const centerY = minimapDisplayHeight / 2 + 15;
 
-    const border = this.add
+    this.minimapBorder = this.add
       .rectangle(
-        gameWidth - minimapWidth / 2 - 15,
-        minimapHeight / 2 + 15,
-        minimapWidth + 4,
-        minimapHeight + 4,
+        centerX,
+        centerY,
+        minimapDisplayWidth + 4,
+        minimapDisplayHeight + 4,
         0xffffff,
         0.3
       )
       .setScrollFactor(0)
       .setDepth(90);
 
-    border.setInteractive(
-      new Phaser.Geom.Rectangle(0, 0, minimapWidth + 4, minimapHeight + 4),
+    this.minimapRenderTexture = this.add
+      .renderTexture(centerX, centerY, minimapDisplayWidth, minimapDisplayHeight)
+      .setScrollFactor(0)
+      .setDepth(91);
+
+    this.minimapContainer = this.add.container(centerX, centerY, [
+      this.minimapRenderTexture,
+    ]);
+    this.minimapContainer.setDepth(95);
+    this.minimapContainer.setScrollFactor(0);
+
+    this.minimapGraphics = this.add.graphics();
+    this.minimapGraphics.setVisible(false);
+
+    this.minimapBorder.setInteractive(
+      new Phaser.Geom.Rectangle(0, 0, minimapDisplayWidth + 4, minimapDisplayHeight + 4),
       Phaser.Geom.Rectangle.Contains
     );
 
-    border.on('pointerover', () => {
+    this.minimapBorder.on('pointerover', () => {
       this.minimapContainer.setScale(1.2);
+      this.minimapBorder.setScale(1.2);
     });
-    border.on('pointerout', () => {
+    this.minimapBorder.on('pointerout', () => {
       this.minimapContainer.setScale(1);
+      this.minimapBorder.setScale(1);
     });
-
-    this.minimapContainer = this.add.container(
-      gameWidth - minimapWidth / 2 - 15,
-      minimapHeight / 2 + 15,
-      [this.minimapGraphics]
-    );
-    this.minimapContainer.setDepth(95);
-    this.minimapContainer.setScrollFactor(0);
   }
 
   private createHaloEffect(): void {
@@ -192,11 +243,14 @@ export class GameScene extends Phaser.Scene {
   private showHaloEffect(): void {
     const gameWidth = this.scale.width;
     const gameHeight = this.scale.height;
-    const thickness = 50;
 
     this.haloGraphics.clear();
 
-    const gradientTexture = this.textures.createCanvas('halo-gradient', gameWidth, gameHeight);
+    const gradientTexture = this.textures.createCanvas(
+      'halo-gradient-' + this.time.now,
+      gameWidth,
+      gameHeight
+    );
     const ctx = gradientTexture.getContext();
 
     const gradient = ctx.createRadialGradient(
@@ -216,7 +270,7 @@ export class GameScene extends Phaser.Scene {
 
     gradientTexture.refresh();
 
-    const halo = this.add.image(gameWidth / 2, gameHeight / 2, 'halo-gradient');
+    const halo = this.add.image(gameWidth / 2, gameHeight / 2, gradientTexture);
     halo.setScrollFactor(0);
     halo.setDepth(200);
     halo.setAlpha(0);
@@ -237,8 +291,13 @@ export class GameScene extends Phaser.Scene {
     const startTime = performance.now();
 
     this.mapData = generateDungeon(seed);
-    while (!verifyConnectivity(this.mapData) || this.mapData.rooms.length < 6) {
+    let attempts = 0;
+    while (
+      (!verifyConnectivity(this.mapData) || this.mapData.rooms.length < 6) &&
+      attempts < 10
+    ) {
       this.mapData = generateDungeon(++seed);
+      attempts++;
     }
 
     this.initExploredArray();
@@ -268,20 +327,27 @@ export class GameScene extends Phaser.Scene {
     this.lastMilestone = 0;
     this.updateProgress();
 
-    this.exploreArea(this.playerGridX, this.playerGridY, 3);
+    this.updateVisibility(this.playerGridX, this.playerGridY, 4);
+    this.markExploredFromVisible();
+
+    this.minimapDirty = true;
+    this.renderMinimap();
 
     const endTime = performance.now();
-    console.log(`地图生成耗时: ${(endTime - startTime).toFixed(2)}ms`);
+    console.log(`地图生成耗时: ${(endTime - startTime).toFixed(2)}ms, 房间数: ${this.mapData.rooms.length}`);
 
     this.hideVictoryModal();
   }
 
   private initExploredArray(): void {
     this.explored = [];
+    this.visible = [];
     for (let y = 0; y < MAP_HEIGHT; y++) {
       this.explored[y] = [];
+      this.visible[y] = [];
       for (let x = 0; x < MAP_WIDTH; x++) {
         this.explored[y][x] = false;
+        this.visible[y][x] = false;
       }
     }
   }
@@ -295,6 +361,77 @@ export class GameScene extends Phaser.Scene {
         }
       }
     }
+  }
+
+  private updateVisibility(centerX: number, centerY: number, viewRadius: number): void {
+    for (let y = 0; y < MAP_HEIGHT; y++) {
+      for (let x = 0; x < MAP_WIDTH; x++) {
+        this.visible[y][x] = false;
+      }
+    }
+
+    for (let angle = 0; angle < 360; angle += 1) {
+      const rad = (angle * Math.PI) / 180;
+      const dx = Math.cos(rad);
+      const dy = Math.sin(rad);
+
+      for (let dist = 0; dist <= viewRadius; dist += 0.5) {
+        const x = Math.floor(centerX + dx * dist + 0.5);
+        const y = Math.floor(centerY + dy * dist + 0.5);
+
+        if (x < 0 || x >= MAP_WIDTH || y < 0 || y >= MAP_HEIGHT) break;
+
+        this.visible[y][x] = true;
+
+        if (this.mapData.tiles[y][x] === TILE.WALL) {
+          break;
+        }
+      }
+    }
+
+    for (let dy = -1; dy <= 1; dy++) {
+      for (let dx = -1; dx <= 1; dx++) {
+        const x = centerX + dx;
+        const y = centerY + dy;
+        if (x >= 0 && x < MAP_WIDTH && y >= 0 && y < MAP_HEIGHT) {
+          this.visible[y][x] = true;
+        }
+      }
+    }
+  }
+
+  private markExploredFromVisible(): void {
+    for (let y = 0; y < MAP_HEIGHT; y++) {
+      for (let x = 0; x < MAP_WIDTH; x++) {
+        if (this.visible[y][x] && !this.explored[y][x]) {
+          if (this.mapData.tiles[y][x] === TILE.FLOOR) {
+            this.explored[y][x] = true;
+            this.exploredTiles++;
+            this.minimapDirty = true;
+          } else if (this.mapData.tiles[y][x] === TILE.WALL) {
+            let hasFloorNeighbor = false;
+            const dirs = [
+              [-1, 0], [1, 0], [0, -1], [0, 1],
+            ];
+            for (const [ndx, ndy] of dirs) {
+              const nx = x + ndx;
+              const ny = y + ndy;
+              if (nx >= 0 && nx < MAP_WIDTH && ny >= 0 && ny < MAP_HEIGHT) {
+                if (this.mapData.tiles[ny][nx] === TILE.FLOOR && this.explored[ny][nx]) {
+                  hasFloorNeighbor = true;
+                  break;
+                }
+              }
+            }
+            if (hasFloorNeighbor) {
+              this.explored[y][x] = true;
+              this.minimapDirty = true;
+            }
+          }
+        }
+      }
+    }
+    this.updateProgress();
   }
 
   private placeChests(): void {
@@ -312,7 +449,8 @@ export class GameScene extends Phaser.Scene {
           if (this.mapData.rooms[0].centerX === x && this.mapData.rooms[0].centerY === y) continue;
 
           const distFromStart =
-            Math.abs(x - this.mapData.rooms[0].centerX) + Math.abs(y - this.mapData.rooms[0].centerY);
+            Math.abs(x - this.mapData.rooms[0].centerX) +
+            Math.abs(y - this.mapData.rooms[0].centerY);
           if (distFromStart > 5) {
             floorTiles.push({ x, y });
           }
@@ -421,25 +559,17 @@ export class GameScene extends Phaser.Scene {
     this.camera.startFollow(this.player, true, 0.1, 0.1);
   }
 
-  private exploreArea(centerX: number, centerY: number, radius: number): void {
-    for (let dy = -radius; dy <= radius; dy++) {
-      for (let dx = -radius; dx <= radius; dx++) {
-        const x = centerX + dx;
-        const y = centerY + dy;
-        if (x >= 0 && x < MAP_WIDTH && y >= 0 && y < MAP_HEIGHT) {
-          if (!this.explored[y][x] && this.mapData.tiles[y][x] === TILE.FLOOR) {
-            this.explored[y][x] = true;
-            this.exploredTiles++;
-          }
-        }
-      }
-    }
-    this.updateProgress();
-  }
-
   private updateProgress(): void {
-    const percentage = this.totalFloorTiles > 0 ? Math.round((this.exploredTiles / this.totalFloorTiles) * 100) : 0;
+    const percentage =
+      this.totalFloorTiles > 0
+        ? Math.round((this.exploredTiles / this.totalFloorTiles) * 100)
+        : 0;
     this.progressText.setText(`探索进度: ${percentage}%`);
+
+    const progressLabel = document.getElementById('progress-label');
+    if (progressLabel) {
+      progressLabel.textContent = `探索进度: ${percentage}%`;
+    }
 
     const currentMilestone = Math.floor(percentage / 10);
     if (currentMilestone > this.lastMilestone && currentMilestone < 10) {
@@ -448,17 +578,20 @@ export class GameScene extends Phaser.Scene {
     }
 
     if (percentage >= 100) {
-      this.showVictoryModal();
+      this.time.delayedCall(300, () => {
+        this.showVictoryModal();
+      });
     }
   }
 
   private showVictoryModal(): void {
-    if (this.victoryModal) return;
+    if (this.victoryModalElement) return;
+    if (document.getElementById('victory-modal')) return;
 
     const gameWidth = this.scale.width;
     const gameHeight = this.scale.height;
 
-    const modalDOM = this.add.dom(gameWidth / 2, gameHeight / 2).createFromHTML(`
+    const modalHTML = `
       <div id="victory-modal" style="
         position: fixed;
         top: 0;
@@ -474,63 +607,120 @@ export class GameScene extends Phaser.Scene {
         font-family: 'Segoe UI', sans-serif;
         opacity: 0;
         transition: opacity 0.3s ease;
-        z-index: 1000;
+        z-index: 9999;
+        pointer-events: auto;
       ">
-        <div style="
-          background: rgba(255, 255, 255, 0.1);
+        <div id="victory-modal-content" style="
+          background: rgba(26, 26, 46, 0.85);
           backdrop-filter: blur(8px);
           -webkit-backdrop-filter: blur(8px);
           border-radius: 16px;
           padding: 40px 60px;
           text-align: center;
           border: 1px solid rgba(255, 255, 255, 0.2);
+          box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
         ">
           <h1 style="color: #ffd700; font-size: 32px; margin: 0 0 20px 0; font-weight: bold;">🎉 探索完成！</h1>
           <p style="color: #ffffff; font-size: 18px; margin: 0 0 30px 0;">你已探索完整个地牢！</p>
-          <button id="restart-btn" style="
-            padding: 12px 30px;
-            background: #1a5276;
-            color: white;
-            border: none;
-            border-radius: 6px;
-            cursor: pointer;
-            font-family: 'Segoe UI', sans-serif;
-            font-size: 16px;
-            transition: all 0.2s ease;
-          ">开始新地图</button>
+          <div style="display: flex; gap: 15px; justify-content: center;">
+            <button id="victory-restart-btn" style="
+              padding: 12px 30px;
+              background: #1a5276;
+              color: white;
+              border: none;
+              border-radius: 6px;
+              cursor: pointer;
+              font-family: 'Segoe UI', sans-serif;
+              font-size: 16px;
+              transition: all 0.2s ease;
+            ">开始新地图</button>
+            <button id="victory-close-btn" style="
+              padding: 12px 30px;
+              background: transparent;
+              color: #aaa;
+              border: 1px solid #555;
+              border-radius: 6px;
+              cursor: pointer;
+              font-family: 'Segoe UI', sans-serif;
+              font-size: 16px;
+              transition: all 0.2s ease;
+            ">关闭</button>
+          </div>
         </div>
       </div>
-    `);
-    modalDOM.setScrollFactor(0);
-    modalDOM.setDepth(500);
+    `;
 
-    const modalElement = document.getElementById('victory-modal') as HTMLDivElement;
+    const tempDiv = document.createElement('div');
+    tempDiv.innerHTML = modalHTML;
+    const modalEl = tempDiv.firstElementChild as HTMLDivElement;
+    document.body.appendChild(modalEl);
+
+    this.victoryModalElement = modalEl;
+
     requestAnimationFrame(() => {
-      modalElement.style.opacity = '1';
+      modalEl.style.opacity = '1';
     });
 
-    const restartBtn = document.getElementById('restart-btn') as HTMLButtonElement;
-    restartBtn.addEventListener('mouseenter', () => {
-      restartBtn.style.background = '#2980b9';
-      restartBtn.style.transform = 'scale(1.05)';
-    });
-    restartBtn.addEventListener('mouseleave', () => {
-      restartBtn.style.background = '#1a5276';
-      restartBtn.style.transform = 'scale(1)';
-    });
-    restartBtn.addEventListener('click', () => {
-      const seed = this.seedInput.value ? parseInt(this.seedInput.value) + 1 : Date.now();
-      this.seedInput.value = seed.toString();
-      this.generateMapWithSeed(seed);
-    });
+    const restartBtn = document.getElementById('victory-restart-btn') as HTMLButtonElement;
+    if (restartBtn) {
+      restartBtn.addEventListener('mouseenter', () => {
+        restartBtn.style.background = '#2980b9';
+        restartBtn.style.transform = 'scale(1.05)';
+      });
+      restartBtn.addEventListener('mouseleave', () => {
+        restartBtn.style.background = '#1a5276';
+        restartBtn.style.transform = 'scale(1)';
+      });
+      restartBtn.addEventListener('click', () => {
+        const seed = this.seedInput.value ? parseInt(this.seedInput.value) + 1 : Date.now();
+        this.seedInput.value = seed.toString();
+        this.hideVictoryModal();
+        this.generateMapWithSeed(seed);
+      });
+    }
 
-    this.victoryModal = this.add.container(0, 0, [modalDOM]);
+    const closeBtn = document.getElementById('victory-close-btn') as HTMLButtonElement;
+    if (closeBtn) {
+      closeBtn.addEventListener('mouseenter', () => {
+        closeBtn.style.color = '#fff';
+        closeBtn.style.borderColor = '#888';
+      });
+      closeBtn.addEventListener('mouseleave', () => {
+        closeBtn.style.color = '#aaa';
+        closeBtn.style.borderColor = '#555';
+      });
+      closeBtn.addEventListener('click', () => {
+        this.hideVictoryModal();
+      });
+    }
+
+    modalEl.addEventListener('click', (e) => {
+      if (e.target === modalEl) {
+        this.hideVictoryModal();
+      }
+    });
   }
 
   private hideVictoryModal(): void {
-    if (this.victoryModal) {
-      this.victoryModal.destroy();
-      this.victoryModal = null;
+    if (this.victoryModalElement) {
+      this.victoryModalElement.style.opacity = '0';
+      const el = this.victoryModalElement;
+      setTimeout(() => {
+        if (el.parentNode) {
+          el.parentNode.removeChild(el);
+        }
+      }, 300);
+      this.victoryModalElement = null;
+    } else {
+      const existingEl = document.getElementById('victory-modal');
+      if (existingEl) {
+        existingEl.style.opacity = '0';
+        setTimeout(() => {
+          if (existingEl.parentNode) {
+            existingEl.parentNode.removeChild(existingEl);
+          }
+        }, 300);
+      }
     }
   }
 
@@ -556,6 +746,7 @@ export class GameScene extends Phaser.Scene {
         });
 
         this.showPickupToast();
+        this.minimapDirty = true;
       }
     }
   }
@@ -635,47 +826,66 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
-  private updateMinimap(): void {
-    this.minimapGraphics.clear();
+  private renderMinimap(): void {
+    if (!this.mapData) return;
 
-    const tileScale = TILE_SIZE * this.minimapScale;
+    const minimapDisplayWidth = this.worldWidth * this.minimapScale;
+    const minimapDisplayHeight = this.worldHeight * this.minimapScale;
+    const tileDisplayWidth = minimapDisplayWidth / MAP_WIDTH;
+    const tileDisplayHeight = minimapDisplayHeight / MAP_HEIGHT;
+
+    this.minimapRenderTexture.clear();
+    this.minimapGraphics.clear();
 
     for (let y = 0; y < MAP_HEIGHT; y++) {
       for (let x = 0; x < MAP_WIDTH; x++) {
-        const px = (x - MAP_WIDTH / 2) * tileScale;
-        const py = (y - MAP_HEIGHT / 2) * tileScale;
+        const px = (x - MAP_WIDTH / 2) * tileDisplayWidth;
+        const py = (y - MAP_HEIGHT / 2) * tileDisplayHeight;
+
+        let color: number;
 
         if (this.explored[y][x]) {
           if (this.mapData.tiles[y][x] === TILE.FLOOR) {
-            this.minimapGraphics.fillStyle(0xaaaaaa);
+            color = 0xaaaaaa;
           } else {
-            this.minimapGraphics.fillStyle(0x666666);
+            color = 0x555555;
           }
         } else {
-          this.minimapGraphics.fillStyle(0x333333);
+          color = 0x2a2a2a;
         }
 
-        this.minimapGraphics.fillRect(px, py, tileScale, tileScale);
+        this.minimapGraphics.fillStyle(color);
+        this.minimapGraphics.fillRect(px, py, tileDisplayWidth + 0.5, tileDisplayHeight + 0.5);
       }
     }
 
     for (const chest of this.chests) {
       if (!chest.collected && this.explored[chest.y][chest.x]) {
-        const cx = (chest.x - MAP_WIDTH / 2) * tileScale + tileScale / 2;
-        const cy = (chest.y - MAP_HEIGHT / 2) * tileScale + tileScale / 2;
+        const cx = (chest.x - MAP_WIDTH / 2 + 0.5) * tileDisplayWidth;
+        const cy = (chest.y - MAP_HEIGHT / 2 + 0.5) * tileDisplayHeight;
         this.minimapGraphics.fillStyle(0xffd700);
-        this.minimapGraphics.fillCircle(cx, cy, tileScale * 0.6);
+        this.minimapGraphics.fillCircle(cx, cy, Math.max(tileDisplayWidth * 0.8, 1.5));
       }
     }
 
-    const playerX = (this.playerGridX - MAP_WIDTH / 2) * tileScale + tileScale / 2;
-    const playerY = (this.playerGridY - MAP_HEIGHT / 2) * tileScale + tileScale / 2;
+    const playerX = (this.playerGridX - MAP_WIDTH / 2 + 0.5) * tileDisplayWidth;
+    const playerY = (this.playerGridY - MAP_HEIGHT / 2 + 0.5) * tileDisplayHeight;
 
-    const blinkAlpha = Math.sin(this.time.now * 0.01) > 0 ? 1 : 0.3;
+    const blinkScale = 1 + Math.sin(this.time.now * 0.01 * Math.PI) * 0.3;
     this.minimapGraphics.fillStyle(0x00ff00);
-    this.minimapGraphics.fillCircle(playerX, playerY, tileScale * 0.8);
-    this.minimapGraphics.fillStyle(0x00ff00, blinkAlpha);
-    this.minimapGraphics.fillCircle(playerX, playerY, tileScale * 1.2);
+    this.minimapGraphics.fillCircle(playerX, playerY, Math.max(tileDisplayWidth * 0.8, 2));
+    this.minimapGraphics.fillStyle(0x00ff00, 0.5);
+    this.minimapGraphics.fillCircle(
+      playerX,
+      playerY,
+      Math.max(tileDisplayWidth * 1.2 * blinkScale, 3)
+    );
+
+    this.minimapRenderTexture.draw(
+      this.minimapGraphics,
+      minimapDisplayWidth / 2,
+      minimapDisplayHeight / 2
+    );
   }
 
   update(time: number, delta: number): void {
@@ -684,7 +894,11 @@ export class GameScene extends Phaser.Scene {
     this.handleInput();
     this.updatePlayerMovement(delta);
     this.updateParticles(delta);
-    this.updateMinimap();
+
+    if (this.minimapDirty) {
+      this.renderMinimap();
+      this.minimapDirty = false;
+    }
   }
 
   private handleInput(): void {
@@ -699,22 +913,38 @@ export class GameScene extends Phaser.Scene {
     else if (this.keys.d.isDown) dx = 1;
 
     if (dx !== 0 || dy !== 0) {
-      const newX = this.playerGridX + dx;
-      const newY = this.playerGridY + dy;
+      this.tryStartMove(dx, dy);
+    }
+  }
 
-      if (this.canMoveTo(newX, newY)) {
-        this.targetGridX = newX;
-        this.targetGridY = newY;
-        this.isMoving = true;
-        this.moveProgress = 0;
-        this.createStepParticles();
+  private tryStartMove(dx: number, dy: number): void {
+    const newX = this.playerGridX + dx;
+    const newY = this.playerGridY + dy;
+
+    if (!this.canMoveTo(newX, newY)) return;
+
+    const checkX = this.playerGridX + (dx !== 0 ? Math.sign(dx) : 0);
+    const checkY = this.playerGridY + (dy !== 0 ? Math.sign(dy) : 0);
+    if (!this.canMoveTo(checkX, checkY)) return;
+
+    if (dx !== 0 && dy !== 0) {
+      if (!this.canMoveTo(this.playerGridX + dx, this.playerGridY) &&
+          !this.canMoveTo(this.playerGridX, this.playerGridY + dy)) {
+        return;
       }
     }
+
+    this.targetGridX = newX;
+    this.targetGridY = newY;
+    this.isMoving = true;
+    this.moveProgress = 0;
+    this.createStepParticles();
   }
 
   private canMoveTo(x: number, y: number): boolean {
     if (x < 0 || x >= MAP_WIDTH || y < 0 || y >= MAP_HEIGHT) return false;
-    return this.mapData.tiles[y][x] === TILE.FLOOR;
+    if (this.mapData.tiles[y][x] !== TILE.FLOOR) return false;
+    return true;
   }
 
   private updatePlayerMovement(delta: number): void {
@@ -726,15 +956,17 @@ export class GameScene extends Phaser.Scene {
     if (this.moveProgress >= 1) {
       this.moveProgress = 1;
       this.isMoving = false;
+
       this.playerGridX = this.targetGridX;
       this.playerGridY = this.targetGridY;
 
-      this.exploreArea(this.playerGridX, this.playerGridY, 3);
+      this.updateVisibility(this.playerGridX, this.playerGridY, 4);
+      this.markExploredFromVisible();
       this.checkChestPickup();
     }
 
-    const startX = this.playerGridX * TILE_SIZE + TILE_SIZE / 2;
-    const startY = this.playerGridY * TILE_SIZE + TILE_SIZE / 2;
+    const startX = (this.isMoving ? this.playerGridX : this.targetGridX) * TILE_SIZE + TILE_SIZE / 2;
+    const startY = (this.isMoving ? this.playerGridY : this.targetGridY) * TILE_SIZE + TILE_SIZE / 2;
     const endX = this.targetGridX * TILE_SIZE + TILE_SIZE / 2;
     const endY = this.targetGridY * TILE_SIZE + TILE_SIZE / 2;
 
