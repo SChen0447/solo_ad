@@ -857,7 +857,7 @@ const App: React.FC = () => {
                     gap: '18px',
                     minHeight: '260px',
                     padding: '10px 10px 20px',
-                    borderBottom: '1.5px solid rgba(79,70,229,0.4)',
+                    borderBottom: '1.5px solid rgba(79,70,229,0.5)',
                     position: 'relative'
                   }}>
                     {pollResult.results.map((r, idx) => (
@@ -874,23 +874,17 @@ const App: React.FC = () => {
                       >
                         <div style={{
                           fontSize: '0.85rem',
-                          color: 'rgba(255,255,255,0.75)',
+                          color: 'rgba(255,255,255,0.7)',
                           marginBottom: '3px',
                           fontWeight: 600,
-                          whiteSpace: 'nowrap',
-                          transition: 'all 0.2s ease',
-                          transform: hoveredBar === idx ? 'translateY(-2px)' : 'translateY(0)',
-                          opacity: hoveredBar === idx ? 1 : 0.75
+                          whiteSpace: 'nowrap'
                         }}>
                           {r.percentage}%
                         </div>
                         <div style={{
                           fontSize: '0.85rem',
-                          color: 'rgba(255,255,255,0.6)',
-                          marginBottom: '10px',
-                          transition: 'all 0.2s ease',
-                          transform: hoveredBar === idx ? 'translateY(-2px)' : 'translateY(0)',
-                          opacity: hoveredBar === idx ? 0.9 : 0.6
+                          color: 'rgba(255,255,255,0.7)',
+                          marginBottom: '10px'
                         }}>
                           {r.votes}票
                         </div>
@@ -920,10 +914,8 @@ const App: React.FC = () => {
                             minHeight: '4px',
                             background: 'linear-gradient(180deg, #818cf8 0%, #6366f1 100%)',
                             borderRadius: '8px 8px 4px 4px',
-                            transition: 'height 0.5s cubic-bezier(0.34, 1.56, 0.64, 1), filter 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease',
-                            boxShadow: hoveredBar === idx
-                              ? '0 8px 24px rgba(99,102,241,0.5), 0 0 20px rgba(129,140,248,0.3)'
-                              : '0 4px 12px rgba(99,102,241,0.3)',
+                            transition: 'height 0.5s cubic-bezier(0.34, 1.56, 0.64, 1), filter 0.2s ease, box-shadow 0.2s ease',
+                            boxShadow: '0 4px 12px rgba(99,102,241,0.3)',
                             filter: hoveredBar === idx ? 'brightness(1.15)' : 'brightness(1)',
                             cursor: 'pointer',
                             position: 'relative'
@@ -938,59 +930,35 @@ const App: React.FC = () => {
                           left: tooltipPos.x,
                           top: tooltipPos.y,
                           transform: 'translate(-50%, -100%)',
-                          background: 'rgba(15,15,35,0.95)',
-                          backdropFilter: 'blur(8px)',
-                          padding: '10px 14px',
-                          borderRadius: '10px',
-                          border: '1px solid rgba(99,102,241,0.4)',
-                          boxShadow: '0 8px 24px rgba(0,0,0,0.4)',
+                          background: 'rgba(20,20,40,0.9)',
+                          padding: '8px 12px',
+                          borderRadius: '6px',
                           pointerEvents: 'none',
                           zIndex: 10,
                           whiteSpace: 'nowrap',
-                          animation: 'tooltipFadeIn 0.18s ease-out',
-                          fontSize: '13px'
+                          fontSize: '13px',
+                          color: '#fff'
                         }}>
-                        <div style={{
-                          fontWeight: 600,
-                          color: '#fff',
-                          marginBottom: '5px',
-                          fontSize: '13.5px'
-                        }}>
+                        <div style={{ fontWeight: 600, marginBottom: '4px' }}>
                           {pollResult.results[hoveredBar].text}
                         </div>
-                        <div style={{ display: 'flex', gap: '12px', color: '#a5b4fc' }}>
-                          <span>票数: <span style={{ color: '#818cf8', fontWeight: 600 }}>{pollResult.results[hoveredBar].votes}</span></span>
-                          <span>占比: <span style={{ color: '#818cf8', fontWeight: 600 }}>{pollResult.results[hoveredBar].percentage}%</span></span>
+                        <div style={{ opacity: 0.85 }}>
+                          {pollResult.results[hoveredBar].votes}票 · {pollResult.results[hoveredBar].percentage}%
                         </div>
-                        <div style={{
-                          position: 'absolute',
-                          left: '50%',
-                          bottom: '-6px',
-                          transform: 'translateX(-50%) rotate(45deg)',
-                          width: '10px',
-                          height: '10px',
-                          background: 'rgba(15,15,35,0.95)',
-                          borderRight: '1px solid rgba(99,102,241,0.4)',
-                          borderBottom: '1px solid rgba(99,102,241,0.4)'
-                        }} />
                       </div>
                     )}
                   </div>
                   <div style={{ display: 'flex', marginTop: '12px', gap: '18px' }}>
-                    {pollResult.results.map((r, idx) => (
+                    {pollResult.results.map(r => (
                       <div
                         key={r.id}
                         style={{
                           flex: 1,
                           textAlign: 'center',
                           fontSize: '12px',
-                          color: hoveredBar === idx ? '#e0e7ff' : '#c7d2fe',
+                          color: '#c7d2fe',
                           lineHeight: 1.4,
-                          wordBreak: 'break-all',
-                          paddingTop: '6px',
-                          borderTop: hoveredBar === idx ? '2px solid rgba(79,70,229,0.6)' : '1px solid rgba(79,70,229,0.2)',
-                          transition: 'all 0.2s ease',
-                          fontWeight: hoveredBar === idx ? 500 : 400
+                          wordBreak: 'break-all'
                         }}
                       >
                         {r.text.length > 8 ? r.text.slice(0, 8) + '…' : r.text}
@@ -1017,7 +985,7 @@ const App: React.FC = () => {
                             background: 'rgba(99,102,241,0.08)',
                             borderRadius: '10px',
                             border: '1px solid rgba(99,102,241,0.2)',
-                            animation: 'wordDetailFadeIn 0.35s ease-out'
+                            animation: 'simpleFadeIn 0.3s ease-out'
                           }}
                         >
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
@@ -1026,8 +994,8 @@ const App: React.FC = () => {
                           </div>
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                             {selectedWord.texts.map((t, i) => {
-                              const dotColors = ['#a5b4fc', '#c7d2fe', '#e0e7ff', '#f5f3ff', '#818cf8']
-                              const dotColor = dotColors[(i * 3 + selectedWord.word.length) % dotColors.length]
+                              const dotColors = ['#a5b4fc', '#c7d2fe', '#e0e7ff', '#f5f3ff']
+                              const dotColor = dotColors[(i + selectedWord.word.length) % dotColors.length]
                               return (
                                 <div
                                   key={i}
@@ -1041,7 +1009,7 @@ const App: React.FC = () => {
                                     fontSize: '13px',
                                     color: '#e0e7ff',
                                     lineHeight: 1.6,
-                                    animation: `viewItemFadeIn 0.4s ease-out ${i * 0.08}s both`
+                                    animation: 'simpleFadeIn 0.3s ease-out'
                                   }}
                                 >
                                   <span
@@ -1052,8 +1020,7 @@ const App: React.FC = () => {
                                       borderRadius: '50%',
                                       background: dotColor,
                                       marginTop: '8px',
-                                      flexShrink: 0,
-                                      boxShadow: `0 0 6px ${dotColor}`
+                                      flexShrink: 0
                                     }}
                                   />
                                   <span style={{ flex: 1 }}>{t}</span>
@@ -1084,17 +1051,9 @@ const App: React.FC = () => {
           0% { opacity: 0; transform: scale(0.97); }
           100% { opacity: 1; transform: scale(1); }
         }
-        @keyframes tooltipFadeIn {
-          0% { opacity: 0; transform: translate(-50%, -90%); }
-          100% { opacity: 1; transform: translate(-50%, -100%); }
-        }
-        @keyframes wordDetailFadeIn {
-          0% { opacity: 0; transform: translateY(8px); }
-          100% { opacity: 1; transform: translateY(0); }
-        }
-        @keyframes viewItemFadeIn {
-          0% { opacity: 0; transform: translateX(-8px); }
-          100% { opacity: 1; transform: translateX(0); }
+        @keyframes simpleFadeIn {
+          0% { opacity: 0; }
+          100% { opacity: 1; }
         }
         @media (max-width: 768px) {
           div[style*="max-width: 1200px"] { padding: 0 !important; }
