@@ -9,6 +9,7 @@ interface SkuItem {
   quantity: number;
   in_transit: number;
   safety_threshold: number;
+  base_threshold: number;
   recent_records: Array<{
     warehouse_id: string;
     sku_id: string;
@@ -26,6 +27,8 @@ interface Warehouse {
   capacity_ratio: number;
   pending_orders: number;
   below_threshold: boolean;
+  threshold_multiplier: number;
+  threshold_note: string;
   skus: SkuItem[];
 }
 
@@ -136,6 +139,7 @@ const Dashboard: React.FC = () => {
   const [diffSearch, setDiffSearch] = useState('');
   const [showDiffs, setShowDiffs] = useState(false);
   const [blinkFinished, setBlinkFinished] = useState<Record<string, boolean>>({});
+  const [hoveredWarehouse, setHoveredWarehouse] = useState<string | null>(null);
 
   useEffect(() => {
     if (!data) return;
@@ -144,7 +148,7 @@ const Dashboard: React.FC = () => {
       if (wh.below_threshold && !blinkFinished[wh.id]) {
         const timer = setTimeout(() => {
           setBlinkFinished((prev) => ({ ...prev, [wh.id]: true }));
-        }, 3000);
+        }, 4500);
         timers.push(timer);
       }
     });
@@ -410,7 +414,13 @@ const Dashboard: React.FC = () => {
       }}>
         {data.warehouses.map((wh) => {
           const isAlert = wh.below_threshold;
-          const isBlinking = isAlert && !blinkFinished[wh.id];
+          const isBlinkPhase = isAlert && !blinkFinished[wh.id];
+          const isHovered = hoveredWarehouse === wh.id;
+          const animationName = isBlinkPhase ? 'blink-pulse-combined' : isAlert ? 'pulse-scale' : 'none';
+          const animationDuration = isBlinkPhase ? '1.5s' : '1.5s';
+          const animationIteration = isBlinkPhase ? '3' : 'infinite';
+          const animationPaused = isHovered ? 'paused' : 'running';
+
           return (
             <div
               key={wh.id}
@@ -422,19 +432,27 @@ const Dashboard: React.FC = () => {
                 background: '#fff',
                 borderRadius: 12,
                 padding: 24,
-                boxShadow: '0 2px 12px rgba(0,0,0,0.06)',
+                boxShadow: isAlert ? '0 2px 16px rgba(231,76,60,0.2)' : '0 2px 12px rgba(0,0,0,0.06)',
                 border: isAlert ? '2px solid #e74c3c' : '2px solid transparent',
-                animation: isBlinking ? 'blink 1s ease-in-out 3' : 'none',
+                animation: `${animationName} ${animationDuration} ease-in-out ${animationIteration}`,
+                animationPlayState: animationPaused,
                 cursor: 'pointer',
                 transition: 'transform 0.3s, box-shadow 0.3s',
+                transformOrigin: 'center center',
               }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.transform = 'translateY(-4px)';
-                e.currentTarget.style.boxShadow = '0 8px 24px rgba(0,0,0,0.12)';
+                setHoveredWarehouse(wh.id);
+                if (!isAlert) {
+                  e.currentTarget.style.transform = 'translateY(-4px)';
+                  e.currentTarget.style.boxShadow = '0 8px 24px rgba(0,0,0,0.12)';
+                }
               }}
               onMouseLeave={(e) => {
-                e.currentTarget.style.transform = 'translateY(0)';
-                e.currentTarget.style.boxShadow = '0 2px 12px rgba(0,0,0,0.06)';
+                setHoveredWarehouse(null);
+                if (!isAlert) {
+                  e.currentTarget.style.transform = 'translateY(0)';
+                  e.currentTarget.style.boxShadow = '0 2px 12px rgba(0,0,0,0.06)';
+                }
               }}
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
@@ -551,6 +569,25 @@ const Dashboard: React.FC = () => {
               borderBottom: '1px solid #eee',
             }}>
               <RingChart ratio={selectedWarehouse.capacity_ratio} size={140} />
+            </div>
+
+            <div style={{
+              padding: '12px 24px',
+              background: selectedWarehouse.below_threshold ? '#fdecea' : '#f0f7ff',
+              borderBottom: '1px solid #eee',
+              fontSize: 12,
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ color: '#666' }}>安全阈值系数：</span>
+                <strong style={{ color: selectedWarehouse.below_threshold ? '#e74c3c' : '#0f4c81' }}>
+                  {selectedWarehouse.threshold_multiplier}x
+                </strong>
+              </div>
+              {selectedWarehouse.threshold_note && (
+                <div style={{ color: '#888', marginTop: 4, fontSize: 11 }}>
+                  {selectedWarehouse.threshold_note}
+                </div>
+              )}
             </div>
 
             <div style={{ padding: '16px 24px', flex: 1, overflowY: 'auto' }}>

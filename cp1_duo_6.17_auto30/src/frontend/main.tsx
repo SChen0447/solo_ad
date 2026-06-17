@@ -29,9 +29,16 @@ const globalStyles = `
     0%, 100% { opacity: 1; }
     50% { opacity: 0.5; }
   }
-  @keyframes blink-3times {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.5; }
+  @keyframes pulse-scale {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.03); }
+  }
+  @keyframes blink-pulse-combined {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.5; transform: scale(1.03); }
+  }
+  .alert-card-paused * {
+    animation-play-state: paused !important;
   }
   @keyframes slideInRight {
     from { transform: translateX(100%); opacity: 0; }

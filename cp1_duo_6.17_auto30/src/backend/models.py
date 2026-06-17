@@ -30,6 +30,34 @@ SKUS = {
     "SKU006": {"id": "SKU006", "name": "降噪耳机", "safety_threshold": 25, "price": 699.0, "image": "https://via.placeholder.com/80/f07b3f/ffffff?text=降噪"},
 }
 
+warehouse_thresholds = {
+    "east": {
+        "warehouse_id": "east",
+        "warehouse_name": "华东仓",
+        "multiplier": 1.2,
+        "note": "物流快，阈值系数1.2",
+    },
+    "south": {
+        "warehouse_id": "south",
+        "warehouse_name": "华南仓",
+        "multiplier": 1.0,
+        "note": "标准配置，阈值系数1.0",
+    },
+    "north": {
+        "warehouse_id": "north",
+        "warehouse_name": "华北仓",
+        "multiplier": 0.8,
+        "note": "补货周期长，阈值系数0.8（更灵敏）",
+    },
+}
+
+
+def get_sku_threshold(warehouse_id, sku_id):
+    base = SKUS.get(sku_id, {}).get("safety_threshold", 0)
+    multiplier = warehouse_thresholds.get(warehouse_id, {}).get("multiplier", 1.0)
+    return round(base * multiplier)
+
+
 inventory = {}
 inventory_records = []
 

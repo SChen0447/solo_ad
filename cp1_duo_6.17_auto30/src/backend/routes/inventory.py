@@ -1,6 +1,7 @@
 from flask import Blueprint, request, jsonify
 from ..models import (
     WAREHOUSES, SKUS, inventory, inventory_records, snapshots,
+    warehouse_thresholds, get_sku_threshold,
     create_snapshot, compare_snapshots
 )
 
@@ -22,6 +23,7 @@ def get_inventory():
         sku_list = []
         for sku_id, item in inventory[wh_id].items():
             sku_info = SKUS.get(sku_id, {})
+            threshold = get_sku_threshold(wh_id, sku_id)
             recent_records = []
             for r in inventory_records:
                 if r["warehouse_id"] == wh_id and r["sku_id"] == sku_id:
@@ -33,13 +35,15 @@ def get_inventory():
                 "sku_name": sku_info.get("name", sku_id),
                 "quantity": item["quantity"],
                 "in_transit": item["in_transit"],
-                "safety_threshold": sku_info.get("safety_threshold", 0),
+                "safety_threshold": threshold,
+                "base_threshold": sku_info.get("safety_threshold", 0),
                 "recent_records": recent_records,
             })
         below_threshold = any(
-            item["quantity"] < SKUS.get(sku_id, {}).get("safety_threshold", 0)
+            item["quantity"] < get_sku_threshold(wh_id, sku_id)
             for sku_id, item in inventory[wh_id].items()
         )
+        wh_threshold = warehouse_thresholds.get(wh_id, {})
         warehouses_data.append({
             "id": wh_id,
             "name": wh["name"],
@@ -48,6 +52,8 @@ def get_inventory():
             "capacity_ratio": round(total_qty / capacity, 3) if capacity > 0 else 0,
             "pending_orders": pending_orders,
             "below_threshold": below_threshold,
+            "threshold_multiplier": wh_threshold.get("multiplier", 1.0),
+            "threshold_note": wh_threshold.get("note", ""),
             "skus": sku_list,
         })
     recent_changes = inventory_records[:20]
@@ -63,7 +69,7 @@ def check_alerts():
     alerts = []
     for wh_id, wh in WAREHOUSES.items():
         for sku_id, item in inventory[wh_id].items():
-            threshold = SKUS.get(sku_id, {}).get("safety_threshold", 0)
+            threshold = get_sku_threshold(wh_id, sku_id)
             if item["quantity"] < threshold:
                 alerts.append({
                     "warehouse_id": wh_id,
@@ -72,6 +78,7 @@ def check_alerts():
                     "sku_name": SKUS.get(sku_id, {}).get("name", sku_id),
                     "current_qty": item["quantity"],
                     "threshold": threshold,
+                    "base_threshold": SKUS.get(sku_id, {}).get("safety_threshold", 0),
                 })
     return jsonify({"alerts": alerts})
 
@@ -108,3 +115,43 @@ def compare():
     if diffs is None:
         return jsonify({"error": "快照不存在"}), 404
     return jsonify({"differences": diffs})
+
+
+@inventory_bp.route("/thresholds", methods=["GET"])
+def get_thresholds():
+    thresholds_list = []
+    for wh_id, wh in WAREHOUSES.items():
+        wh_th = warehouse_thresholds.get(wh_id, {})
+        sku_thresholds = []
+        for sku_id, sku in SKUS.items():
+            actual_threshold = get_sku_threshold(wh_id, sku_id)
+            sku_thresholds.append({
+                "sku_id": sku_id,
+                "sku_name": sku.get("name", sku_id),
+                "base_threshold": sku.get("safety_threshold", 0),
+                "actual_threshold": actual_threshold,
+            })
+        thresholds_list.append({
+            "warehouse_id": wh_id,
+            "warehouse_name": wh["name"],
+            "multiplier": wh_th.get("multiplier", 1.0),
+            "note": wh_th.get("note", ""),
+            "sku_thresholds": sku_thresholds,
+        })
+    return jsonify({"thresholds": thresholds_list})
+
+
+@inventory_bp.route("/thresholds/<warehouse_id>", methods=["PUT"])
+def update_threshold(warehouse_id):
+    if warehouse_id not in warehouse_thresholds:
+        return jsonify({"error": "仓库不存在"}), 404
+    data = request.get_json()
+    if "multiplier" in data:
+        warehouse_thresholds[warehouse_id]["multiplier"] = float(data["multiplier"])
+    if "note" in data:
+        warehouse_thresholds[warehouse_id]["note"] = data["note"]
+    return jsonify({
+        "message": "阈值配置已更新",
+        "warehouse_id": warehouse_id,
+        "multiplier": warehouse_thresholds[warehouse_id]["multiplier"],
+    })
