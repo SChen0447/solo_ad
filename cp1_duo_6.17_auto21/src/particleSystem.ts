@@ -41,6 +41,63 @@ const DEGRADATION_THRESHOLD = 8000;
 const LERP_DURATION = 0.5;
 const SEPARATION_ANGLE = (120 * Math.PI) / 180;
 
+function fade(t: number): number {
+  return t * t * t * (t * (t * 6 - 15) + 10);
+}
+
+function lerp2(a: number, b: number, t: number): number {
+  return a + t * (b - a);
+}
+
+function grad3(hash: number, x: number, y: number, z: number): number {
+  const h = hash & 15;
+  const u = h < 8 ? x : y;
+  const v = h < 4 ? y : (h === 12 || h === 14 ? x : z);
+  return ((h & 1) === 0 ? u : -u) + ((h & 2) === 0 ? v : -v);
+}
+
+const PERM = new Uint8Array(512);
+(function initPerm() {
+  const p = new Uint8Array(256);
+  for (let i = 0; i < 256; i++) p[i] = i;
+  for (let i = 255; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [p[i], p[j]] = [p[j], p[i]];
+  }
+  for (let i = 0; i < 512; i++) PERM[i] = p[i & 255];
+})();
+
+function perlinNoise3(x: number, y: number, z: number): number {
+  const X = Math.floor(x) & 255;
+  const Y = Math.floor(y) & 255;
+  const Z = Math.floor(z) & 255;
+  x -= Math.floor(x);
+  y -= Math.floor(y);
+  z -= Math.floor(z);
+  const u = fade(x);
+  const v = fade(y);
+  const w = fade(z);
+  const A = PERM[X] + Y;
+  const AA = PERM[A] + Z;
+  const AB = PERM[A + 1] + Z;
+  const B = PERM[X + 1] + Y;
+  const BA = PERM[B] + Z;
+  const BB = PERM[B + 1] + Z;
+  return lerp2(
+    lerp2(
+      lerp2(grad3(PERM[AA], x, y, z), grad3(PERM[BA], x - 1, y, z), u),
+      lerp2(grad3(PERM[AB], x, y - 1, z), grad3(PERM[BB], x - 1, y - 1, z), u),
+      v
+    ),
+    lerp2(
+      lerp2(grad3(PERM[AA + 1], x, y, z - 1), grad3(PERM[BA + 1], x - 1, y, z - 1), u),
+      lerp2(grad3(PERM[AB + 1], x, y - 1, z - 1), grad3(PERM[BB + 1], x - 1, y - 1, z - 1), u),
+      v
+    ),
+    w
+  );
+}
+
 export class ParticleSystem {
   private scene: THREE.Scene;
   private objectManager: ObjectManager;
@@ -282,45 +339,37 @@ export class ParticleSystem {
     return nearby;
   }
 
-  private checkCollision(
-    index: number,
-    pos: THREE.Vector3,
-    vel: THREE.Vector3,
-    delta: number
-  ): { hit: boolean; normal: THREE.Vector3; curvature: number } {
-    const obstacle = this.objectManager.getObstacleMesh();
-    if (!obstacle) {
-      return { hit: false, normal: new THREE.Vector3(), curvature: 0 };
+  private calculateReynolds(
+    windSpeed: number,
+    charLength: number = 3.0,
+    nu: number = 1.5e-5
+  ): number {
+    return (windSpeed * charLength) / nu;
+  }
+
+  private computeBarycentric(
+    a: THREE.Vector3,
+    b: THREE.Vector3,
+    c: THREE.Vector3,
+    p: THREE.Vector3
+  ): THREE.Vector3 {
+    const v0 = new THREE.Vector3().subVectors(b, a);
+    const v1 = new THREE.Vector3().subVectors(c, a);
+    const v2 = new THREE.Vector3().subVectors(p, a);
+    const d00 = v0.dot(v0);
+    const d01 = v0.dot(v1);
+    const d11 = v1.dot(v1);
+    const d20 = v2.dot(v0);
+    const d21 = v2.dot(v1);
+    const denom = d00 * d11 - d01 * d01;
+    const eps = 1e-8;
+    if (Math.abs(denom) < eps) {
+      return new THREE.Vector3(1 / 3, 1 / 3, 1 / 3);
     }
-
-    const speed = vel.length();
-    if (speed < 0.001) {
-      return { hit: false, normal: new THREE.Vector3(), curvature: 0 };
-    }
-
-    this.tmpVector.copy(vel).normalize();
-    this.raycaster.set(pos, this.tmpVector);
-    this.raycaster.far = speed * delta + 0.3;
-
-    const intersects = this.raycaster.intersectObject(obstacle, true);
-    if (intersects.length === 0) {
-      return { hit: false, normal: new THREE.Vector3(), curvature: 0 };
-    }
-
-    const hit = intersects[0];
-    const normal = hit.face
-      ? hit.face.normal.clone()
-      : new THREE.Vector3(0, 1, 0);
-
-    normal.transformDirection(obstacle.matrixWorld);
-
-    const curvature = this.estimateCurvature(
-      obstacle,
-      hit.point,
-      normal
-    );
-
-    return { hit: true, normal, curvature };
+    const v = (d11 * d20 - d01 * d21) / denom;
+    const w = (d00 * d21 - d01 * d20) / denom;
+    const u = 1 - v - w;
+    return new THREE.Vector3(u, v, w);
   }
 
   private estimateCurvature(
@@ -341,11 +390,13 @@ export class ParticleSystem {
     const indices = geometry.index;
 
     const sampleRadius = 0.3;
-    let curvatureSum = 0;
+    let angleSum = 0;
     let sampleCount = 0;
 
     const localPoint = point.clone();
     localPoint.applyMatrix4(object.matrixWorld.clone().invert());
+
+    const worldNormal = normal.clone().normalize();
 
     for (let i = 0; i < indices.count; i += 3) {
       const i0 = indices.getX(i);
@@ -374,61 +425,261 @@ export class ParticleSystem {
         .multiplyScalar(1 / 3);
       const dist = center.distanceTo(localPoint);
 
-      if (dist < sampleRadius) {
+      if (dist < sampleRadius && dist > 0.0001) {
         const edge1 = new THREE.Vector3().subVectors(v1, v0);
         const edge2 = new THREE.Vector3().subVectors(v2, v0);
         const faceNormal = new THREE.Vector3()
           .crossVectors(edge1, edge2)
           .normalize();
 
-        const dot = Math.abs(faceNormal.dot(normal));
-        curvatureSum += 1 - dot;
+        faceNormal.transformDirection(object.matrixWorld);
+
+        const dot = Math.max(-1, Math.min(1, faceNormal.dot(worldNormal)));
+        const angleDiff = Math.acos(dot);
+
+        angleSum += angleDiff;
         sampleCount++;
       }
     }
 
-    return sampleCount > 0 ? curvatureSum / sampleCount : 0;
+    if (sampleCount === 0) {
+      return 0;
+    }
+
+    const avgAngleDiff = angleSum / sampleCount;
+    const curvatureMagnitude = avgAngleDiff / sampleRadius;
+
+    const probeOffset = localPoint.clone().add(
+      worldNormal.clone().multiplyScalar(0.05)
+    );
+    let insideCount = 0;
+    let totalNearby = 0;
+    for (let i = 0; i < indices.count; i += 3) {
+      const i0 = indices.getX(i);
+      const i1 = indices.getX(i + 1);
+      const i2 = indices.getX(i + 2);
+
+      const v0 = new THREE.Vector3(
+        positions.getX(i0),
+        positions.getY(i0),
+        positions.getZ(i0)
+      );
+      const center = new THREE.Vector3()
+        .addVectors(
+          v0,
+          new THREE.Vector3(
+            positions.getX(i1),
+            positions.getY(i1),
+            positions.getZ(i1)
+          )
+        )
+        .add(
+          new THREE.Vector3(
+            positions.getX(i2),
+            positions.getY(i2),
+            positions.getZ(i2)
+          )
+        )
+        .multiplyScalar(1 / 3);
+
+      if (center.distanceTo(localPoint) < sampleRadius) {
+        totalNearby++;
+        const toProbe = new THREE.Vector3().subVectors(probeOffset, center);
+        if (toProbe.lengthSq() < center.distanceTo(localPoint) ** 2) {
+          insideCount++;
+        }
+      }
+    }
+
+    const sign = totalNearby > 0 && insideCount < totalNearby / 2 ? 1 : -1;
+    return curvatureMagnitude * sign;
+  }
+
+  private checkCollision(
+    index: number,
+    pos: THREE.Vector3,
+    vel: THREE.Vector3,
+    delta: number
+  ): { hit: boolean; normal: THREE.Vector3; curvature: number; point: THREE.Vector3; baryNormal: THREE.Vector3 } {
+    const obstacle = this.objectManager.getObstacleMesh();
+    if (!obstacle) {
+      return { hit: false, normal: new THREE.Vector3(), curvature: 0, point: new THREE.Vector3(), baryNormal: new THREE.Vector3() };
+    }
+
+    const speed = vel.length();
+    if (speed < 0.001) {
+      return { hit: false, normal: new THREE.Vector3(), curvature: 0, point: new THREE.Vector3(), baryNormal: new THREE.Vector3() };
+    }
+
+    this.tmpVector.copy(vel).normalize();
+    this.raycaster.set(pos, this.tmpVector);
+    this.raycaster.far = speed * delta + 0.3;
+
+    const intersects = this.raycaster.intersectObject(obstacle, true);
+    if (intersects.length === 0) {
+      return { hit: false, normal: new THREE.Vector3(), curvature: 0, point: new THREE.Vector3(), baryNormal: new THREE.Vector3() };
+    }
+
+    const hit = intersects[0];
+    const hitPoint = hit.point.clone();
+
+    let interpolatedNormal: THREE.Vector3;
+    if (hit.face && hit.uv && hit.object instanceof THREE.Mesh) {
+      const mesh = hit.object as THREE.Mesh;
+      const geom = mesh.geometry as THREE.BufferGeometry;
+      const normalAttr = geom.attributes.normal;
+      const idx = geom.index;
+
+      if (normalAttr && idx && hit.face) {
+        const ia = idx.getX(hit.face.a);
+        const ib = idx.getX(hit.face.b);
+        const ic = idx.getX(hit.face.c);
+
+        const na = new THREE.Vector3(
+          normalAttr.getX(ia),
+          normalAttr.getY(ia),
+          normalAttr.getZ(ia)
+        );
+        const nb = new THREE.Vector3(
+          normalAttr.getX(ib),
+          normalAttr.getY(ib),
+          normalAttr.getZ(ib)
+        );
+        const nc = new THREE.Vector3(
+          normalAttr.getX(ic),
+          normalAttr.getY(ic),
+          normalAttr.getZ(ic)
+        );
+
+        const posAttr = mesh.geometry.getAttribute('position') as THREE.BufferAttribute;
+        const vA = new THREE.Vector3(posAttr.getX(ia), posAttr.getY(ia), posAttr.getZ(ia));
+        const vB = new THREE.Vector3(posAttr.getX(ib), posAttr.getY(ib), posAttr.getZ(ib));
+        const vC = new THREE.Vector3(posAttr.getX(ic), posAttr.getY(ic), posAttr.getZ(ic));
+        const localHitPoint = hit.point.clone().applyMatrix4(mesh.matrixWorld.clone().invert());
+        const bc = this.computeBarycentric(vA, vB, vC, localHitPoint);
+        interpolatedNormal = new THREE.Vector3()
+          .addScaledVector(na, bc.x)
+          .addScaledVector(nb, bc.y)
+          .addScaledVector(nc, bc.z)
+          .normalize();
+
+        interpolatedNormal.transformDirection(mesh.matrixWorld);
+      } else {
+        interpolatedNormal = hit.face.normal.clone();
+        interpolatedNormal.transformDirection(hit.object.matrixWorld);
+      }
+    } else if (hit.face) {
+      interpolatedNormal = hit.face.normal.clone();
+      interpolatedNormal.transformDirection(hit.object.matrixWorld);
+    } else {
+      interpolatedNormal = new THREE.Vector3(0, 1, 0);
+    }
+
+    interpolatedNormal.normalize();
+
+    const curvature = this.estimateCurvature(
+      obstacle,
+      hitPoint,
+      interpolatedNormal
+    );
+
+    return { hit: true, normal: interpolatedNormal, curvature, point: hitPoint, baryNormal: interpolatedNormal };
   }
 
   private handleCollision(
     vel: THREE.Vector3,
     normal: THREE.Vector3,
-    curvature: number
+    curvature: number,
+    delta: number,
+    index: number,
+    age: number,
+    vorticity: THREE.Vector3,
+    hitPoint: THREE.Vector3,
+    particlePos: THREE.Vector3
   ): void {
-    const dot = vel.dot(normal);
+    const vel_initial = vel.clone();
+    const Re = this.calculateReynolds(this.currentParams.windSpeed);
 
-    const reflected = vel.clone();
-    reflected.addScaledVector(normal, -2 * dot);
+    const vnMag = vel.dot(normal);
+    const vn = normal.clone().multiplyScalar(vnMag);
+    const vt = vel.clone().sub(vn);
 
-    this.tmpTangent.crossVectors(normal, vel).normalize();
-    const tangentVel = new THREE.Vector3()
-      .crossVectors(this.tmpTangent, normal)
-      .normalize();
-    const slidingSpeed = Math.abs(dot) * 0.5;
+    if (vnMag < 0) {
+      vn.multiplyScalar(-0.1);
+      particlePos.addScaledVector(normal, 0.05);
+    }
 
-    vel.copy(reflected);
-    vel.addScaledVector(tangentVel, slidingSpeed);
+    const R = 1 / Math.max(Math.abs(curvature), 0.01);
+    const vtMag = vt.length();
 
-    if (dot < 0) {
-      const angle = Math.acos(Math.min(1, Math.max(-1, -dot / vel.length())));
+    if (vtMag > 0.001 && Math.abs(curvature) > 0.01) {
+      const vtNorm = vt.clone().normalize();
+      const deflectionDir = new THREE.Vector3().crossVectors(normal, vtNorm).normalize();
+      const a_n = (vtMag * vtMag) / R * Math.sign(curvature);
+      vt.addScaledVector(deflectionDir, a_n * delta * 0.3);
+    }
 
-      if (angle > SEPARATION_ANGLE) {
-        const vortexStrength = curvature * 5 + 0.5;
-        this.tmpVector.crossVectors(normal, vel).normalize();
+    if (Re > 0) {
+      const Cf = 0.0592 / Math.pow(Re, 0.2);
+      vt.multiplyScalar(1 - Cf * 0.5);
+    }
 
-        const vortexVel = new THREE.Vector3()
-          .crossVectors(this.tmpVector, vel)
-          .normalize();
+    vel.copy(vn).add(vt);
 
-        vel.x += (Math.random() - 0.5) * vortexStrength;
-        vel.y += (Math.random() - 0.5) * vortexStrength;
-        vel.z += (Math.random() - 0.5) * vortexStrength;
+    const currentFlowDir = vel.clone().normalize();
+    const initialFlowDir = vel_initial.lengthSq() > 0 ? vel_initial.clone().normalize() : new THREE.Vector3(1, 0, 0);
+    const flowAlongNormal = currentFlowDir.dot(initialFlowDir);
+    const adversePressureGradient = (1 - flowAlongNormal) > 0.7;
+    const highCurvature = curvature > 0.3;
+    const separation = adversePressureGradient && highCurvature && Re > 1000;
 
-        vel.addScaledVector(vortexVel, vortexStrength * 0.5);
+    if (separation) {
+      const flowDirection = initialFlowDir.clone();
+      const vortexCore = hitPoint.clone().addScaledVector(normal, 0.5);
+      const rVector = particlePos.clone().sub(vortexCore);
+      const r = rVector.length();
+      const omegaSign = Math.sign(curvature) !== 0 ? Math.sign(curvature) : 1;
+      const omega = (2 * vtMag) / R * omegaSign;
+      const vortexDir = new THREE.Vector3().crossVectors(normal, flowDirection).normalize();
+
+      if (r > 0.001) {
+        const rNorm = rVector.clone().divideScalar(r);
+        const vVortex = new THREE.Vector3()
+          .crossVectors(vortexDir, rNorm)
+          .multiplyScalar(omega * r * Math.exp(-(r * r) / 0.5));
+        vel.addScaledVector(vVortex, 0.8);
       }
     }
 
-    vel.multiplyScalar(0.95);
+    const speed = vel.length();
+    if (speed > 0.001) {
+      if (Re < 2300) {
+        const disturbanceCoeff = 0.02 * Math.sin(age * 5 + index);
+        const disturbanceDir = new THREE.Vector3(
+          Math.sin(age * 3 + index * 0.1),
+          Math.cos(age * 2.5 + index * 0.15),
+          Math.sin(age * 2 + index * 0.2)
+        ).normalize();
+        vel.addScaledVector(disturbanceDir, disturbanceCoeff * speed);
+      } else {
+        const px = particlePos.x;
+        const py = particlePos.y;
+        const pz = particlePos.z;
+        const noiseX = perlinNoise3(px * 2 + index * 0.01, py * 2, pz * 2);
+        const noiseY = perlinNoise3(px * 2 + 100, py * 2 + index * 0.01, pz * 2 + 100);
+        const noiseZ = perlinNoise3(px * 2 + 200, py * 2 + 200, pz * 2 + index * 0.01);
+        const disturbanceDir = new THREE.Vector3(noiseX, noiseY, noiseZ).normalize();
+        const disturbanceCoeff = 0.15 * (noiseX * 0.5 + 0.5);
+        vel.addScaledVector(disturbanceDir, disturbanceCoeff * speed);
+      }
+    }
+
+    vorticity.multiplyScalar(0.995);
+    if (separation) {
+      const flowDirection = initialFlowDir.lengthSq() > 0 ? initialFlowDir.clone().normalize() : new THREE.Vector3(1, 0, 0);
+      const vortexDir = new THREE.Vector3().crossVectors(normal, flowDirection).normalize();
+      vorticity.addScaledVector(vortexDir, curvature * 0.01);
+    }
   }
 
   private updateColor(index: number, speed: number, age: number): void {
@@ -632,9 +883,25 @@ export class ParticleSystem {
         this.particles.velocity[pi + 2]
       );
 
+      const vort = new THREE.Vector3(
+        this.particles.vorticity[pi],
+        this.particles.vorticity[pi + 1],
+        this.particles.vorticity[pi + 2]
+      );
+
       const collision = this.checkCollision(i, this.tmpVector, vel, delta);
       if (collision.hit) {
-        this.handleCollision(vel, collision.normal, collision.curvature);
+        this.handleCollision(
+          vel,
+          collision.normal,
+          collision.curvature,
+          delta,
+          i,
+          this.particles.age[i],
+          vort,
+          collision.point,
+          this.tmpVector
+        );
       }
 
       vel.x += (this.currentParams.windSpeed - vel.x) * delta * 0.5;
@@ -655,23 +922,22 @@ export class ParticleSystem {
         }
       }
 
-      const vort = new THREE.Vector3(
-        this.particles.vorticity[pi],
-        this.particles.vorticity[pi + 1],
-        this.particles.vorticity[pi + 2]
-      );
       const vortexForce = new THREE.Vector3()
         .crossVectors(vort, vel)
-        .multiplyScalar(0.1 * delta);
+        .multiplyScalar(delta * 0.05);
       vel.add(vortexForce);
 
       this.particles.velocity[pi] = vel.x;
       this.particles.velocity[pi + 1] = vel.y;
       this.particles.velocity[pi + 2] = vel.z;
 
-      this.particles.position[pi] += vel.x * delta;
-      this.particles.position[pi + 1] += vel.y * delta;
-      this.particles.position[pi + 2] += vel.z * delta;
+      this.particles.vorticity[pi] = vort.x;
+      this.particles.vorticity[pi + 1] = vort.y;
+      this.particles.vorticity[pi + 2] = vort.z;
+
+      this.particles.position[pi] = this.tmpVector.x + vel.x * delta;
+      this.particles.position[pi + 1] = this.tmpVector.y + vel.y * delta;
+      this.particles.position[pi + 2] = this.tmpVector.z + vel.z * delta;
 
       positions.setXYZ(
         i,

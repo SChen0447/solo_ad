@@ -20,10 +20,16 @@ const DISPLAY_MODE_LABELS: Record<string, string> = {
   overlay: '叠加'
 };
 
-interface Preset {
+interface FlatPreset {
   id: string;
   name: string;
-  params: SimulationParams;
+  obstacleType: string;
+  windSpeed: number;
+  particleDensity: number;
+  rotationX: number;
+  rotationY: number;
+  rotationZ: number;
+  displayMode: 'particles' | 'streamlines' | 'pressure' | 'overlay';
 }
 
 export class ControlPanel {
@@ -45,13 +51,17 @@ export class ControlPanel {
   private recordingStartTime: number = 0;
   private isDragging: boolean = false;
   private dragStartY: number = 0;
-  private dragCurrentY: number = 0;
+  private dragStartTransform: number = 0;
   private isExpanded: boolean = false;
   private velocity: number = 0;
   private lastMoveTime: number = 0;
   private lastMoveY: number = 0;
+  private pointerId: number | null = null;
+  private drawerFullHeight: number = 0;
+  private maxTranslate: number = 0;
+  private animationFrameId: number | null = null;
   private params: SimulationParams;
-  private presets: Preset[] = [];
+  private presets: FlatPreset[] = [];
 
   constructor(params: SimulationParams) {
     this.params = { ...params };
@@ -84,6 +94,8 @@ export class ControlPanel {
     this.setupResponsive();
     this.updateUI(this.params);
     document.body.appendChild(this.container);
+    this.measureDrawerHeight();
+    this.setInitialMobileState();
   }
 
   private setupStyles(): void {
@@ -548,8 +560,6 @@ export class ControlPanel {
           bottom: 0;
           left: 0;
           right: 0;
-          transform: translateY(calc(70vh - 40px));
-          transition: transform 0.1s linear;
         }
         
         .control-panel-container.dragging {
@@ -557,7 +567,6 @@ export class ControlPanel {
         }
         
         .control-panel {
-          height: 70vh;
           width: 100%;
           border-radius: 0;
           border-top-left-radius: 0;
@@ -736,7 +745,16 @@ export class ControlPanel {
     this.savePresetButton.addEventListener('click', () => {
       const name = this.presetNameInput.value.trim();
       if (name) {
-        const data = { name, params: { ...this.params } };
+        const data = {
+          name: name,
+          obstacleType: this.params.obstacleType,
+          windSpeed: this.params.windSpeed,
+          particleDensity: this.params.particleDensity,
+          rotationX: this.params.rotationX,
+          rotationY: this.params.rotationY,
+          rotationZ: this.params.rotationZ,
+          displayMode: this.params.displayMode
+        };
         eventBus.emit('savePreset', data);
         this.presetNameInput.value = '';
         this.loadPresetsFromBackend();
@@ -809,118 +827,178 @@ export class ControlPanel {
   }
 
   private setupEventListeners(): void {
-    this.dragHandle.addEventListener('mousedown', this.handleDragStart.bind(this));
-    this.dragHandle.addEventListener('touchstart', this.handleDragStart.bind(this), { passive: false });
-    
-    document.addEventListener('mousemove', this.handleDragMove.bind(this));
-    document.addEventListener('touchmove', this.handleDragMove.bind(this), { passive: false });
-    
-    document.addEventListener('mouseup', this.handleDragEnd.bind(this));
-    document.addEventListener('touchend', this.handleDragEnd.bind(this));
+    this.dragHandle.addEventListener('pointerdown', this.handleDragStart.bind(this));
+    window.addEventListener('pointermove', this.handleDragMove.bind(this));
+    window.addEventListener('pointerup', this.handleDragEnd.bind(this));
+    window.addEventListener('pointercancel', this.handleDragEnd.bind(this));
   }
 
   private setupResponsive(): void {
     const mediaQuery = window.matchMedia('(max-width: 767px)');
     mediaQuery.addEventListener('change', () => {
+      this.cancelAnimation();
+      this.measureDrawerHeight();
       if (mediaQuery.matches) {
-        this.container.style.transform = 'translateY(calc(70vh - 40px))';
         this.isExpanded = false;
+        this.applyTransform(this.maxTranslate);
       } else {
         this.container.style.transform = '';
       }
     });
+
+    window.addEventListener('resize', () => {
+      const mq = window.matchMedia('(max-width: 767px)');
+      if (mq.matches) {
+        const wasExpanded = this.isExpanded;
+        this.measureDrawerHeight();
+        this.isExpanded = wasExpanded;
+        this.applyTransform(this.isExpanded ? 0 : this.maxTranslate);
+      }
+    });
   }
 
-  private handleDragStart(e: MouseEvent | TouchEvent): void {
+  private measureDrawerHeight(): void {
+    const contentHeight = this.panel.scrollHeight;
+    this.drawerFullHeight = Math.min(contentHeight + 40, window.innerHeight * 0.85);
+    this.panel.style.height = `${this.drawerFullHeight}px`;
+    this.maxTranslate = this.drawerFullHeight - 40;
+  }
+
+  private setInitialMobileState(): void {
+    const mq = window.matchMedia('(max-width: 767px)');
+    if (mq.matches) {
+      this.isExpanded = false;
+      this.applyTransform(this.maxTranslate);
+    }
+  }
+
+  private handleDragStart(e: PointerEvent): void {
+    if (e.pointerType === 'mouse' && e.button !== 0) {
+      return;
+    }
     e.preventDefault();
+    this.cancelAnimation();
+    this.dragHandle.setPointerCapture(e.pointerId);
+    this.pointerId = e.pointerId;
     this.isDragging = true;
     this.container.classList.add('dragging');
-    this.dragStartY = this.getEventY(e);
-    this.dragCurrentY = this.dragStartY;
-    this.lastMoveY = this.dragStartY;
-    this.lastMoveTime = Date.now();
     this.velocity = 0;
+    this.dragStartY = e.clientY;
+    this.dragStartTransform = this.getCurrentTransform();
+    this.lastMoveTime = performance.now();
+    this.lastMoveY = e.clientY;
   }
 
-  private handleDragMove(e: MouseEvent | TouchEvent): void {
-    if (!this.isDragging) return;
+  private handleDragMove(e: PointerEvent): void {
+    if (!this.isDragging || e.pointerId !== this.pointerId) {
+      return;
+    }
     e.preventDefault();
     
-    const currentY = this.getEventY(e);
-    const now = Date.now();
-    const deltaY = currentY - this.lastMoveY;
-    const deltaTime = now - this.lastMoveTime;
+    const deltaY = e.clientY - this.lastMoveY;
+    const deltaTime = performance.now() - this.lastMoveTime;
     
     if (deltaTime > 0) {
-      this.velocity = deltaY / deltaTime;
+      const instantaneousVelocity = deltaY / deltaTime;
+      this.velocity = 0.8 * this.velocity + 0.2 * instantaneousVelocity;
     }
     
-    this.lastMoveY = currentY;
-    this.lastMoveTime = now;
-    this.dragCurrentY = currentY;
+    this.lastMoveTime = performance.now();
+    this.lastMoveY = e.clientY;
     
-    const diff = currentY - this.dragStartY;
-    const currentTransform = this.isExpanded ? 0 : (window.innerHeight * 0.7 - 40);
-    const newTransform = Math.max(0, Math.min(window.innerHeight * 0.7 - 40, currentTransform + diff));
-    
-    this.container.style.transform = `translateY(${newTransform}px)`;
+    const totalDeltaY = e.clientY - this.dragStartY;
+    const newTranslate = Math.max(0, Math.min(this.maxTranslate, this.dragStartTransform + totalDeltaY));
+    this.applyTransform(newTranslate);
   }
 
-  private handleDragEnd(): void {
-    if (!this.isDragging) return;
-    
+  private handleDragEnd(e: PointerEvent): void {
+    if (!this.isDragging || e.pointerId !== this.pointerId) {
+      return;
+    }
+    this.dragHandle.releasePointerCapture(e.pointerId);
     this.isDragging = false;
     this.container.classList.remove('dragging');
+    this.pointerId = null;
     
     const currentTransform = this.getCurrentTransform();
-    const threshold = (window.innerHeight * 0.7 - 40) / 2;
-    
     let targetTransform: number;
     
-    if (this.velocity > 0.5) {
-      targetTransform = window.innerHeight * 0.7 - 40;
-      this.isExpanded = false;
-    } else if (this.velocity < -0.5) {
+    if (this.velocity < -0.3) {
       targetTransform = 0;
       this.isExpanded = true;
-    } else if (currentTransform < threshold) {
+    } else if (this.velocity > 0.3) {
+      targetTransform = this.maxTranslate;
+      this.isExpanded = false;
+    } else if (currentTransform < this.maxTranslate / 2) {
       targetTransform = 0;
       this.isExpanded = true;
     } else {
-      targetTransform = window.innerHeight * 0.7 - 40;
+      targetTransform = this.maxTranslate;
       this.isExpanded = false;
     }
     
-    this.animateTo(targetTransform);
+    this.animateWithDamping(targetTransform, this.velocity);
   }
 
-  private animateTo(target: number): void {
-    const start = this.getCurrentTransform();
-    const diff = target - start;
-    const duration = 300;
-    const startTime = Date.now();
+  private animateWithDamping(targetTransform: number, initialVelocity: number): void {
+    this.cancelAnimation();
+    
+    const m = 1;
+    const k = 150;
+    const c = 18;
+    
+    const x0 = this.getCurrentTransform();
+    const xTarget = targetTransform;
+    const v0 = initialVelocity * 1000;
+    
+    const omega0 = Math.sqrt(k / m);
+    const zeta = c / (2 * Math.sqrt(m * k));
+    const omegaD = omega0 * Math.sqrt(1 - zeta * zeta);
+    
+    const A = x0 - xTarget;
+    const B = (v0 + zeta * omega0 * A) / omegaD;
+    
+    const startTime = performance.now();
+    const maxDuration = 1200;
     
     const animate = () => {
-      const elapsed = Date.now() - startTime;
-      const progress = Math.min(1, elapsed / duration);
-      const easeProgress = 1 - Math.pow(1 - progress, 3);
-      const current = start + diff * easeProgress;
+      const elapsed = performance.now() - startTime;
+      const t = elapsed / 1000;
       
-      this.container.style.transform = `translateY(${current}px)`;
+      const expTerm = Math.exp(-zeta * omega0 * t);
+      const cosTerm = Math.cos(omegaD * t);
+      const sinTerm = Math.sin(omegaD * t);
       
-      if (progress < 1) {
-        requestAnimationFrame(animate);
+      const x = xTarget + expTerm * (A * cosTerm + B * sinTerm);
+      const v = -zeta * omega0 * expTerm * (A * cosTerm + B * sinTerm) 
+              + expTerm * (-A * omegaD * sinTerm + B * omegaD * cosTerm);
+      
+      this.applyTransform(x);
+      
+      const displacement = Math.abs(x - xTarget);
+      const velocityAbs = Math.abs(v);
+      
+      if ((displacement < 0.5 && velocityAbs < 5) || elapsed > maxDuration) {
+        this.applyTransform(xTarget);
+        this.animationFrameId = null;
+        return;
       }
+      
+      this.animationFrameId = requestAnimationFrame(animate);
     };
     
-    requestAnimationFrame(animate);
+    this.animationFrameId = requestAnimationFrame(animate);
   }
 
-  private getEventY(e: MouseEvent | TouchEvent): number {
-    if ('touches' in e) {
-      return e.touches[0].clientY;
+  private cancelAnimation(): void {
+    if (this.animationFrameId !== null) {
+      cancelAnimationFrame(this.animationFrameId);
+      this.animationFrameId = null;
     }
-    return e.clientY;
+  }
+
+  private applyTransform(translateY: number): void {
+    this.container.style.transform = `translateY(${translateY}px)`;
   }
 
   private getCurrentTransform(): number {
@@ -1004,6 +1082,12 @@ export class ControlPanel {
     updateSliderProgress(this.rotationXSlider, -180, 180, '°');
     updateSliderProgress(this.rotationYSlider, -180, 180, '°');
     updateSliderProgress(this.rotationZSlider, -180, 180, '°');
+
+    this.measureDrawerHeight();
+    const mq = window.matchMedia('(max-width: 767px)');
+    if (mq.matches) {
+      this.applyTransform(this.isExpanded ? 0 : this.maxTranslate);
+    }
   }
 
   public async loadPresetsFromBackend(): Promise<void> {
@@ -1048,7 +1132,16 @@ export class ControlPanel {
       loadBtn.textContent = '加载';
       loadBtn.addEventListener('click', () => {
         eventBus.emit('loadPreset', preset);
-        this.updateUI(preset.params);
+        const params: SimulationParams = {
+          obstacleType: preset.obstacleType,
+          windSpeed: preset.windSpeed,
+          particleDensity: preset.particleDensity,
+          rotationX: preset.rotationX,
+          rotationY: preset.rotationY,
+          rotationZ: preset.rotationZ,
+          displayMode: preset.displayMode
+        };
+        this.updateUI(params);
       });
       
       const deleteBtn = document.createElement('button');

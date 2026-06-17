@@ -122,8 +122,17 @@ class AeroFlowApp {
     eventBus.on('startRecording', () => this.recorder.start());
     eventBus.on('stopRecording', () => this.recorder.stop());
     eventBus.on('savePreset', (data: any) => this.savePreset(data));
-    eventBus.on('loadPreset', (data: SimulationParams) => {
-      Object.assign(this.params, data);
+    eventBus.on('loadPreset', (data: any) => {
+      const mapped: SimulationParams = {
+        obstacleType: data.obstacleType || data.params?.obstacleType || defaultParams.obstacleType,
+        windSpeed: data.windSpeed ?? data.params?.windSpeed ?? defaultParams.windSpeed,
+        particleDensity: data.particleDensity ?? data.params?.particleDensity ?? defaultParams.particleDensity,
+        rotationX: data.rotationX ?? data.params?.rotationX ?? defaultParams.rotationX,
+        rotationY: data.rotationY ?? data.params?.rotationY ?? defaultParams.rotationY,
+        rotationZ: data.rotationZ ?? data.params?.rotationZ ?? defaultParams.rotationZ,
+        displayMode: (data.displayMode || data.params?.displayMode || defaultParams.displayMode) as SimulationParams['displayMode']
+      };
+      Object.assign(this.params, mapped);
       this.objectManager.setObstacle(this.params.obstacleType);
       this.objectManager.updateRotation(this.params.rotationX, this.params.rotationY, this.params.rotationZ);
       this.particleSystem.updateParams(this.params);
@@ -131,6 +140,7 @@ class AeroFlowApp {
       this.objectManager.setDisplayMode(this.params.displayMode);
       this.controlPanel.updateUI(this.params);
     });
+    eventBus.on('deletePreset', (id: any) => this.deletePreset(id));
 
     this.renderer.domElement.addEventListener('click', (e) => this.onCanvasClick(e));
 
@@ -209,8 +219,19 @@ class AeroFlowApp {
       });
       const result = await response.json();
       eventBus.emit('presetSaved', result);
+      this.controlPanel.loadPresetsFromBackend();
     } catch (e) {
       console.warn('Failed to save preset:', e);
+    }
+  }
+
+  private async deletePreset(id: any): Promise<void> {
+    try {
+      await fetch(`/api/preset/${id}`, {
+        method: 'DELETE'
+      });
+    } catch (e) {
+      console.warn('Failed to delete preset:', e);
     }
   }
 

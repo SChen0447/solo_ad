@@ -17,6 +17,7 @@ export class ObjectManager {
   private obstacleBoundingBox: THREE.Box3 = new THREE.Box3();
   private customGeometry: THREE.BufferGeometry | null = null;
   private pressureColors: Float32Array | null = null;
+  private frameCounter: number = 0;
 
   constructor(scene: THREE.Scene, params: SimulationParams) {
     this.scene = scene;
@@ -56,30 +57,63 @@ export class ObjectManager {
     return this.obstacleMesh;
   }
 
-  getPressureAt(point: THREE.Vector3): number {
+  getPressureAt(worldPoint: THREE.Vector3): number {
     if (!this.obstacleMesh) return 0;
 
     const center = new THREE.Vector3();
     this.obstacleMesh.getWorldPosition(center);
 
-    const toPoint = point.clone().sub(center).normalize();
-    const flowDir = new THREE.Vector3(1, 0, 0);
-
     const worldRot = new THREE.Quaternion();
     this.obstacleMesh.getWorldQuaternion(worldRot);
-    const localFlowDir = flowDir.clone().applyQuaternion(worldRot.invert());
+    const invRot = worldRot.clone().invert();
 
-    const dot = toPoint.dot(localFlowDir);
-    const angle = Math.acos(Math.max(-1, Math.min(1, dot)));
+    const localPoint = worldPoint.clone().sub(center).applyQuaternion(invRot);
+    const flowDir = new THREE.Vector3(1, 0, 0);
 
-    const normalizedAngle = angle / Math.PI;
-    let cp = 1 - Math.pow(Math.sin(angle), 2) * 2.5;
+    const rVec = localPoint.clone();
+    const r = rVec.length();
+    if (r < 1e-8) return 1.0;
 
-    const distance = point.distanceTo(center);
-    const curvature = this.calculateCurvatureCorrection(point, center, distance);
-    cp += curvature;
+    const surfaceNormal = rVec.clone().normalize();
+    const dot = THREE.MathUtils.clamp(surfaceNormal.dot(flowDir), -1, 1);
+    const theta = Math.acos(dot);
 
-    return Math.max(-1.5, Math.min(1.5, cp));
+    let cp: number;
+    const pi9 = Math.PI / 9;
+    const pi3 = Math.PI / 3;
+    const pi23 = 2 * Math.PI / 3;
+    const pi = Math.PI;
+
+    if (theta < pi9) {
+      const ratio = theta / pi9;
+      cp = 1.0 - 2.5 * ratio * ratio;
+    } else if (theta < pi3) {
+      const cpPotential = 1 - 4 * Math.sin(theta) * Math.sin(theta);
+      const curvatureSign = 1.0;
+      const suctionCorrection = -0.6 * Math.exp(-Math.pow(theta - Math.PI / 6, 2) / 0.05) * curvatureSign;
+      cp = cpPotential + suctionCorrection;
+    } else if (theta < pi23) {
+      const cpPotential = 1 - 4 * Math.sin(theta) * Math.sin(theta);
+      const blRatio = (theta - pi3) / pi3;
+      const blCorrection = 0.3 * Math.pow(blRatio, 1.5);
+      cp = cpPotential + blCorrection;
+    } else {
+      const basePressure = -0.2 + 0.1 * Math.sin(theta * 3);
+      const recoveryRatio = (theta - pi23) / (pi - pi23);
+      const recovery = recoveryRatio * 0.3;
+      cp = basePressure + recovery;
+    }
+
+    const curvature = this.estimateSurfaceCurvature(localPoint);
+    const curvatureCorrection = -curvature * 0.5 * Math.cos(theta) * Math.exp(-Math.pow(theta - Math.PI / 4, 2) / 0.3);
+    cp += curvatureCorrection;
+
+    const Re = this.params.windSpeed * 3.0 / 1.5e-5;
+    const reCorrectionFactor = 0.02 * Math.log10(Re / 1e5);
+    cp *= (1 + reCorrectionFactor * Math.cos(theta));
+
+    cp = THREE.MathUtils.clamp(cp, -1.5, 1.5);
+    return cp;
   }
 
   update(elapsed: number): void {
@@ -103,18 +137,72 @@ export class ObjectManager {
       line.geometry.attributes.position.needsUpdate = true;
     });
 
+    this.frameCounter++;
+    this.updatePressureCloud(elapsed);
     this.updateBoundingBox();
   }
 
   setCustomGeometry(geometry: THREE.BufferGeometry): void {
+    if (!geometry || !geometry.getAttribute('position') || geometry.getAttribute('position').count <= 3) {
+      console.warn('setCustomGeometry: invalid geometry - position attribute missing or vertex count <= 3');
+      return;
+    }
     this.customGeometry = geometry;
     if (this.params.obstacleType === 'custom') {
       this.setObstacle('custom');
     }
   }
 
+  createCustomGeometryExample(): THREE.BufferGeometry {
+    const widthSegments = 48;
+    const heightSegments = 32;
+    const a = 2.0;
+    const b = 1.2;
+    const c = 1.5;
+
+    const positions: number[] = [];
+    const indices: number[] = [];
+
+    for (let y = 0; y <= heightSegments; y++) {
+      const v = y / heightSegments;
+      const phi = v * Math.PI;
+      const sinPhi = Math.sin(phi);
+      const cosPhi = Math.cos(phi);
+
+      for (let x = 0; x <= widthSegments; x++) {
+        const u = x / widthSegments;
+        const theta = u * Math.PI * 2;
+
+        const px = a * sinPhi * Math.cos(theta);
+        const py = b * cosPhi;
+        const pz = c * sinPhi * Math.sin(theta);
+
+        positions.push(px, py, pz);
+      }
+    }
+
+    for (let y = 0; y < heightSegments; y++) {
+      for (let x = 0; x < widthSegments; x++) {
+        const i = y * (widthSegments + 1) + x;
+        indices.push(i, i + 1, i + widthSegments + 1);
+        indices.push(i + 1, i + widthSegments + 2, i + widthSegments + 1);
+      }
+    }
+
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+    geometry.setIndex(indices);
+    geometry.computeVertexNormals();
+    return geometry;
+  }
+
   getObstacleBoundingBox(): THREE.Box3 {
     return this.obstacleBoundingBox.clone();
+  }
+
+  updatePressureCloud(elapsed: number): void {
+    if (this.frameCounter % 10 !== 0) return;
+    this.updatePressureColors();
   }
 
   private clearObstacle(): void {
@@ -241,25 +329,104 @@ export class ObjectManager {
   }
 
   private createAirfoilGeometry(): THREE.BufferGeometry {
-    const shape = new THREE.Shape();
     const chord = 4;
-    const thickness = 0.12;
-    const points: THREE.Vector2[] = [];
+    const t = 0.12;
+    const numPoints = 200;
+    const r = 1.1019 * t * t;
 
-    for (let i = 0; i <= 100; i++) {
-      const x = (i / 100) * chord;
-      const yt = this.nacaThickness(x / chord, thickness);
-      points.push(new THREE.Vector2(x, yt));
-    }
-    for (let i = 100; i >= 0; i--) {
-      const x = (i / 100) * chord;
-      const yt = this.nacaThickness(x / chord, thickness);
-      points.push(new THREE.Vector2(x, -yt));
+    const upperPoints: THREE.Vector2[] = [];
+    const lowerPoints: THREE.Vector2[] = [];
+
+    for (let i = 0; i <= numPoints; i++) {
+      let xNorm: number;
+      let beta: number;
+
+      if (i < numPoints) {
+        beta = (i / numPoints) * Math.PI;
+        xNorm = 0.5 * (1 - Math.cos(beta));
+      } else {
+        xNorm = 1.0;
+      }
+
+      let yt: number;
+      let xActual = xNorm;
+
+      if (xNorm < 0.005) {
+        const thetaArc = Math.acos(1 - xNorm / r);
+        xActual = r * (1 - Math.cos(thetaArc));
+        yt = r * Math.sin(thetaArc);
+      } else {
+        const x = xNorm;
+        yt = 5 * t * (
+          0.2969 * Math.sqrt(x) -
+          0.1260 * x -
+          0.3516 * x * x +
+          0.2843 * x * x * x -
+          0.1015 * x * x * x * x
+        );
+      }
+
+      if (i > numPoints - 10) {
+        const tailIdx = numPoints - 10;
+        const tailBeta = (tailIdx / numPoints) * Math.PI;
+        const tailXNorm = 0.5 * (1 - Math.cos(tailBeta));
+        const tailX = tailXNorm * chord;
+        const tailYT = 5 * t * (
+          0.2969 * Math.sqrt(tailXNorm) -
+          0.1260 * tailXNorm -
+          0.3516 * tailXNorm * tailXNorm +
+          0.2843 * tailXNorm * tailXNorm * tailXNorm -
+          0.1015 * tailXNorm * tailXNorm * tailXNorm * tailXNorm
+        ) * chord;
+        const linearT = (i - tailIdx) / 10;
+        upperPoints.push(new THREE.Vector2(
+          tailX + linearT * (chord - tailX),
+          tailYT * (1 - linearT)
+        ));
+        lowerPoints.push(new THREE.Vector2(
+          tailX + linearT * (chord - tailX),
+          -tailYT * (1 - linearT)
+        ));
+      } else {
+        upperPoints.push(new THREE.Vector2(xActual * chord, yt * chord));
+        lowerPoints.push(new THREE.Vector2(xActual * chord, -yt * chord));
+      }
     }
 
-    shape.moveTo(points[0].x, points[0].y);
-    for (let i = 1; i < points.length; i++) {
-      shape.lineTo(points[i].x, points[i].y);
+    let valid = true;
+    for (let i = 1; i < upperPoints.length - 1; i++) {
+      const dx1 = upperPoints[i].x - upperPoints[i - 1].x;
+      const dy1 = upperPoints[i].y - upperPoints[i - 1].y;
+      const dx2 = upperPoints[i + 1].x - upperPoints[i].x;
+      const dy2 = upperPoints[i + 1].y - upperPoints[i].y;
+      if (dx1 > 1e-8 && dx2 > 1e-8) {
+        const s1 = dy1 / dx1;
+        const s2 = dy2 / dx2;
+        if (Math.abs(s2 - s1) > 0.05) {
+          valid = false;
+          break;
+        }
+      }
+    }
+
+    const allAirfoilPoints: THREE.Vector2[] = [];
+    for (let i = 0; i < upperPoints.length; i++) {
+      allAirfoilPoints.push(upperPoints[i]);
+    }
+    for (let i = lowerPoints.length - 2; i >= 1; i--) {
+      allAirfoilPoints.push(lowerPoints[i]);
+    }
+
+    const splinePoints3D: THREE.Vector3[] = allAirfoilPoints.map(
+      p => new THREE.Vector3(p.x, p.y, 0)
+    );
+    const catmull = new THREE.CatmullRomCurve3(splinePoints3D, true);
+    const smoothedPoints = catmull.getPoints(400);
+
+    const shape = new THREE.Shape();
+    shape.moveTo(smoothedPoints[0].x, smoothedPoints[0].y);
+    for (let i = 1; i < smoothedPoints.length; i++) {
+      shape.lineTo(smoothedPoints[i].x, smoothedPoints[i].y);
     }
 
     const extrudeSettings = {
@@ -271,17 +438,6 @@ export class ObjectManager {
     const geometry = new THREE.ExtrudeGeometry(shape, extrudeSettings);
     geometry.translate(-chord / 2, 0, -0.75);
     return geometry;
-  }
-
-  private nacaThickness(x: number, t: number): number {
-    const c = 1.0;
-    return 5 * t * c * (
-      0.2969 * Math.sqrt(x) -
-      0.1260 * x -
-      0.3516 * x * x +
-      0.2843 * x * x * x -
-      0.1015 * x * x * x * x
-    );
   }
 
   private createCarModel(): THREE.Group {
@@ -545,31 +701,167 @@ export class ObjectManager {
   }
 
   private calculateVertexPressure(point: THREE.Vector3): number {
-    const center = new THREE.Vector3(0, 0, 0);
-    const toPoint = point.clone().sub(center).normalize();
     const flowDir = new THREE.Vector3(1, 0, 0);
 
-    const dot = toPoint.dot(flowDir);
-    const angle = Math.acos(Math.max(-1, Math.min(1, dot)));
+    const rVec = point.clone();
+    const r = rVec.length();
+    if (r < 1e-8) return 1.0;
 
-    let cp = 1 - Math.pow(Math.sin(angle), 2) * 2.5;
+    const surfaceNormal = rVec.clone().normalize();
+    const dot = THREE.MathUtils.clamp(surfaceNormal.dot(flowDir), -1, 1);
+    const theta = Math.acos(dot);
+    const x_s = r * (1 - Math.cos(theta));
 
-    const distance = point.distanceTo(center);
-    const curvature = this.calculateCurvatureCorrection(point, center, distance);
-    cp += curvature;
+    let cp: number;
+    const pi9 = Math.PI / 9;
+    const pi3 = Math.PI / 3;
+    const pi23 = 2 * Math.PI / 3;
+    const pi = Math.PI;
 
-    return Math.max(-1.5, Math.min(1.5, cp));
+    if (theta < pi9) {
+      const ratio = theta / pi9;
+      cp = 1.0 - 2.5 * ratio * ratio;
+    } else if (theta < pi3) {
+      const cpPotential = 1 - 4 * Math.sin(theta) * Math.sin(theta);
+      const curvatureSign = 1.0;
+      const suctionCorrection = -0.6 * Math.exp(-Math.pow(theta - Math.PI / 6, 2) / 0.05) * curvatureSign;
+      cp = cpPotential + suctionCorrection;
+    } else if (theta < pi23) {
+      const cpPotential = 1 - 4 * Math.sin(theta) * Math.sin(theta);
+      const blRatio = (theta - pi3) / pi3;
+      const blCorrection = 0.3 * Math.pow(blRatio, 1.5);
+      cp = cpPotential + blCorrection;
+    } else {
+      const basePressure = -0.2 + 0.1 * Math.sin(theta * 3);
+      const recoveryRatio = (theta - pi23) / (pi - pi23);
+      const recovery = recoveryRatio * 0.3;
+      cp = basePressure + recovery;
+    }
+
+    const curvature = this.estimateSurfaceCurvature(point);
+    const curvatureCorrection = -curvature * 0.5 * Math.cos(theta) * Math.exp(-Math.pow(theta - Math.PI / 4, 2) / 0.3);
+    cp += curvatureCorrection;
+
+    const Re = this.params.windSpeed * 3.0 / 1.5e-5;
+    const reCorrectionFactor = 0.02 * Math.log10(Re / 1e5);
+    cp *= (1 + reCorrectionFactor * Math.cos(theta));
+
+    cp = THREE.MathUtils.clamp(cp, -1.5, 1.5);
+    return cp;
   }
 
-  private calculateCurvatureCorrection(point: THREE.Vector3, center: THREE.Vector3, distance: number): number {
-    const toPoint = point.clone().sub(center).normalize();
-    const flowDir = new THREE.Vector3(1, 0, 0);
+  private estimateSurfaceCurvature(point: THREE.Vector3): number {
+    const vertices: THREE.Vector3[] = [];
 
-    const cross = new THREE.Vector3().crossVectors(toPoint, flowDir);
-    const curvature = cross.length();
+    if (this.obstacleMesh && this.obstacleMesh instanceof THREE.Mesh) {
+      const posAttr = this.obstacleMesh.geometry.getAttribute('position');
+      if (posAttr) {
+        for (let i = 0; i < posAttr.count; i++) {
+          vertices.push(new THREE.Vector3(
+            posAttr.getX(i),
+            posAttr.getY(i),
+            posAttr.getZ(i)
+          ));
+        }
+      }
+    }
 
-    const suctionFactor = Math.max(0, -toPoint.dot(flowDir));
-    return -curvature * suctionFactor * 0.5;
+    if (vertices.length < 8) {
+      return 0.0;
+    }
+
+    const distances: { idx: number; dist: number }[] = [];
+    for (let i = 0; i < vertices.length; i++) {
+      distances.push({ idx: i, dist: vertices[i].distanceTo(point) });
+    }
+    distances.sort((a, b) => a.dist - b.dist);
+
+    const nearestCount = Math.min(8, distances.length);
+    const nearest: THREE.Vector3[] = [];
+    for (let i = 0; i < nearestCount; i++) {
+      nearest.push(vertices[distances[i].idx]);
+    }
+
+    const normal = point.clone().normalize();
+    const tangent1 = new THREE.Vector3();
+    if (Math.abs(normal.x) < 0.9) {
+      tangent1.crossVectors(normal, new THREE.Vector3(1, 0, 0)).normalize();
+    } else {
+      tangent1.crossVectors(normal, new THREE.Vector3(0, 1, 0)).normalize();
+    }
+    const tangent2 = new THREE.Vector3().crossVectors(normal, tangent1).normalize();
+
+    const points2D: { u: number; v: number; w: number }[] = [];
+    for (const v of nearest) {
+      const diff = v.clone().sub(point);
+      const u = diff.dot(tangent1);
+      const vCoord = diff.dot(tangent2);
+      const w = diff.dot(normal);
+      points2D.push({ u, v: vCoord, w });
+    }
+
+    const n = points2D.length;
+    if (n < 6) return 0.0;
+
+    const A: number[][] = [];
+    const B: number[] = [];
+    for (const p of points2D) {
+      A.push([p.u * p.u, p.u * p.v, p.v * p.v, p.u, p.v, 1]);
+      B.push(p.w);
+    }
+
+    const ATA: number[][] = [[0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0]];
+    const ATB: number[] = [0, 0, 0, 0, 0, 0];
+
+    for (let i = 0; i < n; i++) {
+      for (let j = 0; j < 6; j++) {
+        for (let k = 0; k < 6; k++) {
+          ATA[j][k] += A[i][j] * A[i][k];
+        }
+        ATB[j] += A[i][j] * B[i];
+      }
+    }
+
+    for (let col = 0; col < 6; col++) {
+      let maxRow = col;
+      for (let row = col + 1; row < 6; row++) {
+        if (Math.abs(ATA[row][col]) > Math.abs(ATA[maxRow][col])) {
+          maxRow = row;
+        }
+      }
+      if (maxRow !== col) {
+        [ATA[col], ATA[maxRow]] = [ATA[maxRow], ATA[col]];
+        [ATB[col], ATB[maxRow]] = [ATB[maxRow], ATB[col]];
+      }
+      const pivot = ATA[col][col];
+      if (Math.abs(pivot) < 1e-12) return 0.0;
+      for (let row = col + 1; row < 6; row++) {
+        const factor = ATA[row][col] / pivot;
+        for (let k = col; k < 6; k++) {
+          ATA[row][k] -= factor * ATA[col][k];
+        }
+        ATB[row] -= factor * ATB[col];
+      }
+    }
+
+    const x = new Array(6).fill(0);
+    for (let row = 5; row >= 0; row--) {
+      let sum = ATB[row];
+      for (let k = row + 1; k < 6; k++) {
+        sum -= ATA[row][k] * x[k];
+      }
+      x[row] = sum / ATA[row][row];
+    }
+
+    const a = x[0];
+    const b = x[1];
+    const c = x[2];
+
+    const H = a + c;
+
+    let curvature = H;
+    curvature = THREE.MathUtils.clamp(curvature, -0.5, 0.5);
+    return curvature;
   }
 
   private cpToRgb(cp: number): { r: number; g: number; b: number } {
