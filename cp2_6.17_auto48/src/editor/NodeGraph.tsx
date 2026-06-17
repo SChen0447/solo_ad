@@ -73,16 +73,22 @@ export const NodeGraph: React.FC<NodeGraphProps> = ({
     if (!containerRef.current || throttled) return;
     
     const rect = containerRef.current.getBoundingClientRect();
-    const x = Math.max(0, Math.min(e.clientX - rect.left, rect.width - NODE_WIDTH));
-    const y = Math.max(0, Math.min(e.clientY - rect.top, rect.height - NODE_HEIGHT));
+    const mouseX = e.clientX - rect.left;
+    const mouseY = e.clientY - rect.top;
 
     setThrottled(true);
     requestAnimationFrame(() => {
       setThrottled(false);
       
       if (draggingNodeId) {
-        const snappedX = Math.round((x - dragOffset.x) / GRID_SIZE) * GRID_SIZE;
-        const snappedY = Math.round((y - dragOffset.y) / GRID_SIZE) * GRID_SIZE;
+        let newX = mouseX - dragOffset.x;
+        let newY = mouseY - dragOffset.y;
+        
+        newX = Math.max(0, Math.min(newX, rect.width - NODE_WIDTH));
+        newY = Math.max(0, Math.min(newY, rect.height - NODE_HEIGHT));
+        
+        const snappedX = Math.round(newX / GRID_SIZE) * GRID_SIZE;
+        const snappedY = Math.round(newY / GRID_SIZE) * GRID_SIZE;
         onNodeMove(draggingNodeId, snappedX, snappedY);
       }
       

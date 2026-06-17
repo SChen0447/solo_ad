@@ -1,15 +1,16 @@
-import React, { useRef, useEffect, useState, useCallback, forwardRef, useImperativeHandle } from 'react';
-import { NodeGraph } from './editor/NodeGraph';
-import { CanvasRenderer } from './renderer/CanvasRenderer';
-import { DialogueNode, DialogueOption, NodeConnection, ConnectionPoint, DialogueTree } from './types/DialogueNode';
-import { editorBus, EDITOR_EVENTS, RENDERER_EVENTS } from './eventBus';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { NodeGraph } from './NodeGraph';
+import { DialogueNode, DialogueOption, NodeConnection, ConnectionPoint, DialogueTree } from '../types/DialogueNode';
+import { editorBus, EDITOR_EVENTS, RENDERER_EVENTS } from '../eventBus';
+
+interface EditorPanelProps {
+  onExportRequest: () => DialogueTree;
+  onImportData: (data: DialogueTree) => { invalidNodeIds: Set<string> };
+}
 
 const MAX_NODES = 100;
 const MAX_OPTIONS = 4;
 const MAX_TEXT_LENGTH = 200;
-const NODE_WIDTH = 180;
-const NODE_HEIGHT = 100;
-const GRID_SIZE = 20;
 
 const BACKGROUND_OPTIONS = [
   { value: 0, label: '0 - 星空 (#1a1a2e)' },
@@ -22,12 +23,51 @@ const generateId = (): string => {
   return `node_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 7)}`;
 };
 
+const createInitialNodes = (): DialogueNode[] => {
+  const node1: DialogueNode = {
+    id: 'node_start',
+    speaker: 'Narrator',
+    text: 'Welcome, adventurer! A great journey awaits you.',
+    backgroundIndex: 0,
+    options: [
+      { text: 'Start the adventure', nextNodeId: 'node_choice' },
+      { text: 'Stay at home', nextNodeId: 'node_end' },
+    ],
+    x: 60,
+    y: 80,
+  };
+
+  const node2: DialogueNode = {
+    id: 'node_choice',
+    speaker: 'Old Man',
+    text: 'The forest is dangerous. Take this sword with you.',
+    backgroundIndex: 1,
+    options: [
+      { text: 'Thank you kindly', nextNodeId: 'node_end' },
+    ],
+    x: 60,
+    y: 240,
+  };
+
+  const node3: DialogueNode = {
+    id: 'node_end',
+    speaker: 'Narrator',
+    text: 'The End. Thanks for playing!',
+    backgroundIndex: 2,
+    options: [],
+    x: 300,
+    y: 160,
+  };
+
+  return [node1, node2, node3];
+};
+
 const buildConnections = (nodes: DialogueNode[]): NodeConnection[] => {
   const connections: NodeConnection[] = [];
-  const validIds = new Set(nodes.map(n => n.id));
+  
   for (const node of nodes) {
     node.options.forEach((option, optionIndex) => {
-      if (option.nextNodeId && validIds.has(option.nextNodeId)) {
+      if (option.nextNodeId && nodes.some(n => n.id === option.nextNodeId)) {
         const existing = connections.find(
           c => c.fromNodeId === node.id && c.toNodeId === option.nextNodeId && c.optionIndex === optionIndex
         );
@@ -42,140 +82,58 @@ const buildConnections = (nodes: DialogueNode[]): NodeConnection[] => {
       }
     });
   }
+  
   return connections;
 };
 
-const validateNextNodeIds = (nodes: DialogueNode[]): Set<string> => {
-  const invalid = new Set<string>();
-  const validIds = new Set(nodes.map(n => n.id));
-  for (const node of nodes) {
-    for (const option of node.options) {
-      if (option.nextNodeId && !validIds.has(option.nextNodeId)) {
-        invalid.add(node.id);
-        break;
-      }
-    }
-  }
-  return invalid;
-};
-
-const createInitialNodes = (): DialogueNode[] => [
-  {
-    id: 'node_start',
-    speaker: 'Narrator',
-    text: 'Welcome, adventurer! A great journey awaits you.',
-    backgroundIndex: 0,
-    options: [
-      { text: 'Start the adventure', nextNodeId: 'node_choice' },
-      { text: 'Stay at home', nextNodeId: 'node_end' },
-    ],
-    x: 60,
-    y: 80,
-  },
-  {
-    id: 'node_choice',
-    speaker: 'Old Man',
-    text: 'The forest is dangerous. Take this sword with you.',
-    backgroundIndex: 1,
-    options: [{ text: 'Thank you kindly', nextNodeId: 'node_end' }],
-    x: 60,
-    y: 240,
-  },
-  {
-    id: 'node_end',
-    speaker: 'Narrator',
-    text: 'The End. Thanks for playing!',
-    backgroundIndex: 2,
-    options: [],
-    x: 300,
-    y: 160,
-  },
-];
-
-export interface EditorPanelHandle {
-  exportJSON: () => void;
-  importJSON: () => void;
-}
-
-interface EditorPanelProps {
-  onStatusChange?: (nodeId: string | null, optionCount: number) => void;
-}
-
-const EditorPanelComp = forwardRef<EditorPanelHandle, EditorPanelProps>(({ onStatusChange }, ref) => {
+export const EditorPanel: React.FC<EditorPanelProps> = ({ onExportRequest, onImportData }) => {
   const [nodes, setNodes] = useState<DialogueNode[]>(createInitialNodes);
   const [connections, setConnections] = useState<NodeConnection[]>(() => buildConnections(createInitialNodes()));
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [invalidNodeIds, setInvalidNodeIds] = useState<Set<string>>(new Set());
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  useImperativeHandle(ref, () => ({
-    exportJSON: () => handleExport(),
-    importJSON: () => fileInputRef.current?.click(),
-  }));
-
   useEffect(() => {
     editorBus.emit(EDITOR_EVENTS.UPDATE_TREE, nodes);
+  }, [nodes]);
+
+  useEffect(() => {
+    editorBus.on(RENDERER_EVENTS.OPTION_CLICKED, (optionIndex) => {
+      console.log('Renderer clicked option:', optionIndex);
+    });
+
+    editorBus.on(RENDERER_EVENTS.NODE_CLICKED, (nodeId) => {
+      setSelectedNodeId(nodeId);
+      const node = nodes.find(n => n.id === nodeId);
+      if (node) {
+        editorBus.emit(EDITOR_EVENTS.PREVIEW_NODE, nodeId);
+      }
+    });
   }, [nodes]);
 
   useEffect(() => {
     const selectedNode = nodes.find(n => n.id === selectedNodeId);
     if (selectedNode) {
       editorBus.emit(EDITOR_EVENTS.PREVIEW_NODE, selectedNode.id);
-      onStatusChange?.(selectedNode.id, selectedNode.options.length);
     } else if (nodes.length > 0) {
       editorBus.emit(EDITOR_EVENTS.PREVIEW_NODE, nodes[0].id);
-      onStatusChange?.(nodes[0].id, nodes[0].options.length);
     }
-  }, [selectedNodeId, nodes, onStatusChange]);
+  }, [selectedNodeId, nodes]);
 
-  useEffect(() => {
-    return editorBus.on(RENDERER_EVENTS.OPTION_CLICKED, () => {});
-  }, []);
-
-  const handleExport = useCallback(() => {
-    const data: DialogueTree = {
-      nodes,
-      rootNodeId: nodes[0]?.id || '',
-    };
-
-    const json = JSON.stringify(data, null, 2);
-    const blob = new Blob([json], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'dialogue.dialogtree';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-  }, [nodes]);
-
-  const handleFileChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      try {
-        const content = event.target?.result as string;
-        const parsed = JSON.parse(content) as DialogueTree;
-
-        if (!parsed.nodes || !Array.isArray(parsed.nodes)) {
-          throw new Error('Invalid format: nodes array missing');
+  const validateNextNodeIds = useCallback((nodesToValidate: DialogueNode[]): Set<string> => {
+    const invalid = new Set<string>();
+    const validIds = new Set(nodesToValidate.map(n => n.id));
+    
+    for (const node of nodesToValidate) {
+      for (const option of node.options) {
+        if (option.nextNodeId && !validIds.has(option.nextNodeId)) {
+          invalid.add(node.id);
+          break;
         }
-
-        const invalidSet = validateNextNodeIds(parsed.nodes);
-
-        setNodes(parsed.nodes);
-        setConnections(buildConnections(parsed.nodes));
-        setInvalidNodeIds(invalidSet);
-        setSelectedNodeId(parsed.nodes[0]?.id || null);
-      } catch (error) {
-        alert(`Failed to import: ${(error as Error).message}`);
       }
-    };
-    reader.readAsText(file);
-    e.target.value = '';
+    }
+    
+    return invalid;
   }, []);
 
   const handleCanvasDoubleClick = useCallback((x: number, y: number) => {
@@ -230,14 +188,35 @@ const EditorPanelComp = forwardRef<EditorPanelHandle, EditorPanelProps>(({ onSta
 
   const handlePropertyChange = useCallback((field: keyof DialogueNode, value: unknown) => {
     if (!selectedNodeId) return;
-    setNodes(prev => prev.map(n => n.id === selectedNodeId ? { ...n, [field]: value } : n));
+    
+    setNodes(prev => prev.map(n => {
+      if (n.id === selectedNodeId) {
+        return { ...n, [field]: value };
+      }
+      return n;
+    }));
   }, [selectedNodeId]);
+
+  const handleTextChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const value = e.target.value.substring(0, MAX_TEXT_LENGTH);
+    handlePropertyChange('text', value);
+  }, [handlePropertyChange]);
+
+  const handleSpeakerChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    handlePropertyChange('speaker', e.target.value);
+  }, [handlePropertyChange]);
+
+  const handleBackgroundChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
+    handlePropertyChange('backgroundIndex', parseInt(e.target.value, 10));
+  }, [handlePropertyChange]);
 
   const handleAddOption = useCallback(() => {
     if (!selectedNodeId) return;
+    
     setNodes(prev => prev.map(n => {
       if (n.id === selectedNodeId && n.options.length < MAX_OPTIONS) {
-        return { ...n, options: [...n.options, { text: '', nextNodeId: '' }] };
+        const newOptions: DialogueOption[] = [...n.options, { text: '', nextNodeId: '' }];
+        return { ...n, options: newOptions };
       }
       return n;
     }));
@@ -245,17 +224,21 @@ const EditorPanelComp = forwardRef<EditorPanelHandle, EditorPanelProps>(({ onSta
 
   const handleRemoveOption = useCallback((index: number) => {
     if (!selectedNodeId) return;
+    
     setNodes(prev => prev.map(n => {
       if (n.id === selectedNodeId) {
-        return { ...n, options: n.options.filter((_, i) => i !== index) };
+        const newOptions = n.options.filter((_, i) => i !== index);
+        return { ...n, options: newOptions };
       }
       return n;
     }));
+    
     setConnections(prev => prev.filter(conn => !(conn.fromNodeId === selectedNodeId && conn.optionIndex === index)));
   }, [selectedNodeId]);
 
   const handleOptionTextChange = useCallback((index: number, text: string) => {
     if (!selectedNodeId) return;
+    
     setNodes(prev => prev.map(n => {
       if (n.id === selectedNodeId) {
         const newOptions = [...n.options];
@@ -268,6 +251,7 @@ const EditorPanelComp = forwardRef<EditorPanelHandle, EditorPanelProps>(({ onSta
 
   const handleOptionTargetChange = useCallback((index: number, nextNodeId: string) => {
     if (!selectedNodeId) return;
+    
     setNodes(prev => {
       const updated = prev.map(n => {
         if (n.id === selectedNodeId) {
@@ -277,74 +261,163 @@ const EditorPanelComp = forwardRef<EditorPanelHandle, EditorPanelProps>(({ onSta
         }
         return n;
       });
-      setInvalidNodeIds(validateNextNodeIds(updated));
+      
+      const invalidSet = validateNextNodeIds(updated);
+      setInvalidNodeIds(invalidSet);
+      
       return updated;
     });
+    
     setConnections(prev => {
       const filtered = prev.filter(conn => !(conn.fromNodeId === selectedNodeId && conn.optionIndex === index));
+      
       if (nextNodeId) {
-        filtered.push({ fromNodeId: selectedNodeId, toNodeId: nextNodeId, optionIndex: index, bendPoints: [] });
+        filtered.push({
+          fromNodeId: selectedNodeId,
+          toNodeId: nextNodeId,
+          optionIndex: index,
+          bendPoints: [],
+        });
       }
+      
       return filtered;
     });
-  }, [selectedNodeId]);
+  }, [selectedNodeId, validateNextNodeIds]);
 
   const handleDeleteNode = useCallback(() => {
     if (!selectedNodeId) return;
+    
     setNodes(prev => {
+      const nodeToDelete = prev.find(n => n.id === selectedNodeId);
+      if (!nodeToDelete) return prev;
+      
       const remaining = prev.filter(n => n.id !== selectedNodeId);
+      
       const cleaned = remaining.map(n => ({
         ...n,
         options: n.options.filter(opt => opt.nextNodeId !== selectedNodeId),
       }));
+      
       setConnections(buildConnections(cleaned));
       setInvalidNodeIds(validateNextNodeIds(cleaned));
+      
       return cleaned;
     });
+    
     setSelectedNodeId(null);
-  }, [selectedNodeId]);
+  }, [selectedNodeId, validateNextNodeIds]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (!selectedNodeId) return;
-
-      const target = e.target as HTMLElement;
-      const isInput = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT';
-
-      if ((e.key === 'Delete' || e.key === 'Backspace') && !isInput) {
+      
+      if (e.key === 'Delete' || e.key === 'Backspace') {
+        const target = e.target as HTMLElement;
+        if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT') {
+          return;
+        }
         e.preventDefault();
         handleDeleteNode();
       }
-
+      
       if (e.key === 'Tab') {
         e.preventDefault();
         const currentIndex = nodes.findIndex(n => n.id === selectedNodeId);
         if (nodes.length > 1) {
-          const nextIndex = e.shiftKey
+          const nextIndex = e.shiftKey 
             ? (currentIndex - 1 + nodes.length) % nodes.length
             : (currentIndex + 1) % nodes.length;
           setSelectedNodeId(nodes[nextIndex].id);
         }
       }
-
-      if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key) && !isInput) {
+      
+      if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
+        const target = e.target as HTMLElement;
+        if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT') {
+          return;
+        }
         e.preventDefault();
+        
         const step = 4;
-        let dx = 0, dy = 0;
+        let dx = 0;
+        let dy = 0;
+        
         if (e.key === 'ArrowUp') dy = -step;
         if (e.key === 'ArrowDown') dy = step;
         if (e.key === 'ArrowLeft') dx = -step;
         if (e.key === 'ArrowRight') dx = step;
-        setNodes(prev => prev.map(n => n.id === selectedNodeId
-          ? { ...n, x: Math.max(0, n.x + dx), y: Math.max(0, n.y + dy) }
-          : n
-        ));
+        
+        setNodes(prev => prev.map(n => {
+          if (n.id === selectedNodeId) {
+            return {
+              ...n,
+              x: Math.max(0, n.x + dx),
+              y: Math.max(0, n.y + dy),
+            };
+          }
+          return n;
+        }));
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [selectedNodeId, nodes, handleDeleteNode]);
+
+  const handleExportClick = useCallback(() => {
+    const data: DialogueTree = {
+      nodes,
+      rootNodeId: nodes[0]?.id || '',
+    };
+    
+    const json = JSON.stringify(data, null, 2);
+    const blob = new Blob([json], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'dialogue.dialogtree';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    
+    onExportRequest();
+  }, [nodes, onExportRequest]);
+
+  const handleImportClick = useCallback(() => {
+    fileInputRef.current?.click();
+  }, []);
+
+  const handleFileChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const content = event.target?.result as string;
+        const parsed = JSON.parse(content) as DialogueTree;
+        
+        if (!parsed.nodes || !Array.isArray(parsed.nodes)) {
+          throw new Error('Invalid format: nodes array missing');
+        }
+
+        const invalidSet = validateNextNodeIds(parsed.nodes);
+        const result = onImportData(parsed);
+        
+        setNodes(parsed.nodes);
+        setConnections(buildConnections(parsed.nodes));
+        setInvalidNodeIds(result.invalidNodeIds.size > 0 ? result.invalidNodeIds : invalidSet);
+        setSelectedNodeId(parsed.nodes[0]?.id || null);
+        
+      } catch (error) {
+        alert(`Failed to import: ${(error as Error).message}`);
+      }
+    };
+    reader.readAsText(file);
+    
+    e.target.value = '';
+  }, [validateNextNodeIds, onImportData]);
 
   const selectedNode = nodes.find(n => n.id === selectedNodeId);
 
@@ -398,6 +471,7 @@ const EditorPanelComp = forwardRef<EditorPanelHandle, EditorPanelProps>(({ onSta
             <div style={{ color: '#00e5ff', fontSize: '14px', fontWeight: 'bold', marginBottom: '4px' }}>
               Node Properties
             </div>
+            
             <div style={{ color: '#888', fontSize: '11px', fontFamily: 'monospace' }}>
               ID: {selectedNode.id}
             </div>
@@ -407,7 +481,7 @@ const EditorPanelComp = forwardRef<EditorPanelHandle, EditorPanelProps>(({ onSta
               <input
                 type="text"
                 value={selectedNode.speaker}
-                onChange={(e) => handlePropertyChange('speaker', e.target.value)}
+                onChange={handleSpeakerChange}
                 placeholder="Enter speaker name..."
                 style={{
                   backgroundColor: '#4a4a4a',
@@ -427,7 +501,7 @@ const EditorPanelComp = forwardRef<EditorPanelHandle, EditorPanelProps>(({ onSta
               </label>
               <textarea
                 value={selectedNode.text}
-                onChange={(e) => handlePropertyChange('text', e.target.value.substring(0, MAX_TEXT_LENGTH))}
+                onChange={handleTextChange}
                 placeholder="Enter dialogue text..."
                 rows={5}
                 maxLength={MAX_TEXT_LENGTH}
@@ -450,7 +524,7 @@ const EditorPanelComp = forwardRef<EditorPanelHandle, EditorPanelProps>(({ onSta
               <label style={{ color: '#ccc', fontSize: '12px' }}>Background</label>
               <select
                 value={selectedNode.backgroundIndex}
-                onChange={(e) => handlePropertyChange('backgroundIndex', parseInt(e.target.value, 10))}
+                onChange={handleBackgroundChange}
                 style={{
                   backgroundColor: '#4a4a4a',
                   border: '1px solid #555',
@@ -491,7 +565,7 @@ const EditorPanelComp = forwardRef<EditorPanelHandle, EditorPanelProps>(({ onSta
                 </button>
               </div>
 
-              {selectedNode.options.map((option: DialogueOption, index: number) => (
+              {selectedNode.options.map((option, index) => (
                 <div
                   key={index}
                   style={{
@@ -537,8 +611,8 @@ const EditorPanelComp = forwardRef<EditorPanelHandle, EditorPanelProps>(({ onSta
                       outline: 'none',
                       boxSizing: 'border-box',
                     }}
-                    onFocus={(e) => { e.currentTarget.style.borderColor = '#00e5ff'; }}
-                    onBlur={(e) => { e.currentTarget.style.borderColor = '#555'; }}
+                    onFocus={(e) => { e.target.style.borderColor = '#00e5ff'; }}
+                    onBlur={(e) => { e.target.style.borderColor = '#555'; }}
                   />
                   <select
                     value={option.nextNodeId}
@@ -558,7 +632,9 @@ const EditorPanelComp = forwardRef<EditorPanelHandle, EditorPanelProps>(({ onSta
                     {nodes
                       .filter(n => n.id !== selectedNodeId)
                       .map(n => (
-                        <option key={n.id} value={n.id}>{n.id}</option>
+                        <option key={n.id} value={n.id}>
+                          {n.id}
+                        </option>
                       ))}
                   </select>
                 </div>
@@ -591,231 +667,11 @@ const EditorPanelComp = forwardRef<EditorPanelHandle, EditorPanelProps>(({ onSta
         style={{ display: 'none' }}
         onChange={handleFileChange}
       />
-    </div>
-  );
-});
-EditorPanelComp.displayName = 'EditorPanel';
 
-interface Ripple {
-  id: number;
-  x: number;
-  y: number;
-}
-
-interface ToolbarButtonProps {
-  label: string;
-  ripples: Ripple[];
-  onClick: (e: React.MouseEvent<HTMLButtonElement>) => void;
-}
-
-const ToolbarButton: React.FC<ToolbarButtonProps> = ({ label, ripples, onClick }) => {
-  return (
-    <button
-      onClick={onClick}
-      style={{
-        position: 'relative',
-        height: '32px',
-        padding: '0 16px',
-        border: '1px solid #00e5ff',
-        backgroundColor: 'transparent',
-        color: '#00e5ff',
-        fontSize: '13px',
-        cursor: 'pointer',
-        borderRadius: '4px',
-        overflow: 'hidden',
-        transition: 'background-color 0.2s ease',
-        fontFamily: 'inherit',
-      }}
-      onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'rgba(0, 229, 255, 0.125)'; }}
-      onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
-    >
-      {label}
-      {ripples.map(ripple => (
-        <span
-          key={ripple.id}
-          style={{
-            position: 'absolute',
-            left: ripple.x,
-            top: ripple.y,
-            width: '0',
-            height: '0',
-            borderRadius: '50%',
-            backgroundColor: 'rgba(0, 229, 255, 0.4)',
-            transform: 'translate(-50%, -50%)',
-            animation: 'ripple 0.6s ease-out forwards',
-            pointerEvents: 'none',
-          }}
-        />
-      ))}
-    </button>
-  );
-};
-
-const App: React.FC = () => {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const rendererRef = useRef<CanvasRenderer | null>(null);
-  const editorRef = useRef<EditorPanelHandle>(null);
-
-  const [isResponsive, setIsResponsive] = useState(false);
-  const [importRipples, setImportRipples] = useState<Ripple[]>([]);
-  const [exportRipples, setExportRipples] = useState<Ripple[]>([]);
-  const rippleIdRef = useRef(0);
-  const [statusInfo, setStatusInfo] = useState<{ nodeId: string; optionCount: number } | null>(null);
-  const [previewNodeInfo, setPreviewNodeInfo] = useState<{ nodeId: string; optionCount: number } | null>(null);
-
-  useEffect(() => {
-    if (canvasRef.current && !rendererRef.current) {
-      rendererRef.current = new CanvasRenderer(canvasRef.current);
-    }
-    return () => {
-      if (rendererRef.current) {
-        rendererRef.current.destroy();
-        rendererRef.current = null;
-      }
-    };
-  }, []);
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      if (rendererRef.current) {
-        setPreviewNodeInfo(rendererRef.current.getCurrentNodeInfo());
-      }
-    }, 100);
-    return () => clearInterval(interval);
-  }, []);
-
-  useEffect(() => {
-    const handleResize = () => setIsResponsive(window.innerWidth < 900);
-    handleResize();
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
-
-  const createRipple = (e: React.MouseEvent<HTMLButtonElement>, setter: React.Dispatch<React.SetStateAction<Ripple[]>>) => {
-    const rect = e.currentTarget.getBoundingClientRect();
-    const id = rippleIdRef.current++;
-    setter(prev => [...prev, { id, x: e.clientX - rect.left, y: e.clientY - rect.top }]);
-    setTimeout(() => setter(prev => prev.filter(r => r.id !== id)), 600);
-  };
-
-  const handleExport = useCallback((e: React.MouseEvent<HTMLButtonElement>) => {
-    createRipple(e, setExportRipples);
-    editorRef.current?.exportJSON();
-  }, []);
-
-  const handleImport = useCallback((e: React.MouseEvent<HTMLButtonElement>) => {
-    createRipple(e, setImportRipples);
-    editorRef.current?.importJSON();
-  }, []);
-
-  const handleStatusChange = useCallback((nodeId: string | null, optionCount: number) => {
-    if (nodeId) {
-      setStatusInfo({ nodeId, optionCount });
-    }
-  }, []);
-
-  const displayInfo = previewNodeInfo || statusInfo;
-
-  const layoutStyle: React.CSSProperties = isResponsive
-    ? { display: 'flex', flexDirection: 'column', height: '100%' }
-    : { display: 'flex', flexDirection: 'row', height: '100%' };
-
-  const editorStyle: React.CSSProperties = isResponsive
-    ? { width: '100%', height: '70%', borderBottom: '1px solid #555' }
-    : { width: '60%', height: '100%', borderRight: '1px solid #555' };
-
-  const previewStyle: React.CSSProperties = isResponsive
-    ? {
-        width: '100%', height: '30%',
-        display: 'flex', flexDirection: 'column',
-        alignItems: 'center', justifyContent: 'center',
-        gap: '12px', padding: '16px', boxSizing: 'border-box',
-      }
-    : {
-        width: '40%', height: '100%',
-        display: 'flex', flexDirection: 'column',
-        alignItems: 'center', justifyContent: 'center',
-        gap: '16px', padding: '20px', boxSizing: 'border-box',
-      };
-
-  return (
-    <div style={{ width: '100%', height: '100vh', display: 'flex', flexDirection: 'column', backgroundColor: '#2d2d2d' }}>
-      <div
-        style={{
-          height: '50px',
-          backgroundColor: '#252525',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          padding: '0 20px',
-          boxSizing: 'border-box',
-          borderBottom: '1px solid #333',
-          flexShrink: 0,
-        }}
-      >
-        <div style={{ fontSize: '16px', color: '#00e5ff', fontWeight: 'bold', letterSpacing: '1px' }}>
-          对话树编辑器
-        </div>
-        <div style={{ display: 'flex', gap: '12px' }}>
-          <ToolbarButton label="导入JSON" ripples={importRipples} onClick={handleImport} />
-          <ToolbarButton label="导出JSON" ripples={exportRipples} onClick={handleExport} />
-        </div>
+      <div style={{ position: 'absolute', top: 0, right: 0, display: 'none' }}>
+        <button onClick={handleExportClick}>Export</button>
+        <button onClick={handleImportClick}>Import</button>
       </div>
-
-      <div style={{ flex: 1, overflow: 'hidden', ...layoutStyle }}>
-        <div style={{ ...editorStyle, overflow: 'hidden' }}>
-          <EditorPanelComp ref={editorRef} onStatusChange={handleStatusChange} />
-        </div>
-        <div style={{ backgroundColor: '#2d2d2d', ...previewStyle }}>
-          <div style={{ position: 'relative' }}>
-            <canvas
-              ref={canvasRef}
-              style={{
-                width: isResponsive ? 'min(100%, 400px)' : '400px',
-                height: 'auto',
-                aspectRatio: '400 / 240',
-                imageRendering: 'pixelated',
-                border: '2px solid #555',
-                borderRadius: '4px',
-                boxShadow: '0 4px 20px rgba(0, 0, 0, 0.5)',
-              }}
-            />
-          </div>
-          <div
-            style={{
-              display: 'flex',
-              gap: '20px',
-              padding: '8px 16px',
-              backgroundColor: '#333',
-              borderRadius: '4px',
-              border: '1px solid #444',
-              minWidth: '300px',
-              justifyContent: 'space-between',
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span style={{ color: '#888', fontSize: '12px' }}>Node:</span>
-              <span style={{ color: '#00e5ff', fontSize: '12px', fontFamily: 'monospace', fontWeight: 'bold' }}>
-                {displayInfo?.nodeId || '--'}
-              </span>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span style={{ color: '#888', fontSize: '12px' }}>Options:</span>
-              <span style={{ color: '#f0c040', fontSize: '12px', fontFamily: 'monospace', fontWeight: 'bold' }}>
-                {displayInfo?.optionCount ?? 0}
-              </span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <style>{`
-        @keyframes ripple {
-          to { width: 80px; height: 80px; opacity: 0; }
-        }
-      `}</style>
     </div>
   );
 };
-
-export default App;

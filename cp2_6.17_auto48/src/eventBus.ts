@@ -1,33 +1,48 @@
-type EventCallback = (...args: unknown[]) => void;
+import { DialogueNode } from './types/DialogueNode';
 
-class EventBus {
-  private events: Map<string, EventCallback[]> = new Map();
+export interface EditorToRendererEvents {
+  PREVIEW_NODE: [nodeId: string];
+  UPDATE_TREE: [nodes: DialogueNode[]];
+}
 
-  on(event: string, callback: EventCallback): void {
-    if (!this.events.has(event)) {
-      this.events.set(event, []);
+export interface RendererToEditorEvents {
+  OPTION_CLICKED: [optionIndex: number];
+  NODE_CLICKED: [nodeId: string];
+}
+
+type EventMap = Record<string, unknown[]>;
+
+class TypedEventBus<EmitEvents extends EventMap, OnEvents extends EventMap> {
+  private events: Map<keyof (EmitEvents & OnEvents), Array<(...args: never[]) => void>> = new Map();
+
+  on<K extends keyof OnEvents>(event: K, callback: (...args: OnEvents[K]) => void): void {
+    const key = event as keyof (EmitEvents & OnEvents);
+    if (!this.events.has(key)) {
+      this.events.set(key, []);
     }
-    this.events.get(event)!.push(callback);
+    this.events.get(key)!.push(callback as (...args: never[]) => void);
   }
 
-  off(event: string, callback: EventCallback): void {
-    const callbacks = this.events.get(event);
+  off<K extends keyof OnEvents>(event: K, callback: (...args: OnEvents[K]) => void): void {
+    const key = event as keyof (EmitEvents & OnEvents);
+    const callbacks = this.events.get(key);
     if (callbacks) {
-      const index = callbacks.indexOf(callback);
+      const index = callbacks.indexOf(callback as (...args: never[]) => void);
       if (index > -1) {
         callbacks.splice(index, 1);
       }
     }
   }
 
-  emit(event: string, ...args: unknown[]): void {
-    const callbacks = this.events.get(event);
+  emit<K extends keyof EmitEvents>(event: K, ...args: EmitEvents[K]): void {
+    const key = event as keyof (EmitEvents & OnEvents);
+    const callbacks = this.events.get(key);
     if (callbacks) {
       callbacks.forEach((callback) => {
         try {
-          callback(...args);
+          callback(...(args as never[]));
         } catch (error) {
-          console.error(`Error in event handler for ${event}:`, error);
+          console.error(`Error in event handler for ${String(event)}:`, error);
         }
       });
     }
@@ -38,11 +53,46 @@ class EventBus {
   }
 }
 
-export const eventBus = new EventBus();
+type EditorBus = TypedEventBus<EditorToRendererEvents, RendererToEditorEvents>;
+type RendererBus = TypedEventBus<RendererToEditorEvents, EditorToRendererEvents>;
 
-export const EVENTS = {
+class SharedEventBus {
+  private editorBus: EditorBus;
+  private rendererBus: RendererBus;
+
+  constructor() {
+    const sharedEvents = new Map<string, Array<(...args: never[]) => void>>();
+
+    this.editorBus = new TypedEventBus<EditorToRendererEvents, RendererToEditorEvents>();
+    this.rendererBus = new TypedEventBus<RendererToEditorEvents, EditorToRendererEvents>();
+
+    (this.editorBus as unknown as { events: typeof sharedEvents }).events = sharedEvents;
+    (this.rendererBus as unknown as { events: typeof sharedEvents }).events = sharedEvents;
+  }
+
+  forEditor(): EditorBus {
+    return this.editorBus;
+  }
+
+  forRenderer(): RendererBus {
+    return this.rendererBus;
+  }
+
+  clear(): void {
+    this.editorBus.clear();
+  }
+}
+
+export const eventBusHub = new SharedEventBus();
+export const editorBus = eventBusHub.forEditor();
+export const rendererBus = eventBusHub.forRenderer();
+
+export const EDITOR_EVENTS: Record<keyof EditorToRendererEvents, keyof EditorToRendererEvents> = {
   PREVIEW_NODE: 'PREVIEW_NODE',
   UPDATE_TREE: 'UPDATE_TREE',
+};
+
+export const RENDERER_EVENTS: Record<keyof RendererToEditorEvents, keyof RendererToEditorEvents> = {
   OPTION_CLICKED: 'OPTION_CLICKED',
   NODE_CLICKED: 'NODE_CLICKED',
-} as const;
+};

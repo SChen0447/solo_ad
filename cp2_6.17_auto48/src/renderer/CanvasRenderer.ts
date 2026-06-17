@@ -1,6 +1,6 @@
 import { drawPixelText, wrapPixelText, measurePixelText } from './PixelFont';
 import { DialogueNode } from '../types/DialogueNode';
-import { eventBus, EVENTS } from '../eventBus';
+import { rendererBus, EDITOR_EVENTS, RENDERER_EVENTS } from '../eventBus';
 
 const CANVAS_WIDTH = 400;
 const CANVAS_HEIGHT = 240;
@@ -58,12 +58,12 @@ export class CanvasRenderer {
   }
 
   private setupBusListeners(): void {
-    eventBus.on(EVENTS.PREVIEW_NODE, (nodeId: unknown) => {
-      this.previewNode(nodeId as string);
+    rendererBus.on(EDITOR_EVENTS.PREVIEW_NODE, (nodeId) => {
+      this.previewNode(nodeId);
     });
 
-    eventBus.on(EVENTS.UPDATE_TREE, (nodes: unknown) => {
-      this.nodes = nodes as DialogueNode[];
+    rendererBus.on(EDITOR_EVENTS.UPDATE_TREE, (nodes) => {
+      this.nodes = nodes;
     });
   }
 
@@ -104,7 +104,7 @@ export class CanvasRenderer {
 
     for (const btn of this.buttonRects) {
       if (x >= btn.x && x <= btn.x + btn.width && y >= btn.y && y <= btn.y + btn.height) {
-        eventBus.emit(EVENTS.OPTION_CLICKED, btn.optionIndex);
+        rendererBus.emit(RENDERER_EVENTS.OPTION_CLICKED, btn.optionIndex);
         if (this.currentNode?.options[btn.optionIndex]) {
           const nextNodeId = this.currentNode.options[btn.optionIndex].nextNodeId;
           this.previewNode(nextNodeId);
@@ -364,6 +364,5 @@ export class CanvasRenderer {
     this.canvas.removeEventListener('mousemove', this.handleMouseMove);
     this.canvas.removeEventListener('click', this.handleClick);
     this.canvas.removeEventListener('mouseleave', this.handleMouseLeave);
-    eventBus.clear();
   }
 }
