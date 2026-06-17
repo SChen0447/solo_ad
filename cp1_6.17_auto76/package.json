@@ -1,0 +1,22 @@
+{
+  "name": "building-3d-tour",
+  "version": "1.0.0",
+  "description": "Interactive 3D building interior tour with facility annotations",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "three": "^0.160.0",
+    "@types/three": "^0.160.0",
+    "axios": "^1.6.2",
+    "dat.gui": "^0.7.9",
+    "@tweenjs/tween.js": "^21.0.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.3",
+    "vite": "^5.0.8",
+    "@types/dat.gui": "^0.7.12"
+  }
+}

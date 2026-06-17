@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>3D 建筑内部结构漫游</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/src/styles.css" />
+</head>
+<body>
+  <div id="app">
+    <canvas id="three-canvas"></canvas>
+    
+    <div id="loading-screen">
+      <div class="loading-content">
+        <div class="loading-spinner"></div>
+        <div class="loading-text">正在加载建筑模型...</div>
+        <div class="loading-progress"><span id="progress-bar"></span></div>
+      </div>
+    </div>
+
+    <div id="ui-overlay">
+      <div id="minimap-panel" class="hidden">
+        <div class="panel-header">
+          <span>楼层平面图</span>
+          <button id="minimap-close">×</button>
+        </div>
+        <canvas id="minimap-canvas"></canvas>
+      </div>
+
+      <div id="filter-panel">
+        <div class="panel-header draggable-header">
+          <span>设施筛选</span>
+          <button id="filter-toggle">−</button>
+        </div>
+        <div class="filter-content">
+          <label class="filter-item">
+            <input type="checkbox" value="fire" checked />
+            <span class="filter-icon">🔥</span>
+            <span>消防设施</span>
+          </label>
+          <label class="filter-item">
+            <input type="checkbox" value="electrical" checked />
+            <span class="filter-icon">⚡</span>
+            <span>电气设施</span>
+          </label>
+          <label class="filter-item">
+            <input type="checkbox" value="plumbing" checked />
+            <span class="filter-icon">💧</span>
+            <span>给排水设施</span>
+          </label>
+          <label class="filter-item">
+            <input type="checkbox" value="hvac" checked />
+            <span class="filter-icon">❄️</span>
+            <span>暖通设施</span>
+          </label>
+        </div>
+      </div>
+
+      <div id="bottom-menu">
+        <button class="menu-btn" id="floor-switch-btn">
+          <span class="btn-icon">🏢</span>
+          <span>楼层切换</span>
+        </button>
+        <button class="menu-btn" id="view-switch-btn">
+          <span class="btn-icon">👁️</span>
+          <span>切换视角</span>
+        </button>
+        <button class="menu-btn" id="minimap-btn">
+          <span class="btn-icon">🗺️</span>
+          <span>小地图 (M)</span>
+        </button>
+      </div>
+
+      <div id="floor-selector" class="hidden">
+        <div class="floor-options">
+          <button class="floor-btn" data-floor="1">1F</button>
+          <button class="floor-btn" data-floor="2">2F</button>
+          <button class="floor-btn" data-floor="3">3F</button>
+        </div>
+      </div>
+
+      <div id="position-info">
+        <div class="info-item">
+          <span class="info-label">当前楼层:</span>
+          <span id="current-floor">1F</span>
+        </div>
+        <div class="info-item">
+          <span class="info-label">位置:</span>
+          <span id="current-position">-</span>
+        </div>
+      </div>
+
+      <div id="annotation-container"></div>
+
+      <div id="facility-card" class="hidden">
+        <div class="card-header">
+          <span id="card-icon">🔧</span>
+          <span id="card-title">设施名称</span>
+          <button id="card-close">×</button>
+        </div>
+        <div class="card-content">
+          <div class="card-row">
+            <span class="card-label">设施类型:</span>
+            <span id="card-type">-</span>
+          </div>
+          <div class="card-row">
+            <span class="card-label">状态:</span>
+            <span id="card-status" class="status-normal">正常</span>
+          </div>
+          <div class="card-row">
+            <span class="card-label">上次维护:</span>
+            <span id="card-maintenance">-</span>
+          </div>
+          <div class="card-row">
+            <span class="card-label">所在位置:</span>
+            <span id="card-location">-</span>
+          </div>
+        </div>
+      </div>
+
+      <div id="collision-overlay"></div>
+
+      <div id="teleport-overlay"></div>
+
+      <div id="filter-mobile-btn" class="hidden">
+        <span>🔍</span>
+      </div>
+    </div>
+
+    <div id="controls-hint">
+      <div class="hint-item"><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> 移动</div>
+      <div class="hint-item"><kbd>鼠标拖拽</kbd> 旋转视角</div>
+      <div class="hint-item"><kbd>滚轮</kbd> 切换视角</div>
+      <div class="hint-item"><kbd>M</kbd> 小地图</div>
+    </div>
+  </div>
+
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
