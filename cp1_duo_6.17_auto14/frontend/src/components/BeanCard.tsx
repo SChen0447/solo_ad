@@ -37,8 +37,7 @@ function StarRating({ rating }: { rating: number }) {
 
 function BeanCard({ bean, onClick, style }: BeanCardProps) {
   const [isVisible, setIsVisible] = useState(false);
-  const [thumbLoaded, setThumbLoaded] = useState(false);
-  const [imageLoaded, setImageLoaded] = useState(false);
+  const [loaded, setLoaded] = useState(false);
   const [ripple, setRipple] = useState<{ x: number; y: number; id: number } | null>(null);
   const cardRef = useRef<HTMLDivElement>(null);
 
@@ -62,13 +61,6 @@ function BeanCard({ bean, onClick, style }: BeanCardProps) {
     return () => observer.disconnect();
   }, []);
 
-  const getThumbImageUrl = () => {
-    if (bean.thumb_image) return bean.thumb_image;
-    return bean.image.includes('?')
-      ? `${bean.image}&thumb=true&w=100`
-      : `${bean.image}?thumb=true&w=100`;
-  };
-
   const handleFlavorClick = (e: React.MouseEvent, flavor: string) => {
     e.stopPropagation();
     const rect = e.currentTarget.getBoundingClientRect();
@@ -82,19 +74,13 @@ function BeanCard({ bean, onClick, style }: BeanCardProps) {
   return (
     <div className="bean-card" ref={cardRef} onClick={onClick} style={style}>
       <div className="bean-card__image-wrapper">
-        <img
-          src={getThumbImageUrl()}
-          alt={`${bean.name} 缩略图`}
-          className={`bean-card__image bean-card__image--thumb ${thumbLoaded ? 'bean-card__image--loaded' : ''} ${imageLoaded ? 'bean-card__image--fading' : ''}`}
-          onLoad={() => setThumbLoaded(true)}
-          loading="lazy"
-        />
+        <div className="bean-card__image-placeholder" />
         {isVisible && (
           <img
             src={bean.image}
             alt={bean.name}
-            className={`bean-card__image bean-card__image--main ${imageLoaded ? 'bean-card__image--loaded' : ''}`}
-            onLoad={() => setImageLoaded(true)}
+            className={`bean-card__image ${loaded ? 'bean-card__image--loaded' : ''}`}
+            onLoad={() => setLoaded(true)}
             loading="lazy"
           />
         )}

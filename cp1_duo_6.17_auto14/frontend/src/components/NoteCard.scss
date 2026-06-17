@@ -200,7 +200,7 @@
   }
 
   &--animating &__icon {
-    animation: heartScale 0.2s ease;
+    animation: likeAnimation 0.2s ease;
   }
 
   &--active {
@@ -209,7 +209,11 @@
   }
 }
 
-@keyframes heartScale {
+.like-animation {
+  animation: likeAnimation 0.2s ease;
+}
+
+@keyframes likeAnimation {
   0% {
     transform: scale(1);
   }
