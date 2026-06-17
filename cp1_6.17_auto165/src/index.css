@@ -1,0 +1,131 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg-primary: #2C3E50;
+  --bg-secondary: #34495E;
+  --bg-canvas: #FFFFFF;
+  --accent-primary: #1ABC9C;
+  --accent-secondary: #3498DB;
+  --accent-warning: #FFA500;
+  --accent-success: #2ECC71;
+  --accent-danger: #E74C3C;
+  --text-primary: #FFFFFF;
+  --text-secondary: #7F8C8D;
+  --line-color: #ECF0F1;
+  --border-color: #7F8C8D;
+
+  font-family: Arial, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+@keyframes breathe {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.2);
+    opacity: 0.7;
+  }
+}
+
+@keyframes noteAdd {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.1);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes slideLeft {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-20px);
+  }
+}
+
+@keyframes fadeOut {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+.cursor-breathe {
+  animation: breathe 1s ease-in-out infinite;
+}
+
+.note-add-animation {
+  animation: noteAdd 0.15s ease-out;
+}
+
+.slide-left-animation {
+  animation: slideLeft 0.3s ease-out;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+}
+
+button {
+  font-family: Arial, sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  border: none;
+  border-radius: 8px;
+  padding: 8px 16px;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+  background-color: var(--bg-secondary);
+  color: var(--text-primary);
+}
+
+button:hover {
+  background-color: var(--accent-primary);
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--bg-primary);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--bg-secondary);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--accent-primary);
+}
