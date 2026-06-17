@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>3D 差分对比可视化</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      font-family: 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+      background: #1a1a2e;
+      color: #e0e0e0;
+    }
+
+    #app {
+      display: flex;
+      width: 100%;
+      height: 100%;
+      position: relative;
+    }
+
+    #canvas-container {
+      width: 75%;
+      height: 100%;
+      position: relative;
+    }
+
+    #canvas-container canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+
+    #info-panel {
+      width: 25%;
+      height: 100%;
+      background: rgba(15, 52, 96, 0.65);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border-left: 1px solid rgba(83, 52, 131, 0.4);
+      padding: 20px;
+      overflow-y: auto;
+      z-index: 10;
+      transition: transform 0.3s ease;
+    }
+
+    #info-panel h2 {
+      font-size: 16px;
+      font-weight: 600;
+      margin-bottom: 16px;
+      color: #a8b2ff;
+      letter-spacing: 0.5px;
+    }
+
+    .info-section {
+      margin-bottom: 20px;
+    }
+
+    .info-section h3 {
+      font-size: 13px;
+      font-weight: 500;
+      color: #8a92c4;
+      margin-bottom: 8px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    #current-time-label {
+      font-size: 20px;
+      font-weight: 700;
+      color: #ffffff;
+      margin-bottom: 4px;
+    }
+
+    .stat-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 6px 0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+      font-size: 13px;
+    }
+
+    .stat-label {
+      color: #8a92c4;
+    }
+
+    .stat-value {
+      font-weight: 600;
+      color: #e0e0ff;
+    }
+
+    .stat-value.added { color: #ff4d6a; }
+    .stat-value.removed { color: #4d9fff; }
+    .stat-value.changed { color: #ffaa33; }
+
+    .change-list {
+      max-height: 300px;
+      overflow-y: auto;
+    }
+
+    .change-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 8px;
+      margin-bottom: 4px;
+      border-radius: 4px;
+      background: rgba(255, 255, 255, 0.04);
+      font-size: 12px;
+    }
+
+    .change-badge {
+      display: inline-block;
+      padding: 2px 6px;
+      border-radius: 3px;
+      font-size: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      flex-shrink: 0;
+    }
+
+    .change-badge.added { background: rgba(255, 77, 106, 0.25); color: #ff4d6a; }
+    .change-badge.removed { background: rgba(77, 159, 255, 0.25); color: #4d9fff; }
+    .change-badge.height-up { background: rgba(255, 100, 50, 0.25); color: #ff6432; }
+    .change-badge.height-down { background: rgba(50, 120, 255, 0.25); color: #3278ff; }
+
+    .change-id {
+      color: #c0c0e0;
+      font-family: 'Consolas', 'Courier New', monospace;
+    }
+
+    #toolbar {
+      position: absolute;
+      top: 16px;
+      right: calc(25% + 16px);
+      display: flex;
+      gap: 8px;
+      z-index: 20;
+    }
+
+    .toolbar-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      padding: 8px 14px;
+      border: none;
+      border-radius: 8px;
+      background: linear-gradient(135deg, #0f3460, #533483);
+      color: #e0e0ff;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      position: relative;
+      white-space: nowrap;
+    }
+
+    .toolbar-btn:hover {
+      filter: brightness(1.2);
+      transform: translateY(-2px);
+      box-shadow: 0 4px 16px rgba(83, 52, 131, 0.4);
+    }
+
+    .toolbar-btn:active {
+      transform: scale(0.95) translateY(0);
+    }
+
+    .toolbar-btn .tooltip {
+      position: absolute;
+      bottom: -28px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(0, 0, 0, 0.8);
+      color: #fff;
+      padding: 3px 8px;
+      border-radius: 4px;
+      font-size: 11px;
+      white-space: nowrap;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s;
+    }
+
+    .toolbar-btn:hover .tooltip {
+      opacity: 1;
+    }
+
+    .toolbar-btn.active {
+      background: linear-gradient(135deg, #533483, #e94560);
+      box-shadow: 0 0 16px rgba(233, 69, 96, 0.3);
+    }
+
+    .toolbar-btn svg {
+      width: 16px;
+      height: 16px;
+      fill: currentColor;
+    }
+
+    #timeline-container {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      width: 100%;
+      height: 72px;
+      background: linear-gradient(to top, rgba(22, 33, 62, 0.95), rgba(22, 33, 62, 0.6));
+      backdrop-filter: blur(8px);
+      display: flex;
+      align-items: center;
+      padding: 0 32px;
+      z-index: 20;
+    }
+
+    .timeline-label {
+      font-size: 14px;
+      color: #ffffff;
+      font-weight: 600;
+      min-width: 64px;
+      text-align: center;
+      user-select: none;
+    }
+
+    .timeline-label.active-label {
+      color: #a8b2ff;
+      text-shadow: 0 0 8px rgba(168, 178, 255, 0.5);
+    }
+
+    #timeline-track {
+      flex: 1;
+      position: relative;
+      height: 40px;
+      margin: 0 16px;
+      display: flex;
+      align-items: center;
+    }
+
+    #timeline-track input[type="range"] {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 100%;
+      height: 6px;
+      border-radius: 3px;
+      background: linear-gradient(90deg, #0f3460, #533483);
+      outline: none;
+      position: relative;
+    }
+
+    #timeline-track input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: #4d9fff;
+      border: 2px solid #ffffff;
+      box-shadow: 0 0 12px rgba(77, 159, 255, 0.6), 0 0 4px rgba(255, 255, 255, 0.4);
+      cursor: pointer;
+      transition: box-shadow 0.2s;
+    }
+
+    #timeline-track input[type="range"]::-webkit-slider-thumb:hover {
+      box-shadow: 0 0 20px rgba(77, 159, 255, 0.8), 0 0 8px rgba(255, 255, 255, 0.6);
+    }
+
+    #timeline-track input[type="range"]::-moz-range-thumb {
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: #4d9fff;
+      border: 2px solid #ffffff;
+      box-shadow: 0 0 12px rgba(77, 159, 255, 0.6), 0 0 4px rgba(255, 255, 255, 0.4);
+      cursor: pointer;
+    }
+
+    .timeline-mark {
+      position: absolute;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      border: 2px solid #a8b2ff;
+      background: #16213e;
+      pointer-events: none;
+    }
+
+    .timeline-mark.mark-a { left: 0%; }
+    .timeline-mark.mark-b { left: 100%; }
+
+    #legend-card {
+      position: absolute;
+      top: 16px;
+      left: 16px;
+      background: rgba(255, 255, 255, 0.1);
+      backdrop-filter: blur(12px);
+      border-radius: 10px;
+      padding: 12px 16px;
+      z-index: 15;
+      cursor: move;
+      user-select: none;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      min-width: 160px;
+    }
+
+    #legend-card h4 {
+      font-size: 12px;
+      font-weight: 600;
+      margin-bottom: 8px;
+      color: #c0c0e0;
+      letter-spacing: 0.5px;
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 4px;
+      font-size: 11px;
+      color: #a0a0c0;
+    }
+
+    .legend-color {
+      width: 14px;
+      height: 14px;
+      border-radius: 3px;
+      flex-shrink: 0;
+    }
+
+    .legend-color.lc-added { background: #ff4d6a; }
+    .legend-color.lc-height-up { background: linear-gradient(90deg, #1a3a8a, #ff3333); }
+    .legend-color.lc-height-down { background: linear-gradient(90deg, #1a3a8a, #ff8833); }
+    .legend-color.lc-unchanged { background: #808080; }
+
+    #status-bar {
+      position: absolute;
+      bottom: 72px;
+      left: 0;
+      width: 75%;
+      padding: 4px 16px;
+      background: rgba(0, 0, 0, 0.3);
+      font-size: 11px;
+      color: #6a6a8a;
+      z-index: 15;
+      display: flex;
+      gap: 20px;
+    }
+
+    #mobile-panel-toggle {
+      display: none;
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 40px;
+      background: rgba(15, 52, 96, 0.8);
+      backdrop-filter: blur(8px);
+      border-bottom: 1px solid rgba(83, 52, 131, 0.4);
+      z-index: 25;
+      cursor: pointer;
+      align-items: center;
+      justify-content: center;
+      font-size: 13px;
+      color: #a8b2ff;
+    }
+
+    @media (max-width: 768px) {
+      #canvas-container {
+        width: 100%;
+      }
+
+      #info-panel {
+        position: absolute;
+        top: 40px;
+        left: 0;
+        width: 100%;
+        height: auto;
+        max-height: 40vh;
+        transform: translateY(-100%);
+        border-left: none;
+        border-bottom: 1px solid rgba(83, 52, 131, 0.4);
+        z-index: 25;
+      }
+
+      #info-panel.panel-open {
+        transform: translateY(0);
+      }
+
+      #mobile-panel-toggle {
+        display: flex;
+      }
+
+      #toolbar {
+        right: 16px;
+        top: 48px;
+      }
+
+      #status-bar {
+        width: 100%;
+      }
+
+      #legend-card {
+        top: 56px;
+      }
+    }
+
+    ::-webkit-scrollbar {
+      width: 4px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: rgba(0, 0, 0, 0.1);
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: rgba(83, 52, 131, 0.5);
+      border-radius: 2px;
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <div id="canvas-container">
+      <div id="toolbar">
+        <button class="toolbar-btn" id="btn-diff">
+          <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>
+          显示差异
+          <span class="tooltip">切换差分高亮显示</span>
+        </button>
+        <button class="toolbar-btn" id="btn-screenshot">
+          <svg viewBox="0 0 24 24"><path d="M12 15.2a3.2 3.2 0 100-6.4 3.2 3.2 0 000 6.4z"/><path d="M9 2L7.17 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2h-3.17L15 2H9zm3 15c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5z"/></svg>
+          <span class="tooltip">保存对比截图</span>
+        </button>
+        <button class="toolbar-btn" id="btn-reset">
+          <svg viewBox="0 0 24 24"><path d="M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z"/></svg>
+          <span class="tooltip">复位视角</span>
+        </button>
+      </div>
+
+      <div id="legend-card">
+        <h4>图例</h4>
+        <div class="legend-item"><div class="legend-color lc-added"></div>新增建筑</div>
+        <div class="legend-item"><div class="legend-color lc-height-up"></div>高度增加</div>
+        <div class="legend-item"><div class="legend-color lc-height-down"></div>高度减少</div>
+        <div class="legend-item"><div class="legend-color lc-unchanged"></div>无变化</div>
+      </div>
+
+      <div id="status-bar">
+        <span id="fps-display">FPS: --</span>
+        <span id="building-count">建筑数: --</span>
+      </div>
+    </div>
+
+    <div id="info-panel">
+      <div class="info-section">
+        <h3>当前时间点</h3>
+        <div id="current-time-label">Time A</div>
+      </div>
+      <div class="info-section">
+        <h3>变化统计</h3>
+        <div class="stat-row">
+          <span class="stat-label">新增建筑</span>
+          <span class="stat-value added" id="stat-added">0</span>
+        </div>
+        <div class="stat-row">
+          <span class="stat-label">删除建筑</span>
+          <span class="stat-value removed" id="stat-removed">0</span>
+        </div>
+        <div class="stat-row">
+          <span class="stat-label">高度变化</span>
+          <span class="stat-value changed" id="stat-changed">0</span>
+        </div>
+      </div>
+      <div class="info-section">
+        <h3>变更列表</h3>
+        <div class="change-list" id="change-list"></div>
+      </div>
+    </div>
+
+    <div id="mobile-panel-toggle" onclick="document.getElementById('info-panel').classList.toggle('panel-open')">
+      ▼ 展开信息面板
+    </div>
+
+    <div id="timeline-container">
+      <span class="timeline-label active-label" id="label-time-a">Time A</span>
+      <div id="timeline-track">
+        <input type="range" id="timeline-slider" min="0" max="100" value="0" step="1" />
+        <div class="timeline-mark mark-a"></div>
+        <div class="timeline-mark mark-b"></div>
+      </div>
+      <span class="timeline-label" id="label-time-b">Time B</span>
+    </div>
+  </div>
+
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
