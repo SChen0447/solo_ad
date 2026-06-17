@@ -1,0 +1,434 @@
+{
+  "periods": [
+    {
+      "id": "ancient",
+      "name": "古代",
+      "color": "#8B4513",
+      "startYear": -3000,
+      "endYear": 500
+    },
+    {
+      "id": "medieval",
+      "name": "中世纪",
+      "color": "#8B0000",
+      "startYear": 500,
+      "endYear": 1500
+    },
+    {
+      "id": "modern",
+      "name": "近代",
+      "color": "#4B0082",
+      "startYear": 1500,
+      "endYear": 1900
+    },
+    {
+      "id": "contemporary",
+      "name": "现代",
+      "color": "#2E8B57",
+      "startYear": 1900,
+      "endYear": 2025
+    }
+  ],
+  "events": [
+    {
+      "id": "event-001",
+      "periodId": "ancient",
+      "year": -3000,
+      "title": "古埃及文明兴起",
+      "description": "尼罗河流域出现早期文明，埃及第一王朝建立。古埃及人开始使用象形文字，建造早期的神庙和陵墓。尼罗河流域的肥沃土壤孕育了人类最早的文明之一。",
+      "imageUrl": "https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=ancient%20egypt%20pyramids%20nile%20river%20pharaoh&image_size=landscape_16_9",
+      "lat": 29.9792,
+      "lng": 31.1342
+    },
+    {
+      "id": "event-002",
+      "periodId": "ancient",
+      "year": -2560,
+      "title": "吉萨大金字塔建成",
+      "description": "古埃及第四王朝法老胡夫的金字塔在吉萨高原建成，成为古代世界七大奇迹之一。这座金字塔高达146.5米，是古代世界最高的建筑。",
+      "imageUrl": "https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=great%20pyramid%20of%20giza%20sunset%20desert&image_size=landscape_16_9",
+      "lat": 29.9792,
+      "lng": 31.1342
+    },
+    {
+      "id": "event-003",
+      "periodId": "ancient",
+      "year": -1750,
+      "title": "汉谟拉比法典颁布",
+      "description": "古巴比伦国王汉谟拉比颁布了世界上第一部成文法典，包含282条法律，涵盖了民事、刑事和商业等各个方面。",
+      "imageUrl": "https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=hammurabi%20code%20stele%20babylonian%20artifact&image_size=landscape_16_9",
+      "lat": 32.5359,
+      "lng": 44.4277
+    },
+    {
+      "id": "event-004",
+      "periodId": "ancient",
+      "year": -776,
+      "title": "古代奥林匹克运动会",
+      "description": "第一届古代奥林匹克运动会在希腊奥林匹亚举行，以纪念众神之王宙斯。运动会每四年举办一次，持续了近12个世纪。",
+      "imageUrl": "https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=ancient%20greek%20olympic%20games%20stadium&image_size=landscape_16_9",
+      "lat": 37.6378,
+      "lng": 21.6297
+    },
+    {
+      "id": "event-005",
+      "periodId": "ancient",
+      "year": -551,
+      "title": "孔子诞生",
+      "description": "中国伟大的思想家、教育家孔子诞生于鲁国。他的儒家思想深刻影响了中国及东亚文化两千余年，强调仁、义、礼、智、信。",
+      "imageUrl": "https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=confucius%20ancient%20chinese%20philosopher&image_size=landscape_16_9",
+      "lat": 35.5906,
+      "lng": 116.9833
+    },
+    {
+      "id": "event-006",
+      "periodId": "ancient",
+      "year": -509,
+      "title": "罗马共和国建立",
+      "description": "罗马人推翻了最后一位国王，建立了罗马共和国，实行元老院、执政官和公民大会的三权分立制度。",
+      "imageUrl": "https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=ancient%20rome%20republic%20senate%20forum&image_size=landscape_16_9",
+      "lat": 41.8902,
+      "lng": 12.4922
+    },
+    {
+      "id": "event-007",
+      "periodId": "ancient",
+      "year": -221,
+      "title": "秦始皇统一中国",
+      "description": "秦王嬴政统一六国，建立了中国历史上第一个中央集权的大一统王朝。他统一文字、度量衡和货币，修建了万里长城。",
+      "imageUrl": "https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=qin%20shi%20huang%20great%20wall%20china%20terracotta&image_size=landscape_16_9",
+      "lat": 34.3400,
+      "lng": 108.9400
+    },
+    {
+      "id": "event-008",
+      "periodId": "ancient",
+      "year": -44,
+      "title": "凯撒遇刺",
+      "description": "罗马独裁官尤利乌斯·凯撒在元老院被布鲁图斯等人刺杀，这一事件导致了罗马共和国的内战和最终的帝国建立。",
+      "imageUrl": "https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=julius%20caesar%20assassination%20senate%20rome&image_size=landscape_16_9",
+      "lat": 41.8902,
+      "lng": 12.4922
+    },
+    {
+      "id": "event-009",
+      "periodId": "ancient",
+      "year": 0,
+      "title": "耶稣诞生",
+      "description": "基督教创始人耶稣诞生于伯利恒。他的教义和生平事迹成为基督教的核心，深刻影响了西方文明的发展。",
+      "imageUrl": "https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=nativity%20bethlehem%20christmas%20holy%20family&image_size=landscape_16_9",
+      "lat": 31.7054,
+      "lng": 35.2024
+    },
+    {
+      "id": "event-010",
+      "periodId": "ancient",
+      "year": 70,
+      "title": "罗马攻陷耶路撒冷",
+      "description": "罗马军队在提图斯的率领下攻陷耶路撒冷，摧毁了第二圣殿，导致犹太人大规模离散。",
+      "imageUrl": "https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=jerusalem%20temple%20destruction%20roman%20siege&image_size=landscape_16_9",
+      "lat": 31.7767,
+      "lng": 35.2345
+    },
+    {
+      "id": "event-011",
+      "periodId": "medieval",
+      "year": 476,
+      "title": "西罗马帝国灭亡",
+      "description": "日耳曼雇佣军首领奥多亚克废黜了最后一位西罗马皇帝罗慕路斯·奥古斯都，标志着西罗马帝国的正式灭亡和中世纪的开始。",
+      "imageUrl": "https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=fall%20of%20rome%20barbarian%20invasion%20ancient%20city&image_size=landscape_16_9",
+      "lat": 41.8902,
+      "lng": 12.4922
+    },
+    {
+      "id": "event-012",
+      "periodId": "medieval",
+      "year": 618,
+      "title": "唐朝建立",
+      "description": "李渊在长安建立唐朝，开启了中国历史上最辉煌的朝代之一。唐朝以其开放、包容和文化繁荣著称，成为当时世界上最强盛的国家。",
+      "imageUrl": "https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=ancient%20china%20tang%20dynasty%20palace%20xi%27an&image_size=landscape_16_9",
+      "lat": 34.2658,
+      "lng": 108.9541
+    },
+    {
+      "id": "event-013",
+      "periodId": "medieval",
+      "year": 622,
+      "title": "伊斯兰教历元年",
+      "description": "先知穆罕默德从麦加迁徙到麦地那，这一年被定为伊斯兰教历元年。伊斯兰教随后在阿拉伯半岛迅速传播。",
+      "imageUrl": "https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=prophet%20muhammad%20hijra%20medina%20islamic&image_size=landscape_16_9",
+      "lat": 24.4700,
+      "lng": 39.6100
+    },
+    {
+      "id": "event-014",
+      "periodId": "medieval",
+      "year": 800,
+      "title": "查理曼加冕",
+      "description": "法兰克国王查理曼在罗马被教皇利奥三世加冕为\"罗马人的皇帝\"，建立了神圣罗马帝国的雏形。",
+      "imageUrl": "https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=charlemagne%20crowned%20pope%20leo%20iii%20rome&image_size=landscape_16_9",
+      "lat": 41.9029,
+      "lng": 12.4534
+    },
+    {
+      "id": "event-015",
+      "periodId": "medieval",
+      "year": 1066,
+      "title": "诺曼征服英格兰",
+      "description": "诺曼底公爵威廉在黑斯廷斯战役中击败英格兰国王哈罗德二世，随后加冕为英格兰国王，建立了诺曼王朝。",
+      "imageUrl": "https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=norman%20conquest%20battle%20of%20hastings%201066&image_size=landscape_16_9",
+      "lat": 50.8673,
+      "lng": 0.4914
+    },
+    {
+      "id": "event-016",
+      "periodId": "medieval",
+      "year": 1096,
+      "title": "第一次十字军东征",
+      "description": "在教皇乌尔班二世的号召下，欧洲基督徒开始了第一次十字军东征，旨在收复圣地耶路撒冷。",
+      "imageUrl": "https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=first%20crusade%20knights%20templar%20jerusalem&image_size=landscape_16_9",
+      "lat": 41.9029,
+      "lng": 12.4534
+    },
+    {
+      "id": "event-017",
+      "periodId": "medieval",
+      "year": 1206,
+      "title": "成吉思汗建立蒙古帝国",
+      "description": "铁木真在斡难河畔被推举为大汗，尊号成吉思汗，建立了大蒙古国。随后蒙古铁骑横扫欧亚大陆，建立了人类历史上疆域最辽阔的帝国。",
+      "imageUrl": "https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=genghis%20khan%20mongol%20empire%20warriors&image_size=landscape_16_9",
+      "lat": 47.8864,
+      "lng": 106.9450
+    },
+    {
+      "id": "event-018",
+      "periodId": "medieval",
+      "year": 1215,
+      "title": "大宪章签署",
+      "description": "英格兰国王约翰在贵族的压力下签署了《大宪章》，限制了王权，确立了法律高于君主的原则，成为后世宪政的基石。",
+      "imageUrl": "https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=magna%20carta%20king%20john%20english%20nobles&image_size=landscape_16_9",
+      "lat": 51.4350,
+      "lng": -0.6640
+    },
+    {
+      "id": "event-019",
+      "periodId": "medieval",
+      "year": 1347,
+      "title": "黑死病爆发",
+      "description": "黑死病从亚洲传入欧洲，在随后几年内造成了欧洲约三分之一人口的死亡，深刻改变了欧洲的社会经济结构。",
+      "imageUrl": "https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=black%20death%20plague%20medieval%20europe%20doctor&image_size=landscape_16_9",
+      "lat": 45.4408,
+      "lng": 12.3155
+    },
+    {
+      "id": "event-020",
+      "periodId": "medieval",
+      "year": 1453,
+      "title": "君士坦丁堡陷落",
+      "description": "奥斯曼土耳其苏丹穆罕默德二世攻陷君士坦丁堡，东罗马帝国灭亡。这一事件标志着中世纪的结束和文艺复兴的开始。",
+      "imageUrl": "https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=fall%20of%20constantinople%20ottoman%20siege%20hagia%20sophia&image_size=landscape_16_9",
+      "lat": 41.0082,
+      "lng": 28.9784
+    },
+    {
+      "id": "event-021",
+      "periodId": "modern",
+      "year": 1492,
+      "title": "哥伦布发现新大陆",
+      "description": "意大利航海家克里斯托弗·哥伦布在西班牙王室的资助下横渡大西洋，到达美洲大陆，开启了大航海时代。",
+      "imageUrl": "https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=christopher%20columbus%20santa%20maria%20ship%20america&image_size=landscape_16_9",
+      "lat": 19.0500,
+      "lng": -73.1500
+    },
+    {
+      "id": "event-022",
+      "periodId": "modern",
+      "year": 1517,
+      "title": "马丁·路德宗教改革",
+      "description": "德国神学家马丁·路德在威登堡教堂门前张贴《九十五条论纲》，抨击教会的赎罪券制度，引发了宗教改革运动。",
+      "imageUrl": "https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=martin%20luther%2095%20theses%20wittenberg%20church&image_size=landscape_16_9",
+      "lat": 51.8678,
+      "lng": 12.6400
+    },
+    {
+      "id": "event-023",
+      "periodId": "modern",
+      "year": 1543,
+      "title": "哥白尼日心说",
+      "description": "波兰天文学家哥白尼出版《天体运行论》，提出了日心说，挑战了统治西方思想一千多年的地心说，开启了科学革命。",
+      "imageUrl": "https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=nicolaus%20copernicus%20heliocentric%20solar%20system&image_size=landscape_16_9",
+      "lat": 53.0137,
+      "lng": 18.6070
+    },
+    {
+      "id": "event-024",
+      "periodId": "modern",
+      "year": 1687,
+      "title": "牛顿发表《自然哲学的数学原理》",
+      "description": "英国科学家艾萨克·牛顿发表了划时代的巨著《自然哲学的数学原理》，阐述了万有引力定律和三大运动定律。",
+      "imageUrl": "https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=isaac%20newton%20principia%20mathematica%20apple%20gravity&image_size=landscape_16_9",
+      "lat": 52.2053,
+      "lng": 0.1218
+    },
+    {
+      "id": "event-025",
+      "periodId": "modern",
+      "year": 1776,
+      "title": "美国独立宣言",
+      "description": "北美十三个殖民地在费城召开第二届大陆会议，通过了由托马斯·杰斐逊起草的《独立宣言》，宣告美利坚合众国诞生。",
+      "imageUrl": "https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=declaration%20of%20independence%201776%20philadelphia&image_size=landscape_16_9",
+      "lat": 39.9526,
+      "lng": -75.1652
+    },
+    {
+      "id": "event-026",
+      "periodId": "modern",
+      "year": 1789,
+      "title": "法国大革命爆发",
+      "description": "巴黎民众攻占巴士底狱，标志着法国大革命的开始。这场革命推翻了波旁王朝的专制统治，传播了自由、平等、博爱的思想。",
+      "imageUrl": "https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=french%20revolution%20storming%20bastille%201789&image_size=landscape_16_9",
+      "lat": 48.8566,
+      "lng": 2.3522
+    },
+    {
+      "id": "event-027",
+      "periodId": "modern",
+      "year": 1804,
+      "title": "拿破仑加冕称帝",
+      "description": "拿破仑·波拿巴在巴黎圣母院加冕为法兰西皇帝，建立了法兰西第一帝国。随后他颁布了《拿破仑法典》，统一了法国的法律体系。",
+      "imageUrl": "https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=napoleon%20bonaparte%20crowning%20notre%20dame%20paris&image_size=landscape_16_9",
+      "lat": 48.8530,
+      "lng": 2.3499
+    },
+    {
+      "id": "event-028",
+      "periodId": "modern",
+      "year": 1840,
+      "title": "鸦片战争爆发",
+      "description": "英国以林则徐虎门销烟为借口发动鸦片战争，清政府战败后签订《南京条约》，割让香港岛，中国开始沦为半殖民地半封建社会。",
+      "imageUrl": "https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=opium%20war%20british%20navy%20china%201840&image_size=landscape_16_9",
+      "lat": 22.3964,
+      "lng": 114.1095
+    },
+    {
+      "id": "event-029",
+      "periodId": "modern",
+      "year": 1859,
+      "title": "达尔文发表《物种起源》",
+      "description": "英国博物学家查尔斯·达尔文出版《物种起源》，提出了生物进化论学说，认为物种是通过自然选择而进化的。",
+      "imageUrl": "https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=charles%20darwin%20origin%20of%20species%20evolution&image_size=landscape_16_9",
+      "lat": 51.5074,
+      "lng": -0.1278
+    },
+    {
+      "id": "event-030",
+      "periodId": "modern",
+      "year": 1879,
+      "title": "爱迪生发明实用电灯",
+      "description": "美国发明家托马斯·爱迪生成功研制出具有实用价值的白炽灯泡，为人类带来了光明，开启了电气时代。",
+      "imageUrl": "https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=thomas%20edison%20light%20bulb%20invention%20lab&image_size=landscape_16_9",
+      "lat": 40.7128,
+      "lng": -74.0060
+    },
+    {
+      "id": "event-031",
+      "periodId": "contemporary",
+      "year": 1903,
+      "title": "莱特兄弟发明飞机",
+      "description": "威尔伯和奥维尔·莱特兄弟在美国北卡罗来纳州基蒂霍克成功完成了人类历史上首次动力飞行，开启了航空时代。",
+      "imageUrl": "https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=wright%20brothers%20first%20flight%201903%20airplane&image_size=landscape_16_9",
+      "lat": 36.0137,
+      "lng": -75.6717
+    },
+    {
+      "id": "event-032",
+      "periodId": "contemporary",
+      "year": 1914,
+      "title": "第一次世界大战爆发",
+      "description": "奥匈帝国皇储斐迪南大公在萨拉热窝遇刺，成为第一次世界大战的导火索。这场战争持续了四年，造成了巨大的人员伤亡。",
+      "imageUrl": "https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=world%20war%20i%20trenches%20soldiers%201914&image_size=landscape_16_9",
+      "lat": 43.8563,
+      "lng": 18.4131
+    },
+    {
+      "id": "event-033",
+      "periodId": "contemporary",
+      "year": 1917,
+      "title": "俄国十月革命",
+      "description": "列宁领导的布尔什维克党在彼得格勒发动武装起义，推翻了资产阶级临时政府，建立了世界上第一个社会主义国家。",
+      "imageUrl": "https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=russian%20revolution%201917%20lenin%20soviet&image_size=landscape_16_9",
+      "lat": 59.9343,
+      "lng": 30.3351
+    },
+    {
+      "id": "event-034",
+      "periodId": "contemporary",
+      "year": 1939,
+      "title": "第二次世界大战爆发",
+      "description": "纳粹德国闪击波兰，第二次世界大战全面爆发。这场战争历时六年，波及全球，是人类历史上规模最大、伤亡最惨重的战争。",
+      "imageUrl": "https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=world%20war%20ii%20blitzkrieg%20german%20tanks%201939&image_size=landscape_16_9",
+      "lat": 52.2297,
+      "lng": 21.0122
+    },
+    {
+      "id": "event-035",
+      "periodId": "contemporary",
+      "year": 1945,
+      "title": "联合国成立",
+      "description": "50个国家的代表在旧金山签署《联合国宪章》，联合国正式成立。联合国致力于维护国际和平与安全，促进国际合作。",
+      "imageUrl": "https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=united%20nations%20building%20new%20york%20charter&image_size=landscape_16_9",
+      "lat": 40.7484,
+      "lng": -73.9680
+    },
+    {
+      "id": "event-036",
+      "periodId": "contemporary",
+      "year": 1949,
+      "title": "中华人民共和国成立",
+      "description": "毛泽东在北京天安门城楼上庄严宣告中华人民共和国中央人民政府成立，中国人民从此站起来了。",
+      "imageUrl": "https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=founding%20of%20peoples%20republic%20china%20tiananmen%201949&image_size=landscape_16_9",
+      "lat": 39.9042,
+      "lng": 116.4074
+    },
+    {
+      "id": "event-037",
+      "periodId": "contemporary",
+      "year": 1969,
+      "title": "人类首次登月",
+      "description": "美国宇航员尼尔·阿姆斯特朗成为第一个踏上月球的人类，他说出了那句著名的话：\"这是个人的一小步，却是人类的一大步。\"",
+      "imageUrl": "https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=apollo%2011%20moon%20landing%20neil%20armstrong%201969&image_size=landscape_16_9",
+      "lat": 28.5721,
+      "lng": -80.6480
+    },
+    {
+      "id": "event-038",
+      "periodId": "contemporary",
+      "year": 1989,
+      "title": "柏林墙倒塌",
+      "description": "柏林墙的倒塌标志着冷战的结束和德国统一的开始。这一历史性事件象征着共产主义阵营的瓦解和冷战时代的终结。",
+      "imageUrl": "https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=berlin%20wall%20fall%201989%20germany%20reunification&image_size=landscape_16_9",
+      "lat": 52.5200,
+      "lng": 13.4050
+    },
+    {
+      "id": "event-039",
+      "periodId": "contemporary",
+      "year": 1991,
+      "title": "万维网向公众开放",
+      "description": "蒂姆·伯纳斯-李发明的万维网（World Wide Web）向公众开放，彻底改变了人类的信息传播方式和生活方式，开启了互联网时代。",
+      "imageUrl": "https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=world%20wide%20web%20internet%20digital%20age%201991&image_size=landscape_16_9",
+      "lat": 46.5197,
+      "lng": 6.6323
+    },
+    {
+      "id": "event-040",
+      "periodId": "contemporary",
+      "year": 2008,
+      "title": "北京奥运会",
+      "description": "第29届夏季奥林匹克运动会在北京隆重开幕，这是中国首次举办奥运会，开幕式的壮观表演震撼世界。",
+      "imageUrl": "https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=beijing%202008%20olympics%20bird%20nest%20stadium%20opening&image_size=landscape_16_9",
+      "lat": 39.9929,
+      "lng": 116.3966
+    }
+  ]
+}
