@@ -4,6 +4,14 @@ import { eventBus } from './eventBus';
 
 let gui: GUI | null = null;
 let currentState: AppState;
+let controllers: {
+  molecule?: dat.GUIController;
+  atomScale?: dat.GUIController;
+  cameraDistance?: dat.GUIController;
+  backgroundColor?: dat.GUIController;
+  displayMode?: dat.GUIController;
+  autoRotate?: dat.GUIController;
+} = {};
 
 const BACKGROUND_COLORS: Record<string, string> = {
   '深蓝': '#0a0a2e',
@@ -70,6 +78,17 @@ export function initControlPanel(
     currentState.currentMoleculeId = value;
     eventBus.emit('molecule:change', value);
   });
+  controllers.molecule = moleculeController;
+
+  const autoRotateController = moleculeFolder.add(
+    { autoRotate: false },
+    'autoRotate'
+  );
+  autoRotateController.name('自动旋转');
+  autoRotateController.onChange((value: boolean) => {
+    eventBus.emit('autoRotate:change', value);
+  });
+  controllers.autoRotate = autoRotateController;
 
   const paramsFolder = gui.addFolder('显示参数');
   paramsFolder.open();
@@ -88,6 +107,7 @@ export function initControlPanel(
       eventBus.emit('atomScale:change', value);
     }, 16)
   );
+  controllers.atomScale = atomScaleController;
 
   const cameraDistanceController = paramsFolder.add(
     { cameraDistance: currentState.cameraDistance },
@@ -103,6 +123,7 @@ export function initControlPanel(
       eventBus.emit('cameraDistance:change', value);
     }, 16)
   );
+  controllers.cameraDistance = cameraDistanceController;
 
   const backgroundColorController = paramsFolder.add(
     { backgroundColor: '深蓝' },
@@ -115,6 +136,7 @@ export function initControlPanel(
     currentState.backgroundColor = color;
     eventBus.emit('backgroundColor:change', color);
   });
+  controllers.backgroundColor = backgroundColorController;
 
   const displayModeController = paramsFolder.add(
     { displayMode: '实心填充' },
@@ -127,6 +149,7 @@ export function initControlPanel(
     currentState.displayMode = mode;
     eventBus.emit('displayMode:change', mode);
   });
+  controllers.displayMode = displayModeController;
 
   const mobileToggle = document.createElement('button');
   mobileToggle.className = 'mobile-toggle';
@@ -142,20 +165,18 @@ export function initControlPanel(
 export function updateControlState(state: Partial<AppState>): void {
   currentState = { ...currentState, ...state };
 
-  if (!gui) return;
-
-  const controllers = gui.controllersRecursive();
-  controllers.forEach((controller) => {
-    if (controller.property === 'molecule' && state.currentMoleculeId) {
-      controller.setValue(state.currentMoleculeId);
-    }
-    if (controller.property === 'atomScale' && state.atomScale !== undefined) {
-      controller.setValue(state.atomScale);
-    }
-    if (controller.property === 'cameraDistance' && state.cameraDistance !== undefined) {
-      controller.setValue(state.cameraDistance);
-    }
-  });
+  if (state.currentMoleculeId !== undefined && controllers.molecule) {
+    controllers.molecule.setValue(state.currentMoleculeId);
+  }
+  if (state.atomScale !== undefined && controllers.atomScale) {
+    controllers.atomScale.setValue(state.atomScale);
+  }
+  if (state.cameraDistance !== undefined && controllers.cameraDistance) {
+    controllers.cameraDistance.setValue(state.cameraDistance);
+  }
+  if (state.autoRotate !== undefined && controllers.autoRotate) {
+    controllers.autoRotate.setValue(state.autoRotate);
+  }
 }
 
 function applyCustomStyles(): void {

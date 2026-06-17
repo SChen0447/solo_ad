@@ -29,6 +29,7 @@ export interface AppState {
   cameraDistance: number;
   backgroundColor: string;
   displayMode: DisplayMode;
+  autoRotate: boolean;
 }
 
 type EventType =
@@ -37,6 +38,7 @@ type EventType =
   | 'cameraDistance:change'
   | 'backgroundColor:change'
   | 'displayMode:change'
+  | 'autoRotate:change'
   | 'molecule:loaded'
   | 'atom:doubleClick';
 
@@ -46,6 +48,7 @@ interface EventPayloadMap {
   'cameraDistance:change': number;
   'backgroundColor:change': string;
   'displayMode:change': DisplayMode;
+  'autoRotate:change': boolean;
   'molecule:loaded': Molecule;
   'atom:doubleClick': Atom;
 }

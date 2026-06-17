@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
-import type { Molecule, Atom, AppState, DisplayMode } from './eventBus';
+import type { Molecule, Atom, AppState } from './eventBus';
 import { eventBus } from './eventBus';
 import { getMoleculeList, getMoleculeById } from './moleculeDataModule';
 import { createMoleculeGroup, updateAtomScale, updateDisplayMode, fadeInGroup } from './renderModule';
@@ -15,14 +15,17 @@ let raycaster: THREE.Raycaster;
 let mouse: THREE.Vector2;
 
 let currentMoleculeGroup: THREE.Group | null = null;
-let currentMolecule: Molecule | null = null;
+
+let autoRotate = false;
+const ROTATION_SPEED = 0.5;
 
 let appState: AppState = {
   currentMoleculeId: 'h2o',
   atomScale: 1.0,
   cameraDistance: 10,
   backgroundColor: '#0a0a2e',
-  displayMode: 'solid'
+  displayMode: 'solid',
+  autoRotate: false
 };
 
 let backgroundColorTarget = new THREE.Color('#0a0a2e');
@@ -35,7 +38,7 @@ let infoCardTimeout: number | null = null;
 
 function initScene(): void {
   scene = new THREE.Scene();
-  scene.background = backgroundColorCurrent;
+  scene.background = backgroundColorStart;
 
   const container = document.getElementById('scene-container');
   if (!container) return;
@@ -124,7 +127,13 @@ function setupEventBus(): void {
     appState.displayMode = mode;
     if (currentMoleculeGroup) {
       updateDisplayMode(currentMoleculeGroup, mode);
+      currentMoleculeGroup.rotation.y = 0;
     }
+  });
+
+  eventBus.on('autoRotate:change', (enabled) => {
+    autoRotate = enabled;
+    appState.autoRotate = enabled;
   });
 }
 
@@ -142,7 +151,6 @@ function changeMolecule(moleculeId: string): void {
   const molecule = getMoleculeById(moleculeId);
   if (!molecule) return;
 
-  currentMolecule = molecule;
   appState.currentMoleculeId = moleculeId;
 
   if (currentMoleculeGroup) {
@@ -161,6 +169,7 @@ function changeMolecule(moleculeId: string): void {
 
   const newGroup = createMoleculeGroup(molecule, appState.atomScale, appState.displayMode);
   (newGroup.userData as { molecule: Molecule }).molecule = molecule;
+  newGroup.rotation.y = 0;
   scene.add(newGroup);
   currentMoleculeGroup = newGroup;
 
@@ -241,8 +250,18 @@ function showAtomInfo(atom: Atom): void {
   }, 100);
 }
 
+let lastTime = 0;
+
 function animate(): void {
   requestAnimationFrame(animate);
+
+  const currentTime = performance.now();
+  const deltaTime = (currentTime - lastTime) / 1000;
+  lastTime = currentTime;
+
+  if (autoRotate && currentMoleculeGroup) {
+    currentMoleculeGroup.rotation.y += ROTATION_SPEED * deltaTime;
+  }
 
   if (isAnimatingBackground) {
     const elapsed = performance.now() - backgroundAnimationStart;
