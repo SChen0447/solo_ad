@@ -13,6 +13,17 @@ import './App.css';
 
 const ELEMENT_OPTIONS: ElementSymbol[] = ['C', 'H', 'N', 'O', 'S', 'P', 'F', 'Cl'];
 
+const ELEMENT_NAMES: Record<ElementSymbol, string> = {
+  C: '碳',
+  H: '氢',
+  N: '氮',
+  O: '氧',
+  S: '硫',
+  P: '磷',
+  F: '氟',
+  Cl: '氯',
+};
+
 function getElementColor(element: ElementSymbol): string {
   const colorMap: Record<ElementSymbol, string> = {
     C: '#404040',
@@ -70,6 +81,24 @@ function App() {
     const m = calculateMass(debouncedAtoms);
     return Math.round(m * 100) / 100;
   }, [debouncedAtoms]);
+
+  const atomComposition = useMemo(() => {
+    const count: Record<ElementSymbol, number> = {} as Record<ElementSymbol, number>;
+    atoms.forEach(a => {
+      count[a.element] = (count[a.element] ?? 0) + 1;
+    });
+    const order: ElementSymbol[] = ['C', 'H', 'N', 'O', 'S', 'P', 'F', 'Cl'];
+    return order
+      .filter(el => count[el] && count[el] > 0)
+      .map(el => ({
+        element: el,
+        name: ELEMENT_NAMES[el],
+        count: count[el],
+      }));
+  }, [atoms]);
+
+  const totalAtoms = atoms.length;
+  const totalBonds = bonds.length;
 
   useEffect(() => {
     const checkMobile = () => {
@@ -315,6 +344,43 @@ function App() {
           <div className="property-row">
             <span className="property-label">分子量：</span>
             <span className="property-value">{atoms.length > 0 ? mass.toFixed(2) : '—'} g/mol</span>
+          </div>
+        </div>
+
+        <div className="property-section">
+          <h3 className="section-title">原子组成</h3>
+          {atomComposition.length > 0 ? (
+            <div className="composition-table">
+              <div className="composition-header">
+                <span className="comp-col-symbol">符号</span>
+                <span className="comp-col-name">原子名称</span>
+                <span className="comp-col-count">数量</span>
+              </div>
+              {atomComposition.map((item, index) => (
+                <div
+                  key={item.element}
+                  className={`composition-row ${index < atomComposition.length - 1 ? 'with-border' : ''}`}
+                >
+                  <span className="comp-col-symbol">
+                    <span
+                      className="element-dot"
+                      style={{ backgroundColor: getElementColor(item.element) }}
+                    />
+                    {item.element}
+                  </span>
+                  <span className="comp-col-name">{item.name}</span>
+                  <span className="comp-col-count">{item.count}</span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="empty-message">暂无原子</div>
+          )}
+
+          <div className="structure-summary">
+            <span>总原子数: <strong>{totalAtoms}</strong></span>
+            <span className="summary-divider">|</span>
+            <span>总键数: <strong>{totalBonds}</strong></span>
           </div>
         </div>
 
