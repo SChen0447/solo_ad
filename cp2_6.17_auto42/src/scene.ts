@@ -1,6 +1,37 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
-import type { Star, ConstellationLine, PlanetOrbit } from './types';
+
+export interface Star {
+  id: string;
+  position: { x: number; y: number; z: number };
+  brightness: number;
+  color: { r: number; g: number; b: number };
+  spectralType: 'O' | 'B' | 'A' | 'F' | 'G' | 'K' | 'M';
+  size: number;
+}
+
+export interface StarGenerationParams {
+  count: number;
+  distribution: 'sphere' | 'disk';
+  seed: number;
+}
+
+export interface ConstellationLine {
+  id: string;
+  startStarId: string;
+  endStarId: string;
+}
+
+export interface PlanetOrbit {
+  id: string;
+  centerStarId: string;
+  semiMajorAxis: number;
+  eccentricity: number;
+  inclination: number;
+  speed: number;
+  planetRadius: number;
+  planetColor: string;
+}
 
 interface PlanetData {
   orbit: PlanetOrbit;
@@ -8,8 +39,102 @@ interface PlanetData {
   line: THREE.Line;
   trail: THREE.Points;
   trailPositions: THREE.Vector3[];
+  trailAlphas: Float32Array;
   angle: number;
   centerStar: THREE.Vector3;
+}
+
+class SeededRandom {
+  private seed: number;
+  constructor(seed: number) { this.seed = seed; }
+  next(): number { this.seed = (this.seed * 9301 + 49297) % 233280; return this.seed / 233280; }
+  range(min: number, max: number): number { return min + this.next() * (max - min); }
+}
+
+const spectralColors: Record<string, { r: number; g: number; b: number }> = {
+  O: { r: 155, g: 176, b: 255 }, B: { r: 170, g: 191, b: 255 },
+  A: { r: 213, g: 224, b: 255 }, F: { r: 255, g: 248, b: 220 },
+  G: { r: 255, g: 230, b: 150 }, K: { r: 255, g: 180, b: 80 },
+  M: { r: 255, g: 100, b: 50 },
+};
+
+const spectralTypes: Array<'O' | 'B' | 'A' | 'F' | 'G' | 'K' | 'M'> = ['O', 'B', 'A', 'F', 'G', 'K', 'M'];
+const spectralWeights = [0.00003, 0.13, 0.6, 3, 7, 12, 76];
+
+function generateSpectralType(random: SeededRandom): 'O' | 'B' | 'A' | 'F' | 'G' | 'K' | 'M' {
+  const totalWeight = spectralWeights.reduce((a, b) => a + b, 0);
+  let rand = random.next() * totalWeight;
+  for (let i = 0; i < spectralTypes.length; i++) {
+    rand -= spectralWeights[i];
+    if (rand <= 0) return spectralTypes[i];
+  }
+  return 'M';
+}
+
+function poissonDiskSampling3D(
+  count: number, radius: number, minDistance: number,
+  random: SeededRandom, distribution: 'sphere' | 'disk'
+): Array<{ x: number; y: number; z: number }> {
+  const points: Array<{ x: number; y: number; z: number }> = [];
+  const maxAttempts = 30;
+
+  function getRandomPoint(): { x: number; y: number; z: number } {
+    if (distribution === 'sphere') {
+      const theta = random.range(0, Math.PI * 2);
+      const phi = Math.acos(random.range(-1, 1));
+      const r = Math.cbrt(random.next()) * radius;
+      return {
+        x: r * Math.sin(phi) * Math.cos(theta),
+        y: r * Math.sin(phi) * Math.sin(theta),
+        z: r * Math.cos(phi),
+      };
+    } else {
+      const theta = random.range(0, Math.PI * 2);
+      const r = Math.sqrt(random.next()) * radius;
+      const y = random.range(-radius * 0.15, radius * 0.15);
+      return { x: r * Math.cos(theta), y, z: r * Math.sin(theta) };
+    }
+  }
+
+  function isFarEnough(point: { x: number; y: number; z: number }): boolean {
+    for (const existing of points) {
+      const dx = point.x - existing.x, dy = point.y - existing.y, dz = point.z - existing.z;
+      if (Math.sqrt(dx * dx + dy * dy + dz * dz) < minDistance) return false;
+    }
+    return true;
+  }
+
+  while (points.length < count) {
+    for (let attempt = 0; attempt < maxAttempts && points.length < count; attempt++) {
+      const point = getRandomPoint();
+      if (isFarEnough(point)) points.push(point);
+    }
+  }
+  return points;
+}
+
+export async function generateStars(params: StarGenerationParams): Promise<Star[]> {
+  await new Promise(resolve => setTimeout(resolve, 500));
+  const { count, distribution, seed } = params;
+  const random = new SeededRandom(seed);
+  const radius = 100;
+  const minDistance = distribution === 'sphere' ? 8 : 6;
+  const positions = poissonDiskSampling3D(count, radius, minDistance, random, distribution);
+
+  return positions.map((pos, index) => {
+    const spectralType = generateSpectralType(random);
+    const color = spectralColors[spectralType];
+    const brightness = random.range(0.3, 1.0);
+    const size = random.range(0.8, 2.5) * brightness;
+    return {
+      id: `star-${index}-${Date.now()}`,
+      position: pos,
+      brightness,
+      color: { r: color.r / 255, g: color.g / 255, b: color.b / 255 },
+      spectralType,
+      size,
+    };
+  });
 }
 
 export class StarScene {
@@ -29,7 +154,7 @@ export class StarScene {
   private selectedStarId: string | null = null;
   private hoveredStarId: string | null = null;
   private selectedStarMesh: THREE.Mesh | null = null;
-  private hoverIndicator: THREE.Mesh | null = null;
+  private hoverIndicator: THREE.LineSegments | null = null;
 
   private constellationLines: Map<string, THREE.Line> = new Map();
   private previewLine: THREE.Line | null = null;
@@ -56,16 +181,23 @@ export class StarScene {
   private transitionStartFov = 60;
   private transitionEndFov = 60;
 
-  private pulseTime = 0;
+  private lastTime = 0;
+  private selectedPulseTime = 0;
+  private selectedPulsePeriod = 800;
+
+  private frustum: THREE.Frustum;
+  private projScreenMatrix: THREE.Matrix4;
 
   constructor(container: HTMLElement) {
     this.container = container;
     this.scene = new THREE.Scene();
     this.camera = new THREE.PerspectiveCamera(60, container.clientWidth / container.clientHeight, 0.1, 2000);
-    this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'high-performance' });
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
     this.raycaster = new THREE.Raycaster();
     this.mouse = new THREE.Vector2();
+    this.frustum = new THREE.Frustum();
+    this.projScreenMatrix = new THREE.Matrix4();
 
     this.init();
   }
@@ -130,7 +262,7 @@ export class StarScene {
     }
 
     const texture = new THREE.CanvasTexture(canvas);
-    const geometry = new THREE.SphereGeometry(800, 64, 64);
+    const geometry = new THREE.SphereGeometry(800, 32, 32);
     const material = new THREE.MeshBasicMaterial({
       map: texture,
       side: THREE.BackSide,
@@ -139,6 +271,32 @@ export class StarScene {
     });
     const nebula = new THREE.Mesh(geometry, material);
     this.scene.add(nebula);
+  }
+
+  private createDashedCircleGeometry(radius: number, dashSize: number, gapSize: number): THREE.BufferGeometry {
+    const points: THREE.Vector3[] = [];
+    const circumference = 2 * Math.PI * radius;
+    const segments = Math.ceil(circumference / (dashSize + gapSize));
+    
+    for (let i = 0; i < segments; i++) {
+      const startAngle = (i / segments) * Math.PI * 2;
+      const endAngle = ((i + 0.5) / segments) * Math.PI * 2;
+      
+      const start = new THREE.Vector3(
+        Math.cos(startAngle) * radius,
+        Math.sin(startAngle) * radius,
+        0
+      );
+      const end = new THREE.Vector3(
+        Math.cos(endAngle) * radius,
+        Math.sin(endAngle) * radius,
+        0
+      );
+      
+      points.push(start, end);
+    }
+    
+    return new THREE.BufferGeometry().setFromPoints(points);
   }
 
   setStars(stars: Star[]): void {
@@ -158,11 +316,9 @@ export class StarScene {
       positions[i * 3] = star.position.x;
       positions[i * 3 + 1] = star.position.y;
       positions[i * 3 + 2] = star.position.z;
-
       colors[i * 3] = star.color.r * star.brightness;
       colors[i * 3 + 1] = star.color.g * star.brightness;
       colors[i * 3 + 2] = star.color.b * star.brightness;
-
       sizes[i] = star.size;
     });
 
@@ -182,6 +338,7 @@ export class StarScene {
     });
 
     this.starPoints = new THREE.Points(this.starGeometry, this.starMaterial);
+    this.starPoints.frustumCulled = true;
     this.scene.add(this.starPoints);
   }
 
@@ -255,15 +412,17 @@ export class StarScene {
     const trailGeometry = new THREE.BufferGeometry();
     const trailColors = new Float32Array(10 * 3);
     const trailSizes = new Float32Array(10);
+    const trailAlphas = new Float32Array(10);
     const color = new THREE.Color(orbit.planetColor);
 
     for (let i = 0; i < 10; i++) {
       trailPositions.push(new THREE.Vector3());
-      const alpha = i / 10;
+      const alpha = 0.1 + (i / 10) * 0.7;
+      trailAlphas[i] = alpha;
       trailColors[i * 3] = color.r * alpha;
       trailColors[i * 3 + 1] = color.g * alpha;
       trailColors[i * 3 + 2] = color.b * alpha;
-      trailSizes[i] = orbit.planetRadius * 0.5 * (i / 10);
+      trailSizes[i] = orbit.planetRadius * 0.3 * (0.3 + (i / 10) * 0.7);
     }
 
     trailGeometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(30), 3));
@@ -274,7 +433,7 @@ export class StarScene {
       size: 0.5,
       vertexColors: true,
       transparent: true,
-      opacity: 0.8,
+      opacity: 1,
       sizeAttenuation: true,
       blending: THREE.AdditiveBlending,
       depthWrite: false,
@@ -288,6 +447,7 @@ export class StarScene {
       line: orbitLine,
       trail,
       trailPositions,
+      trailAlphas,
       angle: Math.random() * Math.PI * 2,
       centerStar: centerPos.clone(),
     });
@@ -318,15 +478,16 @@ export class StarScene {
     }
 
     this.selectedStarId = starId;
+    this.selectedPulseTime = 0;
 
     if (starId) {
       const pos = this.getStarPosition(starId);
       if (pos) {
-        const geometry = new THREE.SphereGeometry(3, 32, 32);
+        const geometry = new THREE.SphereGeometry(5, 32, 32);
         const material = new THREE.MeshBasicMaterial({
           color: 0xFFD54F,
           transparent: true,
-          opacity: 0.3,
+          opacity: 0.4,
         });
         this.selectedStarMesh = new THREE.Mesh(geometry, material);
         this.selectedStarMesh.position.copy(pos);
@@ -348,14 +509,13 @@ export class StarScene {
     if (starId && starId !== this.connectionStartId) {
       const pos = this.getStarPosition(starId);
       if (pos) {
-        const geometry = new THREE.RingGeometry(12, 15, 48);
-        const material = new THREE.MeshBasicMaterial({
+        const geometry = this.createDashedCircleGeometry(15, 4, 4);
+        const material = new THREE.LineBasicMaterial({
           color: 0x4FC3F7,
           transparent: true,
           opacity: 0.6,
-          side: THREE.DoubleSide,
         });
-        this.hoverIndicator = new THREE.Mesh(geometry, material);
+        this.hoverIndicator = new THREE.LineSegments(geometry, material);
         this.hoverIndicator.position.copy(pos);
         this.hoverIndicator.lookAt(this.camera.position);
         this.scene.add(this.hoverIndicator);
@@ -459,8 +619,8 @@ export class StarScene {
     this.controls.enabled = false;
   }
 
-  private easeInOutCubic(t: number): number {
-    return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+  private easeInOut(t: number): number {
+    return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
   }
 
   onStarClick(callback: (starId: string) => void): void {
@@ -565,6 +725,7 @@ export class StarScene {
 
   private handleRightClick = (event: MouseEvent): void => {
     event.preventDefault();
+    event.stopPropagation();
     
     if (this.connectionStartId) {
       this.cancelConnection();
@@ -583,12 +744,23 @@ export class StarScene {
     this.animate();
   }
 
+  private updateFrustum(): void {
+    this.camera.updateMatrixWorld();
+    this.projScreenMatrix.multiplyMatrices(
+      this.camera.projectionMatrix,
+      this.camera.matrixWorldInverse
+    );
+    this.frustum.setFromProjectionMatrix(this.projScreenMatrix);
+  }
+
   private animate = (): void => {
     this.animationFrameId = requestAnimationFrame(this.animate);
 
     const now = performance.now();
-    const delta = Math.min((now - (this.pulseTime || now)) / 1000, 0.1);
-    this.pulseTime = now;
+    const delta = Math.min((now - this.lastTime) / 1000, 0.1);
+    this.lastTime = now;
+
+    this.updateFrustum();
 
     if (this.isTransitioning) {
       const elapsed = now - this.transitionStart;
@@ -600,7 +772,7 @@ export class StarScene {
         this.isTransitioning = false;
         this.controls.enabled = true;
       } else {
-        const t = this.easeInOutCubic(elapsed / this.transitionDuration);
+        const t = this.easeInOut(elapsed / this.transitionDuration);
         this.camera.position.lerpVectors(this.transitionStartPos, this.transitionEndPos, t);
         this.controls.target.lerpVectors(this.transitionStartTarget, this.transitionEndTarget, t);
         this.camera.fov = this.transitionStartFov + (this.transitionEndFov - this.transitionStartFov) * t;
@@ -609,10 +781,12 @@ export class StarScene {
     }
 
     if (this.selectedStarMesh) {
-      const pulseScale = 1 + Math.sin(now * 0.005) * 0.3;
-      this.selectedStarMesh.scale.setScalar(pulseScale);
+      this.selectedPulseTime += delta * 1000;
+      const pulsePhase = (this.selectedPulseTime % this.selectedPulsePeriod) / this.selectedPulsePeriod;
+      const pulseRadius = 5 + (12 - 5) * (0.5 - 0.5 * Math.cos(pulsePhase * Math.PI * 2));
+      this.selectedStarMesh.scale.setScalar(pulseRadius / 5);
       const material = this.selectedStarMesh.material as THREE.MeshBasicMaterial;
-      material.opacity = 0.2 + Math.sin(now * 0.005) * 0.15;
+      material.opacity = 0.2 + 0.3 * (0.5 - 0.5 * Math.cos(pulsePhase * Math.PI * 2));
     }
 
     this.planets.forEach((planetData) => {
@@ -626,16 +800,28 @@ export class StarScene {
 
       planetData.mesh.position.set(x, y, z);
 
-      planetData.trailPositions.pop();
-      planetData.trailPositions.unshift(new THREE.Vector3(x, y, z));
+      for (let i = 9; i > 0; i--) {
+        planetData.trailPositions[i].copy(planetData.trailPositions[i - 1]);
+      }
+      planetData.trailPositions[0].set(x, y, z);
 
       const positions = planetData.trail.geometry.attributes.position.array as Float32Array;
-      planetData.trailPositions.forEach((pos, i) => {
-        positions[i * 3] = pos.x;
-        positions[i * 3 + 1] = pos.y;
-        positions[i * 3 + 2] = pos.z;
-      });
+      const colors = planetData.trail.geometry.attributes.color.array as Float32Array;
+      const color = new THREE.Color(planetData.orbit.planetColor);
+      
+      for (let i = 0; i < 10; i++) {
+        positions[i * 3] = planetData.trailPositions[i].x;
+        positions[i * 3 + 1] = planetData.trailPositions[i].y;
+        positions[i * 3 + 2] = planetData.trailPositions[i].z;
+        
+        const alpha = 0.1 + (i / 10) * 0.7;
+        colors[i * 3] = color.r * alpha;
+        colors[i * 3 + 1] = color.g * alpha;
+        colors[i * 3 + 2] = color.b * alpha;
+      }
+      
       planetData.trail.geometry.attributes.position.needsUpdate = true;
+      planetData.trail.geometry.attributes.color.needsUpdate = true;
     });
 
     this.controls.update();
