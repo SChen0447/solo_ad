@@ -31,6 +31,21 @@ interface GrowthAnimation {
   startY: number;
 }
 
+interface OutlineMesh {
+  outline: THREE.LineSegments;
+  glow: THREE.Mesh;
+}
+
+interface OutlineConfig {
+  outlineColor: number;
+  glowColor: number;
+  outlineOpacity: number;
+  glowOpacity: number;
+  lineWidth: number;
+  scale: number;
+  glowScale: number;
+}
+
 export class SceneManager {
   scene: THREE.Scene;
   camera: THREE.PerspectiveCamera;
@@ -48,6 +63,7 @@ export class SceneManager {
   hoverGlow: THREE.Mesh | null = null;
   selectedOutline: THREE.LineSegments | null = null;
   selectedGlow: THREE.Mesh | null = null;
+  pulseTime: number = 0;
   onBuildingHover?: (info: BuildingInfo | null) => void;
   onBuildingSelect?: (info: BuildingInfo | null) => void;
   onBuildingCountChange?: (count: number, density: number) => void;
