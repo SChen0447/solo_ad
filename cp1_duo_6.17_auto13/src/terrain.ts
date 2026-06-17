@@ -9,202 +9,28 @@ export interface TectonicParams {
 const GRID_SIZE = 100;
 const TERRAIN_SIZE = 50;
 const TRANSITION_DURATION = 1.5;
+const VERTEX_COUNT = (GRID_SIZE + 1) * (GRID_SIZE + 1);
 
-const terrainVertexShader = /* glsl */ `
-  uniform float uCompression;
-  uniform float uStretch;
-  uniform float uShearAngle;
-  uniform float uTerrainSize;
+const COLOR_DEEP_VALLEY = new THREE.Color('#1B5E20');
+const COLOR_PLAIN = new THREE.Color('#66BB6A');
+const COLOR_HILL = new THREE.Color('#8D6E63');
+const COLOR_MOUNTAIN = new THREE.Color('#8D6E63');
+const COLOR_SNOW = new THREE.Color('#ECEFF1');
 
-  varying float vHeight;
-  varying vec3 vWorldPosition;
+interface HeightLevel {
+  threshold: number;
+  low: THREE.Color;
+  high: THREE.Color;
+}
 
-  void main() {
-    vec3 pos = position;
-    float z = pos.z;
-    float halfSize = uTerrainSize * 0.5;
-    float normalizedZ = abs(z) / halfSize;
+const HEIGHT_LEVELS: HeightLevel[] = [
+  { threshold: -1, low: COLOR_DEEP_VALLEY, high: COLOR_PLAIN },
+  { threshold: 1, low: COLOR_PLAIN, high: COLOR_HILL },
+  { threshold: 3, low: COLOR_MOUNTAIN, high: COLOR_SNOW }
+];
 
-    float height = 0.0;
-
-    if (uCompression > 0.0) {
-      float peakHeight = uCompression * 0.5;
-      float mountain = peakHeight * exp(-normalizedZ * normalizedZ * 4.0);
-      float valley = -uCompression * 0.15 * (1.0 - exp(-normalizedZ * normalizedZ * 0.5));
-      height += mountain + valley;
-    }
-
-    if (uStretch > 0.0) {
-      float grabenDepth = -uStretch * 0.6 * exp(-normalizedZ * normalizedZ * 8.0);
-      float shoulder = uStretch * 0.2 * exp(-pow(normalizedZ - 0.5, 2.0) * 12.0);
-      height += grabenDepth + shoulder;
-    }
-
-    pos.y = height;
-
-    if (uShearAngle > 0.0) {
-      float shearRad = radians(uShearAngle);
-      float shearAmount = sin(shearRad) * 2.0;
-      float sideFactor = z >= 0.0 ? 1.0 : -1.0;
-      pos.x += sideFactor * shearAmount * (1.0 - exp(-abs(z) * 0.1));
-    }
-
-    vHeight = height;
-    vec4 worldPosition = modelMatrix * vec4(pos, 1.0);
-    vWorldPosition = worldPosition.xyz;
-
-    gl_Position = projectionMatrix * viewMatrix * worldPosition;
-  }
-`;
-
-const terrainFragmentShader = /* glsl */ `
-  uniform float uBlendWidth;
-
-  varying float vHeight;
-  varying vec3 vWorldPosition;
-
-  vec3 valley = vec3(0.106, 0.369, 0.125);
-  vec3 plain = vec3(0.4, 0.733, 0.416);
-  vec3 hill = vec3(0.553, 0.431, 0.388);
-  vec3 snow = vec3(0.925, 0.937, 0.945);
-
-  vec3 getTerrainColor(float height) {
-    float halfBlend = uBlendWidth * 0.5;
-    vec3 color;
-
-    if (height < -1.0 - halfBlend) {
-      color = valley;
-    } else if (height < -1.0 + halfBlend) {
-      float t = (height + 1.0 + halfBlend) / uBlendWidth;
-      color = mix(valley, plain, t);
-    } else if (height < 1.0 - halfBlend) {
-      color = plain;
-    } else if (height < 1.0 + halfBlend) {
-      float t = (height - 1.0 + halfBlend) / uBlendWidth;
-      color = mix(plain, hill, t);
-    } else if (height < 3.0 - halfBlend) {
-      color = hill;
-    } else if (height < 3.0 + halfBlend) {
-      float t = (height - 3.0 + halfBlend) / uBlendWidth;
-      color = mix(hill, snow, t);
-    } else {
-      color = snow;
-    }
-
-    return color;
-  }
-
-  void main() {
-    vec3 color = getTerrainColor(vHeight);
-
-    vec3 lightDir = normalize(vec3(0.5, 0.8, 0.5));
-    vec3 dx = dFdx(vWorldPosition);
-    vec3 dy = dFdy(vWorldPosition);
-    vec3 normal = normalize(cross(dy, dx));
-    float diffuse = max(dot(normal, lightDir), 0.0);
-    float ambient = 0.55;
-    vec3 finalColor = color * (ambient + diffuse * 0.45);
-
-    gl_FragColor = vec4(finalColor, 1.0);
-  }
-`;
-
-const wireframeVertexShader = /* glsl */ `
-  uniform float uCompression;
-  uniform float uStretch;
-  uniform float uShearAngle;
-  uniform float uTerrainSize;
-
-  void main() {
-    vec3 pos = position;
-    float z = pos.z;
-    float halfSize = uTerrainSize * 0.5;
-    float normalizedZ = abs(z) / halfSize;
-
-    float height = 0.0;
-
-    if (uCompression > 0.0) {
-      float peakHeight = uCompression * 0.5;
-      float mountain = peakHeight * exp(-normalizedZ * normalizedZ * 4.0);
-      float valley = -uCompression * 0.15 * (1.0 - exp(-normalizedZ * normalizedZ * 0.5));
-      height += mountain + valley;
-    }
-
-    if (uStretch > 0.0) {
-      float grabenDepth = -uStretch * 0.6 * exp(-normalizedZ * normalizedZ * 8.0);
-      float shoulder = uStretch * 0.2 * exp(-pow(normalizedZ - 0.5, 2.0) * 12.0);
-      height += grabenDepth + shoulder;
-    }
-
-    pos.y = height;
-
-    if (uShearAngle > 0.0) {
-      float shearRad = radians(uShearAngle);
-      float shearAmount = sin(shearRad) * 2.0;
-      float sideFactor = z >= 0.0 ? 1.0 : -1.0;
-      pos.x += sideFactor * shearAmount * (1.0 - exp(-abs(z) * 0.1));
-    }
-
-    gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
-  }
-`;
-
-const wireframeFragmentShader = /* glsl */ `
-  void main() {
-    gl_FragColor = vec4(0.53, 0.53, 0.53, 0.35);
-  }
-`;
-
-const lineVertexShader = /* glsl */ `
-  uniform float uCompression;
-  uniform float uStretch;
-  uniform float uShearAngle;
-  uniform float uTerrainSize;
-
-  attribute float lineType;
-
-  void main() {
-    vec3 pos = position;
-    float z = pos.z;
-    float halfSize = uTerrainSize * 0.5;
-    float normalizedZ = abs(z) / halfSize;
-
-    float height = 0.0;
-
-    if (uCompression > 0.0) {
-      float peakHeight = uCompression * 0.5;
-      float mountain = peakHeight * exp(-normalizedZ * normalizedZ * 4.0);
-      float valley = -uCompression * 0.15 * (1.0 - exp(-normalizedZ * normalizedZ * 0.5));
-      height += mountain + valley;
-    }
-
-    if (uStretch > 0.0) {
-      float grabenDepth = -uStretch * 0.6 * exp(-normalizedZ * normalizedZ * 8.0);
-      float shoulder = uStretch * 0.2 * exp(-pow(normalizedZ - 0.5, 2.0) * 12.0);
-      height += grabenDepth + shoulder;
-    }
-
-    if (lineType == 1.0) {
-      height = uCompression * 0.5 * 0.98;
-    } else if (lineType == 2.0) {
-      float grabenDepth = -uStretch * 0.6;
-      height = grabenDepth * 0.5 + 0.1;
-    } else {
-      height += 0.02;
-    }
-
-    pos.y = height;
-
-    if (uShearAngle > 0.0) {
-      float shearRad = radians(uShearAngle);
-      float shearAmount = sin(shearRad) * 2.0;
-      float sideFactor = z >= 0.0 ? 1.0 : -1.0;
-      pos.x += sideFactor * shearAmount * (1.0 - exp(-abs(z) * 0.1));
-    }
-
-    gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
-  }
-`;
+const BLEND_WIDTH = 0.5;
+const HALF_BLEND = BLEND_WIDTH / 2;
 
 export class TerrainManager {
   public mesh: THREE.Mesh;
@@ -214,57 +40,73 @@ export class TerrainManager {
   public shearPlane: THREE.Mesh;
 
   private geometry: THREE.PlaneGeometry;
-  private terrainMaterial: THREE.ShaderMaterial;
-  private wireframeMaterial: THREE.ShaderMaterial;
-  private ridgeMaterial: THREE.LineBasicMaterial;
-  private faultMaterial: THREE.LineDashedMaterial;
+
+  private basePositions: Float32Array;
+  private targetPositions: Float32Array;
+  private startPositions: Float32Array;
+  private currentPositions: Float32Array;
+  private targetColors: Float32Array;
+  private startColors: Float32Array;
+  private currentColors: Float32Array;
+  private targetHeight: Float32Array;
+  private baseHeight: Float32Array;
+
+  private needRecomputeTarget: boolean = true;
 
   private currentParams: TectonicParams = { compression: 0, stretch: 0, shearAngle: 0 };
   private targetParams: TectonicParams = { compression: 0, stretch: 0, shearAngle: 0 };
   private transitionProgress: number = 1;
   private transitionStartParams: TectonicParams = { compression: 0, stretch: 0, shearAngle: 0 };
 
+  private tmpColor: THREE.Color = new THREE.Color();
+  private tmpColorA: THREE.Color = new THREE.Color();
+  private tmpColorB: THREE.Color = new THREE.Color();
+
   constructor() {
     this.geometry = new THREE.PlaneGeometry(TERRAIN_SIZE, TERRAIN_SIZE, GRID_SIZE, GRID_SIZE);
     this.geometry.rotateX(-Math.PI / 2);
 
-    this.terrainMaterial = new THREE.ShaderMaterial({
-      vertexShader: terrainVertexShader,
-      fragmentShader: terrainFragmentShader,
-      uniforms: {
-        uCompression: { value: 0 },
-        uStretch: { value: 0 },
-        uShearAngle: { value: 0 },
-        uTerrainSize: { value: TERRAIN_SIZE },
-        uBlendWidth: { value: 0.5 }
-      },
-      side: THREE.DoubleSide
-    });
+    const posAttr = this.geometry.getAttribute('position') as THREE.BufferAttribute;
+    posAttr.setUsage(THREE.DynamicDrawUsage);
+    this.currentPositions = posAttr.array as Float32Array;
 
-    this.wireframeMaterial = new THREE.ShaderMaterial({
-      vertexShader: wireframeVertexShader,
-      fragmentShader: wireframeFragmentShader,
-      uniforms: {
-        uCompression: { value: 0 },
-        uStretch: { value: 0 },
-        uShearAngle: { value: 0 },
-        uTerrainSize: { value: TERRAIN_SIZE }
-      },
-      transparent: true
-    });
+    this.basePositions = new Float32Array(this.currentPositions);
+    this.targetPositions = new Float32Array(VERTEX_COUNT * 3);
+    this.startPositions = new Float32Array(VERTEX_COUNT * 3);
 
-    this.mesh = new THREE.Mesh(this.geometry, this.terrainMaterial);
+    const colorAttr = new THREE.BufferAttribute(new Float32Array(VERTEX_COUNT * 3), 3);
+    colorAttr.setUsage(THREE.DynamicDrawUsage);
+    this.geometry.setAttribute('color', colorAttr);
+    this.currentColors = colorAttr.array as Float32Array;
+    this.targetColors = new Float32Array(VERTEX_COUNT * 3);
+    this.startColors = new Float32Array(VERTEX_COUNT * 3);
+
+    this.targetHeight = new Float32Array(VERTEX_COUNT);
+    this.baseHeight = new Float32Array(VERTEX_COUNT);
+
+    this.mesh = new THREE.Mesh(
+      this.geometry,
+      new THREE.MeshStandardMaterial({
+        vertexColors: true,
+        flatShading: false,
+        metalness: 0.05,
+        roughness: 0.85,
+        side: THREE.DoubleSide
+      })
+    );
 
     const wireGeo = new THREE.WireframeGeometry(this.geometry);
-    this.wireframe = new THREE.LineSegments(wireGeo, this.wireframeMaterial);
+    (wireGeo.getAttribute('position') as THREE.BufferAttribute).setUsage(THREE.DynamicDrawUsage);
+    this.wireframe = new THREE.LineSegments(
+      wireGeo,
+      new THREE.LineBasicMaterial({ color: 0x888888, transparent: true, opacity: 0.35 })
+    );
 
     this.ridgeLine = this.createRidgeLine();
     this.faultLines = this.createFaultLines();
     this.shearPlane = this.createShearPlane();
 
-    this.ridgeMaterial = this.ridgeLine.material as THREE.LineBasicMaterial;
-    this.faultMaterial = this.faultLines.material as THREE.LineDashedMaterial;
-
+    this.computeBaseAndApply();
     this.updateDecorations();
   }
 
@@ -276,6 +118,7 @@ export class TerrainManager {
       points.push(new THREE.Vector3(x, 0, 0));
     }
     const geo = new THREE.BufferGeometry().setFromPoints(points);
+    (geo.getAttribute('position') as THREE.BufferAttribute).setUsage(THREE.DynamicDrawUsage);
     const mat = new THREE.LineBasicMaterial({
       color: 0xE53935,
       transparent: true,
@@ -296,6 +139,7 @@ export class TerrainManager {
       points.push(new THREE.Vector3(x, 0, TERRAIN_SIZE * 0.2));
     }
     const geo = new THREE.BufferGeometry().setFromPoints(points);
+    (geo.getAttribute('position') as THREE.BufferAttribute).setUsage(THREE.DynamicDrawUsage);
     const mat = new THREE.LineDashedMaterial({
       color: 0xFDD835,
       transparent: true,
@@ -314,7 +158,8 @@ export class TerrainManager {
       color: 0x1E88E5,
       transparent: true,
       opacity: 0.3,
-      side: THREE.DoubleSide
+      side: THREE.DoubleSide,
+      depthWrite: false
     });
     const plane = new THREE.Mesh(geo, mat);
     plane.rotation.x = -Math.PI / 2;
@@ -331,10 +176,172 @@ export class TerrainManager {
       this.transitionStartParams = { ...this.currentParams };
       this.targetParams = newTarget;
       this.transitionProgress = 0;
+      this.needRecomputeTarget = true;
+
+      this.startPositions.set(this.currentPositions);
+      this.startColors.set(this.currentColors);
+    }
+  }
+
+  private computeBase(): void {
+    const { compression, stretch, shearAngle } = this.targetParams;
+    const shearRad = (shearAngle * Math.PI) / 180;
+    const shearAmount = Math.sin(shearRad) * 2;
+    const halfSize = TERRAIN_SIZE / 2;
+
+    for (let vi = 0; vi < VERTEX_COUNT; vi++) {
+      const bi = vi * 3;
+      const baseZ = this.basePositions[bi + 2];
+      const normalizedZ = Math.abs(baseZ) / halfSize;
+
+      let height = 0;
+
+      if (compression > 0) {
+        const peakHeight = compression * 0.5;
+        const mountain = peakHeight * Math.exp(-normalizedZ * normalizedZ * 4);
+        const valley = -compression * 0.15 * (1 - Math.exp(-normalizedZ * normalizedZ * 0.5));
+        height += mountain + valley;
+      }
+
+      if (stretch > 0) {
+        const grabenDepth = -stretch * 0.6 * Math.exp(-normalizedZ * normalizedZ * 8);
+        const shoulder = stretch * 0.2 * Math.exp(-Math.pow(normalizedZ - 0.5, 2) * 12);
+        height += grabenDepth + shoulder;
+      }
+
+      this.baseHeight[vi] = height;
+    }
+
+    const shearSmoothing = 0.08;
+
+    for (let vi = 0; vi < VERTEX_COUNT; vi++) {
+      const bi = vi * 3;
+      const baseX = this.basePositions[bi];
+      const baseZ = this.basePositions[bi + 2];
+      const height = this.baseHeight[vi];
+
+      let shearOffsetX = 0;
+      if (shearAngle > 0) {
+        const smoothFactor = 1 - Math.exp(-Math.abs(baseZ) * shearSmoothing);
+        const sideFactor = baseZ >= 0 ? 1 : -1;
+        shearOffsetX = sideFactor * shearAmount * smoothFactor;
+      }
+
+      this.targetPositions[bi] = baseX + shearOffsetX;
+      this.targetPositions[bi + 1] = height;
+      this.targetPositions[bi + 2] = baseZ;
+      this.targetHeight[vi] = height;
+
+      this.getColorForHeight(height, this.tmpColor);
+      this.targetColors[bi] = this.tmpColor.r;
+      this.targetColors[bi + 1] = this.tmpColor.g;
+      this.targetColors[bi + 2] = this.tmpColor.b;
+    }
+
+    this.repairShearBoundary();
+  }
+
+  private repairShearBoundary(): void {
+    const { shearAngle } = this.targetParams;
+    if (shearAngle <= 0) return;
+
+    const halfSize = TERRAIN_SIZE / 2;
+    const rows = GRID_SIZE + 1;
+    const shearTolerance = (TERRAIN_SIZE / GRID_SIZE) * 0.6;
+
+    for (let row = 0; row < rows; row++) {
+      const z = -halfSize + (row * TERRAIN_SIZE) / GRID_SIZE;
+      if (Math.abs(z) <= shearTolerance) {
+        for (let col = 0; col <= GRID_SIZE; col++) {
+          const idxNeg = (row * rows + col) * 3;
+          const idxPos = ((row + 1) * rows + col) * 3;
+
+          const hNeg = this.targetHeight[row * rows + col];
+          const hPos = this.targetHeight[(row + 1) * rows + col];
+          const avgH = (hNeg + hPos) * 0.5;
+
+          this.targetPositions[idxNeg + 1] = avgH;
+          this.targetPositions[idxPos + 1] = avgH;
+
+          this.getColorForHeight(avgH, this.tmpColor);
+          this.targetColors[idxNeg] = this.tmpColor.r;
+          this.targetColors[idxNeg + 1] = this.tmpColor.g;
+          this.targetColors[idxNeg + 2] = this.tmpColor.b;
+          this.targetColors[idxPos] = this.tmpColor.r;
+          this.targetColors[idxPos + 1] = this.tmpColor.g;
+          this.targetColors[idxPos + 2] = this.tmpColor.b;
+        }
+      }
+    }
+  }
+
+  private computeBaseAndApply(): void {
+    this.computeBase();
+    this.currentPositions.set(this.targetPositions);
+    this.currentColors.set(this.targetColors);
+
+    const posAttr = this.geometry.getAttribute('position') as THREE.BufferAttribute;
+    posAttr.needsUpdate = true;
+    const colorAttr = this.geometry.getAttribute('color') as THREE.BufferAttribute;
+    colorAttr.needsUpdate = true;
+    this.geometry.computeVertexNormals();
+
+    this.syncWireframe();
+  }
+
+  private getColorForHeight(height: number, out: THREE.Color): void {
+    let levelIndex = 0;
+    for (let i = 0; i < HEIGHT_LEVELS.length; i++) {
+      if (height <= HEIGHT_LEVELS[i].threshold) {
+        levelIndex = i;
+        break;
+      }
+      levelIndex = i + 1;
+    }
+
+    if (levelIndex === 0) {
+      if (height < HEIGHT_LEVELS[0].threshold - HALF_BLEND) {
+        out.copy(HEIGHT_LEVELS[0].low);
+      } else {
+        const t = (height - (HEIGHT_LEVELS[0].threshold - HALF_BLEND)) / BLEND_WIDTH;
+        this.tmpColorA.copy(HEIGHT_LEVELS[0].low);
+        this.tmpColorB.copy(HEIGHT_LEVELS[0].high);
+        out.copy(this.tmpColorA).lerp(this.tmpColorB, Math.max(0, Math.min(1, t)));
+      }
+    } else if (levelIndex === HEIGHT_LEVELS.length) {
+      const last = HEIGHT_LEVELS[HEIGHT_LEVELS.length - 1];
+      if (height > last.threshold + HALF_BLEND) {
+        out.copy(last.high);
+      } else {
+        const t = (height - (last.threshold - HALF_BLEND)) / BLEND_WIDTH;
+        this.tmpColorA.copy(last.low);
+        this.tmpColorB.copy(last.high);
+        out.copy(this.tmpColorA).lerp(this.tmpColorB, Math.max(0, Math.min(1, t)));
+      }
+    } else {
+      const below = HEIGHT_LEVELS[levelIndex - 1];
+      const above = HEIGHT_LEVELS[levelIndex];
+      const mid = (below.threshold + above.threshold) / 2;
+      if (height <= mid) {
+        const t = (height - (below.threshold - HALF_BLEND)) / BLEND_WIDTH;
+        this.tmpColorA.copy(below.low);
+        this.tmpColorB.copy(below.high);
+        out.copy(this.tmpColorA).lerp(this.tmpColorB, Math.max(0, Math.min(1, t)));
+      } else {
+        const t = (height - (above.threshold - HALF_BLEND)) / BLEND_WIDTH;
+        this.tmpColorA.copy(above.low);
+        this.tmpColorB.copy(above.high);
+        out.copy(this.tmpColorA).lerp(this.tmpColorB, Math.max(0, Math.min(1, t)));
+      }
     }
   }
 
   public update(deltaTime: number): void {
+    if (this.needRecomputeTarget) {
+      this.computeBase();
+      this.needRecomputeTarget = false;
+    }
+
     if (this.transitionProgress < 1) {
       this.transitionProgress = Math.min(1, this.transitionProgress + deltaTime / TRANSITION_DURATION);
       const t = this.easeInOut(this.transitionProgress);
@@ -355,40 +362,59 @@ export class TerrainManager {
         t
       );
 
-      this.updateShaderUniforms();
+      this.interpolateBuffers(t);
       this.updateDecorations();
     }
   }
 
-  private updateShaderUniforms(): void {
-    const { compression, stretch, shearAngle } = this.currentParams;
+  private interpolateBuffers(t: number): void {
+    const total = VERTEX_COUNT * 3;
+    const cp = this.currentPositions;
+    const sp = this.startPositions;
+    const tp = this.targetPositions;
+    const cc = this.currentColors;
+    const sc = this.startColors;
+    const tc = this.targetColors;
 
-    this.terrainMaterial.uniforms.uCompression.value = compression;
-    this.terrainMaterial.uniforms.uStretch.value = stretch;
-    this.terrainMaterial.uniforms.uShearAngle.value = shearAngle;
+    for (let i = 0; i < total; i++) {
+      cp[i] = sp[i] + (tp[i] - sp[i]) * t;
+      cc[i] = sc[i] + (tc[i] - sc[i]) * t;
+    }
 
-    this.wireframeMaterial.uniforms.uCompression.value = compression;
-    this.wireframeMaterial.uniforms.uStretch.value = stretch;
-    this.wireframeMaterial.uniforms.uShearAngle.value = shearAngle;
+    const posAttr = this.geometry.getAttribute('position') as THREE.BufferAttribute;
+    posAttr.needsUpdate = true;
+    const colorAttr = this.geometry.getAttribute('color') as THREE.BufferAttribute;
+    colorAttr.needsUpdate = true;
+    this.geometry.computeVertexNormals();
+
+    this.syncWireframe();
+  }
+
+  private syncWireframe(): void {
+    const wireAttr = this.wireframe.geometry.getAttribute('position') as THREE.BufferAttribute;
+    const wireArr = wireAttr.array as Float32Array;
+    wireArr.set(this.currentPositions);
+    wireAttr.needsUpdate = true;
   }
 
   private updateDecorations(): void {
     const { compression, stretch, shearAngle } = this.currentParams;
     const shearRad = (shearAngle * Math.PI) / 180;
     const shearAmount = Math.sin(shearRad) * 2;
+    const halfSize = TERRAIN_SIZE / 2;
 
     if (compression > 0.01) {
       this.ridgeLine.visible = true;
-      this.ridgeMaterial.opacity = Math.min(0.75, compression * 0.08 + 0.1);
-      this.updateRidgeLine(compression, shearAngle, shearAmount);
+      (this.ridgeLine.material as THREE.LineBasicMaterial).opacity = Math.min(0.75, compression * 0.08 + 0.1);
+      this.updateRidgeLine(compression, shearAngle, shearAmount, halfSize);
     } else {
       this.ridgeLine.visible = false;
     }
 
     if (stretch > 0.01) {
       this.faultLines.visible = true;
-      this.faultMaterial.opacity = Math.min(0.85, stretch * 0.15 + 0.1);
-      this.updateFaultLines(compression, stretch, shearAngle, shearAmount);
+      (this.faultLines.material as THREE.LineDashedMaterial).opacity = Math.min(0.85, stretch * 0.15 + 0.1);
+      this.updateFaultLines(compression, stretch, shearAngle, shearAmount, halfSize);
     } else {
       this.faultLines.visible = false;
     }
@@ -404,33 +430,35 @@ export class TerrainManager {
     }
   }
 
-  private updateRidgeLine(compression: number, shearAngle: number, shearAmount: number): void {
+  private updateRidgeLine(compression: number, shearAngle: number, shearAmount: number, halfSize: number): void {
     const posAttr = this.ridgeLine.geometry.getAttribute('position') as THREE.BufferAttribute;
     const positions = posAttr.array as Float32Array;
     const peakHeight = compression * 0.5 * 0.98;
+    const shearSmoothing = 0.08;
 
     for (let i = 0; i < positions.length; i += 3) {
       positions[i + 1] = peakHeight;
+      const z = positions[i + 2];
+      const baseX = -halfSize + (halfSize * 2 * (i / 3)) / 200;
       if (shearAngle > 0) {
-        const z = positions[i + 2];
+        const smoothFactor = 1 - Math.exp(-Math.abs(z) * shearSmoothing);
         const sideFactor = z >= 0 ? 1 : -1;
-        const baseX = -TERRAIN_SIZE / 2 + (TERRAIN_SIZE * (i / 3)) / 200;
-        positions[i] = baseX + sideFactor * shearAmount * (1 - Math.exp(-Math.abs(z) * 0.1));
+        positions[i] = baseX + sideFactor * shearAmount * smoothFactor;
+      } else {
+        positions[i] = baseX;
       }
     }
 
     posAttr.needsUpdate = true;
   }
 
-  private updateFaultLines(compression: number, stretch: number, shearAngle: number, shearAmount: number): void {
+  private updateFaultLines(compression: number, stretch: number, shearAngle: number, shearAmount: number, halfSize: number): void {
     const posAttr = this.faultLines.geometry.getAttribute('position') as THREE.BufferAttribute;
     const positions = posAttr.array as Float32Array;
-    const grabenDepth = -stretch * 0.6;
-    const faultY = grabenDepth * 0.5 + 0.1;
+    const shearSmoothing = 0.08;
 
     for (let i = 0; i < positions.length; i += 3) {
       const z = positions[i + 2];
-      const halfSize = TERRAIN_SIZE / 2;
       const normalizedZ = Math.abs(z) / halfSize;
 
       let height = 0;
@@ -448,10 +476,14 @@ export class TerrainManager {
 
       positions[i + 1] = height + 0.05;
 
+      const segIdx = Math.floor((i / 3) % 201);
+      const baseX = -halfSize + (halfSize * 2 * segIdx) / 200;
       if (shearAngle > 0) {
+        const smoothFactor = 1 - Math.exp(-Math.abs(z) * shearSmoothing);
         const sideFactor = z >= 0 ? 1 : -1;
-        const baseX = positions[i];
-        positions[i] = baseX + sideFactor * shearAmount * (1 - Math.exp(-Math.abs(z) * 0.1));
+        positions[i] = baseX + sideFactor * shearAmount * smoothFactor;
+      } else {
+        positions[i] = baseX;
       }
     }
 
