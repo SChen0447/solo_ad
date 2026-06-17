@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { Canvas } from '@react-three/fiber'
 import ParticleSystem from '@/components/ParticleSystem'
 import CameraController from '@/components/CameraController'
@@ -15,19 +15,31 @@ export default function App() {
   const mobileMenuOpen = useStore((s) => s.mobileMenuOpen)
   const toggleMobileMenu = useStore((s) => s.toggleMobileMenu)
 
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
   useEffect(() => {
     const handleResize = () => {
-      const mobile = window.innerWidth < 768
-      setIsMobile(mobile)
-      if (mobile) {
-        setParticleCount(500)
-      } else {
-        setParticleCount(1000)
+      if (debounceRef.current) {
+        clearTimeout(debounceRef.current)
       }
+      debounceRef.current = setTimeout(() => {
+        const mobile = window.innerWidth < 768
+        setIsMobile(mobile)
+        if (mobile) {
+          setParticleCount(500)
+        } else {
+          setParticleCount(1000)
+        }
+      }, 200)
     }
     window.addEventListener('resize', handleResize)
     handleResize()
-    return () => window.removeEventListener('resize', handleResize)
+    return () => {
+      window.removeEventListener('resize', handleResize)
+      if (debounceRef.current) {
+        clearTimeout(debounceRef.current)
+      }
+    }
   }, [setIsMobile, setParticleCount])
 
   return (

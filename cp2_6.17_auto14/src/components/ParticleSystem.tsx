@@ -8,6 +8,12 @@ const MAX_BURST = 200
 const EMOTION_TRANSITION_SEC = 1.5
 const COUNT_TRANSITION_SEC = 0.5
 
+function normalizeHue(h: number): number {
+  let nh = h % 360
+  if (nh < 0) nh += 360
+  return nh
+}
+
 function hslToRgb(h: number, s: number, l: number): [number, number, number] {
   const hn = h / 360
   const sn = s / 100
@@ -28,17 +34,25 @@ function hslToRgb(h: number, s: number, l: number): [number, number, number] {
 }
 
 function lerpHue(a: number, b: number, t: number): number {
-  let diff = b - a
+  const na = normalizeHue(a)
+  const nb = normalizeHue(b)
+  let diff = nb - na
   if (diff > 180) diff -= 360
-  if (diff < -180) diff += 360
-  let result = a + diff * t
-  if (result < 0) result += 360
-  if (result >= 360) result -= 360
-  return result
+  if (diff <= -180) diff += 360
+  const result = na + diff * t
+  return normalizeHue(result)
 }
 
 function lerp(a: number, b: number, t: number): number {
   return a + (b - a) * t
+}
+
+function lerpPos(
+  a: [number, number, number],
+  b: [number, number, number],
+  t: number
+): [number, number, number] {
+  return [lerp(a[0], b[0], t), lerp(a[1], b[1], t), lerp(a[2], b[2], t)]
 }
 
 function easeOutCubic(t: number): number {
@@ -165,6 +179,8 @@ function computeParticlePosition(
   }
 }
 
+const INITIAL_COUNT = typeof window !== 'undefined' && window.innerWidth < 768 ? 500 : 1000
+
 export default function ParticleSystem() {
   const emotionMode = useStore((s) => s.emotionMode)
   const particleCount = useStore((s) => s.particleCount)
@@ -180,7 +196,7 @@ export default function ParticleSystem() {
   const transitionStartHSL = useRef<[number, number, number]>([48, 100, 62])
   const transitionProgress = useRef(1)
 
-  const currentMotionType = useRef<EmotionConfig['motionType']>('scatter')
+  const prevMotionType = useRef<EmotionConfig['motionType']>('scatter')
   const targetMotionType = useRef<EmotionConfig['motionType']>('scatter')
   const currentSpeedMult = useRef(1.5)
   const targetSpeedMult = useRef(1.5)
@@ -193,19 +209,19 @@ export default function ParticleSystem() {
   const motionTransitionStartAmplitude = useRef(1.8)
   const motionTransitionStartFreq = useRef(1.4)
 
+  const prevMotionConfig = useRef<EmotionConfig>(EMOTION_CONFIGS.joy)
+  const targetMotionConfig = useRef<EmotionConfig>(EMOTION_CONFIGS.joy)
+
   const highlightState = useRef<HighlightState | null>(null)
   const burstData = useRef<BurstDatum[]>([])
   const burstCount = useRef(0)
 
-  const drawnCount = useRef(particleCount)
+  const drawnCount = useRef(INITIAL_COUNT)
   const countTransition = useRef(1)
-  const countFrom = useRef(particleCount)
+  const countFrom = useRef(INITIAL_COUNT)
 
   const prevParticleSize = useRef(particleSize)
   const sizeTransition = useRef(1)
-
-  const { camera } = useThree()
-  const raycaster = useRef<THREE.Raycaster | null>(null)
 
   useMemo(() => {
     const data: ParticleDatum[] = []
@@ -245,8 +261,8 @@ export default function ParticleSystem() {
     geo.setAttribute('aColor', new THREE.BufferAttribute(colors, 3))
     geo.setAttribute('aSize', new THREE.BufferAttribute(sizes, 1))
     geo.setAttribute('aAlpha', new THREE.BufferAttribute(alphas, 1))
-    geo.setDrawRange(0, particleCount)
-    drawnCount.current = particleCount
+    geo.setDrawRange(0, INITIAL_COUNT)
+    drawnCount.current = INITIAL_COUNT
     return geo
   }, [])
 
@@ -296,6 +312,14 @@ export default function ParticleSystem() {
     targetHSL.current = [...config.color] as [number, number, number]
     transitionProgress.current = 0
 
+    prevMotionConfig.current = {
+      ...EMOTION_CONFIGS[emotionMode],
+      motionType: prevMotionType.current,
+      speedMultiplier: currentSpeedMult.current,
+      amplitudeMultiplier: currentAmplitudeMult.current,
+      freqScale: currentFreqScale.current,
+    }
+    targetMotionConfig.current = { ...config }
     targetMotionType.current = config.motionType
     motionTransitionStartSpeed.current = currentSpeedMult.current
     motionTransitionStartAmplitude.current = currentAmplitudeMult.current
@@ -307,8 +331,9 @@ export default function ParticleSystem() {
   }, [emotionMode])
 
   useEffect(() => {
-    if (particleCount !== drawnCount.current) {
-      countFrom.current = drawnCount.current
+    const clampedCount = Math.max(1, Math.min(MAX_PARTICLES, particleCount))
+    if (clampedCount !== drawnCount.current) {
+      countFrom.current = Math.max(1, drawnCount.current)
       countTransition.current = 0
     }
   }, [particleCount])
@@ -327,9 +352,9 @@ export default function ParticleSystem() {
       const phi = Math.acos(2 * Math.random() - 1)
       const speed = 3 + Math.random() * 5
       burstData.current.push({
-        x,
-        y,
-        z,
+        x: Number(x),
+        y: Number(y),
+        z: Number(z),
         vx: Math.sin(phi) * Math.cos(theta) * speed,
         vy: Math.sin(phi) * Math.sin(theta) * speed,
         vz: Math.cos(phi) * speed,
@@ -344,23 +369,9 @@ export default function ParticleSystem() {
     (event: ThreeEvent<PointerEvent>) => {
       event.stopPropagation()
       if (highlightState.current && highlightState.current.phase !== 'done') return
-
-      if (!raycaster.current) {
-        raycaster.current = new THREE.Raycaster()
-        raycaster.current.params.Points = { threshold: 0.5 }
-      }
-
-      const rc = raycaster.current
-      const ndcX = (event.point.x / window.innerWidth) * 2 - 1
-      const ndcY = -(event.point.y / window.innerHeight) * 2 + 1
-      rc.setFromCamera(new THREE.Vector2(ndcX, ndcY), camera)
-
       if (!pointsRef.current) return
-      const intersects = rc.intersectObject(pointsRef.current)
-      if (intersects.length === 0) return
 
-      const hit = intersects[0]
-      const pointIndex = hit.index
+      const pointIndex = event.index
       if (pointIndex === undefined || pointIndex < 0 || pointIndex >= drawnCount.current) return
 
       const dir = new THREE.Vector3(
@@ -383,13 +394,12 @@ export default function ParticleSystem() {
         originZ: positions[i3 + 2],
       }
     },
-    [camera]
+    []
   )
 
   useFrame(() => {
     const now = performance.now()
     const timeSec = now / 1000
-    const config = EMOTION_CONFIGS[emotionMode]
 
     const delta = 1 / 60
 
@@ -416,14 +426,14 @@ export default function ParticleSystem() {
       currentAmplitudeMult.current = lerp(motionTransitionStartAmplitude.current, targetAmplitudeMult.current, t)
       currentFreqScale.current = lerp(motionTransitionStartFreq.current, targetFreqScale.current, t)
       if (t >= 1) {
-        currentMotionType.current = targetMotionType.current
+        prevMotionType.current = targetMotionType.current
       }
     }
 
     if (countTransition.current < 1) {
       countTransition.current = Math.min(1, countTransition.current + delta / COUNT_TRANSITION_SEC)
       const t = easeOutCubic(countTransition.current)
-      const current = Math.round(lerp(countFrom.current, particleCount, t))
+      const current = Math.max(1, Math.round(lerp(countFrom.current, particleCount, t)))
       drawnCount.current = current
       geometry.setDrawRange(0, current)
     }
@@ -436,12 +446,20 @@ export default function ParticleSystem() {
     const amplitude = currentAmplitudeMult.current
     const [r, g, b] = hslToRgb(...currentHSL.current)
 
-    const effectiveConfig: EmotionConfig = {
-      ...config,
-      motionType: motionTransitionProgress.current >= 1 ? targetMotionType.current : currentMotionType.current,
-      freqScale: currentFreqScale.current,
+    const motionT = motionTransitionProgress.current
+    const blending = motionT < 1
+
+    const prevConfig: EmotionConfig = {
+      ...prevMotionConfig.current,
       speedMultiplier: currentSpeedMult.current,
       amplitudeMultiplier: currentAmplitudeMult.current,
+      freqScale: currentFreqScale.current,
+    }
+    const nextConfig: EmotionConfig = {
+      ...targetMotionConfig.current,
+      speedMultiplier: currentSpeedMult.current,
+      amplitudeMultiplier: currentAmplitudeMult.current,
+      freqScale: currentFreqScale.current,
     }
 
     const hl = highlightState.current
@@ -460,15 +478,22 @@ export default function ParticleSystem() {
 
         if (hlState.phase === 'highlight') {
           if (elapsed < 0.3) {
-            const t = elapsed / 0.3
-            const [px, py, pz] = computeParticlePosition(d, timeSec, speed, amplitude, effectiveConfig)
-            positions[i3] = px
-            positions[i3 + 1] = py
-            positions[i3 + 2] = pz
-            sizes[i] = particleSize * d.sizeFactor * (1 + t * 2)
-            colors[i3] = lerp(r + d.colorOffset, 1, t)
-            colors[i3 + 1] = lerp(g + d.colorOffset * 0.5, 1, t)
-            colors[i3 + 2] = lerp(b + d.colorOffset * 0.3, 1, t)
+            const ht = elapsed / 0.3
+            const posOld = computeParticlePosition(d, timeSec, speed, amplitude, prevConfig)
+            let pos: [number, number, number]
+            if (blending) {
+              const posNew = computeParticlePosition(d, timeSec, speed, amplitude, nextConfig)
+              pos = lerpPos(posOld, posNew, motionT)
+            } else {
+              pos = posOld
+            }
+            positions[i3] = pos[0]
+            positions[i3 + 1] = pos[1]
+            positions[i3 + 2] = pos[2]
+            sizes[i] = particleSize * d.sizeFactor * (1 + ht * 2)
+            colors[i3] = lerp(r + d.colorOffset, 1, ht)
+            colors[i3 + 1] = lerp(g + d.colorOffset * 0.5, 1, ht)
+            colors[i3 + 2] = lerp(b + d.colorOffset * 0.3, 1, ht)
             alphas[i] = 1
           } else {
             hlState.phase = 'flyout'
@@ -486,15 +511,15 @@ export default function ParticleSystem() {
         if (hlState.phase === 'flyout') {
           const flyElapsed = (now - hlState.startTime) / 1000
           if (flyElapsed < 2) {
-            const t = flyElapsed / 2
-            positions[i3] = hlState.originX + hlState.flyDirX * t
-            positions[i3 + 1] = hlState.originY + hlState.flyDirY * t
-            positions[i3 + 2] = hlState.originZ + hlState.flyDirZ * t
-            sizes[i] = particleSize * d.sizeFactor * 3 * (1 - t)
+            const ft = flyElapsed / 2
+            positions[i3] = hlState.originX + hlState.flyDirX * ft
+            positions[i3 + 1] = hlState.originY + hlState.flyDirY * ft
+            positions[i3 + 2] = hlState.originZ + hlState.flyDirZ * ft
+            sizes[i] = particleSize * d.sizeFactor * 3 * (1 - ft)
             colors[i3] = 1
             colors[i3 + 1] = 1
             colors[i3 + 2] = 1
-            alphas[i] = 1 - t
+            alphas[i] = 1 - ft
           } else {
             hlState.phase = 'done'
             d.baseX = (Math.random() - 0.5) * 30
@@ -508,10 +533,19 @@ export default function ParticleSystem() {
         continue
       }
 
-      const [px, py, pz] = computeParticlePosition(d, timeSec, speed, amplitude, effectiveConfig)
-      positions[i3] = px
-      positions[i3 + 1] = py
-      positions[i3 + 2] = pz
+      if (blending) {
+        const posOld = computeParticlePosition(d, timeSec, speed, amplitude, prevConfig)
+        const posNew = computeParticlePosition(d, timeSec, speed, amplitude, nextConfig)
+        const pos = lerpPos(posOld, posNew, motionT)
+        positions[i3] = pos[0]
+        positions[i3 + 1] = pos[1]
+        positions[i3 + 2] = pos[2]
+      } else {
+        const pos = computeParticlePosition(d, timeSec, speed, amplitude, prevConfig)
+        positions[i3] = pos[0]
+        positions[i3 + 1] = pos[1]
+        positions[i3 + 2] = pos[2]
+      }
 
       const co = d.colorOffset
       colors[i3] = Math.min(1, Math.max(0, r + co))
