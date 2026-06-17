@@ -18,19 +18,21 @@ interface NoteBoardProps {
 
 const GRID_SIZE = 50;
 const NOTE_WIDTH = 180;
+const NOTE_EST_HEIGHT = 80;
 const GROUP_HEADER_HEIGHT = 40;
+const PROXIMITY_THRESHOLD = 30;
 
 function snapToGrid(value: number): number {
   return Math.round(value / GRID_SIZE) * GRID_SIZE;
 }
 
-function lightenColor(hex: string, percent: number): string {
-  const num = parseInt(hex.replace('#', ''), 16);
-  const amt = Math.round(2.55 * percent);
-  const R = Math.min(255, (num >> 16) + amt);
-  const G = Math.min(255, ((num >> 8) & 0x00FF) + amt);
-  const B = Math.min(255, (num & 0x0000FF) + amt);
-  return `#${((1 << 24) + (R << 16) + (G << 8) + B).toString(16).slice(1)}`;
+function rectEdgeDistance(
+  ax: number, ay: number, aw: number, ah: number,
+  bx: number, by: number, bw: number, bh: number
+): number {
+  const dx = Math.max(0, Math.max(ax - (bx + bw), bx - (ax + aw)));
+  const dy = Math.max(0, Math.max(ay - (by + bh), by - (ay + ah)));
+  return Math.sqrt(dx * dx + dy * dy);
 }
 
 function NoteBoard({
@@ -49,10 +51,19 @@ function NoteBoard({
 }: NoteBoardProps) {
   const boardRef = useRef<HTMLDivElement>(null);
   const noteRefs = useRef<Map<string, HTMLDivElement>>(new Map());
+  const groupRefs = useRef<Map<string, HTMLDivElement>>(new Map());
+  const svgRef = useRef<SVGSVGElement | null>(null);
+  const notesRef = useRef(notes);
+  notesRef.current = notes;
+  const groupsRef = useRef(groups);
+  groupsRef.current = groups;
+
   const [draggingNote, setDraggingNote] = useState<string | null>(null);
   const dragOffsetRef = useRef({ x: 0, y: 0 });
   const dragPosRef = useRef({ x: 0, y: 0 });
   const rafIdRef = useRef<number | null>(null);
+  const dragOverGroupRef = useRef<string | null>(null);
+
   const [editingNote, setEditingNote] = useState<string | null>(null);
   const [editContent, setEditContent] = useState('');
   const [deletingNote, setDeletingNote] = useState<string | null>(null);
@@ -89,6 +100,64 @@ function NoteBoard({
     if (noteEl) {
       noteEl.style.left = `${dragPosRef.current.x}px`;
       noteEl.style.top = `${dragPosRef.current.y}px`;
+    }
+
+    const curX = dragPosRef.current.x;
+    const curY = dragPosRef.current.y;
+
+    let overGroupId: string | null = null;
+    for (const group of groupsRef.current) {
+      const groupEl = groupRefs.current.get(group.id);
+      const groupHeight = groupEl ? groupEl.offsetHeight : 120;
+      if (
+        curX >= group.x &&
+        curX <= group.x + group.width &&
+        curY >= group.y &&
+        curY <= group.y + groupHeight
+      ) {
+        overGroupId = group.id;
+        break;
+      }
+    }
+
+    if (overGroupId !== dragOverGroupRef.current) {
+      if (dragOverGroupRef.current) {
+        const prevEl = groupRefs.current.get(dragOverGroupRef.current);
+        if (prevEl) {
+          prevEl.classList.remove('drag-hover');
+        }
+      }
+      if (overGroupId) {
+        const newEl = groupRefs.current.get(overGroupId);
+        if (newEl) {
+          newEl.classList.remove('drag-hover');
+          void newEl.offsetWidth;
+          newEl.classList.add('drag-hover');
+        }
+      }
+      dragOverGroupRef.current = overGroupId;
+    }
+
+    if (svgRef.current) {
+      const lines: string[] = [];
+      const dragCx = curX + NOTE_WIDTH / 2;
+      const dragCy = curY + NOTE_EST_HEIGHT / 2;
+
+      for (const otherNote of notesRef.current) {
+        if (otherNote.id === draggingNote) continue;
+        const dist = rectEdgeDistance(
+          curX, curY, NOTE_WIDTH, NOTE_EST_HEIGHT,
+          otherNote.x, otherNote.y, NOTE_WIDTH, NOTE_EST_HEIGHT
+        );
+        if (dist < PROXIMITY_THRESHOLD) {
+          const otherCx = otherNote.x + NOTE_WIDTH / 2;
+          const otherCy = otherNote.y + NOTE_EST_HEIGHT / 2;
+          lines.push(
+            `<line x1="${dragCx}" y1="${dragCy}" x2="${otherCx}" y2="${otherCy}" stroke="rgba(74, 144, 217, 0.5)" stroke-width="2" stroke-dasharray="6,4"/>`
+          );
+        }
+      }
+      svgRef.current.innerHTML = lines.join('');
     }
 
     rafIdRef.current = requestAnimationFrame(updateDragPosition);
@@ -138,6 +207,19 @@ function NoteBoard({
     [draggingNote]
   );
 
+  const cleanupDragVisuals = useCallback(() => {
+    if (dragOverGroupRef.current) {
+      const el = groupRefs.current.get(dragOverGroupRef.current);
+      if (el) {
+        el.classList.remove('drag-hover');
+      }
+      dragOverGroupRef.current = null;
+    }
+    if (svgRef.current) {
+      svgRef.current.innerHTML = '';
+    }
+  }, []);
+
   const handleMouseUp = useCallback(() => {
     if (!draggingNote) return;
 
@@ -145,6 +227,8 @@ function NoteBoard({
       cancelAnimationFrame(rafIdRef.current);
       rafIdRef.current = null;
     }
+
+    cleanupDragVisuals();
 
     const note = notes.find((n) => n.id === draggingNote);
     if (!note) {
@@ -215,7 +299,7 @@ function NoteBoard({
     }, 200);
 
     setDraggingNote(null);
-  }, [draggingNote, notes, groups, calculateGroupHeight, getNotesByGroup, onUpdateNote]);
+  }, [draggingNote, notes, groups, calculateGroupHeight, getNotesByGroup, onUpdateNote, cleanupDragVisuals]);
 
   useEffect(() => {
     if (draggingNote) {
@@ -345,6 +429,14 @@ function NoteBoard({
     }
   }, []);
 
+  const setGroupRef = useCallback((groupId: string) => (el: HTMLDivElement | null) => {
+    if (el) {
+      groupRefs.current.set(groupId, el);
+    } else {
+      groupRefs.current.delete(groupId);
+    }
+  }, []);
+
   const renderNote = (note: Note) => {
     const isEditing = editingNote === note.id;
     const isDeleting = deletingNote === note.id;
@@ -370,7 +462,7 @@ function NoteBoard({
           padding: '12px',
           paddingRight: '32px',
           boxShadow: isDragging
-            ? '0 12px 32px rgba(0, 0, 0, 0.4)'
+            ? '0 16px 40px rgba(0, 0, 0, 0.5), 0 0 0 2px rgba(255, 255, 255, 0.15)'
             : '0 4px 12px rgba(0, 0, 0, 0.2)',
           cursor: isEditing ? 'text' : 'grab',
           zIndex: isDragging ? 1000 : isSnapping ? 500 : 1,
@@ -468,6 +560,7 @@ function NoteBoard({
       return (
         <div
           key={group.id}
+          ref={setGroupRef(group.id)}
           className="group-area"
           style={{
             position: 'absolute',
@@ -480,6 +573,7 @@ function NoteBoard({
             border: `2px solid ${group.color}`,
             padding: '10px',
             overflow: 'visible',
+            ['--group-color' as any]: group.color,
           }}
         >
           <div
@@ -1073,6 +1167,8 @@ function NoteBoard({
                 pointerEvents: 'none',
               }}
             />
+
+            <svg ref={svgRef} className="proximity-svg" />
 
             {notes.map(renderNote)}
 
