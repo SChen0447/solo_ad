@@ -9,7 +9,6 @@ const TRACK_COLORS = ['#ff4757', '#3742fa', '#2ed573', '#ffa502'];
 
 export class GameApp {
   private canvas: HTMLCanvasElement;
-  private ctx: CanvasRenderingContext2D;
   private audioManager: AudioManager;
   private noteManager: NoteManager;
   private renderer: Renderer;
@@ -44,7 +43,6 @@ export class GameApp {
     if (!ctx) {
       throw new Error('Failed to get 2D context');
     }
-    this.ctx = ctx;
 
     this.audioManager = new AudioManager();
     this.noteManager = new NoteManager();
@@ -106,7 +104,7 @@ export class GameApp {
         this.canvas.style.cursor = this.backBtnHover ? 'pointer' : 'default';
       } else if (this.currentScene === 'select') {
         if (this.isDraggingSlider && this.activeSliderIndex !== null) {
-          this.speedSettings[this.activeSliderIndex] = this.renderer.getSpeedValueFromX(x, this.activeSliderIndex, this.songs);
+          this.speedSettings[this.activeSliderIndex] = this.renderer.getSpeedValueFromX(x);
           this.canvas.style.cursor = 'ew-resize';
         } else {
           const sliderIndex = this.renderer.getSliderAtPoint(x, y, this.songs);
@@ -134,7 +132,7 @@ export class GameApp {
         if (sliderIndex >= 0) {
           this.isDraggingSlider = true;
           this.activeSliderIndex = sliderIndex;
-          this.speedSettings[sliderIndex] = this.renderer.getSpeedValueFromX(x, sliderIndex, this.songs);
+          this.speedSettings[sliderIndex] = this.renderer.getSpeedValueFromX(x);
           e.preventDefault();
         }
       }
@@ -155,16 +153,19 @@ export class GameApp {
       const y = e.clientY - rect.top;
 
       if (this.currentScene === 'start' && this.renderer.isPointInStartButton(x, y)) {
+        this.audioManager.playSfxConfirm();
         this.changeScene('select');
       } else if (this.currentScene === 'select') {
         const sliderIndex = this.renderer.getSliderAtPoint(x, y, this.songs);
         if (sliderIndex >= 0) return;
         const cardIndex = this.renderer.isPointInSongCard(x, y, this.songs);
         if (cardIndex >= 0) {
+          this.audioManager.playSfxConfirm();
           this.selectedSongIndex = cardIndex;
           setTimeout(() => this.startGame(this.songs[cardIndex].id), 200);
         }
       } else if (this.currentScene === 'result' && this.renderer.isPointInBackButton(x, y)) {
+        this.audioManager.playSfxConfirm();
         this.changeScene('select');
       }
     });
@@ -174,16 +175,19 @@ export class GameApp {
     this.renderer.showJudgeResult(result);
 
     if (result.type === 'perfect') {
+      this.audioManager.playSfxPerfect();
       this.perfectCount++;
       this.combo++;
       this.score += 100 * (1 + this.combo / 100);
       this.renderer.spawnParticles(result.x, result.y, TRACK_COLORS[result.track], 6 + Math.floor(Math.random() * 3));
       this.renderer.spawnHalo(result.x, result.y, result.track);
     } else if (result.type === 'good') {
+      this.audioManager.playSfxGood();
       this.goodCount++;
       this.combo++;
       this.score += 50 * (1 + this.combo / 100);
     } else if (result.type === 'miss') {
+      this.audioManager.playSfxMiss();
       this.missCount++;
       this.combo = 0;
     }

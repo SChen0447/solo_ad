@@ -24,7 +24,6 @@ export class Renderer {
   private judgeResultTimer = 0;
   private haloEffects: { x: number; y: number; life: number; maxLife: number; track: number }[] = [];
   private buttonHoverStates: Map<string, boolean> = new Map();
-  private selectedSongIndex = 0;
 
   constructor(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement) {
     this.ctx = ctx;
@@ -164,7 +163,6 @@ export class Renderer {
     speedSettings: number[],
     activeSliderIndex: number | null
   ): void {
-    this.selectedSongIndex = selectedIndex;
     const ctx = this.ctx;
     const centerX = this.canvas.width / 2;
 
@@ -329,16 +327,11 @@ export class Renderer {
     return -1;
   }
 
-  public getSpeedValueFromX(x: number, songIndex: number, songs: Song[]): number {
+  public getSpeedValueFromX(x: number): number {
     const centerX = this.canvas.width / 2;
     const cardWidth = 420;
-    const cardHeight = 200;
-    const cardSpacing = 35;
-    const startY = 150;
-
-    const cardY = startY + songIndex * (cardHeight + cardSpacing);
-    const sliderX = centerX - cardWidth / 2 + 25;
     const sliderWidth = cardWidth - 120;
+    const sliderX = centerX - cardWidth / 2 + 25;
 
     const ratio = Math.max(0, Math.min(1, (x - sliderX) / sliderWidth));
     const rawSpeed = 0.5 + ratio * 1.5;

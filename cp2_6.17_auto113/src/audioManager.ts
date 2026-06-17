@@ -9,6 +9,9 @@ export class AudioManager {
   private duration = 0;
   private syntheticOscillators: OscillatorNode[] = [];
   private syntheticGainNodes: GainNode[] = [];
+  private sfxGainNode: GainNode | null = null;
+  private sfxOscillators: OscillatorNode[] = [];
+  private sfxGainNodes: GainNode[] = [];
 
   constructor() {
     this.initAudioContext();
@@ -20,6 +23,10 @@ export class AudioManager {
       this.gainNode = this.audioContext.createGain();
       this.gainNode.connect(this.audioContext.destination);
       this.gainNode.gain.value = 0.7;
+
+      this.sfxGainNode = this.audioContext.createGain();
+      this.sfxGainNode.connect(this.audioContext.destination);
+      this.sfxGainNode.gain.value = 0.5;
     }
   }
 
@@ -233,5 +240,65 @@ export class AudioManager {
 
   public getIsPlaying(): boolean {
     return this.isPlaying;
+  }
+
+  public playSfxPerfect(): void {
+    this.playTone(880, 'sine', 0.08, 0.35);
+  }
+
+  public playSfxGood(): void {
+    this.playTone(440, 'triangle', 0.1, 0.3);
+  }
+
+  public playSfxMiss(): void {
+    this.playTone(150, 'sawtooth', 0.15, 0.25);
+  }
+
+  public playSfxConfirm(): void {
+    this.playTone(660, 'sine', 0.06, 0.3);
+    setTimeout(() => this.playTone(880, 'sine', 0.06, 0.25), 40);
+  }
+
+  private playTone(frequency: number, type: OscillatorType, duration: number, volume: number): void {
+    this.initAudioContext();
+    if (!this.audioContext || !this.sfxGainNode) return;
+
+    if (this.audioContext.state === 'suspended') {
+      this.audioContext.resume();
+    }
+
+    const osc = this.audioContext.createOscillator();
+    const gain = this.audioContext.createGain();
+
+    osc.type = type;
+    osc.frequency.setValueAtTime(frequency, this.audioContext.currentTime);
+
+    gain.gain.setValueAtTime(volume, this.audioContext.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, this.audioContext.currentTime + duration);
+
+    osc.connect(gain);
+    gain.connect(this.sfxGainNode);
+
+    osc.start();
+    osc.stop(this.audioContext.currentTime + duration);
+
+    this.sfxOscillators.push(osc);
+    this.sfxGainNodes.push(gain);
+
+    osc.onended = () => {
+      osc.disconnect();
+      gain.disconnect();
+      const idx = this.sfxOscillators.indexOf(osc);
+      if (idx >= 0) {
+        this.sfxOscillators.splice(idx, 1);
+        this.sfxGainNodes.splice(idx, 1);
+      }
+    };
+  }
+
+  public setSfxVolume(volume: number): void {
+    if (this.sfxGainNode) {
+      this.sfxGainNode.gain.value = Math.max(0, Math.min(1, volume));
+    }
   }
 }
