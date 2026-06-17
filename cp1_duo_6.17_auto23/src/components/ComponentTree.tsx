@@ -1,14 +1,14 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import axios from 'axios';
 import type { ComponentInfo } from '../App';
 
-interface TreeNode {
+interface TreeNodeData {
   name: string;
   path: string;
   type: 'file' | 'folder';
   size?: number;
   lastModified?: string;
-  children?: TreeNode[];
+  children?: TreeNodeData[];
 }
 
 interface ComponentTreeProps {
@@ -16,8 +16,126 @@ interface ComponentTreeProps {
   selected: ComponentInfo | null;
 }
 
+const formatSize = (bytes: number): string => {
+  const kb = bytes / 1024;
+  if (kb < 1024) {
+    return `${kb.toFixed(1)} KB`;
+  }
+  const mb = kb / 1024;
+  return `${mb.toFixed(2)} MB`;
+};
+
+const formatTime = (isoString: string): string => {
+  try {
+    return new Date(isoString).toLocaleString(undefined, {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  } catch {
+    return '';
+  }
+};
+
+interface TreeNodeItemProps {
+  node: TreeNodeData;
+  depth: number;
+  expanded: Set<string>;
+  selected: ComponentInfo | null;
+  onToggleExpand: (path: string) => void;
+  onSelectFile: (node: TreeNodeData) => void;
+}
+
+const TreeNodeItem: React.FC<TreeNodeItemProps> = ({ node, depth, expanded, selected, onToggleExpand, onSelectFile }) => {
+  const isExpanded = expanded.has(node.path);
+  const isSelected = selected?.path === node.path;
+  const childrenRef = useRef<HTMLDivElement>(null);
+  const [childrenHeight, setChildrenHeight] = useState<number>(0);
+
+  useEffect(() => {
+    if (childrenRef.current) {
+      const measure = () => {
+        setChildrenHeight(childrenRef.current!.scrollHeight);
+      };
+      measure();
+      const id = requestAnimationFrame(measure);
+      return () => cancelAnimationFrame(id);
+    }
+  }, [node.children, isExpanded]);
+
+  const handleClick = () => {
+    if (node.type === 'folder') {
+      onToggleExpand(node.path);
+    } else {
+      onSelectFile(node);
+    }
+  };
+
+  return (
+    <div>
+      <div
+        onClick={handleClick}
+        style={{
+          display: 'flex',
+          alignItems: 'flex-start',
+          gap: 6,
+          padding: '8px 8px 8px ' + (depth * 16 + 8) + 'px',
+          cursor: 'pointer',
+          background: isSelected ? 'rgba(137,180,250,0.15)' : 'transparent',
+          borderRadius: 4,
+          transition: 'background 0.2s',
+        }}
+        onMouseEnter={(e) => {
+          if (!isSelected) (e.currentTarget as HTMLDivElement).style.background = 'rgba(255,255,255,0.05)';
+        }}
+        onMouseLeave={(e) => {
+          if (!isSelected) (e.currentTarget as HTMLDivElement).style.background = 'transparent';
+        }}
+      >
+        <span style={{ width: 16, textAlign: 'center', fontSize: 12, marginTop: 2, flexShrink: 0 }}>
+          {node.type === 'folder' ? (isExpanded ? '▼' : '▶') : '⚛'}
+        </span>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 13, color: '#cdd6f4' }}>{node.name}</div>
+          {node.type === 'file' && (node.size != null || node.lastModified) && (
+            <div style={{ display: 'flex', gap: 10, marginTop: 2, fontSize: 10, color: '#6c7086' }}>
+              {node.size != null && <span>{formatSize(node.size)}</span>}
+              {node.lastModified && <span>{formatTime(node.lastModified)}</span>}
+            </div>
+          )}
+        </div>
+      </div>
+      {node.type === 'folder' && node.children && node.children.length > 0 && (
+        <div
+          style={{
+            height: isExpanded ? childrenHeight : 0,
+            overflow: 'hidden',
+            transition: 'height 0.2s ease-in-out',
+          }}
+        >
+          <div ref={childrenRef}>
+            {node.children.map((child) => (
+              <TreeNodeItem
+                key={child.path}
+                node={child}
+                depth={depth + 1}
+                expanded={expanded}
+                selected={selected}
+                onToggleExpand={onToggleExpand}
+                onSelectFile={onSelectFile}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 const ComponentTree: React.FC<ComponentTreeProps> = ({ onSelect, selected }) => {
-  const [tree, setTree] = useState<TreeNode[]>([]);
+  const [tree, setTree] = useState<TreeNodeData[]>([]);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [uploading, setUploading] = useState(false);
 
@@ -51,20 +169,16 @@ const ComponentTree: React.FC<ComponentTreeProps> = ({ onSelect, selected }) => 
     }
   };
 
-  const toggleExpand = (path: string) => {
+  const toggleExpand = useCallback((path: string) => {
     setExpanded((prev) => {
       const next = new Set(prev);
       if (next.has(path)) next.delete(path);
       else next.add(path);
       return next;
     });
-  };
+  }, []);
 
-  const handleClick = async (node: TreeNode) => {
-    if (node.type === 'folder') {
-      toggleExpand(node.path);
-      return;
-    }
+  const handleSelectFile = useCallback(async (node: TreeNodeData) => {
     try {
       const res = await axios.get('/api/list', { params: { path: node.path } });
       const info: ComponentInfo = {
@@ -86,51 +200,7 @@ const ComponentTree: React.FC<ComponentTreeProps> = ({ onSelect, selected }) => 
         dependencies: [],
       });
     }
-  };
-
-  const formatSize = (bytes: number) => {
-    if (bytes < 1024) return `${bytes} B`;
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-  };
-
-  const renderNode = (node: TreeNode, depth: number) => {
-    const isExpanded = expanded.has(node.path);
-    const isSelected = selected?.path === node.path;
-
-    return (
-      <div key={node.path}>
-        <div
-          onClick={() => handleClick(node)}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 6,
-            padding: '6px 8px 6px ' + (depth * 16 + 8) + 'px',
-            cursor: 'pointer',
-            background: isSelected ? 'rgba(137,180,250,0.15)' : 'transparent',
-            borderRadius: 4,
-            transition: 'background 0.2s',
-          }}
-          onMouseEnter={(e) => {
-            if (!isSelected) (e.currentTarget as HTMLDivElement).style.background = 'rgba(255,255,255,0.05)';
-          }}
-          onMouseLeave={(e) => {
-            if (!isSelected) (e.currentTarget as HTMLDivElement).style.background = 'transparent';
-          }}
-        >
-          <span style={{ width: 16, textAlign: 'center', fontSize: 12 }}>
-            {node.type === 'folder' ? (isExpanded ? '▼' : '▶') : '⚛'}
-          </span>
-          <span style={{ flex: 1, fontSize: 13, color: '#cdd6f4' }}>{node.name}</span>
-          {node.type === 'file' && node.size != null && (
-            <span style={{ fontSize: 11, color: '#6c7086' }}>{formatSize(node.size)}</span>
-          )}
-        </div>
-        {node.type === 'folder' && isExpanded && node.children?.map((child) => renderNode(child, depth + 1))}
-      </div>
-    );
-  };
+  }, [onSelect]);
 
   return (
     <div style={{ padding: 12, height: '100%', display: 'flex', flexDirection: 'column' }}>
@@ -161,7 +231,17 @@ const ComponentTree: React.FC<ComponentTreeProps> = ({ onSelect, selected }) => 
             请上传包含 React 组件的 .zip 压缩包
           </div>
         ) : (
-          tree.map((node) => renderNode(node, 0))
+          tree.map((node) => (
+            <TreeNodeItem
+              key={node.path}
+              node={node}
+              depth={0}
+              expanded={expanded}
+              selected={selected}
+              onToggleExpand={toggleExpand}
+              onSelectFile={handleSelectFile}
+            />
+          ))
         )}
       </div>
     </div>
