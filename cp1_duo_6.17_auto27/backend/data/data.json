@@ -1,0 +1,375 @@
+{
+  "characters": [
+    {
+      "id": "char_1",
+      "name": "林墨",
+      "faction": "protagonist",
+      "description": "故事主角，出身贫寒的少年，拥有神秘的古老血脉。性格坚毅，重情重义。"
+    },
+    {
+      "id": "char_2",
+      "name": "苏婉清",
+      "faction": "protagonist",
+      "description": "苏家千金，天资聪颖，精通医术。与林墨青梅竹马。"
+    },
+    {
+      "id": "char_3",
+      "name": "萧尘",
+      "faction": "protagonist",
+      "description": "落魄的世家子弟，剑法高超，为人洒脱不羁。"
+    },
+    {
+      "id": "char_4",
+      "name": "夜天宸",
+      "faction": "antagonist",
+      "description": "暗夜组织首领，城府极深，野心勃勃，试图颠覆王朝。"
+    },
+    {
+      "id": "char_5",
+      "name": "姬瑶月",
+      "faction": "antagonist",
+      "description": "神秘组织的女杀手，冷酷无情，身世成谜。"
+    },
+    {
+      "id": "char_6",
+      "name": "老鬼",
+      "faction": "neutral",
+      "description": "隐世高人，知晓许多上古秘辛，亦是林墨的启蒙恩师。"
+    },
+    {
+      "id": "char_7",
+      "name": "赵虎",
+      "faction": "protagonist",
+      "description": "山贼出身，后被林墨收服，忠心耿耿，力大无穷。"
+    },
+    {
+      "id": "char_8",
+      "name": "慕容雪",
+      "faction": "neutral",
+      "description": "慕容家族的大小姐，亦正亦邪，行事全凭喜好。"
+    }
+  ],
+  "relations": [
+    {
+      "id": "rel_1",
+      "characterAId": "char_1",
+      "characterBId": "char_2",
+      "type": "romantic",
+      "frequency": 8,
+      "description": "青梅竹马，互相倾慕"
+    },
+    {
+      "id": "rel_2",
+      "characterAId": "char_1",
+      "characterBId": "char_3",
+      "type": "friendly",
+      "frequency": 6,
+      "description": "生死之交，结拜兄弟"
+    },
+    {
+      "id": "rel_3",
+      "characterAId": "char_1",
+      "characterBId": "char_4",
+      "type": "hostile",
+      "frequency": 5,
+      "description": "宿命之敌"
+    },
+    {
+      "id": "rel_4",
+      "characterAId": "char_1",
+      "characterBId": "char_6",
+      "type": "family",
+      "frequency": 3,
+      "description": "师徒如父子"
+    },
+    {
+      "id": "rel_5",
+      "characterAId": "char_1",
+      "characterBId": "char_7",
+      "type": "friendly",
+      "frequency": 4,
+      "description": "主仆情深"
+    },
+    {
+      "id": "rel_6",
+      "characterAId": "char_4",
+      "characterBId": "char_5",
+      "type": "friendly",
+      "frequency": 7,
+      "description": "上下级，亦有暧昧"
+    },
+    {
+      "id": "rel_7",
+      "characterAId": "char_2",
+      "characterBId": "char_8",
+      "type": "hostile",
+      "frequency": 2,
+      "description": "情敌关系"
+    },
+    {
+      "id": "rel_8",
+      "characterAId": "char_3",
+      "characterBId": "char_5",
+      "type": "romantic",
+      "frequency": 3,
+      "description": "相爱相杀"
+    },
+    {
+      "id": "rel_9",
+      "characterAId": "char_5",
+      "characterBId": "char_6",
+      "type": "family",
+      "frequency": 1,
+      "description": "失散多年的父女"
+    },
+    {
+      "id": "rel_10",
+      "characterAId": "char_6",
+      "characterBId": "char_8",
+      "type": "friendly",
+      "frequency": 2,
+      "description": "旧相识"
+    }
+  ],
+  "events": [
+    {
+      "id": "evt_1",
+      "name": "山村变故",
+      "date": "靖康元年-春-三月-初七",
+      "time": "辰时",
+      "type": "main",
+      "characterIds": ["char_1", "char_6", "char_7"],
+      "chapterIds": ["ch_1", "ch_2"],
+      "description": "林墨所在的青牛村遭遇山贼袭击，老鬼现身救下林墨，赵虎被收服。"
+    },
+    {
+      "id": "evt_2",
+      "name": "拜师学艺",
+      "date": "靖康元年-春-三月-十五",
+      "time": "卯时",
+      "type": "main",
+      "characterIds": ["char_1", "char_6"],
+      "chapterIds": ["ch_3"],
+      "description": "林墨拜老鬼为师，开始修炼上古功法《太虚诀》。"
+    },
+    {
+      "id": "evt_3",
+      "name": "初遇苏婉清",
+      "date": "靖康元年-夏-六月-初二",
+      "time": "午时",
+      "type": "main",
+      "characterIds": ["char_1", "char_2"],
+      "chapterIds": ["ch_5"],
+      "description": "林墨下山采药，偶遇受伤的苏婉清，将其救下。"
+    },
+    {
+      "id": "evt_4",
+      "name": "酒楼结识萧尘",
+      "date": "靖康元年-夏-七月-廿一",
+      "time": "申时",
+      "type": "side",
+      "characterIds": ["char_1", "char_3"],
+      "chapterIds": ["ch_8"],
+      "description": "林墨与萧尘在清风楼不打不相识，结为好友。"
+    },
+    {
+      "id": "evt_5",
+      "name": "夜天宸登场",
+      "date": "靖康元年-秋-九月-初九",
+      "time": "亥时",
+      "type": "foreshadow",
+      "characterIds": ["char_4", "char_5"],
+      "chapterIds": ["ch_12"],
+      "description": "暗夜组织首领夜天宸在月圆之夜现身，似乎在谋划什么阴谋。"
+    },
+    {
+      "id": "evt_6",
+      "name": "苏家之难",
+      "date": "靖康元年-冬-十一月-十八",
+      "time": "丑时",
+      "type": "main",
+      "characterIds": ["char_1", "char_2", "char_4"],
+      "chapterIds": ["ch_15", "ch_16", "ch_17"],
+      "description": "苏家被暗夜组织灭门，林墨拼死救出苏婉清，但苏父身亡。"
+    },
+    {
+      "id": "evt_7",
+      "name": "林墨身世",
+      "date": "靖康二年-春-二月-十四",
+      "time": "子时",
+      "type": "memory",
+      "characterIds": ["char_1", "char_6"],
+      "chapterIds": ["ch_20"],
+      "description": "老鬼向林墨揭示其身世——他是前朝太子遗孤。"
+    },
+    {
+      "id": "evt_8",
+      "name": "姬瑶月刺杀",
+      "date": "靖康二年-春-三月-初三",
+      "time": "寅时",
+      "type": "main",
+      "characterIds": ["char_1", "char_5", "char_3"],
+      "chapterIds": ["ch_22"],
+      "description": "姬瑶月奉命刺杀林墨，萧尘舍身相护，三人各有损伤。"
+    },
+    {
+      "id": "evt_9",
+      "name": "慕容雪出现",
+      "date": "靖康二年-夏-五月-廿七",
+      "time": "辰时",
+      "type": "side",
+      "characterIds": ["char_8", "char_1", "char_6"],
+      "chapterIds": ["ch_28"],
+      "description": "慕容雪找上林墨，似乎与老鬼有旧交，带来了重要消息。"
+    },
+    {
+      "id": "evt_10",
+      "name": "古墓探秘",
+      "date": "靖康二年-秋-八月-十五",
+      "time": "未时",
+      "type": "main",
+      "characterIds": ["char_1", "char_2", "char_3", "char_8"],
+      "chapterIds": ["ch_35", "ch_36", "ch_37"],
+      "description": "众人进入上古遗迹，探寻太虚诀的完整传承，遭遇重重机关。"
+    },
+    {
+      "id": "evt_11",
+      "name": "父女相认",
+      "date": "靖康二年-冬-十月-初一",
+      "time": "巳时",
+      "type": "side",
+      "characterIds": ["char_5", "char_6"],
+      "chapterIds": ["ch_42"],
+      "description": "老鬼与姬瑶月父女相认，姬瑶月的身世之谜终于揭开。"
+    },
+    {
+      "id": "evt_12",
+      "name": "最终决战",
+      "date": "靖康三年-春-正月-廿三",
+      "time": "辰时",
+      "type": "main",
+      "characterIds": ["char_1", "char_2", "char_3", "char_4", "char_5", "char_6", "char_7", "char_8"],
+      "chapterIds": ["ch_50", "ch_51", "ch_52"],
+      "description": "林墨与夜天宸在皇城之巅展开决战，各方势力纷纷登场。"
+    }
+  ],
+  "volumes": [
+    {
+      "id": "vol_1",
+      "title": "第一卷 青牛村",
+      "volumeNumber": 1
+    },
+    {
+      "id": "vol_2",
+      "title": "第二卷 江湖路",
+      "volumeNumber": 2
+    },
+    {
+      "id": "vol_3",
+      "title": "第三卷 风云起",
+      "volumeNumber": 3
+    }
+  ],
+  "chapters": [
+    {
+      "id": "ch_1",
+      "title": "第一章 山村少年",
+      "volumeId": "vol_1",
+      "volumeTitle": "第一卷 青牛村",
+      "chapterNumber": 1,
+      "progress": 100,
+      "summary": "介绍主角林墨的日常生活和青牛村的背景。",
+      "content": "<p><b>靖康元年，春。</b></p><p>青牛村坐落在群山环抱之中，村子不大，只有几十户人家，都是靠打猎和采药为生的山民。</p><p>林墨是村里的孤儿，从小吃百家饭长大，如今已经十三岁了。虽然家境贫寒，但他生得眉清目秀，眼神中透着一股与年龄不符的坚毅。</p><p>这日清晨，天刚蒙蒙亮，林墨便背着药篓，踏上了后山的小径。他要去采一种名叫"凝露草"的草药，据说这种草药在清晨露水未干时采摘，药效最好。</p><p><i>"今天一定要多采一些，换了钱就能给王奶奶买些米了。"</i>林墨心中想着，脚下的步伐也加快了几分。</p>"
+    },
+    {
+      "id": "ch_2",
+      "title": "第二章 山贼来袭",
+      "volumeId": "vol_1",
+      "volumeTitle": "第一卷 青牛村",
+      "chapterNumber": 2,
+      "progress": 100,
+      "summary": "山贼袭击村庄，林墨遭遇危机。",
+      "content": "<p>日暮时分，林墨满载而归。可刚到村口，他便听到了村里传来的喊杀声和哭喊声。</p><p><b>不好！</b>林墨心中一紧，连忙扔下背上的药篓，朝着村子的方向飞奔而去。</p><p>只见一群身穿黑衣、面蒙黑巾的山贼，正在村中烧杀抢掠。村民们虽然奋起反抗，但哪里是这些悍匪的对手？</p><p>林墨躲在一棵大树后，紧紧攥着拳头，指甲深深陷入掌心。他看到平日里对自己照顾有加的王大叔，为了保护妻儿，被山贼一刀砍倒在地。</p><p><mark>"住手！"</mark>林墨不知从哪里来的勇气，猛地冲了出去。</p>"
+    },
+    {
+      "id": "ch_3",
+      "title": "第三章 神秘老者",
+      "volumeId": "vol_1",
+      "volumeTitle": "第一卷 青牛村",
+      "chapterNumber": 3,
+      "progress": 100,
+      "summary": "老鬼现身救下林墨，并收他为徒。",
+      "content": "<p>就在山贼的大刀即将落在林墨头上的瞬间，一道灰色身影如同鬼魅般出现在他的面前。</p><p>那是一个衣衫褴褛的老者，头发花白，脸上沟壑纵横，看起来就像一个行将就木的乞丐。可他只是轻轻挥了挥衣袖，那名山贼便如同断线的风筝般飞了出去，重重摔在地上，口吐鲜血。</p><p>其余山贼见状，吓得魂飞魄散，哪里还敢停留？一个个屁滚尿流地逃走了。</p><p>林墨呆呆地看着眼前的老者，半晌才反应过来，"噗通"一声跪倒在地：<b>"多谢老前辈救命之恩！"</b></p>"
+    },
+    {
+      "id": "ch_4",
+      "title": "第四章 太虚诀",
+      "volumeId": "vol_1",
+      "volumeTitle": "第一卷 青牛村",
+      "chapterNumber": 4,
+      "progress": 85,
+      "summary": "林墨开始修炼上古功法。",
+      "content": "<p>老者名叫"老鬼"，没人知道他的真实姓名，也没人知道他活了多少年。他在青牛村外的山洞里隐居多年，平日里极少与人来往。</p><p>老鬼告诉林墨，他看中了林墨的根骨，想要收他为徒，传授他一门上古功法——《太虚诀》。</p><p>林墨大喜过望，当场磕头拜师。</p><p><i>"徒儿，你记住，修炼一途，贵在坚持。这《太虚诀》博大精深，绝非一朝一夕能够练成。你可要有心理准备。"</i></p><p><b>"师父放心，弟子不怕吃苦！"</b></p>"
+    },
+    {
+      "id": "ch_5",
+      "title": "第五章 下山采药",
+      "volumeId": "vol_1",
+      "volumeTitle": "第一卷 青牛村",
+      "chapterNumber": 5,
+      "progress": 70,
+      "summary": "林墨偶遇受伤的苏婉清。",
+      "content": "<p>时光飞逝，转眼已是盛夏。</p><p>经过三个月的修炼，林墨的身体发生了翻天覆地的变化。他不仅力气大增，而且反应敏捷，整个人的气质都变得不同了。</p><p>这日，老鬼让林墨下山去采购一些生活用品。这是林墨拜师以来第一次正式下山。</p><p>走到半山腰时，林墨忽然听到一阵微弱的呻吟声。循声找去，只见一个身穿白衣的少女倒在草丛中，腿部受了重伤，鲜血染红了裙摆。</p><p>那少女约莫十二三岁年纪，生得眉清目秀，如同瓷娃娃一般精致。此刻她脸色苍白，额头上满是豆大的汗珠。</p>"
+    },
+    {
+      "id": "ch_8",
+      "title": "第八章 清风楼",
+      "volumeId": "vol_2",
+      "volumeTitle": "第二卷 江湖路",
+      "chapterNumber": 8,
+      "progress": 60,
+      "summary": "林墨在清风楼结识萧尘。",
+      "content": "<p>清风楼是青州城内最大的酒楼，楼高五层，雕梁画栋，气派非凡。</p><p>这日，林墨身着一袭青衫，来到了清风楼。他是来打探消息的——师父老鬼让他查一查暗夜组织的动向。</p><p>刚一进门，林墨便听到二楼传来一阵喧闹声。</p><p><i>"臭小子，敢挡萧爷的路，活腻歪了是吧？"</i></p><p><b>"哼，光天化日之下强抢民女，你们还要不要脸了？"</b>一个清朗的声音响起，带着几分不羁。</p>"
+    },
+    {
+      "id": "ch_12",
+      "title": "第十二章 月圆之夜",
+      "volumeId": "vol_2",
+      "volumeTitle": "第二卷 江湖路",
+      "chapterNumber": 12,
+      "progress": 45,
+      "summary": "夜天宸神秘登场。",
+      "content": "<p>月圆之夜，紫禁之巅。</p><p>一道黑影静静矗立在皇城最高处的屋檐上，黑衣如墨，与夜色融为一体。</p><p>那人戴着一张青铜面具，遮住了大半张脸，只露出一双深邃的眼眸，如同寒星般闪烁着冷冽的光芒。</p><p>他便是<mark>夜天宸</mark>——暗夜组织的最高首领。</p><p><i>"计划进行得如何了？"</i>夜天宸的声音低沉而沙哑，仿佛从九幽地狱传来。</p>"
+    },
+    {
+      "id": "ch_15",
+      "title": "第十五章 惊变",
+      "volumeId": "vol_2",
+      "volumeTitle": "第二卷 江湖路",
+      "chapterNumber": 15,
+      "progress": 30,
+      "summary": "苏家遭遇灭门之祸。",
+      "content": "<p>寒冬腊月，大雪纷飞。</p><p>林墨正在山洞中闭关修炼，忽然心头一跳，生出一股强烈的不安。</p><p><b>"不好！"</b>林墨猛地睁开眼睛，身形一闪，便冲出了山洞。</p><p>他的直觉告诉他，有什么不好的事情发生了——而且，这件事与苏婉清有关。</p>"
+    },
+    {
+      "id": "ch_20",
+      "title": "第二十章 身世之谜",
+      "volumeId": "vol_3",
+      "volumeTitle": "第三卷 风云起",
+      "chapterNumber": 20,
+      "progress": 20,
+      "summary": "老鬼揭示林墨的真实身份。",
+      "content": "<p>靖康二年，春。</p><p>经历了苏家之难后，林墨的心性变得更加成熟，修为也在悲痛中突破到了新的境界。</p><p>这日，老鬼将林墨叫到了山洞深处。</p><p><i>"墨儿，你如今也长大了，有些事情，也是时候告诉你了。"</i>老鬼的语气中带着几分沉重。</p><p><b>"师父请讲。"</b>林墨恭敬地说道。</p><p>老鬼沉默了片刻，缓缓开口：<i>"你可知你姓什么？"</i></p><p>林墨一怔：<b>"弟子...弟子不是姓林吗？"</b></p>"
+    },
+    {
+      "id": "ch_22",
+      "title": "第二十二章 刺杀",
+      "volumeId": "vol_3",
+      "volumeTitle": "第三卷 风云起",
+      "chapterNumber": 22,
+      "progress": 15,
+      "summary": "姬瑶月奉命刺杀林墨。",
+      "content": "<p>三月初三，上巳节。</p><p>林墨和萧尘正在城中采购物资，准备前往慕容家。</p><p>忽然，林墨感到背后一阵寒意袭来——那是一种被毒蛇盯上的感觉。</p><p><b>"小心！"</b>林墨一把推开身边的萧尘，同时身形急闪。</p><p>一道黑色的剑光如同毒蛇出洞，贴着林墨的脸颊划过，削断了他几缕发丝。</p>"
+    }
+  ]
+}
