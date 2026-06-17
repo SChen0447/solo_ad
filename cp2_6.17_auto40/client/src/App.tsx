@@ -182,13 +182,14 @@ function ResultPanel({ raceData, onRestart }: { raceData: RaceData; onRestart: (
           <h2 className="result-title">🏆 比赛结果</h2>
 
           <div className="champion-horse">
-            <div className="champion-horse-icon">
-              <ChampionStars color={champion?.color || '#ffd700'} />
-              <svg viewBox="0 0 48 48" fill="none">
+            <div className="champion-horse-icon" style={{ width: 64, height: 64 }}>
+              <ChampionStars />
+              <svg viewBox="0 0 48 48" fill="none" style={{ width: '100%', height: '100%', position: 'relative', zIndex: 2 }}>
                 <ellipse cx="24" cy="30" rx="14" ry="8" fill={champion?.color || '#ffd700'} />
                 <circle cx="34" cy="20" r="7" fill={champion?.color || '#ffd700'} />
                 <polygon points="38,15 44,8 40,18" fill={champion?.color || '#ffd700'} />
                 <circle cx="35" cy="18" r="2" fill="#fff" />
+                <ellipse cx="24" cy="30" rx="14" ry="8" fill="url(#championGlow)" />
               </svg>
             </div>
           </div>
@@ -229,27 +230,43 @@ function formatFinishTime(seconds: number): string {
   return `${mins}:${secs.toString().padStart(2, '0')}.${ms.toString().padStart(2, '0')}`;
 }
 
-function ChampionStars({ color }: { color: string }) {
+function ChampionStars() {
   const starCount = 12;
-  const radius = 30;
+  const orbitRadius = 40;
 
   return (
-    <div className="champion-stars">
+    <div
+      className="champion-stars"
+      style={{
+        width: 0,
+        height: 0,
+        position: 'absolute',
+        top: '50%',
+        left: '50%',
+        animation: 'championRotate 2s linear infinite',
+      }}
+    >
       {Array.from({ length: starCount }).map((_, i) => {
         const angle = (i / starCount) * Math.PI * 2;
-        const x = Math.cos(angle) * radius;
-        const y = Math.sin(angle) * radius;
-        const starColor = i % 2 === 0 ? '#ffd700' : '#ffaa00';
+        const x = Math.cos(angle) * orbitRadius;
+        const y = Math.sin(angle) * orbitRadius;
+        const delay = (i % 3) * 0.17;
 
         return (
           <div
             key={i}
             className="champion-star"
             style={{
-              left: x - 4,
-              top: y - 4,
-              background: starColor,
-              boxShadow: `0 0 4px ${starColor}`,
+              position: 'absolute',
+              left: `${x}px`,
+              top: `${y}px`,
+              width: '8px',
+              height: '8px',
+              borderRadius: '50%',
+              transform: 'translate(-50%, -50%)',
+              animation: `starColorSwap 0.5s ease-in-out infinite alternate`,
+              animationDelay: `${delay}s`,
+              background: i % 2 === 0 ? '#ffd700' : '#ffaa00',
             }}
           />
         );

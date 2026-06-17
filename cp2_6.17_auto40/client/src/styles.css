@@ -309,12 +309,66 @@ body::before {
   height: 32px;
   transition: none;
   z-index: 10;
+  background-image: url('./assets/horse-sprite.svg');
+  background-size: 256px 64px;
+  background-repeat: no-repeat;
   filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.5));
+  animation: horseRun 0.3s steps(2) infinite;
 }
 
-.horse-sprite svg {
-  width: 100%;
-  height: 100%;
+.horse-color-0 { background-position: 0 0; }
+.horse-color-1 { background-position: -32px 0; }
+.horse-color-2 { background-position: -64px 0; }
+.horse-color-3 { background-position: -96px 0; }
+.horse-color-4 { background-position: -128px 0; }
+.horse-color-5 { background-position: -160px 0; }
+.horse-color-6 { background-position: -192px 0; }
+.horse-color-7 { background-position: -224px 0; }
+
+.horse-color-0.horse-running { animation: horseRun-0 0.3s steps(2) infinite; }
+.horse-color-1.horse-running { animation: horseRun-1 0.3s steps(2) infinite; }
+.horse-color-2.horse-running { animation: horseRun-2 0.3s steps(2) infinite; }
+.horse-color-3.horse-running { animation: horseRun-3 0.3s steps(2) infinite; }
+.horse-color-4.horse-running { animation: horseRun-4 0.3s steps(2) infinite; }
+.horse-color-5.horse-running { animation: horseRun-5 0.3s steps(2) infinite; }
+.horse-color-6.horse-running { animation: horseRun-6 0.3s steps(2) infinite; }
+.horse-color-7.horse-running { animation: horseRun-7 0.3s steps(2) infinite; }
+
+@keyframes horseRun-0 {
+  0% { background-position: 0 0; }
+  100% { background-position: 0 -32px; }
+}
+@keyframes horseRun-1 {
+  0% { background-position: -32px 0; }
+  100% { background-position: -32px -32px; }
+}
+@keyframes horseRun-2 {
+  0% { background-position: -64px 0; }
+  100% { background-position: -64px -32px; }
+}
+@keyframes horseRun-3 {
+  0% { background-position: -96px 0; }
+  100% { background-position: -96px -32px; }
+}
+@keyframes horseRun-4 {
+  0% { background-position: -128px 0; }
+  100% { background-position: -128px -32px; }
+}
+@keyframes horseRun-5 {
+  0% { background-position: -160px 0; }
+  100% { background-position: -160px -32px; }
+}
+@keyframes horseRun-6 {
+  0% { background-position: -192px 0; }
+  100% { background-position: -192px -32px; }
+}
+@keyframes horseRun-7 {
+  0% { background-position: -224px 0; }
+  100% { background-position: -224px -32px; }
+}
+
+.horse-sprite.horse-idle {
+  animation: none;
 }
 
 .star-effect {
@@ -398,6 +452,8 @@ body::before {
   justify-content: center;
   flex-wrap: nowrap;
   padding: 8px 0;
+  position: relative;
+  height: 76px;
 }
 
 .ranking-item {
@@ -408,11 +464,37 @@ body::before {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
-  position: relative;
+  position: absolute;
+  top: 8px;
   font-family: 'Orbitron', monospace;
   backdrop-filter: blur(4px);
   border: 1px solid rgba(255, 255, 255, 0.1);
+  transition: left 0.5s cubic-bezier(0.4, 0, 0.2, 1),
+              top 0.5s cubic-bezier(0.4, 0, 0.2, 1),
+              transform 0.5s cubic-bezier(0.4, 0, 0.2, 1),
+              background-color 0.5s ease,
+              border-color 0.5s ease;
+  will-change: left, transform;
+}
+
+.ranking-item.ranking-up {
+  animation: rankUp 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.ranking-item.ranking-down {
+  animation: rankDown 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@keyframes rankUp {
+  0% { transform: translateY(10px) scale(1); }
+  50% { transform: translateY(-4px) scale(1.05); }
+  100% { transform: translateY(0) scale(1); }
+}
+
+@keyframes rankDown {
+  0% { transform: translateY(-10px) scale(1); }
+  50% { transform: translateY(4px) scale(0.95); }
+  100% { transform: translateY(0) scale(1); }
 }
 
 .ranking-item .rank-num {
@@ -465,48 +547,6 @@ body::before {
   border-radius: 4px;
   z-index: 20;
   pointer-events: none;
-}
-
-.first-person-view {
-  width: 100%;
-  height: 700px;
-  position: relative;
-  overflow: hidden;
-  background: linear-gradient(180deg, #87CEEB 0%, #87CEEB 50%, var(--track-green-1) 50%, var(--track-green-2) 100%);
-  border-radius: 12px;
-}
-
-.fp-track {
-  position: absolute;
-  bottom: 0;
-  width: 100%;
-  height: 50%;
-  perspective: 400px;
-}
-
-.fp-lane-lines {
-  position: absolute;
-  bottom: 0;
-  width: 100%;
-  height: 100%;
-}
-
-.fp-lane-line {
-  position: absolute;
-  bottom: 0;
-  width: 2px;
-  height: 100%;
-  background: rgba(255, 255, 255, 0.4);
-  transform-origin: bottom center;
-}
-
-.fp-horse {
-  position: absolute;
-  transition: left 0.05s linear;
-}
-
-.fp-blur {
-  filter: blur(2px);
 }
 
 .minimap-container {
@@ -681,6 +721,166 @@ body::before {
   width: 8px;
   height: 8px;
   border-radius: 50%;
+  animation: starColorSwap 0.5s ease-in-out infinite alternate;
+}
+
+.champion-star:nth-child(odd) {
+  animation-delay: 0.25s;
+}
+
+@keyframes starColorSwap {
+  0% { background-color: #ffd700; box-shadow: 0 0 6px #ffd700; }
+  100% { background-color: #ffaa00; box-shadow: 0 0 6px #ffaa00; }
+}
+
+.horse-leader-stars {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 11;
+}
+
+.horse-leader-star {
+  position: absolute;
+  width: 6px;
+  height: 6px;
+  background: #ffd700;
+  border-radius: 50%;
+  box-shadow: 0 0 4px #ffd700;
+  animation: leaderStarBlink 0.2s ease-in-out infinite alternate;
+}
+
+.horse-leader-star:nth-child(1) { top: -2px; left: 28px; animation-delay: 0s; }
+.horse-leader-star:nth-child(2) { top: 6px; left: 32px; animation-delay: 0.07s; }
+.horse-leader-star:nth-child(3) { top: -8px; left: 24px; animation-delay: 0.14s; }
+
+@keyframes leaderStarBlink {
+  0% { opacity: 0.3; transform: scale(0.6); }
+  100% { opacity: 1; transform: scale(1.2); }
+}
+
+.horse-sprint-glow {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 60px;
+  height: 60px;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 9;
+  animation: sprintGlowPulse 0.3s ease-in-out infinite alternate;
+}
+
+@keyframes sprintGlowPulse {
+  0% { opacity: 0.4; transform: translate(-50%, -50%) scale(0.85); }
+  100% { opacity: 0.7; transform: translate(-50%, -50%) scale(1.15); }
+}
+
+.first-person-view {
+  width: 100%;
+  height: 700px;
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(180deg, #87CEEB 0%, #b0d8e8 40%, #2e7d32 55%, #1b5e20 100%);
+  border-radius: 12px;
+}
+
+.first-person-track {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 45%;
+  perspective: 600px;
+  perspective-origin: 50% 0%;
+}
+
+.first-person-track-inner {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  transform-style: preserve-3d;
+}
+
+.fp-lane-divider {
+  position: absolute;
+  bottom: 0;
+  width: 2px;
+  height: 100%;
+  background: rgba(255, 255, 255, 0.3);
+  transform-origin: bottom center;
+}
+
+.fp-ground-texture {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-image: 
+    repeating-linear-gradient(
+      0deg,
+      transparent 0px,
+      transparent 24px,
+      rgba(255, 255, 255, 0.06) 24px,
+      rgba(255, 255, 255, 0.06) 26px
+    );
+  transform: rotateX(60deg);
+  transform-origin: top center;
+  animation: fpGroundScroll 0.3s linear infinite;
+}
+
+@keyframes fpGroundScroll {
+  0% { background-position-y: 0; }
+  100% { background-position-y: 26px; }
+}
+
+.fp-motion-blur {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  background: linear-gradient(90deg, 
+    rgba(0,0,0,0.4) 0%, 
+    transparent 15%, 
+    transparent 85%, 
+    rgba(0,0,0,0.4) 100%
+  );
+}
+
+.fp-horse-silhouette {
+  position: absolute;
+  bottom: 30px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 120px;
+  height: 60px;
+  opacity: 0.6;
+  filter: blur(1px);
+  z-index: 20;
+}
+
+.fp-speed-lines {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 5;
+}
+
+.fp-speed-line {
+  position: absolute;
+  width: 2px;
+  height: 40px;
+  background: rgba(255, 255, 255, 0.4);
+  border-radius: 2px;
+  animation: fpSpeedLineMove 0.4s linear infinite;
 }
 
 .restart-btn {
@@ -732,6 +932,18 @@ body::before {
 @keyframes championRotate {
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
+}
+
+@keyframes fpSpeedLineMove {
+  0% { transform: translateY(-40px); opacity: 0; }
+  20% { opacity: 0.6; }
+  80% { opacity: 0.6; }
+  100% { transform: translateY(700px); opacity: 0; }
+}
+
+@keyframes fpTrackMove {
+  0% { transform: translateY(0); }
+  100% { transform: translateY(26px); }
 }
 
 @media (min-width: 1400px) {

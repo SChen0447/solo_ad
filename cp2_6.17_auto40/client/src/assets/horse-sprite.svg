@@ -1,0 +1,80 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="64" viewBox="0 0 256 64">
+  <defs>
+    <symbol id="horse-run1" viewBox="0 0 32 32">
+      <g fill="currentColor">
+        <ellipse cx="16" cy="18" rx="8" ry="5"/>
+        <circle cx="24" cy="12" r="5"/>
+        <polygon points="28,8 32,3 30,10"/>
+        <circle cx="25" cy="11" r="1.5" fill="#fff"/>
+        <rect x="9" y="22" width="3" height="8" rx="1.5" transform="rotate(-10 10.5 26)"/>
+        <rect x="13" y="22" width="3" height="7" rx="1.5"/>
+        <rect x="17" y="22" width="3" height="8" rx="1.5" transform="rotate(8 18.5 26)"/>
+        <rect x="21" y="22" width="3" height="7" rx="1.5"/>
+        <path d="M6 16 L2 12" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>
+      </g>
+    </symbol>
+    <symbol id="horse-run2" viewBox="0 0 32 32">
+      <g fill="currentColor">
+        <ellipse cx="16" cy="19" rx="8" ry="4.5"/>
+        <circle cx="24" cy="13" r="5"/>
+        <polygon points="28,9 32,4 30,11"/>
+        <circle cx="25" cy="12" r="1.5" fill="#fff"/>
+        <rect x="9" y="23" width="3" height="6" rx="1.5"/>
+        <rect x="13" y="23" width="3" height="7" rx="1.5" transform="rotate(-8 14.5 26.5)"/>
+        <rect x="17" y="23" width="3" height="6" rx="1.5"/>
+        <rect x="21" y="23" width="3" height="7" rx="1.5" transform="rotate(8 22.5 26.5)"/>
+        <path d="M6 17 L2 13" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>
+      </g>
+    </symbol>
+  </defs>
+  
+  <g transform="translate(0, 0)" fill="#e94560">
+    <use href="#horse-run1" x="0" y="0" width="32" height="32"/>
+  </g>
+  <g transform="translate(32, 0)" fill="#6c63ff">
+    <use href="#horse-run1" x="0" y="0" width="32" height="32"/>
+  </g>
+  <g transform="translate(64, 0)" fill="#00bcd4">
+    <use href="#horse-run1" x="0" y="0" width="32" height="32"/>
+  </g>
+  <g transform="translate(96, 0)" fill="#4caf50">
+    <use href="#horse-run1" x="0" y="0" width="32" height="32"/>
+  </g>
+  <g transform="translate(128, 0)" fill="#ff9800">
+    <use href="#horse-run1" x="0" y="0" width="32" height="32"/>
+  </g>
+  <g transform="translate(160, 0)" fill="#e91e63">
+    <use href="#horse-run1" x="0" y="0" width="32" height="32"/>
+  </g>
+  <g transform="translate(192, 0)" fill="#9c27b0">
+    <use href="#horse-run1" x="0" y="0" width="32" height="32"/>
+  </g>
+  <g transform="translate(224, 0)" fill="#ffeb3b">
+    <use href="#horse-run1" x="0" y="0" width="32" height="32"/>
+  </g>
+  
+  <g transform="translate(0, 32)" fill="#e94560">
+    <use href="#horse-run2" x="0" y="0" width="32" height="32"/>
+  </g>
+  <g transform="translate(32, 32)" fill="#6c63ff">
+    <use href="#horse-run2" x="0" y="0" width="32" height="32"/>
+  </g>
+  <g transform="translate(64, 32)" fill="#00bcd4">
+    <use href="#horse-run2" x="0" y="0" width="32" height="32"/>
+  </g>
+  <g transform="translate(96, 32)" fill="#4caf50">
+    <use href="#horse-run2" x="0" y="0" width="32" height="32"/>
+  </g>
+  <g transform="translate(128, 32)" fill="#ff9800">
+    <use href="#horse-run2" x="0" y="0" width="32" height="32"/>
+  </g>
+  <g transform="translate(160, 32)" fill="#e91e63">
+    <use href="#horse-run2" x="0" y="0" width="32" height="32"/>
+  </g>
+  <g transform="translate(192, 32)" fill="#9c27b0">
+    <use href="#horse-run2" x="0" y="0" width="32" height="32"/>
+  </g>
+  <g transform="translate(224, 32)" fill="#ffeb3b">
+    <use href="#horse-run2" x="0" y="0" width="32" height="32"/>
+  </g>
+</svg>
