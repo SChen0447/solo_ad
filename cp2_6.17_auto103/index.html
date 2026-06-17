@@ -52,15 +52,38 @@
     }
 
     .control-panel h2 {
+      position: relative;
       font-size: 16px;
       font-weight: 600;
       color: #00e5ff;
-      margin-bottom: 16px;
+      margin-bottom: 20px;
       letter-spacing: 0.5px;
+      text-align: center;
+      padding-bottom: 12px;
+    }
+
+    .control-panel h2::after {
+      content: '';
+      position: absolute;
+      bottom: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 60%;
+      height: 1px;
+      background: rgba(0, 229, 255, 0.3);
+      border-radius: 1px;
     }
 
     .control-group {
-      margin-bottom: 16px;
+      margin-bottom: 18px;
+      padding-bottom: 18px;
+      border-bottom: 1px solid rgba(0, 229, 255, 0.1);
+    }
+
+    .control-group:last-child {
+      margin-bottom: 0;
+      padding-bottom: 0;
+      border-bottom: none;
     }
 
     .control-group label {
@@ -77,6 +100,7 @@
       display: inline-flex;
       align-items: center;
       justify-content: center;
+      gap: 8px;
       width: 100%;
       padding: 10px 16px;
       background: rgba(0, 229, 255, 0.1);
@@ -93,7 +117,44 @@
     .file-upload-btn:hover {
       background: rgba(0, 229, 255, 0.2);
       border-color: #00e5ff;
-      box-shadow: 0 0 16px rgba(0, 229, 255, 0.3);
+      box-shadow: 0 4px 20px rgba(0, 229, 255, 0.3);
+      transform: translateY(-1px);
+    }
+
+    .file-upload-btn.selected {
+      background: rgba(74, 222, 128, 0.15);
+      border-color: rgba(74, 222, 128, 0.5);
+      color: #4ade80;
+    }
+
+    .file-upload-btn.selected:hover {
+      background: rgba(74, 222, 128, 0.25);
+      box-shadow: 0 4px 20px rgba(74, 222, 128, 0.35);
+    }
+
+    .file-upload-btn .file-icon {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+      transition: transform 0.2s ease;
+    }
+
+    .file-upload-btn.selected .file-icon {
+      animation: filePulse 0.5s ease-out;
+    }
+
+    @keyframes filePulse {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.15); }
+    }
+
+    .file-upload-btn .file-name {
+      flex: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      text-align: left;
     }
 
     .file-upload-btn input[type="file"] {
@@ -103,8 +164,8 @@
     select {
       width: 100%;
       padding: 8px 12px;
-      background: rgba(20, 20, 50, 0.8);
-      border: 1px solid rgba(255, 255, 255, 0.1);
+      background: rgba(20, 20, 50, 0.9);
+      border: 1px solid rgba(0, 229, 255, 0.3);
       border-radius: 6px;
       color: #d0d0e0;
       font-size: 14px;
@@ -112,15 +173,35 @@
       cursor: pointer;
       transition: all 0.2s ease;
       outline: none;
+      appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%2300e5ff' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 12px center;
+      padding-right: 36px;
     }
 
     select:hover {
-      border-color: rgba(0, 229, 255, 0.4);
+      border-color: rgba(0, 229, 255, 0.6);
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(0, 229, 255, 0.15);
     }
 
     select:focus {
       border-color: #00e5ff;
-      box-shadow: 0 0 8px rgba(0, 229, 255, 0.2);
+      box-shadow: 0 0 12px rgba(0, 229, 255, 0.3);
+    }
+
+    select option {
+      background: #1a1a3e;
+      color: #d0d0e0;
+      padding: 8px 12px;
+      font-size: 14px;
+    }
+
+    select option:hover,
+    select option:checked {
+      background: rgba(0, 229, 255, 0.2);
+      color: #00e5ff;
     }
 
     .checkbox-group {
@@ -135,10 +216,14 @@
       gap: 8px;
       cursor: pointer;
       transition: all 0.2s ease;
+      padding: 4px 6px;
+      border-radius: 4px;
     }
 
     .checkbox-item:hover {
       color: #00e5ff;
+      transform: translateY(-1px);
+      background: rgba(0, 229, 255, 0.05);
     }
 
     .checkbox-item input[type="checkbox"] {
@@ -178,6 +263,14 @@
       display: flex;
       flex-direction: column;
       gap: 6px;
+      padding: 4px 2px;
+      transition: all 0.2s ease;
+      border-radius: 4px;
+    }
+
+    .slider-container:hover {
+      background: rgba(0, 229, 255, 0.03);
+      transform: translateY(-1px);
     }
 
     .slider-value {
@@ -208,8 +301,8 @@
     }
 
     input[type="range"]::-webkit-slider-thumb:hover {
-      transform: scale(1.2);
-      box-shadow: 0 0 12px rgba(0, 229, 255, 0.8);
+      transform: scale(1.2) translateY(-1px);
+      box-shadow: 0 4px 16px rgba(0, 229, 255, 0.6);
     }
 
     .reset-btn {
@@ -224,12 +317,22 @@
       cursor: pointer;
       transition: all 0.2s ease;
       font-family: 'Inter', sans-serif;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
     }
 
     .reset-btn:hover {
       border-color: #00e5ff;
       color: #00e5ff;
       background: rgba(0, 229, 255, 0.08);
+      transform: translateY(-1px);
+      box-shadow: 0 4px 16px rgba(0, 229, 255, 0.2);
+    }
+
+    .reset-btn:active {
+      transform: translateY(0);
     }
 
     .info-panel {
@@ -409,8 +512,9 @@
 
     <div class="control-group">
       <label>数据文件</label>
-      <label class="file-upload-btn">
-        <span>📁 上传 CSV 文件</span>
+      <label class="file-upload-btn" id="fileUploadBtn">
+        <span class="file-icon">📁</span>
+        <span class="file-name" id="fileNameDisplay">上传 CSV 文件</span>
         <input type="file" id="fileInput" accept=".csv" />
       </label>
     </div>
