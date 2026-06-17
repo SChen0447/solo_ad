@@ -10,6 +10,7 @@ export class StationScene extends Phaser.Scene {
   private gridOffsetX = 0;
   private gridOffsetY = 0;
   private gridGraphics!: Phaser.GameObjects.Graphics;
+  private gridHighlightGraphics!: Phaser.GameObjects.Graphics;
   private moduleContainer!: Phaser.GameObjects.Container;
   private resourceBarContainer!: Phaser.GameObjects.Container;
   private crewContainer!: Phaser.GameObjects.Container;
@@ -22,7 +23,7 @@ export class StationScene extends Phaser.Scene {
   private isDragging = false;
   private dragX = 0;
   private dragY = 0;
-  private dragModulePreview!: Phaser.GameObjects.Graphics | null;
+  private dragModulePreview!: Phaser.GameObjects.Container | null;
 
   private tickTimer = 0;
   private tickInterval = 5000;
@@ -30,9 +31,18 @@ export class StationScene extends Phaser.Scene {
   private dayText!: Phaser.GameObjects.Text;
   private scoreText!: Phaser.GameObjects.Text;
 
-  private floatingTexts: Phaser.GameObjects.Text[] = [];
+  private resourceBars: Record<string, {
+    bar: Phaser.GameObjects.Graphics;
+    text: Phaser.GameObjects.Text;
+    icon: string;
+    pulseGlow: Phaser.GameObjects.Graphics;
+    barWidth: number;
+    barX: number;
+    barY: number;
+  }> = {};
 
-  private resourceBars: Record<string, { bar: Phaser.GameObjects.Graphics; text: Phaser.GameObjects.Text; icon: string }> = {};
+  private resourceKeys: string[] = [];
+  private crewDetailPanel: Phaser.GameObjects.Container | null = null;
 
   constructor() {
     super('StationScene');
@@ -54,6 +64,7 @@ export class StationScene extends Phaser.Scene {
     }
 
     this.createGrid();
+    this.createGridHighlight();
     this.createModuleContainer();
     this.createResourceBar();
     this.createBuildPanel();
@@ -70,6 +81,7 @@ export class StationScene extends Phaser.Scene {
 
     this.updateUI();
     this.renderModules();
+    this.updateCrewDisplay();
   }
 
   private createBackground(): void {
@@ -132,13 +144,63 @@ export class StationScene extends Phaser.Scene {
     );
   }
 
+  private createGridHighlight(): void {
+    this.gridHighlightGraphics = this.add.graphics();
+    this.gridHighlightGraphics.setDepth(5);
+  }
+
+  private updateGridHighlight(gridX: number, gridY: number, moduleType: string): void {
+    this.gridHighlightGraphics.clear();
+
+    const info = stationManager.getModuleInfo(moduleType);
+    if (!info) return;
+
+    const [w, h] = info.size;
+    const canPlace = stationManager.canPlaceModule(moduleType, gridX, gridY);
+    const color = canPlace ? 0x00FF00 : 0xFF0000;
+    const alpha = canPlace ? 0.25 : 0.35;
+
+    for (let dx = 0; dx < w; dx++) {
+      for (let dy = 0; dy < h; dy++) {
+        const cellX = gridX + dx;
+        const cellY = gridY + dy;
+
+        const isValidCell = cellX >= 0 && cellY >= 0 && cellX < GRID_SIZE && cellY < GRID_SIZE;
+        const cellColor = isValidCell ? color : 0xFF0000;
+        const cellAlpha = isValidCell ? alpha : 0.5;
+
+        this.gridHighlightGraphics.fillStyle(cellColor, cellAlpha);
+        this.gridHighlightGraphics.fillRect(
+          this.gridOffsetX + cellX * CELL_SIZE + 2,
+          this.gridOffsetY + cellY * CELL_SIZE + 2,
+          CELL_SIZE - 4,
+          CELL_SIZE - 4
+        );
+
+        this.gridHighlightGraphics.lineStyle(2, cellColor, 0.9);
+        this.gridHighlightGraphics.strokeRect(
+          this.gridOffsetX + cellX * CELL_SIZE + 2,
+          this.gridOffsetY + cellY * CELL_SIZE + 2,
+          CELL_SIZE - 4,
+          CELL_SIZE - 4
+        );
+      }
+    }
+  }
+
+  private clearGridHighlight(): void {
+    this.gridHighlightGraphics.clear();
+  }
+
   private createModuleContainer(): void {
     this.moduleContainer = this.add.container(0, 0);
+    this.moduleContainer.setDepth(10);
   }
 
   private createResourceBar(): void {
     const width = this.cameras.main.width;
     this.resourceBarContainer = this.add.container(0, 0);
+    this.resourceBarContainer.setDepth(20);
 
     const barHeight = 60;
     const barY = 15;
@@ -152,15 +214,16 @@ export class StationScene extends Phaser.Scene {
     this.resourceBarContainer.add(barBg);
 
     const resources = [
-      { key: 'oxygen', name: '氧气', icon: '💨', color: 0x00D4FF },
-      { key: 'water', name: '水', icon: '💧', color: 0x00CED1 },
-      { key: 'food', name: '食物', icon: '🍎', color: 0x32CD32 },
-      { key: 'power', name: '电力', icon: '⚡', color: 0xFFD700 },
-      { key: 'tech_points', name: '科技', icon: '🔬', color: 0xA855F7 },
-      { key: 'reputation', name: '信誉', icon: '⭐', color: 0xFFD700 },
-      { key: 'materials', name: '材料', icon: '🔧', color: 0xCD853F }
+      { key: 'oxygen', name: '氧气', icon: '💨' },
+      { key: 'water', name: '水', icon: '💧' },
+      { key: 'food', name: '食物', icon: '🍎' },
+      { key: 'power', name: '电力', icon: '⚡' },
+      { key: 'tech_points', name: '科技', icon: '🔬' },
+      { key: 'reputation', name: '信誉', icon: '⭐' },
+      { key: 'materials', name: '材料', icon: '🔧' }
     ];
 
+    this.resourceKeys = resources.map(r => r.key);
     const barWidth = (width - 60) / resources.length;
 
     resources.forEach((res, index) => {
@@ -178,17 +241,28 @@ export class StationScene extends Phaser.Scene {
         fontStyle: 'bold'
       }).setOrigin(0, 0.5);
 
-      const barContainer = this.add.graphics();
-      barContainer.fillStyle(0x2a2a4a, 1);
-      barContainer.fillRect(x + 10, y + 5, barWidth - 30, 8);
+      const barGraphics = this.add.graphics();
+      const pulseGlow = this.add.graphics();
+
+      const barX = x + 10;
+      const barY2 = y + 5;
+      const barW = barWidth - 30;
+      const barH = 8;
+
+      barGraphics.fillStyle(0x2a2a4a, 1);
+      barGraphics.fillRect(barX, barY2, barW, barH);
 
       this.resourceBars[res.key] = {
-        bar: barContainer,
+        bar: barGraphics,
         text: valueText,
-        icon: res.icon
+        icon: res.icon,
+        pulseGlow: pulseGlow,
+        barWidth: barW,
+        barX: barX,
+        barY: barY2
       };
 
-      this.resourceBarContainer.add([iconText, valueText, barContainer]);
+      this.resourceBarContainer.add([iconText, valueText, barGraphics, pulseGlow]);
     });
   }
 
@@ -219,8 +293,8 @@ export class StationScene extends Phaser.Scene {
     const panelBg = this.add.graphics();
     panelBg.fillStyle(0x1a1a2e, 0.9);
     panelBg.lineStyle(1, 0x00D4FF, 0.5);
-    panelBg.strokeRect(panelX, panelY, panelWidth, 400);
-    panelBg.fillRect(panelX, panelY, panelWidth, 400);
+    panelBg.strokeRect(panelX, panelY, panelWidth, 450);
+    panelBg.fillRect(panelX, panelY, panelWidth, 450);
 
     const titleText = this.add.text(panelX + panelWidth / 2, panelY + 15, '建造模块', {
       fontSize: '18px',
@@ -238,6 +312,13 @@ export class StationScene extends Phaser.Scene {
       const y = panelY + 50 + index * 55;
       this.createBuildItem(key, info as ModuleInfo, panelX + 10, y, panelWidth - 20, 50);
     });
+
+    const hintText = this.add.text(panelX + panelWidth / 2, panelY + 420, '拖拽到网格放置', {
+      fontSize: '11px',
+      fontFamily: "'Segoe UI', system-ui, sans-serif",
+      color: '#8888aa'
+    }).setOrigin(0.5, 0);
+    this.buildPanelContainer.add(hintText);
   }
 
   private createBuildItem(
@@ -277,6 +358,12 @@ export class StationScene extends Phaser.Scene {
       color: '#FFD700'
     }).setOrigin(0, 0);
 
+    const sizeText = this.add.text(x + 52, y + 42, `尺寸: ${info.size[0]}x${info.size[1]}`, {
+      fontSize: '9px',
+      fontFamily: "'Segoe UI', system-ui, sans-serif",
+      color: '#8888aa'
+    }).setOrigin(0, 0);
+
     const hitArea = this.add.zone(x, y, width, height).setOrigin(0, 0);
     hitArea.setInteractive({ useHandCursor: true });
 
@@ -300,15 +387,16 @@ export class StationScene extends Phaser.Scene {
       this.startBuilding(moduleType);
     });
 
-    this.buildPanelContainer.add([itemBg, iconBg, iconText, nameText, costText, hitArea]);
+    this.buildPanelContainer.add([itemBg, iconBg, iconText, nameText, costText, sizeText, hitArea]);
   }
 
   private getModuleIcon(type: string): string {
     const icons: Record<string, string> = {
+      core: '🏠',
       life_support: '💨',
       power_core: '⚡',
       lab: '🔬',
-      habitat: '🏠',
+      habitat: '🛏️',
       greenhouse: '🌱',
       medical: '💊',
       solar_panel: '☀️',
@@ -319,6 +407,7 @@ export class StationScene extends Phaser.Scene {
 
   private getModuleColor(type: string): string {
     const colors: Record<string, string> = {
+      core: '#00D4FF',
       life_support: '#00FF9D',
       power_core: '#FFD700',
       lab: '#A855F7',
@@ -326,8 +415,7 @@ export class StationScene extends Phaser.Scene {
       greenhouse: '#32CD32',
       medical: '#FF69B4',
       solar_panel: '#FFA500',
-      water_recycler: '#00CED1',
-      core: '#00D4FF'
+      water_recycler: '#00CED1'
     };
     return colors[type] || '#00D4FF';
   }
@@ -343,6 +431,8 @@ export class StationScene extends Phaser.Scene {
 
   private createCrewPanel(): void {
     this.crewContainer = this.add.container(0, 0);
+    this.crewContainer.setDepth(15);
+    this.crewDetailPanel = null;
   }
 
   private setupInput(): void {
@@ -362,6 +452,8 @@ export class StationScene extends Phaser.Scene {
 
     this.input.keyboard?.on('keydown-ESC', () => {
       this.cancelBuilding();
+      this.hideRecruitPanel();
+      this.hideCrewDetailPanel();
     });
   }
 
@@ -383,6 +475,7 @@ export class StationScene extends Phaser.Scene {
     this.dragY = pointer.y;
 
     this.createDragPreview();
+    this.updateDragPreview();
   }
 
   private createDragPreview(): void {
@@ -392,19 +485,33 @@ export class StationScene extends Phaser.Scene {
     if (!info) return;
 
     const [w, h] = info.size;
-    const width = w * CELL_SIZE - 4;
-    const height = h * CELL_SIZE - 4;
+    const moduleWidth = w * CELL_SIZE - 8;
+    const moduleHeight = h * CELL_SIZE - 8;
 
-    this.dragModulePreview = this.add.graphics();
-    this.dragModulePreview.setAlpha(0.7);
+    this.dragModulePreview = this.add.container(0, 0);
+    this.dragModulePreview.setDepth(30);
+    this.dragModulePreview.setAlpha(0.85);
 
     const colorStr = this.getModuleColor(this.selectedModuleType);
     const color = Phaser.Display.Color.HexStringToColor(colorStr).color;
 
-    this.dragModulePreview.fillStyle(color, 0.5);
-    this.dragModulePreview.lineStyle(2, color, 1);
-    this.dragModulePreview.strokeRoundedRect(-width / 2, -height / 2, width, height, 6);
-    this.dragModulePreview.fillRoundedRect(-width / 2, -height / 2, width, height, 6);
+    const bg = this.add.graphics();
+    bg.fillStyle(color, 0.5);
+    bg.lineStyle(3, color, 0.9);
+    bg.strokeRoundedRect(-moduleWidth / 2, -moduleHeight / 2, moduleWidth, moduleHeight, 8);
+    bg.fillRoundedRect(-moduleWidth / 2, -moduleHeight / 2, moduleWidth, moduleHeight, 8);
+
+    const iconText = this.add.text(0, -5, this.getModuleIcon(this.selectedModuleType), {
+      fontSize: '28px'
+    }).setOrigin(0.5);
+
+    const nameText = this.add.text(0, moduleHeight / 2 - 12, info.name, {
+      fontSize: '11px',
+      fontFamily: "'Segoe UI', system-ui, sans-serif",
+      color: '#ffffff'
+    }).setOrigin(0.5);
+
+    this.dragModulePreview.add([bg, iconText, nameText]);
   }
 
   private updateDragPreview(): void {
@@ -413,29 +520,15 @@ export class StationScene extends Phaser.Scene {
     const gridX = Math.floor((this.dragX - this.gridOffsetX) / CELL_SIZE);
     const gridY = Math.floor((this.dragY - this.gridOffsetY) / CELL_SIZE);
 
-    const canPlace = stationManager.canPlaceModule(this.selectedModuleType, gridX, gridY);
-    const color = canPlace ? 0x00FF00 : 0xFF0000;
-
     const info = stationManager.getModuleInfo(this.selectedModuleType);
     if (!info) return;
 
     const [w, h] = info.size;
-    const width = w * CELL_SIZE - 4;
-    const height = h * CELL_SIZE - 4;
-
     const centerX = this.gridOffsetX + gridX * CELL_SIZE + (w * CELL_SIZE) / 2;
     const centerY = this.gridOffsetY + gridY * CELL_SIZE + (h * CELL_SIZE) / 2;
 
     this.dragModulePreview.setPosition(centerX, centerY);
-
-    this.dragModulePreview.clear();
-    const colorStr = this.getModuleColor(this.selectedModuleType);
-    const baseColor = Phaser.Display.Color.HexStringToColor(colorStr).color;
-
-    this.dragModulePreview.fillStyle(baseColor, 0.3);
-    this.dragModulePreview.lineStyle(3, color, 0.8);
-    this.dragModulePreview.strokeRoundedRect(-width / 2, -height / 2, width, height, 6);
-    this.dragModulePreview.fillRoundedRect(-width / 2, -height / 2, width, height, 6);
+    this.updateGridHighlight(gridX, gridY, this.selectedModuleType);
   }
 
   private async tryPlaceModule(pointerX: number, pointerY: number): Promise<void> {
@@ -448,6 +541,7 @@ export class StationScene extends Phaser.Scene {
       const success = await stationManager.buildModule(this.selectedModuleType, gridX, gridY);
       if (success) {
         this.renderModules();
+        this.updateCrewDisplay();
       }
     }
 
@@ -457,6 +551,8 @@ export class StationScene extends Phaser.Scene {
   private cancelBuilding(): void {
     this.selectedModuleType = null;
     this.isDragging = false;
+
+    this.clearGridHighlight();
 
     if (this.dragModulePreview) {
       this.dragModulePreview.destroy();
@@ -522,13 +618,42 @@ export class StationScene extends Phaser.Scene {
 
     this.moduleContainer.add(container);
 
-    if (module.type === 'habitat') {
-      container.setSize(moduleWidth, moduleHeight);
-      container.setInteractive({ useHandCursor: true });
-      container.on('pointerdown', () => {
-        this.showRecruitPanel();
+    container.setSize(moduleWidth, moduleHeight);
+    container.setInteractive({ useHandCursor: true });
+
+    container.on('pointerover', () => {
+      this.tweens.add({
+        targets: container,
+        scale: 1.05,
+        duration: 150,
+        ease: 'Power2.easeOut'
       });
-    }
+      bg.clear();
+      bg.fillStyle(color, 0.6);
+      bg.lineStyle(3, 0x00FF9D, 1);
+      bg.strokeRoundedRect(-moduleWidth / 2, -moduleHeight / 2, moduleWidth, moduleHeight, 8);
+      bg.fillRoundedRect(-moduleWidth / 2, -moduleHeight / 2, moduleWidth, moduleHeight, 8);
+    });
+
+    container.on('pointerout', () => {
+      this.tweens.add({
+        targets: container,
+        scale: 1,
+        duration: 150,
+        ease: 'Power2.easeOut'
+      });
+      bg.clear();
+      bg.fillStyle(color, 0.4);
+      bg.lineStyle(2, color, 0.8);
+      bg.strokeRoundedRect(-moduleWidth / 2, -moduleHeight / 2, moduleWidth, moduleHeight, 8);
+      bg.fillRoundedRect(-moduleWidth / 2, -moduleHeight / 2, moduleWidth, moduleHeight, 8);
+    });
+
+    container.on('pointerdown', () => {
+      if (module.type === 'habitat') {
+        this.showRecruitPanel();
+      }
+    });
   }
 
   private showRecruitPanel(): void {
@@ -540,17 +665,18 @@ export class StationScene extends Phaser.Scene {
     const height = this.cameras.main.height;
 
     this.recruitPanelContainer = this.add.container(0, 0);
+    this.recruitPanelContainer.setDepth(50);
 
     const overlay = this.add.graphics();
-    overlay.fillStyle(0x000000, 0.5);
+    overlay.fillStyle(0x000000, 0.6);
     overlay.fillRect(0, 0, width, height);
     overlay.setInteractive({ useHandCursor: true });
     overlay.on('pointerdown', () => {
       this.hideRecruitPanel();
     });
 
-    const panelWidth = 400;
-    const panelHeight = 350;
+    const panelWidth = 420;
+    const panelHeight = 420;
     const panelX = width / 2 - panelWidth / 2;
     const panelY = height / 2 - panelHeight / 2;
 
@@ -560,7 +686,7 @@ export class StationScene extends Phaser.Scene {
     panelBg.strokeRoundedRect(panelX, panelY, panelWidth, panelHeight, 12);
     panelBg.fillRoundedRect(panelX, panelY, panelWidth, panelHeight, 12);
 
-    const titleText = this.add.text(width / 2, panelY + 30, '招募船员', {
+    const titleText = this.add.text(width / 2, panelY + 30, '🛸 招募船员', {
       fontSize: '24px',
       fontFamily: "'Segoe UI', system-ui, sans-serif",
       color: '#00D4FF',
@@ -578,97 +704,105 @@ export class StationScene extends Phaser.Scene {
 
     const avatarBg = this.add.graphics();
     avatarBg.fillStyle(avatarColor, 1);
-    avatarBg.fillCircle(width / 2 - 80, panelY + 130, 40);
+    avatarBg.lineStyle(3, 0xffffff, 0.3);
+    avatarBg.fillCircle(width / 2 - 100, panelY + 135, 45);
+    avatarBg.strokeCircle(width / 2 - 100, panelY + 135, 45);
 
-    const avatarInitial = this.add.text(width / 2 - 80, panelY + 130, previewMember.name[0], {
-      fontSize: '24px',
+    const avatarInitial = this.add.text(width / 2 - 100, panelY + 135, previewMember.name[0], {
+      fontSize: '28px',
       fontFamily: "'Segoe UI', system-ui, sans-serif",
       color: '#ffffff',
       fontStyle: 'bold'
     }).setOrigin(0.5);
 
-    const memberName = this.add.text(width / 2 - 30, panelY + 110, previewMember.name, {
-      fontSize: '20px',
+    const memberName = this.add.text(width / 2 - 40, panelY + 110, previewMember.name, {
+      fontSize: '22px',
       fontFamily: "'Segoe UI', system-ui, sans-serif",
       color: '#ffffff',
       fontStyle: 'bold'
     }).setOrigin(0, 0);
 
-    const memberProfession = this.add.text(width / 2 - 30, panelY + 140, previewMember.profession, {
-      fontSize: '14px',
+    const memberProfession = this.add.text(width / 2 - 40, panelY + 142, previewMember.profession, {
+      fontSize: '15px',
       fontFamily: "'Segoe UI', system-ui, sans-serif",
       color: '#00FF9D'
     }).setOrigin(0, 0);
 
-    const memberMorale = this.add.text(width / 2 - 30, panelY + 165, `士气: ${previewMember.morale}`, {
+    const memberMorale = this.add.text(width / 2 - 40, panelY + 170, `士气: ${previewMember.morale}/100`, {
       fontSize: '13px',
       fontFamily: "'Segoe UI', system-ui, sans-serif",
       color: '#FFD700'
     }).setOrigin(0, 0);
 
-    const skillsTitle = this.add.text(width / 2, panelY + 200, '技能', {
-      fontSize: '14px',
-      fontFamily: "'Segoe UI', system-ui, sans-serif",
-      color: '#8888aa'
-    }).setOrigin(0.5);
+    const moraleBarBg = this.add.graphics();
+    moraleBarBg.fillStyle(0x2a2a4a, 1);
+    moraleBarBg.fillRect(width / 2 - 40, panelY + 190, 150, 8);
 
-    let skillY = panelY + 225;
+    const moraleBar = this.add.graphics();
+    moraleBar.fillStyle(0x00FF9D, 1);
+    moraleBar.fillRect(width / 2 - 40, panelY + 190, (previewMember.morale / 100) * 150, 8);
+
+    const skillsTitle = this.add.text(panelX + 30, panelY + 230, '📊 技能属性', {
+      fontSize: '16px',
+      fontFamily: "'Segoe UI', system-ui, sans-serif",
+      color: '#00D4FF',
+      fontStyle: 'bold'
+    }).setOrigin(0, 0);
+
+    let skillY = panelY + 260;
     Object.entries(previewMember.skills).forEach(([skill, level]) => {
-      const skillName = this.add.text(width / 2 - 100, skillY, skill, {
-        fontSize: '12px',
+      const skillName = this.add.text(panelX + 30, skillY, skill, {
+        fontSize: '13px',
         fontFamily: "'Segoe UI', system-ui, sans-serif",
         color: '#ccccdd'
       }).setOrigin(0, 0.5);
 
       const skillBarBg = this.add.graphics();
       skillBarBg.fillStyle(0x2a2a4a, 1);
-      skillBarBg.fillRect(width / 2 - 30, skillY - 5, 100, 10);
+      skillBarBg.fillRect(panelX + 100, skillY - 6, 200, 12);
 
       const skillBar = this.add.graphics();
-      skillBar.fillStyle(0x00D4FF, 1);
-      skillBar.fillRect(width / 2 - 30, skillY - 5, (level / 5) * 100, 10);
+      const skillColor = level >= 4 ? 0x00FF9D : level >= 2 ? 0xFFD700 : 0xEF4444;
+      skillBar.fillStyle(skillColor, 1);
+      skillBar.fillRect(panelX + 100, skillY - 6, (level / 5) * 200, 12);
 
-      const skillLevel = this.add.text(width / 2 + 75, skillY, `${level}/5`, {
+      const skillLevel = this.add.text(panelX + 310, skillY, `Lv.${level}`, {
         fontSize: '12px',
         fontFamily: "'Segoe UI', system-ui, sans-serif",
-        color: '#FFD700'
+        color: '#FFD700',
+        fontStyle: 'bold'
       }).setOrigin(0, 0.5);
 
-      skillY += 20;
+      skillY += 28;
     });
 
-    const recruitBtn = this.add.graphics();
-    recruitBtn.fillStyle(0x00D4FF, 0.8);
-    recruitBtn.strokeRoundedRect(width / 2 - 80, panelY + 300, 160, 40, 8);
-    recruitBtn.fillRoundedRect(width / 2 - 80, panelY + 300, 160, 40, 8);
+    const canRecruit = this.canRecruit();
 
-    const recruitBtnText = this.add.text(width / 2, panelY + 320, '确认招募', {
+    const recruitBtn = this.add.graphics();
+    const btnColor = canRecruit ? 0x00D4FF : 0x666666;
+    recruitBtn.fillStyle(btnColor, canRecruit ? 0.8 : 0.5);
+    recruitBtn.strokeRoundedRect(width / 2 - 100, panelY + 370, 200, 40, 8);
+    recruitBtn.fillRoundedRect(width / 2 - 100, panelY + 370, 200, 40, 8);
+
+    const recruitBtnText = this.add.text(width / 2, panelY + 390, canRecruit ? '✅ 确认招募' : '❌ 条件不足', {
       fontSize: '16px',
       fontFamily: "'Segoe UI', system-ui, sans-serif",
-      color: '#0a0a2a',
+      color: canRecruit ? '#0a0a2a' : '#999999',
       fontStyle: 'bold'
     }).setOrigin(0.5);
 
-    const canRecruit = this.canRecruit();
-    if (!canRecruit) {
-      recruitBtn.clear();
-      recruitBtn.fillStyle(0x666666, 0.5);
-      recruitBtn.fillRoundedRect(width / 2 - 80, panelY + 300, 160, 40, 8);
-      recruitBtnText.setColor('#999999');
-    }
-
-    const btnHitArea = this.add.zone(width / 2 - 80, panelY + 300, 160, 40).setOrigin(0, 0);
     if (canRecruit) {
+      const btnHitArea = this.add.zone(width / 2 - 100, panelY + 370, 200, 40).setOrigin(0, 0);
       btnHitArea.setInteractive({ useHandCursor: true });
       btnHitArea.on('pointerover', () => {
         recruitBtn.clear();
         recruitBtn.fillStyle(0x00FF9D, 0.9);
-        recruitBtn.fillRoundedRect(width / 2 - 80, panelY + 300, 160, 40, 8);
+        recruitBtn.fillRoundedRect(width / 2 - 100, panelY + 370, 200, 40, 8);
       });
       btnHitArea.on('pointerout', () => {
         recruitBtn.clear();
         recruitBtn.fillStyle(0x00D4FF, 0.8);
-        recruitBtn.fillRoundedRect(width / 2 - 80, panelY + 300, 160, 40, 8);
+        recruitBtn.fillRoundedRect(width / 2 - 100, panelY + 370, 200, 40, 8);
       });
       btnHitArea.on('pointerdown', async () => {
         const result = await stationManager.recruitCrew();
@@ -677,17 +811,40 @@ export class StationScene extends Phaser.Scene {
           this.updateCrewDisplay();
         }
       });
+      this.recruitPanelContainer.add(btnHitArea);
     }
+
+    const refreshBtn = this.add.graphics();
+    refreshBtn.fillStyle(0x2a2a4a, 0.8);
+    refreshBtn.lineStyle(1, 0x00D4FF, 0.5);
+    refreshBtn.strokeRoundedRect(panelX + 20, panelY + 370, 100, 40, 8);
+    refreshBtn.fillRoundedRect(panelX + 20, panelY + 370, 100, 40, 8);
+
+    const refreshBtnText = this.add.text(panelX + 70, panelY + 390, '🔄 刷新', {
+      fontSize: '14px',
+      fontFamily: "'Segoe UI', system-ui, sans-serif",
+      color: '#00D4FF'
+    }).setOrigin(0.5);
+
+    const refreshHitArea = this.add.zone(panelX + 20, panelY + 370, 100, 40).setOrigin(0, 0);
+    refreshHitArea.setInteractive({ useHandCursor: true });
+    refreshHitArea.on('pointerdown', () => {
+      this.recruitPanelContainer?.destroy();
+      this.showRecruitPanel();
+    });
 
     this.recruitPanelContainer.add([
       overlay, panelBg, titleText, costText,
       avatarBg, avatarInitial, memberName, memberProfession, memberMorale,
-      skillsTitle, recruitBtn, recruitBtnText, btnHitArea
+      moraleBarBg, moraleBar,
+      skillsTitle, recruitBtn, recruitBtnText,
+      refreshBtn, refreshBtnText, refreshHitArea
     ]);
   }
 
   private generatePreviewCrew(): any {
-    const names = ['张伟', '李娜', '王强', '刘洋', '陈明', '杨静', '赵磊', '周芳', '吴涛', '郑霞'];
+    const names = ['张伟', '李娜', '王强', '刘洋', '陈明', '杨静', '赵磊', '周芳', '吴涛', '郑霞',
+      '孙浩', '马琳', '朱军', '胡雪', '林峰', '何婷', '罗明', '梁宇', '宋佳', '唐杰'];
     const professions = ['工程师', '生物学家', '医生', '厨师', '宇航员', '维修工', '通信员', '指挥官'];
     const skills = ['工程', '科研', '医疗', '烹饪', '驾驶', '维修', '通信', '领导'];
     const colors = ['#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7', '#DDA0DD',
@@ -734,6 +891,7 @@ export class StationScene extends Phaser.Scene {
 
   private updateCrewDisplay(): void {
     this.crewContainer.removeAll(true);
+    this.hideCrewDetailPanel();
 
     const state = stationManager.getState();
     if (!state) return;
@@ -747,7 +905,7 @@ export class StationScene extends Phaser.Scene {
     const cardHeight = 110;
     const spacing = 10;
 
-    const titleText = this.add.text(width - 20, y - 30, `船员 (${state.crew.length}/${stationManager.getTotalCapacity()})`, {
+    const titleText = this.add.text(width - 20, y - 30, `👥 船员 (${state.crew.length}/${stationManager.getTotalCapacity()})`, {
       fontSize: '14px',
       fontFamily: "'Segoe UI', system-ui, sans-serif",
       color: '#00D4FF',
@@ -760,6 +918,15 @@ export class StationScene extends Phaser.Scene {
       const x = startX - (index + 1) * (cardWidth + spacing);
       this.createCrewCard(member, x, y, cardWidth, cardHeight);
     });
+
+    if (state.crew.length === 0) {
+      const hintText = this.add.text(width - 20, y + 50, '点击居住舱招募船员', {
+        fontSize: '12px',
+        fontFamily: "'Segoe UI', system-ui, sans-serif",
+        color: '#8888aa'
+      }).setOrigin(1, 0);
+      this.crewContainer.add(hintText);
+    }
   }
 
   private createCrewCard(member: CrewMember, x: number, y: number, width: number, height: number): void {
@@ -774,7 +941,9 @@ export class StationScene extends Phaser.Scene {
     const avatarColor = Phaser.Display.Color.HexStringToColor(member.avatar_color).color;
     const avatarBg = this.add.graphics();
     avatarBg.fillStyle(avatarColor, 1);
+    avatarBg.lineStyle(2, 0xffffff, 0.2);
     avatarBg.fillCircle(width / 2, 28, 20);
+    avatarBg.strokeCircle(width / 2, 28, 20);
 
     const avatarText = this.add.text(width / 2, 28, member.name[0], {
       fontSize: '18px',
@@ -795,13 +964,22 @@ export class StationScene extends Phaser.Scene {
       color: '#00FF9D'
     }).setOrigin(0.5);
 
-    const moraleText = this.add.text(width / 2, 92, `士气: ${member.morale}`, {
-      fontSize: '10px',
+    const moraleBarBg = this.add.graphics();
+    moraleBarBg.fillStyle(0x1a1a2e, 1);
+    moraleBarBg.fillRect(10, 90, width - 20, 6);
+
+    const moraleColor = member.morale > 60 ? 0x00FF9D : member.morale > 30 ? 0xFFD700 : 0xEF4444;
+    const moraleBar = this.add.graphics();
+    moraleBar.fillStyle(moraleColor, 1);
+    moraleBar.fillRect(10, 90, ((width - 20) * member.morale) / 100, 6);
+
+    const moraleText = this.add.text(width / 2, 102, `士气 ${member.morale}`, {
+      fontSize: '9px',
       fontFamily: "'Segoe UI', system-ui, sans-serif",
-      color: member.morale > 60 ? '#00FF9D' : member.morale > 30 ? '#FFD700' : '#EF4444'
+      color: '#8888aa'
     }).setOrigin(0.5);
 
-    container.add([cardBg, avatarBg, avatarText, nameText, professionText, moraleText]);
+    container.add([cardBg, avatarBg, avatarText, nameText, professionText, moraleBarBg, moraleBar, moraleText]);
 
     container.setSize(width, height);
     container.setInteractive({ useHandCursor: true });
@@ -841,7 +1019,105 @@ export class StationScene extends Phaser.Scene {
       }
     });
 
+    container.on('pointerdown', () => {
+      this.showCrewDetailPanel(member, x + width / 2, y);
+    });
+
     this.crewContainer.add(container);
+  }
+
+  private showCrewDetailPanel(member: CrewMember, anchorX: number, anchorY: number): void {
+    this.hideCrewDetailPanel();
+
+    const panelWidth = 250;
+    const panelHeight = 200;
+    const panelX = Math.max(20, Math.min(anchorX - panelWidth / 2, this.cameras.main.width - panelWidth - 20));
+    const panelY = anchorY - panelHeight - 10;
+
+    this.crewDetailPanel = this.add.container(0, 0);
+    this.crewDetailPanel.setDepth(40);
+
+    const panelBg = this.add.graphics();
+    panelBg.fillStyle(0x1a1a2e, 0.95);
+    panelBg.lineStyle(2, 0x00D4FF, 0.8);
+    panelBg.strokeRoundedRect(panelX, panelY, panelWidth, panelHeight, 10);
+    panelBg.fillRoundedRect(panelX, panelY, panelWidth, panelHeight, 10);
+
+    const avatarColor = Phaser.Display.Color.HexStringToColor(member.avatar_color).color;
+    const avatarBg = this.add.graphics();
+    avatarBg.fillStyle(avatarColor, 1);
+    avatarBg.fillCircle(panelX + 35, panelY + 40, 25);
+
+    const avatarText = this.add.text(panelX + 35, panelY + 40, member.name[0], {
+      fontSize: '22px',
+      fontFamily: "'Segoe UI', system-ui, sans-serif",
+      color: '#ffffff',
+      fontStyle: 'bold'
+    }).setOrigin(0.5);
+
+    const nameText = this.add.text(panelX + 70, panelY + 25, member.name, {
+      fontSize: '18px',
+      fontFamily: "'Segoe UI', system-ui, sans-serif",
+      color: '#ffffff',
+      fontStyle: 'bold'
+    }).setOrigin(0, 0);
+
+    const professionText = this.add.text(panelX + 70, panelY + 50, member.profession, {
+      fontSize: '14px',
+      fontFamily: "'Segoe UI', system-ui, sans-serif",
+      color: '#00FF9D'
+    }).setOrigin(0, 0);
+
+    const moraleLabel = this.add.text(panelX + 70, panelY + 75, `士气: ${member.morale}/100`, {
+      fontSize: '12px',
+      fontFamily: "'Segoe UI', system-ui, sans-serif",
+      color: '#FFD700'
+    }).setOrigin(0, 0);
+
+    const skillsTitle = this.add.text(panelX + 20, panelY + 100, '技能:', {
+      fontSize: '13px',
+      fontFamily: "'Segoe UI', system-ui, sans-serif",
+      color: '#00D4FF',
+      fontStyle: 'bold'
+    }).setOrigin(0, 0);
+
+    let skillY = panelY + 125;
+    Object.entries(member.skills).forEach(([skill, level]) => {
+      const skillName = this.add.text(panelX + 20, skillY, skill, {
+        fontSize: '11px',
+        fontFamily: "'Segoe UI', system-ui, sans-serif",
+        color: '#ccccdd'
+      }).setOrigin(0, 0.5);
+
+      const skillBarBg = this.add.graphics();
+      skillBarBg.fillStyle(0x2a2a4a, 1);
+      skillBarBg.fillRect(panelX + 75, skillY - 4, 130, 8);
+
+      const skillBar = this.add.graphics();
+      const skillColor = level >= 4 ? 0x00FF9D : level >= 2 ? 0xFFD700 : 0xEF4444;
+      skillBar.fillStyle(skillColor, 1);
+      skillBar.fillRect(panelX + 75, skillY - 4, (level / 5) * 130, 8);
+
+      const skillLevel = this.add.text(panelX + 210, skillY, `${level}`, {
+        fontSize: '11px',
+        fontFamily: "'Segoe UI', system-ui, sans-serif",
+        color: '#FFD700'
+      }).setOrigin(0, 0.5);
+
+      skillY += 22;
+    });
+
+    this.crewDetailPanel.add([
+      panelBg, avatarBg, avatarText, nameText, professionText,
+      moraleLabel, skillsTitle
+    ]);
+  }
+
+  private hideCrewDetailPanel(): void {
+    if (this.crewDetailPanel) {
+      this.crewDetailPanel.destroy();
+      this.crewDetailPanel = null;
+    }
   }
 
   private updateUI(): void {
@@ -851,7 +1127,10 @@ export class StationScene extends Phaser.Scene {
     this.dayText.setText(`第 ${state.day} 天`);
     this.scoreText.setText(`分数: ${stationManager.calculateScore()}`);
 
-    Object.entries(this.resourceBars).forEach(([key, barInfo]) => {
+    this.resourceKeys.forEach((key) => {
+      const barInfo = this.resourceBars[key];
+      if (!barInfo) return;
+
       const current = (state.resources as any)[key] || 0;
       const max = (state.max_resources as any)[key] || 100;
       const percentage = Math.min(100, (current / max) * 100);
@@ -860,12 +1139,7 @@ export class StationScene extends Phaser.Scene {
 
       barInfo.bar.clear();
       barInfo.bar.fillStyle(0x2a2a4a, 1);
-      barInfo.bar.fillRect(
-        30 + Object.keys(this.resourceBars).indexOf(key) * ((this.cameras.main.width - 60) / 7) + 40,
-        45,
-        ((this.cameras.main.width - 60) / 7) - 50,
-        8
-      );
+      barInfo.bar.fillRect(barInfo.barX, barInfo.barY, barInfo.barWidth, 8);
 
       let barColor = 0x00FF9D;
       if (percentage < 30) barColor = 0xEF4444;
@@ -873,21 +1147,32 @@ export class StationScene extends Phaser.Scene {
 
       barInfo.bar.fillStyle(barColor, 1);
       barInfo.bar.fillRect(
-        30 + Object.keys(this.resourceBars).indexOf(key) * ((this.cameras.main.width - 60) / 7) + 40,
-        45,
-        (((this.cameras.main.width - 60) / 7) - 50) * (percentage / 100),
+        barInfo.barX,
+        barInfo.barY,
+        barInfo.barWidth * (percentage / 100),
         8
       );
 
       if (percentage < 20) {
-        const pulse = Math.sin(this.time.now / 200) * 0.5 + 0.5;
+        const pulse = Math.sin(this.time.now / 150) * 0.5 + 0.5;
         barInfo.text.setColor(pulse > 0.5 ? '#EF4444' : '#FF6B6B');
+        barInfo.text.setFontSize(pulse > 0.5 ? '18px' : '16px');
+
+        barInfo.pulseGlow.clear();
+        barInfo.pulseGlow.fillStyle(0xEF4444, pulse * 0.3);
+        barInfo.pulseGlow.fillRoundedRect(
+          barInfo.barX - 3,
+          barInfo.barY - 3,
+          barInfo.barWidth + 6,
+          14,
+          4
+        );
       } else {
         barInfo.text.setColor('#ffffff');
+        barInfo.text.setFontSize('16px');
+        barInfo.pulseGlow.clear();
       }
     });
-
-    this.updateCrewDisplay();
   }
 
   override update(time: number, delta: number): void {
@@ -900,7 +1185,7 @@ export class StationScene extends Phaser.Scene {
       this.doTick();
     }
 
-    stationManager.updateFloatingNumbers();
+    this.updateUI();
   }
 
   private async doTick(): Promise<void> {
@@ -919,6 +1204,7 @@ export class StationScene extends Phaser.Scene {
           this.isPaused = false;
           this.updateUI();
           this.renderModules();
+          this.updateCrewDisplay();
         }
       });
     }
@@ -944,10 +1230,16 @@ export class StationScene extends Phaser.Scene {
       const consumption = info.consumption;
 
       let totalProduction = 0;
+      let totalConsumption = 0;
+
       Object.values(production).forEach(v => totalProduction += v);
+      Object.values(consumption).forEach(v => totalConsumption += v);
 
       if (totalProduction > 0) {
-        this.createFloatingText(x, y, `+${totalProduction}`, true);
+        this.createFloatingText(x, y - 20, `+${totalProduction.toFixed(1)}`, true);
+      }
+      if (totalConsumption > 0) {
+        this.createFloatingText(x, y - 5, `-${totalConsumption.toFixed(1)}`, false);
       }
     });
   }
@@ -955,17 +1247,19 @@ export class StationScene extends Phaser.Scene {
   private createFloatingText(x: number, y: number, text: string, isPositive: boolean): void {
     const color = isPositive ? '#00FF9D' : '#EF4444';
     const floatingText = this.add.text(x, y, text, {
-      fontSize: '16px',
+      fontSize: '14px',
       fontFamily: "'Segoe UI', system-ui, sans-serif",
       color: color,
       fontStyle: 'bold'
     }).setOrigin(0.5);
 
+    floatingText.setDepth(25);
+
     this.tweens.add({
       targets: floatingText,
-      y: y - 50,
+      y: y - 40,
       alpha: 0,
-      duration: 1500,
+      duration: 1200,
       ease: 'Power2.easeOut',
       onComplete: () => {
         floatingText.destroy();
@@ -980,23 +1274,24 @@ export class StationScene extends Phaser.Scene {
     const height = this.cameras.main.height;
 
     this.gameOverContainer = this.add.container(0, 0);
+    this.gameOverContainer.setDepth(100);
 
     const overlay = this.add.graphics();
-    overlay.fillStyle(0x000000, 0.8);
+    overlay.fillStyle(0x000000, 0.85);
     overlay.fillRect(0, 0, width, height);
 
     const panelWidth = 500;
-    const panelHeight = 450;
+    const panelHeight = 480;
     const panelX = width / 2 - panelWidth / 2;
     const panelY = height / 2 - panelHeight / 2;
 
     const panelBg = this.add.graphics();
     panelBg.fillStyle(0x1a1a2e, 0.95);
-    panelBg.lineStyle(2, 0xEF4444, 0.8);
+    panelBg.lineStyle(3, 0xEF4444, 0.8);
     panelBg.strokeRoundedRect(panelX, panelY, panelWidth, panelHeight, 16);
     panelBg.fillRoundedRect(panelX, panelY, panelWidth, panelHeight, 16);
 
-    const titleText = this.add.text(width / 2, panelY + 40, '游戏结束', {
+    const titleText = this.add.text(width / 2, panelY + 40, '💀 游戏结束', {
       fontSize: '36px',
       fontFamily: "'Segoe UI', system-ui, sans-serif",
       color: '#EF4444',
@@ -1006,20 +1301,30 @@ export class StationScene extends Phaser.Scene {
     const state = stationManager.getState();
     const score = stationManager.calculateScore();
 
-    const scoreText = this.add.text(width / 2, panelY + 90, `最终分数: ${score}`, {
-      fontSize: '28px',
+    const scoreLabelText = this.add.text(width / 2, panelY + 95, '🏆 最终分数', {
+      fontSize: '18px',
+      fontFamily: "'Segoe UI', system-ui, sans-serif",
+      color: '#8888aa'
+    }).setOrigin(0.5);
+
+    const scoreValueText = this.add.text(width / 2, panelY + 130, score.toLocaleString(), {
+      fontSize: '42px',
       fontFamily: "'Segoe UI', system-ui, sans-serif",
       color: '#FFD700',
       fontStyle: 'bold'
     }).setOrigin(0.5);
 
-    const daysText = this.add.text(width / 2, panelY + 130, `存活天数: ${state?.day || 0} 天`, {
-      fontSize: '18px',
+    const daysText = this.add.text(width / 2, panelY + 175, `存活天数: ${state?.day || 0} 天`, {
+      fontSize: '16px',
       fontFamily: "'Segoe UI', system-ui, sans-serif",
       color: '#00D4FF'
     }).setOrigin(0.5);
 
-    const inputLabel = this.add.text(width / 2, panelY + 180, '输入你的昵称:', {
+    const divider = this.add.graphics();
+    divider.lineStyle(1, 0x333366, 1);
+    divider.lineBetween(panelX + 50, panelY + 200, panelX + panelWidth - 50, panelY + 200);
+
+    const inputLabel = this.add.text(width / 2, panelY + 225, '✍️ 输入你的昵称上传排行榜', {
       fontSize: '16px',
       fontFamily: "'Segoe UI', system-ui, sans-serif",
       color: '#ccccdd'
@@ -1027,75 +1332,19 @@ export class StationScene extends Phaser.Scene {
 
     const inputBg = this.add.graphics();
     inputBg.fillStyle(0x2a2a4a, 1);
-    inputBg.lineStyle(1, 0x00D4FF, 0.5);
-    inputBg.strokeRoundedRect(width / 2 - 150, panelY + 200, 300, 40, 6);
-    inputBg.fillRoundedRect(width / 2 - 150, panelY + 200, 300, 40, 6);
+    inputBg.lineStyle(2, 0x00D4FF, 0.5);
+    inputBg.strokeRoundedRect(width / 2 - 150, panelY + 250, 300, 45, 8);
+    inputBg.fillRoundedRect(width / 2 - 150, panelY + 250, 300, 45, 8);
 
     let playerName = '指挥官';
-    const nameText = this.add.text(width / 2, panelY + 220, playerName, {
-      fontSize: '18px',
+    const nameText = this.add.text(width / 2, panelY + 273, playerName, {
+      fontSize: '20px',
       fontFamily: "'Segoe UI', system-ui, sans-serif",
-      color: '#ffffff'
-    }).setOrigin(0.5);
-
-    const submitBtn = this.add.graphics();
-    submitBtn.fillStyle(0x00D4FF, 0.8);
-    submitBtn.strokeRoundedRect(width / 2 - 100, panelY + 260, 200, 45, 8);
-    submitBtn.fillRoundedRect(width / 2 - 100, panelY + 260, 200, 45, 8);
-
-    const submitBtnText = this.add.text(width / 2, panelY + 283, '提交分数', {
-      fontSize: '18px',
-      fontFamily: "'Segoe UI', system-ui, sans-serif",
-      color: '#0a0a2a',
+      color: '#ffffff',
       fontStyle: 'bold'
     }).setOrigin(0.5);
 
-    const leaderboardBtn = this.add.graphics();
-    leaderboardBtn.fillStyle(0x2a2a4a, 0.8);
-    leaderboardBtn.lineStyle(1, 0x00FF9D, 0.8);
-    leaderboardBtn.strokeRoundedRect(width / 2 - 100, panelY + 320, 200, 40, 8);
-    leaderboardBtn.fillRoundedRect(width / 2 - 100, panelY + 320, 200, 40, 8);
-
-    const leaderboardBtnText = this.add.text(width / 2, panelY + 340, '查看排行榜', {
-      fontSize: '16px',
-      fontFamily: "'Segoe UI', system-ui, sans-serif",
-      color: '#00FF9D'
-    }).setOrigin(0.5);
-
-    const submitHitArea = this.add.zone(width / 2 - 100, panelY + 260, 200, 45).setOrigin(0, 0);
-    submitHitArea.setInteractive({ useHandCursor: true });
-    submitHitArea.on('pointerover', () => {
-      submitBtn.clear();
-      submitBtn.fillStyle(0x00FF9D, 0.9);
-      submitBtn.fillRoundedRect(width / 2 - 100, panelY + 260, 200, 45, 8);
-    });
-    submitHitArea.on('pointerout', () => {
-      submitBtn.clear();
-      submitBtn.fillStyle(0x00D4FF, 0.8);
-      submitBtn.fillRoundedRect(width / 2 - 100, panelY + 260, 200, 45, 8);
-    });
-    submitHitArea.on('pointerdown', async () => {
-      await stationManager.submitScore(playerName, score, state?.day || 0);
-      this.showLeaderboard();
-    });
-
-    const leaderboardHitArea = this.add.zone(width / 2 - 100, panelY + 320, 200, 40).setOrigin(0, 0);
-    leaderboardHitArea.setInteractive({ useHandCursor: true });
-    leaderboardHitArea.on('pointerover', () => {
-      leaderboardBtn.clear();
-      leaderboardBtn.fillStyle(0x3a3a6a, 0.9);
-      leaderboardBtn.fillRoundedRect(width / 2 - 100, panelY + 320, 200, 40, 8);
-    });
-    leaderboardHitArea.on('pointerout', () => {
-      leaderboardBtn.clear();
-      leaderboardBtn.fillStyle(0x2a2a4a, 0.8);
-      leaderboardBtn.fillRoundedRect(width / 2 - 100, panelY + 320, 200, 40, 8);
-    });
-    leaderboardHitArea.on('pointerdown', () => {
-      this.showLeaderboard();
-    });
-
-    const inputHitArea = this.add.zone(width / 2 - 150, panelY + 200, 300, 40).setOrigin(0, 0);
+    const inputHitArea = this.add.zone(width / 2 - 150, panelY + 250, 300, 45).setOrigin(0, 0);
     inputHitArea.setInteractive({ useHandCursor: true });
     inputHitArea.on('pointerdown', () => {
       const input = prompt('请输入你的昵称:', playerName);
@@ -1105,12 +1354,68 @@ export class StationScene extends Phaser.Scene {
       }
     });
 
+    const submitBtn = this.add.graphics();
+    submitBtn.fillStyle(0x00D4FF, 0.8);
+    submitBtn.strokeRoundedRect(width / 2 - 120, panelY + 320, 240, 50, 10);
+    submitBtn.fillRoundedRect(width / 2 - 120, panelY + 320, 240, 50, 10);
+
+    const submitBtnText = this.add.text(width / 2, panelY + 345, '📤 提交分数', {
+      fontSize: '20px',
+      fontFamily: "'Segoe UI', system-ui, sans-serif",
+      color: '#0a0a2a',
+      fontStyle: 'bold'
+    }).setOrigin(0.5);
+
+    const submitHitArea = this.add.zone(width / 2 - 120, panelY + 320, 240, 50).setOrigin(0, 0);
+    submitHitArea.setInteractive({ useHandCursor: true });
+    submitHitArea.on('pointerover', () => {
+      submitBtn.clear();
+      submitBtn.fillStyle(0x00FF9D, 0.9);
+      submitBtn.fillRoundedRect(width / 2 - 120, panelY + 320, 240, 50, 10);
+    });
+    submitHitArea.on('pointerout', () => {
+      submitBtn.clear();
+      submitBtn.fillStyle(0x00D4FF, 0.8);
+      submitBtn.fillRoundedRect(width / 2 - 120, panelY + 320, 240, 50, 10);
+    });
+    submitHitArea.on('pointerdown', async () => {
+      await stationManager.submitScore(playerName, score, state?.day || 0);
+      this.showLeaderboard();
+    });
+
+    const leaderboardBtn = this.add.graphics();
+    leaderboardBtn.fillStyle(0x2a2a4a, 0.8);
+    leaderboardBtn.lineStyle(1, 0x00FF9D, 0.8);
+    leaderboardBtn.strokeRoundedRect(width / 2 - 120, panelY + 390, 240, 40, 8);
+    leaderboardBtn.fillRoundedRect(width / 2 - 120, panelY + 390, 240, 40, 8);
+
+    const leaderboardBtnText = this.add.text(width / 2, panelY + 410, '🏆 查看排行榜', {
+      fontSize: '16px',
+      fontFamily: "'Segoe UI', system-ui, sans-serif",
+      color: '#00FF9D'
+    }).setOrigin(0.5);
+
+    const leaderboardHitArea = this.add.zone(width / 2 - 120, panelY + 390, 240, 40).setOrigin(0, 0);
+    leaderboardHitArea.setInteractive({ useHandCursor: true });
+    leaderboardHitArea.on('pointerover', () => {
+      leaderboardBtn.clear();
+      leaderboardBtn.fillStyle(0x3a3a6a, 0.9);
+      leaderboardBtn.fillRoundedRect(width / 2 - 120, panelY + 390, 240, 40, 8);
+    });
+    leaderboardHitArea.on('pointerout', () => {
+      leaderboardBtn.clear();
+      leaderboardBtn.fillStyle(0x2a2a4a, 0.8);
+      leaderboardBtn.fillRoundedRect(width / 2 - 120, panelY + 390, 240, 40, 8);
+    });
+    leaderboardHitArea.on('pointerdown', () => {
+      this.showLeaderboard();
+    });
+
     this.gameOverContainer.add([
-      overlay, panelBg, titleText, scoreText, daysText,
-      inputLabel, inputBg, nameText,
+      overlay, panelBg, titleText, scoreLabelText, scoreValueText, daysText, divider,
+      inputLabel, inputBg, nameText, inputHitArea,
       submitBtn, submitBtnText, submitHitArea,
-      leaderboardBtn, leaderboardBtnText, leaderboardHitArea,
-      inputHitArea
+      leaderboardBtn, leaderboardBtnText, leaderboardHitArea
     ]);
   }
 
@@ -1125,49 +1430,77 @@ export class StationScene extends Phaser.Scene {
     const height = this.cameras.main.height;
 
     this.leaderboardContainer = this.add.container(0, 0);
+    this.leaderboardContainer.setDepth(100);
 
     const overlay = this.add.graphics();
-    overlay.fillStyle(0x000000, 0.8);
+    overlay.fillStyle(0x000000, 0.85);
     overlay.fillRect(0, 0, width, height);
     overlay.setInteractive({ useHandCursor: true });
     overlay.on('pointerdown', () => {
       this.hideLeaderboard();
+      this.restartGame();
     });
 
-    const panelWidth = 450;
-    const panelHeight = 500;
+    const panelWidth = 500;
+    const panelHeight = 550;
     const panelX = width / 2 - panelWidth / 2;
     const panelY = height / 2 - panelHeight / 2;
 
     const panelBg = this.add.graphics();
     panelBg.fillStyle(0x1a1a2e, 0.95);
-    panelBg.lineStyle(2, 0x00D4FF, 0.8);
+    panelBg.lineStyle(2, 0xFFD700, 0.6);
     panelBg.strokeRoundedRect(panelX, panelY, panelWidth, panelHeight, 16);
     panelBg.fillRoundedRect(panelX, panelY, panelWidth, panelHeight, 16);
 
-    const titleText = this.add.text(width / 2, panelY + 30, '🏆 排行榜', {
+    const titleText = this.add.text(width / 2, panelY + 30, '🏆 排行榜 TOP 20', {
       fontSize: '28px',
       fontFamily: "'Segoe UI', system-ui, sans-serif",
       color: '#FFD700',
       fontStyle: 'bold'
     }).setOrigin(0.5);
 
-    const headerText = this.add.text(panelX + 25, panelY + 70, '排名  昵称            分数    天数', {
+    const headerBg = this.add.graphics();
+    headerBg.fillStyle(0x2a2a4a, 0.8);
+    headerBg.fillRect(panelX + 20, panelY + 70, panelWidth - 40, 35);
+
+    const rankHeader = this.add.text(panelX + 40, panelY + 87, '排名', {
       fontSize: '14px',
       fontFamily: "'Segoe UI', system-ui, sans-serif",
-      color: '#8888aa'
-    }).setOrigin(0, 0);
+      color: '#00D4FF',
+      fontStyle: 'bold'
+    }).setOrigin(0, 0.5);
 
-    const rowHeight = 35;
-    const startY = panelY + 100;
+    const nameHeader = this.add.text(panelX + 100, panelY + 87, '昵称', {
+      fontSize: '14px',
+      fontFamily: "'Segoe UI', system-ui, sans-serif",
+      color: '#00D4FF',
+      fontStyle: 'bold'
+    }).setOrigin(0, 0.5);
 
-    leaderboard.forEach((entry: any, index: number) => {
+    const scoreHeader = this.add.text(panelX + 280, panelY + 87, '分数', {
+      fontSize: '14px',
+      fontFamily: "'Segoe UI', system-ui, sans-serif",
+      color: '#00D4FF',
+      fontStyle: 'bold'
+    }).setOrigin(0, 0.5);
+
+    const daysHeader = this.add.text(panelX + 380, panelY + 87, '天数', {
+      fontSize: '14px',
+      fontFamily: "'Segoe UI', system-ui, sans-serif",
+      color: '#00D4FF',
+      fontStyle: 'bold'
+    }).setOrigin(0, 0.5);
+
+    const rowHeight = 32;
+    const startY = panelY + 115;
+
+    leaderboard.slice(0, 12).forEach((entry: any, index: number) => {
       const y = startY + index * rowHeight;
       const isEven = index % 2 === 0;
 
       const rowBg = this.add.graphics();
       rowBg.fillStyle(isEven ? 0x1a1a2e : 0x2a2a4a, 0.5);
-      rowBg.fillRect(panelX + 15, y - 5, panelWidth - 30, rowHeight - 5);
+      rowBg.fillRect(panelX + 20, y, panelWidth - 40, rowHeight);
 
       let rankColor = '#ffffff';
       let rankIcon = `${index + 1}`;
@@ -1175,31 +1508,31 @@ export class StationScene extends Phaser.Scene {
       else if (index === 1) { rankColor = '#C0C0C0'; rankIcon = '🥈'; }
       else if (index === 2) { rankColor = '#CD7F32'; rankIcon = '🥉'; }
 
-      const rankText = this.add.text(panelX + 30, y + 8, rankIcon, {
+      const rankText = this.add.text(panelX + 40, y + rowHeight / 2, rankIcon, {
         fontSize: '16px',
         fontFamily: "'Segoe UI', system-ui, sans-serif",
         color: rankColor,
         fontStyle: 'bold'
-      }).setOrigin(0, 0);
+      }).setOrigin(0, 0.5);
 
-      const nameText = this.add.text(panelX + 80, y + 8, entry.name, {
+      const nameText = this.add.text(panelX + 100, y + rowHeight / 2, entry.name, {
         fontSize: '14px',
         fontFamily: "'Segoe UI', system-ui, sans-serif",
         color: '#ffffff'
-      }).setOrigin(0, 0);
+      }).setOrigin(0, 0.5);
 
-      const scoreText = this.add.text(panelX + 250, y + 8, entry.score.toString(), {
+      const scoreText = this.add.text(panelX + 280, y + rowHeight / 2, entry.score.toLocaleString(), {
         fontSize: '14px',
         fontFamily: "'Segoe UI', system-ui, sans-serif",
         color: '#00FF9D',
         fontStyle: 'bold'
-      }).setOrigin(0, 0);
+      }).setOrigin(0, 0.5);
 
-      const daysText = this.add.text(panelX + 350, y + 8, `${entry.days}天`, {
-        fontSize: '14px',
+      const daysText = this.add.text(panelX + 380, y + rowHeight / 2, `${entry.days}天`, {
+        fontSize: '13px',
         fontFamily: "'Segoe UI', system-ui, sans-serif",
         color: '#8888aa'
-      }).setOrigin(0, 0);
+      }).setOrigin(0, 0.5);
 
       this.leaderboardContainer.add([rowBg, rankText, nameText, scoreText, daysText]);
     });
@@ -1218,7 +1551,7 @@ export class StationScene extends Phaser.Scene {
     closeBtn.strokeRoundedRect(width / 2 - 80, panelY + panelHeight - 60, 160, 40, 8);
     closeBtn.fillRoundedRect(width / 2 - 80, panelY + panelHeight - 60, 160, 40, 8);
 
-    const closeBtnText = this.add.text(width / 2, panelY + panelHeight - 40, '关闭', {
+    const closeBtnText = this.add.text(width / 2, panelY + panelHeight - 40, '重新开始', {
       fontSize: '16px',
       fontFamily: "'Segoe UI', system-ui, sans-serif",
       color: '#0a0a2a',
@@ -1243,7 +1576,8 @@ export class StationScene extends Phaser.Scene {
     });
 
     this.leaderboardContainer.add([
-      overlay, panelBg, titleText, headerText,
+      overlay, panelBg, titleText, headerBg,
+      rankHeader, nameHeader, scoreHeader, daysHeader,
       closeBtn, closeBtnText, closeHitArea
     ]);
   }
