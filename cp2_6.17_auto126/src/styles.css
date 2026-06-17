@@ -129,6 +129,28 @@ textarea {
   }
 }
 
+@keyframes modalScaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes modalScaleOut {
+  from {
+    opacity: 1;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: scale(0.85);
+  }
+}
+
 @keyframes spin {
   to {
     transform: rotate(360deg);
@@ -653,25 +675,38 @@ textarea {
 
 .card-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  grid-template-columns: repeat(auto-fill, 280px);
   gap: 24px;
+  justify-content: flex-start;
   align-items: start;
   padding-bottom: 40px;
+}
+
+@supports (display: flex) {
+  .card-grid {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+  }
 }
 
 .card-grid--casting {
   font-size: 1.5em;
   gap: 32px;
-  grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+  grid-template-columns: repeat(auto-fill, 360px);
   padding: 24px;
+}
+
+.card-grid--casting.card-grid {
+  display: flex;
+  flex-wrap: wrap;
 }
 
 /* ========== Standup Card ========== */
 
 .standup-card {
-  width: 100%;
-  max-width: 360px;
-  justify-self: center;
+  width: 280px;
+  flex-shrink: 0;
   background: var(--color-card-bg);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
@@ -697,7 +732,7 @@ textarea {
 }
 
 .standup-card--casting {
-  max-width: 420px;
+  width: 360px;
   background: var(--color-cast-card);
   border: 1px solid var(--color-border);
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
@@ -1224,11 +1259,11 @@ textarea {
 }
 
 .summary-modal--enter {
-  animation: fadeInUp 0.3s ease-out both;
+  animation: modalScaleIn 0.3s ease-out both;
 }
 
 .summary-modal--leave {
-  animation: fadeInUp 0.26s ease-in both reverse;
+  animation: modalScaleOut 0.25s ease-in both;
 }
 
 .summary-modal__header {

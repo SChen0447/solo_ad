@@ -148,18 +148,31 @@ export function useRoomData() {
     setRoom((prev) => {
       if (!prev || !prev.cards[memberId]) return prev;
       const next = deepClone(prev);
-      next.cards[memberId].followed = !next.cards[memberId].followed;
-      next.cards[memberId].updatedAt = Date.now();
+      const currentCard = next.cards[memberId];
+      const newFollowed = !currentCard.followed;
+      if (newFollowed) {
+        const allFollowed = Object.values(next.cards).filter((c) => c.followed).length;
+        console.log(`[关注] 成员 ${memberId} 已添加关注，当前共 ${allFollowed + 1} 条关注`);
+      } else {
+        console.log(`[关注] 成员 ${memberId} 已取消关注`);
+      }
+      next.cards[memberId] = {
+        ...currentCard,
+        followed: newFollowed,
+        updatedAt: Date.now(),
+      };
       return next;
     });
   }, []);
 
   const getFollowedCards = useCallback((): Array<{ member: Member; card: StandupCard }> => {
     if (!room) return [];
+    const seen = new Set<string>();
     const result: Array<{ member: Member; card: StandupCard }> = [];
     for (const m of room.members) {
       const card = room.cards[m.id];
-      if (card && card.followed) {
+      if (card && card.followed && !seen.has(m.id)) {
+        seen.add(m.id);
         result.push({ member: m, card });
       }
     }

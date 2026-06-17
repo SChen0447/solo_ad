@@ -95,8 +95,20 @@ const FieldSection: React.FC<{
   const updateItem = (idx: number, content: string) => {
     const next = items.slice();
     const safe = content.slice(0, 80);
+    if (safe !== content) {
+      console.warn(`[字数限制] 内容超过80字符，已自动截断`);
+    }
     if (next[idx]) next[idx] = { ...next[idx], content: safe };
     onUpdateCard(cardMemberId, { [fieldKey]: next } as Partial<StandupCard>);
+  };
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>, idx: number) => {
+    const value = e.target.value;
+    if (value.length > 80) {
+      e.target.value = value.slice(0, 80);
+      e.target.scrollTop = e.target.scrollHeight;
+    }
+    updateItem(idx, e.target.value);
   };
 
   const removeItem = (idx: number) => {
@@ -149,7 +161,7 @@ const FieldSection: React.FC<{
                   maxLength={80}
                   rows={2}
                   placeholder={`请输入${title}内容...`}
-                  onChange={(e) => updateItem(idx, e.target.value)}
+                  onChange={(e) => handleInputChange(e, idx)}
                   style={{ minHeight: '80px', height: 'auto' }}
                   onInput={(e) => {
                     const el = e.currentTarget;
@@ -277,24 +289,55 @@ const CastingModeOverlay: React.FC<{
   cards: Record<string, StandupCard>;
   onExit: () => void;
 }> = ({ members, cards, onExit }) => {
+  const isExitingRef = useRef(false);
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onExit();
-    };
-    window.addEventListener('keydown', onKey);
-    try {
-      const el = document.documentElement;
-      if (el.requestFullscreen && !document.fullscreenElement) {
-        el.requestFullscreen().catch(() => {});
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        handleExit();
       }
-    } catch {}
-    return () => {
-      window.removeEventListener('keydown', onKey);
+    };
+
+    const onFullscreenChange = () => {
+      if (!document.fullscreenElement && !isExitingRef.current) {
+        onExit();
+      }
+    };
+
+    const handleExit = async () => {
+      isExitingRef.current = true;
       try {
         if (document.fullscreenElement) {
-          document.exitFullscreen().catch(() => {});
+          await document.exitFullscreen().catch(() => {});
         }
       } catch {}
+      onExit();
+    };
+
+    const enterFullscreen = async () => {
+      try {
+        const el = document.documentElement;
+        if (el.requestFullscreen && !document.fullscreenElement) {
+          await el.requestFullscreen().catch(() => {});
+        }
+      } catch {
+        console.warn('浏览器不支持全屏API或已被阻止');
+      }
+    };
+
+    window.addEventListener('keydown', onKey);
+    document.addEventListener('fullscreenchange', onFullscreenChange);
+    document.addEventListener('webkitfullscreenchange', onFullscreenChange);
+    enterFullscreen();
+
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      document.removeEventListener('fullscreenchange', onFullscreenChange);
+      document.removeEventListener('webkitfullscreenchange', onFullscreenChange);
+      if (document.fullscreenElement && !isExitingRef.current) {
+        document.exitFullscreen().catch(() => {});
+      }
     };
   }, [onExit]);
 
