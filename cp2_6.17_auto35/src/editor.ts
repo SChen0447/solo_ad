@@ -1,4 +1,5 @@
-import type { TerrainType, ToolType, Tile, LevelData } from './renderer';
+import type { TerrainType, ToolType, Tile, Enemy as _Enemy, Collectible as _Collectible, LevelData } from './renderer';
+import { Renderer } from './renderer';
 
 export interface EditorState {
   currentTool: ToolType;
@@ -23,9 +24,12 @@ export class LevelEditor {
   private canvas: HTMLCanvasElement;
   private offsetX: number;
   private offsetY: number;
+  private _toolbarContainer: HTMLElement | null = null;
   private terrainContainer: HTMLElement | null = null;
   private entityContainer: HTMLElement | null = null;
   private utilityContainer: HTMLElement | null = null;
+  private editorAreaWidth: number;
+  private editorAreaHeight: number;
 
   constructor(
     canvas: HTMLCanvasElement,
@@ -43,6 +47,8 @@ export class LevelEditor {
     this.callbacks = callbacks;
     this.offsetX = offsetX;
     this.offsetY = offsetY;
+    this.editorAreaWidth = gridWidth * tileSize;
+    this.editorAreaHeight = gridHeight * tileSize;
 
     this.state = {
       currentTool: 'brick',
@@ -174,16 +180,10 @@ export class LevelEditor {
   private drawToolIcon(ctx: CanvasRenderingContext2D, toolType: ToolType, size: number): void {
     switch (toolType) {
       case 'brick':
-        this.drawBrickIcon(ctx, size);
-        break;
       case 'grass':
-        this.drawGrassIcon(ctx, size);
-        break;
       case 'spike':
-        this.drawSpikeIcon(ctx, size);
-        break;
       case 'platform':
-        this.drawPlatformIcon(ctx, size);
+        Renderer.drawTerrainIcon(ctx, toolType, size);
         break;
       case 'enemy':
         this.drawEnemyIcon(ctx, size);
@@ -194,77 +194,6 @@ export class LevelEditor {
       case 'eraser':
         this.drawEraserIcon(ctx, size);
         break;
-    }
-  }
-
-  private drawBrickIcon(ctx: CanvasRenderingContext2D, size: number): void {
-    const half = size / 2;
-    ctx.fillStyle = '#8B4513';
-    ctx.fillRect(0, 0, size, size);
-    ctx.fillStyle = '#654321';
-    ctx.fillRect(0, 0, size, 2);
-    ctx.fillRect(0, half - 1, size, 2);
-    ctx.fillRect(0, size - 2, size, 2);
-    ctx.fillRect(0, 0, 2, half);
-    ctx.fillRect(half - 1, half, 2, half);
-    ctx.fillRect(size - 2, 0, 2, half);
-    ctx.fillStyle = '#A0522D';
-    ctx.fillRect(2, 2, half - 4, half - 4);
-    ctx.fillRect(half + 2, half + 2, half - 4, half - 4);
-  }
-
-  private drawGrassIcon(ctx: CanvasRenderingContext2D, size: number): void {
-    ctx.fillStyle = '#228B22';
-    ctx.fillRect(0, 0, size, size);
-    ctx.fillStyle = '#006400';
-    ctx.fillRect(0, size - 4, size, 4);
-    ctx.fillStyle = '#32CD32';
-    ctx.fillRect(4, 4, 2, 3);
-    ctx.fillRect(12, 8, 2, 3);
-    ctx.fillRect(20, 5, 2, 3);
-    ctx.fillRect(8, 14, 2, 3);
-    ctx.fillRect(24, 16, 2, 3);
-    ctx.fillRect(16, 20, 2, 3);
-  }
-
-  private drawSpikeIcon(ctx: CanvasRenderingContext2D, size: number): void {
-    const tipCount = 4;
-    const spikeWidth = size / tipCount;
-    const spikeHeight = size * 0.7;
-    const baseY = size;
-
-    ctx.fillStyle = '#8B0000';
-    ctx.fillRect(0, baseY - 4, size, 4);
-
-    for (let i = 0; i < tipCount; i++) {
-      const sx = i * spikeWidth;
-      const tipX = sx + spikeWidth / 2;
-      const tipY = size - spikeHeight;
-
-      ctx.fillStyle = '#CC0000';
-      ctx.beginPath();
-      ctx.moveTo(sx, baseY - 4);
-      ctx.lineTo(tipX, tipY);
-      ctx.lineTo(sx + spikeWidth, baseY - 4);
-      ctx.closePath();
-      ctx.fill();
-
-      ctx.fillStyle = '#FF4444';
-      ctx.fillRect(Math.floor(tipX - 1), tipY + 2, 2, spikeHeight * 0.4);
-    }
-  }
-
-  private drawPlatformIcon(ctx: CanvasRenderingContext2D, size: number): void {
-    const plankHeight = size / 4;
-    ctx.fillStyle = '#B0C4DE';
-    ctx.fillRect(0, 0, size, size);
-    ctx.fillStyle = '#708090';
-    for (let i = 1; i < 4; i++) {
-      ctx.fillRect(0, i * plankHeight - 1, size, 2);
-    }
-    ctx.fillStyle = '#E6E6FA';
-    for (let i = 0; i < 4; i++) {
-      ctx.fillRect(2, i * plankHeight + 2, 4, plankHeight - 6);
     }
   }
 
@@ -324,7 +253,6 @@ export class LevelEditor {
     ctx.fillRect(4, 8, size - 8, size - 16);
     ctx.fillStyle = '#FFC0CB';
     ctx.fillRect(4, 8, size - 8, 6);
-    ctx.fillStyle = '#000';
     ctx.strokeStyle = '#000';
     ctx.lineWidth = 1;
     ctx.strokeRect(4, 8, size - 8, size - 16);
@@ -334,6 +262,9 @@ export class LevelEditor {
     this.state.currentTool = tool;
     this.updateToolButtons();
     this.callbacks.onToolChange(tool);
+    if (this.state.hoverTile) {
+      this.callbacks.onHoverChange({ ...this.state.hoverTile });
+    }
   }
 
   private updateToolButtons(): void {
@@ -353,18 +284,35 @@ export class LevelEditor {
     this.canvas.addEventListener('mousedown', this.handleMouseDown);
     this.canvas.addEventListener('mouseup', this.handleMouseUp);
     this.canvas.addEventListener('mouseleave', this.handleMouseLeave);
+    this.canvas.addEventListener('mouseenter', this.handleMouseEnter);
     this.canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+  }
+
+  private isInEditorArea(mouseX: number, mouseY: number): boolean {
+    return (
+      mouseX >= this.offsetX &&
+      mouseX < this.offsetX + this.editorAreaWidth &&
+      mouseY >= this.offsetY &&
+      mouseY < this.offsetY + this.editorAreaHeight
+    );
   }
 
   private handleMouseMove = (e: MouseEvent): void => {
     const rect = this.canvas.getBoundingClientRect();
     const scaleX = this.canvas.width / rect.width;
     const scaleY = this.canvas.height / rect.height;
-    const mouseX = (e.clientX - rect.left) * scaleX - this.offsetX;
-    const mouseY = (e.clientY - rect.top) * scaleY - this.offsetY;
+    const mouseX = (e.clientX - rect.left) * scaleX;
+    const mouseY = (e.clientY - rect.top) * scaleY;
 
-    const tileX = Math.floor(mouseX / this.tileSize);
-    const tileY = Math.floor(mouseY / this.tileSize);
+    if (!this.isInEditorArea(mouseX, mouseY)) {
+      this.clearHover();
+      return;
+    }
+
+    const localX = mouseX - this.offsetX;
+    const localY = mouseY - this.offsetY;
+    const tileX = Math.floor(localX / this.tileSize);
+    const tileY = Math.floor(localY / this.tileSize);
 
     const inBounds = tileX >= 0 && tileX < this.gridWidth && tileY >= 0 && tileY < this.gridHeight;
     const newHover = inBounds ? { x: tileX, y: tileY } : null;
@@ -390,15 +338,27 @@ export class LevelEditor {
     const rect = this.canvas.getBoundingClientRect();
     const scaleX = this.canvas.width / rect.width;
     const scaleY = this.canvas.height / rect.height;
-    const mouseX = (e.clientX - rect.left) * scaleX - this.offsetX;
-    const mouseY = (e.clientY - rect.top) * scaleY - this.offsetY;
+    const mouseX = (e.clientX - rect.left) * scaleX;
+    const mouseY = (e.clientY - rect.top) * scaleY;
 
-    const tileX = Math.floor(mouseX / this.tileSize);
-    const tileY = Math.floor(mouseY / this.tileSize);
+    if (!this.isInEditorArea(mouseX, mouseY)) {
+      this.clearHover();
+      return;
+    }
 
-    if (tileX < 0 || tileX >= this.gridWidth || tileY < 0 || tileY >= this.gridHeight) return;
+    const localX = mouseX - this.offsetX;
+    const localY = mouseY - this.offsetY;
+    const tileX = Math.floor(localX / this.tileSize);
+    const tileY = Math.floor(localY / this.tileSize);
+
+    if (tileX < 0 || tileX >= this.gridWidth || tileY < 0 || tileY >= this.gridHeight) {
+      this.clearHover();
+      return;
+    }
 
     this.state.isMouseDown = true;
+    this.state.hoverTile = { x: tileX, y: tileY };
+    this.callbacks.onHoverChange({ x: tileX, y: tileY });
 
     if (e.button === 2) {
       this.eraseAt(tileX, tileY);
@@ -415,11 +375,21 @@ export class LevelEditor {
   private handleMouseLeave = (): void => {
     this.state.isMouseDown = false;
     this.state.lastPlacedTile = null;
+    this.clearHover();
+  };
+
+  private handleMouseEnter = (_e: MouseEvent): void => {
+    if (!this.state.hoverTile) {
+      return;
+    }
+  };
+
+  private clearHover(): void {
     if (this.state.hoverTile) {
       this.state.hoverTile = null;
       this.callbacks.onHoverChange(null);
     }
-  };
+  }
 
   private canPlaceAt(x: number, y: number): boolean {
     if (!this.state.lastPlacedTile) return true;
@@ -449,7 +419,7 @@ export class LevelEditor {
         initialX: x,
       });
       this.state.lastPlacedTile = { x, y };
-      this.callbacks.onLevelChange({ ...level });
+      this.callbacks.onLevelChange({ ...level, enemies: [...level.enemies] });
       return;
     }
 
@@ -465,7 +435,7 @@ export class LevelEditor {
         collectAnim: 0,
       });
       this.state.lastPlacedTile = { x, y };
-      this.callbacks.onLevelChange({ ...level });
+      this.callbacks.onLevelChange({ ...level, collectibles: [...level.collectibles] });
       return;
     }
 
@@ -480,7 +450,7 @@ export class LevelEditor {
     }
 
     this.state.lastPlacedTile = { x, y };
-    this.callbacks.onLevelChange({ ...level });
+    this.callbacks.onLevelChange({ ...level, tiles: [...level.tiles] });
   }
 
   private eraseAt(x: number, y: number): void {
@@ -507,7 +477,12 @@ export class LevelEditor {
 
     if (changed) {
       this.state.lastPlacedTile = { x, y };
-      this.callbacks.onLevelChange({ ...level });
+      this.callbacks.onLevelChange({
+        tiles: [...level.tiles],
+        enemies: [...level.enemies],
+        collectibles: [...level.collectibles],
+        spawnPoint: level.spawnPoint,
+      });
     }
   }
 
@@ -522,7 +497,12 @@ export class LevelEditor {
   }
 
   getLevel(): LevelData {
-    return { ...this.state.level };
+    return {
+      tiles: [...this.state.level.tiles],
+      enemies: this.state.level.enemies.map((e) => ({ ...e })),
+      collectibles: this.state.level.collectibles.map((c) => ({ ...c })),
+      spawnPoint: { ...this.state.level.spawnPoint },
+    };
   }
 
   setLevel(level: LevelData): void {
@@ -545,6 +525,8 @@ export class LevelEditor {
   setOffset(offsetX: number, offsetY: number): void {
     this.offsetX = offsetX;
     this.offsetY = offsetY;
+    this.editorAreaWidth = this.gridWidth * this.tileSize;
+    this.editorAreaHeight = this.gridHeight * this.tileSize;
   }
 
   destroy(): void {
@@ -552,5 +534,6 @@ export class LevelEditor {
     this.canvas.removeEventListener('mousedown', this.handleMouseDown);
     this.canvas.removeEventListener('mouseup', this.handleMouseUp);
     this.canvas.removeEventListener('mouseleave', this.handleMouseLeave);
+    this.canvas.removeEventListener('mouseenter', this.handleMouseEnter);
   }
 }

@@ -103,10 +103,148 @@ const COLORS = {
   starLight: '#FFFF00',
 };
 
+type TerrainRenderer = (ctx: CanvasRenderingContext2D, px: number, py: number, size: number) => void;
+
+const TERRAIN_RENDERERS: Record<TerrainType, TerrainRenderer> = {
+  brick: drawBrickPattern,
+  grass: drawGrassPattern,
+  spike: drawSpikePattern,
+  platform: drawPlatformPattern,
+};
+
+function px(size: number, ratio: number): number {
+  return Math.max(1, Math.floor(size * ratio));
+}
+
+function drawBrickPattern(ctx: CanvasRenderingContext2D, px0: number, py0: number, size: number): void {
+  const half = size / 2;
+  const lineW = px(size, 0.05);
+  const inset = px(size, 0.05);
+
+  ctx.fillStyle = COLORS.brickBase;
+  ctx.fillRect(px0, py0, size, size);
+
+  ctx.fillStyle = COLORS.brickDark;
+  ctx.fillRect(px0, py0, size, lineW);
+  ctx.fillRect(px0, py0 + half - lineW / 2, size, lineW);
+  ctx.fillRect(px0, py0 + size - lineW, size, lineW);
+
+  ctx.fillRect(px0, py0, lineW, half);
+  ctx.fillRect(px0 + half - lineW / 2, py0 + half, lineW, half);
+  ctx.fillRect(px0 + size - lineW, py0, lineW, half);
+
+  ctx.fillStyle = COLORS.brickLight;
+  ctx.fillRect(px0 + inset * 2, py0 + inset * 2, half - inset * 4, half - inset * 4);
+  ctx.fillRect(px0 + half + inset * 2, py0 + half + inset * 2, half - inset * 4, half - inset * 4);
+}
+
+function drawGrassPattern(ctx: CanvasRenderingContext2D, px0: number, py0: number, size: number): void {
+  const soilH = px(size, 0.15);
+  const borderW = px(size, 0.03);
+  const grassW = px(size, 0.05);
+  const grassH = px(size, 0.08);
+
+  ctx.fillStyle = COLORS.grassBase;
+  ctx.fillRect(px0, py0, size, size);
+
+  ctx.fillStyle = COLORS.grassDark;
+  ctx.fillRect(px0, py0 + size - soilH, size, soilH);
+  ctx.fillRect(px0, py0, size, borderW);
+  ctx.fillRect(px0, py0, borderW, size);
+  ctx.fillRect(px0 + size - borderW, py0, borderW, size);
+
+  ctx.fillStyle = COLORS.grassLight;
+  const seed = Math.floor((px0 * 7 + py0 * 13) / Math.max(1, size));
+  const count = Math.max(6, Math.floor(size / 4));
+  const rng = seededRandom(seed);
+  for (let i = 0; i < count; i++) {
+    const gx = px0 + Math.floor(rng() * (size - grassW * 2)) + grassW;
+    const gy = py0 + Math.floor(rng() * (size - soilH - grassH * 2)) + grassH;
+    ctx.fillRect(gx, gy, grassW, grassH);
+  }
+}
+
+function drawSpikePattern(ctx: CanvasRenderingContext2D, px0: number, py0: number, size: number): void {
+  const tipCount = 4;
+  const spikeWidth = size / tipCount;
+  const spikeHeight = size * 0.7;
+  const baseY = py0 + size;
+  const baseH = px(size, 0.1);
+  const highlightW = px(size, 0.04);
+
+  ctx.fillStyle = COLORS.spikeDark;
+  ctx.fillRect(px0, baseY - baseH, size, baseH);
+
+  for (let i = 0; i < tipCount; i++) {
+    const sx = px0 + i * spikeWidth;
+    const tipX = sx + spikeWidth / 2;
+    const tipY = py0 + size - spikeHeight;
+
+    ctx.fillStyle = COLORS.spikeBase;
+    ctx.beginPath();
+    ctx.moveTo(sx, baseY - baseH);
+    ctx.lineTo(tipX, tipY);
+    ctx.lineTo(sx + spikeWidth, baseY - baseH);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.fillStyle = COLORS.spikeLight;
+    ctx.fillRect(
+      Math.floor(tipX - highlightW / 2),
+      tipY + px(size, 0.05),
+      highlightW,
+      spikeHeight * 0.4
+    );
+  }
+
+  ctx.fillStyle = COLORS.spikeDark;
+  ctx.fillRect(px0, baseY - px(size, 0.05), size, px(size, 0.05));
+}
+
+function drawPlatformPattern(ctx: CanvasRenderingContext2D, px0: number, py0: number, size: number): void {
+  const planks = 4;
+  const plankHeight = size / planks;
+  const lineW = px(size, 0.04);
+  const borderW = px(size, 0.03);
+  const highlightW = px(size, 0.1);
+  const highlightH = px(size, 0.12);
+
+  ctx.fillStyle = COLORS.platformBase;
+  ctx.fillRect(px0, py0, size, size);
+
+  ctx.fillStyle = COLORS.platformDark;
+  for (let i = 1; i < planks; i++) {
+    ctx.fillRect(px0, py0 + i * plankHeight - lineW / 2, size, lineW);
+  }
+
+  ctx.fillStyle = COLORS.platformLight;
+  for (let i = 0; i < planks; i++) {
+    ctx.fillRect(
+      px0 + highlightW / 2,
+      py0 + i * plankHeight + highlightH / 2,
+      highlightW,
+      plankHeight - highlightH
+    );
+  }
+
+  ctx.fillStyle = COLORS.platformDark;
+  ctx.fillRect(px0, py0, size, borderW);
+  ctx.fillRect(px0, py0 + size - borderW, size, borderW);
+  ctx.fillRect(px0, py0, borderW, size);
+  ctx.fillRect(px0 + size - borderW, py0, borderW, size);
+}
+
+function seededRandom(seed: number): () => number {
+  let s = seed;
+  return () => {
+    s = (s * 9301 + 49297) % 233280;
+    return s / 233280;
+  };
+}
+
 export class Renderer {
   private ctx: CanvasRenderingContext2D;
   private canvas: HTMLCanvasElement;
-  private grassPatternCache: Map<number, HTMLCanvasElement> = new Map();
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
@@ -123,11 +261,6 @@ export class Renderer {
     this.ctx.translate(offsetX, offsetY);
 
     this.drawBackground(data);
-
-    if (mode === 'editor') {
-      this.drawGrid(data);
-    }
-
     this.drawTiles(data);
     this.drawEntities(data);
 
@@ -137,6 +270,7 @@ export class Renderer {
     }
 
     if (mode === 'editor') {
+      this.drawGrid(data);
       this.drawHoverPreview(data);
     }
 
@@ -158,9 +292,10 @@ export class Renderer {
     if (data.mode === 'game') {
       this.ctx.fillStyle = '#3a3a3a';
       for (let i = 0; i < 20; i++) {
-        const px = (i * 73) % w;
-        const py = (i * 47) % h;
-        this.ctx.fillRect(px, py, 2, 2);
+        const px1 = (i * 73) % w;
+        const py1 = (i * 47) % h;
+        const dotSize = Math.max(1, Math.floor(tileSize * 0.05));
+        this.ctx.fillRect(px1, py1, dotSize, dotSize);
       }
     }
   }
@@ -192,172 +327,31 @@ export class Renderer {
     const { level, tileSize } = data;
 
     for (const tile of level.tiles) {
-      const px = tile.x * tileSize;
-      const py = tile.y * tileSize;
-      this.drawTerrainTile(px, py, tileSize, tile.type, 1);
+      const pxi = tile.x * tileSize;
+      const pyi = tile.y * tileSize;
+      this.drawTerrainTile(pxi, pyi, tileSize, tile.type, 1);
     }
   }
 
-  drawTerrainTile(px: number, py: number, size: number, type: TerrainType, alpha: number = 1): void {
+  drawTerrainTile(px0: number, py0: number, size: number, type: TerrainType, alpha: number = 1): void {
     this.ctx.save();
     if (alpha < 1) {
       this.ctx.globalAlpha = alpha;
     }
 
-    switch (type) {
-      case 'brick':
-        this.drawBrickTile(px, py, size);
-        break;
-      case 'grass':
-        this.drawGrassTile(px, py, size);
-        break;
-      case 'spike':
-        this.drawSpikeTile(px, py, size);
-        break;
-      case 'platform':
-        this.drawPlatformTile(px, py, size);
-        break;
+    const renderer = TERRAIN_RENDERERS[type];
+    if (renderer) {
+      renderer(this.ctx, px0, py0, size);
     }
 
     this.ctx.restore();
   }
 
-  private drawBrickTile(px: number, py: number, size: number): void {
-    const half = size / 2;
-
-    this.ctx.fillStyle = COLORS.brickBase;
-    this.ctx.fillRect(px, py, size, size);
-
-    this.ctx.fillStyle = COLORS.brickDark;
-    this.ctx.fillRect(px, py, size, 2);
-    this.ctx.fillRect(px, py + half - 1, size, 2);
-    this.ctx.fillRect(px, py + size - 2, size, 2);
-
-    this.ctx.fillRect(px, py, 2, half);
-    this.ctx.fillRect(px + half - 1, py + half, 2, half);
-    this.ctx.fillRect(px + size - 2, py, 2, half);
-
-    this.ctx.fillStyle = COLORS.brickLight;
-    this.ctx.fillRect(px + 2, py + 2, half - 4, half - 4);
-    this.ctx.fillRect(px + half + 2, py + half + 2, half - 4, half - 4);
-  }
-
-  private drawGrassTile(px: number, py: number, size: number): void {
-    this.ctx.fillStyle = COLORS.grassBase;
-    this.ctx.fillRect(px, py, size, size);
-
-    this.ctx.fillStyle = COLORS.grassDark;
-    this.ctx.fillRect(px, py + size - 4, size, 4);
-    this.ctx.fillRect(px, py, size, 1);
-    this.ctx.fillRect(px, py, 1, size);
-    this.ctx.fillRect(px + size - 1, py, 1, size);
-
-    this.ctx.fillStyle = COLORS.grassLight;
-    const seed = Math.floor((px * 7 + py * 13) / 40);
-    const grassPositions = this.getGrassPositions(seed, size);
-    for (const g of grassPositions) {
-      this.ctx.fillRect(px + g.x, py + g.y, 2, 3);
+  static drawTerrainIcon(ctx: CanvasRenderingContext2D, type: TerrainType, size: number): void {
+    const renderer = TERRAIN_RENDERERS[type];
+    if (renderer) {
+      renderer(ctx, 0, 0, size);
     }
-  }
-
-  private getGrassPositions(seed: number, size: number): Array<{ x: number; y: number }> {
-    if (this.grassPatternCache.has(seed)) {
-      const cached = this.grassPatternCache.get(seed)!;
-      const positions: Array<{ x: number; y: number }> = [];
-      const ctx = cached.getContext('2d')!;
-      const imgData = ctx.getImageData(0, 0, size, size);
-      for (let y = 0; y < size; y++) {
-        for (let x = 0; x < size; x++) {
-          const idx = (y * size + x) * 4;
-          if (imgData.data[idx + 3] > 0) {
-            positions.push({ x, y });
-          }
-        }
-      }
-      return positions;
-    }
-
-    const positions: Array<{ x: number; y: number }> = [];
-    const rng = this.seededRandom(seed);
-    for (let i = 0; i < 12; i++) {
-      positions.push({
-        x: Math.floor(rng() * (size - 4)) + 2,
-        y: Math.floor(rng() * (size - 8)) + 2,
-      });
-    }
-
-    const offscreen = document.createElement('canvas');
-    offscreen.width = size;
-    offscreen.height = size;
-    const offCtx = offscreen.getContext('2d')!;
-    offCtx.fillStyle = COLORS.grassLight;
-    for (const p of positions) {
-      offCtx.fillRect(p.x, p.y, 2, 3);
-    }
-    this.grassPatternCache.set(seed, offscreen);
-
-    return positions;
-  }
-
-  private seededRandom(seed: number): () => number {
-    let s = seed;
-    return () => {
-      s = (s * 9301 + 49297) % 233280;
-      return s / 233280;
-    };
-  }
-
-  private drawSpikeTile(px: number, py: number, size: number): void {
-    const tipCount = 4;
-    const spikeWidth = size / tipCount;
-    const spikeHeight = size * 0.7;
-    const baseY = py + size;
-
-    this.ctx.fillStyle = COLORS.spikeDark;
-    this.ctx.fillRect(px, baseY - 4, size, 4);
-
-    for (let i = 0; i < tipCount; i++) {
-      const sx = px + i * spikeWidth;
-      const tipX = sx + spikeWidth / 2;
-      const tipY = py + size - spikeHeight;
-
-      this.ctx.fillStyle = COLORS.spikeBase;
-      this.ctx.beginPath();
-      this.ctx.moveTo(sx, baseY - 4);
-      this.ctx.lineTo(tipX, tipY);
-      this.ctx.lineTo(sx + spikeWidth, baseY - 4);
-      this.ctx.closePath();
-      this.ctx.fill();
-
-      this.ctx.fillStyle = COLORS.spikeLight;
-      this.ctx.fillRect(Math.floor(tipX - 1), tipY + 2, 2, spikeHeight * 0.4);
-    }
-
-    this.ctx.fillStyle = COLORS.spikeDark;
-    this.ctx.fillRect(px, baseY - 2, size, 2);
-  }
-
-  private drawPlatformTile(px: number, py: number, size: number): void {
-    const plankHeight = size / 4;
-
-    this.ctx.fillStyle = COLORS.platformBase;
-    this.ctx.fillRect(px, py, size, size);
-
-    this.ctx.fillStyle = COLORS.platformDark;
-    for (let i = 1; i < 4; i++) {
-      this.ctx.fillRect(px, py + i * plankHeight - 1, size, 2);
-    }
-
-    this.ctx.fillStyle = COLORS.platformLight;
-    for (let i = 0; i < 4; i++) {
-      this.ctx.fillRect(px + 2, py + i * plankHeight + 2, 4, plankHeight - 6);
-    }
-
-    this.ctx.fillStyle = COLORS.platformDark;
-    this.ctx.fillRect(px, py, size, 1);
-    this.ctx.fillRect(px, py + size - 1, size, 1);
-    this.ctx.fillRect(px, py, 1, size);
-    this.ctx.fillRect(px + size - 1, py, 1, size);
   }
 
   private drawEntities(data: RenderData): void {
@@ -380,12 +374,12 @@ export class Renderer {
     }
   }
 
-  drawEnemy(px: number, py: number, tileSize: number, direction: 1 | -1 = 1, animate: boolean = false): void {
+  drawEnemy(px0: number, py0: number, tileSize: number, direction: 1 | -1 = 1, animate: boolean = false): void {
     const size = tileSize * 0.8;
     const offsetX = (tileSize - size) / 2;
     const offsetY = tileSize - size;
-    const x = px + offsetX;
-    const y = py + offsetY;
+    const x = px0 + offsetX;
+    const y = py0 + offsetY;
 
     this.ctx.fillStyle = COLORS.enemyBody;
     this.ctx.beginPath();
@@ -438,12 +432,12 @@ export class Renderer {
     for (let i = 0; i < points * 2; i++) {
       const r = i % 2 === 0 ? outerR : innerR;
       const angle = (i * Math.PI) / points - Math.PI / 2;
-      const x = Math.cos(angle) * r;
-      const y = Math.sin(angle) * r;
+      const x1 = Math.cos(angle) * r;
+      const y1 = Math.sin(angle) * r;
       if (i === 0) {
-        this.ctx.moveTo(x, y);
+        this.ctx.moveTo(x1, y1);
       } else {
-        this.ctx.lineTo(x, y);
+        this.ctx.lineTo(x1, y1);
       }
     }
     this.ctx.closePath();
@@ -452,9 +446,9 @@ export class Renderer {
     this.ctx.fillStyle = COLORS.starDark;
     for (let i = 0; i < points; i++) {
       const angle = (i * 2 * Math.PI) / points - Math.PI / 2;
-      const x = Math.cos(angle) * (outerR * 0.5);
-      const y = Math.sin(angle) * (outerR * 0.5);
-      this.ctx.fillRect(x - 1, y - 1, 2, 2);
+      const x1 = Math.cos(angle) * (outerR * 0.5);
+      const y1 = Math.sin(angle) * (outerR * 0.5);
+      this.ctx.fillRect(x1 - 1, y1 - 1, 2, 2);
     }
 
     this.ctx.fillStyle = COLORS.starLight;
@@ -472,7 +466,7 @@ export class Renderer {
   }
 
   private drawPlayer(data: RenderData): void {
-    const { player, tileSize } = data;
+    const { player } = data;
 
     if (player.isDead && Math.floor(player.deathTimer * 20) % 2 === 0) {
       return;
@@ -491,41 +485,41 @@ export class Renderer {
       y = 0;
     }
 
-    const px = Math.floor(x);
-    const py = Math.floor(y);
+    const pxi = Math.floor(x);
+    const pyi = Math.floor(y);
     const w = Math.floor(width);
     const h = Math.floor(height);
 
     const headH = Math.floor(h * 0.28);
     const bodyH = Math.floor(h * 0.38);
     const legH = h - headH - bodyH;
-    const headY = py;
-    const bodyY = py + headH;
-    const legY = py + headH + bodyH;
+    const headY = pyi;
+    const bodyY = pyi + headH;
+    const legY = pyi + headH + bodyH;
 
     this.ctx.fillStyle = COLORS.playerSkin;
-    this.ctx.fillRect(px + 2, headY, w - 4, headH);
+    this.ctx.fillRect(pxi + 2, headY, w - 4, headH);
 
     this.ctx.fillStyle = '#000';
-    this.ctx.fillRect(px + w * 0.55, headY + headH * 0.4, 2, 2);
-    this.ctx.fillRect(px + w * 0.3, headY + headH * 0.4, 2, 2);
+    this.ctx.fillRect(pxi + w * 0.55, headY + headH * 0.4, 2, 2);
+    this.ctx.fillRect(pxi + w * 0.3, headY + headH * 0.4, 2, 2);
 
     this.ctx.fillStyle = COLORS.playerBody;
-    this.ctx.fillRect(px + 1, bodyY, w - 2, bodyH);
+    this.ctx.fillRect(pxi + 1, bodyY, w - 2, bodyH);
 
     this.ctx.fillStyle = COLORS.playerSkin;
     const armSwing = onGround ? (Math.abs(vx) > 0.5 ? Math.sin(Date.now() / 80) * 2 : 0) : -2;
-    this.ctx.fillRect(px - 1, bodyY + 2 + armSwing, 3, bodyH * 0.6);
-    this.ctx.fillRect(px + w - 2, bodyY + 2 - armSwing, 3, bodyH * 0.6);
+    this.ctx.fillRect(pxi - 1, bodyY + 2 + armSwing, 3, bodyH * 0.6);
+    this.ctx.fillRect(pxi + w - 2, bodyY + 2 - armSwing, 3, bodyH * 0.6);
 
     this.ctx.fillStyle = COLORS.playerPants;
     const legSwing = onGround ? (Math.abs(vx) > 0.5 ? Math.sin(Date.now() / 80) * 2 : 0) : 3;
-    this.ctx.fillRect(px + 2, legY, Math.floor(w / 2) - 3, legH + legSwing);
-    this.ctx.fillRect(px + Math.floor(w / 2) + 1, legY, Math.floor(w / 2) - 3, legH - legSwing);
+    this.ctx.fillRect(pxi + 2, legY, Math.floor(w / 2) - 3, legH + legSwing);
+    this.ctx.fillRect(pxi + Math.floor(w / 2) + 1, legY, Math.floor(w / 2) - 3, legH - legSwing);
 
     this.ctx.fillStyle = COLORS.playerShoe;
-    this.ctx.fillRect(px + 1, legY + legH - 2 + legSwing, Math.floor(w / 2) - 1, 3);
-    this.ctx.fillRect(px + Math.floor(w / 2), legY + legH - 2 - legSwing, Math.floor(w / 2) - 1, 3);
+    this.ctx.fillRect(pxi + 1, legY + legH - 2 + legSwing, Math.floor(w / 2) - 1, 3);
+    this.ctx.fillRect(pxi + Math.floor(w / 2), legY + legH - 2 - legSwing, Math.floor(w / 2) - 1, 3);
 
     this.ctx.restore();
   }
@@ -546,27 +540,28 @@ export class Renderer {
     if (!hoverTile) return;
     if (hoverTile.x < 0 || hoverTile.x >= gridWidth || hoverTile.y < 0 || hoverTile.y >= gridHeight) return;
 
-    const px = hoverTile.x * tileSize;
-    const py = hoverTile.y * tileSize;
+    const pxi = hoverTile.x * tileSize;
+    const pyi = hoverTile.y * tileSize;
 
     this.ctx.fillStyle = COLORS.hoverHighlight;
-    this.ctx.fillRect(px, py, tileSize, tileSize);
+    this.ctx.fillRect(pxi, pyi, tileSize, tileSize);
 
     if (currentTool === 'eraser') {
       this.ctx.strokeStyle = '#FF0000';
       this.ctx.lineWidth = 2;
+      const margin = Math.max(8, Math.floor(tileSize * 0.2));
       this.ctx.beginPath();
-      this.ctx.moveTo(px + 8, py + 8);
-      this.ctx.lineTo(px + tileSize - 8, py + tileSize - 8);
-      this.ctx.moveTo(px + tileSize - 8, py + 8);
-      this.ctx.lineTo(px + 8, py + tileSize - 8);
+      this.ctx.moveTo(pxi + margin, pyi + margin);
+      this.ctx.lineTo(pxi + tileSize - margin, pyi + tileSize - margin);
+      this.ctx.moveTo(pxi + tileSize - margin, pyi + margin);
+      this.ctx.lineTo(pxi + margin, pyi + tileSize - margin);
       this.ctx.stroke();
     } else if (currentTool === 'enemy') {
-      this.drawEnemy(px, py, tileSize, 1, false);
+      this.drawEnemy(pxi, pyi, tileSize, 1, false);
     } else if (currentTool === 'collectible') {
-      this.drawCollectible(px + tileSize / 2, py + tileSize / 2, tileSize, 0, 0);
+      this.drawCollectible(pxi + tileSize / 2, pyi + tileSize / 2, tileSize, 0, 0);
     } else {
-      this.drawTerrainTile(px, py, tileSize, currentTool as TerrainType, 0.6);
+      this.drawTerrainTile(pxi, pyi, tileSize, currentTool as TerrainType, 0.6);
     }
   }
 
