@@ -241,7 +241,6 @@ export const useGameStore = create<GameState>((set, get) => ({
       }
 
       const totalRounds = data.totalRounds;
-      const logsPerBatch = Math.ceil(data.logs.length / Math.min(totalRounds, 10));
       let displayedLogs = 0;
 
       for (let round = 1; round <= totalRounds; round++) {
