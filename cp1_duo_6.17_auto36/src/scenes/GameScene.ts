@@ -100,6 +100,8 @@ export class GameScene extends Phaser.Scene {
 
   asteroids: AsteroidData[] = [];
   asteroidSprites: Map<string, Phaser.GameObjects.Graphics> = new Map();
+  asteroidGlows: Map<string, Phaser.GameObjects.Graphics> = new Map();
+  asteroidRotationSpeeds: Map<string, number> = new Map();
 
   keys!: { W: Phaser.Input.Keyboard.Key; A: Phaser.Input.Keyboard.Key; S: Phaser.Input.Keyboard.Key; D: Phaser.Input.Keyboard.Key };
 
@@ -219,6 +221,8 @@ export class GameScene extends Phaser.Scene {
   }
 
   createShip() {
+    const w = this.scale.width;
+    const h = this.scale.height;
     this.shipX = 0;
     this.shipY = 0;
     this.ship = this.add.graphics();
@@ -316,7 +320,18 @@ export class GameScene extends Phaser.Scene {
     this.updateDockPulse(dt);
     this.updateSmelting(dt);
     this.updateAutoSave(dt);
+    this.updateAsteroidRotation(dt);
     this.checkProximity();
+  }
+
+  updateAsteroidRotation(dt: number) {
+    for (const ast of this.asteroids) {
+      const rockGfx = this.asteroidSprites.get(ast.id);
+      const rotSpeed = this.asteroidRotationSpeeds.get(ast.id);
+      if (rockGfx && rotSpeed) {
+        rockGfx.rotation += rotSpeed * dt;
+      }
+    }
   }
 
   updateShipMovement(dt: number) {
@@ -337,6 +352,11 @@ export class GameScene extends Phaser.Scene {
       this.shipX += dx * speed * dt;
       this.shipY += dy * speed * dt;
       this.shipAngle = Math.atan2(dy, dx);
+
+      const boundW = this.cameras.main.width * 0.9;
+      const boundH = this.cameras.main.height * 0.9;
+      this.shipX = Phaser.Math.Clamp(this.shipX, -boundW, boundW);
+      this.shipY = Phaser.Math.Clamp(this.shipY, -boundH, boundH);
     }
 
     this.ship.setPosition(this.shipX, this.shipY);
@@ -354,22 +374,22 @@ export class GameScene extends Phaser.Scene {
     if (isMoving && !this.docked) {
       if (!this.trailEmitter) {
         const trailGfx = this.add.graphics();
-        trailGfx.fillStyle(0x00d4ff, 0.6);
+        trailGfx.fillStyle(0x88ccff, 1);
         trailGfx.fillCircle(2, 2, 2);
         trailGfx.generateTexture('trailParticle', 4, 4);
         trailGfx.destroy();
 
         const particles = this.add.particles(this.shipX, this.shipY, 'trailParticle', {
-          speed: { min: 10, max: 30 },
-          scale: { start: 0.8, end: 0 },
-          lifespan: { min: 200, max: 500 },
-          alpha: { start: 0.6, end: 0 },
+          speed: { min: 8, max: 20 },
+          scale: { start: 0.9, end: 0 },
+          lifespan: { min: 280, max: 320 },
+          alpha: { start: 0.9, end: 0 },
           blendMode: 'ADD',
           emitting: true,
-          quantity: 2,
+          quantity: 3,
           angle: {
             onEmit: () => {
-              return (this.shipAngle * 180 / Math.PI) + 180 + Phaser.Math.Between(-30, 30);
+              return (this.shipAngle * 180 / Math.PI) + 180 + Phaser.Math.Between(-15, 15);
             }
           },
         });
@@ -377,6 +397,7 @@ export class GameScene extends Phaser.Scene {
         this.trailEmitter = particles;
       }
       this.trailEmitter.emitting = true;
+      this.trailEmitter.quantity = Phaser.Math.Between(3, 5);
     } else if (this.trailEmitter) {
       this.trailEmitter.emitting = false;
     }
@@ -972,8 +993,12 @@ export class GameScene extends Phaser.Scene {
     const oreTypes = ['iron', 'copper', 'silver', 'gold', 'crystal'];
     const probs = [0.35, 0.25, 0.20, 0.12, 0.08];
 
-    for (let i = 0; i < 15; i++) {
-      const gridSize = i < 5 ? 4 : 6;
+    const count = Phaser.Math.Between(5, 8);
+    const w = this.scale.width;
+    const h = this.scale.height;
+
+    for (let i = 0; i < count; i++) {
+      const gridSize = Phaser.Math.Between(4, 6);
       const hexGrid: HexCell[] = [];
       const oreDist: Record<string, number> = {};
 
@@ -1002,13 +1027,31 @@ export class GameScene extends Phaser.Scene {
         }
       }
 
-      const angle = (i / 15) * Math.PI * 2;
-      const dist = 300 + Math.random() * 1500;
+      let x: number, y: number;
+      let tooClose = false;
+      let attempts = 0;
+      do {
+        tooClose = false;
+        const angle = Math.random() * Math.PI * 2;
+        const dist = 150 + Math.random() * Math.min(w, h) * 0.35;
+        x = Math.cos(angle) * dist;
+        y = Math.sin(angle) * dist;
+        for (const ast of this.asteroids) {
+          const dx = x - ast.x;
+          const dy = y - ast.y;
+          if (Math.sqrt(dx * dx + dy * dy) < 200) {
+            tooClose = true;
+            break;
+          }
+        }
+        attempts++;
+      } while (tooClose && attempts < 50);
+
       this.asteroids.push({
         id: `ast_${i.toString().padStart(3, '0')}`,
-        x: Math.cos(angle) * dist,
-        y: Math.sin(angle) * dist,
-        zone: i < 5 ? 'inner' : i < 10 ? 'middle' : 'outer',
+        x: x,
+        y: y,
+        zone: i < 3 ? 'inner' : i < 6 ? 'middle' : 'outer',
         grid_size: gridSize,
         hex_grid: hexGrid,
         total_value: hexGrid.reduce((a, h) => a + h.value, 0),
@@ -1024,33 +1067,74 @@ export class GameScene extends Phaser.Scene {
     for (const [id, sprite] of this.asteroidSprites) {
       sprite.destroy();
     }
+    for (const [id, glow] of this.asteroidGlows) {
+      glow.destroy();
+    }
     this.asteroidSprites.clear();
+    this.asteroidGlows.clear();
+    this.asteroidRotationSpeeds.clear();
 
     for (const ast of this.asteroids) {
-      const gfx = this.add.graphics();
-      gfx.setPosition(ast.x, ast.y);
-      gfx.setDepth(5);
+      const size = Phaser.Math.Between(40, 80);
 
-      const rarity = ast.zone === 'outer' ? 0.7 : ast.zone === 'middle' ? 0.5 : 0.3;
-      const baseAlpha = 0.6 + rarity * 0.3;
-      const baseColor = ast.zone === 'outer' ? 0x6a3a8a : ast.zone === 'middle' ? 0x5a6a8a : 0x6a7a7a;
+      const glowGfx = this.add.graphics();
+      glowGfx.setPosition(ast.x, ast.y);
+      glowGfx.setDepth(4);
+      glowGfx.fillStyle(0x4488ff, 0.15);
+      glowGfx.fillCircle(0, 0, size + 20);
+      this.asteroidGlows.set(ast.id, glowGfx);
 
-      gfx.fillStyle(baseColor, baseAlpha);
-      gfx.fillCircle(0, 0, 30 + ast.grid_size * 2);
-      gfx.lineStyle(1, 0x00d4ff, 0.2);
-      gfx.strokeCircle(0, 0, 30 + ast.grid_size * 2);
+      const rockGfx = this.add.graphics();
+      rockGfx.setPosition(ast.x, ast.y);
+      rockGfx.setDepth(5);
 
-      const ringColor = ast.zone === 'outer' ? 0xd4a5ff : ast.zone === 'middle' ? 0xe0e0ff : 0xaaaaaa;
-      gfx.lineStyle(1, ringColor, 0.15);
-      gfx.strokeCircle(0, 0, 40 + ast.grid_size * 2);
+      if (!ast.mined_out) {
+        const points: { x: number; y: number }[] = [];
+        const vertexCount = 9;
+        for (let i = 0; i < vertexCount; i++) {
+          const angle = (i / vertexCount) * Math.PI * 2;
+          const radius = size * (0.75 + Math.sin(i * 2.5) * 0.15 + Math.random() * 0.1);
+          points.push({
+            x: Math.cos(angle) * radius,
+            y: Math.sin(angle) * radius,
+          });
+        }
 
-      if (ast.mined_out) {
-        gfx.clear();
-        gfx.fillStyle(0x333333, 0.3);
-        gfx.fillCircle(0, 0, 30);
+        rockGfx.fillGradientStyle(
+          0x8a7a6a,
+          0x6a5a4a,
+          0x5a4a3a,
+          0x7a6a5a,
+          0.9, 0.9, 0.9, 0.9
+        );
+        rockGfx.beginPath();
+        rockGfx.moveTo(points[0].x, points[0].y);
+        for (let i = 1; i < points.length; i++) {
+          rockGfx.lineTo(points[i].x, points[i].y);
+        }
+        rockGfx.closePath();
+        rockGfx.fillPath();
+
+        rockGfx.lineStyle(1, 0x3a3a3a, 0.6);
+        rockGfx.strokePath();
+
+        const craterCount = Phaser.Math.Between(3, 5);
+        for (let c = 0; c < craterCount; c++) {
+          const angle = Math.random() * Math.PI * 2;
+          const dist = Math.random() * size * 0.5;
+          const cx = Math.cos(angle) * dist;
+          const cy = Math.sin(angle) * dist;
+          const craterSize = size * (0.05 + Math.random() * 0.08);
+          rockGfx.fillStyle(0x3a3028, 0.6);
+          rockGfx.fillCircle(cx, cy, craterSize);
+        }
+      } else {
+        rockGfx.fillStyle(0x333333, 0.5);
+        rockGfx.fillCircle(0, 0, size * 0.7);
       }
 
-      this.asteroidSprites.set(ast.id, gfx);
+      this.asteroidSprites.set(ast.id, rockGfx);
+      this.asteroidRotationSpeeds.set(ast.id, 0.1 * (Math.random() * 0.4 + 0.8));
     }
   }
 
