@@ -157,7 +157,7 @@ export class Navigation {
     if (this.motionBlurElement) {
       const blur = isMoving ? 0.3 : 0;
       this.motionBlurElement.style.backdropFilter = `blur(${blur}px)`;
-      (this.motionBlurElement.style as Record<string, string>).webkitBackdropFilter = `blur(${blur}px)`;
+      (this.motionBlurElement.style as unknown as Record<string, string>).webkitBackdropFilter = `blur(${blur}px)`;
     }
   }
 

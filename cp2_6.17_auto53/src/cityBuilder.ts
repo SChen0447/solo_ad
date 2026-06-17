@@ -96,38 +96,112 @@ export class CityBuilder {
     const baseW = 2 + Math.random() * 2;
     const baseD = 2 + Math.random() * 2;
     const baseH = 3 + Math.random() * 5;
+
+    const warmColors = [
+      0xf5e6d3,
+      0xfff0dc,
+      0xffe4b5,
+      0xffdab9,
+      0xf5deb3,
+      0xffcba4,
+      0xffb6c1,
+      0xffc0cb,
+      0xffe4e1,
+      0xe6cfa5,
+    ];
+    const primaryColor = warmColors[Math.floor(Math.random() * warmColors.length)];
+    const roofColors = [0x8b4513, 0xa0522d, 0xcd853f, 0xd2691e, 0x8b0000, 0x654321];
+    const roofColor = roofColors[Math.floor(Math.random() * roofColors.length)];
+    const trimColor = 0xffffff;
+
     const baseGeo = new THREE.BoxGeometry(baseW, baseH, baseD);
-    const colors = [0x4a6fa5, 0x5b7f9e, 0x6a8dae, 0x7a9dbe];
-    const baseMat = new THREE.MeshPhongMaterial({ color: colors[Math.floor(Math.random() * colors.length)] });
+    const baseMat = new THREE.MeshPhongMaterial({
+      color: primaryColor,
+      shininess: 20,
+      specular: 0x222222,
+    });
     const baseMesh = new THREE.Mesh(baseGeo, baseMat);
     baseMesh.position.y = baseH / 2;
     baseMesh.castShadow = true;
     baseMesh.receiveShadow = true;
     group.add(baseMesh);
 
+    const trimGeo = new THREE.BoxGeometry(baseW + 0.02, 0.15, baseD + 0.02);
+    const trimMat = new THREE.MeshPhongMaterial({ color: trimColor });
+    const bottomTrim = new THREE.Mesh(trimGeo, trimMat);
+    bottomTrim.position.y = 0.08;
+    bottomTrim.castShadow = true;
+    bottomTrim.receiveShadow = true;
+    group.add(bottomTrim);
+    const topTrim = new THREE.Mesh(trimGeo, trimMat);
+    topTrim.position.y = baseH - 0.08;
+    topTrim.castShadow = true;
+    topTrim.receiveShadow = true;
+    group.add(topTrim);
+
     const roofGeo = new THREE.ConeGeometry(Math.max(baseW, baseD) * 0.75, 2, 4);
-    const roofMat = new THREE.MeshPhongMaterial({ color: 0x8b4513 });
+    const roofMat = new THREE.MeshPhongMaterial({ color: roofColor, shininess: 10 });
     const roof = new THREE.Mesh(roofGeo, roofMat);
     roof.position.y = baseH + 1;
     roof.rotation.y = Math.PI / 4;
     roof.castShadow = true;
+    roof.receiveShadow = true;
     group.add(roof);
 
-    const windowRows = Math.floor(baseH / 1.5);
-    const windowCols = Math.floor(baseW / 1.2);
-    for (let r = 0; r < windowRows; r++) {
-      for (let c = 0; c < windowCols; c++) {
-        const winGeo = new THREE.BoxGeometry(0.4, 0.5, 0.05);
-        const winMat = new THREE.MeshPhongMaterial({ color: 0xffffaa, emissive: 0x444400 });
-        const win = new THREE.Mesh(winGeo, winMat);
-        win.position.set(
-          -baseW / 2 + 0.6 + c * 1.2,
-          1 + r * 1.5,
-          baseD / 2 + 0.01,
-        );
-        group.add(win);
+    const windowCols = Math.max(2, Math.floor(baseW / 1.3));
+    const windowRows = Math.max(2, Math.floor(baseH / 1.8));
+    const winW = 0.5;
+    const winH = 0.7;
+    const frameDepth = 0.08;
+
+    for (let face = 0; face < 2; face++) {
+      const zSign = face === 0 ? 1 : -1;
+      for (let r = 0; r < windowRows; r++) {
+        for (let c = 0; c < windowCols; c++) {
+          const frameGeo = new THREE.BoxGeometry(winW + 0.1, winH + 0.1, frameDepth);
+          const frameMat = new THREE.MeshPhongMaterial({ color: 0x8b7355 });
+          const frame = new THREE.Mesh(frameGeo, frameMat);
+          frame.position.set(
+            -baseW / 2 + (baseW / (windowCols + 1)) * (c + 1),
+            0.8 + r * 1.8,
+            (baseD / 2 + 0.01) * zSign,
+          );
+          frame.castShadow = true;
+          frame.receiveShadow = true;
+          group.add(frame);
+
+          const glassGeo = new THREE.BoxGeometry(winW - 0.05, winH - 0.05, frameDepth + 0.02);
+          const isLit = Math.random() > 0.4;
+          const glassMat = new THREE.MeshPhongMaterial({
+            color: isLit ? 0xffffcc : 0x444466,
+            emissive: isLit ? 0x443300 : 0x000000,
+            emissiveIntensity: isLit ? 0.4 : 0,
+            transparent: true,
+            opacity: 0.9,
+          });
+          const glass = new THREE.Mesh(glassGeo, glassMat);
+          glass.position.copy(frame.position);
+          glass.position.z += 0.001 * zSign;
+          group.add(glass);
+        }
       }
     }
+
+    const doorW = 0.6;
+    const doorH = 1.2;
+    const doorGeo = new THREE.BoxGeometry(doorW, doorH, 0.08);
+    const doorMat = new THREE.MeshPhongMaterial({ color: 0x654321 });
+    const door = new THREE.Mesh(doorGeo, doorMat);
+    door.position.set(0, doorH / 2, baseD / 2 + 0.05);
+    door.castShadow = true;
+    door.receiveShadow = true;
+    group.add(door);
+
+    const knobGeo = new THREE.SphereGeometry(0.04);
+    const knobMat = new THREE.MeshPhongMaterial({ color: 0xffd700 });
+    const knob = new THREE.Mesh(knobGeo, knobMat);
+    knob.position.set(doorW / 2 - 0.08, doorH / 2, baseD / 2 + 0.095);
+    group.add(knob);
 
     group.userData.buildingType = 'residential';
     return group;
@@ -138,49 +212,120 @@ export class CityBuilder {
     const baseW = 3 + Math.random() * 3;
     const baseD = 3 + Math.random() * 3;
     const baseH = 8 + Math.random() * 12;
-    const baseGeo = new THREE.BoxGeometry(baseW, baseH, baseD);
-    const colors = [0x3a5a8c, 0x4a6a9c, 0x2a4a7c, 0x5a7aac];
-    const baseMat = new THREE.MeshPhongMaterial({
-      color: colors[Math.floor(Math.random() * colors.length)],
+
+    const coolColors = [
+      0xb3cde0,
+      0xaec6cf,
+      0x779ecb,
+      0x87ceeb,
+      0xc0c0c0,
+      0xd3d3d3,
+      0xe6e6fa,
+      0xd8bfd8,
+      0x9370db,
+      0x6495ed,
+    ];
+    const primaryColor = coolColors[Math.floor(Math.random() * coolColors.length)];
+    const accentColor = 0x4682b4;
+
+    const coreGeo = new THREE.BoxGeometry(baseW, baseH, baseD);
+    const coreMat = new THREE.MeshPhongMaterial({
+      color: primaryColor,
+      shininess: 80,
+      specular: 0x444444,
     });
-    const baseMesh = new THREE.Mesh(baseGeo, baseMat);
-    baseMesh.position.y = baseH / 2;
-    baseMesh.castShadow = true;
-    baseMesh.receiveShadow = true;
-    group.add(baseMesh);
+    const coreMesh = new THREE.Mesh(coreGeo, coreMat);
+    coreMesh.position.y = baseH / 2;
+    coreMesh.castShadow = true;
+    coreMesh.receiveShadow = true;
+    group.add(coreMesh);
+
+    const glassRows = Math.max(4, Math.floor(baseH / 1.5));
+    const glassCols = Math.max(3, Math.floor(baseW / 1.2));
+    const glassPaneW = (baseW * 0.9) / glassCols;
+    const glassPaneH = (baseH * 0.9) / glassRows;
+
+    for (let face = 0; face < 2; face++) {
+      const zSign = face === 0 ? 1 : -1;
+      for (let r = 0; r < glassRows; r++) {
+        for (let c = 0; c < glassCols; c++) {
+          const frameGeo = new THREE.BoxGeometry(glassPaneW + 0.04, glassPaneH + 0.04, 0.08);
+          const frameMat = new THREE.MeshPhongMaterial({ color: 0x333344 });
+          const frame = new THREE.Mesh(frameGeo, frameMat);
+          frame.position.set(
+            -baseW / 2 + glassPaneW / 2 + c * glassPaneW + baseW * 0.05,
+            baseH * 0.05 + glassPaneH / 2 + r * glassPaneH,
+            (baseD / 2 + 0.05) * zSign,
+          );
+          frame.castShadow = true;
+          frame.receiveShadow = true;
+          group.add(frame);
+
+          const reflectivity = 0.3 + Math.random() * 0.3;
+          const glassGeo = new THREE.BoxGeometry(glassPaneW - 0.02, glassPaneH - 0.02, 0.06);
+          const glassMat = new THREE.MeshPhysicalMaterial({
+            color: 0x87cefa,
+            transparent: true,
+            opacity: 0.55 + Math.random() * 0.2,
+            metalness: 0.1,
+            roughness: 0.1,
+            reflectivity: reflectivity,
+            clearcoat: 1.0,
+            clearcoatRoughness: 0.1,
+            envMapIntensity: 1.0,
+          });
+          const glass = new THREE.Mesh(glassGeo, glassMat);
+          glass.position.copy(frame.position);
+          glass.position.z += 0.02 * zSign;
+          group.add(glass);
+        }
+      }
+    }
 
     for (let i = 0; i < 3; i++) {
       const stripeGeo = new THREE.BoxGeometry(baseW + 0.1, 0.15, baseD + 0.1);
-      const stripeMat = new THREE.MeshPhongMaterial({ color: 0xcccccc });
+      const stripeMat = new THREE.MeshPhongMaterial({ color: accentColor, shininess: 60 });
       const stripe = new THREE.Mesh(stripeGeo, stripeMat);
       stripe.position.y = baseH * (0.25 + i * 0.25);
+      stripe.castShadow = true;
+      stripe.receiveShadow = true;
       group.add(stripe);
     }
+
+    const topGeo = new THREE.BoxGeometry(baseW * 0.7, 0.6, baseD * 0.7);
+    const topMat = new THREE.MeshPhongMaterial({ color: 0x444444 });
+    const top = new THREE.Mesh(topGeo, topMat);
+    top.position.y = baseH + 0.3;
+    top.castShadow = true;
+    top.receiveShadow = true;
+    group.add(top);
 
     const antennaGeo = new THREE.CylinderGeometry(0.05, 0.05, 2);
     const antennaMat = new THREE.MeshPhongMaterial({ color: 0x888888 });
     const antenna = new THREE.Mesh(antennaGeo, antennaMat);
-    antenna.position.y = baseH + 1;
+    antenna.position.set(baseW * 0.15, baseH + 1.6, baseD * 0.15);
+    antenna.castShadow = true;
     group.add(antenna);
 
     const lightGeo = new THREE.SphereGeometry(0.15);
     const lightMat = new THREE.MeshPhongMaterial({ color: 0xff0000, emissive: 0xff0000 });
     const light = new THREE.Mesh(lightGeo, lightMat);
-    light.position.y = baseH + 2;
+    light.position.set(baseW * 0.15, baseH + 2.7, baseD * 0.15);
     group.add(light);
 
-    const glassRows = Math.floor(baseH / 2);
-    for (let r = 0; r < glassRows; r++) {
-      const glassGeo = new THREE.BoxGeometry(baseW * 0.8, 0.8, 0.05);
-      const glassMat = new THREE.MeshPhongMaterial({
-        color: 0x88ccff,
-        transparent: true,
-        opacity: 0.5,
-      });
-      const glass = new THREE.Mesh(glassGeo, glassMat);
-      glass.position.set(0, 1 + r * 2, baseD / 2 + 0.01);
-      group.add(glass);
-    }
+    const entranceGeo = new THREE.BoxGeometry(baseW * 0.3, 1.5, 0.1);
+    const entranceMat = new THREE.MeshPhysicalMaterial({
+      color: 0xaaddff,
+      transparent: true,
+      opacity: 0.6,
+      metalness: 0.2,
+      roughness: 0.1,
+      clearcoat: 1.0,
+    });
+    const entrance = new THREE.Mesh(entranceGeo, entranceMat);
+    entrance.position.set(0, 0.75, baseD / 2 + 0.1);
+    entrance.castShadow = true;
+    group.add(entrance);
 
     group.userData.buildingType = 'commercial';
     return group;
@@ -188,41 +333,140 @@ export class CityBuilder {
 
   private createPark(): THREE.Group {
     const group = new THREE.Group();
-    const groundGeo = new THREE.CylinderGeometry(3, 3, 0.1, 16);
-    const groundMat = new THREE.MeshPhongMaterial({ color: 0x2d5a1e });
+    const groundRadius = 3 + Math.random() * 1.5;
+
+    const groundColors = [0x2d5a1e, 0x228b22, 0x3a7a2a, 0x2e6a1e, 0x4a8a3a];
+    const groundColor = groundColors[Math.floor(Math.random() * groundColors.length)];
+
+    const groundGeo = new THREE.CylinderGeometry(groundRadius, groundRadius, 0.1, 16);
+    const groundMat = new THREE.MeshPhongMaterial({ color: groundColor });
     const ground = new THREE.Mesh(groundGeo, groundMat);
     ground.position.y = 0.05;
     ground.receiveShadow = true;
     group.add(ground);
 
-    const treeCount = 2 + Math.floor(Math.random() * 3);
+    const pathColor = 0xc4a35a;
+    for (let i = 0; i < 4; i++) {
+      const angle = (i / 4) * Math.PI * 2;
+      const pathGeo = new THREE.BoxGeometry(groundRadius * 0.7, 0.08, 0.5);
+      const pathMat = new THREE.MeshPhongMaterial({ color: pathColor });
+      const path = new THREE.Mesh(pathGeo, pathMat);
+      path.position.set(
+        Math.cos(angle) * groundRadius * 0.35,
+        0.09,
+        Math.sin(angle) * groundRadius * 0.35,
+      );
+      path.rotation.y = angle;
+      path.receiveShadow = true;
+      group.add(path);
+    }
+
+    for (let i = 0; i < 20; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const dist = Math.random() * (groundRadius - 0.5);
+      const grassGeo = new THREE.ConeGeometry(0.1 + Math.random() * 0.1, 0.2 + Math.random() * 0.3, 5);
+      const grassMat = new THREE.MeshPhongMaterial({
+        color: 0x2e8b2e + Math.floor(Math.random() * 0x111111),
+      });
+      const grass = new THREE.Mesh(grassGeo, grassMat);
+      grass.position.set(
+        Math.cos(angle) * dist,
+        0.15 + Math.random() * 0.1,
+        Math.sin(angle) * dist,
+      );
+      grass.rotation.x = (Math.random() - 0.5) * 0.3;
+      grass.rotation.z = (Math.random() - 0.5) * 0.3;
+      grass.castShadow = true;
+      group.add(grass);
+    }
+
+    const flowerColors = [0xff69b4, 0xff4500, 0xffff00, 0xff0000, 0x9370db, 0xffffff];
+    for (let i = 0; i < 8; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const dist = Math.random() * (groundRadius - 1);
+      const flower = new THREE.Group();
+      for (let p = 0; p < 5; p++) {
+        const petalGeo = new THREE.SphereGeometry(0.08, 6, 4);
+        const petalMat = new THREE.MeshPhongMaterial({
+          color: flowerColors[Math.floor(Math.random() * flowerColors.length)],
+        });
+        const petal = new THREE.Mesh(petalGeo, petalMat);
+        petal.position.set(
+          Math.cos((p / 5) * Math.PI * 2) * 0.08,
+          0,
+          Math.sin((p / 5) * Math.PI * 2) * 0.08,
+        );
+        flower.add(petal);
+      }
+      const centerGeo = new THREE.SphereGeometry(0.06);
+      const centerMat = new THREE.MeshPhongMaterial({ color: 0xffff00 });
+      const center = new THREE.Mesh(centerGeo, centerMat);
+      flower.add(center);
+
+      const stemGeo = new THREE.CylinderGeometry(0.01, 0.01, 0.3);
+      const stemMat = new THREE.MeshPhongMaterial({ color: 0x228b22 });
+      const stem = new THREE.Mesh(stemGeo, stemMat);
+      stem.position.y = -0.15;
+      flower.add(stem);
+
+      flower.position.set(
+        Math.cos(angle) * dist,
+        0.25,
+        Math.sin(angle) * dist,
+      );
+      group.add(flower);
+    }
+
+    const treeCount = 3 + Math.floor(Math.random() * 4);
+    const leafColors = [0x228b22, 0x2e8b57, 0x3cb371, 0x2e8b2e, 0x1a6b1a];
     for (let i = 0; i < treeCount; i++) {
       const tree = new THREE.Group();
-      const trunkGeo = new THREE.CylinderGeometry(0.12, 0.18, 1.5);
+      const trunkGeo = new THREE.CylinderGeometry(0.12, 0.18, 1.5 + Math.random() * 0.8);
       const trunkMat = new THREE.MeshPhongMaterial({ color: 0x5c3a1e });
       const trunk = new THREE.Mesh(trunkGeo, trunkMat);
-      trunk.position.y = 0.75;
+      trunk.position.y = 0.75 + Math.random() * 0.4;
       trunk.castShadow = true;
+      trunk.receiveShadow = true;
       tree.add(trunk);
 
-      const leafGeo = new THREE.SphereGeometry(0.8 + Math.random() * 0.4, 8, 6);
-      const leafMat = new THREE.MeshPhongMaterial({ color: 0x228b22 });
-      const leaf = new THREE.Mesh(leafGeo, leafMat);
-      leaf.position.y = 1.8 + Math.random() * 0.3;
-      leaf.castShadow = true;
-      tree.add(leaf);
+      const leafColor = leafColors[Math.floor(Math.random() * leafColors.length)];
+      const levels = 2 + Math.floor(Math.random() * 2);
+      for (let l = 0; l < levels; l++) {
+        const leafGeo = new THREE.SphereGeometry(0.9 - l * 0.15, 8, 6);
+        const leafMat = new THREE.MeshPhongMaterial({ color: leafColor });
+        const leaf = new THREE.Mesh(leafGeo, leafMat);
+        leaf.position.y = 1.5 + l * 0.7 + Math.random() * 0.3;
+        leaf.scale.set(1 - l * 0.15, 1 - l * 0.1, 1 - l * 0.15);
+        leaf.castShadow = true;
+        leaf.receiveShadow = true;
+        tree.add(leaf);
+      }
 
       const angle = (i / treeCount) * Math.PI * 2 + Math.random() * 0.5;
-      const dist = 0.8 + Math.random() * 1.2;
+      const dist = 1 + Math.random() * (groundRadius - 2);
       tree.position.set(Math.cos(angle) * dist, 0, Math.sin(angle) * dist);
+      tree.rotation.y = Math.random() * Math.PI;
       group.add(tree);
     }
 
-    const benchGeo = new THREE.BoxGeometry(1.2, 0.3, 0.4);
+    const benchGeo = new THREE.BoxGeometry(1.2, 0.15, 0.4);
     const benchMat = new THREE.MeshPhongMaterial({ color: 0x8b6914 });
     const bench = new THREE.Mesh(benchGeo, benchMat);
-    bench.position.set(1.5, 0.25, 0);
+    bench.position.set(1.5, 0.4, 0);
+    bench.castShadow = true;
+    bench.receiveShadow = true;
     group.add(bench);
+
+    const benchLegGeo = new THREE.BoxGeometry(0.08, 0.3, 0.35);
+    const benchLegMat = new THREE.MeshPhongMaterial({ color: 0x666666 });
+    const leg1 = new THREE.Mesh(benchLegGeo, benchLegMat);
+    leg1.position.set(1.5 - 0.5, 0.15, 0);
+    leg1.castShadow = true;
+    group.add(leg1);
+    const leg2 = new THREE.Mesh(benchLegGeo, benchLegMat);
+    leg2.position.set(1.5 + 0.5, 0.15, 0);
+    leg2.castShadow = true;
+    group.add(leg2);
 
     group.userData.buildingType = 'park';
     return group;
@@ -230,51 +474,120 @@ export class CityBuilder {
 
   private createStreetlight(): THREE.Group {
     const group = new THREE.Group();
-    const poleGeo = new THREE.CylinderGeometry(0.06, 0.08, 4);
-    const poleMat = new THREE.MeshPhongMaterial({ color: 0x555555 });
+
+    const poleGeo = new THREE.CylinderGeometry(0.06, 0.08, 4.2);
+    const poleMat = new THREE.MeshPhongMaterial({ color: 0x2f2f2f, shininess: 100 });
     const pole = new THREE.Mesh(poleGeo, poleMat);
-    pole.position.y = 2;
+    pole.position.y = 2.1;
     pole.castShadow = true;
+    pole.receiveShadow = true;
     group.add(pole);
 
-    const armGeo = new THREE.CylinderGeometry(0.04, 0.04, 1);
-    const armMat = new THREE.MeshPhongMaterial({ color: 0x555555 });
+    const armGeo = new THREE.CylinderGeometry(0.04, 0.04, 1.2);
+    const armMat = new THREE.MeshPhongMaterial({ color: 0x2f2f2f, shininess: 100 });
     const arm = new THREE.Mesh(armGeo, armMat);
-    arm.position.set(0.5, 3.8, 0);
+    arm.position.set(0.6, 4.1, 0);
     arm.rotation.z = Math.PI / 2;
+    arm.castShadow = true;
     group.add(arm);
 
-    const lampGeo = new THREE.SphereGeometry(0.2);
-    const lampMat = new THREE.MeshPhongMaterial({
-      color: 0xffffcc,
-      emissive: 0xffff66,
-      emissiveIntensity: 0.8,
-    });
-    const lamp = new THREE.Mesh(lampGeo, lampMat);
-    lamp.position.set(1, 3.7, 0);
-    group.add(lamp);
+    const connectorGeo = new THREE.CylinderGeometry(0.05, 0.08, 0.2);
+    const connectorMat = new THREE.MeshPhongMaterial({ color: 0x2f2f2f });
+    const connector = new THREE.Mesh(connectorGeo, connectorMat);
+    connector.position.set(1.2, 3.9, 0);
+    connector.castShadow = true;
+    group.add(connector);
 
-    const baseGeo = new THREE.CylinderGeometry(0.2, 0.25, 0.2);
-    const baseMat = new THREE.MeshPhongMaterial({ color: 0x333333 });
+    const shadeGeo = new THREE.ConeGeometry(0.35, 0.2, 16, 1, true);
+    const shadeMat = new THREE.MeshPhongMaterial({
+      color: 0x444444,
+      emissive: 0x111100,
+      emissiveIntensity: 0.1,
+      side: THREE.DoubleSide,
+      shininess: 100,
+    });
+    const shade = new THREE.Mesh(shadeGeo, shadeMat);
+    shade.position.set(1.2, 3.75, 0);
+    shade.rotation.x = Math.PI;
+    shade.castShadow = true;
+    group.add(shade);
+
+    const yellowColors = [0xffffcc, 0xffffb3, 0xfffacd, 0xfff8dc, 0xfff44f];
+    const glowColor = yellowColors[Math.floor(Math.random() * yellowColors.length)];
+
+    const bulbGeo = new THREE.SphereGeometry(0.18, 12, 12);
+    const bulbMat = new THREE.MeshPhongMaterial({
+      color: glowColor,
+      emissive: glowColor,
+      emissiveIntensity: 1.2,
+      transparent: true,
+      opacity: 0.95,
+    });
+    const bulb = new THREE.Mesh(bulbGeo, bulbMat);
+    bulb.position.set(1.2, 3.6, 0);
+    group.add(bulb);
+
+    const glowGeo = new THREE.SphereGeometry(0.28, 12, 12);
+    const glowMat = new THREE.MeshBasicMaterial({
+      color: glowColor,
+      transparent: true,
+      opacity: 0.25,
+    });
+    const glow = new THREE.Mesh(glowGeo, glowMat);
+    glow.position.set(1.2, 3.6, 0);
+    group.add(glow);
+
+    const baseGeo = new THREE.CylinderGeometry(0.22, 0.28, 0.25);
+    const baseMat = new THREE.MeshPhongMaterial({ color: 0x2a2a2a });
     const base = new THREE.Mesh(baseGeo, baseMat);
-    base.position.y = 0.1;
+    base.position.y = 0.125;
+    base.castShadow = true;
+    base.receiveShadow = true;
     group.add(base);
+
+    const accentGeo = new THREE.CylinderGeometry(0.24, 0.24, 0.05);
+    const accentMat = new THREE.MeshPhongMaterial({ color: 0x8b6914 });
+    const accent = new THREE.Mesh(accentGeo, accentMat);
+    accent.position.y = 0.25;
+    accent.castShadow = true;
+    group.add(accent);
+
+    const pointLight = new THREE.PointLight(glowColor, 0.8, 12);
+    pointLight.position.set(1.2, 3.6, 0);
+    pointLight.castShadow = true;
+    group.add(pointLight);
 
     group.userData.buildingType = 'streetlight';
     return group;
   }
 
+  private addShadowsToGroup(group: THREE.Group): void {
+    group.traverse((child) => {
+      if (child instanceof THREE.Mesh) {
+        child.castShadow = true;
+        child.receiveShadow = true;
+      }
+    });
+  }
+
   createBuildingModel(type: BuildingType): THREE.Group {
+    let group: THREE.Group;
     switch (type) {
       case 'residential':
-        return this.createResidentialBuilding();
+        group = this.createResidentialBuilding();
+        break;
       case 'commercial':
-        return this.createCommercialBuilding();
+        group = this.createCommercialBuilding();
+        break;
       case 'park':
-        return this.createPark();
+        group = this.createPark();
+        break;
       case 'streetlight':
-        return this.createStreetlight();
+        group = this.createStreetlight();
+        break;
     }
+    this.addShadowsToGroup(group);
+    return group;
   }
 
   placeBuilding(type: BuildingType, position: THREE.Vector3): BuildingData | null {
@@ -529,10 +842,10 @@ export class CityBuilder {
       anim.mesh.scale.setScalar(1 - t);
       (anim.mesh as THREE.Object3D).traverse((child) => {
         if (child instanceof THREE.Mesh) {
-          const mat = child.material as THREE.MeshPhongMaterial;
-          if (mat.transparent !== undefined) {
+          const mat = child.material as THREE.Material;
+          if ('opacity' in mat) {
             mat.transparent = true;
-            mat.opacity = 1 - t;
+            (mat as THREE.MeshStandardMaterial).opacity = 1 - t;
           }
         }
       });
