@@ -447,13 +447,13 @@ body {
 
 .plan-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  grid-template-columns: repeat(auto-fill, 280px);
   gap: 20px;
 }
 
 .plan-card {
-  width: 100%;
-  min-height: 200px;
+  width: 280px;
+  height: 200px;
   background: var(--card-bg);
   border-radius: 12px;
   border: 1px solid var(--border);
@@ -462,6 +462,7 @@ body {
   flex-direction: column;
   transition: transform 0.3s ease, box-shadow 0.3s ease;
   cursor: default;
+  overflow: hidden;
 }
 
 .plan-card:hover {
@@ -1007,6 +1008,10 @@ body {
 
   .plan-grid {
     grid-template-columns: 1fr;
+  }
+
+  .plan-card {
+    width: 100%;
   }
 
   .page-body {
