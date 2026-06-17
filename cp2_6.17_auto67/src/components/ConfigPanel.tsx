@@ -433,20 +433,42 @@ export default function ConfigPanel() {
                 style={{
                   border: '2px dashed rgba(0,173,181,0.5)',
                   borderRadius: 12,
-                  height: 8,
+                  height: config.collapsed ? 70 : 520,
                   marginBottom: 8,
                   background: 'rgba(0,173,181,0.05)',
+                  transition: 'height 0.2s',
                 }}
               />
             )}
-            <ApiCard
-              config={config}
-              index={index}
-              onDragStart={handleDragStart}
-              onDragOver={handleDragOver}
-              onDragEnd={handleDragEnd}
-              onDrop={handleDrop}
-            />
+            {dragIndex === index ? (
+              <div
+                style={{
+                  border: '2px dashed rgba(0,173,181,0.4)',
+                  borderRadius: 12,
+                  minHeight: config.collapsed ? 64 : 514,
+                  marginBottom: 8,
+                  background:
+                    'repeating-linear-gradient(45deg, rgba(0,173,181,0.03) 0px, rgba(0,173,181,0.03) 10px, rgba(0,173,181,0.06) 10px, rgba(0,173,181,0.06) 20px)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: 'rgba(0,173,181,0.5)',
+                  fontSize: 12,
+                  transition: 'min-height 0.2s',
+                }}
+              >
+                拖到此处放置
+              </div>
+            ) : (
+              <ApiCard
+                config={config}
+                index={index}
+                onDragStart={handleDragStart}
+                onDragOver={handleDragOver}
+                onDragEnd={handleDragEnd}
+                onDrop={handleDrop}
+              />
+            )}
           </div>
         ))}
 

@@ -10,6 +10,9 @@ function ClearButton({ onClick }: { onClick: () => void }) {
       style={{
         width: 24,
         height: 24,
+        minWidth: 24,
+        minHeight: 24,
+        boxSizing: 'border-box',
         borderRadius: '50%',
         border: 'none',
         background: '#ff4d4d',
@@ -17,22 +20,33 @@ function ClearButton({ onClick }: { onClick: () => void }) {
         fontSize: 12,
         fontWeight: 700,
         cursor: 'pointer',
-        display: 'flex',
+        display: 'inline-flex',
         alignItems: 'center',
         justifyContent: 'center',
-        transition: 'transform 0.2s, box-shadow 0.2s',
+        transition: 'transform 0.2s ease-out, box-shadow 0.2s ease-out',
         boxShadow: '0 1px 4px rgba(255,77,77,0.3)',
-        lineHeight: 1,
+        lineHeight: '24px',
         padding: 0,
+        margin: 0,
+        outline: 'none',
+        flexShrink: 0,
       }}
       onMouseEnter={e => {
         const el = e.currentTarget;
         el.style.transform = 'scale(1.1)';
-        el.style.boxShadow = '0 2px 8px rgba(255,77,77,0.5)';
+        el.style.boxShadow = '0 4px 12px rgba(255,77,77,0.5), 0 2px 4px rgba(255,77,77,0.3)';
       }}
       onMouseLeave={e => {
         const el = e.currentTarget;
         el.style.transform = 'scale(1)';
+        el.style.boxShadow = '0 1px 4px rgba(255,77,77,0.3)';
+      }}
+      onFocus={e => {
+        const el = e.currentTarget;
+        el.style.boxShadow = '0 0 0 2px rgba(255,77,77,0.2), 0 1px 4px rgba(255,77,77,0.3)';
+      }}
+      onBlur={e => {
+        const el = e.currentTarget;
         el.style.boxShadow = '0 1px 4px rgba(255,77,77,0.3)';
       }}
     >
@@ -50,13 +64,20 @@ function LoadingOverlay() {
         left: 0,
         right: 0,
         bottom: 0,
-        background: 'rgba(26, 26, 46, 0.7)',
+        width: '100vw',
+        height: '100vh',
+        margin: 0,
+        padding: 0,
+        background: 'rgba(26, 26, 46, 0.75)',
         backdropFilter: 'blur(4px)',
+        WebkitBackdropFilter: 'blur(4px)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        zIndex: 1000,
+        zIndex: 99999,
         animation: 'fadeIn 0.3s ease-out',
+        boxSizing: 'border-box',
+        overflow: 'hidden',
       }}
     >
       <div style={{ textAlign: 'center' }}>

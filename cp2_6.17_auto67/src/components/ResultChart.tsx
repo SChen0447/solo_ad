@@ -178,9 +178,11 @@ export default function ResultChart({ data, chartType, onChartTypeChange }: Resu
           flex: 1,
           minHeight: 220,
           position: 'relative',
-          transition: 'opacity 0.4s, transform 0.4s',
-          opacity: transitioning ? 0.3 : 1,
-          transform: transitioning ? 'scale(0.97)' : 'scale(1)',
+          transition: 'opacity 0.4s ease-in-out, transform 0.4s ease-in-out',
+          WebkitTransition: 'opacity 0.4s ease-in-out, -webkit-transform 0.4s ease-in-out',
+          willChange: 'opacity, transform',
+          opacity: transitioning ? 0.2 : 1,
+          transform: transitioning ? 'scale(0.94) translateY(4px)' : 'scale(1) translateY(0)',
         }}
       >
         {chartType === 'bar' && <Bar data={chartData} options={options} />}
