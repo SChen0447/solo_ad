@@ -129,13 +129,26 @@ class DataStore {
     });
   }
 
+  private sortCommentsDesc(comments: Comment[]): Comment[] {
+    return [...comments].sort((a, b) => b.createdAt - a.createdAt);
+  }
+
   getAllStalls(): Stall[] {
-    return this.stalls.map(s => ({ ...s, likes: [...s.likes], comments: [...s.comments] }));
+    return this.stalls.map(s => ({
+      ...s,
+      likes: [...s.likes],
+      comments: this.sortCommentsDesc(s.comments)
+    }));
   }
 
   getStallById(id: string): Stall | undefined {
     const stall = this.stalls.find(s => s.id === id);
-    return stall ? { ...stall, likes: [...stall.likes], comments: [...stall.comments] } : undefined;
+    if (!stall) return undefined;
+    return {
+      ...stall,
+      likes: [...stall.likes],
+      comments: this.sortCommentsDesc(stall.comments)
+    };
   }
 
   createStall(data: {
@@ -188,8 +201,8 @@ class DataStore {
 
     const debounceKey = `${stallId}:${ip}`;
     const now = Date.now();
-    const lastLike = this.likeDebounceMap.get(debounceKey);
-    if (lastLike && now - lastLike < 500) {
+    const lastLikeTime = this.likeDebounceMap.get(debounceKey);
+    if (lastLikeTime !== undefined && now - lastLikeTime < 500) {
       return { success: false, liked: false, likesCount: stall.likes.length };
     }
     this.likeDebounceMap.set(debounceKey, now);
@@ -216,6 +229,7 @@ class DataStore {
       createdAt: Date.now()
     };
     stall.comments.unshift(comment);
+    stall.comments = this.sortCommentsDesc(stall.comments);
     return { ...comment };
   }
 

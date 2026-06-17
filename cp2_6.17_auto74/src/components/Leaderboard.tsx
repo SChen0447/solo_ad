@@ -9,24 +9,32 @@ export interface LeaderboardItem {
   interactionCount: number;
 }
 
-interface LeaderboardProps {
-  onRefresh?: () => Promise<LeaderboardItem[]>;
-}
-
-const Leaderboard: React.FC<LeaderboardProps> = ({ onRefresh }) => {
+const Leaderboard: React.FC = () => {
   const [items, setItems] = useState<LeaderboardItem[]>([]);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
+  const fetchLeaderboard = useCallback(async (): Promise<LeaderboardItem[]> => {
+    try {
+      const res = await fetch('/api/leaderboard');
+      const json = await res.json();
+      return json.data || [];
+    } catch {
+      return [];
+    }
+  }, []);
+
   const refreshData = useCallback(async () => {
-    if (!onRefresh) return;
     setIsRefreshing(true);
     try {
-      const data = await onRefresh();
-      setItems(data);
+      const data = await fetchLeaderboard();
+      setItems(prev => {
+        if (JSON.stringify(prev) === JSON.stringify(data)) return prev;
+        return data;
+      });
     } finally {
       setIsRefreshing(false);
     }
-  }, [onRefresh]);
+  }, [fetchLeaderboard]);
 
   useEffect(() => {
     refreshData();

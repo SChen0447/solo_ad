@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import StallCard, { StallListItem } from './components/StallCard';
-import Leaderboard, { LeaderboardItem } from './components/Leaderboard';
+import Leaderboard from './components/Leaderboard';
 
 interface Comment {
   id: string;
@@ -82,16 +82,6 @@ const App: React.FC = () => {
       setCarouselIndex(0);
     } catch (err) {
       setErrorMsg(err instanceof Error ? err.message : '获取详情失败');
-    }
-  }, []);
-
-  const fetchLeaderboard = useCallback(async (): Promise<LeaderboardItem[]> => {
-    try {
-      const res = await fetch('/api/leaderboard');
-      const json = await res.json();
-      return json.data || [];
-    } catch {
-      return [];
     }
   }, []);
 
@@ -215,6 +205,10 @@ const App: React.FC = () => {
     if (!commentForm.nickname.trim() || !commentForm.content.trim()) return;
     if (commentForm.content.length > 100) return;
 
+    const originalComments = [...currentStall.comments];
+    const originalCommentsCount = currentStall.commentsCount;
+    const originalInteractionCount = currentStall.interactionCount;
+
     const optimisticComment: Comment = {
       id: `temp-${Date.now()}`,
       stallId: currentStall.id,
@@ -223,8 +217,9 @@ const App: React.FC = () => {
       createdAt: Date.now()
     };
 
-    const updatedComments = [optimisticComment, ...(currentStall.comments || [])];
-    const newCommentsCount = currentStall.commentsCount + 1;
+    const updatedComments = [optimisticComment, ...originalComments];
+    const newCommentsCount = originalCommentsCount + 1;
+    const newInteractionCount = currentStall.likesCount + newCommentsCount;
 
     setCurrentStall(prev =>
       prev
@@ -232,7 +227,7 @@ const App: React.FC = () => {
             ...prev,
             comments: updatedComments,
             commentsCount: newCommentsCount,
-            interactionCount: prev.likesCount + newCommentsCount
+            interactionCount: newInteractionCount
           }
         : prev
     );
@@ -245,7 +240,33 @@ const App: React.FC = () => {
     );
 
     const savedNickname = commentForm.nickname;
+    const savedContent = commentForm.content;
     setCommentForm({ nickname: savedNickname, content: '' });
+
+    const rollback = () => {
+      setCurrentStall(prev =>
+        prev
+          ? {
+              ...prev,
+              comments: originalComments,
+              commentsCount: originalCommentsCount,
+              interactionCount: originalInteractionCount
+            }
+          : prev
+      );
+      setStalls(prev =>
+        prev.map(s =>
+          s.id === currentStall.id
+            ? {
+                ...s,
+                commentsCount: originalCommentsCount,
+                interactionCount: s.likesCount + originalCommentsCount
+              }
+            : s
+        )
+      );
+      setCommentForm({ nickname: savedNickname, content: savedContent });
+    };
 
     setCommentSubmitting(true);
     try {
@@ -270,51 +291,11 @@ const App: React.FC = () => {
             : prev
         );
       } else {
-        setCurrentStall(prev =>
-          prev
-            ? {
-                ...prev,
-                comments: prev.comments.filter(c => c.id !== optimisticComment.id),
-                commentsCount: prev.commentsCount - 1,
-                interactionCount: prev.likesCount + (prev.commentsCount - 1)
-              }
-            : prev
-        );
-        setStalls(prev =>
-          prev.map(s =>
-            s.id === currentStall.id
-              ? {
-                  ...s,
-                  commentsCount: s.commentsCount - 1,
-                  interactionCount: s.likesCount + (s.commentsCount - 1)
-                }
-              : s
-          )
-        );
+        rollback();
         alert(json.error || '留言失败，请重试');
       }
     } catch {
-      setCurrentStall(prev =>
-        prev
-          ? {
-              ...prev,
-              comments: prev.comments.filter(c => c.id !== optimisticComment.id),
-              commentsCount: prev.commentsCount - 1,
-              interactionCount: prev.likesCount + (prev.commentsCount - 1)
-            }
-          : prev
-      );
-      setStalls(prev =>
-        prev.map(s =>
-          s.id === currentStall.id
-            ? {
-                ...s,
-                commentsCount: s.commentsCount - 1,
-                interactionCount: s.likesCount + (s.commentsCount - 1)
-              }
-            : s
-        )
-      );
+      rollback();
       alert('网络错误，留言失败');
     } finally {
       setCommentSubmitting(false);
@@ -643,7 +624,7 @@ const App: React.FC = () => {
           renderRegisterView()
         )}
       </main>
-      {view === 'list' && <Leaderboard onRefresh={fetchLeaderboard} />}
+      {view === 'list' && <Leaderboard />}
     </div>
   );
 };
