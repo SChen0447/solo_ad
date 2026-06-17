@@ -11,6 +11,7 @@ export interface ComponentInfo {
   lastModified: string;
   props: string[];
   dependencies: string[];
+  description: string;
 }
 
 export interface TestResult {

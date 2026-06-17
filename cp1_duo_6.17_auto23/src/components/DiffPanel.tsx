@@ -16,7 +16,9 @@ const DiffPanel: React.FC<DiffPanelProps> = ({ testResults }) => {
   const [threshold, setThreshold] = useState(10);
   const [diffData, setDiffData] = useState<DiffData | null>(null);
   const [computing, setComputing] = useState(false);
-  const panelRef = useRef<HTMLDivElement>(null);
+  const [splitRatio, setSplitRatio] = useState(0.5);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const draggingRef = useRef(false);
 
   const toggleSelect = useCallback((index: number) => {
     setSelected((prev) => {
@@ -29,6 +31,30 @@ const DiffPanel: React.FC<DiffPanelProps> = ({ testResults }) => {
   useEffect(() => {
     setDiffData(null);
   }, [selected, threshold]);
+
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!draggingRef.current || !containerRef.current) return;
+      const rect = containerRef.current.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const ratio = Math.max(0.15, Math.min(0.85, x / rect.width));
+      setSplitRatio(ratio);
+    };
+    const handleMouseUp = () => {
+      draggingRef.current = false;
+    };
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, []);
+
+  const handleDividerDown = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    draggingRef.current = true;
+  }, []);
 
   const computeDiff = useCallback(async () => {
     if (selected.length !== 2) return;
@@ -67,7 +93,7 @@ const DiffPanel: React.FC<DiffPanelProps> = ({ testResults }) => {
   const selectedResults = selected.map((i) => testResults[i]);
 
   return (
-    <div ref={panelRef} style={{ padding: 12, height: '100%', display: 'flex', flexDirection: 'column', gap: 12 }}>
+    <div style={{ padding: 12, height: '100%', display: 'flex', flexDirection: 'column', gap: 12 }}>
       <h3 style={{ fontSize: 14, fontWeight: 600, color: '#cdd6f4', margin: 0 }}>差异对比</h3>
 
       {testResults.length === 0 ? (
@@ -108,15 +134,44 @@ const DiffPanel: React.FC<DiffPanelProps> = ({ testResults }) => {
 
           {selectedResults.length === 2 && (
             <div style={{ marginTop: 8 }}>
-              <div style={{ display: 'flex', gap: 8, alignItems: 'stretch' }}>
-                <div style={{ flex: 1, textAlign: 'center' }}>
+              <div
+                ref={containerRef}
+                style={{ display: 'flex', alignItems: 'stretch', position: 'relative', userSelect: draggingRef.current ? 'none' : 'auto' }}
+              >
+                <div style={{ flex: `0 0 ${splitRatio * 100}%`, textAlign: 'center', overflow: 'hidden' }}>
                   <div style={{ fontSize: 11, color: '#6c7086', marginBottom: 4 }}>左图</div>
-                  <img src={selectedResults[0].thumbnail} alt="A" style={{ width: '100%', borderRadius: 4 }} />
+                  <img src={selectedResults[0].thumbnail} alt="A" style={{ width: '100%', borderRadius: 4, display: 'block' }} />
                 </div>
-                <div style={{ width: 1, background: 'rgba(205,214,244,0.3)' }} />
-                <div style={{ flex: 1, textAlign: 'center' }}>
+                <div
+                  onMouseDown={handleDividerDown}
+                  style={{
+                    width: 6,
+                    cursor: 'col-resize',
+                    background: 'rgba(205,214,244,0.25)',
+                    borderRadius: 3,
+                    flexShrink: 0,
+                    position: 'relative',
+                    transition: draggingRef.current ? 'none' : 'background 0.2s',
+                    zIndex: 10,
+                    margin: '0 1px',
+                  }}
+                  onMouseEnter={(e) => { (e.currentTarget as HTMLDivElement).style.background = 'rgba(137,180,250,0.6)'; }}
+                  onMouseLeave={(e) => { if (!draggingRef.current) (e.currentTarget as HTMLDivElement).style.background = 'rgba(205,214,244,0.25)'; }}
+                >
+                  <div style={{
+                    position: 'absolute',
+                    top: '50%',
+                    left: '50%',
+                    transform: 'translate(-50%, -50%)',
+                    width: 2,
+                    height: 20,
+                    background: 'rgba(205,214,244,0.4)',
+                    borderRadius: 1,
+                  }} />
+                </div>
+                <div style={{ flex: `0 0 ${(1 - splitRatio) * 100}%`, textAlign: 'center', overflow: 'hidden' }}>
                   <div style={{ fontSize: 11, color: '#6c7086', marginBottom: 4 }}>右图</div>
-                  <img src={selectedResults[1].thumbnail} alt="B" style={{ width: '100%', borderRadius: 4 }} />
+                  <img src={selectedResults[1].thumbnail} alt="B" style={{ width: '100%', borderRadius: 4, display: 'block' }} />
                 </div>
               </div>
 

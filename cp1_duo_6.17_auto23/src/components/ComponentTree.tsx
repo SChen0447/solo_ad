@@ -8,6 +8,7 @@ interface TreeNodeData {
   type: 'file' | 'folder';
   size?: number;
   lastModified?: string;
+  description?: string;
   children?: TreeNodeData[];
 }
 
@@ -188,6 +189,7 @@ const ComponentTree: React.FC<ComponentTreeProps> = ({ onSelect, selected }) => 
         lastModified: node.lastModified || '',
         props: res.data.props || [],
         dependencies: res.data.dependencies || [],
+        description: res.data.description || node.description || '',
       };
       onSelect(info);
     } catch {
@@ -198,6 +200,7 @@ const ComponentTree: React.FC<ComponentTreeProps> = ({ onSelect, selected }) => 
         lastModified: node.lastModified || '',
         props: [],
         dependencies: [],
+        description: node.description || '',
       });
     }
   }, [onSelect]);

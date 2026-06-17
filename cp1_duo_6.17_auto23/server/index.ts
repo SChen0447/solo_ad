@@ -29,7 +29,22 @@ interface TreeNode {
   type: 'file' | 'folder';
   size?: number;
   lastModified?: string;
+  description?: string;
   children?: TreeNode[];
+}
+
+function findReadme(dir: string): string {
+  const candidates = ['README.md', 'README.txt', 'README', 'readme.md', 'readme.txt'];
+  for (const name of candidates) {
+    const p = path.join(dir, name);
+    if (fs.existsSync(p)) {
+      try {
+        const content = fs.readFileSync(p, 'utf-8').trim();
+        return content.slice(0, 500);
+      } catch {}
+    }
+  }
+  return '';
 }
 
 function buildFileTree(dir: string, basePath: string): TreeNode[] {
@@ -50,20 +65,23 @@ function buildFileTree(dir: string, basePath: string): TreeNode[] {
       const stat = fs.statSync(fullPath);
       const ext = path.extname(entry.name).toLowerCase();
       if (!['.tsx', '.jsx', '.ts', '.js'].includes(ext)) return null;
+      const readmeContent = findReadme(path.dirname(fullPath));
       return {
         name: entry.name,
         path: relPath,
         type: 'file' as const,
         size: stat.size,
         lastModified: stat.mtime.toISOString(),
+        description: readmeContent,
       };
     })
     .filter(Boolean) as TreeNode[];
 }
 
-function extractPropsAndDeps(filePath: string): { props: string[]; dependencies: string[] } {
+function extractPropsAndDeps(filePath: string): { props: string[]; dependencies: string[]; description: string } {
   const props: string[] = [];
   const dependencies: string[] = [];
+  const description = findReadme(path.dirname(filePath));
   try {
     const content = fs.readFileSync(filePath, 'utf-8');
     const propsMatch = content.match(/interface\s+\w*Props\s*\{([^}]*)\}/);
@@ -80,7 +98,7 @@ function extractPropsAndDeps(filePath: string): { props: string[]; dependencies:
       dependencies.push(match[1]);
     }
   } catch {}
-  return { props, dependencies };
+  return { props, dependencies, description };
 }
 
 app.post('/api/upload', upload.single('file'), (req, res) => {
@@ -110,8 +128,8 @@ app.get('/api/list', (req, res) => {
     if (queryPath) {
       const filePath = path.join(extractDir, queryPath);
       if (fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {
-        const { props, dependencies } = extractPropsAndDeps(filePath);
-        res.json({ props, dependencies });
+        const { props, dependencies, description } = extractPropsAndDeps(filePath);
+        res.json({ props, dependencies, description });
         return;
       }
     }

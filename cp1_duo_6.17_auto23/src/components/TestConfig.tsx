@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import type { ComponentInfo, TestResult } from '../App';
 
 const PRESET_STATES = [
@@ -17,8 +17,34 @@ interface TestConfigProps {
   running: boolean;
 }
 
+const formatSize = (bytes: number): string => {
+  const kb = bytes / 1024;
+  if (kb < 1024) {
+    return `${kb.toFixed(1)} KB`;
+  }
+  const mb = kb / 1024;
+  return `${mb.toFixed(2)} MB`;
+};
+
 const TestConfig: React.FC<TestConfigProps> = ({ component, testResults, onRunTest, running }) => {
   const [selectedStates, setSelectedStates] = useState<Set<string>>(new Set());
+  const [cardVisible, setCardVisible] = useState(false);
+  const prevComponentRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (component && component.path !== prevComponentRef.current) {
+      setCardVisible(false);
+      prevComponentRef.current = component.path;
+      const timer = requestAnimationFrame(() => {
+        setCardVisible(true);
+      });
+      return () => cancelAnimationFrame(timer);
+    }
+    if (!component) {
+      setCardVisible(false);
+      prevComponentRef.current = null;
+    }
+  }, [component]);
 
   const toggleState = useCallback((key: string) => {
     setSelectedStates((prev) => {
@@ -50,10 +76,21 @@ const TestConfig: React.FC<TestConfigProps> = ({ component, testResults, onRunTe
           borderRadius: 8,
           padding: 16,
           marginBottom: 24,
-          animation: 'fadeIn 0.3s ease',
+          opacity: cardVisible ? 1 : 0,
+          transition: 'opacity 0.3s ease',
         }}
       >
         <h2 style={{ fontSize: 18, fontWeight: 600, color: '#cdd6f4', marginBottom: 12 }}>{component.name}</h2>
+
+        {component.description && (
+          <div style={{ marginBottom: 12 }}>
+            <div style={{ fontSize: 11, color: '#6c7086', marginBottom: 4, textTransform: 'uppercase', letterSpacing: 1 }}>Description</div>
+            <div style={{ fontSize: 12, color: '#a6adc8', lineHeight: 1.6, background: 'rgba(0,0,0,0.2)', borderRadius: 6, padding: '8px 10px', maxHeight: 80, overflow: 'auto' }}>
+              {component.description}
+            </div>
+          </div>
+        )}
+
         <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
           <div>
             <div style={{ fontSize: 11, color: '#6c7086', marginBottom: 4, textTransform: 'uppercase', letterSpacing: 1 }}>Props</div>
@@ -73,13 +110,12 @@ const TestConfig: React.FC<TestConfigProps> = ({ component, testResults, onRunTe
           </div>
           <div>
             <div style={{ fontSize: 11, color: '#6c7086', marginBottom: 4, textTransform: 'uppercase', letterSpacing: 1 }}>Size</div>
-            <span style={{ fontSize: 12, color: '#a6e3a1' }}>{component.size} B</span>
+            <span style={{ fontSize: 12, color: '#a6e3a1' }}>{formatSize(component.size)}</span>
           </div>
         </div>
       </div>
 
       <style>{`
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
         @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
       `}</style>
 
@@ -151,7 +187,6 @@ const TestConfig: React.FC<TestConfigProps> = ({ component, testResults, onRunTe
                   background: '#2d2d44',
                   borderRadius: 8,
                   overflow: 'hidden',
-                  animation: 'fadeIn 0.3s ease',
                 }}
               >
                 <img
