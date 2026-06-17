@@ -4,7 +4,7 @@ import GUI from 'lil-gui';
 import { createBuilding } from './building';
 import { createSunController, sunPathByMonth, SunController } from './sunControl';
 import { createShadowAnalyzer, ShadowAnalyzer } from './shadowAnalyzer';
-import { createSkyboxEnvironment, createGrassTexture, createGrassRoughnessMap } from './textures';
+import { createSkyboxEnvironment, createGrassTexture, createGrassRoughnessMap, createGrassNormalMap, createGrassHeightMap } from './textures';
 import { createLightIndicator, LightIndicator } from './lightIndicator';
 
 let renderer: THREE.WebGLRenderer;
@@ -96,7 +96,7 @@ function init(): void {
   });
   scene.add(building);
 
-  lightIndicator = createLightIndicator(scene);
+  lightIndicator = createLightIndicator(scene, { occluder: building });
 
   sunController = createSunController(scene, camera, renderer, Math.PI / 4, Math.PI / 3);
   sunController.onDirectionChange((direction: THREE.Vector3) => {
@@ -128,17 +128,26 @@ function init(): void {
 
 function createGround(): void {
   const groundSize = 20;
-  const groundGeometry = new THREE.PlaneGeometry(groundSize, groundSize);
+  const groundGeometry = new THREE.PlaneGeometry(groundSize, groundSize, 64, 64);
   groundGeometry.rotateX(-Math.PI / 2);
 
   const grassTexture = createGrassTexture();
   const grassRoughness = createGrassRoughnessMap();
+  const grassNormal = createGrassNormalMap();
+  const grassHeight = createGrassHeightMap();
   grassTexture.repeat.set(6, 6);
   grassRoughness.repeat.set(6, 6);
+  grassNormal.repeat.set(6, 6);
+  grassHeight.repeat.set(6, 6);
 
   const groundMaterial = new THREE.MeshStandardMaterial({
     map: grassTexture,
     roughnessMap: grassRoughness,
+    normalMap: grassNormal,
+    normalScale: new THREE.Vector2(0.5, 0.5),
+    displacementMap: grassHeight,
+    displacementScale: 0.1,
+    displacementBias: -0.05,
     roughness: 0.95,
     metalness: 0.0
   });
