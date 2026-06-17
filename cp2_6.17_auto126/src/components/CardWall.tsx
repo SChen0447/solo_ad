@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { Member, StandupCard, StandupItem } from '../hooks/useRoomData';
 
 interface CardWallProps {
@@ -94,21 +94,8 @@ const FieldSection: React.FC<{
 
   const updateItem = (idx: number, content: string) => {
     const next = items.slice();
-    const safe = content.slice(0, 80);
-    if (safe !== content) {
-      console.warn(`[字数限制] 内容超过80字符，已自动截断`);
-    }
-    if (next[idx]) next[idx] = { ...next[idx], content: safe };
+    if (next[idx]) next[idx] = { ...next[idx], content };
     onUpdateCard(cardMemberId, { [fieldKey]: next } as Partial<StandupCard>);
-  };
-
-  const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>, idx: number) => {
-    const value = e.target.value;
-    if (value.length > 80) {
-      e.target.value = value.slice(0, 80);
-      e.target.scrollTop = e.target.scrollHeight;
-    }
-    updateItem(idx, e.target.value);
   };
 
   const removeItem = (idx: number) => {
@@ -161,7 +148,7 @@ const FieldSection: React.FC<{
                   maxLength={80}
                   rows={2}
                   placeholder={`请输入${title}内容...`}
-                  onChange={(e) => handleInputChange(e, idx)}
+                  onChange={(e) => updateItem(idx, e.target.value)}
                   style={{ minHeight: '80px', height: 'auto' }}
                   onInput={(e) => {
                     const el = e.currentTarget;
@@ -290,8 +277,27 @@ const CastingModeOverlay: React.FC<{
   onExit: () => void;
 }> = ({ members, cards, onExit }) => {
   const isExitingRef = useRef(false);
+  const mountedRef = useRef(true);
+
+  const handleExit = useCallback(async () => {
+    if (isExitingRef.current) return;
+    isExitingRef.current = true;
+    try {
+      if (document.fullscreenElement && document.exitFullscreen) {
+        await document.exitFullscreen();
+      }
+    } catch (err) {
+      console.warn('退出全屏失败:', err);
+    }
+    if (mountedRef.current) {
+      onExit();
+    }
+  }, [onExit]);
 
   useEffect(() => {
+    isExitingRef.current = false;
+    mountedRef.current = true;
+
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         e.preventDefault();
@@ -300,29 +306,26 @@ const CastingModeOverlay: React.FC<{
     };
 
     const onFullscreenChange = () => {
-      if (!document.fullscreenElement && !isExitingRef.current) {
+      if (!document.fullscreenElement && !isExitingRef.current && mountedRef.current) {
+        isExitingRef.current = true;
         onExit();
       }
     };
 
-    const handleExit = async () => {
-      isExitingRef.current = true;
-      try {
-        if (document.fullscreenElement) {
-          await document.exitFullscreen().catch(() => {});
-        }
-      } catch {}
-      onExit();
-    };
-
     const enterFullscreen = async () => {
       try {
-        const el = document.documentElement;
-        if (el.requestFullscreen && !document.fullscreenElement) {
-          await el.requestFullscreen().catch(() => {});
+        const el = document.documentElement as HTMLElement & {
+          webkitRequestFullscreen?: () => Promise<void>;
+        };
+        if (!document.fullscreenElement) {
+          if (el.requestFullscreen) {
+            await el.requestFullscreen();
+          } else if (el.webkitRequestFullscreen) {
+            await el.webkitRequestFullscreen();
+          }
         }
-      } catch {
-        console.warn('浏览器不支持全屏API或已被阻止');
+      } catch (err) {
+        console.warn('进入全屏失败（可能被浏览器阻止）:', err);
       }
     };
 
@@ -332,20 +335,22 @@ const CastingModeOverlay: React.FC<{
     enterFullscreen();
 
     return () => {
+      mountedRef.current = false;
       window.removeEventListener('keydown', onKey);
       document.removeEventListener('fullscreenchange', onFullscreenChange);
       document.removeEventListener('webkitfullscreenchange', onFullscreenChange);
       if (document.fullscreenElement && !isExitingRef.current) {
         document.exitFullscreen().catch(() => {});
       }
+      isExitingRef.current = false;
     };
-  }, [onExit]);
+  }, [handleExit, onExit]);
 
   return (
     <div className="casting-overlay">
       <div className="casting-overlay__topbar">
         <div className="casting-overlay__title">📺 投屏模式</div>
-        <button className="btn btn--ghost casting-overlay__exit" onClick={onExit}>
+        <button className="btn btn--ghost casting-overlay__exit" onClick={handleExit}>
           ✕ 退出投屏
         </button>
       </div>

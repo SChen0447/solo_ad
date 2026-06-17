@@ -675,38 +675,23 @@ textarea {
 
 .card-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, 280px);
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
   gap: 24px;
-  justify-content: flex-start;
   align-items: start;
   padding-bottom: 40px;
-}
-
-@supports (display: flex) {
-  .card-grid {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: flex-start;
-  }
 }
 
 .card-grid--casting {
   font-size: 1.5em;
   gap: 32px;
-  grid-template-columns: repeat(auto-fill, 360px);
+  grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
   padding: 24px;
-}
-
-.card-grid--casting.card-grid {
-  display: flex;
-  flex-wrap: wrap;
 }
 
 /* ========== Standup Card ========== */
 
 .standup-card {
-  width: 280px;
-  flex-shrink: 0;
+  width: 100%;
   background: var(--color-card-bg);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
@@ -732,7 +717,7 @@ textarea {
 }
 
 .standup-card--casting {
-  width: 360px;
+  width: 100%;
   background: var(--color-cast-card);
   border: 1px solid var(--color-border);
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
@@ -1259,11 +1244,11 @@ textarea {
 }
 
 .summary-modal--enter {
-  animation: modalScaleIn 0.3s ease-out both;
+  animation: modalScaleIn 0.3s ease-out forwards;
 }
 
 .summary-modal--leave {
-  animation: modalScaleOut 0.25s ease-in both;
+  animation: modalScaleOut 0.3s ease-in forwards;
 }
 
 .summary-modal__header {

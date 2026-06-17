@@ -146,21 +146,32 @@ export function useRoomData() {
 
   const toggleFollow = useCallback((memberId: string) => {
     setRoom((prev) => {
-      if (!prev || !prev.cards[memberId]) return prev;
-      const next = deepClone(prev);
-      const currentCard = next.cards[memberId];
-      const newFollowed = !currentCard.followed;
-      if (newFollowed) {
-        const allFollowed = Object.values(next.cards).filter((c) => c.followed).length;
-        console.log(`[关注] 成员 ${memberId} 已添加关注，当前共 ${allFollowed + 1} 条关注`);
-      } else {
-        console.log(`[关注] 成员 ${memberId} 已取消关注`);
+      if (!prev) return prev;
+      const card = prev.cards[memberId];
+      if (!card) return prev;
+      const nextCards: Record<string, StandupCard> = {};
+      for (const [id, c] of Object.entries(prev.cards)) {
+        if (id === memberId) {
+          nextCards[id] = {
+            ...c,
+            followed: !c.followed,
+            updatedAt: Date.now(),
+          };
+        } else {
+          nextCards[id] = c;
+        }
       }
-      next.cards[memberId] = {
-        ...currentCard,
-        followed: newFollowed,
-        updatedAt: Date.now(),
+      const next: RoomData = {
+        ...prev,
+        cards: nextCards,
       };
+      const newFollowed = !card.followed;
+      if (newFollowed) {
+        const count = Object.values(nextCards).filter((c) => c.followed).length;
+        console.log(`[关注] 添加成员 #${memberId.slice(0, 4)}，当前共 ${count} 条`);
+      } else {
+        console.log(`[关注] 取消成员 #${memberId.slice(0, 4)}`);
+      }
       return next;
     });
   }, []);

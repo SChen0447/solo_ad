@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 
 interface Props {
   open: boolean;
@@ -8,36 +8,41 @@ interface Props {
 
 const SummaryModal: React.FC<Props> = ({ open, summaryText, onClose }) => {
   const [copied, setCopied] = useState(false);
-  const [visible, setVisible] = useState(false);
-  const [animating, setAnimating] = useState<'in' | 'out' | null>(null);
-  const timerRef = useRef<number | null>(null);
+  const [mounted, setMounted] = useState(false);
+  const [closing, setClosing] = useState(false);
+  const copyTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
     if (open) {
-      setVisible(true);
-      setAnimating('in');
-      const t = window.setTimeout(() => setAnimating(null), 320);
-      return () => window.clearTimeout(t);
-    } else if (visible) {
-      setAnimating('out');
-      const t = window.setTimeout(() => {
-        setVisible(false);
-        setAnimating(null);
-      }, 260);
-      return () => window.clearTimeout(t);
+      setMounted(true);
+      setClosing(false);
+    } else if (mounted) {
+      setClosing(true);
     }
-  }, [open]);
+  }, [open, mounted]);
+
+  const handleAnimationEnd = useCallback(() => {
+    if (closing) {
+      setMounted(false);
+      setClosing(false);
+    }
+  }, [closing]);
 
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
+      if (e.key === 'Escape') handleClose();
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [open, onClose]);
+  }, [open]);
 
-  const handleCopy = async () => {
+  const handleClose = useCallback(() => {
+    if (closing) return;
+    onClose();
+  }, [closing, onClose]);
+
+  const handleCopy = useCallback(async () => {
     try {
       if (navigator.clipboard && window.isSecureContext) {
         await navigator.clipboard.writeText(summaryText);
@@ -52,24 +57,31 @@ const SummaryModal: React.FC<Props> = ({ open, summaryText, onClose }) => {
         document.body.removeChild(ta);
       }
       setCopied(true);
-      if (timerRef.current) window.clearTimeout(timerRef.current);
-      timerRef.current = window.setTimeout(() => setCopied(false), 1500);
+      if (copyTimerRef.current) window.clearTimeout(copyTimerRef.current);
+      copyTimerRef.current = window.setTimeout(() => setCopied(false), 1500);
     } catch (e) {
       console.warn('复制失败:', e);
     }
-  };
+  }, [summaryText]);
 
-  if (!visible) return null;
+  useEffect(() => {
+    return () => {
+      if (copyTimerRef.current) {
+        window.clearTimeout(copyTimerRef.current);
+      }
+    };
+  }, []);
 
-  const modalClass = `summary-modal${
-    animating === 'in' ? ' summary-modal--enter' : ''
-  }${animating === 'out' ? ' summary-modal--leave' : ''}`;
+  if (!mounted) return null;
+
+  const modalClass = `summary-modal${closing ? ' summary-modal--leave' : ' summary-modal--enter'}`;
 
   return (
-    <div className="summary-modal__overlay" onClick={onClose}>
+    <div className="summary-modal__overlay" onClick={handleClose}>
       <div
         className={modalClass}
         onClick={(e) => e.stopPropagation()}
+        onAnimationEnd={handleAnimationEnd}
         role="dialog"
         aria-modal="true"
         aria-label="站会总结"
@@ -78,7 +90,7 @@ const SummaryModal: React.FC<Props> = ({ open, summaryText, onClose }) => {
           <h2 className="summary-modal__title">📋 站会总结</h2>
           <button
             className="summary-modal__close"
-            onClick={onClose}
+            onClick={handleClose}
             aria-label="关闭"
           >
             ×
