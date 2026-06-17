@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>参数化曲面幕墙设计器</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif;
+    }
+    body {
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+    }
+    #app { width: 100%; height: 100%; position: relative; }
+    #canvas-container {
+      width: 100%;
+      height: 100%;
+      position: absolute;
+      top: 0; left: 0;
+    }
+    #start-screen {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+      transition: opacity 0.6s ease;
+    }
+    #start-screen.hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
+    .start-card {
+      background: rgba(30, 30, 50, 0.55);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      padding: 64px 80px;
+      border-radius: 16px;
+      text-align: center;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+    }
+    .start-title {
+      font-size: 42px;
+      font-weight: 300;
+      letter-spacing: 4px;
+      color: #d4af37;
+      margin-bottom: 16px;
+      text-shadow: 0 0 20px rgba(212, 175, 55, 0.3);
+    }
+    .start-subtitle {
+      font-size: 14px;
+      color: rgba(255, 255, 255, 0.5);
+      letter-spacing: 2px;
+      margin-bottom: 48px;
+    }
+    .start-btn {
+      padding: 16px 48px;
+      font-size: 16px;
+      letter-spacing: 3px;
+      color: #1a1a2e;
+      background: linear-gradient(135deg, #d4af37 0%, #f4d03f 100%);
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: 600;
+      transition: all 0.3s ease;
+      box-shadow: 0 4px 20px rgba(212, 175, 55, 0.3);
+    }
+    .start-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 30px rgba(212, 175, 55, 0.5);
+    }
+    #sidebar-panel {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      width: 280px;
+      max-height: calc(100% - 40px);
+      background: rgba(30, 30, 50, 0.85);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      border-radius: 12px;
+      color: #fff;
+      z-index: 50;
+      display: none;
+      overflow-y: auto;
+      overflow-x: hidden;
+    }
+    #sidebar-panel.visible { display: block; }
+    .panel-section {
+      padding: 16px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    .panel-section:last-child { border-bottom: none; }
+    .section-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      cursor: pointer;
+      user-select: none;
+      padding: 4px 0;
+    }
+    .section-title {
+      font-size: 13px;
+      font-weight: 600;
+      letter-spacing: 1.5px;
+      color: #d4af37;
+      text-transform: uppercase;
+    }
+    .section-toggle {
+      width: 16px;
+      height: 16px;
+      color: rgba(255, 255, 255, 0.5);
+      transition: transform 0.25s ease;
+    }
+    .section-toggle.collapsed { transform: rotate(-90deg); }
+    .section-content {
+      overflow: hidden;
+      transition: max-height 0.25s ease, opacity 0.25s ease;
+      max-height: 2000px;
+      opacity: 1;
+    }
+    .section-content.collapsed {
+      max-height: 0;
+      opacity: 0;
+    }
+    .control-group { margin-top: 14px; }
+    .control-label {
+      font-size: 11px;
+      color: rgba(255, 255, 255, 0.6);
+      margin-bottom: 6px;
+      letter-spacing: 0.5px;
+    }
+    .control-row {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+    .coord-input {
+      flex: 1;
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      color: #fff;
+      padding: 6px 8px;
+      border-radius: 6px;
+      font-size: 12px;
+      outline: none;
+      transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    }
+    .coord-input:focus {
+      border-color: #4488ff;
+      box-shadow: 0 0 0 2px rgba(68, 136, 255, 0.25);
+    }
+    .slider {
+      -webkit-appearance: none;
+      width: 100%;
+      height: 4px;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 2px;
+      outline: none;
+    }
+    .slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 14px;
+      height: 14px;
+      background: #d4af37;
+      border-radius: 50%;
+      cursor: pointer;
+      box-shadow: 0 0 8px rgba(212, 175, 55, 0.5);
+    }
+    .slider::-webkit-slider-thumb:hover { box-shadow: 0 0 12px rgba(212, 175, 55, 0.8); }
+    .color-picker {
+      width: 100%;
+      height: 32px;
+      background: transparent;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 6px;
+      cursor: pointer;
+      padding: 2px;
+    }
+    .color-picker:focus {
+      border-color: #4488ff;
+      box-shadow: 0 0 0 2px rgba(68, 136, 255, 0.25);
+      outline: none;
+    }
+    .value-display {
+      min-width: 40px;
+      text-align: right;
+      font-size: 11px;
+      color: rgba(255, 255, 255, 0.6);
+      font-variant-numeric: tabular-nums;
+    }
+    .sun-dial-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 8px 0;
+    }
+    .sun-dial {
+      position: relative;
+      width: 120px;
+      height: 120px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(68,136,255,0.15) 0%, rgba(255,255,255,0.03) 70%);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      cursor: grab;
+      user-select: none;
+    }
+    .sun-dial:active { cursor: grabbing; }
+    .sun-dial:focus {
+      border-color: #4488ff;
+      box-shadow: 0 0 0 2px rgba(68, 136, 255, 0.25);
+      outline: none;
+    }
+    .sun-indicator {
+      position: absolute;
+      width: 20px;
+      height: 20px;
+      transform: translate(-50%, -50%);
+      pointer-events: none;
+    }
+    .sun-indicator svg { width: 100%; height: 100%; filter: drop-shadow(0 0 6px rgba(244, 208, 63, 0.8)); }
+    .sun-angle-display {
+      margin-top: 10px;
+      font-size: 11px;
+      color: rgba(255, 255, 255, 0.7);
+      letter-spacing: 0.5px;
+      font-variant-numeric: tabular-nums;
+    }
+    .env-buttons {
+      display: flex;
+      gap: 6px;
+    }
+    .env-btn {
+      flex: 1;
+      padding: 8px 6px;
+      font-size: 11px;
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 6px;
+      color: rgba(255, 255, 255, 0.7);
+      cursor: pointer;
+      transition: all 0.2s ease;
+      letter-spacing: 0.5px;
+    }
+    .env-btn:hover { background: rgba(255, 255, 255, 0.1); }
+    .env-btn.active {
+      background: rgba(212, 175, 55, 0.2);
+      border-color: #d4af37;
+      color: #d4af37;
+    }
+    .env-btn:focus {
+      border-color: #4488ff;
+      box-shadow: 0 0 0 2px rgba(68, 136, 255, 0.25);
+      outline: none;
+    }
+    .panel-list {
+      max-height: 120px;
+      overflow-y: auto;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 6px;
+      padding: 4px;
+    }
+    .panel-item {
+      padding: 5px 8px;
+      font-size: 11px;
+      border-radius: 4px;
+      cursor: pointer;
+      color: rgba(255, 255, 255, 0.65);
+      transition: background 0.15s ease, color 0.15s ease;
+      user-select: none;
+    }
+    .panel-item:hover { background: rgba(255, 255, 255, 0.06); }
+    .panel-item.selected {
+      background: rgba(68, 136, 255, 0.25);
+      color: #fff;
+    }
+    .selection-hint {
+      font-size: 10px;
+      color: rgba(255, 255, 255, 0.4);
+      margin-top: 6px;
+      font-style: italic;
+    }
+    #minimap {
+      position: absolute;
+      bottom: 20px;
+      right: 20px;
+      width: 150px;
+      height: 150px;
+      background: rgba(30, 30, 50, 0.85);
+      backdrop-filter: blur(8px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 10px;
+      z-index: 40;
+      display: none;
+      overflow: hidden;
+      transition: border-color 0.3s ease, box-shadow 0.3s ease;
+    }
+    #minimap.visible { display: block; }
+    #minimap.interacting {
+      border-color: #4488ff;
+      box-shadow: 0 0 16px rgba(68, 136, 255, 0.5);
+    }
+    #minimap canvas { width: 100%; height: 100%; display: block; }
+    #hamburger {
+      position: absolute;
+      top: 16px;
+      left: 16px;
+      width: 40px;
+      height: 40px;
+      background: rgba(30, 30, 50, 0.85);
+      backdrop-filter: blur(8px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 8px;
+      z-index: 60;
+      display: none;
+      cursor: pointer;
+      align-items: center;
+      justify-content: center;
+      color: #d4af37;
+    }
+    #hamburger.visible { display: flex; }
+    #hamburger:hover { background: rgba(30, 30, 50, 0.95); }
+    #hamburger:focus {
+      border-color: #4488ff;
+      box-shadow: 0 0 0 2px rgba(68, 136, 255, 0.25);
+      outline: none;
+    }
+    #sidebar-overlay {
+      position: absolute;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.5);
+      z-index: 45;
+      display: none;
+      opacity: 0;
+      transition: opacity 0.3s ease;
+    }
+    #sidebar-overlay.visible {
+      display: block;
+      opacity: 1;
+    }
+    @media (max-width: 768px) {
+      #sidebar-panel {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 280px;
+        max-height: 100%;
+        height: 100%;
+        border-radius: 0;
+        transform: translateX(-100%);
+        transition: transform 0.3s ease;
+      }
+      #sidebar-panel.mobile-open {
+        transform: translateX(0);
+      }
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <div id="canvas-container"></div>
+
+    <div id="start-screen">
+      <div class="start-card">
+        <div class="start-title">曲面幕墙设计器</div>
+        <div class="start-subtitle">PARAMETRIC CURTAIN WALL STUDIO</div>
+        <button class="start-btn" id="start-btn">开始设计</button>
+      </div>
+    </div>
+
+    <button id="hamburger" aria-label="菜单">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <line x1="3" y1="6" x2="21" y2="6"></line>
+        <line x1="3" y1="12" x2="21" y2="12"></line>
+        <line x1="3" y1="18" x2="21" y2="18"></line>
+      </svg>
+    </button>
+
+    <div id="sidebar-overlay"></div>
+
+    <div id="sidebar-panel">
+      <div class="panel-section">
+        <div class="section-header" data-section="control-points">
+          <div class="section-title">控制点</div>
+          <svg class="section-toggle" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="6 9 12 15 18 9"></polyline>
+          </svg>
+        </div>
+        <div class="section-content" id="content-control-points">
+          <div id="control-points-list"></div>
+        </div>
+      </div>
+
+      <div class="panel-section">
+        <div class="section-header" data-section="material">
+          <div class="section-title">材质参数</div>
+          <svg class="section-toggle" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="6 9 12 15 18 9"></polyline>
+          </svg>
+        </div>
+        <div class="section-content" id="content-material">
+          <div class="control-group">
+            <div class="control-label">面板选择</div>
+            <div class="panel-list" id="panel-select-list"></div>
+            <div class="selection-hint">按住 Ctrl 多选面板</div>
+          </div>
+          <div class="control-group">
+            <div class="control-label">颜色</div>
+            <input type="color" class="color-picker" id="mat-color" value="#8ab4f8" />
+          </div>
+          <div class="control-group">
+            <div class="control-label">透明度</div>
+            <div class="control-row">
+              <input type="range" class="slider" id="mat-opacity" min="0.3" max="0.9" step="0.01" value="0.7" />
+              <span class="value-display" id="mat-opacity-val">0.70</span>
+            </div>
+          </div>
+          <div class="control-group">
+            <div class="control-label">金属度</div>
+            <div class="control-row">
+              <input type="range" class="slider" id="mat-metalness" min="0" max="1" step="0.01" value="0.6" />
+              <span class="value-display" id="mat-metalness-val">0.60</span>
+            </div>
+          </div>
+          <div class="control-group">
+            <div class="control-label">粗糙度</div>
+            <div class="control-row">
+              <input type="range" class="slider" id="mat-roughness" min="0" max="1" step="0.01" value="0.25" />
+              <span class="value-display" id="mat-roughness-val">0.25</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel-section">
+        <div class="section-header" data-section="lighting">
+          <div class="section-title">光照控制</div>
+          <svg class="section-toggle" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="6 9 12 15 18 9"></polyline>
+          </svg>
+        </div>
+        <div class="section-content" id="content-lighting">
+          <div class="control-group">
+            <div class="control-label">太阳角度</div>
+            <div class="sun-dial-container">
+              <div class="sun-dial" id="sun-dial" tabindex="0">
+                <div class="sun-indicator" id="sun-indicator">
+                  <svg viewBox="0 0 24 24" fill="#f4d03f">
+                    <circle cx="12" cy="12" r="5"></circle>
+                    <line x1="12" y1="1" x2="12" y2="3" stroke="#f4d03f" stroke-width="2"></line>
+                    <line x1="12" y1="21" x2="12" y2="23" stroke="#f4d03f" stroke-width="2"></line>
+                    <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" stroke="#f4d03f" stroke-width="2"></line>
+                    <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" stroke="#f4d03f" stroke-width="2"></line>
+                    <line x1="1" y1="12" x2="3" y2="12" stroke="#f4d03f" stroke-width="2"></line>
+                    <line x1="21" y1="12" x2="23" y2="12" stroke="#f4d03f" stroke-width="2"></line>
+                    <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" stroke="#f4d03f" stroke-width="2"></line>
+                    <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" stroke="#f4d03f" stroke-width="2"></line>
+                  </svg>
+                </div>
+              </div>
+              <div class="sun-angle-display">
+                方位角: <span id="sun-azimuth-val">45°</span> &nbsp;|&nbsp;
+                高度角: <span id="sun-altitude-val">45°</span>
+              </div>
+            </div>
+          </div>
+          <div class="control-group">
+            <div class="control-label">环境贴图</div>
+            <div class="env-buttons">
+              <button class="env-btn active" data-env="clearSky">晴空</button>
+              <button class="env-btn" data-env="sunset">黄昏</button>
+              <button class="env-btn" data-env="cloudy">阴天</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="minimap"></div>
+  </div>
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
