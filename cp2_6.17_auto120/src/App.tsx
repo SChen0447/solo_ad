@@ -29,6 +29,7 @@ const MAX_HISTORY = 20;
 const HISTORY_KEY = 'plant_history';
 const NOTES_KEY = 'plant_notes';
 const LIKES_KEY = 'plant_likes';
+const LIKE_COUNT_KEY = 'plant_like_counts';
 
 export function saveHistory(item: HistoryItem) {
   const raw = localStorage.getItem(HISTORY_KEY);
@@ -78,6 +79,32 @@ export function loadLike(plantName: string): boolean {
   const raw = localStorage.getItem(LIKES_KEY);
   const likes: Record<string, boolean> = raw ? JSON.parse(raw) : {};
   return !!likes[plantName];
+}
+
+export function loadLikeCount(plantName: string): number {
+  const raw = localStorage.getItem(LIKE_COUNT_KEY);
+  const counts: Record<string, number> = raw ? JSON.parse(raw) : {};
+  return counts[plantName] || 0;
+}
+
+export function incrementLikeCount(plantName: string): number {
+  const raw = localStorage.getItem(LIKE_COUNT_KEY);
+  const counts: Record<string, number> = raw ? JSON.parse(raw) : {};
+  const current = counts[plantName] || 0;
+  const next = current + 1;
+  counts[plantName] = next;
+  localStorage.setItem(LIKE_COUNT_KEY, JSON.stringify(counts));
+  return next;
+}
+
+export function decrementLikeCount(plantName: string): number {
+  const raw = localStorage.getItem(LIKE_COUNT_KEY);
+  const counts: Record<string, number> = raw ? JSON.parse(raw) : {};
+  const current = counts[plantName] || 0;
+  const next = Math.max(0, current - 1);
+  counts[plantName] = next;
+  localStorage.setItem(LIKE_COUNT_KEY, JSON.stringify(counts));
+  return next;
 }
 
 export function generateShareId(): string {

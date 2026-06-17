@@ -6,6 +6,9 @@ import {
   loadNote,
   saveLike,
   loadLike,
+  loadLikeCount,
+  incrementLikeCount,
+  decrementLikeCount,
   generateShareId,
   saveHistory,
 } from './App';
@@ -37,6 +40,7 @@ function getThumbUrl(name: string): string {
 export default function PlantCard({ plant }: PlantCardProps) {
   const navigate = useNavigate();
   const [liked, setLiked] = useState(false);
+  const [likeCount, setLikeCount] = useState(0);
   const [heartAnimating, setHeartAnimating] = useState(false);
   const [note, setNote] = useState('');
   const [shareCopied, setShareCopied] = useState(false);
@@ -44,6 +48,7 @@ export default function PlantCard({ plant }: PlantCardProps) {
 
   useEffect(() => {
     setLiked(loadLike(plant.name));
+    setLikeCount(loadLikeCount(plant.name));
     setNote(loadNote(plant.name));
     saveHistory({
       name: plant.name,
@@ -56,6 +61,11 @@ export default function PlantCard({ plant }: PlantCardProps) {
     const newLiked = !liked;
     setLiked(newLiked);
     saveLike(plant.name, newLiked);
+    if (newLiked) {
+      setLikeCount(incrementLikeCount(plant.name));
+    } else {
+      setLikeCount(decrementLikeCount(plant.name));
+    }
     setHeartAnimating(true);
     setTimeout(() => setHeartAnimating(false), 200);
   };
@@ -244,7 +254,7 @@ export default function PlantCard({ plant }: PlantCardProps) {
         <div
           style={{
             display: 'flex',
-            gap: '12px',
+            gap: '16px',
             flexWrap: 'wrap',
           }}
         >
@@ -253,11 +263,10 @@ export default function PlantCard({ plant }: PlantCardProps) {
               key={`${h.label}-${i}`}
               style={{
                 width: '120px',
-                padding: '16px 8px',
-                background: 'linear-gradient(180deg, #f0fdf4 0%, #dcfce7 100%)',
-                borderRadius: '12px',
+                padding: '8px',
+                background: '#dcfce7',
+                borderRadius: '8px',
                 textAlign: 'center',
-                border: '1px solid #bbf7d0',
                 transition: 'transform 0.2s',
               }}
             >
@@ -280,9 +289,9 @@ export default function PlantCard({ plant }: PlantCardProps) {
         style={{
           marginBottom: '32px',
           padding: '20px',
-          background: 'linear-gradient(135deg, #fef9c3 0%, #fef3c7 100%)',
+          background: '#fef9c3',
           borderRadius: '12px',
-          borderLeft: '4px solid #eab308',
+          borderLeft: '4px solid #22c55e',
         }}
       >
         <h3
@@ -423,6 +432,20 @@ export default function PlantCard({ plant }: PlantCardProps) {
             {liked ? '❤️' : '🤍'}
           </span>
           <span>{liked ? '已收藏' : '点赞收藏'}</span>
+          <span
+            style={{
+              fontSize: '13px',
+              fontWeight: 500,
+              padding: '2px 8px',
+              borderRadius: '12px',
+              background: liked ? '#fee2e2' : '#f3f4f6',
+              color: liked ? '#dc2626' : '#6b7280',
+              minWidth: '32px',
+              textAlign: 'center',
+            }}
+          >
+            {likeCount}
+          </span>
         </button>
       </div>
 
