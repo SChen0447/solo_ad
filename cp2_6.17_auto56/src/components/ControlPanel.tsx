@@ -132,8 +132,8 @@ export function ControlPanel({
             accentColor: '#8B4513',
           }}
         />
-        <span style={{ color: '#2c1810', fontSize: '14px', fontFamily: 'KaiTi, STKaiti, serif', minWidth: '45px', textAlign: 'right' }}>
-          {currentStrokeIndex + 1}/{totalStrokes}
+        <span style={{ color: '#2c1810', fontSize: '14px', fontFamily: 'KaiTi, STKaiti, serif', minWidth: '90px', textAlign: 'right' }}>
+          第{currentStrokeIndex + 1}笔/共{totalStrokes}笔
         </span>
       </div>
 

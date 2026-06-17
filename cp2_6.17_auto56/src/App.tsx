@@ -3,7 +3,7 @@ import { StrokeCanvas } from './components/StrokeCanvas';
 import { ControlPanel } from './components/ControlPanel';
 import { hanziDataList, getHanziData } from './data/hanziData';
 
-const STROKE_DRAW_DURATION = 1000;
+const STROKE_DRAW_DURATION = 500;
 const BASE_INTERVAL = 1500;
 
 export default function App() {
