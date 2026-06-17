@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { Trash2, Play, ChevronDown } from 'lucide-react';
 import { useAppStore, TRANSITION_LABELS } from '@/store';
 import type { TransitionType, StoryCardData } from '@/types';
@@ -9,44 +9,24 @@ interface StoryCardProps {
   onSelect: () => void;
   index: number;
   onDragStart: (index: number) => void;
-  onDragOver: (index: number) => void;
-  onDragEnd: () => void;
+  onDragOver: (index: number, insertBefore: boolean) => void;
+  onDragEnd: (dropIndex: number) => void;
   isDragging?: boolean;
   dragOverIndex?: number;
+  dragInsertBefore?: boolean;
 }
 
 const TRANSITION_TYPES: TransitionType[] = ['fadeInOut', 'slideUp', 'slideDown', 'slideLeft', 'slideRight', 'zoom'];
 
-function getTransitionAnimStyle(type: TransitionType, animKey: number): React.CSSProperties {
-  const duration = '0.6s';
-  const easing = 'cubic-bezier(0.4, 0, 0.2, 1)';
+function getTransitionAnimName(type: TransitionType): string {
   switch (type) {
-    case 'fadeInOut':
-      return {
-        animation: `${animKey > 0 ? 'cardFadeIn' : 'none'} ${duration} ${easing} both`,
-      };
-    case 'slideUp':
-      return {
-        animation: `${animKey > 0 ? 'cardSlideUp' : 'none'} ${duration} ${easing} both`,
-      };
-    case 'slideDown':
-      return {
-        animation: `${animKey > 0 ? 'cardSlideDown' : 'none'} ${duration} ${easing} both`,
-      };
-    case 'slideLeft':
-      return {
-        animation: `${animKey > 0 ? 'cardSlideLeft' : 'none'} ${duration} ${easing} both`,
-      };
-    case 'slideRight':
-      return {
-        animation: `${animKey > 0 ? 'cardSlideRight' : 'none'} ${duration} ${easing} both`,
-      };
-    case 'zoom':
-      return {
-        animation: `${animKey > 0 ? 'cardZoom' : 'none'} ${duration} ${easing} both`,
-      };
-    default:
-      return {};
+    case 'fadeInOut': return 'cardFadeIn';
+    case 'slideUp': return 'cardSlideUp';
+    case 'slideDown': return 'cardSlideDown';
+    case 'slideLeft': return 'cardSlideLeft';
+    case 'slideRight': return 'cardSlideRight';
+    case 'zoom': return 'cardZoom';
+    default: return 'cardFadeIn';
   }
 }
 
@@ -60,14 +40,36 @@ export default function StoryCard({
   onDragEnd,
   isDragging = false,
   dragOverIndex = -1,
+  dragInsertBefore = false,
 }: StoryCardProps) {
   const updateCard = useAppStore((s) => s.updateCard);
-  const [animKey, setAnimKey] = useState(0);
-  const animKeyRef = useRef(0);
+  const [isAnimating, setIsAnimating] = useState(false);
+  const animTimerRef = useRef<number | null>(null);
+  const animSeqRef = useRef(0);
 
   const triggerPreview = useCallback(() => {
-    animKeyRef.current += 1;
-    setAnimKey(animKeyRef.current);
+    if (animTimerRef.current) {
+      clearTimeout(animTimerRef.current);
+      animTimerRef.current = null;
+    }
+    animSeqRef.current += 1;
+    const seq = animSeqRef.current;
+    setIsAnimating(false);
+    requestAnimationFrame(() => {
+      if (animSeqRef.current !== seq) return;
+      setIsAnimating(true);
+    });
+  }, []);
+
+  const handleAnimationEnd = useCallback(() => {
+    setIsAnimating(false);
+    if (animTimerRef.current) {
+      clearTimeout(animTimerRef.current);
+    }
+    animTimerRef.current = window.setTimeout(() => {
+      animSeqRef.current += 1;
+      setIsAnimating(false);
+    }, 50);
   }, []);
 
   const handleTransitionChange = useCallback(
@@ -78,48 +80,50 @@ export default function StoryCard({
     [card.id, updateCard, triggerPreview]
   );
 
-  const animStyle = getTransitionAnimStyle(card.transition, animKey);
-  useEffect(() => {
-    if (animKey > 0) {
-      const t = setTimeout(() => {
-        animKeyRef.current = 0;
-        setAnimKey(0);
-      }, 700);
-      return () => clearTimeout(t);
-    }
-  }, [animKey]);
+  const animStyle: React.CSSProperties = isAnimating
+    ? {
+        animation: `${getTransitionAnimName(card.transition)} 0.6s cubic-bezier(0.4, 0, 0.2, 1) both`,
+      }
+    : {
+        animation: 'none',
+        transform: 'none',
+        opacity: 1,
+      };
 
-  const showInsertBefore = dragOverIndex === index;
+  const isDragTarget = dragOverIndex === index && dragInsertBefore;
   const cardBg = card.imageUrl
     ? { backgroundImage: `url(${card.imageUrl})`, backgroundSize: 'cover', backgroundPosition: 'center' }
     : { backgroundColor: card.bgColor };
 
   return (
     <div
-      className={`flex-shrink-0 relative transition-all ${showInsertBefore ? 'pl-6' : ''}`}
-      style={{ transitionDuration: '300ms', transitionTimingFunction: 'ease' }}
+      className={`flex-shrink-0 relative ${isDragTarget ? 'ml-6' : ''}`}
+      style={{ transition: 'margin-left 0.3s ease' }}
       onDragOver={(e) => {
         e.preventDefault();
-        onDragOver(index);
-      }}
-      onDragLeave={(e) => {
-        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        const rect = e.currentTarget.getBoundingClientRect();
+        const midX = rect.left + rect.width / 2;
+        const insertBefore = e.clientX < midX;
+        onDragOver(index, insertBefore);
       }}
       onDrop={(e) => {
         e.preventDefault();
-        onDragEnd();
+        const rect = e.currentTarget.getBoundingClientRect();
+        const midX = rect.left + rect.width / 2;
+        const insertBefore = e.clientX < midX;
+        const dropIndex = insertBefore ? index : index + 1;
+        onDragEnd(dropIndex);
       }}
     >
       <div
-        className={`group relative rounded-xl cursor-pointer transition-all
+        className={`group relative rounded-xl cursor-pointer
           ${isSelected ? 'ring-2 ring-[#3b82f6] shadow-lg shadow-blue-500/25' : 'ring-1 ring-slate-600 hover:ring-slate-400'}
           ${isDragging ? 'opacity-50 scale-95' : 'opacity-100 scale-100'}`}
         style={{
           width: 240,
           height: 180,
-          transitionDuration: '300ms',
-          transitionTimingFunction: 'ease',
-          transitionProperty: 'transform, opacity, box-shadow',
+          transition: 'transform 0.3s ease, opacity 0.3s ease, box-shadow 0.3s ease',
         }}
         draggable
         onDragStart={(e) => {
@@ -134,8 +138,9 @@ export default function StoryCard({
           style={{
             ...cardBg,
             ...animStyle,
-            willChange: 'transform, opacity',
+            willChange: isAnimating ? 'transform, opacity' : 'auto',
           }}
+          onAnimationEnd={handleAnimationEnd}
         >
           {!card.imageUrl && !card.title && !card.content && (
             <div className="flex items-center justify-center h-full text-slate-400 text-sm">

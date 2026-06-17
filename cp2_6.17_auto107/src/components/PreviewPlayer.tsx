@@ -34,6 +34,36 @@ function formatTime(sec: number): string {
   return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
 }
 
+function requestFullscreen(el: HTMLElement): Promise<void> {
+  const fn =
+    el.requestFullscreen ||
+    (el as any).webkitRequestFullscreen ||
+    (el as any).msRequestFullscreen;
+  if (fn) {
+    return fn.call(el).catch(() => {});
+  }
+  return Promise.resolve();
+}
+
+function exitFullscreen(): Promise<void> {
+  const fn =
+    document.exitFullscreen ||
+    (document as any).webkitExitFullscreen ||
+    (document as any).msExitFullscreen;
+  if (fn) {
+    return fn.call(document).catch(() => {});
+  }
+  return Promise.resolve();
+}
+
+function isFullscreen(): boolean {
+  return !!(
+    document.fullscreenElement ||
+    (document as any).webkitFullscreenElement ||
+    (document as any).msFullscreenElement
+  );
+}
+
 export default function PreviewPlayer({ open, onClose }: PreviewPlayerProps) {
   const cards = useAppStore((s) => s.cards);
   const audio = useAppStore((s) => s.audio);
@@ -48,10 +78,21 @@ export default function PreviewPlayer({ open, onClose }: PreviewPlayerProps) {
   const [transitionPhase, setTransitionPhase] = useState<'enter' | 'hold' | 'exit'>('enter');
   const [prevIndex, setPrevIndex] = useState(-1);
   const [isPlaying, setIsPlaying] = useState(false);
+  const isClosingRef = useRef(false);
 
   const totalDuration = cards.reduce((sum, c) => sum + c.duration, 0);
   const currentCard = cards[currentIndex];
   const prevCard = prevIndex >= 0 && prevIndex !== currentIndex ? cards[prevIndex] : null;
+
+  const resetPlayerState = useCallback(() => {
+    stopSequence();
+    stopAudio();
+    setIsPlaying(false);
+    setCurrentIndex(0);
+    setPrevIndex(-1);
+    setElapsed(0);
+    setTransitionPhase('enter');
+  }, []);
 
   const startSequence = useCallback(() => {
     if (cards.length === 0) return;
@@ -109,55 +150,59 @@ export default function PreviewPlayer({ open, onClose }: PreviewPlayerProps) {
   }, []);
 
   const handleClose = useCallback(() => {
+    if (isClosingRef.current) return;
+    isClosingRef.current = true;
     setFadePhase('out');
-    stopSequence();
-    stopAudio();
-    setIsPlaying(false);
+    resetPlayerState();
+    if (isFullscreen()) {
+      exitFullscreen();
+    }
     setTimeout(() => {
       onClose();
       setMounted(false);
       setFadePhase('idle');
-    }, 450);
-  }, [onClose]);
+      isClosingRef.current = false;
+    }, 500);
+  }, [onClose, resetPlayerState]);
 
   useEffect(() => {
     if (open && !mounted) {
       setMounted(true);
-      setCurrentIndex(0);
-      setPrevIndex(-1);
-      setElapsed(0);
-      setTransitionPhase('enter');
+      resetPlayerState();
       setTimeout(() => setFadePhase('in'), 10);
       const el = containerRef.current;
       if (el) {
-        try {
-          if (el.requestFullscreen) {
-            el.requestFullscreen().catch(() => {});
-          }
-        } catch {
-          /* ignore */
-        }
+        requestFullscreen(el);
       }
       setTimeout(() => {
         startSequence();
       }, 550);
     }
-  }, [open, mounted, startSequence]);
+  }, [open, mounted, startSequence, resetPlayerState]);
 
   useEffect(() => {
     const onFsChange = () => {
-      if (!document.fullscreenElement && mounted) {
+      if (!isFullscreen() && mounted && !isClosingRef.current) {
         handleClose();
       }
     };
     document.addEventListener('fullscreenchange', onFsChange);
-    return () => document.removeEventListener('fullscreenchange', onFsChange);
+    document.addEventListener('webkitfullscreenchange', onFsChange);
+    document.addEventListener('msfullscreenchange', onFsChange);
+    return () => {
+      document.removeEventListener('fullscreenchange', onFsChange);
+      document.removeEventListener('webkitfullscreenchange', onFsChange);
+      document.removeEventListener('msfullscreenchange', onFsChange);
+    };
   }, [mounted, handleClose]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (!mounted) return;
-      if (e.key === 'Escape') handleClose();
+      if (!mounted || isClosingRef.current) return;
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        handleClose();
+      }
       if (e.key === ' ') {
         e.preventDefault();
         togglePlay();

@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { Plus, GripVertical } from 'lucide-react';
 import { useAppStore } from '@/store';
 import StoryCard from './StoryCard';
@@ -12,24 +12,88 @@ export default function TimeLine() {
 
   const [dragIndex, setDragIndex] = useState<number>(-1);
   const [dragOverIndex, setDragOverIndex] = useState<number>(-1);
+  const [dragInsertBefore, setDragInsertBefore] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   const handleDragStart = useCallback((index: number) => {
     setDragIndex(index);
   }, []);
 
-  const handleDragOver = useCallback((index: number) => {
-    if (index !== dragIndex) {
-      setDragOverIndex(index);
-    }
-  }, [dragIndex]);
+  const handleDragOver = useCallback((index: number, insertBefore: boolean) => {
+    setDragOverIndex(index);
+    setDragInsertBefore(insertBefore);
+  }, []);
 
-  const handleDragEnd = useCallback(() => {
-    if (dragIndex >= 0 && dragOverIndex >= 0 && dragIndex !== dragOverIndex) {
-      reorderCards(dragIndex, dragOverIndex);
+  const handleDragEnd = useCallback((dropIndex: number) => {
+    if (dragIndex >= 0 && dropIndex >= 0 && dragIndex !== dropIndex) {
+      const adjustedFrom = dragIndex < dropIndex ? dragIndex : dragIndex;
+      const adjustedTo = dragIndex < dropIndex ? dropIndex - 1 : dropIndex;
+      if (adjustedFrom !== adjustedTo) {
+        reorderCards(adjustedFrom, adjustedTo);
+      }
     }
     setDragIndex(-1);
     setDragOverIndex(-1);
-  }, [dragIndex, dragOverIndex, reorderCards]);
+    setDragInsertBefore(false);
+  }, [dragIndex, reorderCards]);
+
+  const handleContainerDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    if (dragIndex < 0 || !containerRef.current) return;
+
+    const cardElements = containerRef.current.querySelectorAll('[data-card-index]');
+    if (cardElements.length === 0) return;
+
+    let targetIndex = cards.length;
+    let insertBefore = true;
+
+    for (let i = 0; i < cardElements.length; i++) {
+      const el = cardElements[i] as HTMLElement;
+      const rect = el.getBoundingClientRect();
+      const midX = rect.left + rect.width / 2;
+      const midY = rect.top + rect.height / 2;
+
+      const isHorizontal = window.innerWidth >= 768;
+      const mousePastMid = isHorizontal
+        ? e.clientX > midX
+        : e.clientY > midY;
+
+      const cardIdx = parseInt(el.getAttribute('data-card-index') || '0', 10);
+
+      if (!mousePastMid) {
+        targetIndex = cardIdx;
+        insertBefore = true;
+        break;
+      } else {
+        targetIndex = cardIdx + 1;
+        insertBefore = false;
+      }
+    }
+
+    if (targetIndex !== dragOverIndex || insertBefore !== dragInsertBefore) {
+      setDragOverIndex(targetIndex >= cards.length ? cards.length - 1 : targetIndex);
+      setDragInsertBefore(insertBefore || targetIndex >= cards.length);
+    }
+  }, [dragIndex, dragOverIndex, dragInsertBefore, cards.length]);
+
+  const handleContainerDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    let dropIdx = dragOverIndex;
+    if (dragInsertBefore) {
+      dropIdx = dragOverIndex;
+    } else {
+      dropIdx = dragOverIndex + 1;
+    }
+    handleDragEnd(dropIdx);
+  }, [dragOverIndex, dragInsertBefore, handleDragEnd]);
+
+  const handleContainerDragLeave = useCallback((e: React.DragEvent) => {
+    if (!containerRef.current?.contains(e.relatedTarget as Node)) {
+      setDragOverIndex(-1);
+      setDragInsertBefore(false);
+    }
+  }, []);
 
   return (
     <div className="h-full flex flex-col">
@@ -71,23 +135,27 @@ export default function TimeLine() {
           </div>
         ) : (
           <div
-            className="timeline-container flex gap-4
-              max-md:flex-col max-md:items-center"
-            onDragOver={(e) => e.preventDefault()}
+            ref={containerRef}
+            className="timeline-container flex gap-4 max-md:flex-col max-md:items-center"
+            onDragOver={handleContainerDragOver}
+            onDrop={handleContainerDrop}
+            onDragLeave={handleContainerDragLeave}
           >
             {cards.map((card, index) => (
-              <StoryCard
-                key={card.id}
-                card={card}
-                index={index}
-                isSelected={selectedCardId === card.id}
-                onSelect={() => selectCard(card.id)}
-                onDragStart={handleDragStart}
-                onDragOver={handleDragOver}
-                onDragEnd={handleDragEnd}
-                isDragging={dragIndex === index}
-                dragOverIndex={dragOverIndex}
-              />
+              <div key={card.id} data-card-index={index}>
+                <StoryCard
+                  card={card}
+                  index={index}
+                  isSelected={selectedCardId === card.id}
+                  onSelect={() => selectCard(card.id)}
+                  onDragStart={handleDragStart}
+                  onDragOver={handleDragOver}
+                  onDragEnd={handleDragEnd}
+                  isDragging={dragIndex === index}
+                  dragOverIndex={dragOverIndex}
+                  dragInsertBefore={dragInsertBefore}
+                />
+              </div>
             ))}
             <button
               onClick={addCard}

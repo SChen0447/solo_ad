@@ -3,16 +3,24 @@ import { Howl } from 'howler';
 let currentHowl: Howl | null = null;
 let currentVolume = 70;
 let progressRafId: number | null = null;
+let isSeeking = false;
 
 type ProgressCallback = (info: { seek: number; duration: number }) => void;
 let onProgress: ProgressCallback | null = null;
 
 function pollProgress() {
-  if (currentHowl && currentHowl.playing()) {
-    const seek = currentHowl.seek() as number;
-    const duration = currentHowl.duration() || 0;
-    onProgress?.({ seek, duration });
+  if (!currentHowl || !currentHowl.playing() || isSeeking) {
+    progressRafId = null;
+    return;
   }
+  const seek = currentHowl.seek() as number;
+  const duration = currentHowl.duration() || 0;
+  onProgress?.({ seek, duration });
+  progressRafId = requestAnimationFrame(pollProgress);
+}
+
+function ensurePolling() {
+  if (progressRafId !== null) return;
   progressRafId = requestAnimationFrame(pollProgress);
 }
 
@@ -40,18 +48,24 @@ export function loadAudio(src: string, onPlay?: () => void, onStop?: () => void)
     volume: currentVolume / 100,
     loop: true,
     onplay: () => {
+      isSeeking = false;
       onPlay?.();
-      startProgressPolling();
+      ensurePolling();
     },
     onstop: () => {
+      isSeeking = false;
       onStop?.();
       stopProgressPolling();
     },
     onend: () => {
+      isSeeking = false;
       onStop?.();
     },
     onpause: () => {
       stopProgressPolling();
+    },
+    onload: () => {
+      isSeeking = false;
     },
   });
 }
@@ -66,6 +80,7 @@ export function stopAudio(): void {
   if (currentHowl) {
     currentHowl.stop();
   }
+  isSeeking = false;
   stopProgressPolling();
 }
 
@@ -105,17 +120,36 @@ export function fadeAudioOut(duration: number = 1000): void {
 }
 
 export function seekAudio(seconds: number): void {
-  if (currentHowl) {
-    try {
-      currentHowl.seek(seconds);
-    } catch {
-      /* ignore */
-    }
+  if (!currentHowl) return;
+  isSeeking = true;
+  stopProgressPolling();
+  try {
+    currentHowl.seek(seconds);
+  } catch {
+    isSeeking = false;
+    return;
   }
+  const checkSeek = () => {
+    if (!currentHowl) {
+      isSeeking = false;
+      return;
+    }
+    const currentSeek = currentHowl.seek() as number;
+    if (Math.abs(currentSeek - seconds) < 0.05) {
+      isSeeking = false;
+      if (currentHowl.playing()) {
+        ensurePolling();
+      }
+    } else {
+      requestAnimationFrame(checkSeek);
+    }
+  };
+  requestAnimationFrame(checkSeek);
 }
 
 export function unloadAudio(): void {
   stopProgressPolling();
+  isSeeking = false;
   if (currentHowl) {
     currentHowl.unload();
     currentHowl = null;
