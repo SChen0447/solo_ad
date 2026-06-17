@@ -1,0 +1,313 @@
+{
+  "rooms": [
+    {
+      "id": "living",
+      "name": "客厅",
+      "dimensions": { "width": 8, "height": 3, "depth": 6 },
+      "cameraPosition": { "x": 6, "y": 4, "z": 6 },
+      "cameraTarget": { "x": 0, "y": 0.5, "z": 0 },
+      "furniture": [
+        {
+          "type": "sofa",
+          "position": { "x": 0, "y": 0, "z": -2 },
+          "rotation": { "x": 0, "y": 0, "z": 0 },
+          "dimensions": { "width": 3, "height": 0.8, "depth": 1 }
+        },
+        {
+          "type": "coffeeTable",
+          "position": { "x": 0, "y": 0, "z": -0.5 },
+          "rotation": { "x": 0, "y": 0, "z": 0 },
+          "dimensions": { "width": 1.5, "height": 0.4, "depth": 0.8 }
+        },
+        {
+          "type": "tvCabinet",
+          "position": { "x": 0, "y": 0, "z": 2.5 },
+          "rotation": { "x": 0, "y": 0, "z": 0 },
+          "dimensions": { "width": 2.5, "height": 0.5, "depth": 0.4 }
+        }
+      ],
+      "lights": [
+        {
+          "id": "living-chandelier-1",
+          "name": "主吊灯",
+          "type": "chandelier",
+          "position": { "x": 0, "y": 2.8, "z": 0 },
+          "color": "#FFFFFF",
+          "intensity": 0.8,
+          "temperature": 4500,
+          "range": 10,
+          "castShadow": true
+        },
+        {
+          "id": "living-tablelamp-1",
+          "name": "左侧台灯",
+          "type": "tablelamp",
+          "position": { "x": -2.5, "y": 0.9, "z": -2.2 },
+          "color": "#FFE4B5",
+          "intensity": 0.5,
+          "temperature": 3200,
+          "range": 5,
+          "castShadow": false
+        },
+        {
+          "id": "living-tablelamp-2",
+          "name": "右侧台灯",
+          "type": "tablelamp",
+          "position": { "x": 2.5, "y": 0.9, "z": -2.2 },
+          "color": "#FFE4B5",
+          "intensity": 0.5,
+          "temperature": 3200,
+          "range": 5,
+          "castShadow": false
+        },
+        {
+          "id": "living-spotlight-1",
+          "name": "电视墙射灯1",
+          "type": "spotlight",
+          "position": { "x": -1, "y": 2.8, "z": 2.3 },
+          "color": "#FFFFFF",
+          "intensity": 0.6,
+          "temperature": 4000,
+          "angle": 30,
+          "penumbra": 0.3,
+          "target": { "x": -1, "y": 1.5, "z": 2.5 },
+          "castShadow": true
+        },
+        {
+          "id": "living-spotlight-2",
+          "name": "电视墙射灯2",
+          "type": "spotlight",
+          "position": { "x": 0, "y": 2.8, "z": 2.3 },
+          "color": "#FFFFFF",
+          "intensity": 0.6,
+          "temperature": 4000,
+          "angle": 30,
+          "penumbra": 0.3,
+          "target": { "x": 0, "y": 1.5, "z": 2.5 },
+          "castShadow": true
+        },
+        {
+          "id": "living-spotlight-3",
+          "name": "电视墙射灯3",
+          "type": "spotlight",
+          "position": { "x": 1, "y": 2.8, "z": 2.3 },
+          "color": "#FFFFFF",
+          "intensity": 0.6,
+          "temperature": 4000,
+          "angle": 30,
+          "penumbra": 0.3,
+          "target": { "x": 1, "y": 1.5, "z": 2.5 },
+          "castShadow": true
+        },
+        {
+          "id": "living-ledstrip-1",
+          "name": "吊顶灯带",
+          "type": "ledstrip",
+          "position": { "x": 0, "y": 2.9, "z": 0 },
+          "color": "#FFF8DC",
+          "intensity": 0.3,
+          "temperature": 3500,
+          "path": [
+            { "x": -3.5, "y": 2.9, "z": -2.5 },
+            { "x": 3.5, "y": 2.9, "z": -2.5 },
+            { "x": 3.5, "y": 2.9, "z": 2.5 },
+            { "x": -3.5, "y": 2.9, "z": 2.5 }
+          ],
+          "castShadow": false
+        }
+      ]
+    },
+    {
+      "id": "bedroom",
+      "name": "卧室",
+      "dimensions": { "width": 5, "height": 2.8, "depth": 4.5 },
+      "cameraPosition": { "x": 4, "y": 3.5, "z": 4 },
+      "cameraTarget": { "x": 0, "y": 0.5, "z": 0 },
+      "furniture": [
+        {
+          "type": "bed",
+          "position": { "x": 0, "y": 0, "z": -1 },
+          "rotation": { "x": 0, "y": 0, "z": 0 },
+          "dimensions": { "width": 2, "height": 0.6, "depth": 2.2 }
+        },
+        {
+          "type": "nightstand",
+          "position": { "x": -1.3, "y": 0, "z": -1.5 },
+          "rotation": { "x": 0, "y": 0, "z": 0 },
+          "dimensions": { "width": 0.5, "height": 0.5, "depth": 0.4 }
+        },
+        {
+          "type": "wardrobe",
+          "position": { "x": 2, "y": 0, "z": 1.5 },
+          "rotation": { "x": 0, "y": -Math.PI/2, "z": 0 },
+          "dimensions": { "width": 2, "height": 2.4, "depth": 0.6 }
+        }
+      ],
+      "lights": [
+        {
+          "id": "bedroom-chandelier-1",
+          "name": "吸顶灯",
+          "type": "chandelier",
+          "position": { "x": 0, "y": 2.6, "z": 0.5 },
+          "color": "#FFF8DC",
+          "intensity": 0.6,
+          "temperature": 3500,
+          "range": 8,
+          "castShadow": true
+        },
+        {
+          "id": "bedroom-tablelamp-1",
+          "name": "床头台灯",
+          "type": "tablelamp",
+          "position": { "x": -1.3, "y": 0.7, "z": -1.5 },
+          "color": "#FFE4B5",
+          "intensity": 0.4,
+          "temperature": 2800,
+          "range": 3,
+          "castShadow": false
+        },
+        {
+          "id": "bedroom-spotlight-1",
+          "name": "床头射灯左",
+          "type": "spotlight",
+          "position": { "x": -0.8, "y": 2.6, "z": -1.8 },
+          "color": "#FFF8DC",
+          "intensity": 0.3,
+          "temperature": 3000,
+          "angle": 25,
+          "penumbra": 0.5,
+          "target": { "x": -0.8, "y": 1, "z": -1.5 },
+          "castShadow": false
+        },
+        {
+          "id": "bedroom-spotlight-2",
+          "name": "床头射灯右",
+          "type": "spotlight",
+          "position": { "x": 0.8, "y": 2.6, "z": -1.8 },
+          "color": "#FFF8DC",
+          "intensity": 0.3,
+          "temperature": 3000,
+          "angle": 25,
+          "penumbra": 0.5,
+          "target": { "x": 0.8, "y": 1, "z": -1.5 },
+          "castShadow": false
+        },
+        {
+          "id": "bedroom-ledstrip-1",
+          "name": "氛围灯带",
+          "type": "ledstrip",
+          "position": { "x": 0, "y": 2.7, "z": 0 },
+          "color": "#FFB6C1",
+          "intensity": 0.2,
+          "temperature": 2800,
+          "path": [
+            { "x": -2.2, "y": 2.7, "z": -2 },
+            { "x": 2.2, "y": 2.7, "z": -2 },
+            { "x": 2.2, "y": 2.7, "z": 1.8 },
+            { "x": -2.2, "y": 2.7, "z": 1.8 }
+          ],
+          "castShadow": false
+        }
+      ]
+    },
+    {
+      "id": "study",
+      "name": "书房",
+      "dimensions": { "width": 4, "height": 2.8, "depth": 3.5 },
+      "cameraPosition": { "x": 3.5, "y": 3, "z": 3 },
+      "cameraTarget": { "x": 0, "y": 0.5, "z": 0 },
+      "furniture": [
+        {
+          "type": "desk",
+          "position": { "x": 0, "y": 0, "z": 1.2 },
+          "rotation": { "x": 0, "y": 0, "z": 0 },
+          "dimensions": { "width": 1.8, "height": 0.75, "depth": 0.8 }
+        },
+        {
+          "type": "bookshelf",
+          "position": { "x": -1.7, "y": 0, "z": 0 },
+          "rotation": { "x": 0, "y": Math.PI/2, "z": 0 },
+          "dimensions": { "width": 1.5, "height": 2.5, "depth": 0.4 }
+        },
+        {
+          "type": "officeChair",
+          "position": { "x": 0, "y": 0, "z": 0.3 },
+          "rotation": { "x": 0, "y": 0, "z": 0 },
+          "dimensions": { "width": 0.6, "height": 1, "depth": 0.6 }
+        }
+      ],
+      "lights": [
+        {
+          "id": "study-chandelier-1",
+          "name": "书房顶灯",
+          "type": "chandelier",
+          "position": { "x": 0, "y": 2.6, "z": 0 },
+          "color": "#FFFFFF",
+          "intensity": 0.7,
+          "temperature": 5000,
+          "range": 7,
+          "castShadow": true
+        },
+        {
+          "id": "study-tablelamp-1",
+          "name": "桌面台灯左",
+          "type": "tablelamp",
+          "position": { "x": -0.6, "y": 0.9, "z": 1.2 },
+          "color": "#FFFACD",
+          "intensity": 0.5,
+          "temperature": 4200,
+          "range": 2,
+          "castShadow": false
+        },
+        {
+          "id": "study-tablelamp-2",
+          "name": "桌面台灯右",
+          "type": "tablelamp",
+          "position": { "x": 0.6, "y": 0.9, "z": 1.2 },
+          "color": "#FFFACD",
+          "intensity": 0.5,
+          "temperature": 4200,
+          "range": 2,
+          "castShadow": false
+        },
+        {
+          "id": "study-floorlamp-1",
+          "name": "落地灯",
+          "type": "floorlamp",
+          "position": { "x": 1.5, "y": 0, "z": -1 },
+          "color": "#FFE4B5",
+          "intensity": 0.4,
+          "temperature": 3200,
+          "range": 3,
+          "castShadow": false
+        },
+        {
+          "id": "study-spotlight-1",
+          "name": "书架射灯1",
+          "type": "spotlight",
+          "position": { "x": -1.5, "y": 2.6, "z": -0.5 },
+          "color": "#FFFFFF",
+          "intensity": 0.4,
+          "temperature": 4500,
+          "angle": 35,
+          "penumbra": 0.3,
+          "target": { "x": -1.7, "y": 1.5, "z": -0.5 },
+          "castShadow": false
+        },
+        {
+          "id": "study-spotlight-2",
+          "name": "书架射灯2",
+          "type": "spotlight",
+          "position": { "x": -1.5, "y": 2.6, "z": 0.5 },
+          "color": "#FFFFFF",
+          "intensity": 0.4,
+          "temperature": 4500,
+          "angle": 35,
+          "penumbra": 0.3,
+          "target": { "x": -1.7, "y": 1.5, "z": 0.5 },
+          "castShadow": false
+        }
+      ]
+    }
+  ]
+}

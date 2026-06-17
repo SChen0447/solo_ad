@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>智能灯光场景预览</title>
+  <link rel="stylesheet" href="/src/styles/main.css">
+</head>
+<body>
+  <div id="app">
+    <div id="canvas-container"></div>
+    
+    <div id="selection-box" class="selection-box"></div>
+    
+    <div id="control-panel" class="control-panel">
+      <div class="panel-header">
+        <h2>灯光控制</h2>
+        <button id="save-scene-btn" class="icon-btn save-btn" title="保存场景">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+            <polyline points="17 21 17 13 7 13 7 21"/>
+            <polyline points="7 3 7 8 15 8"/>
+          </svg>
+        </button>
+      </div>
+
+      <div class="panel-section">
+        <label class="section-label">选择房间</label>
+        <select id="room-select" class="room-select">
+          <option value="living">客厅</option>
+          <option value="bedroom">卧室</option>
+          <option value="study">书房</option>
+        </select>
+      </div>
+
+      <div class="panel-section">
+        <label class="section-label">灯具列表</label>
+        <div id="light-list" class="light-list"></div>
+      </div>
+
+      <div class="panel-section color-section" id="color-section">
+        <label class="section-label">调色板</label>
+        <div class="color-picker-wrapper">
+          <canvas id="hue-ring" width="200" height="200"></canvas>
+          <div id="hue-cursor" class="hue-cursor"></div>
+        </div>
+        <div class="sv-picker-wrapper">
+          <canvas id="sv-canvas" width="120" height="120"></canvas>
+          <div id="sv-cursor" class="sv-cursor"></div>
+        </div>
+      </div>
+
+      <div class="panel-section">
+        <label class="section-label">
+          色温: <span id="temp-value">4500</span>K
+        </label>
+        <div class="temperature-slider-wrapper">
+          <input type="range" id="temperature-slider" class="temperature-slider" 
+                 min="1800" max="6500" value="4500" step="50">
+          <div class="temperature-track"></div>
+        </div>
+      </div>
+
+      <div class="panel-section">
+        <label class="section-label">
+          强度: <span id="intensity-value">50</span>%
+        </label>
+        <div class="intensity-control">
+          <input type="range" id="intensity-slider" class="intensity-slider" 
+                 min="0" max="100" value="50" step="1">
+          <input type="number" id="intensity-input" class="intensity-input" 
+                 min="0" max="100" value="50">
+        </div>
+      </div>
+
+      <div class="panel-section">
+        <label class="section-label">预设场景</label>
+        <div id="preset-scenes" class="preset-scenes"></div>
+      </div>
+
+      <div class="panel-section">
+        <label class="section-label">已保存场景</label>
+        <div id="saved-scenes" class="saved-scenes"></div>
+      </div>
+    </div>
+
+    <button id="mobile-toggle-btn" class="mobile-toggle-btn" title="打开控制面板">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M9 18h6"/>
+        <path d="M10 22h4"/>
+        <path d="M8 6l.5-1a3 3 0 0 1 6 0l.5 1"/>
+        <path d="M12 6v6"/>
+        <circle cx="12" cy="14" r="3"/>
+      </svg>
+    </button>
+
+    <div id="compare-divider" class="compare-divider hidden">
+      <div class="divider-handle"></div>
+    </div>
+
+    <div id="tooltip" class="tooltip hidden"></div>
+  </div>
+
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
