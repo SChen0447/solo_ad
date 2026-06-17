@@ -303,3 +303,48 @@ export function createRecommendedPath(
 
   return { line, arrows }
 }
+
+export function validateVehicleFaceCount(vehicle: THREE.Group): { total: number; valid: boolean } {
+  const MAX_VEHICLE_FACES = 2000
+  let totalTriangles = 0
+
+  vehicle.traverse((child) => {
+    if (child instanceof THREE.Mesh && child.geometry) {
+      const geom = child.geometry
+      if (geom.index) {
+        totalTriangles += geom.index.count / 3
+      } else if (geom.attributes.position) {
+        totalTriangles += geom.attributes.position.count / 3
+      }
+    }
+  })
+
+  console.log(`[Vehicle] 飞行器总三角面数: ${Math.floor(totalTriangles)} / ${MAX_VEHICLE_FACES} (限制)`)
+
+  if (totalTriangles > MAX_VEHICLE_FACES) {
+    console.warn(`[Vehicle] 警告: 飞行器面数 ${Math.floor(totalTriangles)} 超过限制 ${MAX_VEHICLE_FACES}!`)
+  }
+
+  return {
+    total: Math.floor(totalTriangles),
+    valid: totalTriangles <= MAX_VEHICLE_FACES
+  }
+}
+
+export function updateRecommendedPathAnimation(arrows: THREE.Group[], time: number): void {
+  const pulse = (Math.sin(time * 0.003) + 1) * 0.5
+
+  for (let i = 0; i < arrows.length; i++) {
+    const arrow = arrows[i]
+    const phaseOffset = i * 0.2
+    const individualPulse = (Math.sin(time * 0.003 + phaseOffset) + 1) * 0.5
+
+    arrow.scale.setScalar(0.8 + individualPulse * 0.4)
+
+    arrow.traverse((child) => {
+      if (child instanceof THREE.Mesh && child.material instanceof THREE.MeshBasicMaterial) {
+        child.material.opacity = 0.3 + individualPulse * 0.3
+      }
+    })
+  }
+}

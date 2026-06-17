@@ -1,6 +1,6 @@
 import * as THREE from 'three'
-import { generateIslands, getDefaultIslandConfigs, type IslandData } from './terrainGenerator'
-import { generateEnergyRings, createVehicle, createRecommendedPath, type EnergyRing } from './energyRing'
+import { generateIslands, getDefaultIslandConfigs, type IslandData, validateIslandFaceCount } from './terrainGenerator'
+import { generateEnergyRings, createVehicle, createRecommendedPath, type EnergyRing, validateVehicleFaceCount } from './energyRing'
 
 export interface SceneSetupResult {
   scene: THREE.Scene
@@ -89,6 +89,9 @@ export function setupScene(
   createClouds(scene, islands)
   createStars(scene)
   createAtmosphere(scene)
+
+  validateIslandFaceCount(islands)
+  validateVehicleFaceCount(vehicle)
 
   return {
     scene,

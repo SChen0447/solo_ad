@@ -7,6 +7,15 @@ export interface IslandData {
   size: number
   id: number
   isFinish: boolean
+  collisionBox: {
+    minX: number
+    maxX: number
+    minY: number
+    maxY: number
+    minZ: number
+    maxZ: number
+  }
+  collisionMesh: THREE.Mesh
 }
 
 interface IslandConfig {
@@ -174,12 +183,34 @@ export function generateIslands(islandConfigs: IslandConfig[]): IslandData[] {
 
     group.position.set(config.x, config.y, config.z)
 
-    const mergedMesh = new THREE.Mesh(
-      new THREE.BoxGeometry(config.size * 2, height * 2, config.size * 2),
-      topMat
+    const collisionWidth = config.size * 1.8
+    const collisionHeight = height * 1.8
+    const collisionDepth = config.size * 1.8
+
+    const collisionBoxGeom = new THREE.BoxGeometry(
+      collisionWidth,
+      collisionHeight,
+      collisionDepth
     )
-    mergedMesh.visible = false
-    mergedMesh.position.copy(group.position)
+    const collisionBoxMat = new THREE.MeshBasicMaterial({
+      color: 0xff0000,
+      transparent: true,
+      opacity: 0.0,
+      wireframe: false
+    })
+    const collisionMesh = new THREE.Mesh(collisionBoxGeom, collisionBoxMat)
+    collisionMesh.position.copy(group.position)
+    collisionMesh.visible = false
+    collisionMesh.name = 'collisionBox'
+
+    const collisionBox = {
+      minX: config.x - collisionWidth / 2,
+      maxX: config.x + collisionWidth / 2,
+      minY: config.y - collisionHeight / 2,
+      maxY: config.y + collisionHeight / 2,
+      minZ: config.z - collisionDepth / 2,
+      maxZ: config.z + collisionDepth / 2
+    }
 
     islands.push({
       mesh: group as unknown as THREE.Mesh,
@@ -187,11 +218,46 @@ export function generateIslands(islandConfigs: IslandConfig[]): IslandData[] {
       position: new THREE.Vector3(config.x, config.y, config.z),
       size: config.size,
       id: config.id,
-      isFinish: config.isFinish
+      isFinish: config.isFinish,
+      collisionBox,
+      collisionMesh
     })
   }
 
   return islands
+}
+
+export function calculateTrianglesForGeometry(geom: THREE.BufferGeometry): number {
+  if (geom.index) {
+    return geom.index.count / 3
+  } else if (geom.attributes.position) {
+    return geom.attributes.position.count / 3
+  }
+  return 0
+}
+
+export function validateIslandFaceCount(islands: IslandData[]): { total: number; valid: boolean } {
+  const MAX_ISLAND_FACES = 15000
+  let totalTriangles = 0
+
+  for (const island of islands) {
+    island.mesh.traverse((child) => {
+      if (child instanceof THREE.Mesh && child.geometry) {
+        totalTriangles += calculateTrianglesForGeometry(child.geometry)
+      }
+    })
+  }
+
+  console.log(`[Terrain] 浮岛总三角面数: ${Math.floor(totalTriangles)} / ${MAX_ISLAND_FACES} (限制)`)
+
+  if (totalTriangles > MAX_ISLAND_FACES) {
+    console.warn(`[Terrain] 警告: 浮岛总面数 ${Math.floor(totalTriangles)} 超过限制 ${MAX_ISLAND_FACES}!`)
+  }
+
+  return {
+    total: Math.floor(totalTriangles),
+    valid: totalTriangles <= MAX_ISLAND_FACES
+  }
 }
 
 function createTree(): THREE.Group {

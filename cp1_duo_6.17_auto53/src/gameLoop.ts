@@ -3,7 +3,7 @@ import type { CameraState } from './cameraControl'
 import type { IslandData } from './terrainGenerator'
 import type { EnergyRing } from './energyRing'
 import { updateThirdPersonCamera } from './cameraControl'
-import { updateRingsAnimation } from './energyRing'
+import { updateRingsAnimation, updateRecommendedPathAnimation } from './energyRing'
 import { checkIslandCollisions, checkRingCollisions } from './playerController'
 
 export interface GameLoopState {
@@ -251,24 +251,6 @@ export function checkFinishLine(
   return false
 }
 
-export function updateRecommendedPath(
-  arrows: THREE.Group[],
-  time: number
-): void {
-  for (let i = 0; i < arrows.length; i++) {
-    const arrow = arrows[i]
-    const pulse = 0.85 + Math.sin(time * 0.003 + i * 0.5) * 0.15
-    arrow.scale.setScalar(pulse)
-
-    arrow.children.forEach((child) => {
-      if (child instanceof THREE.Mesh) {
-        const mat = child.material as THREE.MeshBasicMaterial
-        mat.opacity = 0.3 + Math.sin(time * 0.003 + i * 0.5) * 0.15
-      }
-    })
-  }
-}
-
 export function gameLoopStep(
   loopState: GameLoopState,
   physics: PlayerPhysicsState,
@@ -278,7 +260,7 @@ export function gameLoopStep(
   scene: THREE.Scene,
   islands: IslandData[],
   rings: EnergyRing[],
-  vehicleGroup: THREE.Group,
+  _vehicleGroup: THREE.Group,
   recommendedArrows: THREE.Group[],
   callbacks: GameCallbacks,
   hasFinished: { value: boolean }
@@ -334,7 +316,7 @@ export function gameLoopStep(
 
   updateRingsAnimation(rings, loopState.elapsedTime)
 
-  updateRecommendedPath(recommendedArrows, loopState.elapsedTime)
+  updateRecommendedPathAnimation(recommendedArrows, loopState.elapsedTime)
 
   updateThirdPersonCamera(
     cameraState,

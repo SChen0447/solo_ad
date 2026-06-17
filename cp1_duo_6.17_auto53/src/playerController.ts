@@ -186,6 +186,7 @@ function isVehicleCollidingWithIsland(
   physics: PlayerPhysicsState,
   island: IslandData
 ): boolean {
+  const { collisionBox } = island
   const halfLength = VEHICLE_BOUNDS.length * 0.5
   const halfWidth = VEHICLE_BOUNDS.width * 0.5
   const halfHeight = VEHICLE_BOUNDS.height * 0.5
@@ -194,39 +195,110 @@ function isVehicleCollidingWithIsland(
   const right = physics.right.clone().normalize()
   const up = physics.up.clone().normalize()
 
+  const vehicleCenter = physics.position.clone()
+
   const vehicleCorners: THREE.Vector3[] = []
-  for (let l = -1; l <= 1; l += 2) {
-    for (let w = -1; w <= 1; w += 2) {
-      for (let h = -1; h <= 1; h += 2) {
-        const corner = physics.position
-          .clone()
-          .add(forward.multiplyScalar(l * halfLength))
-          .add(right.multiplyScalar(w * halfWidth))
-          .add(up.multiplyScalar(h * halfHeight))
-        vehicleCorners.push(corner)
-      }
-    }
+  const offsets = [
+    [-1, -1, -1], [1, -1, -1], [-1, 1, -1], [1, 1, -1],
+    [-1, -1, 1], [1, -1, 1], [-1, 1, 1], [1, 1, 1]
+  ]
+
+  for (const [lo, wi, he] of offsets) {
+    const corner = vehicleCenter.clone()
+      .add(forward.clone().multiplyScalar(lo * halfLength))
+      .add(right.clone().multiplyScalar(wi * halfWidth))
+      .add(up.clone().multiplyScalar(he * halfHeight))
+    vehicleCorners.push(corner)
   }
 
-  const islandHeight = island.size * 0.6
-  const islandTop = island.position.y + islandHeight * 0.5
-  const islandBottom = island.position.y - islandHeight * 0.5
-
   for (const corner of vehicleCorners) {
-    const dx = corner.x - island.position.x
-    const dz = corner.z - island.position.z
-    const horizontalDist = Math.sqrt(dx * dx + dz * dz)
-
     if (
-      horizontalDist < island.collisionRadius * 0.92 &&
-      corner.y > islandBottom - 5 &&
-      corner.y < islandTop + 5
+      corner.x >= collisionBox.minX &&
+      corner.x <= collisionBox.maxX &&
+      corner.y >= collisionBox.minY &&
+      corner.y <= collisionBox.maxY &&
+      corner.z >= collisionBox.minZ &&
+      corner.z <= collisionBox.maxZ
     ) {
       return true
     }
   }
 
-  return false
+  const islandCenter = new THREE.Vector3(
+    (collisionBox.minX + collisionBox.maxX) / 2,
+    (collisionBox.minY + collisionBox.maxY) / 2,
+    (collisionBox.minZ + collisionBox.maxZ) / 2
+  )
+
+  const toIsland = new THREE.Vector3().subVectors(islandCenter, vehicleCenter)
+  const dist = toIsland.length()
+  if (dist > 500) return false
+
+  const vehicleAxes = [forward, right, up]
+  const islandAxes = [
+    new THREE.Vector3(1, 0, 0),
+    new THREE.Vector3(0, 1, 0),
+    new THREE.Vector3(0, 0, 1)
+  ]
+
+  const islandHalfExtents = new THREE.Vector3(
+    (collisionBox.maxX - collisionBox.minX) / 2,
+    (collisionBox.maxY - collisionBox.minY) / 2,
+    (collisionBox.maxZ - collisionBox.minZ) / 2
+  )
+
+  const allAxes = [
+    ...vehicleAxes,
+    ...islandAxes,
+    new THREE.Vector3().crossVectors(vehicleAxes[0], islandAxes[0]).normalize(),
+    new THREE.Vector3().crossVectors(vehicleAxes[0], islandAxes[1]).normalize(),
+    new THREE.Vector3().crossVectors(vehicleAxes[0], islandAxes[2]).normalize(),
+    new THREE.Vector3().crossVectors(vehicleAxes[1], islandAxes[0]).normalize(),
+    new THREE.Vector3().crossVectors(vehicleAxes[1], islandAxes[1]).normalize(),
+    new THREE.Vector3().crossVectors(vehicleAxes[1], islandAxes[2]).normalize(),
+    new THREE.Vector3().crossVectors(vehicleAxes[2], islandAxes[0]).normalize(),
+    new THREE.Vector3().crossVectors(vehicleAxes[2], islandAxes[1]).normalize(),
+    new THREE.Vector3().crossVectors(vehicleAxes[2], islandAxes[2]).normalize()
+  ]
+
+  for (const axis of allAxes) {
+    if (axis.length() < 0.001) continue
+
+    const axisNormalized = axis.clone().normalize()
+
+    let vehicleMin = Infinity
+    let vehicleMax = -Infinity
+    for (const corner of vehicleCorners) {
+      const projection = corner.dot(axisNormalized)
+      vehicleMin = Math.min(vehicleMin, projection)
+      vehicleMax = Math.max(vehicleMax, projection)
+    }
+
+    const islandCorners: THREE.Vector3[] = []
+    for (const [x, y, z] of offsets) {
+      const corner = islandCenter.clone()
+        .add(new THREE.Vector3(
+          x * islandHalfExtents.x,
+          y * islandHalfExtents.y,
+          z * islandHalfExtents.z
+        ))
+      islandCorners.push(corner)
+    }
+
+    let islandMin = Infinity
+    let islandMax = -Infinity
+    for (const corner of islandCorners) {
+      const projection = corner.dot(axisNormalized)
+      islandMin = Math.min(islandMin, projection)
+      islandMax = Math.max(islandMax, projection)
+    }
+
+    if (vehicleMax < islandMin || vehicleMin > islandMax) {
+      return false
+    }
+  }
+
+  return true
 }
 
 function pushVehicleAwayFromIsland(
