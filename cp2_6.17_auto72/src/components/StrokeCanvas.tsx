@@ -23,6 +23,8 @@ const START_DOT_COLOR = '#e53935';
 const END_DOT_COLOR = '#43a047';
 const DOT_RADIUS = 3;
 const NUMBER_COLOR = '#8B4513';
+const PEN_TIP_RADIUS = 5;
+const PEN_TIP_ALPHA = 0.45;
 
 const coordToCanvas = (p: Point): Point => ({
   x: p.x * SCALE,
@@ -52,8 +54,12 @@ const getPointOnPath = (points: Point[], progress: number): Point => {
 const StrokeCanvas = forwardRef<StrokeCanvasRef, StrokeCanvasProps>(({ hanziData, currentStrokeIndex, strokeProgress }, ref) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const rafRef = useRef<number | null>(null);
+  const dprSetRef = useRef<number>(0);
 
-  const drawCompletedStrokes = useCallback((ctx: CanvasRenderingContext2D) => {
+  const propsRef = useRef({ hanziData, currentStrokeIndex, strokeProgress });
+  propsRef.current = { hanziData, currentStrokeIndex, strokeProgress };
+
+  const drawCompletedStrokes = useCallback((ctx: CanvasRenderingContext2D, data: HanziData, strokeIdx: number) => {
     ctx.save();
     ctx.globalAlpha = FINISHED_OPACITY;
     ctx.strokeStyle = STROKE_COLOR;
@@ -61,8 +67,8 @@ const StrokeCanvas = forwardRef<StrokeCanvasRef, StrokeCanvasProps>(({ hanziData
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
 
-    for (let i = 0; i < currentStrokeIndex; i++) {
-      const stroke = hanziData.strokes[i];
+    for (let i = 0; i < strokeIdx; i++) {
+      const stroke = data.strokes[i];
       if (!stroke || stroke.points.length < 2) continue;
 
       const canvasPoints = stroke.points.map(coordToCanvas);
@@ -83,14 +89,14 @@ const StrokeCanvas = forwardRef<StrokeCanvasRef, StrokeCanvasProps>(({ hanziData
       ctx.fillStyle = STROKE_COLOR;
     }
     ctx.restore();
-  }, [hanziData, currentStrokeIndex]);
+  }, []);
 
-  const drawCurrentStroke = useCallback((ctx: CanvasRenderingContext2D) => {
-    const stroke = hanziData.strokes[currentStrokeIndex];
+  const drawCurrentStroke = useCallback((ctx: CanvasRenderingContext2D, data: HanziData, strokeIdx: number, progress: number) => {
+    const stroke = data.strokes[strokeIdx];
     if (!stroke || stroke.points.length < 2) return;
 
     const canvasPoints = stroke.points.map(coordToCanvas);
-    const progress = Math.max(0, Math.min(1, strokeProgress));
+    const clampedProgress = Math.max(0, Math.min(1, progress));
 
     ctx.save();
     ctx.globalAlpha = CURRENT_OPACITY;
@@ -100,7 +106,7 @@ const StrokeCanvas = forwardRef<StrokeCanvasRef, StrokeCanvasProps>(({ hanziData
     ctx.lineJoin = 'round';
 
     const totalSegments = canvasPoints.length - 1;
-    const segmentProgress = progress * totalSegments;
+    const segmentProgress = clampedProgress * totalSegments;
     const fullSegments = Math.floor(segmentProgress);
     const localT = segmentProgress - fullSegments;
 
@@ -124,14 +130,14 @@ const StrokeCanvas = forwardRef<StrokeCanvasRef, StrokeCanvasProps>(({ hanziData
     ctx.arc(startPt.x, startPt.y, DOT_RADIUS, 0, Math.PI * 2);
     ctx.fill();
 
-    if (progress >= 1) {
+    if (clampedProgress >= 1) {
       const endPt = canvasPoints[canvasPoints.length - 1];
       ctx.fillStyle = END_DOT_COLOR;
       ctx.beginPath();
       ctx.arc(endPt.x, endPt.y, DOT_RADIUS, 0, Math.PI * 2);
       ctx.fill();
-    } else {
-      const currentEnd = getPointOnPath(canvasPoints, progress);
+    } else if (clampedProgress > 0) {
+      const currentEnd = getPointOnPath(canvasPoints, clampedProgress);
       ctx.fillStyle = END_DOT_COLOR;
       ctx.beginPath();
       ctx.arc(currentEnd.x, currentEnd.y, DOT_RADIUS, 0, Math.PI * 2);
@@ -139,17 +145,41 @@ const StrokeCanvas = forwardRef<StrokeCanvasRef, StrokeCanvasProps>(({ hanziData
     }
 
     ctx.restore();
-  }, [hanziData, currentStrokeIndex, strokeProgress]);
+  }, []);
 
-  const drawStrokeNumbers = useCallback((ctx: CanvasRenderingContext2D) => {
+  const drawPenTip = useCallback((ctx: CanvasRenderingContext2D, data: HanziData, strokeIdx: number, progress: number) => {
+    if (progress <= 0 || progress >= 1) return;
+
+    const stroke = data.strokes[strokeIdx];
+    if (!stroke || stroke.points.length < 2) return;
+
+    const canvasPoints = stroke.points.map(coordToCanvas);
+    const pos = getPointOnPath(canvasPoints, progress);
+
+    ctx.save();
+
+    const gradient = ctx.createRadialGradient(pos.x, pos.y, 0, pos.x, pos.y, PEN_TIP_RADIUS);
+    gradient.addColorStop(0, `rgba(0, 0, 0, ${PEN_TIP_ALPHA})`);
+    gradient.addColorStop(0.6, `rgba(0, 0, 0, ${PEN_TIP_ALPHA * 0.5})`);
+    gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
+
+    ctx.fillStyle = gradient;
+    ctx.beginPath();
+    ctx.arc(pos.x, pos.y, PEN_TIP_RADIUS, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.restore();
+  }, []);
+
+  const drawStrokeNumbers = useCallback((ctx: CanvasRenderingContext2D, data: HanziData, strokeIdx: number) => {
     ctx.save();
     ctx.fillStyle = NUMBER_COLOR;
     ctx.font = 'bold 12px Arial';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
 
-    for (let i = 0; i < currentStrokeIndex; i++) {
-      const stroke = hanziData.strokes[i];
+    for (let i = 0; i < strokeIdx; i++) {
+      const stroke = data.strokes[i];
       if (!stroke || stroke.points.length === 0) continue;
 
       const startPt = coordToCanvas(stroke.points[0]);
@@ -159,20 +189,20 @@ const StrokeCanvas = forwardRef<StrokeCanvasRef, StrokeCanvasProps>(({ hanziData
       ctx.fillText(String(i + 1), startPt.x + offsetX, startPt.y + offsetY);
     }
 
-    if (currentStrokeIndex < hanziData.strokes.length) {
-      const stroke = hanziData.strokes[currentStrokeIndex];
+    if (strokeIdx < data.strokes.length) {
+      const stroke = data.strokes[strokeIdx];
       if (stroke && stroke.points.length > 0) {
         const startPt = coordToCanvas(stroke.points[0]);
         const offsetX = startPt.x < 30 ? 12 : -12;
         const offsetY = startPt.y < 30 ? 12 : -12;
 
         ctx.font = 'bold 14px Arial';
-        ctx.fillText(String(currentStrokeIndex + 1), startPt.x + offsetX, startPt.y + offsetY);
+        ctx.fillText(String(strokeIdx + 1), startPt.x + offsetX, startPt.y + offsetY);
       }
     }
 
     ctx.restore();
-  }, [hanziData, currentStrokeIndex]);
+  }, []);
 
   const render = useCallback(() => {
     const canvas = canvasRef.current;
@@ -182,35 +212,42 @@ const StrokeCanvas = forwardRef<StrokeCanvasRef, StrokeCanvasProps>(({ hanziData
     if (!ctx) return;
 
     const dpr = window.devicePixelRatio || 1;
-    if (canvas.width !== CANVAS_SIZE * dpr || canvas.height !== CANVAS_SIZE * dpr) {
+    if (dprSetRef.current !== dpr) {
       canvas.width = CANVAS_SIZE * dpr;
       canvas.height = CANVAS_SIZE * dpr;
       canvas.style.width = `${CANVAS_SIZE}px`;
       canvas.style.height = `${CANVAS_SIZE}px`;
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      dprSetRef.current = dpr;
     }
+
+    const { hanziData, currentStrokeIndex, strokeProgress } = propsRef.current;
 
     ctx.clearRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
     ctx.fillStyle = BG_COLOR;
     ctx.fillRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
 
-    drawCompletedStrokes(ctx);
-    drawCurrentStroke(ctx);
-    drawStrokeNumbers(ctx);
-  }, [drawCompletedStrokes, drawCurrentStroke, drawStrokeNumbers]);
+    drawCompletedStrokes(ctx, hanziData, currentStrokeIndex);
+    drawCurrentStroke(ctx, hanziData, currentStrokeIndex, strokeProgress);
+    drawPenTip(ctx, hanziData, currentStrokeIndex, strokeProgress);
+    drawStrokeNumbers(ctx, hanziData, currentStrokeIndex);
+  }, [drawCompletedStrokes, drawCurrentStroke, drawPenTip, drawStrokeNumbers]);
 
   useImperativeHandle(ref, () => ({
     redraw: render,
   }));
 
   useEffect(() => {
+    let running = true;
     const animate = () => {
+      if (!running) return;
       render();
       rafRef.current = requestAnimationFrame(animate);
     };
     rafRef.current = requestAnimationFrame(animate);
 
     return () => {
+      running = false;
       if (rafRef.current !== null) {
         cancelAnimationFrame(rafRef.current);
       }

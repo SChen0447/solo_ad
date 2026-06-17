@@ -6,10 +6,10 @@ import type { HanziData } from './data/hanziData';
 
 const DEFAULT_CHAR = '永';
 const DEFAULT_SPEED = 1;
-const STROKE_DRAW_DURATION = 1000;
-const BASE_INTERVAL = 1500;
+const BASE_DRAW_DURATION = 1000;
+const BASE_PAUSE_DURATION = 500;
 
-type PlayPhase = 'drawing' | 'waiting';
+type PlayPhase = 'drawing' | 'pausing';
 
 const App: React.FC = () => {
   const allChars = getAllChars();
@@ -18,20 +18,17 @@ const App: React.FC = () => {
   const [currentChar, setCurrentChar] = useState<string>(DEFAULT_CHAR);
   const [hanziData, setHanziData] = useState<HanziData>(defaultHanzi);
   const [currentStrokeIndex, setCurrentStrokeIndex] = useState<number>(0);
-  const [strokeProgress, setStrokeProgress] = useState<number>(0);
+  const [strokeProgress, setStrokeProgress] = useState<number>(1);
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
   const [speed, setSpeed] = useState<number>(DEFAULT_SPEED);
 
   const rafRef = useRef<number | null>(null);
   const phaseRef = useRef<PlayPhase>('drawing');
   const phaseStartRef = useRef<number>(0);
+  const speedRef = useRef<number>(speed);
+  speedRef.current = speed;
 
   const totalStrokes = hanziData.strokeCount;
-
-  const resetAnimation = useCallback(() => {
-    phaseRef.current = 'drawing';
-    phaseStartRef.current = performance.now();
-  }, []);
 
   const stopAnimation = useCallback(() => {
     if (rafRef.current !== null) {
@@ -45,7 +42,7 @@ const App: React.FC = () => {
       const nextIndex = prevIndex + 1;
       if (nextIndex >= totalStrokes) {
         setIsPlaying(false);
-        setStrokeProgress(0);
+        setStrokeProgress(1);
         return 0;
       }
       phaseRef.current = 'drawing';
@@ -56,35 +53,32 @@ const App: React.FC = () => {
   }, [totalStrokes]);
 
   const tick = useCallback(() => {
+    const currentSpeed = speedRef.current;
     const now = performance.now();
     const elapsed = now - phaseStartRef.current;
-    const waitTime = Math.max(0, BASE_INTERVAL / speed - STROKE_DRAW_DURATION);
 
     if (phaseRef.current === 'drawing') {
-      const progress = Math.min(1, elapsed / STROKE_DRAW_DURATION);
+      const drawDuration = BASE_DRAW_DURATION / currentSpeed;
+      const progress = Math.min(1, elapsed / drawDuration);
       setStrokeProgress(progress);
 
-      if (elapsed >= STROKE_DRAW_DURATION) {
-        if (waitTime <= 0) {
-          advanceToNextStroke();
-        } else {
-          phaseRef.current = 'waiting';
-          phaseStartRef.current = now;
-        }
+      if (progress >= 1) {
+        phaseRef.current = 'pausing';
+        phaseStartRef.current = now;
       }
-    } else if (phaseRef.current === 'waiting') {
-      if (elapsed >= waitTime) {
+    } else if (phaseRef.current === 'pausing') {
+      const pauseDuration = BASE_PAUSE_DURATION / currentSpeed;
+      if (elapsed >= pauseDuration) {
         advanceToNextStroke();
       }
     }
 
     rafRef.current = requestAnimationFrame(tick);
-  }, [speed, advanceToNextStroke]);
+  }, [advanceToNextStroke]);
 
   useEffect(() => {
     if (isPlaying) {
       if (rafRef.current === null) {
-        phaseStartRef.current = performance.now();
         rafRef.current = requestAnimationFrame(tick);
       }
     } else {
@@ -100,36 +94,37 @@ const App: React.FC = () => {
     const data = getHanziByChar(char);
     if (!data) return;
 
-    const wasPlaying = isPlaying;
     setIsPlaying(false);
     stopAnimation();
 
     setCurrentChar(char);
     setHanziData(data);
     setCurrentStrokeIndex(0);
-    setStrokeProgress(0);
-    resetAnimation();
-
-    if (wasPlaying) {
-      setTimeout(() => setIsPlaying(true), 50);
-    }
-  }, [isPlaying, stopAnimation, resetAnimation]);
+    setStrokeProgress(1);
+  }, [stopAnimation]);
 
   const handleTogglePlay = useCallback(() => {
-    setIsPlaying((prev) => {
-      if (!prev) {
-        resetAnimation();
+    if (!isPlaying) {
+      if (strokeProgress >= 1) {
+        setStrokeProgress(0);
+        phaseRef.current = 'drawing';
+        phaseStartRef.current = performance.now();
+      } else {
+        const drawDuration = BASE_DRAW_DURATION / speed;
+        phaseRef.current = 'drawing';
+        phaseStartRef.current = performance.now() - strokeProgress * drawDuration;
       }
-      return !prev;
-    });
-  }, [resetAnimation]);
+      setIsPlaying(true);
+    } else {
+      setIsPlaying(false);
+    }
+  }, [isPlaying, strokeProgress, speed]);
 
   const handleProgressChange = useCallback((index: number) => {
     setIsPlaying(false);
     stopAnimation();
     setCurrentStrokeIndex(index);
-    setStrokeProgress(0);
-    phaseRef.current = 'drawing';
+    setStrokeProgress(1);
   }, [stopAnimation]);
 
   const handleSpeedChange = useCallback((newSpeed: number) => {
