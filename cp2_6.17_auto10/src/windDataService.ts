@@ -34,6 +34,8 @@ export interface RegionAnalysis {
   centerLat: number;
   centerLon: number;
   avgSpeed: number;
+  minSpeed: number;
+  maxSpeed: number;
   dominantDirection: string;
   avgU: number;
   avgV: number;
@@ -42,6 +44,9 @@ export interface RegionAnalysis {
   latMax: number;
   lonMin: number;
   lonMax: number;
+  histogram: number[];
+  histogramBinSize: number;
+  histogramMaxBin: number;
 }
 
 const EARTH_RADIUS = 1;
@@ -473,6 +478,12 @@ export class WindDataService {
     this.positionsAttr.needsUpdate = true;
     this.colorsAttr.needsUpdate = true;
     this.opacityAttr.needsUpdate = true;
+
+    if (this.highlightBBoxActive && this.highlightBBoxBounds) {
+      this.updateBBoxHighlightColors();
+    } else if (stateManager.get('selectedRegion')) {
+      this.highlightParticlesInRegion(stateManager.get('selectedRegion'));
+    }
   }
 
   getParticleSystem(): THREE.Points {
@@ -496,6 +507,12 @@ export class WindDataService {
     let latMax = -90;
     let lonMin = 180;
     let lonMax = -180;
+    let minSpeed = Infinity;
+    let maxSpeed = -Infinity;
+    const histogramBins = 8;
+    const histogram: number[] = new Array(histogramBins).fill(0);
+    const histogramBinSize = MAX_WIND_SPEED / histogramBins;
+    let speedSum = 0;
 
     const sampleStep = 1;
     for (let i = 0; i < field.lats.length; i += sampleStep) {
@@ -505,9 +522,15 @@ export class WindDataService {
         const d = haversineDistanceKm(lat, lon, pLat, pLon);
         if (d <= radiusKm) {
           const { u, v } = field.grid[i][j];
+          const speed = Math.sqrt(u * u + v * v);
           totalU += u;
           totalV += v;
+          speedSum += speed;
           count++;
+          if (speed < minSpeed) minSpeed = speed;
+          if (speed > maxSpeed) maxSpeed = speed;
+          const binIdx = Math.min(histogramBins - 1, Math.floor(speed / histogramBinSize));
+          histogram[binIdx]++;
           if (pLat < latMin) latMin = pLat;
           if (pLat > latMax) latMax = pLat;
           if (pLon < lonMin) lonMin = pLon;
@@ -520,23 +543,29 @@ export class WindDataService {
     let dominantDirection = 'N/A';
     let avgU = 0;
     let avgV = 0;
+    let histogramMaxBin = 0;
 
     if (count > 0) {
       avgU = totalU / count;
       avgV = totalV / count;
-      avgSpeed = Math.sqrt(avgU * avgU + avgV * avgV);
+      avgSpeed = speedSum / count;
       dominantDirection = getDirectionLabel(avgU, avgV);
+      histogramMaxBin = Math.max(...histogram);
     } else {
       latMin = lat;
       latMax = lat;
       lonMin = lon;
       lonMax = lon;
+      minSpeed = 0;
+      maxSpeed = 0;
     }
 
     return {
       centerLat: lat,
       centerLon: lon,
       avgSpeed,
+      minSpeed,
+      maxSpeed,
       dominantDirection,
       avgU,
       avgV,
@@ -545,6 +574,9 @@ export class WindDataService {
       latMax,
       lonMin,
       lonMax,
+      histogram,
+      histogramBinSize,
+      histogramMaxBin,
     };
   }
 
@@ -577,7 +609,75 @@ export class WindDataService {
     this.colorsAttr.needsUpdate = true;
   }
 
+  private highlightBBoxActive = false;
+  private highlightBBoxTimer: number | null = null;
+  private highlightBBoxBounds: { latMin: number; latMax: number; lonMin: number; lonMax: number } | null = null;
+
+  highlightParticlesInBounds(latMin: number, latMax: number, lonMin: number, lonMax: number, durationMs: number = 3000): void {
+    if (this.highlightBBoxTimer !== null) {
+      window.clearTimeout(this.highlightBBoxTimer);
+      this.highlightBBoxTimer = null;
+    }
+
+    this.highlightBBoxActive = true;
+    this.highlightBBoxBounds = { latMin, latMax, lonMin, lonMax };
+    this.updateBBoxHighlightColors();
+
+    this.highlightBBoxTimer = window.setTimeout(() => {
+      this.highlightBBoxActive = false;
+      this.highlightBBoxBounds = null;
+      this.highlightBBoxTimer = null;
+      if (stateManager.get('selectedRegion')) {
+        this.highlightParticlesInRegion(stateManager.get('selectedRegion'));
+      }
+    }, durationMs);
+  }
+
+  isBBoxHighlightActive(): boolean {
+    return this.highlightBBoxActive;
+  }
+
+  private updateBBoxHighlightColors(): void {
+    if (!this.colorsAttr || !this.highlightBBoxBounds) return;
+    const colors = this.colorsAttr.array as Float32Array;
+    const { latMin, latMax, lonMin, lonMax } = this.highlightBBoxBounds;
+
+    const lonRange = lonMax - lonMin;
+    const lonWrapAround = lonRange < 0;
+
+    for (let i = 0; i < PARTICLE_COUNT; i++) {
+      const p = this.particles[i];
+      const { lat, lon } = vec3ToLatLon(p.position);
+
+      let inBounds = lat >= latMin && lat <= latMax;
+      if (inBounds) {
+        if (lonWrapAround) {
+          inBounds = lon >= lonMin || lon <= lonMax;
+        } else {
+          inBounds = lon >= lonMin && lon <= lonMax;
+        }
+      }
+
+      if (inBounds) {
+        colors[i * 3] = 1.0;
+        colors[i * 3 + 1] = 0.6;
+        colors[i * 3 + 2] = 0.0;
+      } else {
+        const speed = p.baseSpeed;
+        const c = speedToColor(speed);
+        colors[i * 3] = c.r;
+        colors[i * 3 + 1] = c.g;
+        colors[i * 3 + 2] = c.b;
+      }
+    }
+    this.colorsAttr.needsUpdate = true;
+  }
+
   dispose(): void {
+    if (this.highlightBBoxTimer !== null) {
+      window.clearTimeout(this.highlightBBoxTimer);
+      this.highlightBBoxTimer = null;
+    }
     if (this.geometry) this.geometry.dispose();
     if (this.material) this.material.dispose();
     this.particleSystem = null;

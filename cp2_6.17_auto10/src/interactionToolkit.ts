@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { stateManager, SelectedRegion, MonthKey } from './stateManager';
 import { latLonToVec3, vec3ToLatLon, RegionAnalysis } from './windDataService';
+import { windDataService } from './windDataService';
 
 export interface InteractionCallbacks {
   onRegionAnalyzed: (analysis: RegionAnalysis, worldPoint: THREE.Vector3) => void;
@@ -77,6 +78,7 @@ export class InteractionToolkit {
     this.canvas.addEventListener('pointerleave', this.onPointerLeave);
     window.addEventListener('resize', this.onWindowResize);
     document.addEventListener('pointerdown', this.onDocumentPointerDown, true);
+    document.addEventListener('keydown', this.onKeyDown);
   }
 
   private setupAutoHideListener(): void {
@@ -256,6 +258,15 @@ export class InteractionToolkit {
 
   private onWindowResize = (): void => {};
 
+  private onKeyDown = (e: KeyboardEvent): void => {
+    if (e.key === 'Escape' || e.key === 'Esc') {
+      if (stateManager.get('selectedRegion') !== null) {
+        this.clearSelection();
+        e.preventDefault();
+      }
+    }
+  };
+
   private updatePointer(clientX: number, clientY: number): void {
     const rect = this.canvas.getBoundingClientRect();
     this.pointer.x = ((clientX - rect.left) / rect.width) * 2 - 1;
@@ -341,6 +352,19 @@ export class InteractionToolkit {
       zoomFactor = 1.0;
     }
 
+    const bboxLatLon = this.calculateBoxBoundsLatLon(
+      leftScreen, topScreen, rightScreen, bottomScreen
+    );
+    if (bboxLatLon) {
+      windDataService.highlightParticlesInBounds(
+        bboxLatLon.latMin,
+        bboxLatLon.latMax,
+        bboxLatLon.lonMin,
+        bboxLatLon.lonMax,
+        3000
+      );
+    }
+
     if (centerPoint) {
       const startPos = this.camera.position.clone();
       const startTarget = this.controls.target.clone();
@@ -367,6 +391,80 @@ export class InteractionToolkit {
 
       this.animateCamera(startPos, endPos, startTarget, startTarget.clone(), 600);
     }
+  }
+
+  private calculateBoxBoundsLatLon(
+    leftX: number, topY: number, rightX: number, bottomY: number
+  ): { latMin: number; latMax: number; lonMin: number; lonMax: number } | null {
+    const samplePoints: { x: number; y: number }[] = [];
+    const steps = 6;
+    for (let i = 0; i <= steps; i++) {
+      const t = i / steps;
+      samplePoints.push({ x: leftX + (rightX - leftX) * t, y: topY });
+      samplePoints.push({ x: leftX + (rightX - leftX) * t, y: bottomY });
+      samplePoints.push({ x: leftX, y: topY + (bottomY - topY) * t });
+      samplePoints.push({ x: rightX, y: topY + (bottomY - topY) * t });
+    }
+    const centerX = (leftX + rightX) / 2;
+    const centerY = (topY + bottomY) / 2;
+    samplePoints.push({ x: centerX, y: centerY });
+
+    let latMin = 90;
+    let latMax = -90;
+    let lonMin = 180;
+    let lonMax = -180;
+    let validCount = 0;
+
+    const lons: number[] = [];
+
+    for (const pt of samplePoints) {
+      const hit = this.intersectEarth(pt.x, pt.y);
+      if (hit) {
+        const { lat, lon } = vec3ToLatLon(hit);
+        if (lat < latMin) latMin = lat;
+        if (lat > latMax) latMax = lat;
+        lons.push(lon);
+        validCount++;
+      }
+    }
+
+    if (validCount < 4) return null;
+
+    lons.sort((a, b) => a - b);
+
+    let maxGap = 0;
+    let maxGapIdx = 0;
+    for (let i = 1; i < lons.length; i++) {
+      const gap = lons[i] - lons[i - 1];
+      if (gap > maxGap) {
+        maxGap = gap;
+        maxGapIdx = i;
+      }
+    }
+    const wrapGap = (lons[0] + 360) - lons[lons.length - 1];
+    if (wrapGap > maxGap) {
+      maxGap = wrapGap;
+      maxGapIdx = 0;
+      lonMin = lons[lons.length - 1];
+      lonMax = lons[0];
+    } else {
+      lonMin = lons[maxGapIdx - 1] ?? lons[lons.length - 1];
+      lonMax = lons[maxGapIdx];
+    }
+
+    if (lonMin > lonMax) {
+      const tmp = lonMin;
+      lonMin = lonMax;
+      lonMax = tmp;
+    }
+
+    const lonRange = lonMax - lonMin;
+    if (lonRange < 0 || lonRange > 300) {
+      lonMin = -180;
+      lonMax = 180;
+    }
+
+    return { latMin, latMax, lonMin, lonMax };
   }
 
   private animateCamera(
@@ -510,7 +608,6 @@ export class InteractionToolkit {
     const lonEl = document.getElementById('info-lon');
     const speedEl = document.getElementById('info-speed');
     const dirEl = document.getElementById('info-dir');
-
     if (latEl) latEl.textContent = `${analysis.centerLat.toFixed(2)}°`;
     if (lonEl) lonEl.textContent = `${analysis.centerLon.toFixed(2)}°`;
     if (speedEl) speedEl.textContent = `${analysis.avgSpeed.toFixed(1)} m/s`;
@@ -519,7 +616,47 @@ export class InteractionToolkit {
     const angle = this.getWindAngleDeg(analysis.avgU, analysis.avgV);
     this.setWindArrowRotation(angle);
 
+    this.updateSpeedDistribution(analysis);
+
     card.classList.remove('hidden');
+  }
+
+  private updateSpeedDistribution(analysis: RegionAnalysis): void {
+    const speedRangeEl = document.getElementById('info-speed-range');
+    if (speedRangeEl) {
+      speedRangeEl.textContent = `${analysis.minSpeed.toFixed(1)} - ${analysis.maxSpeed.toFixed(1)} m/s`;
+    }
+
+    const avgMarker = document.getElementById('speed-avg-marker');
+    if (avgMarker) {
+      const maxSpeed = 80;
+      const avgPercent = Math.min(100, Math.max(0, (analysis.avgSpeed / maxSpeed) * 100));
+      avgMarker.style.left = `${avgPercent}%`;
+    }
+
+    const minLabelEl = document.getElementById('speed-min-label');
+    const maxLabelEl = document.getElementById('speed-max-label');
+    if (minLabelEl) minLabelEl.textContent = '0';
+    if (maxLabelEl) maxLabelEl.textContent = '80';
+
+    const histogramBarsEl = document.getElementById('histogram-bars');
+    if (histogramBarsEl && analysis.histogram.length > 0) {
+      histogramBarsEl.innerHTML = '';
+      const maxBin = analysis.histogramMaxBin || 1;
+      for (let i = 0; i < analysis.histogram.length; i++) {
+        const bar = document.createElement('div');
+        bar.className = 'histogram-bar';
+        const heightPercent = (analysis.histogram[i] / maxBin) * 100;
+        bar.style.height = `${Math.max(4, heightPercent)}%`;
+        if (analysis.histogram[i] === maxBin && maxBin > 0) {
+          bar.classList.add('max-bar');
+        }
+        const speedAtBin = (i + 0.5) * analysis.histogramBinSize;
+        const hue = 200 - (speedAtBin / 80) * 200;
+        bar.style.background = `linear-gradient(to top, hsla(${hue}, 100%, 60%, 0.25), hsla(${hue}, 100%, 65%, 0.85))`;
+        histogramBarsEl.appendChild(bar);
+      }
+    }
   }
 
   dispose(): void {
@@ -529,6 +666,7 @@ export class InteractionToolkit {
     this.canvas.removeEventListener('pointerleave', this.onPointerLeave);
     window.removeEventListener('resize', this.onWindowResize);
     document.removeEventListener('pointerdown', this.onDocumentPointerDown, true);
+    document.removeEventListener('keydown', this.onKeyDown);
 
     if (this.animationFrameId !== null) {
       cancelAnimationFrame(this.animationFrameId);
