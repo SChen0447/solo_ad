@@ -2,18 +2,10 @@ import { useState, useEffect, useCallback } from 'react';
 import ParameterPanel from './components/ParameterPanel';
 import PreviewArea from './components/PreviewArea';
 import CodeOutput from './components/CodeOutput';
-import { TypographyParams } from './utils/generateCode';
+import { IParams } from './types';
 import { textSample } from './utils/textSample';
-import '@fontsource/roboto/400.css';
-import '@fontsource/roboto/700.css';
-import '@fontsource/noto-sans-sc/400.css';
-import '@fontsource/noto-sans-sc/700.css';
-import '@fontsource/playfair-display/400.css';
-import '@fontsource/playfair-display/700.css';
-import '@fontsource/source-code-pro/400.css';
-import '@fontsource/source-code-pro/700.css';
 
-const defaultParams: TypographyParams = {
+const defaultParams: IParams = {
   fontFamily: 'Roboto',
   fontSize: 16,
   lineHeight: 1.6,
@@ -23,7 +15,7 @@ const defaultParams: TypographyParams = {
 };
 
 function App() {
-  const [params, setParams] = useState<TypographyParams>(defaultParams);
+  const [params, setParams] = useState<IParams>(defaultParams);
   const [panelCollapsed, setPanelCollapsed] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
 
@@ -36,7 +28,7 @@ function App() {
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
-  const handleParamsChange = useCallback((newParams: TypographyParams) => {
+  const handleParamsChange = useCallback((newParams: IParams) => {
     setParams(newParams);
   }, []);
 
@@ -80,25 +72,20 @@ function App() {
               backgroundColor: '#0f3460',
               color: '#eaeaea',
               cursor: 'pointer',
-              fontSize: '13px'
+              fontSize: '13px',
+              transition: 'background 0.2s'
             }}
           >
-            {panelCollapsed ? '展开面板' : '收起面板'}
+            {panelCollapsed ? '展开参数' : '收起参数'}
           </button>
         </div>
 
-        <div style={{
-          flex: 1,
-          display: 'flex',
-          flexDirection: 'column',
-          overflow: 'hidden',
-          position: 'relative'
-        }}>
+        {!panelCollapsed && (
           <div style={{
-            display: panelCollapsed ? 'none' : 'block',
-            height: '40vh',
+            height: '45vh',
             overflow: 'hidden',
-            borderBottom: '1px solid #0f3460'
+            borderBottom: '1px solid #0f3460',
+            flexShrink: 0
           }}>
             <ParameterPanel
               params={params}
@@ -107,20 +94,28 @@ function App() {
               onToggleCollapse={togglePanel}
             />
           </div>
-
-          <div style={{ flex: 1, overflow: 'hidden' }}>
-            <PreviewArea params={params} text={textSample} />
-          </div>
-        </div>
+        )}
 
         <div style={{
-          height: '40vh',
-          borderTop: '1px solid #0f3460',
-          flexShrink: 0,
-          display: 'flex'
+          flex: 1,
+          display: 'flex',
+          flexDirection: 'column',
+          overflow: 'hidden',
+          minHeight: 0
         }}>
-          <div style={{ flex: 1 }}>
-            <CodeOutput params={params} />
+          <div style={{ flex: 1, overflow: 'hidden', minHeight: 0 }}>
+            <PreviewArea params={params} text={textSample} />
+          </div>
+
+          <div style={{
+            height: '40vh',
+            borderTop: '1px solid #0f3460',
+            flexShrink: 0,
+            display: 'flex'
+          }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <CodeOutput params={params} />
+            </div>
           </div>
         </div>
       </div>

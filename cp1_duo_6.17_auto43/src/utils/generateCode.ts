@@ -1,11 +1,6 @@
-export interface TypographyParams {
-  fontFamily: string;
-  fontSize: number;
-  lineHeight: number;
-  letterSpacing: number;
-  textAlign: 'left' | 'center' | 'right' | 'justify';
-  containerWidth: number;
-}
+import { IParams as TypographyParams } from '../types';
+
+export type { TypographyParams };
 
 export function generateCSS(params: TypographyParams): string {
   const { fontFamily, fontSize, lineHeight, letterSpacing, textAlign, containerWidth } = params;

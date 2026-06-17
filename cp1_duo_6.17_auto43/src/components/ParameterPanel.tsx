@@ -1,20 +1,13 @@
-import React, { useCallback } from 'react';
-import { TypographyParams } from '../utils/generateCode';
+import React, { useCallback, useMemo } from 'react';
+import { IParams } from '../types';
+import { useGoogleFonts } from '../hooks/useGoogleFonts';
 
 interface ParameterPanelProps {
-  params: TypographyParams;
-  onParamsChange: (params: TypographyParams) => void;
+  params: IParams;
+  onParamsChange: (params: IParams) => void;
   collapsed: boolean;
   onToggleCollapse: () => void;
 }
-
-const fontOptions = [
-  { name: 'Roboto', value: 'Roboto' },
-  { name: 'Noto Sans SC', value: 'Noto Sans SC' },
-  { name: 'Playfair Display', value: 'Playfair Display' },
-  { name: 'Source Code Pro', value: 'Source Code Pro' },
-  { name: '系统默认', value: 'system-ui' }
-];
 
 const alignOptions = [
   { name: '左对齐', value: 'left' as const },
@@ -23,19 +16,141 @@ const alignOptions = [
   { name: '两端', value: 'justify' as const }
 ];
 
+function hexToRgb(hex: string): { r: number; g: number; b: number } {
+  const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+  return result
+    ? {
+        r: parseInt(result[1], 16),
+        g: parseInt(result[2], 16),
+        b: parseInt(result[3], 16)
+      }
+    : { r: 0, g: 0, b: 0 };
+}
+
+function lerpColor(color1: string, color2: string, t: number): string {
+  const c1 = hexToRgb(color1);
+  const c2 = hexToRgb(color2);
+  const r = Math.round(c1.r + (c2.r - c1.r) * t);
+  const g = Math.round(c1.g + (c2.g - c1.g) * t);
+  const b = Math.round(c1.b + (c2.b - c1.b) * t);
+  return `rgb(${r}, ${g}, ${b})`;
+}
+
 const ParameterPanel: React.FC<ParameterPanelProps> = ({
   params,
   onParamsChange,
   collapsed,
   onToggleCollapse
 }) => {
-  const updateParam = useCallback((key: keyof TypographyParams, value: string | number) => {
-    onParamsChange({ ...params, [key]: value });
+  const { fontOptions, loadingFont, loadFont, isFontLoaded } = useGoogleFonts();
+
+  const chineseFonts = useMemo(() => fontOptions.filter(f => f.category === 'chinese'), [fontOptions]);
+  const englishFonts = useMemo(() => fontOptions.filter(f => f.category === 'english'), [fontOptions]);
+
+  const updateParam = useCallback((key: keyof IParams, value: string | number) => {
+    const newParams = { ...params, [key]: value };
+    onParamsChange(newParams);
   }, [params, onParamsChange]);
 
-  const getSliderBackground = (value: number, min: number, max: number) => {
+  const handleFontChange = useCallback((fontFamily: string) => {
+    updateParam('fontFamily', fontFamily);
+    loadFont(fontFamily);
+  }, [updateParam, loadFont]);
+
+  const getSliderGradient = useCallback((type: 'fontSize' | 'lineHeight' | 'letterSpacing' | 'containerWidth') => {
+    let value = 0;
+    let min = 0;
+    let max = 1;
+    let startColor = '#e94560';
+    let endColor = '#e94560';
+
+    switch (type) {
+      case 'fontSize':
+        value = params.fontSize;
+        min = 12;
+        max = 80;
+        startColor = '#4ea8de';
+        endColor = '#e94560';
+        break;
+      case 'lineHeight':
+        value = params.lineHeight;
+        min = 1.0;
+        max = 2.5;
+        startColor = '#5390d9';
+        endColor = '#80ed99';
+        break;
+      case 'letterSpacing':
+        value = params.letterSpacing;
+        min = -0.1;
+        max = 0.5;
+        startColor = '#ff6b6b';
+        endColor = '#4ecdc4';
+        break;
+      case 'containerWidth':
+        value = params.containerWidth;
+        min = 320;
+        max = 1280;
+        startColor = '#7209b7';
+        endColor = '#f72585';
+        break;
+    }
+
     const percentage = ((value - min) / (max - min)) * 100;
-    return `linear-gradient(to right, #e94560 0%, #e94560 ${percentage}%, #0f3460 ${percentage}%, #0f3460 100%)`;
+    const trackColor = lerpColor(startColor, endColor, (value - min) / (max - min));
+
+    return {
+      background: `linear-gradient(to right, ${trackColor} 0%, ${trackColor} ${percentage}%, #0f3460 ${percentage}%, #0f3460 100%)`,
+      thumbColor: trackColor
+    };
+  }, [params.fontSize, params.lineHeight, params.letterSpacing, params.containerWidth]);
+
+  const fontSizeStyle = useMemo(() => getSliderGradient('fontSize'), [getSliderGradient]);
+  const lineHeightStyle = useMemo(() => getSliderGradient('lineHeight'), [getSliderGradient]);
+  const letterSpacingStyle = useMemo(() => getSliderGradient('letterSpacing'), [getSliderGradient]);
+  const containerWidthStyle = useMemo(() => getSliderGradient('containerWidth'), [getSliderGradient]);
+
+  const renderFontButton = (font: typeof fontOptions[0]) => {
+    const isSelected = params.fontFamily === font.value;
+    const isLoading = loadingFont === font.value;
+    const loaded = isFontLoaded(font.value);
+
+    return (
+      <button
+        key={font.value}
+        onClick={() => handleFontChange(font.value)}
+        style={{
+          position: 'relative' as const,
+          padding: '10px 12px',
+          borderRadius: '8px',
+          border: isSelected ? '2px solid #e94560' : '2px solid transparent',
+          backgroundColor: '#0f3460',
+          color: '#eaeaea',
+          cursor: 'pointer',
+          fontSize: '13px',
+          fontFamily: loaded ? `'${font.value}', sans-serif` : 'system-ui, sans-serif',
+          transition: 'all 0.3s ease',
+          boxShadow: isSelected ? '0 2px 8px rgba(233, 69, 96, 0.3)' : 'none',
+          opacity: isLoading ? 0.7 : 1,
+          overflow: 'hidden'
+        }}
+      >
+        {isLoading && (
+          <span
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              height: '100%',
+              width: '30%',
+              background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.15), transparent)',
+              animation: 'shimmer 1s infinite',
+              pointerEvents: 'none'
+            }}
+          />
+        )}
+        <span style={{ position: 'relative', zIndex: 1 }}>{font.name}</span>
+      </button>
+    );
   };
 
   return (
@@ -85,6 +200,21 @@ const ParameterPanel: React.FC<ParameterPanelProps> = ({
         padding: '20px',
         flex: 1
       }}>
+        <div style={{ marginBottom: '20px' }}>
+          <label style={{
+            display: 'block',
+            color: '#eaeaea',
+            fontSize: '14px',
+            marginBottom: '10px',
+            fontWeight: 500
+          }}>
+            中文字体
+          </label>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+            {chineseFonts.map(renderFontButton)}
+          </div>
+        </div>
+
         <div style={{ marginBottom: '24px' }}>
           <label style={{
             display: 'block',
@@ -93,33 +223,35 @@ const ParameterPanel: React.FC<ParameterPanelProps> = ({
             marginBottom: '10px',
             fontWeight: 500
           }}>
-            字体选择
+            英文字体
           </label>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-            {fontOptions.map((font) => (
-              <button
-                key={font.value}
-                onClick={() => updateParam('fontFamily', font.value)}
-                style={{
-                  padding: '10px 12px',
-                  borderRadius: '8px',
-                  border: params.fontFamily === font.value ? '2px solid #e94560' : '2px solid transparent',
-                  backgroundColor: '#0f3460',
-                  color: '#eaeaea',
-                  cursor: 'pointer',
-                  fontSize: '13px',
-                  fontFamily: font.value === 'system-ui' ? 'system-ui' : `'${font.value}', sans-serif`,
-                  transition: 'all 0.3s ease',
-                  boxShadow: params.fontFamily === font.value ? '0 2px 8px rgba(233, 69, 96, 0.3)' : 'none'
-                }}
-              >
-                {font.name}
-              </button>
-            ))}
+            {englishFonts.map(renderFontButton)}
           </div>
+          {loadingFont && (
+            <div style={{
+              marginTop: '8px',
+              fontSize: '12px',
+              color: '#8892b0',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px'
+            }}>
+              <span style={{
+                display: 'inline-block',
+                width: '12px',
+                height: '12px',
+                border: '2px solid #0f3460',
+                borderTopColor: '#e94560',
+                borderRadius: '50%',
+                animation: 'spin 0.8s linear infinite'
+              }} />
+              正在加载 {loadingFont}...
+            </div>
+          )}
         </div>
 
-        <div style={{ marginBottom: '24px' }}>
+        <div style={{ marginBottom: '20px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
             <label style={{ color: '#eaeaea', fontSize: '14px', fontWeight: 500 }}>字号</label>
             <span style={{ color: '#e94560', fontSize: '14px', fontWeight: 600 }}>{params.fontSize}px</span>
@@ -135,11 +267,12 @@ const ParameterPanel: React.FC<ParameterPanelProps> = ({
               width: '100%',
               height: '6px',
               borderRadius: '3px',
-              background: getSliderBackground(params.fontSize, 12, 80),
+              background: fontSizeStyle.background,
               appearance: 'none',
               outline: 'none',
               cursor: 'pointer'
             }}
+            className="slider-font-size"
           />
           <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '4px' }}>
             <span style={{ color: '#8892b0', fontSize: '11px' }}>12px</span>
@@ -147,10 +280,10 @@ const ParameterPanel: React.FC<ParameterPanelProps> = ({
           </div>
         </div>
 
-        <div style={{ marginBottom: '24px' }}>
+        <div style={{ marginBottom: '20px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
             <label style={{ color: '#eaeaea', fontSize: '14px', fontWeight: 500 }}>行高</label>
-            <span style={{ color: '#e94560', fontSize: '14px', fontWeight: 600 }}>{params.lineHeight.toFixed(1)}</span>
+            <span style={{ color: '#80ed99', fontSize: '14px', fontWeight: 600 }}>{params.lineHeight.toFixed(1)}</span>
           </div>
           <input
             type="range"
@@ -163,11 +296,12 @@ const ParameterPanel: React.FC<ParameterPanelProps> = ({
               width: '100%',
               height: '6px',
               borderRadius: '3px',
-              background: getSliderBackground(params.lineHeight, 1.0, 2.5),
+              background: lineHeightStyle.background,
               appearance: 'none',
               outline: 'none',
               cursor: 'pointer'
             }}
+            className="slider-line-height"
           />
           <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '4px' }}>
             <span style={{ color: '#8892b0', fontSize: '11px' }}>1.0</span>
@@ -175,10 +309,10 @@ const ParameterPanel: React.FC<ParameterPanelProps> = ({
           </div>
         </div>
 
-        <div style={{ marginBottom: '24px' }}>
+        <div style={{ marginBottom: '20px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
             <label style={{ color: '#eaeaea', fontSize: '14px', fontWeight: 500 }}>字间距</label>
-            <span style={{ color: '#e94560', fontSize: '14px', fontWeight: 600 }}>{params.letterSpacing.toFixed(2)}em</span>
+            <span style={{ color: '#4ecdc4', fontSize: '14px', fontWeight: 600 }}>{params.letterSpacing.toFixed(2)}em</span>
           </div>
           <input
             type="range"
@@ -191,11 +325,12 @@ const ParameterPanel: React.FC<ParameterPanelProps> = ({
               width: '100%',
               height: '6px',
               borderRadius: '3px',
-              background: getSliderBackground(params.letterSpacing, -0.1, 0.5),
+              background: letterSpacingStyle.background,
               appearance: 'none',
               outline: 'none',
               cursor: 'pointer'
             }}
+            className="slider-letter-spacing"
           />
           <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '4px' }}>
             <span style={{ color: '#8892b0', fontSize: '11px' }}>-0.1em</span>
@@ -203,7 +338,7 @@ const ParameterPanel: React.FC<ParameterPanelProps> = ({
           </div>
         </div>
 
-        <div style={{ marginBottom: '24px' }}>
+        <div style={{ marginBottom: '20px' }}>
           <label style={{
             display: 'block',
             color: '#eaeaea',
@@ -235,10 +370,10 @@ const ParameterPanel: React.FC<ParameterPanelProps> = ({
           </div>
         </div>
 
-        <div style={{ marginBottom: '24px' }}>
+        <div style={{ marginBottom: '20px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
             <label style={{ color: '#eaeaea', fontSize: '14px', fontWeight: 500 }}>容器宽度</label>
-            <span style={{ color: '#e94560', fontSize: '14px', fontWeight: 600 }}>{params.containerWidth}px</span>
+            <span style={{ color: '#f72585', fontSize: '14px', fontWeight: 600 }}>{params.containerWidth}px</span>
           </div>
           <input
             type="range"
@@ -251,11 +386,12 @@ const ParameterPanel: React.FC<ParameterPanelProps> = ({
               width: '100%',
               height: '6px',
               borderRadius: '3px',
-              background: getSliderBackground(params.containerWidth, 320, 1280),
+              background: containerWidthStyle.background,
               appearance: 'none',
               outline: 'none',
               cursor: 'pointer'
             }}
+            className="slider-container-width"
           />
           <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '4px' }}>
             <span style={{ color: '#8892b0', fontSize: '11px' }}>320px</span>
@@ -265,6 +401,13 @@ const ParameterPanel: React.FC<ParameterPanelProps> = ({
       </div>
 
       <style>{`
+        @keyframes shimmer {
+          0% { transform: translateX(-100%); }
+          100% { transform: translateX(400%); }
+        }
+        @keyframes spin {
+          to { transform: rotate(360deg); }
+        }
         input[type="range"]::-webkit-slider-thumb {
           -webkit-appearance: none;
           appearance: none;
@@ -288,17 +431,17 @@ const ParameterPanel: React.FC<ParameterPanelProps> = ({
           border: none;
           box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
         }
-        ::-webkit-scrollbar {
+        .parameter-panel ::-webkit-scrollbar {
           width: 6px;
         }
-        ::-webkit-scrollbar-track {
+        .parameter-panel ::-webkit-scrollbar-track {
           background: #16213e;
         }
-        ::-webkit-scrollbar-thumb {
+        .parameter-panel ::-webkit-scrollbar-thumb {
           background: #0f3460;
           border-radius: 3px;
         }
-        ::-webkit-scrollbar-thumb:hover {
+        .parameter-panel ::-webkit-scrollbar-thumb:hover {
           background: #e94560;
         }
       `}</style>

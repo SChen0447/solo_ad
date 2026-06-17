@@ -2,10 +2,10 @@ import React, { useState, useMemo, useCallback } from 'react';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { generateCSS } from '../utils/generateCode';
-import { TypographyParams } from '../utils/generateCode';
+import { IParams } from '../types';
 
 interface CodeOutputProps {
-  params: TypographyParams;
+  params: IParams;
 }
 
 const CodeOutput: React.FC<CodeOutputProps> = ({ params }) => {
@@ -14,15 +14,29 @@ const CodeOutput: React.FC<CodeOutputProps> = ({ params }) => {
 
   const cssCode = useMemo(() => generateCSS(params), [params]);
 
+  const tailwindCode = useMemo(() => {
+    const alignMap: Record<string, string> = {
+      'left': 'text-left',
+      'center': 'text-center',
+      'right': 'text-right',
+      'justify': 'text-justify'
+    };
+
+    return `<div className="font-sans text-[${params.fontSize}px] leading-[${params.lineHeight}] tracking-[${params.letterSpacing}em] ${alignMap[params.textAlign]} w-[${params.containerWidth}px]">
+  {/* 内容 */}
+</div>`;
+  }, [params]);
+
   const handleCopy = useCallback(async () => {
     try {
-      await navigator.clipboard.writeText(cssCode);
+      const textToCopy = codeType === 'css' ? cssCode : tailwindCode;
+      await navigator.clipboard.writeText(textToCopy);
       setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      setTimeout(() => setCopied(false), 200);
     } catch (err) {
       console.error('Copy failed:', err);
     }
-  }, [cssCode]);
+  }, [codeType, cssCode, tailwindCode]);
 
   const customStyle = {
     ...oneDark,
@@ -40,6 +54,8 @@ const CodeOutput: React.FC<CodeOutputProps> = ({ params }) => {
       fontFamily: "'Source Code Pro', monospace"
     }
   };
+
+  const buttonBgColor = copied ? '#4CAF50' : '#e94560';
 
   return (
     <div style={{
@@ -106,9 +122,7 @@ const CodeOutput: React.FC<CodeOutputProps> = ({ params }) => {
           </SyntaxHighlighter>
         ) : (
           <SyntaxHighlighter language="jsx" style={customStyle} customStyle={{ background: '#0f3460' }}>
-            {`<div className="font-sans text-[${params.fontSize}px] leading-[${params.lineHeight}] tracking-[${params.letterSpacing}em] text-${params.textAlign} w-[${params.containerWidth}px]">
-  {/* 内容 */}
-</div>`}
+            {tailwindCode}
           </SyntaxHighlighter>
         )}
       </div>
@@ -121,13 +135,16 @@ const CodeOutput: React.FC<CodeOutputProps> = ({ params }) => {
             padding: '10px 16px',
             borderRadius: '8px',
             border: 'none',
-            backgroundColor: copied ? '#22c55e' : '#e94560',
+            backgroundColor: buttonBgColor,
             color: '#fff',
             cursor: 'pointer',
             fontSize: '14px',
             fontWeight: 600,
             transition: 'background 0.2s ease',
-            boxShadow: '0 2px 8px rgba(233, 69, 96, 0.3)'
+            boxShadow: copied
+              ? '0 2px 8px rgba(76, 175, 80, 0.4)'
+              : '0 2px 8px rgba(233, 69, 96, 0.3)',
+            transform: copied ? 'scale(0.98)' : 'scale(1)'
           }}
         >
           {copied ? '✓ 已复制' : '一键复制'}

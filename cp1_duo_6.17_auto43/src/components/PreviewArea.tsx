@@ -1,8 +1,8 @@
-import React, { useRef, useEffect, useState, useMemo } from 'react';
-import { TypographyParams } from '../utils/generateCode';
+import React, { useRef, useEffect, useState, useMemo, useCallback } from 'react';
+import { IParams } from '../types';
 
 interface PreviewAreaProps {
-  params: TypographyParams;
+  params: IParams;
   text: string;
 }
 
@@ -11,14 +11,15 @@ const PreviewArea: React.FC<PreviewAreaProps> = React.memo(({ params, text }) =>
   const [lineStats, setLineStats] = useState({ lines: 0, avgCharsPerLine: 0 });
 
   const textStyle = useMemo(() => ({
-    fontFamily: params.fontFamily === 'system-ui' ? 'system-ui, -apple-system, sans-serif' : `'${params.fontFamily}', sans-serif`,
+    fontFamily: `'${params.fontFamily}', system-ui, -apple-system, sans-serif`,
     fontSize: `${params.fontSize}px`,
     lineHeight: params.lineHeight,
     letterSpacing: `${params.letterSpacing}em`,
     textAlign: params.textAlign,
     color: '#eaeaea',
     transition: 'all 0.3s ease',
-    wordBreak: 'break-word' as const
+    wordBreak: 'break-word' as const,
+    whiteSpace: 'pre-wrap' as const
   }), [params]);
 
   const containerStyle = useMemo(() => ({
@@ -28,53 +29,59 @@ const PreviewArea: React.FC<PreviewAreaProps> = React.memo(({ params, text }) =>
     transition: 'width 0.3s ease'
   }), [params.containerWidth]);
 
-  useEffect(() => {
-    if (!textRef.current) return;
+  const computeLineStats = useCallback(() => {
+    const element = textRef.current;
+    if (!element) return;
 
-    const computeStats = () => {
-      const element = textRef.current;
-      if (!element) return;
+    const textContent = element.textContent || '';
+    if (textContent.length === 0) {
+      setLineStats({ lines: 0, avgCharsPerLine: 0 });
+      return;
+    }
 
+    try {
       const range = document.createRange();
-      const lines: number[] = [];
-      let currentLineTop: number | null = null;
-      let lineCount = 0;
+      let lineCount = 1;
+      let lastTop: number | null = null;
 
-      const textContent = element.textContent || '';
-      if (textContent.length === 0) {
-        setLineStats({ lines: 0, avgCharsPerLine: 0 });
-        return;
-      }
+      const allText = textContent.replace(/\n/g, ' ');
+      const chars = Array.from(allText);
 
-      for (let i = 0; i < textContent.length; i++) {
+      for (let i = 0; i < chars.length; i++) {
         try {
-          range.setStart(element.firstChild as Node, i);
-          const rect = range.getBoundingClientRect();
-          
-          if (currentLineTop === null || rect.top > currentLineTop + 1) {
-            currentLineTop = rect.top;
-            lineCount++;
-            lines.push(i);
+          if (element.firstChild) {
+            range.setStart(element.firstChild, Math.min(i, element.firstChild.textContent?.length || 0));
+            const rect = range.getBoundingClientRect();
+
+            if (lastTop !== null && rect.top > lastTop + 1) {
+              lineCount++;
+            }
+            lastTop = rect.top;
           }
         } catch (e) {
           break;
         }
       }
 
-      if (lineCount === 0) {
-        lineCount = 1;
-      }
-
-      const totalChars = textContent.replace(/\s/g, '').length;
-      const avgCharsPerLine = Math.round(totalChars / lineCount);
+      const totalChars = chars.filter(c => c !== ' ' && c !== '\n').length;
+      const avgCharsPerLine = lineCount > 0 ? Math.round(totalChars / lineCount) : 0;
 
       setLineStats({ lines: lineCount, avgCharsPerLine });
-    };
+    } catch (err) {
+      const lineHeightPx = params.fontSize * params.lineHeight;
+      const approximateLines = Math.ceil(element.scrollHeight / lineHeightPx);
+      const totalChars = textContent.replace(/\s/g, '').length;
+      const avgCharsPerLine = approximateLines > 0 ? Math.round(totalChars / approximateLines) : 0;
+      
+      setLineStats({ lines: approximateLines, avgCharsPerLine });
+    }
+  }, [params.fontSize, params.lineHeight]);
 
-    const timer = setTimeout(computeStats, 50);
+  useEffect(() => {
+    const timer = setTimeout(computeLineStats, 50);
 
     const resizeObserver = new ResizeObserver(() => {
-      computeStats();
+      computeLineStats();
     });
 
     if (textRef.current) {
@@ -85,7 +92,7 @@ const PreviewArea: React.FC<PreviewAreaProps> = React.memo(({ params, text }) =>
       clearTimeout(timer);
       resizeObserver.disconnect();
     };
-  }, [params, text]);
+  }, [computeLineStats, params, text]);
 
   return (
     <div style={{
@@ -95,7 +102,7 @@ const PreviewArea: React.FC<PreviewAreaProps> = React.memo(({ params, text }) =>
       backgroundColor: '#1a1a2e',
       overflow: 'hidden',
       position: 'relative'
-    }}>
+    }} className="preview-area">
       <div style={{
         position: 'absolute',
         top: '16px',
@@ -110,7 +117,8 @@ const PreviewArea: React.FC<PreviewAreaProps> = React.memo(({ params, text }) =>
           backgroundColor: 'rgba(22, 33, 62, 0.9)',
           padding: '6px 12px',
           borderRadius: '6px',
-          backdropFilter: 'blur(4px)'
+          backdropFilter: 'blur(4px)',
+          boxShadow: '0 2px 8px rgba(0, 0, 0, 0.2)'
         }}>
           <span style={{ color: '#e94560', fontWeight: 600 }}>{lineStats.lines}</span> 行
         </div>
@@ -118,7 +126,8 @@ const PreviewArea: React.FC<PreviewAreaProps> = React.memo(({ params, text }) =>
           backgroundColor: 'rgba(22, 33, 62, 0.9)',
           padding: '6px 12px',
           borderRadius: '6px',
-          backdropFilter: 'blur(4px)'
+          backdropFilter: 'blur(4px)',
+          boxShadow: '0 2px 8px rgba(0, 0, 0, 0.2)'
         }}>
           <span style={{ color: '#e94560', fontWeight: 600 }}>{lineStats.avgCharsPerLine}</span> 字/行
         </div>
@@ -142,17 +151,17 @@ const PreviewArea: React.FC<PreviewAreaProps> = React.memo(({ params, text }) =>
       </div>
 
       <style>{`
-        ::-webkit-scrollbar {
+        .preview-area ::-webkit-scrollbar {
           width: 8px;
         }
-        ::-webkit-scrollbar-track {
+        .preview-area ::-webkit-scrollbar-track {
           background: #1a1a2e;
         }
-        ::-webkit-scrollbar-thumb {
+        .preview-area ::-webkit-scrollbar-thumb {
           background: #16213e;
           border-radius: 4px;
         }
-        ::-webkit-scrollbar-thumb:hover {
+        .preview-area ::-webkit-scrollbar-thumb:hover {
           background: #e94560;
         }
       `}</style>
