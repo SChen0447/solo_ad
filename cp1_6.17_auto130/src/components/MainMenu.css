@@ -1,0 +1,94 @@
+.main-menu {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.menu-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 40px;
+  padding: 60px 80px;
+}
+
+.game-title {
+  text-align: center;
+}
+
+.game-title h1 {
+  font-size: 64px;
+  font-weight: 700;
+  background: linear-gradient(135deg, #C7A951 0%, #FFD700 50%, #C7A951 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  letter-spacing: 8px;
+  text-shadow: 0 0 40px rgba(199, 169, 81, 0.5);
+}
+
+.subtitle {
+  font-size: 20px;
+  color: #E0E0E0;
+  margin-top: 8px;
+  letter-spacing: 4px;
+  opacity: 0.8;
+}
+
+.totem-decoration {
+  display: flex;
+  gap: 24px;
+}
+
+.deco-totem {
+  width: 60px;
+  height: 60px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 32px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+  animation: float 3s ease-in-out infinite;
+}
+
+.deco-totem.fire {
+  background: linear-gradient(135deg, #FF4500, #FF6347);
+  animation-delay: 0s;
+}
+
+.deco-totem.water {
+  background: linear-gradient(135deg, #1E90FF, #00BFFF);
+  animation-delay: 0.5s;
+}
+
+.deco-totem.earth {
+  background: linear-gradient(135deg, #8B4513, #D2691E);
+  animation-delay: 1s;
+}
+
+.deco-totem.wind {
+  background: linear-gradient(135deg, #32CD32, #00FA9A);
+  animation-delay: 1.5s;
+}
+
+.menu-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: 280px;
+}
+
+.menu-btn {
+  padding: 16px 32px;
+  font-size: 18px;
+  width: 100%;
+}
+
+.menu-info {
+  text-align: center;
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 14px;
+}

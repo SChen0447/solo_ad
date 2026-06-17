@@ -1,0 +1,260 @@
+.totem-panel {
+  width: 280px;
+  flex-shrink: 0;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.panel-header h3 {
+  font-size: 18px;
+  color: #C7A951;
+}
+
+.totem-count {
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.totem-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+  justify-items: center;
+}
+
+.totem-slot-wrapper {
+  width: 100px;
+  height: 115px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.totem-slot-wrapper.drag-over {
+  transform: scale(1.1);
+}
+
+.totem-slot-wrapper.dragging {
+  opacity: 0.5;
+}
+
+.totem-card {
+  width: 70px;
+  height: 80px;
+  position: relative;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  clip-path: polygon(
+    50% 0%,
+    100% 25%,
+    100% 75%,
+    50% 100%,
+    0% 75%,
+    0% 25%
+  );
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.totem-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+}
+
+.totem-slot-wrapper.selected .totem-card {
+  box-shadow: 0 0 20px rgba(199, 169, 81, 0.8), 0 8px 24px rgba(0, 0, 0, 0.3);
+  transform: translateY(-4px) scale(1.05);
+}
+
+.totem-card-inner {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+.totem-symbol {
+  font-size: 28px;
+  z-index: 2;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3));
+}
+
+.totem-level {
+  position: absolute;
+  top: 4px;
+  right: 6px;
+  font-size: 10px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.9);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+  z-index: 2;
+}
+
+.exp-bar {
+  position: absolute;
+  bottom: 6px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 50px;
+  height: 4px;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 2px;
+  overflow: hidden;
+  z-index: 2;
+}
+
+.exp-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #C7A951, #FFD700);
+  border-radius: 2px;
+  transition: width 0.3s ease;
+}
+
+.rare-aura {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.aura-particle {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 4px;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.8);
+  border-radius: 50%;
+  animation: orbit 3s linear infinite;
+  animation-delay: calc(var(--i) * 0.5s);
+}
+
+@keyframes orbit {
+  0% {
+    transform: rotate(calc(var(--i) * 60deg)) translateX(35px) rotate(0deg);
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+  }
+  90% {
+    opacity: 1;
+  }
+  100% {
+    transform: rotate(calc(var(--i) * 60deg + 360deg)) translateX(35px) rotate(-360deg);
+    opacity: 0;
+  }
+}
+
+.level-particles {
+  position: absolute;
+  top: -8px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 2px;
+}
+
+.particle-dot {
+  width: 5px;
+  height: 5px;
+  background: #FFD700;
+  border-radius: 50%;
+  box-shadow: 0 0 6px rgba(255, 215, 0, 0.8);
+  animation: particleFloat 2s ease-in-out infinite;
+}
+
+.particle-dot:nth-child(2) {
+  animation-delay: 0.3s;
+}
+
+.particle-dot:nth-child(3) {
+  animation-delay: 0.6s;
+}
+
+@keyframes particleFloat {
+  0%, 100% {
+    transform: translateY(0);
+    opacity: 0.8;
+  }
+  50% {
+    transform: translateY(-4px);
+    opacity: 1;
+  }
+}
+
+.upgrade-flash {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.9), transparent);
+  animation: flash 0.5s ease-out;
+  pointer-events: none;
+  z-index: 3;
+}
+
+@keyframes flash {
+  0% {
+    opacity: 0;
+    transform: scale(0.5);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.2);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.5);
+  }
+}
+
+.empty-slot {
+  width: 70px;
+  height: 80px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px dashed rgba(255, 255, 255, 0.2);
+  clip-path: polygon(
+    50% 0%,
+    100% 25%,
+    100% 75%,
+    50% 100%,
+    0% 75%,
+    0% 25%
+  );
+  color: rgba(255, 255, 255, 0.3);
+  font-size: 24px;
+}
+
+.panel-info {
+  margin-top: auto;
+  text-align: center;
+}
+
+.panel-info p {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.selected-info {
+  margin-top: 4px;
+  color: #C7A951 !important;
+  font-weight: 600;
+}
