@@ -1,6 +1,7 @@
-import React, { useState, useRef, useEffect } from 'react'
+import React, { useState, useRef, useEffect, useMemo } from 'react'
 import type { Card } from '../api'
 import { updateCard } from '../api'
+import { renderMarkdown } from '../utils/markdown'
 
 interface RetroCardProps {
   card: Card
@@ -21,6 +22,10 @@ const RetroCard: React.FC<RetroCardProps> = ({ card, onUpdate, onDragStart }) =>
   const [isEditing, setIsEditing] = useState(false)
   const [editContent, setEditContent] = useState(card.content)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+
+  const renderedContent = useMemo(() => {
+    return renderMarkdown(card.content)
+  }, [card.content])
 
   useEffect(() => {
     if (isEditing && textareaRef.current) {
@@ -121,17 +126,16 @@ const RetroCard: React.FC<RetroCardProps> = ({ card, onUpdate, onDragStart }) =>
           }}
         />
       ) : (
-        <p
+        <div
           style={{
             margin: '0 0 12px 0',
             fontSize: '14px',
-            lineHeight: '1.5',
+            lineHeight: '1.6',
             color: '#1e293b',
             wordBreak: 'break-word'
           }}
-        >
-          {card.content}
-        </p>
+          dangerouslySetInnerHTML={{ __html: renderedContent }}
+        />
       )}
       <div
         style={{
