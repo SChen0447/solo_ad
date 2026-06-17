@@ -613,6 +613,73 @@ select:focus {
   font-size: 16px;
 }
 
+.favorite-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px;
+  transition: transform 0.15s ease;
+}
+
+.favorite-btn:active {
+  transform: scale(0.85);
+}
+
+.favorite-btn svg {
+  transition: all 0.2s ease;
+}
+
+.favorite-btn.favorited svg {
+  animation: heart-pop 0.3s ease;
+}
+
+@keyframes heart-pop {
+  0% {
+    transform: scale(1);
+  }
+  30% {
+    transform: scale(1.25);
+  }
+  60% {
+    transform: scale(0.95);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.card-favorite {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background-color: rgba(255, 255, 255, 0.9);
+  border-radius: 50%;
+  width: 36px;
+  height: 36px;
+  backdrop-filter: blur(4px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.card-favorite svg {
+  width: 22px;
+  height: 22px;
+}
+
+.card-favorite:hover {
+  background-color: rgba(255, 255, 255, 1);
+}
+
+.detail-favorite {
+  padding: 6px;
+}
+
+.detail-favorite:hover {
+  transform: scale(1.05);
+}
+
 @media (max-width: 768px) {
   .recipe-detail-header {
     flex-direction: column;

@@ -85,7 +85,18 @@ export default function RecipeDetail({ recipe, onBack, onToggleFavorite }: Recip
             }}
           />
           <div className="recipe-detail-info">
-            <h1 className="recipe-detail-name">{recipe.name}</h1>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <h1 className="recipe-detail-name" style={{ marginBottom: 0 }}>{recipe.name}</h1>
+              <button
+                className={`favorite-btn detail-favorite ${recipe.isFavorite ? 'favorited' : ''}`}
+                onClick={() => onToggleFavorite(recipe.id)}
+                aria-label={recipe.isFavorite ? '取消收藏' : '收藏'}
+              >
+                <svg viewBox="0 0 24 24" width="32" height="32" fill={recipe.isFavorite ? '#c0392b' : 'none'} stroke={recipe.isFavorite ? '#c0392b' : '#95a5a6'} strokeWidth="2">
+                  <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+                </svg>
+              </button>
+            </div>
             <div className="recipe-detail-meta">
               <span className="recipe-card-time">⏱ 烹饪时间：{recipe.cookTime}分钟</span>
               <span className={`difficulty-badge difficulty-${recipe.difficulty}`}>

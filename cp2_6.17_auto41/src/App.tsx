@@ -8,6 +8,7 @@ import {
   getFridge,
   addFridgeItem as apiAddFridgeItem,
   deleteFridgeItem as apiDeleteFridgeItem,
+  toggleFavorite as apiToggleFavorite,
 } from './utils/api';
 import RecipeCard from './components/RecipeCard';
 import RecipeDetail from './components/RecipeDetail';
@@ -92,6 +93,22 @@ function App() {
     }
   };
 
+  const handleToggleFavorite = async (id: string) => {
+    syncing();
+    try {
+      const updatedRecipe = await apiToggleFavorite(id);
+      setRecipes((prev) =>
+        prev.map((r) => (r.id === id ? updatedRecipe : r))
+      );
+      if (selectedRecipe && selectedRecipe.id === id) {
+        setSelectedRecipe(updatedRecipe);
+      }
+      synced();
+    } catch {
+      error();
+    }
+  };
+
   const handleAddIngredientRow = () => {
     setNewIngredients((prev) => [...prev, { name: '', amount: '' }]);
   };
@@ -160,7 +177,13 @@ function App() {
 
   const renderPage = () => {
     if (page === 'detail' && selectedRecipe) {
-      return <RecipeDetail recipe={selectedRecipe} onBack={handleGoHome} />;
+      return (
+        <RecipeDetail
+          recipe={selectedRecipe}
+          onBack={handleGoHome}
+          onToggleFavorite={handleToggleFavorite}
+        />
+      );
     }
 
     if (page === 'fridge') {
@@ -321,6 +344,7 @@ function App() {
                 key={recipe.id}
                 recipe={recipe}
                 onClick={() => handleRecipeClick(recipe)}
+                onToggleFavorite={handleToggleFavorite}
               />
             ))}
           </div>
