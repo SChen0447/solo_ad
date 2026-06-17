@@ -39,7 +39,7 @@ function CalendarView({ notes, onEmotionFilter }: CalendarViewProps) {
       }
       map.get(key)!.push(note)
     })
-    map.forEach(arr => arr.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
+    map.forEach(arr => arr.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()))
     return map
   }, [notes])
 
@@ -54,10 +54,10 @@ function CalendarView({ notes, onEmotionFilter }: CalendarViewProps) {
   const getCountColor = (count: number) => {
     const ratio = count / maxNotesCount
     if (count === 0) return null
-    if (ratio <= 0.25) return { bg: '#A8E6CF, fg: '#27ae60'
-    if (ratio <= 0.5) return { bg: '#FFEAA7', fg: '#f39c12'
-    if (ratio <= 0.75) return { bg: '#fab1a0', fg: '#e17055'
-    return { bg: '#FF6B6B', fg: '#c0392b'
+    if (ratio <= 0.25) return { bg: '#A8E6CF', fg: '#27ae60' }
+    if (ratio <= 0.5) return { bg: '#FFEAA7', fg: '#f39c12' }
+    if (ratio <= 0.75) return { bg: '#fab1a0', fg: '#e17055' }
+    return { bg: '#FF6B6B', fg: '#c0392b' }
   }
 
   const goToPrevMonth = () => {

@@ -87,8 +87,7 @@ function NoteCard({ note, onEmotionClick, highlighted = false }: NoteCardProps) 
   return (
     <div
       className={`note-card ${highlighted ? 'highlighted' : ''} ${isExpanded ? 'expanded' : ''}`}
-      style={{ borderTopColor: emotionBgColors[note.emotion]
-    }}
+      style={{ borderTopColor: emotionBgColors[note.emotion] }}
     >
       <div className="card-header">
         <div className="card-meta">
@@ -138,7 +137,7 @@ function NoteCard({ note, onEmotionClick, highlighted = false }: NoteCardProps) 
           </div>
         )}
 
-        <p className={`card-content ${isExpanded ? '' : 'collapsed'}>
+        <p className={`card-content ${isExpanded ? '' : 'collapsed'}`}>
           {note.content}
         </p>
 

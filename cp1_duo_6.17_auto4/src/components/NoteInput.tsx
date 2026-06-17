@@ -164,7 +164,7 @@ function NoteInput({ onNoteCreated }: NoteInputProps) {
     const dataArray = new Uint8Array(bufferLength)
 
     const draw = () => {
-      if (!analyserRef.current || !isRecording) return
+      if (!analyserRef.current || !isRecording || isPaused) return
       animationFrameRef.current = requestAnimationFrame(draw)
       analyserRef.current.getByteFrequencyData(dataArray)
       const step = Math.floor(bufferLength / 40)
@@ -175,7 +175,12 @@ function NoteInput({ onNoteCreated }: NoteInputProps) {
       }
       setWaveformData(newWaveform)
     }
-    draw()
+
+    if (isPaused) {
+      setWaveformData(new Array(40).fill(8))
+    } else {
+      draw()
+    }
   }
 
   const pauseRecording = () => {
@@ -193,6 +198,7 @@ function NoteInput({ onNoteCreated }: NoteInputProps) {
       recordingTimerRef.current = window.setInterval(() => {
         setRecordingTime(prev => prev + 1)
       }, 1000)
+      animateWaveform()
     }
   }
 
@@ -210,7 +216,8 @@ function NoteInput({ onNoteCreated }: NoteInputProps) {
     if (!recordedBlob || saving) return
     setSaving(true)
     try {
-      const { url, duration } = await api.uploadVoice(recordedBlob, setUploadProgress)
+      const voiceFile = new File([recordedBlob], `voice_${Date.now()}.webm`, { type: 'audio/webm' })
+      const { url, duration } = await api.uploadVoice(voiceFile, setUploadProgress)
       const result = await api.createNote({
         content: `语音记录 (${formatTime(recordingTime)})`,
         type: 'voice',
