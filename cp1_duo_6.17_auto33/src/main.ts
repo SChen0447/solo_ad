@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
-import { CurveSurface, PanelMesh } from './CurveSurface';
+import { DragControls } from 'three/examples/jsm/controls/DragControls.js';
+import { CurveSurface } from './CurveSurface';
 import { LightController } from './LightController';
 import { PanelController } from './PanelController';
 import GUI from 'lil-gui';
@@ -9,18 +10,17 @@ let scene: THREE.Scene;
 let camera: THREE.PerspectiveCamera;
 let renderer: THREE.WebGLRenderer;
 let controls: OrbitControls;
+let dragControls: DragControls;
 let curveSurface: CurveSurface;
 let lightController: LightController;
 let panelController: PanelController;
-let raycaster: THREE.Raycaster;
 let mouse: THREE.Vector2;
-let isDraggingControlPoint: boolean = false;
-let draggedPointIndex: number | null = null;
 let gui: GUI;
 
 const clock = new THREE.Clock();
 let frameCount = 0;
 let lastFpsUpdate = 0;
+let isDraggingPoint = false;
 
 function init(): void {
     const container = document.getElementById('scene-container');
@@ -29,60 +29,62 @@ function init(): void {
     scene = new THREE.Scene();
 
     camera = new THREE.PerspectiveCamera(
-        50,
+        55,
         window.innerWidth / window.innerHeight,
         0.1,
-        1000
+        200
     );
-    camera.position.set(10, 8, 15);
+    camera.position.set(12, 8, 18);
 
     renderer = new THREE.WebGLRenderer({
         antialias: true,
-        alpha: true
+        alpha: true,
+        powerPreference: 'high-performance'
     });
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.2;
+    renderer.toneMappingExposure = 1.15;
     container.appendChild(renderer.domElement);
 
     controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
-    controls.dampingFactor = 0.05;
-    controls.minDistance = 5;
-    controls.maxDistance = 50;
-    controls.maxPolarAngle = Math.PI * 0.9;
+    controls.dampingFactor = 0.06;
+    controls.minDistance = 6;
+    controls.maxDistance = 60;
+    controls.maxPolarAngle = Math.PI * 0.88;
+    controls.target.set(0, 0, 0);
 
     raycaster = new THREE.Raycaster();
     mouse = new THREE.Vector2();
 
-    lightController = new LightController(scene, renderer);
-
     curveSurface = new CurveSurface(scene);
-    curveSurface.setEnvMap(lightController.getEnvMap());
+
+    lightController = new LightController(scene, renderer, curveSurface);
 
     panelController = new PanelController(curveSurface, lightController, camera);
 
-    const groundGeometry = new THREE.PlaneGeometry(100, 100);
+    const groundGeometry = new THREE.PlaneGeometry(120, 120);
     const groundMaterial = new THREE.MeshStandardMaterial({
         color: 0x1a1a2e,
-        roughness: 0.9,
-        metalness: 0.1
+        roughness: 0.95,
+        metalness: 0.05
     });
     const ground = new THREE.Mesh(groundGeometry, groundMaterial);
     ground.rotation.x = -Math.PI / 2;
-    ground.position.y = -4;
+    ground.position.y = -5;
     ground.receiveShadow = true;
     scene.add(ground);
 
-    const gridHelper = new THREE.GridHelper(20, 20, 0x4488ff, 0x222233);
-    gridHelper.position.y = -3.99;
-    gridHelper.material.opacity = 0.3;
+    const gridHelper = new THREE.GridHelper(30, 30, 0x4488ff, 0x2a2a44);
+    gridHelper.position.y = -4.99;
+    gridHelper.material.opacity = 0.25;
     gridHelper.material.transparent = true;
     scene.add(gridHelper);
 
+    setupDragControls();
     setupEventListeners();
     setupDebugGUI();
 
@@ -103,17 +105,68 @@ function init(): void {
     animate();
 }
 
+function setupDragControls(): void {
+    const controlPointMeshes = curveSurface.getControlPointMeshes();
+
+    dragControls = new DragControls(
+        controlPointMeshes,
+        camera,
+        renderer.domElement
+    );
+
+    dragControls.addEventListener('dragstart', (event: any) => {
+        controls.enabled = false;
+        isDraggingPoint = true;
+        panelController.setMinimapInteracting(true);
+        document.body.style.cursor = 'grabbing';
+
+        const mesh = event.object as THREE.Mesh;
+        const index = mesh.userData.index;
+        if (index !== undefined) {
+            panelController['selectedPointIndex'] = index;
+            panelController.updateControlPointDisplay();
+        }
+    });
+
+    dragControls.addEventListener('drag', (event: any) => {
+        const mesh = event.object as THREE.Mesh;
+        const index = mesh.userData.index;
+
+        if (index !== undefined) {
+            curveSurface.updateControlPoint(
+                index,
+                mesh.position.x,
+                mesh.position.y,
+                mesh.position.z
+            );
+            panelController.updateControlPointDisplay();
+        }
+    });
+
+    dragControls.addEventListener('dragend', () => {
+        controls.enabled = true;
+        isDraggingPoint = false;
+        panelController.setMinimapInteracting(false);
+        document.body.style.cursor = 'default';
+    });
+
+    dragControls.addEventListener('hoveron', () => {
+        if (!isDraggingPoint) {
+            document.body.style.cursor = 'grab';
+        }
+    });
+
+    dragControls.addEventListener('hoveroff', () => {
+        if (!isDraggingPoint) {
+            document.body.style.cursor = 'default';
+        }
+    });
+}
+
 function setupEventListeners(): void {
     window.addEventListener('resize', onWindowResize);
 
-    renderer.domElement.addEventListener('mousedown', onMouseDown);
-    renderer.domElement.addEventListener('mousemove', onMouseMove);
-    renderer.domElement.addEventListener('mouseup', onMouseUp);
     renderer.domElement.addEventListener('click', onClick);
-
-    renderer.domElement.addEventListener('touchstart', onTouchStart, { passive: false });
-    renderer.domElement.addEventListener('touchmove', onTouchMove, { passive: false });
-    renderer.domElement.addEventListener('touchend', onTouchEnd);
 
     document.addEventListener('keydown', onKeyDown);
 }
@@ -130,155 +183,15 @@ function updateMouse(event: MouseEvent | Touch): void {
     mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
 }
 
-function onMouseDown(event: MouseEvent): void {
-    updateMouse(event);
-    raycaster.setFromCamera(mouse, camera);
-
-    const controlPoints = curveSurface.getControlPointMeshes();
-    const intersects = raycaster.intersectObjects(controlPoints);
-
-    if (intersects.length > 0) {
-        isDraggingControlPoint = true;
-        draggedPointIndex = intersects[0].object.userData.index;
-        controls.enabled = false;
-        panelController.setMinimapInteracting(true);
-        document.body.style.cursor = 'grabbing';
-    }
-}
-
-function onMouseMove(event: MouseEvent): void {
-    updateMouse(event);
-
-    if (isDraggingControlPoint && draggedPointIndex !== null) {
-        raycaster.setFromCamera(mouse, camera);
-
-        const point = curveSurface.getControlPointMeshes()[draggedPointIndex];
-        if (point) {
-            const planeNormal = new THREE.Vector3(0, 1, 0);
-            const planePoint = point.position.clone();
-            const plane = new THREE.Plane().setFromNormalAndCoplanarPoint(
-                planeNormal,
-                planePoint
-            );
-
-            const intersectPoint = new THREE.Vector3();
-            raycaster.ray.intersectPlane(plane, intersectPoint);
-
-            if (intersectPoint) {
-                curveSurface.updateControlPoint(
-                    draggedPointIndex,
-                    intersectPoint.x,
-                    intersectPoint.y,
-                    intersectPoint.z
-                );
-                panelController.updateControlPointDisplay();
-            }
-        }
-    } else {
-        raycaster.setFromCamera(mouse, camera);
-        const controlPoints = curveSurface.getControlPointMeshes();
-        const intersects = raycaster.intersectObjects(controlPoints);
-
-        if (intersects.length > 0) {
-            document.body.style.cursor = 'grab';
-        } else {
-            const panels = curveSurface.getPanelMeshes();
-            const panelIntersects = raycaster.intersectObjects(panels);
-            if (panelIntersects.length > 0) {
-                document.body.style.cursor = 'pointer';
-            } else {
-                document.body.style.cursor = 'default';
-            }
-        }
-    }
-}
-
-function onMouseUp(): void {
-    if (isDraggingControlPoint) {
-        isDraggingControlPoint = false;
-        draggedPointIndex = null;
-        controls.enabled = true;
-        panelController.setMinimapInteracting(false);
-        document.body.style.cursor = 'default';
-    }
-}
-
 function onClick(event: MouseEvent): void {
-    if (isDraggingControlPoint) return;
+    if (isDraggingPoint) return;
 
     updateMouse(event);
-    raycaster.setFromCamera(mouse, camera);
 
-    const panels = curveSurface.getPanelMeshes();
-    const intersects = raycaster.intersectObjects(panels);
-
-    if (intersects.length > 0) {
-        const mesh = intersects[0].object as PanelMesh;
+    const panelIndex = curveSurface.getPanelAtScreenPosition(mouse, camera);
+    if (panelIndex !== null) {
         const multiSelect = event.ctrlKey || event.metaKey;
-        panelController.selectPanel(mesh.panelIndex, multiSelect);
-    }
-}
-
-function onTouchStart(event: TouchEvent): void {
-    if (event.touches.length === 1) {
-        event.preventDefault();
-        const touch = event.touches[0];
-        updateMouse(touch);
-        raycaster.setFromCamera(mouse, camera);
-
-        const controlPoints = curveSurface.getControlPointMeshes();
-        const intersects = raycaster.intersectObjects(controlPoints);
-
-        if (intersects.length > 0) {
-            isDraggingControlPoint = true;
-            draggedPointIndex = intersects[0].object.userData.index;
-            controls.enabled = false;
-            panelController.setMinimapInteracting(true);
-        }
-    }
-}
-
-function onTouchMove(event: TouchEvent): void {
-    if (event.touches.length === 1 && isDraggingControlPoint) {
-        event.preventDefault();
-        const touch = event.touches[0];
-        updateMouse(touch);
-
-        if (draggedPointIndex !== null) {
-            raycaster.setFromCamera(mouse, camera);
-
-            const point = curveSurface.getControlPointMeshes()[draggedPointIndex];
-            if (point) {
-                const planeNormal = new THREE.Vector3(0, 1, 0);
-                const planePoint = point.position.clone();
-                const plane = new THREE.Plane().setFromNormalAndCoplanarPoint(
-                    planeNormal,
-                    planePoint
-                );
-
-                const intersectPoint = new THREE.Vector3();
-                raycaster.ray.intersectPlane(plane, intersectPoint);
-
-                if (intersectPoint) {
-                    curveSurface.updateControlPoint(
-                        draggedPointIndex,
-                        intersectPoint.x,
-                        intersectPoint.y,
-                        intersectPoint.z
-                    );
-                    panelController.updateControlPointDisplay();
-                }
-            }
-        }
-    }
-}
-
-function onTouchEnd(): void {
-    if (isDraggingControlPoint) {
-        isDraggingControlPoint = false;
-        draggedPointIndex = null;
-        controls.enabled = true;
-        panelController.setMinimapInteracting(false);
+        panelController.selectPanel(panelIndex, multiSelect);
     }
 }
 
@@ -293,18 +206,34 @@ function onKeyDown(event: KeyboardEvent): void {
 }
 
 function setupDebugGUI(): void {
-    gui = new GUI({ title: '调试面板', width: 200 });
+    gui = new GUI({ title: '调试面板', width: 220 });
     gui.close();
 
     const surfaceFolder = gui.addFolder('曲面参数');
-    surfaceFolder.add({ U细分: 18 }, 'U细分', 5, 40, 1).name('U细分').listen();
-    surfaceFolder.add({ V细分: 22 }, 'V细分', 5, 40, 1).name('V细分').listen();
+    const panelCount = { '面板数量': curveSurface.getPanelCount() };
+    surfaceFolder.add(panelCount, '面板数量').listen().name('面板数量');
 
-    const debugFolder = gui.addFolder('调试');
-    debugFolder.add({ '显示网格': true }, '显示网格').onChange((value: boolean) => {
-        curveSurface.getPanelMeshes().forEach(mesh => {
-            mesh.material.wireframe = !value;
-        });
+    const lightFolder = gui.addFolder('光照参数');
+    const sunParams = {
+        '方位角': 45,
+        '高度角': 45
+    };
+    lightFolder.add(sunParams, '方位角', 0, 360, 1).onChange((value: number) => {
+        lightController.setSunAngle(value, lightController.getSunAltitude());
+    }).listen();
+    lightFolder.add(sunParams, '高度角', 0, 90, 1).onChange((value: number) => {
+        lightController.setSunAngle(lightController.getSunAzimuth(), value);
+    }).listen();
+
+    setInterval(() => {
+        sunParams['方位角'] = Math.round(lightController.getSunAzimuth());
+        sunParams['高度角'] = Math.round(lightController.getSunAltitude());
+    }, 200);
+
+    const envFolder = gui.addFolder('环境预设');
+    const envParams = { '环境': 'clearSky' };
+    envFolder.add(envParams, '环境', ['clearSky', 'sunset', 'cloudy']).onChange((value: string) => {
+        lightController.setEnvMap(value as any);
     });
 
     const perfFolder = gui.addFolder('性能');
@@ -321,12 +250,13 @@ function setupDebugGUI(): void {
 function animate(): void {
     requestAnimationFrame(animate);
 
-    const delta = clock.getDelta();
+    const elapsed = clock.getElapsedTime();
 
     controls.update();
     lightController.update();
+    curveSurface.updateTime(elapsed);
 
-    if (frameCount % 5 === 0) {
+    if (frameCount % 3 === 0) {
         panelController.updateMinimap();
     }
 

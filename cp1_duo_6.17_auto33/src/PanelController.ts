@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { CurveSurface, ControlPoint3D } from './CurveSurface';
+import { CurveSurface } from './CurveSurface';
 import { LightController, EnvMapType } from './LightController';
 
 export class PanelController {
@@ -49,7 +49,6 @@ export class PanelController {
             title.addEventListener('click', () => {
                 const sectionName = title.getAttribute('data-section');
                 const content = document.getElementById(`section-${sectionName}`);
-                const toggleIcon = title.querySelector('.toggle-icon');
 
                 title.classList.toggle('collapsed');
                 content?.classList.toggle('collapsed');
@@ -156,7 +155,6 @@ export class PanelController {
 
     private setupLightDial(): void {
         const dial = document.getElementById('sun-dial');
-        const sunIcon = document.getElementById('sun-icon');
         const markersContainer = document.getElementById('dial-markers');
 
         if (markersContainer) {
@@ -272,7 +270,6 @@ export class PanelController {
                     buttons.forEach(b => b.classList.remove('active'));
                     btn.classList.add('active');
                     this.lightController.setEnvMap(envType);
-                    this.curveSurface.setEnvMap(this.lightController.getEnvMap());
                 }
             });
         });
