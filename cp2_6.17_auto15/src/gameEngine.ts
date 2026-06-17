@@ -104,7 +104,9 @@ export class GameEngine {
       boostTimer: 0,
       boostMultiplier: 1,
       warningTimer: 0,
-      slideInertiaTimer: 0
+      slideInertiaTimer: 0,
+      driftTiltAtEnd: 0,
+      isColliding: false
     };
   }
 
@@ -294,8 +296,10 @@ export class GameEngine {
     } else if (input.down) {
       car.speed = Math.max(car.speed - car.deceleration * dt, 0);
     } else {
-      const friction = car.friction * (this.track?.frictionMultiplier || 1) * car.grip;
-      car.speed *= Math.pow(friction, dt * 60);
+      const gripFriction = car.friction * (this.track?.frictionMultiplier || 1);
+      const gripDecel = 1 - (1 - gripFriction) * car.grip;
+      const effectiveFriction = Math.min(gripDecel, 0.999);
+      car.speed *= Math.pow(effectiveFriction, dt * 60);
     }
 
     let steerInput = 0;
@@ -307,7 +311,8 @@ export class GameEngine {
     }
 
     const targetSteer = steerInput * car.maxSteerAngle;
-    car.currentSteerAngle += (targetSteer - car.currentSteerAngle) * Math.min(dt * 8, 1);
+    const steerRate = car.steeringSpeed / STEER_SPEED;
+    car.currentSteerAngle += (targetSteer - car.currentSteerAngle) * Math.min(dt * 8 * steerRate, 1);
 
     const speedFactor = Math.min(car.speed / 50, 1);
     car.angle += car.currentSteerAngle * speedFactor * (car.speed > 0 ? 1 : 0) * dt;
@@ -321,7 +326,9 @@ export class GameEngine {
 
     const targetTilt = car.isDrifting ? (steerInput * DRIFT_TILT) : 0;
     if (car.slideInertiaTimer > 0) {
-      car.tiltAngle += (targetTilt * 0.3 - car.tiltAngle) * Math.min(dt * 3, 1);
+      const inertiaProgress = car.slideInertiaTimer / 0.3;
+      const inertiaTilt = car.driftTiltAtEnd * inertiaProgress;
+      car.tiltAngle += (inertiaTilt - car.tiltAngle) * Math.min(dt * 10, 1);
     } else {
       car.tiltAngle += (targetTilt - car.tiltAngle) * Math.min(dt * 10, 1);
     }
@@ -361,6 +368,7 @@ export class GameEngine {
     } else {
       if (wasDrifting) {
         car.slideInertiaTimer = 0.3;
+        car.driftTiltAtEnd = car.tiltAngle;
       }
       car.driftTime = 0;
     }
@@ -416,12 +424,40 @@ export class GameEngine {
     const trackCenterY = this.canvasHeight / 2;
     const trackHalfWidth = this.track.width / 2;
 
-    if (car.y < trackCenterY - trackHalfWidth + 8 || car.y > trackCenterY + trackHalfWidth - 8) {
+    const cosA = Math.cos(car.angle);
+    const sinA = Math.sin(car.angle);
+    const hw = car.width / 2;
+    const hh = car.height / 2;
+
+    const corners = [
+      { x: car.x + cosA * (-hw) - sinA * (-hh), y: car.y + sinA * (-hw) + cosA * (-hh) },
+      { x: car.x + cosA * (hw) - sinA * (-hh), y: car.y + sinA * (hw) + cosA * (-hh) },
+      { x: car.x + cosA * (-hw) - sinA * (hh), y: car.y + sinA * (-hw) + cosA * (hh) },
+      { x: car.x + cosA * (hw) - sinA * (hh), y: car.y + sinA * (hw) + cosA * (hh) }
+    ];
+
+    const upperBound = trackCenterY - trackHalfWidth;
+    const lowerBound = trackCenterY + trackHalfWidth;
+
+    let colliding = false;
+    for (const corner of corners) {
+      if (corner.y < upperBound || corner.y > lowerBound) {
+        colliding = true;
+        break;
+      }
+    }
+
+    car.isColliding = colliding;
+
+    if (colliding) {
       if (car.warningTimer <= 0) {
         car.speed *= 0.7;
         car.warningTimer = 0.5;
       }
-      car.y = Math.max(trackCenterY - trackHalfWidth + 8, Math.min(trackCenterY + trackHalfWidth - 8, car.y));
+      const minY = upperBound + hh;
+      const maxY = lowerBound - hh;
+      if (car.y < minY) car.y = minY;
+      if (car.y > maxY) car.y = maxY;
     }
   }
 
@@ -463,10 +499,13 @@ export class GameEngine {
       ctx.fillRect(0, 0, this.canvasWidth, this.canvasHeight);
     }
 
-    if (this.car.warningTimer > 0 && Math.floor(this.car.warningTimer * 20) % 2 === 0) {
-      ctx.strokeStyle = '#ff0000';
-      ctx.lineWidth = 4;
-      ctx.strokeRect(2, 2, this.canvasWidth - 4, this.canvasHeight - 4);
+    if (this.car.warningTimer > 0) {
+      const flash = Math.floor(this.car.warningTimer * 10) % 2 === 0;
+      if (flash) {
+        ctx.strokeStyle = '#ff0000';
+        ctx.lineWidth = 6;
+        ctx.strokeRect(3, 3, this.canvasWidth - 6, this.canvasHeight - 6);
+      }
     }
   }
 
@@ -622,6 +661,10 @@ export class GameEngine {
   private renderCar(ctx: CanvasRenderingContext2D): void {
     const car = this.car;
     const p = PIXEL_SIZE;
+
+    if (car.warningTimer > 0 && Math.floor(car.warningTimer * 10) % 2 === 0 && car.isColliding) {
+      return;
+    }
 
     ctx.save();
     ctx.translate(car.x, car.y);

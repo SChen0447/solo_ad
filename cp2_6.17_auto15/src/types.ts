@@ -32,6 +32,8 @@ export interface Car {
   boostMultiplier: number;
   warningTimer: number;
   slideInertiaTimer: number;
+  driftTiltAtEnd: number;
+  isColliding: boolean;
 }
 
 export interface Particle {

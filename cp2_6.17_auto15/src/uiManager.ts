@@ -92,8 +92,14 @@ export class UIManager {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(profile));
   }
 
+  public transitionRandomSeed: number[] = [];
+
   switchState(newState: GameState): void {
     if (this.transitionTimer > 0) return;
+    this.transitionRandomSeed = [];
+    for (let i = 0; i < 60; i++) {
+      this.transitionRandomSeed.push(Math.random());
+    }
     this.nextState = newState;
     this.transitionDirection = 'in';
     this.transitionTimer = 0.3;
@@ -105,6 +111,12 @@ export class UIManager {
       this.nextState = null;
       this.fadeInTimer = 0.5;
       this.buildButtons();
+      if (this.gameState === 'garage') {
+        this.statAnimations = { topSpeed: 0, handling: 0 };
+      }
+      if (this.gameState === 'racing') {
+        this.fadeInTimer = 0.5;
+      }
       this.updateStatTargets();
     }
   }
@@ -215,14 +227,17 @@ export class UIManager {
       this.selectedCar = model;
       this.selectedCarColor = GameEngine.getCarColor(model);
       this.colorAdjustHue = 0;
+      this.statAnimations = { topSpeed: 0, handling: 0 };
       this.updateStatTargets();
     } else if (action.startsWith('selectTrack:')) {
       this.selectedTrack = action.split(':')[1] as TrackType;
     } else if (action.startsWith('selectSpoiler:')) {
       this.selectedSpoiler = action.split(':')[1] as SpoilerType;
+      this.statAnimations = { topSpeed: 0, handling: 0 };
       this.updateStatTargets();
     } else if (action.startsWith('selectTire:')) {
       this.selectedTire = action.split(':')[1] as TireType;
+      this.statAnimations = { topSpeed: 0, handling: 0 };
       this.updateStatTargets();
     } else if (action === 'colorLess') {
       this.colorAdjustHue = (this.colorAdjustHue - 15 + 360) % 360;
@@ -320,8 +335,9 @@ export class UIManager {
       }
     }
 
-    this.statAnimations.topSpeed += (this.statTargetValues.topSpeed - this.statAnimations.topSpeed) * Math.min(dt * 4, 1);
-    this.statAnimations.handling += (this.statTargetValues.handling - this.statAnimations.handling) * Math.min(dt * 4, 1);
+    const lerpRate = 1 - Math.pow(0.01, dt / 0.5);
+    this.statAnimations.topSpeed += (this.statTargetValues.topSpeed - this.statAnimations.topSpeed) * lerpRate;
+    this.statAnimations.handling += (this.statTargetValues.handling - this.statAnimations.handling) * lerpRate;
   }
 
   render(ctx: CanvasRenderingContext2D, engine: GameEngine): void {
@@ -369,12 +385,18 @@ export class UIManager {
       : this.transitionTimer / 0.3;
 
     const rows = 40;
-    const rowH = this.canvasHeight / rows;
-    for (let i = 0; i < rows; i++) {
-      const rand = Math.sin(i * 123.456) * 0.5 + 0.5;
-      if (rand < progress) {
-        ctx.fillStyle = '#1a1a2e';
-        ctx.fillRect(0, i * rowH, this.canvasWidth, rowH + 1);
+    const cols = 60;
+    const cellW = this.canvasWidth / cols;
+    const cellH = this.canvasHeight / rows;
+
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        const idx = (r * cols + c) % this.transitionRandomSeed.length;
+        const threshold = this.transitionRandomSeed[idx] || 0.5;
+        if (threshold < progress) {
+          ctx.fillStyle = '#1a1a2e';
+          ctx.fillRect(c * cellW, r * cellH, cellW + 1, cellH + 1);
+        }
       }
     }
   }
@@ -584,21 +606,26 @@ export class UIManager {
 
   private renderRacingHUD(ctx: CanvasRenderingContext2D, engine: GameEngine): void {
     const isSmall = this.canvasWidth < 768;
-    const hudAlpha = this.fadeInTimer > 0 ? 1 - (this.fadeInTimer / 0.5) : 1;
+    const hudAlpha = this.fadeInTimer > 0 ? Math.max(0, 1 - (this.fadeInTimer / 0.5)) : 1;
     ctx.globalAlpha = hudAlpha;
 
     if (isSmall) {
-      this.renderSpeedometer(ctx, this.canvasWidth / 2 - 110, 10, 0.5, engine);
-      this.renderLapCounter(ctx, this.canvasWidth / 2 + 10, 10, 0.5, engine);
+      this.renderSpeedometer(ctx, this.canvasWidth / 2 - 110, 8, 0.5, engine);
+      this.renderLapCounter(ctx, this.canvasWidth / 2 + 10, 8, 0.5, engine);
+
+      ctx.fillStyle = '#ffffff';
+      ctx.font = '10px monospace';
+      ctx.textAlign = 'left';
+      ctx.fillText(`${engine.lapTime.toFixed(2)}s`, this.canvasWidth / 2 - 100, 60);
     } else {
       this.renderSpeedometer(ctx, 20, this.canvasHeight - 160, 1, engine);
       this.renderLapCounter(ctx, this.canvasWidth - 180, 20, 1, engine);
-    }
 
-    ctx.fillStyle = '#ffffff';
-    ctx.font = `${isSmall ? 12 : 16}px monospace`;
-    ctx.textAlign = 'left';
-    ctx.fillText(`时间: ${engine.lapTime.toFixed(2)}s`, isSmall ? this.canvasWidth / 2 - 100 : 20, isSmall ? 80 : this.canvasHeight - 170);
+      ctx.fillStyle = '#ffffff';
+      ctx.font = '16px monospace';
+      ctx.textAlign = 'left';
+      ctx.fillText(`时间: ${engine.lapTime.toFixed(2)}s`, 20, this.canvasHeight - 170);
+    }
 
     if (engine.car.boostMultiplier > 1) {
       ctx.fillStyle = '#ffcc00';
@@ -688,12 +715,24 @@ export class UIManager {
   private renderMobileControls(ctx: CanvasRenderingContext2D): void {
     if (this.canvasWidth >= 768) return;
 
-    ctx.globalAlpha = 0.5;
-    ctx.fillStyle = '#ffffff';
-    ctx.font = '12px monospace';
+    const overlayH = 50;
+    const overlayY = this.canvasHeight - overlayH;
+
+    ctx.fillStyle = 'rgba(26, 26, 46, 0.75)';
+    ctx.fillRect(0, overlayY, this.canvasWidth, overlayH);
+
+    ctx.strokeStyle = '#4488ff';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(0, overlayY, this.canvasWidth, overlayH);
+
+    ctx.globalAlpha = 0.9;
+    ctx.fillStyle = '#4488ff';
+    ctx.font = 'bold 11px monospace';
     ctx.textAlign = 'center';
-    ctx.fillText('W/↑ 加速 | S/↓ 减速 | A/D/←/→ 转向 | Shift 漂移', this.canvasWidth / 2, this.canvasHeight - 20);
+    ctx.textBaseline = 'middle';
+    ctx.fillText('W/↑ 加速  S/↓ 减速  A/D/←/→ 转向  Shift 漂移', this.canvasWidth / 2, overlayY + overlayH / 2);
     ctx.globalAlpha = 1;
+    ctx.textBaseline = 'alphabetic';
   }
 
   private renderGarage(ctx: CanvasRenderingContext2D): void {
