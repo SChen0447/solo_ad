@@ -2,27 +2,17 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { PlantData } from './App';
 import {
-  saveNote,
   loadNote,
-  saveLike,
-  loadLike,
-  loadLikeCount,
-  incrementLikeCount,
-  decrementLikeCount,
-  generateShareId,
   saveHistory,
 } from './App';
 
 interface PlantCardProps {
   plant: PlantData;
-}
-
-function buildShareUrl(shareId: string, plantName: string): string {
-  const base =
-    typeof window !== 'undefined'
-      ? `${window.location.protocol}//${window.location.host}`
-      : '';
-  return `${base}/plant/${encodeURIComponent(plantName)}?ref=${shareId}`;
+  liked: boolean;
+  likeCount: number;
+  onLike: () => void;
+  onNote: (plantName: string, note: string) => void;
+  onShare: () => string;
 }
 
 function getImageUrl(prompt: string, name: string): string {
@@ -37,18 +27,13 @@ function getThumbUrl(name: string): string {
   )}&image_size=square`;
 }
 
-export default function PlantCard({ plant }: PlantCardProps) {
+export default function PlantCard({ plant, liked, likeCount, onLike, onNote, onShare }: PlantCardProps) {
   const navigate = useNavigate();
-  const [liked, setLiked] = useState(false);
-  const [likeCount, setLikeCount] = useState(0);
   const [heartAnimating, setHeartAnimating] = useState(false);
   const [note, setNote] = useState('');
   const [shareCopied, setShareCopied] = useState(false);
-  const [shareId] = useState(generateShareId());
 
   useEffect(() => {
-    setLiked(loadLike(plant.name));
-    setLikeCount(loadLikeCount(plant.name));
     setNote(loadNote(plant.name));
     saveHistory({
       name: plant.name,
@@ -57,15 +42,8 @@ export default function PlantCard({ plant }: PlantCardProps) {
     });
   }, [plant.name]);
 
-  const handleLike = () => {
-    const newLiked = !liked;
-    setLiked(newLiked);
-    saveLike(plant.name, newLiked);
-    if (newLiked) {
-      setLikeCount(incrementLikeCount(plant.name));
-    } else {
-      setLikeCount(decrementLikeCount(plant.name));
-    }
+  const handleLikeClick = () => {
+    onLike();
     setHeartAnimating(true);
     setTimeout(() => setHeartAnimating(false), 200);
   };
@@ -73,11 +51,11 @@ export default function PlantCard({ plant }: PlantCardProps) {
   const handleNoteChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const val = e.target.value;
     setNote(val);
-    saveNote(plant.name, val);
+    onNote(plant.name, val);
   };
 
-  const handleShare = async () => {
-    const url = buildShareUrl(shareId, plant.name);
+  const handleShareClick = async () => {
+    const url = onShare();
     try {
       if (navigator.clipboard && navigator.clipboard.writeText) {
         await navigator.clipboard.writeText(url);
@@ -264,10 +242,12 @@ export default function PlantCard({ plant }: PlantCardProps) {
               style={{
                 width: '120px',
                 padding: '8px',
-                background: '#dcfce7',
+                background: 'linear-gradient(180deg, #dcfce7 0%, #bbf7d0 100%)',
                 borderRadius: '8px',
                 textAlign: 'center',
-                transition: 'transform 0.2s',
+                border: '1px solid #86efac',
+                boxShadow: '0 2px 6px rgba(34,197,94,0.1)',
+                transition: 'transform 0.2s, box-shadow 0.2s',
               }}
             >
               <div style={{ fontSize: '32px', marginBottom: '6px' }}>{h.icon}</div>
@@ -288,9 +268,7 @@ export default function PlantCard({ plant }: PlantCardProps) {
       <div
         style={{
           marginBottom: '32px',
-          padding: '20px',
           background: '#fef9c3',
-          borderRadius: '12px',
           borderLeft: '4px solid #22c55e',
         }}
       >
@@ -386,7 +364,7 @@ export default function PlantCard({ plant }: PlantCardProps) {
         }}
       >
         <button
-          onClick={handleShare}
+          onClick={handleShareClick}
           style={{
             padding: '10px 18px',
             background: '#ffffff',
@@ -406,7 +384,7 @@ export default function PlantCard({ plant }: PlantCardProps) {
         </button>
 
         <button
-          onClick={handleLike}
+          onClick={handleLikeClick}
           style={{
             padding: '10px 20px',
             background: liked ? '#fef2f2' : '#ffffff',

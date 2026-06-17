@@ -219,6 +219,8 @@ function PlantPage({ name }: { name: string }) {
   const [plant, setPlant] = useState<PlantData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [liked, setLiked] = useState(false);
+  const [likeCount, setLikeCount] = useState(0);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -228,6 +230,8 @@ function PlantPage({ name }: { name: string }) {
         if (res.ok) {
           const data = await res.json();
           setPlant(data);
+          setLiked(loadLike(name));
+          setLikeCount(loadLikeCount(name));
         } else {
           const err = await res.json();
           setError(err.message || '未找到该植物');
@@ -240,6 +244,30 @@ function PlantPage({ name }: { name: string }) {
     }
     fetchPlant();
   }, [name]);
+
+  const handleLike = () => {
+    const newLiked = !liked;
+    setLiked(newLiked);
+    saveLike(name, newLiked);
+    if (newLiked) {
+      setLikeCount(incrementLikeCount(name));
+    } else {
+      setLikeCount(decrementLikeCount(name));
+    }
+  };
+
+  const handleNote = (plantName: string, note: string) => {
+    saveNote(plantName, note);
+  };
+
+  const handleShare = () => {
+    const shareId = generateShareId();
+    const base =
+      typeof window !== 'undefined'
+        ? `${window.location.protocol}//${window.location.host}`
+        : '';
+    return `${base}/plant/${encodeURIComponent(name)}?ref=${shareId}`;
+  };
 
   if (loading) {
     return (
@@ -304,7 +332,14 @@ function PlantPage({ name }: { name: string }) {
         padding: '24px 16px',
       }}
     >
-      <PlantCardComponent plant={plant} />
+      <PlantCardComponent
+        plant={plant}
+        liked={liked}
+        likeCount={likeCount}
+        onLike={handleLike}
+        onNote={handleNote}
+        onShare={handleShare}
+      />
     </div>
   );
 }
