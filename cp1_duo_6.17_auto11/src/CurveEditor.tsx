@@ -357,22 +357,25 @@ const styles: Record<string, React.CSSProperties> = {
     fontFamily: 'monospace',
     outline: 'none',
     flex: 1,
-    minWidth: 0
+    minWidth: 0,
+    height: '34px'
   },
   stepButtons: {
     display: 'flex',
     flexDirection: 'column',
-    gap: '2px'
+    gap: '2px',
+    height: '34px'
   },
   stepButton: {
-    width: '22px',
-    height: '18px',
+    width: '26px',
+    height: '16px',
     backgroundColor: '#2a2a4e',
     border: '1px solid #3a3a5e',
     borderRadius: '3px',
     color: '#a0a0c0',
-    fontSize: '11px',
-    fontWeight: 600,
+    fontSize: '12px',
+    fontWeight: 700,
+    fontFamily: 'monospace',
     cursor: 'pointer',
     display: 'flex',
     alignItems: 'center',

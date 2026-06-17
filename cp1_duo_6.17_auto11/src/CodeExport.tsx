@@ -14,12 +14,19 @@ const ANIMATION_PROPERTIES: Record<AnimationType, string> = {
   opacity: 'opacity'
 };
 
+const formatSpeed = (speed: number): string => {
+  if (Number.isInteger(speed)) {
+    return speed.toString();
+  }
+  return speed.toFixed(2).replace(/\.?0+$/, '');
+};
+
 const CodeExport: React.FC<CodeExportProps> = ({ curve, animationType, speed }) => {
   const [copied, setCopied] = useState(false);
 
   const property = ANIMATION_PROPERTIES[animationType];
   const bezierValue = `cubic-bezier(${curve.p1x.toFixed(3)}, ${curve.p1y.toFixed(3)}, ${curve.p2x.toFixed(3)}, ${curve.p2y.toFixed(3)})`;
-  const cssCode = `/* 预览速度: ${speed.toFixed(1)}x, 基础时长: 2s, 实际时长: ${(2 / speed).toFixed(2)}s */\ntransition: ${property} 2s ${bezierValue};`;
+  const cssCode = `/* 预览速度: ${formatSpeed(speed)} */\ntransition: ${property} 2s ${bezierValue};`;
 
   const handleCopy = async () => {
     try {
@@ -55,7 +62,7 @@ const CodeExport: React.FC<CodeExportProps> = ({ curve, animationType, speed }) 
             <code style={styles.code}>
               <div>
                 <span style={styles.comment}>
-                  {'/* 预览速度: '}{speed.toFixed(1)}x{', 基础时长: 2s, 实际时长: '}{(2 / speed).toFixed(2)}s{' */'}
+                  {'/* 预览速度: '}{formatSpeed(speed)}{' */'}
                 </span>
               </div>
               <span style={styles.property}>transition</span>

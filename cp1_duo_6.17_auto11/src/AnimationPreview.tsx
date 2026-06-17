@@ -38,6 +38,13 @@ const cubicBezier = (t: number, p1x: number, p1y: number, p2x: number, p2y: numb
   return sampleCurveY(x);
 };
 
+const formatSpeed = (speed: number): string => {
+  if (Number.isInteger(speed)) {
+    return speed.toString();
+  }
+  return speed.toFixed(2).replace(/\.?0+$/, '');
+};
+
 const AnimationPreview: React.FC<AnimationPreviewProps> = ({ curve, animationType, speed, onAnimationEnd, autoPlay, onSpeedChange }) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -171,12 +178,12 @@ const AnimationPreview: React.FC<AnimationPreviewProps> = ({ curve, animationTyp
             type="range"
             min="0.5"
             max="3"
-            step="0.1"
+            step="0.05"
             value={speed}
             onChange={(e) => onSpeedChange?.(parseFloat(e.target.value))}
             style={styles.speedSlider}
           />
-          <span style={styles.speedValue}>{speed.toFixed(1)}x</span>
+          <span style={styles.speedValue}>{formatSpeed(speed)}</span>
         </div>
       </div>
 
