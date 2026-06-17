@@ -2,20 +2,14 @@ import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { useAppContext } from '../App';
 import type { TimelineEvent, EventType } from '../types';
 import { forceSimulation, forceX, forceCollide } from 'd3-force';
-
-const EVENT_COLORS: Record<EventType, string> = {
-  main: '#F59E0B',
-  side: '#10B981',
-  memory: '#8B5CF6',
-  foreshadow: '#EC4899',
-};
-
-const EVENT_LABELS: Record<EventType, string> = {
-  main: '主线剧情',
-  side: '支线剧情',
-  memory: '回忆',
-  foreshadow: '伏笔',
-};
+import {
+  EVENT_TYPE_CONFIG,
+  TIMELINE_SCALES,
+  TIMELINE_ZOOM_MIN,
+  TIMELINE_ZOOM_MAX,
+  getScaleKeyByZoom,
+  getScaleLabelByZoom,
+} from '../timelineConfig';
 
 interface EventNode {
   id: string;
@@ -57,12 +51,14 @@ function EventNodeComponent({
   node,
   onClick,
   isSelected,
+  showLabel,
 }: {
   node: EventNode;
-  onClick: () => void;
+  onClick: (e: React.MouseEvent) => void;
   isSelected: boolean;
+  showLabel: boolean;
 }) {
-  const color = EVENT_COLORS[node.event.type];
+  const config = EVENT_TYPE_CONFIG[node.event.type];
 
   return (
     <g
@@ -77,37 +73,63 @@ function EventNodeComponent({
         height={node.height}
         rx={8}
         ry={8}
-        fill={color}
+        fill={config.color}
         opacity={isSelected ? 1 : 0.85}
         stroke={isSelected ? '#FBBF24' : 'transparent'}
         strokeWidth={isSelected ? 2 : 0}
         style={{
-          filter: isSelected ? `drop-shadow(0 0 8px ${color})` : 'drop-shadow(0 2px 4px rgba(0,0,0,0.3))',
+          filter: isSelected
+            ? `drop-shadow(0 0 8px ${config.color})`
+            : 'drop-shadow(0 2px 4px rgba(0,0,0,0.3))',
+          transition: 'all 0.2s ease',
         }}
       />
-      <text
-        x={node.width / 2}
-        y={node.height / 2 + 4}
-        textAnchor="middle"
-        fill="#fff"
-        fontSize="12"
-        fontWeight={500}
-        style={{ pointerEvents: 'none', userSelect: 'none' }}
-      >
-        {node.event.name.length > 8 ? node.event.name.slice(0, 8) + '...' : node.event.name}
-      </text>
+      {showLabel && (
+        <text
+          x={node.width / 2}
+          y={node.height / 2 + 4}
+          textAnchor="middle"
+          fill="#fff"
+          fontSize="12"
+          fontWeight={500}
+          style={{
+            pointerEvents: 'none',
+            userSelect: 'none',
+            transition: 'opacity 0.25s ease',
+          }}
+        >
+          {node.event.name.length > 8
+            ? node.event.name.slice(0, 8) + '...'
+            : node.event.name}
+        </text>
+      )}
+      {!showLabel && (
+        <text
+          x={node.width / 2}
+          y={node.height / 2 + 5}
+          textAnchor="middle"
+          fill="#fff"
+          fontSize="14"
+          fontWeight={700}
+          style={{ pointerEvents: 'none', userSelect: 'none' }}
+        >
+          ●
+        </text>
+      )}
     </g>
   );
 }
 
-function EditPanel({
+function PopupEditPanel({
   event,
   characters,
+  position,
   onClose,
   onSave,
 }: {
   event: TimelineEvent;
   characters: { id: string; name: string }[];
+  position: { x: number; y: number };
   onClose: () => void;
   onSave: (updated: Partial<TimelineEvent>) => void;
 }) {
@@ -115,6 +137,29 @@ function EditPanel({
   const [date, setDate] = useState(event.date);
   const [type, setType] = useState<EventType>(event.type);
   const [description, setDescription] = useState(event.description || '');
+  const panelRef = useRef<HTMLDivElement>(null);
+  const [placement, setPlacement] = useState<'bottom' | 'top'>('bottom');
+  const [align, setAlign] = useState<'left' | 'right'>('left');
+
+  useEffect(() => {
+    if (panelRef.current) {
+      const panelRect = panelRef.current.getBoundingClientRect();
+      const viewportWidth = window.innerWidth;
+      const viewportHeight = window.innerHeight;
+
+      if (position.y + 20 + panelRect.height > viewportHeight) {
+        setPlacement('top');
+      } else {
+        setPlacement('bottom');
+      }
+
+      if (position.x + panelRect.width > viewportWidth - 20) {
+        setAlign('right');
+      } else {
+        setAlign('left');
+      }
+    }
+  }, [position]);
 
   const handleSave = () => {
     onSave({ name, date, type, description });
@@ -125,58 +170,120 @@ function EditPanel({
     return characters.find(c => c.id === id)?.name || id;
   };
 
+  const panelStyle: React.CSSProperties = {
+    position: 'fixed',
+    backgroundColor: '#1E293B',
+    borderRadius: '12px',
+    boxShadow: '0 10px 40px rgba(0,0,0,0.5)',
+    border: '1px solid #334155',
+    padding: '20px',
+    width: '380px',
+    maxWidth: 'calc(100vw - 40px)',
+    maxHeight: 'calc(100vh - 120px)',
+    overflowY: 'auto',
+    zIndex: 1000,
+    animation: 'popupFadeIn 0.2s ease-out',
+    ...(placement === 'bottom'
+      ? { top: position.y + 16 }
+      : { bottom: window.innerHeight - position.y + 16 }),
+    ...(align === 'left'
+      ? { left: position.x }
+      : { right: window.innerWidth - position.x }),
+  };
+
+  const arrowStyle: React.CSSProperties = {
+    position: 'absolute',
+    width: 0,
+    height: 0,
+    borderLeft: '8px solid transparent',
+    borderRight: '8px solid transparent',
+    ...(placement === 'bottom'
+      ? {
+          top: -8,
+          borderBottom: '8px solid #334155',
+        }
+      : {
+          bottom: -8,
+          borderTop: '8px solid #334155',
+        }),
+    ...(align === 'left' ? { left: 20 } : { right: 20 }),
+  };
+
+  const arrowInnerStyle: React.CSSProperties = {
+    position: 'absolute',
+    width: 0,
+    height: 0,
+    borderLeft: '7px solid transparent',
+    borderRight: '7px solid transparent',
+    ...(placement === 'bottom'
+      ? {
+          top: -6,
+          borderBottom: '7px solid #1E293B',
+        }
+      : {
+          bottom: -6,
+          borderTop: '7px solid #1E293B',
+        }),
+    ...(align === 'left' ? { left: 21 } : { right: 21 }),
+  };
+
   return (
-    <div
-      style={{
-        position: 'absolute',
-        top: '50%',
-        left: '50%',
-        transform: 'translate(-50%, -50%)',
-        backgroundColor: '#1E293B',
-        borderRadius: '12px',
-        boxShadow: '0 20px 60px rgba(0,0,0,0.5)',
-        border: '1px solid #334155',
-        padding: '24px',
-        width: '420px',
-        maxWidth: '90vw',
-        zIndex: 1000,
-        animation: 'fadeIn 0.25s ease-out',
-      }}
-    >
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-        <h3 style={{ color: '#F59E0B', fontSize: '18px', fontWeight: 600 }}>编辑事件</h3>
+    <div ref={panelRef} style={panelStyle}>
+      <div style={arrowStyle} />
+      <div style={arrowInnerStyle} />
+
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          marginBottom: '16px',
+        }}
+      >
+        <h3 style={{ color: '#F59E0B', fontSize: '16px', fontWeight: 600, margin: 0 }}>
+          编辑事件
+        </h3>
         <button
           onClick={onClose}
           style={{
             background: 'none',
             border: 'none',
             color: '#64748B',
-            fontSize: '20px',
+            fontSize: '18px',
             cursor: 'pointer',
-            padding: '4px',
+            padding: '2px',
           }}
         >
           ✕
         </button>
       </div>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
         <div>
-          <label style={{ display: 'block', color: '#94A3B8', fontSize: '13px', marginBottom: '6px' }}>事件名称</label>
+          <label
+            style={{
+              display: 'block',
+              color: '#94A3B8',
+              fontSize: '12px',
+              marginBottom: '5px',
+            }}
+          >
+            事件名称
+          </label>
           <input
             type="text"
             value={name}
             onChange={e => setName(e.target.value)}
             style={{
               width: '100%',
-              padding: '10px 12px',
+              padding: '8px 10px',
               backgroundColor: '#0F172A',
               border: '1px solid #334155',
               borderRadius: '6px',
               color: '#E2E8F0',
-              fontSize: '14px',
+              fontSize: '13px',
               outline: 'none',
-              transition: 'border-color 0.2s',
+              boxSizing: 'border-box',
             }}
             onFocus={e => (e.target.style.borderColor = '#F59E0B')}
             onBlur={e => (e.target.style.borderColor = '#334155')}
@@ -184,60 +291,89 @@ function EditPanel({
         </div>
 
         <div>
-          <label style={{ display: 'block', color: '#94A3B8', fontSize: '13px', marginBottom: '6px' }}>发生时间</label>
+          <label
+            style={{
+              display: 'block',
+              color: '#94A3B8',
+              fontSize: '12px',
+              marginBottom: '5px',
+            }}
+          >
+            发生时间
+          </label>
           <input
             type="text"
             value={date}
             onChange={e => setDate(e.target.value)}
             style={{
               width: '100%',
-              padding: '10px 12px',
+              padding: '8px 10px',
               backgroundColor: '#0F172A',
               border: '1px solid #334155',
               borderRadius: '6px',
               color: '#E2E8F0',
-              fontSize: '14px',
+              fontSize: '13px',
               outline: 'none',
+              boxSizing: 'border-box',
             }}
           />
         </div>
 
         <div>
-          <label style={{ display: 'block', color: '#94A3B8', fontSize: '13px', marginBottom: '6px' }}>事件类型</label>
-          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-            {Object.entries(EVENT_LABELS).map(([key, label]) => (
+          <label
+            style={{
+              display: 'block',
+              color: '#94A3B8',
+              fontSize: '12px',
+              marginBottom: '5px',
+            }}
+          >
+            事件类型
+          </label>
+          <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+            {Object.entries(EVENT_TYPE_CONFIG).map(([key, config]) => (
               <button
                 key={key}
                 onClick={() => setType(key as EventType)}
                 style={{
-                  padding: '6px 12px',
+                  padding: '5px 10px',
                   borderRadius: '6px',
                   border: '1px solid',
-                  borderColor: type === key ? EVENT_COLORS[key as EventType] : '#334155',
-                  backgroundColor: type === key ? `${EVENT_COLORS[key as EventType]}20` : 'transparent',
-                  color: type === key ? EVENT_COLORS[key as EventType] : '#94A3B8',
-                  fontSize: '12px',
+                  borderColor: type === key ? config.color : '#334155',
+                  backgroundColor:
+                    type === key ? config.lightColor : 'transparent',
+                  color: type === key ? config.color : '#94A3B8',
+                  fontSize: '11px',
                   cursor: 'pointer',
                   transition: 'all 0.2s',
                 }}
               >
-                {label}
+                {config.label}
               </button>
             ))}
           </div>
         </div>
 
         <div>
-          <label style={{ display: 'block', color: '#94A3B8', fontSize: '13px', marginBottom: '6px' }}>涉及角色</label>
-          <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+          <label
+            style={{
+              display: 'block',
+              color: '#94A3B8',
+              fontSize: '12px',
+              marginBottom: '5px',
+            }}
+          >
+            涉及角色
+          </label>
+          <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap' }}>
             {event.characterIds.map(charId => (
               <span
                 key={charId}
                 style={{
-                  padding: '4px 10px',
+                  padding: '3px 9px',
                   backgroundColor: '#334155',
-                  borderRadius: '12px',
-                  fontSize: '12px',
+                  borderRadius: '10px',
+                  fontSize: '11px',
                   color: '#CBD5E1',
                 }}
               >
@@ -248,37 +384,54 @@ function EditPanel({
         </div>
 
         <div>
-          <label style={{ display: 'block', color: '#94A3B8', fontSize: '13px', marginBottom: '6px' }}>事件描述</label>
+          <label
+            style={{
+              display: 'block',
+              color: '#94A3B8',
+              fontSize: '12px',
+              marginBottom: '5px',
+            }}
+          >
+            事件描述
+          </label>
           <textarea
             value={description}
             onChange={e => setDescription(e.target.value)}
-            rows={4}
+            rows={3}
             style={{
               width: '100%',
-              padding: '10px 12px',
+              padding: '8px 10px',
               backgroundColor: '#0F172A',
               border: '1px solid #334155',
               borderRadius: '6px',
               color: '#E2E8F0',
-              fontSize: '14px',
+              fontSize: '13px',
               outline: 'none',
               resize: 'vertical',
               fontFamily: 'inherit',
+              boxSizing: 'border-box',
             }}
           />
         </div>
       </div>
 
-      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '24px' }}>
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'flex-end',
+          gap: '10px',
+          marginTop: '18px',
+        }}
+      >
         <button
           onClick={onClose}
           style={{
-            padding: '10px 20px',
+            padding: '8px 16px',
             backgroundColor: '#334155',
             border: 'none',
             borderRadius: '6px',
             color: '#CBD5E1',
-            fontSize: '14px',
+            fontSize: '13px',
             cursor: 'pointer',
             transition: 'background-color 0.2s',
           }}
@@ -288,12 +441,12 @@ function EditPanel({
         <button
           onClick={handleSave}
           style={{
-            padding: '10px 20px',
+            padding: '8px 16px',
             backgroundColor: '#F59E0B',
             border: 'none',
             borderRadius: '6px',
             color: '#1E293B',
-            fontSize: '14px',
+            fontSize: '13px',
             fontWeight: 600,
             cursor: 'pointer',
             transition: 'background-color 0.2s',
@@ -306,6 +459,142 @@ function EditPanel({
   );
 }
 
+function ZoomSlider({
+  zoom,
+  onChange,
+}: {
+  zoom: number;
+  onChange: (zoom: number) => void;
+}) {
+  const scaleKey = getScaleKeyByZoom(zoom);
+  const scaleLabel = getScaleLabelByZoom(zoom);
+
+  const handleScaleClick = (key: string) => {
+    const scale = TIMELINE_SCALES.find(s => s.key === key);
+    if (scale) {
+      const midZoom = (scale.zoomRange[0] + scale.zoomRange[1]) / 2;
+      onChange(midZoom);
+    }
+  };
+
+  const sliderMin = Math.log10(TIMELINE_ZOOM_MIN);
+  const sliderMax = Math.log10(TIMELINE_ZOOM_MAX);
+  const sliderValue =
+    ((Math.log10(zoom) - sliderMin) / (sliderMax - sliderMin)) * 100;
+
+  const handleSliderChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const percent = parseInt(e.target.value);
+    const logZoom =
+      sliderMin + (percent / 100) * (sliderMax - sliderMin);
+    onChange(Math.pow(10, logZoom));
+  };
+
+  return (
+    <div style={zoomSliderStyles.container}>
+      <div style={zoomSliderStyles.scaleTabs}>
+        {TIMELINE_SCALES.map(scale => (
+          <button
+            key={scale.key}
+            onClick={() => handleScaleClick(scale.key)}
+            style={{
+              ...zoomSliderStyles.scaleTab,
+              ...(scaleKey === scale.key
+                ? zoomSliderStyles.scaleTabActive
+                : {}),
+            }}
+          >
+            {scale.label}
+          </button>
+        ))}
+      </div>
+      <div style={zoomSliderStyles.sliderWrapper}>
+        <input
+          type="range"
+          min={0}
+          max={100}
+          value={sliderValue}
+          onChange={handleSliderChange}
+          style={zoomSliderStyles.slider}
+        />
+      </div>
+      <div style={zoomSliderStyles.zoomDisplay}>
+        <span style={zoomSliderStyles.zoomLabel}>当前尺度</span>
+        <span style={zoomSliderStyles.zoomValue}>{scaleLabel}级</span>
+        <span style={zoomSliderStyles.zoomPercent}>
+          {(zoom * 100).toFixed(0)}%
+        </span>
+      </div>
+    </div>
+  );
+}
+
+const zoomSliderStyles: Record<string, React.CSSProperties> = {
+  container: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '10px',
+    padding: '12px 24px',
+    backgroundColor: '#172033',
+    borderBottom: '1px solid #2D3A4F',
+  },
+  scaleTabs: {
+    display: 'flex',
+    gap: '4px',
+  },
+  scaleTab: {
+    flex: 1,
+    padding: '6px 0',
+    backgroundColor: 'transparent',
+    border: '1px solid #334155',
+    borderRadius: '6px',
+    color: '#64748B',
+    fontSize: '12px',
+    cursor: 'pointer',
+    transition: 'all 0.2s ease',
+  },
+  scaleTabActive: {
+    backgroundColor: 'rgba(245, 158, 11, 0.15)',
+    borderColor: '#F59E0B',
+    color: '#FBBF24',
+  },
+  sliderWrapper: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '12px',
+  },
+  slider: {
+    flex: 1,
+    height: '4px',
+    WebkitAppearance: 'none',
+    appearance: 'none',
+    background: '#334155',
+    borderRadius: '2px',
+    outline: 'none',
+    cursor: 'pointer',
+    accentColor: '#F59E0B',
+  },
+  zoomDisplay: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '8px',
+  },
+  zoomLabel: {
+    fontSize: '12px',
+    color: '#64748B',
+  },
+  zoomValue: {
+    fontSize: '13px',
+    fontWeight: 600,
+    color: '#F59E0B',
+  },
+  zoomPercent: {
+    fontSize: '11px',
+    color: '#64748B',
+    marginLeft: '4px',
+  },
+};
+
 function TimelineView() {
   const { events, characters, updateEvent } = useAppContext();
   const svgRef = useRef<SVGSVGElement>(null);
@@ -313,14 +602,20 @@ function TimelineView() {
   const [zoom, setZoom] = useState(1);
   const [panX, setPanX] = useState(0);
   const [selectedEvent, setSelectedEvent] = useState<TimelineEvent | null>(null);
+  const [popupPosition, setPopupPosition] = useState({ x: 0, y: 0 });
+  const [selectedNodePos, setSelectedNodePos] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, panX: 0 });
   const [dimensions, setDimensions] = useState({ width: 800, height: 600 });
 
+  const showLabels = zoom >= 0.8;
+
   const nodes = useMemo<EventNode[]>(() => {
     if (events.length === 0) return [];
 
-    const sorted = [...events].sort((a, b) => parseDateToOrder(a.date) - parseDateToOrder(b.date));
+    const sorted = [...events].sort(
+      (a, b) => parseDateToOrder(a.date) - parseDateToOrder(b.date),
+    );
     const minOrder = parseDateToOrder(sorted[0].date);
     const maxOrder = parseDateToOrder(sorted[sorted.length - 1].date);
     const range = Math.max(maxOrder - minOrder, 1);
@@ -336,14 +631,19 @@ function TimelineView() {
         x,
         y: dimensions.height / 2,
         event,
-        width: 100,
+        width: showLabels ? 100 : 32,
         height: 36,
       };
     });
 
     const simulation = forceSimulation(initialNodes as any)
-      .force('x', forceX(d => (d as any).x).strength(0.3))
-      .force('collision', forceCollide().radius(d => Math.max((d as any).width, (d as any).height) / 2 + 8))
+      .force('x', forceX((d: any) => d.x).strength(0.3))
+      .force(
+        'collision',
+        forceCollide().radius(
+          (d: any) => Math.max(d.width, d.height) / 2 + 8,
+        ),
+      )
       .stop();
 
     for (let i = 0; i < 50; i++) {
@@ -351,12 +651,14 @@ function TimelineView() {
     }
 
     return simulation.nodes() as unknown as EventNode[];
-  }, [events, dimensions, zoom]);
+  }, [events, dimensions, zoom, showLabels]);
 
   const handleWheel = useCallback((e: React.WheelEvent) => {
     e.preventDefault();
-    const delta = e.deltaY > 0 ? 0.9 : 1.1;
-    setZoom(prev => Math.max(0.3, Math.min(5, prev * delta)));
+    const delta = e.deltaY > 0 ? 0.92 : 1.08;
+    setZoom(prev =>
+      Math.max(TIMELINE_ZOOM_MIN, Math.min(TIMELINE_ZOOM_MAX, prev * delta)),
+    );
   }, []);
 
   const handleMouseDown = (e: React.MouseEvent) => {
@@ -397,6 +699,23 @@ function TimelineView() {
     }
   };
 
+  const handleNodeClick = (e: React.MouseEvent, event: TimelineEvent, nodeX: number, nodeY: number) => {
+    e.stopPropagation();
+    const rect = svgRef.current?.getBoundingClientRect();
+    if (rect) {
+      setPopupPosition({
+        x: rect.left + nodeX + panX,
+        y: rect.top + nodeY,
+      });
+      setSelectedNodePos({ x: nodeX + panX, y: nodeY });
+    }
+    setSelectedEvent(event);
+  };
+
+  const handleOverlayClick = () => {
+    setSelectedEvent(null);
+  };
+
   const years = useMemo(() => {
     const yearSet = new Set<string>();
     events.forEach(e => {
@@ -406,6 +725,10 @@ function TimelineView() {
     return Array.from(yearSet);
   }, [events]);
 
+  const handleZoomChange = (newZoom: number) => {
+    setZoom(newZoom);
+  };
+
   return (
     <div style={styles.container} ref={containerRef}>
       <div style={styles.header}>
@@ -414,38 +737,46 @@ function TimelineView() {
           <span style={styles.subtitle}>{events.length} 个事件节点</span>
         </div>
         <div style={styles.controls}>
-          <div style={styles.zoomInfo}>缩放: {(zoom * 100).toFixed(0)}%</div>
           <button
-            onClick={() => setZoom(z => Math.min(5, z * 1.2))}
+            onClick={() =>
+              setZoom(z => Math.min(TIMELINE_ZOOM_MAX, z * 1.2))
+            }
             style={styles.zoomBtn}
           >
             +
           </button>
           <button
-            onClick={() => setZoom(z => Math.max(0.3, z * 0.8))}
+            onClick={() =>
+              setZoom(z => Math.max(TIMELINE_ZOOM_MIN, z * 0.8))
+            }
             style={styles.zoomBtn}
           >
             −
           </button>
           <button
-            onClick={() => { setZoom(1); setPanX(0); }}
+            onClick={() => {
+              setZoom(1);
+              setPanX(0);
+            }}
             style={styles.resetBtn}
           >
-            重置
+            重置视图
           </button>
         </div>
       </div>
 
+      <ZoomSlider zoom={zoom} onChange={handleZoomChange} />
+
       <div style={styles.legend}>
-        {Object.entries(EVENT_LABELS).map(([key, label]) => (
+        {Object.entries(EVENT_TYPE_CONFIG).map(([key, config]) => (
           <div key={key} style={styles.legendItem}>
             <div
               style={{
                 ...styles.legendDot,
-                backgroundColor: EVENT_COLORS[key as EventType],
+                backgroundColor: config.color,
               }}
             />
-            <span style={styles.legendText}>{label}</span>
+            <span style={styles.legendText}>{config.label}</span>
           </div>
         ))}
       </div>
@@ -475,7 +806,11 @@ function TimelineView() {
             />
 
             {years.map((year, i) => {
-              const x = 60 + (i / Math.max(years.length - 1, 1)) * (dimensions.width - 120) * zoom;
+              const x =
+                60 +
+                (i / Math.max(years.length - 1, 1)) *
+                  (dimensions.width - 120) *
+                  zoom;
               return (
                 <g key={year}>
                   <line
@@ -492,6 +827,7 @@ function TimelineView() {
                     textAnchor="middle"
                     fill="#64748B"
                     fontSize="12"
+                    style={{ userSelect: 'none' }}
                   >
                     {year}
                   </text>
@@ -503,8 +839,9 @@ function TimelineView() {
               <EventNodeComponent
                 key={node.id}
                 node={node}
-                onClick={() => setSelectedEvent(node.event)}
+                onClick={e => handleNodeClick(e, node.event, node.x, node.y)}
                 isSelected={selectedEvent?.id === node.id}
+                showLabel={showLabels}
               />
             ))}
           </g>
@@ -513,13 +850,11 @@ function TimelineView() {
 
       {selectedEvent && (
         <>
-          <div
-            style={styles.overlay}
-            onClick={() => setSelectedEvent(null)}
-          />
-          <EditPanel
+          <div style={styles.overlay} onClick={handleOverlayClick} />
+          <PopupEditPanel
             event={selectedEvent}
             characters={characters.map(c => ({ id: c.id, name: c.name }))}
+            position={popupPosition}
             onClose={() => setSelectedEvent(null)}
             onSave={handleSaveEvent}
           />
@@ -527,9 +862,38 @@ function TimelineView() {
       )}
 
       <style>{`
-        @keyframes fadeIn {
-          from { opacity: 0; transform: translate(-50%, -48%); }
-          to { opacity: 1; transform: translate(-50%, -50%); }
+        @keyframes popupFadeIn {
+          from { 
+            opacity: 0; 
+            transform: translateY(-4px);
+          }
+          to { 
+            opacity: 1; 
+            transform: translateY(0);
+          }
+        }
+        input[type="range"]::-webkit-slider-thumb {
+          -webkit-appearance: none;
+          appearance: none;
+          width: 14px;
+          height: 14px;
+          border-radius: 50%;
+          background: #F59E0B;
+          cursor: pointer;
+          box-shadow: 0 2px 6px rgba(245, 158, 11, 0.4);
+          transition: transform 0.15s ease;
+        }
+        input[type="range"]::-webkit-slider-thumb:hover {
+          transform: scale(1.2);
+        }
+        input[type="range"]::-moz-range-thumb {
+          width: 14px;
+          height: 14px;
+          border-radius: 50%;
+          background: #F59E0B;
+          cursor: pointer;
+          border: none;
+          box-shadow: 0 2px 6px rgba(245, 158, 11, 0.4);
         }
       `}</style>
     </div>
@@ -572,11 +936,6 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     alignItems: 'center',
     gap: '8px',
-  },
-  zoomInfo: {
-    fontSize: '13px',
-    color: '#94A3B8',
-    marginRight: '8px',
   },
   zoomBtn: {
     width: '32px',
@@ -636,7 +995,7 @@ const styles: Record<string, React.CSSProperties> = {
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
     zIndex: 999,
   },
 };
