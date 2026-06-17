@@ -185,6 +185,11 @@
     flex-direction: column;
   }
 
+  .main-content {
+    flex: none;
+    height: 60%;
+  }
+
   .code-input-section {
     width: 100%;
     max-height: 40vh;
@@ -194,5 +199,46 @@
 
   .mode-tabs {
     display: none;
+  }
+
+  .annotation-list {
+    width: 100% !important;
+    height: 40%;
+    border-left: none;
+    border-top: 1px solid #E0E0E0;
+  }
+
+  .annotation-list.collapsed {
+    width: 100% !important;
+    height: 48px;
+  }
+
+  .annotation-cards {
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+
+  .annotation-card {
+    flex: 1 1 250px;
+    min-width: 250px;
+  }
+}
+
+@media (max-width: 768px) {
+  .app-header {
+    padding: 0 16px;
+  }
+
+  .app-title {
+    font-size: 16px;
+  }
+
+  .preview-section {
+    padding: 10px;
+  }
+
+  .code-input-section {
+    padding: 12px;
+    gap: 10px;
   }
 }

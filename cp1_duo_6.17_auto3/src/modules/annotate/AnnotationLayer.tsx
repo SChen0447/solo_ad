@@ -71,6 +71,9 @@ const AnnotationLayer: React.FC<AnnotationLayerProps> = ({
     setSelection({ left, top, width, height });
   };
 
+  const [panelTransformOrigin, setPanelTransformOrigin] = useState('center bottom');
+  const [panelVisible, setPanelVisible] = useState(false);
+
   const handleMouseUp = (e: React.MouseEvent) => {
     if (!isSelecting) return;
     setIsSelecting(false);
@@ -79,12 +82,27 @@ const AnnotationLayer: React.FC<AnnotationLayerProps> = ({
       const panelLeft = selection.left + selection.width / 2;
       const panelTop = selection.top - 10;
 
+      const panelWidth = 320;
+      const selectionCenterX = selection.left + selection.width / 2;
+      const panelLeftEdge = selectionCenterX - panelWidth / 2;
+      const originX = selectionCenterX - panelLeftEdge;
+      const transformOrigin = `${originX}px bottom`;
+
       setPanelPos({ left: panelLeft, top: panelTop });
+      setPanelTransformOrigin(transformOrigin);
+      setPanelVisible(false);
       setShowPanel(true);
       setAnnotationText('');
       setAnnotationType('suggestion');
+
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          setPanelVisible(true);
+        });
+      });
     } else {
       setSelection(null);
+      setShowPanel(false);
     }
   };
 
@@ -112,8 +130,11 @@ const AnnotationLayer: React.FC<AnnotationLayerProps> = ({
   };
 
   const handleCancel = () => {
-    setShowPanel(false);
-    setSelection(null);
+    setPanelVisible(false);
+    setTimeout(() => {
+      setShowPanel(false);
+      setSelection(null);
+    }, 200);
   };
 
   const getAnnotationColor = (type: AnnotationType) => {
@@ -182,11 +203,12 @@ const AnnotationLayer: React.FC<AnnotationLayerProps> = ({
 
       {showPanel && selection && (
         <div
-          className="annotation-panel"
+          className={`annotation-panel ${panelVisible ? 'panel-visible' : 'panel-hidden'}`}
           style={{
             left: panelPos.left,
             top: panelPos.top,
-            transform: 'translate(-50%, -100%)'
+            transform: 'translate(-50%, -100%)',
+            transformOrigin: panelTransformOrigin
           }}
           onClick={(e) => e.stopPropagation()}
         >

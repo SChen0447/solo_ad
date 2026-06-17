@@ -77,35 +77,29 @@ def find_diff_regions(diff_mask, min_region_size=100):
 
 def create_striped_overlay(width, height, diff_mask):
     base_img = Image.new('RGB', (width, height), (255, 255, 255))
-    
-    stripe_img = Image.new('RGB', (width, height), (255, 255, 255))
-    stripe_pixels = stripe_img.load()
-    
+    base_array = np.array(base_img, dtype=np.uint8)
+
+    stripe_pattern = np.zeros((height, width, 3), dtype=np.uint8)
+    stripe_pattern[:, :, :] = [255, 0, 0]
+
+    stripe_mask = np.zeros((height, width), dtype=bool)
     for y in range(height):
         for x in range(width):
             if (x + y) % 10 < 5:
-                stripe_pixels[x, y] = (255, 0, 0)
-    
-    base_array = np.array(base_img)
-    stripe_array = np.array(stripe_img)
-    
-    diff_mask_3d = np.stack([diff_mask] * 3, axis=-1)
-    
-    result_array = np.where(diff_mask_3d, stripe_array, base_array)
-    
-    overlay = Image.fromarray(result_array.astype('uint8'))
-    
-    original = np.stack([np.ones_like(diff_mask) * 255] * 3, axis=-1)
-    final_array = original.astype('uint8').copy()
-    
+                stripe_mask[y, x] = True
+
+    alpha = 0.5
+    result = base_array.copy()
+
     for c in range(3):
-        final_array[:, :, c] = np.where(
-            diff_mask,
-            (original[:, :, c].astype(int) * 0.5 + result_array[:, :, c].astype(int) * 0.5).astype('uint8'),
-            original[:, :, c]
+        diff_stripe = diff_mask & stripe_mask
+        result[:, :, c] = np.where(
+            diff_stripe,
+            (base_array[:, :, c].astype(float) * (1 - alpha) + stripe_pattern[:, :, c].astype(float) * alpha).astype(np.uint8),
+            base_array[:, :, c]
         )
-    
-    return Image.fromarray(final_array)
+
+    return Image.fromarray(result)
 
 
 @app.route('/upload', methods=['POST'])

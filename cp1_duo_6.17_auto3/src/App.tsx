@@ -101,15 +101,18 @@ const App: React.FC = () => {
   };
 
   const handleAnnotationClick = (annotation: Annotation) => {
-    setHighlightAnnotationId(annotation.id);
-
+    setHighlightAnnotationId(null);
+    
     if (previewContainerRef.current) {
       const container = previewContainerRef.current;
       const sel = annotation.selection;
-      const containerRect = container.getBoundingClientRect();
       
-      const scrollLeft = sel.left + sel.width / 2 - containerRect.width / 2;
-      const scrollTop = sel.top + sel.height / 2 - containerRect.height / 2;
+      const scale = 1.5;
+      const containerWidth = container.clientWidth;
+      const containerHeight = container.clientHeight;
+      
+      const scrollLeft = sel.left + sel.width / 2 - containerWidth / 2;
+      const scrollTop = sel.top + sel.height / 2 - containerHeight / 2;
       
       container.scrollTo({
         left: Math.max(0, scrollLeft),
@@ -118,9 +121,13 @@ const App: React.FC = () => {
       });
     }
 
+    requestAnimationFrame(() => {
+      setHighlightAnnotationId(annotation.id);
+    });
+
     setTimeout(() => {
       setHighlightAnnotationId(null);
-    }, 3000);
+    }, 1500);
   };
 
   const handleDeleteAnnotation = (id: string) => {

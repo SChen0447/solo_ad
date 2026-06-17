@@ -29,7 +29,19 @@
 }
 
 .annotation-marker.highlight {
-  animation: blink 0.5s ease-in-out 6;
+  animation: highlight-blink 0.5s ease-in-out 3;
+  transform-origin: center center;
+}
+
+@keyframes highlight-blink {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.3;
+    transform: scale(1.1);
+  }
 }
 
 .annotation-marker-label {
@@ -50,8 +62,17 @@
   border-radius: 8px;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
   z-index: 200;
-  animation: scaleIn 0.3s ease-out;
-  transform-origin: center bottom;
+  transition: transform 0.3s ease-out, opacity 0.3s ease-out;
+}
+
+.annotation-panel.panel-hidden {
+  transform: translate(-50%, -100%) scale(0.8) !important;
+  opacity: 0;
+}
+
+.annotation-panel.panel-visible {
+  transform: translate(-50%, -100%) scale(1) !important;
+  opacity: 1;
 }
 
 .panel-header {
