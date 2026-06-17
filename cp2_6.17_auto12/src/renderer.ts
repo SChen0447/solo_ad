@@ -19,12 +19,21 @@ export class Renderer {
     this.playerEl = document.getElementById('player')!;
   }
 
-  setupButtonHandlers(onAttack: () => void, onRestart: () => void): void {
+  setupButtonHandlers(
+    onAttack: () => void,
+    onRestart: () => void,
+    onDefend?: () => void
+  ): void {
     const attackBtn = document.getElementById('attack-btn') as HTMLButtonElement;
     const restartBtn = document.getElementById('restart-btn') as HTMLButtonElement;
+    const defendBtn = document.getElementById('defend-btn') as HTMLButtonElement;
 
     attackBtn.addEventListener('click', () => onAttack());
     restartBtn.addEventListener('click', () => onRestart());
+
+    if (defendBtn && onDefend) {
+      defendBtn.addEventListener('click', () => onDefend());
+    }
   }
 
   setupBattleResultCloseHandler(onClose: () => void): void {
@@ -46,19 +55,47 @@ export class Renderer {
     overlay.classList.remove('active');
   }
 
-  showBattleResult(result: 'player_win' | 'player_lose', playerHp: number, playerMaxHp: number, score: number, onClose: () => void): void {
+  showBattleResult(
+    result: 'player_win' | 'player_lose',
+    playerHp: number,
+    playerMaxHp: number,
+    score: number,
+    onClose: () => void,
+    onContinue?: () => void
+  ): void {
     const overlay = document.getElementById('battle-result-overlay')!;
     const titleEl = document.getElementById('battle-result-title')!;
     const msgEl = document.getElementById('battle-result-msg')!;
+    const continueBtn = document.getElementById('battle-result-continue') as HTMLButtonElement;
 
     if (result === 'player_win') {
       titleEl.textContent = '🎉 战斗胜利！';
       titleEl.style.color = '#4caf50';
       msgEl.innerHTML = `恢复了 2 点生命值<br>当前 HP: ${playerHp}/${playerMaxHp}`;
+      continueBtn.style.display = 'inline-block';
+      continueBtn.textContent = '继续探索';
+      continueBtn.style.padding = '8px 24px';
+      continueBtn.style.fontSize = '14px';
+      continueBtn.style.background = '#4caf50';
+      continueBtn.style.color = '#fff';
+      continueBtn.style.border = 'none';
+      continueBtn.style.borderRadius = '8px';
+      continueBtn.style.cursor = 'pointer';
+      continueBtn.style.fontFamily = "'Courier New', monospace";
+
+      const continueHandler = () => {
+        overlay.classList.remove('active');
+        continueBtn.removeEventListener('click', continueHandler);
+        if (onContinue) {
+          onContinue();
+        }
+      };
+      continueBtn.addEventListener('click', continueHandler);
     } else {
       titleEl.textContent = '💀 战斗失败...';
       titleEl.style.color = '#e53935';
       msgEl.innerHTML = `最终得分: ${score}`;
+      continueBtn.style.display = 'none';
     }
 
     overlay.classList.add('active');
@@ -274,10 +311,13 @@ export class Renderer {
     const killedEl = document.getElementById('killed-num')!;
     const invEl = document.getElementById('inventory-display')!;
 
+    const hpColor = this.getHpColor(player.hp, player.maxHp);
+
     floorEl.textContent = String(floor);
     hpNumEl.textContent = `${player.hp}/${player.maxHp}`;
+    hpNumEl.style.color = hpColor;
     hpBarEl.style.width = `${(player.hp / player.maxHp) * 100}%`;
-    hpBarEl.style.background = this.getHpColor(player.hp, player.maxHp);
+    hpBarEl.style.background = hpColor;
     exploredEl.textContent = String(player.getExploredCount());
     killedEl.textContent = String(player.killedMonsters);
     invEl.textContent = player.getInventoryDisplay();

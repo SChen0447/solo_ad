@@ -1,7 +1,7 @@
 import { generateMaze, getCell, CellType, MazeData, MonsterData } from './maze';
 import { Player } from './player';
 import { Renderer } from './renderer';
-import { BattleState, createBattleState, playerAttack, renderBattleUI, BattleResult } from './battle';
+import { BattleState, createBattleState, playerAttack, playerDefend, renderBattleUI, BattleResult } from './battle';
 
 enum GameState {
   Exploring = 'exploring',
@@ -28,7 +28,8 @@ class Game {
   private init(): void {
     this.renderer.setupButtonHandlers(
       () => this.handleAttack(),
-      () => this.restartGame()
+      () => this.restartGame(),
+      () => this.handleDefend()
     );
 
     document.addEventListener('keydown', (e) => this.handleKeyDown(e));
@@ -171,6 +172,22 @@ class Game {
     }
   }
 
+  private handleDefend(): void {
+    if (!this.battleState || this.state !== GameState.Battle) return;
+    if (this.battleState.result !== null) return;
+
+    this.battleState = playerDefend(this.battleState);
+    renderBattleUI(this.battleState);
+
+    if (this.battleState.result !== null) {
+      const result = this.battleState.result;
+      setTimeout(() => {
+        this.renderer.hideBattleOverlay();
+        this.endBattle(result);
+      }, 600);
+    }
+  }
+
   private setState(newState: GameState): void {
     const oldState = this.state;
     this.state = newState;
@@ -198,20 +215,35 @@ class Game {
     const player = this.player;
     if (!player) return;
 
-    this.renderer.showBattleResult(result, player.hp, player.maxHp, player.getScore(), () => {
+    const handleContinue = () => {
+      if (this.currentMonster) {
+        this.renderer.removeMonster(this.currentMonster.x, this.currentMonster.y);
+      }
+      this.state = GameState.Exploring;
+      this.renderer.updateStatusBar(player, this.floor);
+      this.currentMonster = null;
+      this.battleState = null;
+    };
+
+    const handleClose = () => {
       if (result === 'player_win') {
-        if (this.currentMonster) {
-          this.renderer.removeMonster(this.currentMonster.x, this.currentMonster.y);
-        }
-        this.state = GameState.Exploring;
-        this.renderer.updateStatusBar(player, this.floor);
+        handleContinue();
       } else {
         this.state = GameState.GameOver;
         this.renderer.showGameOver(player.getScore(), player.getExploredCount(), player.killedMonsters);
+        this.currentMonster = null;
+        this.battleState = null;
       }
-      this.currentMonster = null;
-      this.battleState = null;
-    });
+    };
+
+    this.renderer.showBattleResult(
+      result,
+      player.hp,
+      player.maxHp,
+      player.getScore(),
+      handleClose,
+      result === 'player_win' ? handleContinue : undefined
+    );
   }
 
   private pickUpItem(item: { x: number; y: number; type: 'potion' | 'power' | 'key'; picked: boolean }): void {
