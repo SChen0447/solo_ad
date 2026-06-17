@@ -202,6 +202,9 @@ const CanvasBoard: React.FC<CanvasBoardProps> = ({
   const rafIdRef = useRef<number | null>(null);
   const lastCursorEmitRef = useRef<number>(0);
   const mouseRawRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
+  const remoteTargetRef = useRef<Record<string, { x: number; y: number }>>({});
+  const remoteRenderedRef = useRef<Record<string, { x: number; y: number }>>({});
+  const REMOTE_CURSOR_SMOOTHING = 0.08;
 
   const animationLoop = useCallback((timestamp: number) => {
     if (!lastFrameTimeRef.current) {
@@ -215,7 +218,6 @@ const CanvasBoard: React.FC<CanvasBoardProps> = ({
     const newY = renderedPosRef.current.y + (targetPosRef.current.y - renderedPosRef.current.y) * factor;
 
     renderedPosRef.current = { x: newX, y: newY };
-    setRenderTick((t) => t + 1);
 
     const dx = Math.abs(targetPosRef.current.x - renderedPosRef.current.x);
     const dy = Math.abs(targetPosRef.current.y - renderedPosRef.current.y);
@@ -224,12 +226,28 @@ const CanvasBoard: React.FC<CanvasBoardProps> = ({
       renderedPosRef.current = { ...targetPosRef.current };
     }
 
+    const remoteFactor = lerpFactor(dt, REMOTE_CURSOR_SMOOTHING);
+    Object.keys(remoteTargetRef.current).forEach((userId) => {
+      const target = remoteTargetRef.current[userId];
+      if (!target) return;
+      let rendered = remoteRenderedRef.current[userId];
+      if (!rendered) {
+        rendered = { ...target };
+      }
+      const rx = rendered.x + (target.x - rendered.x) * remoteFactor;
+      const ry = rendered.y + (target.y - rendered.y) * remoteFactor;
+      remoteRenderedRef.current[userId] = { x: rx, y: ry };
+    });
+
+    setRenderTick((t) => t + 1);
     rafIdRef.current = requestAnimationFrame(animationLoop);
   }, []);
 
-  const startSmoothLoop = useCallback((initialX: number, initialY: number) => {
-    targetPosRef.current = { x: initialX, y: initialY };
-    renderedPosRef.current = { x: initialX, y: initialY };
+  const startSmoothLoop = useCallback((initialX?: number, initialY?: number) => {
+    if (initialX !== undefined && initialY !== undefined) {
+      targetPosRef.current = { x: initialX, y: initialY };
+      renderedPosRef.current = { x: initialX, y: initialY };
+    }
     lastFrameTimeRef.current = 0;
 
     if (rafIdRef.current !== null) {
@@ -246,8 +264,30 @@ const CanvasBoard: React.FC<CanvasBoardProps> = ({
   }, []);
 
   useEffect(() => {
+    startSmoothLoop();
     return () => stopSmoothLoop();
-  }, [stopSmoothLoop]);
+  }, [startSmoothLoop, stopSmoothLoop]);
+
+  useEffect(() => {
+    Object.entries(remoteCursors).forEach(([userId, cursor]) => {
+      if (userId === currentUserId) return;
+      remoteTargetRef.current[userId] = { x: cursor.x, y: cursor.y };
+      if (!remoteRenderedRef.current[userId]) {
+        remoteRenderedRef.current[userId] = { x: cursor.x, y: cursor.y };
+      }
+    });
+
+    const targetIds = new Set(Object.keys(remoteTargetRef.current));
+    const currentIds = Object.keys(remoteCursors).filter((id) => id !== currentUserId);
+    currentIds.forEach((id) => targetIds.add(id));
+
+    targetIds.forEach((userId) => {
+      if (!remoteCursors[userId] || userId === currentUserId) {
+        delete remoteTargetRef.current[userId];
+        delete remoteRenderedRef.current[userId];
+      }
+    });
+  }, [remoteCursors, currentUserId]);
 
   const sortedSwimlanes = useMemo(
     () => [...swimlanes].sort((a, b) => a.position - b.position),
@@ -322,26 +362,27 @@ const CanvasBoard: React.FC<CanvasBoardProps> = ({
 
     const scrollL = containerRef.current?.scrollLeft || 0;
     const scrollT = containerRef.current?.scrollTop || 0;
-    const dropX = e.clientX - containerRect.left + scrollL - SWIMLANE_HEADER_WIDTH;
-    const dropY = e.clientY - containerRect.top + scrollT - TOP_PADDING;
+    const dropX = e.clientX - containerRect.left + scrollL;
+    const dropY = e.clientY - containerRect.top + scrollT;
+
+    const contentY = dropY - TOP_PADDING;
+    const withinYRange = contentY >= -20 && contentY <= totalContentHeight - TOP_PADDING + 100;
 
     let foundLane: SwimLane | null = null;
     let foundPosition = 0;
-    let inEmptyZone = true;
+    let inEmptyZone = false;
 
     for (const layout of swimlaneLayouts) {
       const laneContentX = layout.x + SWIMLANE_HEADER_WIDTH;
       const laneContentWidth = layout.width - SWIMLANE_HEADER_WIDTH;
       const laneContentEnd = laneContentX + laneContentWidth;
 
-      const withinXRange = dropX >= laneContentX - 40 && dropX <= laneContentEnd + 40;
-      const withinYRange = dropY >= -60 && dropY <= window.innerHeight + 200;
+      const withinXRange = dropX >= laneContentX - 12 && dropX <= laneContentEnd + 12;
 
       if (withinXRange && withinYRange) {
         foundLane = layout.lane;
-        inEmptyZone = false;
 
-        if (dropY > 0) {
+        if (contentY > 0) {
           const estimatedRowHeight = 172;
           const columnWidth = CARD_WIDTH + CARD_GAP;
           const colIdx = Math.max(0, Math.min(
@@ -349,7 +390,7 @@ const CanvasBoard: React.FC<CanvasBoardProps> = ({
             Math.floor((dropX - laneContentX - SWIMLANE_CONTENT_PADDING + CARD_GAP) / columnWidth)
           ));
           const rowIdx = Math.max(0, Math.floor(
-            (dropY - CARD_VERTICAL_GAP - 20) / (estimatedRowHeight + CARD_VERTICAL_GAP)
+            (contentY - CARD_VERTICAL_GAP - 20) / (estimatedRowHeight + CARD_VERTICAL_GAP)
           ));
           const laneCards = sortedCardsByLane[layout.lane.id] || [];
           const estPosition = rowIdx * Math.max(1, layout.columns) + colIdx;
@@ -359,8 +400,20 @@ const CanvasBoard: React.FC<CanvasBoardProps> = ({
       }
     }
 
-    return { foundLane, foundPosition, inEmptyZone, dropX, dropY };
-  }, [swimlaneLayouts, sortedCardsByLane]);
+    if (!foundLane && swimlaneLayouts.length > 0) {
+      const lastLayout = swimlaneLayouts[swimlaneLayouts.length - 1];
+      const lastLaneEnd = lastLayout.x + lastLayout.width;
+      const isRightOfAllLanes = dropX > lastLaneEnd + 40;
+
+      if (isRightOfAllLanes && withinYRange) {
+        inEmptyZone = true;
+      }
+    } else if (!foundLane && swimlaneLayouts.length === 0 && withinYRange) {
+      inEmptyZone = true;
+    }
+
+    return { foundLane, foundPosition, inEmptyZone, dropX, dropY: contentY };
+  }, [swimlaneLayouts, sortedCardsByLane, totalContentHeight]);
 
   const handleMouseMove = useCallback((e: MouseEvent) => {
     mouseRawRef.current = { x: e.clientX, y: e.clientY };
@@ -712,17 +765,19 @@ const CanvasBoard: React.FC<CanvasBoardProps> = ({
 
         {Object.entries(remoteCursors).map(([userId, cursor]) => {
           if (userId === currentUserId) return null;
+          const rendered = remoteRenderedRef.current[userId];
+          const posX = rendered ? rendered.x : cursor.x;
+          const posY = rendered ? rendered.y : cursor.y;
           const isDragging = !!cursor.draggingCardId;
           return (
             <div
               key={userId}
               style={{
                 position: 'absolute',
-                left: cursor.x - 1,
-                top: cursor.y - 1,
+                left: posX - 1,
+                top: posY - 1,
                 zIndex: 500,
                 pointerEvents: 'none',
-                transition: 'left 0.12s cubic-bezier(0.16, 1, 0.3, 1), top 0.12s cubic-bezier(0.16, 1, 0.3, 1)',
                 willChange: 'left, top',
               }}
             >

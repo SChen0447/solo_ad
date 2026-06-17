@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import type { Collaborator, ActivityLog, UserCursor } from './types';
 
 interface CollaborationPanelProps {
@@ -24,11 +24,18 @@ const CollaborationPanel: React.FC<CollaborationPanelProps> = ({
   currentUserId,
 }) => {
   const [, setTick] = useState(0);
+  const logsContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const interval = setInterval(() => setTick((t) => t + 1), 5000);
     return () => clearInterval(interval);
   }, []);
+
+  useEffect(() => {
+    if (logsContainerRef.current) {
+      logsContainerRef.current.scrollTop = logsContainerRef.current.scrollHeight;
+    }
+  }, [activityLogs]);
 
   const onlineUsers = collaborators.filter((c) => c.isOnline);
   const offlineUsers = collaborators.filter((c) => !c.isOnline);
@@ -336,15 +343,19 @@ const CollaborationPanel: React.FC<CollaborationPanelProps> = ({
           </span>
         </div>
 
-        <div style={{
-          flex: 1,
-          display: 'flex',
-          flexDirection: 'column-reverse',
-          gap: 8,
-          overflowY: 'auto',
-          overflowX: 'hidden',
-          paddingRight: 4,
-        }}>
+        <div
+          ref={logsContainerRef}
+          style={{
+            flex: 1,
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 8,
+            overflowY: 'auto',
+            overflowX: 'hidden',
+            paddingRight: 4,
+            scrollBehavior: 'smooth',
+          }}
+        >
           {activityLogs.length === 0 && (
             <div style={{
               padding: '24px 8px',
