@@ -47,9 +47,13 @@ export const Canvas: React.FC<CanvasProps> = ({
     x: number;
     y: number;
   } | null>(null);
+  const [showZoomIndicator, setShowZoomIndicator] = useState(false);
+  const [zoomPercent, setZoomPercent] = useState(100);
   const lineFadeStartRef = useRef<Map<string, number>>(new Map());
   const lastPinchDistanceRef = useRef<number>(0);
   const touchStartRef = useRef<Map<number, { x: number; y: number }>>(new Map());
+  const zoomHideTimeoutRef = useRef<number | null>(null);
+  const isPinchingRef = useRef(false);
 
   const screenToWorld = useCallback((screenX: number, screenY: number): Point => {
     const view = viewRef.current;
@@ -295,6 +299,12 @@ export const Canvas: React.FC<CanvasProps> = ({
         const dy = e.touches[0].clientY - e.touches[1].clientY;
         lastPinchDistanceRef.current = Math.sqrt(dx * dx + dy * dy);
         isDraggingRef.current = true;
+        isPinchingRef.current = true;
+        isDrawingRef.current = false;
+        setShowZoomIndicator(true);
+        if (zoomHideTimeoutRef.current) {
+          clearTimeout(zoomHideTimeoutRef.current);
+        }
         return;
       }
 
@@ -336,6 +346,8 @@ export const Canvas: React.FC<CanvasProps> = ({
         targetViewRef.current.x = centerX - worldX * newScale;
         targetViewRef.current.y = centerY - worldY * newScale;
 
+        setZoomPercent(Math.round(newScale * 100));
+
         lastPinchDistanceRef.current = distance;
         return;
       }
@@ -363,6 +375,17 @@ export const Canvas: React.FC<CanvasProps> = ({
       }
       currentLineRef.current = [];
     }
+
+    if (isPinchingRef.current) {
+      isPinchingRef.current = false;
+      if (zoomHideTimeoutRef.current) {
+        clearTimeout(zoomHideTimeoutRef.current);
+      }
+      zoomHideTimeoutRef.current = window.setTimeout(() => {
+        setShowZoomIndicator(false);
+      }, 2000);
+    }
+
     lastPinchDistanceRef.current = 0;
     isDraggingRef.current = false;
   }, [color, brushSize, onLineComplete]);
@@ -445,10 +468,38 @@ export const Canvas: React.FC<CanvasProps> = ({
         </div>
       )}
 
+      {showZoomIndicator && (
+        <div
+          style={{
+            position: 'absolute',
+            left: '50%',
+            bottom: '25%',
+            transform: 'translateX(-50%)',
+            background: 'rgba(93, 78, 55, 0.75)',
+            backdropFilter: 'blur(8px)',
+            WebkitBackdropFilter: 'blur(8px)',
+            borderRadius: 24,
+            padding: '10px 24px',
+            color: '#fff',
+            fontSize: 16,
+            fontWeight: 600,
+            zIndex: 120,
+            pointerEvents: 'none',
+            animation: 'zoomFadeIn 0.2s ease',
+          }}
+        >
+          🔍 {zoomPercent}%
+        </div>
+      )}
+
       <style>{`
         @keyframes fadeIn {
           from { opacity: 0; transform: translateX(-50%) translateY(10px); }
           to { opacity: 1; transform: translateX(-50%) translateY(0); }
+        }
+        @keyframes zoomFadeIn {
+          from { opacity: 0; transform: translateX(-50%) scale(0.9); }
+          to { opacity: 1; transform: translateX(-50%) scale(1); }
         }
       `}</style>
     </div>

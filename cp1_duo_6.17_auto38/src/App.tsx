@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Canvas } from './components/Canvas';
 import { ToolPanel } from './components/ToolPanel';
+import { MobileToolbar } from './components/MobileToolbar';
 import { Leaderboard } from './components/Leaderboard';
 import { TimeTravel } from './components/TimeTravel';
 import { NotificationBanner } from './components/NotificationBanner';
@@ -31,6 +32,17 @@ const App: React.FC = () => {
   } = useCanvasHistory();
 
   const { toolState, setColorFromHSL, setBrushSize } = useToolState();
+
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   const [serverLines, setServerLines] = useState<LineData[]>([]);
   const [firstPublishTime, setFirstPublishTime] = useState<number>(
@@ -188,23 +200,45 @@ const App: React.FC = () => {
         timeTravelLines={timeTravelLines}
       />
 
-      <ToolPanel
-        color={toolState.color}
-        hue={toolState.hue}
-        saturation={toolState.saturation}
-        lightness={toolState.lightness}
-        brushSize={toolState.brushSize}
-        canUndo={canUndo}
-        canRedo={canRedo}
-        isUndoing={isUndoing}
-        isRedoing={isRedoing}
-        onColorChange={setColorFromHSL}
-        onBrushSizeChange={setBrushSize}
-        onUndo={handleUndo}
-        onRedo={handleRedo}
-        onPublish={handlePublish}
-        isPublishing={isPublishing}
-      />
+      {!isMobile && (
+        <ToolPanel
+          color={toolState.color}
+          hue={toolState.hue}
+          saturation={toolState.saturation}
+          lightness={toolState.lightness}
+          brushSize={toolState.brushSize}
+          canUndo={canUndo}
+          canRedo={canRedo}
+          isUndoing={isUndoing}
+          isRedoing={isRedoing}
+          onColorChange={setColorFromHSL}
+          onBrushSizeChange={setBrushSize}
+          onUndo={handleUndo}
+          onRedo={handleRedo}
+          onPublish={handlePublish}
+          isPublishing={isPublishing}
+        />
+      )}
+
+      {isMobile && (
+        <MobileToolbar
+          color={toolState.color}
+          hue={toolState.hue}
+          saturation={toolState.saturation}
+          lightness={toolState.lightness}
+          brushSize={toolState.brushSize}
+          canUndo={canUndo}
+          canRedo={canRedo}
+          isUndoing={isUndoing}
+          isRedoing={isRedoing}
+          onColorChange={setColorFromHSL}
+          onBrushSizeChange={setBrushSize}
+          onUndo={handleUndo}
+          onRedo={handleRedo}
+          onPublish={handlePublish}
+          isPublishing={isPublishing}
+        />
+      )}
 
       <Leaderboard />
 
@@ -215,20 +249,22 @@ const App: React.FC = () => {
         onDismiss={handleDismissNotification}
       />
 
-      <div
-        style={{
-          position: 'fixed',
-          bottom: 24,
-          left: 24,
-          fontSize: 11,
-          color: 'rgba(93, 78, 55, 0.6)',
-          zIndex: 50,
-          pointerEvents: 'none',
-        }}
-      >
-        <div>🖱️ 滚轮缩放 | 拖动平移 | 点击线条点赞</div>
-        <div style={{ marginTop: 4 }}>本地绘制: {history.length} 条 | 公共: {serverLines.length} 条</div>
-      </div>
+      {!isMobile && (
+        <div
+          style={{
+            position: 'fixed',
+            bottom: 24,
+            left: 24,
+            fontSize: 11,
+            color: 'rgba(93, 78, 55, 0.6)',
+            zIndex: 50,
+            pointerEvents: 'none',
+          }}
+        >
+          <div>🖱️ 滚轮缩放 | 拖动平移 | 点击线条点赞</div>
+          <div style={{ marginTop: 4 }}>本地绘制: {history.length} 条 | 公共: {serverLines.length} 条</div>
+        </div>
+      )}
     </div>
   );
 };
