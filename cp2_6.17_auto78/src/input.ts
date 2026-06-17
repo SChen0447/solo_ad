@@ -7,14 +7,27 @@ export interface PlayerActions {
   skill: boolean;
 }
 
+interface EdgeFlags {
+  left: boolean;
+  right: boolean;
+}
+
 export class InputManager {
   private p1Actions: PlayerActions;
   private p2Actions: PlayerActions;
+  private p1Prev: PlayerActions;
+  private p2Prev: PlayerActions;
+  private p1Edge: EdgeFlags;
+  private p2Edge: EdgeFlags;
   private keyMap: Map<string, { player: 1 | 2; action: keyof PlayerActions }>;
 
   constructor() {
     this.p1Actions = this.createEmptyActions();
     this.p2Actions = this.createEmptyActions();
+    this.p1Prev = this.createEmptyActions();
+    this.p2Prev = this.createEmptyActions();
+    this.p1Edge = { left: false, right: false };
+    this.p2Edge = { left: false, right: false };
     this.keyMap = new Map([
       ['KeyA', { player: 1, action: 'left' }],
       ['KeyD', { player: 1, action: 'right' }],
@@ -94,6 +107,47 @@ export class InputManager {
     const actions = player === 1 ? this.p1Actions : this.p2Actions;
     if (actions.skill) {
       actions.skill = false;
+      return true;
+    }
+    return false;
+  }
+
+  public tick(): void {
+    if (this.p1Actions.left && !this.p1Prev.left) this.p1Edge.left = true;
+    if (this.p1Actions.right && !this.p1Prev.right) this.p1Edge.right = true;
+    if (this.p2Actions.left && !this.p2Prev.left) this.p2Edge.left = true;
+    if (this.p2Actions.right && !this.p2Prev.right) this.p2Edge.right = true;
+    this.p1Prev = { ...this.p1Actions };
+    this.p2Prev = { ...this.p2Actions };
+  }
+
+  public consumeP1Left(): boolean {
+    if (this.p1Edge.left) {
+      this.p1Edge.left = false;
+      return true;
+    }
+    return false;
+  }
+
+  public consumeP1Right(): boolean {
+    if (this.p1Edge.right) {
+      this.p1Edge.right = false;
+      return true;
+    }
+    return false;
+  }
+
+  public consumeP2Left(): boolean {
+    if (this.p2Edge.left) {
+      this.p2Edge.left = false;
+      return true;
+    }
+    return false;
+  }
+
+  public consumeP2Right(): boolean {
+    if (this.p2Edge.right) {
+      this.p2Edge.right = false;
       return true;
     }
     return false;

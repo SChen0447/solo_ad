@@ -1,5 +1,14 @@
 import { Character, CHAR_WIDTH, CHAR_HEIGHT } from './entities';
 
+export const FIGHTER_COLORS = [
+  '#3a7bff',
+  '#ff3a5c',
+  '#3aca5c',
+  '#ffcc33'
+] as const;
+
+export const FIGHTER_NAMES = ['BLUE', 'RED', 'GREEN', 'YELLOW'] as const;
+
 const CANVAS_W = 800;
 const CANVAS_H = 450;
 const GRASS_HEIGHT = 30;
@@ -32,6 +41,8 @@ export class Renderer {
   private warnOffset: number;
   private brickPattern: CanvasPattern | null;
   private grassPattern: CanvasPattern | null;
+  private selectAnimAge: number;
+  private titleBlinkAlpha: number;
 
   constructor(ctx: CanvasRenderingContext2D) {
     this.ctx = ctx;
@@ -48,6 +59,8 @@ export class Renderer {
     this.warnOffset = 0;
     this.brickPattern = null;
     this.grassPattern = null;
+    this.selectAnimAge = 0;
+    this.titleBlinkAlpha = 1;
     this.createPatterns();
   }
 
@@ -435,5 +448,234 @@ export class Renderer {
     const btnX = cx - btnW / 2;
     const btnY = CANVAS_H / 2 + 30;
     return mx >= btnX && mx <= btnX + btnW && my >= btnY && my <= btnY + btnH;
+  }
+
+  public isFightButton(mx: number, my: number): boolean {
+    const cx = CANVAS_W / 2;
+    const btnW = 220;
+    const btnH = 60;
+    const btnX = cx - btnW / 2;
+    const btnY = CANVAS_H - 110;
+    return mx >= btnX && mx <= btnX + btnW && my >= btnY && my <= btnY + btnH;
+  }
+
+  public renderSelectScreen(
+    dt: number,
+    p1ColorIdx: number,
+    p2ColorIdx: number,
+    canStart: boolean,
+    fightHovered: boolean
+  ): void {
+    const ctx = this.ctx;
+    this.selectAnimAge += dt;
+    const titleBob = Math.sin(this.selectAnimAge / 400) * 4;
+    this.titleBlinkAlpha = 0.7 + Math.sin(this.selectAnimAge / 250) * 0.3;
+
+    ctx.fillStyle = '#1a1a2e';
+    ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
+
+    ctx.save();
+    ctx.globalAlpha = 0.12;
+    for (let i = 0; i < CANVAS_W; i += 50) {
+      ctx.strokeStyle = '#05d9e8';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(i, 0);
+      ctx.lineTo(i, CANVAS_H);
+      ctx.stroke();
+    }
+    for (let i = 0; i < CANVAS_H; i += 50) {
+      ctx.beginPath();
+      ctx.moveTo(0, i);
+      ctx.lineTo(CANVAS_W, i);
+      ctx.stroke();
+    }
+    ctx.restore();
+
+    const cx = CANVAS_W / 2;
+
+    ctx.save();
+    ctx.font = '32px "Press Start 2P", monospace';
+    ctx.fillStyle = '#ff2a6d';
+    ctx.strokeStyle = '#000';
+    ctx.lineWidth = 5;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    const titleY = 30 + titleBob;
+    ctx.strokeText('SELECT YOUR FIGHTER', cx, titleY);
+    ctx.fillText('SELECT YOUR FIGHTER', cx, titleY);
+    ctx.restore();
+
+    this.drawFighterPreview(180, 180, FIGHTER_COLORS[p1ColorIdx], 1, p1ColorIdx, '#05d9e8');
+    this.drawFighterPreview(620, 180, FIGHTER_COLORS[p2ColorIdx], -1, p2ColorIdx, '#ff2a6d');
+
+    ctx.save();
+    ctx.font = '12px "Press Start 2P", monospace';
+    ctx.textBaseline = 'top';
+    ctx.fillStyle = '#05d9e8';
+    ctx.strokeStyle = '#000';
+    ctx.lineWidth = 3;
+    ctx.textAlign = 'center';
+    const p1NameY = 250;
+    ctx.strokeText('P1 - ' + FIGHTER_NAMES[p1ColorIdx], 180, p1NameY);
+    ctx.fillText('P1 - ' + FIGHTER_NAMES[p1ColorIdx], 180, p1NameY);
+
+    ctx.fillStyle = '#ff2a6d';
+    ctx.strokeText('P2 - ' + FIGHTER_NAMES[p2ColorIdx], 620, p1NameY);
+    ctx.fillText('P2 - ' + FIGHTER_NAMES[p2ColorIdx], 620, p1NameY);
+    ctx.restore();
+
+    this.drawColorButtons(180, 300, p1ColorIdx, '#05d9e8');
+    this.drawColorButtons(620, 300, p2ColorIdx, '#ff2a6d');
+
+    ctx.save();
+    ctx.font = '10px "Press Start 2P", monospace';
+    ctx.fillStyle = '#aaa';
+    ctx.strokeStyle = '#000';
+    ctx.lineWidth = 2;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    ctx.strokeText('A / D  TO SELECT', 180, 380);
+    ctx.fillText('A / D  TO SELECT', 180, 380);
+    ctx.strokeText('ARROWS TO SELECT', 620, 380);
+    ctx.fillText('ARROWS TO SELECT', 620, 380);
+    ctx.restore();
+
+    if (canStart) {
+      const btnW = 220;
+      const btnH = 60;
+      const btnX = cx - btnW / 2;
+      const btnY = CANVAS_H - 110;
+      const pulse = Math.sin(this.selectAnimAge / 150) * 2;
+
+      ctx.save();
+      ctx.fillStyle = fightHovered ? '#ff6666' : '#ff4444';
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = 3 + pulse;
+      ctx.shadowColor = '#ff2a6d';
+      ctx.shadowBlur = 16 * this.titleBlinkAlpha;
+      this.roundRect(ctx, btnX, btnY, btnW, btnH, 10);
+      ctx.fill();
+      ctx.shadowBlur = 0;
+      ctx.stroke();
+
+      ctx.font = '22px "Press Start 2P", monospace';
+      ctx.fillStyle = '#fff';
+      ctx.strokeStyle = '#000';
+      ctx.lineWidth = 4;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.strokeText('FIGHT!', cx, btnY + btnH / 2);
+      ctx.fillText('FIGHT!', cx, btnY + btnH / 2);
+      ctx.restore();
+    } else {
+      ctx.save();
+      ctx.font = '12px "Press Start 2P", monospace';
+      ctx.fillStyle = '#666';
+      ctx.strokeStyle = '#000';
+      ctx.lineWidth = 2;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      const y = CANVAS_H - 80;
+      ctx.strokeText('BOTH PLAYERS MUST SELECT', cx, y);
+      ctx.fillText('BOTH PLAYERS MUST SELECT', cx, y);
+      ctx.restore();
+    }
+  }
+
+  private drawFighterPreview(
+    cx: number,
+    cy: number,
+    color: string,
+    facing: 1 | -1,
+    colorIdx: number,
+    glowColor: string
+  ): void {
+    const ctx = this.ctx;
+    const pulse = Math.sin((this.selectAnimAge + colorIdx * 200) / 300) * 0.15 + 1;
+    const scaleW = CHAR_WIDTH * 1.8 * pulse;
+    const scaleH = CHAR_HEIGHT * 1.8 * pulse;
+    const x = cx - scaleW / 2;
+    const y = cy - scaleH / 2;
+
+    ctx.save();
+    ctx.shadowColor = glowColor;
+    ctx.shadowBlur = 20;
+    ctx.fillStyle = color;
+    ctx.fillRect(x, y, scaleW, scaleH);
+    ctx.shadowBlur = 0;
+    ctx.strokeStyle = '#fff';
+    ctx.lineWidth = 3;
+    ctx.strokeRect(x + 1.5, y + 1.5, scaleW - 3, scaleH - 3);
+
+    const eyeSize = scaleW * 0.15;
+    const eyeGap = scaleW * 0.12;
+    const eyeY = y + scaleH * 0.25;
+    const eyeBaseX = facing === 1 ? cx + eyeGap * 0.3 : cx - eyeGap * 0.3 - eyeSize;
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(eyeBaseX - eyeSize - eyeGap / 2, eyeY, eyeSize, eyeSize);
+    ctx.fillRect(eyeBaseX + eyeGap / 2, eyeY, eyeSize, eyeSize);
+
+    ctx.fillStyle = '#000';
+    const pOff = facing === 1 ? eyeSize * 0.33 : 0;
+    ctx.fillRect(eyeBaseX - eyeSize - eyeGap / 2 + pOff, eyeY + eyeSize * 0.33, eyeSize * 0.33, eyeSize * 0.33);
+    ctx.fillRect(eyeBaseX + eyeGap / 2 + pOff, eyeY + eyeSize * 0.33, eyeSize * 0.33, eyeSize * 0.33);
+    ctx.restore();
+  }
+
+  private drawColorButtons(cx: number, cy: number, selected: number, accent: string): void {
+    const ctx = this.ctx;
+    const btnSize = 42;
+    const gap = 14;
+    const totalW = FIGHTER_COLORS.length * btnSize + (FIGHTER_COLORS.length - 1) * gap;
+    const startX = cx - totalW / 2;
+
+    for (let i = 0; i < FIGHTER_COLORS.length; i++) {
+      const bx = startX + i * (btnSize + gap);
+      const by = cy;
+      const isSelected = i === selected;
+
+      ctx.save();
+      if (isSelected) {
+        ctx.shadowColor = accent;
+        ctx.shadowBlur = 14;
+        ctx.fillStyle = FIGHTER_COLORS[i];
+        ctx.fillRect(bx - 4, by - 4, btnSize + 8, btnSize + 8);
+        ctx.shadowBlur = 0;
+        ctx.strokeStyle = '#fff';
+        ctx.lineWidth = 3;
+        ctx.strokeRect(bx - 4, by - 4, btnSize + 8, btnSize + 8);
+      }
+
+      ctx.fillStyle = FIGHTER_COLORS[i];
+      ctx.fillRect(bx, by, btnSize, btnSize);
+      ctx.strokeStyle = '#111';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(bx + 1, by + 1, btnSize - 2, btnSize - 2);
+
+      if (isSelected) {
+        const arrowY = by - 12;
+        ctx.fillStyle = accent;
+        ctx.strokeStyle = '#000';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(cx - 1, arrowY - 10);
+        ctx.lineTo(cx - 9, arrowY);
+        ctx.lineTo(cx + 7, arrowY);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+
+        const arrowY2 = by + btnSize + 12;
+        ctx.beginPath();
+        ctx.moveTo(cx - 1, arrowY2 + 10);
+        ctx.lineTo(cx - 9, arrowY2);
+        ctx.lineTo(cx + 7, arrowY2);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
   }
 }

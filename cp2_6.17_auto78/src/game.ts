@@ -1,7 +1,7 @@
 import { Character, CHAR_WIDTH } from './entities';
 import type { HitEvent } from './entities';
 import { InputManager } from './input';
-import { Renderer } from './renderer';
+import { Renderer, FIGHTER_COLORS } from './renderer';
 import type { VisualEffect } from './renderer';
 
 const GAME_DURATION = 60000;
@@ -9,7 +9,7 @@ const WARNING_START = 30000;
 const WARNING_DURATION = 5000;
 const MAX_EFFECTS = 16;
 
-export type GameStatus = 'playing' | 'ended';
+export type GameStatus = 'selecting' | 'playing' | 'ended';
 
 export class Game {
   public p1: Character;
@@ -25,12 +25,15 @@ export class Game {
   private warningShown: boolean;
   private warningAge: number;
   private restartHovered: boolean;
+  private fightHovered: boolean;
+  private p1ColorIdx: number;
+  private p2ColorIdx: number;
   private canvas: HTMLCanvasElement;
 
   constructor(canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D) {
     this.canvas = canvas;
-    this.p1 = new Character(120, '#3a7bff', 1, 1);
-    this.p2 = new Character(640, '#ff3a5c', 2, -1);
+    this.p1 = new Character(120, FIGHTER_COLORS[0], 1, 1);
+    this.p2 = new Character(640, FIGHTER_COLORS[1], 2, -1);
     this.input = new InputManager();
     this.renderer = new Renderer(ctx);
     this.effects = [];
@@ -48,9 +51,12 @@ export class Game {
     this.timeLeft = GAME_DURATION;
     this.warningShown = false;
     this.warningAge = 0;
-    this.status = 'playing';
+    this.status = 'selecting';
     this.winnerText = null;
     this.restartHovered = false;
+    this.fightHovered = false;
+    this.p1ColorIdx = 0;
+    this.p2ColorIdx = 1;
 
     this.handleMouseMove = this.handleMouseMove.bind(this);
     this.handleClick = this.handleClick.bind(this);
@@ -69,8 +75,8 @@ export class Game {
   }
 
   public reset(): void {
-    this.p1.reset(120, 1);
-    this.p2.reset(640, -1);
+    this.p1.reset(120, 1, FIGHTER_COLORS[this.p1ColorIdx]);
+    this.p2.reset(640, -1, FIGHTER_COLORS[this.p2ColorIdx]);
     this.effects.length = 0;
     this.timeLeft = GAME_DURATION;
     this.warningShown = false;
@@ -78,10 +84,22 @@ export class Game {
     this.status = 'playing';
     this.winnerText = null;
     this.restartHovered = false;
+    this.fightHovered = false;
     this.renderer.resetHpDisplay();
   }
 
+  private startFight(): void {
+    this.reset();
+  }
+
   public update(dt: number): void {
+    this.input.tick();
+
+    if (this.status === 'selecting') {
+      this.updateSelecting();
+      return;
+    }
+
     if (this.status !== 'playing') {
       this.updateEffects(dt);
       return;
@@ -127,6 +145,18 @@ export class Game {
   }
 
   public render(dt: number): void {
+    if (this.status === 'selecting') {
+      const canStart = this.p1ColorIdx !== this.p2ColorIdx;
+      this.renderer.renderSelectScreen(
+        dt,
+        this.p1ColorIdx,
+        this.p2ColorIdx,
+        canStart,
+        this.fightHovered
+      );
+      return;
+    }
+
     this.renderer.render(
       dt,
       this.p1,
@@ -139,6 +169,23 @@ export class Game {
       this.winnerText,
       this.restartHovered
     );
+  }
+
+  private updateSelecting(): void {
+    const colors = FIGHTER_COLORS.length;
+
+    if (this.input.consumeP1Left()) {
+      this.p1ColorIdx = (this.p1ColorIdx - 1 + colors) % colors;
+    }
+    if (this.input.consumeP1Right()) {
+      this.p1ColorIdx = (this.p1ColorIdx + 1) % colors;
+    }
+    if (this.input.consumeP2Left()) {
+      this.p2ColorIdx = (this.p2ColorIdx - 1 + colors) % colors;
+    }
+    if (this.input.consumeP2Right()) {
+      this.p2ColorIdx = (this.p2ColorIdx + 1) % colors;
+    }
   }
 
   private resolveBodyCollision(): void {
@@ -233,17 +280,28 @@ export class Game {
   }
 
   private handleMouseMove(e: MouseEvent): void {
-    if (this.status !== 'ended') return;
     const { x, y } = this.getCanvasMouse(e);
-    this.restartHovered = this.renderer.isRestartButton(x, y);
-    this.canvas.style.cursor = this.restartHovered ? 'pointer' : 'default';
+    if (this.status === 'ended') {
+      this.restartHovered = this.renderer.isRestartButton(x, y);
+      this.canvas.style.cursor = this.restartHovered ? 'pointer' : 'default';
+    } else if (this.status === 'selecting') {
+      const canStart = this.p1ColorIdx !== this.p2ColorIdx;
+      this.fightHovered = canStart && this.renderer.isFightButton(x, y);
+      this.canvas.style.cursor = this.fightHovered ? 'pointer' : 'default';
+    }
   }
 
   private handleClick(e: MouseEvent): void {
-    if (this.status !== 'ended') return;
     const { x, y } = this.getCanvasMouse(e);
-    if (this.renderer.isRestartButton(x, y)) {
-      this.reset();
+    if (this.status === 'ended') {
+      if (this.renderer.isRestartButton(x, y)) {
+        this.reset();
+      }
+    } else if (this.status === 'selecting') {
+      const canStart = this.p1ColorIdx !== this.p2ColorIdx;
+      if (canStart && this.renderer.isFightButton(x, y)) {
+        this.startFight();
+      }
     }
   }
 }

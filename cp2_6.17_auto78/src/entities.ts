@@ -68,7 +68,7 @@ export class Character {
     this._lastHit = null;
   }
 
-  public reset(x: number, facing: 1 | -1): void {
+  public reset(x: number, facing: 1 | -1, color?: string): void {
     this.x = x;
     this.y = GROUND_Y - CHAR_HEIGHT;
     this.vx = 0;
@@ -76,6 +76,7 @@ export class Character {
     this.hp = this.maxHp;
     this.state = 'idle';
     this.facing = facing;
+    if (color !== undefined) this.color = color;
     this.stateTimer = 0;
     this.hurtFlashTimer = 0;
     this.hurtFlashPhase = 0;
