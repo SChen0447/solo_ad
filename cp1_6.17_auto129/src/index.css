@@ -1,0 +1,80 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow: hidden;
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #D1D5DB;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #9CA3AF;
+}
+
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+input[type="number"] {
+  -moz-appearance: textfield;
+}
+
+.recharts-tooltip-wrapper {
+  outline: none;
+}
+
+select {
+  appearance: auto;
+}
+
+@layer utilities {
+  .backdrop-blur-glass {
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+  }
+}
+
+@media (max-width: 1279px) and (min-width: 768px) {
+  aside {
+    position: fixed;
+    left: 0;
+    top: 56px;
+    bottom: 0;
+    z-index: 25;
+    transform: translateX(0);
+    transition: transform 0.3s ease;
+  }
+  aside[style*="width: 0"] {
+    transform: translateX(-100%);
+  }
+}
+
+@media (max-width: 767px) {
+  #chart-area {
+    grid-template-columns: 1fr !important;
+  }
+}
