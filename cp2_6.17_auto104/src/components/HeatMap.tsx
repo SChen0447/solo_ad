@@ -5,45 +5,62 @@ interface HeatMapProps {
   ratings: StageRatings[]
 }
 
-function getScoreColor(score: number): string {
-  if (score <= 0) return '#2a2a4a'
-  if (score <= 1) return '#ff4d4f'
-  if (score <= 2) {
-    const t = score - 1
-    const r = Math.round(255 - t * (255 - 250))
-    const g = Math.round(77 + t * (173 - 77))
-    const b = Math.round(79 + t * (20 - 79))
-    return `rgb(${r},${g},${b})`
+const HEATMAP_COLORS = {
+  LOW: { r: 255, g: 77, b: 79 },
+  MID: { r: 250, g: 219, b: 20 },
+  HIGH: { r: 82, g: 196, b: 26 },
+  EMPTY: { r: 42, g: 42, b: 74 },
+}
+
+function interpolateRGB(
+  c1: { r: number; g: number; b: number },
+  c2: { r: number; g: number; b: number },
+  t: number
+): string {
+  const r = Math.round(c1.r + (c2.r - c1.r) * t)
+  const g = Math.round(c1.g + (c2.g - c1.g) * t)
+  const b = Math.round(c1.b + (c2.b - c1.b) * t)
+  return `rgb(${r},${g},${b})`
+}
+
+function getScoreColorDynamic(
+  score: number,
+  minScore: number,
+  maxScore: number
+): string {
+  if (score <= 0) {
+    const e = HEATMAP_COLORS.EMPTY
+    return `rgb(${e.r},${e.g},${e.b})`
   }
-  if (score <= 3) {
-    const t = score - 2
-    const r = Math.round(250 - t * (250 - 250))
-    const g = Math.round(173 + t * (219 - 173))
-    const b = Math.round(20 + t * (20 - 20))
-    return `rgb(${r},${g},${b})`
+  if (maxScore === minScore) {
+    return interpolateRGB(HEATMAP_COLORS.LOW, HEATMAP_COLORS.HIGH, 0.5)
   }
-  if (score <= 4) {
-    const t = score - 3
-    const r = Math.round(250 - t * (250 - 82))
-    const g = Math.round(219 + t * (196 - 219))
-    const b = Math.round(20 + t * (26 - 20))
-    return `rgb(${r},${g},${b})`
+  const normalized = (score - minScore) / (maxScore - minScore)
+  if (normalized < 0.5) {
+    return interpolateRGB(
+      HEATMAP_COLORS.LOW,
+      HEATMAP_COLORS.MID,
+      normalized * 2
+    )
   }
-  if (score <= 5) {
-    const t = score - 4
-    const r = Math.round(82 - t * (82 - 82))
-    const g = Math.round(196 + t * (196 - 196))
-    const b = Math.round(26 + t * (26 - 26))
-    return `rgb(${r},${g},${b})`
-  }
-  return '#52c41a'
+  return interpolateRGB(
+    HEATMAP_COLORS.MID,
+    HEATMAP_COLORS.HIGH,
+    (normalized - 0.5) * 2
+  )
 }
 
 const HeatMap: React.FC<HeatMapProps> = ({ ratings }) => {
   const blocks = useMemo(() => {
+    const validScores = ratings
+      .map((r) => r.averageScore)
+      .filter((s) => s > 0)
+    const minScore = validScores.length > 0 ? Math.min(...validScores) : 0
+    const maxScore = validScores.length > 0 ? Math.max(...validScores) : 5
+
     return ratings.map((r) => ({
       ...r,
-      color: getScoreColor(r.averageScore),
+      color: getScoreColorDynamic(r.averageScore, minScore, maxScore),
     }))
   }, [ratings])
 
@@ -58,13 +75,16 @@ const HeatMap: React.FC<HeatMapProps> = ({ ratings }) => {
             boxShadow: '0 4px 20px rgba(0,128,255,0.3)',
           }}
         >
-          <h3 className="text-white font-bold text-lg mb-1 drop-shadow-md text-center">
+          <h3 className="text-white font-bold text-[14px] drop-shadow-md text-center">
             {block.stageName}
           </h3>
-          <p className="text-white text-3xl font-extrabold drop-shadow-lg">
+          <p
+            className="text-white font-extrabold drop-shadow-lg mt-1"
+            style={{ fontSize: '32px', lineHeight: 1.2 }}
+          >
             {block.averageScore > 0 ? block.averageScore.toFixed(1) : '-'}
           </p>
-          <p className="text-white/80 text-xs mt-1">
+          <p className="text-white/80 text-xs mt-0.5">
             {block.voteCount} 人投票
           </p>
         </div>
