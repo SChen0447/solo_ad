@@ -219,7 +219,7 @@ const InspirationCollection = ({ collection, onCollectionChange }: Props) => {
     const day = String(d.getDate()).padStart(2, '0');
     const hh = String(d.getHours()).padStart(2, '0');
     const mm = String(d.getMinutes()).padStart(2, '0');
-    return `${y}-${m}-${day} ${hh}:${mm}`;
+    return `${y}年${m}月${day}日 ${hh}:${mm}`;
   };
 
   return (
@@ -390,19 +390,29 @@ const InspirationCollection = ({ collection, onCollectionChange }: Props) => {
           gap: 10px;
           position: relative;
           border: 1px solid rgba(255,255,255,0.04);
-          transition: all 0.3s ease;
+          transition: all 0.2s ease;
           opacity: 0;
           animation: staggerFadeIn 0.5s ease forwards;
           overflow: hidden;
         }
+        .collect-card::before {
+          content: '';
+          position: absolute;
+          top: 0;
+          left: 0;
+          width: 100%;
+          height: 4px;
+          background: linear-gradient(90deg, #6b46c1 0%, #a855f7 100%);
+          z-index: 1;
+        }
         .collect-card:hover {
-          transform: translateY(-4px);
+          transform: scale(1.02);
           border-color: rgba(139, 92, 246, 0.35);
-          box-shadow: 0 12px 32px rgba(0,0,0,0.3);
+          box-shadow: 0 16px 40px rgba(0,0,0,0.4);
         }
         .collect-card.selected {
           border-color: #8b5cf6;
-          box-shadow: 0 0 0 2px rgba(139, 92, 246, 0.5), 0 12px 32px rgba(139, 92, 246, 0.25);
+          box-shadow: 0 0 0 2px rgba(139, 92, 246, 0.5), 0 16px 40px rgba(139, 92, 246, 0.3);
         }
 
         .card-checkbox {
@@ -545,10 +555,10 @@ const InspirationCollection = ({ collection, onCollectionChange }: Props) => {
           flex-shrink: 0;
         }
         .card-tag {
-          padding: 3px 10px;
+          padding: 4px 8px;
           border-radius: 999px;
-          background: #374151;
-          color: #d1d5db;
+          background: #2d2d3d;
+          color: #a78bfa;
           font-size: 11px;
           font-weight: 500;
           transition: all 0.3s ease;
@@ -565,7 +575,7 @@ const InspirationCollection = ({ collection, onCollectionChange }: Props) => {
           align-items: center;
           justify-content: center;
           border-radius: 50%;
-          color: #9ca3af;
+          color: #a78bfa;
           font-size: 10px;
           line-height: 1;
           transition: all 0.2s ease;
