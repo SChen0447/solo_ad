@@ -1,0 +1,12 @@
+.canvasWrapper {
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.canvas {
+  display: block;
+  border-radius: 8px;
+  overflow: hidden;
+}
