@@ -60,21 +60,22 @@ const LogEntryItem: React.FC<LogEntryItemProps> = ({ log, isNew }) => {
       className={`relative p-3 rounded-lg bg-secondary/40 border border-white/5
         hover:bg-secondary/80 hover:scale-[1.02] hover:border-accent/30
         hover:shadow-lg hover:shadow-accent/5
-        transition-all duration-200 ease-out origin-left
+        origin-left
         ${isNew ? 'animate-slide-up' : ''}
         ${log.isHit && log.isCrit ? 'border-orange-500/20' : ''}
         ${!log.isHit ? 'border-red-500/20' : ''}`}
+      style={{ transition: 'all 0.2s ease' }}
     >
       {showFlash && log.isHit && log.isCrit && (
         <div
-          className="absolute inset-0 rounded-lg pointer-events-none overflow-hidden"
+          className="absolute top-0 right-0 w-24 h-full rounded-r-lg pointer-events-none overflow-hidden"
           style={{ zIndex: 1 }}
         >
           <div
             className="absolute top-0 right-0 w-full h-full"
             style={{
               background:
-                'linear-gradient(90deg, transparent 0%, rgba(251,146,60,0.15) 40%, rgba(251,146,60,0.4) 60%, rgba(251,146,60,0.1) 100%)',
+                'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.3) 30%, rgba(251,146,60,0.6) 60%, rgba(255,255,255,0.2) 100%)',
               animation: 'critFlash 0.5s ease-out forwards',
             }}
           />
@@ -82,7 +83,7 @@ const LogEntryItem: React.FC<LogEntryItemProps> = ({ log, isNew }) => {
             className="absolute top-1 right-2 w-16 h-16"
             style={{
               background:
-                'radial-gradient(circle, rgba(251,146,60,0.6) 0%, transparent 70%)',
+                'radial-gradient(circle, rgba(255,255,255,0.8) 0%, rgba(251,146,60,0.6) 30%, transparent 70%)',
               animation: 'critGlow 0.5s ease-out forwards',
             }}
           />
@@ -91,12 +92,16 @@ const LogEntryItem: React.FC<LogEntryItemProps> = ({ log, isNew }) => {
 
       {showMissFloat && !log.isHit && (
         <div
-          className="absolute inset-0 flex items-center justify-center pointer-events-none"
-          style={{ zIndex: 2 }}
+          className="relative w-full h-full"
+          style={{ zIndex: 2, position: 'absolute', inset: 0, pointerEvents: 'none' }}
         >
           <span
             className="text-2xl font-black text-red-500"
             style={{
+              position: 'absolute',
+              top: '50%',
+              left: '50%',
+              transform: 'translate(-50%, -50%)',
               textShadow: '0 0 10px rgba(239,68,68,0.8), 0 0 20px rgba(239,68,68,0.4)',
               animation: 'missFloatUp 0.4s ease-out forwards',
             }}
@@ -156,44 +161,69 @@ const LogEntryItem: React.FC<LogEntryItemProps> = ({ log, isNew }) => {
       <style>{`
         @keyframes critFlash {
           0% {
-            opacity: 1;
-            transform: translateX(20px) scaleX(0.5);
+            opacity: 0;
+            transform: translateX(30px) scaleX(0.3);
+            filter: brightness(1);
           }
-          50% {
+          10% {
             opacity: 1;
+            filter: brightness(2);
+            transform: translateX(10px) scaleX(1);
+          }
+          30% {
+            opacity: 0.9;
+            filter: brightness(1.7);
             transform: translateX(0) scaleX(1);
+          }
+          60% {
+            opacity: 0.5;
+            filter: brightness(1.3);
+            transform: translateX(-5px) scaleX(0.9);
           }
           100% {
             opacity: 0;
-            transform: translateX(-20px) scaleX(0.8);
+            filter: brightness(1);
+            transform: translateX(-20px) scaleX(0.6);
           }
         }
         @keyframes critGlow {
           0% {
             opacity: 0;
             transform: scale(0.3);
+            filter: brightness(1);
           }
-          30% {
+          20% {
             opacity: 1;
-            transform: scale(1.2);
+            transform: scale(1.0);
+            filter: brightness(2.5);
+          }
+          50% {
+            opacity: 0.9;
+            transform: scale(1.3);
+            filter: brightness(1.8);
           }
           100% {
             opacity: 0;
-            transform: scale(1.5);
+            transform: scale(1.6);
+            filter: brightness(1);
           }
         }
         @keyframes missFloatUp {
           0% {
             opacity: 1;
-            transform: translateY(0) scale(1) rotate(-3deg);
+            transform: translate(-50%, -50%) translateY(0) scale(1) rotate(-3deg);
           }
           40% {
             opacity: 1;
-            transform: translateY(-12px) scale(1.2) rotate(2deg);
+            transform: translate(-50%, -50%) translateY(-12px) scale(1.2) rotate(2deg);
+          }
+          75% {
+            opacity: 0.7;
+            transform: translate(-50%, -50%) translateY(-22px) scale(1.15) rotate(3deg);
           }
           100% {
             opacity: 0;
-            transform: translateY(-30px) scale(1.1) rotate(5deg);
+            transform: translate(-50%, -50%) translateY(-35px) scale(1.0) rotate(5deg);
           }
         }
       `}</style>
@@ -209,6 +239,7 @@ export const BattleLog: React.FC<BattleLogProps> = ({ characters, monsters }) =>
   const latestRoundRef = useRef<number>(0);
   const userScrolledRef = useRef<boolean>(false);
   const scrollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const autoResumeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isSimulatingRef = useRef<boolean>(false);
 
   const { isSimulating, winner } = useGameStore();
@@ -269,8 +300,19 @@ export const BattleLog: React.FC<BattleLogProps> = ({ characters, monsters }) =>
 
     if (!isAtBottom) {
       userScrolledRef.current = true;
+
+      if (autoResumeTimeoutRef.current) {
+        clearTimeout(autoResumeTimeoutRef.current);
+      }
+      autoResumeTimeoutRef.current = setTimeout(() => {
+        userScrolledRef.current = false;
+      }, 3000);
     } else {
       userScrolledRef.current = false;
+      if (autoResumeTimeoutRef.current) {
+        clearTimeout(autoResumeTimeoutRef.current);
+        autoResumeTimeoutRef.current = null;
+      }
     }
 
     if (scrollTimeoutRef.current) {
@@ -287,10 +329,18 @@ export const BattleLog: React.FC<BattleLogProps> = ({ characters, monsters }) =>
     const container = logContainerRef.current;
     if (container) {
       container.addEventListener('scroll', handleScroll, { passive: true });
-      return () => {
-        container.removeEventListener('scroll', handleScroll);
-      };
     }
+    return () => {
+      if (container) {
+        container.removeEventListener('scroll', handleScroll);
+      }
+      if (scrollTimeoutRef.current) {
+        clearTimeout(scrollTimeoutRef.current);
+      }
+      if (autoResumeTimeoutRef.current) {
+        clearTimeout(autoResumeTimeoutRef.current);
+      }
+    };
   }, [handleScroll]);
 
   useEffect(() => {
