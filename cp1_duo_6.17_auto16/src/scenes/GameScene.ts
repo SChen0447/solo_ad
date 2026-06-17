@@ -19,6 +19,8 @@ export class GameScene extends Phaser.Scene {
   private player!: Phaser.GameObjects.Container;
   private playerBody!: Phaser.GameObjects.Arc;
   private playerGlow!: Phaser.GameObjects.Arc;
+  private chargeBarBg!: Phaser.GameObjects.Graphics;
+  private chargeBar!: Phaser.GameObjects.Graphics;
   private ground!: Phaser.Physics.Arcade.StaticGroup;
   private obstacles!: Phaser.Physics.Arcade.Group;
   private crystals!: Phaser.Physics.Arcade.Group;
@@ -161,6 +163,9 @@ export class GameScene extends Phaser.Scene {
     body.setCircle(14, -14, -14);
     body.setCollideWorldBounds(true);
     body.setBounce(0);
+
+    this.chargeBarBg = this.add.graphics().setDepth(20);
+    this.chargeBar = this.add.graphics().setDepth(20);
   }
 
   private setupGroups(): void {
@@ -227,6 +232,12 @@ export class GameScene extends Phaser.Scene {
 
     const body = this.player.body as Phaser.Physics.Arcade.Body;
     body.setVelocityY(clampedVelocity);
+
+    this.chargeBar.clear();
+    this.chargeBarBg.clear();
+    this.playerBody.setFillStyle(0xe67e22);
+    this.playerGlow.setFillStyle(0xff6b35, 0.15);
+    this.playerGlow.setScale(1);
   }
 
   private createHUD(w: number): void {
@@ -448,15 +459,62 @@ export class GameScene extends Phaser.Scene {
   }
 
   private collectCrystal(crystal: Phaser.Physics.Arcade.Sprite): void {
+    const container = crystal.gameObject as Phaser.GameObjects.Container;
+    const x = container.x;
+    const y = container.y;
+
     this.crystals.remove(crystal, true, true);
     this.crystalCount++;
     this.totalCrystalsCollected++;
     this.score += Math.floor(10 * this.scoreMultiplier);
 
+    this.playCrystalCollectEffect(x, y);
+
     if (this.crystalCount >= CRYSTAL_SHIELD_THRESHOLD && !this.isShielded) {
       this.crystalCount -= CRYSTAL_SHIELD_THRESHOLD;
       this.activateShield();
     }
+  }
+
+  private playCrystalCollectEffect(x: number, y: number): void {
+    if (!this.textures.exists('collectParticle')) {
+      const gfx = this.add.graphics();
+      gfx.fillStyle(0x00aaff, 1);
+      gfx.fillCircle(3, 3, 3);
+      gfx.generateTexture('collectParticle', 6, 6);
+      gfx.destroy();
+    }
+
+    const emitter = this.add.particles(x, y, 'collectParticle', {
+      speed: { min: 50, max: 150 },
+      angle: { min: 0, max: 360 },
+      scale: { start: 1, end: 0 },
+      lifespan: 400,
+      quantity: 12,
+      tint: [0x00aaff, 0x00ffff, 0xffffff],
+      alpha: { start: 1, end: 0 },
+      blendMode: 'ADD',
+      emitting: false,
+    });
+    emitter.explode(12);
+    this.time.delayedCall(500, () => emitter.destroy());
+
+    const scorePop = this.add.text(x, y - 10, '+' + Math.floor(10 * this.scoreMultiplier), {
+      fontSize: '14px',
+      fontFamily: 'Courier New, monospace',
+      color: '#00ffff',
+      stroke: '#000000',
+      strokeThickness: 1,
+    }).setOrigin(0.5).setDepth(30);
+
+    this.tweens.add({
+      targets: scorePop,
+      y: y - 40,
+      alpha: 0,
+      duration: 600,
+      ease: 'Quad.easeOut',
+      onComplete: () => scorePop.destroy(),
+    });
   }
 
   private activateShield(): void {
@@ -521,19 +579,54 @@ export class GameScene extends Phaser.Scene {
   private animatePlayer(dt: number): void {
     const body = this.player.body as Phaser.Physics.Arcade.Body;
     if (this.isCharging && (body.touching.down || body.blocked.down)) {
-      const pulse = 0.9 + Math.sin(this.time.now / 80) * 0.1;
-      this.player.setScale(pulse, 2 - pulse);
+      const chargePct = Math.min((this.time.now - this.chargeStart) / 1000, 1.0);
+
+      const scaleY = 1.0 - chargePct * 0.4;
+      const scaleX = 1.0 + chargePct * 0.2;
+      this.player.setScale(scaleX, scaleY);
+
+      const r = Math.floor(230 + chargePct * 25);
+      const g = Math.floor(126 - chargePct * 80);
+      const b = Math.floor(34 - chargePct * 34);
+      const color = Phaser.Display.Color.GetColor(r, g, b);
+      this.playerBody.setFillStyle(color);
+
+      const glowColor = Phaser.Display.Color.GetColor(
+        255,
+        Math.floor(200 - chargePct * 150),
+        Math.floor(100 - chargePct * 100)
+      );
+      this.playerGlow.setFillStyle(glowColor, 0.15 + chargePct * 0.3);
+      this.playerGlow.setScale(1 + chargePct * 0.5);
+
+      this.drawChargeBar(chargePct);
     } else if (!body.touching.down && !body.blocked.down) {
       this.player.setScale(1, 0.9);
     } else {
       this.player.setScale(1, 1);
     }
 
-    if (!this.isShielded) {
+    if (!this.isShielded && !this.isCharging) {
       this.playerGlow.setAlpha(0.1 + Math.sin(this.time.now / 300) * 0.05);
     }
 
     void dt;
+  }
+
+  private drawChargeBar(pct: number): void {
+    const barW = 36;
+    const barH = 6;
+    const x = PLAYER_X - barW / 2;
+    const y = GROUND_Y - 50;
+
+    this.chargeBarBg.clear();
+    this.chargeBarBg.fillStyle(0x333333, 0.7);
+    this.chargeBarBg.fillRoundedRect(x, y, barW, barH, 2);
+
+    this.chargeBar.clear();
+    const color = pct > 0.7 ? 0xff0000 : pct > 0.4 ? 0xff6b35 : 0xffd700;
+    this.chargeBar.fillStyle(color, 1);
+    this.chargeBar.fillRoundedRect(x, y, barW * pct, barH, 2);
   }
 
   private updateHUD(): void {
@@ -575,25 +668,33 @@ export class GameScene extends Phaser.Scene {
     if (!this.textures.exists('deathParticle')) {
       const gfx = this.add.graphics();
       gfx.fillStyle(0xffffff, 1);
-      gfx.fillRect(0, 0, 4, 4);
-      gfx.generateTexture('deathParticle', 4, 4);
+      gfx.fillRect(0, 0, 5, 5);
+      gfx.generateTexture('deathParticle', 5, 5);
       gfx.destroy();
     }
 
     const emitter = this.add.particles(x, y, 'deathParticle', {
-      speed: { min: 80, max: 300 },
+      speed: { min: 60, max: 320 },
       angle: { min: 0, max: 360 },
-      scale: { start: 1.5, end: 0 },
+      scale: { start: 1.8, end: 0 },
       lifespan: 800,
-      gravityY: 300,
+      gravityY: 400,
       quantity: PARTICLE_COUNT,
-      tint: [0xff6b35, 0xff4500, 0xff0000, 0xffaa00],
+      tint: (particle: Phaser.GameObjects.Particles.Particle) => {
+        const t = particle.lifeT;
+        const r = 255;
+        const g = Math.floor(107 - t * 107);
+        const b = Math.floor(53 - t * 53);
+        return Phaser.Display.Color.GetColor(r, g, b);
+      },
       alpha: { start: 1, end: 0 },
       blendMode: 'ADD',
       emitting: false,
     });
 
     emitter.explode(PARTICLE_COUNT);
+
+    this.cameras.main.shake(200, 0.01);
 
     this.time.delayedCall(1000, () => {
       emitter.destroy();

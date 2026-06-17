@@ -33,6 +33,8 @@ export class GameOverScene extends Phaser.Scene {
 
     this.createSubmitButton(width, height);
 
+    this.createRestartButton(width, height);
+
     this.createLeaderboard(width, height);
 
     this.createRestartHint(width, height);
@@ -181,6 +183,57 @@ export class GameOverScene extends Phaser.Scene {
     gfx.strokeRoundedRect(-hw, -hh, w, h, 8);
   }
 
+  private createRestartButton(w: number, h: number): void {
+    const btnY = h * 0.60;
+    const btnW = 140;
+    const btnH = 40;
+
+    const btnBg = this.add.graphics();
+    this.drawRestartBg(btnBg, btnW, btnH, false);
+
+    const btnText = this.add.text(0, 0, '再来一局', {
+      fontSize: '18px',
+      fontFamily: 'Arial, sans-serif',
+      color: '#ffffff',
+    }).setOrigin(0.5);
+
+    const btn = this.add.container(w / 2 + 160, btnY, [btnBg, btnText]);
+    btn.setSize(btnW, btnH);
+    btn.setDepth(10);
+    btn.setInteractive({ useHandCursor: true });
+
+    btn.on('pointerover', () => {
+      this.tweens.add({ targets: btn, scaleX: 1.1, scaleY: 1.1, duration: 150, ease: 'Back.easeOut' });
+      this.drawRestartBg(btnBg, btnW, btnH, true);
+    });
+
+    btn.on('pointerout', () => {
+      this.tweens.add({ targets: btn, scaleX: 1, scaleY: 1, duration: 150 });
+      this.drawRestartBg(btnBg, btnW, btnH, false);
+    });
+
+    btn.on('pointerdown', () => {
+      this.cleanup();
+      this.scene.start('GameScene');
+    });
+  }
+
+  private drawRestartBg(gfx: Phaser.GameObjects.Graphics, w: number, h: number, glow: boolean): void {
+    gfx.clear();
+    const hw = w / 2;
+    const hh = h / 2;
+
+    if (glow) {
+      gfx.fillStyle(0x00ff88, 0.3);
+      gfx.fillRoundedRect(-hw - 3, -hh - 3, w + 6, h + 6, 10);
+    }
+
+    gfx.fillGradientStyle(0x27ae60, 0x2ecc71, 0x27ae60, 0x2ecc71, 1);
+    gfx.fillRoundedRect(-hw, -hh, w, h, 8);
+    gfx.lineStyle(1, 0x7fff7f, glow ? 0.9 : 0.4);
+    gfx.strokeRoundedRect(-hw, -hh, w, h, 8);
+  }
+
   private async submitScore(): Promise<void> {
     const nickname = this.nicknameInput.value.trim();
     if (!nickname) {
@@ -254,7 +307,7 @@ export class GameOverScene extends Phaser.Scene {
   }
 
   private createRestartHint(w: number, h: number): void {
-    const hint = this.add.text(w / 2, h * 0.95, '按空格键重新开始', {
+    const hint = this.add.text(w / 2, h * 0.95, '按空格键快速重来', {
       fontSize: '14px',
       fontFamily: 'Arial, sans-serif',
       color: '#886644',
@@ -270,7 +323,7 @@ export class GameOverScene extends Phaser.Scene {
 
     this.input.keyboard?.on('keydown-SPACE', () => {
       this.cleanup();
-      this.scene.start('MenuScene');
+      this.scene.start('GameScene');
     });
   }
 
