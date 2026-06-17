@@ -181,6 +181,21 @@ export class Renderer {
     c.restore();
   }
 
+  drawPauseOverlay(c: CanvasRenderingContext2D): void {
+    c.save();
+    c.fillStyle = 'rgba(0, 0, 0, 0.3)';
+    c.fillRect(0, 0, CANVAS_W, CANVAS_H);
+    c.shadowColor = 'rgba(0, 0, 0, 0.8)';
+    c.shadowBlur = 12;
+    c.fillStyle = 'rgba(255, 255, 255, 0.9)';
+    c.font = '36px sans-serif';
+    c.textAlign = 'center';
+    c.textBaseline = 'middle';
+    c.fillText('游戏暂停', CANVAS_W / 2, CANVAS_H / 2);
+    c.shadowBlur = 0;
+    c.restore();
+  }
+
   drawMenu(c: CanvasRenderingContext2D, time: number, hoveredBtn: number): MenuButton[] {
     this.menuTime = time;
     this.drawBackground(c);

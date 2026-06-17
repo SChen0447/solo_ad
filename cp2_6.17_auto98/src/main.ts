@@ -51,11 +51,18 @@ class Game {
     this.gameLoop = new GameLoop();
 
     this.setupInput();
-    this.gameLoop.start((dt) => this.update(dt), (fps) => this.render(fps));
+    this.gameLoop.start((dt) => this.update(dt), (fps, paused) => this.render(fps, paused));
   }
 
   private setupInput(): void {
     window.addEventListener('keydown', (e) => {
+      if (e.code === 'KeyP' || e.code === 'Escape') {
+        if (this.state === GameState.PLAYING || this.state === GameState.COUNTDOWN) {
+          this.gameLoop.togglePaused();
+          e.preventDefault();
+        }
+        return;
+      }
       this.keys.add(e.code);
       if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Numpad1'].includes(e.code)) {
         e.preventDefault();
@@ -126,6 +133,7 @@ class Game {
         this.particles = [];
         this.players = [];
         this.ai = null;
+        this.gameLoop.setPaused(false);
       }
     }
   }
@@ -135,6 +143,7 @@ class Game {
     this.countdownTimer = 3;
     this.bullets = [];
     this.particles = [];
+    this.gameLoop.setPaused(false);
     this.initPlayers();
   }
 
@@ -229,6 +238,11 @@ class Game {
   }
 
   private handlePlayer1Input(p1: Player): void {
+    if (this.gameLoop.isPaused()) {
+      p1.vx = 0;
+      p1.vy = 0;
+      return;
+    }
     p1.vx = 0;
     p1.vy = 0;
     if (this.keys.has('KeyW')) p1.vy = -p1.speed;
@@ -247,6 +261,11 @@ class Game {
   }
 
   private handlePlayer2Input(p2: Player): void {
+    if (this.gameLoop.isPaused()) {
+      p2.vx = 0;
+      p2.vy = 0;
+      return;
+    }
     p2.vx = 0;
     p2.vy = 0;
     if (this.keys.has('ArrowUp')) p2.vy = -p2.speed;
@@ -298,7 +317,7 @@ class Game {
     }
   }
 
-  private render(fps: number): void {
+  private render(fps: number, paused: boolean): void {
     const c = this.renderer.getContext();
 
     switch (this.state) {
@@ -319,10 +338,15 @@ class Game {
           this.players, this.bullets, this.particles,
           this.p1Name, this.p2Name, fps
         );
-        const count = Math.ceil(this.countdownTimer);
-        const progress = this.countdownTimer - Math.floor(this.countdownTimer);
-        if (count > 0 && count <= 3) {
-          this.renderer.drawCountdown(this.renderer.getContext(), count, 1 - progress);
+        if (!paused) {
+          const count = Math.ceil(this.countdownTimer);
+          const progress = this.countdownTimer - Math.floor(this.countdownTimer);
+          if (count > 0 && count <= 3) {
+            this.renderer.drawCountdown(this.renderer.getContext(), count, 1 - progress);
+          }
+        }
+        if (paused) {
+          this.renderer.drawPauseOverlay(this.renderer.getContext());
         }
         this.renderer.present();
         break;
@@ -333,6 +357,10 @@ class Game {
           this.players, this.bullets, this.particles,
           this.p1Name, this.p2Name, fps
         );
+        if (paused) {
+          this.renderer.drawPauseOverlay(this.renderer.getContext());
+          this.renderer.present();
+        }
         break;
 
       case GameState.GAME_OVER: {
