@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Stellar Fleet Commander</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+    body {
+      background: linear-gradient(135deg, #0a0a1a 0%, #1c0e2b 50%, #0a0a2a 100%);
+      color: #a8d8ea;
+    }
+    #start-screen {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      z-index: 100;
+      transition: opacity 0.8s ease;
+    }
+    #start-screen.hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
+    .title {
+      font-size: 4rem;
+      font-weight: bold;
+      color: #f0d060;
+      text-shadow: 0 0 20px rgba(240, 208, 96, 0.6),
+                   0 0 40px rgba(240, 208, 96, 0.4),
+                   0 0 60px rgba(240, 208, 96, 0.2);
+      letter-spacing: 8px;
+      margin-bottom: 1rem;
+      animation: glow 3s ease-in-out infinite;
+    }
+    .subtitle {
+      font-size: 1.2rem;
+      color: #a8d8ea;
+      margin-bottom: 3rem;
+      letter-spacing: 2px;
+      opacity: 0.8;
+    }
+    @keyframes glow {
+      0%, 100% {
+        text-shadow: 0 0 20px rgba(240, 208, 96, 0.6),
+                     0 0 40px rgba(240, 208, 96, 0.4),
+                     0 0 60px rgba(240, 208, 96, 0.2);
+      }
+      50% {
+        text-shadow: 0 0 30px rgba(240, 208, 96, 0.8),
+                     0 0 60px rgba(240, 208, 96, 0.6),
+                     0 0 90px rgba(240, 208, 96, 0.3);
+      }
+    }
+    #start-btn {
+      padding: 1rem 3rem;
+      font-size: 1.2rem;
+      background: linear-gradient(135deg, #f0d060 0%, #d4a030 100%);
+      color: #0a0a1a;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: bold;
+      letter-spacing: 2px;
+      transition: all 0.15s ease;
+      box-shadow: 0 0 20px rgba(240, 208, 96, 0.4);
+    }
+    #start-btn:hover {
+      transform: scale(1.05);
+      box-shadow: 0 0 30px rgba(240, 208, 96, 0.6);
+      filter: brightness(1.1);
+    }
+    #game-container {
+      width: 100%;
+      height: 100%;
+      display: none;
+    }
+    #game-container.active {
+      display: flex;
+    }
+    .panel-left, .panel-right {
+      position: relative;
+      z-index: 10;
+      background: rgba(10, 10, 30, 0.8);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      border: 1px solid rgba(168, 216, 234, 0.2);
+      overflow-y: auto;
+      transition: all 0.3s ease;
+    }
+    .panel-left {
+      width: 240px;
+      border-right: 1px solid rgba(168, 216, 234, 0.2);
+    }
+    .panel-right {
+      width: 280px;
+      border-left: 1px solid rgba(168, 216, 234, 0.2);
+    }
+    .panel-center {
+      flex: 1;
+      position: relative;
+      min-height: 500px;
+    }
+    .panel-header {
+      padding: 1rem;
+      font-size: 1rem;
+      font-weight: bold;
+      color: #f0d060;
+      border-bottom: 1px solid rgba(240, 208, 96, 0.3);
+      letter-spacing: 1px;
+      text-transform: uppercase;
+    }
+    .toggle-btn {
+      display: none;
+      position: fixed;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 32px;
+      height: 60px;
+      background: rgba(10, 10, 30, 0.9);
+      border: 1px solid rgba(168, 216, 234, 0.3);
+      color: #f0d060;
+      cursor: pointer;
+      z-index: 20;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.2rem;
+      transition: all 0.15s ease;
+    }
+    .toggle-btn:hover {
+      filter: brightness(1.2);
+      transform: translateY(-50%) scale(1.05);
+    }
+    .toggle-btn.left {
+      left: 0;
+      border-left: none;
+      border-radius: 0 8px 8px 0;
+    }
+    .toggle-btn.right {
+      right: 0;
+      border-right: none;
+      border-radius: 8px 0 0 8px;
+    }
+    @media (max-width: 900px) {
+      .toggle-btn {
+        display: flex;
+      }
+      .panel-left {
+        position: fixed;
+        left: -240px;
+        top: 0;
+        height: 100%;
+        width: 240px;
+        z-index: 15;
+      }
+      .panel-left.open {
+        left: 0;
+      }
+      .panel-right {
+        position: fixed;
+        right: -280px;
+        top: 0;
+        height: 100%;
+        width: 280px;
+        z-index: 15;
+      }
+      .panel-right.open {
+        right: 0;
+      }
+    }
+    .ship-card {
+      margin: 0.75rem;
+      padding: 0.75rem;
+      background: rgba(20, 20, 50, 0.6);
+      border-radius: 6px;
+      border: 2px solid transparent;
+      transition: all 0.3s ease;
+      cursor: pointer;
+      position: relative;
+    }
+    .ship-card:hover {
+      transform: scale(1.02);
+      filter: brightness(1.15);
+    }
+    .ship-card.selected {
+      border-color: #f0d060;
+      box-shadow: 0 0 12px rgba(240, 208, 96, 0.5);
+    }
+    .ship-card.state-idle {
+      box-shadow: 0 0 6px rgba(0, 255, 100, 0.3);
+    }
+    .ship-card.state-moving {
+      box-shadow: 0 0 6px rgba(0, 150, 255, 0.4);
+    }
+    .ship-card.state-battle {
+      box-shadow: 0 0 6px rgba(255, 50, 50, 0.5);
+    }
+    .ship-name {
+      font-weight: bold;
+      color: #a8d8ea;
+      margin-bottom: 0.5rem;
+      font-size: 0.9rem;
+    }
+    .stars {
+      position: absolute;
+      top: 0.5rem;
+      left: 0.5rem;
+      display: flex;
+      gap: 2px;
+    }
+    .star {
+      color: #f0d060;
+      font-size: 0.7rem;
+      text-shadow: 0 0 4px rgba(240, 208, 96, 0.6);
+    }
+    .stat-row {
+      display: flex;
+      align-items: center;
+      margin-top: 0.4rem;
+      font-size: 0.75rem;
+    }
+    .stat-label {
+      width: 40px;
+      color: #7a8ca0;
+    }
+    .stat-bar {
+      flex: 1;
+      height: 8px;
+      background: rgba(0, 0, 0, 0.4);
+      border-radius: 4px;
+      overflow: hidden;
+      position: relative;
+    }
+    .stat-fill {
+      height: 100%;
+      border-radius: 4px;
+      transition: width 0.3s ease, background 0.3s ease;
+    }
+    .stat-fill.hull {
+      background: linear-gradient(90deg, #ff4444, #44ff44);
+    }
+    .stat-fill.firepower {
+      background: linear-gradient(90deg, #4488ff, #ff4444);
+    }
+    .stat-fill.speed {
+      background: linear-gradient(90deg, #00aaaa, #00ffff);
+    }
+    .stat-value {
+      width: 45px;
+      text-align: right;
+      color: #a8d8ea;
+      font-size: 0.7rem;
+    }
+    .status-indicator {
+      position: absolute;
+      bottom: 0.5rem;
+      right: 0.5rem;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+    }
+    .status-idle {
+      background: radial-gradient(circle, #00ff66, #009933);
+      box-shadow: 0 0 6px rgba(0, 255, 100, 0.6);
+    }
+    .status-moving {
+      background: radial-gradient(circle, #00aaff, #0066aa);
+      animation: pulse-blue 0.6s ease-in-out infinite;
+    }
+    .status-battle {
+      background: radial-gradient(circle, #ff3333, #aa0000);
+      animation: flash-red 0.2s steps(2) infinite;
+    }
+    @keyframes pulse-blue {
+      0%, 100% { box-shadow: 0 0 4px rgba(0, 170, 255, 0.4); opacity: 0.6; }
+      50% { box-shadow: 0 0 12px rgba(0, 170, 255, 0.8); opacity: 1; }
+    }
+    @keyframes flash-red {
+      0% { box-shadow: 0 0 4px rgba(255, 50, 50, 0.4); opacity: 0.5; }
+      100% { box-shadow: 0 0 12px rgba(255, 50, 50, 1); opacity: 1; }
+    }
+    .command-section {
+      padding: 1rem;
+      border-bottom: 1px solid rgba(168, 216, 234, 0.1);
+    }
+    .command-title {
+      color: #f0d060;
+      font-size: 0.85rem;
+      margin-bottom: 0.75rem;
+      font-weight: bold;
+      letter-spacing: 1px;
+    }
+    .mission-btn {
+      display: block;
+      width: 100%;
+      padding: 0.75rem;
+      margin-bottom: 0.5rem;
+      background: rgba(30, 30, 60, 0.6);
+      border: 1px solid rgba(168, 216, 234, 0.2);
+      color: #a8d8ea;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 0.85rem;
+      transition: all 0.15s ease;
+      text-align: left;
+    }
+    .mission-btn:hover {
+      transform: scale(1.02);
+      filter: brightness(1.15);
+      border-color: rgba(240, 208, 96, 0.5);
+    }
+    .mission-btn.selected {
+      background: rgba(240, 208, 96, 0.2);
+      border-color: #f0d060;
+      color: #f0d060;
+    }
+    .mission-btn .mission-name {
+      font-weight: bold;
+      margin-bottom: 0.25rem;
+    }
+    .mission-btn .mission-desc {
+      font-size: 0.7rem;
+      color: #7a8ca0;
+    }
+    #execute-btn {
+      width: calc(100% - 2rem);
+      margin: 1rem;
+      padding: 0.75rem;
+      background: linear-gradient(135deg, #f0d060 0%, #d4a030 100%);
+      color: #0a0a1a;
+      border: none;
+      border-radius: 6px;
+      font-weight: bold;
+      cursor: pointer;
+      letter-spacing: 1px;
+      transition: all 0.15s ease;
+    }
+    #execute-btn:hover {
+      transform: scale(1.02);
+      filter: brightness(1.1);
+      box-shadow: 0 0 15px rgba(240, 208, 96, 0.5);
+    }
+    #execute-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none;
+      filter: none;
+      box-shadow: none;
+    }
+    .mission-status {
+      padding: 1rem;
+      font-size: 0.8rem;
+    }
+    .mission-status-item {
+      margin-bottom: 0.5rem;
+      display: flex;
+      justify-content: space-between;
+    }
+    .mission-status-label {
+      color: #7a8ca0;
+    }
+    .mission-status-value {
+      color: #a8d8ea;
+    }
+    #phaser-canvas {
+      display: block;
+    }
+  </style>
+</head>
+<body>
+  <div id="start-screen">
+    <h1 class="title">STELLAR FLEET</h1>
+    <p class="subtitle">Interstellar Fleet Commander</p>
+    <button id="start-btn">Begin Mission</button>
+  </div>
+
+  <div id="game-container">
+    <button class="toggle-btn left" id="toggle-left">&raquo;</button>
+    <div class="panel-left" id="panel-left">
+      <div class="panel-header">Fleet Roster</div>
+      <div id="fleet-list"></div>
+    </div>
+    <div class="panel-center" id="panel-center"></div>
+    <div class="panel-right" id="panel-right">
+      <div class="panel-header">Command Panel</div>
+      <div class="command-section">
+        <div class="command-title">Mission Type</div>
+        <button class="mission-btn" data-mission="patrol">
+          <div class="mission-name">Patrol</div>
+          <div class="mission-desc">Sector security sweep</div>
+        </button>
+        <button class="mission-btn" data-mission="escort">
+          <div class="mission-name">Escort</div>
+          <div class="mission-desc">Protect convoy routes</div>
+        </button>
+        <button class="mission-btn" data-mission="raid">
+          <div class="mission-name">Raid</div>
+          <div class="mission-desc">Strike enemy positions</div>
+        </button>
+      </div>
+      <button id="execute-btn">Execute Mission</button>
+      <div class="mission-status" id="mission-status">
+        <div class="mission-status-item">
+          <span class="mission-status-label">Selected Ship:</span>
+          <span class="mission-status-value" id="selected-ship">None</span>
+        </div>
+        <div class="mission-status-item">
+          <span class="mission-status-label">Target Node:</span>
+          <span class="mission-status-value" id="target-node">None</span>
+        </div>
+        <div class="mission-status-item">
+          <span class="mission-status-label">Mission Type:</span>
+          <span class="mission-status-value" id="mission-type">None</span>
+        </div>
+      </div>
+    </div>
+    <button class="toggle-btn right" id="toggle-right">&laquo;</button>
+  </div>
+
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>

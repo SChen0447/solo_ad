@@ -1,0 +1,20 @@
+{
+  "name": "stellar-fleet-commander",
+  "version": "1.0.0",
+  "description": "Interstellar fleet commander game with Phaser.js and Flask backend",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "phaser": "^3.80.1",
+    "axios": "^1.6.8"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.5",
+    "vite": "^5.2.0",
+    "@types/node": "^20.12.0"
+  }
+}
