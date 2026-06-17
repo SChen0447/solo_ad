@@ -27,6 +27,7 @@ function App() {
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; nodeId?: string } | null>(null);
   const [editName, setEditName] = useState('');
   const [editLabel, setEditLabel] = useState('');
+  const [zoomLevel, setZoomLevel] = useState(1);
   const canvasRef = useRef<GraphCanvasRef>(null);
   const editPopupRef = useRef<HTMLDivElement>(null);
 
@@ -157,6 +158,14 @@ function App() {
     canvasRef.current?.applyLayout(newLayout);
   };
 
+  const handleZoomChange = (zoom: number) => {
+    setZoomLevel(zoom);
+  };
+
+  const handleResetZoom = () => {
+    canvasRef.current?.resetZoom();
+  };
+
   const filteredNodes = nodes.filter(n => {
     if (!searchQuery.trim()) return true;
     const query = searchQuery.toLowerCase();
@@ -250,6 +259,7 @@ function App() {
             nodes={nodes}
             edges={edges}
             searchQuery={searchQuery}
+            labelFilter=""
             layout={layout}
             isEdgeMode={isEdgeMode}
             onEdgeModeChange={setIsEdgeMode}
@@ -257,6 +267,7 @@ function App() {
             onEdgeCreate={handleEdgeCreate}
             onNodeDoubleClick={handleNodeDoubleClick}
             onContextMenu={handleContextMenu}
+            onZoomChange={handleZoomChange}
           />
           {isEdgeMode && (
             <div style={styles.edgeModeIndicator}>
@@ -271,6 +282,9 @@ function App() {
               </button>
             </div>
           )}
+          <div style={styles.zoomIndicator} onClick={handleResetZoom}>
+            {Math.round(zoomLevel * 100)}%
+          </div>
         </div>
       </div>
 
@@ -472,12 +486,13 @@ const styles: Record<string, React.CSSProperties> = {
   },
   nodeItem: {
     padding: '10px 12px',
-    marginBottom: '4px',
+    marginBottom: '0px',
     backgroundColor: '#334155',
-    borderRadius: '8px',
+    borderRadius: '0px',
     cursor: 'pointer',
     transition: 'all 0.2s',
     borderLeft: '3px solid #3b82f6',
+    borderBottom: '1px solid #1e293b',
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
@@ -545,6 +560,21 @@ const styles: Record<string, React.CSSProperties> = {
     flex: 1,
     position: 'relative',
     overflow: 'hidden',
+  },
+  zoomIndicator: {
+    position: 'absolute',
+    bottom: '12px',
+    right: '12px',
+    backgroundColor: '#1e293b',
+    color: '#94a3b8',
+    padding: '6px 12px',
+    borderRadius: '6px',
+    fontSize: '12px',
+    fontWeight: 500,
+    cursor: 'pointer',
+    zIndex: 10,
+    border: '1px solid #334155',
+    transition: 'all 0.2s',
   },
   edgeModeIndicator: {
     position: 'absolute',

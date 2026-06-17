@@ -15,10 +15,13 @@ interface GraphCanvasProps {
   onEdgeCreate: (source: string, target: string) => void;
   onNodeDoubleClick: (node: GraphNode) => void;
   onContextMenu: (x: number, y: number, nodeId?: string) => void;
+  onZoomChange: (zoom: number) => void;
 }
 
 export interface GraphCanvasRef {
   applyLayout: (layout: LayoutType) => void;
+  getZoom: () => number;
+  resetZoom: () => void;
 }
 
 const NODE_RADIUS = 30;
@@ -43,6 +46,7 @@ const GraphCanvas = forwardRef<GraphCanvasRef, GraphCanvasProps>((
     onEdgeCreate,
     onNodeDoubleClick,
     onContextMenu,
+    onZoomChange,
   },
   ref
 ) => {
@@ -65,11 +69,26 @@ const GraphCanvas = forwardRef<GraphCanvasRef, GraphCanvasProps>((
   const edgeFirstNodeRef = useRef<string | null>(null);
   const mousePosRef = useRef({ x: 0, y: 0 });
   const newlyAddedRef = useRef<Set<string>>(new Set());
+  const bounceAnimRef = useRef<{
+    nodeId: string;
+    startTime: number;
+    finalX: number;
+    finalY: number;
+    overshootX: number;
+    overshootY: number;
+  } | null>(null);
+  const lastDragWorldRef = useRef<{ x: number; y: number; time: number }>({ x: 0, y: 0, time: 0 });
   const [dimensions, setDimensions] = useState({ width: 800, height: 600 });
 
   useImperativeHandle(ref, () => ({
     applyLayout: (layoutType: LayoutType) => {
       applyLayout(layoutType);
+    },
+    getZoom: () => zoomRef.current,
+    resetZoom: () => {
+      zoomRef.current = 1;
+      panRef.current = { x: 0, y: 0 };
+      onZoomChange(1);
     },
   }));
 
@@ -308,6 +327,27 @@ const GraphCanvas = forwardRef<GraphCanvasRef, GraphCanvasProps>((
 
     applyForce();
 
+    if (bounceAnimRef.current) {
+      const anim = bounceAnimRef.current;
+      const elapsed = (performance.now() - anim.startTime) / 300;
+      if (elapsed >= 1) {
+        const node = nodesRef.current.find(n => n.id === anim.nodeId);
+        if (node) {
+          node.x = anim.finalX;
+          node.y = anim.finalY;
+        }
+        bounceAnimRef.current = null;
+      } else {
+        const t = elapsed;
+        const easeT = 1 + 2.7 * Math.pow(t - 1, 3) + 1.7 * Math.pow(t - 1, 2);
+        const node = nodesRef.current.find(n => n.id === anim.nodeId);
+        if (node) {
+          node.x = anim.overshootX + (anim.finalX - anim.overshootX) * easeT;
+          node.y = anim.overshootY + (anim.finalY - anim.overshootY) * easeT;
+        }
+      }
+    }
+
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.fillStyle = '#0f172a';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -486,6 +526,7 @@ const GraphCanvas = forwardRef<GraphCanvasRef, GraphCanvasProps>((
       if (node) {
         node.x = world.x - dragOffsetRef.current.x;
         node.y = world.y - dragOffsetRef.current.y;
+        lastDragWorldRef.current = { x: world.x, y: world.y, time: performance.now() };
       }
     } else if (isPanningRef.current) {
       panRef.current = {
@@ -504,6 +545,27 @@ const GraphCanvas = forwardRef<GraphCanvasRef, GraphCanvasProps>((
       const node = nodesRef.current.find(n => n.id === dragNodeRef.current);
       if (node) {
         onNodeUpdate(dragNodeRef.current, { x: node.x, y: node.y });
+
+        const now = performance.now();
+        const dt = now - lastDragWorldRef.current.time;
+        if (dt < 100 && dt > 0) {
+          const prevWorld = lastDragWorldRef.current;
+          const vx = (node.x - (prevWorld.x - dragOffsetRef.current.x)) / (dt / 1000);
+          const vy = (node.y - (prevWorld.y - dragOffsetRef.current.y)) / (dt / 1000);
+          const speed = Math.sqrt(vx * vx + vy * vy);
+          if (speed > 30) {
+            const overshootDist = Math.min(speed * 0.04, 15);
+            const angle = Math.atan2(vy, vx);
+            bounceAnimRef.current = {
+              nodeId: dragNodeRef.current,
+              startTime: now,
+              finalX: node.x,
+              finalY: node.y,
+              overshootX: node.x + Math.cos(angle) * overshootDist,
+              overshootY: node.y + Math.sin(angle) * overshootDist,
+            };
+          }
+        }
       }
     }
     isDraggingRef.current = false;
@@ -534,7 +596,8 @@ const GraphCanvas = forwardRef<GraphCanvasRef, GraphCanvasProps>((
     };
     
     zoomRef.current = newZoom;
-  }, []);
+    onZoomChange(newZoom);
+  }, [onZoomChange]);
 
   const handleContextMenu = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
     e.preventDefault();
