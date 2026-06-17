@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>3D地下岩层与矿体结构可视化系统</title>
+  <link rel="stylesheet" href="/src/styles.css" />
+</head>
+<body>
+  <div id="app-container">
+    <canvas id="scene-canvas"></canvas>
+    
+    <div id="tooltip" class="tooltip hidden">
+      <div class="tooltip-title"></div>
+      <div class="tooltip-content"></div>
+    </div>
+
+    <div id="info-panel" class="info-panel">
+      <div class="panel-header">
+        <h2>地质属性详情</h2>
+        <button id="close-panel" class="close-btn">&times;</button>
+      </div>
+      <div class="panel-body">
+        <div class="info-placeholder">请点击岩层或矿体查看详细属性</div>
+      </div>
+    </div>
+
+    <div id="modal-overlay" class="modal-overlay hidden">
+      <div class="modal-dialog">
+        <div class="modal-header">
+          <h3>矿体详细信息</h3>
+          <button id="close-modal" class="close-btn">&times;</button>
+        </div>
+        <div class="modal-body"></div>
+        <div class="modal-footer">
+          <button id="export-btn" class="btn btn-primary">导出数据</button>
+          <button id="modal-cancel" class="btn btn-secondary">关闭</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
