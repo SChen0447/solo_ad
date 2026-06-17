@@ -182,13 +182,14 @@ function handlePickColor(color: string) {
 }
 
 function handleToolChange(tool: ToolType) {
-  if (tool !== currentTool.value) {
-    if (tool === 'picker') {
-      previousTool.value = currentTool.value
-    }
-    currentTool.value = tool
-  }
+  currentTool.value = tool
 }
+
+watch(currentTool, (newTool, oldTool) => {
+  if (newTool === 'picker' && oldTool !== undefined && oldTool !== 'picker') {
+    previousTool.value = oldTool
+  }
+})
 
 function togglePlay() {
   if (!engine) return

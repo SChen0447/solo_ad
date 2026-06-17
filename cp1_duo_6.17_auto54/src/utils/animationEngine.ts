@@ -90,11 +90,11 @@ export function drawBrush(
   const rows = pixels.length;
   const cols = pixels[0].length;
 
-  const startOffset = Math.floor((size - 1) / 2);
-  for (let dy = 0; dy < size; dy++) {
-    for (let dx = 0; dx < size; dx++) {
-      const x = cx - startOffset + dx;
-      const y = cy - startOffset + dy;
+  const half = Math.floor(size / 2);
+  for (let dy = -half; dy <= size - half - 1; dy++) {
+    for (let dx = -half; dx <= size - half - 1; dx++) {
+      const x = cx + dx;
+      const y = cy + dy;
       if (x >= 0 && x < cols && y >= 0 && y < rows) {
         result[y][x] = color;
       }
@@ -112,7 +112,23 @@ export function drawLine(
   color: string | null,
   size: BrushSize
 ): PixelData {
-  let result = pixels;
+  const rows = pixels.length;
+  const cols = pixels[0].length;
+
+  const toPaint = new Set<string>();
+  const half = Math.floor(size / 2);
+
+  const addBrushPixels = (cx: number, cy: number) => {
+    for (let dy = -half; dy <= size - half - 1; dy++) {
+      for (let dx = -half; dx <= size - half - 1; dx++) {
+        const x = cx + dx;
+        const y = cy + dy;
+        if (x >= 0 && x < cols && y >= 0 && y < rows) {
+          toPaint.add(`${x},${y}`);
+        }
+      }
+    }
+  };
 
   const dx = Math.abs(x1 - x0);
   const dy = Math.abs(y1 - y0);
@@ -127,7 +143,7 @@ export function drawLine(
 
   while (safety < maxSteps) {
     safety++;
-    result = drawBrush(result, x, y, color, size);
+    addBrushPixels(x, y);
 
     if (x === x1 && y === y1) break;
 
@@ -141,6 +157,16 @@ export function drawLine(
       y += sy;
     }
   }
+
+  if (toPaint.size === 0) return pixels;
+
+  const result = clonePixels(pixels);
+  toPaint.forEach((key) => {
+    const [pxStr, pyStr] = key.split(',');
+    const px = parseInt(pxStr, 10);
+    const py = parseInt(pyStr, 10);
+    result[py][px] = color;
+  });
 
   return result;
 }

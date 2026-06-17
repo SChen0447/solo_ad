@@ -37,8 +37,8 @@
             v-for="s in brushSizes"
             :key="s"
             class="size-btn"
-            :class="{ active: brushSize === s }"
-            @click="$emit('change-brush-size', s)"
+            :class="{ active: brushSize === s, scaled: scalingSize === s }"
+            @click="handleBrushSize(s)"
           >
             {{ s }}×{{ s }}
           </button>
@@ -106,6 +106,7 @@ const brushSizes: BrushSize[] = [1, 2, 3]
 
 const scalingTool = ref<ToolType | null>(null)
 const bouncingIndex = ref<number | null>(null)
+const scalingSize = ref<BrushSize | null>(null)
 
 const tools = [
   { type: 'pencil' as ToolType, label: '铅笔', icon: '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/><path d="M2 2l7.586 7.586"/><circle cx="11" cy="11" r="2"/></svg>' },
@@ -124,6 +125,14 @@ function handleTool(tool: ToolType) {
 
 function handleGridSize(size: GridSize) {
   emit('change-grid-size', size)
+}
+
+function handleBrushSize(size: BrushSize) {
+  scalingSize.value = size
+  setTimeout(() => {
+    scalingSize.value = null
+  }, 200)
+  emit('change-brush-size', size)
 }
 
 function handleColorSelect(color: string, idx: number) {
@@ -281,6 +290,12 @@ function handlePresetChange(e: Event) {
 .size-btn.active {
   background: #6c6cff;
   color: #ffffff;
+  font-weight: 600;
+  box-shadow: 0 0 0 2px rgba(108, 108, 255, 0.35);
+}
+
+.size-btn.scaled {
+  transform: scale(1.08);
 }
 
 .preset-select {

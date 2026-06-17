@@ -10,7 +10,7 @@
           @mousedown="handleMouseDown"
           @mousemove="handleMouseMove"
           @mouseup="handleMouseUp"
-          @mouseleave="handleMouseUp"
+          @mouseleave="handleMouseLeave"
         ></canvas>
         <canvas
           ref="gridRef"
@@ -84,7 +84,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, nextTick } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
 import type { Frame, ToolType, BrushSize, GridSize } from '../utils/animationEngine'
 import { floodFill, drawBrush, drawLine, clonePixels } from '../utils/animationEngine'
 import { generateThumbnail, renderFrameToCanvas } from '../utils/exportSprite'
@@ -223,6 +223,16 @@ function handleMouseUp() {
   lastDrawPos.value = null
 }
 
+function handleMouseLeave() {
+  isDrawing.value = false
+  lastDrawPos.value = null
+}
+
+function handleGlobalMouseUp() {
+  isDrawing.value = false
+  lastDrawPos.value = null
+}
+
 function drawLineTo(x: number, y: number, color: string | null) {
   const frame = currentFrame.value
   if (!frame || !lastDrawPos.value) return
@@ -336,6 +346,11 @@ watch(
 onMounted(() => {
   renderCanvas()
   renderGrid()
+  window.addEventListener('mouseup', handleGlobalMouseUp)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('mouseup', handleGlobalMouseUp)
 })
 </script>
 
