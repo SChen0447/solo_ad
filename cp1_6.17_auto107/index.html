@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>霓虹节奏可视化器</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      background: #0a0a0a;
+      color: #fff;
+      font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+
+    .container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 20px;
+      padding: 20px;
+      width: 100%;
+      max-width: 900px;
+    }
+
+    .canvas-wrapper {
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    #visualizer {
+      display: block;
+      border-radius: 12px;
+      background: #0a0a0a;
+    }
+
+    .fps-counter {
+      position: absolute;
+      bottom: 10px;
+      right: 10px;
+      font-size: 14px;
+      font-weight: bold;
+      font-family: 'Courier New', monospace;
+      text-shadow: 0 0 4px rgba(0, 0, 0, 0.8);
+      z-index: 10;
+    }
+
+    .fps-green {
+      color: #00ff88;
+    }
+
+    .fps-yellow {
+      color: #ffdd00;
+    }
+
+    .fps-red {
+      color: #ff4444;
+    }
+
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      padding: 16px;
+      background: rgba(255, 255, 255, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 8px;
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      align-items: center;
+      justify-content: center;
+    }
+
+    .control-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .control-label {
+      font-size: 12px;
+      color: rgba(255, 255, 255, 0.7);
+    }
+
+    button {
+      padding: 10px 20px;
+      font-size: 14px;
+      font-weight: 500;
+      color: #fff;
+      background: rgba(255, 255, 255, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+    }
+
+    button:hover {
+      transform: translateY(-2px);
+      background: rgba(255, 255, 255, 0.15);
+      border-color: rgba(255, 255, 255, 0.3);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    }
+
+    button:active {
+      transform: translateY(0);
+    }
+
+    button.active {
+      background: rgba(0, 255, 136, 0.2);
+      border-color: rgba(0, 255, 136, 0.5);
+      color: #00ff88;
+    }
+
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    input[type="range"] {
+      width: 140px;
+      height: 6px;
+      -webkit-appearance: none;
+      appearance: none;
+      background: rgba(255, 255, 255, 0.2);
+      border-radius: 3px;
+      outline: none;
+      cursor: pointer;
+    }
+
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 16px;
+      height: 16px;
+      background: #00ff88;
+      border-radius: 50%;
+      cursor: pointer;
+      box-shadow: 0 0 8px rgba(0, 255, 136, 0.6);
+      transition: transform 0.2s ease;
+    }
+
+    input[type="range"]::-webkit-slider-thumb:hover {
+      transform: scale(1.2);
+    }
+
+    input[type="range"]::-moz-range-thumb {
+      width: 16px;
+      height: 16px;
+      background: #00ff88;
+      border-radius: 50%;
+      cursor: pointer;
+      border: none;
+      box-shadow: 0 0 8px rgba(0, 255, 136, 0.6);
+    }
+
+    input[type="file"] {
+      display: none;
+    }
+
+    .file-label {
+      padding: 10px 20px;
+      font-size: 14px;
+      font-weight: 500;
+      color: #fff;
+      background: rgba(255, 255, 255, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      display: inline-block;
+    }
+
+    .file-label:hover {
+      transform: translateY(-2px);
+      background: rgba(255, 255, 255, 0.15);
+      border-color: rgba(255, 255, 255, 0.3);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    }
+
+    .fullscreen-btn {
+      position: absolute;
+      bottom: 10px;
+      right: 10px;
+      padding: 8px 12px;
+      font-size: 12px;
+      z-index: 10;
+    }
+
+    .fullscreen-btn {
+      right: 10px;
+      bottom: 40px;
+    }
+
+    .fullscreen-container .controls {
+      position: fixed;
+      left: 20px;
+      bottom: 20px;
+      z-index: 100;
+      opacity: 0.7;
+      transition: opacity 0.3s ease;
+    }
+
+    .fullscreen-container .controls:hover {
+      opacity: 1;
+    }
+
+    .fullscreen-container #visualizer {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      border-radius: 0;
+    }
+
+    .fullscreen-container .fps-counter {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      font-size: 16px;
+    }
+
+    .fullscreen-container .fullscreen-btn {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      bottom: auto;
+    }
+
+    .status-text {
+      font-size: 13px;
+      color: rgba(255, 255, 255, 0.6);
+      margin-left: 8px;
+    }
+
+    @media (max-width: 768px) {
+      .controls {
+        flex-direction: column;
+        width: 100%;
+      }
+
+      .control-group {
+        width: 100%;
+      }
+
+      input[type="range"] {
+        width: 100%;
+      }
+
+      button, .file-label {
+        width: 100%;
+        text-align: center;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container" id="appContainer">
+    <div class="canvas-wrapper" id="canvasWrapper">
+      <canvas id="visualizer" width="600" height="600"></canvas>
+      <div class="fps-counter fps-green" id="fpsCounter">60 FPS</div>
+      <button class="fullscreen-btn" id="fullscreenBtn">⛶ 全屏</button>
+    </div>
+
+    <div class="controls" id="controls">
+      <div class="control-group">
+        <span class="control-label">音频来源</span>
+        <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+          <button id="micBtn">🎤 麦克风</button>
+          <label class="file-label" for="fileInput">📁 本地文件</label>
+          <input type="file" id="fileInput" accept=".mp3,.wav,audio/*">
+        </div>
+      </div>
+
+      <div class="control-group">
+        <span class="control-label">播放控制</span>
+        <div style="display: flex; gap: 8px;">
+          <button id="playBtn" disabled>▶ 播放</button>
+          <button id="pauseBtn" disabled>⏸ 暂停</button>
+        </div>
+      </div>
+
+      <div class="control-group">
+        <span class="control-label">节奏阈值: <span id="thresholdValue">0.6</span></span>
+        <input type="range" id="thresholdSlider" min="0.1" max="1.0" step="0.05" value="0.6">
+      </div>
+
+      <div class="control-group">
+        <span class="control-label">状态</span>
+        <span class="status-text" id="statusText">等待开始...</span>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
