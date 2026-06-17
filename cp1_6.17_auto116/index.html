@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>弹球打砖块</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      font-family: 'Courier New', monospace;
+      background: radial-gradient(ellipse at center, #1a1a2e 0%, #16213e 100%);
+    }
+
+    #game-container {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+    }
+
+    #game-wrapper {
+      position: relative;
+      width: 1200px;
+      height: 750px;
+    }
+
+    #game-canvas {
+      display: block;
+      width: 1200px;
+      height: 750px;
+      border-radius: 8px;
+      box-shadow: 0 0 40px rgba(79, 195, 247, 0.2);
+    }
+
+    #hud {
+      position: absolute;
+      top: 15px;
+      left: 20px;
+      color: #ffffff;
+      font-family: 'Courier New', monospace;
+      font-size: 18px;
+      text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
+      pointer-events: none;
+      z-index: 10;
+    }
+
+    #hud .hud-item {
+      margin-bottom: 8px;
+    }
+
+    #hud #lives {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+    }
+
+    #hud #lives .heart {
+      width: 20px;
+      height: 20px;
+      position: relative;
+      display: inline-block;
+    }
+
+    #hud #lives .heart svg {
+      width: 100%;
+      height: 100%;
+      fill: #ff4d6d;
+      filter: drop-shadow(1px 1px 2px rgba(0, 0, 0, 0.6));
+      transition: opacity 0.3s;
+    }
+
+    #hud #lives .heart.lost svg {
+      fill: #444444;
+      opacity: 0.4;
+    }
+
+    #hud #lives .heart.flash svg {
+      animation: flashRed 0.5s ease-in-out;
+    }
+
+    @keyframes flashRed {
+      0%, 100% { fill: #ff4d6d; }
+      50% { fill: #ffffff; filter: drop-shadow(0 0 10px #ff0000); }
+    }
+
+    #restart-btn {
+      position: absolute;
+      bottom: 15px;
+      right: 20px;
+      padding: 10px 20px;
+      background: linear-gradient(135deg, #66bb6a, #43a047);
+      color: #ffffff;
+      font-family: 'Courier New', monospace;
+      font-size: 14px;
+      font-weight: bold;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+      transition: all 0.2s ease;
+      z-index: 10;
+    }
+
+    #restart-btn:hover {
+      background: linear-gradient(135deg, #81c784, #4caf50);
+      transform: translateY(-2px);
+      box-shadow: 0 6px 16px rgba(0, 0, 0, 0.5);
+    }
+
+    #restart-btn:active {
+      transform: translateY(0);
+    }
+
+    #overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.7);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 20;
+      border-radius: 8px;
+    }
+
+    #overlay.show {
+      display: flex;
+    }
+
+    #result-panel {
+      background: #ffffff;
+      padding: 40px 60px;
+      border-radius: 20px;
+      text-align: center;
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+      min-width: 350px;
+    }
+
+    #result-panel h2 {
+      font-size: 32px;
+      margin-bottom: 20px;
+      color: #1a1a2e;
+    }
+
+    #result-panel .score-text {
+      font-size: 24px;
+      margin-bottom: 30px;
+      color: #1976d2;
+      font-weight: bold;
+    }
+
+    #play-again-btn {
+      padding: 14px 36px;
+      background: linear-gradient(135deg, #81c784, #66bb6a);
+      color: #ffffff;
+      font-family: 'Courier New', monospace;
+      font-size: 18px;
+      font-weight: bold;
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+      text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.3);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+      transition: all 0.2s ease;
+    }
+
+    #play-again-btn:hover {
+      background: linear-gradient(135deg, #a5d6a7, #81c784);
+      transform: translateY(-2px);
+      box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);
+    }
+
+    #play-again-btn:active {
+      transform: translateY(0);
+    }
+  </style>
+</head>
+<body>
+  <div id="game-container">
+    <div id="game-wrapper">
+      <canvas id="game-canvas" width="1200" height="750"></canvas>
+      
+      <div id="hud">
+        <div class="hud-item" id="score">得分: 0</div>
+        <div class="hud-item" id="level">关卡: 1</div>
+        <div class="hud-item" id="lives">
+          生命:
+          <span class="heart" data-idx="0">
+            <svg viewBox="0 0 24 24"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
+          </span>
+          <span class="heart" data-idx="1">
+            <svg viewBox="0 0 24 24"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
+          </span>
+          <span class="heart" data-idx="2">
+            <svg viewBox="0 0 24 24"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
+          </span>
+        </div>
+      </div>
+
+      <button id="restart-btn">重新开始</button>
+
+      <div id="overlay">
+        <div id="result-panel">
+          <h2 id="result-title">游戏结束！</h2>
+          <div class="score-text" id="result-score">得分: 0</div>
+          <button id="play-again-btn">再玩一次</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
