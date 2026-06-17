@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Geological Fault Simulator</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background-color: #1a1a2e;
+      font-family: system-ui, -apple-system, sans-serif;
+    }
+    #app {
+      width: 100%;
+      height: 100%;
+    }
+    #info-panel {
+      position: fixed;
+      top: 16px;
+      left: 16px;
+      padding: 12px 16px;
+      color: #E0E0E0;
+      font-size: 14px;
+      font-family: system-ui;
+      line-height: 1.6;
+      background: rgba(44, 44, 46, 0.7);
+      border-radius: 6px;
+      backdrop-filter: blur(4px);
+      z-index: 10;
+      pointer-events: none;
+    }
+    #info-panel .mode {
+      font-size: 16px;
+      font-weight: 600;
+      margin-bottom: 4px;
+    }
+    #info-panel .param {
+      opacity: 0.9;
+    }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+  <div id="info-panel">
+    <div class="mode" id="mode-label">Flat</div>
+    <div class="param" id="param-label">Compression: 0 | Stretch: 0 | Shear: 0°</div>
+  </div>
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
