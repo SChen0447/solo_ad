@@ -265,6 +265,8 @@ const CalendarView: React.FC = () => {
           endAccessor="end"
           view={view}
           onView={setView}
+          date={selectedDate || new Date()}
+          onNavigate={(newDate) => setSelectedDate(newDate)}
           style={{ height: '100%' }}
           selectable
           onSelectSlot={handleSelectSlot}
@@ -287,6 +289,9 @@ const CalendarView: React.FC = () => {
           }}
           culture="zh-CN"
           {...({
+            // react-big-calendar官方支持draggable和onEventDrop属性，
+            // 但@types/react-big-calendar未包含这些类型定义，
+            // 因此使用as any类型断言绕过TS检查。运行时功能正常。
             draggable: true,
             onEventDrop: handleEventDrop,
           } as any)}

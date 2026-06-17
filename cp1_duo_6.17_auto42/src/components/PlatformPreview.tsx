@@ -28,6 +28,10 @@ const PlatformPreview: React.FC<PlatformPreviewProps> = ({ material }) => {
   });
   const [slideDirection, setSlideDirection] = useState<'left' | 'right'>('right');
   const [isAnimating, setIsAnimating] = useState(false);
+  const [weiboStats, setWeiboStats] = useState({ likes: 23, reposts: 5, comments: 8, liked: false });
+  const [xhsStats, setXhsStats] = useState({ likes: '2.3k', liked: false });
+  const [showCommentModal, setShowCommentModal] = useState(false);
+  const [isFollowing, setIsFollowing] = useState(false);
 
   useEffect(() => {
     const validateAll = async () => {
@@ -70,6 +74,32 @@ const PlatformPreview: React.FC<PlatformPreviewProps> = ({ material }) => {
 
   const renderWeiboPreview = () => {
     const contentTruncated = truncateText(material.content, limits.content);
+
+    const handleLike = (e: React.MouseEvent) => {
+      e.stopPropagation();
+      setWeiboStats((prev) => ({
+        ...prev,
+        liked: !prev.liked,
+        likes: prev.liked ? prev.likes - 1 : prev.likes + 1,
+      }));
+    };
+
+    const handleRepost = (e: React.MouseEvent) => {
+      e.stopPropagation();
+      setWeiboStats((prev) => ({ ...prev, reposts: prev.reposts + 1 }));
+      alert('转发成功！');
+    };
+
+    const handleComment = (e: React.MouseEvent) => {
+      e.stopPropagation();
+      setShowCommentModal(true);
+    };
+
+    const handleFollow = (e: React.MouseEvent) => {
+      e.stopPropagation();
+      setIsFollowing(!isFollowing);
+    };
+
     return (
       <div className="weibo-preview">
         <div className="weibo-header">
@@ -78,7 +108,12 @@ const PlatformPreview: React.FC<PlatformPreviewProps> = ({ material }) => {
             <div className="weibo-username">内容创作者</div>
             <div className="weibo-time">刚刚 来自 微博网页版</div>
           </div>
-          <button className="weibo-follow-btn">+ 关注</button>
+          <button
+            className={`weibo-follow-btn ${isFollowing ? 'following' : ''}`}
+            onClick={handleFollow}
+          >
+            {isFollowing ? '已关注' : '+ 关注'}
+          </button>
         </div>
         <div className="weibo-content">
           {contentTruncated.truncated ? (
@@ -102,19 +137,103 @@ const PlatformPreview: React.FC<PlatformPreviewProps> = ({ material }) => {
           </div>
         )}
         <div className="weibo-footer">
-          <div className="weibo-action">
+          <div className="weibo-action" onClick={handleComment}>
             <span className="action-icon">💬</span>
-            <span>评论</span>
+            <span>{weiboStats.comments > 0 ? weiboStats.comments : '评论'}</span>
           </div>
-          <div className="weibo-action">
+          <div className="weibo-action" onClick={handleRepost}>
             <span className="action-icon">🔄</span>
-            <span>转发</span>
+            <span>{weiboStats.reposts > 0 ? weiboStats.reposts : '转发'}</span>
           </div>
-          <div className="weibo-action">
-            <span className="action-icon">👍</span>
-            <span>赞</span>
+          <div
+            className={`weibo-action ${weiboStats.liked ? 'liked' : ''}`}
+            onClick={handleLike}
+          >
+            <span className="action-icon">{weiboStats.liked ? '❤️' : '👍'}</span>
+            <span>{weiboStats.likes > 0 ? weiboStats.likes : '赞'}</span>
           </div>
         </div>
+
+        {showCommentModal && (
+          <div className="comment-modal-overlay" onClick={(e) => { e.stopPropagation(); setShowCommentModal(false); }}>
+            <div className="comment-modal" onClick={(e) => e.stopPropagation()}>
+              <div className="comment-modal-header">
+                <h4>发表评论</h4>
+                <button onClick={() => setShowCommentModal(false)}>×</button>
+              </div>
+              <div className="comment-modal-body">
+                <textarea
+                  placeholder="说点什么吧..."
+                  style={{
+                    width: '100%',
+                    minHeight: 80,
+                    padding: 10,
+                    border: '1px solid var(--border-color)',
+                    borderRadius: 6,
+                    resize: 'none',
+                    fontSize: 14,
+                  }}
+                />
+              </div>
+              <div className="comment-modal-footer">
+                <button
+                  className="btn btn-primary"
+                  onClick={() => {
+                    setWeiboStats((prev) => ({ ...prev, comments: prev.comments + 1 }));
+                    setShowCommentModal(false);
+                    alert('评论发送成功！');
+                  }}
+                  style={{ padding: '6px 16px' }}
+                >
+                  发送
+                </button>
+              </div>
+            </div>
+            <style>{`
+              .comment-modal-overlay {
+                position: fixed;
+                top: 0; left: 0; right: 0; bottom: 0;
+                background: rgba(0, 0, 0, 0.5);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                z-index: 9999;
+              }
+              .comment-modal {
+                background: white;
+                border-radius: 12px;
+                width: 90%;
+                max-width: 400px;
+                overflow: hidden;
+              }
+              .comment-modal-header {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                padding: 16px 20px;
+                border-bottom: 1px solid var(--border-color);
+              }
+              .comment-modal-header h4 { margin: 0;
+              }
+              .comment-modal-header button {
+                font-size: 20px;
+                background: none;
+                border: none;
+                cursor: pointer;
+                color: var(--text-secondary);
+              }
+              .comment-modal-body {
+                padding: 16px 20px;
+              }
+              .comment-modal-footer {
+                padding: 12px 20px;
+                border-top: 1px solid var(--border-color);
+                display: flex;
+                justify-content: flex-end;
+              }
+            `}</style>
+          </div>
+        )}
       </div>
     );
   };
@@ -168,9 +287,20 @@ const PlatformPreview: React.FC<PlatformPreviewProps> = ({ material }) => {
             <div className="xhs-avatar">小</div>
             <span>小红书创作者</span>
           </div>
-          <div className="xhs-likes">
-            <span>❤️</span>
-            <span>2.3k</span>
+          <div
+            className={`xhs-likes ${xhsStats.liked ? 'liked' : ''}`}
+            onClick={(e) => {
+              e.stopPropagation();
+              setXhsStats((prev) => ({
+                ...prev,
+                liked: !prev.liked,
+                likes: prev.liked ? '2.3k' : '2.4k',
+              }));
+            }}
+            style={{ cursor: 'pointer' }}
+          >
+            <span>{xhsStats.liked ? '❤️' : '🤍'}</span>
+            <span>{xhsStats.likes}</span>
           </div>
         </div>
       </div>

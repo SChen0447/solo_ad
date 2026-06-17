@@ -1,13 +1,25 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import { materialApi } from '../api';
 import type { Material } from '../types';
 
+function useDebounce<T>(value: T, delay: number): T {
+  const [debouncedValue, setDebouncedValue] = useState<T>(value);
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedValue(value);
+    }, delay);
+    return () => clearTimeout(timer);
+  }, [value, delay]);
+  return debouncedValue;
+}
+
 const MaterialList: React.FC = () => {
   const navigate = useNavigate();
   const { materials, tags, loading, fetchMaterials, fetchTags } = useApp();
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchInput, setSearchInput] = useState('');
+  const searchQuery = useDebounce(searchInput, 300);
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
   const [showFade, setShowFade] = useState(false);
   const [newTagInput, setNewTagInput] = useState('');
@@ -82,8 +94,8 @@ const MaterialList: React.FC = () => {
             <input
               type="text"
               placeholder="搜索素材标题..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
               style={{
                 width: '100%',
                 padding: '8px 12px',
