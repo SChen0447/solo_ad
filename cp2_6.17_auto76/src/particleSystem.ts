@@ -131,7 +131,7 @@ export class ParticleSystem {
   }
 
   public update(particleData: ParticleData, deltaTime: number): void {
-    const { position, velocity, count } = particleData;
+    const { position, velocity, alive, count } = particleData;
 
     if (this.isPaused) {
       this.pauseTransition = Math.max(0, this.pauseTransition - deltaTime * 2);
@@ -148,20 +148,20 @@ export class ParticleSystem {
     let active = 0;
 
     for (let i = 0; i < count; i++) {
+      const isAlive = alive[i] === 1;
+      if (isAlive) {
+        active++;
+      }
+
       const px = position[i * 3];
       const py = position[i * 3 + 1];
       const pz = position[i * 3 + 2];
-      const distSq = px * px + py * py + pz * pz;
-
-      if (distSq < 25) {
-        active++;
-      }
       this.dummy.position.set(
         px,
         py,
         pz
       );
-      this.dummy.scale.setScalar(this.particleRadius);
+      this.dummy.scale.setScalar(isAlive ? this.particleRadius : 0);
       this.dummy.updateMatrix();
       this.mesh.setMatrixAt(i, this.dummy.matrix);
 

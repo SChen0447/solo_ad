@@ -3,6 +3,7 @@ export interface ParticleData {
   velocity: Float32Array;
   density: Float32Array;
   pressure: Float32Array;
+  alive: Uint8Array;
   count: number;
 }
 
@@ -45,6 +46,7 @@ export class FluidSimulator {
     const velocity = new Float32Array(count * 3);
     const density = new Float32Array(count);
     const pressure = new Float32Array(count);
+    const alive = new Uint8Array(count);
 
     const gridSize = Math.ceil(Math.cbrt(count));
     const spacing = this.params.particleRadius * 2.5;
@@ -64,12 +66,13 @@ export class FluidSimulator {
 
           density[idx] = REST_DENSITY;
           pressure[idx] = 0;
+          alive[idx] = 1;
           idx++;
         }
       }
     }
 
-    return { position, velocity, density, pressure, count: idx };
+    return { position, velocity, density, pressure, alive, count: idx };
   }
 
   public getParticles(): ParticleData {
@@ -252,7 +255,7 @@ export class FluidSimulator {
   }
 
   private integrate(forces: Float32Array, deltaTime: number): void {
-    const { position, velocity, count } = this.particles;
+    const { position, velocity, alive, count } = this.particles;
     const dt = Math.min(deltaTime, TIME_STEP);
     const damping = this.params.velocityDamping;
 
@@ -268,6 +271,19 @@ export class FluidSimulator {
       position[i * 3] += velocity[i * 3] * dt;
       position[i * 3 + 1] += velocity[i * 3 + 1] * dt;
       position[i * 3 + 2] += velocity[i * 3 + 2] * dt;
+
+      const px = position[i * 3];
+      const py = position[i * 3 + 1];
+      const pz = position[i * 3 + 2];
+      const vx = velocity[i * 3];
+      const vy = velocity[i * 3 + 1];
+      const vz = velocity[i * 3 + 2];
+
+      const validState = Number.isFinite(px) && Number.isFinite(py) && Number.isFinite(pz)
+        && Number.isFinite(vx) && Number.isFinite(vy) && Number.isFinite(vz);
+      const speedSq = vx * vx + vy * vy + vz * vz;
+
+      alive[i] = (validState && speedSq < 10000) ? 1 : 0;
     }
   }
 

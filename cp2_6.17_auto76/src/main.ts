@@ -225,13 +225,12 @@ class App {
         });
 
         input.addEventListener('input', () => {
-          const raw = input.value.replace(/[^0-9.]/g, '');
-          const parts = raw.split('.');
-          if (parts.length > 2) {
-            input.value = parts[0] + '.' + parts.slice(1).join('');
-          } else {
-            input.value = raw;
+          let raw = input.value.replace(/[^0-9.]/g, '');
+          const dotIndex = raw.indexOf('.');
+          if (dotIndex !== -1) {
+            raw = raw.substring(0, dotIndex + 1) + raw.substring(dotIndex + 1).replace(/\./g, '');
           }
+          input.value = raw;
         });
 
         input.addEventListener('blur', () => {
