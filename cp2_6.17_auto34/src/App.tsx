@@ -33,30 +33,26 @@ function App() {
     setSelectedIndex(boundedIndex);
   }, []);
 
-  const handleRotationEnd = useCallback((_finalRotation: number) => {
-  }, []);
+  const handleRotationEnd = useCallback((_finalRotation: number) => {}, []);
 
   return (
     <div className="app-container">
       <div className="wheel-section">
-        <div className="pointer" />
-        <ColorWheel
-          colors={colorSchemes}
-          rotation={rotation}
-          selectedIndex={selectedIndex}
-          onRotationChange={handleRotationChange}
-          onSelect={handleSelect}
-          onRotationEnd={handleRotationEnd}
-        />
+        <div className="wheel-wrapper">
+          <div className="pointer" />
+          <ColorWheel
+            colors={colorSchemes}
+            rotation={rotation}
+            selectedIndex={selectedIndex}
+            onRotationChange={handleRotationChange}
+            onSelect={handleSelect}
+            onRotationEnd={handleRotationEnd}
+          />
+        </div>
         <button className="action-button">复制色值</button>
       </div>
 
-      <div
-        className="preview-panel"
-        style={{
-          ['--accent-color' as string]: selectedColor.hex,
-        } as React.CSSProperties}
-      >
+      <div className="preview-panel">
         <div className="color-name">{selectedColor.name}</div>
         <CoffeeCup
           cupColor={selectedColor.hex}

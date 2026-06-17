@@ -6,7 +6,6 @@ export interface ColorScheme {
   l: number;
 }
 
-const BASE_HEX = '#006241';
 const BASE_H = 160;
 const BASE_S = 100;
 const BASE_L = 19;

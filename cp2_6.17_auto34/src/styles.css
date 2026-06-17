@@ -7,9 +7,7 @@
   --text-white: #ffffff;
   --wheel-size: 320px;
   --panel-width: 320px;
-  --sector-arc: 30deg;
-  --hover-popout: 8px;
-  --glow-extension: 6px;
+  --accent-color: #006241;
 }
 
 * {
@@ -26,8 +24,8 @@ body {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue',
     Arial, sans-serif;
   color: var(--text-white);
+  background-color: rgba(0, 98, 65, 0.15);
   transition: background-color 0.3s ease;
-  will-change: background-color;
 }
 
 #root {
@@ -53,11 +51,18 @@ body {
   display: flex;
   flex-direction: column;
   align-items: center;
+  gap: 20px;
+}
+
+.wheel-wrapper {
+  position: relative;
+  width: var(--wheel-size);
+  height: var(--wheel-size);
 }
 
 .pointer {
   position: absolute;
-  top: calc(50% - var(--wheel-size) / 2 - 30px);
+  top: -24px;
   left: 50%;
   transform: translateX(-50%);
   width: 0;
@@ -66,7 +71,7 @@ body {
   border-right: 10px solid transparent;
   border-top: 20px solid var(--starbucks-gold);
   z-index: 100;
-  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3));
+  filter: drop-shadow(0 2px 6px rgba(184, 145, 60, 0.6));
 }
 
 .color-wheel-container {
@@ -75,7 +80,6 @@ body {
   position: relative;
   cursor: grab;
   touch-action: none;
-  will-change: transform;
 }
 
 .color-wheel-container:active {
@@ -96,26 +100,28 @@ body {
 
 .wheel-sector {
   cursor: pointer;
-  transition: transform 0.3s ease-out, filter 0.3s ease-out;
-  transform-origin: center center;
-  will-change: transform, filter;
+  transition: filter 0.3s ease-out;
 }
 
 .wheel-sector:hover {
-  transform: scale(1.05);
   filter: brightness(1.15);
 }
 
-.wheel-sector.selected {
-  animation: breathe 0.5s ease-in-out infinite alternate;
+.selected-glow {
+  animation: glow-breathe 0.5s ease-in-out infinite alternate;
+  pointer-events: none;
 }
 
-@keyframes breathe {
+@keyframes glow-breathe {
   from {
-    filter: drop-shadow(0 0 6px var(--starbucks-gold));
+    stroke-opacity: 0.4;
+    stroke-width: 4;
+    filter: drop-shadow(0 0 4px var(--starbucks-gold));
   }
   to {
-    filter: drop-shadow(0 0 18px var(--starbucks-gold));
+    stroke-opacity: 1;
+    stroke-width: 8;
+    filter: drop-shadow(0 0 14px var(--starbucks-gold));
   }
 }
 
@@ -135,7 +141,7 @@ body {
   justify-content: space-between;
   padding: 24px 20px;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
-  border: 2px solid var(--accent-color, var(--starbucks-green));
+  border: 2px solid var(--accent-color);
   transition: border-color 0.3s ease;
 }
 
@@ -148,158 +154,187 @@ body {
 }
 
 .coffee-cup-container {
-  width: 160px;
-  height: 200px;
-  perspective: 800px;
+  width: 180px;
+  height: 220px;
+  perspective: 600px;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
-.coffee-cup {
+.coffee-cup-scene {
   width: 120px;
-  height: 160px;
+  height: 150px;
   position: relative;
   transform-style: preserve-3d;
-  animation: spin 12s linear infinite;
+  animation: cup-spin 12s linear infinite;
   will-change: transform;
 }
 
-.coffee-cup.fading {
-  animation: spin 12s linear infinite, fadeOutIn 0.6s ease-in-out;
+.coffee-cup-scene.fading {
+  animation: cup-spin 12s linear infinite, cup-fade 0.6s ease-in-out;
 }
 
-@keyframes spin {
-  from {
-    transform: rotateY(0deg);
-  }
-  to {
-    transform: rotateY(360deg);
-  }
+@keyframes cup-spin {
+  from { transform: rotateY(0deg); }
+  to { transform: rotateY(360deg); }
 }
 
-@keyframes fadeOutIn {
-  0% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.3;
-  }
-  100% {
-    opacity: 1;
-  }
+@keyframes cup-fade {
+  0% { opacity: 1; }
+  50% { opacity: 0.2; }
+  100% { opacity: 1; }
 }
 
-.cup-body {
+.cup-face {
   position: absolute;
+  backface-visibility: hidden;
+}
+
+.cup-face-front {
   width: 100%;
   height: 100%;
-  border-radius: 0 0 60px 60px / 0 0 30px 30px;
-  transform-style: preserve-3d;
+  display: flex;
+  flex-direction: column;
+  border-radius: 4px 4px 40px 40px;
+  overflow: hidden;
+  transform: translateZ(25px);
+  box-shadow: 4px 4px 15px rgba(0, 0, 0, 0.5);
+}
+
+.cup-face-back {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  border-radius: 4px 4px 40px 40px;
+  overflow: hidden;
+  transform: rotateY(180deg) translateZ(25px);
+  box-shadow: -4px 4px 15px rgba(0, 0, 0, 0.5);
+}
+
+.cup-face-left {
+  width: 50px;
+  height: 100%;
+  left: -25px;
+  background: linear-gradient(to right, rgba(0,0,0,0.3), rgba(0,0,0,0.1));
+  transform: rotateY(-90deg) translateZ(0px);
+  border-radius: 2px 2px 20px 20px;
+}
+
+.cup-face-right {
+  width: 50px;
+  height: 100%;
+  right: -25px;
+  background: linear-gradient(to left, rgba(0,0,0,0.3), rgba(0,0,0,0.1));
+  transform: rotateY(90deg) translateZ(70px);
+  border-radius: 2px 2px 20px 20px;
 }
 
 .cup-upper {
+  width: 100%;
+  height: 55%;
+  transition: background-color 0.6s ease-in-out;
+  position: relative;
+}
+
+.cup-upper::after {
+  content: '';
   position: absolute;
   top: 0;
   left: 0;
-  width: 100%;
-  height: 55%;
-  background-color: var(--cup-color, var(--starbucks-green));
-  border-radius: 5px 5px 0 0;
-  transform: translateZ(8px);
-  transition: background-color 0.6s ease-in-out;
-  box-shadow: inset -5px 0 15px rgba(0, 0, 0, 0.3),
-    inset 5px 0 15px rgba(255, 255, 255, 0.1);
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(
+    105deg,
+    rgba(255, 255, 255, 0.15) 0%,
+    transparent 40%,
+    rgba(0, 0, 0, 0.1) 100%
+  );
 }
 
 .cup-lower {
-  position: absolute;
-  bottom: 0;
-  left: 0;
   width: 100%;
   height: 45%;
-  background-color: var(--dark-gray);
-  border-radius: 0 0 60px 60px / 0 0 30px 30px;
-  transform: translateZ(8px);
-  box-shadow: inset -5px 0 15px rgba(0, 0, 0, 0.4),
-    inset 5px 0 10px rgba(255, 255, 255, 0.05);
+  background-color: #3a3a3a;
+  position: relative;
+}
+
+.cup-lower::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(
+    105deg,
+    rgba(255, 255, 255, 0.05) 0%,
+    transparent 40%,
+    rgba(0, 0, 0, 0.15) 100%
+  );
 }
 
 .cup-rim {
   position: absolute;
-  top: 0;
-  left: -5%;
-  width: 110%;
-  height: 12px;
-  background: linear-gradient(
-    to bottom,
-    var(--cup-color, var(--starbucks-green)) 0%,
-    var(--cup-color-dark, var(--dark-green)) 100%
-  );
+  top: -6px;
+  left: -5px;
+  right: -5px;
+  height: 14px;
   border-radius: 50%;
-  transform: rotateX(75deg) translateZ(10px);
+  transform: rotateX(70deg) translateZ(28px);
   transition: background 0.6s ease-in-out;
-  box-shadow: inset 0 -2px 5px rgba(0, 0, 0, 0.5);
+  box-shadow: inset 0 -2px 6px rgba(0, 0, 0, 0.4);
 }
 
 .cup-handle {
   position: absolute;
-  right: -25px;
-  top: 30%;
-  width: 35px;
-  height: 60px;
-  border: 8px solid var(--starbucks-gold);
+  right: -22px;
+  top: 28%;
+  width: 30px;
+  height: 55px;
+  border: 7px solid var(--starbucks-gold);
   border-left: none;
-  border-radius: 0 50px 50px 0;
-  transform: translateZ(12px);
-  box-shadow: 2px 2px 8px rgba(0, 0, 0, 0.3);
+  border-radius: 0 40px 40px 0;
+  transform: translateZ(30px);
+  box-shadow: 3px 2px 8px rgba(0, 0, 0, 0.4);
 }
 
-.cup-handle::before {
-  content: '';
+.cup-handle-back {
   position: absolute;
-  top: -8px;
-  left: 0;
-  width: 8px;
-  height: 8px;
-  background: var(--starbucks-gold);
-  border-radius: 50% 0 0 0;
-}
-
-.cup-handle::after {
-  content: '';
-  position: absolute;
-  bottom: -8px;
-  left: 0;
-  width: 8px;
-  height: 8px;
-  background: var(--starbucks-gold);
-  border-radius: 0 0 0 50%;
+  left: -22px;
+  top: 28%;
+  width: 30px;
+  height: 55px;
+  border: 7px solid #9a7a30;
+  border-right: none;
+  border-radius: 40px 0 0 40px;
+  transform: rotateY(180deg) translateZ(30px);
+  box-shadow: -3px 2px 8px rgba(0, 0, 0, 0.4);
 }
 
 .color-hex {
   font-size: 18px;
   font-weight: 500;
   color: var(--starbucks-gold);
-  letter-spacing: 1px;
+  letter-spacing: 1.5px;
   font-family: 'Courier New', monospace;
 }
 
 .action-button {
   padding: 12px 32px;
   background-color: transparent;
-  color: var(--accent-color, var(--starbucks-green));
-  border: 2px solid var(--accent-color, var(--starbucks-green));
+  color: var(--accent-color);
+  border: 2px solid var(--accent-color);
   border-radius: 8px;
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.3s ease;
-  margin-top: 20px;
 }
 
 .action-button:hover {
-  background-color: var(--accent-color, var(--starbucks-green));
+  background-color: var(--accent-color);
   color: var(--text-white);
   transform: translateY(-2px);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
@@ -308,9 +343,8 @@ body {
 .info-card {
   padding: 16px 24px;
   background-color: rgba(255, 255, 255, 0.05);
-  border: 1px solid var(--accent-color, var(--starbucks-green));
+  border: 1px solid var(--accent-color);
   border-radius: 12px;
-  margin-top: 20px;
   transition: border-color 0.3s ease;
 }
 
@@ -319,10 +353,6 @@ body {
     flex-direction: column;
     gap: 30px;
     padding: 20px;
-  }
-
-  .pointer {
-    top: calc(50% - var(--wheel-size) - 45px);
   }
 
   .preview-panel {

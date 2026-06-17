@@ -51,8 +51,17 @@ const ColorWheel: React.FC<ColorWheelProps> = ({
       const start = polarToCartesian(startAngle, radius);
       const end = polarToCartesian(endAngle, radius);
       const largeArcFlag = endAngle - startAngle <= 180 ? 0 : 1;
-
       return `M ${CENTER} ${CENTER} L ${start.x} ${start.y} A ${radius} ${radius} 0 ${largeArcFlag} 1 ${end.x} ${end.y} Z`;
+    },
+    [polarToCartesian]
+  );
+
+  const createArcPath = useCallback(
+    (startAngle: number, endAngle: number, radius: number): string => {
+      const start = polarToCartesian(endAngle, radius);
+      const end = polarToCartesian(startAngle, radius);
+      const largeArcFlag = endAngle - startAngle <= 180 ? 0 : 1;
+      return `M ${start.x} ${start.y} A ${radius} ${radius} 0 ${largeArcFlag} 0 ${end.x} ${end.y}`;
     },
     [polarToCartesian]
   );
@@ -115,11 +124,9 @@ const ColorWheel: React.FC<ColorWheelProps> = ({
   const handleDragMove = useCallback(
     (clientX: number, clientY: number) => {
       if (!isDragging) return;
-
       const angle = getAngleFromEvent(clientX, clientY);
       const deltaAngle = angle - dragState.current.startAngle;
       const newRotation = dragState.current.startRotation + deltaAngle;
-
       const now = performance.now();
       const deltaTime = now - dragState.current.lastTime;
       if (deltaTime > 0) {
@@ -128,7 +135,6 @@ const ColorWheel: React.FC<ColorWheelProps> = ({
       }
       dragState.current.lastAngle = angle;
       dragState.current.lastTime = now;
-
       onRotationChange(newRotation);
     },
     [isDragging, getAngleFromEvent, onRotationChange]
@@ -137,7 +143,6 @@ const ColorWheel: React.FC<ColorWheelProps> = ({
   const handleDragEnd = useCallback(() => {
     if (!isDragging) return;
     setIsDragging(false);
-
     const velocity = dragState.current.velocity;
     let currentRotation = rotation;
     let currentVelocity = velocity * 16;
@@ -145,7 +150,6 @@ const ColorWheel: React.FC<ColorWheelProps> = ({
     const animate = () => {
       currentVelocity *= 0.95;
       currentRotation += currentVelocity;
-
       if (Math.abs(currentVelocity) > 0.1) {
         onRotationChange(currentRotation);
         dragState.current.rafId = requestAnimationFrame(animate);
@@ -248,41 +252,10 @@ const ColorWheel: React.FC<ColorWheelProps> = ({
     };
   }, [isDragging, handleMouseMove, handleMouseUp, handleTouchMove, handleTouchEnd]);
 
-  const renderSector = (color: ColorScheme, index: number) => {
-    const startAngle = index * SECTOR_ANGLE;
-    const endAngle = (index + 1) * SECTOR_ANGLE;
-    const isHovered = hoveredIndex === index;
-    const isSelected = selectedIndex === index;
-    const radius = isHovered ? RADIUS + 8 : RADIUS;
-    const fillColor = isHovered
-      ? lightenColor(color.hex, 15)
-      : color.hex;
-
-    const pathData = createSectorPath(startAngle, endAngle, radius);
-    const dividerData = createSectorPath(startAngle, startAngle + 0.5, RADIUS);
-
-    return (
-      <g key={index}>
-        <path
-          d={pathData}
-          fill={fillColor}
-          className={`wheel-sector ${isSelected ? 'selected' : ''}`}
-          onClick={(e) => handleSectorClick(index, e)}
-          onMouseEnter={() => !isDragging && setHoveredIndex(index)}
-          onMouseLeave={() => setHoveredIndex(null)}
-          style={{
-            transformOrigin: `${CENTER}px ${CENTER}px`,
-          }}
-        />
-        <path
-          d={dividerData}
-          fill="none"
-          className="sector-divider"
-          style={{ pointerEvents: 'none' }}
-        />
-      </g>
-    );
-  };
+  const selectedGlowRadius = RADIUS + 6;
+  const selectedStartAngle = selectedIndex * SECTOR_ANGLE;
+  const selectedEndAngle = (selectedIndex + 1) * SECTOR_ANGLE;
+  const selectedGlowArc = createArcPath(selectedStartAngle, selectedEndAngle, selectedGlowRadius);
 
   return (
     <div
@@ -298,7 +271,49 @@ const ColorWheel: React.FC<ColorWheelProps> = ({
           transform: `rotate(${rotation}deg)`,
         }}
       >
-        {colors.map((color, index) => renderSector(color, index))}
+        {colors.map((color, index) => {
+          const startAngle = index * SECTOR_ANGLE;
+          const endAngle = (index + 1) * SECTOR_ANGLE;
+          const isHovered = hoveredIndex === index;
+          const isSelected = selectedIndex === index;
+          const radius = isSelected ? RADIUS + 2 : (isHovered ? RADIUS + 8 : RADIUS);
+          const fillColor = isHovered
+            ? lightenColor(color.hex, 15)
+            : color.hex;
+          const pathData = createSectorPath(startAngle, endAngle, radius);
+
+          return (
+            <g key={index}>
+              <path
+                d={pathData}
+                fill={fillColor}
+                className="wheel-sector"
+                onClick={(e) => handleSectorClick(index, e)}
+                onMouseEnter={() => !isDragging && setHoveredIndex(index)}
+                onMouseLeave={() => setHoveredIndex(null)}
+              />
+              <line
+                x1={CENTER}
+                y1={CENTER}
+                x2={polarToCartesian(startAngle, RADIUS).x}
+                y2={polarToCartesian(startAngle, RADIUS).y}
+                stroke="#004d32"
+                strokeWidth="1"
+                style={{ pointerEvents: 'none' }}
+              />
+            </g>
+          );
+        })}
+
+        {selectedGlowArc && (
+          <path
+            d={selectedGlowArc}
+            fill="none"
+            stroke="#b8913c"
+            className="selected-glow"
+          />
+        )}
+
         <circle
           cx={CENTER}
           cy={CENTER}
