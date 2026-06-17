@@ -1,0 +1,580 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>极光回响 - Aurora Echo</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    :root {
+      --bg-dark: #0A0A1A;
+      --bg-black: #000000;
+      --accent-purple: #7B2FFF;
+      --accent-orange: #FF6B35;
+      --accent-blue: #0A0A2E;
+      --glass-bg: rgba(255, 255, 255, 0.05);
+      --glass-border: rgba(255, 255, 255, 0.08);
+      --text-primary: rgba(255, 255, 255, 0.9);
+      --text-secondary: rgba(255, 255, 255, 0.5);
+      --glow-purple: rgba(123, 47, 255, 0.4);
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      font-family: 'Inter', sans-serif;
+      background: radial-gradient(ellipse at center, var(--bg-dark) 0%, var(--bg-black) 100%);
+      color: var(--text-primary);
+    }
+
+    #app {
+      width: 100%;
+      height: 100%;
+      position: relative;
+    }
+
+    #three-container {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 1;
+    }
+
+    #three-container canvas {
+      display: block;
+    }
+
+    #upload-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 10;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: radial-gradient(ellipse at center, rgba(10, 10, 26, 0.95) 0%, rgba(0, 0, 0, 0.98) 100%);
+      transition: opacity 0.8s ease, visibility 0.8s ease;
+    }
+
+    #upload-overlay.hidden {
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+    }
+
+    .upload-title {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 3rem;
+      font-weight: 900;
+      letter-spacing: 0.15em;
+      background: linear-gradient(135deg, #7B2FFF 0%, #FF6B35 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      margin-bottom: 0.5rem;
+    }
+
+    .upload-subtitle {
+      font-size: 0.9rem;
+      color: var(--text-secondary);
+      letter-spacing: 0.3em;
+      text-transform: uppercase;
+      margin-bottom: 3rem;
+    }
+
+    #drop-zone {
+      width: 400px;
+      max-width: 80vw;
+      height: 180px;
+      border: 2px dashed rgba(123, 47, 255, 0.4);
+      border-radius: 16px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      background: rgba(123, 47, 255, 0.03);
+      position: relative;
+      overflow: hidden;
+    }
+
+    #drop-zone::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      border-radius: 16px;
+      background: radial-gradient(circle at center, rgba(123, 47, 255, 0.08), transparent 70%);
+      opacity: 0;
+      transition: opacity 0.3s ease;
+    }
+
+    #drop-zone:hover,
+    #drop-zone.dragover {
+      border-color: var(--accent-purple);
+      background: rgba(123, 47, 255, 0.08);
+      transform: scale(1.02);
+    }
+
+    #drop-zone:hover::before,
+    #drop-zone.dragover::before {
+      opacity: 1;
+    }
+
+    #drop-zone .icon {
+      width: 48px;
+      height: 48px;
+      margin-bottom: 12px;
+      opacity: 0.6;
+    }
+
+    #drop-zone .label {
+      font-size: 0.95rem;
+      color: var(--text-secondary);
+    }
+
+    #drop-zone .label strong {
+      color: var(--accent-purple);
+    }
+
+    #drop-zone .formats {
+      font-size: 0.75rem;
+      color: rgba(255, 255, 255, 0.3);
+      margin-top: 6px;
+    }
+
+    #waveform-container {
+      position: absolute;
+      bottom: 80px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 80%;
+      max-width: 900px;
+      height: 80px;
+      z-index: 5;
+      opacity: 0;
+      transition: opacity 0.5s ease;
+    }
+
+    #waveform-container.visible {
+      opacity: 1;
+    }
+
+    #waveform-canvas {
+      width: 100%;
+      height: 100%;
+      border-radius: 8px;
+    }
+
+    #playback-bar {
+      position: absolute;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      z-index: 5;
+      padding: 10px 24px;
+      background: var(--glass-bg);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      border: 1px solid var(--glass-border);
+      border-radius: 40px;
+      opacity: 0;
+      transition: opacity 0.5s ease;
+    }
+
+    #playback-bar.visible {
+      opacity: 1;
+    }
+
+    .btn-play {
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      border: none;
+      background: linear-gradient(135deg, #7B2FFF, #9B5FFF);
+      color: white;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.25s ease;
+      flex-shrink: 0;
+    }
+
+    .btn-play:hover {
+      transform: scale(1.08);
+      box-shadow: 0 0 20px var(--glow-purple);
+    }
+
+    .btn-play svg {
+      width: 20px;
+      height: 20px;
+    }
+
+    #progress-bar {
+      width: 300px;
+      max-width: 40vw;
+      height: 4px;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 2px;
+      cursor: pointer;
+      position: relative;
+    }
+
+    #progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--accent-purple), var(--accent-orange));
+      border-radius: 2px;
+      width: 0%;
+      transition: width 0.1s linear;
+    }
+
+    #time-display {
+      font-size: 0.75rem;
+      color: var(--text-secondary);
+      font-family: 'Orbitron', sans-serif;
+      min-width: 80px;
+      text-align: center;
+    }
+
+    #control-panel {
+      position: absolute;
+      top: 50%;
+      right: 20px;
+      transform: translateY(-50%);
+      width: 260px;
+      z-index: 5;
+      padding: 24px;
+      background: var(--glass-bg);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      border: 1px solid var(--glass-border);
+      border-radius: 16px;
+      opacity: 0;
+      transition: opacity 0.5s ease;
+      box-shadow: 0 0 1px rgba(255, 255, 255, 0.13), inset 0 0 1px rgba(255, 255, 255, 0.05);
+    }
+
+    #control-panel.visible {
+      opacity: 1;
+    }
+
+    .panel-title {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 0.7rem;
+      letter-spacing: 0.25em;
+      text-transform: uppercase;
+      color: var(--text-secondary);
+      margin-bottom: 20px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--glass-border);
+    }
+
+    .control-group {
+      margin-bottom: 20px;
+    }
+
+    .control-group:last-child {
+      margin-bottom: 0;
+    }
+
+    .control-label {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.8rem;
+      color: rgba(255, 255, 255, 0.7);
+      margin-bottom: 8px;
+    }
+
+    .control-value {
+      color: var(--accent-purple);
+      font-family: 'Orbitron', sans-serif;
+      font-size: 0.7rem;
+    }
+
+    input[type="range"] {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 100%;
+      height: 4px;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 2px;
+      outline: none;
+      cursor: pointer;
+    }
+
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: var(--accent-purple);
+      border: 2px solid rgba(255, 255, 255, 0.3);
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    input[type="range"]::-webkit-slider-thumb:hover {
+      transform: scale(1.2);
+      box-shadow: 0 0 12px var(--glow-purple);
+    }
+
+    input[type="range"]::-moz-range-thumb {
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: var(--accent-purple);
+      border: 2px solid rgba(255, 255, 255, 0.3);
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .gradient-buttons {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    .gradient-btn {
+      padding: 8px 0;
+      border: 1px solid var(--glass-border);
+      border-radius: 8px;
+      background: transparent;
+      color: var(--text-secondary);
+      font-size: 0.75rem;
+      font-family: 'Inter', sans-serif;
+      cursor: pointer;
+      transition: all 0.25s ease;
+    }
+
+    .gradient-btn:hover {
+      transform: scale(1.05);
+      box-shadow: 0 0 10px rgba(255, 255, 255, 0.1);
+    }
+
+    .gradient-btn.active {
+      border-color: var(--accent-purple);
+      color: var(--text-primary);
+      background: rgba(123, 47, 255, 0.15);
+      box-shadow: 0 0 12px rgba(123, 47, 255, 0.2);
+    }
+
+    .mode-buttons {
+      display: flex;
+      gap: 8px;
+    }
+
+    .mode-btn {
+      flex: 1;
+      padding: 8px 0;
+      border: 1px solid var(--glass-border);
+      border-radius: 8px;
+      background: transparent;
+      color: var(--text-secondary);
+      font-size: 0.75rem;
+      font-family: 'Inter', sans-serif;
+      cursor: pointer;
+      transition: all 0.25s ease;
+    }
+
+    .mode-btn:hover {
+      transform: scale(1.05);
+      box-shadow: 0 0 10px rgba(255, 255, 255, 0.1);
+    }
+
+    .mode-btn.active {
+      border-color: var(--accent-orange);
+      color: var(--text-primary);
+      background: rgba(255, 107, 53, 0.15);
+      box-shadow: 0 0 12px rgba(255, 107, 53, 0.2);
+    }
+
+    #toggle-panel {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      z-index: 6;
+      width: 40px;
+      height: 40px;
+      border-radius: 10px;
+      border: 1px solid var(--glass-border);
+      background: var(--glass-bg);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      color: var(--text-secondary);
+      cursor: pointer;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.25s ease;
+    }
+
+    #toggle-panel:hover {
+      background: rgba(255, 255, 255, 0.1);
+      color: var(--text-primary);
+    }
+
+    @media (max-width: 768px) {
+      .upload-title {
+        font-size: 2rem;
+      }
+
+      #control-panel {
+        top: auto;
+        bottom: 0;
+        right: 0;
+        left: 0;
+        width: 100%;
+        transform: none;
+        border-radius: 16px 16px 0 0;
+        max-height: 50vh;
+        overflow-y: auto;
+      }
+
+      #control-panel.collapsed {
+        transform: translateY(100%);
+        opacity: 0;
+        pointer-events: none;
+      }
+
+      #toggle-panel {
+        display: flex;
+      }
+
+      #waveform-container {
+        bottom: 100px;
+        width: 90%;
+      }
+
+      #playback-bar {
+        bottom: 60px;
+      }
+
+      #progress-bar {
+        max-width: 30vw;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <div id="three-container"></div>
+
+    <div id="upload-overlay">
+      <h1 class="upload-title">极光回响</h1>
+      <p class="upload-subtitle">Aurora Echo</p>
+      <div id="drop-zone">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M9 18V5l12-2v13"/>
+          <circle cx="6" cy="18" r="3"/>
+          <circle cx="18" cy="16" r="3"/>
+        </svg>
+        <span class="label">拖拽音频文件到此处，或 <strong>点击上传</strong></span>
+        <span class="formats">支持 MP3 / WAV</span>
+        <input type="file" id="file-input" accept=".mp3,.wav,audio/mpeg,audio/wav" style="display:none" />
+      </div>
+    </div>
+
+    <div id="waveform-container">
+      <canvas id="waveform-canvas"></canvas>
+    </div>
+
+    <div id="playback-bar">
+      <button class="btn-play" id="btn-play">
+        <svg id="play-icon" viewBox="0 0 24 24" fill="currentColor">
+          <polygon points="5,3 19,12 5,21"/>
+        </svg>
+        <svg id="pause-icon" viewBox="0 0 24 24" fill="currentColor" style="display:none">
+          <rect x="6" y="4" width="4" height="16"/>
+          <rect x="14" y="4" width="4" height="16"/>
+        </svg>
+      </button>
+      <div id="progress-bar">
+        <div id="progress-fill"></div>
+      </div>
+      <span id="time-display">0:00 / 0:00</span>
+    </div>
+
+    <button id="toggle-panel">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+        <line x1="4" y1="21" x2="4" y2="14"/>
+        <line x1="4" y1="10" x2="4" y2="3"/>
+        <line x1="12" y1="21" x2="12" y2="12"/>
+        <line x1="12" y1="8" x2="12" y2="3"/>
+        <line x1="20" y1="21" x2="20" y2="16"/>
+        <line x1="20" y1="12" x2="20" y2="3"/>
+        <line x1="1" y1="14" x2="7" y2="14"/>
+        <line x1="9" y1="8" x2="15" y2="8"/>
+        <line x1="17" y1="16" x2="23" y2="16"/>
+      </svg>
+    </button>
+
+    <div id="control-panel">
+      <div class="panel-title">可视化参数</div>
+
+      <div class="control-group">
+        <div class="control-label">
+          <span>粒子扩散半径</span>
+          <span class="control-value" id="val-radius">15.0</span>
+        </div>
+        <input type="range" id="slider-radius" min="5" max="30" step="0.5" value="15" />
+      </div>
+
+      <div class="control-group">
+        <div class="control-label">
+          <span>粒子大小缩放</span>
+          <span class="control-value" id="val-size">1.0</span>
+        </div>
+        <input type="range" id="slider-size" min="0.5" max="3.0" step="0.1" value="1.0" />
+      </div>
+
+      <div class="control-group">
+        <div class="control-label">
+          <span>旋转速度 (°/秒)</span>
+          <span class="control-value" id="val-rotation">30</span>
+        </div>
+        <input type="range" id="slider-rotation" min="0" max="180" step="1" value="30" />
+      </div>
+
+      <div class="control-group">
+        <div class="control-label"><span>颜色渐变模式</span></div>
+        <div class="gradient-buttons">
+          <button class="gradient-btn active" data-gradient="aurora">极光</button>
+          <button class="gradient-btn" data-gradient="lava">熔岩</button>
+          <button class="gradient-btn" data-gradient="ocean">深海</button>
+          <button class="gradient-btn" data-gradient="neon">霓虹</button>
+        </div>
+      </div>
+
+      <div class="control-group">
+        <div class="control-label"><span>渲染模式</span></div>
+        <div class="mode-buttons">
+          <button class="mode-btn active" data-mode="roam">粒子漫游</button>
+          <button class="mode-btn" data-mode="wave">波形波纹</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
