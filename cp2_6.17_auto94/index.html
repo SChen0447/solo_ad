@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TextTo3D - 文字转3D场景</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif;
+      background: linear-gradient(135deg, #0a0a1a 0%, #000011 100%);
+      color: #ffffff;
+    }
+
+    #app {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .header {
+      height: 60px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: linear-gradient(90deg, rgba(0, 212, 170, 0.1) 0%, rgba(0, 170, 255, 0.1) 100%);
+      border-bottom: 1px solid rgba(0, 212, 170, 0.3);
+      position: relative;
+      z-index: 100;
+    }
+
+    .header h1 {
+      font-size: 24px;
+      font-weight: 700;
+      background: linear-gradient(135deg, #00d4aa 0%, #00aaff 50%, #00d4aa 100%);
+      background-size: 200% 200%;
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      animation: shine 3s ease-in-out infinite;
+      text-shadow: 0 0 30px rgba(0, 212, 170, 0.5);
+      letter-spacing: 2px;
+    }
+
+    @keyframes shine {
+      0%, 100% { background-position: 0% 50%; }
+      50% { background-position: 100% 50%; }
+    }
+
+    .main-container {
+      flex: 1;
+      display: flex;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .sidebar {
+      width: 400px;
+      background: #1a1a2e;
+      border-radius: 12px;
+      margin: 16px;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+      border: 1px solid rgba(0, 212, 170, 0.2);
+      transition: transform 0.3s ease, opacity 0.5s ease;
+      opacity: 0;
+      animation: fadeIn 0.5s ease forwards;
+      animation-delay: 0.1s;
+      z-index: 50;
+      overflow-y: auto;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateX(-20px); }
+      to { opacity: 1; transform: translateX(0); }
+    }
+
+    .sidebar.collapsed {
+      transform: translateX(calc(-100% - 32px));
+    }
+
+    .sidebar-toggle {
+      position: fixed;
+      left: 0;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 24px;
+      height: 60px;
+      background: linear-gradient(135deg, #00d4aa 0%, #00aaff 100%);
+      border: none;
+      border-radius: 0 8px 8px 0;
+      cursor: pointer;
+      color: white;
+      font-size: 16px;
+      z-index: 200;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .sidebar-toggle:hover {
+      transform: translateY(-50%) scale(1.05);
+      box-shadow: 0 4px 15px rgba(0, 212, 170, 0.4);
+    }
+
+    .sidebar-toggle.visible {
+      display: flex;
+    }
+
+    .input-group {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .input-group label {
+      font-size: 14px;
+      font-weight: 600;
+      color: #00d4aa;
+      letter-spacing: 0.5px;
+    }
+
+    .textarea {
+      width: 100%;
+      min-height: 120px;
+      padding: 12px;
+      background: rgba(255, 255, 255, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 8px;
+      color: #ffffff;
+      font-size: 14px;
+      line-height: 1.6;
+      resize: vertical;
+      font-family: inherit;
+      transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .textarea:focus {
+      outline: none;
+      border-color: #00d4aa;
+      box-shadow: 0 0 15px rgba(0, 212, 170, 0.2);
+    }
+
+    .textarea::placeholder {
+      color: rgba(255, 255, 255, 0.4);
+    }
+
+    .button-group {
+      display: flex;
+      gap: 12px;
+    }
+
+    .btn {
+      flex: 1;
+      padding: 12px 20px;
+      border: none;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      font-family: inherit;
+      letter-spacing: 0.5px;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #00d4aa 0%, #00aaff 100%);
+      color: #ffffff;
+      box-shadow: 0 4px 15px rgba(0, 212, 170, 0.3);
+    }
+
+    .btn-primary:hover:not(:disabled) {
+      filter: brightness(1.1);
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(0, 212, 170, 0.4);
+    }
+
+    .btn-primary:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .btn-secondary {
+      background: rgba(255, 255, 255, 0.1);
+      color: #ffffff;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+
+    .btn-secondary:hover:not(:disabled) {
+      background: rgba(255, 255, 255, 0.2);
+      transform: translateY(-2px);
+    }
+
+    .divider {
+      height: 1px;
+      background: linear-gradient(90deg, transparent 0%, rgba(0, 212, 170, 0.3) 50%, transparent 100%);
+      margin: 4px 0;
+    }
+
+    .details-panel {
+      display: none;
+      flex-direction: column;
+      gap: 12px;
+      padding: 16px;
+      background: rgba(0, 0, 0, 0.2);
+      border-radius: 8px;
+      border: 1px solid rgba(0, 212, 170, 0.2);
+      animation: fadeIn 0.5s ease;
+    }
+
+    .details-panel.visible {
+      display: flex;
+    }
+
+    .details-title {
+      font-size: 16px;
+      font-weight: 600;
+      color: #00d4aa;
+      margin-bottom: 4px;
+    }
+
+    .detail-row {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .detail-row label {
+      font-size: 12px;
+      color: rgba(255, 255, 255, 0.6);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .detail-row .value {
+      font-size: 14px;
+      color: #ffffff;
+      font-weight: 500;
+    }
+
+    .color-input-wrapper {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .color-input {
+      width: 40px;
+      height: 32px;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      background: none;
+    }
+
+    .color-input::-webkit-color-swatch-wrapper {
+      padding: 0;
+    }
+
+    .color-input::-webkit-color-swatch {
+      border: 2px solid rgba(255, 255, 255, 0.3);
+      border-radius: 4px;
+    }
+
+    .coord-inputs {
+      display: flex;
+      gap: 8px;
+    }
+
+    .coord-input {
+      flex: 1;
+      padding: 8px;
+      background: rgba(255, 255, 255, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 4px;
+      color: #ffffff;
+      font-size: 13px;
+      font-family: inherit;
+      text-align: center;
+    }
+
+    .coord-input:focus {
+      outline: none;
+      border-color: #00d4aa;
+    }
+
+    .coord-label {
+      font-size: 11px;
+      color: #00aaff;
+      font-weight: 600;
+      margin-bottom: 2px;
+    }
+
+    .coord-group {
+      display: flex;
+      flex-direction: column;
+      flex: 1;
+    }
+
+    .info-text {
+      font-size: 12px;
+      color: rgba(255, 255, 255, 0.5);
+      line-height: 1.5;
+    }
+
+    .loading-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.7);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+      border-radius: 12px;
+    }
+
+    .loading-overlay.visible {
+      display: flex;
+    }
+
+    .spinner {
+      width: 40px;
+      height: 40px;
+      border: 3px solid rgba(0, 212, 170, 0.2);
+      border-top-color: #00d4aa;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .scene-container {
+      flex: 1;
+      position: relative;
+      margin: 16px;
+      margin-left: 0;
+      border-radius: 12px;
+      overflow: hidden;
+      opacity: 0;
+      animation: fadeIn 0.5s ease forwards;
+      animation-delay: 0.2s;
+    }
+
+    .scene-container canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+
+    .fps-counter {
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      padding: 4px 8px;
+      background: rgba(0, 0, 0, 0.5);
+      border-radius: 4px;
+      font-size: 12px;
+      font-family: 'Consolas', monospace;
+      color: #00d4aa;
+      z-index: 10;
+    }
+
+    .hint-text {
+      position: absolute;
+      bottom: 12px;
+      left: 50%;
+      transform: translateX(-50%);
+      padding: 6px 12px;
+      background: rgba(0, 0, 0, 0.5);
+      border-radius: 4px;
+      font-size: 12px;
+      color: rgba(255, 255, 255, 0.6);
+      z-index: 10;
+      white-space: nowrap;
+    }
+
+    @media (max-width: 1024px) {
+      .sidebar {
+        position: absolute;
+        left: 0;
+        top: 0;
+        bottom: 0;
+        width: 320px;
+        margin: 0;
+        border-radius: 0;
+        z-index: 100;
+      }
+
+      .scene-container {
+        margin: 16px;
+      }
+    }
+
+    .sidebar::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    .sidebar::-webkit-scrollbar-track {
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 3px;
+    }
+
+    .sidebar::-webkit-scrollbar-thumb {
+      background: rgba(0, 212, 170, 0.3);
+      border-radius: 3px;
+    }
+
+    .sidebar::-webkit-scrollbar-thumb:hover {
+      background: rgba(0, 212, 170, 0.5);
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <header class="header">
+      <h1>✨ TextTo3D · 文字转三维场景</h1>
+    </header>
+    <div class="main-container">
+      <button class="sidebar-toggle" id="sidebarToggle">
+        <span id="toggleIcon">›</span>
+      </button>
+      <aside class="sidebar" id="sidebar">
+        <div class="input-group">
+          <label for="sceneInput">场景描述</label>
+          <textarea 
+            class="textarea" 
+            id="sceneInput" 
+            placeholder="例如：一个迷雾笼罩的古老森林，中心有一棵发光的蓝色大树，树周围飘浮着萤火虫"
+          >一个迷雾笼罩的古老森林，中心有一棵发光的蓝色大树，树周围飘浮着萤火虫</textarea>
+        </div>
+        <div class="button-group">
+          <button class="btn btn-primary" id="generateBtn">生成场景</button>
+          <button class="btn btn-secondary" id="reshuffleBtn">重排</button>
+        </div>
+        <div class="divider"></div>
+        <div class="details-panel" id="detailsPanel">
+          <div class="details-title">物体详情</div>
+          <div class="detail-row">
+            <label>名称</label>
+            <div class="value" id="detailName">-</div>
+          </div>
+          <div class="detail-row">
+            <label>颜色</label>
+            <div class="color-input-wrapper">
+              <input type="color" class="color-input" id="detailColor" value="#00d4aa">
+              <span class="value" id="detailColorHex">#00d4aa</span>
+            </div>
+          </div>
+          <div class="detail-row">
+            <label>坐标</label>
+            <div class="coord-inputs">
+              <div class="coord-group">
+                <div class="coord-label">X</div>
+                <input type="number" class="coord-input" id="coordX" step="0.1" value="0">
+              </div>
+              <div class="coord-group">
+                <div class="coord-label">Y</div>
+                <input type="number" class="coord-input" id="coordY" step="0.1" value="0">
+              </div>
+              <div class="coord-group">
+                <div class="coord-label">Z</div>
+                <input type="number" class="coord-input" id="coordZ" step="0.1" value="0">
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="info-text">
+          💡 提示：输入自然语言描述场景，点击生成按钮即可创建3D场景。点击场景中的物体可以查看和编辑属性。
+        </div>
+        <div class="loading-overlay" id="loadingOverlay">
+          <div class="spinner"></div>
+        </div>
+      </aside>
+      <div class="scene-container" id="sceneContainer">
+        <div class="fps-counter" id="fpsCounter">FPS: --</div>
+        <div class="hint-text">🖱️ 拖拽旋转 · 滚轮缩放 · 点击选中</div>
+      </div>
+    </div>
+  </div>
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
