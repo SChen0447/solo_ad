@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>3D 分子结构搭建沙盘</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+      background: linear-gradient(135deg, #0d1117 0%, #161b22 100%);
+      color: #e6edf3;
+    }
+
+    #app {
+      width: 100%;
+      height: 100%;
+      position: relative;
+    }
+
+    #canvas-container {
+      width: 100%;
+      height: 100%;
+      position: absolute;
+      top: 0;
+      left: 0;
+    }
+
+    #atom-panel {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      width: 220px;
+      background: rgba(22, 27, 34, 0.9);
+      border: 1px solid rgba(88, 166, 255, 0.2);
+      border-radius: 12px;
+      padding: 16px;
+      backdrop-filter: blur(10px);
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+    }
+
+    #property-panel {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      width: 260px;
+      background: rgba(22, 27, 34, 0.9);
+      border: 1px solid rgba(188, 140, 255, 0.2);
+      border-radius: 12px;
+      padding: 16px;
+      backdrop-filter: blur(10px);
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+    }
+
+    #control-panel {
+      position: absolute;
+      bottom: 30px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(22, 27, 34, 0.9);
+      border: 1px solid rgba(88, 166, 255, 0.2);
+      border-radius: 12px;
+      padding: 14px 24px;
+      backdrop-filter: blur(10px);
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+      display: flex;
+      gap: 12px;
+      align-items: center;
+    }
+
+    .panel-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: #58a6ff;
+      margin-bottom: 14px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid rgba(88, 166, 255, 0.15);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .atom-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+      margin-bottom: 16px;
+    }
+
+    .group-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 10px;
+    }
+
+    .atom-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 12px 8px;
+      background: rgba(88, 166, 255, 0.05);
+      border: 1px solid rgba(88, 166, 255, 0.15);
+      border-radius: 10px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      user-select: none;
+    }
+
+    .atom-item:hover {
+      background: rgba(88, 166, 255, 0.15);
+      border-color: rgba(88, 166, 255, 0.5);
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(88, 166, 255, 0.2);
+    }
+
+    .atom-item.dragging {
+      opacity: 0.6;
+    }
+
+    .atom-sphere-preview {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      margin-bottom: 6px;
+      box-shadow: inset -4px -4px 8px rgba(0, 0, 0, 0.3), inset 2px 2px 6px rgba(255, 255, 255, 0.2);
+    }
+
+    .atom-label {
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .atom-valence {
+      font-size: 10px;
+      color: #8b949e;
+      margin-top: 2px;
+    }
+
+    .group-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 12px 8px;
+      background: rgba(188, 140, 255, 0.05);
+      border: 1px solid rgba(188, 140, 255, 0.15);
+      border-radius: 10px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      user-select: none;
+    }
+
+    .group-item:hover {
+      background: rgba(188, 140, 255, 0.15);
+      border-color: rgba(188, 140, 255, 0.5);
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(188, 140, 255, 0.2);
+    }
+
+    .group-label {
+      font-size: 12px;
+      font-weight: 600;
+      color: #bc8cff;
+    }
+
+    .group-formula {
+      font-size: 10px;
+      color: #8b949e;
+      margin-top: 4px;
+    }
+
+    .property-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+      font-size: 13px;
+    }
+
+    .property-row:last-child {
+      border-bottom: none;
+    }
+
+    .property-label {
+      color: #8b949e;
+    }
+
+    .property-value {
+      font-weight: 600;
+      color: #e6edf3;
+    }
+
+    .property-value.formula {
+      color: #58a6ff;
+      font-size: 14px;
+    }
+
+    .property-value.complete {
+      color: #3fb950;
+    }
+
+    .property-value.incomplete {
+      color: #f85149;
+    }
+
+    .btn {
+      padding: 8px 18px;
+      border: none;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      font-family: inherit;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #58a6ff 0%, #388bfd 100%);
+      color: white;
+      box-shadow: 0 2px 8px rgba(88, 166, 255, 0.3);
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(88, 166, 255, 0.4);
+    }
+
+    .btn-secondary {
+      background: linear-gradient(135deg, #bc8cff 0%, #a371f7 100%);
+      color: white;
+      box-shadow: 0 2px 8px rgba(188, 140, 255, 0.3);
+    }
+
+    .btn-secondary:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(188, 140, 255, 0.4);
+    }
+
+    .btn-danger {
+      background: linear-gradient(135deg, #f85149 0%, #da3633 100%);
+      color: white;
+      box-shadow: 0 2px 8px rgba(248, 81, 73, 0.3);
+    }
+
+    .btn-danger:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(248, 81, 73, 0.4);
+    }
+
+    .hint-text {
+      position: absolute;
+      bottom: 100px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 12px;
+      color: #8b949e;
+      background: rgba(22, 27, 34, 0.8);
+      padding: 8px 16px;
+      border-radius: 6px;
+      pointer-events: none;
+    }
+
+    .loading-overlay {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: rgba(22, 27, 34, 0.95);
+      border: 1px solid rgba(88, 166, 255, 0.3);
+      border-radius: 12px;
+      padding: 24px 40px;
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+      z-index: 100;
+    }
+
+    .loading-overlay.show {
+      display: flex;
+    }
+
+    .spinner {
+      width: 32px;
+      height: 32px;
+      border: 3px solid rgba(88, 166, 255, 0.2);
+      border-top-color: #58a6ff;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .loading-text {
+      font-size: 13px;
+      color: #58a6ff;
+      font-weight: 500;
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <div id="canvas-container"></div>
+
+    <div id="atom-panel">
+      <div class="panel-title">
+        <span>🧪</span>
+        <span>原子与基团</span>
+      </div>
+      <div class="atom-grid" id="atom-grid"></div>
+      <div class="panel-title" style="color: #bc8cff; border-color: rgba(188, 140, 255, 0.15); margin-top: 4px;">
+        <span>🔬</span>
+        <span>预定义基团</span>
+      </div>
+      <div class="group-grid" id="group-grid"></div>
+    </div>
+
+    <div id="property-panel">
+      <div class="panel-title" style="color: #bc8cff;">
+        <span>📊</span>
+        <span>分子属性</span>
+      </div>
+      <div id="property-content">
+        <div class="property-row">
+          <span class="property-label">分子式</span>
+          <span class="property-value formula" id="prop-formula">-</span>
+        </div>
+        <div class="property-row">
+          <span class="property-label">分子量</span>
+          <span class="property-value" id="prop-mass">0 g/mol</span>
+        </div>
+        <div class="property-row">
+          <span class="property-label">原子数</span>
+          <span class="property-value" id="prop-atoms">0</span>
+        </div>
+        <div class="property-row">
+          <span class="property-label">化学键数</span>
+          <span class="property-value" id="prop-bonds">0</span>
+        </div>
+        <div class="property-row">
+          <span class="property-label">结构完整</span>
+          <span class="property-value complete" id="prop-complete">是</span>
+        </div>
+      </div>
+    </div>
+
+    <div id="control-panel">
+      <button class="btn btn-primary" id="btn-optimize">优化结构</button>
+      <button class="btn btn-secondary" id="btn-rotate">开始旋转</button>
+      <button class="btn btn-danger" id="btn-clear">清空场景</button>
+    </div>
+
+    <div class="hint-text" id="hint-text">
+      点击或拖拽原子到场景中创建 · 单击两个原子创建/切换化学键 · Ctrl+右键旋转 · 滚轮缩放 · Shift+左键平移
+    </div>
+
+    <div class="loading-overlay" id="loading-overlay">
+      <div class="spinner"></div>
+      <div class="loading-text">正在优化分子结构...</div>
+    </div>
+  </div>
+
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
