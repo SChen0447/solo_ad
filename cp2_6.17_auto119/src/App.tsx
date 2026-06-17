@@ -17,10 +17,34 @@ function App() {
   const [history, setHistory] = useState<HistoryItem[]>([])
   const [showHistory, setShowHistory] = useState<boolean>(true)
   const [copyToast, setCopyToast] = useState<boolean>(false)
+  const [saveToast, setSaveToast] = useState<boolean>(false)
   const previewWrapRef = useRef<HTMLDivElement>(null)
   const previewRef = useRef<PreviewRef>(null)
   const editorRef = useRef<EditorRef>(null)
   const lastSaveRef = useRef<number>(0)
+  const restoringRef = useRef<boolean>(false)
+
+  const saveToHistory = useCallback((value: string, force: boolean = false) => {
+    if (restoringRef.current && !force) return
+    const now = Date.now()
+    if (!force && now - lastSaveRef.current < 2000) return
+    if (value.trim().length === 0) return
+    setHistory(prev => {
+      if (!force && prev.length > 0 && prev[0].formula === value) {
+        return prev
+      }
+      if (force && prev.some(item => item.formula === value)) {
+        return prev
+      }
+      lastSaveRef.current = now
+      const newItem: HistoryItem = {
+        id: uuidv4(),
+        formula: value,
+        timestamp: now
+      }
+      return [newItem, ...prev].slice(0, 10)
+    })
+  }, [])
 
   const handleInsertSymbol = useCallback((template: string, cursorOffset: number = 1) => {
     if (editorRef.current) {
@@ -32,26 +56,28 @@ function App() {
 
   const handleEditorChange = useCallback((value: string) => {
     setFormula(value)
-    const now = Date.now()
-    if (now - lastSaveRef.current > 2000 && value.trim().length > 0) {
-      lastSaveRef.current = now
-      setHistory(prev => {
-        if (prev.length > 0 && prev[0].formula === value) {
-          return prev
-        }
-        const newItem: HistoryItem = {
-          id: uuidv4(),
-          formula: value,
-          timestamp: now
-        }
-        return [newItem, ...prev].slice(0, 5)
-      })
-    }
-  }, [])
+    saveToHistory(value, false)
+  }, [saveToHistory])
 
   const handleSelectHistory = useCallback((item: HistoryItem) => {
+    restoringRef.current = true
     setFormula(item.formula)
+    setTimeout(() => {
+      restoringRef.current = false
+    }, 500)
   }, [])
+
+  const handleManualSave = useCallback(() => {
+    if (formula.trim().length === 0) return
+    const isDuplicate = history.some(h => h.formula === formula)
+    saveToHistory(formula, true)
+    if (!isDuplicate) {
+      setSaveToast(true)
+      setTimeout(() => setSaveToast(false), 1500)
+    } else {
+      setSaveToast(false)
+    }
+  }, [formula, history, saveToHistory])
 
   const handleCopy = useCallback(async () => {
     try {
@@ -151,6 +177,14 @@ function App() {
             <Preview ref={previewRef} formula={formula} />
           </div>
           <div className="action-bar">
+            <button className="action-btn" onClick={handleManualSave} title="手动保存当前公式到历史记录">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
+                <polyline points="17 21 17 13 7 13 7 21"></polyline>
+                <polyline points="7 3 7 8 15 8"></polyline>
+              </svg>
+              <span>保存</span>
+            </button>
             <button className="action-btn" onClick={handleCopy} title="复制LaTeX源码">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
@@ -194,6 +228,14 @@ function App() {
             <polyline points="20 6 9 17 4 12"></polyline>
           </svg>
           <span>已复制</span>
+        </div>
+      )}
+      {saveToast && (
+        <div className="copy-toast" style={{ backgroundColor: '#3b82f6', boxShadow: '0 4px 12px rgba(59, 130, 246, 0.3)' }}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="20 6 9 17 4 12"></polyline>
+          </svg>
+          <span>已保存到历史</span>
         </div>
       )}
     </div>

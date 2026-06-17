@@ -66,6 +66,7 @@ function HistoryPanel({ history, isOpen, onToggle, onSelect }: HistoryPanelProps
                 <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path>
               </svg>
               历史记录
+              <span className="history-count-badge">{history.length}/10</span>
             </h3>
             <button className="sidebar-close desktop-only" onClick={onToggle} title="收起">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -82,7 +83,8 @@ function HistoryPanel({ history, isOpen, onToggle, onSelect }: HistoryPanelProps
                 <line x1="12" y1="16" x2="12.01" y2="16"></line>
               </svg>
               <p>暂无历史记录</p>
-              <p className="history-empty-sub">编辑公式后将自动保存最近5条</p>
+              <p className="history-empty-sub">编辑公式后将自动保存最近10条</p>
+              <p className="history-empty-sub">或点击"保存"按钮手动保存</p>
             </div>
           ) : (
             <div className="history-list">
@@ -94,7 +96,7 @@ function HistoryPanel({ history, isOpen, onToggle, onSelect }: HistoryPanelProps
                   title={`点击回滚到该版本（${formatTime(item.timestamp)}）`}
                 >
                   <div className="history-item-header">
-                    <span className="history-item-index">#{history.length - index}</span>
+                    <span className="history-item-index">#{index + 1}</span>
                     <span className="history-item-time">{formatTime(item.timestamp)}</span>
                   </div>
                   <Thumb formula={item.formula} />
