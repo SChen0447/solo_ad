@@ -52,6 +52,7 @@ export default function RecipeDetail({ recipeId }: Props) {
   const [content, setContent] = useState('');
   const [submittingRating, setSubmittingRating] = useState(false);
   const [submittingComment, setSubmittingComment] = useState(false);
+  const [toast, setToast] = useState<string | null>(null);
 
   useEffect(() => {
     loadDetail();
