@@ -96,8 +96,8 @@ export class ParticleEngine {
         life: 0,
         maxLife: duration,
         phase: Math.random() * Math.PI * 2,
-        amplitude: 3 + Math.random() * 8,
-        frequency: 1 + Math.random() * 2,
+        amplitude: 1 + Math.random() * 2,
+        frequency: 0.02 + Math.random() * 0.03,
         strokeId: sampled.strokeId,
         shape,
         rotation: Math.random() * Math.PI * 2,
@@ -151,14 +151,16 @@ export class ParticleEngine {
         continue
       }
 
-      const t = p.life
-      const sineOffset = Math.sin(t * 0.003 * p.frequency + p.phase) * p.amplitude
+      p.phase += p.frequency
+      const sineOffset = Math.sin(p.phase) * p.amplitude
       const perpX = -p.vy
       const perpY = p.vx
       const perpLen = Math.sqrt(perpX * perpX + perpY * perpY) || 1
+      const perpUx = perpX / perpLen
+      const perpUy = perpY / perpLen
 
-      p.x += (p.vx + (perpX / perpLen) * sineOffset) * dt
-      p.y += (p.vy + (perpY / perpLen) * sineOffset) * dt
+      p.x += p.vx * dt + perpUx * sineOffset
+      p.y += p.vy * dt + perpUy * sineOffset
 
       p.vx *= 0.98
       p.vy *= 0.98
@@ -188,6 +190,8 @@ export class ParticleEngine {
     const rect = this.canvas.getBoundingClientRect()
     this.ctx.clearRect(0, 0, rect.width, rect.height)
 
+    const MAX_CONNECT_DIST = 80
+
     for (let i = 0; i < this.particles.length; i++) {
       const p1 = this.particles[i]
       for (let j = i + 1; j < this.particles.length; j++) {
@@ -196,10 +200,11 @@ export class ParticleEngine {
         const dy = p1.y - p2.y
         const dist = Math.sqrt(dx * dx + dy * dy)
 
-        if (dist < 80) {
+        if (dist < MAX_CONNECT_DIST) {
+          const distanceFactor = 1 - dist / MAX_CONNECT_DIST
           const sameStroke = p1.strokeId === p2.strokeId
-          const baseAlphaMult = sameStroke ? 0.6 : 0.3
-          const alpha = (1 - dist / 80) * baseAlphaMult * Math.min(p1.alpha, p2.alpha)
+          const maxAlpha = sameStroke ? 0.6 : 0.3
+          const alpha = distanceFactor * maxAlpha * Math.min(p1.alpha, p2.alpha)
           if (alpha <= 0.005) continue
 
           this.ctx.beginPath()
