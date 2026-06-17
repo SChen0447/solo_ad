@@ -1,0 +1,24 @@
+{
+  "name": "nebula-generator",
+  "version": "1.0.0",
+  "description": "Interactive 3D Nebula Particle System",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@types/three": "^0.160.0",
+    "axios": "^1.6.0",
+    "dat.gui": "^0.7.9",
+    "three": "^0.160.0",
+    "tween.js": "^16.6.0"
+  },
+  "devDependencies": {
+    "@types/dat.gui": "^0.7.13",
+    "@types/tween.js": "^18.6.1",
+    "typescript": "^5.3.0",
+    "vite": "^5.0.0"
+  }
+}
