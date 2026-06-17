@@ -19,13 +19,43 @@ export async function exportWallpaper(
 ): Promise<void> {
   const { resolution, onProgress } = options;
   const { width: targetW, height: targetH } = RESOLUTIONS[resolution];
+  const totalDuration = 1500;
+  const startTime = performance.now();
+  let progress = 0;
+  let currentRenderStage = 0;
 
   const reportProgress = (p: number) => {
-    onProgress?.(p);
+    progress = Math.max(progress, p);
+    onProgress?.(Math.min(progress, 1));
   };
 
-  await new Promise((r) => setTimeout(r, 100));
-  reportProgress(0.1);
+  const animateProgress = (targetStage: number, minProgress: number) => {
+    return new Promise<void>((resolve) => {
+      const targetProgress = minProgress + (targetStage - currentRenderStage) * 0.25;
+      currentRenderStage = targetStage;
+      
+      const startP = progress;
+      const endP = Math.max(targetProgress, minProgress);
+      const duration = Math.min(300, totalDuration * (endP - startP));
+      const animStart = performance.now();
+      
+      const tick = () => {
+        const elapsed = performance.now() - animStart;
+        const t = Math.min(elapsed / duration, 1);
+        const easeT = t * (2 - t);
+        const newP = startP + (endP - startP) * easeT;
+        reportProgress(newP);
+        if (t < 1) {
+          requestAnimationFrame(tick);
+        } else {
+          resolve();
+        }
+      };
+      requestAnimationFrame(tick);
+    });
+  };
+
+  await animateProgress(1, 0.1);
 
   const canvas = document.createElement('canvas');
   canvas.width = targetW;
@@ -36,9 +66,10 @@ export async function exportWallpaper(
   ctx.fillStyle = '#1a1a2e';
   ctx.fillRect(0, 0, targetW, targetH);
 
-  reportProgress(0.3);
+  await animateProgress(2, 0.3);
 
   if (elements.length === 0) {
+    await animateProgress(4, 0.95);
     reportProgress(1);
     await downloadCanvas(canvas);
     return;
@@ -64,7 +95,7 @@ export async function exportWallpaper(
   const offsetX = (targetW - contentW * scale) / 2 - minX * scale + padding * scale;
   const offsetY = (targetH - contentH * scale) / 2 - minY * scale + padding * scale;
 
-  reportProgress(0.5);
+  await animateProgress(3, 0.5);
 
   const loadImage = (src: string): Promise<HTMLImageElement> =>
     new Promise((resolve, reject) => {
@@ -154,12 +185,14 @@ export async function exportWallpaper(
     }
 
     ctx.restore();
-    reportProgress(0.5 + (0.4 * (i + 1)) / sorted.length);
+    
+    const elementProgress = 0.5 + (0.4 * (i + 1)) / sorted.length;
+    await animateProgress(3, elementProgress);
   }
 
-  reportProgress(0.95);
-  await downloadCanvas(canvas);
+  await animateProgress(4, 0.95);
   reportProgress(1);
+  await downloadCanvas(canvas);
 }
 
 function downloadCanvas(canvas: HTMLCanvasElement): Promise<void> {

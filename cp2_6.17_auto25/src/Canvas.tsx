@@ -27,6 +27,7 @@ export const Canvas: React.FC<CanvasProps> = ({
     view,
     setViewOffset,
     setViewScale,
+    startInertia,
     updateElement,
     deleteElement,
     duplicateElement,
@@ -61,9 +62,40 @@ export const Canvas: React.FC<CanvasProps> = ({
   const resizeStartRef = useRef({ x: 0, y: 0, w: 0, h: 0 });
 
   const velocityRef = useRef({ x: 0, y: 0 });
-  const inertiaRafRef = useRef<number>(0);
   const lastPanTimeRef = useRef(0);
   const lastPanPosRef = useRef({ x: 0, y: 0 });
+
+  const fadeInAnimationsRef = useRef<Map<number, { ctx: CanvasRenderingContext2D; startTime: number; duration: number }>>(new Map());
+  const fadeInRafRef = useRef<number>(0);
+  const fadeInIdCounter = useRef(0);
+
+  const runFadeInLoop = useCallback(() => {
+    const now = performance.now();
+    const anims = fadeInAnimationsRef.current;
+    anims.forEach((anim, id) => {
+      const elapsed = now - anim.startTime;
+      const progress = Math.min(elapsed / anim.duration, 1);
+      if (anim.ctx) {
+        anim.ctx.globalAlpha = progress;
+      }
+      if (progress >= 1) {
+        anims.delete(id);
+      }
+    });
+    if (anims.size > 0) {
+      fadeInRafRef.current = requestAnimationFrame(runFadeInLoop);
+    }
+  }, []);
+
+  const startFadeIn = useCallback((ctx: CanvasRenderingContext2D, duration: number = 300) => {
+    const id = fadeInIdCounter.current++;
+    fadeInAnimationsRef.current.set(id, { ctx, startTime: performance.now(), duration });
+    if (fadeInAnimationsRef.current.size === 1) {
+      cancelAnimationFrame(fadeInRafRef.current);
+      fadeInRafRef.current = requestAnimationFrame(runFadeInLoop);
+    }
+    return () => fadeInAnimationsRef.current.delete(id);
+  }, [runFadeInLoop]);
 
   const screenToCanvas = useCallback(
     (screenX: number, screenY: number): Point => {
@@ -76,36 +108,6 @@ export const Canvas: React.FC<CanvasProps> = ({
     },
     [view]
   );
-
-  const inertiaOffsetRef = useRef({ x: 0, y: 0 });
-
-  const startInertia = useCallback(
-    (vx: number, vy: number) => {
-      cancelAnimationFrame(inertiaRafRef.current);
-      const damping = 0.92;
-      let velX = vx;
-      let velY = vy;
-      inertiaOffsetRef.current = { x: view.offsetX, y: view.offsetY };
-
-      const tick = () => {
-        velX *= damping;
-        velY *= damping;
-        if (Math.abs(velX) < 0.5 && Math.abs(velY) < 0.5) return;
-        inertiaOffsetRef.current = {
-          x: inertiaOffsetRef.current.x + velX,
-          y: inertiaOffsetRef.current.y + velY,
-        };
-        setViewOffset(inertiaOffsetRef.current.x, inertiaOffsetRef.current.y);
-        inertiaRafRef.current = requestAnimationFrame(tick);
-      };
-      inertiaRafRef.current = requestAnimationFrame(tick);
-    },
-    [setViewOffset, view.offsetX, view.offsetY]
-  );
-
-  useEffect(() => {
-    return () => cancelAnimationFrame(inertiaRafRef.current);
-  }, []);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -124,6 +126,12 @@ export const Canvas: React.FC<CanvasProps> = ({
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
+    };
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      cancelAnimationFrame(fadeInRafRef.current);
     };
   }, []);
 
@@ -188,7 +196,7 @@ export const Canvas: React.FC<CanvasProps> = ({
               const sy = (canvasPt.y * view.scale + view.offsetY);
               ctx.moveTo(sx - rect.left + rect.left, sy - rect.top + rect.top);
             }
-            animateStrokeFadeIn(ctx, dCanvas, canvasPt, rect, view);
+            startFadeIn(ctx, 300);
           }
         }
         return;
@@ -219,28 +227,6 @@ export const Canvas: React.FC<CanvasProps> = ({
     },
     [activeTool, brushColor, brushWidth, elements, screenToCanvas, setSelectedId, view]
   );
-
-  const animateStrokeFadeIn = (
-    ctx: CanvasRenderingContext2D,
-    dCanvas: HTMLCanvasElement,
-    startPt: Point,
-    rect: DOMRect | undefined,
-    currentView: CanvasView
-  ) => {
-    const startTime = performance.now();
-    const duration = 300;
-    const tick = (now: number) => {
-      const elapsed = now - startTime;
-      const progress = Math.min(elapsed / duration, 1);
-      if (ctx) {
-        ctx.globalAlpha = progress;
-      }
-      if (progress < 1 && isDrawingRef.current) {
-        requestAnimationFrame(tick);
-      }
-    };
-    requestAnimationFrame(tick);
-  };
 
   const handleMouseMove = useCallback(
     (e: React.MouseEvent) => {
@@ -307,16 +293,17 @@ export const Canvas: React.FC<CanvasProps> = ({
       if (isResizing && resizeTarget) {
         const el = elements.find((el) => el.id === resizeTarget);
         if (!el) return;
+        const startW = resizeStartRef.current.w;
+        const startH = resizeStartRef.current.h;
         const dx = (e.clientX - resizeStartRef.current.x) / view.scale;
-        const originalSize = 150;
-        let newScale = (resizeStartRef.current.w + dx) / originalSize;
-        newScale = Math.round(newScale / 0.5) * 0.5;
-        newScale = Math.max(0.5, Math.min(2.0, newScale));
-        const newW = Math.round(originalSize * newScale);
-        const newH = Math.round(originalSize * newScale);
-        const clampedW = Math.max(50, Math.min(300, newW));
-        const clampedH = Math.max(50, Math.min(300, newH));
-        updateElement(resizeTarget, { width: clampedW, height: clampedH });
+        let scaleRatio = (startW + dx) / startW;
+        scaleRatio = Math.max(0.5, Math.min(2.0, scaleRatio));
+        scaleRatio = Math.round(scaleRatio / 0.5) * 0.5;
+        let newW = Math.round(startW * scaleRatio);
+        let newH = Math.round(startH * scaleRatio);
+        newW = Math.max(50, Math.min(300, newW));
+        newH = Math.max(50, Math.min(300, newH));
+        updateElement(resizeTarget, { width: newW, height: newH });
       }
     },
     [isDragging, dragTarget, isResizing, resizeTarget, elements, updateElement, view, screenToCanvas, brushColor, brushWidth, setViewOffset]

@@ -60,7 +60,11 @@ export const Toolbar: React.FC<ToolbarProps> = ({
   return (
     <>
       <div
-        style={{ ...toolbarStyle, background: toolbarHovered ? '#2c2c3e' : 'rgba(30,30,40,0.8)' }}
+        style={{
+          ...toolbarStyle,
+          background: toolbarHovered ? '#2c2c3e' : 'rgba(30,30,40,0.8)',
+          backgroundColor: toolbarHovered ? '#2c2c3e' : 'rgba(30,30,40,0.8)',
+        } as React.CSSProperties}
         onMouseEnter={() => setToolbarHovered(true)}
         onMouseLeave={() => setToolbarHovered(false)}
       >
@@ -170,18 +174,30 @@ const toolbarStyle: React.CSSProperties = {
   top: '50%',
   transform: 'translateY(-50%)',
   width: 64,
+  minWidth: 64,
+  maxWidth: 64,
   background: 'rgba(30,30,40,0.8)',
+  backgroundColor: 'rgba(30,30,40,0.8)',
   backdropFilter: 'blur(8px)',
+  WebkitBackdropFilter: 'blur(8px)',
   borderRadius: 12,
+  borderTopLeftRadius: 12,
+  borderTopRightRadius: 12,
+  borderBottomLeftRadius: 12,
+  borderBottomRightRadius: 12,
   padding: '12px 0',
   display: 'flex',
   flexDirection: 'column',
   alignItems: 'center',
   gap: 4,
   zIndex: 1000,
-  transition: 'background 0.2s',
+  transition: 'background 0.2s ease, background-color 0.2s ease',
+  transitionProperty: 'background, background-color',
+  transitionDuration: '0.2s',
   boxShadow: '0 4px 20px rgba(0,0,0,0.4)',
-};
+  boxSizing: 'border-box',
+  opacity: 1,
+} as const;
 
 const toolBtnStyle: React.CSSProperties = {
   width: 48,

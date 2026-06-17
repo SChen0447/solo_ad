@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import type { CanvasElement, CanvasView, ImageElement, TextElement, DrawingElement, Point } from './types';
 
 const generateId = () => Math.random().toString(36).slice(2, 11);
@@ -12,6 +12,16 @@ export function useCanvasState() {
     scale: 1,
   });
   const zIndexCounter = useRef(1);
+  const inertiaRafRef = useRef<number>(0);
+  const inertiaOffsetRef = useRef({ x: 0, y: 0 });
+
+  useEffect(() => {
+    return () => {
+      if (inertiaRafRef.current) {
+        cancelAnimationFrame(inertiaRafRef.current);
+      }
+    };
+  }, []);
 
   const getNextZIndex = useCallback(() => {
     zIndexCounter.current += 1;
@@ -139,6 +149,30 @@ export function useCanvasState() {
     setView({ scale, offsetX, offsetY });
   }, []);
 
+  const startInertia = useCallback(
+    (vx: number, vy: number) => {
+      cancelAnimationFrame(inertiaRafRef.current);
+      const damping = 0.92;
+      let velX = vx;
+      let velY = vy;
+      inertiaOffsetRef.current = { x: view.offsetX, y: view.offsetY };
+
+      const tick = () => {
+        velX *= damping;
+        velY *= damping;
+        if (Math.abs(velX) < 0.5 && Math.abs(velY) < 0.5) return;
+        inertiaOffsetRef.current = {
+          x: inertiaOffsetRef.current.x + velX,
+          y: inertiaOffsetRef.current.y + velY,
+        };
+        setViewOffset(inertiaOffsetRef.current.x, inertiaOffsetRef.current.y);
+        inertiaRafRef.current = requestAnimationFrame(tick);
+      };
+      inertiaRafRef.current = requestAnimationFrame(tick);
+    },
+    [setViewOffset, view.offsetX, view.offsetY]
+  );
+
   return {
     elements,
     selectedId,
@@ -146,6 +180,7 @@ export function useCanvasState() {
     view,
     setViewOffset,
     setViewScale,
+    startInertia,
     addImageElement,
     addTextElement,
     addDrawingElement,

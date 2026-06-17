@@ -228,7 +228,7 @@ export default function App() {
                   height: '100%',
                   background: 'linear-gradient(90deg, #6c5ce7, #a29bfe)',
                   borderRadius: 4,
-                  transition: 'width 0.1s ease-out',
+                  transition: 'width 0.05s linear',
                 }}
               />
             </div>
