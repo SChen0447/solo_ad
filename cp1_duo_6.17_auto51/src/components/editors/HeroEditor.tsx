@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
 import { Hero, Skill } from '../../types';
 import { CLASS_COLORS, CLASS_NAMES } from '../../data/heroes';
 import { SKILLS } from '../../data/skills';
@@ -16,12 +16,26 @@ export default function HeroEditor({ hero, onClose }: HeroEditorProps) {
   const [selectedSkillSlot, setSelectedSkillSlot] = useState<number>(-1);
   const [skillSearch, setSkillSearch] = useState('');
   const [skillTypeFilter, setSkillTypeFilter] = useState<string>('all');
+  const [savedSlot, setSavedSlot] = useState<number>(-1);
+  const initialValues = useRef<Record<string, number>>({
+    maxHp: hero.maxHp,
+    attack: hero.attack,
+    defense: hero.defense,
+    speed: hero.speed,
+  });
 
   const classColor = CLASS_COLORS[hero.heroClass];
 
   const statVariance = (base: number) => {
     const v = base * 0.2;
     return { min: Math.round(base - v), max: Math.round(base + v) };
+  };
+
+  const hasSignificantChange = (stat: string, current: number): boolean => {
+    const initial = initialValues.current[stat] || current;
+    if (initial === 0) return current > 0;
+    const change = Math.abs((current - initial) / initial);
+    return change > 0.1;
   };
 
   const handleStatChange = (stat: keyof Hero, value: number) => {
@@ -41,6 +55,8 @@ export default function HeroEditor({ hero, onClose }: HeroEditorProps) {
       const newSkills = [...hero.skills];
       newSkills[selectedSkillSlot] = skill;
       updateHero(hero.id, { skills: newSkills });
+      setSavedSlot(selectedSkillSlot);
+      setTimeout(() => setSavedSlot(-1), 2000);
     }
     setShowSkillModal(false);
     setSelectedSkillSlot(-1);
@@ -53,6 +69,46 @@ export default function HeroEditor({ hero, onClose }: HeroEditorProps) {
 
   const atkVar = statVariance(hero.attack);
   const defVar = statVariance(hero.defense);
+
+  const StatRow = ({
+    label,
+    stat,
+    value,
+    showVariance,
+  }: {
+    label: string;
+    stat: string;
+    value: number;
+    showVariance?: { min: number; max: number };
+  }) => {
+    const isChanged = hasSignificantChange(stat, value);
+    return (
+      <div className="stat-row">
+        <div className="stat-label">{label}</div>
+        <div className="stat-value-row">
+          <div className={`stat-value ${isChanged ? 'changed' : ''}`}>
+            {value}
+            {showVariance && (
+              <span className="stat-variance">
+                ({showVariance.min} ~ {showVariance.max})
+              </span>
+            )}
+          </div>
+          <div className={`stat-number-tag ${isChanged ? 'highlight' : ''}`}>
+            {value}
+          </div>
+        </div>
+        <input
+          type="range"
+          min="0"
+          max="999"
+          value={value}
+          onChange={(e) => handleStatChange(stat as keyof Hero, parseInt(e.target.value))}
+          className="stat-slider"
+        />
+      </div>
+    );
+  };
 
   return (
     <div className="hero-editor">
@@ -73,67 +129,10 @@ export default function HeroEditor({ hero, onClose }: HeroEditorProps) {
       </div>
 
       <div className="hero-stats">
-        <div className="stat-row">
-          <div className="stat-label">生命值</div>
-          <div className="stat-value">{hero.maxHp}</div>
-          <input
-            type="range"
-            min="0"
-            max="999"
-            value={hero.maxHp}
-            onChange={(e) => handleStatChange('maxHp', parseInt(e.target.value))}
-            className="stat-slider"
-          />
-        </div>
-
-        <div className="stat-row">
-          <div className="stat-label">攻击力</div>
-          <div className="stat-value">
-            {hero.attack}
-            <span className="stat-variance">
-              ({atkVar.min} ~ {atkVar.max})
-            </span>
-          </div>
-          <input
-            type="range"
-            min="0"
-            max="999"
-            value={hero.attack}
-            onChange={(e) => handleStatChange('attack', parseInt(e.target.value))}
-            className="stat-slider"
-          />
-        </div>
-
-        <div className="stat-row">
-          <div className="stat-label">防御力</div>
-          <div className="stat-value">
-            {hero.defense}
-            <span className="stat-variance">
-              ({defVar.min} ~ {defVar.max})
-            </span>
-          </div>
-          <input
-            type="range"
-            min="0"
-            max="999"
-            value={hero.defense}
-            onChange={(e) => handleStatChange('defense', parseInt(e.target.value))}
-            className="stat-slider"
-          />
-        </div>
-
-        <div className="stat-row">
-          <div className="stat-label">速度</div>
-          <div className="stat-value">{hero.speed}</div>
-          <input
-            type="range"
-            min="0"
-            max="999"
-            value={hero.speed}
-            onChange={(e) => handleStatChange('speed', parseInt(e.target.value))}
-            className="stat-slider"
-          />
-        </div>
+        <StatRow label="生命值" stat="maxHp" value={hero.maxHp} />
+        <StatRow label="攻击力" stat="attack" value={hero.attack} showVariance={atkVar} />
+        <StatRow label="防御力" stat="defense" value={hero.defense} showVariance={defVar} />
+        <StatRow label="速度" stat="speed" value={hero.speed} />
       </div>
 
       <div className="skills-section">
@@ -154,6 +153,9 @@ export default function HeroEditor({ hero, onClose }: HeroEditorProps) {
                 </>
               ) : (
                 <span className="skill-empty">+ 添加技能</span>
+              )}
+              {savedSlot === idx && (
+                <span className="skill-saved-checkmark">✓</span>
               )}
             </div>
           ))}

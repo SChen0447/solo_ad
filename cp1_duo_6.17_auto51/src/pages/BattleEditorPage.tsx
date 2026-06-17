@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAppStore } from '../store/gameStore';
 import GridCanvas from '../components/grid/GridCanvas';
@@ -7,13 +7,47 @@ import { CLASS_COLORS, CLASS_NAMES } from '../data/heroes';
 import { Hero } from '../types';
 import './BattleEditorPage.css';
 
+type SortField = 'default' | 'name' | 'maxHp' | 'attack' | 'defense' | 'speed';
+type SortOrder = 'asc' | 'desc';
+
 export default function BattleEditorPage() {
   const { state, getFormationStats, startSimulation, selectWave } = useAppStore();
   const navigate = useNavigate();
   const [selectedHero, setSelectedHero] = useState<Hero | null>(null);
   const [showResult, setShowResult] = useState(false);
+  const [sortField, setSortField] = useState<SortField>('default');
+  const [sortOrder, setSortOrder] = useState<SortOrder>('asc');
 
   const stats = getFormationStats();
+
+  const sortedHeroes = useMemo(() => {
+    if (sortField === 'default') {
+      return state.heroes;
+    }
+    const heroes = [...state.heroes];
+    heroes.sort((a, b) => {
+      let valA: string | number = a[sortField as keyof Hero] as string | number;
+      let valB: string | number = b[sortField as keyof Hero] as string | number;
+      if (typeof valA === 'string' && typeof valB === 'string') {
+        valA = valA.toLowerCase();
+        valB = valB.toLowerCase();
+        return sortOrder === 'asc' ? valA.localeCompare(valB as string) : (valB as string).localeCompare(valA as string);
+      }
+      valA = Number(valA);
+      valB = Number(valB);
+      return sortOrder === 'asc' ? valA - valB : valB - valA;
+    });
+    return heroes;
+  }, [state.heroes, sortField, sortOrder]);
+
+  const handleSortChange = (field: SortField) => {
+    if (sortField === field) {
+      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortOrder('asc');
+    }
+  };
 
   const handleDragStart = (e: React.DragEvent, hero: Hero) => {
     e.dataTransfer.setData('hero', JSON.stringify(hero));
@@ -71,9 +105,32 @@ export default function BattleEditorPage() {
 
       <div className="editor-content">
         <div className="hero-pool">
-          <div className="pool-title">英雄池</div>
+          <div className="pool-header">
+            <div className="pool-title">英雄池</div>
+            <div className="sort-dropdown">
+              <select
+                className="sort-select"
+                value={sortField}
+                onChange={(e) => handleSortChange(e.target.value as SortField)}
+              >
+                <option value="default">默认排序</option>
+                <option value="name">按名称</option>
+                <option value="maxHp">按生命值</option>
+                <option value="attack">按攻击力</option>
+                <option value="defense">按防御力</option>
+                <option value="speed">按速度</option>
+              </select>
+              <button
+                className="sort-order-btn"
+                onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
+                title={sortOrder === 'asc' ? '升序' : '降序'}
+              >
+                {sortOrder === 'asc' ? '↑' : '↓'}
+              </button>
+            </div>
+          </div>
           <div className="hero-list">
-            {state.heroes.map((hero) => {
+            {sortedHeroes.map((hero) => {
               const isPlaced = state.formation.some((f) => f.heroId === hero.id);
               const classColor = CLASS_COLORS[hero.heroClass];
               return (
