@@ -30,6 +30,7 @@ export default function FilterBar({ tags, selectedTag, onTagSelect }: FilterBarP
               background: colors.background,
               opacity: isSelected ? 1 : 0.6,
               border: isSelected ? '1px solid #ffffff' : '1px solid transparent',
+              transition: 'all 0.3s ease-out',
             }}
             onClick={() => onTagSelect(isSelected ? null : tag)}
             title={tag}

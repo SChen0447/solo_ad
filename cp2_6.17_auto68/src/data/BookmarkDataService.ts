@@ -38,9 +38,7 @@ class BookmarkDataService {
 
   getByTimeRange(range: TimeRange): Bookmark[] {
     return this.bookmarks
-      .filter((b) => {
-        return b.createdAt >= range.start && b.createdAt <= range.end;
-      })
+      .filter((b) => b.createdAt >= range.start && b.createdAt <= range.end)
       .sort((a, b) => a.createdAt - b.createdAt);
   }
 

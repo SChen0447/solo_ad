@@ -34,7 +34,6 @@ const EXIT_ANIMATION_DURATION = 200;
 
 export default function BookmarkGrid({ bookmarks, onTagFilter, onDelete }: BookmarkGridProps) {
   const [displayCards, setDisplayCards] = useState<DisplayCard[]>([]);
-  const prevIdsRef = useRef<Set<string>>(new Set());
   const exitTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
 
   const clearExitTimer = useCallback((id: string) => {
@@ -47,18 +46,17 @@ export default function BookmarkGrid({ bookmarks, onTagFilter, onDelete }: Bookm
 
   useEffect(() => {
     const currentIds = new Set(bookmarks.map((b) => b.id));
-    const bookmarkMap = new Map(bookmarks.map((b) => [b.id, b]));
 
     setDisplayCards((prev) => {
-      const prevIds = new Set(prev.map((c) => c.id));
-      const result: DisplayCard[] = [];
+      const nextCards: DisplayCard[] = [];
+      const exitedIds = new Set<string>();
 
       for (const bm of bookmarks) {
         const prevCard = prev.find((c) => c.id === bm.id);
         if (prevCard) {
-          result.push({ ...bm, isEntering: prevCard.isEntering, isExiting: false });
+          nextCards.push({ ...bm, isEntering: prevCard.isEntering, isExiting: false });
         } else {
-          result.push({ ...bm, isEntering: true, isExiting: false });
+          nextCards.push({ ...bm, isEntering: true, isExiting: false });
           requestAnimationFrame(() => {
             setDisplayCards((curr) =>
               curr.map((c) => (c.id === bm.id ? { ...c, isEntering: false } : c))
@@ -69,26 +67,24 @@ export default function BookmarkGrid({ bookmarks, onTagFilter, onDelete }: Bookm
 
       for (const card of prev) {
         if (!currentIds.has(card.id) && !card.isExiting) {
-          result.push({ ...card, isExiting: true });
+          nextCards.push({ ...card, isExiting: true });
+          exitedIds.add(card.id);
           clearExitTimer(card.id);
           const timer = setTimeout(() => {
             setDisplayCards((curr) => curr.filter((c) => c.id !== card.id));
             exitTimersRef.current.delete(card.id);
           }, EXIT_ANIMATION_DURATION);
           exitTimersRef.current.set(card.id, timer);
-        }
-        if (card.isExiting && !currentIds.has(card.id)) {
-          result.push(card);
+        } else if (!currentIds.has(card.id) && card.isExiting) {
+          nextCards.push(card);
         }
       }
 
-      return result.sort((a, b) => {
+      return nextCards.sort((a, b) => {
         if (a.isExiting !== b.isExiting) return a.isExiting ? 1 : -1;
         return b.createdAt - a.createdAt;
       });
     });
-
-    prevIdsRef.current = currentIds;
   }, [bookmarks, clearExitTimer]);
 
   useEffect(() => {
@@ -132,6 +128,7 @@ export default function BookmarkGrid({ bookmarks, onTagFilter, onDelete }: Bookm
           key={card.id}
           className={`bookmark-card ${card.isEntering ? 'card-enter' : ''} ${card.isExiting ? 'card-exit' : ''}`}
           onClick={() => !card.isExiting && window.open(card.url, '_blank')}
+          data-id={card.id}
         >
           <div className="card-favicon">
             <img
@@ -149,8 +146,8 @@ export default function BookmarkGrid({ bookmarks, onTagFilter, onDelete }: Bookm
                   parent.style.display = 'flex';
                   parent.style.alignItems = 'center';
                   parent.style.justifyContent = 'center';
-                  parent.style.fontSize = 16;
-                  parent.style.fontWeight = 700;
+                  parent.style.fontSize = '16px';
+                  parent.style.fontWeight = '700';
                   parent.style.color = '#6C63FF';
                   parent.style.background = 'rgba(108,99,255,0.1)';
                 }
