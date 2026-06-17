@@ -2,8 +2,12 @@ import React, { useRef, useState, useCallback, useEffect, memo } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { useDrop } from '../hooks/useDragDrop';
 import { snapToGrid, GRID_SIZE, WALL_THICKNESS, getFloorPattern, isInRoomBounds } from '../modules/roomConfig';
-import { PRESET_COLORS, applyColorTransition } from '../modules/colorManager';
+import { applyColorTransition } from '../modules/colorManager';
 import type { RoomLayout, FurnitureItem, Wall, DragData } from '../types';
+
+const ALIGN_THRESHOLD = 20;
+const WALL_SNAP_THRESHOLD = 15;
+const DROP_ANIMATION_MS = 150;
 
 interface RoomCanvasProps {
   layout: RoomLayout;
@@ -17,12 +21,25 @@ interface RoomCanvasProps {
   isTransitioning: boolean;
 }
 
+interface GuideLine {
+  x1: number; y1: number; x2: number; y2: number;
+  furnitureId: string;
+}
+
+interface SnapInfo {
+  snapped: boolean;
+  x: number; y: number;
+  checkX: number; checkY: number;
+}
+
 const FurnitureBlock = memo(function FurnitureBlock({
   item,
+  isBeingDragged,
   onDelete,
   onMouseDown,
 }: {
   item: FurnitureItem;
+  isBeingDragged: boolean;
   onDelete: () => void;
   onMouseDown: (e: React.MouseEvent, offsetX: number, offsetY: number) => void;
 }) {
@@ -45,11 +62,16 @@ const FurnitureBlock = memo(function FurnitureBlock({
         backgroundColor: item.color,
         borderRadius: '2px',
         cursor: 'grab',
-        boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
-        transform: `rotate(${item.rotation}deg)`,
-        transition: 'transform 0.2s ease, box-shadow 0.2s ease, filter 0.2s ease',
+        boxShadow: isBeingDragged
+          ? '0 10px 24px rgba(0,0,0,0.35)'
+          : '0 2px 4px rgba(0,0,0,0.2)',
+        transform: `rotate(${item.rotation}deg) scale(${isBeingDragged ? 1.05 : 1})`,
+        transformOrigin: 'center center',
+        transition: 'transform 0.15s ease, box-shadow 0.15s ease, filter 0.2s ease, opacity 0.15s ease',
         willChange: 'transform',
         userSelect: 'none',
+        opacity: isBeingDragged ? 0.35 : 1,
+        zIndex: isBeingDragged ? 2 : 1,
       }}
       onMouseDown={handleMouseDown}
       onTouchStart={(e) => {
@@ -165,6 +187,109 @@ const WallElement = memo(function WallElement({
   );
 });
 
+function easeOutCubic(t: number): number {
+  return 1 - Math.pow(1 - t, 3);
+}
+
+const computeAlignmentGuides = (
+  dragX: number,
+  dragY: number,
+  dragW: number,
+  dragH: number,
+  furniture: FurnitureItem[],
+  excludeId: string | null
+): GuideLine[] => {
+  const guides: GuideLine[] = [];
+  const dragLeft = dragX;
+  const dragRight = dragX + dragW;
+  const dragTop = dragY;
+  const dragBottom = dragY + dragH;
+  const dragCenterX = dragX + dragW / 2;
+  const dragCenterY = dragY + dragH / 2;
+
+  for (const item of furniture) {
+    if (excludeId && item.id === excludeId) continue;
+    const fLeft = item.x;
+    const fRight = item.x + item.width;
+    const fTop = item.y;
+    const fBottom = item.y + item.height;
+    const fCenterX = item.x + item.width / 2;
+    const fCenterY = item.y + item.height / 2;
+
+    const edges: { dist: number; type: string; gx1: number; gy1: number; gx2: number; gy2: number }[] = [];
+
+    edges.push({ dist: Math.abs(dragLeft - fLeft), type: 'left-left', gx1: fLeft, gy1: Math.min(fTop, dragTop) - 5, gx2: fLeft, gy2: Math.max(fBottom, dragBottom) + 5 });
+    edges.push({ dist: Math.abs(dragLeft - fRight), type: 'left-right', gx1: fRight, gy1: Math.min(fTop, dragTop) - 5, gx2: fRight, gy2: Math.max(fBottom, dragBottom) + 5 });
+    edges.push({ dist: Math.abs(dragRight - fLeft), type: 'right-left', gx1: fLeft, gy1: Math.min(fTop, dragTop) - 5, gx2: fLeft, gy2: Math.max(fBottom, dragBottom) + 5 });
+    edges.push({ dist: Math.abs(dragRight - fRight), type: 'right-right', gx1: fRight, gy1: Math.min(fTop, dragTop) - 5, gx2: fRight, gy2: Math.max(fBottom, dragBottom) + 5 });
+    edges.push({ dist: Math.abs(dragTop - fTop), type: 'top-top', gx1: Math.min(fLeft, dragLeft) - 5, gy1: fTop, gx2: Math.max(fRight, dragRight) + 5, gy2: fTop });
+    edges.push({ dist: Math.abs(dragTop - fBottom), type: 'top-bottom', gx1: Math.min(fLeft, dragLeft) - 5, gy1: fBottom, gx2: Math.max(fRight, dragRight) + 5, gy2: fBottom });
+    edges.push({ dist: Math.abs(dragBottom - fTop), type: 'bottom-top', gx1: Math.min(fLeft, dragLeft) - 5, gy1: fTop, gx2: Math.max(fRight, dragRight) + 5, gy2: fTop });
+    edges.push({ dist: Math.abs(dragBottom - fBottom), type: 'bottom-bottom', gx1: Math.min(fLeft, dragLeft) - 5, gy1: fBottom, gx2: Math.max(fRight, dragRight) + 5, gy2: fBottom });
+    edges.push({ dist: Math.abs(dragCenterX - fCenterX), type: 'centerX', gx1: fCenterX, gy1: Math.min(fTop, dragTop) - 5, gx2: fCenterX, gy2: Math.max(fBottom, dragBottom) + 5 });
+    edges.push({ dist: Math.abs(dragCenterY - fCenterY), type: 'centerY', gx1: Math.min(fLeft, dragLeft) - 5, gy1: fCenterY, gx2: Math.max(fRight, dragRight) + 5, gy2: fCenterY });
+
+    for (const edge of edges) {
+      if (edge.dist <= ALIGN_THRESHOLD) {
+        guides.push({
+          x1: edge.gx1,
+          y1: edge.gy1,
+          x2: edge.gx2,
+          y2: edge.gy2,
+          furnitureId: item.id,
+        });
+      }
+    }
+  }
+
+  return guides;
+};
+
+const computeWallSnap = (
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  layout: RoomLayout
+): SnapInfo => {
+  const leftWall = WALL_THICKNESS;
+  const rightWall = layout.canvasWidth - WALL_THICKNESS;
+  const topWall = WALL_THICKNESS;
+  const bottomWall = layout.canvasHeight - WALL_THICKNESS;
+
+  let snapped = false;
+  let nx = x;
+  let ny = y;
+  let checkX = -1;
+  let checkY = -1;
+
+  if (x - leftWall <= WALL_SNAP_THRESHOLD && x - leftWall > -WALL_SNAP_THRESHOLD) {
+    nx = leftWall;
+    snapped = true;
+    checkX = nx + 8;
+    checkY = y + h / 2;
+  } else if (rightWall - (x + w) <= WALL_SNAP_THRESHOLD && rightWall - (x + w) > -WALL_SNAP_THRESHOLD) {
+    nx = rightWall - w;
+    snapped = true;
+    checkX = nx + w - 20;
+    checkY = y + h / 2;
+  }
+
+  if (y - topWall <= WALL_SNAP_THRESHOLD && y - topWall > -WALL_SNAP_THRESHOLD) {
+    ny = topWall;
+    snapped = true;
+    checkX = x + w / 2;
+    checkY = ny + 8;
+  } else if (bottomWall - (y + h) <= WALL_SNAP_THRESHOLD && bottomWall - (y + h) > -WALL_SNAP_THRESHOLD) {
+    ny = bottomWall - h;
+    snapped = true;
+    checkX = x + w / 2;
+    checkY = ny + h - 20;
+  }
+
+  return { snapped, x: nx, y: ny, checkX, checkY };
+};
+
 export const RoomCanvas: React.FC<RoomCanvasProps> = ({
   layout,
   furniture,
@@ -181,37 +306,175 @@ export const RoomCanvas: React.FC<RoomCanvasProps> = ({
   const [dragData, setDragData] = useState<DragData | null>(null);
   const [movingFurnitureId, setMovingFurnitureId] = useState<string | null>(null);
   const [moveOffset, setMoveOffset] = useState({ x: 0, y: 0 });
+  const [originalPosition, setOriginalPosition] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
+  const [guides, setGuides] = useState<GuideLine[]>([]);
+  const [wallSnap, setWallSnap] = useState<SnapInfo | null>(null);
+
+  const [dropAnimState, setDropAnimState] = useState<{
+    running: boolean;
+    data: DragData | null;
+    fromX: number; fromY: number;
+    toX: number; toY: number;
+    w: number; h: number;
+    color: string;
+    startTime: number;
+  } | null>(null);
+  const dropAnimRef = useRef<number | null>(null);
+
+  const getDragDimensions = useCallback((): { w: number; h: number } | null => {
+    if (!dragData) return null;
+    if (dragData.type === 'furniture') {
+      return { w: dragData.furniture.width, h: dragData.furniture.height };
+    } else {
+      const item = furniture.find(f => f.id === dragData.furnitureId);
+      return item ? { w: item.width, h: item.height } : null;
+    }
+  }, [dragData, furniture]);
+
+  const getDragColor = useCallback((): string => {
+    if (!dragData) return '#8b7355';
+    if (dragData.type === 'furniture') return dragData.furniture.color;
+    const item = furniture.find(f => f.id === dragData.furnitureId);
+    return item?.color ?? '#8b7355';
+  }, [dragData, furniture]);
+
+  const computeDragXY = useCallback((pos: { x: number; y: number }) => {
+    if (!dragData) return null;
+    const dims = getDragDimensions();
+    if (!dims) return null;
+
+    let baseX: number, baseY: number;
+    if (dragData.type === 'furniture') {
+      baseX = pos.x - dims.w / 2;
+      baseY = pos.y - dims.h / 2;
+    } else {
+      baseX = pos.x - moveOffset.x;
+      baseY = pos.y - moveOffset.y;
+    }
+
+    let x = snapToGrid(baseX);
+    let y = snapToGrid(baseY);
+
+    const snap = computeWallSnap(x, y, dims.w, dims.h, layout);
+    if (snap.snapped) {
+      x = snap.x;
+      y = snap.y;
+      setWallSnap(snap);
+    } else {
+      setWallSnap(null);
+    }
+
+    if (!isInRoomBounds(x, y, dims.w, dims.h, layout)) {
+      const padding = WALL_THICKNESS;
+      x = Math.max(padding, Math.min(x, layout.canvasWidth - padding - dims.w));
+      y = Math.max(padding, Math.min(y, layout.canvasHeight - padding - dims.h));
+    }
+
+    const newGuides = computeAlignmentGuides(x, y, dims.w, dims.h, furniture,
+      dragData.type === 'move' ? dragData.furnitureId : null);
+    setGuides(newGuides);
+
+    return { x, y, dims };
+  }, [dragData, moveOffset, layout, furniture, getDragDimensions]);
 
   const handleDrop = useCallback(
     (data: DragData, position: { x: number; y: number }) => {
-      if (data.type === 'furniture') {
-        const x = snapToGrid(position.x - data.furniture.width / 2);
-        const y = snapToGrid(position.y - data.furniture.height / 2);
-
-        if (isInRoomBounds(x, y, data.furniture.width, data.furniture.height, layout)) {
-          const newFurniture: FurnitureItem = {
-            id: uuidv4(),
-            ...data.furniture,
-            x,
-            y,
-          };
-          onFurnitureAdd(newFurniture);
-        }
-      } else if (data.type === 'move') {
-        const x = snapToGrid(position.x - data.offsetX);
-        const y = snapToGrid(position.y - data.offsetY);
-
-        const item = furniture.find((f) => f.id === data.furnitureId);
-        if (item && isInRoomBounds(x, y, item.width, item.height, layout)) {
-          onFurnitureMove(data.furnitureId, x, y);
-        }
+      const dims = data.type === 'furniture'
+        ? { w: data.furniture.width, h: data.furniture.height }
+        : (() => {
+            const it = furniture.find(f => f.id === data.furnitureId);
+            return it ? { w: it.width, h: it.height } : null;
+          })();
+      if (!dims) {
+        setDragPosition(null);
+        setDragData(null);
+        setMovingFurnitureId(null);
+        setOriginalPosition(null);
+        setGuides([]);
+        setWallSnap(null);
+        return;
       }
+
+      let fromX: number, fromY: number;
+      if (data.type === 'furniture') {
+        fromX = snapToGrid(position.x - dims.w / 2);
+        fromY = snapToGrid(position.y - dims.h / 2);
+      } else {
+        fromX = snapToGrid(position.x - (data as Extract<DragData, { type: 'move' }>).offsetX);
+        fromY = snapToGrid(position.y - (data as Extract<DragData, { type: 'move' }>).offsetY);
+      }
+
+      const snap = computeWallSnap(fromX, fromY, dims.w, dims.h, layout);
+      let toX = snap.snapped ? snap.x : fromX;
+      let toY = snap.snapped ? snap.y : fromY;
+
+      if (!isInRoomBounds(toX, toY, dims.w, dims.h, layout)) {
+        const padding = WALL_THICKNESS;
+        toX = Math.max(padding, Math.min(toX, layout.canvasWidth - padding - dims.w));
+        toY = Math.max(padding, Math.min(toY, layout.canvasHeight - padding - dims.h));
+      }
+
+      const color = data.type === 'furniture'
+        ? data.furniture.color
+        : (furniture.find(f => f.id === data.furnitureId)?.color ?? '#8b7355');
+
       setDragPosition(null);
+      setGuides([]);
+      setWallSnap(null);
+      setDropAnimState({
+        running: true,
+        data,
+        fromX, fromY,
+        toX, toY,
+        w: dims.w, h: dims.h,
+        color,
+        startTime: performance.now(),
+      });
+
+      const animate = (now: number) => {
+        setDropAnimState(prev => {
+          if (!prev) return null;
+          const elapsed = now - prev.startTime;
+          const progress = Math.min(1, elapsed / DROP_ANIMATION_MS);
+          const eased = easeOutCubic(progress);
+          if (progress < 1) {
+            dropAnimRef.current = requestAnimationFrame(animate);
+            return { ...prev };
+          }
+          dropAnimRef.current = null;
+          const d = prev.data!;
+          if (d.type === 'furniture') {
+            if (isInRoomBounds(prev.toX, prev.toY, prev.w, prev.h, layout)) {
+              const newFurniture: FurnitureItem = {
+                id: uuidv4(),
+                ...d.furniture,
+                x: prev.toX,
+                y: prev.toY,
+              };
+              onFurnitureAdd(newFurniture);
+            }
+          } else {
+            if (isInRoomBounds(prev.toX, prev.toY, prev.w, prev.h, layout)) {
+              onFurnitureMove(d.furnitureId, prev.toX, prev.toY);
+            }
+          }
+          return null;
+        });
+      };
+      dropAnimRef.current = requestAnimationFrame(animate);
+
       setDragData(null);
       setMovingFurnitureId(null);
+      setOriginalPosition(null);
     },
     [layout, furniture, onFurnitureAdd, onFurnitureMove]
   );
+
+  useEffect(() => {
+    return () => {
+      if (dropAnimRef.current) cancelAnimationFrame(dropAnimRef.current);
+    };
+  }, []);
 
   const handleDragOver = useCallback((position: { x: number; y: number }) => {
     setDragPosition(position);
@@ -225,13 +488,20 @@ export const RoomCanvas: React.FC<RoomCanvasProps> = ({
   useEffect(() => {
     const handleDndStart = (e: Event) => {
       const customEvent = e as CustomEvent<DragData>;
-      setDragData(customEvent.detail);
+      const data = customEvent.detail;
+      setDragData(data);
+      if (data.type === 'move') {
+        const item = furniture.find(f => f.id === data.furnitureId);
+        if (item) {
+          setOriginalPosition({ x: item.x, y: item.y, w: item.width, h: item.height });
+        }
+      }
     };
     document.addEventListener('dnd:start', handleDndStart as EventListener);
     return () => {
       document.removeEventListener('dnd:start', handleDndStart as EventListener);
     };
-  }, []);
+  }, [furniture]);
 
   const handleFurnitureMouseDown = useCallback(
     (itemId: string, e: React.MouseEvent, offsetX: number, offsetY: number) => {
@@ -242,6 +512,7 @@ export const RoomCanvas: React.FC<RoomCanvasProps> = ({
 
       const item = furniture.find((f) => f.id === itemId);
       if (item) {
+        setOriginalPosition({ x: item.x, y: item.y, w: item.width, h: item.height });
         const dragData: DragData = {
           type: 'move',
           furnitureId: itemId,
@@ -298,6 +569,19 @@ export const RoomCanvas: React.FC<RoomCanvasProps> = ({
   };
 
   const floorPattern = getFloorPattern(layout.floor);
+
+  const computedDrag = dragPosition && dragData ? computeDragXY(dragPosition) : null;
+
+  const dropAnimProgress = dropAnimState ? easeOutCubic(
+    Math.min(1, (performance.now() - dropAnimState.startTime) / DROP_ANIMATION_MS)
+  ) : 0;
+
+  const dropAnimX = dropAnimState
+    ? dropAnimState.fromX + (dropAnimState.toX - dropAnimState.fromX) * dropAnimProgress
+    : 0;
+  const dropAnimY = dropAnimState
+    ? dropAnimState.fromY + (dropAnimState.toY - dropAnimState.fromY) * dropAnimProgress
+    : 0;
 
   return (
     <div
@@ -358,6 +642,19 @@ export const RoomCanvas: React.FC<RoomCanvasProps> = ({
           }}
         >
           {renderGrid()}
+          {guides.map((g, i) => (
+            <line
+              key={`guide-${i}`}
+              x1={g.x1}
+              y1={g.y1}
+              x2={g.x2}
+              y2={g.y2}
+              stroke="#2563eb"
+              strokeWidth="1.5"
+              strokeDasharray="4 3"
+              opacity="0.85"
+            />
+          ))}
         </svg>
 
         <div
@@ -395,54 +692,104 @@ export const RoomCanvas: React.FC<RoomCanvasProps> = ({
           }}
         />
 
+        {originalPosition && (
+          <div
+            style={{
+              position: 'absolute',
+              left: originalPosition.x,
+              top: originalPosition.y,
+              width: originalPosition.w,
+              height: originalPosition.h,
+              border: '2px dashed #9ca3af',
+              borderRadius: '2px',
+              backgroundColor: 'rgba(156, 163, 175, 0.12)',
+              pointerEvents: 'none',
+              boxSizing: 'border-box',
+            }}
+          />
+        )}
+
         {furniture.map((item) => (
           <FurnitureBlock
             key={item.id}
             item={item}
+            isBeingDragged={movingFurnitureId === item.id}
             onDelete={() => onFurnitureDelete(item.id)}
             onMouseDown={(e, offsetX, offsetY) => handleFurnitureMouseDown(item.id, e, offsetX, offsetY)}
           />
         ))}
 
-        {isDragOver && dragPosition && dragData && dragData.type === 'furniture' && (
+        {isDragOver && computedDrag && (
           <div
             style={{
               position: 'absolute',
-              left: snapToGrid(dragPosition.x - dragData.furniture.width / 2),
-              top: snapToGrid(dragPosition.y - dragData.furniture.height / 2),
-              width: dragData.furniture.width,
-              height: dragData.furniture.height,
-              backgroundColor: dragData.furniture.color,
+              left: computedDrag.x,
+              top: computedDrag.y,
+              width: computedDrag.dims.w,
+              height: computedDrag.dims.h,
+              backgroundColor: getDragColor(),
               borderRadius: '2px',
-              opacity: 0.5,
+              opacity: 0.55,
               pointerEvents: 'none',
               border: '2px dashed #8b5e3c',
+              boxShadow: '0 12px 28px rgba(0,0,0,0.3)',
+              transform: 'scale(1.03)',
+              transformOrigin: 'center center',
+              zIndex: 50,
             }}
           />
         )}
 
-        {isDragOver && dragPosition && dragData && dragData.type === 'move' && movingFurnitureId && (
-          (() => {
-            const item = furniture.find((f) => f.id === movingFurnitureId);
-            if (!item) return null;
-            return (
-              <div
-                style={{
-                  position: 'absolute',
-                  left: snapToGrid(dragPosition.x - moveOffset.x),
-                  top: snapToGrid(dragPosition.y - moveOffset.y),
-                  width: item.width,
-                  height: item.height,
-                  backgroundColor: item.color,
-                  borderRadius: '2px',
-                  opacity: 0.5,
-                  pointerEvents: 'none',
-                  border: '2px dashed #8b5e3c',
-                }}
-              />
-            );
-          })()
+        {wallSnap && wallSnap.snapped && computedDrag && (
+          <div
+            style={{
+              position: 'absolute',
+              left: wallSnap.checkX - 10,
+              top: wallSnap.checkY - 10,
+              width: '20px',
+              height: '20px',
+              borderRadius: '50%',
+              backgroundColor: '#22c55e',
+              color: 'white',
+              fontSize: '13px',
+              fontWeight: 700,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              pointerEvents: 'none',
+              boxShadow: '0 2px 6px rgba(34, 197, 94, 0.5)',
+              zIndex: 100,
+              animation: 'snapPulse 0.6s ease-in-out infinite',
+            }}
+          >
+            ✓
+          </div>
         )}
+
+        {dropAnimState && (
+          <div
+            style={{
+              position: 'absolute',
+              left: dropAnimX,
+              top: dropAnimY,
+              width: dropAnimState.w,
+              height: dropAnimState.h,
+              backgroundColor: dropAnimState.color,
+              borderRadius: '2px',
+              opacity: 0.85,
+              pointerEvents: 'none',
+              boxShadow: '0 8px 20px rgba(0,0,0,0.25)',
+              zIndex: 60,
+            }}
+          />
+        )}
+
+        <style>{`
+          @keyframes snapPulse {
+            0%, 100% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.15); opacity: 0.85; }
+          }
+        `}</style>
       </div>
     </div>
   );

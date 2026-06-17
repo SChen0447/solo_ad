@@ -1,0 +1,1 @@
+{"root":["./src/app.tsx","./src/main.tsx","./src/vite-env.d.ts","./src/components/furniturepanel.tsx","./src/components/roomcanvas.tsx","./src/components/savebar.tsx","./src/hooks/usedragdrop.ts","./src/modules/colormanager.ts","./src/modules/roomconfig.ts","./src/types/index.ts"],"version":"5.8.3"}
