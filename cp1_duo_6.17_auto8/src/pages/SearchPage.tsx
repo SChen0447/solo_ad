@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { Search, X, Loader2, FileText } from 'lucide-react'
 import DocCard from '../components/DocCard'
-import { fetchDocs, DocItem } from '../api/docSearch'
+import { fetchDocs, DocItem, SEARCH_DEBOUNCE_MS, getFavorites, toggleFavorite } from '../api/docSearch'
 
 const TECH_STACKS = [
   { name: 'React', value: 'React', color: 'react' },
@@ -18,23 +18,19 @@ function SearchPage() {
   const debounceRef = useRef<number | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
-  useEffect(() => {
-    const saved = JSON.parse(localStorage.getItem('docrover_bookmarks') || '[]')
-    setBookmarks(saved)
+  const refreshBookmarks = useCallback(() => {
+    setBookmarks(getFavorites())
   }, [])
 
+  useEffect(() => {
+    refreshBookmarks()
+    window.addEventListener('bookmarkChange', refreshBookmarks)
+    return () => window.removeEventListener('bookmarkChange', refreshBookmarks)
+  }, [refreshBookmarks])
+
   const toggleBookmark = useCallback((id: number) => {
-    setBookmarks((prev) => {
-      let newBookmarks: number[]
-      if (prev.includes(id)) {
-        newBookmarks = prev.filter((b) => b !== id)
-      } else {
-        newBookmarks = [...prev, id]
-      }
-      localStorage.setItem('docrover_bookmarks', JSON.stringify(newBookmarks))
-      window.dispatchEvent(new Event('bookmarkChange'))
-      return newBookmarks
-    })
+    toggleFavorite(id)
+    setBookmarks(getFavorites())
   }, [])
 
   const performSearch = useCallback(async () => {
@@ -56,7 +52,7 @@ function SearchPage() {
     }
     debounceRef.current = setTimeout(() => {
       performSearch()
-    }, 500)
+    }, SEARCH_DEBOUNCE_MS)
     return () => {
       if (debounceRef.current) {
         clearTimeout(debounceRef.current)

@@ -195,8 +195,8 @@ body {
   border-radius: 50%;
 }
 
-.tech-tag-dot.react { background-color: #61DAFB; }
-.tech-tag-dot.typescript { background-color: #3178C6; }
+.tech-tag-dot.react { background-color: #3B82F6; }
+.tech-tag-dot.typescript { background-color: #8B5CF6; }
 .tech-tag-dot.tailwind { background-color: #06B6D4; }
 
 .content-area {
@@ -402,18 +402,18 @@ body {
 }
 
 .card-tech-badge.react {
-  background-color: rgba(97, 218, 251, 0.15);
-  color: #0891B2;
+  background-color: rgba(59, 130, 246, 0.15);
+  color: #2563EB;
 }
 
 .card-tech-badge.typescript {
-  background-color: rgba(49, 120, 198, 0.15);
-  color: #0369A1;
+  background-color: rgba(139, 92, 246, 0.15);
+  color: #7C3AED;
 }
 
 .card-tech-badge.tailwind {
   background-color: rgba(6, 182, 212, 0.15);
-  color: #0E7490;
+  color: #0891B2;
 }
 
 .card-description {

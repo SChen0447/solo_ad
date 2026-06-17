@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Star, Loader2, FileText } from 'lucide-react'
 import DocCard from '../components/DocCard'
-import { getDocById, DocItem } from '../api/docSearch'
+import { getDocById, DocItem, getFavorites, removeFavorite } from '../api/docSearch'
 
 const TABS = [
   { label: '全部', value: 'all' },
@@ -20,7 +20,7 @@ function CollectionPage() {
   const loadBookmarks = useCallback(async () => {
     setLoading(true)
     try {
-      const savedIds: number[] = JSON.parse(localStorage.getItem('docrover_bookmarks') || '[]')
+      const savedIds: number[] = getFavorites()
       setBookmarkIds(savedIds)
 
       const docs: DocItem[] = []
@@ -46,10 +46,9 @@ function CollectionPage() {
     setRemovingIds((prev) => new Set(prev).add(id))
 
     setTimeout(() => {
-      const newIds = bookmarkIds.filter((b) => b !== id)
+      removeFavorite(id)
+      const newIds = getFavorites()
       setBookmarkIds(newIds)
-      localStorage.setItem('docrover_bookmarks', JSON.stringify(newIds))
-      window.dispatchEvent(new Event('bookmarkChange'))
 
       setBookmarkedDocs((prev) => prev.filter((doc) => doc.id !== id))
       setRemovingIds((prev) => {
@@ -58,7 +57,7 @@ function CollectionPage() {
         return next
       })
     }, 300)
-  }, [bookmarkIds])
+  }, [])
 
   const filteredDocs = activeTab === 'all'
     ? bookmarkedDocs
