@@ -564,3 +564,115 @@ body {
   opacity: 0.5;
   pointer-events: none;
 }
+
+.filter-bar {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.filter-tab {
+  padding: 10px 20px;
+  border: none;
+  background: white;
+  color: #6b7280;
+  font-size: 14px;
+  font-weight: 500;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  border: 1px solid #e5e7eb;
+}
+
+.filter-tab:hover {
+  color: #7c3aed;
+  border-color: #c4b5fd;
+}
+
+.filter-tab.active {
+  background: #7c3aed;
+  color: white;
+  border-color: #7c3aed;
+}
+
+.card-favorite-btn {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  width: 36px;
+  height: 36px;
+  background: rgba(255, 255, 255, 0.95);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  z-index: 2;
+}
+
+.card-favorite-btn:hover {
+  transform: scale(1.1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.card-favorite-icon {
+  width: 20px;
+  height: 20px;
+  transition: transform 0.2s ease;
+}
+
+.card-favorite-btn:hover .card-favorite-icon {
+  transform: scale(1.15);
+}
+
+.recipe-card {
+  position: relative;
+}
+
+.detail-favorite-section {
+  margin-bottom: 24px;
+}
+
+.detail-favorite-btn {
+  width: 100%;
+  padding: 14px 20px;
+  background: white;
+  color: #6b7280;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  font-size: 15px;
+  font-weight: 500;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: all 0.3s ease;
+}
+
+.detail-favorite-btn:hover {
+  border-color: #fca5a5;
+  color: #ef4444;
+  background: #fef2f2;
+}
+
+.detail-favorite-btn.favorited {
+  background: #fef2f2;
+  color: #ef4444;
+  border-color: #fecaca;
+}
+
+.detail-favorite-btn.favorited:hover {
+  background: #fee2e2;
+}
+
+.detail-favorite-btn.loading {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.detail-favorite-btn:disabled {
+  cursor: not-allowed;
+}

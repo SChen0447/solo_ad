@@ -3,6 +3,9 @@ import type { Recipe, Comment } from '../types';
 
 interface Props {
   recipeId: string;
+  userId: string;
+  isFavorited: boolean;
+  onToggleFavorite: (recipeId: string) => Promise<boolean>;
 }
 
 interface DetailData {
@@ -43,7 +46,7 @@ function StarIcon({
   );
 }
 
-export default function RecipeDetail({ recipeId }: Props) {
+export default function RecipeDetail({ recipeId, userId, isFavorited, onToggleFavorite }: Props) {
   const [data, setData] = useState<DetailData | null>(null);
   const [loading, setLoading] = useState(true);
   const [hoverRating, setHoverRating] = useState(0);
@@ -53,10 +56,18 @@ export default function RecipeDetail({ recipeId }: Props) {
   const [submittingRating, setSubmittingRating] = useState(false);
   const [submittingComment, setSubmittingComment] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
+  const [favLoading, setFavLoading] = useState(false);
 
   useEffect(() => {
     loadDetail();
   }, [recipeId]);
+
+  useEffect(() => {
+    if (toast) {
+      const timer = setTimeout(() => setToast(null), 2000);
+      return () => clearTimeout(timer);
+    }
+  }, [toast]);
 
   const loadDetail = async () => {
     setLoading(true);
@@ -92,8 +103,10 @@ export default function RecipeDetail({ recipeId }: Props) {
           },
         });
       }
+      setToast('评分成功！');
     } catch (err) {
       console.error('提交评分失败:', err);
+      setToast('评分失败，请重试');
     } finally {
       setSubmittingRating(false);
     }
@@ -118,11 +131,25 @@ export default function RecipeDetail({ recipeId }: Props) {
       }
       setNickname('');
       setContent('');
+      setToast('评论发表成功！');
     } catch (err) {
       console.error('提交评论失败:', err);
+      setToast('评论失败，请重试');
     } finally {
       setSubmittingComment(false);
     }
+  };
+
+  const handleToggleFavorite = async () => {
+    if (favLoading) return;
+    setFavLoading(true);
+    const success = await onToggleFavorite(recipeId);
+    if (success) {
+      setToast(isFavorited ? '已取消收藏' : '已加入收藏');
+    } else {
+      setToast('操作失败，请重试');
+    }
+    setFavLoading(false);
   };
 
   if (loading) {
@@ -137,7 +164,9 @@ export default function RecipeDetail({ recipeId }: Props) {
   const displayRating = hoverRating || selectedRating;
 
   return (
-    <div className="detail-container">
+    <>
+      {toast && <div className="toast">{toast}</div>}
+      <div className="detail-container">
       <div className="detail-left">
         <div className="detail-image">
           {recipe.image ? (
@@ -195,6 +224,28 @@ export default function RecipeDetail({ recipeId }: Props) {
       </div>
 
       <div className="detail-right">
+        <div className="detail-favorite-section">
+          <button
+            className={`detail-favorite-btn ${isFavorited ? 'favorited' : ''} ${favLoading ? 'loading' : ''}`}
+            onClick={handleToggleFavorite}
+            disabled={favLoading}
+          >
+            <svg
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill={isFavorited ? '#ef4444' : 'none'}
+              stroke={isFavorited ? '#ef4444' : 'currentColor'}
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+            </svg>
+            <span>{isFavorited ? '已收藏' : '收藏这道菜'}</span>
+          </button>
+        </div>
+
         <div className="rating-section">
           <h3 className="rating-header">⭐ 给这道菜评分</h3>
           <div className="rating-stars">
@@ -268,5 +319,6 @@ export default function RecipeDetail({ recipeId }: Props) {
         </div>
       </div>
     </div>
+    </>
   );
 }

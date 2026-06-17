@@ -39,6 +39,13 @@ export interface Rating {
   createdAt: number;
 }
 
+export interface Favorite {
+  id: string;
+  userId: string;
+  recipeId: string;
+  createdAt: number;
+}
+
 const recipes: Recipe[] = [
   {
     id: uuidv4(),
@@ -294,4 +301,56 @@ export function addRating(data: {
     averageRating: recipe!.averageRating,
     ratingCount: recipe!.ratingCount,
   };
+}
+
+const favorites: Favorite[] = [];
+
+export function getFavoritesByUserId(userId: string): string[] {
+  return favorites
+    .filter((f) => f.userId === userId)
+    .sort((a, b) => b.createdAt - a.createdAt)
+    .map((f) => f.recipeId);
+}
+
+export function addFavorite(data: {
+  userId: string;
+  recipeId: string;
+}): Favorite | null {
+  const existing = favorites.find(
+    (f) => f.userId === data.userId && f.recipeId === data.recipeId
+  );
+  if (existing) {
+    return existing;
+  }
+  const recipe = recipes.find((r) => r.id === data.recipeId);
+  if (!recipe) {
+    return null;
+  }
+  const newFavorite: Favorite = {
+    id: uuidv4(),
+    userId: data.userId,
+    recipeId: data.recipeId,
+    createdAt: Date.now(),
+  };
+  favorites.push(newFavorite);
+  recipe.heat += 1;
+  return newFavorite;
+}
+
+export function removeFavorite(data: {
+  userId: string;
+  recipeId: string;
+}): boolean {
+  const index = favorites.findIndex(
+    (f) => f.userId === data.userId && f.recipeId === data.recipeId
+  );
+  if (index === -1) {
+    return false;
+  }
+  favorites.splice(index, 1);
+  const recipe = recipes.find((r) => r.id === data.recipeId);
+  if (recipe) {
+    recipe.heat = Math.max(0, recipe.heat - 1);
+  }
+  return true;
 }

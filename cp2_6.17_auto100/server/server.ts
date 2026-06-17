@@ -8,6 +8,9 @@ import {
   getCommentsByRecipeId,
   addComment,
   addRating,
+  getFavoritesByUserId,
+  addFavorite,
+  removeFavorite,
 } from './data';
 
 const app = express();
@@ -73,6 +76,45 @@ app.post('/api/recipes/:id/rate', (req: Request, res: Response) => {
   }
   const result = addRating({ recipeId: id, score });
   res.json(result);
+});
+
+app.get('/api/favorites', (req: Request, res: Response) => {
+  const userId = req.query.userId as string;
+  if (!userId) {
+    res.status(400).json({ error: '缺少 userId 参数' });
+    return;
+  }
+  const recipeIds = getFavoritesByUserId(userId);
+  res.json({ userId, recipeIds });
+});
+
+app.post('/api/favorites', (req: Request, res: Response) => {
+  const { userId, recipeId } = req.body;
+  if (!userId || !recipeId) {
+    res.status(400).json({ error: '缺少 userId 或 recipeId' });
+    return;
+  }
+  const favorite = addFavorite({ userId, recipeId });
+  if (!favorite) {
+    res.status(404).json({ error: '食谱不存在' });
+    return;
+  }
+  res.status(201).json(favorite);
+});
+
+app.delete('/api/favorites/:recipeId', (req: Request, res: Response) => {
+  const { recipeId } = req.params;
+  const { userId } = req.body;
+  if (!userId) {
+    res.status(400).json({ error: '缺少 userId' });
+    return;
+  }
+  const success = removeFavorite({ userId, recipeId });
+  if (!success) {
+    res.status(404).json({ error: '收藏不存在' });
+    return;
+  }
+  res.json({ success: true });
 });
 
 app.listen(PORT, () => {

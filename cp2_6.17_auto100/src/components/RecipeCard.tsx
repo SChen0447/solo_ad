@@ -2,13 +2,31 @@ import type { Recipe } from '../types';
 
 interface Props {
   recipe: Recipe;
+  isFavorited: boolean;
   onClick: () => void;
+  onFavoriteClick: (e: React.MouseEvent) => void;
 }
 
 function StarIcon({ filled }: { filled: boolean }) {
   return (
     <svg className="star" viewBox="0 0 24 24" fill={filled ? '#fbbf24' : '#e5e7eb'}>
       <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+    </svg>
+  );
+}
+
+function HeartIcon({ filled }: { filled: boolean }) {
+  return (
+    <svg
+      className="card-favorite-icon"
+      viewBox="0 0 24 24"
+      fill={filled ? '#ef4444' : 'none'}
+      stroke={filled ? '#ef4444' : '#9ca3af'}
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
     </svg>
   );
 }
@@ -26,7 +44,7 @@ function ImageUploadIcon() {
   );
 }
 
-export default function RecipeCard({ recipe, onClick }: Props) {
+export default function RecipeCard({ recipe, isFavorited, onClick, onFavoriteClick }: Props) {
   const fullStars = Math.round(recipe.averageRating);
 
   return (
@@ -37,6 +55,9 @@ export default function RecipeCard({ recipe, onClick }: Props) {
         ) : (
           <ImageUploadIcon />
         )}
+      </div>
+      <div className="card-favorite-btn" onClick={onFavoriteClick}>
+        <HeartIcon filled={isFavorited} />
       </div>
       <div className="card-content">
         <div className="card-title">{recipe.title}</div>
