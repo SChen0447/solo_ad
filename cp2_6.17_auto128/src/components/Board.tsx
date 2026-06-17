@@ -118,7 +118,6 @@ export function Board() {
       <style>{`
         @keyframes dropBounce {
           0% { transform: scale(0.95); }
-          60% { transform: scale(1.02); }
           100% { transform: scale(1); }
         }
       `}</style>
@@ -217,7 +216,6 @@ function CardPlaceholder() {
         height: '180px',
         border: '2px dashed #d1d5db',
         borderRadius: '16px',
-        backgroundColor: 'rgba(243, 244, 246, 0.5)',
         boxSizing: 'border-box',
         flexShrink: 0,
         transition: 'all 0.2s ease',
@@ -234,36 +232,9 @@ function InsertIndicator() {
         backgroundColor: '#1e3a5f',
         borderRadius: '1px',
         margin: '-5px 0',
-        position: 'relative',
         zIndex: 10,
         flexShrink: 0,
-        boxShadow: '0 0 4px rgba(30, 58, 95, 0.4)',
       }}
-    >
-      <div
-        style={{
-          position: 'absolute',
-          left: '-5px',
-          top: '50%',
-          transform: 'translateY(-50%)',
-          width: '10px',
-          height: '10px',
-          backgroundColor: '#1e3a5f',
-          borderRadius: '50%',
-        }}
-      />
-      <div
-        style={{
-          position: 'absolute',
-          right: '-5px',
-          top: '50%',
-          transform: 'translateY(-50%)',
-          width: '10px',
-          height: '10px',
-          backgroundColor: '#1e3a5f',
-          borderRadius: '50%',
-        }}
-      />
-    </div>
+    />
   );
 }
