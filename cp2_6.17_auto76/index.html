@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>3D 粒子流体动力学模拟</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: linear-gradient(135deg, #0a0f28 0%, #1a1040 100%);
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+    #app {
+      width: 100%;
+      height: 100%;
+      position: relative;
+    }
+    #canvas-container {
+      width: 100%;
+      height: 100%;
+      position: absolute;
+      top: 0;
+      left: 0;
+    }
+    #control-panel {
+      position: absolute;
+      top: 50%;
+      right: 20px;
+      transform: translateY(-50%);
+      width: 300px;
+      background: rgba(10, 15, 40, 0.9);
+      border-radius: 12px;
+      padding: 24px;
+      color: #c0c0c8;
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(0, 229, 255, 0.2);
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+      max-height: 90vh;
+      overflow-y: auto;
+    }
+    #control-panel::-webkit-scrollbar {
+      width: 6px;
+    }
+    #control-panel::-webkit-scrollbar-track {
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 3px;
+    }
+    #control-panel::-webkit-scrollbar-thumb {
+      background: rgba(0, 229, 255, 0.3);
+      border-radius: 3px;
+    }
+    .panel-header {
+      margin-bottom: 24px;
+      padding-bottom: 16px;
+      border-bottom: 1px solid rgba(0, 229, 255, 0.2);
+    }
+    .panel-title {
+      font-size: 18px;
+      font-weight: 600;
+      color: #00e5ff;
+      margin-bottom: 12px;
+      letter-spacing: 1px;
+    }
+    .stats {
+      display: flex;
+      justify-content: space-between;
+      font-size: 16px;
+      color: #00bcd4;
+      font-family: 'Consolas', 'Monaco', monospace;
+    }
+    .control-group {
+      margin-bottom: 16px;
+    }
+    .control-group:last-child {
+      margin-bottom: 0;
+    }
+    .control-label {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+      font-size: 14px;
+      color: #c0c0c8;
+    }
+    .control-value {
+      color: #00e5ff;
+      font-family: 'Consolas', 'Monaco', monospace;
+      font-size: 13px;
+    }
+    input[type="range"] {
+      width: 100%;
+      height: 6px;
+      -webkit-appearance: none;
+      appearance: none;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 3px;
+      outline: none;
+      transition: all 0.3s ease;
+    }
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 18px;
+      height: 18px;
+      background: #00e5ff;
+      border-radius: 50%;
+      cursor: pointer;
+      box-shadow: 0 0 10px rgba(0, 229, 255, 0.6);
+      transition: all 0.3s ease;
+    }
+    input[type="range"]::-webkit-slider-thumb:hover {
+      transform: scale(1.2);
+      box-shadow: 0 0 15px rgba(0, 229, 255, 0.8);
+    }
+    input[type="range"]::-moz-range-thumb {
+      width: 18px;
+      height: 18px;
+      background: #00e5ff;
+      border-radius: 50%;
+      cursor: pointer;
+      border: none;
+      box-shadow: 0 0 10px rgba(0, 229, 255, 0.6);
+      transition: all 0.3s ease;
+    }
+    input[type="range"]:hover {
+      background: rgba(255, 255, 255, 0.15);
+    }
+    #preset-buttons {
+      position: absolute;
+      left: 20px;
+      bottom: 20px;
+      display: flex;
+      gap: 12px;
+      z-index: 10;
+    }
+    .preset-btn {
+      padding: 12px 24px;
+      background: rgba(10, 15, 40, 0.9);
+      border: 1px solid rgba(0, 229, 255, 0.3);
+      border-radius: 8px;
+      color: #c0c0c8;
+      font-size: 14px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      backdrop-filter: blur(10px);
+    }
+    .preset-btn:hover {
+      background: rgba(0, 229, 255, 0.15);
+      border-color: #00e5ff;
+      color: #00e5ff;
+      box-shadow: 0 0 20px rgba(0, 229, 255, 0.3);
+      transform: translateY(-2px);
+    }
+    .preset-btn.active {
+      background: rgba(0, 229, 255, 0.2);
+      border-color: #00e5ff;
+      color: #00e5ff;
+      box-shadow: 0 0 15px rgba(0, 229, 255, 0.4);
+    }
+    #pause-indicator {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 48px;
+      color: rgba(255, 255, 255, 0.3);
+      font-weight: bold;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.3s ease;
+      text-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+    }
+    #pause-indicator.visible {
+      opacity: 1;
+    }
+    #instructions {
+      position: absolute;
+      left: 20px;
+      top: 20px;
+      color: rgba(192, 192, 200, 0.6);
+      font-size: 12px;
+      line-height: 1.8;
+      background: rgba(10, 15, 40, 0.7);
+      padding: 12px 16px;
+      border-radius: 8px;
+      backdrop-filter: blur(5px);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+    }
+    #instructions kbd {
+      background: rgba(0, 229, 255, 0.1);
+      border: 1px solid rgba(0, 229, 255, 0.3);
+      padding: 2px 6px;
+      border-radius: 4px;
+      color: #00e5ff;
+      font-family: 'Consolas', monospace;
+      font-size: 11px;
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <div id="canvas-container"></div>
+    
+    <div id="instructions">
+      <div><kbd>左键拖拽</kbd> 旋转视角</div>
+      <div><kbd>右键拖拽</kbd> 平移视角</div>
+      <div><kbd>滚轮</kbd> 缩放</div>
+      <div><kbd>空格</kbd> 暂停/恢复</div>
+    </div>
+
+    <div id="preset-buttons">
+      <button class="preset-btn active" data-preset="water">水流</button>
+      <button class="preset-btn" data-preset="honey">蜂蜜流</button>
+      <button class="preset-btn" data-preset="smoke">烟雾流</button>
+    </div>
+
+    <div id="control-panel">
+      <div class="panel-header">
+        <div class="panel-title">流体参数控制</div>
+        <div class="stats">
+          <span>FPS: <span id="fps-value">60</span></span>
+          <span>粒子: <span id="particle-count">1500</span></span>
+        </div>
+      </div>
+      
+      <div class="control-group">
+        <div class="control-label">
+          <span>粘度</span>
+          <span class="control-value" id="viscosity-value">1.0</span>
+        </div>
+        <input type="range" id="viscosity" min="0.1" max="10" step="0.1" value="1.0" />
+      </div>
+
+      <div class="control-group">
+        <div class="control-label">
+          <span>密度</span>
+          <span class="control-value" id="density-value">1.0</span>
+        </div>
+        <input type="range" id="density" min="0.5" max="2.0" step="0.05" value="1.0" />
+      </div>
+
+      <div class="control-group">
+        <div class="control-label">
+          <span>压力场强度</span>
+          <span class="control-value" id="pressure-value">500</span>
+        </div>
+        <input type="range" id="pressure" min="100" max="1000" step="10" value="500" />
+      </div>
+
+      <div class="control-group">
+        <div class="control-label">
+          <span>粒子半径</span>
+          <span class="control-value" id="radius-value">0.1</span>
+        </div>
+        <input type="range" id="radius" min="0.05" max="0.2" step="0.01" value="0.1" />
+      </div>
+
+      <div class="control-group">
+        <div class="control-label">
+          <span>速度阻尼</span>
+          <span class="control-value" id="damping-value">0.98</span>
+        </div>
+        <input type="range" id="damping" min="0.9" max="1.0" step="0.005" value="0.98" />
+      </div>
+
+      <div class="control-group">
+        <div class="control-label">
+          <span>边界恢复力</span>
+          <span class="control-value" id="boundary-value">0.5</span>
+        </div>
+        <input type="range" id="boundary" min="0.1" max="1.0" step="0.05" value="0.5" />
+      </div>
+    </div>
+
+    <div id="pause-indicator">PAUSED</div>
+  </div>
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
