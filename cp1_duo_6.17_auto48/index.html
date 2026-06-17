@@ -63,16 +63,6 @@
       border-bottom: 1px solid rgba(240,208,96,0.2);
       letter-spacing: 2px;
     }
-    .fleet-card {
-      margin: 10px;
-      padding: 10px;
-      background: rgba(20,20,40,0.9);
-      border: 1px solid rgba(168,216,234,0.15);
-      border-radius: 8px;
-      cursor: pointer;
-      transition: all 0.15s ease;
-      position: relative;
-    }
     .fleet-card:hover {
       transform: scale(1.02);
       filter: brightness(1.15);
@@ -80,12 +70,6 @@
     .fleet-card.selected {
       border-color: #f0d060;
       box-shadow: 0 0 8px rgba(240,208,96,0.4);
-    }
-    .fleet-card .card-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 8px;
     }
     .fleet-card .ship-name {
       font-size: 13px;
@@ -222,6 +206,186 @@
       font-size: 12px;
       color: rgba(168,216,234,0.7);
       line-height: 1.8;
+    }
+    .filter-bar {
+      padding: 10px;
+      border-bottom: 1px solid rgba(240,208,96,0.1);
+      background: rgba(20,20,40,0.5);
+    }
+    .filter-row {
+      margin-bottom: 8px;
+    }
+    .filter-row:last-child {
+      margin-bottom: 0;
+    }
+    #search-input {
+      width: 100%;
+      padding: 6px 10px;
+      background: rgba(10,10,30,0.8);
+      border: 1px solid rgba(240,208,96,0.2);
+      border-radius: 4px;
+      color: #a8d8ea;
+      font-size: 12px;
+      outline: none;
+      transition: all 0.15s ease;
+    }
+    #search-input::placeholder {
+      color: rgba(168,216,234,0.4);
+    }
+    #search-input:focus {
+      border-color: rgba(240,208,96,0.5);
+      box-shadow: 0 0 4px rgba(240,208,96,0.2);
+    }
+    #star-filter {
+      width: 100%;
+      padding: 6px 8px;
+      background: rgba(10,10,30,0.8);
+      border: 1px solid rgba(240,208,96,0.2);
+      border-radius: 4px;
+      color: #a8d8ea;
+      font-size: 12px;
+      outline: none;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    #star-filter:focus {
+      border-color: rgba(240,208,96,0.5);
+    }
+    #star-filter option {
+      background: #0a0a1a;
+      color: #a8d8ea;
+    }
+    .fleet-card {
+      margin: 10px;
+      padding: 10px;
+      background: rgba(20,20,40,0.9);
+      border: 1px solid rgba(168,216,234,0.15);
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      position: relative;
+      user-select: none;
+    }
+    .fleet-card.dragging {
+      opacity: 0.4;
+      transform: scale(0.98);
+    }
+    .fleet-card.drag-over {
+      border-color: #f0d060;
+      box-shadow: 0 0 12px rgba(240,208,96,0.5);
+    }
+    .drag-handle {
+      position: absolute;
+      left: 2px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: rgba(240,208,96,0.3);
+      font-size: 10px;
+      cursor: grab;
+      padding: 2px 3px;
+      letter-spacing: -2px;
+    }
+    .drag-handle:hover {
+      color: rgba(240,208,96,0.6);
+    }
+    .fleet-card .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+      margin-left: 16px;
+    }
+    .card-actions {
+      display: flex;
+      justify-content: flex-end;
+      margin-top: 6px;
+    }
+    .expand-btn {
+      font-size: 11px;
+      color: rgba(168,216,234,0.6);
+      cursor: pointer;
+      padding: 2px 6px;
+      border-radius: 3px;
+      transition: all 0.15s ease;
+    }
+    .expand-btn:hover {
+      color: #f0d060;
+      background: rgba(240,208,96,0.1);
+    }
+    .ship-detail {
+      margin-top: 8px;
+      padding: 10px;
+      background: rgba(10,10,30,0.6);
+      border-radius: 6px;
+      border: 1px solid rgba(240,208,96,0.15);
+    }
+    .detail-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 3px 0;
+      font-size: 11px;
+      border-bottom: 1px dashed rgba(168,216,234,0.1);
+    }
+    .detail-row:last-child {
+      border-bottom: none;
+    }
+    .detail-label {
+      color: rgba(168,216,234,0.6);
+    }
+    .detail-value {
+      color: #a8d8ea;
+      font-weight: 500;
+    }
+    .detail-value.star-gold {
+      color: #f0d060;
+      text-shadow: 0 0 4px rgba(240,208,96,0.5);
+    }
+    .task-logs {
+      max-height: 180px;
+      overflow-y: auto;
+      font-size: 11px;
+      line-height: 1.6;
+    }
+    .task-logs::-webkit-scrollbar {
+      width: 4px;
+    }
+    .task-logs::-webkit-scrollbar-track {
+      background: rgba(255,255,255,0.05);
+    }
+    .task-logs::-webkit-scrollbar-thumb {
+      background: rgba(240,208,96,0.3);
+      border-radius: 2px;
+    }
+    .log-entry {
+      padding: 5px 0;
+      border-bottom: 1px dashed rgba(168,216,234,0.08);
+      animation: logFadeIn 0.3s ease;
+    }
+    .log-entry:last-child {
+      border-bottom: none;
+    }
+    .log-entry.empty {
+      color: rgba(168,216,234,0.4);
+      text-align: center;
+      padding: 12px 0;
+    }
+    .log-time {
+      color: rgba(240,208,96,0.6);
+      margin-right: 6px;
+      font-family: 'Courier New', monospace;
+    }
+    .log-msg {
+      color: rgba(168,216,234,0.85);
+    }
+    @keyframes logFadeIn {
+      from {
+        opacity: 0;
+        transform: translateY(-5px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
     }
     .mobile-toggle {
       display: none;

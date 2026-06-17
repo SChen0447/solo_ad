@@ -17,6 +17,20 @@ star_systems = []
 routes = []
 missions = {}
 mission_timers = {}
+task_logs = []
+MAX_LOGS = 50
+
+
+def add_log(message):
+    global task_logs
+    log_entry = {
+        "id": len(task_logs),
+        "timestamp": time.strftime("%H:%M:%S"),
+        "message": message,
+    }
+    task_logs.append(log_entry)
+    if len(task_logs) > MAX_LOGS:
+        task_logs = task_logs[-MAX_LOGS:]
 
 SHIP_NAMES = [
     "破晓号", "星尘号", "银河号", "暗影号", "烈焰号", "霜月号",
@@ -194,10 +208,15 @@ def mission_tick(mission_id):
 
         if arrived:
             m["path_index"] += 1
+            target_name = star_systems[path[min(m["path_index"], len(path) - 1)]]["name"] if m["path_index"] < len(path) else "目的地"
+            if ship["faction"] == "player":
+                add_log(f"{ship['name']} 正在前往 {target_name}")
             if m["path_index"] >= len(path):
                 m["completed"] = True
                 ship["status"] = "idle"
                 ship["system_id"] = path[-1]
+                if ship["faction"] == "player":
+                    add_log(f"{ship['name']} 已抵达 {star_systems[path[-1]]['name']}")
 
         check_combat()
 
@@ -212,15 +231,19 @@ def check_combat():
                 continue
             dist = math.hypot(ps["x"] - es["x"], ps["y"] - es["y"])
             if dist < 80:
+                if ps["status"] != "combat":
+                    add_log(f"{ps['name']} 与 {es['name']} 遭遇交火！")
                 ps["status"] = "combat"
                 es["status"] = "combat"
                 ps_dmg = max(1, es["firepower"] - random.randint(0, 20))
                 es_dmg = max(1, ps["firepower"] - random.randint(0, 20))
                 ps["hp"] = max(0, ps["hp"] - ps_dmg)
                 es["hp"] = max(0, es["hp"] - es_dmg)
-                if ps["hp"] <= 0:
+                if ps["hp"] <= 0 and ps["status"] != "destroyed":
+                    add_log(f"{ps['name']} 在战斗中被击毁")
                     ps["status"] = "destroyed"
-                if es["hp"] <= 0:
+                if es["hp"] <= 0 and es["status"] != "destroyed":
+                    add_log(f"{ps['name']} 击毁了 {es['name']}")
                     es["status"] = "destroyed"
 
 
@@ -284,6 +307,9 @@ def init_fleet():
         generate_fleet()
         generate_enemy_fleet()
         missions.clear()
+        task_logs.clear()
+        add_log("舰队指挥系统已初始化")
+        add_log(f"检测到 {len(fleet_data)} 艘己方战舰和 {len(enemy_fleet_data)} 艘敌舰")
     threading.Thread(target=run_mission_loop, daemon=True).start()
     threading.Thread(target=run_enemy_ai_loop, daemon=True).start()
     threading.Thread(target=run_combat_loop, daemon=True).start()
@@ -321,6 +347,10 @@ def assign_mission():
             "completed": False,
         }
         ship["status"] = "moving"
+        mission_labels = {"patrol": "巡逻", "escort": "护航", "raid": "突袭"}
+        label = mission_labels.get(mission_type, mission_type)
+        if ship["faction"] == "player":
+            add_log(f"{ship['name']} 已分配{label}任务")
 
     return jsonify({"mission_id": mid, "status": "assigned"})
 
@@ -362,6 +392,12 @@ def calc_path():
         return jsonify({"error": "Missing parameters"}), 400
     path = astar(start_id, end_id)
     return jsonify({"path": path})
+
+
+@app.route("/api/task_logs", methods=["GET"])
+def get_task_logs():
+    with lock:
+        return jsonify({"logs": task_logs[-10:]})
 
 
 if __name__ == "__main__":

@@ -36,6 +36,12 @@ export interface MissionInfo {
   completed: boolean;
 }
 
+export interface TaskLog {
+  id: number;
+  timestamp: string;
+  message: string;
+}
+
 export interface GameData {
   fleet: Ship[];
   enemy_fleet: Ship[];
@@ -50,7 +56,9 @@ class FleetManager {
   private starSystems: StarSystem[] = [];
   private routes: Route[] = [];
   private activeMissions: MissionInfo[] = [];
+  private taskLogs: TaskLog[] = [];
   private listeners: (() => void)[] = [];
+  private logListeners: (() => void)[] = [];
 
   async initFleet(): Promise<GameData> {
     const res = await axios.post('/api/init_fleet');
@@ -59,6 +67,7 @@ class FleetManager {
     this.starSystems = res.data.star_systems;
     this.routes = res.data.routes;
     this.notify();
+    this.queryTaskLogs();
     return res.data;
   }
 
@@ -73,12 +82,27 @@ class FleetManager {
     return res.data;
   }
 
+  async queryTaskLogs(): Promise<TaskLog[]> {
+    try {
+      const res = await axios.get('/api/task_logs');
+      const newLogs = res.data.logs as TaskLog[];
+      if (JSON.stringify(newLogs) !== JSON.stringify(this.taskLogs)) {
+        this.taskLogs = newLogs;
+        this.notifyLogs();
+      }
+      return this.taskLogs;
+    } catch (e) {
+      return this.taskLogs;
+    }
+  }
+
   async assignMission(shipId: string, missionType: string, path: number[]): Promise<any> {
     const res = await axios.post('/api/assign_mission', {
       ship_id: shipId,
       mission_type: missionType,
       path: path,
     });
+    this.queryTaskLogs();
     return res.data;
   }
 
@@ -110,6 +134,10 @@ class FleetManager {
     return this.activeMissions;
   }
 
+  getTaskLogs(): TaskLog[] {
+    return this.taskLogs;
+  }
+
   getShipById(id: string): Ship | undefined {
     return this.fleet.find(s => s.id === id) || this.enemyFleet.find(s => s.id === id);
   }
@@ -133,8 +161,19 @@ class FleetManager {
     };
   }
 
+  onLogsChange(listener: () => void): () => void {
+    this.logListeners.push(listener);
+    return () => {
+      this.logListeners = this.logListeners.filter(l => l !== listener);
+    };
+  }
+
   private notify(): void {
     this.listeners.forEach(l => l());
+  }
+
+  private notifyLogs(): void {
+    this.logListeners.forEach(l => l());
   }
 }
 

@@ -25,9 +25,19 @@ export class StarmapScene extends Phaser.Scene {
   private combatPositions: { x: number; y: number; timer: number }[] = [];
   private prevShipStatuses: Map<string, string> = new Map();
   private hoveredRoute: [number, number] | null = null;
+  private onShipSelectCb: ((id: string | null) => void) | null = null;
+  private onPathChangeCb: ((path: number[]) => void) | null = null;
 
   constructor() {
     super({ key: 'StarmapScene' });
+  }
+
+  setOnShipSelect(cb: (id: string | null) => void): void {
+    this.onShipSelectCb = cb;
+  }
+
+  setOnPathChange(cb: (path: number[]) => void): void {
+    this.onPathChangeCb = cb;
   }
 
   async create(): Promise<void> {
