@@ -88,6 +88,16 @@ function onMouseMove(event: MouseEvent) {
 sceneManager.onBuildingHover = (info) => {
   if (info) {
     uiManager.showBuildingPanel(info);
+  } else {
+    uiManager.requestHidePanel();
+  }
+};
+
+sceneManager.onBuildingSelect = (info) => {
+  if (info) {
+    uiManager.pinBuildingPanel(info);
+  } else {
+    uiManager.pinBuildingPanel(null);
   }
 };
 
@@ -126,7 +136,9 @@ uiManager.onRandomize = () => {
 
 uiManager.onClosePanel = () => {
   sceneManager.hoveredBuilding = null;
+  sceneManager.selectedBuilding = null;
   sceneManager.updateHoverOutline();
+  sceneManager.updateSelectedOutline();
 };
 
 canvas.addEventListener('mousedown', onMouseDown);

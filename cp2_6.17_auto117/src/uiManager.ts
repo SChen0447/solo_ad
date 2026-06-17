@@ -14,10 +14,15 @@ export class UIManager {
   private buildingInfoHeight: HTMLElement;
   private buildingInfoArea: HTMLElement;
   private buildingInfoDistance: HTMLElement;
+  private buildingInfoColor: HTMLElement;
+  private buildingInfoColorSwatch: HTMLElement;
+  private buildingInfoPosition: HTMLElement;
   private closeBtn: HTMLElement;
   private resetBtn: HTMLElement;
   private exportBtn: HTMLElement;
   private randomBtn: HTMLElement;
+  private hidePanelTimer: number | null = null;
+  private isPanelPinned: boolean = false;
 
   onTimeChange?: (hour: number) => void;
   onGrowthToggle?: (isGrowing: boolean) => void;
@@ -47,6 +52,9 @@ export class UIManager {
     this.buildingInfoHeight = document.getElementById('info-height')!;
     this.buildingInfoArea = document.getElementById('info-area')!;
     this.buildingInfoDistance = document.getElementById('info-distance')!;
+    this.buildingInfoColor = document.getElementById('info-color')!;
+    this.buildingInfoColorSwatch = document.getElementById('info-color-swatch')!;
+    this.buildingInfoPosition = document.getElementById('info-position')!;
     this.closeBtn = document.getElementById('close-btn')!;
     this.resetBtn = document.getElementById('reset-btn')!;
     this.exportBtn = document.getElementById('export-btn')!;
@@ -306,6 +314,20 @@ export class UIManager {
         font-family: monospace;
       }
 
+      .color-swatch-container {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+
+      .color-swatch {
+        width: 16px;
+        height: 16px;
+        border-radius: 3px;
+        border: 1px solid rgba(255,255,255,0.3);
+        box-shadow: 0 0 4px rgba(0,0,0,0.4);
+      }
+
       #close-btn {
         position: absolute;
         bottom: 12px;
@@ -529,11 +551,19 @@ export class UIManager {
 
     const row3 = document.createElement('div');
     row3.className = 'info-row';
-    row3.innerHTML = '<span class="info-label">占地面积:</span><span class="info-value" id="info-area">-</span>';
+    row3.innerHTML = '<span class="info-label">颜色:</span><span class="info-value color-swatch-container"><span class="color-swatch" id="info-color-swatch"></span><span id="info-color">-</span></span>';
 
     const row4 = document.createElement('div');
     row4.className = 'info-row';
-    row4.innerHTML = '<span class="info-label">距中心:</span><span class="info-value" id="info-distance">-</span>';
+    row4.innerHTML = '<span class="info-label">位置:</span><span class="info-value" id="info-position">-</span>';
+
+    const row5 = document.createElement('div');
+    row5.className = 'info-row';
+    row5.innerHTML = '<span class="info-label">占地面积:</span><span class="info-value" id="info-area">-</span>';
+
+    const row6 = document.createElement('div');
+    row6.className = 'info-row';
+    row6.innerHTML = '<span class="info-label">距中心:</span><span class="info-value" id="info-distance">-</span>';
 
     const closeBtn = document.createElement('button');
     closeBtn.id = 'close-btn';
@@ -543,6 +573,8 @@ export class UIManager {
     panel.appendChild(row2);
     panel.appendChild(row3);
     panel.appendChild(row4);
+    panel.appendChild(row5);
+    panel.appendChild(row6);
     panel.appendChild(closeBtn);
 
     this.container.appendChild(panel);
@@ -625,14 +657,50 @@ export class UIManager {
   }
 
   showBuildingPanel(info: BuildingInfo) {
+    this.clearHideTimer();
     this.buildingInfoFloors.textContent = `${info.floors} 层`;
     this.buildingInfoHeight.textContent = `${info.height} 米`;
+    this.buildingInfoColor.textContent = info.color.toUpperCase();
+    this.buildingInfoColorSwatch.style.background = info.color;
+    this.buildingInfoPosition.textContent = `(${info.gridX}, ${info.gridZ})`;
     this.buildingInfoArea.textContent = `${info.area} m²`;
     this.buildingInfoDistance.textContent = `${info.distanceFromCenter} 格`;
     this.buildingPanel.classList.add('visible');
   }
 
+  pinBuildingPanel(info: BuildingInfo | null) {
+    this.clearHideTimer();
+    if (info) {
+      this.isPanelPinned = true;
+      this.showBuildingPanel(info);
+    } else {
+      this.isPanelPinned = false;
+      this.scheduleHidePanel();
+    }
+  }
+
+  requestHidePanel() {
+    if (this.isPanelPinned) return;
+    this.scheduleHidePanel();
+  }
+
+  private scheduleHidePanel() {
+    this.clearHideTimer();
+    this.hidePanelTimer = window.setTimeout(() => {
+      this.hideBuildingPanel();
+    }, 500);
+  }
+
+  private clearHideTimer() {
+    if (this.hidePanelTimer !== null) {
+      clearTimeout(this.hidePanelTimer);
+      this.hidePanelTimer = null;
+    }
+  }
+
   hideBuildingPanel() {
+    this.clearHideTimer();
+    this.isPanelPinned = false;
     this.buildingPanel.classList.remove('visible');
   }
 

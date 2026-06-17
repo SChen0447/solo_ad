@@ -43,8 +43,13 @@ export class SceneManager {
   growthAnimations: GrowthAnimation[] = [];
   isNight: boolean = false;
   hoveredBuilding: THREE.Group | null = null;
+  selectedBuilding: THREE.Group | null = null;
   hoverOutline: THREE.LineSegments | null = null;
+  hoverGlow: THREE.Mesh | null = null;
+  selectedOutline: THREE.LineSegments | null = null;
+  selectedGlow: THREE.Mesh | null = null;
   onBuildingHover?: (info: BuildingInfo | null) => void;
+  onBuildingSelect?: (info: BuildingInfo | null) => void;
   onBuildingCountChange?: (count: number, density: number) => void;
   growthTimer: number | null = null;
   growthStartTime: number = 0;
@@ -128,18 +133,51 @@ export class SceneManager {
   }
 
   initHoverOutline() {
-    const outlineGeo = new THREE.EdgesGeometry(new THREE.BoxGeometry(1, 0.1, 1));
-    const outlineMat = new THREE.LineDashedMaterial({
-      color: 0xffffff,
+    const hoverBox = new THREE.BoxGeometry(1.08, 1, 1.08);
+    const hoverOutlineGeo = new THREE.EdgesGeometry(hoverBox);
+    const hoverOutlineMat = new THREE.LineBasicMaterial({
+      color: 0xffdd44,
       transparent: true,
-      opacity: 0.7,
-      dashSize: 0.1,
-      gapSize: 0.05,
+      opacity: 0.9,
+      linewidth: 2,
     });
-    this.hoverOutline = new THREE.LineSegments(outlineGeo, outlineMat);
+    this.hoverOutline = new THREE.LineSegments(hoverOutlineGeo, hoverOutlineMat);
     this.hoverOutline.visible = false;
-    this.hoverOutline.computeLineDistances();
     this.scene.add(this.hoverOutline);
+
+    const hoverGlowGeo = new THREE.BoxGeometry(1.12, 1, 1.12);
+    const hoverGlowMat = new THREE.MeshBasicMaterial({
+      color: 0xffdd44,
+      transparent: true,
+      opacity: 0.12,
+      side: THREE.BackSide,
+    });
+    this.hoverGlow = new THREE.Mesh(hoverGlowGeo, hoverGlowMat);
+    this.hoverGlow.visible = false;
+    this.scene.add(this.hoverGlow);
+
+    const selectedBox = new THREE.BoxGeometry(1.12, 1, 1.12);
+    const selectedOutlineGeo = new THREE.EdgesGeometry(selectedBox);
+    const selectedOutlineMat = new THREE.LineBasicMaterial({
+      color: 0xffdd44,
+      transparent: true,
+      opacity: 1.0,
+      linewidth: 3,
+    });
+    this.selectedOutline = new THREE.LineSegments(selectedOutlineGeo, selectedOutlineMat);
+    this.selectedOutline.visible = false;
+    this.scene.add(this.selectedOutline);
+
+    const selectedGlowGeo = new THREE.BoxGeometry(1.18, 1, 1.18);
+    const selectedGlowMat = new THREE.MeshBasicMaterial({
+      color: 0xffdd44,
+      transparent: true,
+      opacity: 0.18,
+      side: THREE.BackSide,
+    });
+    this.selectedGlow = new THREE.Mesh(selectedGlowGeo, selectedGlowMat);
+    this.selectedGlow.visible = false;
+    this.scene.add(this.selectedGlow);
   }
 
   onResize() {
@@ -149,29 +187,71 @@ export class SceneManager {
   }
 
   handleClick(intersects: THREE.Intersection[]) {
+    let clickedBuilding: THREE.Group | null = null;
+    let clickedCell: { gridX: number; gridZ: number } | null = null;
+
     for (const intersect of intersects) {
       const obj = intersect.object;
-      if (obj.userData.isCell) {
+      if (obj.userData.isCell && !clickedCell) {
         const gridX = obj.userData.gridX;
         const gridZ = obj.userData.gridZ;
         if (!this.buildingGrid[gridZ][gridX]) {
-          this.addBuilding(gridX, gridZ);
-          return;
+          clickedCell = { gridX, gridZ };
         }
       }
       if (obj.userData.isFloor) {
         const buildingGroup = obj.parent as THREE.Group;
-        if (buildingGroup && buildingGroup.userData.id) {
-          this.upgradeBuilding(buildingGroup.userData.id);
-          return;
+        if (buildingGroup && buildingGroup.userData.id && !clickedBuilding) {
+          clickedBuilding = buildingGroup;
         }
       }
       const parent = obj.parent;
-      if (parent && parent.userData && parent.userData.id) {
-        this.upgradeBuilding(parent.userData.id);
-        return;
+      if (parent && parent.userData && parent.userData.id && !clickedBuilding) {
+        const grandParent = parent.parent;
+        if (grandParent && grandParent.userData && grandParent.userData.id) {
+          clickedBuilding = grandParent as THREE.Group;
+        } else {
+          clickedBuilding = parent as THREE.Group;
+        }
       }
     }
+
+    if (clickedBuilding) {
+      if (this.selectedBuilding && this.selectedBuilding.userData.id === clickedBuilding.userData.id) {
+        this.upgradeBuilding(clickedBuilding.userData.id);
+      } else {
+        this.setSelectedBuilding(clickedBuilding);
+        this.upgradeBuilding(clickedBuilding.userData.id);
+      }
+      return;
+    }
+
+    this.clearSelection();
+
+    if (clickedCell) {
+      this.addBuilding(clickedCell.gridX, clickedCell.gridZ);
+      return;
+    }
+  }
+
+  setSelectedBuilding(building: THREE.Group | null) {
+    this.selectedBuilding = building;
+    this.updateSelectedOutline();
+
+    if (this.onBuildingSelect) {
+      if (building) {
+        const data = this.buildings.get(building.userData.id)?.data;
+        if (data) {
+          this.onBuildingSelect(this.getBuildingInfo(data));
+        }
+      } else {
+        this.onBuildingSelect(null);
+      }
+    }
+  }
+
+  clearSelection() {
+    this.setSelectedBuilding(null);
   }
 
   handleHover(intersects: THREE.Intersection[]) {
@@ -216,24 +296,73 @@ export class SceneManager {
   }
 
   updateHoverOutline() {
-    if (!this.hoverOutline || !this.hoveredBuilding) {
-      if (this.hoverOutline) {
+    const shouldShowHover = !!this.hoveredBuilding &&
+      (!this.selectedBuilding || this.hoveredBuilding.userData.id !== this.selectedBuilding.userData.id);
+
+    if (!this.hoverOutline || !this.hoverGlow) return;
+
+    if (!shouldShowHover) {
+      this.hoverOutline.visible = false;
+      this.hoverGlow.visible = false;
+    } else {
+      const data = this.buildings.get(this.hoveredBuilding!.userData.id)?.data;
+      if (!data) {
         this.hoverOutline.visible = false;
+        this.hoverGlow.visible = false;
+        return;
       }
+
+      const height = this.hoveredBuilding!.userData.totalHeight || data.floors;
+      this.hoverOutline.scale.set(1, height, 1);
+      this.hoverOutline.position.set(
+        data.gridX + 0.5,
+        height / 2,
+        data.gridZ + 0.5
+      );
+      this.hoverOutline.visible = true;
+
+      this.hoverGlow.scale.set(1, height, 1);
+      this.hoverGlow.position.set(
+        data.gridX + 0.5,
+        height / 2,
+        data.gridZ + 0.5
+      );
+      this.hoverGlow.visible = true;
+    }
+  }
+
+  updateSelectedOutline() {
+    if (!this.selectedOutline || !this.selectedGlow) return;
+
+    if (!this.selectedBuilding) {
+      this.selectedOutline.visible = false;
+      this.selectedGlow.visible = false;
       return;
     }
 
-    const data = this.buildings.get(this.hoveredBuilding.userData.id)?.data;
-    if (!data) return;
+    const data = this.buildings.get(this.selectedBuilding.userData.id)?.data;
+    if (!data) {
+      this.selectedOutline.visible = false;
+      this.selectedGlow.visible = false;
+      return;
+    }
 
-    const height = this.hoveredBuilding.userData.totalHeight || data.floors;
-    this.hoverOutline.scale.set(1.05, height * 10, 1.05);
-    this.hoverOutline.position.set(
+    const height = this.selectedBuilding.userData.totalHeight || data.floors;
+    this.selectedOutline.scale.set(1, height, 1);
+    this.selectedOutline.position.set(
       data.gridX + 0.5,
       height / 2,
       data.gridZ + 0.5
     );
-    this.hoverOutline.visible = true;
+    this.selectedOutline.visible = true;
+
+    this.selectedGlow.scale.set(1, height, 1);
+    this.selectedGlow.position.set(
+      data.gridX + 0.5,
+      height / 2,
+      data.gridZ + 0.5
+    );
+    this.selectedGlow.visible = true;
   }
 
   getBuildingInfo(data: BuildingData): BuildingInfo {
@@ -327,6 +456,14 @@ export class SceneManager {
       this.updateHoverOutline();
     }
 
+    if (this.selectedBuilding && this.selectedBuilding.userData.id === id) {
+      this.selectedBuilding = newMesh;
+      this.updateSelectedOutline();
+      if (this.onBuildingSelect) {
+        this.onBuildingSelect(this.getBuildingInfo(data));
+      }
+    }
+
     return data;
   }
 
@@ -349,6 +486,14 @@ export class SceneManager {
       this.updateHoverOutline();
       if (this.onBuildingHover) {
         this.onBuildingHover(null);
+      }
+    }
+
+    if (this.selectedBuilding && this.selectedBuilding.userData.id === id) {
+      this.selectedBuilding = null;
+      this.updateSelectedOutline();
+      if (this.onBuildingSelect) {
+        this.onBuildingSelect(null);
       }
     }
 
@@ -490,10 +635,16 @@ export class SceneManager {
     this.buildings.clear();
     this.initBuildingGrid();
     this.hoveredBuilding = null;
+    this.selectedBuilding = null;
     this.updateHoverOutline();
+    this.updateSelectedOutline();
 
     if (this.onBuildingHover) {
       this.onBuildingHover(null);
+    }
+
+    if (this.onBuildingSelect) {
+      this.onBuildingSelect(null);
     }
 
     this.notifyBuildingCount();
