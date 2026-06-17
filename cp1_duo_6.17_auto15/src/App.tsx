@@ -10,6 +10,10 @@ const defaultColors: ColorItem[] = [
   { id: 'background', name: 'background', label: '背景色', value: '#F5F5F5' },
   { id: 'text', name: 'text', label: '文字色', value: '#333333' },
   { id: 'buttonHover', name: 'buttonHover', label: '按钮交互色', value: '#1565C0' },
+  { id: 'surface', name: 'surface', label: '卡片色', value: '#FFFFFF' },
+  { id: 'border', name: 'border', label: '边框色', value: '#DDDDDD' },
+  { id: 'navBg', name: 'navBg', label: '导航栏色', value: '#333333' },
+  { id: 'alertBg', name: 'alertBg', label: '提示条色', value: '#FFF3CD' },
 ];
 
 const App: React.FC = () => {
