@@ -105,6 +105,41 @@ input {
   }
 }
 
+/* 火焰图标脉冲动画：连击触发时缩放1.1倍，持续0.15秒 */
+@keyframes comboPulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.1); }
+  100% { transform: scale(1); }
+}
+
+.combo-pulse {
+  animation: comboPulse 0.15s ease-out;
+}
+
+/* 难度等级渐变过渡动画：0.5秒淡入淡出切换 */
+@keyframes difficultyFade {
+  0% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0; transform: scale(0.95); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+.difficulty-transition {
+  animation: difficultyFade 0.5s ease-in-out;
+}
+
+/* 历史记录面板折叠动画：max-height 从 0 到 800px，过渡 0.3 秒 */
+.history-panel-collapse {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.3s ease;
+}
+
+.history-panel-expand {
+  max-height: 800px;
+  overflow: hidden;
+  transition: max-height 0.3s ease;
+}
+
 @media (max-width: 768px) {
   .battle-area {
     flex-direction: column;

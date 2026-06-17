@@ -289,11 +289,8 @@ const BattleArena: React.FC = () => {
           </div>
 
           <div
-            style={{
-              ...styles.comboContainer,
-              transform: comboPulse ? 'scale(1.1)' : 'scale(1)',
-              transition: 'transform 0.15s ease-out',
-            }}
+            className={comboPulse ? 'combo-pulse' : ''}
+            style={styles.comboContainer}
           >
             {combo >= 2 && (
               <div
@@ -324,11 +321,10 @@ const BattleArena: React.FC = () => {
             历史最佳：<strong style={{ color: '#c23b22' }}>{bestScore}</strong> 分
           </span>
           <div
+            className={difficultyTransition ? 'difficulty-transition' : ''}
             style={{
               ...styles.difficultyBadge,
               backgroundColor: getDifficultyColor(difficulty),
-              opacity: difficultyTransition ? 0 : 1,
-              transition: 'opacity 0.5s ease',
             }}
           >
             <span style={styles.difficultyIcon}>🎭</span>
@@ -490,11 +486,7 @@ const BattleArena: React.FC = () => {
         </button>
 
         <div
-          style={{
-            maxHeight: historyExpanded ? '800px' : '0px',
-            overflow: 'hidden',
-            transition: 'max-height 0.3s ease',
-          }}
+          className={historyExpanded ? 'history-panel-expand' : 'history-panel-collapse'}
         >
           <div style={styles.historyContainer}>
             {history.length === 0 ? (

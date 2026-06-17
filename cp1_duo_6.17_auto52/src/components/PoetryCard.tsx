@@ -40,7 +40,7 @@ const PoetryCard: React.FC<PoetryCardProps> = ({
     if (!poem) return;
     setIsAnimating(true);
     setIsExpanded(!isExpanded);
-    setTimeout(() => setIsAnimating(false), 400);
+    setTimeout(() => setIsAnimating(false), 300);
   };
 
   return (
@@ -133,8 +133,8 @@ const PoetryCard: React.FC<PoetryCardProps> = ({
       <div
         style={{
           overflow: 'hidden',
-          maxHeight: isExpanded ? '500px' : '0px',
-          transition: 'max-height 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55)',
+          maxHeight: isExpanded ? '800px' : '0px',
+          transition: 'max-height 0.3s ease',
         }}
       >
         {poem && (

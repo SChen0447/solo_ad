@@ -18,6 +18,7 @@ class PoetryDB:
         self.author_info = {}
         self.classic_poems = set()
         self.rare_poems = set()
+        self.first_char_index = {}  # 首字快速查找索引
         self._init_classic_database()
         self._expand_database()
         self._classify_difficulty()
@@ -54,6 +55,16 @@ class PoetryDB:
                 if clean_line not in self.line_index:
                     self.line_index[clean_line] = []
                 self.line_index[clean_line].append({
+                    "poem_id": poem_id,
+                    "line_index": i,
+                    "original": line,
+                })
+                # 构建首字快速查找索引
+                first_char = clean_line[0]
+                if first_char not in self.first_char_index:
+                    self.first_char_index[first_char] = []
+                self.first_char_index[first_char].append({
+                    "clean_line": clean_line,
                     "poem_id": poem_id,
                     "line_index": i,
                     "original": line,
@@ -668,14 +679,19 @@ class PoetryDB:
                             total_lines += 2
 
     def find_next_line(self, input_line: str, difficulty: str = "medium") -> Optional[Dict[str, Any]]:
-        """根据用户输入的诗句查找下一句，支持难度筛选"""
+        """根据用户输入的诗句查找下一句，支持难度筛选
+        优化：优先通过首字快速索引定位，无需遍历全部诗句
+        """
         clean = self._clean_line(input_line)
         if not clean or len(clean) < 3:
             return None
 
+        # 先尝试精确匹配 O(1)
         candidates = self.next_line_map.get(clean, [])
+
+        # 精确匹配失败时，使用首字索引进行模糊匹配（避免遍历全部5500行）
         if not candidates:
-            candidates = self._fuzzy_match(clean)
+            candidates = self._fast_fuzzy_match(clean)
 
         if not candidates:
             return None
@@ -706,19 +722,24 @@ class PoetryDB:
             "is_classic": poem["is_classic"],
         }
 
-    def _fuzzy_match(self, clean: str) -> List[Dict[str, Any]]:
-        """模糊匹配：考虑字首字尾、字数相同、常见字重叠等因素"""
+    def _fast_fuzzy_match(self, clean: str) -> List[Dict[str, Any]]:
+        """基于首字索引的快速模糊匹配，避免遍历全部诗句
+        匹配优先级：字数相同 + 字首字尾匹配 > 常见字重叠
+        """
         results = []
         clean_len = len(clean)
+        first_char = clean[0]
 
-        for key, candidates in self.next_line_map.items():
+        # 通过首字索引快速缩小搜索范围（O(n)但n远小于5500）
+        candidates_by_first_char = self.first_char_index.get(first_char, [])
+
+        for line_info in candidates_by_first_char:
+            key = line_info["clean_line"]
             key_len = len(key)
             score = 0
 
             if key_len == clean_len:
                 score += 3
-                if key[0] == clean[0]:
-                    score += 2
                 if key[-1] == clean[-1]:
                     score += 3
                 common_chars = len(set(key) & set(clean))
@@ -726,8 +747,29 @@ class PoetryDB:
             elif clean_len > 0 and (clean in key or key in clean):
                 score += 5
 
-            if score >= 6:
-                results.extend(candidates)
+            if score >= 5:
+                # 查找对应的下一句
+                next_lines = self.next_line_map.get(key, [])
+                if next_lines:
+                    results.extend(next_lines)
+
+        # 如果首字匹配不到结果，再尝试完整索引搜索（作为兜底）
+        if not results:
+            for key, next_lines in self.next_line_map.items():
+                key_len = len(key)
+                score = 0
+                if key_len == clean_len:
+                    score += 3
+                    if key[0] == clean[0]:
+                        score += 2
+                    if key[-1] == clean[-1]:
+                        score += 3
+                    common_chars = len(set(key) & set(clean))
+                    score += common_chars * 1
+                elif clean_len > 0 and (clean in key or key in clean):
+                    score += 5
+                if score >= 6:
+                    results.extend(next_lines)
 
         return results[:30]
 
@@ -769,6 +811,7 @@ class PoetryDB:
             "rare_poems": len(self.rare_poems),
             "indexed_lines": len(self.line_index),
             "indexed_next_lines": len(self.next_line_map),
+            "first_char_index_keys": len(self.first_char_index),
         }
 
 

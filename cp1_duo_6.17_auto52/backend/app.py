@@ -33,6 +33,7 @@ def get_session(session_id):
     return user_sessions[session_id]
 
 
+# 连击倍率递增逻辑
 def calculate_score(combo):
     base_score = 10
     if combo <= 1:
@@ -208,6 +209,24 @@ def score():
     if request.method == "GET":
         session_id = request.args.get("session_id") or str(uuid.uuid4())
         session = get_session(session_id)
+
+        # 难度自适应逻辑：记录过去10轮成功率，动态切换匹配策略
+        # 统计最近10轮成功率
+        recent_results = session["recent_results"][-10:]
+        recent_count = len(recent_results)
+        success_count = sum(1 for r in recent_results if r)
+        success_rate = success_count / recent_count if recent_count > 0 else 0.5
+
+        # 根据成功率动态切换匹配策略
+        # >80% 匹配冷门诗句（hard），<40% 只匹配经典名句（easy）
+        if recent_count >= 5:
+            if success_rate > 0.8:
+                session["difficulty"] = "hard"
+            elif success_rate < 0.4:
+                session["difficulty"] = "easy"
+            else:
+                session["difficulty"] = "medium"
+
         return jsonify({
             "session_id": session_id,
             "score": session["score"],
@@ -217,6 +236,9 @@ def score():
             "difficulty": session["difficulty"],
             "difficulty_name": get_difficulty_name(session["difficulty"]),
             "history_count": len(session["history"]),
+            "recent_10_rounds": recent_count,
+            "recent_success_count": success_count,
+            "recent_success_rate": round(success_rate, 2),
         })
 
     data = request.get_json()
