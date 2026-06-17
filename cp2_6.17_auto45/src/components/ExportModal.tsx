@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Theme } from '../types';
 
 interface ExportModalProps {
@@ -15,6 +15,7 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, currentTheme
   const [exportType, setExportType] = useState<ExportType>('css');
   const [copied, setCopied] = useState(false);
   const [content, setContent] = useState('');
+  const copyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (isOpen) {
@@ -27,8 +28,21 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, currentTheme
       setCopied(false);
       setContent('');
       setExportType('css');
+      if (copyTimerRef.current) {
+        clearTimeout(copyTimerRef.current);
+        copyTimerRef.current = null;
+      }
     }
   }, [isOpen]);
+
+  useEffect(() => {
+    return () => {
+      if (copyTimerRef.current) {
+        clearTimeout(copyTimerRef.current);
+        copyTimerRef.current = null;
+      }
+    };
+  }, []);
 
   useEffect(() => {
     const handleEsc = (e: KeyboardEvent) => {
@@ -58,7 +72,13 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, currentTheme
     try {
       await navigator.clipboard.writeText(content);
       setCopied(true);
-      setTimeout(() => setCopied(false), 500);
+      if (copyTimerRef.current) {
+        clearTimeout(copyTimerRef.current);
+      }
+      copyTimerRef.current = setTimeout(() => {
+        setCopied(false);
+        copyTimerRef.current = null;
+      }, 500);
     } catch (err) {
       console.error('复制失败:', err);
     }

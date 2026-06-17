@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 
 interface ColorPickerProps {
   label: string;
@@ -11,6 +11,10 @@ const ColorPicker: React.FC<ColorPickerProps> = ({ label, value, onChange }) => 
   const [inputValue, setInputValue] = useState(value);
   const pickerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  const eyeDropperSupported = useMemo(() => {
+    return typeof window !== 'undefined' && 'EyeDropper' in window;
+  }, []);
 
   useEffect(() => {
     setInputValue(value);
@@ -93,16 +97,16 @@ const ColorPicker: React.FC<ColorPickerProps> = ({ label, value, onChange }) => 
   };
 
   const handleEyeDropper = async () => {
-    if ('EyeDropper' in window) {
-      try {
-        const eyeDropper = new (window as any).EyeDropper();
-        const result = await eyeDropper.open();
+    if (!eyeDropperSupported) return;
+    try {
+      const eyeDropper = new (window as any).EyeDropper();
+      const result = await eyeDropper.open();
+      if (result && result.sRGBHex) {
         onChange(result.sRGBHex);
         setInputValue(result.sRGBHex);
-      } catch {
       }
-    } else {
-      alert('您的浏览器不支持吸管工具，请使用Chrome或Edge浏览器。');
+    } catch (err) {
+      console.warn('吸管工具操作失败:', err);
     }
   };
 
@@ -176,29 +180,54 @@ const ColorPicker: React.FC<ColorPickerProps> = ({ label, value, onChange }) => 
               display: 'block'
             }}
           />
-          <button
-            onClick={handleEyeDropper}
-            style={{
-              marginTop: 10,
-              width: '100%',
-              height: 32,
-              borderRadius: 6,
-              border: '1px solid #444',
-              backgroundColor: '#3a3a4e',
-              color: '#fff',
-              fontSize: 12,
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: 6
-            }}
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M2 22l6-6m8.5-8.5l2.5 2.5M15.5 5.5l3 3L7.5 19.5 4.5 19.5 4.5 16.5 15.5 5.5z" />
-            </svg>
-            吸管工具
-          </button>
+          <div style={{ position: 'relative', display: 'inline-block', width: '100%' }}>
+            <button
+              onClick={handleEyeDropper}
+              disabled={!eyeDropperSupported}
+              style={{
+                marginTop: 10,
+                width: '100%',
+                height: 32,
+                borderRadius: 6,
+                border: '1px solid ' + (eyeDropperSupported ? '#444' : '#333'),
+                backgroundColor: eyeDropperSupported ? '#3a3a4e' : '#2a2a3e',
+                color: eyeDropperSupported ? '#fff' : '#666',
+                fontSize: 12,
+                cursor: eyeDropperSupported ? 'pointer' : 'not-allowed',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 6,
+                opacity: eyeDropperSupported ? 1 : 0.6
+              }}
+              title={eyeDropperSupported ? '从屏幕取色' : '当前浏览器不支持吸管工具'}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M2 22l6-6m8.5-8.5l2.5 2.5M15.5 5.5l3 3L7.5 19.5 4.5 19.5 4.5 16.5 15.5 5.5z" />
+              </svg>
+              吸管工具
+            </button>
+            {!eyeDropperSupported && (
+              <div style={{
+                position: 'absolute',
+                bottom: '100%',
+                left: '50%',
+                transform: 'translateX(-50%)',
+                marginBottom: 6,
+                padding: '6px 10px',
+                backgroundColor: '#1a1a2e',
+                color: '#ff9999',
+                fontSize: 11,
+                borderRadius: 4,
+                whiteSpace: 'nowrap',
+                pointerEvents: 'none',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
+                zIndex: 10
+              }}>
+                当前浏览器不支持吸管工具
+              </div>
+            )}
+          </div>
         </div>
       )}
     </div>

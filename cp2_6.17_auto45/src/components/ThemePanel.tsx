@@ -58,7 +58,6 @@ const ThemePanel: React.FC<ThemePanelProps> = ({
   }, [themes]);
 
   const currentTheme = themes.find(t => t.id === currentThemeId) || themes[0];
-  const compareTheme = themes.find(t => t.id === compareThemeId) || themes[1];
 
   const handleAddTheme = () => {
     const newTheme: Theme = {
