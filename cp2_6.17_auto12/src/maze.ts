@@ -96,13 +96,116 @@ export function generateMaze(width: number, height: number): MazeData {
 
   cells[startY][startX] = CellType.Start;
 
+  const corridorCells: [number, number][] = [];
+  for (let y = 0; y < mazeH; y++) {
+    for (let x = 0; x < mazeW; x++) {
+      if (cells[y][x] === CellType.Corridor) {
+        corridorCells.push([x, y]);
+      }
+    }
+  }
+
+  const reachable = bfsReachable(cells, startX, startY, mazeW, mazeH);
+  const unreachable: [number, number][] = [];
+  for (const [cx, cy] of corridorCells) {
+    if (!reachable.has(`${cx},${cy}`)) {
+      unreachable.push([cx, cy]);
+    }
+  }
+
+  if (unreachable.length > 0) {
+    for (const [ux, uy] of unreachable) {
+      const neighborDirs: [number, number][] = [[0, -1], [0, 1], [-1, 0], [1, 0]];
+      for (const [dx, dy] of neighborDirs) {
+        const nx = ux + dx;
+        const ny = uy + dy;
+        if (nx >= 0 && nx < mazeW && ny >= 0 && ny < mazeH && cells[ny][nx] === CellType.Wall) {
+          const nnx = ux + dx * 2;
+          const nny = uy + dy * 2;
+          if (nnx >= 0 && nnx < mazeW && nny >= 0 && nny < mazeH && reachable.has(`${nnx},${nny}`)) {
+            cells[ny][nx] = CellType.Corridor;
+            break;
+          }
+        }
+      }
+    }
+  }
+
+  const allCorridors: [number, number][] = [];
+  for (let y = 0; y < mazeH; y++) {
+    for (let x = 0; x < mazeW; x++) {
+      if (cells[y][x] === CellType.Corridor) {
+        allCorridors.push([x, y]);
+      }
+    }
+  }
+
+  const deadEnds: [number, number][] = [];
+  for (const [cx, cy] of allCorridors) {
+    let wallCount = 0;
+    const neighborDirs: [number, number][] = [[0, -1], [0, 1], [-1, 0], [1, 0]];
+    for (const [dx, dy] of neighborDirs) {
+      const nx = cx + dx;
+      const ny = cy + dy;
+      if (nx < 0 || nx >= mazeW || ny < 0 || ny >= mazeH || cells[ny][nx] === CellType.Wall) {
+        wallCount++;
+      }
+    }
+    if (wallCount >= 3) {
+      deadEnds.push([cx, cy]);
+    }
+  }
+
+  const extraOpenings = Math.min(Math.floor(deadEnds.length * 0.3), 10);
+  for (let i = 0; i < extraOpenings && deadEnds.length > 0; i++) {
+    const idx = Math.floor(Math.random() * deadEnds.length);
+    const [dx, dy] = deadEnds.splice(idx, 1)[0];
+    const neighborDirs: [number, number][] = [[0, -1], [0, 1], [-1, 0], [1, 0]];
+    for (const [ndx, ndy] of neighborDirs) {
+      const nx = dx + ndx;
+      const ny = dy + ndy;
+      const nnx = dx + ndx * 2;
+      const nny = dy + ndy * 2;
+      if (nx >= 0 && nx < mazeW && ny >= 0 && ny < mazeH &&
+          nnx >= 0 && nnx < mazeW && nny >= 0 && nny < mazeH &&
+          cells[ny][nx] === CellType.Wall &&
+          cells[nny][nnx] === CellType.Corridor) {
+        cells[ny][nx] = CellType.Corridor;
+        break;
+      }
+    }
+  }
+
+  const finalCorridors: [number, number][] = [];
+  for (let y = 0; y < mazeH; y++) {
+    for (let x = 0; x < mazeW; x++) {
+      if (cells[y][x] === CellType.Corridor) {
+        finalCorridors.push([x, y]);
+      }
+    }
+  }
+
   let endX = mazeW - 2;
   let endY = mazeH - 2;
-  while (cells[endY][endX] === CellType.Wall) {
-    endX -= 2;
-    if (endX <= 1) {
-      endX = mazeW - 2;
-      endY -= 2;
+  let foundEnd = false;
+  const finalReachable = bfsReachable(cells, startX, startY, mazeW, mazeH);
+  for (let y = mazeH - 2; y >= 1 && !foundEnd; y -= 2) {
+    for (let x = mazeW - 2; x >= 1 && !foundEnd; x -= 2) {
+      if (cells[y][x] === CellType.Corridor && finalReachable.has(`${x},${y}`) && (x !== startX || y !== startY)) {
+        endX = x;
+        endY = y;
+        foundEnd = true;
+      }
+    }
+  }
+  if (!foundEnd) {
+    for (let i = finalCorridors.length - 1; i >= 0; i--) {
+      const [cx, cy] = finalCorridors[i];
+      if (cx !== startX || cy !== startY) {
+        endX = cx;
+        endY = cy;
+        break;
+      }
     }
   }
   cells[endY][endX] = CellType.End;
@@ -201,4 +304,28 @@ export function getCell(maze: MazeData, x: number, y: number): CellType {
     return CellType.Wall;
   }
   return maze.cells[y][x];
+}
+
+function bfsReachable(cells: CellType[][], startX: number, startY: number, width: number, height: number): Set<string> {
+  const visited = new Set<string>();
+  const queue: [number, number][] = [[startX, startY]];
+  visited.add(`${startX},${startY}`);
+  const dirs: [number, number][] = [[0, -1], [0, 1], [-1, 0], [1, 0]];
+
+  while (queue.length > 0) {
+    const [cx, cy] = queue.shift()!;
+    for (const [dx, dy] of dirs) {
+      const nx = cx + dx;
+      const ny = cy + dy;
+      const key = `${nx},${ny}`;
+      if (nx >= 0 && nx < width && ny >= 0 && ny < height &&
+          !visited.has(key) &&
+          (cells[ny][nx] === CellType.Corridor || cells[ny][nx] === CellType.Start || cells[ny][nx] === CellType.End)) {
+        visited.add(key);
+        queue.push([nx, ny]);
+      }
+    }
+  }
+
+  return visited;
 }

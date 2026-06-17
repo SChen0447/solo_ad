@@ -26,6 +26,75 @@ function getHpColor(current: number, max: number): string {
   return '#e53935';
 }
 
+const animationLocks: Map<string, boolean> = new Map();
+const animationCleanup: Map<string, () => void> = new Map();
+
+function cancelAnimation(elementId: string): void {
+  const cleanup = animationCleanup.get(elementId);
+  if (cleanup) {
+    cleanup();
+    animationCleanup.delete(elementId);
+  }
+  animationLocks.delete(elementId);
+}
+
+function animateCombatant(elementId: string, animClass: string): void {
+  const el = document.getElementById(elementId);
+  if (!el) return;
+
+  cancelAnimation(elementId);
+
+  const animDuration = animClass === 'flash-anim' ? 100 : 200;
+  animationLocks.set(elementId, true);
+
+  let rafId: number | null = null;
+  let eventHandler: ((e: AnimationEvent) => void) | null = null;
+  let fallbackTimer: number | null = null;
+
+  const cleanup = () => {
+    if (rafId !== null) {
+      cancelAnimationFrame(rafId);
+      rafId = null;
+    }
+    if (fallbackTimer !== null) {
+      clearTimeout(fallbackTimer);
+      fallbackTimer = null;
+    }
+    if (eventHandler !== null) {
+      el.removeEventListener('animationend', eventHandler);
+      eventHandler = null;
+    }
+    el.classList.remove(animClass);
+    animationLocks.delete(elementId);
+  };
+
+  animationCleanup.set(elementId, cleanup);
+
+  rafId = requestAnimationFrame(() => {
+    el.classList.remove(animClass);
+    void el.offsetWidth;
+
+    eventHandler = (e: AnimationEvent) => {
+      if (e.animationName === (animClass === 'flash-anim' ? 'attackFlash' : 'hitShake')) {
+        cleanup();
+        animationCleanup.delete(elementId);
+      }
+    };
+    el.addEventListener('animationend', eventHandler);
+
+    el.classList.add(animClass);
+
+    fallbackTimer = window.setTimeout(() => {
+      if (animationLocks.get(elementId)) {
+        cleanup();
+        animationCleanup.delete(elementId);
+      }
+    }, animDuration + 50);
+
+    rafId = null;
+  });
+}
+
 export function renderBattleUI(state: BattleState): void {
   const playerInfoEl = document.getElementById('player-info')!;
   const monsterInfoEl = document.getElementById('monster-info')!;
@@ -94,50 +163,4 @@ function monsterCounterAttack(state: BattleState): BattleState {
   }
 
   return state;
-}
-
-function animateCombatant(elementId: string, animClass: string): void {
-  const el = document.getElementById(elementId);
-  if (!el) return;
-  el.classList.remove(animClass);
-  void el.offsetWidth;
-  el.classList.add(animClass);
-  const duration = animClass === 'flash-anim' ? 100 : 200;
-  setTimeout(() => el.classList.remove(animClass), duration);
-}
-
-export function showBattleResult(result: BattleResult, player: Player, onClose: () => void): void {
-  const overlay = document.getElementById('battle-result-overlay')!;
-  const titleEl = document.getElementById('battle-result-title')!;
-  const msgEl = document.getElementById('battle-result-msg')!;
-  const closeBtn = document.getElementById('battle-result-close')!;
-
-  if (result === 'player_win') {
-    titleEl.textContent = '🎉 战斗胜利！';
-    titleEl.style.color = '#4caf50';
-    msgEl.innerHTML = `恢复了 2 点生命值<br>当前 HP: ${player.hp}/${player.maxHp}`;
-  } else {
-    titleEl.textContent = '💀 战斗失败...';
-    titleEl.style.color = '#e53935';
-    msgEl.innerHTML = `最终得分: ${player.getScore()}`;
-  }
-
-  overlay.classList.add('active');
-
-  const handler = () => {
-    overlay.classList.remove('active');
-    closeBtn.removeEventListener('click', handler);
-    onClose();
-  };
-  closeBtn.addEventListener('click', handler);
-}
-
-export function showBattleOverlay(): void {
-  const overlay = document.getElementById('battle-overlay')!;
-  overlay.classList.add('active');
-}
-
-export function hideBattleOverlay(): void {
-  const overlay = document.getElementById('battle-overlay')!;
-  overlay.classList.remove('active');
 }

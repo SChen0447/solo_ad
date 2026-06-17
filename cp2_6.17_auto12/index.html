@@ -92,7 +92,7 @@
       width: 40px;
       height: 40px;
       position: relative;
-      transition: opacity 0.2s;
+      transition: opacity 0.3s, filter 0.3s;
       opacity: 0;
       animation: cellFadeIn 0.2s forwards;
     }
@@ -120,17 +120,14 @@
 
     .cell.fog {
       filter: brightness(0.15);
-      transition: filter 0.3s;
     }
 
     .cell.visible {
       filter: brightness(1);
-      transition: filter 0.3s;
     }
 
     .cell.fog-edge {
       filter: brightness(0.5);
-      transition: filter 0.3s;
     }
 
     #player {

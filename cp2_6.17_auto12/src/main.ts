@@ -1,7 +1,7 @@
 import { generateMaze, getCell, CellType, MazeData, MonsterData } from './maze';
 import { Player } from './player';
 import { Renderer } from './renderer';
-import { BattleState, createBattleState, playerAttack, renderBattleUI, showBattleOverlay, hideBattleOverlay, showBattleResult, BattleResult } from './battle';
+import { BattleState, createBattleState, playerAttack, renderBattleUI, BattleResult } from './battle';
 
 enum GameState {
   Exploring = 'exploring',
@@ -26,16 +26,14 @@ class Game {
   }
 
   private init(): void {
-    this.startNewGame();
+    this.renderer.setupButtonHandlers(
+      () => this.handleAttack(),
+      () => this.restartGame()
+    );
 
     document.addEventListener('keydown', (e) => this.handleKeyDown(e));
 
-    const attackBtn = document.getElementById('attack-btn')!;
-    attackBtn.addEventListener('click', () => this.handleAttack());
-
-    const restartBtn = document.getElementById('restart-btn')!;
-    restartBtn.addEventListener('click', () => this.restartGame());
-
+    this.startNewGame();
     this.gameLoop();
   }
 
@@ -153,7 +151,7 @@ class Game {
     this.state = GameState.Battle;
     this.battleState = createBattleState(this.player, monster);
 
-    showBattleOverlay();
+    this.renderer.showBattleOverlay();
     renderBattleUI(this.battleState);
   }
 
@@ -167,17 +165,40 @@ class Game {
     if (this.battleState.result !== null) {
       const result = this.battleState.result;
       setTimeout(() => {
-        hideBattleOverlay();
+        this.renderer.hideBattleOverlay();
         this.endBattle(result);
       }, 600);
     }
+  }
+
+  private setState(newState: GameState): void {
+    const oldState = this.state;
+    this.state = newState;
+
+    if (newState === GameState.Exploring && oldState === GameState.GameOver) {
+      this.resetGameCounters();
+    }
+
+    this.renderer.fadeContainer(true);
+    setTimeout(() => {
+      this.renderer.fadeContainer(false);
+    }, 300);
+  }
+
+  private resetGameCounters(): void {
+    if (!this.player) return;
+    this.player.exploredCells = new Set<string>();
+    this.player.killedMonsters = 0;
+    this.player.x = this.maze!.startX;
+    this.player.y = this.maze!.startY;
+    this.player.markExplored(this.maze!.startX, this.maze!.startY);
   }
 
   private endBattle(result: BattleResult): void {
     const player = this.player;
     if (!player) return;
 
-    showBattleResult(result, player, () => {
+    this.renderer.showBattleResult(result, player.hp, player.maxHp, player.getScore(), () => {
       if (result === 'player_win') {
         if (this.currentMonster) {
           this.renderer.removeMonster(this.currentMonster.x, this.currentMonster.y);

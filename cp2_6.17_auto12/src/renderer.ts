@@ -11,10 +11,61 @@ export class Renderer {
   private itemElements: Map<string, HTMLElement> = new Map();
   private chestElements: Map<string, HTMLElement> = new Map();
   private currentMaze: MazeData | null = null;
+  private pendingItemRemovals: Map<string, number> = new Map();
+  private pendingChestRemovals: Map<string, number> = new Map();
 
   constructor() {
     this.mazeGrid = document.getElementById('maze-grid')!;
     this.playerEl = document.getElementById('player')!;
+  }
+
+  setupButtonHandlers(onAttack: () => void, onRestart: () => void): void {
+    const attackBtn = document.getElementById('attack-btn') as HTMLButtonElement;
+    const restartBtn = document.getElementById('restart-btn') as HTMLButtonElement;
+
+    attackBtn.addEventListener('click', () => onAttack());
+    restartBtn.addEventListener('click', () => onRestart());
+  }
+
+  setupBattleResultCloseHandler(onClose: () => void): void {
+    const closeBtn = document.getElementById('battle-result-close') as HTMLButtonElement;
+    const newBtn = closeBtn.cloneNode(true) as HTMLButtonElement;
+    if (closeBtn.parentNode) {
+      closeBtn.parentNode.replaceChild(newBtn, closeBtn);
+    }
+    newBtn.addEventListener('click', () => onClose());
+  }
+
+  showBattleOverlay(): void {
+    const overlay = document.getElementById('battle-overlay')!;
+    overlay.classList.add('active');
+  }
+
+  hideBattleOverlay(): void {
+    const overlay = document.getElementById('battle-overlay')!;
+    overlay.classList.remove('active');
+  }
+
+  showBattleResult(result: 'player_win' | 'player_lose', playerHp: number, playerMaxHp: number, score: number, onClose: () => void): void {
+    const overlay = document.getElementById('battle-result-overlay')!;
+    const titleEl = document.getElementById('battle-result-title')!;
+    const msgEl = document.getElementById('battle-result-msg')!;
+
+    if (result === 'player_win') {
+      titleEl.textContent = '🎉 战斗胜利！';
+      titleEl.style.color = '#4caf50';
+      msgEl.innerHTML = `恢复了 2 点生命值<br>当前 HP: ${playerHp}/${playerMaxHp}`;
+    } else {
+      titleEl.textContent = '💀 战斗失败...';
+      titleEl.style.color = '#e53935';
+      msgEl.innerHTML = `最终得分: ${score}`;
+    }
+
+    overlay.classList.add('active');
+    this.setupBattleResultCloseHandler(() => {
+      overlay.classList.remove('active');
+      onClose();
+    });
   }
 
   renderMaze(maze: MazeData): void {
@@ -144,25 +195,75 @@ export class Renderer {
   pickItem(x: number, y: number): void {
     const key = `${x},${y}`;
     const el = this.itemElements.get(key);
-    if (el) {
-      el.classList.add('picked');
-      setTimeout(() => {
-        el.remove();
-        this.itemElements.delete(key);
-      }, 300);
+    if (!el) return;
+
+    const pending = this.pendingItemRemovals.get(key);
+    if (pending !== undefined) {
+      clearTimeout(pending);
     }
+
+    let rafId: number | null = null;
+    let fallbackTimer: number | null = null;
+
+    const transitionHandler = (e: TransitionEvent) => {
+      if (e.propertyName === 'transform' || e.propertyName === 'opacity') {
+        cleanup();
+      }
+    };
+
+    const cleanup = () => {
+      if (rafId !== null) {
+        cancelAnimationFrame(rafId);
+        rafId = null;
+      }
+      if (fallbackTimer !== null) {
+        clearTimeout(fallbackTimer);
+        fallbackTimer = null;
+      }
+      el.removeEventListener('transitionend', transitionHandler);
+      el.remove();
+      this.itemElements.delete(key);
+      this.pendingItemRemovals.delete(key);
+    };
+
+    rafId = requestAnimationFrame(() => {
+      el.classList.remove('picked');
+      void el.offsetWidth;
+
+      el.addEventListener('transitionend', transitionHandler);
+      el.classList.add('picked');
+
+      fallbackTimer = window.setTimeout(() => {
+        if (this.itemElements.has(key)) {
+          cleanup();
+        }
+      }, 350);
+
+      this.pendingItemRemovals.set(key, fallbackTimer);
+      rafId = null;
+    });
   }
 
   openChest(x: number, y: number): void {
     const key = `${x},${y}`;
     const el = this.chestElements.get(key);
-    if (el) {
-      el.textContent = '✨';
-      setTimeout(() => {
-        el.remove();
-        this.chestElements.delete(key);
-      }, 400);
+    if (!el) return;
+
+    const pending = this.pendingChestRemovals.get(key);
+    if (pending !== undefined) {
+      clearTimeout(pending);
     }
+
+    el.style.transition = 'transform 0.3s, opacity 0.3s';
+    el.textContent = '✨';
+
+    const timer = window.setTimeout(() => {
+      el.remove();
+      this.chestElements.delete(key);
+      this.pendingChestRemovals.delete(key);
+    }, 400);
+
+    this.pendingChestRemovals.set(key, timer);
   }
 
   updateStatusBar(player: Player, floor: number): void {
