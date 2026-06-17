@@ -8,6 +8,7 @@ interface FilterBarProps {
   primaryColor: string;
   showFavoritesOnly: boolean;
   onShowFavoritesChange: (show: boolean) => void;
+  favoritesLoading: boolean;
 }
 
 const categories: { value: CategoryType; label: string }[] = [
@@ -25,7 +26,8 @@ function FilterBar({
   onSearchChange,
   primaryColor,
   showFavoritesOnly,
-  onShowFavoritesChange
+  onShowFavoritesChange,
+  favoritesLoading
 }: FilterBarProps) {
   return (
     <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
@@ -69,16 +71,18 @@ function FilterBar({
         </svg>
       </div>
       <label
-        className="flex items-center gap-2 cursor-pointer select-none"
+        className={`flex items-center gap-2 select-none ${favoritesLoading ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`}
         style={{ transition: 'all 0.2s ease' }}
       >
         <button
           role="switch"
           aria-checked={showFavoritesOnly}
-          onClick={() => onShowFavoritesChange(!showFavoritesOnly)}
-          className="relative inline-flex h-6 w-11 items-center rounded-full"
+          aria-busy={favoritesLoading}
+          disabled={favoritesLoading}
+          onClick={() => !favoritesLoading && onShowFavoritesChange(!showFavoritesOnly)}
+          className="relative inline-flex h-6 w-11 items-center rounded-full disabled:cursor-not-allowed"
           style={{
-            backgroundColor: showFavoritesOnly ? primaryColor : '#d1d5db',
+            backgroundColor: favoritesLoading ? '#d1d5db' : showFavoritesOnly ? primaryColor : '#d1d5db',
             transition: 'background-color 0.2s ease'
           }}
         >
@@ -90,6 +94,14 @@ function FilterBar({
               boxShadow: '0 1px 3px rgba(0,0,0,0.2)'
             }}
           />
+          {favoritesLoading && (
+            <span
+              className="absolute inset-0 flex items-center justify-center"
+              style={{ color: '#6b7280', fontSize: '8px', fontWeight: 'bold' }}
+            >
+              ⟳
+            </span>
+          )}
         </button>
         <span className="text-sm text-gray-700 whitespace-nowrap">
           <svg
@@ -103,7 +115,7 @@ function FilterBar({
           >
             <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
           </svg>
-          只看收藏
+          {favoritesLoading ? '加载中...' : '只看收藏'}
         </span>
       </label>
     </div>

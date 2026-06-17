@@ -1,13 +1,13 @@
 import { useState } from 'react';
 import ComponentRender from './ComponentRender';
-import { ComponentItem, Theme } from './componentData';
+import { ComponentItem, Theme, FavoriteItem } from './componentData';
 
 interface GalleeryListProps {
   components: ComponentItem[];
   theme: Theme;
-  favoriteIds: number[];
-  onAddFavorite: (id: number) => Promise<boolean>;
-  onRemoveFavorite: (id: number) => Promise<boolean>;
+  favorites: FavoriteItem[];
+  onAddFavorite: (id: number) => Promise<{ success: boolean; error?: string }>;
+  onRemoveFavorite: (id: number) => Promise<{ success: boolean; error?: string }>;
 }
 
 function generateCodeSnippet(component: ComponentItem): string {
@@ -17,25 +17,35 @@ function generateCodeSnippet(component: ComponentItem): string {
   return `<${component.name.replace(/\s+/g, '')} ${propsStr} />`;
 }
 
-function GalleeryList({ components, theme, favoriteIds, onAddFavorite, onRemoveFavorite }: GalleeryListProps) {
+function GalleeryList({ components, theme, favorites, onAddFavorite, onRemoveFavorite }: GalleeryListProps) {
   const [animatingId, setAnimatingId] = useState<number | null>(null);
   const [failedId, setFailedId] = useState<number | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<number | null>(null);
 
+  const favoriteIds = favorites.map((fav) => fav.component_id);
+
   const handleFavoriteClick = async (id: number) => {
-    setAnimatingId(id);
     setFailedId(null);
+    setErrorMessage(null);
     const isFavorite = favoriteIds.includes(id);
-    let success: boolean;
+    let result: { success: boolean; error?: string };
     if (isFavorite) {
-      success = await onRemoveFavorite(id);
+      result = await onRemoveFavorite(id);
     } else {
-      success = await onAddFavorite(id);
+      result = await onAddFavorite(id);
     }
-    if (!success) {
+    if (result.success) {
+      setAnimatingId(id);
+      setTimeout(() => setAnimatingId(null), 300);
+    } else {
       setFailedId(id);
+      setErrorMessage(result.error || '操作失败');
+      setTimeout(() => {
+        setFailedId(null);
+        setErrorMessage(null);
+      }, 3000);
     }
-    setTimeout(() => setAnimatingId(null), 300);
   };
 
   const handleCopyCode = async (code: string, id: number) => {
@@ -80,7 +90,16 @@ function GalleeryList({ components, theme, favoriteIds, onAddFavorite, onRemoveF
   }
 
   return (
-    <div className="gallery-grid">
+    <>
+      {errorMessage && (
+        <div
+          className="fixed top-20 left-1/2 -translate-x-1/2 z-50 px-6 py-3 rounded-lg shadow-lg text-white text-sm"
+          style={{ backgroundColor: '#ef4444' }}
+        >
+          {errorMessage}
+        </div>
+      )}
+      <div className="gallery-grid">
       {components.map((component) => {
         const isFavorite = favoriteIds.includes(component.id);
         const isAnimating = animatingId === component.id;
@@ -134,6 +153,7 @@ function GalleeryList({ components, theme, favoriteIds, onAddFavorite, onRemoveF
         );
       })}
     </div>
+    </>
   );
 }
 
