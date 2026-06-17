@@ -16,15 +16,29 @@ export interface Particle {
   vx: number;
   vy: number;
   size: number;
+  width?: number;
+  height?: number;
   color: string;
+  colorEnd?: string;
   life: number;
   maxLife: number;
-  type: 'debris' | 'spark' | 'shard' | 'droplet' | 'explosion';
-  shape: 'circle' | 'polygon';
+  type: 'debris' | 'spark' | 'shard' | 'droplet' | 'explosion' | 'sliver';
+  shape: 'circle' | 'polygon' | 'rect';
   points?: number[][];
   opacity: number;
   rotation: number;
   rotationSpeed: number;
+  trail?: Array<{ x: number; y: number; life: number }>;
+  trailLength?: number;
+  glowIntensity?: number;
+  flickerPhase?: number;
+  flickerTimer?: number;
+  swingAmplitude?: number;
+  swingSpeed?: number;
+  swingPhase?: number;
+  startX?: number;
+  rotateStartTime?: number;
+  gravityScale?: number;
 }
 
 export interface SimulationStats {

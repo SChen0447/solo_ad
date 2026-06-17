@@ -73,7 +73,7 @@ export default function ResultPanel({ stats, visible, onReset }: ResultPanelProp
 
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
             <span style={{ color: '#888', fontSize: 12 }}>方块摧毁数</span>
-            <span style={{ color: '#e0e0e0', fontSize: 16, fontWeight: 'bold' }}>{stats.blocksDestroyed}</span>
+            <span style={{ color: '#e0e0e0', fontSize: 16, fontWeight: 'bold' }}>{stats.destroyedCount}</span>
           </div>
         </div>
       )}

@@ -1,0 +1,11 @@
+Error: The following dependencies are imported but could not be resolved:
+
+  [36m@/Sidebar[39m [37m[2m(imported by E:/solo/SoloAutoDemo/tasks/auto26/src/App.tsx)[22m[39m
+  [36m@/PhysicsScene[39m [37m[2m(imported by E:/solo/SoloAutoDemo/tasks/auto26/src/App.tsx)[22m[39m
+  [36m@/ResultPanel[39m [37m[2m(imported by E:/solo/SoloAutoDemo/tasks/auto26/src/App.tsx)[22m[39m
+  [36m@/utils[39m [37m[2m(imported by E:/solo/SoloAutoDemo/tasks/auto26/src/App.tsx)[22m[39m
+
+Are they installed?
+    at file:///e:/solo/SoloAutoDemo/tasks/auto26/node_modules/vite/dist/node/chunks/dep-Dm0c1Wj2.js:14849:15
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async file:///e:/solo/SoloAutoDemo/tasks/auto26/node_modules/vite/dist/node/chunks/dep-Dm0c1Wj2.js:47144:28

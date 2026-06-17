@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { MaterialType, MaterialConfig } from '@/types';
+import { MaterialType } from '@/types';
 import { MATERIAL_CONFIGS } from '@/utils';
 
 interface SidebarProps {
