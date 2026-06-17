@@ -22,6 +22,7 @@ interface Recipe {
   cookTime: number;
   difficulty: 'easy' | 'medium' | 'hard';
   coverImage: string;
+  isFavorite: boolean;
 }
 
 interface FridgeItem {
@@ -51,6 +52,7 @@ let recipes: Recipe[] = [
     cookTime: 15,
     difficulty: 'easy',
     coverImage: 'https://images.unsplash.com/photo-1482049016gy-9e39f6379634?w=400&h=300&fit=crop',
+    isFavorite: false,
   },
   {
     id: uuidv4(),
@@ -76,6 +78,7 @@ let recipes: Recipe[] = [
     cookTime: 60,
     difficulty: 'medium',
     coverImage: 'https://images.unsplash.com/photo-1544025162-d76694265947?w=400&h=300&fit=crop',
+    isFavorite: false,
   },
   {
     id: uuidv4(),
@@ -97,6 +100,7 @@ let recipes: Recipe[] = [
     cookTime: 10,
     difficulty: 'easy',
     coverImage: 'https://images.unsplash.com/photo-1583608354155-90119ee969ca?w=400&h=300&fit=crop',
+    isFavorite: false,
   },
   {
     id: uuidv4(),
@@ -121,6 +125,7 @@ let recipes: Recipe[] = [
     cookTime: 30,
     difficulty: 'hard',
     coverImage: 'https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?w=400&h=300&fit=crop',
+    isFavorite: false,
   },
   {
     id: uuidv4(),
@@ -146,6 +151,7 @@ let recipes: Recipe[] = [
     cookTime: 70,
     difficulty: 'medium',
     coverImage: 'https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=400&h=300&fit=crop',
+    isFavorite: false,
   },
   {
     id: uuidv4(),
@@ -168,6 +174,7 @@ let recipes: Recipe[] = [
     cookTime: 20,
     difficulty: 'easy',
     coverImage: 'https://images.unsplash.com/photo-1604909052743-94e838986d24?w=400&h=300&fit=crop',
+    isFavorite: false,
   },
 ];
 
@@ -186,10 +193,22 @@ app.get('/api/recipes', (req, res) => {
 app.post('/api/recipes', (req, res) => {
   const newRecipe: Recipe = {
     id: uuidv4(),
+    isFavorite: false,
     ...req.body,
   };
   recipes.push(newRecipe);
   res.status(201).json(newRecipe);
+});
+
+app.patch('/api/recipes/:id/favorite', (req, res) => {
+  const { id } = req.params;
+  const index = recipes.findIndex((r) => r.id === id);
+  if (index !== -1) {
+    recipes[index].isFavorite = !recipes[index].isFavorite;
+    res.json(recipes[index]);
+  } else {
+    res.status(404).json({ error: 'Recipe not found' });
+  }
 });
 
 app.put('/api/recipes/:id', (req, res) => {

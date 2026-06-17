@@ -11,6 +11,7 @@ export interface Recipe {
   cookTime: number;
   difficulty: 'easy' | 'medium' | 'hard';
   coverImage: string;
+  isFavorite: boolean;
 }
 
 export interface FridgeItem {
@@ -86,4 +87,14 @@ export async function deleteFridgeItem(id: string): Promise<void> {
     method: 'DELETE',
   });
   return handleResponse<void>(response);
+}
+
+export async function toggleFavorite(id: string): Promise<Recipe> {
+  const response = await fetch(`${API_BASE}/recipes/${id}/favorite`, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+  });
+  return handleResponse<Recipe>(response);
 }

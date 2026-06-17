@@ -4,6 +4,7 @@ import { Recipe } from '../utils/api';
 interface RecipeDetailProps {
   recipe: Recipe;
   onBack: () => void;
+  onToggleFavorite: (id: string) => void;
 }
 
 const difficultyText: Record<'easy' | 'medium' | 'hard', string> = {
@@ -45,7 +46,7 @@ function calculateScaledAmount(amount: string, scale: number): string {
   return `${formatNumber(scaled)}${parsed.unit}`;
 }
 
-export default function RecipeDetail({ recipe, onBack }: RecipeDetailProps) {
+export default function RecipeDetail({ recipe, onBack, onToggleFavorite }: RecipeDetailProps) {
   const [servings, setServings] = useState(2);
   const [showSlider, setShowSlider] = useState(false);
   const [animKey, setAnimKey] = useState(0);
