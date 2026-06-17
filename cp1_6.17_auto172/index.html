@@ -1,0 +1,526 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>高维数据聚类可视化探索器</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    html, body {
+      width: 100vw;
+      height: 100vh;
+      background: #0D1117;
+      color: #E6EDF3;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      overflow: hidden;
+    }
+    #app {
+      width: 100%;
+      height: 100%;
+      position: relative;
+    }
+    #canvas-container {
+      width: 100%;
+      height: 100%;
+      position: absolute;
+      top: 0;
+      left: 0;
+    }
+    #canvas-container canvas {
+      display: block;
+      width: 100% !important;
+      height: 100% !important;
+    }
+    /* 右上角操作面板 */
+    #control-panel {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      width: 340px;
+      max-height: calc(100vh - 40px);
+      overflow-y: auto;
+      background: rgba(22, 27, 34, 0.85);
+      backdrop-filter: blur(12px);
+      border-radius: 12px;
+      padding: 20px;
+      border: 1px solid rgba(48, 54, 61, 0.6);
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+      z-index: 10;
+    }
+    #control-panel::-webkit-scrollbar {
+      width: 6px;
+    }
+    #control-panel::-webkit-scrollbar-track {
+      background: rgba(48, 54, 61, 0.3);
+      border-radius: 3px;
+    }
+    #control-panel::-webkit-scrollbar-thumb {
+      background: rgba(52, 152, 219, 0.5);
+      border-radius: 3px;
+    }
+    .panel-title {
+      font-size: 16px;
+      font-weight: 600;
+      color: #E6EDF3;
+      margin-bottom: 16px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid rgba(48, 54, 61, 0.8);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .panel-title::before {
+      content: '';
+      display: inline-block;
+      width: 4px;
+      height: 16px;
+      background: linear-gradient(180deg, #3498DB, #E74C3C);
+      border-radius: 2px;
+    }
+    .control-group {
+      margin-bottom: 18px;
+    }
+    .control-label {
+      font-size: 12px;
+      color: #7D8590;
+      margin-bottom: 8px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .control-label .value {
+      color: #3498DB;
+      font-weight: 600;
+      font-size: 13px;
+    }
+    select, input[type="file"] {
+      width: 100%;
+      padding: 10px 12px;
+      background: rgba(13, 17, 23, 0.8);
+      border: 1px solid rgba(48, 54, 61, 0.8);
+      border-radius: 8px;
+      color: #E6EDF3;
+      font-size: 13px;
+      outline: none;
+      transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    select:hover, input[type="file"]:hover {
+      border-color: rgba(52, 152, 219, 0.6);
+    }
+    select:focus {
+      border-color: #3498DB;
+      box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.15);
+    }
+    input[type="range"] {
+      width: 100%;
+      height: 6px;
+      -webkit-appearance: none;
+      appearance: none;
+      border-radius: 3px;
+      background: linear-gradient(to right, #30363D, var(--track-color, #3498DB));
+      outline: none;
+      cursor: pointer;
+    }
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: var(--track-color, #3498DB);
+      border: 3px solid #161B22;
+      cursor: pointer;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+      transition: transform 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    input[type="range"]::-webkit-slider-thumb:hover {
+      transform: scale(1.15);
+    }
+    input[type="range"]::-moz-range-thumb {
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: var(--track-color, #3498DB);
+      border: 3px solid #161B22;
+      cursor: pointer;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    }
+    .btn-group {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    button {
+      flex: 1;
+      min-width: 100px;
+      padding: 10px 16px;
+      background: linear-gradient(135deg, rgba(52, 152, 219, 0.15), rgba(52, 152, 219, 0.05));
+      border: 1px solid rgba(52, 152, 219, 0.4);
+      border-radius: 8px;
+      color: #3498DB;
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    button:hover {
+      background: linear-gradient(135deg, rgba(52, 152, 219, 0.3), rgba(52, 152, 219, 0.1));
+      transform: scale(1.05);
+      border-color: rgba(52, 152, 219, 0.8);
+    }
+    button:active {
+      transform: scale(0.98);
+    }
+    button.primary {
+      background: linear-gradient(135deg, #3498DB, #2980B9);
+      border-color: #3498DB;
+      color: white;
+    }
+    button.primary:hover {
+      background: linear-gradient(135deg, #2980B9, #1F618D);
+    }
+    button.danger {
+      background: linear-gradient(135deg, rgba(231, 76, 60, 0.15), rgba(231, 76, 60, 0.05));
+      border-color: rgba(231, 76, 60, 0.4);
+      color: #E74C3C;
+    }
+    button.danger:hover {
+      background: linear-gradient(135deg, rgba(231, 76, 60, 0.3), rgba(231, 76, 60, 0.1));
+    }
+    /* 聚类统计摘要 */
+    .stats-section {
+      margin-top: 20px;
+      padding-top: 16px;
+      border-top: 1px solid rgba(48, 54, 61, 0.8);
+    }
+    .stats-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: #E6EDF3;
+      margin-bottom: 12px;
+    }
+    .cluster-stat {
+      padding: 10px 12px;
+      background: rgba(13, 17, 23, 0.6);
+      border-radius: 8px;
+      margin-bottom: 8px;
+      border-left: 3px solid var(--cluster-color, #3498DB);
+      transition: all 0.15s ease;
+    }
+    .cluster-stat:hover {
+      background: rgba(13, 17, 23, 0.9);
+      transform: translateX(2px);
+    }
+    .cluster-stat-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 6px;
+    }
+    .cluster-name {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--cluster-color, #3498DB);
+    }
+    .cluster-count {
+      font-size: 11px;
+      color: #7D8590;
+      background: rgba(48, 54, 61, 0.5);
+      padding: 2px 8px;
+      border-radius: 10px;
+    }
+    .cluster-stat-detail {
+      font-size: 11px;
+      color: #7D8590;
+      line-height: 1.6;
+    }
+    /* 左下角选中点列表 */
+    #selected-list {
+      position: absolute;
+      bottom: 20px;
+      left: 20px;
+      width: 360px;
+      max-height: 280px;
+      background: rgba(22, 27, 34, 0.85);
+      backdrop-filter: blur(12px);
+      border-radius: 12px;
+      border: 1px solid rgba(48, 54, 61, 0.6);
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+      z-index: 10;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    #selected-list-header {
+      padding: 14px 16px;
+      border-bottom: 1px solid rgba(48, 54, 61, 0.8);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    #selected-list-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: #E6EDF3;
+    }
+    #selected-list-count {
+      font-size: 11px;
+      color: #3498DB;
+      background: rgba(52, 152, 219, 0.15);
+      padding: 3px 10px;
+      border-radius: 10px;
+    }
+    #selected-list-body {
+      flex: 1;
+      overflow-y: auto;
+      padding: 8px;
+    }
+    #selected-list-body::-webkit-scrollbar {
+      width: 5px;
+    }
+    #selected-list-body::-webkit-scrollbar-thumb {
+      background: rgba(52, 152, 219, 0.4);
+      border-radius: 3px;
+    }
+    .selected-item {
+      padding: 10px 12px;
+      background: rgba(13, 17, 23, 0.5);
+      border-radius: 6px;
+      margin-bottom: 6px;
+      font-size: 11px;
+      color: #E6EDF3;
+      border-left: 2px solid var(--item-color, #3498DB);
+      transition: all 0.15s ease;
+    }
+    .selected-item:hover {
+      background: rgba(13, 17, 23, 0.8);
+    }
+    .selected-item-id {
+      font-weight: 600;
+      color: #E6EDF3;
+      margin-bottom: 4px;
+    }
+    .selected-item-features {
+      color: #7D8590;
+      line-height: 1.5;
+    }
+    /* 左上角性能监控 */
+    #perf-monitor {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      background: rgba(22, 27, 34, 0.85);
+      backdrop-filter: blur(12px);
+      border-radius: 10px;
+      padding: 12px 16px;
+      border: 1px solid rgba(48, 54, 61, 0.6);
+      font-family: 'SF Mono', Monaco, monospace;
+      font-size: 12px;
+      z-index: 10;
+      display: none;
+      min-width: 160px;
+    }
+    #perf-monitor.visible {
+      display: block;
+    }
+    .perf-row {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 6px;
+    }
+    .perf-row:last-child {
+      margin-bottom: 0;
+    }
+    .perf-label {
+      color: #7D8590;
+    }
+    .perf-value {
+      color: #3FB950;
+      font-weight: 600;
+    }
+    .perf-value.warning {
+      color: #D29922;
+    }
+    .perf-value.danger {
+      color: #F85149;
+    }
+    /* 加载进度条 */
+    #loading-overlay {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      z-index: 100;
+      display: none;
+    }
+    #loading-overlay.visible {
+      display: block;
+      animation: fadeIn 0.3s ease-out;
+    }
+    .loader {
+      width: 60px;
+      height: 60px;
+      border: 4px solid rgba(48, 54, 61, 0.5);
+      border-top-color: #3498DB;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+    .loader-text {
+      margin-top: 12px;
+      text-align: center;
+      font-size: 12px;
+      color: #7D8590;
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+    /* Tooltip */
+    #tooltip {
+      position: absolute;
+      background: rgba(22, 27, 34, 0.95);
+      backdrop-filter: blur(8px);
+      border: 1px solid rgba(52, 152, 219, 0.5);
+      border-radius: 8px;
+      padding: 10px 14px;
+      font-size: 12px;
+      color: #E6EDF3;
+      pointer-events: none;
+      z-index: 50;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+      display: none;
+      min-width: 180px;
+    }
+    #tooltip.visible {
+      display: block;
+    }
+    .tooltip-id {
+      font-weight: 600;
+      color: #3498DB;
+      margin-bottom: 8px;
+      padding-bottom: 6px;
+      border-bottom: 1px solid rgba(48, 54, 61, 0.6);
+    }
+    .tooltip-row {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 4px;
+    }
+    .tooltip-label {
+      color: #7D8590;
+    }
+    .tooltip-value {
+      color: #E6EDF3;
+      font-weight: 500;
+    }
+    /* 框选选择框 */
+    #selection-box {
+      position: absolute;
+      border: 2px dashed rgba(52, 152, 219, 0.8);
+      background: rgba(52, 152, 219, 0.1);
+      pointer-events: none;
+      z-index: 20;
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <div id="canvas-container"></div>
+
+    <div id="perf-monitor">
+      <div class="perf-row">
+        <span class="perf-label">FPS</span>
+        <span class="perf-value" id="perf-fps">0</span>
+      </div>
+      <div class="perf-row">
+        <span class="perf-label">三角面数</span>
+        <span class="perf-value" id="perf-tris">0</span>
+      </div>
+      <div class="perf-row">
+        <span class="perf-label">点数</span>
+        <span class="perf-value" id="perf-points">0</span>
+      </div>
+    </div>
+
+    <div id="control-panel">
+      <div class="panel-title">数据聚类可视化控制台</div>
+
+      <div class="control-group">
+        <div class="control-label">
+          <span>数据源</span>
+        </div>
+        <div class="btn-group">
+          <button id="btn-sample" class="primary">鸢尾花样本</button>
+          <button id="btn-random">随机数据</button>
+        </div>
+        <input type="file" id="csv-file" accept=".csv" style="margin-top: 10px;" />
+      </div>
+
+      <div class="control-group">
+        <div class="control-label">
+          <span>聚类算法</span>
+        </div>
+        <select id="algo-select">
+          <option value="kmeans">K-Means 聚类</option>
+          <option value="dbscan">DBSCAN 聚类</option>
+        </select>
+      </div>
+
+      <div class="control-group" id="kmeans-group">
+        <div class="control-label">
+          <span>聚类数量 K</span>
+          <span class="value" id="k-value">3</span>
+        </div>
+        <input type="range" id="k-slider" min="2" max="10" step="1" value="3" />
+      </div>
+
+      <div class="control-group" id="dbscan-group" style="display: none;">
+        <div class="control-label">
+          <span>Epsilon (邻域半径)</span>
+          <span class="value" id="epsilon-value">0.5</span>
+        </div>
+        <input type="range" id="epsilon-slider" min="0.1" max="2.0" step="0.05" value="0.5" />
+      </div>
+
+      <div class="control-group">
+        <div class="btn-group">
+          <button id="btn-toggle-perf">性能监控</button>
+          <button id="btn-reset" class="danger">重置视图</button>
+        </div>
+      </div>
+
+      <div class="stats-section">
+        <div class="stats-title">聚类统计摘要</div>
+        <div id="stats-container"></div>
+      </div>
+    </div>
+
+    <div id="selected-list">
+      <div id="selected-list-header">
+        <span id="selected-list-title">已选择的数据点</span>
+        <span id="selected-list-count">0</span>
+      </div>
+      <div id="selected-list-body"></div>
+    </div>
+
+    <div id="loading-overlay">
+      <div class="loader"></div>
+      <div class="loader-text">正在处理数据...</div>
+    </div>
+
+    <div id="tooltip"></div>
+
+    <div id="selection-box"></div>
+  </div>
+
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
