@@ -164,14 +164,23 @@ function App() {
     }
   }, []);
 
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < 960);
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
   return (
     <div style={{ display: 'flex', minHeight: '100vh', background: '#1a1a2e', color: '#e0e0e0' }}>
       <main
         style={{
           flex: 1,
-          minWidth: 780,
-          marginRight: 320,
-          padding: '32px 40px',
+          minWidth: isMobile ? 'auto' : 780,
+          marginRight: isMobile ? 0 : 320,
+          padding: isMobile ? '20px 16px 100px' : '32px 40px',
           overflowY: 'auto',
         }}
       >
@@ -207,7 +216,7 @@ function App() {
             <div
               style={{
                 display: 'grid',
-                gridTemplateColumns: 'repeat(3, 240px)',
+                gridTemplateColumns: isMobile ? 'repeat(auto-fill, minmax(200px, 1fr))' : 'repeat(3, 240px)',
                 gap: 24,
               }}
             >

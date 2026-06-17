@@ -28,28 +28,27 @@ function SongCard({ song, mood, index, isFavorite, onFeedback, onToggleFavorite 
   const handleFavorite = () => {
     setHeartAnimating(true);
     onToggleFavorite(song);
-    setTimeout(() => setHeartAnimating(false), 200);
+    setTimeout(() => setHeartAnimating(false), 250);
   };
 
   return (
     <>
       <style>{`
-        @keyframes cardEnter {
+        @keyframes cardEnter-${song.id} {
           from { opacity: 0; transform: translateY(20px); }
           to { opacity: 1; transform: translateY(0); }
         }
         @keyframes heartBounce {
           0% { transform: scale(1); }
-          50% { transform: scale(1.3); }
+          40% { transform: scale(1.3); }
+          70% { transform: scale(0.9); }
           100% { transform: scale(1); }
         }
         @keyframes feedbackBounce {
           0% { transform: scale(1); }
-          50% { transform: scale(1.4); }
+          40% { transform: scale(1.4); }
+          70% { transform: scale(0.85); }
           100% { transform: scale(1); }
-        }
-        .song-card-${song.id} {
-          animation: cardEnter 0.4s ease-out ${index * 50}ms both;
         }
         .song-card-${song.id}:hover {
           transform: translateY(-8px) !important;
@@ -69,6 +68,7 @@ function SongCard({ song, mood, index, isFavorite, onFeedback, onToggleFavorite 
           display: 'flex',
           flexDirection: 'column',
           position: 'relative',
+          animation: `cardEnter-${song.id} 0.4s ease-out ${index * 50}ms both`,
         }}
       >
         <div
