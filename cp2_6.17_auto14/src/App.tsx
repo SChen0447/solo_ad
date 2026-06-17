@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect } from 'react'
 import { Canvas } from '@react-three/fiber'
 import ParticleSystem from '@/components/ParticleSystem'
 import CameraController from '@/components/CameraController'
@@ -12,8 +12,8 @@ export default function App() {
   const setIsMobile = useStore((s) => s.setIsMobile)
   const setParticleCount = useStore((s) => s.setParticleCount)
   const emotionMode = useStore((s) => s.emotionMode)
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
-  const [mobileTab, setMobileTab] = useState<'emotion' | 'sliders'>('emotion')
+  const mobileMenuOpen = useStore((s) => s.mobileMenuOpen)
+  const toggleMobileMenu = useStore((s) => s.toggleMobileMenu)
 
   useEffect(() => {
     const handleResize = () => {
@@ -21,16 +21,14 @@ export default function App() {
       setIsMobile(mobile)
       if (mobile) {
         setParticleCount(500)
+      } else {
+        setParticleCount(1000)
       }
     }
     window.addEventListener('resize', handleResize)
     handleResize()
     return () => window.removeEventListener('resize', handleResize)
   }, [setIsMobile, setParticleCount])
-
-  const toggleMobileMenu = useCallback(() => {
-    setMobileMenuOpen((v) => !v)
-  }, [])
 
   return (
     <div style={{ width: '100vw', height: '100vh', background: '#000', position: 'relative' }}>
@@ -46,64 +44,18 @@ export default function App() {
         <CameraController />
       </Canvas>
 
-      <EmotionPanel />
-      <SliderPanel />
+      <EmotionPanel mobileOpen={isMobile && mobileMenuOpen} />
+      <SliderPanel mobileOpen={isMobile && mobileMenuOpen} />
       <ViewIndicator />
 
       {isMobile && (
-        <>
-          <button
-            className="mobile-menu-btn glass"
-            onClick={toggleMobileMenu}
-            style={{ color: EMOTION_CONFIGS[emotionMode].hex }}
-          >
-            {mobileMenuOpen ? '✕' : '☰'}
-          </button>
-          {mobileMenuOpen && (
-            <div
-              style={{
-                position: 'fixed',
-                bottom: '90px',
-                left: '50%',
-                transform: 'translateX(-50%)',
-                display: 'flex',
-                gap: '8px',
-                zIndex: 25,
-              }}
-            >
-              <button
-                className="glass"
-                style={{
-                  padding: '6px 16px',
-                  borderRadius: '20px',
-                  border: 'none',
-                  color: '#fff',
-                  cursor: 'pointer',
-                  opacity: mobileTab === 'emotion' ? 1 : 0.5,
-                  fontSize: '12px',
-                }}
-                onClick={() => setMobileTab('emotion')}
-              >
-                情绪
-              </button>
-              <button
-                className="glass"
-                style={{
-                  padding: '6px 16px',
-                  borderRadius: '20px',
-                  border: 'none',
-                  color: '#fff',
-                  cursor: 'pointer',
-                  opacity: mobileTab === 'sliders' ? 1 : 0.5,
-                  fontSize: '12px',
-                }}
-                onClick={() => setMobileTab('sliders')}
-              >
-                调节
-              </button>
-            </div>
-          )}
-        </>
+        <button
+          className="mobile-menu-btn glass"
+          onClick={toggleMobileMenu}
+          style={{ color: EMOTION_CONFIGS[emotionMode].hex }}
+        >
+          {mobileMenuOpen ? '✕' : '☰'}
+        </button>
       )}
     </div>
   )

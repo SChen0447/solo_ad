@@ -1,9 +1,13 @@
-import { useCallback, useRef } from 'react'
+import { useCallback } from 'react'
 import { useStore, EMOTION_CONFIGS, EmotionMode } from '@/store/useStore'
 
 const EMOTIONS: EmotionMode[] = ['joy', 'calm', 'sorrow', 'fervor']
 
-export default function EmotionPanel() {
+interface EmotionPanelProps {
+  mobileOpen: boolean
+}
+
+export default function EmotionPanel({ mobileOpen }: EmotionPanelProps) {
   const emotionMode = useStore((s) => s.emotionMode)
   const setEmotionMode = useStore((s) => s.setEmotionMode)
 
@@ -25,7 +29,7 @@ export default function EmotionPanel() {
   )
 
   return (
-    <div className="emotion-panel glass">
+    <div className={`emotion-panel glass ${mobileOpen ? 'mobile-open' : ''}`}>
       {EMOTIONS.map((mode) => {
         const cfg = EMOTION_CONFIGS[mode]
         return (

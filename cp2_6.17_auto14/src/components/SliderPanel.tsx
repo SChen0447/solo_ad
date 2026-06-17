@@ -1,6 +1,10 @@
 import { useStore, EMOTION_CONFIGS } from '@/store/useStore'
 
-export default function SliderPanel() {
+interface SliderPanelProps {
+  mobileOpen: boolean
+}
+
+export default function SliderPanel({ mobileOpen }: SliderPanelProps) {
   const particleCount = useStore((s) => s.particleCount)
   const particleSize = useStore((s) => s.particleSize)
   const motionSpeed = useStore((s) => s.motionSpeed)
@@ -12,7 +16,10 @@ export default function SliderPanel() {
   const themeColor = EMOTION_CONFIGS[emotionMode].hex
 
   return (
-    <div className="slider-panel glass" style={{ '--slider-color': themeColor } as React.CSSProperties}>
+    <div
+      className={`slider-panel glass ${mobileOpen ? 'mobile-open' : ''}`}
+      style={{ '--slider-color': themeColor } as React.CSSProperties}
+    >
       <div className="slider-group">
         <label>
           粒子数量 <span>{particleCount}</span>
