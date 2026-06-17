@@ -38,7 +38,7 @@ const PlatformPreview: React.FC<PlatformPreviewProps> = ({ material }) => {
         wechat: null,
       };
       results.forEach((v) => {
-        newValidations[v.platform] = v;
+        newValidations[v.platform as PlatformType] = v;
       });
       setValidations(newValidations);
     };

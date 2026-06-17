@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { Calendar, dateFnsLocalizer, Views } from 'react-big-calendar';
+import { Calendar, dateFnsLocalizer, Views, View } from 'react-big-calendar';
 import { format, parse, startOfWeek, getDay, isSameDay, startOfDay, addDays } from 'date-fns';
 import zhCN from 'date-fns/locale/zh-CN';
 import 'react-big-calendar/lib/css/react-big-calendar.css';
@@ -38,7 +38,7 @@ const CalendarView: React.FC = () => {
   const [selectedDate, setSelectedDate] = useState<Date | null>(new Date());
   const [showModal, setShowModal] = useState(false);
   const [editingSchedule, setEditingSchedule] = useState<Schedule | null>(null);
-  const [view, setView] = useState(Views.MONTH);
+  const [view, setView] = useState<View>(Views.MONTH);
   const [isMobile, setIsMobile] = useState(false);
   const calendarRef = useRef<HTMLDivElement>(null);
   const [draggedId, setDraggedId] = useState<string | null>(null);
@@ -269,7 +269,6 @@ const CalendarView: React.FC = () => {
           selectable
           onSelectSlot={handleSelectSlot}
           onSelectEvent={handleSelectEvent}
-          onEventDrop={handleEventDrop}
           dayPropGetter={dayPropGetter}
           eventPropGetter={eventPropGetter}
           components={components}
@@ -287,6 +286,10 @@ const CalendarView: React.FC = () => {
             noEventsInRange: '暂无排期',
           }}
           culture="zh-CN"
+          {...({
+            draggable: true,
+            onEventDrop: handleEventDrop,
+          } as any)}
         />
       </div>
 
