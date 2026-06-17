@@ -1,3 +1,5 @@
+export type ObjectTag = 'glowing' | 'particle';
+
 export interface SceneObject {
   id: string;
   type: string;
@@ -10,6 +12,7 @@ export interface SceneObject {
   emissiveIntensity?: number;
   count?: number;
   children?: SceneObject[];
+  tags?: ObjectTag[];
 }
 
 export interface SceneData {
@@ -91,6 +94,7 @@ class TextParser {
         if (isGlowing) {
           tree.emissive = isBlue ? '#00aaff' : '#44ff88';
           tree.emissiveIntensity = 0.6;
+          tree.tags = ['glowing'];
           if (tree.children) {
             tree.children[0].emissive = tree.emissive;
             tree.children[0].emissiveIntensity = 0.5;
@@ -128,6 +132,7 @@ class TextParser {
             rotation: { x: 0, y: 0, z: 0 },
             emissive: '#aaff66',
             emissiveIntensity: 1.2,
+            tags: ['glowing', 'particle'],
           });
         }
         return particles;
