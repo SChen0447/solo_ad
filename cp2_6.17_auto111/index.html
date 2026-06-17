@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>建筑日照光影模拟器</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background-color: #1a1a2e;
+      font-family: 'Inter', sans-serif;
+      color: #ffffff;
+    }
+
+    #app {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* 顶部控制面板 */
+    .control-panel {
+      height: 60px;
+      min-height: 60px;
+      background-color: #16213e;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 32px;
+      padding: 0 24px;
+      border-bottom: 1px solid rgba(233, 69, 96, 0.2);
+      box-shadow: 0 2px 20px rgba(15, 52, 96, 0.5);
+    }
+
+    .control-group {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .control-label {
+      font-size: 14px;
+      font-weight: 500;
+      color: #ffffff;
+      white-space: nowrap;
+      min-width: 70px;
+    }
+
+    .control-value {
+      font-size: 14px;
+      font-weight: 600;
+      color: #e94560;
+      min-width: 50px;
+      text-align: right;
+      text-shadow: 0 0 10px rgba(233, 69, 96, 0.5);
+    }
+
+    /* 自定义滑块 */
+    input[type="range"] {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 160px;
+      height: 6px;
+      border-radius: 3px;
+      background: linear-gradient(90deg, #0f3460, #533483);
+      outline: none;
+      cursor: pointer;
+    }
+
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: #e94560;
+      cursor: pointer;
+      box-shadow: 0 0 12px rgba(233, 69, 96, 0.8);
+      transition: all 0.2s ease;
+    }
+
+    input[type="range"]::-webkit-slider-thumb:hover {
+      background: #ff6b6b;
+      transform: scale(1.1);
+      box-shadow: 0 0 20px rgba(255, 107, 107, 1);
+    }
+
+    input[type="range"]::-moz-range-thumb {
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: #e94560;
+      cursor: pointer;
+      border: none;
+      box-shadow: 0 0 12px rgba(233, 69, 96, 0.8);
+      transition: all 0.2s ease;
+    }
+
+    input[type="range"]::-moz-range-thumb:hover {
+      background: #ff6b6b;
+      transform: scale(1.1);
+      box-shadow: 0 0 20px rgba(255, 107, 107, 1);
+    }
+
+    /* 场景容器 */
+    .scene-container {
+      flex: 1;
+      position: relative;
+      overflow: hidden;
+    }
+
+    #main-canvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    /* 交互反馈光晕 */
+    .update-glow {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      opacity: 0;
+      background: radial-gradient(circle at center, rgba(255, 200, 100, 0.15) 0%, transparent 70%);
+      transition: opacity 0.3s ease-out;
+    }
+
+    .update-glow.active {
+      opacity: 1;
+    }
+
+    /* 辅助俯视图 */
+    .minimap {
+      position: absolute;
+      bottom: 56px;
+      right: 20px;
+      width: 200px;
+      height: 200px;
+      border: 2px solid #ffffff;
+      border-radius: 8px;
+      overflow: hidden;
+      box-shadow: 0 0 20px rgba(83, 52, 131, 0.6);
+    }
+
+    #minimap-canvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+      background-color: #16213e;
+    }
+
+    .minimap-label {
+      position: absolute;
+      top: 4px;
+      left: 8px;
+      font-size: 10px;
+      color: rgba(255, 255, 255, 0.7);
+      pointer-events: none;
+      font-weight: 600;
+    }
+
+    /* 底部信息栏 */
+    .info-bar {
+      height: 40px;
+      min-height: 40px;
+      background-color: #0f3460;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 48px;
+      padding: 0 24px;
+      border-top: 1px solid rgba(83, 52, 131, 0.3);
+    }
+
+    .info-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .info-label {
+      font-size: 13px;
+      color: rgba(255, 255, 255, 0.7);
+    }
+
+    .info-datetime {
+      font-size: 14px;
+      font-weight: 600;
+      color: #ffffff;
+    }
+
+    .info-intensity {
+      font-size: 14px;
+      font-weight: 600;
+      color: #00ff88;
+      text-shadow: 0 0 10px rgba(0, 255, 136, 0.5);
+    }
+
+    /* 响应式：小屏幕 */
+    @media (max-width: 768px) {
+      .control-panel {
+        height: auto;
+        flex-direction: column;
+        gap: 12px;
+        padding: 12px 16px;
+      }
+
+      .control-group {
+        width: 100%;
+        justify-content: space-between;
+      }
+
+      input[type="range"] {
+        width: 140px;
+        flex: 1;
+      }
+
+      .control-label {
+        min-width: 60px;
+        font-size: 12px;
+      }
+
+      .control-value {
+        font-size: 12px;
+        min-width: 40px;
+      }
+
+      .minimap {
+        width: 140px;
+        height: 140px;
+        bottom: 48px;
+        right: 12px;
+      }
+
+      .info-bar {
+        gap: 24px;
+        padding: 0 12px;
+      }
+
+      .info-datetime, .info-intensity {
+        font-size: 12px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <header class="control-panel" id="control-panel">
+      <div class="control-group">
+        <span class="control-label">方位角</span>
+        <input type="range" id="azimuth-slider" min="0" max="360" value="180" step="1" />
+        <span class="control-value" id="azimuth-value">180°</span>
+      </div>
+      <div class="control-group">
+        <span class="control-label">高度角</span>
+        <input type="range" id="altitude-slider" min="0" max="90" value="45" step="1" />
+        <span class="control-value" id="altitude-value">45°</span>
+      </div>
+      <div class="control-group">
+        <span class="control-label">月份</span>
+        <input type="range" id="month-slider" min="1" max="12" value="6" step="1" />
+        <span class="control-value" id="month-value">6月</span>
+      </div>
+    </header>
+
+    <div class="scene-container">
+      <canvas id="main-canvas"></canvas>
+      <div class="update-glow" id="update-glow"></div>
+      <div class="minimap">
+        <span class="minimap-label">俯视图</span>
+        <canvas id="minimap-canvas"></canvas>
+      </div>
+    </div>
+
+    <footer class="info-bar">
+      <div class="info-item">
+        <span class="info-label">模拟时间：</span>
+        <span class="info-datetime" id="datetime-display">2024年06月15日 12:00</span>
+      </div>
+      <div class="info-item">
+        <span class="info-label">光照强度：</span>
+        <span class="info-intensity" id="intensity-display">50%</span>
+      </div>
+    </footer>
+  </div>
+
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
