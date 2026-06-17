@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>交互式分子结构查看器</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+      color: #e0e0ff;
+    }
+
+    #app {
+      width: 100%;
+      height: 100%;
+      position: relative;
+      background: linear-gradient(135deg, #0b0d17 0%, #1a1f33 100%);
+      transition: background 0.5s ease;
+    }
+
+    #start-screen {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+      background: linear-gradient(135deg, #0b0d17 0%, #1a1f33 100%);
+      transition: opacity 0.6s ease, visibility 0.6s ease;
+    }
+
+    #start-screen.hidden {
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+    }
+
+    .glow-title {
+      font-size: 48px;
+      font-weight: 700;
+      letter-spacing: 4px;
+      margin-bottom: 16px;
+      background: linear-gradient(90deg, #4a6cf7, #8b5cf6, #4a6cf7);
+      background-size: 200% auto;
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      animation: shimmer 3s linear infinite;
+      text-shadow: 0 0 40px rgba(74, 108, 247, 0.5);
+    }
+
+    @keyframes shimmer {
+      to { background-position: 200% center; }
+    }
+
+    .subtitle {
+      font-size: 16px;
+      color: #8a8db0;
+      margin-bottom: 60px;
+      letter-spacing: 2px;
+    }
+
+    .start-btn {
+      padding: 14px 48px;
+      font-size: 16px;
+      color: #4a6cf7;
+      background: transparent;
+      border: 2px solid #4a6cf7;
+      border-radius: 8px;
+      cursor: pointer;
+      letter-spacing: 3px;
+      transition: all 0.2s ease;
+      box-shadow: 0 0 20px rgba(74, 108, 247, 0.3);
+    }
+
+    .start-btn:hover {
+      background: #4a6cf7;
+      color: #ffffff;
+      box-shadow: 0 0 40px rgba(74, 108, 247, 0.6);
+      transform: translateY(-2px);
+    }
+
+    #canvas-container {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+    }
+
+    #panel {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      width: 300px;
+      max-height: calc(100% - 40px);
+      background: rgba(30, 32, 51, 0.75);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      border-radius: 12px;
+      border: 1px solid rgba(74, 108, 247, 0.2);
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      overflow-y: auto;
+      z-index: 10;
+      transition: all 0.3s ease;
+    }
+
+    .panel-section {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .panel-title {
+      font-size: 12px;
+      color: #8a8db0;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      margin-bottom: 4px;
+    }
+
+    .molecule-select {
+      width: 100%;
+      padding: 10px 12px;
+      background: rgba(11, 13, 23, 0.8);
+      border: 1px solid rgba(74, 108, 247, 0.4);
+      border-radius: 6px;
+      color: #e0e0ff;
+      font-size: 14px;
+      cursor: pointer;
+      outline: none;
+      transition: border-color 0.2s ease;
+    }
+
+    .molecule-select:hover,
+    .molecule-select:focus {
+      border-color: #4a6cf7;
+    }
+
+    .info-card {
+      background: rgba(11, 13, 23, 0.6);
+      border-radius: 8px;
+      padding: 12px;
+      min-height: 80px;
+      transition: all 0.3s ease;
+    }
+
+    .info-card.empty {
+      opacity: 0.5;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      color: #8a8db0;
+    }
+
+    .info-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 4px 0;
+      font-size: 13px;
+    }
+
+    .info-label {
+      color: #8a8db0;
+    }
+
+    .info-value {
+      color: #e0e0ff;
+      font-weight: 500;
+    }
+
+    .element-badge {
+      display: inline-block;
+      width: 32px;
+      height: 32px;
+      line-height: 32px;
+      text-align: center;
+      border-radius: 50%;
+      font-weight: 700;
+      font-size: 14px;
+      margin-right: 8px;
+      vertical-align: middle;
+    }
+
+    .tool-buttons {
+      display: flex;
+      gap: 8px;
+    }
+
+    .tool-btn {
+      flex: 1;
+      padding: 10px;
+      font-size: 13px;
+      color: #4a6cf7;
+      background: transparent;
+      border: 1px solid #4a6cf7;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      letter-spacing: 1px;
+    }
+
+    .tool-btn:hover {
+      background: #4a6cf7;
+      color: #ffffff;
+    }
+
+    .tool-btn.active {
+      background: #4a6cf7;
+      color: #ffffff;
+      box-shadow: 0 0 15px rgba(74, 108, 247, 0.5);
+    }
+
+    .snapshot-list {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      max-height: 180px;
+      overflow-y: auto;
+    }
+
+    .snapshot-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 12px;
+      background: rgba(11, 13, 23, 0.6);
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      font-size: 13px;
+    }
+
+    .snapshot-item:hover {
+      background: rgba(74, 108, 247, 0.2);
+      transform: translateX(-2px);
+    }
+
+    .snapshot-index {
+      width: 24px;
+      height: 24px;
+      line-height: 24px;
+      text-align: center;
+      background: #4a6cf7;
+      border-radius: 50%;
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .snapshot-clear {
+      opacity: 0.4;
+      transition: opacity 0.2s ease;
+      padding: 4px;
+    }
+
+    .snapshot-clear:hover {
+      opacity: 1;
+      color: #ff6b6b;
+    }
+
+    #camera-btn {
+      position: absolute;
+      bottom: 24px;
+      right: 24px;
+      width: 52px;
+      height: 52px;
+      border-radius: 50%;
+      background: rgba(30, 32, 51, 0.85);
+      backdrop-filter: blur(10px);
+      border: 2px solid #4a6cf7;
+      color: #4a6cf7;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 22px;
+      transition: all 0.2s ease;
+      z-index: 10;
+      box-shadow: 0 0 20px rgba(74, 108, 247, 0.3);
+    }
+
+    #camera-btn:hover {
+      background: #4a6cf7;
+      color: #ffffff;
+      box-shadow: 0 0 30px rgba(74, 108, 247, 0.6);
+      transform: scale(1.05);
+    }
+
+    #measurement-info {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      background: rgba(30, 32, 51, 0.85);
+      backdrop-filter: blur(10px);
+      border-radius: 8px;
+      padding: 12px 16px;
+      font-size: 13px;
+      z-index: 10;
+      display: none;
+      border: 1px solid rgba(74, 108, 247, 0.3);
+      max-width: 280px;
+    }
+
+    #measurement-info.visible {
+      display: block;
+    }
+
+    #measurement-info .hint {
+      color: #8a8db0;
+      font-size: 11px;
+      margin-bottom: 8px;
+      letter-spacing: 1px;
+    }
+
+    #measurement-info .result-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 3px 0;
+    }
+
+    #measurement-info .result-label {
+      color: #8a8db0;
+    }
+
+    #measurement-info .result-value {
+      font-weight: 600;
+    }
+
+    .dist-1 { color: #60a5fa; }
+    .dist-2 { color: #fbbf24; }
+    .angle-val { color: #a78bfa; }
+
+    @media (max-width: 768px) {
+      #panel {
+        top: auto;
+        bottom: 0;
+        right: 0;
+        left: 0;
+        width: 100%;
+        max-height: 60px;
+        border-radius: 16px 16px 0 0;
+        overflow: hidden;
+        padding: 0;
+        cursor: pointer;
+      }
+
+      #panel.expanded {
+        max-height: 70vh;
+        overflow-y: auto;
+        padding: 20px;
+        cursor: default;
+      }
+
+      #panel::before {
+        content: '';
+        display: block;
+        width: 40px;
+        height: 4px;
+        background: rgba(138, 141, 176, 0.4);
+        border-radius: 2px;
+        margin: 10px auto 0;
+      }
+
+      #panel.expanded::before {
+        margin-bottom: 16px;
+      }
+
+      .glow-title {
+        font-size: 28px;
+      }
+
+      #camera-btn {
+        bottom: 80px;
+        right: 16px;
+      }
+    }
+
+    ::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: rgba(74, 108, 247, 0.3);
+      border-radius: 3px;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+      background: rgba(74, 108, 247, 0.5);
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <div id="start-screen">
+      <h1 class="glow-title">分子结构查看器</h1>
+      <p class="subtitle">Molecular Structure Viewer · 探索微观世界</p>
+      <button class="start-btn" id="start-btn">开 始 探 索</button>
+    </div>
+
+    <div id="canvas-container"></div>
+
+    <div id="measurement-info">
+      <div class="hint" id="measurement-hint">点击原子开始测量</div>
+      <div id="measurement-results"></div>
+    </div>
+
+    <div id="panel">
+      <div class="panel-section">
+        <div class="panel-title">分子库</div>
+        <select class="molecule-select" id="molecule-select"></select>
+      </div>
+
+      <div class="panel-section">
+        <div class="panel-title">原子信息</div>
+        <div class="info-card empty" id="atom-info">
+          悬停原子查看详情
+        </div>
+      </div>
+
+      <div class="panel-section">
+        <div class="panel-title">测量工具</div>
+        <div class="tool-buttons">
+          <button class="tool-btn" id="measure-btn">📏 测量模式</button>
+        </div>
+      </div>
+
+      <div class="panel-section">
+        <div class="panel-title">视角快照 <span style="float:right;color:#8a8db0;font-weight:400;" id="snapshot-count">(0/5)</span></div>
+        <div class="snapshot-list" id="snapshot-list"></div>
+      </div>
+    </div>
+
+    <button id="camera-btn" title="保存当前视角">📷</button>
+  </div>
+
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
