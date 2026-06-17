@@ -1,0 +1,83 @@
+.code-editor {
+  display: flex;
+  flex-direction: column;
+  background: #FFFFFF;
+  border: 1px solid #E0E0E0;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.editor-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 14px;
+  background: #FAFAFA;
+  border-bottom: 1px solid #E0E0E0;
+}
+
+.editor-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #333;
+}
+
+.editor-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.btn-upload,
+.btn-submit {
+  padding: 6px 14px;
+  border-radius: 8px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: none;
+}
+
+.btn-upload {
+  background: #F0F0F0;
+  color: #666;
+}
+
+.btn-upload:hover {
+  background: #E0E0E0;
+}
+
+.btn-submit {
+  background: #1A237E;
+  color: white;
+}
+
+.btn-submit:hover:not(:disabled) {
+  background: #283593;
+}
+
+.btn-submit:disabled {
+  background: #CCC;
+  cursor: not-allowed;
+}
+
+.editor-textarea {
+  flex: 1;
+  padding: 14px;
+  border: none;
+  outline: none;
+  resize: none;
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-size: 13px;
+  line-height: 1.6;
+  color: #333;
+  background: #FFFFFF;
+  min-height: 120px;
+}
+
+.editor-textarea::placeholder {
+  color: #BBB;
+}
+
+.hidden-file-input {
+  display: none;
+}
