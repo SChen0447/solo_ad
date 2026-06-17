@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
-import { AudioAnalyzer, type AudioAnalysisData } from './AudioAnalyzer';
-import { ParticleSystem, type VisualizationMode } from './ParticleSystem';
+import { AudioAnalyzer } from './AudioAnalyzer';
+import { ParticleSystem } from './ParticleSystem';
 import { ModeSelector } from './ModeSelector';
+import type { AudioData, VisualizationMode } from './types';
 
 export default function App() {
   const canvasContainerRef = useRef<HTMLDivElement>(null);
@@ -13,7 +14,7 @@ export default function App() {
   const controlsRef = useRef<OrbitControls | null>(null);
   const particleSystemRef = useRef<ParticleSystem | null>(null);
   const audioAnalyzerRef = useRef<AudioAnalyzer | null>(null);
-  const lastAnalysisRef = useRef<AudioAnalysisData | null>(null);
+  const lastAnalysisRef = useRef<AudioData | null>(null);
   const rafIdRef = useRef<number | null>(null);
   const clockRef = useRef<THREE.Clock>(new THREE.Clock());
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -99,7 +100,7 @@ export default function App() {
     }
   }, [mode]);
 
-  const handleAnalysis = useCallback((data: AudioAnalysisData) => {
+  const handleAnalysis = useCallback((data: AudioData) => {
     lastAnalysisRef.current = data;
   }, []);
 
@@ -170,13 +171,14 @@ export default function App() {
 
       <div ref={canvasContainerRef} style={styles.canvasContainer} />
 
-      <div style={styles.bottomBar}>
-        <div style={styles.bottomContent}>
+      <div style={styles.bottomBar} className="bottom-bar">
+        <div style={styles.bottomContent} className="bottom-content">
           <div
             style={{
               ...styles.uploadArea,
               ...(isDragOver ? styles.uploadAreaActive : {}),
             }}
+            className="upload-area"
             onDrop={handleDrop}
             onDragOver={handleDragOver}
             onDragLeave={handleDragLeave}
@@ -210,6 +212,23 @@ export default function App() {
           <ModeSelector currentMode={mode} onModeChange={setMode} />
         </div>
       </div>
+
+      <style>{`
+        @media (max-width: 768px) {
+          .bottom-content {
+            flex-direction: column !important;
+            gap: 20px !important;
+            padding: 16px 20px !important;
+          }
+          .upload-area {
+            width: 280px !important;
+            height: 160px !important;
+          }
+          .bottom-bar {
+            bottom: 10px !important;
+          }
+        }
+      `}</style>
     </div>
   );
 }
@@ -230,7 +249,7 @@ const styles: Record<string, React.CSSProperties> = {
     position: 'fixed',
     top: '20px',
     left: '20px',
-    zIndex: 10,
+    zIndex: 100,
     backgroundColor: 'rgba(0, 0, 0, 0.4)',
     padding: '10px 20px',
     borderRadius: '8px',
@@ -247,6 +266,7 @@ const styles: Record<string, React.CSSProperties> = {
     left: 0,
     width: '100%',
     height: '100%',
+    zIndex: 1,
   },
   bottomBar: {
     position: 'fixed',
@@ -255,7 +275,7 @@ const styles: Record<string, React.CSSProperties> = {
     width: '100%',
     display: 'flex',
     justifyContent: 'center',
-    zIndex: 10,
+    zIndex: 100,
     pointerEvents: 'none',
   },
   bottomContent: {
@@ -343,39 +363,3 @@ const styles: Record<string, React.CSSProperties> = {
     textAlign: 'center',
   },
 };
-
-const responsiveStyles = `
-  @media (max-width: 768px) {
-    div[style*="bottomContent"] {
-      flex-direction: column !important;
-      gap: 20px !important;
-      padding: 16px 20px !important;
-    }
-    div[style*="uploadArea"] {
-      width: 280px !important;
-      height: 160px !important;
-    }
-    div[style*="uploadTitle"] {
-      font-size: 12px !important;
-    }
-    div[style*="uploadHint"] {
-      font-size: 11px !important;
-    }
-    div[style*="uploadIcon"] {
-      font-size: 36px !important;
-    }
-    span[style*="titleText"] {
-      font-size: 14px !important;
-      letter-spacing: 1px !important;
-    }
-    div[style*="title"] {
-      padding: 8px 14px !important;
-      top: 12px !important;
-      left: 12px !important;
-    }
-  }
-`;
-
-const styleEl = document.createElement('style');
-styleEl.textContent = responsiveStyles;
-document.head.appendChild(styleEl);

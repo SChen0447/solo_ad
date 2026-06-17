@@ -1,4 +1,4 @@
-import type { VisualizationMode } from './ParticleSystem';
+import type { VisualizationMode } from './types';
 
 interface ModeSelectorProps {
   currentMode: VisualizationMode;

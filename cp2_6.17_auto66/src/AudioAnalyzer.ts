@@ -1,13 +1,4 @@
-export interface AudioAnalysisData {
-  frequencyData: Uint8Array;
-  timeDomainData: Uint8Array;
-  lowFrequency: number;
-  midFrequency: number;
-  highFrequency: number;
-  averageSpectrum: number;
-}
-
-export type AnalysisCallback = (data: AudioAnalysisData) => void;
+import type { AudioData, AnalysisCallback } from './types';
 
 const FFT_SIZE = 2048;
 const SAMPLE_RATE = 44100;
@@ -25,10 +16,12 @@ const freqToBin = (freq: number): number => Math.floor(freq / BIN_SIZE);
 export class AudioAnalyzer {
   private audioContext: AudioContext | null = null;
   private analyser: AnalyserNode | null = null;
-  private source: AudioBufferSourceNode | MediaElementAudioSourceNode | null = null;
+  private source: AudioBufferSourceNode | null = null;
   private audioBuffer: AudioBuffer | null = null;
-  private frequencyData: Uint8Array;
-  private timeDomainData: Uint8Array;
+  private byteFrequencyData: Uint8Array;
+  private byteTimeDomainData: Uint8Array;
+  private normalizedFrequencyData: Float32Array;
+  private normalizedTimeDomainData: Float32Array;
   private animationId: number | null = null;
   private onAnalysis: AnalysisCallback;
   private _isPlaying = false;
@@ -38,8 +31,10 @@ export class AudioAnalyzer {
 
   constructor(onAnalysis: AnalysisCallback) {
     this.onAnalysis = onAnalysis;
-    this.frequencyData = new Uint8Array(FFT_SIZE / 2);
-    this.timeDomainData = new Uint8Array(FFT_SIZE / 2);
+    this.byteFrequencyData = new Uint8Array(FFT_SIZE / 2);
+    this.byteTimeDomainData = new Uint8Array(FFT_SIZE / 2);
+    this.normalizedFrequencyData = new Float32Array(FFT_SIZE / 2);
+    this.normalizedTimeDomainData = new Float32Array(FFT_SIZE / 2);
   }
 
   get isPlaying(): boolean {
@@ -77,8 +72,10 @@ export class AudioAnalyzer {
     const arrayBuffer = await file.arrayBuffer();
     this.audioBuffer = await this.audioContext.decodeAudioData(arrayBuffer);
 
-    this.frequencyData = new Uint8Array(this.analyser.frequencyBinCount);
-    this.timeDomainData = new Uint8Array(this.analyser.frequencyBinCount);
+    this.byteFrequencyData = new Uint8Array(this.analyser.frequencyBinCount);
+    this.byteTimeDomainData = new Uint8Array(this.analyser.frequencyBinCount);
+    this.normalizedFrequencyData = new Float32Array(this.analyser.frequencyBinCount);
+    this.normalizedTimeDomainData = new Float32Array(this.analyser.frequencyBinCount);
   }
 
   play(): void {
@@ -143,29 +140,36 @@ export class AudioAnalyzer {
     const analyze = () => {
       if (!this.analyser) return;
 
-      this.analyser.getByteFrequencyData(this.frequencyData);
-      this.analyser.getByteTimeDomainData(this.timeDomainData);
+      this.analyser.getByteFrequencyData(this.byteFrequencyData);
+      this.analyser.getByteTimeDomainData(this.byteTimeDomainData);
+
+      for (let i = 0; i < this.byteFrequencyData.length; i++) {
+        this.normalizedFrequencyData[i] = this.byteFrequencyData[i] / 255;
+        this.normalizedTimeDomainData[i] = (this.byteTimeDomainData[i] - 128) / 128;
+      }
 
       const lowBinStart = freqToBin(LOW_FREQ_START);
-      const lowBinEnd = Math.min(freqToBin(LOW_FREQ_END), this.frequencyData.length - 1);
+      const lowBinEnd = Math.min(freqToBin(LOW_FREQ_END), this.normalizedFrequencyData.length - 1);
       const midBinStart = freqToBin(MID_FREQ_START);
-      const midBinEnd = Math.min(freqToBin(MID_FREQ_END), this.frequencyData.length - 1);
+      const midBinEnd = Math.min(freqToBin(MID_FREQ_END), this.normalizedFrequencyData.length - 1);
       const highBinStart = freqToBin(HIGH_FREQ_START);
-      const highBinEnd = Math.min(freqToBin(HIGH_FREQ_END), this.frequencyData.length - 1);
+      const highBinEnd = Math.min(freqToBin(HIGH_FREQ_END), this.normalizedFrequencyData.length - 1);
 
-      const lowFrequency = this.averageRange(this.frequencyData, lowBinStart, lowBinEnd) / 255;
-      const midFrequency = this.averageRange(this.frequencyData, midBinStart, midBinEnd) / 255;
-      const highFrequency = this.averageRange(this.frequencyData, highBinStart, highBinEnd) / 255;
-      const averageSpectrum = this.averageRange(this.frequencyData, 0, this.frequencyData.length - 1) / 255;
+      const lowFrequency = this.averageRange(this.normalizedFrequencyData, lowBinStart, lowBinEnd);
+      const midFrequency = this.averageRange(this.normalizedFrequencyData, midBinStart, midBinEnd);
+      const highFrequency = this.averageRange(this.normalizedFrequencyData, highBinStart, highBinEnd);
+      const averageSpectrum = this.averageRange(this.normalizedFrequencyData, 0, this.normalizedFrequencyData.length - 1);
 
-      this.onAnalysis({
-        frequencyData: this.frequencyData,
-        timeDomainData: this.timeDomainData,
+      const audioData: AudioData = {
+        frequencyData: this.normalizedFrequencyData,
+        timeDomainData: this.normalizedTimeDomainData,
         lowFrequency,
         midFrequency,
         highFrequency,
         averageSpectrum,
-      });
+      };
+
+      this.onAnalysis(audioData);
 
       if (this._isPlaying) {
         this.animationId = requestAnimationFrame(analyze);
@@ -182,7 +186,7 @@ export class AudioAnalyzer {
     }
   }
 
-  private averageRange(data: Uint8Array, start: number, end: number): number {
+  private averageRange(data: Float32Array, start: number, end: number): number {
     if (start > end) return 0;
     let sum = 0;
     for (let i = start; i <= end; i++) {
