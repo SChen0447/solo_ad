@@ -331,11 +331,12 @@ class StarSandbox {
 
     const geometry = new THREE.BufferGeometry().setFromPoints(points);
     const material = new THREE.LineDashedMaterial({
-      color: 0x4ecdc4,
-      dashSize: 1,
-      gapSize: 0.5,
+      color: 0xffffff,
+      dashSize: 1.2,
+      gapSize: 0.6,
       transparent: true,
-      opacity: 0.8,
+      opacity: 0.55,
+      linewidth: 2,
     });
 
     this.previewLine = new THREE.Line(geometry, material);

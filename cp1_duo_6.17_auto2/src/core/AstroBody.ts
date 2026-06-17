@@ -28,6 +28,11 @@ export class AstroBody {
 
   private static bodyCount = 0;
 
+  private haloBasePositions?: Float32Array;
+  private haloSizes?: Float32Array;
+  private haloPulsePhase: number = 0;
+  private glowPulsePhase: number = 0;
+
   constructor(config: BodyConfig, scene: THREE.Scene) {
     this.id = config.id || `body_${Date.now()}_${AstroBody.bodyCount++}`;
     this.type = config.type;
@@ -46,6 +51,9 @@ export class AstroBody {
     );
     this.acceleration = new THREE.Vector3(0, 0, 0);
     this.userData = { isBody: true, body: this };
+
+    this.haloPulsePhase = Math.random() * Math.PI * 2;
+    this.glowPulsePhase = Math.random() * Math.PI * 2;
 
     this.mesh = this.createMesh();
     this.mesh.position.copy(this.position);
@@ -66,8 +74,12 @@ export class AstroBody {
 
     let material: THREE.Material;
     if (this.type === 'star') {
-      material = new THREE.MeshBasicMaterial({
+      material = new THREE.MeshStandardMaterial({
         color: colorObj,
+        emissive: colorObj,
+        emissiveIntensity: 1.5,
+        roughness: 0.2,
+        metalness: 0.1,
       });
     } else {
       material = new THREE.MeshStandardMaterial({
@@ -84,35 +96,55 @@ export class AstroBody {
   }
 
   private createStarEffects(): void {
-    const glowGeometry = new THREE.SphereGeometry(this.radius * 1.5, 32, 32);
+    const glowGeometry = new THREE.SphereGeometry(this.radius * 1.6, 32, 32);
     const glowMaterial = new THREE.MeshBasicMaterial({
       color: new THREE.Color(this.color),
       transparent: true,
-      opacity: 0.3,
+      opacity: 0.35,
       side: THREE.BackSide,
+      blending: THREE.AdditiveBlending,
     });
     this.glowMesh = new THREE.Mesh(glowGeometry, glowMaterial);
     this.glowMesh.position.copy(this.position);
 
     const particleCount = 100;
     const positions = new Float32Array(particleCount * 3);
+    this.haloBasePositions = new Float32Array(particleCount * 3);
+    this.haloSizes = new Float32Array(particleCount);
+
+    const haloColor = new THREE.Color('#FFF4B8');
+
     for (let i = 0; i < particleCount; i++) {
       const theta = Math.random() * Math.PI * 2;
       const phi = Math.acos(2 * Math.random() - 1);
-      const r = this.radius * (1.8 + Math.random() * 0.8);
-      positions[i * 3] = r * Math.sin(phi) * Math.cos(theta);
-      positions[i * 3 + 1] = r * Math.sin(phi) * Math.sin(theta);
-      positions[i * 3 + 2] = r * Math.cos(phi);
+      const r = this.radius * (1.7 + Math.random() * 1.0);
+
+      const x = r * Math.sin(phi) * Math.cos(theta);
+      const y = r * Math.sin(phi) * Math.sin(theta);
+      const z = r * Math.cos(phi);
+
+      positions[i * 3] = x;
+      positions[i * 3 + 1] = y;
+      positions[i * 3 + 2] = z;
+
+      this.haloBasePositions[i * 3] = x;
+      this.haloBasePositions[i * 3 + 1] = y;
+      this.haloBasePositions[i * 3 + 2] = z;
+
+      this.haloSizes[i] = 0.05 + Math.random() * 0.15;
     }
+
     const particleGeometry = new THREE.BufferGeometry();
     particleGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
     const particleMaterial = new THREE.PointsMaterial({
-      color: new THREE.Color(this.color),
+      color: haloColor,
       size: 0.15,
       transparent: true,
-      opacity: 0.8,
+      opacity: 0.75,
       blending: THREE.AdditiveBlending,
+      sizeAttenuation: true,
     });
+
     this.haloParticles = new THREE.Points(particleGeometry, particleMaterial);
     this.haloParticles.position.copy(this.position);
   }
@@ -128,16 +160,47 @@ export class AstroBody {
 
     if (this.glowMesh) {
       this.glowMesh.position.copy(this.position);
-      this.glowMesh.rotation.y += deltaTime * 0.1;
+      this.glowMesh.rotation.y += deltaTime * 0.15;
+
+      this.glowPulsePhase += deltaTime * 1.5;
+      const glowScale = 1 + Math.sin(this.glowPulsePhase) * 0.15;
+      this.glowMesh.scale.setScalar(glowScale);
+      (this.glowMesh.material as THREE.MeshBasicMaterial).opacity = 0.25 + Math.sin(this.glowPulsePhase * 0.7) * 0.15;
     }
-    if (this.haloParticles) {
+
+    if (this.haloParticles && this.haloBasePositions && this.haloSizes) {
       this.haloParticles.position.copy(this.position);
-      this.haloParticles.rotation.y += deltaTime * 0.05;
-      this.haloParticles.rotation.x += deltaTime * 0.03;
+      this.haloParticles.rotation.y += deltaTime * 0.08;
+      this.haloParticles.rotation.x += deltaTime * 0.05;
+
+      this.haloPulsePhase += deltaTime * 2.0;
+
+      const positionAttr = this.haloParticles.geometry.getAttribute('position') as THREE.BufferAttribute;
+      const positions = positionAttr.array as Float32Array;
+      const particleCount = positions.length / 3;
+
+      for (let i = 0; i < particleCount; i++) {
+        const phaseOffset = i * 0.37;
+        const pulse = 1 + Math.sin(this.haloPulsePhase + phaseOffset) * 0.25;
+        const idx = i * 3;
+        positions[idx] = this.haloBasePositions[idx] * pulse;
+        positions[idx + 1] = this.haloBasePositions[idx + 1] * pulse;
+        positions[idx + 2] = this.haloBasePositions[idx + 2] * pulse;
+      }
+      positionAttr.needsUpdate = true;
+
+      const mat = this.haloParticles.material as THREE.PointsMaterial;
+      const sizePulse = 1 + Math.sin(this.haloPulsePhase * 0.8) * 0.3;
+      mat.size = 0.15 * sizePulse;
+      mat.opacity = 0.6 + Math.sin(this.haloPulsePhase * 0.5) * 0.2;
     }
 
     if (this.type === 'planet') {
       this.mesh.rotation.y += deltaTime * 0.5;
+    } else if (this.type === 'star') {
+      this.mesh.rotation.y += deltaTime * 0.2;
+      const starMat = this.mesh.material as THREE.MeshStandardMaterial;
+      starMat.emissiveIntensity = 1.3 + Math.sin(this.glowPulsePhase * 0.5) * 0.3;
     }
 
     this.acceleration.set(0, 0, 0);
@@ -150,7 +213,7 @@ export class AstroBody {
       if (Array.isArray(this.mesh.material)) {
         this.mesh.material.forEach((m) => m.dispose());
       } else {
-        this.mesh.material.dispose();
+          this.mesh.material.dispose();
       }
     }
 

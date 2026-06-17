@@ -14,18 +14,103 @@ export interface ExplosionParticle {
   maxLife: number;
 }
 
-type SpatialBucket = Map<string, AstroBody[]>;
+class SpatialGrid {
+  private cellSize: number;
+  private buckets: Map<string, AstroBody[]>;
+
+  constructor(cellSize: number) {
+    this.cellSize = cellSize;
+    this.buckets = new Map();
+  }
+
+  public clear(): void {
+    this.buckets.clear();
+  }
+
+  private getKey(position: THREE.Vector3): string {
+    const bx = Math.floor(position.x / this.cellSize);
+    const by = Math.floor(position.y / this.cellSize);
+    const bz = Math.floor(position.z / this.cellSize);
+    return `${bx},${by},${bz}`;
+  }
+
+  private getNeighborKeys(position: THREE.Vector3): string[] {
+    const keys: string[] = [];
+    const bx = Math.floor(position.x / this.cellSize);
+    const by = Math.floor(position.y / this.cellSize);
+    const bz = Math.floor(position.z / this.cellSize);
+
+    for (let dx = -1; dx <= 1; dx++) {
+      for (let dy = -1; dy <= 1; dy++) {
+        for (let dz = -1; dz <= 1; dz++) {
+          keys.push(`${bx + dx},${by + dy},${bz + dz}`);
+        }
+      }
+    }
+
+    return keys;
+  }
+
+  public insert(body: AstroBody): void {
+    const key = this.getKey(body.position);
+    if (!this.buckets.has(key)) {
+      this.buckets.set(key, []);
+    }
+    this.buckets.get(key)!.push(body);
+  }
+
+  public getPotentialCollisions(body: AstroBody): AstroBody[] {
+    const candidates: AstroBody[] = [];
+    const neighborKeys = this.getNeighborKeys(body.position);
+
+    for (const key of neighborKeys) {
+      const bucket = this.buckets.get(key);
+      if (bucket) {
+        for (const other of bucket) {
+          if (other !== body) {
+            candidates.push(other);
+          }
+        }
+      }
+    }
+
+    return candidates;
+  }
+
+  public setCellSize(size: number): void {
+    this.cellSize = size;
+  }
+
+  public getCellSize(): number {
+    return this.cellSize;
+  }
+}
 
 export class PhysicsEngine {
   public gravityConstant: number = 0.5;
   private bodies: AstroBody[] = [];
   private scene: THREE.Scene;
   private explosions: ExplosionParticle[] = [];
-  private bucketSize: number = 20;
+  private spatialGrid: SpatialGrid;
 
   constructor(scene: THREE.Scene, gravityConstant: number = 0.5) {
     this.scene = scene;
     this.gravityConstant = gravityConstant;
+    this.spatialGrid = new SpatialGrid(20);
+  }
+
+  private calculateDynamicCellSize(): number {
+    if (this.bodies.length === 0) return 20;
+
+    let totalRadius = 0;
+    let maxRadius = 0;
+    for (const body of this.bodies) {
+      totalRadius += body.radius;
+      maxRadius = Math.max(maxRadius, body.radius);
+    }
+    const avgRadius = totalRadius / this.bodies.length;
+    const cellSize = Math.max(avgRadius * 4, maxRadius * 2, 5);
+    return cellSize;
   }
 
   public addBody(body: AstroBody): void {
@@ -101,72 +186,34 @@ export class PhysicsEngine {
     }
   }
 
-  private buildSpatialBuckets(): SpatialBucket {
-    const buckets: SpatialBucket = new Map();
+  private detectCollisions(collisions: CollisionEvent[]): void {
+    const cellSize = this.calculateDynamicCellSize();
+    this.spatialGrid.setCellSize(cellSize);
+    this.spatialGrid.clear();
 
     for (const body of this.bodies) {
-      const key = this.getBucketKey(body.position);
-      if (!buckets.has(key)) {
-        buckets.set(key, []);
-      }
-      buckets.get(key)!.push(body);
+      this.spatialGrid.insert(body);
     }
 
-    return buckets;
-  }
-
-  private getBucketKey(position: THREE.Vector3): string {
-    const bx = Math.floor(position.x / this.bucketSize);
-    const by = Math.floor(position.y / this.bucketSize);
-    const bz = Math.floor(position.z / this.bucketSize);
-    return `${bx},${by},${bz}`;
-  }
-
-  private getNeighborBucketKeys(position: THREE.Vector3): string[] {
-    const keys: string[] = [];
-    const bx = Math.floor(position.x / this.bucketSize);
-    const by = Math.floor(position.y / this.bucketSize);
-    const bz = Math.floor(position.z / this.bucketSize);
-
-    for (let dx = -1; dx <= 1; dx++) {
-      for (let dy = -1; dy <= 1; dy++) {
-        for (let dz = -1; dz <= 1; dz++) {
-          keys.push(`${bx + dx},${by + dy},${bz + dz}`);
-        }
-      }
-    }
-
-    return keys;
-  }
-
-  private detectCollisions(collisions: CollisionEvent[]): void {
-    const buckets = this.buildSpatialBuckets();
     const checked = new Set<string>();
 
     for (const body of this.bodies) {
-      const neighborKeys = this.getNeighborBucketKeys(body.position);
+      const candidates = this.spatialGrid.getPotentialCollisions(body);
 
-      for (const key of neighborKeys) {
-        const bucket = buckets.get(key);
-        if (!bucket) continue;
+      for (const other of candidates) {
+        const pairKey = [body.id, other.id].sort().join('|');
+        if (checked.has(pairKey)) continue;
+        checked.add(pairKey);
 
-        for (const other of bucket) {
-          if (body === other) continue;
+        const distance = body.position.distanceTo(other.position);
+        const minDistance = body.radius + other.radius;
 
-          const pairKey = [body.id, other.id].sort().join('|');
-          if (checked.has(pairKey)) continue;
-          checked.add(pairKey);
-
-          const distance = body.position.distanceTo(other.position);
-          const minDistance = body.radius + other.radius;
-
-          if (distance < minDistance) {
-            collisions.push({
-              body1: body,
-              body2: other,
-              position: body.position.clone().add(other.position).multiplyScalar(0.5),
-            });
-          }
+        if (distance < minDistance) {
+          collisions.push({
+            body1: body,
+            body2: other,
+            position: body.position.clone().add(other.position).multiplyScalar(0.5),
+          });
         }
       }
     }
@@ -200,7 +247,8 @@ export class PhysicsEngine {
     const particleCount = 50;
 
     for (let i = 0; i < particleCount; i++) {
-      const geometry = new THREE.SphereGeometry(0.1 + Math.random() * 0.15, 8, 8);
+      const size = 0.1 + Math.random() * 0.2;
+      const geometry = new THREE.BoxGeometry(size, size, size);
       const useColor1 = Math.random() > 0.5;
       const material = new THREE.MeshBasicMaterial({
         color: useColor1 ? new THREE.Color(color1) : new THREE.Color(color2),
@@ -247,10 +295,14 @@ export class PhysicsEngine {
       particle.mesh.position.add(particle.velocity.clone().multiplyScalar(deltaTime));
       particle.velocity.multiplyScalar(0.96);
 
-      const material = particle.mesh.material as THREE.MeshBasicMaterial;
-      material.opacity = particle.life / particle.maxLife;
+      particle.mesh.rotation.x += deltaTime * 5;
+      particle.mesh.rotation.y += deltaTime * 3;
 
-      const scale = 0.5 + (particle.life / particle.maxLife) * 0.5;
+      const material = particle.mesh.material as THREE.MeshBasicMaterial;
+      const t = particle.life / particle.maxLife;
+      material.opacity = t < 0.2 ? t / 0.2 : 1;
+
+      const scale = 0.4 + t * 0.6;
       particle.mesh.scale.setScalar(scale);
     }
   }
