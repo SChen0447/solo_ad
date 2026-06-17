@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+import { CSS2DRenderer, CSS2DObject } from 'three/examples/jsm/renderers/CSS2DRenderer.js';
 import * as TWEEN from '@tweenjs/tween.js';
 import {
   DataService,
@@ -21,6 +22,7 @@ class MoleculeViewerApp {
   private scene: THREE.Scene;
   private camera: THREE.PerspectiveCamera;
   private renderer: THREE.WebGLRenderer;
+  private labelRenderer: CSS2DRenderer;
   private controls: OrbitControls;
   private dataService: DataService;
   private model: MolecularModel;
@@ -101,6 +103,15 @@ class MoleculeViewerApp {
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 1.0;
     this.container.appendChild(this.renderer.domElement);
+
+    this.labelRenderer = new CSS2DRenderer();
+    this.labelRenderer.setSize(width, height);
+    this.labelRenderer.domElement.style.position = 'absolute';
+    this.labelRenderer.domElement.style.top = '0';
+    this.labelRenderer.domElement.style.left = '0';
+    this.labelRenderer.domElement.style.pointerEvents = 'none';
+    const labelContainer = document.getElementById('label-container')!;
+    labelContainer.appendChild(this.labelRenderer.domElement);
 
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
     this.controls.enableDamping = true;
@@ -326,9 +337,11 @@ class MoleculeViewerApp {
         if (this.hoveredAtom !== info) {
           if (this.hoveredAtom) {
             this.model.removeHalo(this.hoveredAtom);
+            this.model.hideAtomLabel(this.hoveredAtom);
           }
           this.hoveredAtom = info;
           this.model.createHaloForAtom(info);
+          this.model.showAtomLabel(info);
           this.showAtomInfo(info);
         }
         this.renderer.domElement.style.cursor = 'pointer';
@@ -342,6 +355,7 @@ class MoleculeViewerApp {
   private clearHover(): void {
     if (this.hoveredAtom) {
       this.model.removeHalo(this.hoveredAtom);
+      this.model.hideAtomLabel(this.hoveredAtom);
       this.hoveredAtom = null;
     }
     this.hideAtomInfo();
@@ -552,6 +566,7 @@ class MoleculeViewerApp {
     this.camera.aspect = width / height;
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(width, height);
+    this.labelRenderer.setSize(width, height);
   };
 
   private animate = (): void => {
@@ -571,6 +586,7 @@ class MoleculeViewerApp {
     this.controls.update();
 
     this.renderer.render(this.scene, this.camera);
+    this.labelRenderer.render(this.scene, this.camera);
   };
 
   private updateAutoRotation(delta: number): void {

@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { CSS2DObject } from 'three/examples/jsm/renderers/CSS2DRenderer.js';
 import {
   MoleculeData,
   Atom,
@@ -14,6 +15,7 @@ export interface AtomMeshInfo {
   atom: Atom;
   mesh: THREE.Mesh;
   haloMesh?: THREE.Mesh;
+  labelObject?: CSS2DObject;
 }
 
 export type TransitionCallback = () => void;
@@ -294,8 +296,13 @@ export class MolecularModel {
   private buildModel(data: MoleculeData): void {
     data.atoms.forEach((atom, index) => {
       const atomMesh = this.createAtomMesh(atom, index);
-      this.atomMeshes.push({ index, atom, mesh: atomMesh });
+      const labelObject = this.createAtomLabel(atom, index);
+      const atomInfo: AtomMeshInfo = { index, atom, mesh: atomMesh, labelObject };
+      this.atomMeshes.push(atomInfo);
       this.group.add(atomMesh);
+      if (labelObject) {
+        this.group.add(labelObject);
+      }
     });
 
     data.bonds.forEach((bond, index) => {
@@ -331,6 +338,54 @@ export class MolecularModel {
     mesh.receiveShadow = true;
 
     return mesh;
+  }
+
+  private createAtomLabel(atom: Atom, index: number): CSS2DObject {
+    const div = document.createElement('div');
+    div.className = 'atom-label';
+    div.style.display = 'none';
+
+    const elementSpan = document.createElement('span');
+    elementSpan.className = 'element-symbol';
+    elementSpan.textContent = atom.element;
+
+    const coordSpan = document.createElement('span');
+    coordSpan.className = 'coord';
+    coordSpan.textContent = `(${atom.x.toFixed(2)}, ${atom.y.toFixed(2)}, ${atom.z.toFixed(2)})`;
+
+    div.appendChild(elementSpan);
+    div.appendChild(coordSpan);
+
+    const label = new CSS2DObject(div);
+    label.position.set(atom.x, atom.y, atom.z);
+    label.center.set(0.5, 1.5);
+    label.userData = { type: 'atomLabel', atomIndex: index };
+
+    return label;
+  }
+
+  public showAtomLabel(atomInfo: AtomMeshInfo): void {
+    if (atomInfo.labelObject) {
+      const div = atomInfo.labelObject.element as HTMLElement;
+      const coordSpan = div.querySelector('.coord') as HTMLElement;
+      if (coordSpan) {
+        const worldPos = new THREE.Vector3();
+        atomInfo.mesh.getWorldPosition(worldPos);
+        coordSpan.textContent = `(${worldPos.x.toFixed(2)}, ${worldPos.y.toFixed(2)}, ${worldPos.z.toFixed(2)})`;
+      }
+      div.style.display = 'block';
+    }
+  }
+
+  public hideAtomLabel(atomInfo: AtomMeshInfo): void {
+    if (atomInfo.labelObject) {
+      const div = atomInfo.labelObject.element as HTMLElement;
+      div.style.display = 'none';
+    }
+  }
+
+  public hideAllLabels(): void {
+    this.atomMeshes.forEach(info => this.hideAtomLabel(info));
   }
 
   public createHaloForAtom(atomInfo: AtomMeshInfo): THREE.Mesh | null {
@@ -492,6 +547,9 @@ export class MolecularModel {
       this.group.remove(info.mesh);
       info.mesh.geometry.dispose();
       (info.mesh.material as THREE.Material).dispose();
+      if (info.labelObject) {
+        this.group.remove(info.labelObject);
+      }
     });
     this.atomMeshes = [];
 
