@@ -1,0 +1,332 @@
+:root {
+  --starbucks-green: #006241;
+  --starbucks-gold: #b8913c;
+  --dark-green: #004d32;
+  --dark-gray: #3a3a3a;
+  --panel-bg: #1a1a1a;
+  --text-white: #ffffff;
+  --wheel-size: 320px;
+  --panel-width: 320px;
+  --sector-arc: 30deg;
+  --hover-popout: 8px;
+  --glow-extension: 6px;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html,
+body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue',
+    Arial, sans-serif;
+  color: var(--text-white);
+  transition: background-color 0.3s ease;
+  will-change: background-color;
+}
+
+#root {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.app-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 60px;
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+.wheel-section {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.pointer {
+  position: absolute;
+  top: calc(50% - var(--wheel-size) / 2 - 30px);
+  left: 50%;
+  transform: translateX(-50%);
+  width: 0;
+  height: 0;
+  border-left: 10px solid transparent;
+  border-right: 10px solid transparent;
+  border-top: 20px solid var(--starbucks-gold);
+  z-index: 100;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3));
+}
+
+.color-wheel-container {
+  width: var(--wheel-size);
+  height: var(--wheel-size);
+  position: relative;
+  cursor: grab;
+  touch-action: none;
+  will-change: transform;
+}
+
+.color-wheel-container:active {
+  cursor: grabbing;
+}
+
+.color-wheel {
+  width: 100%;
+  height: 100%;
+  transform-origin: center center;
+  will-change: transform;
+  transition: transform 0.2s ease-out;
+}
+
+.color-wheel.dragging {
+  transition: none;
+}
+
+.wheel-sector {
+  cursor: pointer;
+  transition: transform 0.3s ease-out, filter 0.3s ease-out;
+  transform-origin: center center;
+  will-change: transform, filter;
+}
+
+.wheel-sector:hover {
+  transform: scale(1.05);
+  filter: brightness(1.15);
+}
+
+.wheel-sector.selected {
+  animation: breathe 0.5s ease-in-out infinite alternate;
+}
+
+@keyframes breathe {
+  from {
+    filter: drop-shadow(0 0 6px var(--starbucks-gold));
+  }
+  to {
+    filter: drop-shadow(0 0 18px var(--starbucks-gold));
+  }
+}
+
+.sector-divider {
+  stroke: var(--dark-green);
+  stroke-width: 1;
+}
+
+.preview-panel {
+  width: var(--panel-width);
+  height: var(--wheel-size);
+  background-color: var(--panel-bg);
+  border-radius: 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  padding: 24px 20px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  border: 2px solid var(--accent-color, var(--starbucks-green));
+  transition: border-color 0.3s ease;
+}
+
+.color-name {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-white);
+  text-align: center;
+  letter-spacing: 0.5px;
+}
+
+.coffee-cup-container {
+  width: 160px;
+  height: 200px;
+  perspective: 800px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.coffee-cup {
+  width: 120px;
+  height: 160px;
+  position: relative;
+  transform-style: preserve-3d;
+  animation: spin 12s linear infinite;
+  will-change: transform;
+}
+
+.coffee-cup.fading {
+  animation: spin 12s linear infinite, fadeOutIn 0.6s ease-in-out;
+}
+
+@keyframes spin {
+  from {
+    transform: rotateY(0deg);
+  }
+  to {
+    transform: rotateY(360deg);
+  }
+}
+
+@keyframes fadeOutIn {
+  0% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.3;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+.cup-body {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  border-radius: 0 0 60px 60px / 0 0 30px 30px;
+  transform-style: preserve-3d;
+}
+
+.cup-upper {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 55%;
+  background-color: var(--cup-color, var(--starbucks-green));
+  border-radius: 5px 5px 0 0;
+  transform: translateZ(8px);
+  transition: background-color 0.6s ease-in-out;
+  box-shadow: inset -5px 0 15px rgba(0, 0, 0, 0.3),
+    inset 5px 0 15px rgba(255, 255, 255, 0.1);
+}
+
+.cup-lower {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 45%;
+  background-color: var(--dark-gray);
+  border-radius: 0 0 60px 60px / 0 0 30px 30px;
+  transform: translateZ(8px);
+  box-shadow: inset -5px 0 15px rgba(0, 0, 0, 0.4),
+    inset 5px 0 10px rgba(255, 255, 255, 0.05);
+}
+
+.cup-rim {
+  position: absolute;
+  top: 0;
+  left: -5%;
+  width: 110%;
+  height: 12px;
+  background: linear-gradient(
+    to bottom,
+    var(--cup-color, var(--starbucks-green)) 0%,
+    var(--cup-color-dark, var(--dark-green)) 100%
+  );
+  border-radius: 50%;
+  transform: rotateX(75deg) translateZ(10px);
+  transition: background 0.6s ease-in-out;
+  box-shadow: inset 0 -2px 5px rgba(0, 0, 0, 0.5);
+}
+
+.cup-handle {
+  position: absolute;
+  right: -25px;
+  top: 30%;
+  width: 35px;
+  height: 60px;
+  border: 8px solid var(--starbucks-gold);
+  border-left: none;
+  border-radius: 0 50px 50px 0;
+  transform: translateZ(12px);
+  box-shadow: 2px 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.cup-handle::before {
+  content: '';
+  position: absolute;
+  top: -8px;
+  left: 0;
+  width: 8px;
+  height: 8px;
+  background: var(--starbucks-gold);
+  border-radius: 50% 0 0 0;
+}
+
+.cup-handle::after {
+  content: '';
+  position: absolute;
+  bottom: -8px;
+  left: 0;
+  width: 8px;
+  height: 8px;
+  background: var(--starbucks-gold);
+  border-radius: 0 0 0 50%;
+}
+
+.color-hex {
+  font-size: 18px;
+  font-weight: 500;
+  color: var(--starbucks-gold);
+  letter-spacing: 1px;
+  font-family: 'Courier New', monospace;
+}
+
+.action-button {
+  padding: 12px 32px;
+  background-color: transparent;
+  color: var(--accent-color, var(--starbucks-green));
+  border: 2px solid var(--accent-color, var(--starbucks-green));
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  margin-top: 20px;
+}
+
+.action-button:hover {
+  background-color: var(--accent-color, var(--starbucks-green));
+  color: var(--text-white);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.info-card {
+  padding: 16px 24px;
+  background-color: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--accent-color, var(--starbucks-green));
+  border-radius: 12px;
+  margin-top: 20px;
+  transition: border-color 0.3s ease;
+}
+
+@media (max-width: 800px) {
+  .app-container {
+    flex-direction: column;
+    gap: 30px;
+    padding: 20px;
+  }
+
+  .pointer {
+    top: calc(50% - var(--wheel-size) - 45px);
+  }
+
+  .preview-panel {
+    height: auto;
+    min-height: 280px;
+  }
+}
