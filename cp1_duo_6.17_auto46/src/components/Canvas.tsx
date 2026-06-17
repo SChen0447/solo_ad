@@ -56,6 +56,7 @@ export const Canvas = forwardRef<CanvasHandle, CanvasProps>(function Canvas(
   const lastPanStartRef = useRef({ x: 0, y: 0 });
   const currentStrokeRef = useRef<Point[]>([]);
   const lastDrawPointRef = useRef<Point | null>(null);
+  const lastDrawTimeRef = useRef<number | null>(null);
   const renderFrameRef = useRef<number | null>(null);
 
   const remoteLinesRef = useRef<LineData[]>([]);
@@ -150,15 +151,18 @@ export const Canvas = forwardRef<CanvasHandle, CanvasProps>(function Canvas(
     ctx: CanvasRenderingContext2D,
     points: Point[],
     color: string,
-    size: number,
+    baseSize: number,
     globalAlpha = 1
   ) => {
     if (points.length < 2) {
       if (points.length === 1) {
         const p = points[0];
+        const pressure = p.p ?? 0.85;
+        const size = baseSize * (0.5 + pressure * 0.5);
+        const alpha = 0.4 + pressure * 0.6;
         ctx.beginPath();
         ctx.fillStyle = color;
-        ctx.globalAlpha = globalAlpha * (p.p ?? 1);
+        ctx.globalAlpha = globalAlpha * alpha;
         ctx.arc(p.x, p.y, size * 0.5, 0, Math.PI * 2);
         ctx.fill();
       }
@@ -168,13 +172,36 @@ export const Canvas = forwardRef<CanvasHandle, CanvasProps>(function Canvas(
     for (let i = 1; i < points.length; i++) {
       const prev = points[i - 1];
       const curr = points[i];
-      const t = points.length > 1 ? i / (points.length - 1) : 0.5;
-      const midAlpha = 0.35 + 0.65 * (1 - Math.abs(t - 0.5) * 2);
-      const pressureAlpha = ((prev.p ?? 0.8 + (curr.p ?? 0.8)) * 0.5;
+      const prevP = prev.p ?? 0.85;
+      const currP = curr.p ?? 0.85;
+
+      const prevSize = baseSize * (0.5 + prevP * 0.5);
+      const currSize = baseSize * (0.5 + currP * 0.5);
+      const avgSize = (prevSize + currSize) * 0.5;
+
+      const prevAlpha = 0.35 + prevP * 0.65;
+      const currAlpha = 0.35 + currP * 0.65;
+      const avgAlpha = (prevAlpha + currAlpha) * 0.5;
+
+      const steps = Math.max(1, Math.ceil(Math.hypot(curr.x - prev.x, curr.y - prev.y) / 0.8));
+      for (let s = 0; s < steps; s++) {
+        const t = s / steps;
+        const x = prev.x + (curr.x - prev.x) * t;
+        const y = prev.y + (curr.y - prev.y) * t;
+        const interpP = prevP + (currP - prevP) * t;
+        const dotSize = baseSize * (0.5 + interpP * 0.5);
+        const dotAlpha = (0.35 + interpP * 0.65) * globalAlpha;
+
+        ctx.beginPath();
+        ctx.fillStyle = color;
+        ctx.globalAlpha = dotAlpha * 0.8;
+        ctx.arc(x, y, dotSize * 0.5, 0, Math.PI * 2);
+        ctx.fill();
+      }
 
       ctx.strokeStyle = color;
-      ctx.globalAlpha = globalAlpha * midAlpha * pressureAlpha;
-      ctx.lineWidth = size;
+      ctx.globalAlpha = globalAlpha * avgAlpha * 0.55;
+      ctx.lineWidth = avgSize;
       ctx.lineCap = 'round';
       ctx.lineJoin = 'round';
       ctx.beginPath();
@@ -412,7 +439,7 @@ export const Canvas = forwardRef<CanvasHandle, CanvasProps>(function Canvas(
     if (!el) return;
 
     const onMouseDown = (e: MouseEvent) => {
-      if (e.button !== 0) return;
+      if (e.button !== 0 && e.button !== 1) return;
       const rect = el.getBoundingClientRect();
       const sx = e.clientX - rect.left;
       const sy = e.clientY - rect.top;
@@ -436,6 +463,7 @@ export const Canvas = forwardRef<CanvasHandle, CanvasProps>(function Canvas(
       isPanningRef.current = false;
       currentStrokeRef.current = [{ x: world.x, y: world.y, p: 0.95 }];
       lastDrawPointRef.current = { x: world.x, y: world.y, p: 0.95 };
+      lastDrawTimeRef.current = performance.now();
     };
 
     const onMouseMove = (e: MouseEvent) => {
@@ -457,11 +485,20 @@ export const Canvas = forwardRef<CanvasHandle, CanvasProps>(function Canvas(
       if (isDrawingRef.current) {
         const world = screenToWorld(sx, sy);
         const last = lastDrawPointRef.current;
-        if (last && Math.hypot(last.x - world.x, last.y - world.y) > 0.5) {
-          const speed = Math.hypot(last.x - world.x, last.y - world.y);
-          const pressure = Math.max(0.4, 1 - Math.min(speed / 15, 0.6));
-          currentStrokeRef.current.push({ x: world.x, y: world.y, p: pressure });
-          lastDrawPointRef.current = { x: world.x, y: world.y, p: pressure };
+        const now = performance.now();
+        if (last && Math.hypot(last.x - world.x, last.y - world.y) > 0.4) {
+          const dist = Math.hypot(last.x - world.x, last.y - world.y);
+          const dt = lastDrawTimeRef.current ? (now - lastDrawTimeRef.current) : 16;
+          const speed = dist / Math.max(1, dt) * 16;
+          const rawPressure = 1 - Math.min(Math.max(0, (speed - 0.5) / 20), 1);
+          const smoothedPressure = last.p !== undefined
+            ? last.p * 0.65 + rawPressure * 0.35
+            : rawPressure;
+          const finalPressure = Math.max(0.25, Math.min(1, smoothedPressure));
+
+          currentStrokeRef.current.push({ x: world.x, y: world.y, p: finalPressure });
+          lastDrawPointRef.current = { x: world.x, y: world.y, p: finalPressure };
+          lastDrawTimeRef.current = now;
         }
       }
     };
@@ -560,6 +597,7 @@ export const Canvas = forwardRef<CanvasHandle, CanvasProps>(function Canvas(
         isDrawingRef.current = true;
         currentStrokeRef.current = [{ x: world.x, y: world.y, p: 0.9 }];
         lastDrawPointRef.current = { x: world.x, y: world.y, p: 0.9 };
+        lastDrawTimeRef.current = performance.now();
       }
     };
 
@@ -589,11 +627,20 @@ export const Canvas = forwardRef<CanvasHandle, CanvasProps>(function Canvas(
         const sp = getTouchPoint(t);
         const world = screenToWorld(sp.x, sp.y);
         const last = lastDrawPointRef.current;
-        if (last && Math.hypot(last.x - world.x, last.y - world.y) > 0.5) {
-          const speed = Math.hypot(last.x - world.x, last.y - world.y);
-          const pressure = Math.max(0.4, 1 - Math.min(speed / 15, 0.6));
-          currentStrokeRef.current.push({ x: world.x, y: world.y, p: pressure });
-          lastDrawPointRef.current = { x: world.x, y: world.y, p: pressure };
+        const now = performance.now();
+        if (last && Math.hypot(last.x - world.x, last.y - world.y) > 0.4) {
+          const dist = Math.hypot(last.x - world.x, last.y - world.y);
+          const dt = lastDrawTimeRef.current ? (now - lastDrawTimeRef.current) : 16;
+          const speed = dist / Math.max(1, dt) * 16;
+          const rawPressure = 1 - Math.min(Math.max(0, (speed - 0.5) / 20), 1);
+          const smoothedPressure = last.p !== undefined
+            ? last.p * 0.65 + rawPressure * 0.35
+            : rawPressure;
+          const finalPressure = Math.max(0.25, Math.min(1, smoothedPressure));
+
+          currentStrokeRef.current.push({ x: world.x, y: world.y, p: finalPressure });
+          lastDrawPointRef.current = { x: world.x, y: world.y, p: finalPressure };
+          lastDrawTimeRef.current = now;
         }
       }
     };

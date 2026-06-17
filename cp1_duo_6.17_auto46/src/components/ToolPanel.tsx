@@ -307,22 +307,86 @@ export const ToolPanel: React.FC<ToolPanelProps> = ({
       <div>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
           <span style={{ fontSize: '13px', fontWeight: 600, color: '#5a4a3a' }}>笔刷大小</span>
-          <div style={{
-            display: 'flex', alignItems: 'center', gap: '8px'
-          }}>
-            <div style={{
-              width: Math.min(32, Math.max(4, brushSize)),
-              height: Math.min(32, Math.max(4, brushSize)),
+          <span style={{
+            fontSize: '12px', color: '#888', fontFamily: 'monospace'
+          }}>{brushSize}px</span>
+        </div>
+
+        <div
+          style={{
+            height: '70px',
+            marginBottom: '12px',
+            background: 'rgba(255,255,255,0.5)',
+            borderRadius: '12px',
+            border: '1px solid rgba(139,90,43,0.1)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            position: 'relative',
+            overflow: 'hidden',
+          }}
+        >
+          <div
+            style={{
+              position: 'absolute',
+              width: '60%',
+              height: '2px',
+              left: '20%',
+              top: '50%',
+              transform: 'translateY(-50%)',
+              background: `linear-gradient(to right, ${color}22 0%, ${color}88 35%, ${color} 50%, ${color}aa 65%, ${color}22 100%)`,
+              borderRadius: '1px',
+              filter: 'blur(0.3px)',
+            }}
+          />
+
+          <div
+            style={{
+              position: 'absolute',
+              left: '22%',
+              top: '50%',
+              transform: 'translateY(-50%)',
+              width: Math.max(4, brushSize * 0.5),
+              height: Math.max(4, brushSize * 0.5),
+              borderRadius: '50%',
+              background: `${color}44`,
+            }}
+          />
+
+          <div
+            style={{
+              position: 'absolute',
+              left: '48%',
+              top: '50%',
+              transform: 'translate(-50%, -50%)',
+              width: Math.max(8, brushSize * 1.3),
+              height: Math.max(8, brushSize * 1.3),
               borderRadius: '50%',
               background: color,
-              boxShadow: '0 1px 4px rgba(0,0,0,0.15)',
-              transition: 'all 0.1s',
-            }} />
-            <span style={{
-              fontSize: '12px', color: '#888', fontFamily: 'monospace', minWidth: '32px', textAlign: 'right'
-            }}>{brushSize}px</span>
-          </div>
+              boxShadow: `0 0 ${brushSize * 0.3}px ${color}66`,
+              transition: 'all 0.15s ease',
+            }}
+          />
+
+          <div
+            style={{
+              position: 'absolute',
+              right: '22%',
+              top: '50%',
+              transform: 'translateY(-50%)',
+              width: Math.max(3, brushSize * 0.4),
+              height: Math.max(3, brushSize * 0.4),
+              borderRadius: '50%',
+              background: `${color}33`,
+            }}
+          />
         </div>
+
+        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', color: '#aaa', marginBottom: '6px', padding: '0 2px' }}>
+          <span>轻 · 淡</span>
+          <span>重 · 浓</span>
+        </div>
+
         <input
           type="range"
           min="1"
@@ -441,7 +505,6 @@ export const ToolPanel: React.FC<ToolPanelProps> = ({
         disabled={isPublishing}
         onMouseDown={() => !isPublishing && pressBtn('publish')}
         onMouseUp={releaseBtn}
-        onMouseLeave={releaseBtn}
         style={{
           padding: '13px 16px',
           fontSize: '14px',
@@ -472,6 +535,7 @@ export const ToolPanel: React.FC<ToolPanelProps> = ({
           }
         }}
         onMouseLeave={(e) => {
+          releaseBtn();
           e.currentTarget.style.filter = 'brightness(1)';
           if (pressedBtn !== 'publish') e.currentTarget.style.transform = 'scale(1)';
           e.currentTarget.style.boxShadow = pressedBtn === 'publish'
