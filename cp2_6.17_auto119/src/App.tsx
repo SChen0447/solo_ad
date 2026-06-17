@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { v4 as uuidv4 } from 'uuid'
 import Toolbar from './components/Toolbar'
 import Editor, { type EditorRef } from './components/Editor'
-import Preview from './components/Preview'
+import Preview, { type PreviewRef } from './components/Preview'
 import HistoryPanel from './components/HistoryPanel'
 import html2canvas from 'html2canvas'
 
@@ -17,7 +17,8 @@ function App() {
   const [history, setHistory] = useState<HistoryItem[]>([])
   const [showHistory, setShowHistory] = useState<boolean>(true)
   const [copyToast, setCopyToast] = useState<boolean>(false)
-  const previewRef = useRef<HTMLDivElement>(null)
+  const previewWrapRef = useRef<HTMLDivElement>(null)
+  const previewRef = useRef<PreviewRef>(null)
   const editorRef = useRef<EditorRef>(null)
   const lastSaveRef = useRef<number>(0)
 
@@ -63,12 +64,51 @@ function App() {
   }, [formula])
 
   const handleExportPNG = useCallback(async () => {
-    if (!previewRef.current) return
     try {
-      const canvas = await html2canvas(previewRef.current, {
+      const hasError = previewRef.current?.hasError() ?? false
+      const isEmpty = previewRef.current?.isEmpty() ?? formula.trim().length === 0
+
+      if (hasError || isEmpty) {
+        const width = 600
+        const height = 120
+        const canvas = document.createElement('canvas')
+        canvas.width = width * 3
+        canvas.height = height * 3
+        canvas.style.width = `${width}px`
+        canvas.style.height = `${height}px`
+        const ctx = canvas.getContext('2d')
+        if (ctx) {
+          ctx.scale(3, 3)
+          ctx.fillStyle = '#ffffff'
+          ctx.fillRect(0, 0, width, height)
+          ctx.fillStyle = hasError ? '#dc2626' : '#9ca3af'
+          ctx.font = '16px -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif'
+          ctx.textAlign = 'center'
+          ctx.textBaseline = 'middle'
+          const msg = hasError ? '公式存在错误，请修正后再导出' : '请先输入公式'
+          ctx.fillText(msg, width / 2, height / 2)
+          if (hasError && formula.trim().length > 0) {
+            ctx.font = '13px Consolas, Monaco, monospace'
+            ctx.fillStyle = '#6b7280'
+            const displayFormula = formula.length > 40 ? formula.substring(0, 40) + '...' : formula
+            ctx.fillText(displayFormula, width / 2, height / 2 + 28)
+          }
+        }
+        const link = document.createElement('a')
+        link.download = `formula-${Date.now()}.png`
+        link.href = canvas.toDataURL('image/png')
+        link.click()
+        return
+      }
+
+      if (!previewWrapRef.current) return
+      const canvas = await html2canvas(previewWrapRef.current, {
         backgroundColor: '#ffffff',
         width: 600,
-        scale: 2
+        windowWidth: 600,
+        scale: 3,
+        useCORS: true,
+        logging: false
       })
       const link = document.createElement('a')
       link.download = `formula-${Date.now()}.png`
@@ -77,7 +117,7 @@ function App() {
     } catch (err) {
       console.error('导出失败:', err)
     }
-  }, [])
+  }, [formula])
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -107,8 +147,8 @@ function App() {
         <div className="editor-section">
           <Toolbar onInsertSymbol={handleInsertSymbol} />
           <Editor ref={editorRef} value={formula} onChange={handleEditorChange} />
-          <div style={{ marginTop: '12px' }} ref={previewRef}>
-            <Preview formula={formula} />
+          <div style={{ marginTop: '12px' }} ref={previewWrapRef}>
+            <Preview ref={previewRef} formula={formula} />
           </div>
           <div className="action-bar">
             <button className="action-btn" onClick={handleCopy} title="复制LaTeX源码">

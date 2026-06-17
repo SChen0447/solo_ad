@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 
 interface ToolbarProps {
   onInsertSymbol: (template: string, cursorOffset?: number) => void
@@ -34,18 +34,18 @@ const greekLetters: { label: string; template: string }[] = [
 ]
 
 const row1: SymbolButton[] = [
-  { label: 'a/b', template: '\\frac{}{}', cursorOffset: 7, title: '分数 (Ctrl+F)' },
-  { label: '√', template: '\\sqrt{}', cursorOffset: 7, title: '根号 (Ctrl+R)' },
-  { label: 'xⁿ', template: '^{}', cursorOffset: 2, title: '上标 (Ctrl+Shift+U)' },
-  { label: 'xₙ', template: '_{}', cursorOffset: 2, title: '下标 (Ctrl+Shift+L)' },
+  { label: 'a/b', template: '\\frac{}{}', cursorOffset: 6, title: '分数 (Ctrl+F)' },
+  { label: '√', template: '\\sqrt{}', cursorOffset: 6, title: '根号 (Ctrl+R)' },
+  { label: 'xⁿ', template: '^{}', cursorOffset: 1, title: '上标 (Ctrl+Shift+U)' },
+  { label: 'xₙ', template: '_{}', cursorOffset: 1, title: '下标 (Ctrl+Shift+L)' },
   { label: '{ }', template: '\\left\\{\\right\\}', cursorOffset: 7, title: '大括号' },
 ]
 
 const row2: SymbolButton[] = [
-  { label: '∫', template: '\\int_{}^{}', cursorOffset: 7, title: '积分' },
-  { label: '∑', template: '\\sum_{i=1}^{n}', cursorOffset: 13, title: '求和' },
-  { label: '∏', template: '\\prod_{i=1}^{n}', cursorOffset: 14, title: '乘积' },
-  { label: 'lim', template: '\\lim_{x \\to \\infty}', cursorOffset: 21, title: '极限' },
+  { label: '∫', template: '\\int_{}^{}', cursorOffset: 6, title: '积分' },
+  { label: '∑', template: '\\sum_{i=1}^{n}', cursorOffset: 12, title: '求和' },
+  { label: '∏', template: '\\prod_{i=1}^{n}', cursorOffset: 13, title: '乘积' },
+  { label: 'lim', template: '\\lim_{x \\to \\infty}', cursorOffset: 20, title: '极限' },
 ]
 
 const row4: SymbolButton[] = [
@@ -63,6 +63,27 @@ const row4: SymbolButton[] = [
 
 function Toolbar({ onInsertSymbol }: ToolbarProps) {
   const [showGreek, setShowGreek] = useState(false)
+  const wrapperRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!showGreek) return
+    const handleClickOutside = (e: MouseEvent) => {
+      if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) {
+        setShowGreek(false)
+      }
+    }
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setShowGreek(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    document.addEventListener('keydown', handleEscape)
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+      document.removeEventListener('keydown', handleEscape)
+    }
+  }, [showGreek])
 
   const renderButton = (btn: SymbolButton) => (
     <button
@@ -70,6 +91,7 @@ function Toolbar({ onInsertSymbol }: ToolbarProps) {
       className="toolbar-btn"
       onClick={() => onInsertSymbol(btn.template, btn.cursorOffset)}
       title={btn.title}
+      type="button"
     >
       <span>{btn.label}</span>
     </button>
@@ -82,30 +104,30 @@ function Toolbar({ onInsertSymbol }: ToolbarProps) {
         <div className="toolbar-divider" />
         {row2.map(renderButton)}
         <div className="toolbar-divider" />
-        <div className="greek-wrapper">
+        <div className="greek-wrapper" ref={wrapperRef}>
           <button
             className={`toolbar-btn greek-toggle ${showGreek ? 'active' : ''}`}
             onClick={() => setShowGreek(!showGreek)}
             title="希腊字母"
+            type="button"
           >
             <span>αβ</span>
           </button>
-          {showGreek && (
-            <div className="greek-panel">
-              {greekLetters.map(g => (
-                <button
-                  key={g.label}
-                  className="greek-btn"
-                  onClick={() => {
-                    onInsertSymbol(g.template, g.template.length)
-                    setShowGreek(false)
-                  }}
-                >
-                  {g.label}
-                </button>
-              ))}
-            </div>
-          )}
+          <div className={`greek-panel ${showGreek ? 'show' : ''}`}>
+            {greekLetters.map(g => (
+              <button
+                key={g.label}
+                className="greek-btn"
+                onClick={() => {
+                  onInsertSymbol(g.template, g.template.length)
+                  setShowGreek(false)
+                }}
+                type="button"
+              >
+                {g.label}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
       <div className="toolbar-row">

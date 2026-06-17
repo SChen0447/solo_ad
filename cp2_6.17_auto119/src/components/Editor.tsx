@@ -13,6 +13,7 @@ export interface EditorRef {
 const Editor = forwardRef<EditorRef, EditorProps>(({ value, onChange }, ref) => {
   const editorRef = useRef<HTMLTextAreaElement>(null)
   const lastExternalValue = useRef<string>(value)
+  const pendingCursorPos = useRef<number | null>(null)
 
   useImperativeHandle(ref, () => ({
     insertText: (text: string, cursorOffset: number = 0) => {
@@ -21,11 +22,16 @@ const Editor = forwardRef<EditorRef, EditorProps>(({ value, onChange }, ref) => 
       const start = el.selectionStart
       const end = el.selectionEnd
       const newValue = value.substring(0, start) + text + value.substring(end)
+      const targetPos = start + cursorOffset
+      pendingCursorPos.current = targetPos
       onChange(newValue)
       requestAnimationFrame(() => {
-        el.focus()
-        const newPos = start + cursorOffset
-        el.setSelectionRange(newPos, newPos)
+        if (editorRef.current) {
+          editorRef.current.focus()
+          const pos = pendingCursorPos.current ?? targetPos
+          editorRef.current.setSelectionRange(pos, pos)
+          pendingCursorPos.current = null
+        }
       })
     },
     getSelectionStart: () => editorRef.current?.selectionStart ?? 0
@@ -34,15 +40,22 @@ const Editor = forwardRef<EditorRef, EditorProps>(({ value, onChange }, ref) => 
   useEffect(() => {
     if (value !== lastExternalValue.current && editorRef.current) {
       const el = editorRef.current
-      const start = el.selectionStart
-      const end = el.selectionEnd
-      const lengthDiff = value.length - lastExternalValue.current.length
-      el.value = value
-      if (lengthDiff > 0) {
-        const newPos = start + lengthDiff
-        el.setSelectionRange(newPos, newPos)
+      if (pendingCursorPos.current !== null) {
+        el.value = value
+        const pos = pendingCursorPos.current
+        el.setSelectionRange(pos, pos)
+        pendingCursorPos.current = null
       } else {
-        el.setSelectionRange(Math.min(start, value.length), Math.min(end, value.length))
+        const start = el.selectionStart
+        const end = el.selectionEnd
+        const lengthDiff = value.length - lastExternalValue.current.length
+        el.value = value
+        if (lengthDiff > 0) {
+          const newPos = start + lengthDiff
+          el.setSelectionRange(newPos, newPos)
+        } else {
+          el.setSelectionRange(Math.min(start, value.length), Math.min(end, value.length))
+        }
       }
       lastExternalValue.current = value
     }
@@ -51,6 +64,7 @@ const Editor = forwardRef<EditorRef, EditorProps>(({ value, onChange }, ref) => 
   const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const newValue = e.target.value
     lastExternalValue.current = newValue
+    pendingCursorPos.current = null
     onChange(newValue)
   }
 
