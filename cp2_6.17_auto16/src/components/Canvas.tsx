@@ -50,7 +50,10 @@ const Canvas: React.FC<CanvasProps> = ({
   const [arrowStart, setArrowStart] = useState<string | null>(null);
   const [editingStickyId, setEditingStickyId] = useState<string | null>(null);
   const [editingText, setEditingText] = useState('');
+  const [originalText, setOriginalText] = useState('');
+  const [hoveredStickyId, setHoveredStickyId] = useState<string | null>(null);
   const [animatingScale, setAnimatingScale] = useState(false);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const lastMousePos = useRef({ x: 0, y: 0 });
   const dragOffset = useRef({ x: 0, y: 0 });
   const animationRef = useRef<number>(0);
@@ -88,6 +91,21 @@ const Canvas: React.FC<CanvasProps> = ({
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      if (editingStickyId) {
+        if (e.code === 'Enter' && !e.shiftKey) {
+          e.preventDefault();
+          onUpdateElement(editingStickyId, { text: editingText } as Partial<CanvasElement>);
+          setEditingStickyId(null);
+          return;
+        }
+        if (e.code === 'Escape') {
+          e.preventDefault();
+          setEditingText(originalText);
+          setEditingStickyId(null);
+          return;
+        }
+      }
+      
       if (e.code === 'Space') {
         setIsSpacePressed(true);
       }
@@ -110,7 +128,7 @@ const Canvas: React.FC<CanvasProps> = ({
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
     };
-  }, [selectedId, editingStickyId, onDeleteElement, onSelect]);
+  }, [selectedId, editingStickyId, editingText, originalText, onDeleteElement, onSelect, onUpdateElement]);
 
   const getElementAtPoint = useCallback((wx: number, wy: number): CanvasElement | null => {
     for (let i = elements.length - 1; i >= 0; i--) {
@@ -280,15 +298,11 @@ const Canvas: React.FC<CanvasProps> = ({
   const getResizeHandles = (el: CanvasElement) => {
     if (el.type !== 'sticky') return [];
     const handles = [];
-    const positions = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'] as const;
+    const positions = ['nw', 'ne', 'se', 'sw'] as const;
     for (const pos of positions) {
       let x = el.x, y = el.y;
       if (pos.includes('e')) x += el.width;
-      if (pos.includes('w')) x += 0;
-      if (pos === 'n' || pos === 's') x += el.width / 2;
       if (pos.includes('s')) y += el.height;
-      if (pos.includes('n')) y += 0;
-      if (pos === 'e' || pos === 'w') y += el.height / 2;
       handles.push({ x, y, position: pos });
     }
     return handles;
@@ -298,6 +312,15 @@ const Canvas: React.FC<CanvasProps> = ({
     const worldPos = screenToWorld(e.clientX, e.clientY);
     setCursorPos({ x: e.clientX, y: e.clientY });
     onCursorMove(worldPos.x, worldPos.y);
+
+    if (!isPanning && !isDrawing && !isDragging && !isResizing) {
+      const hoveredEl = getElementAtPoint(worldPos.x, worldPos.y);
+      if (hoveredEl && hoveredEl.type === 'sticky') {
+        setHoveredStickyId(hoveredEl.id);
+      } else {
+        setHoveredStickyId(null);
+      }
+    }
 
     if (isPanning) {
       const dx = e.clientX - lastMousePos.current.x;
@@ -386,7 +409,14 @@ const Canvas: React.FC<CanvasProps> = ({
     if (clickedEl && clickedEl.type === 'sticky') {
       setEditingStickyId(clickedEl.id);
       setEditingText(clickedEl.text);
+      setOriginalText(clickedEl.text);
       onSelect(clickedEl.id);
+      setTimeout(() => {
+        if (textareaRef.current) {
+          textareaRef.current.focus();
+          textareaRef.current.select();
+        }
+      }, 0);
     }
   };
 
@@ -561,9 +591,31 @@ const Canvas: React.FC<CanvasProps> = ({
       drawStickyShape(ctx, el.x + 5, el.y + 5, el.width, el.height, el.shape);
     }
 
+    const isHovered = hoveredStickyId === el.id;
+    const isEditing = editingStickyId === el.id;
+    
+    if (isHovered && !selected && !isEditing) {
+      ctx.save();
+      ctx.shadowColor = color + '4D';
+      ctx.shadowBlur = 15 / viewport.scale;
+      ctx.strokeStyle = color + '4D';
+      ctx.lineWidth = 2 / viewport.scale;
+      drawStickyShape(ctx, el.x, el.y, el.width, el.height, el.shape);
+      ctx.restore();
+    }
+
     ctx.fillStyle = el.bgColor;
-    ctx.strokeStyle = selected ? '#e94560' : 'rgba(0, 0, 0, 0.1)';
-    ctx.lineWidth = selected ? 2 / viewport.scale : 1 / viewport.scale;
+    
+    if (selected) {
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 2 / viewport.scale;
+    } else if (isHovered && !isEditing) {
+      ctx.strokeStyle = color + '4D';
+      ctx.lineWidth = 1.5 / viewport.scale;
+    } else {
+      ctx.strokeStyle = 'rgba(0, 0, 0, 0.1)';
+      ctx.lineWidth = 1 / viewport.scale;
+    }
     
     drawStickyShape(ctx, el.x, el.y, el.width, el.height, el.shape);
 
@@ -573,15 +625,17 @@ const Canvas: React.FC<CanvasProps> = ({
     ctx.textBaseline = 'middle';
     wrapText(ctx, el.text, el.x + el.width / 2, el.y + el.height / 2, el.width - 20, 18 / viewport.scale);
 
-    if (selected) {
+    if (selected && !isEditing) {
       const handles = getResizeHandles(el);
-      ctx.fillStyle = '#fff';
-      ctx.strokeStyle = '#333';
-      ctx.lineWidth = 1 / viewport.scale;
+      const handleRadius = 4 / viewport.scale;
+      ctx.fillStyle = color;
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = 1.5 / viewport.scale;
       for (const handle of handles) {
-        const size = 6 / viewport.scale;
-        ctx.fillRect(handle.x - size / 2, handle.y - size / 2, size, size);
-        ctx.strokeRect(handle.x - size / 2, handle.y - size / 2, size, size);
+        ctx.beginPath();
+        ctx.arc(handle.x, handle.y, handleRadius, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
       }
     }
 
@@ -755,6 +809,7 @@ const Canvas: React.FC<CanvasProps> = ({
 
       {editingStickyId && selectedElement && selectedElement.type === 'sticky' && (
         <textarea
+          ref={textareaRef}
           value={editingText}
           onChange={handleTextChange}
           onBlur={handleTextBlur}
@@ -766,7 +821,7 @@ const Canvas: React.FC<CanvasProps> = ({
             width: selectedElement.width * viewport.scale,
             height: selectedElement.height * viewport.scale,
             backgroundColor: selectedElement.bgColor,
-            border: '2px solid #e94560',
+            border: `2px solid ${color}`,
             borderRadius: 8,
             padding: 10,
             fontSize: 14,
@@ -775,6 +830,7 @@ const Canvas: React.FC<CanvasProps> = ({
             outline: 'none',
             pointerEvents: 'auto',
             transformOrigin: 'top left',
+            boxShadow: `0 0 20px ${color}4D`,
           }}
         />
       )}
