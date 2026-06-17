@@ -54,6 +54,9 @@ export class GameScene extends Phaser.Scene {
   private groundSegments: Phaser.GameObjects.Rectangle[] = [];
   private bgElements: Phaser.GameObjects.GameObject[] = [];
 
+  private isPaused = false;
+  private pauseOverlay!: Phaser.GameObjects.Container;
+
   constructor() {
     super({ key: 'GameScene' });
   }
@@ -73,6 +76,8 @@ export class GameScene extends Phaser.Scene {
     this.createHUD(width);
 
     this.physics.world.setBounds(0, 0, width, height);
+
+    this.createPauseOverlay(width, height);
   }
 
   private resetState(): void {
@@ -92,6 +97,7 @@ export class GameScene extends Phaser.Scene {
     this.isShielded = false;
     this.shieldTimer = 0;
     this.scoreMultiplier = 1.0;
+    this.isPaused = false;
   }
 
   private createLavaTileBackground(w: number, h: number): void {
@@ -194,7 +200,7 @@ export class GameScene extends Phaser.Scene {
 
   private setupInput(): void {
     this.input.keyboard?.on('keydown-SPACE', () => {
-      if (!this.isAlive) return;
+      if (!this.isAlive || this.isPaused) return;
       const body = this.player.body as Phaser.Physics.Arcade.Body;
       if (body.touching.down || body.blocked.down) {
         this.isCharging = true;
@@ -204,12 +210,17 @@ export class GameScene extends Phaser.Scene {
     });
 
     this.input.keyboard?.on('keyup-SPACE', () => {
-      if (!this.isAlive || !this.isCharging) return;
+      if (!this.isAlive || !this.isCharging || this.isPaused) return;
       this.performJump();
     });
 
-    this.input.on('pointerdown', () => {
+    this.input.keyboard?.on('keydown-P', () => {
       if (!this.isAlive) return;
+      this.togglePause();
+    });
+
+    this.input.on('pointerdown', () => {
+      if (!this.isAlive || this.isPaused) return;
       const body = this.player.body as Phaser.Physics.Arcade.Body;
       if (body.touching.down || body.blocked.down) {
         this.isCharging = true;
@@ -219,7 +230,7 @@ export class GameScene extends Phaser.Scene {
     });
 
     this.input.on('pointerup', () => {
-      if (!this.isAlive || !this.isCharging) return;
+      if (!this.isAlive || !this.isCharging || this.isPaused) return;
       this.performJump();
     });
   }
@@ -257,8 +268,117 @@ export class GameScene extends Phaser.Scene {
     this.shieldBar = this.add.graphics().setDepth(100).setScrollFactor(0);
   }
 
+  private createPauseOverlay(w: number, h: number): void {
+    this.pauseOverlay = this.add.container(w / 2, h / 2).setDepth(500).setVisible(false);
+
+    const overlayBg = this.add.rectangle(0, 0, w * 2, h * 2, 0x000000, 0.65);
+    this.pauseOverlay.add(overlayBg);
+
+    const pauseText = this.add.text(0, -90, '暂停中', {
+      fontSize: '52px',
+      fontFamily: 'Arial, sans-serif',
+      color: '#FFD700',
+      stroke: '#8B4513',
+      strokeThickness: 4,
+      shadow: { offsetX: 2, offsetY: 2, color: '#000', blur: 6, fill: true },
+    }).setOrigin(0.5);
+    this.pauseOverlay.add(pauseText);
+
+    const resumeBtn = this.createMenuButton(0, -10, '继续游戏', '#27ae60', '#2ecc71', '#00ff88');
+    resumeBtn.on('pointerdown', () => this.togglePause());
+    this.pauseOverlay.add(resumeBtn);
+
+    const menuBtn = this.createMenuButton(0, 50, '返回主菜单', '#2980b9', '#3498db', '#00ccff');
+    menuBtn.on('pointerdown', () => {
+      this.isPaused = false;
+      this.physics.world.resume();
+      this.pauseOverlay.setVisible(false);
+      this.scene.start('MenuScene');
+    });
+    this.pauseOverlay.add(menuBtn);
+  }
+
+  private createMenuButton(
+    x: number,
+    y: number,
+    label: string,
+    colorFrom: string,
+    colorTo: string,
+    glowColor: string
+  ): Phaser.GameObjects.Container {
+    const btnW = 180;
+    const btnH = 46;
+    const from = Phaser.Display.Color.HexStringToColor(colorFrom).color;
+    const to = Phaser.Display.Color.HexStringToColor(colorTo).color;
+    const glow = Phaser.Display.Color.HexStringToColor(glowColor).color;
+
+    const btnBg = this.add.graphics();
+    const draw = (g: boolean) => {
+      btnBg.clear();
+      const hw = btnW / 2;
+      const hh = btnH / 2;
+      if (g) {
+        btnBg.fillStyle(glow, 0.3);
+        btnBg.fillRoundedRect(-hw - 3, -hh - 3, btnW + 6, btnH + 6, 10);
+      }
+      btnBg.fillGradientStyle(from, to, from, to, 1);
+      btnBg.fillRoundedRect(-hw, -hh, btnW, btnH, 8);
+      btnBg.lineStyle(1, 0xffffff, g ? 0.9 : 0.5);
+      btnBg.strokeRoundedRect(-hw, -hh, btnW, btnH, 8);
+    };
+    draw(false);
+
+    const btnText = this.add.text(0, 0, label, {
+      fontSize: '18px',
+      fontFamily: 'Arial, sans-serif',
+      color: '#ffffff',
+    }).setOrigin(0.5);
+
+    const btn = this.add.container(x, y, [btnBg, btnText]);
+    btn.setSize(btnW, btnH);
+    btn.setInteractive({ useHandCursor: true });
+
+    btn.on('pointerover', () => {
+      this.tweens.add({ targets: btn, scaleX: 1.1, scaleY: 1.1, duration: 150, ease: 'Back.easeOut' });
+      draw(true);
+    });
+    btn.on('pointerout', () => {
+      this.tweens.add({ targets: btn, scaleX: 1, scaleY: 1, duration: 150 });
+      draw(false);
+    });
+
+    return btn;
+  }
+
+  private togglePause(): void {
+    this.isPaused = !this.isPaused;
+
+    if (this.isPaused) {
+      this.pauseOverlay.setVisible(true).setAlpha(0);
+      this.tweens.add({ targets: this.pauseOverlay, alpha: 1, duration: 200 });
+      this.physics.world.pause();
+      this.tweens.pauseAll();
+
+      if (this.isCharging) {
+        this.performJump();
+      }
+    } else {
+      this.tweens.add({
+        targets: this.pauseOverlay,
+        alpha: 0,
+        duration: 200,
+        onComplete: () => {
+          this.pauseOverlay.setVisible(false);
+        },
+      });
+      this.physics.world.resume();
+      this.tweens.resumeAll();
+    }
+  }
+
   update(_time: number, delta: number): void {
     if (!this.isAlive) return;
+    if (this.isPaused) return;
 
     const dt = delta / 1000;
     const speedPx = this.scrollSpeed;
