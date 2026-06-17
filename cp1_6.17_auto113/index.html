@@ -1,0 +1,599 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>3D分子结构可视化</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    :root {
+      --bg-primary: #1a1a2e;
+      --bg-panel: rgba(255, 255, 255, 0.08);
+      --border-color: rgba(255, 255, 255, 0.1);
+      --text-primary: #ffffff;
+      --text-secondary: rgba(255, 255, 255, 0.7);
+      --accent-color: #4fc3f7;
+      --accent-glow: rgba(79, 195, 247, 0.5);
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif;
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+      color: var(--text-primary);
+    }
+
+    #app {
+      width: 100%;
+      height: 100%;
+      position: relative;
+    }
+
+    #canvas-container {
+      width: 100%;
+      height: 100%;
+      position: absolute;
+      top: 0;
+      left: 0;
+    }
+
+    .glass-panel {
+      background: var(--bg-panel);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    }
+
+    #info-panel {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      width: 280px;
+      padding: 20px;
+      z-index: 10;
+    }
+
+    #control-panel {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      width: 300px;
+      padding: 20px;
+      z-index: 10;
+      max-height: calc(100vh - 40px);
+      overflow-y: auto;
+    }
+
+    #control-panel::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    #control-panel::-webkit-scrollbar-track {
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 3px;
+    }
+
+    #control-panel::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.2);
+      border-radius: 3px;
+    }
+
+    .panel-title {
+      font-size: 18px;
+      font-weight: 600;
+      margin-bottom: 16px;
+      color: var(--text-primary);
+      border-bottom: 1px solid var(--border-color);
+      padding-bottom: 10px;
+    }
+
+    .info-item {
+      margin-bottom: 12px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .info-label {
+      color: var(--text-secondary);
+      font-size: 14px;
+    }
+
+    .info-value {
+      color: var(--text-primary);
+      font-family: 'Consolas', 'Monaco', monospace;
+      font-size: 14px;
+      font-weight: 500;
+    }
+
+    .formula-display {
+      font-size: 24px;
+      font-weight: 700;
+      text-align: center;
+      padding: 16px;
+      background: rgba(79, 195, 247, 0.1);
+      border-radius: 8px;
+      margin-bottom: 16px;
+      border: 1px solid rgba(79, 195, 247, 0.3);
+    }
+
+    .section {
+      margin-bottom: 20px;
+    }
+
+    .section-title {
+      font-size: 14px;
+      font-weight: 600;
+      margin-bottom: 10px;
+      color: var(--accent-color);
+    }
+
+    .input-group {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+
+    input[type="text"] {
+      flex: 1;
+      padding: 10px 12px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      color: var(--text-primary);
+      font-size: 14px;
+      outline: none;
+      transition: all 0.2s;
+    }
+
+    input[type="text"]:focus {
+      border-color: var(--accent-color);
+      box-shadow: 0 0 0 2px var(--accent-glow);
+    }
+
+    select {
+      width: 100%;
+      padding: 10px 12px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      color: var(--text-primary);
+      font-size: 14px;
+      outline: none;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    select:focus {
+      border-color: var(--accent-color);
+      box-shadow: 0 0 0 2px var(--accent-glow);
+    }
+
+    select option {
+      background: #1a1a2e;
+      color: var(--text-primary);
+    }
+
+    .btn {
+      padding: 10px 16px;
+      background: var(--accent-color);
+      color: #1a1a2e;
+      border: none;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px var(--accent-glow);
+    }
+
+    .btn:active {
+      transform: translateY(0);
+    }
+
+    .btn-group {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .btn-mode {
+      flex: 1;
+      min-width: 80px;
+      padding: 10px;
+      background: rgba(255, 255, 255, 0.05);
+      color: var(--text-primary);
+      border: 2px solid transparent;
+      border-radius: 8px;
+      font-size: 13px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .btn-mode:hover {
+      background: rgba(255, 255, 255, 0.1);
+      border-color: var(--border-color);
+    }
+
+    .btn-mode.active {
+      background: rgba(79, 195, 247, 0.2);
+      border-color: var(--accent-color);
+      color: var(--accent-color);
+    }
+
+    .color-theme {
+      display: flex;
+      gap: 12px;
+    }
+
+    .theme-option {
+      flex: 1;
+      padding: 12px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 2px solid transparent;
+      border-radius: 8px;
+      cursor: pointer;
+      text-align: center;
+      transition: all 0.2s;
+    }
+
+    .theme-option:hover {
+      background: rgba(255, 255, 255, 0.1);
+      border-color: var(--border-color);
+    }
+
+    .theme-option.active {
+      border-color: var(--accent-color);
+      background: rgba(79, 195, 247, 0.1);
+    }
+
+    .theme-colors {
+      display: flex;
+      gap: 4px;
+      justify-content: center;
+      margin-bottom: 6px;
+    }
+
+    .theme-color-dot {
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+    }
+
+    .theme-name {
+      font-size: 12px;
+      color: var(--text-secondary);
+    }
+
+    #progress-bar {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      width: 100%;
+      height: 4px;
+      background: rgba(255, 255, 255, 0.1);
+      z-index: 100;
+      overflow: hidden;
+    }
+
+    #progress-bar-fill {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, var(--accent-color), #81d4fa);
+      transition: width 0.3s ease;
+    }
+
+    #progress-bar-fill.loading {
+      animation: loading 1.5s infinite;
+    }
+
+    @keyframes loading {
+      0% { width: 0%; margin-left: 0%; }
+      50% { width: 50%; margin-left: 25%; }
+      100% { width: 0%; margin-left: 100%; }
+    }
+
+    #tooltip {
+      position: fixed;
+      padding: 12px 16px;
+      background: rgba(26, 26, 46, 0.95);
+      backdrop-filter: blur(10px);
+      border: 1px solid var(--accent-color);
+      border-radius: 8px;
+      font-size: 13px;
+      pointer-events: none;
+      z-index: 1000;
+      display: none;
+      box-shadow: 0 4px 20px rgba(79, 195, 247, 0.3);
+    }
+
+    #tooltip .tooltip-title {
+      font-weight: 600;
+      color: var(--accent-color);
+      margin-bottom: 6px;
+    }
+
+    #tooltip .tooltip-row {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 4px;
+    }
+
+    #tooltip .tooltip-label {
+      color: var(--text-secondary);
+    }
+
+    #tooltip .tooltip-value {
+      color: var(--text-primary);
+      font-family: 'Consolas', monospace;
+    }
+
+    .mobile-tabs {
+      display: none;
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      width: 100%;
+      background: rgba(26, 26, 46, 0.95);
+      backdrop-filter: blur(10px);
+      border-top: 1px solid var(--border-color);
+      z-index: 50;
+    }
+
+    .mobile-tab-buttons {
+      display: flex;
+    }
+
+    .mobile-tab-btn {
+      flex: 1;
+      padding: 12px;
+      background: transparent;
+      border: none;
+      color: var(--text-secondary);
+      font-size: 14px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .mobile-tab-btn.active {
+      color: var(--accent-color);
+      border-top: 2px solid var(--accent-color);
+    }
+
+    .mobile-panel-content {
+      display: none;
+      padding: 16px;
+      max-height: 50vh;
+      overflow-y: auto;
+    }
+
+    .mobile-panel-content.active {
+      display: block;
+    }
+
+    #fps-counter {
+      position: absolute;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      padding: 6px 12px;
+      background: rgba(0, 0, 0, 0.5);
+      border-radius: 6px;
+      font-family: 'Consolas', monospace;
+      font-size: 12px;
+      color: var(--accent-color);
+      z-index: 20;
+    }
+
+    .light-indicator {
+      position: absolute;
+      width: 16px;
+      height: 16px;
+      background: #ffd700;
+      border-radius: 50%;
+      cursor: grab;
+      z-index: 15;
+      box-shadow: 0 0 10px rgba(255, 215, 0, 0.8);
+      pointer-events: auto;
+    }
+
+    .light-indicator:active {
+      cursor: grabbing;
+    }
+
+    .light-indicator::after {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 8px;
+      height: 8px;
+      background: #fff;
+      border-radius: 50%;
+    }
+
+    @media (max-width: 768px) {
+      #info-panel, #control-panel {
+        display: none;
+      }
+
+      .mobile-tabs {
+        display: block;
+      }
+
+      #fps-counter {
+        top: 10px;
+        font-size: 11px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <div id="canvas-container"></div>
+
+    <div id="fps-counter">FPS: 60</div>
+
+    <div id="info-panel" class="glass-panel">
+      <div class="panel-title">分子信息</div>
+      <div id="formula" class="formula-display">C₂H₆O</div>
+      <div class="info-item">
+        <span class="info-label">分子量</span>
+        <span id="molecular-weight" class="info-value">46.07</span>
+      </div>
+      <div class="info-item">
+        <span class="info-label">原子数</span>
+        <span id="atom-count" class="info-value">9</span>
+      </div>
+      <div class="info-item">
+        <span class="info-label">键数</span>
+        <span id="bond-count" class="info-value">8</span>
+      </div>
+      <div class="info-item">
+        <span class="info-label">分子名称</span>
+        <span id="molecule-name" class="info-value">乙醇</span>
+      </div>
+    </div>
+
+    <div id="control-panel" class="glass-panel">
+      <div class="panel-title">控制面板</div>
+
+      <div class="section">
+        <div class="section-title">SMILES 输入</div>
+        <div class="input-group">
+          <input type="text" id="smiles-input" placeholder="输入SMILES，如CCO" />
+          <button class="btn" id="load-btn">加载</button>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-title">预设分子</div>
+        <select id="preset-select">
+          <option value="">选择预设分子...</option>
+        </select>
+      </div>
+
+      <div class="section">
+        <div class="section-title">渲染模式</div>
+        <div class="btn-group">
+          <button class="btn-mode active" data-mode="ball-stick">球棍模型</button>
+          <button class="btn-mode" data-mode="space-filling">空间填充</button>
+          <button class="btn-mode" data-mode="wireframe">线框模型</button>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-title">颜色主题</div>
+        <div class="color-theme">
+          <div class="theme-option active" data-theme="cpk">
+            <div class="theme-colors">
+              <div class="theme-color-dot" style="background:#909090"></div>
+              <div class="theme-color-dot" style="background:#ff0d0d"></div>
+              <div class="theme-color-dot" style="background:#3050f8"></div>
+            </div>
+            <div class="theme-name">CPK</div>
+          </div>
+          <div class="theme-option" data-theme="neon">
+            <div class="theme-colors">
+              <div class="theme-color-dot" style="background:#00ffff"></div>
+              <div class="theme-color-dot" style="background:#ff00ff"></div>
+              <div class="theme-color-dot" style="background:#ffff00"></div>
+            </div>
+            <div class="theme-name">霓虹</div>
+          </div>
+          <div class="theme-option" data-theme="grayscale">
+            <div class="theme-colors">
+              <div class="theme-color-dot" style="background:#888888"></div>
+              <div class="theme-color-dot" style="background:#cccccc"></div>
+              <div class="theme-color-dot" style="background:#444444"></div>
+            </div>
+            <div class="theme-name">灰度</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-title">操作提示</div>
+        <div style="font-size: 12px; color: var(--text-secondary); line-height: 1.8;">
+          <div>🖱️ 左键拖拽：旋转分子</div>
+          <div>🖱️ 右键拖拽：平移视图</div>
+          <div>🖱️ 滚轮：缩放视图</div>
+          <div>🖱️ 点击原子/键：查看详情</div>
+          <div>🟡 拖动小黄点：调整光源</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="mobile-tabs">
+      <div class="mobile-tab-buttons">
+        <button class="mobile-tab-btn active" data-tab="info">分子信息</button>
+        <button class="mobile-tab-btn" data-tab="control">控制面板</button>
+      </div>
+      <div class="mobile-panel-content active" id="mobile-info">
+        <div id="mobile-formula" class="formula-display">C₂H₆O</div>
+        <div class="info-item">
+          <span class="info-label">分子量</span>
+          <span id="mobile-molecular-weight" class="info-value">46.07</span>
+        </div>
+        <div class="info-item">
+          <span class="info-label">原子数</span>
+          <span id="mobile-atom-count" class="info-value">9</span>
+        </div>
+        <div class="info-item">
+          <span class="info-label">键数</span>
+          <span id="mobile-bond-count" class="info-value">8</span>
+        </div>
+      </div>
+      <div class="mobile-panel-content" id="mobile-control">
+        <div class="input-group">
+          <input type="text" id="mobile-smiles-input" placeholder="输入SMILES" />
+          <button class="btn" id="mobile-load-btn">加载</button>
+        </div>
+        <select id="mobile-preset-select" style="margin-bottom: 12px;">
+          <option value="">选择预设分子...</option>
+        </select>
+        <div class="section-title">渲染模式</div>
+        <div class="btn-group" style="margin-bottom: 12px;">
+          <button class="btn-mode active" data-mode="ball-stick">球棍</button>
+          <button class="btn-mode" data-mode="space-filling">填充</button>
+          <button class="btn-mode" data-mode="wireframe">线框</button>
+        </div>
+        <div class="section-title">颜色主题</div>
+        <div class="color-theme">
+          <div class="theme-option active" data-theme="cpk">
+            <div class="theme-name">CPK</div>
+          </div>
+          <div class="theme-option" data-theme="neon">
+            <div class="theme-name">霓虹</div>
+          </div>
+          <div class="theme-option" data-theme="grayscale">
+            <div class="theme-name">灰度</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="progress-bar">
+      <div id="progress-bar-fill"></div>
+    </div>
+
+    <div id="tooltip"></div>
+  </div>
+
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
