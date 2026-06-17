@@ -83,6 +83,12 @@ export class WaveformRenderer {
     ctx.fillStyle = this.backgroundColor;
     ctx.fillRect(0, 0, width, height);
 
+    const waveTop = height * (1 - this.waveHeightRatio) / 2;
+    const waveBottom = height - waveTop;
+    const waveHeight = waveBottom - waveTop;
+    const centerY = (waveTop + waveBottom) / 2;
+    const maxAmplitude = waveHeight / 2;
+
     const channelData = this.audioBuffer.getChannelData(0);
     const samples = channelData.length;
     const barWidth = 2;
@@ -90,10 +96,14 @@ export class WaveformRenderer {
     const bars = Math.floor(width / (barWidth + gap));
     const samplesPerBar = Math.floor(samples / bars);
 
-    const centerY = height / 2;
-    const maxAmplitude = (height * this.waveHeightRatio) / 2;
+    let globalPeak = 0;
+    for (let i = 0; i < samples; i++) {
+      const abs = Math.abs(channelData[i]);
+      if (abs > globalPeak) globalPeak = abs;
+    }
+    const normalizationFactor = globalPeak > 0 ? 1 / globalPeak : 1;
 
-    const gradient = ctx.createLinearGradient(0, centerY - maxAmplitude, 0, centerY + maxAmplitude);
+    const gradient = ctx.createLinearGradient(0, waveTop, 0, waveBottom);
     gradient.addColorStop(0, this.colorStart);
     gradient.addColorStop(1, this.colorEnd);
 
@@ -101,53 +111,97 @@ export class WaveformRenderer {
 
     for (let i = 0; i < bars; i++) {
       const start = i * samplesPerBar;
-      const end = start + samplesPerBar;
+      const end = Math.min(start + samplesPerBar, samples);
       let min = 0;
       let max = 0;
 
       for (let j = start; j < end; j++) {
-        const sample = channelData[j];
+        const sample = channelData[j] * normalizationFactor;
         if (sample < min) min = sample;
         if (sample > max) max = sample;
       }
 
       const x = i * (barWidth + gap);
-      const barHeight = Math.max((max - min) * maxAmplitude, 1);
+      const normalizedRange = (max - min);
+      const barHeight = Math.max(normalizedRange * maxAmplitude, 1);
       const y = centerY - barHeight / 2;
 
       ctx.fillRect(x, y, barWidth, barHeight);
     }
 
-    this.renderMarkers();
+    this.renderMarkersToCanvas(ctx, width, height, this.audioBuffer.duration, this.markers, false);
     this.renderPlayhead();
   }
 
-  private renderMarkers() {
-    if (!this.audioBuffer) return;
+  private renderMarkersToCanvas(
+    ctx: CanvasRenderingContext2D,
+    width: number,
+    height: number,
+    duration: number,
+    markers: Marker[],
+    forExport: boolean
+  ) {
+    const triangleSize = forExport ? 12 : 10;
+    const fontSize = forExport ? 14 : 12;
+    const bottomOffset = forExport ? 15 : 10;
+    const textOffset = forExport ? 25 : 20;
 
-    const ctx = this.ctx;
-    const width = this.canvas.width;
-    const height = this.canvas.height;
-    const duration = this.audioBuffer.duration;
-
-    this.markers.forEach(marker => {
+    markers.forEach(marker => {
       const x = (marker.time / duration) * width;
-      const triangleSize = 10;
 
       ctx.fillStyle = '#ffffff';
       ctx.beginPath();
-      ctx.moveTo(x, height - 10);
-      ctx.lineTo(x - triangleSize / 2, height - 10 - triangleSize);
-      ctx.lineTo(x + triangleSize / 2, height - 10 - triangleSize);
+      ctx.moveTo(x, height - bottomOffset);
+      ctx.lineTo(x - triangleSize / 2, height - bottomOffset - triangleSize);
+      ctx.lineTo(x + triangleSize / 2, height - bottomOffset - triangleSize);
       ctx.closePath();
       ctx.fill();
 
       ctx.fillStyle = '#ffffff';
-      ctx.font = '12px sans-serif';
+      ctx.font = `${fontSize}px sans-serif`;
       ctx.textAlign = 'center';
+      ctx.textBaseline = 'alphabetic';
       const timeText = formatTime(marker.time);
-      ctx.fillText(timeText, x, height - 20 - triangleSize);
+      ctx.fillText(timeText, x, height - textOffset - triangleSize);
+
+      if (forExport && marker.note) {
+        const noteX = x;
+        const noteY = height - 50 - triangleSize;
+        const padding = 8;
+        const maxWidth = 200;
+        
+        ctx.font = '14px sans-serif';
+        ctx.textBaseline = 'alphabetic';
+        const textMetrics = ctx.measureText(marker.note);
+        const textWidth = Math.min(textMetrics.width, maxWidth);
+        const bubbleWidth = textWidth + padding * 2;
+        const bubbleHeight = 30;
+        const bubbleX = noteX - bubbleWidth / 2;
+        const bubbleY = noteY - bubbleHeight - 5;
+
+        ctx.fillStyle = '#2a2a3e';
+        ctx.beginPath();
+        roundRect(ctx, bubbleX, bubbleY, bubbleWidth, bubbleHeight, 8);
+        ctx.fill();
+
+        ctx.fillStyle = '#ffffff';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(marker.note, noteX, bubbleY + bubbleHeight / 2);
+      }
     });
+  }
+
+  private renderMarkers() {
+    if (!this.audioBuffer) return;
+    this.renderMarkersToCanvas(
+      this.ctx,
+      this.canvas.width,
+      this.canvas.height,
+      this.audioBuffer.duration,
+      this.markers,
+      false
+    );
   }
 
   private renderPlayhead() {
@@ -282,8 +336,6 @@ export class WaveformRenderer {
       throw new Error('无法创建导出画布');
     }
 
-    const originalCanvas = this.canvas;
-    const originalMarkers = this.markers;
     const originalBuffer = this.audioBuffer;
 
     if (!originalBuffer) {
@@ -293,6 +345,12 @@ export class WaveformRenderer {
     ctx.fillStyle = this.backgroundColor;
     ctx.fillRect(0, 0, width, height);
 
+    const waveTop = height * (1 - this.waveHeightRatio) / 2;
+    const waveBottom = height - waveTop;
+    const waveHeight = waveBottom - waveTop;
+    const centerY = (waveTop + waveBottom) / 2;
+    const maxAmplitude = waveHeight / 2;
+
     const channelData = originalBuffer.getChannelData(0);
     const samples = channelData.length;
     const barWidth = 2;
@@ -300,10 +358,14 @@ export class WaveformRenderer {
     const bars = Math.floor(width / (barWidth + gap));
     const samplesPerBar = Math.floor(samples / bars);
 
-    const centerY = height / 2;
-    const maxAmplitude = (height * this.waveHeightRatio) / 2;
+    let globalPeak = 0;
+    for (let i = 0; i < samples; i++) {
+      const abs = Math.abs(channelData[i]);
+      if (abs > globalPeak) globalPeak = abs;
+    }
+    const normalizationFactor = globalPeak > 0 ? 1 / globalPeak : 1;
 
-    const gradient = ctx.createLinearGradient(0, centerY - maxAmplitude, 0, centerY + maxAmplitude);
+    const gradient = ctx.createLinearGradient(0, waveTop, 0, waveBottom);
     gradient.addColorStop(0, this.colorStart);
     gradient.addColorStop(1, this.colorEnd);
 
@@ -311,67 +373,25 @@ export class WaveformRenderer {
 
     for (let i = 0; i < bars; i++) {
       const start = i * samplesPerBar;
-      const end = start + samplesPerBar;
+      const end = Math.min(start + samplesPerBar, samples);
       let min = 0;
       let max = 0;
 
       for (let j = start; j < end; j++) {
-        const sample = channelData[j];
+        const sample = channelData[j] * normalizationFactor;
         if (sample < min) min = sample;
         if (sample > max) max = sample;
       }
 
       const x = i * (barWidth + gap);
-      const barHeight = Math.max((max - min) * maxAmplitude, 1);
+      const normalizedRange = (max - min);
+      const barHeight = Math.max(normalizedRange * maxAmplitude, 1);
       const y = centerY - barHeight / 2;
 
       ctx.fillRect(x, y, barWidth, barHeight);
     }
 
-    const duration = originalBuffer.duration;
-
-    originalMarkers.forEach(marker => {
-      const x = (marker.time / duration) * width;
-      const triangleSize = 12;
-
-      ctx.fillStyle = '#ffffff';
-      ctx.beginPath();
-      ctx.moveTo(x, height - 15);
-      ctx.lineTo(x - triangleSize / 2, height - 15 - triangleSize);
-      ctx.lineTo(x + triangleSize / 2, height - 15 - triangleSize);
-      ctx.closePath();
-      ctx.fill();
-
-      ctx.fillStyle = '#ffffff';
-      ctx.font = '14px sans-serif';
-      ctx.textAlign = 'center';
-      const timeText = formatTime(marker.time);
-      ctx.fillText(timeText, x, height - 25 - triangleSize);
-
-      if (marker.note) {
-        const noteX = x;
-        const noteY = height - 50 - triangleSize;
-        const padding = 8;
-        const maxWidth = 200;
-        
-        ctx.font = '14px sans-serif';
-        const textWidth = Math.min(ctx.measureText(marker.note).width, maxWidth);
-        const bubbleWidth = textWidth + padding * 2;
-        const bubbleHeight = 30;
-        const bubbleX = noteX - bubbleWidth / 2;
-        const bubbleY = noteY - bubbleHeight - 5;
-
-        ctx.fillStyle = '#2a2a3e';
-        ctx.beginPath();
-        roundRect(ctx, bubbleX, bubbleY, bubbleWidth, bubbleHeight, 8);
-        ctx.fill();
-
-        ctx.fillStyle = '#ffffff';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText(marker.note, noteX, bubbleY + bubbleHeight / 2);
-      }
-    });
+    this.renderMarkersToCanvas(ctx, width, height, originalBuffer.duration, this.markers, true);
 
     return exportCanvas.toDataURL('image/png');
   }

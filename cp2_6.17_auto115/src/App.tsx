@@ -15,6 +15,8 @@ const App: React.FC = () => {
   const markerManagerRef = useRef<MarkerManager>(new MarkerManager());
   const fileInputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const mouseDownPosRef = useRef<{ x: number; y: number; time: number } | null>(null);
+  const isDraggingMarkerRef = useRef(false);
 
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -29,6 +31,7 @@ const App: React.FC = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const [highlightMarkerId, setHighlightMarkerId] = useState<string | null>(null);
+  const [, forceUpdate] = useState(0);
 
   useEffect(() => {
     const checkMobile = () => {
@@ -181,6 +184,7 @@ const App: React.FC = () => {
 
   const handleCanvasDoubleClick = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
     if (!waveformRef.current || !uploadedFile) return;
+    if (isDraggingMarkerRef.current) return;
 
     const time = waveformRef.current.getTimeFromPosition(e.clientX);
     const marker = markerManagerRef.current.addMarker(time);
@@ -193,12 +197,72 @@ const App: React.FC = () => {
     }
   }, [uploadedFile]);
 
-  const handleCanvasClick = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
+  const handleCanvasMouseDown = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
     if (!waveformRef.current || !uploadedFile) return;
 
     const time = waveformRef.current.getTimeFromPosition(e.clientX);
-    waveformRef.current.seek(time);
+    mouseDownPosRef.current = {
+      x: e.clientX,
+      y: e.clientY,
+      time
+    };
+    isDraggingMarkerRef.current = false;
+
+    const dragThresholdSeconds = duration > 0 ? Math.min(duration * 0.01, 0.5) : 0.3;
+    const started = markerManagerRef.current.dragStart(time, dragThresholdSeconds);
+    if (started) {
+      forceUpdate(n => n + 1);
+    }
+  }, [uploadedFile, duration]);
+
+  const handleCanvasMouseMove = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
+    if (!waveformRef.current || !uploadedFile || !mouseDownPosRef.current) return;
+
+    const dx = Math.abs(e.clientX - mouseDownPosRef.current.x);
+    const dy = Math.abs(e.clientY - mouseDownPosRef.current.y);
+
+    if (dx > 4 || dy > 4) {
+      const draggingId = markerManagerRef.current.getDraggingMarkerId();
+      if (draggingId) {
+        isDraggingMarkerRef.current = true;
+        const time = waveformRef.current.getTimeFromPosition(e.clientX);
+        markerManagerRef.current.dragMove(time);
+        if (waveformRef.current) {
+          setCurrentTime(time);
+        }
+      }
+    }
   }, [uploadedFile]);
+
+  const handleCanvasMouseUp = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
+    if (!waveformRef.current || !uploadedFile) return;
+
+    const draggingId = markerManagerRef.current.dragEnd();
+    
+    if (draggingId && isDraggingMarkerRef.current) {
+      const time = waveformRef.current.getTimeFromPosition(e.clientX);
+      setCurrentTime(time);
+      forceUpdate(n => n + 1);
+    } else if (mouseDownPosRef.current && !isDraggingMarkerRef.current) {
+      const time = waveformRef.current.getTimeFromPosition(e.clientX);
+      waveformRef.current.seek(time);
+      setCurrentTime(time);
+    }
+
+    mouseDownPosRef.current = null;
+    
+    setTimeout(() => {
+      isDraggingMarkerRef.current = false;
+    }, 50);
+  }, [uploadedFile]);
+
+  const handleCanvasMouseLeave = useCallback(() => {
+    if (mouseDownPosRef.current && markerManagerRef.current.getDraggingMarkerId()) {
+      markerManagerRef.current.dragEnd();
+    }
+    mouseDownPosRef.current = null;
+    isDraggingMarkerRef.current = false;
+  }, []);
 
   const handlePlayPause = useCallback(() => {
     if (!waveformRef.current || !uploadedFile) return;
@@ -386,7 +450,10 @@ const App: React.FC = () => {
         </div>
       </div>
 
-      <div style={styles.mainContent}>
+      <div style={{
+        ...styles.mainContent,
+        ...(isMobile ? styles.mainContentMobile : {})
+      }}>
         <div style={styles.waveformSection}>
           <div style={styles.controls}>
             <button
@@ -421,9 +488,15 @@ const App: React.FC = () => {
           >
             <canvas
               ref={canvasRef}
-              style={styles.canvas}
+              style={{
+                ...styles.canvas,
+                cursor: markerManagerRef.current.getDraggingMarkerId() ? 'grabbing' : 'crosshair'
+              }}
+              onMouseDown={handleCanvasMouseDown}
+              onMouseMove={handleCanvasMouseMove}
+              onMouseUp={handleCanvasMouseUp}
+              onMouseLeave={handleCanvasMouseLeave}
               onDoubleClick={handleCanvasDoubleClick}
-              onClick={handleCanvasClick}
             />
             {!uploadedFile && !isLoading && (
               <div style={styles.placeholderOverlay}>
@@ -497,21 +570,23 @@ const styles: { [key: string]: React.CSSProperties } = {
   },
   mobileMenuButton: {
     position: 'fixed',
-    top: '16px',
-    left: '16px',
+    top: '12px',
+    left: '12px',
     zIndex: 100,
-    width: '40px',
-    height: '40px',
-    borderRadius: '8px',
+    width: '44px',
+    height: '44px',
+    borderRadius: '12px',
     backgroundColor: '#2a2a3e',
     color: '#ffffff',
-    border: 'none',
-    fontSize: '20px',
+    border: '1px solid #3a3a50',
+    fontSize: '22px',
+    fontWeight: 'bold',
     cursor: 'pointer',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    transition: 'background-color 0.2s ease'
+    transition: 'all 0.2s ease',
+    boxShadow: '0 2px 8px rgba(0, 0, 0, 0.3)'
   },
   overlay: {
     position: 'fixed',
@@ -708,6 +783,9 @@ const styles: { [key: string]: React.CSSProperties } = {
     padding: '24px',
     overflow: 'auto',
     position: 'relative'
+  },
+  mainContentMobile: {
+    paddingTop: '72px'
   },
   waveformSection: {
     flex: 1,

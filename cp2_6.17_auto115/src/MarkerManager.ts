@@ -116,6 +116,34 @@ export class MarkerManager {
     return nearest;
   }
 
+  dragStart(time: number, threshold: number = 0.3): boolean {
+    const marker = this.findNearestMarker(time, threshold);
+    if (!marker) return false;
+    
+    this.draggingMarkerId = marker.id;
+    this.selectedMarkerId = marker.id;
+    this.notifySelect();
+    return true;
+  }
+
+  dragMove(time: number): boolean {
+    if (!this.draggingMarkerId) return false;
+    
+    const marker = this.getMarker(this.draggingMarkerId);
+    if (!marker) return false;
+
+    marker.time = Math.max(0, time);
+    this.markers.sort((a, b) => a.time - b.time);
+    this.notifyChange();
+    return true;
+  }
+
+  dragEnd(): string | null {
+    const id = this.draggingMarkerId;
+    this.draggingMarkerId = null;
+    return id;
+  }
+
   addChangeListener(listener: MarkerChangeListener): () => void {
     this.changeListeners.push(listener);
     return () => {
