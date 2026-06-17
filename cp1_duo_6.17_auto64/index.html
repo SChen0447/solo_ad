@@ -277,6 +277,30 @@
       height: 3px;
       border-radius: 2px;
     }
+
+    #reset-view-btn {
+      width: 100%;
+      padding: 10px 16px;
+      background: rgba(30, 30, 45, 0.9);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 6px;
+      color: #e0e0e0;
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 14px;
+      cursor: pointer;
+      transition: background 0.2s, border-color 0.2s, color 0.2s;
+      margin-bottom: 20px;
+    }
+
+    #reset-view-btn:hover {
+      background: rgba(0, 212, 255, 0.15);
+      border-color: #00d4ff;
+      color: #00d4ff;
+    }
+
+    #reset-view-btn:active {
+      background: rgba(0, 212, 255, 0.3);
+    }
   </style>
 </head>
 <body>
@@ -286,6 +310,10 @@
     
     <div id="control-panel">
       <h2>🎵 声学控制面板</h2>
+
+      <div class="control-group">
+        <button id="reset-view-btn">⟳ 重置视角</button>
+      </div>
       
       <div class="control-group">
         <label for="room-shape">房间形状</label>

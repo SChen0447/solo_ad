@@ -15,6 +15,7 @@ export interface UICallbacks {
   onReceiverPositionChange: (pos: THREE.Vector3) => void;
   onParamsChange: (reflectionRate: number, airAbsorption: number) => void;
   onRedrawRequest: () => void;
+  onResetView: () => void;
 }
 
 export class UIController {
@@ -37,6 +38,7 @@ export class UIController {
     menuToggle: HTMLButtonElement;
     panelOverlay: HTMLDivElement;
     fpsCounter: HTMLDivElement;
+    resetViewBtn: HTMLButtonElement;
   };
 
   private paramsUpdateTimer: number | null = null;
@@ -61,7 +63,8 @@ export class UIController {
       controlPanel: document.getElementById('control-panel') as HTMLDivElement,
       menuToggle: document.getElementById('menu-toggle') as HTMLButtonElement,
       panelOverlay: document.getElementById('panel-overlay') as HTMLDivElement,
-      fpsCounter: document.getElementById('fps-counter') as HTMLDivElement
+      fpsCounter: document.getElementById('fps-counter') as HTMLDivElement,
+      resetViewBtn: document.getElementById('reset-view-btn') as HTMLButtonElement
     };
 
     this.bindEvents();
@@ -121,6 +124,10 @@ export class UIController {
 
     this.elements.panelOverlay.addEventListener('click', () => {
       this.closePanel();
+    });
+
+    this.elements.resetViewBtn.addEventListener('click', () => {
+      this.callbacks.onResetView();
     });
 
     window.addEventListener('resize', () => {

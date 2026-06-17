@@ -24,6 +24,10 @@ class App {
   private sourceMesh!: THREE.Mesh;
   private receiverMesh!: THREE.Mesh;
   private sourcePulse!: THREE.Mesh;
+  private sourceRing!: THREE.Mesh;
+  private receiverRing!: THREE.Mesh;
+  private sourceAxes!: THREE.Group;
+  private receiverAxes!: THREE.Group;
 
   private pathGroup: THREE.Group = new THREE.Group();
   private pathVisuals: PathVisual[] = [];
@@ -47,6 +51,8 @@ class App {
   private readonly REDRAW_DELAY = 500;
 
   private readonly DOT_SPEED = 0.8;
+  private readonly DEFAULT_CAMERA_POSITION = new THREE.Vector3(15, 12, 15);
+  private readonly DEFAULT_CAMERA_TARGET = new THREE.Vector3(0, 2, 0);
   private readonly REFLECTION_COLORS: number[] = [
     0xffffff,
     0xff4444,
@@ -96,6 +102,8 @@ class App {
 
     this.setupLighting();
     this.createSourceAndReceiver();
+    this.createDragHandles();
+    this.createAxisHelper();
     this.scene.add(this.pathGroup);
 
     const initialParams: UIParams = {
@@ -112,7 +120,8 @@ class App {
       onReceiverPositionChange: (pos: THREE.Vector3) => this.handleReceiverPositionChange(pos),
       onParamsChange: (reflectionRate: number, airAbsorption: number) => 
         this.handleParamsChange(reflectionRate, airAbsorption),
-      onRedrawRequest: () => this.scheduleRedraw()
+      onRedrawRequest: () => this.scheduleRedraw(),
+      onResetView: () => this.resetCameraView()
     }, initialParams);
 
     this.bindInputEvents();
@@ -182,6 +191,143 @@ class App {
     this.scene.add(this.receiverMesh);
   }
 
+  private createDragHandles(): void {
+    const ringGeometry = new THREE.TorusGeometry(0.35, 0.02, 8, 32);
+
+    const sourceRingMaterial = new THREE.MeshBasicMaterial({
+      color: 0x4488ff,
+      transparent: true,
+      opacity: 0.4,
+      side: THREE.DoubleSide
+    });
+    this.sourceRing = new THREE.Mesh(ringGeometry, sourceRingMaterial);
+    this.sourceRing.position.copy(this.sourcePosition);
+    this.sourceRing.rotation.x = Math.PI / 2;
+    this.sourceRing.userData.isDragHandle = true;
+    this.scene.add(this.sourceRing);
+
+    const receiverRingMaterial = new THREE.MeshBasicMaterial({
+      color: 0xffcc00,
+      transparent: true,
+      opacity: 0.4,
+      side: THREE.DoubleSide
+    });
+    this.receiverRing = new THREE.Mesh(ringGeometry.clone(), receiverRingMaterial);
+    this.receiverRing.position.copy(this.receiverPosition);
+    this.receiverRing.rotation.x = Math.PI / 2;
+    this.receiverRing.userData.isDragHandle = true;
+    this.scene.add(this.receiverRing);
+
+    this.sourceAxes = this.createMiniAxes(0x4488ff);
+    this.sourceAxes.position.copy(this.sourcePosition);
+    this.scene.add(this.sourceAxes);
+
+    this.receiverAxes = this.createMiniAxes(0xffcc00);
+    this.receiverAxes.position.copy(this.receiverPosition);
+    this.scene.add(this.receiverAxes);
+  }
+
+  private createMiniAxes(tint: number): THREE.Group {
+    const group = new THREE.Group();
+    const axisLength = 0.5;
+    const colors = [0xff4444, 0x44ff44, 0x4444ff];
+    const directions = [
+      new THREE.Vector3(1, 0, 0),
+      new THREE.Vector3(0, 1, 0),
+      new THREE.Vector3(0, 0, 1)
+    ];
+
+    for (let i = 0; i < 3; i++) {
+      const origin = new THREE.Vector3(0, 0, 0);
+      const dir = directions[i].clone().multiplyScalar(axisLength);
+      const points = [origin, dir];
+      const geometry = new THREE.BufferGeometry().setFromPoints(points);
+      const material = new THREE.LineBasicMaterial({
+        color: colors[i],
+        transparent: true,
+        opacity: 0.5
+      });
+      const line = new THREE.Line(geometry, material);
+      group.add(line);
+
+      const coneGeometry = new THREE.ConeGeometry(0.04, 0.12, 6);
+      const coneMaterial = new THREE.MeshBasicMaterial({
+        color: colors[i],
+        transparent: true,
+        opacity: 0.5
+      });
+      const cone = new THREE.Mesh(coneGeometry, coneMaterial);
+      cone.position.copy(dir);
+      if (i === 0) cone.rotation.z = -Math.PI / 2;
+      else if (i === 2) cone.rotation.x = Math.PI / 2;
+      group.add(cone);
+    }
+
+    const tintMaterial = new THREE.MeshBasicMaterial({
+      color: tint,
+      transparent: true,
+      opacity: 0.15
+    });
+    const sphereGeometry = new THREE.SphereGeometry(0.5, 16, 16);
+    const tintSphere = new THREE.Mesh(sphereGeometry, tintMaterial);
+    group.add(tintSphere);
+
+    return group;
+  }
+
+  private createAxisHelper(): void {
+    const axisGroup = new THREE.Group();
+    const axisLength = 2.5;
+    const colors = [0xff4444, 0x44ff44, 0x4444ff];
+    const directions = [
+      new THREE.Vector3(1, 0, 0),
+      new THREE.Vector3(0, 1, 0),
+      new THREE.Vector3(0, 0, 1)
+    ];
+
+    for (let i = 0; i < 3; i++) {
+      const origin = new THREE.Vector3(0, 0, 0);
+      const dir = directions[i].clone().multiplyScalar(axisLength);
+      const points = [origin, dir];
+      const geometry = new THREE.BufferGeometry().setFromPoints(points);
+      const material = new THREE.LineBasicMaterial({
+        color: colors[i],
+        transparent: true,
+        opacity: 0.6
+      });
+      const line = new THREE.Line(geometry, material);
+      axisGroup.add(line);
+
+      const coneGeometry = new THREE.ConeGeometry(0.08, 0.24, 8);
+      const coneMaterial = new THREE.MeshBasicMaterial({
+        color: colors[i],
+        transparent: true,
+        opacity: 0.6
+      });
+      const cone = new THREE.Mesh(coneGeometry, coneMaterial);
+      cone.position.copy(dir);
+      if (i === 0) cone.rotation.z = -Math.PI / 2;
+      else if (i === 2) cone.rotation.x = Math.PI / 2;
+      axisGroup.add(cone);
+    }
+
+    axisGroup.position.set(0, 0.01, 0);
+    this.scene.add(axisGroup);
+  }
+
+  private resetCameraView(): void {
+    this.camera.position.copy(this.DEFAULT_CAMERA_POSITION);
+    this.controls.target.copy(this.DEFAULT_CAMERA_TARGET);
+    this.controls.update();
+  }
+
+  private updateDragHandlePositions(): void {
+    this.sourceRing.position.copy(this.sourcePosition);
+    this.receiverRing.position.copy(this.receiverPosition);
+    this.sourceAxes.position.copy(this.sourcePosition);
+    this.receiverAxes.position.copy(this.receiverPosition);
+  }
+
   private bindInputEvents(): void {
     const canvas = this.renderer.domElement;
 
@@ -199,16 +345,18 @@ class App {
 
     const intersects = this.raycaster.intersectObjects([
       this.sourceMesh,
-      this.receiverMesh
+      this.receiverMesh,
+      this.sourceRing,
+      this.receiverRing
     ]);
 
     if (intersects.length > 0) {
       const object = intersects[0].object;
-      if (object === this.sourceMesh) {
+      if (object === this.sourceMesh || object === this.sourceRing) {
         this.isDraggingSource = true;
         this.controls.enabled = false;
         this.setupDragPlane(intersects[0].point);
-      } else if (object === this.receiverMesh) {
+      } else if (object === this.receiverMesh || object === this.receiverRing) {
         this.isDraggingReceiver = true;
         this.controls.enabled = false;
         this.setupDragPlane(intersects[0].point);
@@ -223,6 +371,7 @@ class App {
         this.sourceMesh.position.copy(this.sourcePosition);
         this.sourcePulse.position.copy(this.sourcePosition);
         this.uiController.updateSourcePosition(this.sourcePosition);
+        this.updateDragHandlePositions();
         this.scheduleRedraw();
         this.startPulseAnimation();
       }
@@ -232,6 +381,7 @@ class App {
         this.receiverPosition.copy(this.roomManager.clampPointToRoom(point));
         this.receiverMesh.position.copy(this.receiverPosition);
         this.uiController.updateReceiverPosition(this.receiverPosition);
+        this.updateDragHandlePositions();
         this.scheduleRedraw();
       }
     }
@@ -270,6 +420,7 @@ class App {
         this.uiController.updateReceiverPosition(clampedPos);
       }
 
+      this.updateDragHandlePositions();
       this.scheduleRedraw();
     }
   }
@@ -307,6 +458,7 @@ class App {
     this.receiverMesh.position.copy(this.receiverPosition);
     this.uiController.updateSourcePosition(this.sourcePosition);
     this.uiController.updateReceiverPosition(this.receiverPosition);
+    this.updateDragHandlePositions();
     this.scheduleRedraw();
   }
 
@@ -315,6 +467,7 @@ class App {
     this.sourcePosition.copy(clamped);
     this.sourceMesh.position.copy(clamped);
     this.sourcePulse.position.copy(clamped);
+    this.updateDragHandlePositions();
     this.scheduleRedraw();
   }
 
@@ -322,6 +475,7 @@ class App {
     const clamped = this.roomManager.clampPointToRoom(pos);
     this.receiverPosition.copy(clamped);
     this.receiverMesh.position.copy(clamped);
+    this.updateDragHandlePositions();
     this.scheduleRedraw();
   }
 
@@ -587,6 +741,10 @@ class App {
 
     this.updateDotPositions(deltaTime);
     this.updatePulseAnimation(time);
+    this.sourceRing.lookAt(this.camera.position);
+    this.receiverRing.lookAt(this.camera.position);
+    this.sourceAxes.lookAt(this.camera.position);
+    this.receiverAxes.lookAt(this.camera.position);
     this.controls.update();
 
     this.renderer.render(this.scene, this.camera);
