@@ -110,3 +110,27 @@ export interface MatchResponse {
   matched: boolean;
   weapon?: WeaponData;
 }
+
+export type SkillEffectType = 'damage' | 'heal' | 'armorBreak' | 'stun' | 'burn' | 'shield';
+
+export interface SkillData {
+  id: string;
+  name: string;
+  description: string;
+  effectType: SkillEffectType;
+  damageMultiplier: number;
+  healPercent: number;
+  armorBreakPercent: number;
+  stunDuration: number;
+  burnDamage: number;
+  burnDuration: number;
+  shieldAmount: number;
+  cooldown: number;
+  iconColor: string;
+  iconSymbol: string;
+}
+
+export interface SkillState {
+  skill: SkillData;
+  currentCooldown: number;
+}

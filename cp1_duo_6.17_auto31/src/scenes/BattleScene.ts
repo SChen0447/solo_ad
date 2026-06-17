@@ -1,7 +1,8 @@
 import Phaser from 'phaser';
 import { monsterGenerator } from '../managers/MonsterGenerator';
 import { gameState } from '../store/GameState';
-import { MonsterData, MaterialData } from '../models/TypeDefinitions';
+import { MonsterData, MaterialData, SkillState, SkillData } from '../models/TypeDefinitions';
+import { skillManager } from '../managers/SkillManager';
 import axios from 'axios';
 
 const STEP_TRIGGER = 3;
@@ -33,6 +34,18 @@ export class BattleScene extends Phaser.Scene {
   private dropItems: Phaser.GameObjects.Container[] = [];
   private playerYBase: number = 0;
   private monsterYBase: number = 0;
+  private skillStates: SkillState[] = [];
+  private skillButtons: Phaser.GameObjects.Container[] = [];
+  private skillPanel!: Phaser.GameObjects.Graphics;
+  private monsterShield: number = 0;
+  private playerShield: number = 0;
+  private monsterArmorBreak: number = 0;
+  private playerArmorBreak: number = 0;
+  private monsterBurnTurns: number = 0;
+  private monsterBurnDamage: number = 0;
+  private monsterStunTurns: number = 0;
+  private damageNumberPool: Phaser.GameObjects.Text[] = [];
+  private showSkills: boolean = false;
 
   constructor() {
     super({ key: 'BattleScene' });
@@ -292,6 +305,7 @@ export class BattleScene extends Phaser.Scene {
     this.drawHpBars(w, h);
     this.createButtons(w, h);
     this.createNavButtons(w, h);
+    this.createSkillPanel(w, h);
   }
 
   private drawBottomPanel(w: number, h: number) {
@@ -439,6 +453,147 @@ export class BattleScene extends Phaser.Scene {
     this.codexBtn = makeNav(w * 0.8, '📖 图鉴', 0x1a2a1a, () => this.scene.start('CodexScene'));
   }
 
+  private createSkillPanel(w: number, h: number) {
+    if (this.skillPanel) this.skillPanel.destroy();
+    this.skillButtons.forEach(b => b.destroy());
+    this.skillButtons = [];
+
+    const panelX = 20;
+    const panelY = h - 130;
+    const panelW = 60;
+    const panelH = 110;
+
+    this.skillPanel = this.add.graphics().setDepth(12);
+    this.skillPanel.fillStyle(0x0d0d0d, 0.9);
+    this.skillPanel.fillRoundedRect(panelX, panelY, panelW, panelH, 8);
+    this.skillPanel.lineStyle(2, 0xffd700, 0.6);
+    this.skillPanel.strokeRoundedRect(panelX, panelY, panelW, panelH, 8);
+
+    const toggleBtn = this.add.rectangle(panelX + panelW / 2, panelY + 22, 48, 32, 0x2a2a4a)
+      .setStrokeStyle(1, 0xffd700)
+      .setInteractive({ useHandCursor: true })
+      .setDepth(13);
+
+    const toggleText = this.add.text(panelX + panelW / 2, panelY + 22, '技能', {
+      fontSize: '13px', color: '#ffd700', fontFamily: 'serif',
+    }).setOrigin(0.5).setDepth(13);
+
+    toggleBtn.on('pointerover', () => toggleBtn.setFillStyle(0x3a3a6a));
+    toggleBtn.on('pointerout', () => toggleBtn.setFillStyle(0x2a2a4a));
+    toggleBtn.on('pointerdown', () => this.toggleSkillPanel());
+
+    const skillBtnSize = 48;
+    const skillStartY = panelY + 60;
+    const skillSpacing = 55;
+
+    for (let i = 0; i < 3; i++) {
+      const skillY = skillStartY + i * skillSpacing;
+      const skillX = panelX + panelW / 2;
+
+      const container = this.add.container(skillX, skillY).setDepth(13);
+
+      const bgCircle = this.add.circle(0, 0, skillBtnSize / 2, 0x222222)
+        .setStrokeStyle(2, 0xffd700, 0.5);
+      container.add(bgCircle);
+
+      const iconText = this.add.text(0, -2, '?', {
+        fontSize: '22px', color: '#ffffff', fontFamily: 'serif',
+      }).setOrigin(0.5);
+      container.add(iconText);
+
+      const nameText = this.add.text(0, skillBtnSize / 2 + 8, '', {
+        fontSize: '10px', color: '#cccccc', fontFamily: 'serif',
+      }).setOrigin(0.5);
+      container.add(nameText);
+
+      const cooldownMask = this.add.circle(0, 0, skillBtnSize / 2, 0x000000, 0.7);
+      cooldownMask.setVisible(false);
+      container.add(cooldownMask);
+
+      const cooldownText = this.add.text(0, 0, '', {
+        fontSize: '20px', color: '#ffffff', fontFamily: 'monospace',
+        fontStyle: 'bold',
+      }).setOrigin(0.5).setDepth(1);
+      cooldownText.setVisible(false);
+      container.add(cooldownText);
+
+      container.setData('bgCircle', bgCircle);
+      container.setData('iconText', iconText);
+      container.setData('nameText', nameText);
+      container.setData('cooldownMask', cooldownMask);
+      container.setData('cooldownText', cooldownText);
+      container.setData('index', i);
+
+      bgCircle.setInteractive({ useHandCursor: true });
+      bgCircle.on('pointerover', () => {
+        const state = this.skillStates[i];
+        if (state && state.currentCooldown === 0 && this.battleActive && this.isPlayerTurn && !this.isAnimating) {
+          bgCircle.setStrokeStyle(3, 0xffffff, 1);
+          bgCircle.setScale(1.1);
+        }
+      });
+      bgCircle.on('pointerout', () => {
+        bgCircle.setStrokeStyle(2, 0xffd700, 0.5);
+        bgCircle.setScale(1);
+      });
+      bgCircle.on('pointerdown', () => {
+        if (this.battleActive && this.isPlayerTurn && !this.isAnimating) {
+          this.useSkill(i);
+        }
+      });
+
+      this.skillButtons.push(container);
+    }
+
+    this.refreshSkillButtons();
+    this.updateSkillPanelVisibility();
+  }
+
+  private toggleSkillPanel() {
+    this.showSkills = !this.showSkills;
+    this.updateSkillPanelVisibility();
+  }
+
+  private updateSkillPanelVisibility() {
+    this.skillButtons.forEach((btn, i) => {
+      const visible = this.showSkills && i < this.skillStates.length;
+      btn.setVisible(visible);
+    });
+  }
+
+  private refreshSkillButtons() {
+    this.skillButtons.forEach((btn, i) => {
+      const state = this.skillStates[i];
+      const bgCircle = btn.get('bgCircle') as Phaser.GameObjects.Arc;
+      const iconText = btn.get('iconText') as Phaser.GameObjects.Text;
+      const nameText = btn.get('nameText') as Phaser.GameObjects.Text;
+      const cooldownMask = btn.get('cooldownMask') as Phaser.GameObjects.Arc;
+      const cooldownText = btn.get('cooldownText') as Phaser.GameObjects.Text;
+
+      if (state) {
+        const color = parseInt(state.skill.iconColor.replace('#', ''), 16);
+        bgCircle.fillColor = color;
+        iconText.setText(state.skill.iconSymbol);
+        nameText.setText(state.skill.name);
+
+        if (state.currentCooldown > 0) {
+          cooldownMask.setVisible(true);
+          cooldownText.setVisible(true);
+          cooldownText.setText(String(state.currentCooldown));
+        } else {
+          cooldownMask.setVisible(false);
+          cooldownText.setVisible(false);
+        }
+      } else {
+        bgCircle.fillColor = 0x222222;
+        iconText.setText('?');
+        nameText.setText('');
+        cooldownMask.setVisible(false);
+        cooldownText.setVisible(false);
+      }
+    });
+  }
+
   private startExplore() {
     if (this.battleActive) return;
 
@@ -467,6 +622,20 @@ export class BattleScene extends Phaser.Scene {
     this.battleActive = true;
     this.isPlayerTurn = true;
 
+    this.monsterShield = 0;
+    this.playerShield = 0;
+    this.monsterArmorBreak = 0;
+    this.playerArmorBreak = 0;
+    this.monsterBurnTurns = 0;
+    this.monsterBurnDamage = 0;
+    this.monsterStunTurns = 0;
+
+    const randomSkills = skillManager.getRandomSkills(3);
+    this.skillStates = skillManager.createSkillStates(randomSkills);
+    this.refreshSkillButtons();
+    this.showSkills = true;
+    this.updateSkillPanelVisibility();
+
     this.addLogEntry(`遭遇了【${monster.name}】！`);
 
     this.createMonsterSprite();
@@ -474,6 +643,9 @@ export class BattleScene extends Phaser.Scene {
 
     const affixNames = monster.affixes.map(a => a.name).join('·');
     this.addLogEntry(`词条：${affixNames} | HP:${monster.hp} ATK:${monster.attack} DEF:${monster.defense}`);
+
+    const skillNames = this.skillStates.map(s => s.skill.name).join('、');
+    this.addLogEntry(`可用技能：${skillNames}`);
   }
 
   private performAttack() {
@@ -497,12 +669,23 @@ export class BattleScene extends Phaser.Scene {
 
     this.cameras.main.shake(200, 0.005);
 
-    const rawDmg = gameState.player.attack - Math.floor(this.currentMonster.defense * 0.5);
+    const rawDmg = gameState.player.attack - Math.floor(this.currentMonster.defense * (1 - this.monsterArmorBreak) * 0.5);
     const crit = Math.random() < (gameState.player.equippedWeapon?.critRate || 0.05);
-    const damage = Math.max(1, crit ? Math.round(rawDmg * 1.5) : rawDmg);
+    let damage = Math.max(1, crit ? Math.round(rawDmg * 1.5) : rawDmg);
+
+    if (this.monsterShield > 0) {
+      const shieldAbsorb = Math.min(this.monsterShield, damage);
+      this.monsterShield -= shieldAbsorb;
+      damage -= shieldAbsorb;
+      if (damage < 0) damage = 0;
+    }
 
     this.currentMonster.hp = Math.max(0, this.currentMonster.hp - damage);
     this.updateHpBars();
+
+    if (damage > 0) {
+      this.showDamageNumber(this.monsterIconContainer.x, this.monsterIconContainer.y - 20, damage, crit);
+    }
 
     const critText = crit ? ' 暴击！' : '';
     this.addLogEntry(`你对【${this.currentMonster.name}】造成 ${damage} 点伤害${critText}`);
@@ -518,29 +701,351 @@ export class BattleScene extends Phaser.Scene {
     });
   }
 
+  private useSkill(index: number) {
+    if (!this.currentMonster || this.isAnimating || !this.isPlayerTurn) return;
+
+    const state = this.skillStates[index];
+    if (!state || state.currentCooldown > 0) return;
+
+    this.isAnimating = true;
+    const skill = state.skill;
+    let endsTurn = true;
+
+    this.addLogEntry(`使用技能【${skill.name}】！`);
+
+    switch (skill.effectType) {
+      case 'damage': {
+        const rawDmg = gameState.player.attack * skill.damageMultiplier - Math.floor(this.currentMonster.defense * (1 - this.monsterArmorBreak) * 0.5);
+        const crit = Math.random() < (gameState.player.equippedWeapon?.critRate || 0.05);
+        let damage = Math.max(1, crit ? Math.round(rawDmg * 1.5) : Math.round(rawDmg));
+
+        if (this.monsterShield > 0) {
+          const shieldAbsorb = Math.min(this.monsterShield, damage);
+          this.monsterShield -= shieldAbsorb;
+          damage -= shieldAbsorb;
+          if (damage < 0) damage = 0;
+        }
+
+        this.currentMonster.hp = Math.max(0, this.currentMonster.hp - damage);
+        this.showDamageNumber(this.monsterIconContainer.x, this.monsterIconContainer.y - 20, damage, crit);
+        this.flashSprite(this.monsterIconSprite, parseInt(skill.iconColor.replace('#', ''), 16));
+        this.addLogEntry(`对【${this.currentMonster.name}】造成 ${damage} 点伤害`);
+
+        if (skill.healPercent > 0) {
+          const healAmt = Math.round(damage * skill.healPercent);
+          gameState.heal(healAmt);
+          this.showDamageNumber(this.playerSprite.x, this.playerSprite.y - 20, healAmt, false, true);
+          this.addLogEntry(`恢复了 ${healAmt} 点生命`);
+        }
+
+        if (skill.armorBreakPercent < 0) {
+          this.playerArmorBreak = Math.min(0.5, this.playerArmorBreak + Math.abs(skill.armorBreakPercent));
+          this.addLogEntry(`自身防御降低 ${Math.round(Math.abs(skill.armorBreakPercent) * 100)}%`);
+        }
+
+        this.playSkillEffect(this.monsterIconContainer.x, this.monsterIconContainer.y, skill.iconColor, 'slash');
+        this.cameras.main.shake(250, 0.008);
+        break;
+      }
+      case 'heal': {
+        const healAmt = Math.round(gameState.player.maxHp * skill.healPercent);
+        gameState.heal(healAmt);
+        this.showDamageNumber(this.playerSprite.x, this.playerSprite.y - 20, healAmt, false, true);
+        this.addLogEntry(`恢复了 ${healAmt} 点生命`);
+        this.playSkillEffect(this.playerSprite.x, this.playerSprite.y, skill.iconColor, 'heal');
+        endsTurn = false;
+        break;
+      }
+      case 'armorBreak': {
+        const rawDmg = gameState.player.attack * skill.damageMultiplier - Math.floor(this.currentMonster.defense * (1 - this.monsterArmorBreak) * 0.5);
+        let damage = Math.max(1, Math.round(rawDmg));
+
+        if (this.monsterShield > 0) {
+          const shieldAbsorb = Math.min(this.monsterShield, damage);
+          this.monsterShield -= shieldAbsorb;
+          damage -= shieldAbsorb;
+          if (damage < 0) damage = 0;
+        }
+
+        this.currentMonster.hp = Math.max(0, this.currentMonster.hp - damage);
+        this.monsterArmorBreak = Math.min(0.8, this.monsterArmorBreak + skill.armorBreakPercent);
+        this.showDamageNumber(this.monsterIconContainer.x, this.monsterIconContainer.y - 20, damage, false);
+        this.flashSprite(this.monsterIconSprite, parseInt(skill.iconColor.replace('#', ''), 16));
+        this.addLogEntry(`对【${this.currentMonster.name}】造成 ${damage} 点伤害，防御降低 ${Math.round(skill.armorBreakPercent * 100)}%`);
+        this.playSkillEffect(this.monsterIconContainer.x, this.monsterIconContainer.y, skill.iconColor, 'armorBreak');
+        this.cameras.main.shake(200, 0.006);
+        break;
+      }
+      case 'stun': {
+        const rawDmg = gameState.player.attack * skill.damageMultiplier - Math.floor(this.currentMonster.defense * (1 - this.monsterArmorBreak) * 0.5);
+        let damage = Math.max(1, Math.round(rawDmg));
+
+        if (this.monsterShield > 0) {
+          const shieldAbsorb = Math.min(this.monsterShield, damage);
+          this.monsterShield -= shieldAbsorb;
+          damage -= shieldAbsorb;
+          if (damage < 0) damage = 0;
+        }
+
+        this.currentMonster.hp = Math.max(0, this.currentMonster.hp - damage);
+        this.monsterStunTurns = Math.max(this.monsterStunTurns, skill.stunDuration);
+        this.showDamageNumber(this.monsterIconContainer.x, this.monsterIconContainer.y - 20, damage, false);
+        this.flashSprite(this.monsterIconSprite, parseInt(skill.iconColor.replace('#', ''), 16));
+        this.addLogEntry(`对【${this.currentMonster.name}】造成 ${damage} 点伤害，眩晕 ${skill.stunDuration} 回合`);
+        this.playSkillEffect(this.monsterIconContainer.x, this.monsterIconContainer.y, skill.iconColor, 'stun');
+        this.cameras.main.shake(300, 0.01);
+        break;
+      }
+      case 'burn': {
+        const rawDmg = gameState.player.attack * skill.damageMultiplier - Math.floor(this.currentMonster.defense * (1 - this.monsterArmorBreak) * 0.5);
+        let damage = Math.max(1, Math.round(rawDmg));
+
+        if (this.monsterShield > 0) {
+          const shieldAbsorb = Math.min(this.monsterShield, damage);
+          this.monsterShield -= shieldAbsorb;
+          damage -= shieldAbsorb;
+          if (damage < 0) damage = 0;
+        }
+
+        this.currentMonster.hp = Math.max(0, this.currentMonster.hp - damage);
+        this.monsterBurnTurns = Math.max(this.monsterBurnTurns, skill.burnDuration);
+        this.monsterBurnDamage = Math.max(this.monsterBurnDamage, skill.burnDamage);
+        this.showDamageNumber(this.monsterIconContainer.x, this.monsterIconContainer.y - 20, damage, false);
+        this.flashSprite(this.monsterIconSprite, parseInt(skill.iconColor.replace('#', ''), 16));
+        this.addLogEntry(`对【${this.currentMonster.name}】造成 ${damage} 点伤害，灼烧 ${skill.burnDuration} 回合`);
+        this.playSkillEffect(this.monsterIconContainer.x, this.monsterIconContainer.y, skill.iconColor, 'burn');
+        this.cameras.main.shake(200, 0.006);
+        break;
+      }
+      case 'shield': {
+        this.playerShield += skill.shieldAmount;
+        this.addLogEntry(`获得 ${skill.shieldAmount} 点护盾`);
+        this.playSkillEffect(this.playerSprite.x, this.playerSprite.y, skill.iconColor, 'shield');
+        endsTurn = false;
+        break;
+      }
+    }
+
+    state.currentCooldown = skill.cooldown;
+    this.refreshSkillButtons();
+    this.updateHpBars();
+
+    const delay = endsTurn ? 600 : 300;
+    this.time.delayedCall(delay, () => {
+      if (this.currentMonster && this.currentMonster.hp <= 0) {
+        this.onMonsterDefeated();
+      } else if (endsTurn) {
+        this.monsterTurn();
+      } else {
+        this.isAnimating = false;
+      }
+    });
+  }
+
+  private playSkillEffect(x: number, y: number, colorHex: string, type: string) {
+    const color = parseInt(colorHex.replace('#', ''), 16);
+
+    if (type === 'heal') {
+      for (let i = 0; i < 8; i++) {
+        const angle = (Math.PI * 2 / 8) * i;
+        const dist = 30;
+        const particle = this.add.circle(x + Math.cos(angle) * dist, y + Math.sin(angle) * dist, 6, color, 0.8).setDepth(22);
+        this.tweens.add({
+          targets: particle,
+          x: x,
+          y: y,
+          alpha: 0,
+          scale: 0.5,
+          duration: 500,
+          ease: 'Cubic.Out',
+          onComplete: () => particle.destroy(),
+        });
+      }
+    } else if (type === 'shield') {
+      const shieldRing = this.add.circle(x, y, 50, color, 0.2).setStrokeStyle(3, color, 0.8).setDepth(22);
+      this.tweens.add({
+        targets: shieldRing,
+        scale: { from: 0.3, to: 1.2 },
+        alpha: { from: 1, to: 0 },
+        duration: 600,
+        ease: 'Cubic.Out',
+        onComplete: () => shieldRing.destroy(),
+      });
+    } else if (type === 'burn') {
+      for (let i = 0; i < 12; i++) {
+        const particle = this.add.circle(x + (Math.random() - 0.5) * 40, y + (Math.random() - 0.5) * 40, 4 + Math.random() * 4, color, 0.9).setDepth(22);
+        this.tweens.add({
+          targets: particle,
+          y: y - 60 - Math.random() * 30,
+          alpha: 0,
+          scale: 0.3,
+          duration: 600 + Math.random() * 300,
+          ease: 'Cubic.Out',
+          onComplete: () => particle.destroy(),
+        });
+      }
+    } else if (type === 'stun') {
+      for (let i = 0; i < 6; i++) {
+        const angle = (Math.PI * 2 / 6) * i;
+        const particle = this.add.circle(x + Math.cos(angle) * 40, y + Math.sin(angle) * 20, 5, color, 0.9).setDepth(22);
+        this.tweens.add({
+          targets: particle,
+          y: y - 40,
+          x: x + Math.cos(angle + 0.5) * 30,
+          alpha: 0,
+          duration: 500,
+          ease: 'Cubic.Out',
+          onComplete: () => particle.destroy(),
+        });
+      }
+    } else if (type === 'armorBreak') {
+      for (let i = 0; i < 6; i++) {
+        const particle = this.add.rectangle(x + (Math.random() - 0.5) * 60, y + (Math.random() - 0.5) * 40, 8, 3, color, 0.8).setDepth(22);
+        const angle = Math.random() * Math.PI;
+        particle.setRotation(angle);
+        this.tweens.add({
+          targets: particle,
+          x: x + Math.cos(angle) * 50,
+          y: y + Math.sin(angle) * 50,
+          alpha: 0,
+          duration: 500,
+          ease: 'Cubic.Out',
+          onComplete: () => particle.destroy(),
+        });
+      }
+    } else {
+      for (let i = 0; i < 8; i++) {
+        const angle = (Math.PI * 2 / 8) * i;
+        const particle = this.add.circle(x, y, 5, color, 0.8).setDepth(22);
+        this.tweens.add({
+          targets: particle,
+          x: x + Math.cos(angle) * 50,
+          y: y + Math.sin(angle) * 50,
+          alpha: 0,
+          scale: 0.3,
+          duration: 400,
+          ease: 'Cubic.Out',
+          onComplete: () => particle.destroy(),
+        });
+      }
+    }
+  }
+
   private monsterTurn() {
     if (!this.currentMonster) return;
 
     this.isPlayerTurn = false;
 
-    const rawDmg = this.currentMonster.attack - Math.floor(gameState.player.defense * 0.4);
-    const damage = Math.max(1, rawDmg + Math.floor(Math.random() * 5));
+    if (this.monsterBurnTurns > 0) {
+      const burnDmg = this.monsterBurnDamage;
+      this.currentMonster.hp = Math.max(0, this.currentMonster.hp - burnDmg);
+      this.monsterBurnTurns--;
+      this.showDamageNumber(this.monsterIconContainer.x, this.monsterIconContainer.y - 10, burnDmg, false);
+      this.addLogEntry(`【${this.currentMonster.name}】受到灼烧伤害 ${burnDmg} 点`);
+      this.flashSprite(this.monsterIconSprite, 0xff6600);
+      this.updateHpBars();
 
-    gameState.takeDamage(damage);
-    this.updateHpBars();
-
-    this.addLogEntry(`【${this.currentMonster.name}】对你造成 ${damage} 点伤害`);
-    this.flashSprite(this.playerSprite, 0xff0000);
-    this.cameras.main.shake(150, 0.003);
-
-    this.time.delayedCall(600, () => {
-      if (gameState.player.hp <= 0) {
-        this.onPlayerDefeated();
-      } else {
-        this.isPlayerTurn = true;
-        this.isAnimating = false;
+      if (this.currentMonster.hp <= 0) {
+        this.time.delayedCall(400, () => this.onMonsterDefeated());
+        return;
       }
+    }
+
+    if (this.monsterStunTurns > 0) {
+      this.monsterStunTurns--;
+      this.addLogEntry(`【${this.currentMonster.name}】被眩晕，无法行动！`);
+      this.flashSprite(this.monsterIconSprite, 0xffff44);
+
+      this.time.delayedCall(500, () => {
+        this.endMonsterTurn();
+      });
+      return;
+    }
+
+    const monsterStartX = this.monsterIconContainer.x;
+    const dashTargetX = this.playerSprite.x + 60;
+
+    const dashParticles = this.add.particles(this.monsterIconContainer.x, this.monsterIconContainer.y, 'particle_dot', {
+      speed: { min: 50, max: 150 },
+      angle: { min: 160, max: 200 },
+      lifespan: 400,
+      quantity: 3,
+      scale: { start: 0.6, end: 0 },
+      alpha: { start: 0.8, end: 0 },
+      tint: 0xff4444,
+      blendMode: 'ADD',
+      emitting: false,
+    }).setDepth(4);
+
+    this.tweens.add({
+      targets: this.monsterIconContainer,
+      x: dashTargetX,
+      duration: 200,
+      ease: 'Cubic.In',
+      onStart: () => {
+        dashParticles.start();
+      },
+      onComplete: () => {
+        dashParticles.stop();
+
+        const impactParticles = this.add.particles(this.playerSprite.x, this.playerSprite.y, 'particle_dot', {
+          speed: { min: 80, max: 200 },
+          angle: { min: 0, max: 360 },
+          lifespan: 500,
+          quantity: 15,
+          scale: { start: 0.8, end: 0 },
+          alpha: { start: 1, end: 0 },
+          tint: 0xff6644,
+          blendMode: 'ADD',
+          emitting: false,
+        }).setDepth(20);
+        impactParticles.explode(15, this.playerSprite.x, this.playerSprite.y);
+        this.time.delayedCall(500, () => impactParticles.destroy());
+
+        this.cameras.main.shake(300, 0.012);
+
+        const rawDmg = this.currentMonster.attack - Math.floor(gameState.player.defense * (1 - this.playerArmorBreak) * 0.4);
+        let damage = Math.max(1, rawDmg + Math.floor(Math.random() * 5));
+
+        if (this.playerShield > 0) {
+          const shieldAbsorb = Math.min(this.playerShield, damage);
+          this.playerShield -= shieldAbsorb;
+          damage -= shieldAbsorb;
+          if (damage < 0) damage = 0;
+          this.addLogEntry(`护盾抵消了 ${shieldAbsorb} 点伤害`);
+        }
+
+        if (damage > 0) {
+          gameState.takeDamage(damage);
+          this.showDamageNumber(this.playerSprite.x, this.playerSprite.y - 20, damage, false);
+          this.addLogEntry(`【${this.currentMonster.name}】对你造成 ${damage} 点伤害`);
+          this.flashSprite(this.playerSprite, 0xff0000);
+        }
+        this.updateHpBars();
+
+        this.tweens.add({
+          targets: this.monsterIconContainer,
+          x: monsterStartX,
+          duration: 250,
+          ease: 'Cubic.Out',
+          onComplete: () => {
+            if (gameState.player.hp <= 0) {
+              this.onPlayerDefeated();
+            } else {
+              this.endMonsterTurn();
+            }
+          },
+        });
+      },
     });
+  }
+
+  private endMonsterTurn() {
+    skillManager.reduceCooldowns(this.skillStates);
+    this.refreshSkillButtons();
+
+    this.isPlayerTurn = true;
+    this.isAnimating = false;
   }
 
   private flashSprite(sprite: Phaser.GameObjects.Sprite, color: number) {
@@ -548,6 +1053,61 @@ export class BattleScene extends Phaser.Scene {
     this.time.delayedCall(150, () => {
       sprite.clearTint();
     });
+  }
+
+  private showDamageNumber(x: number, y: number, damage: number, isCrit: boolean, isHeal?: boolean) {
+    let text = this.damageNumberPool.find(t => !t.active);
+    if (!text) {
+      text = this.add.text(x, y, '', {
+        fontSize: '18px',
+        fontFamily: 'monospace',
+        fontStyle: 'bold',
+        color: '#ffffff',
+        stroke: '#000000',
+        strokeThickness: 3,
+      }).setOrigin(0.5).setDepth(25);
+      this.damageNumberPool.push(text);
+    } else {
+      text.setPosition(x, y).setActive(true).setVisible(true);
+    }
+
+    const displayValue = isHeal ? `+${damage}` : `-${damage}`;
+    text.setText(displayValue);
+
+    if (isHeal) {
+      text.setColor('#44ff44');
+      text.setFontSize('18px');
+    } else if (isCrit) {
+      text.setColor('#ffdd44');
+      text.setFontSize('28px');
+    } else {
+      text.setColor('#ffffff');
+      text.setFontSize('18px');
+    }
+
+    text.setAlpha(1);
+    text.setScale(isCrit ? 1.5 : 1);
+
+    this.tweens.add({
+      targets: text,
+      y: y - 50,
+      alpha: 0,
+      duration: 800,
+      ease: 'Cubic.Out',
+      onComplete: () => {
+        text.setActive(false).setVisible(false);
+      },
+    });
+
+    if (isCrit) {
+      this.tweens.add({
+        targets: text,
+        scaleX: { from: 0.5, to: 1.2 },
+        scaleY: { from: 0.5, to: 1.2 },
+        duration: 200,
+        ease: 'Back.Out',
+      });
+    }
   }
 
   private onMonsterDefeated() {
@@ -710,5 +1270,6 @@ export class BattleScene extends Phaser.Scene {
     this.drawHpBars(this.cameras.main.width, this.cameras.main.height);
     this.createButtons(this.cameras.main.width, this.cameras.main.height);
     this.createNavButtons(this.cameras.main.width, this.cameras.main.height);
+    this.createSkillPanel(this.cameras.main.width, this.cameras.main.height);
   }
 }
