@@ -34,6 +34,8 @@ export interface Car {
   slideInertiaTimer: number;
   driftTiltAtEnd: number;
   isColliding: boolean;
+  flashTimer: number;
+  flashPhase: number;
 }
 
 export interface Particle {

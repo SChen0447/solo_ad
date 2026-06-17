@@ -227,17 +227,14 @@ export class UIManager {
       this.selectedCar = model;
       this.selectedCarColor = GameEngine.getCarColor(model);
       this.colorAdjustHue = 0;
-      this.statAnimations = { topSpeed: 0, handling: 0 };
       this.updateStatTargets();
     } else if (action.startsWith('selectTrack:')) {
       this.selectedTrack = action.split(':')[1] as TrackType;
     } else if (action.startsWith('selectSpoiler:')) {
       this.selectedSpoiler = action.split(':')[1] as SpoilerType;
-      this.statAnimations = { topSpeed: 0, handling: 0 };
       this.updateStatTargets();
     } else if (action.startsWith('selectTire:')) {
       this.selectedTire = action.split(':')[1] as TireType;
-      this.statAnimations = { topSpeed: 0, handling: 0 };
       this.updateStatTargets();
     } else if (action === 'colorLess') {
       this.colorAdjustHue = (this.colorAdjustHue - 15 + 360) % 360;
@@ -638,78 +635,88 @@ export class UIManager {
   }
 
   private renderSpeedometer(ctx: CanvasRenderingContext2D, x: number, y: number, scale: number, engine: GameEngine): void {
-    const s = scale;
-    const w = 200 * s;
-    const h = 100 * s;
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.scale(scale, scale);
+
+    const w = 200;
+    const h = 100;
 
     ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
-    ctx.fillRect(x, y, w, h);
+    ctx.fillRect(0, 0, w, h);
 
     ctx.strokeStyle = '#4488ff';
-    ctx.lineWidth = 3 * s;
+    ctx.lineWidth = 3;
     ctx.beginPath();
-    ctx.arc(x + w / 2, y + h, w * 0.4, Math.PI, 0);
+    ctx.arc(w / 2, h, w * 0.4, Math.PI, 0);
     ctx.stroke();
 
     const speedRatio = Math.min(engine.car.speed / 150, 1);
     const angle = Math.PI + speedRatio * Math.PI;
 
-    const gradient = ctx.createLinearGradient(x, y + h, x + w, y + h);
+    const gradient = ctx.createLinearGradient(0, h, w, h);
     gradient.addColorStop(0, '#00ff00');
     gradient.addColorStop(0.5, '#ffff00');
     gradient.addColorStop(1, '#ff0000');
 
     ctx.strokeStyle = gradient;
-    ctx.lineWidth = 6 * s;
+    ctx.lineWidth = 6;
     ctx.beginPath();
-    ctx.arc(x + w / 2, y + h, w * 0.4, Math.PI, angle);
+    ctx.arc(w / 2, h, w * 0.4, Math.PI, angle);
     ctx.stroke();
 
-    const cx = x + w / 2;
-    const cy = y + h;
+    const cx = w / 2;
+    const cy = h;
     const needleLen = w * 0.35;
     const nx = cx + Math.cos(angle) * needleLen;
     const ny = cy + Math.sin(angle) * needleLen;
 
     ctx.strokeStyle = '#ff6644';
-    ctx.lineWidth = 3 * s;
+    ctx.lineWidth = 3;
     ctx.beginPath();
     ctx.moveTo(cx, cy);
     ctx.lineTo(nx, ny);
     ctx.stroke();
 
     ctx.fillStyle = '#ffffff';
-    ctx.font = `bold ${Math.floor(18 * s)}px monospace`;
+    ctx.font = 'bold 18px monospace';
     ctx.textAlign = 'center';
-    ctx.fillText(`${Math.floor(engine.car.speed)}`, cx, cy - 10 * s);
-    ctx.font = `${Math.floor(10 * s)}px monospace`;
+    ctx.fillText(`${Math.floor(engine.car.speed)}`, cx, cy - 10);
+    ctx.font = '10px monospace';
     ctx.fillStyle = '#aaaaaa';
-    ctx.fillText('px/s', cx, cy + 5 * s);
+    ctx.fillText('px/s', cx, cy + 5);
+
+    ctx.restore();
   }
 
   private renderLapCounter(ctx: CanvasRenderingContext2D, x: number, y: number, scale: number, engine: GameEngine): void {
-    const s = scale;
-    const w = 160 * s;
-    const h = 70 * s;
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.scale(scale, scale);
+
+    const w = 160;
+    const h = 70;
 
     ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
-    ctx.fillRect(x, y, w, h);
+    ctx.fillRect(0, 0, w, h);
 
     const progress = engine.track ? Math.min(engine.lapProgress / engine.track.length, 1) : 0;
 
     ctx.fillStyle = '#ffffff';
-    ctx.font = `bold ${Math.floor(14 * s)}px monospace`;
+    ctx.font = 'bold 14px monospace';
     ctx.textAlign = 'left';
-    ctx.fillText('圈数: 1/1', x + 10 * s, y + 22 * s);
+    ctx.fillText('圈数: 1/1', 10, 22);
 
     ctx.fillStyle = '#333333';
-    ctx.fillRect(x + 10 * s, y + 32 * s, w - 20 * s, 8 * s);
+    ctx.fillRect(10, 32, w - 20, 8);
     ctx.fillStyle = '#4488ff';
-    ctx.fillRect(x + 10 * s, y + 32 * s, (w - 20 * s) * progress, 8 * s);
+    ctx.fillRect(10, 32, (w - 20) * progress, 8);
 
     ctx.fillStyle = '#ff6644';
-    ctx.font = `bold ${Math.floor(10 * s)}px monospace`;
-    ctx.fillText(`最高: ${Math.floor(engine.maxSpeedReached)}px/s`, x + 10 * s, y + 55 * s);
+    ctx.font = 'bold 10px monospace';
+    ctx.fillText(`最高: ${Math.floor(engine.maxSpeedReached)}px/s`, 10, 55);
+
+    ctx.restore();
   }
 
   private renderMobileControls(ctx: CanvasRenderingContext2D): void {

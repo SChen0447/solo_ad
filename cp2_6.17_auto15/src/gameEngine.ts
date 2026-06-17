@@ -106,7 +106,9 @@ export class GameEngine {
       warningTimer: 0,
       slideInertiaTimer: 0,
       driftTiltAtEnd: 0,
-      isColliding: false
+      isColliding: false,
+      flashTimer: 0,
+      flashPhase: 0
     };
   }
 
@@ -282,6 +284,18 @@ export class GameEngine {
     if (this.car.slideInertiaTimer > 0) {
       this.car.slideInertiaTimer -= dt;
     }
+    if (this.car.flashTimer > 0) {
+      const before = this.car.flashTimer;
+      this.car.flashTimer -= dt;
+      const phaseStep = 0.1;
+      this.car.flashPhase += dt;
+      if (this.car.flashPhase >= phaseStep) {
+        this.car.flashPhase -= phaseStep;
+      }
+      if (before > 0 && this.car.flashTimer <= 0) {
+        this.car.flashPhase = 0;
+      }
+    }
   }
 
   private updateCarPhysics(dt: number): void {
@@ -326,9 +340,7 @@ export class GameEngine {
 
     const targetTilt = car.isDrifting ? (steerInput * DRIFT_TILT) : 0;
     if (car.slideInertiaTimer > 0) {
-      const inertiaProgress = car.slideInertiaTimer / 0.3;
-      const inertiaTilt = car.driftTiltAtEnd * inertiaProgress;
-      car.tiltAngle += (inertiaTilt - car.tiltAngle) * Math.min(dt * 10, 1);
+      car.tiltAngle = car.driftTiltAtEnd * (car.slideInertiaTimer / 0.3);
     } else {
       car.tiltAngle += (targetTilt - car.tiltAngle) * Math.min(dt * 10, 1);
     }
@@ -423,28 +435,31 @@ export class GameEngine {
     const car = this.car;
     const trackCenterY = this.canvasHeight / 2;
     const trackHalfWidth = this.track.width / 2;
+    const upperBound = trackCenterY - trackHalfWidth;
+    const lowerBound = trackCenterY + trackHalfWidth;
 
     const cosA = Math.cos(car.angle);
     const sinA = Math.sin(car.angle);
     const hw = car.width / 2;
     const hh = car.height / 2;
 
-    const corners = [
-      { x: car.x + cosA * (-hw) - sinA * (-hh), y: car.y + sinA * (-hw) + cosA * (-hh) },
-      { x: car.x + cosA * (hw) - sinA * (-hh), y: car.y + sinA * (hw) + cosA * (-hh) },
-      { x: car.x + cosA * (-hw) - sinA * (hh), y: car.y + sinA * (-hw) + cosA * (hh) },
-      { x: car.x + cosA * (hw) - sinA * (hh), y: car.y + sinA * (hw) + cosA * (hh) }
-    ];
-
-    const upperBound = trackCenterY - trackHalfWidth;
-    const lowerBound = trackCenterY + trackHalfWidth;
+    const y0 = car.y + sinA * (-hw) + cosA * (-hh);
+    const y1 = car.y + sinA * (hw) + cosA * (-hh);
+    const y2 = car.y + sinA * (-hw) + cosA * (hh);
+    const y3 = car.y + sinA * (hw) + cosA * (hh);
+    const rectMinY = Math.min(y0, y1, y2, y3);
+    const rectMaxY = Math.max(y0, y1, y2, y3);
 
     let colliding = false;
-    for (const corner of corners) {
-      if (corner.y < upperBound || corner.y > lowerBound) {
-        colliding = true;
-        break;
-      }
+    let pushDirection = 0;
+
+    if (rectMinY < upperBound) {
+      colliding = true;
+      pushDirection = Math.max(pushDirection, upperBound - rectMinY);
+    }
+    if (rectMaxY > lowerBound) {
+      colliding = true;
+      pushDirection = Math.min(pushDirection, lowerBound - rectMaxY);
     }
 
     car.isColliding = colliding;
@@ -453,11 +468,10 @@ export class GameEngine {
       if (car.warningTimer <= 0) {
         car.speed *= 0.7;
         car.warningTimer = 0.5;
+        car.flashTimer = 0.5;
+        car.flashPhase = 0;
       }
-      const minY = upperBound + hh;
-      const maxY = lowerBound - hh;
-      if (car.y < minY) car.y = minY;
-      if (car.y > maxY) car.y = maxY;
+      car.y += pushDirection;
     }
   }
 
@@ -499,8 +513,8 @@ export class GameEngine {
       ctx.fillRect(0, 0, this.canvasWidth, this.canvasHeight);
     }
 
-    if (this.car.warningTimer > 0) {
-      const flash = Math.floor(this.car.warningTimer * 10) % 2 === 0;
+    if (this.car.flashTimer > 0) {
+      const flash = Math.floor(this.car.flashPhase / 0.05) % 2 === 0;
       if (flash) {
         ctx.strokeStyle = '#ff0000';
         ctx.lineWidth = 6;
@@ -662,7 +676,7 @@ export class GameEngine {
     const car = this.car;
     const p = PIXEL_SIZE;
 
-    if (car.warningTimer > 0 && Math.floor(car.warningTimer * 10) % 2 === 0 && car.isColliding) {
+    if (car.flashTimer > 0 && car.isColliding && Math.floor(car.flashPhase / 0.05) % 2 === 0) {
       return;
     }
 
