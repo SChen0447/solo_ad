@@ -7,6 +7,7 @@ interface GraphCanvasProps {
   nodes: GraphNode[];
   edges: GraphEdge[];
   searchQuery: string;
+  labelFilter: string;
   layout: LayoutType;
   isEdgeMode: boolean;
   onEdgeModeChange: (active: boolean) => void;
@@ -34,6 +35,7 @@ const GraphCanvas = forwardRef<GraphCanvasRef, GraphCanvasProps>((
     nodes,
     edges,
     searchQuery,
+    labelFilter,
     layout,
     isEdgeMode,
     onEdgeModeChange,
@@ -48,6 +50,7 @@ const GraphCanvas = forwardRef<GraphCanvasRef, GraphCanvasProps>((
   const containerRef = useRef<HTMLDivElement>(null);
   const animationRef = useRef<number>();
   const nodesRef = useRef<GraphNode[]>([]);
+  const edgesRef = useRef<GraphEdge[]>([]);
   const targetNodesRef = useRef<GraphNode[]>([]);
   const animProgressRef = useRef<number>(1);
   const velocityRef = useRef<Map<string, { vx: number; vy: number }>>(new Map());
@@ -158,6 +161,10 @@ const GraphCanvas = forwardRef<GraphCanvasRef, GraphCanvasProps>((
   }, [nodes]);
 
   useEffect(() => {
+    edgesRef.current = edges.map(e => ({ ...e }));
+  }, [edges]);
+
+  useEffect(() => {
     applyLayout(layout);
   }, [layout, applyLayout]);
 
@@ -206,10 +213,12 @@ const GraphCanvas = forwardRef<GraphCanvasRef, GraphCanvasProps>((
   }, []);
 
   const isNodeFiltered = useCallback((node: GraphNode): boolean => {
-    if (!searchQuery.trim()) return false;
-    const query = searchQuery.toLowerCase();
-    return !node.name.toLowerCase().includes(query) && !node.label.toLowerCase().includes(query);
-  }, [searchQuery]);
+    const searchFiltered = searchQuery.trim() && 
+      !node.name.toLowerCase().includes(searchQuery.toLowerCase()) && 
+      !node.label.toLowerCase().includes(searchQuery.toLowerCase());
+    const labelFiltered = labelFilter && labelFilter !== '全部' && node.label !== labelFilter;
+    return searchFiltered || labelFiltered;
+  }, [searchQuery, labelFilter]);
 
   const applyForce = useCallback(() => {
     if (layout !== 'force' || animProgressRef.current < 1) return;
@@ -237,7 +246,7 @@ const GraphCanvas = forwardRef<GraphCanvasRef, GraphCanvasProps>((
       vel.vx += (center.x - node.x) * centerForce;
       vel.vy += (center.y - node.y) * centerForce;
 
-      edges.forEach(edge => {
+      edgesRef.current.forEach(edge => {
         let source: GraphNode | undefined;
         let target: GraphNode | undefined;
         if (edge.source === node.id) {
@@ -274,7 +283,7 @@ const GraphCanvas = forwardRef<GraphCanvasRef, GraphCanvasProps>((
       node.x += vel.vx;
       node.y += vel.vy;
     });
-  }, [layout, edges, getCanvasCenter]);
+  }, [layout, getCanvasCenter]);
 
   const render = useCallback(() => {
     const canvas = canvasRef.current;
@@ -307,7 +316,7 @@ const GraphCanvas = forwardRef<GraphCanvasRef, GraphCanvasProps>((
     ctx.translate(panRef.current.x, panRef.current.y);
     ctx.scale(zoomRef.current, zoomRef.current);
 
-    edges.forEach(edge => {
+    edgesRef.current.forEach(edge => {
       const source = nodesRef.current.find(n => n.id === edge.source);
       const target = nodesRef.current.find(n => n.id === edge.target);
       if (!source || !target) return;
@@ -422,7 +431,7 @@ const GraphCanvas = forwardRef<GraphCanvasRef, GraphCanvasProps>((
     ctx.restore();
 
     animationRef.current = requestAnimationFrame(render);
-  }, [edges, isEdgeMode, isNodeFiltered, applyForce, screenToWorld]);
+  }, [isEdgeMode, isNodeFiltered, applyForce, screenToWorld]);
 
   useEffect(() => {
     animationRef.current = requestAnimationFrame(render);
