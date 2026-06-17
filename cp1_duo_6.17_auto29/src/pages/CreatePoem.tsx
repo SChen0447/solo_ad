@@ -161,8 +161,9 @@ export default function CreatePoem() {
                 <div
                   className="texture-preview-svg"
                   dangerouslySetInnerHTML={{ __html: t.svg }}
-                  style={{ filter: 'invert(0.8)' }}
+                  style={{ filter: 'brightness(1.5) invert(0.15)', opacity: 0.85 }}
                 />
+                <span className="texture-label">{t.name}</span>
               </div>
             ))}
           </div>

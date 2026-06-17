@@ -18,13 +18,19 @@ export default function PoemDetail() {
   const [texture, setTexture] = useState<Texture | null>(null)
 
   const [note, setNote] = useState('')
-  const [noteShake, setNoteShake] = useState(false)
+  const [noteError, setNoteError] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [searchResults, setSearchResults] = useState<Note[]>([])
 
   const { displayText, isComplete } = useTypewriter(poem?.content || '', 60)
 
-  const saveTimer = useRef<number | null>(null)
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  useEffect(() => {
+    return () => {
+      if (saveTimer.current) clearTimeout(saveTimer.current)
+    }
+  }, [])
 
   useEffect(() => {
     if (!id) return
@@ -57,15 +63,15 @@ export default function PoemDetail() {
   const handleNoteChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const value = e.target.value
     if (value.length > MAX_NOTE_LENGTH) {
-      setNoteShake(true)
-      setTimeout(() => setNoteShake(false), 200)
+      setNoteError(true)
+      setTimeout(() => setNoteError(false), 200)
       return
     }
     setNote(value)
     localStorage.setItem(`note_${id}`, value)
 
-    if (saveTimer.current) window.clearTimeout(saveTimer.current)
-    saveTimer.current = window.setTimeout(async () => {
+    if (saveTimer.current) clearTimeout(saveTimer.current)
+    saveTimer.current = setTimeout(async () => {
       if (poem) {
         try {
           await saveNote(id!, poem.title, value)
@@ -98,6 +104,7 @@ export default function PoemDetail() {
       background: radialGradient(palette.primary, palette.secondary),
       color: palette.text,
       fontFamily: font?.family,
+      position: 'relative',
     }
   }, [palette, font])
 
@@ -111,14 +118,24 @@ export default function PoemDetail() {
         {texture && (
           <div
             dangerouslySetInnerHTML={{ __html: texture.svg }}
-            style={{ position: 'absolute', inset: 0, opacity: 0.06, pointerEvents: 'none', borderRadius: 20, overflow: 'hidden' }}
+            style={{
+              position: 'absolute',
+              inset: 0,
+              opacity: 0.08,
+              pointerEvents: 'none',
+              borderRadius: 20,
+              overflow: 'hidden',
+              mixBlendMode: 'overlay',
+            }}
           />
         )}
-        <h1 className="poem-detail-title">{poem.title}</h1>
-        <div className="poem-detail-poet">—— {poem.poet}</div>
-        <div className="poem-detail-content">
-          {displayText}
-          {!isComplete && <span className="typing-cursor" />}
+        <div style={{ position: 'relative', zIndex: 1 }}>
+          <h1 className="poem-detail-title">{poem.title}</h1>
+          <div className="poem-detail-poet">—— {poem.poet}</div>
+          <div className="poem-detail-content" style={{ whiteSpace: 'pre-wrap' }}>
+            {displayText}
+            {!isComplete && <span className="typing-cursor" />}
+          </div>
         </div>
       </div>
 
@@ -148,12 +165,14 @@ export default function PoemDetail() {
           </div>
         )}
         <textarea
-          className={`notes-textarea ${noteShake ? 'error' : ''}`}
+          className={`notes-textarea ${noteError ? 'error' : ''}`}
           placeholder="在这里写下你的感想、赏析、笔记...（支持 Markdown）"
           value={note}
           onChange={handleNoteChange}
         />
-        <div className="notes-counter">{note.length} / {MAX_NOTE_LENGTH}</div>
+        <div className="notes-counter" style={{ color: note.length >= MAX_NOTE_LENGTH ? '#ff4757' : undefined }}>
+          {note.length} / {MAX_NOTE_LENGTH}
+        </div>
         {note && (
           <div className="notes-preview">
             <div style={{ fontSize: 12, opacity: 0.6, marginBottom: 8 }}>预览</div>

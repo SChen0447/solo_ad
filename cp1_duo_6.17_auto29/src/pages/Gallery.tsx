@@ -55,7 +55,6 @@ const ParticleBackground = () => {
 
     let particles = initParticles(60, canvas.width, canvas.height)
     let lastTime = performance.now()
-    let frameCount = 0
 
     const animate = (time: number) => {
       const delta = time - lastTime
@@ -74,7 +73,6 @@ const ParticleBackground = () => {
           ctx.fill()
         })
         lastTime = time
-        frameCount++
       }
       rafRef.current = requestAnimationFrame(animate)
     }
@@ -89,11 +87,12 @@ const ParticleBackground = () => {
   return <canvas ref={canvasRef} className="particles-canvas" />
 }
 
-const PoemCard = ({ poem, palette, texture, font, onClick }: {
+const PoemCard = ({ poem, palette, texture, font, isNew, onClick }: {
   poem: Poem
   palette: Palette
   texture: Texture
   font: FontOption
+  isNew?: boolean
   onClick: () => void
 }) => {
   const { beating, trigger } = useHeartbeat()
@@ -111,24 +110,36 @@ const PoemCard = ({ poem, palette, texture, font, onClick }: {
     }
   }
 
-  const shadowColor = hexToRgba(palette.primary, 0.4)
+  const shadowBase = hexToRgba(palette.primary, 0.18)
+  const shadowHover = hexToRgba(palette.primary, 0.5)
   const cardStyle: React.CSSProperties = {
     background: `linear-gradient(135deg, ${palette.background} 0%, ${palette.secondary} 100%)`,
     color: palette.text,
     fontFamily: font.family,
-    boxShadow: hovered ? `0 12px 40px ${shadowColor}` : `0 4px 16px rgba(0,0,0,0.15)`,
+    transform: hovered ? 'translateY(-6px)' : 'translateY(0)',
+    boxShadow: hovered
+      ? `0 6px 12px ${shadowBase}, 0 16px 48px ${shadowHover}`
+      : `0 2px 6px ${shadowBase}, 0 4px 16px ${hexToRgba(palette.primary, 0.12)}`,
+    transition: 'transform 0.3s ease, box-shadow 0.3s ease',
   }
 
   return (
     <div
-      className="poem-card"
+      className={`poem-card ${isNew ? 'fade-in' : ''}`}
       style={cardStyle}
       onClick={onClick}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
     >
-      <div dangerouslySetInnerHTML={{ __html: texture.svg }}
-        style={{ position: absolute; inset: 0; opacity: 0.08; pointerEvents: 'none' }}
+      <div
+        dangerouslySetInnerHTML={{ __html: texture.svg }}
+        style={{
+          position: 'absolute',
+          inset: 0,
+          opacity: 0.1,
+          pointerEvents: 'none',
+          mixBlendMode: 'overlay',
+        }}
       />
       <div className="poem-card-header">
         <div>
@@ -138,15 +149,16 @@ const PoemCard = ({ poem, palette, texture, font, onClick }: {
         <button
           className={`favorite-btn ${beating ? 'heartbeat' : ''}`}
           onClick={handleFavorite}
+          aria-label="收藏"
         >
-            ♥ {favorites}
+          ♥ {favorites}
         </button>
       </div>
       <div className="poem-card-content">
         {poem.content.split('\n').slice(0, 4).map((line, i) => (
-          <div key={i}>{line}</div>
+          <div key={i}>{line || '\u00A0'}</div>
         ))}
-        {poem.content.split('\n').length > 4 && <div>...</div>}
+        {poem.content.split('\n').length > 4 && <div style={{ marginTop: 4 }}>...</div>}
       </div>
       <div className="poem-card-footer">
         <span>{palette.name}</span>
@@ -212,6 +224,15 @@ export default function Gallery() {
   const getPalette = (id: number) => palettes.find((p) => p.id === id) || palettes[0]
   const getTexture = (id: number) => textures.find((t) => t.id === id) || textures[0]
   const getFont = (id: string) => fonts.find((f) => f.id === id) || fonts[0]
+
+  if (poems.length === 0 && palettes.length === 0) {
+    return (
+      <>
+        <ParticleBackground />
+        <div className="loading-spinner" style={{ paddingTop: 160 }}>加载中...</div>
+      </>
+    )
+  }
 
   return (
     <>
