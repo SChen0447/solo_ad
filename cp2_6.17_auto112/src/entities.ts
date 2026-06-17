@@ -15,6 +15,7 @@ export interface Organism {
   colorRGB: ColorRGB;
   age: number;
   breedCooldown: number;
+  lastBreedTime: number;
   vx: number;
   vy: number;
 }
@@ -57,16 +58,16 @@ function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
 }
 
-export function createOrganism(color: SpeciesColor, x?: number, y?: number, mutationRate = 0.02, parentColor?: ColorRGB): Organism {
+export function createOrganism(color: SpeciesColor, x?: number, y?: number, mutationRate = 0.02, parentColor?: ColorRGB, currentTime = 0): Organism {
   const baseColor = parentColor ?? SPECIES_BASE_COLORS[color];
   let finalColor: ColorRGB = { ...baseColor };
 
   if (Math.random() < mutationRate) {
     const offset = 5;
     finalColor = {
-      r: clamp(baseColor.r + rand(-offset, offset), 30, 255),
-      g: clamp(baseColor.g + rand(-offset, offset), 30, 255),
-      b: clamp(baseColor.b + rand(-offset, offset), 30, 255),
+      r: clamp(baseColor.r + rand(-offset, offset), 0, 255),
+      g: clamp(baseColor.g + rand(-offset, offset), 0, 255),
+      b: clamp(baseColor.b + rand(-offset, offset), 0, 255),
     };
   }
 
@@ -78,7 +79,8 @@ export function createOrganism(color: SpeciesColor, x?: number, y?: number, muta
     color,
     colorRGB: finalColor,
     age: 0,
-    breedCooldown: 5 * 30,
+    breedCooldown: 0,
+    lastBreedTime: currentTime,
     vx: 0,
     vy: 0,
   };

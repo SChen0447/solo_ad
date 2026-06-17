@@ -177,8 +177,8 @@ export class Renderer {
       (m, p) => Math.max(m, p.red, p.blue, p.green),
       0
     );
-    const rawMax = Math.max(maxFromHistory, stats.redCount, stats.blueCount, stats.greenCount, 10);
-    const maxY = Math.ceil(rawMax / 5) * 5;
+    const rawMax = Math.max(maxFromHistory, stats.redCount, stats.blueCount, stats.greenCount, 5);
+    const maxY = Math.max(5, Math.ceil(rawMax / 5) * 5);
     const ySteps = 5;
 
     ctx.strokeStyle = 'rgba(0, 0, 0, 0.1)';

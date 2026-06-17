@@ -56,6 +56,8 @@ export class Simulation {
   readonly HISTORY_WINDOW = 60;
   readonly SAMPLE_INTERVAL = 5;
 
+  readonly BREED_INTERVAL = 5;
+
   constructor(params?: Partial<SimulationParams>) {
     this.params = {
       foodSpawnInterval: 15,
@@ -141,7 +143,7 @@ export class Simulation {
           org.vy = 0;
         }
       } else {
-        if (r < 0.6) {
+        if (r < 0.3) {
           this.randomWalk(org);
         } else {
           org.vx = 0;
@@ -203,27 +205,25 @@ export class Simulation {
     for (const org of this.organisms) {
       org.energy -= ENERGY_PER_FRAME;
       org.age++;
-      if (org.breedCooldown > 0) {
-        org.breedCooldown--;
-      }
     }
   }
 
   private updateBreeding(): void {
     const newOrganisms: Organism[] = [];
-    const breedInterval = 5 * this.fps;
 
     for (const org of this.organisms) {
-      if (org.energy > BREED_ENERGY_THRESHOLD && org.breedCooldown <= 0) {
+      const timeSinceBreed = this.elapsedTime - org.lastBreedTime;
+      if (org.energy > BREED_ENERGY_THRESHOLD && timeSinceBreed >= this.BREED_INTERVAL) {
         org.energy -= BREED_ENERGY_COST;
-        org.breedCooldown = breedInterval;
+        org.lastBreedTime = this.elapsedTime;
 
         const child = createOrganism(
           org.color,
           org.x + (Math.random() - 0.5) * ORGANISM_SIZE * 2,
           org.y + (Math.random() - 0.5) * ORGANISM_SIZE * 2,
           this.params.mutationRate,
-          org.colorRGB
+          org.colorRGB,
+          this.elapsedTime
         );
         newOrganisms.push(child);
       }
@@ -238,11 +238,9 @@ export class Simulation {
 
   private updateFoodSpawn(): void {
     if (this.elapsedTime - this.lastFoodSpawn >= this.params.foodSpawnInterval) {
-      const shortage = INITIAL_FOOD_COUNT - this.foods.length;
-      if (shortage > 0) {
-        for (let i = 0; i < shortage; i++) {
-          this.foods.push(createFood());
-        }
+      const shortage = Math.max(0, INITIAL_FOOD_COUNT - this.foods.length);
+      for (let i = 0; i < shortage; i++) {
+        this.foods.push(createFood());
       }
       this.lastFoodSpawn = this.elapsedTime;
     }

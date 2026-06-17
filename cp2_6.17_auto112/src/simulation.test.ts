@@ -1,6 +1,6 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { Simulation, SimulationStats } from './simulation';
-import { Organism, Food, SpeciesColor, INITIAL_ORGANISMS_PER_SPECIES, INITIAL_FOOD_COUNT, ORGANISM_SIZE, SCENE_WIDTH, SCENE_HEIGHT, MAX_ENERGY, ENERGY_PER_FRAME, ENERGY_FROM_FOOD, BREED_ENERGY_THRESHOLD, BREED_ENERGY_COST, VISION_RANGE, FOOD_RADIUS } from './entities';
+import { describe, it, expect, beforeEach } from 'vitest';
+import { Simulation } from './simulation';
+import { Organism, Food, SpeciesColor, INITIAL_ORGANISMS_PER_SPECIES, INITIAL_FOOD_COUNT, ORGANISM_SIZE, SCENE_WIDTH, SCENE_HEIGHT, MAX_ENERGY, ENERGY_PER_FRAME, ENERGY_FROM_FOOD, BREED_ENERGY_THRESHOLD, BREED_ENERGY_COST, FOOD_RADIUS } from './entities';
 
 describe('Simulation - 基本初始化', () => {
   let sim: Simulation;
@@ -35,6 +35,12 @@ describe('Simulation - 基本初始化', () => {
     const history = sim.getPopulationHistory();
     expect(history.length).toBeGreaterThanOrEqual(1);
     expect(history[0].time).toBe(0);
+  });
+
+  it('初始化时生物的lastBreedTime为0', () => {
+    for (const org of sim.organisms) {
+      expect(org.lastBreedTime).toBe(0);
+    }
   });
 });
 
@@ -128,7 +134,7 @@ describe('Simulation - 进食逻辑', () => {
   });
 });
 
-describe('Simulation - 繁殖逻辑', () => {
+describe('Simulation - 繁殖逻辑（基于时间戳）', () => {
   let sim: Simulation;
 
   beforeEach(() => {
@@ -137,10 +143,10 @@ describe('Simulation - 繁殖逻辑', () => {
     sim.organisms = [];
   });
 
-  it('能量>60且冷却完毕时可繁殖', () => {
+  it('能量>60且距上次繁殖≥5秒时可繁殖', () => {
     const org = createTestOrganism('red', 200, 200);
     org.energy = 80;
-    org.breedCooldown = 0;
+    org.lastBreedTime = -10;
     sim.organisms.push(org);
     const beforeCount = sim.organisms.length;
 
@@ -150,21 +156,21 @@ describe('Simulation - 繁殖逻辑', () => {
     expect(org.energy).toBeCloseTo(80 - BREED_ENERGY_COST - ENERGY_PER_FRAME, 4);
   });
 
-  it('繁殖后设置5秒冷却（150帧）', () => {
+  it('繁殖后更新lastBreedTime为当前时间', () => {
     const org = createTestOrganism('red', 200, 200);
     org.energy = 80;
-    org.breedCooldown = 0;
+    org.lastBreedTime = -10;
     sim.organisms.push(org);
 
     sim.step();
 
-    expect(org.breedCooldown).toBe(5 * 30);
+    expect(org.lastBreedTime).toBeCloseTo(1 / 30, 5);
   });
 
-  it('冷却期内不会再次繁殖', () => {
+  it('5秒冷却期内不会再次繁殖', () => {
     const org = createTestOrganism('red', 200, 200);
     org.energy = 95;
-    org.breedCooldown = 0;
+    org.lastBreedTime = -10;
     sim.organisms.push(org);
 
     sim.step();
@@ -176,10 +182,10 @@ describe('Simulation - 繁殖逻辑', () => {
     expect(sim.organisms.length).toBe(countAfterFirst);
   });
 
-  it('冷却完毕且能量足够时再次繁殖', () => {
+  it('5秒冷却完毕且能量足够时再次繁殖', () => {
     const org = createTestOrganism('red', 200, 200);
     org.energy = 95;
-    org.breedCooldown = 0;
+    org.lastBreedTime = -10;
     sim.organisms.push(org);
 
     sim.step();
@@ -194,7 +200,7 @@ describe('Simulation - 繁殖逻辑', () => {
   it('能量≤60时不会繁殖', () => {
     const org = createTestOrganism('red', 200, 200);
     org.energy = 60;
-    org.breedCooldown = 0;
+    org.lastBreedTime = -10;
     sim.organisms.push(org);
     const beforeCount = sim.organisms.length;
 
@@ -206,7 +212,7 @@ describe('Simulation - 繁殖逻辑', () => {
   it('子代继承父代颜色类别', () => {
     const org = createTestOrganism('blue', 200, 200);
     org.energy = 90;
-    org.breedCooldown = 0;
+    org.lastBreedTime = -10;
     sim.organisms.push(org);
 
     sim.step();
@@ -216,16 +222,44 @@ describe('Simulation - 繁殖逻辑', () => {
     expect(child!.color).toBe('blue');
   });
 
-  it('新出生生物有150帧初始冷却，不会立即繁殖', () => {
+  it('新出生生物的lastBreedTime为出生时刻，5秒内不会繁殖', () => {
     const org = createTestOrganism('green', 200, 200);
     org.energy = 100;
-    org.breedCooldown = 0;
+    org.lastBreedTime = -10;
     sim.organisms.push(org);
 
     sim.step();
 
     const child = sim.organisms.find((o) => o.id !== org.id);
-    expect(child!.breedCooldown).toBe(5 * 30);
+    expect(child).toBeDefined();
+    expect(child!.lastBreedTime).toBeCloseTo(1 / 30, 5);
+
+    for (let i = 0; i < 149; i++) {
+      sim.step();
+      for (const o of sim.organisms) o.energy = Math.min(MAX_ENERGY, o.energy + 10);
+    }
+    const childOnly = sim.organisms.filter((o) => o.id !== org.id);
+    expect(childOnly.length).toBe(1);
+  });
+
+  it('繁殖间隔基于真实时间，不受帧率影响', () => {
+    const org = createTestOrganism('red', 200, 200);
+    org.energy = 100;
+    org.lastBreedTime = -10;
+    sim.organisms.push(org);
+
+    sim.step();
+
+    const firstBreedTime = org.lastBreedTime;
+    expect(firstBreedTime).toBeCloseTo(1 / 30, 5);
+    for (let i = 0; i < 160; i++) {
+      sim.step();
+      for (const o of sim.organisms) o.energy = Math.min(MAX_ENERGY, o.energy + 10);
+    }
+
+    const secondBreedTime = org.lastBreedTime;
+    const diff = secondBreedTime - firstBreedTime;
+    expect(diff).toBeGreaterThanOrEqual(5);
   });
 });
 
@@ -248,7 +282,7 @@ describe('Simulation - 移动逻辑', () => {
     }
   });
 
-  it('视野范围内有食物时，多次步进后生物平均位置向食物靠近', () => {
+  it('视野范围内有食物时，多次步进后生物向食物靠近', () => {
     sim.organisms = [];
     sim.foods = [];
 
@@ -266,7 +300,7 @@ describe('Simulation - 移动逻辑', () => {
     }
   });
 
-  it('无食物时生物仍会移动或静止（不固定位置）', () => {
+  it('无食物时生物仍会移动（30%概率随机游走）', () => {
     sim.foods = [];
     const org = sim.organisms[0];
     const positions: Set<string> = new Set();
@@ -298,7 +332,6 @@ describe('Simulation - 移动逻辑', () => {
       Math.pow(fastOrg.x - fastStart.x, 2) + Math.pow(fastOrg.y - fastStart.y, 2)
     );
 
-    vi.useFakeTimers();
     expect(fastDist).toBeGreaterThanOrEqual(slowDist * 0.5);
   });
 });
@@ -341,6 +374,18 @@ describe('Simulation - 食物补充机制', () => {
 
     expect(simLong.foods.length).toBe(5);
   });
+
+  it('shortage用Math.max(0,...)避免负数', () => {
+    sim.foods = [];
+    for (let i = 0; i < 50; i++) sim.foods.push(createTestFood(i * 10, 50 + (i % 10) * 30));
+
+    for (let i = 0; i < 31; i++) sim.step();
+
+    for (const f of sim.foods) {
+      expect(f.x).toBeGreaterThanOrEqual(0);
+      expect(f.y).toBeGreaterThanOrEqual(0);
+    }
+  });
 });
 
 describe('Simulation - 变异效果', () => {
@@ -356,14 +401,14 @@ describe('Simulation - 变异效果', () => {
     const org = createTestOrganism('red', 200, 200);
     org.colorRGB = { r: testColorR, g: testColorG, b: testColorB };
     org.energy = 90;
-    org.breedCooldown = 0;
+    org.lastBreedTime = -10;
     sim.organisms.push(org);
 
     const childrenColors: Array<{ r: number; g: number; b: number }> = [];
     for (let trial = 0; trial < 20; trial++) {
       sim.organisms = [org];
       org.energy = 90;
-      org.breedCooldown = 0;
+      org.lastBreedTime = -10;
       sim.step();
       const child = sim.organisms.find((o) => o.id !== org.id);
       if (child) {
@@ -388,7 +433,7 @@ describe('Simulation - 变异效果', () => {
     const org = createTestOrganism('green', 300, 300);
     org.colorRGB = { ...baseRGB };
     org.energy = 100;
-    org.breedCooldown = 0;
+    org.lastBreedTime = -10;
     sim.organisms.push(org);
 
     let sameColorCount = 0;
@@ -397,7 +442,7 @@ describe('Simulation - 变异效果', () => {
     for (let trial = 0; trial < totalTrials; trial++) {
       sim.organisms = [org];
       org.energy = 100;
-      org.breedCooldown = 0;
+      org.lastBreedTime = -10;
       sim.step();
       const child = sim.organisms.find((o) => o.id !== org.id);
       if (
@@ -412,10 +457,39 @@ describe('Simulation - 变异效果', () => {
 
     expect(sameColorCount).toBeGreaterThan(totalTrials * 0.8);
   });
+
+  it('变异颜色值不会超出0-255范围', () => {
+    const sim = new Simulation();
+    sim.organisms = [];
+    sim.foods = [];
+    sim.setParams({ mutationRate: 1.0 });
+
+    const org = createTestOrganism('red', 200, 200);
+    org.colorRGB = { r: 252, g: 3, b: 128 };
+    org.energy = 90;
+    org.lastBreedTime = -10;
+    sim.organisms.push(org);
+
+    for (let trial = 0; trial < 50; trial++) {
+      sim.organisms = [org];
+      org.energy = 90;
+      org.lastBreedTime = -10;
+      sim.step();
+      const child = sim.organisms.find((o) => o.id !== org.id);
+      if (child) {
+        expect(child.colorRGB.r).toBeGreaterThanOrEqual(0);
+        expect(child.colorRGB.r).toBeLessThanOrEqual(255);
+        expect(child.colorRGB.g).toBeGreaterThanOrEqual(0);
+        expect(child.colorRGB.g).toBeLessThanOrEqual(255);
+        expect(child.colorRGB.b).toBeGreaterThanOrEqual(0);
+        expect(child.colorRGB.b).toBeLessThanOrEqual(255);
+      }
+    }
+  });
 });
 
 describe('Simulation - 种群历史采样', () => {
-  it('每5秒（150帧）采样一次种群数据', () => {
+  it('每5秒采样一次种群数据', () => {
     const sim = new Simulation();
     const initialHistory = sim.getPopulationHistory().length;
 
@@ -450,7 +524,8 @@ function createTestOrganism(color: SpeciesColor, x: number, y: number): Organism
         ? { r: 59, g: 130, b: 246 }
         : { r: 34, g: 197, b: 94 },
     age: 0,
-    breedCooldown: 5 * 30,
+    breedCooldown: 0,
+    lastBreedTime: -10,
     vx: 0,
     vy: 0,
   };
