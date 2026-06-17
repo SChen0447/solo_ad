@@ -35,7 +35,17 @@ const QueueList: React.FC<QueueListProps> = ({ songs }) => {
     });
 
     if (Object.keys(newAnimations).length > 0) {
-      setVoteAnimations((prev) => ({ ...prev, ...newAnimations }));
+      setVoteAnimations((prev) => {
+        const updated = { ...prev };
+        Object.keys(newAnimations).forEach((id) => {
+          delete updated[id];
+        });
+        return updated;
+      });
+
+      requestAnimationFrame(() => {
+        setVoteAnimations((prev) => ({ ...prev, ...newAnimations }));
+      });
 
       const timer = setTimeout(() => {
         setVoteAnimations((prev) => {
@@ -45,7 +55,7 @@ const QueueList: React.FC<QueueListProps> = ({ songs }) => {
           });
           return updated;
         });
-      }, 300);
+      }, 500);
 
       return () => clearTimeout(timer);
     }
@@ -81,7 +91,7 @@ const QueueList: React.FC<QueueListProps> = ({ songs }) => {
   const sortedSongs = [...songs].sort((a, b) => b.votes - a.votes);
 
   return (
-    <div className="h-full flex flex-col rounded-2xl p-6 overflow-hidden" style={{ backgroundColor: '#1e1e1e' }}>
+    <div className="h-full flex flex-col rounded-2xl p-6 overflow-hidden card-hover" style={{ backgroundColor: '#1e1e1e', boxShadow: '0 4px 15px rgba(0, 0, 0, 0.3)' }}>
       <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
         <span className="w-1 h-5 rounded-full" style={{ backgroundColor: '#1db954' }} />
         待播队列
@@ -136,7 +146,7 @@ const QueueList: React.FC<QueueListProps> = ({ songs }) => {
 
                 <div
                   className={`relative px-2.5 py-1 rounded-full text-sm font-semibold flex items-center justify-center min-w-[36px] ${
-                    voteAnimations[song.id] ? 'animate-bounce-scale' : ''
+                    voteAnimations[song.id] ? 'animate-bounce-vote' : ''
                   }`}
                   style={{
                     backgroundColor: song.votes > 0 ? '#1db954' : '#2a2a2a',

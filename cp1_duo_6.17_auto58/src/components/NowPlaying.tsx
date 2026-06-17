@@ -55,8 +55,11 @@ const NowPlaying: React.FC<NowPlayingProps> = ({ data }) => {
 
   return (
     <div
-      className="flex flex-col items-center justify-center rounded-2xl p-8 h-full"
-      style={{ backgroundColor: '#1e1e1e' }}
+      className="flex flex-col items-center justify-center rounded-2xl p-8 h-full card-hover"
+      style={{
+        backgroundColor: '#1e1e1e',
+        boxShadow: '0 4px 15px rgba(0, 0, 0, 0.3)',
+      }}
     >
       <div className="relative mb-8">
         <div

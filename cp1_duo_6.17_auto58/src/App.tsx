@@ -95,7 +95,7 @@ const App: React.FC = () => {
         const data = await getPlaylist();
         setPlaylistState(data);
         setUseMockData(false);
-      } catch {
+      } catch (_error) {
         setUseMockData(true);
       }
     };
@@ -119,18 +119,26 @@ const App: React.FC = () => {
         unsubscribeSong();
         socketManager.disconnect();
       };
-    } catch {
+    } catch (_error) {
       setUseMockData(true);
     }
   }, []);
 
   const handleRefresh = useCallback(async () => {
-    setIsRefreshing(true);
+    setIsRefreshing(false);
+
+    requestAnimationFrame(() => {
+      setIsRefreshing(true);
+      setTimeout(() => {
+        // 确保动画能完整播放
+      }, 10);
+    });
+
     try {
       const data = await getPlaylist();
       setPlaylistState(data);
       setUseMockData(false);
-    } catch {
+    } catch (_error) {
       if (useMockData) {
         const shuffled = [...mockSongs].map((s) => ({
           ...s,
@@ -140,7 +148,7 @@ const App: React.FC = () => {
           ...mockPlaylistState,
           queue: shuffled,
           onlineUsers: Math.max(1, mockPlaylistState.onlineUsers + Math.floor(Math.random() * 5) - 2),
-        });
+        }));
       }
     } finally {
       setTimeout(() => setIsRefreshing(false), 600);

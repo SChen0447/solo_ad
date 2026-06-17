@@ -42,12 +42,24 @@ html, body, #root {
   }
 }
 
-@keyframes bounce-scale {
-  0%, 100% {
+@keyframes bounce-vote {
+  0% {
     transform: scale(1);
   }
-  50% {
-    transform: scale(1.3);
+  20% {
+    transform: scale(1.4);
+  }
+  40% {
+    transform: scale(0.95);
+  }
+  60% {
+    transform: scale(1.15);
+  }
+  80% {
+    transform: scale(0.98);
+  }
+  100% {
+    transform: scale(1);
   }
 }
 
@@ -56,24 +68,24 @@ html, body, #root {
     transform: translateX(0);
   }
   10%, 30%, 50%, 70%, 90% {
-    transform: translateX(-4px);
+    transform: translateX(-6px);
   }
   20%, 40%, 60%, 80% {
-    transform: translateX(4px);
+    transform: translateX(6px);
   }
 }
 
 @keyframes checkmark-pop {
   0% {
-    transform: scale(0);
+    transform: scale(0) rotate(-45deg);
     opacity: 0;
   }
   50% {
-    transform: scale(1.2);
+    transform: scale(1.2) rotate(5deg);
     opacity: 1;
   }
   100% {
-    transform: scale(1);
+    transform: scale(1) rotate(0deg);
     opacity: 1;
   }
 }
@@ -98,22 +110,41 @@ html, body, #root {
   }
 }
 
-.animate-spin-slow {
-  animation: spin-slow 30s linear infinite;
+@keyframes card-float {
+  0% {
+    transform: translateY(0);
+  }
+  100% {
+    transform: translateY(-2px);
+  }
 }
 
-.animate-bounce-scale {
-  animation: bounce-scale 0.3s ease-in-out;
+.animate-spin-slow {
+  animation: spin-slow 30s linear infinite;
+  animation-duration: 30s;
+}
+
+.animate-bounce-vote {
+  animation: bounce-vote 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55);
 }
 
 .animate-shake {
-  animation: shake 0.5s ease-in-out;
+  animation: shake 0.5s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
 }
 
 .animate-checkmark {
-  animation: checkmark-pop 0.4s ease-out forwards;
+  animation: checkmark-pop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
 }
 
 .animate-rotate-360 {
-  animation: rotate-360 0.6s ease-in-out;
+  animation: rotate-360 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.card-hover {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.card-hover:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.4);
 }

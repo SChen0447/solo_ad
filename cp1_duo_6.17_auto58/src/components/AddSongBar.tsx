@@ -28,6 +28,8 @@ const AddSongBar: React.FC<AddSongBarProps> = ({ onSongAdded }) => {
     setUrl(value);
     if (value.trim() === '') {
       setIsValid(true);
+    } else {
+      setIsValid(validateMusicUrl(value.trim()));
     }
   };
 
