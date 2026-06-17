@@ -15,7 +15,7 @@ import type { Bookmark } from '@/api'
 import * as api from '@/api'
 import BookmarkCard from './BookmarkCard'
 import useBookmarkStore from '@/store/useBookmarkStore'
-import { useDebounce, cn } from '@/utils'
+import { useDebounce, cn, copyToClipboard } from '@/utils'
 
 interface BookmarkListProps {
   onEdit: (bookmark: Bookmark) => void
@@ -37,6 +37,7 @@ export default function BookmarkList({ onEdit }: BookmarkListProps) {
     setBookmarks,
     setAllTags,
     folders,
+    showToast,
   } = useBookmarkStore()
 
   const [searchQuery, setSearchQuery] = useState('')
@@ -48,8 +49,11 @@ export default function BookmarkList({ onEdit }: BookmarkListProps) {
   const [newBatchTags, setNewBatchTags] = useState<string[]>([])
   const [newTagName, setNewTagName] = useState('')
   const [draggedId, setDraggedId] = useState<string | null>(null)
+  const [isDragOverList, setIsDragOverList] = useState(false)
   const [visibleRange, setVisibleRange] = useState({ start: 0, end: 20 })
+
   const listRef = useRef<HTMLDivElement>(null)
+  const abortControllerRef = useRef<AbortController | null>(null)
   const debouncedSearch = useDebounce(searchQuery, 300)
 
   const filteredBookmarks = useMemo(() => {
@@ -75,6 +79,9 @@ export default function BookmarkList({ onEdit }: BookmarkListProps) {
   }, [bookmarks, debouncedSearch, selectedTagFilters])
 
   useEffect(() => {
+    const controller = new AbortController()
+    abortControllerRef.current = controller
+
     const fetchData = async () => {
       setLoading(true)
       setError(null)
@@ -83,15 +90,25 @@ export default function BookmarkList({ onEdit }: BookmarkListProps) {
           api.searchBookmarks(debouncedSearch, selectedTagFilters),
           api.getAllTags(),
         ])
-        setBookmarks(bookmarksData)
-        setAllTags(tagsData)
+        if (!controller.signal.aborted) {
+          setBookmarks(bookmarksData)
+          setAllTags(tagsData)
+        }
       } catch (err) {
-        setError((err as Error).message)
+        if (!controller.signal.aborted) {
+          setError((err as Error).message)
+        }
       } finally {
-        setLoading(false)
+        if (!controller.signal.aborted) {
+          setLoading(false)
+        }
       }
     }
     fetchData()
+
+    return () => {
+      controller.abort()
+    }
   }, [debouncedSearch, selectedTagFilters])
 
   useEffect(() => {
@@ -114,30 +131,64 @@ export default function BookmarkList({ onEdit }: BookmarkListProps) {
     return () => container?.removeEventListener('scroll', handleScroll)
   }, [filteredBookmarks.length])
 
-  const handleDragStart = (e: React.DragEvent, id: string) => {
+  const handleDragStart = useCallback((e: React.DragEvent, id: string) => {
     setDraggedId(id)
     e.dataTransfer.effectAllowed = 'move'
     e.dataTransfer.setData('text/plain', id)
-  }
+    try {
+      e.dataTransfer.setDragImage(e.currentTarget, 20, 20)
+    } catch {
+      // ignore
+    }
+  }, [])
 
-  const handleDragOver = (e: React.DragEvent) => {
+  const handleDragEnd = useCallback(() => {
+    setDraggedId(null)
+    setIsDragOverList(false)
+  }, [])
+
+  const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault()
     e.dataTransfer.dropEffect = 'move'
-  }
+    if (!isDragOverList) {
+      setIsDragOverList(true)
+    }
+  }, [isDragOverList])
 
-  const handleDrop = async (e: React.DragEvent, folderId: string | null) => {
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
+    const x = e.clientX
+    const y = e.clientY
+
+    if (
+      x <= rect.left ||
+      x >= rect.right ||
+      y <= rect.top ||
+      y >= rect.bottom
+    ) {
+      setIsDragOverList(false)
+    }
+  }, [])
+
+  const handleDrop = useCallback(async (e: React.DragEvent, folderId: string | null) => {
     e.preventDefault()
-    if (!draggedId) return
+    e.stopPropagation()
+    setIsDragOverList(false)
+
+    const id = draggedId || e.dataTransfer.getData('text/plain')
+    if (!id) return
+
     try {
-      await api.updateBookmark(draggedId, { folderId })
+      await api.updateBookmark(id, { folderId })
       const updated = await api.getBookmarks()
       setBookmarks(updated)
-      useBookmarkStore.getState().showToast('移动成功', 'success')
+      showToast('移动成功', 'success')
     } catch (err) {
-      useBookmarkStore.getState().showToast((err as Error).message, 'error')
+      showToast((err as Error).message, 'error')
+    } finally {
+      setDraggedId(null)
     }
-    setDraggedId(null)
-  }
+  }, [draggedId, setBookmarks, showToast])
 
   const handleBatchDelete = async () => {
     if (selectedIds.size === 0) return
@@ -145,10 +196,11 @@ export default function BookmarkList({ onEdit }: BookmarkListProps) {
       await api.batchDelete(Array.from(selectedIds))
       const updated = await api.getBookmarks()
       setBookmarks(updated)
+      const count = selectedIds.size
       clearSelection()
-      useBookmarkStore.getState().showToast(`已删除 ${selectedIds.size} 个书签`, 'success')
+      showToast(`已删除 ${count} 个书签`, 'success')
     } catch (err) {
-      useBookmarkStore.getState().showToast((err as Error).message, 'error')
+      showToast((err as Error).message, 'error')
     }
     setShowBatchMenu(false)
   }
@@ -159,10 +211,11 @@ export default function BookmarkList({ onEdit }: BookmarkListProps) {
       await api.batchTag(Array.from(selectedIds), newBatchTags)
       const updated = await api.getBookmarks()
       setBookmarks(updated)
+      const count = selectedIds.size
       clearSelection()
-      useBookmarkStore.getState().showToast(`已为 ${selectedIds.size} 个书签添加标签`, 'success')
+      showToast(`已为 ${count} 个书签添加标签`, 'success')
     } catch (err) {
-      useBookmarkStore.getState().showToast((err as Error).message, 'error')
+      showToast((err as Error).message, 'error')
     }
     setShowTagModal(false)
     setNewBatchTags([])
@@ -174,10 +227,11 @@ export default function BookmarkList({ onEdit }: BookmarkListProps) {
       await api.batchMove(Array.from(selectedIds), folderId)
       const updated = await api.getBookmarks()
       setBookmarks(updated)
+      const count = selectedIds.size
       clearSelection()
-      useBookmarkStore.getState().showToast(`已移动 ${selectedIds.size} 个书签`, 'success')
+      showToast(`已移动 ${count} 个书签`, 'success')
     } catch (err) {
-      useBookmarkStore.getState().showToast((err as Error).message, 'error')
+      showToast((err as Error).message, 'error')
     }
     setShowMoveMenu(false)
     setShowBatchMenu(false)
@@ -555,12 +609,19 @@ export default function BookmarkList({ onEdit }: BookmarkListProps) {
 
       <div
         ref={listRef}
-        className="flex-1 overflow-y-auto px-6 py-6 bg-gray-50"
+        className={cn(
+          'flex-1 overflow-y-auto px-6 py-6 bg-gray-50 transition-colors',
+          isDragOverList && draggedId && 'bg-blue-50/50'
+        )}
         onClick={() => {
           setShowTagDropdown(false)
           setShowBatchMenu(false)
           setShowMoveMenu(false)
         }}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={e => handleDrop(e, null)}
+        onDragEnd={handleDragEnd}
       >
         <div className="max-w-7xl mx-auto">
           {loading ? (
@@ -571,11 +632,13 @@ export default function BookmarkList({ onEdit }: BookmarkListProps) {
             renderEmptyState()
           ) : (
             <div
-              className="grid gap-4 justify-center"
+              className={cn(
+                'grid gap-4 justify-center transition-all duration-200',
+                isDragOverList && draggedId && 'scale-[1.01]'
+              )}
               style={{
                 gridTemplateColumns: 'repeat(auto-fill, 260px)',
               }}
-              onDragOver={handleDragOver}
             >
               {filteredBookmarks
                 .slice(visibleRange.start, visibleRange.end)
@@ -594,11 +657,11 @@ export default function BookmarkList({ onEdit }: BookmarkListProps) {
             </div>
           )}
         </div>
-      </div>
 
-      {showTagDropdown || showBatchMenu || showMoveMenu
-        ? null
-        : undefined}
+        {isDragOverList && draggedId && (
+          <div className="pointer-events-none fixed inset-0 border-2 border-blue-400 border-dashed m-4 rounded-2xl z-10" />
+        )}
+      </div>
     </div>
   )
 }

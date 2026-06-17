@@ -1,10 +1,12 @@
 import { create } from 'zustand'
 import type { Bookmark, Folder } from '@/api'
+import { TOAST_DURATION } from '@/utils'
 
 interface Toast {
   id: string
   message: string
   type: 'success' | 'error' | 'info'
+  duration?: number
 }
 
 interface BookmarkState {
@@ -40,7 +42,7 @@ interface BookmarkState {
   updateFolder: (folder: Folder & { bookmarks?: Bookmark[] }) => void
   deleteFolder: (id: string) => void
 
-  showToast: (message: string, type?: Toast['type']) => void
+  showToast: (message: string, type?: Toast['type'], duration?: number) => void
   removeToast: (id: string) => void
 }
 
@@ -108,13 +110,13 @@ const useBookmarkStore = create<BookmarkState>((set, get) => ({
       folders: state.folders.filter(f => f.id !== id),
     })),
 
-  showToast: (message, type = 'success') => {
+  showToast: (message, type = 'success', duration = TOAST_DURATION) => {
     const id = Date.now().toString()
-    const toast: Toast = { id, message, type }
+    const toast: Toast = { id, message, type, duration }
     set(state => ({ toasts: [...state.toasts, toast] }))
     setTimeout(() => {
       get().removeToast(id)
-    }, 2000)
+    }, duration)
   },
 
   removeToast: id =>

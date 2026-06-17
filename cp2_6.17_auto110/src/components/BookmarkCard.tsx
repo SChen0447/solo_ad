@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useCallback } from 'react'
 import {
   ExternalLink,
   Trash2,
@@ -9,7 +9,7 @@ import {
   MoreVertical,
 } from 'lucide-react'
 import type { Bookmark } from '@/api'
-import { getTagColor, truncateUrl, cn } from '@/utils'
+import { getTagColor, truncateUrl, cn, getFaviconUrl, DEFAULT_FAVICON, copyToClipboard } from '@/utils'
 import useBookmarkStore from '@/store/useBookmarkStore'
 import * as api from '@/api'
 
@@ -24,6 +24,8 @@ interface BookmarkCardProps {
   onDrop?: (e: React.DragEvent, folderId: string | null) => void
   folderId?: string | null
 }
+
+const LONG_PRESS_DURATION = 500
 
 export default function BookmarkCard({
   bookmark,
@@ -46,28 +48,50 @@ export default function BookmarkCard({
 
   const [showMenu, setShowMenu] = useState(false)
   const [sharing, setSharing] = useState(false)
-  const longPressTimer = useRef<NodeJS.Timeout | null>(null)
+  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const isLongPress = useRef(false)
+  const hasPointerMoved = useRef(false)
 
-  const handlePointerDown = () => {
+  const clearLongPressTimer = useCallback(() => {
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current)
+      longPressTimer.current = null
+    }
+  }, [])
+
+  const handlePointerDown = (e: React.PointerEvent) => {
+    if (batchMode) return
+    if (e.button !== 0) return
+
     isLongPress.current = false
+    hasPointerMoved.current = false
+    clearLongPressTimer()
+
     longPressTimer.current = setTimeout(() => {
-      isLongPress.current = true
-      setBatchMode(true)
-      toggleSelect(bookmark.id)
-    }, 500)
+      if (!hasPointerMoved.current) {
+        isLongPress.current = true
+        setBatchMode(true)
+        toggleSelect(bookmark.id)
+      }
+    }, LONG_PRESS_DURATION)
   }
 
-  const handlePointerUp = () => {
-    if (longPressTimer.current && clearTimeout(longPressTimer.current))
-  }
+  const handlePointerUp = useCallback(() => {
+    clearLongPressTimer()
+  }, [clearLongPressTimer])
 
-  const handlePointerLeave = () => {
-    if (longPressTimer.current && clearTimeout(longPressTimer.current))
-  }
+  const handlePointerMove = useCallback(() => {
+    hasPointerMoved.current = true
+    clearLongPressTimer()
+  }, [clearLongPressTimer])
+
+  const handlePointerLeave = useCallback(() => {
+    clearLongPressTimer()
+  }, [clearLongPressTimer])
 
   const handleContextMenu = (e: React.MouseEvent) => {
     e.preventDefault()
+    clearLongPressTimer()
     setBatchMode(true)
     if (!isSelected) {
       toggleSelect(bookmark.id)
@@ -75,8 +99,10 @@ export default function BookmarkCard({
   }
 
   const handleClick = (e: React.MouseEvent) => {
+    clearLongPressTimer()
     if (batchMode || isLongPress.current) {
       e.preventDefault()
+      e.stopPropagation()
       toggleSelect(bookmark.id)
     }
   }
@@ -97,8 +123,12 @@ export default function BookmarkCard({
     try {
       const { shareCode } = await api.shareBookmark(bookmark.id)
       const shareUrl = `${window.location.origin}/s/${shareCode}`
-      await navigator.clipboard.writeText(shareUrl)
-      showToast('链接已复制到剪贴板', 'success')
+      const result = await copyToClipboard(shareUrl)
+      if (result.success) {
+        showToast('链接已复制到剪贴板', 'success')
+      } else {
+        showToast(result.error || '复制失败，请手动复制', 'error')
+      }
     } catch (err) {
       showToast((err as Error).message, 'error')
     } finally {
@@ -108,11 +138,11 @@ export default function BookmarkCard({
   }
 
   const handleCopyLink = async () => {
-    try {
-      await navigator.clipboard.writeText(bookmark.url)
+    const result = await copyToClipboard(bookmark.url)
+    if (result.success) {
       showToast('链接已复制到剪贴板', 'success')
-    } catch (err) {
-      showToast('复制失败', 'error')
+    } else {
+      showToast(result.error || '复制失败', 'error')
     }
     setShowMenu(false)
   }
@@ -121,14 +151,22 @@ export default function BookmarkCard({
     window.open(bookmark.url, '_blank', 'noopener,noreferrer')
   }
 
-  const tagColor = getTagColor(bookmark.tags[0] || 'default')
+  const faviconSrc = getFaviconUrl(bookmark)
+
+  const handleImageError = (e: React.SyntheticEvent<HTMLImageElement>) => {
+    const target = e.target as HTMLImageElement
+    if (target.src !== DEFAULT_FAVICON) {
+      target.src = DEFAULT_FAVICON
+    }
+  }
 
   if (compact) {
     return (
       <div
         className={cn(
-          'flex items-center gap-3 px-3 h-10 cursor-pointer group transition-colors',
-          isSelected ? 'bg-blue-50' : 'hover:bg-gray-50'
+          'flex items-center gap-3 px-3 h-10 cursor-pointer group transition-colors select-none',
+          isSelected ? 'bg-blue-50' : 'hover:bg-gray-50',
+          isDragging && 'opacity-50'
         )}
         draggable
         onDragStart={e => onDragStart && onDragStart(e, bookmark.id)}
@@ -137,11 +175,17 @@ export default function BookmarkCard({
           e.preventDefault()
           onDrop && onDrop(e, folderId)
         }}
+        onClick={handleClick}
+        onPointerDown={handlePointerDown}
+        onPointerUp={handlePointerUp}
+        onPointerMove={handlePointerMove}
+        onPointerLeave={handlePointerLeave}
+        onContextMenu={handleContextMenu}
       >
         {batchMode && (
           <div
             className={cn(
-              'w-4 h-4 rounded border-2 flex items-center justify-center transition-all',
+              'w-4 h-4 rounded border-2 flex items-center justify-center transition-all flex-shrink-0',
               isSelected
                 ? 'bg-blue-500 border-blue-500'
                 : 'border-gray-300 group-hover:border-gray-400'
@@ -152,13 +196,10 @@ export default function BookmarkCard({
         )}
 
         <img
-          src={bookmark.favicon || 'https://www.google.com/s2/favicons?domain=' + new URL(bookmark.url).hostname + '&sz=32'}
+          src={faviconSrc}
           alt=""
           className="w-4 h-4 rounded flex-shrink-0"
-          onError={e => {
-            ;(e.target as HTMLImageElement).src =
-              'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" class="lucide lucide-link"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>'
-          }}
+          onError={handleImageError}
         />
 
         <div className="flex-1 min-w-0">
@@ -195,23 +236,22 @@ export default function BookmarkCard({
         'group relative bg-white rounded-xl border transition-all duration-300 ease-out',
         'hover:shadow-[0_8px_24px_rgba(0,0,0,0.08)]',
         'hover:-translate-y-[3px]',
-        isSelected
-          ? 'border-blue-500'
-          : 'border-gray-200',
-        isDragging && 'opacity-50',
-        'cursor-pointer'
+        isSelected ? 'border-blue-500 ring-2 ring-blue-200' : 'border-gray-200',
+        isDragging && 'opacity-50 scale-95',
+        'cursor-pointer select-none'
       )}
       style={{ width: '260px' }}
       onClick={handleClick}
       onPointerDown={handlePointerDown}
       onPointerUp={handlePointerUp}
+      onPointerMove={handlePointerMove}
       onPointerLeave={handlePointerLeave}
       onContextMenu={handleContextMenu}
       draggable
       onDragStart={e => onDragStart && onDragStart(e, bookmark.id)}
     >
       {isSelected && (
-        <div className="absolute top-2 left-2 z-10 bg-blue-500 rounded-full p-1 animate-[fadeIn_0.2s_ease-out']}>
+        <div className="absolute top-2 left-2 z-10 bg-blue-500 rounded-full p-1 animate-[fadeIn_0.2s_ease-out]">
           <Check className="w-3.5 h-3.5 text-white" />
         </div>
       )}
@@ -219,16 +259,10 @@ export default function BookmarkCard({
       <div className="p-4 space-y-3">
         <div className="flex items-start gap-3">
           <img
-            src={
-              bookmark.favicon ||
-              'https://www.google.com/s2/favicons?domain=' + new URL(bookmark.url).hostname + '&sz=32'
-            }
+            src={faviconSrc}
             alt=""
             className="w-8 h-8 rounded-lg flex-shrink-0 mt-0.5"
-            onError={e => {
-              ;(e.target as HTMLImageElement).src =
-                'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" fill="%23e5e7eb" viewBox="0 0 24 24"><rect width="24" height="24" rx="4"/><text x="12" y="16" text-anchor="middle" font-size="14" fill="%239ca3af">🔗</text></svg>'
-            }}
+            onError={handleImageError}
           />
           <div className="flex-1 min-w-0">
             <h3 className="text-[14px] font-bold text-gray-800 leading-snug line-clamp-2 group-hover:text-blue-600 transition-colors">
@@ -273,6 +307,7 @@ export default function BookmarkCard({
                   onClick={e => {
                     e.stopPropagation()
                     onEdit(bookmark)
+                    setShowMenu(false)
                   }}
                   className="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
                 >

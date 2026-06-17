@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useCallback } from 'react'
 import {
   FolderPlus,
   ChevronDown,
@@ -19,11 +19,22 @@ interface FolderListProps {
 }
 
 export default function FolderList({ onEdit }: FolderListProps) {
-  const { folders, setFolders, addFolder, updateFolder, deleteFolder, showToast, setBookmarks, batchMode, clearSelection } = useBookmarkStore()
+  const {
+    folders,
+    setFolders,
+    addFolder,
+    updateFolder,
+    deleteFolder,
+    showToast,
+    setBookmarks,
+    batchMode,
+    clearSelection,
+  } = useBookmarkStore()
   const [newFolderName, setNewFolderName] = useState('')
   const [showCreateInput, setShowCreateInput] = useState(false)
   const [draggedId, setDraggedId] = useState<string | null>(null)
   const [dragOverFolder, setDragOverFolder] = useState<string | null>(null)
+  const [isGlobalDragOver, setIsGlobalDragOver] = useState(false)
 
   const handleCreateFolder = async () => {
     if (!newFolderName.trim()) return
@@ -62,45 +73,102 @@ export default function FolderList({ onEdit }: FolderListProps) {
     }
   }
 
-  const handleDragStart = (e: React.DragEvent, id: string) => {
+  const handleDragStart = useCallback((e: React.DragEvent, id: string) => {
     setDraggedId(id)
+    setIsGlobalDragOver(true)
     e.dataTransfer.effectAllowed = 'move'
     e.dataTransfer.setData('text/plain', id)
-  }
-
-  const handleDragOver = (e: React.DragEvent, folderId: string) => {
-    e.preventDefault()
-    e.dataTransfer.dropEffect = 'move'
-    setDragOverFolder(folderId)
-  }
-
-  const handleDragLeave = () => {
-    setDragOverFolder(null)
-  }
-
-  const handleDrop = async (e: React.DragEvent, folderId: string) => {
-    e.preventDefault()
-    e.stopPropagation()
-    if (!draggedId) return
     try {
-      await api.updateBookmark(draggedId, { folderId })
-      const [updatedBookmarks, updatedFolders] = await Promise.all([
-        api.getBookmarks(),
-        api.getFolders(),
-      ])
-      setBookmarks(updatedBookmarks)
-      setFolders(updatedFolders)
-      showToast('移动成功', 'success')
-    } catch (err) {
-      showToast((err as Error).message, 'error')
+      e.dataTransfer.setDragImage(e.currentTarget, 20, 20)
+    } catch {
+      // ignore
     }
+  }, [])
+
+  const handleDragEnd = useCallback(() => {
     setDraggedId(null)
     setDragOverFolder(null)
-    clearSelection()
+    setIsGlobalDragOver(false)
+  }, [])
+
+  const handleFolderDragOver = useCallback(
+    (e: React.DragEvent, folderId: string) => {
+      e.preventDefault()
+      e.dataTransfer.dropEffect = 'move'
+      if (dragOverFolder !== folderId) {
+        setDragOverFolder(folderId)
+      }
+    },
+    [dragOverFolder]
+  )
+
+  const handleFolderDragLeave = useCallback(
+    (e: React.DragEvent, folderId: string) => {
+      const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
+      const x = e.clientX
+      const y = e.clientY
+
+      if (
+        x <= rect.left ||
+        x >= rect.right ||
+        y <= rect.top ||
+        y >= rect.bottom
+      ) {
+        if (dragOverFolder === folderId) {
+          setDragOverFolder(null)
+        }
+      }
+    },
+    [dragOverFolder]
+  )
+
+  const handleDrop = useCallback(
+    async (e: React.DragEvent, folderId: string) => {
+      e.preventDefault()
+      e.stopPropagation()
+
+      const id = draggedId || e.dataTransfer.getData('text/plain')
+      if (!id) return
+
+      try {
+        await api.updateBookmark(id, { folderId })
+        const [updatedBookmarks, updatedFolders] = await Promise.all([
+          api.getBookmarks(),
+          api.getFolders(),
+        ])
+        setBookmarks(updatedBookmarks)
+        setFolders(updatedFolders)
+        showToast('移动成功', 'success')
+      } catch (err) {
+        showToast((err as Error).message, 'error')
+      } finally {
+        setDraggedId(null)
+        setDragOverFolder(null)
+        setIsGlobalDragOver(false)
+      }
+      clearSelection()
+    },
+    [draggedId, setBookmarks, setFolders, showToast, clearSelection]
+  )
+
+  const getFolderDropIndicator = (folderId: string) => {
+    if (dragOverFolder === folderId && draggedId) {
+      return 'ring-2 ring-blue-400 ring-offset-2 bg-blue-50/80 scale-[1.02] border-blue-400'
+    }
+    if (isGlobalDragOver && draggedId) {
+      return 'border-dashed border-gray-300'
+    }
+    return 'border-gray-200 hover:border-gray-300'
   }
 
   return (
-    <div className="bg-white border-b border-gray-200">
+    <div
+      className={cn(
+        'bg-white border-b border-gray-200 transition-colors',
+        isGlobalDragOver && draggedId && 'bg-blue-50/30'
+      )}
+      onDragEnd={handleDragEnd}
+    >
       <div className="max-w-7xl mx-auto px-6 py-4">
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-sm font-semibold text-gray-700 flex items-center gap-2">
@@ -146,26 +214,51 @@ export default function FolderList({ onEdit }: FolderListProps) {
         </div>
 
         {folders.length === 0 && !showCreateInput ? (
-          <p className="text-sm text-gray-400 text-center py-4">
-            暂无收藏夹，点击上方按钮创建
-          </p>
+          <div
+            className={cn(
+              'text-center py-8 border-2 border-dashed rounded-lg transition-all duration-300',
+              isGlobalDragOver && draggedId
+                ? 'border-blue-400 bg-blue-50'
+                : 'border-gray-200'
+            )}
+          >
+            <Folder
+              className={cn(
+                'w-10 h-10 mx-auto mb-2 transition-colors',
+                isGlobalDragOver && draggedId ? 'text-blue-400' : 'text-gray-300'
+              )}
+            />
+            <p
+              className={cn(
+                'text-sm transition-colors',
+                isGlobalDragOver && draggedId ? 'text-blue-600' : 'text-gray-400'
+              )}
+            >
+              {isGlobalDragOver && draggedId
+                ? '拖放到这里创建收藏夹'
+                : '暂无收藏夹，点击上方按钮创建'}
+            </p>
+          </div>
         ) : (
           <div className="space-y-2">
             {folders.map(folder => (
               <div
                 key={folder.id}
                 className={cn(
-                  'rounded-lg border transition-all duration-300',
-                  dragOverFolder === folder.id
-                    ? 'border-blue-500 bg-blue-50 scale-[1.01]'
-                    : 'border-gray-200 hover:border-gray-300'
+                  'rounded-lg border transition-all duration-300 overflow-hidden',
+                  getFolderDropIndicator(folder.id)
                 )}
-                onDragOver={e => handleDragOver(e, folder.id)}
-                onDragLeave={handleDragLeave}
+                onDragOver={e => handleFolderDragOver(e, folder.id)}
+                onDragLeave={e => handleFolderDragLeave(e, folder.id)}
                 onDrop={e => handleDrop(e, folder.id)}
               >
                 <div
-                  className="flex items-center justify-between px-4 py-3 cursor-pointer group"
+                  className={cn(
+                    'flex items-center justify-between px-4 py-3 cursor-pointer group transition-colors',
+                    dragOverFolder === folder.id && draggedId
+                      ? 'bg-blue-50'
+                      : 'hover:bg-gray-50'
+                  )}
                   onClick={() => handleToggleFolder(folder.id, folder.collapsed)}
                 >
                   <div className="flex items-center gap-3">
@@ -174,13 +267,32 @@ export default function FolderList({ onEdit }: FolderListProps) {
                     ) : (
                       <ChevronDown className="w-4 h-4 text-gray-400" />
                     )}
-                    <Folder className="w-5 h-5 text-yellow-500" />
+                    <Folder
+                      className={cn(
+                        'w-5 h-5 transition-colors',
+                        dragOverFolder === folder.id && draggedId
+                          ? 'text-blue-500'
+                          : 'text-yellow-500'
+                      )}
+                    />
                     <span className="text-sm font-medium text-gray-800">
                       {folder.name}
                     </span>
-                    <span className="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">
+                    <span
+                      className={cn(
+                        'text-xs px-2 py-0.5 rounded-full transition-colors',
+                        dragOverFolder === folder.id && draggedId
+                          ? 'bg-blue-200 text-blue-700'
+                          : 'bg-gray-100 text-gray-500'
+                      )}
+                    >
                       {folder.bookmarks?.length || 0}
                     </span>
+                    {dragOverFolder === folder.id && draggedId && (
+                      <span className="text-xs text-blue-500 font-medium animate-pulse">
+                        松开以移动
+                      </span>
+                    )}
                   </div>
                   <button
                     onClick={e => handleDeleteFolder(folder.id, e)}
@@ -193,8 +305,17 @@ export default function FolderList({ onEdit }: FolderListProps) {
                 {!folder.collapsed && (
                   <div className="border-t border-gray-100">
                     {!folder.bookmarks || folder.bookmarks.length === 0 ? (
-                      <div className="px-4 py-6 text-center text-sm text-gray-400">
-                        拖放书签到这里
+                      <div
+                        className={cn(
+                          'px-4 py-6 text-center text-sm border-2 border-dashed m-2 rounded-lg transition-all',
+                          dragOverFolder === folder.id && draggedId
+                            ? 'border-blue-300 bg-blue-50/50 text-blue-500'
+                            : 'border-gray-200 text-gray-400'
+                        )}
+                      >
+                        {dragOverFolder === folder.id && draggedId
+                          ? '松手放置到此处'
+                          : '拖放书签到这里'}
                       </div>
                     ) : (
                       <div className="divide-y divide-gray-50">
@@ -202,12 +323,17 @@ export default function FolderList({ onEdit }: FolderListProps) {
                           <div
                             key={bookmark.id}
                             className={cn(
-                              index % 2 === 0 ? 'bg-white' : 'bg-gray-50'
+                              'transition-all',
+                              index % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'
                             )}
                           >
                             <BookmarkCard
                               bookmark={bookmark}
-                              isSelected={useBookmarkStore.getState().selectedIds.has(bookmark.id)}
+                              isSelected={
+                                useBookmarkStore.getState().selectedIds.has(
+                                  bookmark.id
+                                )
+                              }
                               onEdit={onEdit}
                               compact
                               folderId={folder.id}
@@ -215,8 +341,10 @@ export default function FolderList({ onEdit }: FolderListProps) {
                               onDragOver={e => {
                                 e.preventDefault()
                                 e.stopPropagation()
+                                handleFolderDragOver(e, folder.id)
                               }}
-                              onDrop={handleDrop}
+                              onDrop={(e, _fid) => handleDrop(e, folder.id)}
+                              isDragging={draggedId === bookmark.id}
                             />
                           </div>
                         ))}
@@ -227,6 +355,10 @@ export default function FolderList({ onEdit }: FolderListProps) {
               </div>
             ))}
           </div>
+        )}
+
+        {isGlobalDragOver && draggedId && (
+          <div className="pointer-events-none fixed inset-0 border-2 border-blue-400/30 border-dashed m-2 rounded-2xl z-10" />
         )}
       </div>
     </div>

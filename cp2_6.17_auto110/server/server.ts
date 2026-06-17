@@ -78,15 +78,25 @@ const folders: Folder[] = [
   },
 ]
 
-const URL_PATTERN = /^https?:\/\/(www\.)?[-a-zA-Z0-9@:%._+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_+.~#?&/=]*)$/
+const URL_PATTERN = /^https?:\/\/(?:(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}(?::\d{1,5})?|(?:\d{1,3}\.){3}\d{1,3}(?::\d{1,5})?|localhost(?::\d{1,5})?)(?:\/[^\s]*)?$/i
 
 function generateShareCode(): string {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
   let result = ''
-  for (let i = 0; i < 6; i++) {
-    result += chars.charAt(Math.floor(Math.random() * chars.length))
-  }
-  return result
+  let attempts = 0
+  const maxAttempts = 100
+
+  do {
+    result = ''
+    for (let i = 0; i < 6; i++) {
+      result += chars.charAt(Math.floor(Math.random() * chars.length))
+    }
+    attempts++
+    const exists = bookmarks.some(b => b.shareCode === result)
+    if (!exists) return result
+  } while (attempts < maxAttempts)
+
+  return result + Date.now().toString(36).slice(-2)
 }
 
 function simulateFetchUrl(url: string): { title: string; favicon: string } {
