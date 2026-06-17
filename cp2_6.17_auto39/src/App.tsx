@@ -1,8 +1,7 @@
 import React, { lazy, Suspense, useState } from 'react';
-import { Routes, Route, NavLink, useLocation } from 'react-router-dom';
+import { Routes, Route, NavLink } from 'react-router-dom';
 import AddBookModal from './components/AddBookModal';
 import LoadingSpinner from './components/LoadingSpinner';
-import { Book } from './types';
 
 const Home = lazy(() => import('./pages/Home'));
 const BookList = lazy(() => import('./pages/BookList'));
@@ -10,7 +9,6 @@ const BookDetail = lazy(() => import('./pages/BookDetail'));
 
 const App: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const location = useLocation();
 
   const handleAddBook = async (bookData: {
     title: string;

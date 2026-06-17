@@ -9,7 +9,7 @@ interface BookCardProps {
 
 const BookCard: React.FC<BookCardProps> = ({ book }) => {
   const navigate = useNavigate();
-  const progress = book.totalPages > 0 ? Math.round((book.currentPage / book.totalPages) * 100 : 0;
+  const progress = book.totalPages > 0 ? Math.round((book.currentPage / book.totalPages) * 100) : 0;
 
   const placeholderColor = getPlaceholderColor(book.title);
 
