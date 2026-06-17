@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
 import type { Idea, Group } from '../types';
 
 interface IdeaBoardProps {
@@ -17,13 +17,51 @@ const GROUP_BORDER_COLORS = [
   '#FBC02D', '#5D4037'
 ];
 
+const CARD_PASTEL_COLORS = [
+  '#E3F2FD',
+  '#E8F5E9',
+  '#FFF8E1',
+  '#FCE4EC',
+  '#F3E5F5',
+  '#E0F7FA',
+  '#FFF3E0',
+  '#F1F8E9',
+];
+
+function getCardColor(id: string): string {
+  let hash = 0;
+  for (let i = 0; i < id.length; i++) {
+    hash = ((hash << 5) - hash) + id.charCodeAt(i);
+    hash |= 0;
+  }
+  return CARD_PASTEL_COLORS[Math.abs(hash) % CARD_PASTEL_COLORS.length];
+}
+
 function IdeaBoard({ ideas, groups, onRandomGroup, onExportMarkdown, onClearGroups, isLoading }: IdeaBoardProps) {
   const [groupSize, setGroupSize] = useState(3);
   const [showCopied, setShowCopied] = useState(false);
+  const prevIdeaIdsRef = useRef<Set<string>>(new Set());
+  const [newIds, setNewIds] = useState<Set<string>>(new Set());
 
   const displayIdeas = useMemo(() => {
     return ideas.slice(0, MAX_DISPLAY);
   }, [ideas]);
+
+  useEffect(() => {
+    const currentIds = new Set(ideas.map(i => i.id));
+    const fresh = new Set<string>();
+    currentIds.forEach(id => {
+      if (!prevIdeaIdsRef.current.has(id)) {
+        fresh.add(id);
+      }
+    });
+    prevIdeaIdsRef.current = currentIds;
+    if (fresh.size > 0) {
+      setNewIds(fresh);
+    }
+  }, [ideas]);
+
+  const gridGap = ideas.length > 30 ? 24 : ideas.length > 15 ? 20 : 16;
 
   const handleExport = async () => {
     const success = await onExportMarkdown();
@@ -38,24 +76,30 @@ function IdeaBoard({ ideas, groups, onRandomGroup, onExportMarkdown, onClearGrou
     onRandomGroup(groupSize);
   };
 
-  const renderIdeaCard = (idea: Idea, groupColor?: string) => (
-    <div
-      key={idea.id}
-      className="idea-card"
-      style={{ borderColor: groupColor || '#e0e0e0' }}
-    >
-      <div className="card-header">
-        <span className="idea-number">#{idea.number}</span>
-        <div
-          className="avatar"
-          style={{ backgroundColor: idea.avatarColor }}
-        >
-          {idea.initials}
+  const renderIdeaCard = (idea: Idea, groupColor?: string) => {
+    const isNew = newIds.has(idea.id);
+    return (
+      <div
+        key={idea.id}
+        className={`idea-card${isNew ? ' idea-card-new' : ''}`}
+        style={{
+          borderColor: groupColor || '#e0e0e0',
+          backgroundColor: getCardColor(idea.id),
+        }}
+      >
+        <div className="card-header">
+          <span className="idea-number">#{idea.number}</span>
+          <div
+            className="avatar"
+            style={{ backgroundColor: idea.avatarColor }}
+          >
+            {idea.initials}
+          </div>
         </div>
+        <p className="idea-content">{idea.content}</p>
       </div>
-      <p className="idea-content">{idea.content}</p>
-    </div>
-  );
+    );
+  };
 
   return (
     <div className="idea-board-container">
@@ -84,14 +128,14 @@ function IdeaBoard({ ideas, groups, onRandomGroup, onExportMarkdown, onClearGrou
               <h3 className="group-title" style={{ color: GROUP_BORDER_COLORS[groupIndex % GROUP_BORDER_COLORS.length] }}>
                 第 {groupIndex + 1} 组
               </h3>
-              <div className="ideas-grid">
+              <div className="ideas-grid" style={{ gap: `${gridGap}px` }}>
                 {group.map((idea) => renderIdeaCard(idea, GROUP_BORDER_COLORS[groupIndex % GROUP_BORDER_COLORS.length]))}
               </div>
             </div>
           ))}
         </div>
       ) : (
-        <div className="ideas-grid">
+        <div className="ideas-grid" style={{ gap: `${gridGap}px` }}>
           {displayIdeas.map((idea) => renderIdeaCard(idea))}
         </div>
       )}
@@ -145,6 +189,17 @@ function IdeaBoard({ ideas, groups, onRandomGroup, onExportMarkdown, onClearGrou
       </div>
 
       <style>{`
+        @keyframes cardFadeIn {
+          from {
+            opacity: 0;
+            transform: translateY(12px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+
         .idea-board-container {
           position: relative;
           padding-bottom: 20px;
@@ -204,18 +259,20 @@ function IdeaBoard({ ideas, groups, onRandomGroup, onExportMarkdown, onClearGrou
         
         .ideas-grid {
           display: grid;
-          grid-template-columns: repeat(4, minmax(260px, 1fr));
-          gap: 16px;
+          grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
         }
         
         .idea-card {
-          background: #ffffff;
           border: 1px solid #e0e0e0;
           border-radius: 10px;
           padding: 16px;
           box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-          transition: all 0.2s ease;
+          transition: transform 0.2s ease, box-shadow 0.2s ease;
           cursor: default;
+        }
+
+        .idea-card-new {
+          animation: cardFadeIn 0.4s ease-out;
         }
         
         .idea-card:hover {
@@ -370,7 +427,6 @@ function IdeaBoard({ ideas, groups, onRandomGroup, onExportMarkdown, onClearGrou
           
           .ideas-grid {
             grid-template-columns: repeat(2, minmax(140px, 1fr));
-            gap: 12px;
             margin-bottom: 80px;
           }
           
