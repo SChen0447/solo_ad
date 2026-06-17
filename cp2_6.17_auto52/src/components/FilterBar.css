@@ -1,0 +1,58 @@
+.filter-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 0;
+  overflow-x: auto;
+  flex-wrap: wrap;
+}
+
+.filter-bar-label {
+  color: #999;
+  font-size: 13px;
+  flex-shrink: 0;
+}
+
+.tag-cloud {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.tag-bubble {
+  min-width: 40px;
+  padding: 4px 12px;
+  border-radius: 20px;
+  border: 1px solid transparent;
+  color: white;
+  font-size: 12px;
+  cursor: pointer;
+  opacity: 0.6;
+  transition: opacity 0.3s ease-out, transform 0.3s ease-out, border-color 0.3s ease-out;
+  white-space: nowrap;
+}
+
+.tag-bubble:hover {
+  opacity: 0.8;
+  transform: translateY(-1px);
+}
+
+.tag-bubble.selected {
+  opacity: 1;
+  border-color: white;
+}
+
+@media (max-width: 768px) {
+  .filter-bar {
+    padding: 6px 0;
+  }
+
+  .filter-bar-label {
+    font-size: 12px;
+  }
+
+  .tag-bubble {
+    font-size: 11px;
+    padding: 3px 10px;
+  }
+}
