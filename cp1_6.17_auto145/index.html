@@ -1,0 +1,554 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>3D音景混合器 | Soundscape Mixer</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700&family=Rajdhani:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      font-family: 'Rajdhani', sans-serif;
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+      color: #ffffff;
+    }
+
+    #app {
+      width: 100%;
+      height: 100%;
+      position: relative;
+    }
+
+    #canvas-container {
+      width: 100%;
+      height: 100%;
+      position: absolute;
+      top: 0;
+      left: 0;
+    }
+
+    #start-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+      cursor: pointer;
+      transition: opacity 0.5s ease;
+    }
+
+    #start-overlay.hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    #start-overlay h1 {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 48px;
+      font-weight: 700;
+      background: linear-gradient(90deg, #4cc9f0, #ff006e, #ffd700);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      margin-bottom: 20px;
+      animation: pulse 2s ease-in-out infinite;
+    }
+
+    #start-overlay p {
+      font-size: 18px;
+      color: #a8dadc;
+      margin-bottom: 40px;
+    }
+
+    #start-overlay button {
+      padding: 15px 50px;
+      font-family: 'Orbitron', sans-serif;
+      font-size: 18px;
+      font-weight: 600;
+      background: linear-gradient(135deg, #4cc9f0, #7b2cbf);
+      border: none;
+      border-radius: 30px;
+      color: white;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      box-shadow: 0 0 30px rgba(76, 201, 240, 0.3);
+    }
+
+    #start-overlay button:hover {
+      transform: scale(1.05);
+      box-shadow: 0 0 50px rgba(76, 201, 240, 0.5);
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.8; }
+    }
+
+    #control-panel {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      width: 300px;
+      background: rgba(22, 33, 62, 0.85);
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(76, 201, 240, 0.3);
+      border-radius: 15px;
+      padding: 20px;
+      z-index: 100;
+      box-shadow: 0 0 40px rgba(0, 0, 0, 0.3);
+    }
+
+    #control-panel h2 {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 18px;
+      font-weight: 600;
+      color: #4cc9f0;
+      margin-bottom: 20px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid rgba(76, 201, 240, 0.3);
+    }
+
+    .control-section {
+      margin-bottom: 20px;
+    }
+
+    .control-section h3 {
+      font-size: 14px;
+      font-weight: 500;
+      color: #a8dadc;
+      margin-bottom: 10px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .slider-container {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .slider-container input[type="range"] {
+      flex: 1;
+      height: 6px;
+      -webkit-appearance: none;
+      appearance: none;
+      background: rgba(76, 201, 240, 0.2);
+      border-radius: 3px;
+      outline: none;
+    }
+
+    .slider-container input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 18px;
+      height: 18px;
+      background: linear-gradient(135deg, #4cc9f0, #7b2cbf);
+      border-radius: 50%;
+      cursor: pointer;
+      box-shadow: 0 0 10px rgba(76, 201, 240, 0.5);
+      transition: transform 0.2s;
+    }
+
+    .slider-container input[type="range"]::-webkit-slider-thumb:hover {
+      transform: scale(1.2);
+    }
+
+    .slider-value {
+      min-width: 40px;
+      text-align: right;
+      font-size: 14px;
+      color: #4cc9f0;
+      font-weight: 600;
+    }
+
+    .toggle-btn {
+      width: 100%;
+      padding: 10px 15px;
+      font-family: 'Rajdhani', sans-serif;
+      font-size: 14px;
+      font-weight: 500;
+      background: rgba(76, 201, 240, 0.1);
+      border: 1px solid rgba(76, 201, 240, 0.3);
+      border-radius: 8px;
+      color: #a8dadc;
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+
+    .toggle-btn:hover {
+      background: rgba(76, 201, 240, 0.2);
+    }
+
+    .toggle-btn.active {
+      background: linear-gradient(135deg, #4cc9f0, #7b2cbf);
+      border-color: transparent;
+      color: white;
+    }
+
+    .preset-buttons {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 8px;
+    }
+
+    .preset-btn {
+      padding: 10px 5px;
+      font-family: 'Rajdhani', sans-serif;
+      font-size: 12px;
+      font-weight: 500;
+      background: rgba(123, 44, 191, 0.2);
+      border: 1px solid rgba(123, 44, 191, 0.3);
+      border-radius: 6px;
+      color: #e0aaff;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      text-align: center;
+    }
+
+    .preset-btn:hover {
+      background: rgba(123, 44, 191, 0.4);
+      transform: translateY(-2px);
+    }
+
+    .action-buttons {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    .action-btn {
+      padding: 12px 10px;
+      font-family: 'Rajdhani', sans-serif;
+      font-size: 13px;
+      font-weight: 600;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+
+    .action-btn.export {
+      background: linear-gradient(135deg, #ffd700, #ff8c42);
+      color: #1a1a2e;
+    }
+
+    .action-btn.import {
+      background: linear-gradient(135deg, #2ec4b6, #4cc9f0);
+      color: #1a1a2e;
+    }
+
+    .action-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 5px 20px rgba(0, 0, 0, 0.3);
+    }
+
+    #sound-library {
+      position: absolute;
+      left: 20px;
+      top: 50%;
+      transform: translateY(-50%);
+      background: rgba(22, 33, 62, 0.85);
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(76, 201, 240, 0.3);
+      border-radius: 15px;
+      padding: 15px;
+      z-index: 100;
+    }
+
+    #sound-library h3 {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 14px;
+      font-weight: 600;
+      color: #4cc9f0;
+      margin-bottom: 15px;
+      text-align: center;
+    }
+
+    .sound-item {
+      width: 70px;
+      height: 70px;
+      margin-bottom: 12px;
+      border-radius: 50%;
+      cursor: grab;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 11px;
+      font-weight: 600;
+      text-align: center;
+      padding: 5px;
+      transition: all 0.3s ease;
+      border: 2px solid transparent;
+      user-select: none;
+    }
+
+    .sound-item:last-child {
+      margin-bottom: 0;
+    }
+
+    .sound-item:hover {
+      transform: scale(1.1);
+    }
+
+    .sound-item:active {
+      cursor: grabbing;
+    }
+
+    .sound-item.piano {
+      background: radial-gradient(circle, #ff8c42 0%, rgba(255, 140, 66, 0.3) 100%);
+      box-shadow: 0 0 20px rgba(255, 140, 66, 0.5);
+      color: white;
+    }
+
+    .sound-item.bass {
+      background: radial-gradient(circle, #7b2cbf 0%, rgba(123, 44, 191, 0.3) 100%);
+      box-shadow: 0 0 20px rgba(123, 44, 191, 0.5);
+      color: white;
+    }
+
+    .sound-item.drums {
+      background: radial-gradient(circle, #e63946 0%, rgba(230, 57, 70, 0.3) 100%);
+      box-shadow: 0 0 20px rgba(230, 57, 70, 0.5);
+      color: white;
+    }
+
+    .sound-item.birds {
+      background: radial-gradient(circle, #2ec4b6 0%, rgba(46, 196, 182, 0.3) 100%);
+      box-shadow: 0 0 20px rgba(46, 196, 182, 0.5);
+      color: white;
+    }
+
+    .sound-item.rain {
+      background: radial-gradient(circle, #4cc9f0 0%, rgba(76, 201, 240, 0.3) 100%);
+      box-shadow: 0 0 20px rgba(76, 201, 240, 0.5);
+      color: white;
+    }
+
+    .sound-item.synth {
+      background: radial-gradient(circle, #ff006e 0%, rgba(255, 0, 110, 0.3) 100%);
+      box-shadow: 0 0 20px rgba(255, 0, 110, 0.5);
+      color: white;
+    }
+
+    #minimap {
+      position: absolute;
+      left: 20px;
+      bottom: 20px;
+      width: 150px;
+      height: 150px;
+      background: rgba(0, 0, 0, 0.6);
+      backdrop-filter: blur(5px);
+      border: 1px solid rgba(76, 201, 240, 0.3);
+      border-radius: 10px;
+      z-index: 100;
+      overflow: hidden;
+    }
+
+    #minimap canvas {
+      width: 100%;
+      height: 100%;
+    }
+
+    #tooltip {
+      position: absolute;
+      background: rgba(0, 0, 0, 0.9);
+      border: 1px solid rgba(76, 201, 240, 0.5);
+      border-radius: 8px;
+      padding: 10px 15px;
+      font-size: 12px;
+      pointer-events: none;
+      z-index: 200;
+      display: none;
+      min-width: 150px;
+    }
+
+    #tooltip .tooltip-name {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 14px;
+      font-weight: 600;
+      margin-bottom: 5px;
+    }
+
+    #tooltip .tooltip-coord {
+      color: #a8dadc;
+      margin-bottom: 5px;
+    }
+
+    #tooltip .volume-bar {
+      height: 6px;
+      background: rgba(255, 255, 255, 0.2);
+      border-radius: 3px;
+      overflow: hidden;
+    }
+
+    #tooltip .volume-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #2ec4b6, #4cc9f0);
+      transition: width 0.1s ease;
+    }
+
+    #instructions {
+      position: absolute;
+      bottom: 20px;
+      right: 20px;
+      background: rgba(22, 33, 62, 0.7);
+      backdrop-filter: blur(5px);
+      border: 1px solid rgba(76, 201, 240, 0.2);
+      border-radius: 10px;
+      padding: 15px;
+      font-size: 12px;
+      color: #a8dadc;
+      z-index: 100;
+      max-width: 250px;
+    }
+
+    #instructions h4 {
+      color: #4cc9f0;
+      margin-bottom: 8px;
+      font-size: 13px;
+    }
+
+    #instructions p {
+      margin-bottom: 5px;
+      line-height: 1.5;
+    }
+
+    #instructions kbd {
+      background: rgba(76, 201, 240, 0.2);
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-family: monospace;
+      font-size: 11px;
+    }
+
+    #file-input {
+      display: none;
+    }
+
+    .drop-zone {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(76, 201, 240, 0.1);
+      border: 3px dashed #4cc9f0;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 500;
+      pointer-events: none;
+    }
+
+    .drop-zone.active {
+      display: flex;
+    }
+
+    .drop-zone p {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 24px;
+      color: #4cc9f0;
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <div id="canvas-container"></div>
+
+    <div id="start-overlay">
+      <h1>3D音景混合器</h1>
+      <p>Soundscape Mixer - 沉浸式空间音频创作工具</p>
+      <button id="start-btn">点击开始</button>
+    </div>
+
+    <div id="sound-library">
+      <h3>音源库</h3>
+      <div class="sound-item piano" draggable="true" data-type="piano">钢琴</div>
+      <div class="sound-item bass" draggable="true" data-type="bass">贝斯</div>
+      <div class="sound-item drums" draggable="true" data-type="drums">鼓点</div>
+      <div class="sound-item birds" draggable="true" data-type="birds">鸟鸣</div>
+      <div class="sound-item rain" draggable="true" data-type="rain">雨声</div>
+      <div class="sound-item synth" draggable="true" data-type="synth">电子脉冲</div>
+    </div>
+
+    <div id="control-panel">
+      <h2>🎛️ 混合控制</h2>
+      
+      <div class="control-section">
+        <h3>总音量</h3>
+        <div class="slider-container">
+          <input type="range" id="master-volume" min="0" max="100" value="70" />
+          <span class="slider-value" id="master-volume-value">70%</span>
+        </div>
+      </div>
+
+      <div class="control-section">
+        <h3>环境混响</h3>
+        <button class="toggle-btn" id="reverb-toggle">开启混响</button>
+      </div>
+
+      <div class="control-section">
+        <h3>预设音景</h3>
+        <div class="preset-buttons">
+          <button class="preset-btn" data-preset="forest">🌲 清晨森林</button>
+          <button class="preset-btn" data-preset="city">🌃 雨夜城市</button>
+          <button class="preset-btn" data-preset="dance">💃 电子舞池</button>
+        </div>
+      </div>
+
+      <div class="control-section">
+        <h3>配置管理</h3>
+        <div class="action-buttons">
+          <button class="action-btn export" id="export-btn">📤 导出</button>
+          <button class="action-btn import" id="import-btn">📥 导入</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="minimap">
+      <canvas id="minimap-canvas" width="150" height="150"></canvas>
+    </div>
+
+    <div id="tooltip">
+      <div class="tooltip-name" id="tooltip-name"></div>
+      <div class="tooltip-coord" id="tooltip-coord"></div>
+      <div class="volume-bar">
+        <div class="volume-fill" id="tooltip-volume" style="width: 0%"></div>
+      </div>
+    </div>
+
+    <div id="instructions">
+      <h4>操作说明</h4>
+      <p>🎯 从左侧拖拽音源到场景中</p>
+      <p>🖱️ 点击选中音源，拖拽移动</p>
+      <p>⌨️ <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> 前后左右</p>
+      <p>⌨️ <kbd>Q</kbd><kbd>E</kbd> 上下移动</p>
+      <p>🔄 鼠标滚轮缩放视角</p>
+    </div>
+
+    <div class="drop-zone" id="drop-zone">
+      <p>释放以加载音景配置</p>
+    </div>
+
+    <input type="file" id="file-input" accept=".json" />
+  </div>
+
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
