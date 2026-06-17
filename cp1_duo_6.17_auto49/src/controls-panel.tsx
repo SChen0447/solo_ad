@@ -1,12 +1,13 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { InputSource, AudioFileInfo } from './audio-engine';
-import { ViewType, ViewConfig } from './visualizations';
+import { ViewType, ViewConfig, PresetType, presets } from './visualizations';
 
 interface ControlsPanelProps {
   currentSource: InputSource;
   fileInfo: AudioFileInfo | null;
   isPanelOpen: boolean;
   activeSettings: ViewType | null;
+  activePreset: PresetType;
   onTogglePanel: () => void;
   onSelectMicrophone: () => void;
   onFileUpload: (file: File) => void;
@@ -14,6 +15,7 @@ interface ControlsPanelProps {
   viewConfigs: Record<ViewType, ViewConfig>;
   onConfigChange: (viewType: ViewType, config: Partial<ViewConfig>) => void;
   onOpenSettings: (viewType: ViewType | null) => void;
+  onPresetChange: (presetId: PresetType) => void;
 }
 
 interface SettingsModalProps {
@@ -83,13 +85,15 @@ export const ControlsPanel: React.FC<ControlsPanelProps> = ({
   fileInfo,
   isPanelOpen,
   activeSettings,
+  activePreset,
   onTogglePanel,
   onSelectMicrophone,
   onFileUpload,
   onStop,
   viewConfigs,
   onConfigChange,
-  onOpenSettings
+  onOpenSettings,
+  onPresetChange
 }) => {
   const [isDragging, setIsDragging] = useState(false);
 
@@ -196,6 +200,21 @@ export const ControlsPanel: React.FC<ControlsPanelProps> = ({
               停止
             </button>
           )}
+        </div>
+
+        <div className="panel-section">
+          <h3>预设场景</h3>
+          <div className="preset-buttons">
+            {presets.map(preset => (
+              <button
+                key={preset.id}
+                className={`preset-btn ${activePreset === preset.id ? 'active' : ''}`}
+                onClick={() => onPresetChange(preset.id)}
+              >
+                {preset.name}
+              </button>
+            ))}
+          </div>
         </div>
 
         <div

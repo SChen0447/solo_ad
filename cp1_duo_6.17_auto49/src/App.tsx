@@ -1,20 +1,21 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { AudioEngine, InputSource, AudioFileInfo, AudioData } from './audio-engine';
-import { VisualizationManager, ViewType, ViewConfig } from './visualizations';
+import { VisualizationManager, ViewType, ViewConfig, PresetType, presets } from './visualizations';
 import { ControlsPanel } from './controls-panel';
 import { InfoBar, InfoBarHandle, InfoBarData } from './info-bar';
 import './styles.css';
 
 const defaultViewConfigs: Record<ViewType, ViewConfig> = {
-  waveform: { scale: 1, refreshRate: 60, colorMap: 'cyan-blue' },
-  spectrum: { scale: 1, refreshRate: 60, colorMap: 'purple-red' },
-  waterfall: { scale: 1, refreshRate: 60, colorMap: 'purple-red' }
-};
+  waveform: { scale: 1, refreshRate: 60, colorMap: 'cyan-blue', lineWidth: 2 },
+  spectrum: { scale: 1, refreshRate: 60, colorMap: 'purple-red', freqRange: [20, 20000] },
+  waterfall: { scale: 1, refreshRate: 60, colorMap: 'purple-red', cameraAngle: { x: 0.5, y: 0 } }
+} as any;
 
 const initialInfoBarData: InfoBarData = {
   peakFrequency: 0,
   peakAmplitude: 0,
-  averageLoudness: 0
+  averageLoudness: 0,
+  activeBand: 'low' as const
 };
 
 function App() {
@@ -33,6 +34,7 @@ function App() {
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [activeSettings, setActiveSettings] = useState<ViewType | null>(null);
+  const [activePreset, setActivePreset] = useState<PresetType>('full');
 
   useEffect(() => {
     const handleResize = () => {
@@ -67,7 +69,8 @@ function App() {
           infoBarRef.current.updateData({
             peakFrequency: data.peakFrequency,
             peakAmplitude: data.peakAmplitude,
-            averageLoudness: data.averageLoudness
+            averageLoudness: data.averageLoudness,
+            activeBand: data.activeBand
           });
         }
       },
@@ -156,6 +159,19 @@ function App() {
     setActiveSettings(viewType);
   }, []);
 
+  const handlePresetChange = useCallback((presetId: PresetType) => {
+    setActivePreset(presetId);
+    const preset = presets.find(p => p.id === presetId);
+    if (preset && visualizationManagerRef.current) {
+      visualizationManagerRef.current.applyPreset(preset);
+      setViewConfigs({
+        waveform: { ...preset.configs.waveform },
+        spectrum: { ...preset.configs.spectrum },
+        waterfall: { ...preset.configs.waterfall }
+      });
+    }
+  }, []);
+
   const renderSettingsGear = (viewType: ViewType) => (
     <button
       className="view-settings-gear"
@@ -181,6 +197,7 @@ function App() {
         fileInfo={fileInfo}
         isPanelOpen={isPanelOpen}
         activeSettings={activeSettings}
+        activePreset={activePreset}
         onTogglePanel={handleTogglePanel}
         onSelectMicrophone={handleSelectMicrophone}
         onFileUpload={handleFileUpload}
@@ -188,6 +205,7 @@ function App() {
         viewConfigs={viewConfigs}
         onConfigChange={handleConfigChange}
         onOpenSettings={handleOpenSettings}
+        onPresetChange={handlePresetChange}
       />
 
       {isPanelOpen && (

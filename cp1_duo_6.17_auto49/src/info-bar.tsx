@@ -1,9 +1,11 @@
-import React, { useRef, useEffect } from 'react';
+import { useRef, useEffect } from 'react';
+import { FrequencyBand, frequencyBandLabels } from './audio-engine';
 
 export interface InfoBarData {
   peakFrequency: number;
   peakAmplitude: number;
   averageLoudness: number;
+  activeBand: FrequencyBand;
 }
 
 interface InfoBarProps {
@@ -20,6 +22,7 @@ export const InfoBar: React.FC<InfoBarProps> = ({ initialData, infoBarRef }) => 
   const ampRef = useRef<HTMLSpanElement>(null);
   const loudnessBarRef = useRef<HTMLDivElement>(null);
   const loudnessValueRef = useRef<HTMLSpanElement>(null);
+  const bandRef = useRef<HTMLSpanElement>(null);
 
   useEffect(() => {
     if (infoBarRef) {
@@ -39,6 +42,9 @@ export const InfoBar: React.FC<InfoBarProps> = ({ initialData, infoBarRef }) => 
           if (loudnessValueRef.current) {
             loudnessValueRef.current.textContent = String(loudnessPercent);
           }
+          if (bandRef.current) {
+            bandRef.current.textContent = frequencyBandLabels[data.activeBand];
+          }
         }
       };
     }
@@ -56,6 +62,9 @@ export const InfoBar: React.FC<InfoBarProps> = ({ initialData, infoBarRef }) => 
     }
     if (loudnessValueRef.current) {
       loudnessValueRef.current.textContent = String(loudnessPercent);
+    }
+    if (bandRef.current) {
+      bandRef.current.textContent = frequencyBandLabels[initialData.activeBand];
     }
   }, []);
 
@@ -89,6 +98,13 @@ export const InfoBar: React.FC<InfoBarProps> = ({ initialData, infoBarRef }) => 
         <div className="info-value loudness-value">
           <span className="value-number" ref={loudnessValueRef}>0</span>
           <span className="value-unit">%</span>
+        </div>
+      </div>
+      <div className="info-divider"></div>
+      <div className="info-item band-item">
+        <div className="info-label">活跃频段</div>
+        <div className="info-value">
+          <span className="band-text" ref={bandRef}>低频（20-250Hz）</span>
         </div>
       </div>
     </div>

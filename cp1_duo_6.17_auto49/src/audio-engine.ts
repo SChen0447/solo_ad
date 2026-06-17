@@ -1,4 +1,5 @@
 export type InputSource = 'microphone' | 'file' | 'none';
+export type FrequencyBand = 'low' | 'mid' | 'high';
 
 export interface AudioFileInfo {
   name: string;
@@ -7,12 +8,19 @@ export interface AudioFileInfo {
 }
 
 export interface AudioData {
-  timeDomain: Float32Array;
-  frequency: Uint8Array;
+  timeDomain: Float32Array<ArrayBuffer>;
+  frequency: Uint8Array<ArrayBuffer>;
   peakFrequency: number;
   peakAmplitude: number;
   averageLoudness: number;
+  activeBand: FrequencyBand;
 }
+
+export const frequencyBandLabels: Record<FrequencyBand, string> = {
+  low: '低频（20-250Hz）',
+  mid: '中频（250-4000Hz）',
+  high: '高频（4000-20000Hz）'
+};
 
 export interface AudioEngineCallbacks {
   onData?: (data: AudioData) => void;
@@ -156,12 +164,20 @@ export class AudioEngine {
       const amplitudeDb = 20 * Math.log10(peakAmp / 255 || 0.001);
       const avgLoudness = totalLoudness / this.frequencyData.length / 255;
 
+      let activeBand: FrequencyBand = 'low';
+      if (frequencyHz >= 4000) {
+        activeBand = 'high';
+      } else if (frequencyHz >= 250) {
+        activeBand = 'mid';
+      }
+
       const audioData: AudioData = {
-        timeDomain: new Float32Array(this.timeDomainData),
-        frequency: new Uint8Array(this.frequencyData),
+        timeDomain: new Float32Array(this.timeDomainData) as Float32Array<ArrayBuffer>,
+        frequency: new Uint8Array(this.frequencyData) as Uint8Array<ArrayBuffer>,
         peakFrequency: Math.round(frequencyHz),
         peakAmplitude: Math.round(amplitudeDb * 10) / 10,
-        averageLoudness: Math.round(avgLoudness * 100) / 100
+        averageLoudness: Math.round(avgLoudness * 100) / 100,
+        activeBand
       };
 
       this.callbacks.onData?.(audioData);

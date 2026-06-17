@@ -3,22 +3,90 @@ import { AudioData } from './audio-engine';
 
 export type ViewType = 'waveform' | 'spectrum' | 'waterfall';
 
-export interface ViewConfig {
+export interface WaveformConfig {
   scale: number;
   refreshRate: number;
   colorMap: string;
+  lineWidth: number;
 }
+
+export interface SpectrumConfig {
+  scale: number;
+  refreshRate: number;
+  colorMap: string;
+  freqRange: [number, number];
+}
+
+export interface WaterfallConfig {
+  scale: number;
+  refreshRate: number;
+  colorMap: string;
+  cameraAngle: { x: number; y: number };
+}
+
+export type ViewConfig = WaveformConfig | SpectrumConfig | WaterfallConfig;
 
 export interface VisualizationConfigs {
-  waveform: ViewConfig;
-  spectrum: ViewConfig;
-  waterfall: ViewConfig;
+  waveform: WaveformConfig;
+  spectrum: SpectrumConfig;
+  waterfall: WaterfallConfig;
 }
 
-const defaultConfigs: VisualizationConfigs = {
-  waveform: { scale: 1, refreshRate: 60, colorMap: 'cyan-blue' },
-  spectrum: { scale: 1, refreshRate: 60, colorMap: 'purple-red' },
-  waterfall: { scale: 1, refreshRate: 60, colorMap: 'purple-red' }
+export type PresetType = 'vocals' | 'instruments' | 'electronic' | 'full';
+
+export interface PresetConfig {
+  id: PresetType;
+  name: string;
+  configs: VisualizationConfigs;
+}
+
+export const presets: PresetConfig[] = [
+  {
+    id: 'vocals',
+    name: '人声',
+    configs: {
+      waveform: { scale: 1.5, refreshRate: 60, colorMap: 'cyan-blue', lineWidth: 2 },
+      spectrum: { scale: 1.2, refreshRate: 30, colorMap: 'midrange', freqRange: [250, 4000] },
+      waterfall: { scale: 1.2, refreshRate: 30, colorMap: 'midrange', cameraAngle: { x: 0.8, y: 0 } }
+    }
+  },
+  {
+    id: 'instruments',
+    name: '乐器',
+    configs: {
+      waveform: { scale: 1, refreshRate: 60, colorMap: 'green-yellow', lineWidth: 3 },
+      spectrum: { scale: 1.3, refreshRate: 60, colorMap: 'purple-red', freqRange: [20, 10000] },
+      waterfall: { scale: 1, refreshRate: 60, colorMap: 'purple-red', cameraAngle: { x: 0.3, y: 0.5 } }
+    }
+  },
+  {
+    id: 'electronic',
+    name: '电子乐',
+    configs: {
+      waveform: { scale: 0.8, refreshRate: 60, colorMap: 'rainbow', lineWidth: 2 },
+      spectrum: { scale: 1.5, refreshRate: 60, colorMap: 'rainbow', freqRange: [20, 20000] },
+      waterfall: { scale: 1.5, refreshRate: 60, colorMap: 'rainbow', cameraAngle: { x: 0.5, y: 0.3 } }
+    }
+  },
+  {
+    id: 'full',
+    name: '全频段',
+    configs: {
+      waveform: { scale: 1, refreshRate: 60, colorMap: 'cyan-blue', lineWidth: 2 },
+      spectrum: { scale: 1, refreshRate: 60, colorMap: 'purple-red', freqRange: [20, 20000] },
+      waterfall: { scale: 1, refreshRate: 60, colorMap: 'purple-red', cameraAngle: { x: 0.5, y: 0 } }
+    }
+  }
+];
+
+const defaultConfigs: VisualizationConfigs = presets[3].configs;
+
+const colorMaps: Record<string, { stops: string[]; hueRange?: [number, number] }> = {
+  'cyan-blue': { stops: ['#00ffff', '#0088ff'] },
+  'purple-red': { stops: ['#8800ff', '#ff0040'] },
+  'green-yellow': { stops: ['#00ff88', '#ffff00'] },
+  'rainbow': { stops: ['#ff0080', '#8000ff', '#0080ff', '#00ff80', '#ffff00', '#ff8000', '#ff0080'] },
+  'midrange': { stops: ['#00ccff', '#00ffcc'] }
 };
 
 interface ViewState {
@@ -202,15 +270,44 @@ export class VisualizationManager {
     }
   }
 
+  setConfig(viewType: 'waveform', config: Partial<WaveformConfig>): void;
+  setConfig(viewType: 'spectrum', config: Partial<SpectrumConfig>): void;
+  setConfig(viewType: 'waterfall', config: Partial<WaterfallConfig>): void;
   setConfig(viewType: ViewType, config: Partial<ViewConfig>): void {
-    this.configs[viewType] = { ...this.configs[viewType], ...config };
+    this.configs[viewType] = { ...this.configs[viewType], ...config } as any;
     if (config.refreshRate) {
       this.viewStates[viewType].frameInterval = 1000 / config.refreshRate;
     }
+    if (viewType === 'waterfall' && (config as Partial<WaterfallConfig>).cameraAngle && this.camera) {
+      const angle = (config as Partial<WaterfallConfig>).cameraAngle!;
+      this.cameraRotation = { ...angle };
+      const radius = 15;
+      this.camera.position.x = radius * Math.sin(angle.y) * Math.cos(angle.x);
+      this.camera.position.y = radius * Math.sin(angle.x);
+      this.camera.position.z = radius * Math.cos(angle.y) * Math.cos(angle.x);
+      this.camera.lookAt(0, 0, 0);
+    }
   }
 
+  getConfig(viewType: 'waveform'): WaveformConfig;
+  getConfig(viewType: 'spectrum'): SpectrumConfig;
+  getConfig(viewType: 'waterfall'): WaterfallConfig;
   getConfig(viewType: ViewType): ViewConfig {
     return { ...this.configs[viewType] };
+  }
+
+  getAllConfigs(): VisualizationConfigs {
+    return {
+      waveform: { ...this.configs.waveform },
+      spectrum: { ...this.configs.spectrum },
+      waterfall: { ...this.configs.waterfall }
+    };
+  }
+
+  applyPreset(preset: PresetConfig): void {
+    this.setConfig('waveform', preset.configs.waveform);
+    this.setConfig('spectrum', preset.configs.spectrum);
+    this.setConfig('waterfall', preset.configs.waterfall);
   }
 
   updateData(audioData: AudioData): void {
@@ -291,11 +388,13 @@ export class VisualizationManager {
     }
 
     const gradient = ctx.createLinearGradient(0, 0, width, 0);
-    gradient.addColorStop(0, '#00ffff');
-    gradient.addColorStop(1, '#0088ff');
+    const colorStops = colorMaps[config.colorMap]?.stops || colorMaps['cyan-blue'].stops;
+    colorStops.forEach((color, index) => {
+      gradient.addColorStop(index / (colorStops.length - 1), color);
+    });
 
     ctx.strokeStyle = gradient;
-    ctx.lineWidth = 2;
+    ctx.lineWidth = config.lineWidth;
     ctx.beginPath();
 
     const data = this.currentAudioData.timeDomain;
@@ -339,21 +438,42 @@ export class VisualizationManager {
     const freqData = this.currentAudioData.frequency;
     const bars = this.barCount;
     const barWidth = (width - bars - 1) / bars;
-    const step = Math.floor(freqData.length / bars);
+
+    const [minFreq, maxFreq] = config.freqRange || [20, 20000];
+    const nyquist = (this.currentAudioData.peakFrequency > 0) ? 22050 : 20000;
+    const startIndex = Math.floor((minFreq / nyquist) * freqData.length);
+    const endIndex = Math.floor((maxFreq / nyquist) * freqData.length);
+    const rangeStep = (endIndex - startIndex) / bars;
+
+    const colorStops = colorMaps[config.colorMap]?.stops || colorMaps['purple-red'].stops;
 
     for (let i = 0; i < bars; i++) {
-      const dataIndex = i * step;
-      let value = 0;
-      for (let j = 0; j < step; j++) {
-        value += freqData[dataIndex + j] || 0;
-      }
-      value = (value / step / 255) * config.scale;
-      const barHeight = value * height * 0.9;
+      const startFloat = startIndex + i * rangeStep;
+      const endFloat = startFloat + rangeStep;
+      const startIdx = Math.max(0, Math.floor(startFloat));
+      const endIdx = Math.min(freqData.length - 1, Math.ceil(endFloat));
+      const count = Math.max(1, endIdx - startIdx);
 
-      const hue = 280 - (i / bars) * 280;
-      const saturation = 100;
-      const lightness = 50 + value * 20;
-      ctx.fillStyle = `hsl(${hue}, ${saturation}%, ${lightness}%)`;
+      let value = 0;
+      for (let j = startIdx; j < endIdx; j++) {
+        value += freqData[j] || 0;
+      }
+      value = (value / count / 255) * config.scale;
+      const barHeight = Math.max(0, Math.min(height * 0.9, value * height * 0.9));
+
+      const colorIndex = i / (bars - 1);
+      const stopCount = colorStops.length;
+      const stopIndex = colorIndex * (stopCount - 1);
+      const stopLeft = Math.floor(stopIndex);
+      const stopRight = Math.min(stopCount - 1, stopLeft + 1);
+      const stopFrac = stopIndex - stopLeft;
+
+      const color1 = colorStops[stopLeft];
+      const color2 = colorStops[stopRight];
+      const r = Math.round(parseInt(color1.slice(1, 3), 16) * (1 - stopFrac) + parseInt(color2.slice(1, 3), 16) * stopFrac);
+      const g = Math.round(parseInt(color1.slice(3, 5), 16) * (1 - stopFrac) + parseInt(color2.slice(3, 5), 16) * stopFrac);
+      const b = Math.round(parseInt(color1.slice(5, 7), 16) * (1 - stopFrac) + parseInt(color2.slice(5, 7), 16) * stopFrac);
+      ctx.fillStyle = `rgb(${r}, ${g}, ${b})`;
 
       const x = i * (barWidth + 1);
       const y = height - barHeight;
@@ -367,8 +487,8 @@ export class VisualizationManager {
       }
 
       if (this.spectrumPeakData[i] > 0) {
-        ctx.fillStyle = `hsla(${hue}, ${saturation}%, ${lightness + 20}%, 0.8)`;
         const peakY = Math.max(0, height - this.spectrumPeakData[i] - 3);
+        ctx.fillStyle = `rgba(${r}, ${g}, ${b}, 0.8)`;
         ctx.fillRect(x, peakY, barWidth, 3);
       }
     }
@@ -405,6 +525,9 @@ export class VisualizationManager {
     const geometry = this.waterfallMesh.geometry as THREE.PlaneGeometry;
     const positions = geometry.attributes.position;
     const colors = geometry.attributes.color || new THREE.BufferAttribute(new Float32Array(positions.count * 3), 3);
+    const config = this.configs.waterfall;
+    const colorStops = colorMaps[config.colorMap]?.stops || colorMaps['purple-red'].stops;
+    const stopCount = colorStops.length;
 
     for (let frame = 0; frame < this.maxWaterfallFrames; frame++) {
       for (let bar = 0; bar < this.barCount; bar++) {
@@ -415,8 +538,19 @@ export class VisualizationManager {
         positions.setY(index, height * 5);
         positions.setZ(index, z);
 
-        const hue = 280 - (bar / this.barCount) * 280;
-        const color = new THREE.Color().setHSL(hue / 360, 1, 0.3 + height * 0.4);
+        const colorIndex = bar / (this.barCount - 1);
+        const stopIndex = colorIndex * (stopCount - 1);
+        const stopLeft = Math.floor(stopIndex);
+        const stopRight = Math.min(stopCount - 1, stopLeft + 1);
+        const stopFrac = stopIndex - stopLeft;
+
+        const color1 = new THREE.Color(colorStops[stopLeft]);
+        const color2 = new THREE.Color(colorStops[stopRight]);
+        const color = new THREE.Color().lerpColors(color1, color2, stopFrac);
+
+        const brightness = 0.3 + height * 0.6;
+        color.multiplyScalar(brightness);
+
         colors.setXYZ(index, color.r, color.g, color.b);
       }
     }
