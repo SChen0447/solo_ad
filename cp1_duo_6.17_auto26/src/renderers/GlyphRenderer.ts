@@ -14,10 +14,19 @@ export class GlyphRenderer {
   private visible: boolean = true;
   private data: VectorDataset | null = null;
   private dummy: THREE.Object3D;
-  private colors: Float32Array | null = null;
+  private instanceColors: Float32Array | null = null;
+  private instanceScales: Float32Array | null = null;
   private numInstances: number = 0;
   private minMagnitude: number = 0;
   private maxMagnitude: number = 1;
+  private stepSize: number = 1;
+
+  private static readonly ARROW_BASE_DIR = new THREE.Vector3(0, 1, 0);
+  private static readonly UP_VECTORS = [
+    new THREE.Vector3(1, 0, 0),
+    new THREE.Vector3(0, 0, 1),
+    new THREE.Vector3(1, 0, 0)
+  ];
 
   constructor(scene: THREE.Scene) {
     this.scene = scene;
@@ -25,12 +34,13 @@ export class GlyphRenderer {
     this.scene.add(this.group);
     this.dummy = new THREE.Object3D();
 
-    this.arrowGeometry = new THREE.ConeGeometry(0.1, 0.3, 8);
-    this.arrowGeometry.translate(0, 0.15, 0);
-    this.shaftGeometry = new THREE.CylinderGeometry(0.05, 0.05, 0.7, 8);
-    this.shaftGeometry.translate(0, -0.35, 0);
+    this.arrowGeometry = new THREE.ConeGeometry(0.12, 0.35, 8);
+    this.arrowGeometry.translate(0, 0.425, 0);
+    this.shaftGeometry = new THREE.CylinderGeometry(0.05, 0.05, 0.5, 8);
+    this.shaftGeometry.translate(0, 0, 0);
 
     this.combinedGeometry = this.mergeGeometries(this.shaftGeometry, this.arrowGeometry);
+    this.combinedGeometry.translate(0, 0.25, 0);
   }
 
   private mergeGeometries(g1: THREE.BufferGeometry, g2: THREE.BufferGeometry): THREE.BufferGeometry {
@@ -57,8 +67,9 @@ export class GlyphRenderer {
     if (index1 && index2) {
       const indices = new Uint32Array(index1.length + index2.length);
       indices.set(index1, 0);
+      const offset = positions1.length / 3;
       for (let i = 0; i < index2.length; i++) {
-        indices[i + index1.length] = index2[i] + positions1.length / 3;
+        indices[i + index1.length] = index2[i] + offset;
       }
       geometry.setIndex(new THREE.BufferAttribute(indices, 1));
     }
@@ -121,24 +132,27 @@ export class GlyphRenderer {
     }
 
     const { nx, ny, nz } = dataset.gridSize;
-    const step = Math.max(1, Math.floor(Math.pow(15000 / (nx * ny * nz), 1/3)));
+    this.stepSize = Math.max(1, Math.floor(Math.pow(15000 / (nx * ny * nz), 1/3)));
     let count = 0;
-    for (let iz = 0; iz < nz; iz += step) {
-      for (let iy = 0; iy < ny; iy += step) {
-        for (let ix = 0; ix < nx; ix += step) {
+    for (let iz = 0; iz < nz; iz += this.stepSize) {
+      for (let iy = 0; iy < ny; iy += this.stepSize) {
+        for (let ix = 0; ix < nx; ix += this.stepSize) {
           count++;
         }
       }
     }
     this.numInstances = count;
 
-    const magnitudes: number[] = [];
+    this.instanceScales = new Float32Array(this.numInstances);
+    let minMag = Infinity;
+    let maxMag = -Infinity;
     for (const vec of dataset.values) {
       const mag = Math.sqrt(vec[0] * vec[0] + vec[1] * vec[1] + vec[2] * vec[2]);
-      magnitudes.push(mag);
+      if (mag < minMag) minMag = mag;
+      if (mag > maxMag) maxMag = mag;
     }
-    this.minMagnitude = Math.min(...magnitudes);
-    this.maxMagnitude = Math.max(...magnitudes);
+    this.minMagnitude = isFinite(minMag) ? minMag : 0;
+    this.maxMagnitude = (isFinite(maxMag) && maxMag > this.minMagnitude) ? maxMag : this.minMagnitude + 1;
 
     const material = new THREE.MeshBasicMaterial({
       color: 0xffffff,
@@ -154,51 +168,79 @@ export class GlyphRenderer {
       material,
       this.numInstances
     );
-    this.instancedMesh.instanceColor = new THREE.InstancedBufferAttribute(
-      new Float32Array(this.numInstances * 3),
-      3
-    );
-    this.colors = this.instancedMesh.instanceColor.array as Float32Array;
+
+    this.instanceColors = new Float32Array(this.numInstances * 3);
+    this.instancedMesh.instanceColor = new THREE.InstancedBufferAttribute(this.instanceColors, 3);
 
     this.group.add(this.instancedMesh);
     this.updateInstances();
   }
 
-  private updateInstances(): void {
-    if (!this.data || !this.instancedMesh || !this.colors) return;
+  private alignArrowToDirection(quaternion: THREE.Quaternion, direction: THREE.Vector3): void {
+    const dir = direction.clone().normalize();
+
+    if (!isFinite(dir.x) || !isFinite(dir.y) || !isFinite(dir.z) || dir.lengthSq() < 1e-8) {
+      quaternion.identity();
+      return;
+    }
+
+    const dot = GlyphRenderer.ARROW_BASE_DIR.dot(dir);
+    if (dot > 0.99999) {
+      quaternion.identity();
+      return;
+    }
+    if (dot < -0.99999) {
+      let up: THREE.Vector3;
+      if (Math.abs(GlyphRenderer.ARROW_BASE_DIR.x) < 0.9) {
+        up = GlyphRenderer.UP_VECTORS[0];
+      } else {
+        up = GlyphRenderer.UP_VECTORS[1];
+      }
+      quaternion.setFromAxisAngle(up, Math.PI);
+      return;
+    }
+
+    const axis = new THREE.Vector3().crossVectors(GlyphRenderer.ARROW_BASE_DIR, dir).normalize();
+    const angle = Math.acos(dot);
+    quaternion.setFromAxisAngle(axis, angle);
+  }
+
+  updateInstances(): void {
+    if (!this.data || !this.instancedMesh || !this.instanceColors || !this.instanceScales) return;
 
     const { nx, ny, nz } = this.data.gridSize;
-    const step = Math.max(1, Math.floor(Math.pow(15000 / (nx * ny * nz), 1/3)));
     let instanceIndex = 0;
+    const tmpQuat = new THREE.Quaternion();
 
-    for (let iz = 0; iz < nz; iz += step) {
-      for (let iy = 0; iy < ny; iy += step) {
-        for (let ix = 0; ix < nx; ix += step) {
+    for (let iz = 0; iz < nz; iz += this.stepSize) {
+      for (let iy = 0; iy < ny; iy += this.stepSize) {
+        for (let ix = 0; ix < nx; ix += this.stepSize) {
           const idx = iz * nx * ny + iy * nx + ix;
           const vec = this.data.values[idx];
           const [wx, wy, wz] = gridToWorld(ix, iy, iz, this.data.bounds, this.data.gridSize);
 
           const magnitude = Math.sqrt(vec[0] * vec[0] + vec[1] * vec[1] + vec[2] * vec[2]);
-          const normalizedMag = (magnitude - this.minMagnitude) / (this.maxMagnitude - this.minMagnitude);
+          const magRange = this.maxMagnitude - this.minMagnitude;
+          const normalizedMag = magRange > 1e-8 ? clamp((magnitude - this.minMagnitude) / magRange, 0, 1) : 0;
           const color = valueToColor(magnitude, this.minMagnitude, this.maxMagnitude, VELOCITY_COLORMAP);
 
-          const lengthScale = 0.5 + normalizedMag * 1.5;
-          const scale = this.glyphScale * lengthScale;
+          const lengthScale = 0.3 + normalizedMag * 1.2;
+          const uniformScale = this.glyphScale * lengthScale;
+          this.instanceScales[instanceIndex] = uniformScale;
 
-          const dir = new THREE.Vector3(vec[0], vec[1], vec[2]).normalize();
-          const up = new THREE.Vector3(0, 1, 0);
-          const quaternion = new THREE.Quaternion().setFromUnitVectors(up, dir);
+          const dirVec = new THREE.Vector3(vec[0], vec[1], vec[2]);
+          this.alignArrowToDirection(tmpQuat, dirVec);
 
           this.dummy.position.set(wx, wy, wz);
-          this.dummy.quaternion.copy(quaternion);
-          this.dummy.scale.set(scale, scale, scale);
+          this.dummy.quaternion.copy(tmpQuat);
+          this.dummy.scale.set(uniformScale, uniformScale, uniformScale);
           this.dummy.updateMatrix();
           this.instancedMesh.setMatrixAt(instanceIndex, this.dummy.matrix);
 
           const colorIdx = instanceIndex * 3;
-          this.colors[colorIdx] = color[0];
-          this.colors[colorIdx + 1] = color[1];
-          this.colors[colorIdx + 2] = color[2];
+          this.instanceColors[colorIdx] = color[0];
+          this.instanceColors[colorIdx + 1] = color[1];
+          this.instanceColors[colorIdx + 2] = color[2];
 
           instanceIndex++;
         }
@@ -206,6 +248,9 @@ export class GlyphRenderer {
     }
 
     this.instancedMesh.instanceMatrix.needsUpdate = true;
-    this.instancedMesh.instanceColor!.needsUpdate = true;
+    if (this.instancedMesh.instanceColor) {
+      this.instancedMesh.instanceColor.needsUpdate = true;
+    }
+    this.instancedMesh.computeBoundingSphere();
   }
 }

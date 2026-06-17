@@ -4,9 +4,7 @@ import { valueToColor, TEMPERATURE_COLORMAP, gridToWorld, clamp, getGridIndex } 
 
 const temperatureVertexShader = `
   varying vec3 vWorldPosition;
-  varying vec3 vLocalPosition;
   void main() {
-    vLocalPosition = position * 0.5 + 0.5;
     vec4 worldPosition = modelMatrix * vec4(position, 1.0);
     vWorldPosition = worldPosition.xyz;
     gl_Position = projectionMatrix * viewMatrix * worldPosition;
@@ -24,7 +22,7 @@ const temperatureFragmentShader = `
   uniform vec3 uVolumeBoundsMin;
   uniform vec3 uVolumeBoundsMax;
   
-  varying vec3 vLocalPosition;
+  varying vec3 vWorldPosition;
   
   vec3 colormap(float t) {
     t = clamp(t, 0.0, 1.0);
@@ -43,10 +41,13 @@ const temperatureFragmentShader = `
   }
   
   void main() {
-    float value = texture(uVolume, vLocalPosition).r;
-    float normalizedValue = (value - uMinValue) / (uMaxValue - uMinValue);
+    vec3 texCoord = (vWorldPosition - uVolumeBoundsMin) / (uVolumeBoundsMax - uVolumeBoundsMin);
+    texCoord = clamp(texCoord, 0.0, 1.0);
+    float value = texture(uVolume, texCoord).r;
+    float normalizedValue = (value - uMinValue) / max(uMaxValue - uMinValue, 0.001);
+    normalizedValue = clamp(normalizedValue, 0.0, 1.0);
     vec3 color = colormap(normalizedValue);
-    float alpha = uOpacity * smoothstep(0.0, 0.3, normalizedValue);
+    float alpha = uOpacity * (0.15 + 0.85 * smoothstep(0.0, 0.4, normalizedValue));
     gl_FragColor = vec4(color, alpha);
   }
 `;

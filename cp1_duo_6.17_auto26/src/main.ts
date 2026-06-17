@@ -75,7 +75,7 @@ class App {
 
     this.probeTool.setOnProbeUpdate((data: ProbeData | null) => {
       this.uiManager.updateProbeData(data);
-    };
+    });
 
     window.addEventListener('resize', this.onResize.bind(this));
 
