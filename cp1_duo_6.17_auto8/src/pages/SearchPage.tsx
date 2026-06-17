@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { Search, X, Loader2, FileText } from 'lucide-react'
 import DocCard from '../components/DocCard'
 import { fetchDocs, DocItem, SEARCH_DEBOUNCE_MS, getFavorites, toggleFavorite } from '../api/docSearch'
+import useDebounce from '../hooks/useDebounce'
 
 const TECH_STACKS = [
   { name: 'React', value: 'React', color: 'react' },
@@ -15,8 +16,10 @@ function SearchPage() {
   const [results, setResults] = useState<DocItem[]>([])
   const [loading, setLoading] = useState(false)
   const [bookmarks, setBookmarks] = useState<number[]>([])
-  const debounceRef = useRef<number | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
+
+  const debouncedQuery = useDebounce(query, SEARCH_DEBOUNCE_MS)
+  const debouncedTechs = useDebounce(selectedTechs, SEARCH_DEBOUNCE_MS)
 
   const refreshBookmarks = useCallback(() => {
     setBookmarks(getFavorites())
@@ -33,10 +36,10 @@ function SearchPage() {
     setBookmarks(getFavorites())
   }, [])
 
-  const performSearch = useCallback(async () => {
+  const performSearch = useCallback(async (searchQuery: string, techs: string[]) => {
     setLoading(true)
     try {
-      const data = await fetchDocs(query, selectedTechs)
+      const data = await fetchDocs(searchQuery, techs)
       setResults(data)
     } catch (err) {
       console.error('Search failed:', err)
@@ -44,28 +47,15 @@ function SearchPage() {
     } finally {
       setLoading(false)
     }
-  }, [query, selectedTechs])
+  }, [])
 
   useEffect(() => {
-    if (debounceRef.current) {
-      clearTimeout(debounceRef.current)
-    }
-    debounceRef.current = setTimeout(() => {
-      performSearch()
-    }, SEARCH_DEBOUNCE_MS)
-    return () => {
-      if (debounceRef.current) {
-        clearTimeout(debounceRef.current)
-      }
-    }
-  }, [query, selectedTechs, performSearch])
+    performSearch(debouncedQuery, debouncedTechs)
+  }, [debouncedQuery, debouncedTechs, performSearch])
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
-      if (debounceRef.current) {
-        clearTimeout(debounceRef.current)
-      }
-      performSearch()
+      performSearch(query, selectedTechs)
     }
   }
 
