@@ -178,6 +178,7 @@ class GlobalWindExplorer {
         uPixelRatio: { value: Math.min(window.devicePixelRatio, 2) },
       },
       vertexShader: `
+        uniform float uPixelRatio;
         attribute float size;
         varying vec3 vColor;
 

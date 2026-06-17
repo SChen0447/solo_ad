@@ -410,33 +410,45 @@ export class WindDataService {
     const positions = this.positionsAttr.array as Float32Array;
     const colors = this.colorsAttr.array as Float32Array;
     const opacities = this.opacityAttr.array as Float32Array;
-    const dt = deltaTime * animationSpeed * 0.6;
+    const dt = deltaTime * 0.6;
+    const speedFactor = animationSpeed;
 
     for (let i = 0; i < PARTICLE_COUNT; i++) {
       const p = this.particles[i];
 
-      p.life += dt;
+      p.life += dt * speedFactor;
       if (p.life >= p.maxLife) {
         this.respawnParticle(p, field);
       }
 
       const { lat, lon } = vec3ToLatLon(p.position);
       const { u, v } = bilinearInterpolate(field, lat, lon);
-      const speed = Math.sqrt(u * u + v * v);
+      const windSpeed = Math.sqrt(u * u + v * v);
 
-      const pColor = speedToColor(speed);
-      p.color.lerp(pColor, 0.05);
-      p.baseSpeed += (Math.max(1, speed) - p.baseSpeed) * 0.05;
+      const pColor = speedToColor(windSpeed);
+      p.color.lerp(pColor, 0.25);
+      const currentSpeedFactor = 1.0 + windSpeed * 0.12;
 
-      const east = new THREE.Vector3(-Math.sin(toRadians(lon)), 0, Math.cos(toRadians(lon)));
+      const lonRad = toRadians(lon);
+      const latRad = toRadians(lat);
+      const sinLon = Math.sin(lonRad);
+      const cosLon = Math.cos(lonRad);
+      const sinLat = Math.sin(latRad);
+      const cosLat = Math.cos(latRad);
+
+      const east = new THREE.Vector3(-sinLon, 0, cosLon);
       const north = new THREE.Vector3(
-        -Math.sin(toRadians(lat)) * Math.cos(toRadians(lon)),
-        Math.cos(toRadians(lat)),
-        -Math.sin(toRadians(lat)) * Math.sin(toRadians(lon))
+        -sinLat * cosLon,
+        cosLat,
+        -sinLat * sinLon
       );
 
-      const moveScale = 0.00008 * (1 + p.baseSpeed * 0.08) * dt;
-      p.velocity.copy(east.multiplyScalar(u * moveScale)).add(north.multiplyScalar(v * moveScale));
+      const baseMove = 0.000085 * dt * speedFactor * currentSpeedFactor;
+      p.velocity.set(
+        east.x * u * baseMove + north.x * v * baseMove,
+        east.y * u * baseMove + north.y * v * baseMove,
+        east.z * u * baseMove + north.z * v * baseMove
+      );
       p.position.add(p.velocity);
       p.position.normalize().multiplyScalar(EARTH_RADIUS * 1.003);
 

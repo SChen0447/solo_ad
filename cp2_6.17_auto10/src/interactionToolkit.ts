@@ -11,6 +11,7 @@ export interface InteractionCallbacks {
 const EARTH_RADIUS = 1;
 const SELECT_RADIUS_KM = 200;
 const INDICATOR_RADIUS_KM = 60;
+const ROTATION_THRESHOLD_DEG = 15;
 
 export class InteractionToolkit {
   private canvas: HTMLCanvasElement;
@@ -36,6 +37,11 @@ export class InteractionToolkit {
   private selectionBoxEl: HTMLDivElement | null = null;
   private animationFrameId: number | null = null;
 
+  private initialAzimuthAngle = 0;
+  private initialPolarAngle = 0;
+  private trackingRotation = false;
+  private rotationCheckRafId: number | null = null;
+
   constructor(
     canvas: HTMLCanvasElement,
     camera: THREE.PerspectiveCamera,
@@ -57,6 +63,7 @@ export class InteractionToolkit {
     this.bindEvents();
     this.setupUIControls();
     this.createSelectionBox();
+    this.setupAutoHideListener();
   }
 
   setEarthMesh(mesh: THREE.Mesh): void {
@@ -69,6 +76,20 @@ export class InteractionToolkit {
     this.canvas.addEventListener('pointerup', this.onPointerUp);
     this.canvas.addEventListener('pointerleave', this.onPointerLeave);
     window.addEventListener('resize', this.onWindowResize);
+    document.addEventListener('pointerdown', this.onDocumentPointerDown, true);
+  }
+
+  private setupAutoHideListener(): void {
+    this.controls.addEventListener('change', () => {
+      if (!this.trackingRotation || stateManager.get('selectedRegion') === null) return;
+      const dAz = Math.abs(this.controls.getAzimuthalAngle() - this.initialAzimuthAngle);
+      const dPol = Math.abs(this.controls.getPolarAngle() - this.initialPolarAngle);
+      const dAzDeg = (dAz * 180) / Math.PI;
+      const dPolDeg = (dPol * 180) / Math.PI;
+      if (dAzDeg > ROTATION_THRESHOLD_DEG || dPolDeg > ROTATION_THRESHOLD_DEG) {
+        this.clearSelection();
+      }
+    });
   }
 
   private createSelectionBox(): void {
@@ -109,21 +130,48 @@ export class InteractionToolkit {
 
       updateProgress();
 
-      speedSlider.addEventListener('input', () => {
+      const applySpeed = (immediate = false) => {
         const val = parseFloat(speedSlider.value);
         stateManager.set('animationSpeed', val);
         speedValue.textContent = `${val.toFixed(1)}x`;
         updateProgress();
-      });
+      };
+
+      speedSlider.addEventListener('input', () => applySpeed(true));
+      speedSlider.addEventListener('change', () => applySpeed(true));
     }
 
     const closeInfoBtn = document.getElementById('close-info-btn');
     if (closeInfoBtn) {
-      closeInfoBtn.addEventListener('click', () => {
+      closeInfoBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
         this.clearSelection();
       });
     }
+
+    const infoCard = document.getElementById('info-card');
+    if (infoCard) {
+      infoCard.addEventListener('pointerdown', (e) => {
+        e.stopPropagation();
+      });
+    }
   }
+
+  private onDocumentPointerDown = (e: PointerEvent): void => {
+    const target = e.target as HTMLElement;
+    if (!target) return;
+    const isControlElement =
+      target.closest('#info-card') ||
+      target.closest('#controls-area') ||
+      target.closest('#speed-control') ||
+      target.closest('#title-area');
+    if (isControlElement) return;
+
+    if (stateManager.get('selectedRegion') !== null && target !== this.canvas) {
+      this.clearSelection();
+      return;
+    }
+  };
 
   private onPointerDown = (e: PointerEvent): void => {
     this.pointerDownX = e.clientX;
@@ -206,9 +254,7 @@ export class InteractionToolkit {
     }
   };
 
-  private onWindowResize = (): void => {
-    // handled by main
-  };
+  private onWindowResize = (): void => {};
 
   private updatePointer(clientX: number, clientY: number): void {
     const rect = this.canvas.getBoundingClientRect();
@@ -239,7 +285,12 @@ export class InteractionToolkit {
 
   private handleClick(clientX: number, clientY: number): void {
     const hitPoint = this.intersectEarth(clientX, clientY);
-    if (!hitPoint) return;
+    if (!hitPoint) {
+      if (stateManager.get('selectedRegion') !== null) {
+        this.clearSelection();
+      }
+      return;
+    }
 
     const { lat, lon } = vec3ToLatLon(hitPoint);
 
@@ -252,6 +303,10 @@ export class InteractionToolkit {
     stateManager.set('selectedRegion', region);
 
     this.showIndicator(hitPoint);
+
+    this.trackingRotation = true;
+    this.initialAzimuthAngle = this.controls.getAzimuthalAngle();
+    this.initialPolarAngle = this.controls.getPolarAngle();
 
     this.canvas.dispatchEvent(new CustomEvent('regionSelected', {
       detail: { lat, lon, worldPoint: hitPoint, region }
@@ -292,8 +347,8 @@ export class InteractionToolkit {
       const direction = centerPoint.clone().normalize();
       const currentDist = this.camera.position.length();
       const targetDist = currentDist / zoomFactor;
-      const minDist = 0.5;
-      const maxDist = 3.0;
+      const minDist = 1.3;
+      const maxDist = 7.8;
       const finalDist = Math.max(minDist, Math.min(maxDist, targetDist));
 
       const endPos = direction.multiplyScalar(finalDist);
@@ -303,8 +358,8 @@ export class InteractionToolkit {
     } else {
       const currentDist = this.camera.position.length();
       const targetDist = currentDist / zoomFactor;
-      const minDist = 0.5;
-      const maxDist = 3.0;
+      const minDist = 1.3;
+      const maxDist = 7.8;
       const finalDist = Math.max(minDist, Math.min(maxDist, targetDist));
       const startPos = this.camera.position.clone();
       const endPos = this.camera.position.clone().normalize().multiplyScalar(finalDist);
@@ -425,12 +480,25 @@ export class InteractionToolkit {
   }
 
   clearSelection(): void {
+    this.trackingRotation = false;
     this.clearIndicator();
     stateManager.set('selectedRegion', null);
     this.callbacks.onClearSelection();
     const infoCard = document.getElementById('info-card');
     if (infoCard) {
       infoCard.classList.add('hidden');
+    }
+  }
+
+  private getWindAngleDeg(u: number, v: number): number {
+    const angleRad = Math.atan2(u, v);
+    return (angleRad * 180) / Math.PI;
+  }
+
+  private setWindArrowRotation(angleDeg: number): void {
+    const arrowGroup = document.getElementById('wind-arrow-group');
+    if (arrowGroup) {
+      arrowGroup.setAttribute('transform', `translate(32,32) rotate(${angleDeg.toFixed(1)})`);
     }
   }
 
@@ -448,6 +516,9 @@ export class InteractionToolkit {
     if (speedEl) speedEl.textContent = `${analysis.avgSpeed.toFixed(1)} m/s`;
     if (dirEl) dirEl.textContent = analysis.dominantDirection;
 
+    const angle = this.getWindAngleDeg(analysis.avgU, analysis.avgV);
+    this.setWindArrowRotation(angle);
+
     card.classList.remove('hidden');
   }
 
@@ -457,9 +528,13 @@ export class InteractionToolkit {
     this.canvas.removeEventListener('pointerup', this.onPointerUp);
     this.canvas.removeEventListener('pointerleave', this.onPointerLeave);
     window.removeEventListener('resize', this.onWindowResize);
+    document.removeEventListener('pointerdown', this.onDocumentPointerDown, true);
 
     if (this.animationFrameId !== null) {
       cancelAnimationFrame(this.animationFrameId);
+    }
+    if (this.rotationCheckRafId !== null) {
+      cancelAnimationFrame(this.rotationCheckRafId);
     }
 
     this.clearIndicator();
