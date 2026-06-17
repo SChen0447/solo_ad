@@ -1001,13 +1001,21 @@ ol {
   -webkit-overflow-scrolling: touch;
   scrollbar-width: thin;
   scrollbar-color: #3b82f6 #d1d5db;
+  scroll-behavior: smooth;
 }
 
 .matrix-scroll-wrapper::-webkit-scrollbar {
   height: 6px;
+  width: 6px;
 }
 
 .matrix-scroll-wrapper::-webkit-scrollbar-track {
+  background: #d1d5db;
+  border-radius: 4px;
+  margin: 4px 8px;
+}
+
+.matrix-scroll-wrapper::-webkit-scrollbar-track-piece:horizontal {
   background: #d1d5db;
   border-radius: 4px;
 }
@@ -1015,10 +1023,28 @@ ol {
 .matrix-scroll-wrapper::-webkit-scrollbar-thumb {
   background: #3b82f6;
   border-radius: 4px;
+  min-width: 24px;
+}
+
+.matrix-scroll-wrapper::-webkit-scrollbar-thumb:horizontal {
+  background: #3b82f6;
+  border-radius: 4px;
 }
 
 .matrix-scroll-wrapper::-webkit-scrollbar-thumb:hover {
   background: #2563eb;
+}
+
+.matrix-scroll-wrapper::-webkit-scrollbar-thumb:horizontal:hover {
+  background: #2563eb;
+}
+
+.matrix-scroll-wrapper::-webkit-scrollbar-thumb:active {
+  background: #1d4ed8;
+}
+
+.matrix-scroll-wrapper::-webkit-scrollbar-corner {
+  background: transparent;
 }
 
 .matrix-container {
@@ -1066,6 +1092,7 @@ ol {
 
 .tech-header-icon {
   flex-shrink: 0;
+  color: var(--primary);
 }
 
 .header-cell-version {
@@ -1124,6 +1151,7 @@ ol {
 
 .stacked-card-header .tech-header-icon {
   flex-shrink: 0;
+  color: var(--primary);
 }
 
 .stacked-matrix-table {
@@ -1196,11 +1224,8 @@ ol {
   0% {
     transform: scale(1);
   }
-  40% {
+  50% {
     transform: scale(0.8);
-  }
-  70% {
-    transform: scale(1.1);
   }
   100% {
     transform: scale(1);
@@ -1263,23 +1288,15 @@ ol {
 .tooltip-bubble::after {
   content: '';
   position: absolute;
-  bottom: -6px;
+  bottom: -5px;
   left: 50%;
   transform: translateX(-50%);
-  border: 6px solid transparent;
-  border-top-color: #ffffff;
-  border-bottom: none;
-}
-
-.tooltip-bubble::before {
-  content: '';
-  position: absolute;
-  bottom: -7px;
-  left: 50%;
-  transform: translateX(-50%);
-  border: 7px solid transparent;
-  border-top-color: rgba(0, 0, 0, 0.06);
-  border-bottom: none;
+  width: 10px;
+  height: 10px;
+  background: #ffffff;
+  border-right: 1px solid rgba(0, 0, 0, 0.06);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+  clip-path: polygon(50% 100%, 0% 0%, 100% 0%);
 }
 
 @keyframes tooltipFade {

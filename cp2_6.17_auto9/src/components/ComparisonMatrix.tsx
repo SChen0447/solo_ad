@@ -25,16 +25,17 @@ const TechIcon = () => (
     viewBox="0 0 16 16"
     fill="none"
     xmlns="http://www.w3.org/2000/svg"
+    aria-hidden="true"
   >
     <path
       d="M8 1L14 4.5V11.5L8 15L2 11.5V4.5L8 1Z"
-      stroke="#3b82f6"
+      stroke="currentColor"
       strokeWidth="1.5"
       strokeLinejoin="round"
     />
     <path
       d="M8 1V15M2 4.5L8 8L14 4.5M8 8V15"
-      stroke="#3b82f6"
+      stroke="currentColor"
       strokeWidth="1"
       opacity="0.5"
     />
