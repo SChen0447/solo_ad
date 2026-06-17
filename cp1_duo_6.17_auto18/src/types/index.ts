@@ -23,3 +23,5 @@ export interface ApiResponse<T> {
 }
 
 export type PreviewShape = 'background' | 'circle' | 'text' | 'border' | 'stripes';
+
+export type StripeDirection = 'horizontal' | 'vertical';

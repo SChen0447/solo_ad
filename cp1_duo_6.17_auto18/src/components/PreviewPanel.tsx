@@ -1,10 +1,17 @@
-import React, { useState, useCallback } from 'react';
+import React, { useCallback } from 'react';
 import { Resizable } from 're-resizable';
-import type { PreviewShape } from '../types';
+import type { PreviewShape, StripeDirection, ColorStop } from '../types';
+import { generateGradientString } from '../utils/gradientUtils';
 
 interface PreviewPanelProps {
   gradient: string;
   webkitGradient: string;
+  stops: ColorStop[];
+  angle: number;
+  shape: PreviewShape;
+  onShapeChange: (shape: PreviewShape) => void;
+  stripeDirection: StripeDirection;
+  onStripeDirectionChange: (direction: StripeDirection) => void;
 }
 
 const shapeLabels: Record<PreviewShape, string> = {
@@ -15,12 +22,29 @@ const shapeLabels: Record<PreviewShape, string> = {
   stripes: '渐变条纹',
 };
 
-type StripeDirection = 'horizontal' | 'vertical';
+function buildRepeatingStripeGradient(
+  stops: ColorStop[],
+  angle: number,
+  direction: StripeDirection
+): string {
+  const sortedStops = [...stops].sort((a, b) => a.position - b.position);
+  const deg = direction === 'horizontal' ? 90 : 0;
+  const totalWidth = 20 * sortedStops.length;
+  const colorStops = sortedStops
+    .map((stop) => `${stop.color} ${(stop.position / 100) * totalWidth}px`)
+    .join(', ');
+  return `repeating-linear-gradient(${deg}deg, ${colorStops}, ${sortedStops[0].color} ${totalWidth}px)`;
+}
 
-const PreviewPanel: React.FC<PreviewPanelProps> = ({ gradient, webkitGradient }) => {
-  const [shape, setShape] = useState<PreviewShape>('background');
-  const [stripeDirection, setStripeDirection] = useState<StripeDirection>('horizontal');
-
+const PreviewPanel: React.FC<PreviewPanelProps> = ({
+  gradient,
+  stops,
+  angle,
+  shape,
+  onShapeChange,
+  stripeDirection,
+  onStripeDirectionChange,
+}) => {
   const renderPreview = useCallback(() => {
     switch (shape) {
       case 'background':
@@ -146,13 +170,13 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ gradient, webkitGradient })
                 flex: stripeDirection === 'horizontal' ? '1' : '0 0 auto',
                 width: stripeDirection === 'vertical' ? `${100 / stripeCount}%` : '100%',
                 height: stripeDirection === 'horizontal' ? 'auto' : '100%',
-                background: gradient,
-                backgroundSize: stripeDirection === 'horizontal'
-                  ? '100% 200%'
-                  : '200% 100%',
-                backgroundPosition: stripeDirection === 'horizontal'
-                  ? `0 ${offset * 2}%`
-                  : `${offset * 2}% 0`,
+                background: generateGradientString(stops, angle),
+                backgroundSize:
+                  stripeDirection === 'horizontal' ? '100% 200%' : '200% 100%',
+                backgroundPosition:
+                  stripeDirection === 'horizontal'
+                    ? `0 ${offset * 2}%`
+                    : `${offset * 2}% 0`,
               }}
             />
           );
@@ -178,7 +202,7 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ gradient, webkitGradient })
       default:
         return null;
     }
-  }, [shape, gradient, webkitGradient, stripeDirection]);
+  }, [shape, gradient, stops, angle, stripeDirection]);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', height: '100%' }}>
@@ -201,7 +225,7 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ gradient, webkitGradient })
             {(Object.keys(shapeLabels) as PreviewShape[]).map((s) => (
               <button
                 key={s}
-                onClick={() => setShape(s)}
+                onClick={() => onShapeChange(s)}
                 style={{
                   padding: '6px 10px',
                   border: shape === s ? '1px solid #1890ff' : '1px solid #d9d9d9',
@@ -232,10 +256,13 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ gradient, webkitGradient })
           >
             <span style={{ fontSize: '12px', color: '#666' }}>条纹方向：</span>
             <button
-              onClick={() => setStripeDirection('horizontal')}
+              onClick={() => onStripeDirectionChange('horizontal')}
               style={{
                 padding: '4px 10px',
-                border: stripeDirection === 'horizontal' ? '1px solid #1890ff' : '1px solid #d9d9d9',
+                border:
+                  stripeDirection === 'horizontal'
+                    ? '1px solid #1890ff'
+                    : '1px solid #d9d9d9',
                 background: stripeDirection === 'horizontal' ? '#e6f7ff' : '#fff',
                 color: stripeDirection === 'horizontal' ? '#1890ff' : '#666',
                 borderRadius: '4px',
@@ -247,10 +274,11 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ gradient, webkitGradient })
               水平
             </button>
             <button
-              onClick={() => setStripeDirection('vertical')}
+              onClick={() => onStripeDirectionChange('vertical')}
               style={{
                 padding: '4px 10px',
-                border: stripeDirection === 'vertical' ? '1px solid #1890ff' : '1px solid #d9d9d9',
+                border:
+                  stripeDirection === 'vertical' ? '1px solid #1890ff' : '1px solid #d9d9d9',
                 background: stripeDirection === 'vertical' ? '#e6f7ff' : '#fff',
                 color: stripeDirection === 'vertical' ? '#1890ff' : '#666',
                 borderRadius: '4px',

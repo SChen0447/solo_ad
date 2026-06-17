@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import GradientEditor from './components/GradientEditor';
 import PreviewPanel from './components/PreviewPanel';
-import type { ColorStop, GradientTemplate } from './types';
+import type { ColorStop, GradientTemplate, PreviewShape, StripeDirection } from './types';
 import { generateGradientString, generateWebkitGradient, generateId } from './utils/gradientUtils';
 import { getTemplates, saveTemplate, deleteTemplate } from './services/api';
 
@@ -18,6 +18,8 @@ const App: React.FC = () => {
   const [templateName, setTemplateName] = useState('');
   const [copied, setCopied] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [previewShape, setPreviewShape] = useState<PreviewShape>('background');
+  const [stripeDirection, setStripeDirection] = useState<StripeDirection>('horizontal');
 
   const gradientStr = useMemo(() => generateGradientString(stops, angle), [stops, angle]);
   const webkitGradientStr = useMemo(() => generateWebkitGradient(stops, angle), [stops, angle]);
@@ -75,6 +77,17 @@ const App: React.FC = () => {
     setStops(template.config.stops);
     setAngle(template.config.angle);
     setSidebarOpen(false);
+  }, []);
+
+  const handlePreviewShapeChange = useCallback((shape: PreviewShape) => {
+    setPreviewShape(shape);
+    if (shape !== 'stripes') {
+      setStripeDirection('horizontal');
+    }
+  }, []);
+
+  const handleStripeDirectionChange = useCallback((direction: StripeDirection) => {
+    setStripeDirection(direction);
   }, []);
 
   const generateThumbnailGradient = (tpl: GradientTemplate) => {
@@ -254,7 +267,16 @@ const App: React.FC = () => {
                 minHeight: 0,
               }}
             >
-              <PreviewPanel gradient={gradientStr} webkitGradient={webkitGradientStr} />
+              <PreviewPanel
+                gradient={gradientStr}
+                webkitGradient={webkitGradientStr}
+                stops={stops}
+                angle={angle}
+                shape={previewShape}
+                onShapeChange={handlePreviewShapeChange}
+                stripeDirection={stripeDirection}
+                onStripeDirectionChange={handleStripeDirectionChange}
+              />
             </div>
           </div>
         </div>

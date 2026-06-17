@@ -45,8 +45,8 @@ export function generateRandomGradient(): { stops: ColorStop[]; angle: number } 
   const modes: HarmonyMode[] = ['analogous', 'complementary', 'triadic', 'split-complementary'];
   const mode = modes[Math.floor(Math.random() * modes.length)];
 
-  const baseSaturation = 0.6 + Math.random() * 0.3;
-  const baseLightness = 0.45 + Math.random() * 0.2;
+  const baseSaturation = 0.4 + Math.random() * 0.4;
+  const baseLightness = 0.3 + Math.random() * 0.4;
 
   const hues: number[] = [];
 
@@ -86,15 +86,27 @@ export function generateRandomGradient(): { stops: ColorStop[]; angle: number } 
       break;
   }
 
+  const positions = Array.from({ length: numStops }, (_, i) =>
+    Math.round((i / (numStops - 1)) * 100)
+  );
+
   const stops: ColorStop[] = hues
     .slice(0, numStops)
     .map((hue, index) => {
-      const saturation = Math.min(1, Math.max(0.5, baseSaturation + (Math.random() - 0.5) * 0.2));
-      const lightness = Math.min(0.85, Math.max(0.35, baseLightness + (Math.random() - 0.5) * 0.15));
+      const saturation = clamp(
+        baseSaturation + (Math.random() - 0.5) * 0.15,
+        0.4,
+        0.8
+      );
+      const lightness = clamp(
+        baseLightness + (Math.random() - 0.5) * 0.1,
+        0.3,
+        0.7
+      );
       return {
         id: generateId(),
         color: hslToHex(hue, saturation, lightness),
-        position: Math.round((index / (numStops - 1)) * 100),
+        position: positions[index],
       };
     })
     .sort((a, b) => a.position - b.position);
