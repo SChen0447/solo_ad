@@ -17,6 +17,30 @@ const DEFAULT_NOTES: Record<string, string[]> = {
   deployment: ['极复杂', '较复杂', '一般', '较简单', '极简单'],
 };
 
+const TechIcon = () => (
+  <svg
+    className="tech-header-icon"
+    width="16"
+    height="16"
+    viewBox="0 0 16 16"
+    fill="none"
+    xmlns="http://www.w3.org/2000/svg"
+  >
+    <path
+      d="M8 1L14 4.5V11.5L8 15L2 11.5V4.5L8 1Z"
+      stroke="#3b82f6"
+      strokeWidth="1.5"
+      strokeLinejoin="round"
+    />
+    <path
+      d="M8 1V15M2 4.5L8 8L14 4.5M8 8V15"
+      stroke="#3b82f6"
+      strokeWidth="1"
+      opacity="0.5"
+    />
+  </svg>
+);
+
 const StarRating = ({
   value,
   onChange,
@@ -31,17 +55,25 @@ const StarRating = ({
   hovered?: number | null;
 }) => {
   const displayValue = hovered !== undefined && hovered !== null ? hovered : value;
+  const [clickedStar, setClickedStar] = useState<number | null>(null);
+
+  const handleClick = (i: number) => {
+    if (disabled) return;
+    setClickedStar(i);
+    onChange?.(i);
+    setTimeout(() => setClickedStar(null), 200);
+  };
 
   return (
     <div className="star-rating">
       {[1, 2, 3, 4, 5].map((i) => (
         <span
           key={i}
-          className={`star ${i <= displayValue ? 'filled' : ''} ${disabled ? 'disabled' : ''}`}
+          className={`star ${i <= displayValue ? 'filled' : ''} ${disabled ? 'disabled' : ''} ${clickedStar === i ? 'star-clicked' : ''}`}
           style={{ color: i <= displayValue ? '#f59e0b' : '#d1d5db' }}
           onMouseEnter={() => !disabled && onHover?.(i)}
           onMouseLeave={() => !disabled && onHover?.(null)}
-          onClick={() => !disabled && onChange?.(i)}
+          onClick={() => handleClick(i)}
         >
           ★
         </span>
@@ -381,7 +413,7 @@ export default function ComparisonMatrix({
                 <div className="matrix-corner-cell">维度</div>
                 {options.map((opt) => (
                   <div key={opt.id} className="matrix-header-cell">
-                    {opt.name || '方案'}
+                    <span className="header-cell-title"><TechIcon />{opt.name || '方案'}</span>
                   </div>
                 ))}
               </div>
@@ -454,7 +486,7 @@ export default function ComparisonMatrix({
                 }}
               >
                 <div className="stacked-card-header">
-                  <strong>{opt.name || '未命名方案'}</strong>
+                  <TechIcon /><strong>{opt.name || '未命名方案'}</strong>
                   {opt.version && <span className="version-tag">v{opt.version}</span>}
                 </div>
                 <div className="matrix-scroll-wrapper">
@@ -491,11 +523,11 @@ export default function ComparisonMatrix({
             >
               <div className="matrix-corner-cell">维度 / 方案</div>
               {options.map((opt) => (
-                <div key={opt.id} className="matrix-header-cell">
-                  <div className="header-cell-title">{opt.name || '未命名方案'}</div>
-                  {opt.version && <div className="header-cell-version">v{opt.version}</div>}
-                </div>
-              ))}
+                  <div key={opt.id} className="matrix-header-cell">
+                    <div className="header-cell-title"><TechIcon />{opt.name || '未命名方案'}</div>
+                    {opt.version && <div className="header-cell-version">v{opt.version}</div>}
+                  </div>
+                ))}
 
               {dimensions.map((dim) => (
                 <>
