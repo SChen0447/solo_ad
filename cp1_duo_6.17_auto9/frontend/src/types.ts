@@ -27,6 +27,7 @@ export interface RoundStartData {
   forbiddenWords: string[];
   duration: number;
   palette: string[];
+  serverTimestamp: number;
 }
 
 export interface RoundResult {
@@ -74,11 +75,14 @@ export interface GameState {
   forbiddenWords: string[];
   phase: 'waiting' | 'describing' | 'answering' | 'revealing' | 'roundEnd' | 'gameEnd';
   timeRemaining: number;
+  roundDuration: number;
+  serverTimestamp: number;
   answers: PlayerAnswer[];
   roundLogs: RoundLog[];
   funniestAnswer: FunniestAnswer | null;
   finalResult: GameFinalResult | null;
   palette: string[];
+  lastScoreChangeId: string | null;
 }
 
 export type GameAction =
@@ -87,12 +91,12 @@ export type GameAction =
   | { type: 'PLAYER_LEFT'; players: PlayerInfo[] }
   | { type: 'GAME_STARTED'; players: PlayerInfo[] }
   | { type: 'ROUND_START'; data: RoundStartData }
-  | { type: 'COUNTDOWN_TICK' }
+  | { type: 'COUNTDOWN_SYNC'; timeRemaining: number }
   | { type: 'ANSWER_SUBMITTED'; playerId: string; answer: string }
   | { type: 'ROUND_ENDED'; answers: PlayerAnswer[] }
   | { type: 'ANSWER_REVEALED'; answerIndex: number; correct: boolean }
   | { type: 'ROUND_RESULT'; result: RoundResult }
-  | { type: 'SCORE_UPDATE'; players: PlayerInfo[] }
+  | { type: 'SCORE_UPDATE'; players: PlayerInfo[]; changedPlayerId?: string }
   | { type: 'GAME_ENDED'; finalResult: GameFinalResult }
   | { type: 'RESET' };
 

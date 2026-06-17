@@ -1,8 +1,8 @@
 import React, { useReducer, useEffect, useCallback, useRef } from 'react';
-import { getSocket, disconnectSocket } from './socket';
+import { getSocket } from './socket';
 import {
   GameState, GameAction, PlayerInfo, RoundStartData, RoundResult,
-  PlayerAnswer, GameFinalResult, THEME_OPTIONS, THEME_PALETTES,
+  PlayerAnswer, GameFinalResult, THEME_OPTIONS, THEME_PALETTES, PLAYER_COLORS,
 } from './types';
 import GameBoard from './components/GameBoard';
 import ScorePanel from './components/ScorePanel';
@@ -21,11 +21,14 @@ const initialState: GameState = {
   forbiddenWords: [],
   phase: 'waiting',
   timeRemaining: 60,
+  roundDuration: 60,
+  serverTimestamp: 0,
   answers: [],
   roundLogs: [],
   funniestAnswer: null,
   finalResult: null,
   palette: THEME_PALETTES.fantasy,
+  lastScoreChangeId: null,
 };
 
 type PageView = 'home' | 'room' | 'game' | 'result';
@@ -47,6 +50,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       return { ...state, players: action.players, phase: 'describing' };
     case 'ROUND_START': {
       const d = action.data;
+      const localStartTime = performance.now();
       return {
         ...state,
         currentRound: d.round,
@@ -57,12 +61,14 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         forbiddenWords: d.forbiddenWords,
         phase: 'answering',
         timeRemaining: d.duration,
+        roundDuration: d.duration,
+        serverTimestamp: d.serverTimestamp,
         answers: [],
         palette: d.palette || state.palette,
       };
     }
-    case 'COUNTDOWN_TICK':
-      return { ...state, timeRemaining: Math.max(0, state.timeRemaining - 0.1) };
+    case 'COUNTDOWN_SYNC':
+      return { ...state, timeRemaining: Math.max(0, action.timeRemaining) };
     case 'ANSWER_SUBMITTED':
       return {
         ...state,
@@ -74,7 +80,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         }],
       };
     case 'ROUND_ENDED':
-      return { ...state, phase: 'revealing', answers: action.answers };
+      return { ...state, phase: 'revealing', timeRemaining: 0, answers: action.answers };
     case 'ANSWER_REVEALED': {
       const newAnswers = [...state.answers];
       if (newAnswers[action.answerIndex]) {
@@ -100,11 +106,12 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       };
     }
     case 'SCORE_UPDATE':
-      return { ...state, players: action.players };
+      return { ...state, players: action.players, lastScoreChangeId: action.changedPlayerId || null };
     case 'GAME_ENDED':
       return {
         ...state,
         phase: 'gameEnd',
+        timeRemaining: 0,
         finalResult: action.finalResult,
         funniestAnswer: action.finalResult.funniestAnswer,
       };
@@ -135,10 +142,51 @@ export default function App() {
   const [myId, setMyId] = React.useState('');
   const [isHost, setIsHost] = React.useState(false);
   const [error, setError] = React.useState('');
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const rafRef = useRef<number | null>(null);
+  const roundStartLocalRef = useRef<number>(0);
+  const roundDurationRef = useRef<number>(60);
   const logEndRef = useRef<HTMLDivElement>(null);
 
   const socket = getSocket();
+
+  const stopCountdown = useCallback(() => {
+    if (rafRef.current !== null) {
+      cancelAnimationFrame(rafRef.current);
+      rafRef.current = null;
+    }
+  }, []);
+
+  const tickCountdown = useCallback(() => {
+    const elapsed = (performance.now() - roundStartLocalRef.current) / 1000;
+    const remaining = Math.max(0, roundDurationRef.current - elapsed);
+    dispatch({ type: 'COUNTDOWN_SYNC', timeRemaining: remaining });
+    if (remaining > 0 && rafRef.current !== null) {
+      rafRef.current = requestAnimationFrame(tickCountdown);
+    }
+  }, []);
+
+  const startCountdown = useCallback((duration: number) => {
+    stopCountdown();
+    roundDurationRef.current = duration;
+    roundStartLocalRef.current = performance.now();
+    rafRef.current = requestAnimationFrame(tickCountdown);
+  }, [stopCountdown, tickCountdown]);
+
+  useEffect(() => {
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible' && state.phase === 'answering') {
+        stopCountdown();
+        roundStartLocalRef.current = performance.now() - (state.roundDuration - state.timeRemaining) * 1000;
+        rafRef.current = requestAnimationFrame(tickCountdown);
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibility);
+      stopCountdown();
+    };
+  }, [state.phase, state.roundDuration, state.timeRemaining, stopCountdown, tickCountdown]);
 
   useEffect(() => {
     socket.on('connect', () => {
@@ -174,18 +222,12 @@ export default function App() {
     });
 
     socket.on('round:start', (data: RoundStartData) => {
-      if (timerRef.current) clearInterval(timerRef.current);
       dispatch({ type: 'ROUND_START', data });
-      timerRef.current = setInterval(() => {
-        dispatch({ type: 'COUNTDOWN_TICK' });
-      }, 100);
+      startCountdown(data.duration);
     });
 
     socket.on('round:ended', (answers: PlayerAnswer[]) => {
-      if (timerRef.current) {
-        clearInterval(timerRef.current);
-        timerRef.current = null;
-      }
+      stopCountdown();
       dispatch({ type: 'ROUND_ENDED', answers });
     });
 
@@ -197,20 +239,18 @@ export default function App() {
       dispatch({ type: 'ROUND_RESULT', result });
     });
 
-    socket.on('score:update', (players: PlayerInfo[]) => {
-      dispatch({ type: 'SCORE_UPDATE', players });
+    socket.on('score:update', (data: { players: PlayerInfo[]; changedPlayerId?: string }) => {
+      dispatch({ type: 'SCORE_UPDATE', players: data.players, changedPlayerId: data.changedPlayerId });
     });
 
     socket.on('game:ended', (finalResult: GameFinalResult) => {
-      if (timerRef.current) {
-        clearInterval(timerRef.current);
-        timerRef.current = null;
-      }
+      stopCountdown();
       dispatch({ type: 'GAME_ENDED', finalResult });
       setPage('result');
     });
 
     return () => {
+      stopCountdown();
       socket.off('connect');
       socket.off('room:created');
       socket.off('room:joined');
@@ -225,22 +265,13 @@ export default function App() {
       socket.off('score:update');
       socket.off('game:ended');
     };
-  }, [socket, selectedTheme]);
+  }, [socket, selectedTheme, startCountdown, stopCountdown]);
 
   useEffect(() => {
     if (logEndRef.current) {
       logEndRef.current.scrollIntoView({ behavior: 'smooth' });
     }
   }, [state.roundLogs]);
-
-  useEffect(() => {
-    if (state.phase === 'answering' && state.timeRemaining <= 0) {
-      if (timerRef.current) {
-        clearInterval(timerRef.current);
-        timerRef.current = null;
-      }
-    }
-  }, [state.timeRemaining, state.phase]);
 
   const handleCreateRoom = useCallback(() => {
     if (!nickname.trim()) { setError('请输入昵称'); return; }
@@ -275,7 +306,7 @@ export default function App() {
     socket.emit('answer:judge', { roomId: state.roomId, answerIndex, correct });
   }, [state.roomId, socket]);
 
-  const bgColor = state.palette
+  const bgColor = state.palette && state.palette.length > 0
     ? state.palette[state.currentRound % state.palette.length] || '#FFF8E7'
     : '#FFF8E7';
 
@@ -313,7 +344,7 @@ export default function App() {
             />
           </div>
           <div style={{ width: 300, flexShrink: 0 }}>
-            <ScorePanel players={state.players} roundLogs={state.roundLogs} />
+            <ScorePanel players={state.players} roundLogs={state.roundLogs} lastScoreChangeId={state.lastScoreChangeId} />
           </div>
         </div>
         <div style={{
@@ -323,7 +354,10 @@ export default function App() {
           padding: '12px 24px',
           background: 'rgba(255,255,255,0.5)',
         }}>
-          <div style={{ fontSize: 13, fontWeight: 600, color: '#888', marginBottom: 8 }}>回合日志</div>
+          <div style={{ fontSize: 13, fontWeight: 600, color: '#888', marginBottom: 8 }}>📝 回合日志</div>
+          {state.roundLogs.length === 0 && (
+            <div style={{ color: '#aaa', fontSize: 12, fontStyle: 'italic' }}>游戏还没有进行任何回合...</div>
+          )}
           {state.roundLogs.map((log, i) => (
             <div key={i} className="log-slide-in" style={{
               padding: '6px 12px',
@@ -332,6 +366,7 @@ export default function App() {
               background: 'rgba(255,255,255,0.7)',
               fontSize: 13,
               color: '#555',
+              animationDelay: `${i * 0.05}s`,
             }}>
               <span style={{ fontWeight: 600, color: '#2D3436' }}>第{log.round}轮</span>
               {' · '}
@@ -339,7 +374,7 @@ export default function App() {
               {' · '}
               <span style={{ color: '#4ECDC4', fontWeight: 600 }}>{log.keyword}</span>
               {' · '}
-              <span>{log.correctGuessers.length > 0 ? `${log.correctGuessers.length}人猜对` : '无人猜对'}</span>
+              <span>{log.correctGuessers.length > 0 ? `${log.correctGuessers.join('、')} ${log.correctGuessers.length}人猜对` : '无人猜对'}</span>
             </div>
           ))}
           <div ref={logEndRef} />
@@ -483,7 +518,7 @@ export default function App() {
           </button>
         </div>
 
-        <div className="card fade-in-up" style={{ padding: 36, flex: 1, minWidth: 340, maxWidth: 420, animationDelay: '0.1s' }}>
+        <div className="card fade-in-up" style={{ padding: 36, flex: 1, minWidth: 340, maxWidth: 420 }}>
           <h2 style={{ fontSize: 24, fontWeight: 800, marginBottom: 6, color: '#2D3436' }}>🚪 加入房间</h2>
           <p style={{ fontSize: 13, color: '#888', marginBottom: 20 }}>输入房间号，加入好友的房间</p>
           <label style={{ fontSize: 13, fontWeight: 600, color: '#555', display: 'block', marginBottom: 6 }}>你的昵称</label>
