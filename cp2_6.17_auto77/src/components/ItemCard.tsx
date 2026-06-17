@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { UserCheck, Package } from 'lucide-react';
+import { UserCheck, Package, Heart } from 'lucide-react';
 
 interface Item {
   id: string;
@@ -17,6 +17,8 @@ interface Item {
 
 interface ItemCardProps {
   item: Item;
+  isFavorite?: boolean;
+  onToggleFavorite?: (itemId: string, isFav: boolean) => void;
 }
 
 const getCreditColorClass = (score: number): string => {
@@ -25,19 +27,51 @@ const getCreditColorClass = (score: number): string => {
   return 'green';
 };
 
-const ItemCard: React.FC<ItemCardProps> = ({ item }) => {
+const DEFAULT_USER_ID = 'user1';
+
+const ItemCard: React.FC<ItemCardProps> = ({ item, isFavorite: initialFavorite, onToggleFavorite }) => {
   const navigate = useNavigate();
   const [imageError, setImageError] = useState(false);
+  const [localFavorite, setLocalFavorite] = useState<boolean>(initialFavorite ?? false);
+
+  const isFav = initialFavorite !== undefined ? initialFavorite : localFavorite;
 
   const creditScore = item.ownerCreditScore ?? 70;
   const creditColorClass = getCreditColorClass(creditScore);
 
-  const handleClick = () => {
+  const handleClick = (e: React.MouseEvent) => {
     navigate(`/items/${item.id}`);
   };
 
   const handleImageError = () => {
     setImageError(true);
+  };
+
+  const handleFavoriteClick = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const newState = !isFav;
+
+    if (onToggleFavorite) {
+      onToggleFavorite(item.id, newState);
+    } else {
+      setLocalFavorite(newState);
+      try {
+        if (newState) {
+          await fetch(`/api/users/${DEFAULT_USER_ID}/favorites`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ itemId: item.id }),
+          });
+        } else {
+          await fetch(`/api/users/${DEFAULT_USER_ID}/favorites/${item.id}`, {
+            method: 'DELETE',
+          });
+        }
+      } catch (err) {
+        console.error('切换收藏状态失败', err);
+        setLocalFavorite(!newState);
+      }
+    }
   };
 
   return (
@@ -59,6 +93,14 @@ const ItemCard: React.FC<ItemCardProps> = ({ item }) => {
           <UserCheck className="credit-badge-icon" />
           <span>{creditScore}</span>
         </div>
+
+        <button
+          className={`favorite-btn ${isFav ? 'favorited' : ''}`}
+          onClick={handleFavoriteClick}
+          title={isFav ? '取消收藏' : '收藏'}
+        >
+          <Heart size={18} fill={isFav ? '#e53935' : 'none'} stroke={isFav ? '#e53935' : '#fff'} />
+        </button>
 
         <div className="item-card-hover-overlay">
           <div className="overlay-title">期望交换</div>

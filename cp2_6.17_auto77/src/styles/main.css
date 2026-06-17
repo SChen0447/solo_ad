@@ -890,4 +890,88 @@ input {
     width: 48px;
     height: 48px;
   }
+
+  .my-favorites-btn {
+    padding: 6px 12px;
+    font-size: 13px;
+  }
+}
+
+/* 收藏按钮 */
+.favorite-btn {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background-color: rgba(0, 0, 0, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background-color 0.2s ease, transform 0.1s ease;
+  border: none;
+  outline: none;
+  padding: 0;
+  z-index: 2;
+  backdrop-filter: blur(4px);
+}
+
+.favorite-btn:hover {
+  background-color: rgba(0, 0, 0, 0.5);
+  transform: scale(1.05);
+}
+
+.favorite-btn:active {
+  transform: scale(0.95);
+}
+
+.favorite-btn.favorited {
+  background-color: rgba(255, 255, 255, 0.9);
+}
+
+.favorite-btn.favorited:hover {
+  background-color: rgba(255, 255, 255, 1);
+}
+
+/* 我的收藏导航按钮 */
+.my-favorites-btn {
+  position: absolute;
+  top: 0;
+  right: 28px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border-radius: 24px;
+  background-color: #ffffff;
+  color: #4caf50;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  transition: background-color 0.2s ease, box-shadow 0.2s ease;
+  border: none;
+  outline: none;
+}
+
+.my-favorites-btn:hover {
+  background-color: #f5f5f5;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+}
+
+.fav-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 10px;
+  background-color: #4caf50;
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1;
 }

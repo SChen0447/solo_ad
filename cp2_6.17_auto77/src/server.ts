@@ -48,6 +48,13 @@ interface CreditRecord {
   scoreChange: number;
 }
 
+interface Favorite {
+  id: string;
+  userId: string;
+  itemId: string;
+  createdAt: Date;
+}
+
 const users: User[] = [
   { id: 'user1', nickname: '小明', avatar: '', creditScore: 92 },
   { id: 'user2', nickname: '小红', avatar: '', creditScore: 65 },
@@ -196,6 +203,11 @@ const creditRecords: CreditRecord[] = [
     exchangeTime: new Date('2024-01-08'),
     scoreChange: 5,
   },
+];
+
+const favorites: Favorite[] = [
+  { id: 'fav1', userId: 'user1', itemId: 'item2', createdAt: new Date('2024-02-10') },
+  { id: 'fav2', userId: 'user1', itemId: 'item5', createdAt: new Date('2024-02-12') },
 ];
 
 interface ApiResponse<T> {
@@ -451,6 +463,92 @@ app.put('/api/exchanges/:id', (req, res) => {
     success: true,
     data: exchange,
     message: '更新交换状态成功',
+  };
+  res.json(response);
+});
+
+app.get('/api/users/:id/favorites', (req, res) => {
+  const userId = req.params.id;
+  const userFavorites = favorites
+    .filter((f) => f.userId === userId)
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+  const favoriteItems = userFavorites
+    .map((fav) => items.find((item) => item.id === fav.itemId))
+    .filter((item): item is Item => !!item);
+
+  const response: ApiResponse<Item[]> = {
+    success: true,
+    data: favoriteItems,
+    message: '获取收藏列表成功',
+  };
+  res.json(response);
+});
+
+app.post('/api/users/:id/favorites', (req, res) => {
+  const userId = req.params.id;
+  const { itemId } = req.body;
+
+  const existing = favorites.find((f) => f.userId === userId && f.itemId === itemId);
+  if (existing) {
+    const response: ApiResponse<null> = {
+      success: false,
+      data: null,
+      message: '已收藏该物品',
+    };
+    return res.status(400).json(response);
+  }
+
+  const newFavorite: Favorite = {
+    id: uuidv4(),
+    userId,
+    itemId,
+    createdAt: new Date(),
+  };
+
+  favorites.push(newFavorite);
+
+  const response: ApiResponse<Favorite> = {
+    success: true,
+    data: newFavorite,
+    message: '收藏成功',
+  };
+  res.json(response);
+});
+
+app.delete('/api/users/:id/favorites/:itemId', (req, res) => {
+  const { id: userId, itemId } = req.params;
+
+  const index = favorites.findIndex((f) => f.userId === userId && f.itemId === itemId);
+  if (index === -1) {
+    const response: ApiResponse<null> = {
+      success: false,
+      data: null,
+      message: '未收藏该物品',
+    };
+    return res.status(404).json(response);
+  }
+
+  favorites.splice(index, 1);
+
+  const response: ApiResponse<null> = {
+    success: true,
+    data: null,
+    message: '取消收藏成功',
+  };
+  res.json(response);
+});
+
+app.get('/api/users/:id/favorites/check', (req, res) => {
+  const { id: userId } = req.params;
+  const itemId = req.query.itemId as string;
+
+  const isFavorite = favorites.some((f) => f.userId === userId && f.itemId === itemId);
+
+  const response: ApiResponse<{ isFavorite: boolean }> = {
+    success: true,
+    data: { isFavorite },
+    message: '查询收藏状态成功',
   };
   res.json(response);
 });

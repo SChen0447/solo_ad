@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Plus, X } from 'lucide-react';
+import { Search, Plus, X, Heart } from 'lucide-react';
 import ItemCard from '../components/ItemCard';
 
 interface Item {
@@ -16,6 +16,8 @@ interface Item {
   createdAt: string;
 }
 
+const DEFAULT_USER_ID = 'user1';
+
 const categories = [
   { value: 'all', label: '全部' },
   { value: 'electronics', label: '电子产品' },
@@ -28,6 +30,7 @@ const categories = [
 const HomePage: React.FC = () => {
   const navigate = useNavigate();
   const [items, setItems] = useState<Item[]>([]);
+  const [favoriteIds, setFavoriteIds] = useState<Set<string>>(new Set());
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedQuery, setDebouncedQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
@@ -41,6 +44,18 @@ const HomePage: React.FC = () => {
     category: 'electronics',
     desiredTags: '',
   });
+
+  const fetchFavorites = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/users/${DEFAULT_USER_ID}/favorites`);
+      const result = await res.json();
+      if (result.success) {
+        setFavoriteIds(new Set(result.data.map((item: Item) => item.id)));
+      }
+    } catch (err) {
+      console.error('获取收藏列表失败', err);
+    }
+  }, []);
 
   const fetchItems = useCallback(async (query: string, category: string) => {
     try {
@@ -61,7 +76,8 @@ const HomePage: React.FC = () => {
 
   useEffect(() => {
     fetchItems(debouncedQuery, selectedCategory);
-  }, [debouncedQuery, selectedCategory, fetchItems]);
+    fetchFavorites();
+  }, [debouncedQuery, selectedCategory, fetchItems, fetchFavorites]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -88,6 +104,30 @@ const HomePage: React.FC = () => {
     setShowSuggestions(false);
     setSearchQuery('');
     navigate(`/items/${itemId}`);
+  };
+
+  const handleToggleFavorite = async (itemId: string, isFav: boolean) => {
+    try {
+      if (isFav) {
+        await fetch(`/api/users/${DEFAULT_USER_ID}/favorites`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ itemId }),
+        });
+        setFavoriteIds((prev) => new Set([...prev, itemId]));
+      } else {
+        await fetch(`/api/users/${DEFAULT_USER_ID}/favorites/${itemId}`, {
+          method: 'DELETE',
+        });
+        setFavoriteIds((prev) => {
+          const next = new Set(prev);
+          next.delete(itemId);
+          return next;
+        });
+      }
+    } catch (err) {
+      console.error('切换收藏状态失败', err);
+    }
   };
 
   const handlePublish = async () => {
@@ -139,6 +179,15 @@ const HomePage: React.FC = () => {
     <div className="app-container">
       <div className="home-header">
         <h1 className="app-title">闲置物品交换市集</h1>
+        <button
+          className="my-favorites-btn"
+          onClick={() => navigate('/favorites')}
+          title="我的收藏"
+        >
+          <Heart size={20} fill="#4caf50" stroke="#4caf50" />
+          <span>我的收藏</span>
+          {favoriteIds.size > 0 && <span className="fav-count">{favoriteIds.size}</span>}
+        </button>
         {hasNewMatches && (
           <div
             className="match-notification"
@@ -188,7 +237,12 @@ const HomePage: React.FC = () => {
 
       <div className="items-grid">
         {items.map((item) => (
-          <ItemCard key={item.id} item={item} />
+          <ItemCard
+            key={item.id}
+            item={item}
+            isFavorite={favoriteIds.has(item.id)}
+            onToggleFavorite={handleToggleFavorite}
+          />
         ))}
       </div>
 
