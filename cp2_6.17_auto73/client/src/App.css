@@ -771,12 +771,13 @@ body {
 .task-item {
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: 12px;
   padding: 14px 16px;
   border: 1px solid var(--border);
   border-radius: 8px;
   margin-bottom: 10px;
   transition: all 0.2s ease;
+  background: var(--card-bg);
 }
 
 .task-item:hover {
@@ -786,6 +787,46 @@ body {
 .task-item.completed {
   background: rgba(76, 175, 80, 0.05);
   border-color: rgba(76, 175, 80, 0.2);
+}
+
+.task-item.dragging {
+  opacity: 0.5;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+  z-index: 10;
+}
+
+.task-item.drag-over {
+  border-top: 2px solid var(--primary);
+  padding-top: 12px;
+}
+
+.task-item[draggable="true"]:not(.completed) {
+  cursor: grab;
+}
+
+.task-item[draggable="true"]:not(.completed):active {
+  cursor: grabbing;
+}
+
+.task-drag-handle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  flex-shrink: 0;
+  cursor: grab;
+  color: var(--text-light);
+  opacity: 0.4;
+  transition: opacity 0.2s ease;
+}
+
+.task-drag-handle:hover {
+  opacity: 1;
+  color: var(--primary);
+}
+
+.task-drag-handle:active {
+  cursor: grabbing;
 }
 
 .task-checkbox {
@@ -818,17 +859,39 @@ body {
 
 .task-info {
   flex: 1;
+  min-width: 0;
+}
+
+.task-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
 }
 
 .task-title {
   font-size: 14px;
   font-weight: 500;
   color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .task-item.completed .task-title {
   text-decoration: line-through;
   color: var(--text-light);
+}
+
+.task-estimated {
+  font-size: 12px;
+  color: var(--text-light);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.task-item.completed .task-estimated {
+  color: var(--border);
 }
 
 .task-time {

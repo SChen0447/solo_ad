@@ -2,7 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import { v4 as uuidv4 } from 'uuid';
 import { users, plans, tasks, generatePlanTasks, calculateProgress, User, Plan, Task } from './services/planGenerator';
-import { toggleTaskStatus, getTasksByPlan } from './services/taskTracker';
+import { toggleTaskStatus, getTasksByPlan, reorderTasks } from './services/taskTracker';
 
 const planApp = express();
 const taskApp = express();
@@ -125,6 +125,20 @@ taskApp.patch('/api/tasks/:id', (req, res) => {
 taskApp.get('/api/tasks/plan/:planId', (req, res) => {
   const planTasks = getTasksByPlan(req.params.planId);
   res.json(planTasks);
+});
+
+taskApp.put('/api/reorder', (req, res) => {
+  const { planId, date, taskIds } = req.body;
+  if (!planId || !date || !Array.isArray(taskIds)) {
+    res.status(400).json({ error: '参数无效' });
+    return;
+  }
+  const success = reorderTasks(planId, date, taskIds);
+  if (!success) {
+    res.status(400).json({ error: '排序失败' });
+    return;
+  }
+  res.json({ success: true });
 });
 
 planApp.listen(3001, () => {

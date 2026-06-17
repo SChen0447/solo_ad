@@ -67,6 +67,29 @@ export default function PlanDetail() {
     } catch {}
   };
 
+  const handleReorderTasks = async (planId: string, date: string, taskIds: string[]): Promise<boolean> => {
+    try {
+      const res = await fetch('/task-api/reorder', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ planId, date, taskIds }),
+      });
+      if (!res.ok) return false;
+      const data = await res.json();
+      if (!data.success) return false;
+      setPlan(prev => prev ? {
+        ...prev,
+        tasks: taskIds.map((tid, idx) => {
+          const existing = prev.tasks.find(t => t.id === tid)!;
+          return existing;
+        }).concat(prev.tasks.filter(t => t.date !== date)),
+      } : null);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
   if (loading) return <div className="page-body"><p>加载中...</p></div>;
   if (!plan) return <div className="page-body"><p>计划不存在</p></div>;
 
@@ -97,6 +120,7 @@ export default function PlanDetail() {
             tasks={plan.tasks.filter(t => t.date === selectedDate)}
             selectedDate={selectedDate}
             onToggleTask={handleToggleTask}
+            onReorderTasks={handleReorderTasks}
           />
         </div>
       </div>
