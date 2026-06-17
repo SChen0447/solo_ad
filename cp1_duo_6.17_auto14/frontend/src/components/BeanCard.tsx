@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import type { Bean } from '../types';
 import './BeanCard.scss';
 
@@ -36,8 +36,38 @@ function StarRating({ rating }: { rating: number }) {
 }
 
 function BeanCard({ bean, onClick, style }: BeanCardProps) {
+  const [isVisible, setIsVisible] = useState(false);
+  const [thumbLoaded, setThumbLoaded] = useState(false);
   const [imageLoaded, setImageLoaded] = useState(false);
   const [ripple, setRipple] = useState<{ x: number; y: number; id: number } | null>(null);
+  const cardRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            setIsVisible(true);
+            observer.disconnect();
+          }
+        });
+      },
+      { rootMargin: '100px' }
+    );
+
+    if (cardRef.current) {
+      observer.observe(cardRef.current);
+    }
+
+    return () => observer.disconnect();
+  }, []);
+
+  const getThumbImageUrl = () => {
+    if (bean.thumb_image) return bean.thumb_image;
+    return bean.image.includes('?')
+      ? `${bean.image}&thumb=true&w=100`
+      : `${bean.image}?thumb=true&w=100`;
+  };
 
   const handleFlavorClick = (e: React.MouseEvent, flavor: string) => {
     e.stopPropagation();
@@ -50,20 +80,24 @@ function BeanCard({ bean, onClick, style }: BeanCardProps) {
   };
 
   return (
-    <div className="bean-card" onClick={onClick} style={style}>
+    <div className="bean-card" ref={cardRef} onClick={onClick} style={style}>
       <div className="bean-card__image-wrapper">
-        {!imageLoaded && (
-          <div className="bean-card__image-placeholder">
-            <span>☕</span>
-          </div>
-        )}
         <img
-          src={bean.image}
-          alt={bean.name}
-          className={`bean-card__image ${imageLoaded ? 'bean-card__image--loaded' : ''}`}
-          onLoad={() => setImageLoaded(true)}
+          src={getThumbImageUrl()}
+          alt={`${bean.name} 缩略图`}
+          className={`bean-card__image bean-card__image--thumb ${thumbLoaded ? 'bean-card__image--loaded' : ''} ${imageLoaded ? 'bean-card__image--fading' : ''}`}
+          onLoad={() => setThumbLoaded(true)}
           loading="lazy"
         />
+        {isVisible && (
+          <img
+            src={bean.image}
+            alt={bean.name}
+            className={`bean-card__image bean-card__image--main ${imageLoaded ? 'bean-card__image--loaded' : ''}`}
+            onLoad={() => setImageLoaded(true)}
+            loading="lazy"
+          />
+        )}
         <div className="bean-card__price">¥{bean.price}</div>
       </div>
 

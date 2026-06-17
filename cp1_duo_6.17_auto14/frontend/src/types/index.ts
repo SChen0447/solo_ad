@@ -7,6 +7,7 @@ export interface Bean {
   avg_rating: number;
   price: number;
   image: string;
+  thumb_image: string;
   description: string;
   roast_level: string;
 }

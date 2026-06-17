@@ -13,6 +13,9 @@ function NoteCard({ note, onLike }: NoteCardProps) {
   const [replyTo, setReplyTo] = useState<Comment | null>(null);
   const [comments, setComments] = useState<Comment[]>(note.comments || []);
   const [expandedReplies, setExpandedReplies] = useState<Set<number>>(new Set());
+  const [likeAnimating, setLikeAnimating] = useState(false);
+  const [tempLiked, setTempLiked] = useState(note.is_liked);
+  const [tempLikesCount, setTempLikesCount] = useState(note.likes_count);
 
   const userInitial = note.user?.nickname?.charAt(0) || '?';
   const avatarColor = note.user?.avatar_color || '#8BC34A';
@@ -41,6 +44,20 @@ function NoteCard({ note, onLike }: NoteCardProps) {
   };
 
   const handleLikeClick = () => {
+    if (likeAnimating) return;
+    
+    setLikeAnimating(true);
+    
+    const newLiked = !tempLiked;
+    const newCount = tempLikesCount + (newLiked ? 1 : -1);
+    
+    setTempLiked(newLiked);
+    setTempLikesCount(newCount);
+    
+    setTimeout(() => {
+      setLikeAnimating(false);
+    }, 200);
+    
     onLike(note.id);
   };
 
@@ -98,8 +115,11 @@ function NoteCard({ note, onLike }: NoteCardProps) {
     const initial = comment.user?.nickname?.charAt(0) || '?';
     const color = comment.user?.avatar_color || '#8BC34A';
     const replies = comment.replies || [];
-    const visibleReplies = expandedReplies.has(comment.id) ? replies : replies.slice(0, 5);
-    const hasMoreReplies = replies.length > 5 && !expandedReplies.has(comment.id);
+    const isExpanded = expandedReplies.has(comment.id);
+    const maxRepliesPerLevel = 5;
+    const visibleReplies = isExpanded ? replies : replies.slice(0, maxRepliesPerLevel);
+    const hiddenCount = replies.length - maxRepliesPerLevel;
+    const hasMoreReplies = hiddenCount > 0 && !isExpanded;
 
     return (
       <div className={`comment-item ${depth > 0 ? 'comment-item--reply' : ''}`}>
@@ -131,7 +151,15 @@ function NoteCard({ note, onLike }: NoteCardProps) {
                   className="view-more-replies"
                   onClick={() => toggleReplies(comment.id)}
                 >
-                  查看 {replies.length - 5} 条回复 ↓
+                  查看 {hiddenCount} 条回复 ↓
+                </button>
+              )}
+              {isExpanded && hiddenCount > 0 && (
+                <button
+                  className="view-more-replies view-more-replies--collapse"
+                  onClick={() => toggleReplies(comment.id)}
+                >
+                  收起回复 ↑
                 </button>
               )}
             </div>
@@ -197,11 +225,11 @@ function NoteCard({ note, onLike }: NoteCardProps) {
 
       <div className="note-card__actions">
         <button
-          className={`action-btn ${note.is_liked ? 'action-btn--liked' : ''}`}
+          className={`action-btn ${tempLiked ? 'action-btn--liked' : ''} ${likeAnimating ? 'action-btn--animating' : ''}`}
           onClick={handleLikeClick}
         >
-          <span className="action-btn__icon">{note.is_liked ? '❤️' : '🤍'}</span>
-          <span>{note.likes_count}</span>
+          <span className="action-btn__icon">{tempLiked ? '❤️' : '🤍'}</span>
+          <span>{tempLikesCount}</span>
         </button>
         <button
           className={`action-btn ${showComments ? 'action-btn--active' : ''}`}

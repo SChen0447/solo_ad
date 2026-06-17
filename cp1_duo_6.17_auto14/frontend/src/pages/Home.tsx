@@ -9,10 +9,26 @@ function Home() {
   const [recommendations, setRecommendations] = useState<Bean[]>([]);
   const [reason, setReason] = useState('');
   const [loading, setLoading] = useState(true);
+  const [showRecommendations, setShowRecommendations] = useState(false);
 
   useEffect(() => {
     loadRecommendations();
+    
+    const refreshInterval = setInterval(() => {
+      loadRecommendations();
+    }, 3600000);
+
+    return () => clearInterval(refreshInterval);
   }, []);
+
+  useEffect(() => {
+    if (!loading && recommendations.length > 0) {
+      const timer = setTimeout(() => {
+        setShowRecommendations(true);
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [loading, recommendations]);
 
   const loadRecommendations = async () => {
     try {
@@ -92,7 +108,7 @@ function Home() {
           </div>
         ) : (
           <div className="recommendations-grid">
-            {recommendations.map((bean, index) => (
+            {showRecommendations && recommendations.map((bean, index) => (
               <div
                 key={bean.id}
                 className="recommendation-item"

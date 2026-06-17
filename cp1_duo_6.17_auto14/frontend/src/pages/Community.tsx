@@ -1,9 +1,15 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { marked } from 'marked';
 import { notesAPI } from '../utils/api';
 import NoteCard from '../components/NoteCard';
 import type { Note } from '../types';
 import './Community.scss';
+
+marked.setOptions({
+  breaks: true,
+  gfm: true,
+});
 
 function Community() {
   const [searchParams] = useSearchParams();
@@ -204,64 +210,116 @@ function NoteEditorModal({
   const [images, setImages] = useState<string[]>([]);
   const [flavorTags, setFlavorTags] = useState<string[]>([]);
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
+  const [isDragOver, setIsDragOver] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const dragRef = useRef<HTMLDivElement>(null);
 
   const flavorOptions = ['高甜感', '明亮酸度', '醇厚', '花香明显', '坚果风味', '巧克力尾韵'];
+  const maxImages = 3;
+  const isMaxImages = images.length >= maxImages;
 
-  const handleImageUpload = (files: FileList | null) => {
-    if (!files || images.length >= 3) return;
-    
-    const file = files[0];
-    if (!file) return;
+  const compressImage = useCallback(async (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          const ctx = canvas.getContext('2d');
+          const maxWidth = 1200;
 
-    setUploadProgress(0);
-    
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const img = new Image();
-      img.onload = () => {
-        const canvas = document.createElement('canvas');
-        const ctx = canvas.getContext('2d');
-        const maxWidth = 1200;
-        
-        if (img.width > maxWidth) {
-          const ratio = maxWidth / img.width;
-          canvas.width = maxWidth;
-          canvas.height = img.height * ratio;
-        } else {
-          canvas.width = img.width;
-          canvas.height = img.height;
-        }
-        
-        ctx?.drawImage(img, 0, 0, canvas.width, canvas.height);
-        const compressed = canvas.toDataURL('image/jpeg', 0.85);
-        
-        setImages((prev) => [...prev, compressed]);
-        setUploadProgress(null);
+          let width = img.width;
+          let height = img.height;
+          if (width > maxWidth) {
+            height = (maxWidth / width) * height;
+            width = maxWidth;
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+          ctx?.drawImage(img, 0, 0, width, height);
+          resolve(canvas.toDataURL('image/jpeg', 0.85));
+        };
+        img.onerror = () => reject(new Error('图片加载失败'));
+        img.src = e.target?.result as string;
       };
-      img.src = e.target?.result as string;
-    };
-    reader.readAsDataURL(file);
+      reader.onerror = () => reject(new Error('文件读取失败'));
+      reader.readAsDataURL(file);
+    });
+  }, []);
 
-    let progress = 0;
-    const interval = setInterval(() => {
-      progress += 10;
-      setUploadProgress(progress);
-      if (progress >= 100) {
-        clearInterval(interval);
+  const handleImageUpload = useCallback(async (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    
+    if (images.length >= maxImages) {
+      setUploadError(`最多只能上传${maxImages}张图片`);
+      setTimeout(() => setUploadError(null), 3000);
+      return;
+    }
+
+    const availableSlots = maxImages - images.length;
+    const filesToProcess = Array.from(files).slice(0, availableSlots);
+
+    for (const file of filesToProcess) {
+      if (!file.type.startsWith('image/')) {
+        setUploadError('请上传图片文件');
+        setTimeout(() => setUploadError(null), 3000);
+        continue;
       }
-    }, 50);
-  };
 
-  const handleDrop = (e: React.DragEvent) => {
+      try {
+        setUploadProgress(0);
+        
+        let progress = 0;
+        const progressInterval = setInterval(() => {
+          progress += 15;
+          if (progress < 90) {
+            setUploadProgress(progress);
+          }
+        }, 80);
+
+        const compressedImage = await compressImage(file);
+        
+        clearInterval(progressInterval);
+        setUploadProgress(100);
+        
+        setTimeout(() => {
+          setImages((prev) => [...prev, compressedImage]);
+          setUploadProgress(null);
+        }, 200);
+      } catch (error) {
+        console.error('Image upload failed:', error);
+        setUploadError('图片上传失败，请重试');
+        setTimeout(() => setUploadError(null), 3000);
+        setUploadProgress(null);
+      }
+    }
+  }, [images.length, compressImage]);
+
+  const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
+    setIsDragOver(false);
+    
+    if (images.length >= maxImages) {
+      setUploadError(`最多只能上传${maxImages}张图片`);
+      setTimeout(() => setUploadError(null), 3000);
+      return;
+    }
+    
     handleImageUpload(e.dataTransfer.files);
-  };
+  }, [images.length, handleImageUpload]);
 
-  const handleDragOver = (e: React.DragEvent) => {
+  const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
-  };
+    if (!isMaxImages) {
+      setIsDragOver(true);
+    }
+  }, [isMaxImages]);
+
+  const handleDragLeave = useCallback(() => {
+    setIsDragOver(false);
+  }, []);
 
   const toggleFlavorTag = (tag: string) => {
     setFlavorTags((prev) =>
@@ -275,6 +333,14 @@ function NoteEditorModal({
 
   const handleSubmit = () => {
     onSubmit();
+  };
+
+  const renderMarkdown = () => {
+    if (!content.trim()) {
+      return <p className="preview-placeholder">预览区域 - 开始输入内容可实时预览</p>;
+    }
+    const html = marked(content);
+    return <div className="markdown-preview" dangerouslySetInnerHTML={{ __html: html }} />;
   };
 
   return (
@@ -330,24 +396,14 @@ function NoteEditorModal({
               placeholder="分享你的品鉴体验...
 支持 Markdown 语法
 **加粗** *斜体*
-- 列表项"
+- 列表项
+# 标题"
               value={content}
               onChange={(e) => setContent(e.target.value)}
             />
           ) : (
             <div className="editor-preview">
-              <div className="markdown-preview">
-                {content.split('\n').map((line, i) => {
-                  let processed = line
-                    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-                    .replace(/\*(.+?)\*/g, '<em>$1</em>')
-                    .replace(/^- (.+)$/, '• $1');
-                  return (
-                    <p key={i} dangerouslySetInnerHTML={{ __html: processed || '&nbsp;' }} />
-                  );
-                })}
-                {!content && <p className="preview-placeholder">预览区域</p>}
-              </div>
+              {renderMarkdown()}
             </div>
           )}
 
@@ -366,16 +422,20 @@ function NoteEditorModal({
             </div>
           </div>
 
+          {uploadError && (
+            <div className="upload-error">
+              ⚠️ {uploadError}
+            </div>
+          )}
+
           <div
-            className="editor-upload"
+            className={`editor-upload ${isDragOver ? 'editor-upload--dragover' : ''} ${isMaxImages ? 'editor-upload--disabled' : ''}`}
             ref={dragRef}
             onDrop={handleDrop}
             onDragOver={handleDragOver}
-            onClick={() => fileInputRef.current?.click()}
+            onDragLeave={handleDragLeave}
+            onClick={() => !isMaxImages && fileInputRef.current?.click()}
           >
-            <div className="editor-upload__icon">📷</div>
-            <p className="editor-upload__text">拖拽图片到此处或点击上传</p>
-            <p className="editor-upload__hint">最多3张，自动压缩至1200px</p>
             <input
               ref={fileInputRef}
               type="file"
@@ -383,25 +443,9 @@ function NoteEditorModal({
               multiple
               style={{ display: 'none' }}
               onChange={(e) => handleImageUpload(e.target.files)}
+              disabled={isMaxImages}
             />
-            {images.length > 0 && (
-              <div className="uploaded-images">
-                {images.map((img, idx) => (
-                  <div key={idx} className="uploaded-image">
-                    <img src={img} alt="" />
-                    <button
-                      className="uploaded-image__remove"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        removeImage(idx);
-                      }}
-                    >
-                      ×
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
+            
             {uploadProgress !== null && (
               <div className="upload-progress">
                 <div
@@ -415,6 +459,39 @@ function NoteEditorModal({
                   </div>
                 </div>
               </div>
+            )}
+
+            {uploadProgress === null && (
+              <>
+                <div className="editor-upload__icon">
+                  {isMaxImages ? '✅' : '📷'}
+                </div>
+                <p className="editor-upload__text">
+                  {isMaxImages ? '已达到最大图片数量' : '拖拽图片到此处或点击上传'}
+                </p>
+                <p className="editor-upload__hint">
+                  已上传 {images.length}/{maxImages} 张，自动压缩至1200px
+                </p>
+
+                {images.length > 0 && (
+                  <div className="uploaded-images">
+                    {images.map((img, idx) => (
+                      <div key={idx} className="uploaded-image">
+                        <img src={img} alt="" />
+                        <button
+                          className="uploaded-image__remove"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            removeImage(idx);
+                          }}
+                        >
+                          ×
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </>
             )}
           </div>
 
