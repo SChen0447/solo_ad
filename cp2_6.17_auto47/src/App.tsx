@@ -8,14 +8,45 @@ import {
   calculateFormula,
   calculateMass,
 } from './moleculeData';
-import { Atom, Bond, ElementSymbol, BondType } from './types';
+import { Atom, Bond, ElementSymbol } from './types';
 import './App.css';
 
 const ELEMENT_OPTIONS: ElementSymbol[] = ['C', 'H', 'N', 'O', 'S', 'P', 'F', 'Cl'];
 
+function getElementColor(element: ElementSymbol): string {
+  const colorMap: Record<ElementSymbol, string> = {
+    C: '#404040',
+    H: '#FFFFFF',
+    N: '#3050F8',
+    O: '#FF0D0D',
+    S: '#FFFF30',
+    P: '#FF8000',
+    F: '#90E050',
+    Cl: '#1FF01F',
+  };
+  return colorMap[element] || '#888888';
+}
+
+function useDebounce<T>(value: T, delay: number): T {
+  const [debouncedValue, setDebouncedValue] = useState<T>(value);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedValue(value);
+    }, delay);
+
+    return () => {
+      clearTimeout(timer);
+    };
+  }, [value, delay]);
+
+  return debouncedValue;
+}
+
 function App() {
   const containerRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<MoleculeScene | null>(null);
+  const initialLoadDone = useRef<boolean>(false);
 
   const [atoms, setAtoms] = useState<Atom[]>([]);
   const [bonds, setBonds] = useState<Bond[]>([]);
@@ -32,8 +63,13 @@ function App() {
   const [isMobile, setIsMobile] = useState<boolean>(false);
   const [panelOpen, setPanelOpen] = useState<boolean>(true);
 
-  const formula = useMemo(() => calculateFormula(atoms), [atoms]);
-  const mass = useMemo(() => calculateMass(atoms).toFixed(2), [atoms]);
+  const debouncedAtoms = useDebounce(atoms, 300);
+
+  const formula = useMemo(() => calculateFormula(debouncedAtoms), [debouncedAtoms]);
+  const mass = useMemo(() => {
+    const m = calculateMass(debouncedAtoms);
+    return Math.round(m * 100) / 100;
+  }, [debouncedAtoms]);
 
   useEffect(() => {
     const checkMobile = () => {
@@ -80,14 +116,10 @@ function App() {
   useEffect(() => {
     if (sceneRef.current && atoms.length > 0) {
       sceneRef.current.loadMolecule({ name: moleculeName, atoms, bonds }, true);
-    }
-  }, [atoms, bonds, moleculeName]);
-
-  useEffect(() => {
-    if (atoms.length === 0 && sceneRef.current) {
+    } else if (sceneRef.current && atoms.length === 0) {
       sceneRef.current.clearMolecule();
     }
-  }, [atoms]);
+  }, [atoms, bonds, moleculeName]);
 
   useEffect(() => {
     if (sceneRef.current && selectedAtomId !== null) {
@@ -96,20 +128,41 @@ function App() {
   }, [selectedAtomId]);
 
   useEffect(() => {
+    if (sceneRef.current && !initialLoadDone.current) {
+      initialLoadDone.current = true;
+      setAtoms([...CAFFEINE_MOLECULE.atoms]);
+      setBonds([...CAFFEINE_MOLECULE.bonds]);
+      setMoleculeName(CAFFEINE_MOLECULE.name);
+    }
+  }, []);
+
+  useEffect(() => {
     const handleClick = () => {
       if (contextMenu.visible) {
         setContextMenu(prev => ({ ...prev, visible: false }));
       }
     };
+    const handleScrollOrResize = () => {
+      if (contextMenu.visible) {
+        setContextMenu(prev => ({ ...prev, visible: false }));
+      }
+    };
     window.addEventListener('click', handleClick);
-    return () => window.removeEventListener('click', handleClick);
+    window.addEventListener('scroll', handleScrollOrResize);
+    window.addEventListener('resize', handleScrollOrResize);
+    return () => {
+      window.removeEventListener('click', handleClick);
+      window.removeEventListener('scroll', handleScrollOrResize);
+      window.removeEventListener('resize', handleScrollOrResize);
+    };
   }, [contextMenu.visible]);
 
   const loadMolecule = useCallback((mol: { name: string; atoms: Atom[]; bonds: Bond[] }) => {
+    setSelectedAtomId(null);
+    setContextMenu({ visible: false, x: 0, y: 0, atomId: null });
     setMoleculeName(mol.name);
     setAtoms([...mol.atoms]);
     setBonds([...mol.bonds]);
-    setSelectedAtomId(null);
   }, []);
 
   const loadCaffeine = () => loadMolecule(CAFFEINE_MOLECULE);
@@ -117,10 +170,11 @@ function App() {
   const loadGlucose = () => loadMolecule(GLUCOSE_MOLECULE);
 
   const clearCanvas = () => {
+    setSelectedAtomId(null);
+    setContextMenu({ visible: false, x: 0, y: 0, atomId: null });
     setAtoms([]);
     setBonds([]);
     setMoleculeName('空');
-    setSelectedAtomId(null);
   };
 
   const resetView = () => {
@@ -133,13 +187,13 @@ function App() {
     if (!smilesInput.trim()) return;
 
     setIsLoading(true);
+    setSelectedAtomId(null);
     try {
-      await new Promise(resolve => setTimeout(resolve, 300));
+      await new Promise(resolve => setTimeout(resolve, 500));
       const molecule = parseSMILES(smilesInput.trim());
       setMoleculeName('SMILES分子');
       setAtoms(molecule.atoms);
       setBonds(molecule.bonds);
-      setSelectedAtomId(null);
     } catch (e) {
       console.error('SMILES解析失败:', e);
       alert('SMILES解析失败，请检查输入格式');
@@ -148,48 +202,41 @@ function App() {
     }
   };
 
-  const changeAtomElement = (element: ElementSymbol) => {
-    if (contextMenu.atomId === null) return;
-
-    const atomId = contextMenu.atomId;
-
+  const performChangeAtomElement = useCallback((atomId: number, element: ElementSymbol) => {
     setAtoms(prev =>
       prev.map(a =>
         a.id === atomId ? { ...a, element } : a
       )
     );
-
     if (sceneRef.current) {
       sceneRef.current.updateAtomElement(atomId, element);
     }
+  }, []);
 
+  const performDeleteAtom = useCallback((atomId: number) => {
+    setBonds(prev => prev.filter(b => b.atom1 !== atomId && b.atom2 !== atomId));
+    setAtoms(prev => prev.filter(a => a.id !== atomId));
+    if (sceneRef.current) {
+      sceneRef.current.removeAtom(atomId);
+    }
+    if (selectedAtomId === atomId) {
+      setSelectedAtomId(null);
+    }
+  }, [selectedAtomId]);
+
+  const changeAtomElement = (element: ElementSymbol) => {
+    if (contextMenu.atomId === null) return;
+    const atomId = contextMenu.atomId;
+    performChangeAtomElement(atomId, element);
     setContextMenu(prev => ({ ...prev, visible: false }));
   };
 
   const deleteAtom = () => {
     if (contextMenu.atomId === null) return;
-
     const atomId = contextMenu.atomId;
-
-    setBonds(prev => prev.filter(b => b.atom1 !== atomId && b.atom2 !== atomId));
-    setAtoms(prev => prev.filter(a => a.id !== atomId));
-
-    if (sceneRef.current) {
-      sceneRef.current.removeAtom(atomId);
-    }
-
-    if (selectedAtomId === atomId) {
-      setSelectedAtomId(null);
-    }
-
+    performDeleteAtom(atomId);
     setContextMenu(prev => ({ ...prev, visible: false }));
   };
-
-  useEffect(() => {
-    if (atoms.length > 0 && sceneRef.current) {
-      sceneRef.current.loadMolecule({ name: moleculeName, atoms, bonds }, false);
-    }
-  }, [atoms, bonds, moleculeName]);
 
   const selectedAtom = atoms.find(a => a.id === selectedAtomId);
 
@@ -218,10 +265,15 @@ function App() {
           <input
             type="text"
             className="smiles-input"
-            placeholder="输入SMILES字符串，如：O=C(O)c1ccccc1C(=O)O"
+            placeholder="输入SMILES字符串，如：O=C(O)c1ccccc1C(=O)O (阿司匹林)"
             value={smilesInput}
             onChange={e => setSmilesInput(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && parseSmiles()}
+            onKeyDown={e => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                parseSmiles();
+              }
+            }}
           />
           <button
             className="btn btn-parse"
@@ -258,11 +310,11 @@ function App() {
           </div>
           <div className="property-row">
             <span className="property-label">分子式：</span>
-            <span className="property-value formula">{formula}</span>
+            <span className="property-value formula">{formula || '—'}</span>
           </div>
           <div className="property-row">
             <span className="property-label">分子量：</span>
-            <span className="property-value">{mass} g/mol</span>
+            <span className="property-value">{atoms.length > 0 ? mass.toFixed(2) : '—'} g/mol</span>
           </div>
         </div>
 
@@ -338,18 +390,11 @@ function App() {
                       style={{
                         backgroundColor: selectedAtom.element === el ? getElementColor(el) : 'transparent',
                         borderColor: getElementColor(el),
-                        color: selectedAtom.element === el ? '#fff' : getElementColor(el),
+                        color: selectedAtom.element === el
+                          ? (el === 'H' || el === 'S' || el === 'F' || el === 'Cl' ? '#333' : '#fff')
+                          : getElementColor(el),
                       }}
-                      onClick={() => {
-                        setAtoms(prev =>
-                          prev.map(a =>
-                            a.id === selectedAtom.id ? { ...a, element: el } : a
-                          )
-                        );
-                        if (sceneRef.current) {
-                          sceneRef.current.updateAtomElement(selectedAtom.id, el);
-                        }
-                      }}
+                      onClick={() => performChangeAtomElement(selectedAtom.id, el)}
                     >
                       {el}
                     </button>
@@ -359,16 +404,9 @@ function App() {
 
               <button
                 className="btn btn-delete"
-                onClick={() => {
-                  setBonds(prev => prev.filter(b => b.atom1 !== selectedAtom.id && b.atom2 !== selectedAtom.id));
-                  setAtoms(prev => prev.filter(a => a.id !== selectedAtom.id));
-                  if (sceneRef.current) {
-                    sceneRef.current.removeAtom(selectedAtom.id);
-                  }
-                  setSelectedAtomId(null);
-                }}
+                onClick={() => performDeleteAtom(selectedAtom.id)}
               >
-                删除原子
+                删除原子（同时删除相关键）
               </button>
             </div>
           </div>
@@ -378,10 +416,11 @@ function App() {
           <h3 className="section-title">使用说明</h3>
           <ul className="help-list">
             <li>左键拖动：旋转视角</li>
-            <li>滚轮：缩放</li>
-            <li>右键拖动：平移</li>
-            <li>点击原子：选中并高亮</li>
-            <li>右键原子：打开菜单</li>
+            <li>滚轮：缩放视图</li>
+            <li>右键拖动：平移视图</li>
+            <li>点击原子：选中高亮</li>
+            <li>右键原子：弹出菜单</li>
+            <li>操作分子：暂停自动旋转</li>
           </ul>
         </div>
       </div>
@@ -389,8 +428,12 @@ function App() {
       {contextMenu.visible && (
         <div
           className="context-menu"
-          style={{ left: contextMenu.x, top: contextMenu.y }}
+          style={{
+            left: Math.min(contextMenu.x, window.innerWidth - 210),
+            top: Math.min(contextMenu.y, window.innerHeight - 320),
+          }}
           onClick={e => e.stopPropagation()}
+          onContextMenu={e => e.preventDefault()}
         >
           <div className="context-menu-title">修改元素类型</div>
           <div className="context-element-grid">
@@ -419,25 +462,11 @@ function App() {
       {isLoading && (
         <div className="loading-overlay">
           <div className="loading-spinner" />
-          <span className="loading-text">解析中...</span>
+          <span className="loading-text">正在生成分子结构...</span>
         </div>
       )}
     </div>
   );
-}
-
-function getElementColor(element: ElementSymbol): string {
-  const colors: Record<ElementSymbol, string> = {
-    C: '#404040',
-    H: '#FFFFFF',
-    N: '#3050F8',
-    O: '#FF0D0D',
-    S: '#FFFF30',
-    P: '#FF8000',
-    F: '#90E050',
-    Cl: '#1FF01F',
-  };
-  return colors[element] || '#888888';
 }
 
 export default App;

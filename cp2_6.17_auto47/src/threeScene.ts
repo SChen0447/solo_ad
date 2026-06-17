@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
-import { Atom, Bond, Molecule, ELEMENT_INFO, BondType } from './types';
+import { Atom, Bond, Molecule, ELEMENT_INFO, BondType, ElementSymbol } from './types';
 
 interface AtomMesh {
   mesh: THREE.Mesh;
@@ -41,9 +41,16 @@ export class MoleculeScene {
   private newAtomTime: Map<number, number> = new Map();
   private deletingAtoms: Set<number> = new Set();
   private deleteAtomTime: Map<number, number> = new Map();
-  private atomScaleAnim: Map<number, number> = new Map();
   private clock: THREE.Clock;
   private isRunning: boolean = false;
+
+  static getElementColor(element: ElementSymbol): string {
+    return ELEMENT_INFO[element]?.color || '#888888';
+  }
+
+  static getElementRadius(element: ElementSymbol): number {
+    return ELEMENT_INFO[element]?.radius || 0.6;
+  }
 
   constructor(
     container: HTMLElement,
@@ -115,7 +122,7 @@ export class MoleculeScene {
     directionalLight.shadow.mapSize.height = 1024;
     this.scene.add(directionalLight);
 
-    const pointLight = new THREE.PointLight(0x4a90d9, 0.5, 20);
+    const pointLight = new THREE.PointLight(0x4a90d9, 0.5, 50);
     pointLight.position.set(-5, 3, 5);
     this.scene.add(pointLight);
   }
@@ -138,12 +145,13 @@ export class MoleculeScene {
 
     this.raycaster.setFromCamera(this.pointer, this.camera);
     const meshes = Array.from(this.atomMeshes.values()).map(am => am.mesh);
-    const intersects = this.raycaster.intersectObjects(meshes);
+    const intersects = this.raycaster.intersectObjects(meshes, false);
 
     if (intersects.length > 0) {
       const mesh = intersects[0].object as THREE.Mesh;
       const atomMesh = this.findAtomMeshByMesh(mesh);
       if (atomMesh) {
+        this.autoRotate = false;
         this.highlightAtom(atomMesh.atomId);
         this.onAtomClick(atomMesh.atomId, event);
       }
@@ -152,6 +160,7 @@ export class MoleculeScene {
 
   private handleContextMenu = (event: MouseEvent) => {
     event.preventDefault();
+    event.stopPropagation();
 
     const rect = this.renderer.domElement.getBoundingClientRect();
     this.pointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
@@ -159,14 +168,14 @@ export class MoleculeScene {
 
     this.raycaster.setFromCamera(this.pointer, this.camera);
     const meshes = Array.from(this.atomMeshes.values()).map(am => am.mesh);
-    const intersects = this.raycaster.intersectObjects(meshes);
+    const intersects = this.raycaster.intersectObjects(meshes, false);
 
     if (intersects.length > 0) {
       const mesh = intersects[0].object as THREE.Mesh;
       const atomMesh = this.findAtomMeshByMesh(mesh);
       if (atomMesh) {
-        this.highlightAtom(atomMesh.atomId);
         this.autoRotate = false;
+        this.highlightAtom(atomMesh.atomId);
         this.onAtomContextMenu(atomMesh.atomId, event);
       }
     }
@@ -195,31 +204,34 @@ export class MoleculeScene {
 
     const atomMesh = this.atomMeshes.get(atomId);
     if (atomMesh && !atomMesh.highlightMesh) {
-      const info = this.getAtomInfoById(atomId);
-      if (info) {
-        const highlightGeo = new THREE.SphereGeometry(info.radius * 1.2, 32, 32);
-        const highlightMat = new THREE.MeshBasicMaterial({
-          color: 0x4a90d9,
-          transparent: true,
-          opacity: 0,
-          side: THREE.BackSide,
-        });
-        const highlightMesh = new THREE.Mesh(highlightGeo, highlightMat);
-        highlightMesh.position.copy(atomMesh.mesh.position);
-        this.moleculeGroup.add(highlightMesh);
-        atomMesh.highlightMesh = highlightMesh;
-      }
+      const radius = MoleculeScene.getElementRadius(this.getElementSymbolById(atomId));
+      const highlightGeo = new THREE.SphereGeometry(radius * 1.25, 32, 32);
+      const highlightMat = new THREE.MeshBasicMaterial({
+        color: 0x4a90d9,
+        transparent: true,
+        opacity: 0,
+        side: THREE.BackSide,
+      });
+      const highlightMesh = new THREE.Mesh(highlightGeo, highlightMat);
+      highlightMesh.position.copy(atomMesh.mesh.position);
+      this.moleculeGroup.add(highlightMesh);
+      atomMesh.highlightMesh = highlightMesh;
     }
   }
 
-  private getAtomInfoById(atomId: number): { radius: number } | null {
+  private getElementSymbolById(atomId: number): ElementSymbol {
     for (const [id, atomMesh] of this.atomMeshes) {
       if (id === atomId) {
-        const geom = atomMesh.mesh.geometry as THREE.SphereGeometry;
-        return { radius: geom.parameters.radius };
+        const mat = atomMesh.mesh.material as THREE.MeshStandardMaterial;
+        const colorHex = '#' + mat.color.getHexString().toUpperCase();
+        for (const [sym, info] of Object.entries(ELEMENT_INFO)) {
+          if (info.color.toUpperCase() === colorHex) {
+            return sym as ElementSymbol;
+          }
+        }
       }
     }
-    return null;
+    return 'C';
   }
 
   public clearMolecule() {
@@ -247,7 +259,6 @@ export class MoleculeScene {
     this.newAtomTime.clear();
     this.deletingAtoms.clear();
     this.deleteAtomTime.clear();
-    this.atomScaleAnim.clear();
   }
 
   public loadMolecule(molecule: Molecule, animate: boolean = true) {
@@ -269,12 +280,14 @@ export class MoleculeScene {
   }
 
   private createAtomMesh(atom: Atom, animate: boolean = true) {
-    const info = ELEMENT_INFO[atom.element];
-    const geometry = new THREE.SphereGeometry(info.radius, 32, 32);
+    const color = MoleculeScene.getElementColor(atom.element);
+    const radius = MoleculeScene.getElementRadius(atom.element);
+
+    const geometry = new THREE.SphereGeometry(radius, 32, 32);
     const material = new THREE.MeshStandardMaterial({
-      color: new THREE.Color(info.color),
-      metalness: 0.3,
-      roughness: 0.5,
+      color: new THREE.Color(color),
+      metalness: 0.35,
+      roughness: 0.45,
     });
 
     const mesh = new THREE.Mesh(geometry, material);
@@ -286,7 +299,8 @@ export class MoleculeScene {
       mesh.scale.setScalar(0);
       this.newAtoms.add(atom.id);
       this.newAtomTime.set(atom.id, 0);
-      this.atomScaleAnim.set(atom.id, 0);
+    } else {
+      mesh.scale.setScalar(1);
     }
 
     this.moleculeGroup.add(mesh);
@@ -301,49 +315,65 @@ export class MoleculeScene {
 
     const start = new THREE.Vector3(atom1.x, atom1.y, atom1.z);
     const end = new THREE.Vector3(atom2.x, atom2.y, atom2.z);
-    const direction = end.clone().sub(start);
+
+    this.createBondCylinder(bond.id, bond.type, start, end, bond.atom1, bond.atom2);
+  }
+
+  private createBondCylinder(
+    bondId: number,
+    bondType: BondType,
+    start: THREE.Vector3,
+    end: THREE.Vector3,
+    atom1: number,
+    atom2: number
+  ) {
+    const direction = new THREE.Vector3().subVectors(end, start);
     const length = direction.length();
+    if (length < 0.001) return;
 
     const bondRadius = 0.15;
     let color = 0x888888;
-    if (bond.type === 'double') color = 0xaaaaaa;
-    if (bond.type === 'aromatic') color = 0x999999;
+    if (bondType === 'double') color = 0xaaaaaa;
+    if (bondType === 'aromatic') color = 0x999999;
 
-    const geometry = new THREE.CylinderGeometry(bondRadius, bondRadius, length, 16);
+    const geometry = new THREE.CylinderGeometry(bondRadius, bondRadius, length, 16, 1, false);
     const material = new THREE.MeshStandardMaterial({
       color,
-      metalness: 0.2,
-      roughness: 0.6,
+      metalness: 0.25,
+      roughness: 0.55,
     });
 
     const mesh = new THREE.Mesh(geometry, material);
-    mesh.position.copy(start.clone().add(end).multiplyScalar(0.5));
-    mesh.lookAt(end);
-    mesh.rotateX(Math.PI / 2);
+
+    const mid = new THREE.Vector3().addVectors(start, end).multiplyScalar(0.5);
+    mesh.position.copy(mid);
+
+    const up = new THREE.Vector3(0, 1, 0);
+    const dirNorm = direction.clone().normalize();
+    const quaternion = new THREE.Quaternion().setFromUnitVectors(up, dirNorm);
+    mesh.quaternion.copy(quaternion);
+
     mesh.castShadow = true;
     mesh.receiveShadow = true;
 
     this.moleculeGroup.add(mesh);
-    this.bondMeshes.set(bond.id, { mesh, bondId: bond.id, atom1: bond.atom1, atom2: bond.atom2 });
+    this.bondMeshes.set(bondId, { mesh, bondId, atom1, atom2 });
   }
 
-  public updateAtomElement(atomId: number, element: string) {
+  public updateAtomElement(atomId: number, element: ElementSymbol) {
     const atomMesh = this.atomMeshes.get(atomId);
     if (!atomMesh) return;
 
-    const info = ELEMENT_INFO[element as keyof typeof ELEMENT_INFO];
-    if (!info) return;
-
-    const oldRadius = (atomMesh.mesh.geometry as THREE.SphereGeometry).parameters.radius;
-    const newRadius = info.radius;
+    const color = MoleculeScene.getElementColor(element);
+    const radius = MoleculeScene.getElementRadius(element);
 
     atomMesh.mesh.geometry.dispose();
-    atomMesh.mesh.geometry = new THREE.SphereGeometry(newRadius, 32, 32);
-    (atomMesh.mesh.material as THREE.MeshStandardMaterial).color.set(info.color);
+    atomMesh.mesh.geometry = new THREE.SphereGeometry(radius, 32, 32);
+    (atomMesh.mesh.material as THREE.MeshStandardMaterial).color.set(color);
 
     if (atomMesh.highlightMesh) {
       atomMesh.highlightMesh.geometry.dispose();
-      atomMesh.highlightMesh.geometry = new THREE.SphereGeometry(newRadius * 1.2, 32, 32);
+      atomMesh.highlightMesh.geometry = new THREE.SphereGeometry(radius * 1.25, 32, 32);
     }
   }
 
@@ -356,10 +386,6 @@ export class MoleculeScene {
       atomMesh.highlightMesh.position.set(x, y, z);
     }
 
-    this.updateBondsForAtom(atomId, x, y, z);
-  }
-
-  private updateBondsForAtom(atomId: number, x: number, y: number, z: number) {
     const atomPos = new THREE.Vector3(x, y, z);
 
     this.bondMeshes.forEach((bm) => {
@@ -367,25 +393,44 @@ export class MoleculeScene {
         const otherAtomId = bm.atom1 === atomId ? bm.atom2 : bm.atom1;
         const otherAtomMesh = this.atomMeshes.get(otherAtomId);
         if (otherAtomMesh) {
-          this.repositionBond(bm, atomPos, otherAtomMesh.mesh.position);
+          const start = bm.atom1 === atomId ? atomPos : otherAtomMesh.mesh.position;
+          const end = bm.atom2 === atomId ? atomPos : otherAtomMesh.mesh.position;
+          this.recreateBondCylinder(bm, start, end);
         }
       }
     });
   }
 
-  private repositionBond(bondMesh: BondMesh, start: THREE.Vector3, end: THREE.Vector3) {
-    const direction = end.clone().sub(start);
+  private recreateBondCylinder(
+    bondMesh: BondMesh,
+    start: THREE.Vector3,
+    end: THREE.Vector3
+  ) {
+    const direction = new THREE.Vector3().subVectors(end, start);
     const length = direction.length();
+    if (length < 0.001) return;
 
     const geom = bondMesh.mesh.geometry as THREE.CylinderGeometry;
-    const oldRadius = geom.parameters.radiusTop;
+    const oldRadiusTop = geom.parameters.radiusTop;
+    const oldRadiusBottom = geom.parameters.radiusBottom;
 
     bondMesh.mesh.geometry.dispose();
-    bondMesh.mesh.geometry = new THREE.CylinderGeometry(oldRadius, oldRadius, length, 16);
+    bondMesh.mesh.geometry = new THREE.CylinderGeometry(
+      oldRadiusTop,
+      oldRadiusBottom,
+      length,
+      16,
+      1,
+      false
+    );
 
-    bondMesh.mesh.position.copy(start.clone().add(end).multiplyScalar(0.5));
-    bondMesh.mesh.lookAt(end);
-    bondMesh.mesh.rotateX(Math.PI / 2);
+    const mid = new THREE.Vector3().addVectors(start, end).multiplyScalar(0.5);
+    bondMesh.mesh.position.copy(mid);
+
+    const up = new THREE.Vector3(0, 1, 0);
+    const dirNorm = direction.clone().normalize();
+    const quaternion = new THREE.Quaternion().setFromUnitVectors(up, dirNorm);
+    bondMesh.mesh.quaternion.copy(quaternion);
   }
 
   public addAtom(atom: Atom, bondType: BondType = 'single', connectedToAtomId?: number) {
@@ -394,39 +439,37 @@ export class MoleculeScene {
     if (connectedToAtomId !== undefined) {
       const otherAtomMesh = this.atomMeshes.get(connectedToAtomId);
       if (otherAtomMesh) {
-        const start = otherAtomMesh.mesh.position;
+        const start = otherAtomMesh.mesh.position.clone();
         const end = new THREE.Vector3(atom.x, atom.y, atom.z);
-        const direction = end.clone().sub(start);
-        const length = direction.length();
-
-        const bondRadius = 0.15;
-        const geometry = new THREE.CylinderGeometry(bondRadius, bondRadius, length, 16);
-        const material = new THREE.MeshStandardMaterial({
-          color: 0x888888,
-          metalness: 0.2,
-          roughness: 0.6,
-        });
-
-        const mesh = new THREE.Mesh(geometry, material);
-        mesh.position.copy(start.clone().add(end).multiplyScalar(0.5));
-        mesh.lookAt(end);
-        mesh.rotateX(Math.PI / 2);
-        mesh.castShadow = true;
-        mesh.receiveShadow = true;
-
-        this.moleculeGroup.add(mesh);
         const bondId = Date.now() + Math.random();
-        this.bondMeshes.set(bondId, { mesh, bondId });
+        this.createBondCylinder(bondId, bondType, start, end, connectedToAtomId, atom.id);
       }
     }
   }
 
   public removeAtom(atomId: number) {
-    const atomMesh = this.atomMeshes.get(atomId);
-    if (!atomMesh) return;
+    const bondsToRemove: number[] = [];
+    this.bondMeshes.forEach((bm, bondId) => {
+      if (bm.atom1 === atomId || bm.atom2 === atomId) {
+        bondsToRemove.push(bondId);
+      }
+    });
 
-    this.deletingAtoms.add(atomId);
-    this.deleteAtomTime.set(atomId, 0);
+    bondsToRemove.forEach(bondId => {
+      const bm = this.bondMeshes.get(bondId);
+      if (bm) {
+        this.moleculeGroup.remove(bm.mesh);
+        bm.mesh.geometry.dispose();
+        (bm.mesh.material as THREE.Material).dispose();
+        this.bondMeshes.delete(bondId);
+      }
+    });
+
+    const atomMesh = this.atomMeshes.get(atomId);
+    if (atomMesh) {
+      this.deletingAtoms.add(atomId);
+      this.deleteAtomTime.set(atomId, 0);
+    }
   }
 
   public setAutoRotate(rotate: boolean) {
@@ -443,12 +486,12 @@ export class MoleculeScene {
 
     const center = box.getCenter(new THREE.Vector3());
     const size = box.getSize(new THREE.Vector3());
-    const maxDim = Math.max(size.x, size.y, size.z);
+    const maxDim = Math.max(size.x, size.y, size.z, 3);
     const fov = this.camera.fov * (Math.PI / 180);
     let cameraZ = Math.abs(maxDim / 2 / Math.tan(fov / 2));
-    cameraZ *= 1.5;
+    cameraZ *= 2.0;
 
-    this.camera.position.set(center.x, center.y, center.z + cameraZ);
+    this.camera.position.set(center.x, center.y + 1, center.z + cameraZ);
     this.controls.target.copy(center);
     this.controls.update();
   }
@@ -478,7 +521,7 @@ export class MoleculeScene {
 
     this.animationId = requestAnimationFrame(this.animate);
 
-    const delta = this.clock.getDelta();
+    const delta = Math.min(this.clock.getDelta(), 0.1);
 
     if (this.autoRotate) {
       this.moleculeGroup.rotation.y += this.autoRotateSpeed * delta;
@@ -509,7 +552,7 @@ export class MoleculeScene {
       const atomMesh = this.atomMeshes.get(this.selectedAtomId);
       if (atomMesh?.highlightMesh) {
         const mat = atomMesh.highlightMesh.material as THREE.MeshBasicMaterial;
-        mat.opacity = 0.2;
+        mat.opacity = 0.25;
       }
     }
   }
@@ -517,28 +560,36 @@ export class MoleculeScene {
   private updateNewAtoms(delta: number) {
     const animDuration = 0.4;
 
+    const done: number[] = [];
+
     this.newAtoms.forEach(atomId => {
       const time = (this.newAtomTime.get(atomId) ?? 0) + delta;
       this.newAtomTime.set(atomId, time);
 
       const progress = Math.min(time / animDuration, 1);
-      const scale = this.easeOutElastic(progress);
+      const scale = this.easeOutBack(progress);
 
       const atomMesh = this.atomMeshes.get(atomId);
       if (atomMesh) {
         atomMesh.mesh.scale.setScalar(scale);
+        if (atomMesh.highlightMesh) {
+          atomMesh.highlightMesh.scale.setScalar(scale);
+        }
       }
 
       if (progress >= 1) {
-        this.newAtoms.delete(atomId);
-        this.newAtomTime.delete(atomId);
+        done.push(atomId);
       }
+    });
+
+    done.forEach(atomId => {
+      this.newAtoms.delete(atomId);
+      this.newAtomTime.delete(atomId);
     });
   }
 
   private updateDeletingAtoms(delta: number) {
     const animDuration = 0.3;
-
     const toRemove: number[] = [];
 
     this.deletingAtoms.forEach(atomId => {
@@ -550,9 +601,9 @@ export class MoleculeScene {
 
       const atomMesh = this.atomMeshes.get(atomId);
       if (atomMesh) {
-        atomMesh.mesh.scale.setScalar(scale);
+        atomMesh.mesh.scale.setScalar(Math.max(scale, 0));
         if (atomMesh.highlightMesh) {
-          atomMesh.highlightMesh.scale.setScalar(scale);
+          atomMesh.highlightMesh.scale.setScalar(Math.max(scale, 0));
         }
       }
 
@@ -585,13 +636,10 @@ export class MoleculeScene {
     this.atomMeshes.delete(atomId);
   }
 
-  private easeOutElastic(x: number): number {
-    const c4 = (2 * Math.PI) / 3;
-    return x === 0
-      ? 0
-      : x === 1
-      ? 1
-      : Math.pow(2, -10 * x) * Math.sin((x * 10 - 0.75) * c4) + 1;
+  private easeOutBack(x: number): number {
+    const c1 = 1.70158;
+    const c3 = c1 + 1;
+    return 1 + c3 * Math.pow(x - 1, 3) + c1 * Math.pow(x - 1, 2);
   }
 
   private easeInCubic(x: number): number {
