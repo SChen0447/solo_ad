@@ -1,0 +1,710 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>参数化曲面幕墙设计器</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+      color: #fff;
+      user-select: none;
+    }
+
+    /* 欢迎页面 */
+    #welcome-screen {
+      position: fixed;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+      transition: opacity 0.6s ease, visibility 0.6s ease;
+    }
+
+    #welcome-screen.hidden {
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+    }
+
+    .welcome-title {
+      font-size: 42px;
+      font-weight: 300;
+      letter-spacing: 8px;
+      margin-bottom: 16px;
+      color: rgba(255, 255, 255, 0.9);
+      text-shadow: 0 0 40px rgba(68, 136, 255, 0.3);
+    }
+
+    .welcome-subtitle {
+      font-size: 14px;
+      color: rgba(255, 255, 255, 0.5);
+      letter-spacing: 4px;
+      margin-bottom: 48px;
+    }
+
+    .welcome-divider {
+      width: 60px;
+      height: 2px;
+      background: linear-gradient(90deg, transparent, #d4af37, transparent);
+      margin-bottom: 48px;
+    }
+
+    .start-btn {
+      padding: 16px 48px;
+      font-size: 16px;
+      letter-spacing: 4px;
+      color: #d4af37;
+      background: transparent;
+      border: 1px solid rgba(212, 175, 55, 0.5);
+      border-radius: 2px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .start-btn:hover {
+      background: rgba(212, 175, 55, 0.1);
+      border-color: #d4af37;
+      box-shadow: 0 0 30px rgba(212, 175, 55, 0.3);
+      transform: translateY(-2px);
+    }
+
+    .start-btn::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: -100%;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(90deg, transparent, rgba(212, 175, 55, 0.2), transparent);
+      transition: left 0.5s ease;
+    }
+
+    .start-btn:hover::before {
+      left: 100%;
+    }
+
+    /* 主应用容器 */
+    #app-container {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      opacity: 0;
+      transition: opacity 0.6s ease 0.3s;
+    }
+
+    #app-container.visible {
+      opacity: 1;
+    }
+
+    #scene-container {
+      width: 100%;
+      height: 100%;
+      position: absolute;
+      top: 0;
+      left: 0;
+    }
+
+    /* 左侧面板 */
+    #side-panel {
+      position: absolute;
+      top: 50%;
+      left: 20px;
+      transform: translateY(-50%);
+      width: 280px;
+      background: rgba(30, 30, 50, 0.85);
+      backdrop-filter: blur(10px);
+      border-radius: 8px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      padding: 16px;
+      z-index: 10;
+      max-height: 90vh;
+      overflow-y: auto;
+      scrollbar-width: thin;
+      scrollbar-color: rgba(68, 136, 255, 0.3) transparent;
+    }
+
+    #side-panel::-webkit-scrollbar {
+      width: 4px;
+    }
+
+    #side-panel::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    #side-panel::-webkit-scrollbar-thumb {
+      background: rgba(68, 136, 255, 0.3);
+      border-radius: 2px;
+    }
+
+    .panel-section {
+      margin-bottom: 16px;
+    }
+
+    .panel-section:last-child {
+      margin-bottom: 0;
+    }
+
+    .section-title {
+      font-size: 12px;
+      color: rgba(255, 255, 255, 0.6);
+      letter-spacing: 2px;
+      margin-bottom: 12px;
+      text-transform: uppercase;
+      display: flex;
+      align-items: center;
+      cursor: pointer;
+      transition: color 0.2s;
+    }
+
+    .section-title:hover {
+      color: #d4af37;
+    }
+
+    .section-title::before {
+      content: '';
+      display: inline-block;
+      width: 4px;
+      height: 4px;
+      background: #d4af37;
+      border-radius: 50%;
+      margin-right: 8px;
+    }
+
+    .section-title .toggle-icon {
+      margin-left: auto;
+      font-size: 10px;
+      transition: transform 0.25s ease;
+    }
+
+    .section-title.collapsed .toggle-icon {
+      transform: rotate(-90deg);
+    }
+
+    .section-content {
+      overflow: hidden;
+      transition: max-height 0.25s ease, opacity 0.25s ease;
+    }
+
+    .section-content.collapsed {
+      max-height: 0 !important;
+      opacity: 0;
+    }
+
+    .divider {
+      height: 1px;
+      background: rgba(255, 255, 255, 0.1);
+      margin: 16px 0;
+    }
+
+    /* 控制点列表 */
+    .control-point-list {
+      max-height: 120px;
+      overflow-y: auto;
+      scrollbar-width: thin;
+      scrollbar-color: rgba(68, 136, 255, 0.3) transparent;
+    }
+
+    .control-point-list::-webkit-scrollbar {
+      width: 3px;
+    }
+
+    .control-point-list::-webkit-scrollbar-thumb {
+      background: rgba(68, 136, 255, 0.3);
+      border-radius: 2px;
+    }
+
+    .point-item {
+      display: flex;
+      align-items: center;
+      padding: 6px 8px;
+      margin-bottom: 4px;
+      background: rgba(255, 255, 255, 0.03);
+      border-radius: 4px;
+      cursor: pointer;
+      transition: all 0.2s;
+      font-size: 12px;
+    }
+
+    .point-item:hover {
+      background: rgba(68, 136, 255, 0.15);
+    }
+
+    .point-item.selected {
+      background: rgba(68, 136, 255, 0.2);
+      box-shadow: 0 0 0 1px #4488ff;
+    }
+
+    .point-dot {
+      width: 8px;
+      height: 8px;
+      background: #d4af37;
+      border-radius: 50%;
+      margin-right: 8px;
+      box-shadow: 0 0 6px #d4af37;
+    }
+
+    .point-coords {
+      flex: 1;
+      color: rgba(255, 255, 255, 0.7);
+      font-family: 'Consolas', 'Monaco', monospace;
+      font-size: 11px;
+    }
+
+    /* 材质滑块 */
+    .slider-group {
+      margin-bottom: 12px;
+    }
+
+    .slider-group:last-child {
+      margin-bottom: 0;
+    }
+
+    .slider-label {
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+      color: rgba(255, 255, 255, 0.7);
+      margin-bottom: 6px;
+    }
+
+    .slider-value {
+      color: #d4af37;
+      font-family: 'Consolas', monospace;
+    }
+
+    .slider {
+      -webkit-appearance: none;
+      width: 100%;
+      height: 4px;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 2px;
+      outline: none;
+      cursor: pointer;
+    }
+
+    .slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 14px;
+      height: 14px;
+      background: #d4af37;
+      border-radius: 50%;
+      cursor: pointer;
+      box-shadow: 0 0 8px rgba(212, 175, 55, 0.5);
+      transition: all 0.2s;
+    }
+
+    .slider::-webkit-slider-thumb:hover {
+      transform: scale(1.2);
+      box-shadow: 0 0 12px rgba(212, 175, 55, 0.8);
+    }
+
+    .slider:focus {
+      outline: none;
+    }
+
+    .color-picker-wrapper {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+
+    .color-input {
+      -webkit-appearance: none;
+      width: 40px;
+      height: 24px;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      background: transparent;
+    }
+
+    .color-input::-webkit-color-swatch-wrapper {
+      padding: 0;
+    }
+
+    .color-input::-webkit-color-swatch {
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 4px;
+    }
+
+    .color-label {
+      font-size: 12px;
+      color: rgba(255, 255, 255, 0.7);
+    }
+
+    .color-hex {
+      font-family: 'Consolas', monospace;
+      font-size: 11px;
+      color: #d4af37;
+      margin-left: auto;
+    }
+
+    /* 光照控制盘 */
+    .light-control-wrapper {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 8px 0;
+    }
+
+    .light-control-dial {
+      width: 120px;
+      height: 120px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(68, 136, 255, 0.1) 0%, rgba(30, 30, 50, 0.8) 100%);
+      border: 2px solid rgba(68, 136, 255, 0.3);
+      position: relative;
+      cursor: grab;
+      transition: box-shadow 0.3s;
+    }
+
+    .light-control-dial:hover {
+      box-shadow: 0 0 20px rgba(68, 136, 255, 0.3);
+    }
+
+    .light-control-dial:active {
+      cursor: grabbing;
+    }
+
+    .sun-icon {
+      position: absolute;
+      width: 20px;
+      height: 20px;
+      background: radial-gradient(circle, #ffd700 0%, #ff8c00 100%);
+      border-radius: 50%;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      box-shadow: 0 0 15px #ffd700, 0 0 30px #ff8c00;
+      pointer-events: none;
+    }
+
+    .dial-markers {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+    }
+
+    .dial-marker {
+      position: absolute;
+      width: 2px;
+      height: 6px;
+      background: rgba(255, 255, 255, 0.3);
+      left: 50%;
+      top: 4px;
+      transform: translateX(-50%);
+    }
+
+    .light-angles {
+      margin-top: 12px;
+      display: flex;
+      gap: 16px;
+      font-size: 11px;
+      color: rgba(255, 255, 255, 0.6);
+    }
+
+    .light-angle-item {
+      text-align: center;
+    }
+
+    .light-angle-value {
+      color: #d4af37;
+      font-family: 'Consolas', monospace;
+      font-size: 13px;
+    }
+
+    /* 环境预设 */
+    .env-presets {
+      display: flex;
+      gap: 8px;
+    }
+
+    .env-btn {
+      flex: 1;
+      padding: 8px 4px;
+      font-size: 11px;
+      color: rgba(255, 255, 255, 0.7);
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 4px;
+      cursor: pointer;
+      transition: all 0.3s;
+      text-align: center;
+    }
+
+    .env-btn:hover {
+      background: rgba(68, 136, 255, 0.15);
+      border-color: rgba(68, 136, 255, 0.4);
+    }
+
+    .env-btn.active {
+      background: rgba(68, 136, 255, 0.25);
+      border-color: #4488ff;
+      color: #fff;
+      box-shadow: 0 0 10px rgba(68, 136, 255, 0.3);
+    }
+
+    /* 迷你地图 */
+    #mini-map {
+      position: absolute;
+      bottom: 20px;
+      right: 20px;
+      width: 150px;
+      height: 150px;
+      background: rgba(30, 30, 50, 0.8);
+      backdrop-filter: blur(8px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 6px;
+      z-index: 10;
+      transition: box-shadow 0.3s, border-color 0.3s;
+    }
+
+    #mini-map.interacting {
+      border-color: #4488ff;
+      box-shadow: 0 0 15px rgba(68, 136, 255, 0.4);
+    }
+
+    #mini-map canvas {
+      width: 100%;
+      height: 100%;
+      border-radius: 5px;
+    }
+
+    /* 汉堡菜单按钮 - 窄屏显示 */
+    #menu-toggle {
+      display: none;
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      width: 44px;
+      height: 44px;
+      background: rgba(30, 30, 50, 0.85);
+      backdrop-filter: blur(8px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 6px;
+      cursor: pointer;
+      z-index: 20;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 5px;
+      transition: all 0.3s;
+    }
+
+    #menu-toggle:hover {
+      border-color: #4488ff;
+      box-shadow: 0 0 10px rgba(68, 136, 255, 0.3);
+    }
+
+    #menu-toggle span {
+      display: block;
+      width: 20px;
+      height: 2px;
+      background: rgba(255, 255, 255, 0.8);
+      transition: all 0.3s;
+    }
+
+    #menu-toggle.active span:nth-child(1) {
+      transform: rotate(45deg) translate(5px, 5px);
+    }
+
+    #menu-toggle.active span:nth-child(2) {
+      opacity: 0;
+    }
+
+    #menu-toggle.active span:nth-child(3) {
+      transform: rotate(-45deg) translate(5px, -5px);
+    }
+
+    /* 选择面板数量提示 */
+    .selection-info {
+      font-size: 11px;
+      color: rgba(255, 255, 255, 0.5);
+      margin-bottom: 10px;
+      padding: 6px 8px;
+      background: rgba(68, 136, 255, 0.1);
+      border-radius: 4px;
+      border-left: 2px solid #4488ff;
+    }
+
+    .selection-count {
+      color: #d4af37;
+      font-weight: bold;
+    }
+
+    /* 响应式 - 窄屏 */
+    @media (max-width: 768px) {
+      #menu-toggle {
+        display: flex;
+      }
+
+      #side-panel {
+        left: -300px;
+        top: 0;
+        transform: none;
+        height: 100vh;
+        max-height: 100vh;
+        border-radius: 0;
+        border: none;
+        border-right: 1px solid rgba(255, 255, 255, 0.08);
+        transition: left 0.3s ease;
+        padding-top: 70px;
+      }
+
+      #side-panel.open {
+        left: 0;
+      }
+
+      #mini-map {
+        width: 100px;
+        height: 100px;
+        bottom: 10px;
+        right: 10px;
+      }
+
+      .welcome-title {
+        font-size: 28px;
+        letter-spacing: 4px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <!-- 欢迎页面 -->
+  <div id="welcome-screen">
+    <h1 class="welcome-title">参数化幕墙</h1>
+    <p class="welcome-subtitle">PARAMETRIC CURTAIN WALL</p>
+    <div class="welcome-divider"></div>
+    <button class="start-btn" id="start-btn">开 始 设 计</button>
+  </div>
+
+  <!-- 主应用容器 -->
+  <div id="app-container">
+    <div id="scene-container"></div>
+
+    <!-- 汉堡菜单按钮 -->
+    <button id="menu-toggle" aria-label="菜单">
+      <span></span>
+      <span></span>
+      <span></span>
+    </button>
+
+    <!-- 左侧控制面板 -->
+    <aside id="side-panel">
+      <!-- 控制点编辑区 -->
+      <div class="panel-section">
+        <div class="section-title" data-section="control-points">
+          控制点
+          <span class="toggle-icon">▼</span>
+        </div>
+        <div class="section-content" id="section-control-points">
+          <div class="control-point-list" id="point-list"></div>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <!-- 材质参数调节区 -->
+      <div class="panel-section">
+        <div class="section-title" data-section="material">
+          材质编辑
+          <span class="toggle-icon">▼</span>
+        </div>
+        <div class="section-content" id="section-material">
+          <div class="selection-info">
+            已选择 <span class="selection-count" id="selection-count">0</span> 个面板
+            <br><small>按住 Ctrl 点击多选</small>
+          </div>
+          <div class="color-picker-wrapper">
+            <input type="color" class="color-input" id="material-color" value="#4a90d9">
+            <span class="color-label">颜色</span>
+            <span class="color-hex" id="color-hex">#4A90D9</span>
+          </div>
+          <div class="slider-group">
+            <div class="slider-label">
+              <span>透明度</span>
+              <span class="slider-value" id="opacity-value">0.7</span>
+            </div>
+            <input type="range" class="slider" id="material-opacity" min="0.3" max="0.9" step="0.01" value="0.7">
+          </div>
+          <div class="slider-group">
+            <div class="slider-label">
+              <span>金属度</span>
+              <span class="slider-value" id="metalness-value">0.6</span>
+            </div>
+            <input type="range" class="slider" id="material-metalness" min="0" max="1" step="0.01" value="0.6">
+          </div>
+          <div class="slider-group">
+            <div class="slider-label">
+              <span>粗糙度</span>
+              <span class="slider-value" id="roughness-value">0.3</span>
+            </div>
+            <input type="range" class="slider" id="material-roughness" min="0" max="1" step="0.01" value="0.3">
+          </div>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <!-- 光照控制区 -->
+      <div class="panel-section">
+        <div class="section-title" data-section="lighting">
+          光照控制
+          <span class="toggle-icon">▼</span>
+        </div>
+        <div class="section-content" id="section-lighting">
+          <div class="light-control-wrapper">
+            <div class="light-control-dial" id="sun-dial">
+              <div class="dial-markers" id="dial-markers"></div>
+              <div class="sun-icon" id="sun-icon"></div>
+            </div>
+            <div class="light-angles">
+              <div class="light-angle-item">
+                <div>方位角</div>
+                <div class="light-angle-value" id="azimuth-value">45°</div>
+              </div>
+              <div class="light-angle-item">
+                <div>高度角</div>
+                <div class="light-angle-value" id="altitude-value">45°</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="divider" style="margin: 16px 0;"></div>
+
+          <div style="font-size: 12px; color: rgba(255,255,255,0.6); margin-bottom: 8px;">环境预设</div>
+          <div class="env-presets">
+            <button class="env-btn active" data-env="clearSky">晴空</button>
+            <button class="env-btn" data-env="sunset">黄昏</button>
+            <button class="env-btn" data-env="cloudy">阴天</button>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- 迷你小地图 -->
+    <div id="mini-map">
+      <canvas id="minimap-canvas" width="150" height="150"></canvas>
+    </div>
+  </div>
+
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
