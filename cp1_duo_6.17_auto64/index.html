@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>3D声学传播与反射可视化</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background-color: #1a1a2e;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+
+    #app {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      display: flex;
+    }
+
+    #scene-container {
+      width: 70%;
+      height: 100%;
+      position: relative;
+      margin-left: 30%;
+    }
+
+    #canvas-container {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    canvas {
+      display: block;
+      max-width: 100%;
+      max-height: 100%;
+    }
+
+    #control-panel {
+      position: fixed;
+      left: 0;
+      top: 0;
+      width: 30%;
+      height: 100%;
+      padding: 20px;
+      background: rgba(45, 45, 60, 0.85);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      border-radius: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      color: #ffffff;
+      overflow-y: auto;
+      transition: transform 0.3s ease;
+      z-index: 100;
+    }
+
+    #control-panel h2 {
+      font-size: 18px;
+      margin-bottom: 20px;
+      color: #00d4ff;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+      padding-bottom: 10px;
+    }
+
+    .control-group {
+      margin-bottom: 20px;
+    }
+
+    .control-group label {
+      display: block;
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 14px;
+      margin-bottom: 8px;
+      color: #cccccc;
+    }
+
+    .control-group select,
+    .control-group input[type="number"] {
+      width: 100%;
+      padding: 8px 12px;
+      background: rgba(30, 30, 45, 0.9);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 6px;
+      color: #ffffff;
+      font-size: 14px;
+      font-family: 'Courier New', Courier, monospace;
+    }
+
+    .control-group select:focus,
+    .control-group input[type="number"]:focus {
+      outline: none;
+      border-color: #00d4ff;
+    }
+
+    .coord-inputs {
+      display: flex;
+      gap: 8px;
+    }
+
+    .coord-inputs .coord-item {
+      flex: 1;
+    }
+
+    .coord-inputs .coord-item label {
+      font-size: 12px;
+      text-align: center;
+    }
+
+    .coord-inputs input {
+      text-align: center;
+    }
+
+    .slider-container {
+      position: relative;
+    }
+
+    .slider-container input[type="range"] {
+      width: 100%;
+      height: 6px;
+      -webkit-appearance: none;
+      appearance: none;
+      background: rgba(30, 30, 45, 0.9);
+      border-radius: 3px;
+      outline: none;
+    }
+
+    .slider-container input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 18px;
+      height: 18px;
+      background: #00d4ff;
+      border-radius: 50%;
+      cursor: pointer;
+      transition: transform 0.2s;
+    }
+
+    .slider-container input[type="range"]::-webkit-slider-thumb:hover {
+      transform: scale(1.2);
+    }
+
+    .slider-container input[type="range"]::-moz-range-thumb {
+      width: 18px;
+      height: 18px;
+      background: #00d4ff;
+      border-radius: 50%;
+      cursor: pointer;
+      border: none;
+    }
+
+    .slider-value {
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 14px;
+      color: #00d4ff;
+      text-align: right;
+      margin-top: 4px;
+    }
+
+    .info-text {
+      font-size: 12px;
+      color: #888888;
+      margin-top: 20px;
+      line-height: 1.6;
+    }
+
+    .info-text .key {
+      color: #ffcc00;
+      font-family: 'Courier New', Courier, monospace;
+    }
+
+    #menu-toggle {
+      display: none;
+      position: fixed;
+      left: 15px;
+      top: 15px;
+      width: 50px;
+      height: 50px;
+      background: rgba(45, 45, 60, 0.9);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 50%;
+      color: #00d4ff;
+      font-size: 24px;
+      cursor: pointer;
+      z-index: 200;
+      align-items: center;
+      justify-content: center;
+      transition: transform 0.3s ease;
+    }
+
+    #menu-toggle:hover {
+      transform: scale(1.1);
+    }
+
+    #panel-overlay {
+      display: none;
+      position: fixed;
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.5);
+      z-index: 90;
+    }
+
+    #panel-overlay.active {
+      display: block;
+    }
+
+    @media (max-width: 768px) {
+      #scene-container {
+        width: 100%;
+        margin-left: 0;
+      }
+
+      #control-panel {
+        width: 85%;
+        transform: translateX(-100%);
+      }
+
+      #control-panel.active {
+        transform: translateX(0);
+      }
+
+      #menu-toggle {
+        display: flex;
+      }
+    }
+
+    .fps-counter {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      background: rgba(0, 0, 0, 0.5);
+      color: #00ff00;
+      padding: 5px 10px;
+      border-radius: 4px;
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 12px;
+      pointer-events: none;
+    }
+
+    .path-legend {
+      position: absolute;
+      bottom: 10px;
+      right: 10px;
+      background: rgba(0, 0, 0, 0.5);
+      padding: 10px;
+      border-radius: 8px;
+      pointer-events: none;
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 4px;
+      font-size: 11px;
+      color: #ffffff;
+      font-family: 'Courier New', Courier, monospace;
+    }
+
+    .legend-color {
+      width: 20px;
+      height: 3px;
+      border-radius: 2px;
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <button id="menu-toggle" aria-label="打开菜单">☰</button>
+    <div id="panel-overlay"></div>
+    
+    <div id="control-panel">
+      <h2>🎵 声学控制面板</h2>
+      
+      <div class="control-group">
+        <label for="room-shape">房间形状</label>
+        <select id="room-shape">
+          <option value="rectangle">矩形房间</option>
+          <option value="lshape">L形房间</option>
+          <option value="circle">圆形房间</option>
+        </select>
+      </div>
+
+      <div class="control-group">
+        <label>声源位置 (X, Y, Z)</label>
+        <div class="coord-inputs">
+          <div class="coord-item">
+            <label>X</label>
+            <input type="number" id="source-x" value="2" step="0.5" min="-10" max="10">
+          </div>
+          <div class="coord-item">
+            <label>Y</label>
+            <input type="number" id="source-y" value="1.5" step="0.5" min="0" max="5">
+          </div>
+          <div class="coord-item">
+            <label>Z</label>
+            <input type="number" id="source-z" value="2" step="0.5" min="-10" max="10">
+          </div>
+        </div>
+      </div>
+
+      <div class="control-group">
+        <label>接收点位置 (X, Y, Z)</label>
+        <div class="coord-inputs">
+          <div class="coord-item">
+            <label>X</label>
+            <input type="number" id="receiver-x" value="-2" step="0.5" min="-10" max="10">
+          </div>
+          <div class="coord-item">
+            <label>Y</label>
+            <input type="number" id="receiver-y" value="1.5" step="0.5" min="0" max="5">
+          </div>
+          <div class="coord-item">
+            <label>Z</label>
+            <input type="number" id="receiver-z" value="-2" step="0.5" min="-10" max="10">
+          </div>
+        </div>
+      </div>
+
+      <div class="control-group">
+        <label for="reflection-rate">墙面反射率</label>
+        <div class="slider-container">
+          <input type="range" id="reflection-rate" min="0" max="1" step="0.1" value="0.8">
+          <div class="slider-value" id="reflection-rate-value">0.8</div>
+        </div>
+      </div>
+
+      <div class="control-group">
+        <label for="absorption-coeff">空气吸音系数</label>
+        <div class="slider-container">
+          <input type="range" id="absorption-coeff" min="0" max="0.5" step="0.05" value="0.05">
+          <div class="slider-value" id="absorption-coeff-value">0.05</div>
+        </div>
+      </div>
+
+      <div class="info-text">
+        <p><span class="key">左键点击</span> 场景放置声源</p>
+        <p><span class="key">右键点击</span> 场景放置接收点</p>
+        <p><span class="key">拖拽</span> 移动声源或接收点</p>
+        <p><span class="key">滚轮</span> 缩放视角</p>
+      </div>
+    </div>
+
+    <div id="scene-container">
+      <div id="canvas-container"></div>
+      <div class="fps-counter" id="fps-counter">FPS: 60</div>
+      <div class="path-legend">
+        <div class="legend-item">
+          <div class="legend-color" style="background: #ff4444;"></div>
+          <span>1次反射</span>
+        </div>
+        <div class="legend-item">
+          <div class="legend-color" style="background: #ff8800;"></div>
+          <span>2次反射</span>
+        </div>
+        <div class="legend-item">
+          <div class="legend-color" style="background: #ffcc00;"></div>
+          <span>3次反射</span>
+        </div>
+        <div class="legend-item">
+          <div class="legend-color" style="background: #44cc44;"></div>
+          <span>4次反射</span>
+        </div>
+        <div class="legend-item">
+          <div class="legend-color" style="background: #4488ff;"></div>
+          <span>5次反射</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
