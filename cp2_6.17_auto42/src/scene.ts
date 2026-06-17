@@ -152,6 +152,7 @@ export class StarScene {
   private starMaterial: THREE.PointsMaterial | null = null;
 
   private selectedStarId: string | null = null;
+  private selectedStarIndex: number = -1;
   private hoveredStarId: string | null = null;
   private selectedStarMesh: THREE.Mesh | null = null;
   private hoverIndicator: THREE.LineSegments | null = null;
@@ -161,6 +162,11 @@ export class StarScene {
   private connectionStartId: string | null = null;
 
   private planets: Map<string, PlanetData> = new Map();
+
+  private flickerPeriods: Float32Array = new Float32Array(0);
+  private flickerPhases: Float32Array = new Float32Array(0);
+  private baseColors: Float32Array = new Float32Array(0);
+  private flickerTime: number = 0;
 
   private onStarClickCallback: ((starId: string) => void) | null = null;
   private onStarHoverCallback: ((starId: string | null) => void) | null = null;
@@ -301,6 +307,7 @@ export class StarScene {
 
   setStars(stars: Star[]): void {
     this.stars = stars;
+    this.selectedStarIndex = -1;
 
     if (this.starPoints) {
       this.scene.remove(this.starPoints);
@@ -308,18 +315,37 @@ export class StarScene {
       this.starMaterial?.dispose();
     }
 
-    const positions = new Float32Array(stars.length * 3);
-    const colors = new Float32Array(stars.length * 3);
-    const sizes = new Float32Array(stars.length);
+    const count = stars.length;
+    const positions = new Float32Array(count * 3);
+    const colors = new Float32Array(count * 3);
+    const sizes = new Float32Array(count);
+
+    this.flickerPeriods = new Float32Array(count);
+    this.flickerPhases = new Float32Array(count);
+    this.baseColors = new Float32Array(count * 3);
 
     stars.forEach((star, i) => {
       positions[i * 3] = star.position.x;
       positions[i * 3 + 1] = star.position.y;
       positions[i * 3 + 2] = star.position.z;
-      colors[i * 3] = star.color.r * star.brightness;
-      colors[i * 3 + 1] = star.color.g * star.brightness;
-      colors[i * 3 + 2] = star.color.b * star.brightness;
+
+      const br = star.brightness;
+      const r = star.color.r * br;
+      const g = star.color.g * br;
+      const b = star.color.b * br;
+
+      colors[i * 3] = r;
+      colors[i * 3 + 1] = g;
+      colors[i * 3 + 2] = b;
+
+      this.baseColors[i * 3] = r;
+      this.baseColors[i * 3 + 1] = g;
+      this.baseColors[i * 3 + 2] = b;
+
       sizes[i] = star.size;
+
+      this.flickerPeriods[i] = 1 + Math.random() * 2;
+      this.flickerPhases[i] = Math.random() * Math.PI * 2;
     });
 
     this.starGeometry = new THREE.BufferGeometry();
@@ -481,6 +507,7 @@ export class StarScene {
     this.selectedPulseTime = 0;
 
     if (starId) {
+      this.selectedStarIndex = this.stars.findIndex(s => s.id === starId);
       const pos = this.getStarPosition(starId);
       if (pos) {
         const geometry = new THREE.SphereGeometry(5, 32, 32);
@@ -493,6 +520,8 @@ export class StarScene {
         this.selectedStarMesh.position.copy(pos);
         this.scene.add(this.selectedStarMesh);
       }
+    } else {
+      this.selectedStarIndex = -1;
     }
   }
 
@@ -787,6 +816,26 @@ export class StarScene {
       this.selectedStarMesh.scale.setScalar(pulseRadius / 5);
       const material = this.selectedStarMesh.material as THREE.MeshBasicMaterial;
       material.opacity = 0.2 + 0.3 * (0.5 - 0.5 * Math.cos(pulsePhase * Math.PI * 2));
+    }
+
+    if (this.starGeometry && this.stars.length > 0) {
+      this.flickerTime += delta;
+      const colorAttr = this.starGeometry.attributes.color;
+      const colors = colorAttr.array as Float32Array;
+      const count = this.stars.length;
+      const time = this.flickerTime;
+
+      for (let i = 0; i < count; i++) {
+        if (i === this.selectedStarIndex) continue;
+
+        const flicker = 1 + 0.15 * Math.sin(time / this.flickerPeriods[i] * Math.PI * 2 + this.flickerPhases[i]);
+        const i3 = i * 3;
+        colors[i3] = this.baseColors[i3] * flicker;
+        colors[i3 + 1] = this.baseColors[i3 + 1] * flicker;
+        colors[i3 + 2] = this.baseColors[i3 + 2] * flicker;
+      }
+
+      colorAttr.needsUpdate = true;
     }
 
     this.planets.forEach((planetData) => {
