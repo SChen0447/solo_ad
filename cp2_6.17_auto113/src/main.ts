@@ -33,6 +33,10 @@ export class GameApp {
   private startBtnHover = false;
   private backBtnHover = false;
   private isGameEnded = false;
+  private speedSettings: number[] = [];
+  private activeSliderIndex: number | null = null;
+  private isDraggingSlider = false;
+  private currentSpeedMultiplier = 1.0;
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
@@ -47,6 +51,7 @@ export class GameApp {
     this.renderer = new Renderer(ctx, canvas);
 
     this.songs = songsData.songs as Song[];
+    this.speedSettings = this.songs.map(() => 1.0);
 
     this.resize();
     this.bindEvents();
@@ -100,11 +105,48 @@ export class GameApp {
         this.renderer.setButtonHover('backBtn', this.backBtnHover);
         this.canvas.style.cursor = this.backBtnHover ? 'pointer' : 'default';
       } else if (this.currentScene === 'select') {
-        const cardIndex = this.renderer.isPointInSongCard(x, y, this.songs);
-        this.canvas.style.cursor = cardIndex >= 0 ? 'pointer' : 'default';
+        if (this.isDraggingSlider && this.activeSliderIndex !== null) {
+          this.speedSettings[this.activeSliderIndex] = this.renderer.getSpeedValueFromX(x, this.activeSliderIndex, this.songs);
+          this.canvas.style.cursor = 'ew-resize';
+        } else {
+          const sliderIndex = this.renderer.getSliderAtPoint(x, y, this.songs);
+          if (sliderIndex >= 0) {
+            this.activeSliderIndex = sliderIndex;
+            this.canvas.style.cursor = 'ew-resize';
+          } else {
+            this.activeSliderIndex = null;
+            const cardIndex = this.renderer.isPointInSongCard(x, y, this.songs);
+            this.canvas.style.cursor = cardIndex >= 0 ? 'pointer' : 'default';
+          }
+        }
       } else {
         this.canvas.style.cursor = 'default';
       }
+    });
+
+    this.canvas.addEventListener('mousedown', (e) => {
+      const rect = this.canvas.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+
+      if (this.currentScene === 'select') {
+        const sliderIndex = this.renderer.getSliderAtPoint(x, y, this.songs);
+        if (sliderIndex >= 0) {
+          this.isDraggingSlider = true;
+          this.activeSliderIndex = sliderIndex;
+          this.speedSettings[sliderIndex] = this.renderer.getSpeedValueFromX(x, sliderIndex, this.songs);
+          e.preventDefault();
+        }
+      }
+    });
+
+    window.addEventListener('mouseup', () => {
+      this.isDraggingSlider = false;
+    });
+
+    this.canvas.addEventListener('mouseleave', () => {
+      this.isDraggingSlider = false;
+      this.activeSliderIndex = null;
     });
 
     this.canvas.addEventListener('click', (e) => {
@@ -115,6 +157,8 @@ export class GameApp {
       if (this.currentScene === 'start' && this.renderer.isPointInStartButton(x, y)) {
         this.changeScene('select');
       } else if (this.currentScene === 'select') {
+        const sliderIndex = this.renderer.getSliderAtPoint(x, y, this.songs);
+        if (sliderIndex >= 0) return;
         const cardIndex = this.renderer.isPointInSongCard(x, y, this.songs);
         if (cardIndex >= 0) {
           this.selectedSongIndex = cardIndex;
@@ -150,7 +194,8 @@ export class GameApp {
   }
 
   public startGame(songId: string): void {
-    const song = this.songs.find(s => s.id === songId);
+    const songIndex = this.songs.findIndex(s => s.id === songId);
+    const song = this.songs[songIndex];
     if (!song) return;
 
     this.currentSong = song;
@@ -162,7 +207,9 @@ export class GameApp {
     this.missCount = 0;
     this.isGameEnded = false;
     this.gameStartTime = 0;
+    this.currentSpeedMultiplier = this.speedSettings[songIndex] || 1.0;
 
+    this.noteManager.setSpeed(this.currentSpeedMultiplier);
     this.noteManager.loadNotes(song);
 
     if (song.useSynthetic) {
@@ -264,7 +311,13 @@ export class GameApp {
         break;
 
       case 'select':
-        this.renderer.drawSelectScreen(this.songs, this.selectedSongIndex, this.animationTime);
+        this.renderer.drawSelectScreen(
+          this.songs,
+          this.selectedSongIndex,
+          this.animationTime,
+          this.speedSettings,
+          this.isDraggingSlider ? this.activeSliderIndex : this.activeSliderIndex
+        );
         break;
 
       case 'game':
@@ -279,7 +332,8 @@ export class GameApp {
             this.score,
             this.combo,
             progress,
-            judgeLineY
+            judgeLineY,
+            this.currentSpeedMultiplier
           );
         }
         break;

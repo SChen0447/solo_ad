@@ -157,7 +157,13 @@ export class Renderer {
     return x >= btnX && x <= btnX + btnWidth && y >= btnY && y <= btnY + btnHeight;
   }
 
-  public drawSelectScreen(songs: Song[], selectedIndex: number, animationTime: number): void {
+  public drawSelectScreen(
+    songs: Song[],
+    selectedIndex: number,
+    animationTime: number,
+    speedSettings: number[],
+    activeSliderIndex: number | null
+  ): void {
     this.selectedSongIndex = selectedIndex;
     const ctx = this.ctx;
     const centerX = this.canvas.width / 2;
@@ -170,15 +176,16 @@ export class Renderer {
     ctx.fillText('选择歌曲', centerX, 80);
     ctx.shadowBlur = 0;
 
-    const cardWidth = 350;
-    const cardHeight = 140;
-    const cardSpacing = 40;
-    const startY = 160;
+    const cardWidth = 420;
+    const cardHeight = 200;
+    const cardSpacing = 35;
+    const startY = 150;
 
     songs.forEach((song, index) => {
       const cardY = startY + index * (cardHeight + cardSpacing);
       const isSelected = index === selectedIndex;
       const hoverScale = isSelected ? 1.02 : 1;
+      const speed = speedSettings[index] || 1.0;
 
       ctx.save();
       ctx.translate(centerX, cardY + cardHeight / 2);
@@ -212,13 +219,13 @@ export class Renderer {
       const difficultyColors: Record<string, string> = { '简单': '#2ed573', '普通': '#ffa502', '困难': '#ff4757' };
       ctx.fillStyle = difficultyColors[song.difficulty] || '#ffffff';
       ctx.font = 'bold 14px "Segoe UI", "Microsoft YaHei", sans-serif';
-      ctx.fillText(song.difficulty, centerX - cardWidth / 2 + 25, cardY + 105);
+      ctx.fillText(song.difficulty, centerX - cardWidth / 2 + 25, cardY + 100);
 
       ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
       ctx.font = '14px "Segoe UI", "Microsoft YaHei", sans-serif';
       ctx.textAlign = 'right';
       const durationSec = Math.ceil(song.duration / 1000);
-      ctx.fillText(`${durationSec}秒 | BPM ${song.bpm}`, centerX + cardWidth / 2 - 25, cardY + 105);
+      ctx.fillText(`${durationSec}秒 | BPM ${song.bpm}`, centerX + cardWidth / 2 - 25, cardY + 100);
 
       if (isSelected) {
         const pulse = Math.sin(animationTime / 200) * 0.5 + 0.5;
@@ -228,21 +235,123 @@ export class Renderer {
         ctx.fill();
       }
 
+      const sliderX = centerX - cardWidth / 2 + 25;
+      const sliderY = cardY + 140;
+      const sliderWidth = cardWidth - 120;
+      const sliderTrackHeight = 4;
+      const sliderThumbDiameter = 16;
+      const sliderThumbRadius = sliderThumbDiameter / 2;
+
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+      ctx.font = '13px "Segoe UI", "Microsoft YaHei", sans-serif';
+      ctx.textAlign = 'left';
+      ctx.fillText('下落速度', sliderX, sliderY - 8);
+
+      ctx.shadowColor = activeSliderIndex === index ? '#ff6b35' : 'transparent';
+      ctx.shadowBlur = activeSliderIndex === index ? 8 : 0;
+
+      ctx.fillStyle = '#0a0a23';
+      this.drawRoundedRect(sliderX, sliderY - sliderTrackHeight / 2, sliderWidth, sliderTrackHeight, 2);
+      ctx.fill();
+
+      const fillRatio = (speed - 0.5) / 1.5;
+      const fillWidth = sliderWidth * fillRatio;
+      ctx.fillStyle = '#ff6b35';
+      this.drawRoundedRect(sliderX, sliderY - sliderTrackHeight / 2, fillWidth, sliderTrackHeight, 2);
+      ctx.fill();
+
+      const thumbX = sliderX + fillWidth;
+      ctx.shadowColor = '#ff6b35';
+      ctx.shadowBlur = activeSliderIndex === index ? 15 : 8;
+      ctx.fillStyle = '#ff6b35';
+      ctx.beginPath();
+      ctx.arc(thumbX, sliderY, sliderThumbRadius, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.shadowBlur = 0;
+
+      ctx.fillStyle = '#ffffff';
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+
+      const labelX = sliderX + sliderWidth + 15;
+      const labelY = sliderY;
+      const labelWidth = 55;
+      const labelHeight = 26;
+
+      ctx.shadowColor = '#00d2d3';
+      ctx.shadowBlur = 5;
+      this.drawRoundedRect(labelX, labelY - labelHeight / 2, labelWidth, labelHeight, 6);
+      ctx.fillStyle = 'rgba(0, 210, 211, 0.15)';
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(0, 210, 211, 0.5)';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+      ctx.shadowBlur = 0;
+
+      ctx.fillStyle = '#00d2d3';
+      ctx.font = 'bold 14px "Segoe UI", sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(`x${speed.toFixed(1)}`, labelX + labelWidth / 2, labelY);
+      ctx.textBaseline = 'alphabetic';
+
       ctx.restore();
     });
 
     ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
     ctx.font = '16px "Segoe UI", "Microsoft YaHei", sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText('↑↓ 选择歌曲 | Enter 开始游戏 | 点击卡片选择', centerX, this.canvas.height - 40);
+    ctx.fillText('↑↓ 选择歌曲 | Enter 开始游戏 | 拖拽滑块调节速度 (x0.5 ~ x2.0)', centerX, this.canvas.height - 30);
+  }
+
+  public getSliderAtPoint(x: number, y: number, songs: Song[]): number {
+    const centerX = this.canvas.width / 2;
+    const cardWidth = 420;
+    const cardHeight = 200;
+    const cardSpacing = 35;
+    const startY = 150;
+
+    for (let i = 0; i < songs.length; i++) {
+      const cardY = startY + i * (cardHeight + cardSpacing);
+      const sliderX = centerX - cardWidth / 2 + 25;
+      const sliderY = cardY + 140;
+      const sliderWidth = cardWidth - 120;
+      const hitAreaExpand = 10;
+
+      if (x >= sliderX - hitAreaExpand &&
+          x <= sliderX + sliderWidth + 55 + hitAreaExpand &&
+          y >= sliderY - 15 &&
+          y <= sliderY + 15) {
+        return i;
+      }
+    }
+    return -1;
+  }
+
+  public getSpeedValueFromX(x: number, songIndex: number, songs: Song[]): number {
+    const centerX = this.canvas.width / 2;
+    const cardWidth = 420;
+    const cardHeight = 200;
+    const cardSpacing = 35;
+    const startY = 150;
+
+    const cardY = startY + songIndex * (cardHeight + cardSpacing);
+    const sliderX = centerX - cardWidth / 2 + 25;
+    const sliderWidth = cardWidth - 120;
+
+    const ratio = Math.max(0, Math.min(1, (x - sliderX) / sliderWidth));
+    const rawSpeed = 0.5 + ratio * 1.5;
+    const stepped = Math.round(rawSpeed * 10) / 10;
+    return Math.max(0.5, Math.min(2.0, stepped));
   }
 
   public isPointInSongCard(x: number, y: number, songs: Song[]): number {
     const centerX = this.canvas.width / 2;
-    const cardWidth = 350;
-    const cardHeight = 140;
-    const cardSpacing = 40;
-    const startY = 160;
+    const cardWidth = 420;
+    const cardHeight = 200;
+    const cardSpacing = 35;
+    const startY = 150;
 
     for (let i = 0; i < songs.length; i++) {
       const cardY = startY + i * (cardHeight + cardSpacing);
@@ -259,7 +368,8 @@ export class Renderer {
     score: number,
     combo: number,
     progress: number,
-    judgeLineY: number
+    judgeLineY: number,
+    speedMultiplier: number
   ): void {
     const ctx = this.ctx;
     const trackWidth = this.canvas.width / 4;
@@ -398,6 +508,28 @@ export class Renderer {
       ctx.shadowBlur = 0;
       ctx.restore();
     }
+
+    const speedLabelWidth = 60;
+    const speedLabelHeight = 28;
+    const speedLabelX = this.canvas.width - speedLabelWidth - 30;
+    const speedLabelY = 95;
+
+    ctx.shadowColor = '#00d2d3';
+    ctx.shadowBlur = 5;
+    this.drawRoundedRect(speedLabelX, speedLabelY, speedLabelWidth, speedLabelHeight, 6);
+    ctx.fillStyle = 'rgba(10, 10, 35, 0.7)';
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(0, 210, 211, 0.5)';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+
+    ctx.fillStyle = '#00d2d3';
+    ctx.font = 'bold 16px "Segoe UI", sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(`x${speedMultiplier.toFixed(1)}`, speedLabelX + speedLabelWidth / 2, speedLabelY + speedLabelHeight / 2);
+    ctx.textBaseline = 'alphabetic';
   }
 
   public drawResultScreen(

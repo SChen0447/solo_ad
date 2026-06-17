@@ -34,7 +34,7 @@ export interface Song {
 
 const PERFECT_WINDOW = 20;
 const GOOD_WINDOW = 50;
-const NOTE_FALL_DURATION = 2000;
+const BASE_FALL_DURATION = 2000;
 
 export class NoteManager {
   private notes: Note[] = [];
@@ -43,6 +43,19 @@ export class NoteManager {
   private trackKeys = ['d', 'f', 'j', 'k'];
   private canvasWidth = 0;
   private canvasHeight = 0;
+  private speedMultiplier = 1.0;
+
+  public setSpeed(multiplier: number): void {
+    this.speedMultiplier = Math.max(0.5, Math.min(2.0, multiplier));
+  }
+
+  public getSpeed(): number {
+    return this.speedMultiplier;
+  }
+
+  private getFallDuration(): number {
+    return BASE_FALL_DURATION / this.speedMultiplier;
+  }
 
   public loadNotes(songData: Song): void {
     this.notes = songData.notes.map((noteData, index) => ({
@@ -70,7 +83,7 @@ export class NoteManager {
       if (note.hit || note.missed) continue;
 
       const timeDiff = currentTime - note.time;
-      const progress = timeDiff / NOTE_FALL_DURATION;
+      const progress = timeDiff / this.getFallDuration();
       note.y = this.judgeLineY - (1 - progress) * this.judgeLineY;
 
       if (timeDiff > GOOD_WINDOW && !note.missed) {
