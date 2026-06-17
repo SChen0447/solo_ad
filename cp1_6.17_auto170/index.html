@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>重力涂鸦</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background-color: #1a1a2e;
+      font-family: 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+    }
+    #game-container {
+      width: 100vw;
+      height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      position: relative;
+    }
+    #loading-overlay {
+      position: absolute;
+      inset: 0;
+      background-color: #1a1a2e;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      color: #ffffff;
+      z-index: 100;
+      transition: opacity 0.5s ease-out;
+    }
+    #loading-overlay.hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
+    #loading-text {
+      font-size: 24px;
+      margin-bottom: 20px;
+      letter-spacing: 4px;
+    }
+    #loading-bar-container {
+      width: 300px;
+      height: 6px;
+      background-color: rgba(255, 255, 255, 0.1);
+      border-radius: 3px;
+      overflow: hidden;
+    }
+    #loading-bar {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, #00ff88, #00d4aa);
+      border-radius: 3px;
+      transition: width 0.3s ease-out;
+    }
+    #loading-percent {
+      margin-top: 12px;
+      font-size: 14px;
+      color: rgba(255, 255, 255, 0.6);
+    }
+  </style>
+</head>
+<body>
+  <div id="game-container">
+    <div id="loading-overlay">
+      <div id="loading-text">重力涂鸦</div>
+      <div id="loading-bar-container">
+        <div id="loading-bar"></div>
+      </div>
+      <div id="loading-percent">0%</div>
+    </div>
+  </div>
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
