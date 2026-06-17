@@ -45,6 +45,7 @@ const CalendarGantt: React.FC<Props> = ({
   const [modalDate, setModalDate] = useState('')
   const [hoveredTask, setHoveredTask] = useState<Task | null>(null)
   const [hoverPos, setHoverPos] = useState({ x: 0, y: 0 })
+  const [tooltipVisible, setTooltipVisible] = useState(false)
   const [selectedTaskIds, setSelectedTaskIds] = useState<Set<string>>(new Set())
   const [duplicateResults, setDuplicateResults] = useState<DuplicateResult[]>([])
   const [isCheckingDuplicate, setIsCheckingDuplicate] = useState(false)
@@ -58,6 +59,7 @@ const CalendarGantt: React.FC<Props> = ({
   const [isLoadingHistory, setIsLoadingHistory] = useState(false)
   const [highlightedDate, setHighlightedDate] = useState<string | null>(null)
   const [windowWidth, setWindowWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 1200)
+  const [showConflictModal, setShowConflictModal] = useState(false)
 
   useEffect(() => {
     const handler = () => setWindowWidth(window.innerWidth)
@@ -134,10 +136,14 @@ const CalendarGantt: React.FC<Props> = ({
 
   const submitTask = async () => {
     if (!formData.title.trim() || !formData.accountId || !modalDate) return
-    if (conflictWarn) {
-      const ok = window.confirm('该账号在此日期已有发布任务，是否仍要创建？')
-      if (!ok) return
+    if (hasConflict(formData.accountId, modalDate)) {
+      setShowConflictModal(true)
+      return
     }
+    await doCreateTask()
+  }
+
+  const doCreateTask = async () => {
     await onCreateTask({
       ...formData,
       date: modalDate,
@@ -145,6 +151,7 @@ const CalendarGantt: React.FC<Props> = ({
       estimatedEngagement: Number((2 + Math.random() * 8).toFixed(1))
     })
     setShowTaskModal(false)
+    setShowConflictModal(false)
   }
 
   const toggleTaskSelect = (id: string, e: React.MouseEvent) => {
@@ -154,6 +161,33 @@ const CalendarGantt: React.FC<Props> = ({
       n.has(id) ? n.delete(id) : n.add(id)
       return n
     })
+  }
+
+  const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const handleMouseEnterTask = (task: Task, e: React.MouseEvent) => {
+    if (hoverTimerRef.current) {
+      clearTimeout(hoverTimerRef.current)
+      hoverTimerRef.current = null
+    }
+    setHoveredTask(task)
+    setHoverPos({ x: e.clientX, y: e.clientY })
+    hoverTimerRef.current = setTimeout(() => {
+      setTooltipVisible(true)
+    }, 80)
+  }
+
+  const handleMouseMoveTask = (e: React.MouseEvent) => {
+    setHoverPos({ x: e.clientX, y: e.clientY })
+  }
+
+  const handleMouseLeaveTask = () => {
+    if (hoverTimerRef.current) {
+      clearTimeout(hoverTimerRef.current)
+      hoverTimerRef.current = null
+    }
+    setTooltipVisible(false)
+    setTimeout(() => setHoveredTask(null), 300)
   }
 
   const runDuplicateCheck = async () => {
@@ -409,12 +443,9 @@ const CalendarGantt: React.FC<Props> = ({
                                   <div
                                     key={t.id}
                                     onClick={(e) => toggleTaskSelect(t.id, e)}
-                                    onMouseEnter={(e) => {
-                                      setHoveredTask(t)
-                                      setHoverPos({ x: e.clientX, y: e.clientY })
-                                    }}
-                                    onMouseMove={(e) => setHoverPos({ x: e.clientX, y: e.clientY })}
-                                    onMouseLeave={() => setHoveredTask(null)}
+                                    onMouseEnter={(e) => handleMouseEnterTask(t, e)}
+                                    onMouseMove={handleMouseMoveTask}
+                                    onMouseLeave={handleMouseLeaveTask}
                                     style={{
                                       ...styles.ganttBar,
                                       backgroundColor: acc.color,
@@ -710,36 +741,54 @@ const CalendarGantt: React.FC<Props> = ({
         </div>
       )}
 
-      {hoveredTask && (
-        <div style={{
-          ...styles.tooltipCard,
-          left: Math.min(hoverPos.x + 16, window.innerWidth - 320),
-          top: hoverPos.y + 16
-        }}>
-          <div style={{ ...styles.tooltipAccLine, backgroundColor: accountById.get(hoveredTask.accountId)?.color }} />
-          <div style={styles.tooltipContent}>
-            <div style={styles.tooltipTitle}>{hoveredTask.title}</div>
-            <div style={styles.tooltipMetaRow}>
-              <span style={{
-                ...styles.statusBadge,
-                backgroundColor: statusColor[hoveredTask.status]
-              }}>{statusLabel[hoveredTask.status]}</span>
-              <span style={styles.tooltipMeta}>{contentTypeLabel[hoveredTask.type]}</span>
-            </div>
-            <div style={styles.tooltipSummary}>{hoveredTask.summary}</div>
-            <div style={styles.tooltipStats}>
-              <div style={styles.stat}>
-                <div style={styles.statLabel}>预计阅读量</div>
-                <div style={styles.statValue}>{hoveredTask.estimatedViews.toLocaleString()}</div>
+      {hoveredTask && (() => {
+        const accColor = accountById.get(hoveredTask.accountId)?.color || '#7950f2'
+        const tooltipW = 320
+        const tooltipH = 220
+        let left = hoverPos.x + 16
+        let top = hoverPos.y + 16
+        if (left + tooltipW > window.innerWidth - 16) {
+          left = hoverPos.x - tooltipW - 16
+        }
+        if (top + tooltipH > window.innerHeight - 16) {
+          top = hoverPos.y - tooltipH - 16
+        }
+        left = Math.max(16, left)
+        top = Math.max(16, top)
+        return (
+          <div style={{
+            ...styles.tooltipCard,
+            left,
+            top,
+            border: `2px solid ${accColor}`,
+            opacity: tooltipVisible ? 1 : 0,
+            transform: tooltipVisible ? 'translateY(0)' : 'translateY(6px)',
+          }}>
+            <div style={{ ...styles.tooltipAccLine, backgroundColor: accColor }} />
+            <div style={styles.tooltipContent}>
+              <div style={styles.tooltipTitle}>{hoveredTask.title}</div>
+              <div style={styles.tooltipMetaRow}>
+                <span style={{
+                  ...styles.statusBadge,
+                  backgroundColor: statusColor[hoveredTask.status]
+                }}>{statusLabel[hoveredTask.status]}</span>
+                <span style={styles.tooltipMeta}>{contentTypeLabel[hoveredTask.type]}</span>
               </div>
-              <div style={styles.stat}>
-                <div style={styles.statLabel}>预估互动率</div>
-                <div style={styles.statValue}>{hoveredTask.estimatedEngagement}%</div>
+              <div style={styles.tooltipSummary}>{hoveredTask.summary}</div>
+              <div style={styles.tooltipStats}>
+                <div style={styles.stat}>
+                  <div style={styles.statLabel}>预计阅读量</div>
+                  <div style={styles.statValue}>{hoveredTask.estimatedViews.toLocaleString()}</div>
+                </div>
+                <div style={styles.stat}>
+                  <div style={styles.statLabel}>预估互动率</div>
+                  <div style={styles.statValue}>{hoveredTask.estimatedEngagement}%</div>
+                </div>
               </div>
             </div>
           </div>
-        </div>
-      )}
+        )
+      })()}
 
       {showTaskModal && (
         <div style={styles.modalOverlay} onClick={() => setShowTaskModal(false)}>
@@ -839,6 +888,30 @@ const CalendarGantt: React.FC<Props> = ({
                 }}
               >
                 确认创建
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showConflictModal && (
+        <div style={styles.modalOverlay} onClick={() => setShowConflictModal(false)}>
+          <div style={{ ...styles.modal, maxWidth: 420 }} onClick={e => e.stopPropagation()}>
+            <div style={styles.conflictIcon}>⚠️</div>
+            <h3 style={{ ...styles.modalTitle, textAlign: 'center', marginBottom: 12 }}>时间冲突提示</h3>
+            <div style={{ ...styles.conflictWarnBig, marginBottom: 8 }}>
+              该账号在 <span style={{ fontWeight: 600, color: '#7950f2' }}>{modalDate}</span> 已有其他发布任务
+            </div>
+            <div style={{ fontSize: 13, color: '#a0a0c0', marginBottom: 24, textAlign: 'center', lineHeight: 1.6 }}>
+              同时发布多条内容可能导致粉丝阅读体验下降，建议调整发布时间。
+              <br />是否仍要在该时间点创建任务？
+            </div>
+            <div style={styles.modalActions}>
+              <button onClick={() => setShowConflictModal(false)} style={styles.cancelBtn}>
+                返回调整
+              </button>
+              <button onClick={doCreateTask} style={{ ...styles.confirmBtn, backgroundColor: '#ff6b6b' }}>
+                仍要创建
               </button>
             </div>
           </div>
@@ -999,9 +1072,18 @@ const styles: Record<string, React.CSSProperties> = {
   conflictBadge: {
     position: 'absolute',
     top: 2, right: 2,
-    fontSize: 12, color: '#ff6b6b',
-    fontWeight: 700,
-    zIndex: 2
+    width: 20, height: 20,
+    borderRadius: '50%',
+    backgroundColor: '#ff6b6b',
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: 900,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 5,
+    boxShadow: '0 0 8px rgba(255,107,107,0.8)',
+    animation: 'pulse 1.5s ease-in-out infinite'
   },
   tasksStack: { display: 'flex', flexDirection: 'column', gap: 3 },
   ganttBar: {
@@ -1024,13 +1106,14 @@ const styles: Record<string, React.CSSProperties> = {
   },
   tooltipCard: {
     position: 'fixed',
-    width: 300,
+    width: 320,
     backgroundColor: '#2a2a3e',
-    borderRadius: 12,
-    boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
+    borderRadius: 8,
+    boxShadow: '0 16px 48px rgba(0,0,0,0.6), 0 4px 12px rgba(0,0,0,0.4)',
     zIndex: 9999,
     overflow: 'hidden',
-    pointerEvents: 'none'
+    pointerEvents: 'none',
+    transition: 'opacity 0.3s ease, transform 0.3s ease'
   },
   tooltipAccLine: { height: 4 },
   tooltipContent: { padding: 16 },
@@ -1283,7 +1366,21 @@ const styles: Record<string, React.CSSProperties> = {
     flexShrink: 0
   },
   dupTaskMeta: { fontSize: 11, color: '#a0a0c0', marginBottom: 8 },
-  dupSummary: { fontSize: 12, color: '#c0c0d8', lineHeight: 1.6 }
+  dupSummary: { fontSize: 12, color: '#c0c0d8', lineHeight: 1.6 },
+  conflictIcon: {
+    textAlign: 'center',
+    fontSize: 48,
+    marginBottom: 8
+  },
+  conflictWarnBig: {
+    fontSize: 14,
+    color: '#e0e0f0',
+    textAlign: 'center',
+    padding: '12px 16px',
+    backgroundColor: '#ff6b6b22',
+    borderRadius: 8,
+    border: '1px solid #ff6b6b55'
+  }
 }
 
 export default CalendarGantt
