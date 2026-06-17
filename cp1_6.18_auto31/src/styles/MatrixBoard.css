@@ -1,0 +1,166 @@
+.matrix-board {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  padding: 20px;
+  overflow: hidden;
+}
+
+.matrix-grid {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 1fr 1fr;
+  gap: 2px;
+  position: relative;
+  border: 2px dashed rgba(255, 255, 255, 0.15);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.matrix-cards-container {
+  position: absolute;
+  top: 20px;
+  left: 20px;
+  right: 20px;
+  bottom: 20px;
+  pointer-events: none;
+  border-radius: 12px;
+}
+
+.matrix-cards-container > * {
+  pointer-events: auto;
+}
+
+.quadrant {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-start;
+  overflow: hidden;
+}
+
+.quadrant-important-urgent {
+  grid-column: 2;
+  grid-row: 1;
+  background: linear-gradient(135deg, rgba(255, 107, 107, 0.15) 0%, rgba(255, 159, 67, 0.15) 100%);
+}
+
+.quadrant-important-not-urgent {
+  grid-column: 1;
+  grid-row: 1;
+  background: linear-gradient(135deg, rgba(79, 172, 254, 0.15) 0%, rgba(0, 242, 254, 0.15) 100%);
+}
+
+.quadrant-not-important-urgent {
+  grid-column: 2;
+  grid-row: 2;
+  background: linear-gradient(135deg, rgba(255, 217, 61, 0.15) 0%, rgba(255, 159, 67, 0.15) 100%);
+}
+
+.quadrant-not-important-not-urgent {
+  grid-column: 1;
+  grid-row: 2;
+  background: linear-gradient(135deg, rgba(108, 117, 125, 0.15) 0%, rgba(134, 239, 172, 0.1) 100%);
+}
+
+.quadrant-label {
+  position: absolute;
+  top: 16px;
+  left: 20px;
+  font-size: 14px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.6);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.quadrant-cards {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+.matrix-axis {
+  position: absolute;
+  pointer-events: none;
+}
+
+.axis-x-label {
+  position: absolute;
+  bottom: 30px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  justify-content: space-between;
+  width: 80%;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.5);
+  pointer-events: none;
+}
+
+.axis-y-label {
+  position: absolute;
+  left: 30px;
+  top: 50%;
+  transform: translateY(-50%) rotate(-90deg);
+  display: flex;
+  justify-content: space-between;
+  height: 80%;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.5);
+  pointer-events: none;
+  writing-mode: vertical-rl;
+}
+
+.axis-label-high {
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.axis-label-low {
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.matrix-divider-h,
+.matrix-divider-v {
+  position: absolute;
+  background: rgba(255, 255, 255, 0.15);
+  pointer-events: none;
+  z-index: 2;
+}
+
+.matrix-divider-h {
+  left: 20px;
+  right: 20px;
+  top: 50%;
+  height: 2px;
+  transform: translateY(-50%);
+  border-top: 2px dashed rgba(255, 255, 255, 0.15);
+  background: transparent;
+}
+
+.matrix-divider-v {
+  top: 20px;
+  bottom: 20px;
+  left: 50%;
+  width: 2px;
+  transform: translateX(-50%);
+  border-left: 2px dashed rgba(255, 255, 255, 0.15);
+  background: transparent;
+}
+
+@media (max-width: 900px) {
+  .matrix-board {
+    padding: 10px;
+  }
+
+  .quadrant-label {
+    font-size: 11px;
+    top: 8px;
+    left: 12px;
+  }
+}
