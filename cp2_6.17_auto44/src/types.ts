@@ -53,3 +53,23 @@ export interface JoinShelfResult {
   member: Member
   shelf: Shelf
 }
+
+export interface ReadingHistoryRecord {
+  id: string
+  date: string
+  currentPage: number
+  deltaPages: number | null
+  percentage: number
+  memberNickname: string
+}
+
+export interface BookHistory {
+  book: {
+    id: string
+    title: string
+    author: string
+    totalPages: number
+    memberNickname: string
+  }
+  history: ReadingHistoryRecord[]
+}

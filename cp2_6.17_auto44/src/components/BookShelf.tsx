@@ -19,7 +19,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { apiClient } from '../apiClient'
-import type { Book, Member, AverageProgress, ReadingProgress } from '../types'
+import type { Book, Member, AverageProgress, ReadingProgress, BookHistory } from '../types'
 import Modal from './Modal'
 import '../styles/BookShelf.css'
 
@@ -45,6 +45,10 @@ function BookShelf({ shelfId, currentMember }: BookShelfProps) {
   const [updatePage, setUpdatePage] = useState('')
   // 当前选中的需要更新进度的书籍
   const [selectedBookForUpdate, setSelectedBookForUpdate] = useState<Book | null>(null)
+  // 完整阅读历史模态框数据（通过 GET /api/books/:id/history 拉取）
+  const [bookHistoryModal, setBookHistoryModal] = useState<BookHistory | null>(null)
+  // 阅读历史加载中状态
+  const [historyLoading, setHistoryLoading] = useState(false)
   // canvas 引用
   const canvasRef = useRef<HTMLCanvasElement>(null)
 
@@ -371,6 +375,22 @@ function BookShelf({ shelfId, currentMember }: BookShelfProps) {
     return currentMember !== null && book.memberId === currentMember.id
   }
 
+  // 点击"📜 阅读历史"按钮：从后端拉取完整阅读历史并打开时间线模态框
+  // 调用: apiClient.getBookHistory(bookId) → GET /api/books/:bookId/history
+  const handleViewHistory = async (bookId: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation()
+    setHistoryLoading(true)
+    try {
+      const data = await apiClient.getBookHistory(bookId)
+      setBookHistoryModal(data)
+    } catch (err) {
+      console.error('Failed to load book history:', err)
+      alert('加载阅读历史失败')
+    } finally {
+      setHistoryLoading(false)
+    }
+  }
+
   return (
     <div className="bookshelf-container">
       {/* 小组平均进度曲线图区域 */}
@@ -496,6 +516,15 @@ function BookShelf({ shelfId, currentMember }: BookShelfProps) {
                       </div>
                     )}
                   </div>
+
+                  {/* 📜 独立阅读历史按钮（所有成员可见） */}
+                  <button
+                    className="btn-secondary view-history-btn"
+                    onClick={(e) => handleViewHistory(book.id, e)}
+                    title="查看完整阅读历史时间线"
+                  >
+                    📜 阅读历史
+                  </button>
 
                   {/* 更新进度按钮（仅书籍拥有者可见） */}
                   {canUpdateBook(book) && (
@@ -629,6 +658,69 @@ function BookShelf({ shelfId, currentMember }: BookShelfProps) {
               </button>
             </div>
           </>
+        )}
+      </Modal>
+
+      {/* === 完整阅读历史时间线模态框（通过 GET /api/books/:bookId/history 获取） === */}
+      <Modal
+        isOpen={!!bookHistoryModal}
+        onClose={() => setBookHistoryModal(null)}
+        title={bookHistoryModal ? `📜 ${bookHistoryModal.book.title} - 阅读历史` : '阅读历史'}
+      >
+        {historyLoading && <p className="history-empty">加载中...</p>}
+
+        {!historyLoading && bookHistoryModal && (
+          <div className="full-history-modal">
+            <div className="full-history-book-info">
+              <p>作者：<strong>{bookHistoryModal.book.author}</strong></p>
+              <p>读者：<strong>{bookHistoryModal.book.memberNickname}</strong></p>
+              <p>总页数：<strong>{bookHistoryModal.book.totalPages} 页</strong></p>
+              <p>更新次数：<strong>{bookHistoryModal.history.length} 次</strong></p>
+            </div>
+
+            {bookHistoryModal.history.length === 0 ? (
+              <p className="history-empty">暂无阅读记录</p>
+            ) : (
+              <div className="full-history-timeline">
+                {bookHistoryModal.history.map((record, idx) => (
+                  <div key={record.id} className="full-history-item">
+                    <div className="timeline-line-wrapper">
+                      <div className="history-dot" />
+                      {idx < bookHistoryModal.history.length - 1 && (
+                        <div className="history-connector" />
+                      )}
+                    </div>
+                    <div className="full-history-content">
+                      <div className="history-date-row">
+                        <span className="history-date">{record.date}</span>
+                        {record.deltaPages !== null && record.deltaPages > 0 && (
+                          <span className="history-delta positive">+{record.deltaPages} 页</span>
+                        )}
+                        {record.deltaPages !== null && record.deltaPages < 0 && (
+                          <span className="history-delta negative">{record.deltaPages} 页</span>
+                        )}
+                        {record.deltaPages === null && (
+                          <span className="history-delta">起点</span>
+                        )}
+                      </div>
+                      <div className="full-history-page">
+                        当前进度：第 {record.currentPage} / {bookHistoryModal.book.totalPages} 页
+                      </div>
+                      <div className="progress-bar full-history-progress">
+                        <div
+                          className="progress-fill"
+                          style={{ width: `${record.percentage}%` }}
+                        />
+                      </div>
+                      <div className="full-history-percentage">
+                        {record.percentage.toFixed(1)}%
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         )}
       </Modal>
     </div>

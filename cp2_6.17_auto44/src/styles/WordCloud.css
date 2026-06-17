@@ -81,6 +81,53 @@
   padding: 40px 0;
 }
 
+/* ============ 词云刷新按钮 ============ */
+.wordcloud-refresh-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  background-color: #2d333b;
+  color: #e0e0e0;
+  font-size: 13px;
+  font-weight: 500;
+  border: 1px solid #444c56;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.25s ease;
+}
+
+.wordcloud-refresh-btn:hover:not(:disabled) {
+  border-color: #58a6ff;
+  color: #58a6ff;
+  box-shadow: 0 0 12px rgba(88, 166, 255, 0.25);
+  background-color: #30363d;
+}
+
+.wordcloud-refresh-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.refresh-icon {
+  font-size: 16px;
+  display: inline-block;
+  line-height: 1;
+}
+
+.refresh-icon.spin {
+  animation: iconSpin 1s linear infinite;
+}
+
+@keyframes iconSpin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 @media (max-width: 768px) {
   .wordcloud-container {
     min-height: 250px;
@@ -88,5 +135,10 @@
 
   .discussion-item {
     padding: 12px;
+  }
+
+  .wordcloud-refresh-btn {
+    padding: 5px 10px;
+    font-size: 12px;
   }
 }

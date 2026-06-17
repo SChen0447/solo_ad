@@ -488,6 +488,54 @@ app.get('/api/shelves/:id/wordcloud', (req, res) => {
 })
 
 /**
+ * GET /api/books/:bookId/history - 获取某本书的完整阅读历史记录（含增量计算）
+ * 返回结构: {
+ *   book: { id, title, author, totalPages, memberNickname },
+ *   history: [{ date, currentPage, deltaPages, percentage }]  按日期倒序排列
+ * }
+ * → 被 BookShelf.tsx 的 handleViewHistory() 调用 → 打开阅读历史模态框
+ */
+app.get('/api/books/:bookId/history', (req, res) => {
+  const book = books.find(b => b.id === req.params.bookId)
+  if (!book) {
+    return res.status(404).json({ error: '书籍不存在' })
+  }
+
+  // 按日期倒序排列，并计算相比上一条记录的页数增量
+  const sortedProgress = [...book.progress].sort(
+    (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
+  )
+
+  const history = sortedProgress.map((record, idx) => {
+    // 在原始升序数组中找位置来计算 delta
+    const originalIdx = book.progress.findIndex(p => p.id === record.id)
+    let deltaPages: number | null = null
+    if (originalIdx > 0) {
+      deltaPages = record.currentPage - book.progress[originalIdx - 1].currentPage
+    }
+    return {
+      id: record.id,
+      date: record.date,
+      currentPage: record.currentPage,
+      deltaPages,
+      percentage: Math.min(100, (record.currentPage / (book.totalPages || 1)) * 100),
+      memberNickname: record.memberNickname,
+    }
+  })
+
+  res.json({
+    book: {
+      id: book.id,
+      title: book.title,
+      author: book.author,
+      totalPages: book.totalPages,
+      memberNickname: book.memberNickname,
+    },
+    history,
+  })
+})
+
+/**
  * GET /api/discussions - 获取讨论记录
  * Query 参数: word (可选) - 指定关键词筛选
  * → 被 WordCloud.tsx 的 handleWordClick() 调用 → 打开讨论模态框

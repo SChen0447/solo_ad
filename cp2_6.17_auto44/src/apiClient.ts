@@ -48,6 +48,7 @@ import type {
   AverageProgress,
   JoinShelfResult,
   ReadingProgress,
+  BookHistory,
 } from './types'
 
 /** API 前缀，所有请求都走 /api，由 vite 代理到后端 3001 端口 */
@@ -167,4 +168,11 @@ export const apiClient = {
    */
   getDiscussions: (word?: string): Promise<Discussion[]> =>
     request<Discussion[]>(word ? `/discussions?word=${encodeURIComponent(word)}` : '/discussions'),
+
+  /**
+   * 获取某本书的完整阅读历史记录（含页数增量、完成百分比）
+   * GET /api/books/:bookId/history → 被 BookShelf.tsx (handleViewHistory) 调用
+   */
+  getBookHistory: (bookId: string): Promise<BookHistory> =>
+    request<BookHistory>(`/books/${bookId}/history`),
 }

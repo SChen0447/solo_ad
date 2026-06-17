@@ -355,6 +355,86 @@
   margin-top: 2px;
 }
 
+/* ============ 独立「阅读历史」按钮 ============ */
+.view-history-btn {
+  margin-top: 12px;
+  width: 100%;
+  padding: 8px 12px;
+  font-size: 13px;
+}
+
+/* ============ 完整阅读历史模态框 ============ */
+.full-history-modal {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.full-history-book-info {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px 16px;
+  padding: 12px 16px;
+  background-color: #0d1117;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+  font-size: 13px;
+  color: #b0b0b0;
+}
+
+.full-history-book-info strong {
+  color: #e0e0e0;
+}
+
+.full-history-timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 420px;
+  overflow-y: auto;
+  padding-right: 8px;
+}
+
+.full-history-item {
+  display: flex;
+  gap: 12px;
+  padding: 10px 0;
+}
+
+.full-history-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 14px;
+  background-color: #0d1117;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+  transition: all 0.2s ease;
+}
+
+.full-history-content:hover {
+  border-color: rgba(88, 166, 255, 0.3);
+  box-shadow: 0 0 12px rgba(88, 166, 255, 0.08);
+}
+
+.full-history-page {
+  font-size: 13px;
+  color: #e0e0e0;
+  font-weight: 500;
+}
+
+.full-history-progress {
+  height: 6px;
+}
+
+.full-history-percentage {
+  font-size: 12px;
+  color: #58a6ff;
+  font-weight: 600;
+  text-align: right;
+}
+
 @media (max-width: 768px) {
   .books-grid {
     grid-template-columns: 1fr;

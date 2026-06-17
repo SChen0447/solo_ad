@@ -47,6 +47,8 @@ function WordCloud({ shelfId }: WordCloudProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   // 计算后的词汇位置数组（含坐标、大小、颜色）
   const [wordPositions, setWordPositions] = useState<WordPosition[]>([])
+  // 刷新按钮加载中状态
+  const [isRefreshing, setIsRefreshing] = useState(false)
 
   // 组件挂载或 shelfId 变化时，加载词云数据
   useEffect(() => {
@@ -69,13 +71,21 @@ function WordCloud({ shelfId }: WordCloudProps) {
   }, [keywords, containerRef.current?.offsetWidth])
 
   // 通过 apiClient.getWordCloud(shelfId) 加载当前书架的关键词词云数据
-  const loadWordCloud = async () => {
+  const loadWordCloud = async (showLoading = false) => {
+    if (showLoading) setIsRefreshing(true)
     try {
       const data = await apiClient.getWordCloud(shelfId)
       setKeywords(data)
     } catch (err) {
       console.error('Failed to load word cloud:', err)
+    } finally {
+      if (showLoading) setIsRefreshing(false)
     }
+  }
+
+  // 点击刷新按钮：重新拉取后端词云数据并重绘布局
+  const handleRefresh = () => {
+    loadWordCloud(true)
   }
 
   /**
@@ -110,12 +120,17 @@ function WordCloud({ shelfId }: WordCloudProps) {
     const maxAttempts = 2500 // 单个词最大尝试次数（防止死循环）
 
     sortedKeywords.forEach((keyword) => {
-      // 根据频率计算字体大小：14px ~ 46px
+      // 归一化频率到 [0, 1]
       const normalizedFreq = maxFreq === minFreq ? 1 : (keyword.frequency - minFreq) / (maxFreq - minFreq)
-      const fontSize = 14 + normalizedFreq * 32
+      // 使用平方根映射放大高频词视觉权重，低频词更小更淡
+      // 字体大小范围：12px ~ 52px（之前 14~46，范围扩大并使用非线性曲线）
+      const boostedFreq = Math.pow(normalizedFreq, 0.65)
+      const fontSize = 12 + boostedFreq * 40
 
-      // 颜色插值：低频 #b0b0b0 → 高频 #ff6b6b
-      const color = lerpColor('#b0b0b0', '#ff6b6b', normalizedFreq)
+      // 颜色插值：低频 #8b949e（更暗） → 中频 #58a6ff（蓝） → 高频 #ff6b6b（亮红）
+      const color = normalizedFreq < 0.5
+        ? lerpColor('#8b949e', '#58a6ff', normalizedFreq * 2)
+        : lerpColor('#58a6ff', '#ff6b6b', (normalizedFreq - 0.5) * 2)
 
       // 测量词汇实际渲染尺寸（在 DOM 中创建临时 span 测量）
       const tempSpan = document.createElement('span')
@@ -254,7 +269,19 @@ function WordCloud({ shelfId }: WordCloudProps) {
 
   return (
     <div className="wordcloud-section card">
-      <h2 className="section-title">💬 讨论热词</h2>
+      <div className="section-header">
+        <h2 className="section-title">💬 讨论热词</h2>
+        <button
+          className={`wordcloud-refresh-btn ${isRefreshing ? 'loading' : ''}`}
+          onClick={handleRefresh}
+          disabled={isRefreshing}
+          aria-label="刷新词云"
+          title="重新获取最新讨论热词"
+        >
+          <span className={`refresh-icon ${isRefreshing ? 'spin' : ''}`}>⟳</span>
+          {isRefreshing ? '刷新中...' : '刷新词云'}
+        </button>
+      </div>
       <div
         ref={containerRef}
         className="wordcloud-container"
