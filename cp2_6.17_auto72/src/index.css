@@ -219,6 +219,21 @@ body {
   font-weight: 600;
 }
 
+.progress-group {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.progress-label-row {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  gap: 10px;
+}
+
 @media (max-width: 600px) {
   .app-title {
     font-size: 26px;
@@ -240,6 +255,12 @@ body {
   .control-group {
     justify-content: space-between;
     width: 100%;
+  }
+
+  .progress-group {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 6px;
   }
 
   .progress-slider {

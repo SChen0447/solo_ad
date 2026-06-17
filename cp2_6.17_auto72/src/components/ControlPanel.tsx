@@ -64,8 +64,13 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
         </button>
       </div>
 
-      <div className="control-group">
-        <label className="control-label">进度：</label>
+      <div className="control-group progress-group">
+        <div className="progress-label-row">
+          <label className="control-label">进度：</label>
+          <span className="stroke-info">
+            第{currentStrokeIndex + 1}笔/共{totalStrokes}笔
+          </span>
+        </div>
         <input
           type="range"
           className="progress-slider"
@@ -75,9 +80,6 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
           value={currentStrokeIndex}
           onChange={handleProgressInput}
         />
-        <span className="stroke-info">
-          {currentStrokeIndex + 1}/{totalStrokes}
-        </span>
       </div>
 
       <div className="control-group">
@@ -91,7 +93,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
           value={speed}
           onChange={handleSpeedInput}
         />
-        <span className="speed-value">{speed.toFixed(2)}x</span>
+        <span className="speed-value">{speed.toFixed(1)}x</span>
       </div>
     </div>
   );
