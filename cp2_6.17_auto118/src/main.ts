@@ -30,6 +30,9 @@ class Game {
   private lastSpawnTime: number;
   private lastFrameTime: number;
   private running: boolean;
+  private upgradeBtnScale: number;
+  private sellBtnScale: number;
+  private lastClickTime: number;
 
   private hudResources: HTMLElement;
   private hudWave: HTMLElement;
@@ -67,6 +70,9 @@ class Game {
     this.lastSpawnTime = 0;
     this.lastFrameTime = 0;
     this.running = true;
+    this.upgradeBtnScale = 1;
+    this.sellBtnScale = 1;
+    this.lastClickTime = 0;
 
     this.hudResources = document.getElementById('resources')!;
     this.hudWave = document.getElementById('wave')!;
@@ -188,7 +194,66 @@ class Game {
     this.updateTowerInfoPanel();
   }
 
+  private getUpgradeBtnRect(): { x: number; y: number; w: number; h: number } {
+    if (!this.selectedTower) return { x: 0, y: 0, w: 0, h: 0 };
+    const btnW = 24;
+    const btnH = 20;
+    const spacing = 6;
+    const totalW = btnW * 2 + spacing;
+    const startX = this.selectedTower.getX() - totalW / 2;
+    const y = this.selectedTower.getY() - 30 - CELL_SIZE / 2;
+    return { x: startX, y, w: btnW, h: btnH };
+  }
+
+  private getSellBtnRect(): { x: number; y: number; w: number; h: number } {
+    if (!this.selectedTower) return { x: 0, y: 0, w: 0, h: 0 };
+    const btnW = 24;
+    const btnH = 20;
+    const spacing = 6;
+    const upgradeRect = this.getUpgradeBtnRect();
+    return { x: upgradeRect.x + btnW + spacing, y: upgradeRect.y, w: btnW, h: btnH };
+  }
+
+  private isPointInRect(px: number, py: number, rect: { x: number; y: number; w: number; h: number }): boolean {
+    return px >= rect.x && px <= rect.x + rect.w && py >= rect.y && py <= rect.y + rect.h;
+  }
+
   private handleCanvasClick(px: number, py: number): void {
+    if (this.selectedTower) {
+      const upgradeRect = this.getUpgradeBtnRect();
+      const sellRect = this.getSellBtnRect();
+      const now = performance.now();
+
+      if (this.isPointInRect(px, py, upgradeRect) && now - this.lastClickTime > 200) {
+        this.lastClickTime = now;
+        this.upgradeBtnScale = 0.8;
+        if (this.selectedTower.canUpgrade()) {
+          const cost = this.selectedTower.getUpgradeCost();
+          if (this.gameState.spend(cost)) {
+            this.selectedTower.upgrade();
+            this.updateHUD();
+            this.updateTowerInfoPanel();
+            this.updateTowerShopButtons();
+          }
+        }
+        return;
+      }
+
+      if (this.isPointInRect(px, py, sellRect) && now - this.lastClickTime > 200) {
+        this.lastClickTime = now;
+        this.sellBtnScale = 0.8;
+        const refund = this.selectedTower.getSellValue();
+        this.gameState.addResources(refund);
+        this.gameMap.removeTower(this.selectedTower.getGridX(), this.selectedTower.getGridY());
+        this.towers = this.towers.filter(t => t !== this.selectedTower);
+        this.selectedTower = null;
+        this.updateHUD();
+        this.updateTowerInfoPanel();
+        this.updateTowerShopButtons();
+        return;
+      }
+    }
+
     const { x: gx, y: gy } = pixelToGrid(px, py);
     if (gx < 0 || gx >= GRID_SIZE || gy < 0 || gy >= GRID_SIZE) return;
 
@@ -402,6 +467,92 @@ class Game {
     }
   }
 
+  private drawTowerActionButtons(): void {
+    if (!this.selectedTower) return;
+
+    const upgradeRect = this.getUpgradeBtnRect();
+    const sellRect = this.getSellBtnRect();
+
+    this.drawActionButton(
+      upgradeRect.x,
+      upgradeRect.y,
+      upgradeRect.w,
+      upgradeRect.h,
+      this.upgradeBtnScale,
+      '#28a745',
+      '↑',
+      this.selectedTower.canUpgrade() ? this.selectedTower.getUpgradeCost() : null
+    );
+
+    this.drawActionButton(
+      sellRect.x,
+      sellRect.y,
+      sellRect.w,
+      sellRect.h,
+      this.sellBtnScale,
+      '#dc3545',
+      '$',
+      this.selectedTower.getSellValue()
+    );
+  }
+
+  private drawActionButton(
+    x: number,
+    y: number,
+    w: number,
+    h: number,
+    scale: number,
+    color: string,
+    icon: string,
+    costOrValue: number | null
+  ): void {
+    const cx = x + w / 2;
+    const cy = y + h / 2;
+
+    this.ctx.save();
+    this.ctx.translate(cx, cy);
+    this.ctx.scale(scale, scale);
+
+    this.ctx.fillStyle = color;
+    this.ctx.beginPath();
+    const r = 4;
+    const left = -w / 2;
+    const right = w / 2;
+    const top = -h / 2;
+    const bottom = h / 2;
+    this.ctx.moveTo(left + r, top);
+    this.ctx.lineTo(right - r, top);
+    this.ctx.quadraticCurveTo(right, top, right, top + r);
+    this.ctx.lineTo(right, bottom - r);
+    this.ctx.quadraticCurveTo(right, bottom, right - r, bottom);
+    this.ctx.lineTo(left + r, bottom);
+    this.ctx.quadraticCurveTo(left, bottom, left, bottom - r);
+    this.ctx.lineTo(left, top + r);
+    this.ctx.quadraticCurveTo(left, top, left + r, top);
+    this.ctx.closePath();
+    this.ctx.fill();
+
+    this.ctx.strokeStyle = '#ffffff66';
+    this.ctx.lineWidth = 1;
+    this.ctx.stroke();
+
+    this.ctx.fillStyle = '#fff';
+    this.ctx.font = 'bold 12px Consolas';
+    this.ctx.textAlign = 'center';
+    this.ctx.textBaseline = 'middle';
+    this.ctx.fillText(icon, 0, 0);
+
+    if (costOrValue !== null) {
+      this.ctx.fillStyle = costOrValue > 0 ? '#ffd700' : '#fff';
+      this.ctx.font = '10px Consolas';
+      this.ctx.textAlign = 'center';
+      this.ctx.textBaseline = 'top';
+      this.ctx.fillText(costOrValue.toString(), 0, h / 2 + 2);
+    }
+
+    this.ctx.restore();
+  }
+
   private drawBuildPreview(): void {
     if (!this.mouseInCanvas || !this.selectedTowerType) return;
     const { x: gx, y: gy } = pixelToGrid(this.mouseX, this.mouseY);
@@ -414,27 +565,28 @@ class Game {
     if (canBuild) {
       const pos = gridToPixel(gx, gy);
       const config = TOWER_CONFIGS[this.selectedTowerType];
+      const halfSize = config.size / 2;
       this.ctx.globalAlpha = 0.5;
       this.ctx.fillStyle = config.color;
 
       switch (config.shape) {
         case 'triangle':
           this.ctx.beginPath();
-          this.ctx.moveTo(pos.x, pos.y - config.size);
-          this.ctx.lineTo(pos.x + config.size, pos.y + config.size);
-          this.ctx.lineTo(pos.x - config.size, pos.y + config.size);
+          this.ctx.moveTo(pos.x, pos.y - halfSize);
+          this.ctx.lineTo(pos.x + halfSize, pos.y + halfSize);
+          this.ctx.lineTo(pos.x - halfSize, pos.y + halfSize);
           this.ctx.closePath();
           this.ctx.fill();
           break;
         case 'square':
-          this.ctx.fillRect(pos.x - config.size, pos.y - config.size, config.size * 2, config.size * 2);
+          this.ctx.fillRect(pos.x - halfSize, pos.y - halfSize, config.size, config.size);
           break;
         case 'diamond':
           this.ctx.beginPath();
-          this.ctx.moveTo(pos.x, pos.y - config.size);
-          this.ctx.lineTo(pos.x + config.size, pos.y);
-          this.ctx.lineTo(pos.x, pos.y + config.size);
-          this.ctx.lineTo(pos.x - config.size, pos.y);
+          this.ctx.moveTo(pos.x, pos.y - halfSize);
+          this.ctx.lineTo(pos.x + halfSize, pos.y);
+          this.ctx.lineTo(pos.x, pos.y + halfSize);
+          this.ctx.lineTo(pos.x - halfSize, pos.y);
           this.ctx.closePath();
           this.ctx.fill();
           break;
@@ -459,10 +611,14 @@ class Game {
 
     this.drawProjectiles();
     this.drawBuildPreview();
+    this.drawTowerActionButtons();
   }
 
   private gameLoop = (currentTime: number): void => {
     if (!this.running) return;
+
+    this.upgradeBtnScale = this.upgradeBtnScale + (1 - this.upgradeBtnScale) * 0.2;
+    this.sellBtnScale = this.sellBtnScale + (1 - this.sellBtnScale) * 0.2;
 
     this.spawnEnemy(currentTime);
 

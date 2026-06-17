@@ -151,7 +151,7 @@ export class Tower {
   draw(ctx: CanvasRenderingContext2D, isSelected: boolean): void {
     const size = this.config.size;
     const scale = 1 + this.animationScale * 0.3;
-    const drawSize = size * scale;
+    const halfSize = (size / 2) * scale;
 
     ctx.save();
     ctx.translate(this.x, this.y);
@@ -169,21 +169,21 @@ export class Tower {
     switch (this.config.shape) {
       case 'triangle':
         ctx.beginPath();
-        ctx.moveTo(0, -drawSize);
-        ctx.lineTo(drawSize, drawSize);
-        ctx.lineTo(-drawSize, drawSize);
+        ctx.moveTo(0, -halfSize);
+        ctx.lineTo(halfSize, halfSize);
+        ctx.lineTo(-halfSize, halfSize);
         ctx.closePath();
         ctx.fill();
         break;
       case 'square':
-        ctx.fillRect(-drawSize, -drawSize, drawSize * 2, drawSize * 2);
+        ctx.fillRect(-halfSize, -halfSize, size * scale, size * scale);
         break;
       case 'diamond':
         ctx.beginPath();
-        ctx.moveTo(0, -drawSize);
-        ctx.lineTo(drawSize, 0);
-        ctx.lineTo(0, drawSize);
-        ctx.lineTo(-drawSize, 0);
+        ctx.moveTo(0, -halfSize);
+        ctx.lineTo(halfSize, 0);
+        ctx.lineTo(0, halfSize);
+        ctx.lineTo(-halfSize, 0);
         ctx.closePath();
         ctx.fill();
         break;
