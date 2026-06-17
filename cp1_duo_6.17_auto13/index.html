@@ -44,6 +44,91 @@
     #info-panel .param {
       opacity: 0.9;
     }
+    #compass {
+      position: fixed;
+      top: 100px;
+      left: 24px;
+      width: 64px;
+      height: 64px;
+      z-index: 10;
+      pointer-events: none;
+    }
+    #compass-ring {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      border-radius: 50%;
+      border: 2px solid rgba(136, 136, 136, 0.5);
+      background: rgba(44, 44, 46, 0.4);
+      backdrop-filter: blur(4px);
+    }
+    #compass-needle {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      transition: transform 0.1s ease-out;
+    }
+    #compass-north {
+      position: absolute;
+      top: 6px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 0;
+      height: 0;
+      border-left: 6px solid transparent;
+      border-right: 6px solid transparent;
+      border-bottom: 14px solid #E53935;
+    }
+    #compass-south {
+      position: absolute;
+      bottom: 8px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 0;
+      height: 0;
+      border-left: 5px solid transparent;
+      border-right: 5px solid transparent;
+      border-top: 12px solid #888888;
+    }
+    #compass-east {
+      position: absolute;
+      right: 10px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #888888;
+    }
+    #compass-west {
+      position: absolute;
+      left: 10px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #888888;
+    }
+    #compass-center {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #E0E0E0;
+    }
+    #compass-n-label {
+      position: absolute;
+      top: -2px;
+      left: 50%;
+      transform: translateX(-50%);
+      color: #E0E0E0;
+      font-size: 10px;
+      font-weight: 600;
+    }
   </style>
 </head>
 <body>
@@ -51,6 +136,17 @@
   <div id="info-panel">
     <div class="mode" id="mode-label">Flat</div>
     <div class="param" id="param-label">Compression: 0 | Stretch: 0 | Shear: 0°</div>
+  </div>
+  <div id="compass">
+    <div id="compass-ring"></div>
+    <div id="compass-needle">
+      <div id="compass-north"></div>
+      <div id="compass-south"></div>
+      <div id="compass-east"></div>
+      <div id="compass-west"></div>
+      <div id="compass-center"></div>
+    </div>
+    <div id="compass-n-label">N</div>
   </div>
   <script type="module" src="/src/main.ts"></script>
 </body>
