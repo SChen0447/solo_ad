@@ -28,6 +28,7 @@ export class LightController {
   private fromEnv: EnvPreset = 'clearSky';
   private toEnv: EnvPreset = 'clearSky';
   private tempColor: THREE.Color = new THREE.Color();
+  private tempFogColor: THREE.Color = new THREE.Color();
 
   constructor(scene: THREE.Scene, renderer: THREE.WebGLRenderer) {
     this.scene = scene;
@@ -187,8 +188,23 @@ export class LightController {
 
     this.fromEnv = this.currentEnv;
     this.toEnv = preset;
-    this.fromConfig = { ...this.envConfigs[this.fromEnv] };
-    this.toConfig = { ...this.envConfigs[this.toEnv] };
+    const fromSrc = this.envConfigs[this.fromEnv];
+    const toSrc = this.envConfigs[this.toEnv];
+
+    this.fromConfig = {
+      background: fromSrc.background.clone(),
+      ambientIntensity: fromSrc.ambientIntensity,
+      directionalIntensity: fromSrc.directionalIntensity,
+      fogColor: fromSrc.fogColor.clone(),
+      fogDensity: fromSrc.fogDensity
+    };
+    this.toConfig = {
+      background: toSrc.background.clone(),
+      ambientIntensity: toSrc.ambientIntensity,
+      directionalIntensity: toSrc.directionalIntensity,
+      fogColor: toSrc.fogColor.clone(),
+      fogDensity: toSrc.fogDensity
+    };
 
     if (animate) {
       this.transitionActive = true;
@@ -245,11 +261,12 @@ export class LightController {
       (this.toConfig.directionalIntensity - this.fromConfig.directionalIntensity) * easeT;
 
     if (this.scene.fog instanceof THREE.FogExp2) {
-      this.scene.fog.color.setRGB(
+      this.tempFogColor.setRGB(
         this.fromConfig.fogColor.r + (this.toConfig.fogColor.r - this.fromConfig.fogColor.r) * easeT,
         this.fromConfig.fogColor.g + (this.toConfig.fogColor.g - this.fromConfig.fogColor.g) * easeT,
         this.fromConfig.fogColor.b + (this.toConfig.fogColor.b - this.fromConfig.fogColor.b) * easeT
       );
+      this.scene.fog.color.copy(this.tempFogColor);
       this.scene.fog.density =
         this.fromConfig.fogDensity + (this.toConfig.fogDensity - this.fromConfig.fogDensity) * easeT;
     }

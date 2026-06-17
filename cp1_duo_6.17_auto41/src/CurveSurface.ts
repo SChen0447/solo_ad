@@ -14,9 +14,12 @@ export interface PanelMaterialParams {
 }
 
 const CONTROL_GRID_SIZE = 6;
-const SURFACE_U_DIVISIONS = 20;
-const SURFACE_V_DIVISIONS = 20;
-const PANEL_COUNT = SURFACE_U_DIVISIONS * SURFACE_V_DIVISIONS;
+const MATERIAL_TRANSITION_DURATION = 200;
+
+export interface SurfaceConfig {
+  uDivisions?: number;
+  vDivisions?: number;
+}
 
 export class CurveSurface {
   private scene: THREE.Scene;
@@ -35,8 +38,29 @@ export class CurveSurface {
   private selectedPanels: Set<number> = new Set();
   private highlightEdges: THREE.LineSegments[] = [];
 
-  constructor(scene: THREE.Scene, controlPoints?: ControlPoint[]) {
+  private uDivisions: number;
+  private vDivisions: number;
+  private panelCount: number;
+
+  private _tmpVec0: THREE.Vector3 = new THREE.Vector3();
+  private _tmpVec1: THREE.Vector3 = new THREE.Vector3();
+  private _tmpVec2: THREE.Vector3 = new THREE.Vector3();
+  private _tmpVec3: THREE.Vector3 = new THREE.Vector3();
+  private _tmpVec4: THREE.Vector3 = new THREE.Vector3();
+  private _tmpVec5: THREE.Vector3 = new THREE.Vector3();
+  private _tmpVec6: THREE.Vector3 = new THREE.Vector3();
+  private _tmpVec7: THREE.Vector3 = new THREE.Vector3();
+  private _tmpVec8: THREE.Vector3 = new THREE.Vector3();
+  private _tmpVec9: THREE.Vector3 = new THREE.Vector3();
+  private _tmpVec10: THREE.Vector3 = new THREE.Vector3();
+  private _tmpVec11: THREE.Vector3 = new THREE.Vector3();
+  private _tmpColor: THREE.Color = new THREE.Color();
+
+  constructor(scene: THREE.Scene, controlPoints?: ControlPoint[], config?: SurfaceConfig) {
     this.scene = scene;
+    this.uDivisions = config?.uDivisions ?? 20;
+    this.vDivisions = config?.vDivisions ?? 20;
+    this.panelCount = this.uDivisions * this.vDivisions;
     this.controlPoints = controlPoints || this.createDefaultControlPoints();
     this.initControlPointMeshes();
     this.initSurface();
@@ -47,10 +71,10 @@ export class CurveSurface {
     const halfSize = 4;
     for (let i = 0; i < CONTROL_GRID_SIZE; i++) {
       for (let j = 0; j < CONTROL_GRID_SIZE; j++) {
-        const u = (j / (CONTROL_GRID_SIZE - 1) - 0.5) * 2 * halfSize;
-        const v = (i / (CONTROL_GRID_SIZE - 1) - 0.5) * 2 * halfSize;
-        const wave = Math.sin(u * 0.5) * Math.cos(v * 0.5) * 1.5;
-        points.push({ x: u, y: wave, z: v });
+        const x = (j / (CONTROL_GRID_SIZE - 1) - 0.5) * 2 * halfSize;
+        const z = (i / (CONTROL_GRID_SIZE - 1) - 0.5) * 2 * halfSize;
+        const y = Math.sin(x * 0.6) * Math.cos(z * 0.6) * 2.0 + Math.sin(x * 0.3 + z * 0.4) * 0.8;
+        points.push({ x, y, z });
       }
     }
     return points;
@@ -76,7 +100,7 @@ export class CurveSurface {
     }
   }
 
-  private catmullRom(p0: THREE.Vector3, p1: THREE.Vector3, p2: THREE.Vector3, p3: THREE.Vector3, t: number): THREE.Vector3 {
+  private catmullRom(p0: THREE.Vector3, p1: THREE.Vector3, p2: THREE.Vector3, p3: THREE.Vector3, t: number, out: THREE.Vector3): THREE.Vector3 {
     const t2 = t * t;
     const t3 = t2 * t;
     const v0x = (p2.x - p0.x) * 0.5;
@@ -86,22 +110,22 @@ export class CurveSurface {
     const v0z = (p2.z - p0.z) * 0.5;
     const v1z = (p3.z - p1.z) * 0.5;
 
-    return new THREE.Vector3(
+    return out.set(
       (2 * p1.x - 2 * p2.x + v0x + v1x) * t3 + (-3 * p1.x + 3 * p2.x - 2 * v0x - v1x) * t2 + v0x * t + p1.x,
       (2 * p1.y - 2 * p2.y + v0y + v1y) * t3 + (-3 * p1.y + 3 * p2.y - 2 * v0y - v1y) * t2 + v0y * t + p1.y,
       (2 * p1.z - 2 * p2.z + v0z + v1z) * t3 + (-3 * p1.z + 3 * p2.z - 2 * v0z - v1z) * t2 + v0z * t + p1.z
     );
   }
 
-  private getControlPointVector(row: number, col: number): THREE.Vector3 {
+  private getControlPointVector(row: number, col: number, out: THREE.Vector3): THREE.Vector3 {
     const clampedRow = Math.max(0, Math.min(CONTROL_GRID_SIZE - 1, row));
     const clampedCol = Math.max(0, Math.min(CONTROL_GRID_SIZE - 1, col));
     const idx = clampedRow * CONTROL_GRID_SIZE + clampedCol;
     const p = this.controlPoints[idx];
-    return new THREE.Vector3(p.x, p.y, p.z);
+    return out.set(p.x, p.y, p.z);
   }
 
-  private evaluateSurface(u: number, v: number): THREE.Vector3 {
+  private evaluateSurface(u: number, v: number, out: THREE.Vector3): THREE.Vector3 {
     const uIdx = u * (CONTROL_GRID_SIZE - 1);
     const vIdx = v * (CONTROL_GRID_SIZE - 1);
     const u0 = Math.floor(uIdx);
@@ -109,16 +133,41 @@ export class CurveSurface {
     const uT = uIdx - u0;
     const vT = vIdx - v0;
 
-    const rowPoints: THREE.Vector3[] = [];
-    for (let i = -1; i <= 2; i++) {
-      const p0 = this.getControlPointVector(v0 + i, u0 - 1);
-      const p1 = this.getControlPointVector(v0 + i, u0);
-      const p2 = this.getControlPointVector(v0 + i, u0 + 1);
-      const p3 = this.getControlPointVector(v0 + i, u0 + 2);
-      rowPoints.push(this.catmullRom(p0, p1, p2, p3, uT));
-    }
+    const tmpP0 = this._tmpVec0;
+    const tmpP1 = this._tmpVec1;
+    const tmpP2 = this._tmpVec2;
+    const tmpP3 = this._tmpVec3;
 
-    return this.catmullRom(rowPoints[0], rowPoints[1], rowPoints[2], rowPoints[3], vT);
+    const r0 = this._tmpVec4;
+    const r1 = this._tmpVec5;
+    const r2 = this._tmpVec6;
+    const r3 = this._tmpVec7;
+
+    this.getControlPointVector(v0 - 1, u0 - 1, tmpP0);
+    this.getControlPointVector(v0 - 1, u0, tmpP1);
+    this.getControlPointVector(v0 - 1, u0 + 1, tmpP2);
+    this.getControlPointVector(v0 - 1, u0 + 2, tmpP3);
+    this.catmullRom(tmpP0, tmpP1, tmpP2, tmpP3, uT, r0);
+
+    this.getControlPointVector(v0, u0 - 1, tmpP0);
+    this.getControlPointVector(v0, u0, tmpP1);
+    this.getControlPointVector(v0, u0 + 1, tmpP2);
+    this.getControlPointVector(v0, u0 + 2, tmpP3);
+    this.catmullRom(tmpP0, tmpP1, tmpP2, tmpP3, uT, r1);
+
+    this.getControlPointVector(v0 + 1, u0 - 1, tmpP0);
+    this.getControlPointVector(v0 + 1, u0, tmpP1);
+    this.getControlPointVector(v0 + 1, u0 + 1, tmpP2);
+    this.getControlPointVector(v0 + 1, u0 + 2, tmpP3);
+    this.catmullRom(tmpP0, tmpP1, tmpP2, tmpP3, uT, r2);
+
+    this.getControlPointVector(v0 + 2, u0 - 1, tmpP0);
+    this.getControlPointVector(v0 + 2, u0, tmpP1);
+    this.getControlPointVector(v0 + 2, u0 + 1, tmpP2);
+    this.getControlPointVector(v0 + 2, u0 + 2, tmpP3);
+    this.catmullRom(tmpP0, tmpP1, tmpP2, tmpP3, uT, r3);
+
+    return this.catmullRom(r0, r1, r2, r3, vT, out);
   }
 
   private initSurface(): void {
@@ -127,22 +176,23 @@ export class CurveSurface {
     const uvs: number[] = [];
     const indices: number[] = [];
 
-    const vertexCols = SURFACE_U_DIVISIONS + 1;
-    const vertexRows = SURFACE_V_DIVISIONS + 1;
+    const vertexCols = this.uDivisions + 1;
+    const vertexRows = this.vDivisions + 1;
+    const tmpPoint = this._tmpVec8;
 
     for (let i = 0; i < vertexRows; i++) {
       for (let j = 0; j < vertexCols; j++) {
-        const u = j / SURFACE_U_DIVISIONS;
-        const v = i / SURFACE_V_DIVISIONS;
-        const p = this.evaluateSurface(u, v);
-        positions.push(p.x, p.y, p.z);
+        const u = j / this.uDivisions;
+        const v = i / this.vDivisions;
+        this.evaluateSurface(u, v, tmpPoint);
+        positions.push(tmpPoint.x, tmpPoint.y, tmpPoint.z);
         normals.push(0, 1, 0);
         uvs.push(u, v);
       }
     }
 
-    for (let i = 0; i < SURFACE_V_DIVISIONS; i++) {
-      for (let j = 0; j < SURFACE_U_DIVISIONS; j++) {
+    for (let i = 0; i < this.vDivisions; i++) {
+      for (let j = 0; j < this.uDivisions; j++) {
         const a = i * vertexCols + j;
         const b = a + 1;
         const c = a + vertexCols;
@@ -163,10 +213,10 @@ export class CurveSurface {
   }
 
   private createIndividualPanels(): void {
-    const panelWidth = 8 / SURFACE_U_DIVISIONS;
-    const panelHeight = 8 / SURFACE_V_DIVISIONS;
+    const panelWidth = 8 / this.uDivisions;
+    const panelHeight = 8 / this.vDivisions;
 
-    for (let i = 0; i < PANEL_COUNT; i++) {
+    for (let i = 0; i < this.panelCount; i++) {
       const geometry = new THREE.PlaneGeometry(panelWidth * 0.95, panelHeight * 0.95);
       const material = new THREE.MeshStandardMaterial({
         color: this.defaultMaterialParams.color,
@@ -208,32 +258,42 @@ export class CurveSurface {
   }
 
   private updatePanelPosition(index: number, mesh: THREE.Mesh): void {
-    const row = Math.floor(index / SURFACE_U_DIVISIONS);
-    const col = index % SURFACE_U_DIVISIONS;
+    const row = Math.floor(index / this.uDivisions);
+    const col = index % this.uDivisions;
 
-    const u1 = col / SURFACE_U_DIVISIONS;
-    const u2 = (col + 1) / SURFACE_U_DIVISIONS;
-    const v1 = row / SURFACE_V_DIVISIONS;
-    const v2 = (row + 1) / SURFACE_V_DIVISIONS;
+    const u1 = col / this.uDivisions;
+    const u2 = (col + 1) / this.uDivisions;
+    const v1 = row / this.vDivisions;
+    const v2 = (row + 1) / this.vDivisions;
 
-    const p00 = this.evaluateSurface(u1, v1);
-    const p10 = this.evaluateSurface(u2, v1);
-    const p01 = this.evaluateSurface(u1, v2);
-    const p11 = this.evaluateSurface(u2, v2);
+    const p00 = this._tmpVec0;
+    const p10 = this._tmpVec1;
+    const p01 = this._tmpVec2;
+    const p11 = this._tmpVec3;
+    const center = this._tmpVec8;
+    const tangentU = this._tmpVec4;
+    const tangentV = this._tmpVec5;
+    const normal = this._tmpVec6;
+    const up = this._tmpVec7;
+    const lookTarget = this._tmpVec9;
 
-    const center = new THREE.Vector3()
-      .add(p00).add(p10).add(p01).add(p11)
-      .multiplyScalar(0.25);
+    this.evaluateSurface(u1, v1, p00);
+    this.evaluateSurface(u2, v1, p10);
+    this.evaluateSurface(u1, v2, p01);
+    this.evaluateSurface(u2, v2, p11);
 
-    const tangentU = new THREE.Vector3().subVectors(p10, p00).normalize();
-    const tangentV = new THREE.Vector3().subVectors(p01, p00).normalize();
-    const normal = new THREE.Vector3().crossVectors(tangentU, tangentV).normalize();
+    center.set(0, 0, 0).add(p00).add(p10).add(p01).add(p11).multiplyScalar(0.25);
 
-    const up = new THREE.Vector3(0, 1, 0);
+    tangentU.copy(p10).sub(p00).normalize();
+    tangentV.copy(p01).sub(p00).normalize();
+    normal.crossVectors(tangentU, tangentV).normalize();
+
+    up.set(0, 1, 0);
     if (normal.dot(up) < 0) normal.negate();
 
     mesh.position.copy(center);
-    mesh.lookAt(center.clone().add(normal));
+    lookTarget.copy(center).add(normal);
+    mesh.lookAt(lookTarget);
   }
 
   public updateControlPoints(points: ControlPoint[]): void {
@@ -255,18 +315,19 @@ export class CurveSurface {
     if (!this.positionAttribute) return;
 
     const positions = this.positionAttribute.array as Float32Array;
-    const vertexCols = SURFACE_U_DIVISIONS + 1;
-    const vertexRows = SURFACE_V_DIVISIONS + 1;
+    const vertexCols = this.uDivisions + 1;
+    const vertexRows = this.vDivisions + 1;
+    const tmpPoint = this._tmpVec8;
 
     for (let i = 0; i < vertexRows; i++) {
       for (let j = 0; j < vertexCols; j++) {
-        const u = j / SURFACE_U_DIVISIONS;
-        const v = i / SURFACE_V_DIVISIONS;
-        const p = this.evaluateSurface(u, v);
+        const u = j / this.uDivisions;
+        const v = i / this.vDivisions;
+        this.evaluateSurface(u, v, tmpPoint);
         const idx = (i * vertexCols + j) * 3;
-        positions[idx] = p.x;
-        positions[idx + 1] = p.y;
-        positions[idx + 2] = p.z;
+        positions[idx] = tmpPoint.x;
+        positions[idx + 1] = tmpPoint.y;
+        positions[idx + 2] = tmpPoint.z;
       }
     }
 
@@ -365,12 +426,13 @@ export class CurveSurface {
 
       const now = performance.now();
       const elapsed = now - (userData.transitionStart as number);
-      const progress = Math.min(elapsed / 200, 1);
+      const progress = Math.min(elapsed / MATERIAL_TRANSITION_DURATION, 1);
       const easeProgress = 1 - Math.pow(1 - progress, 3);
 
       const startColor = userData.startColor as THREE.Color;
       const targetColor = userData.targetColor as THREE.Color;
-      material.color.lerpColors(startColor, targetColor, easeProgress);
+      this._tmpColor.copy(startColor).lerp(targetColor, easeProgress);
+      material.color.copy(this._tmpColor);
 
       material.opacity = (userData.startOpacity as number) +
         ((userData.targetOpacity as number) - (userData.startOpacity as number)) * easeProgress;
@@ -408,11 +470,37 @@ export class CurveSurface {
   }
 
   public getPanelCount(): number {
-    return PANEL_COUNT;
+    return this.panelCount;
   }
 
   public getControlGridSize(): number {
     return CONTROL_GRID_SIZE;
+  }
+
+  public getDivisions(): { u: number; v: number } {
+    return { u: this.uDivisions, v: this.vDivisions };
+  }
+
+  public setDivisions(uDivisions: number, vDivisions: number): void {
+    this.uDivisions = Math.max(2, Math.min(30, Math.floor(uDivisions)));
+    this.vDivisions = Math.max(2, Math.min(30, Math.floor(vDivisions)));
+    this.panelCount = this.uDivisions * this.vDivisions;
+
+    for (const mesh of this.panels) {
+      this.scene.remove(mesh);
+      mesh.geometry.dispose();
+      (mesh.material as THREE.Material).dispose();
+    }
+    this.panels = [];
+    this.panelGeometries = [];
+    this.highlightEdges = [];
+
+    if (this.surfaceGeometry) {
+      this.surfaceGeometry.dispose();
+    }
+
+    this.initSurface();
+    this.setSelectedPanels([]);
   }
 
   public dispose(): void {
