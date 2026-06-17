@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0" />
+  <title>多物理场叠加可视化</title>
+  <link rel="stylesheet" href="/src/styles.css" />
+</head>
+<body>
+  <div id="app">
+    <canvas id="scene-canvas"></canvas>
+
+    <div id="data-status-panel">
+      <div class="data-status-title">数据集加载状态</div>
+      <div class="data-item" id="data-temperature">
+        <span class="data-name">data1_temperature.json</span>
+        <span class="data-icon loading">⏳</span>
+      </div>
+      <div class="data-item" id="data-velocity">
+        <span class="data-name">data2_velocity.json</span>
+        <span class="data-icon loading">⏳</span>
+      </div>
+      <div class="data-item" id="data-pressure">
+        <span class="data-name">data3_pressure.json</span>
+        <span class="data-icon loading">⏳</span>
+      </div>
+    </div>
+
+    <div id="view-preset-panel">
+      <button class="view-btn" data-view="front">正视图</button>
+      <button class="view-btn" data-view="top">俯视图</button>
+      <button class="view-btn" data-view="iso">45°俯视</button>
+    </div>
+
+    <div id="control-panel">
+      <div class="control-row">
+        <div class="control-item">
+          <span class="control-label">温度场</span>
+          <div class="toggle-switch" id="toggle-temperature">
+            <div class="toggle-slider"></div>
+          </div>
+        </div>
+        <div class="control-item">
+          <span class="control-label">速度场</span>
+          <div class="toggle-switch" id="toggle-velocity">
+            <div class="toggle-slider"></div>
+          </div>
+        </div>
+        <div class="control-item">
+          <span class="control-label">压力场</span>
+          <div class="toggle-switch" id="toggle-pressure">
+            <div class="toggle-slider"></div>
+          </div>
+        </div>
+        <div class="control-item">
+          <span class="control-label">探针</span>
+          <div class="toggle-switch" id="toggle-probe">
+            <div class="toggle-slider"></div>
+          </div>
+        </div>
+      </div>
+      <div class="control-row sliders-row">
+        <div class="slider-item">
+          <span class="slider-label">温度透明度</span>
+          <input type="range" id="slider-temperature" min="0" max="1" step="0.01" value="0.6" />
+        </div>
+        <div class="slider-item">
+          <span class="slider-label">速度透明度</span>
+          <input type="range" id="slider-velocity" min="0" max="1" step="0.01" value="0.8" />
+        </div>
+        <div class="slider-item">
+          <span class="slider-label">压力透明度</span>
+          <input type="range" id="slider-pressure" min="0" max="1" step="0.01" value="0.5" />
+        </div>
+        <div class="slider-item">
+          <span class="slider-label">箭头缩放</span>
+          <input type="range" id="slider-glyph-scale" min="0.1" max="3" step="0.1" value="1" />
+        </div>
+      </div>
+    </div>
+
+    <div id="probe-panel" class="hidden">
+      <div class="probe-title">探针数据</div>
+      <div class="probe-row">
+        <span class="probe-label">位置:</span>
+        <span class="probe-value" id="probe-position">(0.00, 0.00, 0.00)</span>
+      </div>
+      <div class="probe-row">
+        <span class="probe-label">温度:</span>
+        <span class="probe-value" id="probe-temperature">--</span>
+      </div>
+      <div class="probe-row">
+        <span class="probe-label">速度:</span>
+        <span class="probe-value" id="probe-velocity">--</span>
+      </div>
+      <div class="probe-row">
+        <span class="probe-label">压力:</span>
+        <span class="probe-value" id="probe-pressure">--</span>
+      </div>
+    </div>
+  </div>
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
