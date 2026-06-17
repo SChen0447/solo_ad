@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>抽象艺术视觉动画</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+      color: #eee;
+    }
+
+    #loading {
+      position: fixed;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+      z-index: 9999;
+      transition: opacity 0.6s ease;
+    }
+
+    #loading.hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .loading-spinner {
+      width: 60px;
+      height: 60px;
+      border: 3px solid rgba(233, 69, 96, 0.2);
+      border-top-color: #e94560;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+
+    .loading-text {
+      margin-top: 20px;
+      font-size: 14px;
+      letter-spacing: 2px;
+      color: #eee;
+      opacity: 0.8;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    #app {
+      width: 100%;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .top-bar {
+      height: 80px;
+      background-color: rgba(22, 33, 62, 0.55);
+      -webkit-backdrop-filter: saturate(180%) blur(6px);
+      backdrop-filter: saturate(180%) blur(6px);
+      -moz-backdrop-filter: saturate(180%) blur(6px);
+      border-bottom: 1px solid rgba(233, 69, 96, 0.2);
+      display: flex;
+      align-items: center;
+      padding: 0 24px;
+      position: relative;
+      z-index: 100;
+      isolation: isolate;
+    }
+
+    .top-bar .title {
+      font-size: 18px;
+      font-weight: 600;
+      letter-spacing: 1px;
+      margin-right: 40px;
+    }
+
+    .progress-container {
+      flex: 1;
+      height: 4px;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 2px;
+      overflow: hidden;
+      margin-right: 40px;
+    }
+
+    .progress-bar {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, #e94560 0%, #0f3460 50%, #e94560 100%);
+      background-size: 200% 100%;
+      animation: shimmer 2s linear infinite;
+      transition: width 0.6s ease;
+    }
+
+    @keyframes shimmer {
+      0% { background-position: -200% 0; }
+      100% { background-position: 200% 0; }
+    }
+
+    .interaction-hints {
+      display: flex;
+      gap: 24px;
+      margin-right: 30px;
+    }
+
+    .hint-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+      opacity: 0.7;
+      transition: opacity 0.3s ease;
+    }
+
+    .hint-item:hover {
+      opacity: 1;
+    }
+
+    .hint-icon {
+      width: 24px;
+      height: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: 1px solid rgba(238, 238, 238, 0.3);
+      border-radius: 6px;
+      font-size: 14px;
+    }
+
+    .upload-btn {
+      padding: 10px 24px;
+      background: linear-gradient(135deg, #e94560 0%, #0f3460 100%);
+      border: none;
+      border-radius: 8px;
+      color: #fff;
+      font-family: 'Inter', sans-serif;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: filter 0.3s ease, transform 0.2s ease;
+    }
+
+    .upload-btn:hover {
+      -webkit-filter: brightness(1.2);
+      filter: brightness(1.2);
+      transform: translateY(-1px);
+    }
+
+    .upload-btn:active {
+      transform: translateY(0);
+    }
+
+    .main-content {
+      flex: 1;
+      display: flex;
+      overflow: hidden;
+    }
+
+    .artwork-selector {
+      width: 160px;
+      padding: 20px 16px;
+      background: rgba(22, 33, 62, 0.4);
+      border-right: 1px solid rgba(233, 69, 96, 0.15);
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      overflow-y: auto;
+    }
+
+    .selector-title {
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      opacity: 0.6;
+      margin-bottom: 4px;
+    }
+
+    .artwork-card {
+      width: 120px;
+      height: 80px;
+      border-radius: 8px;
+      border: 1px solid #e94560;
+      cursor: pointer;
+      overflow: hidden;
+      position: relative;
+      transition: all 0.3s ease;
+      flex-shrink: 0;
+    }
+
+    .artwork-card:hover {
+      transform: scale(1.02);
+    }
+
+    .artwork-card.active {
+      border-width: 3px;
+      box-shadow: 0 0 20px rgba(233, 69, 96, 0.5);
+    }
+
+    .artwork-card img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
+    .artwork-card .overlay {
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(to top, rgba(0,0,0,0.7) 0%, transparent 50%);
+      display: flex;
+      align-items: flex-end;
+      padding: 6px 8px;
+      opacity: 0;
+      transition: opacity 0.3s ease;
+    }
+
+    .artwork-card:hover .overlay {
+      opacity: 1;
+    }
+
+    .artwork-card .artwork-name {
+      font-size: 10px;
+      font-weight: 500;
+      color: #fff;
+    }
+
+    .canvas-container {
+      flex: 1;
+      position: relative;
+      height: calc(100vh - 100px);
+    }
+
+    #animation-canvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    .info-panel {
+      position: absolute;
+      bottom: 20px;
+      left: 20px;
+      background-color: rgba(22, 33, 62, 0.75);
+      -webkit-backdrop-filter: saturate(180%) blur(6px);
+      backdrop-filter: saturate(180%) blur(6px);
+      -moz-backdrop-filter: saturate(180%) blur(6px);
+      padding: 16px 20px;
+      border-radius: 12px;
+      border: 1px solid rgba(233, 69, 96, 0.3);
+      font-size: 12px;
+      max-width: 300px;
+      isolation: isolate;
+    }
+
+    .info-panel .artwork-title {
+      font-size: 16px;
+      font-weight: 600;
+      margin-bottom: 4px;
+    }
+
+    .info-panel .artwork-artist {
+      font-size: 12px;
+      opacity: 0.7;
+      margin-bottom: 12px;
+    }
+
+    .color-palette {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    .color-swatch {
+      width: 24px;
+      height: 24px;
+      border-radius: 4px;
+      border: 2px solid rgba(255, 255, 255, 0.2);
+    }
+
+    .stats {
+      margin-top: 12px;
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 8px;
+      font-size: 11px;
+      opacity: 0.8;
+    }
+
+    #file-input {
+      display: none;
+    }
+
+    .hint-fade-in {
+      animation: fadeInHint 0.3s ease;
+    }
+
+    @keyframes fadeInHint {
+      from { opacity: 0; transform: translateY(-5px); }
+      to { opacity: 0.7; transform: translateY(0); }
+    }
+
+    @media (max-width: 768px) {
+      .artwork-selector {
+        width: 100%;
+        height: 120px;
+        flex-direction: row;
+        padding: 12px;
+        overflow-x: auto;
+        overflow-y: hidden;
+        border-right: none;
+        border-bottom: 1px solid rgba(233, 69, 96, 0.15);
+      }
+
+      .main-content {
+        flex-direction: column;
+      }
+
+      .interaction-hints {
+        display: none;
+      }
+
+      .canvas-container {
+        height: calc(100vh - 200px);
+      }
+    }
+  </style>
+</head>
+<body>
+  <div id="loading">
+    <div class="loading-spinner"></div>
+    <div class="loading-text">LOADING</div>
+  </div>
+
+  <div id="app">
+    <div class="top-bar">
+      <div class="title">抽象艺术视觉动画</div>
+      <div class="progress-container">
+        <div class="progress-bar" id="progress-bar"></div>
+      </div>
+      <div class="interaction-hints">
+        <div class="hint-item hint-fade-in">
+          <div class="hint-icon">🖱️</div>
+          <span>移动</span>
+        </div>
+        <div class="hint-item hint-fade-in" style="animation-delay: 0.1s;">
+          <div class="hint-icon">⚙️</div>
+          <span>滚轮</span>
+        </div>
+        <div class="hint-item hint-fade-in" style="animation-delay: 0.2s;">
+          <div class="hint-icon">👆</div>
+          <span>点击</span>
+        </div>
+      </div>
+      <button class="upload-btn" id="upload-btn">上传画作</button>
+      <input type="file" id="file-input" accept="image/jpeg,image/png" />
+    </div>
+
+    <div class="main-content">
+      <div class="artwork-selector" id="artwork-selector">
+        <div class="selector-title">选择画作</div>
+      </div>
+      <div class="canvas-container">
+        <canvas id="animation-canvas"></canvas>
+        <div class="info-panel" id="info-panel">
+          <div class="artwork-title" id="artwork-title">康定斯基《构成第八号》</div>
+          <div class="artwork-artist" id="artwork-artist">Wassily Kandinsky, 1923</div>
+          <div class="color-palette" id="color-palette"></div>
+          <div class="stats">
+            <div>粒子数: <span id="stat-particles">4000</span></div>
+            <div>帧率: <span id="stat-fps">60</span> FPS</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
