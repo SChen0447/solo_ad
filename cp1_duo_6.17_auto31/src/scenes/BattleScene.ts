@@ -9,15 +9,16 @@ const STEP_TRIGGER = 3;
 export class BattleScene extends Phaser.Scene {
   private currentMonster: MonsterData | null = null;
   private playerSprite!: Phaser.GameObjects.Sprite;
-  private monsterSprite!: Phaser.GameObjects.Sprite;
-  private monsterTint: number = 0xcc4444;
+  private monsterIconContainer!: Phaser.GameObjects.Container;
+  private monsterIconSprite!: Phaser.GameObjects.Sprite;
+  private monsterHalo!: Phaser.GameObjects.Sprite;
   private monsterParticles: Phaser.GameObjects.Particles.ParticleEmitter | null = null;
+  private monsterOrbitParticles: Phaser.GameObjects.Particles.ParticleEmitter | null = null;
   private playerHpBar!: Phaser.GameObjects.Graphics;
   private monsterHpBar!: Phaser.GameObjects.Graphics;
   private playerHpText!: Phaser.GameObjects.Text;
   private monsterHpText!: Phaser.GameObjects.Text;
   private monsterNameText!: Phaser.GameObjects.Text;
-  private actionLog: Phaser.GameObjects.Text[] = [];
   private attackBtn!: Phaser.GameObjects.Container;
   private forgeBtn!: Phaser.GameObjects.Container;
   private codexBtn!: Phaser.GameObjects.Container;
@@ -138,52 +139,85 @@ export class BattleScene extends Phaser.Scene {
     const h = this.cameras.main.height;
     const isNarrow = w < 768;
 
-    if (this.monsterSprite) this.monsterSprite.destroy();
+    if (this.monsterIconContainer) {
+      this.monsterIconContainer.destroy();
+    }
     if (this.monsterParticles) {
-      this.monsterParticles.emitter.stop();
+      (this.monsterParticles as any).emitter?.stop();
       this.monsterParticles = null;
     }
-
-    if (isNarrow) {
-      this.monsterYBase = h * 0.22;
-    } else {
-      this.monsterYBase = h * 0.4;
+    if (this.monsterOrbitParticles) {
+      (this.monsterOrbitParticles as any).emitter?.stop();
+      this.monsterOrbitParticles = null;
     }
-    const monsterX = isNarrow ? w * 0.5 : w * 0.8;
 
-    this.monsterTint = parseInt(this.currentMonster.color.replace('#', ''), 16);
+    const iconSize = 180;
+    const monsterAreaX = isNarrow ? w * 0.5 : w * 0.75;
+    const monsterAreaY = isNarrow ? h * 0.28 : h * 0.38;
+    this.monsterYBase = monsterAreaY;
 
-    this.monsterSprite = this.add.sprite(monsterX, this.monsterYBase, 'monster_sprite')
-      .setTint(this.monsterTint)
-      .setScale(2.5)
-      .setDepth(5)
-      .setAlpha(0);
+    const textureKey = monsterGenerator.createMonsterTexture(this, this.currentMonster, iconSize);
+
+    this.monsterIconContainer = this.add.container(monsterAreaX, monsterAreaY).setDepth(5);
+    this.monsterIconContainer.setAlpha(0);
+
+    const particleColor = parseInt(this.currentMonster.particleColor.replace('#', ''), 16);
+
+    const haloG = this.make.graphics({ x: 0, y: 0, add: false });
+    const haloSize = iconSize * 1.4;
+    for (let i = 8; i >= 0; i--) {
+      const r = (haloSize / 2) * (i / 8);
+      const alpha = (1 - i / 8) * 0.25;
+      haloG.fillStyle(particleColor, alpha);
+      haloG.beginPath();
+      haloG.arc(haloSize / 2, haloSize / 2, r, 0, Math.PI * 2, false);
+      haloG.fill();
+      haloG.closePath();
+    }
+    const haloKey = `halo_${this.currentMonster.id}`;
+    haloG.generateTexture(haloKey, haloSize, haloSize);
+    haloG.destroy();
+
+    this.monsterHalo = this.add.sprite(0, 0, haloKey).setDepth(4);
+    this.monsterIconContainer.add(this.monsterHalo);
+
+    this.monsterIconSprite = this.add.sprite(0, 0, textureKey).setDepth(6);
+    this.monsterIconContainer.add(this.monsterIconSprite);
 
     this.tweens.add({
-      targets: this.monsterSprite,
+      targets: this.monsterHalo,
+      scaleX: 1.15,
+      scaleY: 1.15,
+      alpha: 0.7,
+      duration: 2000 + Math.random() * 1000,
+      yoyo: true,
+      repeat: -1,
+      ease: 'Sine.easeInOut',
+    });
+
+    this.tweens.add({
+      targets: this.monsterIconContainer,
       alpha: 1,
-      duration: 600,
+      duration: 700,
       ease: 'Power2',
     });
 
     this.tweens.add({
-      targets: this.monsterSprite,
-      y: this.monsterYBase - 6,
-      duration: 1500,
+      targets: this.monsterIconContainer,
+      y: monsterAreaY - 8,
+      duration: 1800,
       yoyo: true,
       repeat: -1,
       ease: 'Sine.easeInOut',
     });
 
     const particleKey = this.getParticleKeyForAffix(this.currentMonster.affixes[0]?.id);
-    const particleColor = parseInt(this.currentMonster.particleColor.replace('#', ''), 16);
-
-    const emitter = this.add.particles(monsterX, this.monsterYBase + 30, particleKey, {
-      speed: { min: 10, max: 40 },
-      lifespan: { min: 400, max: 900 },
-      quantity: 1,
-      frequency: 200,
-      scale: { start: 0.6, end: 0 },
+    const emitter = this.add.particles(monsterAreaX, monsterAreaY + 40, particleKey, {
+      speed: { min: 10, max: 50 },
+      lifespan: { min: 500, max: 1100 },
+      quantity: 2,
+      frequency: 180,
+      scale: { start: 0.5, end: 0 },
       alpha: { start: 0.7, end: 0 },
       tint: particleColor,
       blendMode: 'ADD',
@@ -191,6 +225,54 @@ export class BattleScene extends Phaser.Scene {
     });
     emitter.setDepth(4);
     this.monsterParticles = emitter as unknown as Phaser.GameObjects.Particles.ParticleEmitter;
+
+    this.createOrbitParticles(monsterAreaX, monsterAreaY, particleColor);
+  }
+
+  private createOrbitParticles(cx: number, cy: number, color: number) {
+    if (!this.currentMonster) return;
+
+    const orbitRadius = 95;
+    const particles = this.add.particles(cx, cy, 'particle_dot', {
+      lifespan: 2000,
+      speed: { min: 0, max: 0 },
+      quantity: 0,
+      scale: { start: 0.3, end: 0.1 },
+      alpha: { start: 0.6, end: 0 },
+      tint: color,
+      blendMode: 'ADD',
+    });
+
+    const count = 8 + Math.floor(Math.random() * 5);
+    for (let i = 0; i < count; i++) {
+      const angle = (Math.PI * 2 / count) * i;
+      const px = cx + Math.cos(angle) * orbitRadius;
+      const py = cy + Math.sin(angle) * orbitRadius;
+
+      const p = particles.createEmitter({
+        on: true,
+        frequency: 300 + Math.random() * 400,
+        quantity: 1,
+        x: px,
+        y: py,
+        speed: { min: 5, max: 15 },
+        scale: { start: 0.25, end: 0 },
+        alpha: { start: 0.7, end: 0 },
+        tint: color,
+      });
+
+      this.tweens.add({
+        targets: p,
+        x: px + Math.cos(angle + Math.PI * 2) * 10,
+        y: py + Math.sin(angle + Math.PI * 2) * 10,
+        duration: 3000 + Math.random() * 2000,
+        repeat: -1,
+        ease: 'Sine.easeInOut',
+        yoyo: true,
+      });
+    }
+
+    this.monsterOrbitParticles = particles as unknown as Phaser.GameObjects.Particles.ParticleEmitter;
   }
 
   private getParticleKeyForAffix(affixId?: string): string {
@@ -232,27 +314,27 @@ export class BattleScene extends Phaser.Scene {
     this.playerHpBar = this.add.graphics().setDepth(8);
     this.monsterHpBar = this.add.graphics().setDepth(8);
 
-    const barWidth = 180;
-    const barHeight = 16;
+    const barWidth = 200;
+    const barHeight = 18;
     const isNarrow = w < 768;
 
-    const playerBarX = isNarrow ? w * 0.5 - barWidth / 2 : w * 0.05;
-    const playerBarY = isNarrow ? h * 0.42 : h * 0.55;
-    this.playerHpText = this.add.text(playerBarX, playerBarY - 20,
+    const playerBarX = isNarrow ? w * 0.5 - barWidth / 2 : w * 0.1;
+    const playerBarY = isNarrow ? h * 0.45 : h * 0.55;
+    this.playerHpText = this.add.text(playerBarX + barWidth / 2, playerBarY - 22,
       `勇者  ${gameState.player.hp}/${gameState.player.maxHp}`, {
         fontSize: '13px', color: '#ffd700', fontFamily: 'monospace',
-      }).setDepth(8);
+      }).setDepth(8).setOrigin(0.5);
 
     const monsterBarX = isNarrow ? w * 0.5 - barWidth / 2 : w * 0.65;
-    const monsterBarY = isNarrow ? h * 0.12 : h * 0.55;
-    this.monsterHpText = this.add.text(monsterBarX, monsterBarY - 20,
+    const monsterBarY = isNarrow ? h * 0.42 : h * 0.55;
+    this.monsterHpText = this.add.text(monsterBarX + barWidth / 2, monsterBarY + 22,
       this.currentMonster ? `${this.currentMonster.hp}/${this.currentMonster.maxHp}` : '???', {
         fontSize: '13px', color: '#ff4444', fontFamily: 'monospace',
-      }).setDepth(8);
-    this.monsterNameText = this.add.text(monsterBarX, monsterBarY - 38,
+      }).setDepth(8).setOrigin(0.5);
+    this.monsterNameText = this.add.text(monsterBarX + barWidth / 2, monsterBarY + 40,
       this.currentMonster?.name || '???', {
-        fontSize: '15px', color: '#ff8844', fontFamily: 'serif', stroke: '#000', strokeThickness: 2,
-      }).setDepth(8);
+        fontSize: '16px', color: '#ff8844', fontFamily: 'serif', stroke: '#000', strokeThickness: 2,
+      }).setDepth(8).setOrigin(0.5);
 
     this.updateHpBars();
   }
@@ -260,32 +342,32 @@ export class BattleScene extends Phaser.Scene {
   private updateHpBars() {
     const w = this.cameras.main.width;
     const h = this.cameras.main.height;
-    const barWidth = 180;
-    const barHeight = 16;
+    const barWidth = 200;
+    const barHeight = 18;
     const isNarrow = w < 768;
 
-    const playerBarX = isNarrow ? w * 0.5 - barWidth / 2 : w * 0.05;
-    const playerBarY = isNarrow ? h * 0.42 : h * 0.55;
+    const playerBarX = isNarrow ? w * 0.5 - barWidth / 2 : w * 0.1;
+    const playerBarY = isNarrow ? h * 0.45 : h * 0.55;
     this.playerHpBar.clear();
     this.playerHpBar.fillStyle(0x333333, 0.8);
-    this.playerHpBar.fillRoundedRect(playerBarX, playerBarY, barWidth, barHeight, 3);
+    this.playerHpBar.fillRoundedRect(playerBarX, playerBarY, barWidth, barHeight, 4);
     const playerRatio = gameState.player.hp / gameState.player.maxHp;
     const playerColor = playerRatio > 0.5 ? 0x44cc44 : playerRatio > 0.25 ? 0xccaa44 : 0xcc4444;
     this.playerHpBar.fillStyle(playerColor, 1);
-    this.playerHpBar.fillRoundedRect(playerBarX, playerBarY, barWidth * playerRatio, barHeight, 3);
+    this.playerHpBar.fillRoundedRect(playerBarX, playerBarY, barWidth * playerRatio, barHeight, 4);
     this.playerHpText.setText(`勇者  ${gameState.player.hp}/${gameState.player.maxHp}`);
 
     if (this.currentMonster) {
       const monsterBarX = isNarrow ? w * 0.5 - barWidth / 2 : w * 0.65;
-      const monsterBarY = isNarrow ? h * 0.12 : h * 0.55;
+      const monsterBarY = isNarrow ? h * 0.42 : h * 0.55;
       this.monsterHpBar.clear();
       this.monsterHpBar.fillStyle(0x333333, 0.8);
-      this.monsterHpBar.fillRoundedRect(monsterBarX, monsterBarY, barWidth, barHeight, 3);
+      this.monsterHpBar.fillRoundedRect(monsterBarX, monsterBarY, barWidth, barHeight, 4);
       const monsterRatio = this.currentMonster.hp / this.currentMonster.maxHp;
       const gradientR = Math.round(255 * (1 - monsterRatio));
       const gradientColor = (gradientR << 16) | (Math.round(60 * monsterRatio) << 8);
       this.monsterHpBar.fillStyle(gradientColor, 1);
-      this.monsterHpBar.fillRoundedRect(monsterBarX, monsterBarY, barWidth * monsterRatio, barHeight, 3);
+      this.monsterHpBar.fillRoundedRect(monsterBarX, monsterBarY, barWidth * monsterRatio, barHeight, 4);
       this.monsterHpText.setText(`${this.currentMonster.hp}/${this.currentMonster.maxHp}`);
       this.monsterNameText.setText(this.currentMonster.name);
     }
@@ -399,15 +481,16 @@ export class BattleScene extends Phaser.Scene {
     this.isAnimating = true;
 
     const slash = this.add.sprite(
-      this.monsterSprite.x - 20,
-      this.monsterSprite.y,
+      this.monsterIconContainer.x,
+      this.monsterIconContainer.y,
       'slash_effect'
-    ).setDepth(20).setAlpha(0).setScale(1.5);
+    ).setDepth(20).setAlpha(0).setScale(2);
 
     this.tweens.add({
       targets: slash,
       alpha: { from: 0, to: 1 },
-      duration: 80,
+      angle: { from: -30, to: 30 },
+      duration: 120,
       yoyo: true,
       onComplete: () => slash.destroy(),
     });
@@ -424,7 +507,7 @@ export class BattleScene extends Phaser.Scene {
     const critText = crit ? ' 暴击！' : '';
     this.addLogEntry(`你对【${this.currentMonster.name}】造成 ${damage} 点伤害${critText}`);
 
-    this.flashSprite(this.monsterSprite, 0xffffff);
+    this.flashSprite(this.monsterIconSprite, 0xffffff);
 
     this.time.delayedCall(400, () => {
       if (this.currentMonster && this.currentMonster.hp <= 0) {
@@ -462,12 +545,8 @@ export class BattleScene extends Phaser.Scene {
 
   private flashSprite(sprite: Phaser.GameObjects.Sprite, color: number) {
     sprite.setTint(color);
-    this.time.delayedCall(120, () => {
-      if (sprite === this.monsterSprite && this.currentMonster) {
-        sprite.setTint(this.monsterTint);
-      } else {
-        sprite.clearTint();
-      }
+    this.time.delayedCall(150, () => {
+      sprite.clearTint();
     });
   }
 
@@ -489,14 +568,18 @@ export class BattleScene extends Phaser.Scene {
     gameState.addMaterials(drops);
 
     this.tweens.add({
-      targets: this.monsterSprite,
+      targets: this.monsterIconContainer,
       alpha: 0,
-      y: this.monsterSprite.y + 20,
-      scaleX: 0.5,
-      scaleY: 0.5,
-      duration: 500,
+      scaleX: 0.4,
+      scaleY: 0.4,
+      y: this.monsterIconContainer.y + 30,
+      duration: 600,
       ease: 'Power2',
     });
+
+    if (this.monsterOrbitParticles) {
+      (this.monsterOrbitParticles as any).emitter?.stop();
+    }
 
     this.showDropAnimation(drops);
 
