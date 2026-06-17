@@ -23,6 +23,13 @@ interface DragState {
   targetPosition: number;
   hoverStartTime: number;
   hoverCategoryId: string | null;
+  rafPending: boolean;
+}
+
+interface LogItemState {
+  id: string;
+  log: LogEntryData;
+  visible: boolean;
 }
 
 export const CollabBoard: React.FC = () => {
@@ -35,13 +42,15 @@ export const CollabBoard: React.FC = () => {
   const [cards, setCards] = useState<CardData[]>([]);
   const [categories, setCategories] = useState<CategoryData[]>([]);
   const [users, setUsers] = useState<UserData[]>([]);
-  const [logs, setLogs] = useState<LogEntryData[]>([]);
+  const [rawLogs, setRawLogs] = useState<LogEntryData[]>([]);
+  const [logItems, setLogItems] = useState<LogItemState[]>([]);
   const [logPanelCollapsed, setLogPanelCollapsed] = useState(false);
   const [showExportModal, setShowExportModal] = useState(false);
   const [showAddCategoryModal, setShowAddCategoryModal] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState('');
   const [renameCategoryId, setRenameCategoryId] = useState<string | null>(null);
   const [renameCategoryName, setRenameCategoryName] = useState('');
+  const [, forceRender] = useState(0);
 
   const boardRef = useRef<HTMLDivElement>(null);
   const dragStateRef = useRef<DragState>({
@@ -58,10 +67,11 @@ export const CollabBoard: React.FC = () => {
     targetPosition: 0,
     hoverStartTime: 0,
     hoverCategoryId: null,
+    rafPending: false,
   });
-  const [, forceRender] = useState(0);
   const dragElRef = useRef<HTMLDivElement | null>(null);
   const categoryRefs = useRef<Map<string, HTMLDivElement>>(new Map());
+  const logTimersRef = useRef<Map<string, NodeJS.Timeout>>(new Map());
 
   const sortedCategories = useMemo(() => {
     return [...categories].sort((a, b) => a.position - b.position);
@@ -76,6 +86,52 @@ export const CollabBoard: React.FC = () => {
     [cards],
   );
 
+  const triggerLogStaggered = useCallback((newLogs: LogEntryData[]) => {
+    logTimersRef.current.forEach((timer) => clearTimeout(timer));
+    logTimersRef.current.clear();
+
+    setLogItems(
+      newLogs.map((log) => ({
+        id: log.id,
+        log,
+        visible: false,
+      })),
+    );
+
+    newLogs.forEach((log, idx) => {
+      const timer = setTimeout(() => {
+        setLogItems((prev) =>
+          prev.map((item) =>
+            item.id === log.id ? { ...item, visible: true } : item,
+          ),
+        );
+        logTimersRef.current.delete(log.id);
+      }, idx * 500);
+      logTimersRef.current.set(log.id, timer);
+    });
+  }, []);
+
+  const appendLog = useCallback((log: LogEntryData) => {
+    setRawLogs((prev) => {
+      const next = [...prev, log].slice(-20);
+      setLogItems((prevItems) => {
+        const newItem: LogItemState = { id: log.id, log, visible: false };
+        const items = [...prevItems, newItem].slice(-20);
+        const timer = setTimeout(() => {
+          setLogItems((curr) =>
+            curr.map((item) =>
+              item.id === log.id ? { ...item, visible: true } : item,
+            ),
+          );
+          logTimersRef.current.delete(log.id);
+        }, 50);
+        logTimersRef.current.set(log.id, timer);
+        return items;
+      });
+      return next;
+    });
+  }, []);
+
   useEffect(() => {
     const unsub1 = websocketManager.on('connected', () => setIsConnected(true));
     const unsub2 = websocketManager.on('disconnected', () => setIsConnected(false));
@@ -87,7 +143,8 @@ export const CollabBoard: React.FC = () => {
       setCards(state.cards || []);
       setCategories(state.categories || []);
       setUsers(state.users || []);
-      setLogs(state.logs || []);
+      setRawLogs(state.logs || []);
+      triggerLogStaggered(state.logs || []);
     });
 
     const unsub5 = websocketManager.on('users_updated', (newUsers: UserData[]) => {
@@ -95,10 +152,7 @@ export const CollabBoard: React.FC = () => {
     });
 
     const unsub6 = websocketManager.on('log_added', (log: LogEntryData) => {
-      setLogs((prev) => {
-        const next = [...prev, log];
-        return next.slice(-20);
-      });
+      appendLog(log);
     });
 
     return () => {
@@ -108,8 +162,10 @@ export const CollabBoard: React.FC = () => {
       unsub4?.();
       unsub5?.();
       unsub6?.();
+      logTimersRef.current.forEach((timer) => clearTimeout(timer));
+      logTimersRef.current.clear();
     };
-  }, []);
+  }, [triggerLogStaggered, appendLog]);
 
   const handleCreateRoom = async () => {
     if (!nickname.trim()) {
@@ -193,6 +249,7 @@ export const CollabBoard: React.FC = () => {
     ds.targetPosition = card.position;
     ds.hoverStartTime = 0;
     ds.hoverCategoryId = null;
+    ds.rafPending = false;
 
     if (!dragElRef.current) {
       dragElRef.current = document.createElement('div');
@@ -200,6 +257,7 @@ export const CollabBoard: React.FC = () => {
       dragElRef.current.style.pointerEvents = 'none';
       dragElRef.current.style.zIndex = '9999';
       dragElRef.current.style.transform = 'rotate(2deg)';
+      dragElRef.current.style.willChange = 'left, top';
       document.body.appendChild(dragElRef.current);
     }
 
@@ -209,6 +267,7 @@ export const CollabBoard: React.FC = () => {
     clone.style.boxShadow = '0 12px 32px rgba(0,0,0,0.3)';
     clone.style.opacity = '0.95';
     clone.style.transform = 'scale(1.05)';
+    clone.style.pointerEvents = 'none';
     dragElRef.current.innerHTML = '';
     dragElRef.current.appendChild(clone);
     dragElRef.current.style.left = `${e.clientX - ds.offsetX}px`;
@@ -216,6 +275,68 @@ export const CollabBoard: React.FC = () => {
 
     forceRender((n) => n + 1);
   }, [cards]);
+
+  const performDragFrame = useCallback(() => {
+    const ds = dragStateRef.current;
+    ds.rafPending = false;
+
+    if (!ds.isDragging || !ds.cardId) return;
+
+    if (dragElRef.current) {
+      dragElRef.current.style.left = `${ds.currentX - ds.offsetX}px`;
+      dragElRef.current.style.top = `${ds.currentY - ds.offsetY}px`;
+    }
+
+    let hoveredCategoryId: string | null = null;
+    let insertIndex = -1;
+
+    for (const [catId, catEl] of categoryRefs.current) {
+      const rect = catEl.getBoundingClientRect();
+      if (
+        ds.currentX >= rect.left &&
+        ds.currentX <= rect.right &&
+        ds.currentY >= rect.top &&
+        ds.currentY <= rect.bottom
+      ) {
+        hoveredCategoryId = catId;
+        const cardsContainer = catEl.querySelector('.category-cards');
+        if (cardsContainer) {
+          const cardEls = cardsContainer.querySelectorAll<HTMLElement>(':scope > .card-slot');
+          insertIndex = cardEls.length;
+          for (let i = 0; i < cardEls.length; i++) {
+            const cardRect = cardEls[i].getBoundingClientRect();
+            if (ds.currentY < cardRect.top + cardRect.height / 2) {
+              insertIndex = i;
+              break;
+            }
+          }
+        }
+        break;
+      }
+    }
+
+    if (hoveredCategoryId !== ds.hoverCategoryId) {
+      ds.hoverCategoryId = hoveredCategoryId;
+      ds.hoverStartTime = hoveredCategoryId ? Date.now() : 0;
+    }
+
+    let needsRender = false;
+    if (hoveredCategoryId) {
+      const now = Date.now();
+      if (hoveredCategoryId !== ds.targetCategoryId) {
+        ds.targetCategoryId = hoveredCategoryId;
+        ds.targetPosition = insertIndex >= 0 ? insertIndex : 0;
+        needsRender = true;
+      } else if (now - ds.hoverStartTime >= 500 && insertIndex !== ds.targetPosition && insertIndex >= 0) {
+        ds.targetPosition = insertIndex;
+        needsRender = true;
+      }
+    }
+
+    if (needsRender) {
+      forceRender((n) => n + 1);
+    }
+  }, []);
 
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
@@ -225,61 +346,17 @@ export const CollabBoard: React.FC = () => {
       ds.currentX = e.clientX;
       ds.currentY = e.clientY;
 
-      if (dragElRef.current) {
-        dragElRef.current.style.left = `${e.clientX - ds.offsetX}px`;
-        dragElRef.current.style.top = `${e.clientY - ds.offsetY}px`;
+      if (!ds.rafPending) {
+        ds.rafPending = true;
+        requestAnimationFrame(performDragFrame);
       }
-
-      let hoveredCategoryId: string | null = null;
-      let insertIndex = -1;
-
-      for (const [catId, catEl] of categoryRefs.current) {
-        const rect = catEl.getBoundingClientRect();
-        if (
-          e.clientX >= rect.left &&
-          e.clientX <= rect.right &&
-          e.clientY >= rect.top &&
-          e.clientY <= rect.bottom
-        ) {
-          hoveredCategoryId = catId;
-          const cardsContainer = catEl.querySelector('.category-cards');
-          if (cardsContainer) {
-            const cardEls = cardsContainer.querySelectorAll<HTMLElement>(':scope > .card-slot');
-            insertIndex = cardEls.length;
-            for (let i = 0; i < cardEls.length; i++) {
-              const cardRect = cardEls[i].getBoundingClientRect();
-              if (e.clientY < cardRect.top + cardRect.height / 2) {
-                insertIndex = i;
-                break;
-              }
-            }
-          }
-          break;
-        }
-      }
-
-      if (hoveredCategoryId !== ds.hoverCategoryId) {
-        ds.hoverCategoryId = hoveredCategoryId;
-        ds.hoverStartTime = hoveredCategoryId ? Date.now() : 0;
-      }
-
-      if (hoveredCategoryId) {
-        const now = Date.now();
-        if (now - ds.hoverStartTime >= 500 || hoveredCategoryId !== ds.targetCategoryId) {
-          ds.targetCategoryId = hoveredCategoryId;
-          ds.targetPosition = insertIndex >= 0 ? insertIndex : 0;
-          forceRender((n) => n + 1);
-        }
-      }
-
-      forceRender((n) => n + 1);
     };
 
     const handleMouseUp = () => {
       const ds = dragStateRef.current;
       if (!ds.isDragging || !ds.cardId) return;
 
-      if (ds.sourceCategoryId !== ds.targetCategoryId || true) {
+      if (ds.sourceCategoryId !== ds.targetCategoryId || ds.targetPosition !== -1) {
         websocketManager.moveCard(ds.cardId, ds.targetCategoryId || ds.sourceCategoryId!, ds.targetPosition).catch((err) => {
           console.error('Failed to move card:', err);
         });
@@ -291,6 +368,7 @@ export const CollabBoard: React.FC = () => {
       ds.targetCategoryId = null;
       ds.hoverCategoryId = null;
       ds.hoverStartTime = 0;
+      ds.rafPending = false;
 
       if (dragElRef.current) {
         dragElRef.current.remove();
@@ -307,7 +385,7 @@ export const CollabBoard: React.FC = () => {
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mouseup', handleMouseUp);
     };
-  }, []);
+  }, [performDragFrame]);
 
   const handleAddCategory = () => {
     const name = newCategoryName.trim().substring(0, 10);
@@ -382,11 +460,35 @@ export const CollabBoard: React.FC = () => {
   }, [roomId, cards, categories, sortedCategories, getCardsByCategory]);
 
   const handleCopyReport = async () => {
+    const text = JSON.stringify(exportReport, null, 2);
     try {
-      await navigator.clipboard.writeText(JSON.stringify(exportReport, null, 2));
-      alert('已复制到剪贴板');
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(text);
+        alert('✅ 已复制到剪贴板');
+        return;
+      }
+    } catch (err) {
+      console.warn('Clipboard API failed, falling back:', err);
+    }
+
+    try {
+      const textarea = document.createElement('textarea');
+      textarea.value = text;
+      textarea.style.position = 'fixed';
+      textarea.style.top = '-1000px';
+      textarea.style.left = '-1000px';
+      textarea.style.opacity = '0';
+      document.body.appendChild(textarea);
+      textarea.select();
+      const success = document.execCommand('copy');
+      document.body.removeChild(textarea);
+      if (success) {
+        alert('✅ 已复制到剪贴板');
+      } else {
+        alert('❌ 复制失败，请手动复制');
+      }
     } catch {
-      alert('复制失败，请手动复制');
+      alert('❌ 复制失败，请手动复制');
     }
   };
 
@@ -677,10 +779,11 @@ export const CollabBoard: React.FC = () => {
                       return (
                         <React.Fragment key={card.id}>
                           {showInsertLine && <div className="insert-line" />}
-                          <div className="card-slot">
+                          <div className="card-slot" style={{ transition: 'transform 0.3s ease' }}>
                             <Card
                               card={card}
-                              category={category}
+                              categoryColor={category.color}
+                              categoryId={category.id}
                               isDragging={ds.isDragging && ds.cardId === card.id}
                               isSourceGhost={isGhostCard}
                               onEdit={handleEditCard}
@@ -720,12 +823,11 @@ export const CollabBoard: React.FC = () => {
               </button>
             </div>
             <div className="log-list">
-              {logs.length === 0 && <div className="log-empty">暂无操作记录</div>}
-              {logs.map((log, idx) => (
+              {logItems.length === 0 && <div className="log-empty">暂无操作记录</div>}
+              {logItems.map(({ id, log, visible }, idx) => (
                 <div
-                  key={log.id}
-                  className="log-item"
-                  style={{ animationDelay: `${idx * 0.02}s` }}
+                  key={id}
+                  className={`log-item ${visible ? 'log-item-visible' : ''}`}
                 >
                   <span className="log-time">{formatTime(log.timestamp)}</span>
                   <span className="log-content">{formatLogAction(log)}</span>
@@ -742,8 +844,8 @@ export const CollabBoard: React.FC = () => {
             <div className="modal-header">
               <h3>📊 观点聚合报告</h3>
               <div className="modal-header-actions">
-                <button className="btn btn-modal" onClick={handleCopyReport}>
-                  📋 复制
+                <button className="btn btn-modal btn-copy" onClick={handleCopyReport}>
+                  📋 一键复制
                 </button>
                 <button className="btn btn-modal btn-primary" onClick={handleDownloadReport}>
                   ⬇️ 下载 JSON
@@ -1082,12 +1184,6 @@ export const CollabBoard: React.FC = () => {
 
         .card-slot {
           position: relative;
-          transition: transform 0.3s ease;
-        }
-
-        @keyframes fadeIn {
-          from { opacity: 0; transform: translateY(-4px); }
-          to { opacity: 1; transform: translateY(0); }
         }
 
         .insert-line {
@@ -1231,18 +1327,14 @@ export const CollabBoard: React.FC = () => {
           flex-direction: column;
           gap: 2px;
           border-left: 2px solid transparent;
-          animation: slideIn 0.2s ease both;
+          opacity: 0;
+          transform: translateX(-100%);
+          transition: opacity 0.2s ease, transform 0.2s ease;
         }
 
-        @keyframes slideIn {
-          from {
-            opacity: 0;
-            transform: translateX(-12px);
-          }
-          to {
-            opacity: 1;
-            transform: translateX(0);
-          }
+        .log-item.log-item-visible {
+          opacity: 1;
+          transform: translateX(0);
         }
 
         .log-item:hover {
@@ -1400,6 +1492,17 @@ export const CollabBoard: React.FC = () => {
         .btn-modal:hover {
           background: #f9fafb;
           border-color: #9ca3af;
+        }
+
+        .btn-modal.btn-copy {
+          background: #e0f2fe;
+          border-color: #7dd3fc;
+          color: #0369a1;
+        }
+
+        .btn-modal.btn-copy:hover {
+          background: #bae6fd;
+          border-color: #38bdf8;
         }
 
         .btn-modal.btn-primary {
