@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { ColorInfo, ExtractResponse } from './types';
 import UploadZone from './components/UploadZone';
 import ColorPalette from './components/ColorPalette';
@@ -16,25 +16,26 @@ export default function App() {
   const [colors, setColors] = useState<ColorInfo[]>(DEFAULT_COLORS);
   const [loading, setLoading] = useState(false);
   const [copied, setCopied] = useState(false);
+  const lockedColorsRef = useRef<Set<number>>(new Set());
 
-  const handleFileUpload = useCallback(async (file: File) => {
+  const handleFileUpload = useCallback(async (base64DataUrl: string) => {
     setLoading(true);
-    const formData = new FormData();
-    formData.append('image', file);
-
     try {
-      const res = await fetch('/api/extract-colors', {
-        method: 'POST',
-        body: formData,
+      const encoded = encodeURIComponent(base64DataUrl);
+      const res = await fetch(`/api/extract-colors?image=${encoded}`, {
+        method: 'GET',
       });
       const data: ExtractResponse = await res.json();
       if (data.colors) {
         setColors(prev => {
-          return data.colors.map((c, i) => ({
-            hex: prev[i]?.locked ? prev[i].hex : c.hex,
-            percentage: c.percentage,
-            locked: prev[i]?.locked ?? false,
-          }));
+          return data.colors.map((c, i) => {
+            const isLocked = prev[i]?.locked || lockedColorsRef.current.has(i);
+            return {
+              hex: isLocked ? prev[i].hex : c.hex,
+              percentage: isLocked ? prev[i].percentage : c.percentage,
+              locked: isLocked,
+            };
+          });
         });
       }
     } catch (err) {
@@ -52,17 +53,24 @@ export default function App() {
 
   const handleToggleLock = useCallback((index: number) => {
     setColors(prev =>
-      prev.map((c, i) => (i === index ? { ...c, locked: !c.locked } : c))
+      prev.map((c, i) => {
+        if (i !== index) return c;
+        const newLocked = !c.locked;
+        if (newLocked) {
+          lockedColorsRef.current.add(i);
+        } else {
+          lockedColorsRef.current.delete(i);
+        }
+        return { ...c, locked: newLocked };
+      })
     );
   }, []);
 
   const cssCode = `:root {\n${colors
-    .map(
-      (c, i) => {
-        const names = ['--primary', '--secondary', '--tertiary', '--quaternary', '--quinary'];
-        return `  ${names[i]}: ${c.hex};`;
-      }
-    )
+    .map((c, i) => {
+      const names = ['--primary', '--secondary', '--tertiary', '--quaternary', '--quinary'];
+      return `  ${names[i]}: ${c.hex};`;
+    })
     .join('\n')}\n}`;
 
   const handleCopy = useCallback(() => {
@@ -74,23 +82,28 @@ export default function App() {
 
   return (
     <div style={styles.container}>
-      <div style={styles.leftPanel}>
-        <UploadZone onFileSelect={handleFileUpload} loading={loading} />
-        <ColorPalette
-          colors={colors}
-          onColorChange={handleColorChange}
-          onToggleLock={handleToggleLock}
-        />
-      </div>
-      <div style={styles.divider} />
-      <div style={styles.rightPanel}>
-        <TemplatePreview colors={colors} />
+      <div style={styles.mainRow}>
+        <div style={styles.leftPanel}>
+          <UploadZone onFileSelect={handleFileUpload} loading={loading} />
+          <ColorPalette
+            colors={colors}
+            onColorChange={handleColorChange}
+            onToggleLock={handleToggleLock}
+          />
+        </div>
+        <div style={styles.divider} />
+        <div style={styles.rightPanel}>
+          <TemplatePreview colors={colors} />
+        </div>
       </div>
       <div style={styles.bottomBar}>
         <div style={styles.codeArea}>{cssCode}</div>
-        <button style={styles.copyBtn} onClick={handleCopy}>
-          {copied ? '已复制' : '复制'}
-        </button>
+        <div style={styles.copyWrapper}>
+          <button style={styles.copyBtn} onClick={handleCopy}>
+            {copied ? '已复制 ✓' : '复制'}
+          </button>
+          {copied && <div style={styles.copiedToast}>已复制到剪贴板</div>}
+        </div>
       </div>
     </div>
   );
@@ -99,11 +112,16 @@ export default function App() {
 const styles: Record<string, React.CSSProperties> = {
   container: {
     display: 'flex',
-    flexWrap: 'wrap',
+    flexDirection: 'column',
     minHeight: '100vh',
     background: '#121212',
     color: '#e0e0e0',
     fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
+  },
+  mainRow: {
+    display: 'flex',
+    flex: '1 1 auto',
+    alignItems: 'stretch',
   },
   leftPanel: {
     width: '45%',
@@ -115,6 +133,7 @@ const styles: Record<string, React.CSSProperties> = {
   divider: {
     width: '1px',
     background: '#333',
+    flexShrink: 0,
   },
   rightPanel: {
     width: '54%',
@@ -144,6 +163,12 @@ const styles: Record<string, React.CSSProperties> = {
     whiteSpace: 'pre',
     lineHeight: 1.6,
   },
+  copyWrapper: {
+    position: 'relative',
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+  },
   copyBtn: {
     padding: '8px 20px',
     background: '#333',
@@ -154,5 +179,17 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: '14px',
     whiteSpace: 'nowrap',
     transition: 'background 0.2s',
+  },
+  copiedToast: {
+    position: 'absolute',
+    top: '40px',
+    background: '#64ffda',
+    color: '#121212',
+    padding: '6px 14px',
+    borderRadius: '6px',
+    fontSize: '12px',
+    fontWeight: 600,
+    whiteSpace: 'nowrap',
+    animation: 'fadeIn 0.2s ease',
   },
 };

@@ -91,7 +91,6 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     flexDirection: 'column',
     overflow: 'hidden',
-    minHeight: '500px',
   },
   header: {
     height: '80px',

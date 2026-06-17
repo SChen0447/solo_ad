@@ -1,8 +1,17 @@
 import { useState, useCallback, useRef } from 'react';
 
 interface UploadZoneProps {
-  onFileSelect: (file: File) => void;
+  onFileSelect: (base64DataUrl: string) => void;
   loading: boolean;
+}
+
+function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
 }
 
 export default function UploadZone({ onFileSelect, loading }: UploadZoneProps) {
@@ -10,7 +19,7 @@ export default function UploadZone({ onFileSelect, loading }: UploadZoneProps) {
   const inputRef = useRef<HTMLInputElement>(null);
 
   const validateAndSend = useCallback(
-    (file: File) => {
+    async (file: File) => {
       const validTypes = ['image/jpeg', 'image/png', 'image/webp'];
       if (!validTypes.includes(file.type)) {
         alert('仅支持 JPG、PNG、WebP 格式');
@@ -20,7 +29,8 @@ export default function UploadZone({ onFileSelect, loading }: UploadZoneProps) {
         alert('文件大小不能超过 10MB');
         return;
       }
-      onFileSelect(file);
+      const base64 = await fileToBase64(file);
+      onFileSelect(base64);
     },
     [onFileSelect]
   );

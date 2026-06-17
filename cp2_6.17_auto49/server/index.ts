@@ -1,12 +1,11 @@
 import express from 'express';
 import cors from 'cors';
-import multer from 'multer';
+import https from 'https';
+import http from 'http';
 
 const app = express();
 app.use(cors());
 app.use(express.json({ limit: '15mb' }));
-
-const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 
 interface Pixel {
   r: number;
@@ -90,78 +89,6 @@ function kMeans(pixels: Pixel[], k: number, maxIter: number = 20): Centroid[] {
   return centroids;
 }
 
-function extractPixelsFromBuffer(buffer: Buffer): Pixel[] {
-  const width = buffer.readUInt32BE(16);
-  const height = buffer.readUInt32BE(20);
-  const bpp = buffer.readUInt8(25);
-  const pixelData = buffer.slice(buffer.readUInt32BE(28));
-
-  const pixels: Pixel[] = [];
-  const stride = Math.ceil((width * bpp) / 8);
-  const maxPixels = 10000;
-  const step = Math.max(1, Math.floor((width * height) / maxPixels));
-
-  let idx = 0;
-  for (let y = 0; y < height; y++) {
-    for (let x = 0; x < width; x++) {
-      if (idx % step === 0) {
-        const offset = y * stride + x * (bpp / 8);
-        if (offset + 2 < pixelData.length) {
-          pixels.push({
-            r: pixelData[offset],
-            g: pixelData[offset + 1],
-            b: pixelData[offset + 2],
-          });
-        }
-      }
-      idx++;
-    }
-  }
-
-  return pixels;
-}
-
-app.post('/api/extract-colors', upload.single('image'), (req: express.Request, res: express.Response) => {
-  try {
-    const file = req.file;
-    if (!file || !file.buffer) {
-      res.status(400).json({ error: 'No image provided' });
-      return;
-    }
-
-    const buffer = file.buffer;
-    const mime = file.mimetype;
-
-    let pixels: Pixel[];
-
-    if (mime === 'image/png') {
-      pixels = extractPixelsFromPng(buffer);
-    } else {
-      pixels = extractPixelsFallback(buffer);
-    }
-
-    if (pixels.length < 5) {
-      res.status(400).json({ error: 'Image too small or invalid' });
-      return;
-    }
-
-    const centroids = kMeans(pixels, 5);
-
-    const total = centroids.reduce((s, c) => s + c.count, 0);
-    const colors = centroids
-      .map(c => ({
-        hex: rgbToHex(c.r, c.g, c.b),
-        percentage: (c.count / total) * 100,
-      }))
-      .sort((a, b) => b.percentage - a.percentage);
-
-    res.json({ colors });
-  } catch (err) {
-    console.error('Extraction error:', err);
-    res.status(500).json({ error: 'Color extraction failed' });
-  }
-});
-
 function extractPixelsFromPng(buffer: Buffer): Pixel[] {
   try {
     const zlib = require('zlib');
@@ -231,7 +158,90 @@ function extractPixelsFallback(buffer: Buffer): Pixel[] {
   return pixels;
 }
 
+function extractPixels(buffer: Buffer, mime: string): Pixel[] {
+  if (mime === 'image/png') {
+    return extractPixelsFromPng(buffer);
+  }
+  return extractPixelsFallback(buffer);
+}
+
+function fetchImage(url: string): Promise<Buffer> {
+  return new Promise((resolve, reject) => {
+    const client = url.startsWith('https') ? https : http;
+    client.get(url, (res) => {
+      if (res.statusCode && res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+        return fetchImage(res.headers.location).then(resolve).catch(reject);
+      }
+      const chunks: Buffer[] = [];
+      res.on('data', (chunk: Buffer) => chunks.push(chunk));
+      res.on('end', () => resolve(Buffer.concat(chunks)));
+      res.on('error', reject);
+    }).on('error', reject);
+  });
+}
+
+function guessMime(image: string): string {
+  if (image.startsWith('data:image/png')) return 'image/png';
+  if (image.startsWith('data:image/webp')) return 'image/webp';
+  if (image.startsWith('data:image/jpeg') || image.startsWith('data:image/jpg')) return 'image/jpeg';
+  const lower = image.toLowerCase();
+  if (lower.endsWith('.png')) return 'image/png';
+  if (lower.endsWith('.webp')) return 'image/webp';
+  return 'image/jpeg';
+}
+
 const sessionStore: Map<string, object> = new Map();
+
+app.get('/api/extract-colors', async (req: express.Request, res: express.Response) => {
+  try {
+    const image = req.query.image as string | undefined;
+    if (!image) {
+      res.status(400).json({ error: 'Missing image parameter (URL or base64)' });
+      return;
+    }
+
+    let buffer: Buffer;
+    let mime: string;
+
+    if (image.startsWith('data:')) {
+      const matches = image.match(/^data:image\/[\w+]+;base64,(.+)$/);
+      if (!matches) {
+        res.status(400).json({ error: 'Invalid base64 data URI' });
+        return;
+      }
+      buffer = Buffer.from(matches[1], 'base64');
+      mime = guessMime(image);
+    } else {
+      buffer = await fetchImage(image);
+      mime = guessMime(image);
+    }
+
+    const pixels = extractPixels(buffer, mime);
+
+    if (pixels.length < 5) {
+      res.status(400).json({ error: 'Image too small or invalid' });
+      return;
+    }
+
+    const centroids = kMeans(pixels, 5);
+
+    const total = centroids.reduce((s, c) => s + c.count, 0);
+    const colors = centroids
+      .map(c => ({
+        hex: rgbToHex(c.r, c.g, c.b),
+        percentage: (c.count / total) * 100,
+      }))
+      .sort((a, b) => b.percentage - a.percentage);
+
+    const sessionId = Date.now().toString(36) + Math.random().toString(36).slice(2);
+    sessionStore.set(sessionId, { colors, timestamp: Date.now() });
+
+    res.json({ colors, sessionId });
+  } catch (err) {
+    console.error('Extraction error:', err);
+    res.status(500).json({ error: 'Color extraction failed' });
+  }
+});
 
 app.get('/api/session/:id', (req: express.Request, res: express.Response) => {
   const data = sessionStore.get(req.params.id);
