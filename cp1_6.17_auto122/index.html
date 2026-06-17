@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>2D太阳系模拟沙盘</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      font-family: 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+      font-size: 16px;
+    }
+
+    body {
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+      background: linear-gradient(to bottom, #0a0a2e, #000000);
+    }
+
+    #app {
+      width: 100%;
+      height: 100%;
+      position: relative;
+    }
+
+    #canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      cursor: crosshair;
+    }
+
+    .panel {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      width: 320px;
+      max-height: calc(100vh - 40px);
+      overflow-y: auto;
+      background: rgba(20, 20, 40, 0.55);
+      backdrop-filter: blur(10px);
+      border-radius: 12px;
+      padding: 20px;
+      color: #ffffff;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .info-section {
+      background: rgba(255, 255, 255, 0.1);
+      backdrop-filter: blur(8px);
+      border-radius: 8px;
+      padding: 15px;
+      margin-bottom: 20px;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+    }
+
+    .info-section h3 {
+      font-size: 18px;
+      margin-bottom: 10px;
+      color: #ffd700;
+    }
+
+    .info-section p {
+      margin: 5px 0;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    .info-section .value {
+      color: #64b5f6;
+      font-weight: 500;
+    }
+
+    .controls-section {
+      margin-top: 20px;
+    }
+
+    .control-group {
+      margin-bottom: 18px;
+    }
+
+    .control-group label {
+      display: block;
+      margin-bottom: 6px;
+      font-size: 14px;
+      color: #e0e0e0;
+    }
+
+    .control-group .value-display {
+      float: right;
+      color: #64b5f6;
+      font-weight: 500;
+    }
+
+    .control-group input[type="range"] {
+      width: 100%;
+      height: 6px;
+      -webkit-appearance: none;
+      appearance: none;
+      background: rgba(255, 255, 255, 0.2);
+      border-radius: 3px;
+      outline: none;
+      cursor: pointer;
+    }
+
+    .control-group input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 16px;
+      height: 16px;
+      background: #64b5f6;
+      border-radius: 50%;
+      cursor: pointer;
+      transition: transform 0.2s, background 0.2s;
+    }
+
+    .control-group input[type="range"]::-webkit-slider-thumb:hover {
+      background: #90caf9;
+      transform: scale(1.1);
+    }
+
+    .control-group input[type="range"]::-moz-range-thumb {
+      width: 16px;
+      height: 16px;
+      background: #64b5f6;
+      border-radius: 50%;
+      cursor: pointer;
+      border: none;
+      transition: transform 0.2s, background 0.2s;
+    }
+
+    .control-group input[type="range"]::-moz-range-thumb:hover {
+      background: #90caf9;
+      transform: scale(1.1);
+    }
+
+    .btn {
+      width: 100%;
+      padding: 12px 20px;
+      background: rgba(100, 181, 246, 0.3);
+      border: 1px solid rgba(100, 181, 246, 0.5);
+      border-radius: 8px;
+      color: #ffffff;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 500;
+      transition: all 0.2s ease;
+      margin-top: 10px;
+    }
+
+    .btn:hover {
+      background: rgba(100, 181, 246, 0.5);
+      transform: scale(0.995);
+    }
+
+    .btn:active {
+      transform: scale(0.99);
+    }
+
+    .panel-title {
+      font-size: 18px;
+      font-weight: 600;
+      margin-bottom: 15px;
+      color: #ffd700;
+      text-align: center;
+      padding-bottom: 10px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .fps-counter {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      background: rgba(20, 20, 40, 0.55);
+      backdrop-filter: blur(10px);
+      border-radius: 12px;
+      padding: 10px 15px;
+      color: #64b5f6;
+      font-size: 14px;
+      font-weight: 500;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .instructions {
+      position: absolute;
+      bottom: 20px;
+      left: 20px;
+      background: rgba(20, 20, 40, 0.55);
+      backdrop-filter: blur(10px);
+      border-radius: 12px;
+      padding: 15px;
+      color: #e0e0e0;
+      font-size: 13px;
+      line-height: 1.6;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      max-width: 280px;
+    }
+
+    .instructions strong {
+      color: #ffd700;
+      font-size: 13px;
+    }
+
+    .asteroid-popup {
+      position: absolute;
+      background: rgba(10, 10, 30, 0.9);
+      border: 2px solid #ffffff;
+      border-radius: 8px;
+      padding: 10px 12px;
+      color: #ffffff;
+      font-size: 12px;
+      pointer-events: none;
+      z-index: 100;
+      min-width: 150px;
+    }
+
+    .asteroid-popup p {
+      margin: 3px 0;
+      font-size: 12px;
+    }
+
+    .asteroid-popup .label {
+      color: #90caf9;
+      margin-right: 5px;
+    }
+
+    .asteroid-popup .value {
+      color: #ffd700;
+    }
+
+    ::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 3px;
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.2);
+      border-radius: 3px;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+      background: rgba(255, 255, 255, 0.3);
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <canvas id="canvas"></canvas>
+    
+    <div class="fps-counter">
+      FPS: <span id="fpsValue">60</span>
+    </div>
+
+    <div class="instructions">
+      <p><strong>操作说明：</strong></p>
+      <p>• 点击画布添加小行星</p>
+      <p>• 点击行星查看详细信息</p>
+      <p>• 点击小行星查看实时状态</p>
+      <p>• 拖动滑块调整参数</p>
+    </div>
+
+    <div class="panel">
+      <div class="panel-title">⚙️ 控制面板</div>
+      
+      <div class="info-section" id="planetInfo">
+        <h3 id="planetName">未选中行星</h3>
+        <p id="planetDetails" style="color: #888; font-style: italic;">点击行星查看详细信息</p>
+      </div>
+
+      <div class="controls-section">
+        <div class="control-group">
+          <label>
+            恒星星体质量
+            <span class="value-display"><span id="sunMassValue">1000</span></span>
+          </label>
+          <input type="range" id="sunMass" min="500" max="3000" step="10" value="1000">
+        </div>
+
+        <div class="control-group">
+          <label>
+            选中行星质量
+            <span class="value-display"><span id="planetMassValue">0</span></span>
+          </label>
+          <input type="range" id="planetMass" min="1" max="100" step="1" value="10">
+        </div>
+
+        <div class="control-group">
+          <label>
+            G值常数
+            <span class="value-display"><span id="gValue">0.5</span></span>
+          </label>
+          <input type="range" id="gConstant" min="0.1" max="2.0" step="0.05" value="0.5">
+        </div>
+
+        <div class="control-group">
+          <label>
+            小行星初始速度 X
+            <span class="value-display"><span id="velXValue">0</span></span>
+          </label>
+          <input type="range" id="asteroidVelX" min="-5" max="5" step="0.1" value="0">
+        </div>
+
+        <div class="control-group">
+          <label>
+            小行星初始速度 Y
+            <span class="value-display"><span id="velYValue">0</span></span>
+          </label>
+          <input type="range" id="asteroidVelY" min="-5" max="5" step="0.1" value="0">
+        </div>
+
+        <button class="btn" id="resetBtn">🔄 重置小行星</button>
+      </div>
+    </div>
+
+    <div id="asteroidPopup" class="asteroid-popup" style="display: none;"></div>
+  </div>
+
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
