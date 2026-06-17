@@ -63,6 +63,8 @@ const App: React.FC = () => {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [barHeights, setBarHeights] = useState<number[]>([])
+  const [hoveredBar, setHoveredBar] = useState<number | null>(null)
+  const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 })
   const pollingRef = useRef<number | null>(null)
 
   useEffect(() => {
@@ -845,35 +847,152 @@ const App: React.FC = () => {
           {pollResult ? (
             <div>
               {pollResult.type === 'choice' && pollResult.results ? (
-                <div>
+                <div style={{ position: 'relative' }}>
                   <div style={{ color: '#a5b4fc', fontSize: '13px', marginBottom: '20px' }}>
                     共 <span style={{ color: '#fff', fontWeight: 600, fontSize: '16px' }}>{pollResult.total}</span> 人参与投票
                   </div>
-                  <div style={{ display: 'flex', alignItems: 'flex-end', gap: '18px', minHeight: '240px', padding: '0 10px 20px', borderBottom: '2px solid rgba(99,102,241,0.3)' }}>
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'flex-end',
+                    gap: '18px',
+                    minHeight: '260px',
+                    padding: '10px 10px 20px',
+                    borderBottom: '1.5px solid rgba(79,70,229,0.4)',
+                    position: 'relative'
+                  }}>
                     {pollResult.results.map((r, idx) => (
-                      <div key={r.id} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', minWidth: 0 }}>
-                        <div style={{ fontSize: '13px', color: '#818cf8', marginBottom: '4px', fontWeight: 600 }}>
+                      <div
+                        key={r.id}
+                        style={{
+                          flex: 1,
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'center',
+                          minWidth: 0,
+                          position: 'relative'
+                        }}
+                      >
+                        <div style={{
+                          fontSize: '0.85rem',
+                          color: 'rgba(255,255,255,0.75)',
+                          marginBottom: '3px',
+                          fontWeight: 600,
+                          whiteSpace: 'nowrap',
+                          transition: 'all 0.2s ease',
+                          transform: hoveredBar === idx ? 'translateY(-2px)' : 'translateY(0)',
+                          opacity: hoveredBar === idx ? 1 : 0.75
+                        }}>
                           {r.percentage}%
                         </div>
-                        <div style={{ fontSize: '12px', color: '#a5b4fc', marginBottom: '10px' }}>
+                        <div style={{
+                          fontSize: '0.85rem',
+                          color: 'rgba(255,255,255,0.6)',
+                          marginBottom: '10px',
+                          transition: 'all 0.2s ease',
+                          transform: hoveredBar === idx ? 'translateY(-2px)' : 'translateY(0)',
+                          opacity: hoveredBar === idx ? 0.9 : 0.6
+                        }}>
                           {r.votes}票
                         </div>
-                        <div style={{
-                          width: '100%',
-                          maxWidth: '300px',
-                          height: `${barHeights[idx] || 0}px`,
-                          minHeight: '4px',
-                          background: 'linear-gradient(180deg, #818cf8 0%, #6366f1 100%)',
-                          borderRadius: '8px 8px 4px 4px',
-                          transition: 'height 0.5s cubic-bezier(0.34, 1.56, 0.64, 1)',
-                          boxShadow: '0 4px 12px rgba(99,102,241,0.3)'
-                        }} />
+                        <div
+                          onMouseEnter={(e) => {
+                            setHoveredBar(idx)
+                            const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
+                            const parentRect = (e.currentTarget as HTMLElement).parentElement!.parentElement!.parentElement!.getBoundingClientRect()
+                            setTooltipPos({
+                              x: rect.left + rect.width / 2 - parentRect.left,
+                              y: rect.top - parentRect.top - 10
+                            })
+                          }}
+                          onMouseMove={(e) => {
+                            const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
+                            const parentRect = (e.currentTarget as HTMLElement).parentElement!.parentElement!.parentElement!.getBoundingClientRect()
+                            setTooltipPos({
+                              x: rect.left + rect.width / 2 - parentRect.left,
+                              y: rect.top - parentRect.top - 10
+                            })
+                          }}
+                          onMouseLeave={() => setHoveredBar(null)}
+                          style={{
+                            width: '100%',
+                            maxWidth: '300px',
+                            height: `${barHeights[idx] || 0}px`,
+                            minHeight: '4px',
+                            background: 'linear-gradient(180deg, #818cf8 0%, #6366f1 100%)',
+                            borderRadius: '8px 8px 4px 4px',
+                            transition: 'height 0.5s cubic-bezier(0.34, 1.56, 0.64, 1), filter 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease',
+                            boxShadow: hoveredBar === idx
+                              ? '0 8px 24px rgba(99,102,241,0.5), 0 0 20px rgba(129,140,248,0.3)'
+                              : '0 4px 12px rgba(99,102,241,0.3)',
+                            filter: hoveredBar === idx ? 'brightness(1.15)' : 'brightness(1)',
+                            cursor: 'pointer',
+                            position: 'relative'
+                          }}
+                        />
                       </div>
                     ))}
+                    {hoveredBar !== null && pollResult.results[hoveredBar] && (
+                      <div
+                        style={{
+                          position: 'absolute',
+                          left: tooltipPos.x,
+                          top: tooltipPos.y,
+                          transform: 'translate(-50%, -100%)',
+                          background: 'rgba(15,15,35,0.95)',
+                          backdropFilter: 'blur(8px)',
+                          padding: '10px 14px',
+                          borderRadius: '10px',
+                          border: '1px solid rgba(99,102,241,0.4)',
+                          boxShadow: '0 8px 24px rgba(0,0,0,0.4)',
+                          pointerEvents: 'none',
+                          zIndex: 10,
+                          whiteSpace: 'nowrap',
+                          animation: 'tooltipFadeIn 0.18s ease-out',
+                          fontSize: '13px'
+                        }}>
+                        <div style={{
+                          fontWeight: 600,
+                          color: '#fff',
+                          marginBottom: '5px',
+                          fontSize: '13.5px'
+                        }}>
+                          {pollResult.results[hoveredBar].text}
+                        </div>
+                        <div style={{ display: 'flex', gap: '12px', color: '#a5b4fc' }}>
+                          <span>票数: <span style={{ color: '#818cf8', fontWeight: 600 }}>{pollResult.results[hoveredBar].votes}</span></span>
+                          <span>占比: <span style={{ color: '#818cf8', fontWeight: 600 }}>{pollResult.results[hoveredBar].percentage}%</span></span>
+                        </div>
+                        <div style={{
+                          position: 'absolute',
+                          left: '50%',
+                          bottom: '-6px',
+                          transform: 'translateX(-50%) rotate(45deg)',
+                          width: '10px',
+                          height: '10px',
+                          background: 'rgba(15,15,35,0.95)',
+                          borderRight: '1px solid rgba(99,102,241,0.4)',
+                          borderBottom: '1px solid rgba(99,102,241,0.4)'
+                        }} />
+                      </div>
+                    )}
                   </div>
                   <div style={{ display: 'flex', marginTop: '12px', gap: '18px' }}>
-                    {pollResult.results.map(r => (
-                      <div key={r.id} style={{ flex: 1, textAlign: 'center', fontSize: '12px', color: '#c7d2fe', lineHeight: 1.4, wordBreak: 'break-all' }}>
+                    {pollResult.results.map((r, idx) => (
+                      <div
+                        key={r.id}
+                        style={{
+                          flex: 1,
+                          textAlign: 'center',
+                          fontSize: '12px',
+                          color: hoveredBar === idx ? '#e0e7ff' : '#c7d2fe',
+                          lineHeight: 1.4,
+                          wordBreak: 'break-all',
+                          paddingTop: '6px',
+                          borderTop: hoveredBar === idx ? '2px solid rgba(79,70,229,0.6)' : '1px solid rgba(79,70,229,0.2)',
+                          transition: 'all 0.2s ease',
+                          fontWeight: hoveredBar === idx ? 500 : 400
+                        }}
+                      >
                         {r.text.length > 8 ? r.text.slice(0, 8) + '…' : r.text}
                       </div>
                     ))}
@@ -890,31 +1009,57 @@ const App: React.FC = () => {
                     <>
                       {generateWordCloud()}
                       {selectedWord && (
-                        <div style={{
-                          marginTop: '20px',
-                          padding: '14px',
-                          background: 'rgba(99,102,241,0.08)',
-                          borderRadius: '10px',
-                          border: '1px solid rgba(99,102,241,0.2)'
-                        }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-                            <span style={{ color: '#818cf8', fontWeight: 600 }}>「{selectedWord.word}」</span>
+                        <div
+                          key={selectedWord.word}
+                          style={{
+                            marginTop: '20px',
+                            padding: '14px',
+                            background: 'rgba(99,102,241,0.08)',
+                            borderRadius: '10px',
+                            border: '1px solid rgba(99,102,241,0.2)',
+                            animation: 'wordDetailFadeIn 0.35s ease-out'
+                          }}
+                        >
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                            <span style={{ color: '#818cf8', fontWeight: 600, fontSize: '14px' }}>「{selectedWord.word}」相关观点</span>
                             <span style={{ color: '#a5b4fc', fontSize: '12px' }}>出现 {selectedWord.count} 次</span>
                           </div>
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                            {selectedWord.texts.map((t, i) => (
-                              <div key={i} style={{
-                                padding: '8px 12px',
-                                background: 'rgba(255,255,255,0.04)',
-                                borderRadius: '6px',
-                                fontSize: '13px',
-                                color: '#e0e7ff',
-                                lineHeight: 1.5,
-                                borderLeft: '3px solid #6366f1'
-                              }}>
-                                {t}
-                              </div>
-                            ))}
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                            {selectedWord.texts.map((t, i) => {
+                              const dotColors = ['#a5b4fc', '#c7d2fe', '#e0e7ff', '#f5f3ff', '#818cf8']
+                              const dotColor = dotColors[(i * 3 + selectedWord.word.length) % dotColors.length]
+                              return (
+                                <div
+                                  key={i}
+                                  style={{
+                                    display: 'flex',
+                                    alignItems: 'flex-start',
+                                    gap: '10px',
+                                    padding: '10px 12px',
+                                    background: 'rgba(255,255,255,0.04)',
+                                    borderRadius: '8px',
+                                    fontSize: '13px',
+                                    color: '#e0e7ff',
+                                    lineHeight: 1.6,
+                                    animation: `viewItemFadeIn 0.4s ease-out ${i * 0.08}s both`
+                                  }}
+                                >
+                                  <span
+                                    style={{
+                                      display: 'inline-block',
+                                      width: '8px',
+                                      height: '8px',
+                                      borderRadius: '50%',
+                                      background: dotColor,
+                                      marginTop: '8px',
+                                      flexShrink: 0,
+                                      boxShadow: `0 0 6px ${dotColor}`
+                                    }}
+                                  />
+                                  <span style={{ flex: 1 }}>{t}</span>
+                                </div>
+                              )
+                            })}
                           </div>
                         </div>
                       )}
@@ -938,6 +1083,18 @@ const App: React.FC = () => {
         @keyframes fadeInScale {
           0% { opacity: 0; transform: scale(0.97); }
           100% { opacity: 1; transform: scale(1); }
+        }
+        @keyframes tooltipFadeIn {
+          0% { opacity: 0; transform: translate(-50%, -90%); }
+          100% { opacity: 1; transform: translate(-50%, -100%); }
+        }
+        @keyframes wordDetailFadeIn {
+          0% { opacity: 0; transform: translateY(8px); }
+          100% { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes viewItemFadeIn {
+          0% { opacity: 0; transform: translateX(-8px); }
+          100% { opacity: 1; transform: translateX(0); }
         }
         @media (max-width: 768px) {
           div[style*="max-width: 1200px"] { padding: 0 !important; }
