@@ -8,6 +8,8 @@ class App {
   private waveformCtx: CanvasRenderingContext2D;
   private isAudioLoaded = false;
   private currentPlaybackFraction = 0;
+  private waveformData: Float32Array = new Float32Array(0);
+  private cachedWaveform: { min: number; max: number }[] = [];
 
   constructor() {
     const container = document.getElementById('three-container')!;
@@ -37,6 +39,20 @@ class App {
       this.waveformCanvas.width = newRect.width * newDpr;
       this.waveformCanvas.height = newRect.height * newDpr;
       this.waveformCtx.scale(newDpr, newDpr);
+      if (this.cachedWaveform.length > 0) {
+        this.buildCachedWaveform();
+      }
+    });
+
+    this.waveformCanvas.addEventListener('click', (e) => {
+      if (!this.isAudioLoaded) return;
+      const rect = this.waveformCanvas.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const fraction = x / rect.width;
+      const centerX = 0.5;
+      const offset = (fraction - centerX) * 2;
+      const targetFraction = Math.max(0, Math.min(1, this.currentPlaybackFraction + offset * 0.5));
+      this.visualizer.seekTo(targetFraction);
     });
   }
 
@@ -82,113 +98,203 @@ class App {
       overlay.classList.add('hidden');
 
       this.controls.showUI();
-      this.drawStaticWaveform();
+      this.waveformData = this.visualizer.getWaveformData();
+      this.buildCachedWaveform();
       this.isAudioLoaded = true;
+      this.drawStaticWaveform();
     } catch (err) {
       console.error('Failed to load audio:', err);
     }
   }
 
-  private drawStaticWaveform(): void {
-    const data = this.visualizer.getWaveformData();
-    if (data.length === 0) return;
+  private buildCachedWaveform(): void {
+    if (this.waveformData.length === 0) return;
 
+    const canvas = this.waveformCanvas;
+    const w = canvas.clientWidth;
+    const samples = Math.floor(w * 1.5);
+    this.cachedWaveform = [];
+
+    const blockSize = Math.floor(this.waveformData.length / samples);
+    for (let i = 0; i < samples; i++) {
+      const start = i * blockSize;
+      let min = 1;
+      let max = -1;
+      for (let j = 0; j < blockSize; j++) {
+        const val = this.waveformData[start + j] ?? 0;
+        if (val < min) min = val;
+        if (val > max) max = val;
+      }
+      this.cachedWaveform.push({ min, max });
+    }
+  }
+
+  private drawStaticWaveform(): void {
     const canvas = this.waveformCanvas;
     const ctx = this.waveformCtx;
     const w = canvas.clientWidth;
     const h = canvas.clientHeight;
+    const halfH = h / 2;
 
     ctx.clearRect(0, 0, w, h);
 
-    const step = Math.ceil(data.length / w);
-    const halfH = h / 2;
+    if (this.cachedWaveform.length === 0) return;
+
+    const sampleCount = this.cachedWaveform.length;
+    const xStep = w / sampleCount;
 
     ctx.beginPath();
-    ctx.strokeStyle = 'rgba(123, 47, 255, 0.5)';
+    ctx.strokeStyle = 'rgba(123, 47, 255, 0.6)';
     ctx.lineWidth = 1;
 
-    for (let x = 0; x < w; x++) {
-      const idx = Math.floor(x * data.length / w);
-      let min = 1.0;
-      let max = -1.0;
-      for (let j = 0; j < step; j++) {
-        const val = data[idx + j] ?? 0;
-        if (val < min) min = val;
-        if (val > max) max = val;
-      }
-      const yMin = halfH + min * halfH;
-      const yMax = halfH + max * halfH;
+    for (let i = 0; i < sampleCount; i++) {
+      const x = i * xStep;
+      const s = this.cachedWaveform[i]!;
+      const yMin = halfH + s.min * halfH;
+      const yMax = halfH + s.max * halfH;
       ctx.moveTo(x, yMin);
       ctx.lineTo(x, yMax);
     }
     ctx.stroke();
   }
 
-  private drawPlayingWaveform(): void {
-    const data = this.visualizer.getWaveformData();
-    if (data.length === 0) return;
-
+  private drawPlayingScrollingWaveform(): void {
     const canvas = this.waveformCanvas;
     const ctx = this.waveformCtx;
     const w = canvas.clientWidth;
     const h = canvas.clientHeight;
+    const halfH = h / 2;
 
     ctx.clearRect(0, 0, w, h);
 
-    const step = Math.ceil(data.length / w);
-    const halfH = h / 2;
-    const playedX = this.currentPlaybackFraction * w;
+    if (this.cachedWaveform.length === 0) return;
 
-    ctx.beginPath();
-    ctx.strokeStyle = 'rgba(123, 47, 255, 0.3)';
-    ctx.lineWidth = 1;
+    const totalSamples = this.cachedWaveform.length;
+    const currentSample = Math.floor(this.currentPlaybackFraction * totalSamples);
+    const centerX = w * 0.5;
+    const samplesPerPixel = totalSamples / w;
 
-    for (let x = 0; x < w; x++) {
-      if (x <= playedX) continue;
-      const idx = Math.floor(x * data.length / w);
-      let min = 1.0;
-      let max = -1.0;
-      for (let j = 0; j < step; j++) {
-        const val = data[idx + j] ?? 0;
-        if (val < min) min = val;
-        if (val > max) max = val;
-      }
-      const yMin = halfH + min * halfH;
-      const yMax = halfH + max * halfH;
-      ctx.moveTo(x, yMin);
-      ctx.lineTo(x, yMax);
-    }
-    ctx.stroke();
-
-    const gradient = ctx.createLinearGradient(0, 0, playedX, 0);
-    gradient.addColorStop(0, 'rgba(123, 47, 255, 0.8)');
-    gradient.addColorStop(1, 'rgba(255, 107, 53, 0.8)');
+    const gradient = ctx.createLinearGradient(0, 0, centerX, 0);
+    gradient.addColorStop(0, 'rgba(123, 47, 255, 0.9)');
+    gradient.addColorStop(0.5, 'rgba(180, 100, 255, 0.8)');
+    gradient.addColorStop(1, 'rgba(255, 107, 53, 0.9)');
 
     ctx.beginPath();
     ctx.strokeStyle = gradient;
     ctx.lineWidth = 1.5;
 
-    for (let x = 0; x < playedX; x++) {
-      const idx = Math.floor(x * data.length / w);
-      let min = 1.0;
-      let max = -1.0;
-      for (let j = 0; j < step; j++) {
-        const val = data[idx + j] ?? 0;
-        if (val < min) min = val;
-        if (val > max) max = val;
-      }
-      const yMin = halfH + min * halfH;
-      const yMax = halfH + max * halfH;
-      ctx.moveTo(x, yMin);
-      ctx.lineTo(x, yMax);
+    for (let px = 0; px < centerX; px++) {
+      const sampleIdx = Math.floor(currentSample - (centerX - px) * samplesPerPixel);
+      if (sampleIdx < 0 || sampleIdx >= totalSamples) continue;
+      const s = this.cachedWaveform[sampleIdx]!;
+      const yMin = halfH + s.min * halfH;
+      const yMax = halfH + s.max * halfH;
+      ctx.moveTo(px, yMin);
+      ctx.lineTo(px, yMax);
     }
     ctx.stroke();
 
     ctx.beginPath();
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.9)';
+    ctx.strokeStyle = 'rgba(123, 47, 255, 0.25)';
+    ctx.lineWidth = 1;
+
+    for (let px = centerX; px < w; px++) {
+      const sampleIdx = Math.floor(currentSample + (px - centerX) * samplesPerPixel);
+      if (sampleIdx < 0 || sampleIdx >= totalSamples) continue;
+      const s = this.cachedWaveform[sampleIdx]!;
+      const yMin = halfH + s.min * halfH;
+      const yMax = halfH + s.max * halfH;
+      ctx.moveTo(px, yMin);
+      ctx.lineTo(px, yMax);
+    }
+    ctx.stroke();
+
+    ctx.beginPath();
+    const playheadGrad = ctx.createLinearGradient(centerX, 0, centerX, h);
+    playheadGrad.addColorStop(0, 'rgba(255, 255, 255, 0)');
+    playheadGrad.addColorStop(0.3, 'rgba(255, 255, 255, 0.9)');
+    playheadGrad.addColorStop(0.7, 'rgba(255, 255, 255, 0.9)');
+    playheadGrad.addColorStop(1, 'rgba(255, 255, 255, 0)');
+    ctx.strokeStyle = playheadGrad;
     ctx.lineWidth = 2;
-    ctx.moveTo(playedX, 0);
-    ctx.lineTo(playedX, h);
+    ctx.moveTo(centerX, 0);
+    ctx.lineTo(centerX, h);
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.fillStyle = 'rgba(255, 107, 53, 0.9)';
+    ctx.arc(centerX, halfH, 4, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.shadowColor = 'rgba(255, 107, 53, 0.8)';
+    ctx.shadowBlur = 10;
+    ctx.beginPath();
+    ctx.fillStyle = 'rgba(255, 107, 53, 1)';
+    ctx.arc(centerX, halfH, 3, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.shadowBlur = 0;
+  }
+
+  private drawPausedScrollingWaveform(): void {
+    const canvas = this.waveformCanvas;
+    const ctx = this.waveformCtx;
+    const w = canvas.clientWidth;
+    const h = canvas.clientHeight;
+    const halfH = h / 2;
+
+    ctx.clearRect(0, 0, w, h);
+
+    if (this.cachedWaveform.length === 0) return;
+
+    const totalSamples = this.cachedWaveform.length;
+    const currentSample = Math.floor(this.currentPlaybackFraction * totalSamples);
+    const centerX = w * 0.5;
+    const samplesPerPixel = totalSamples / w;
+
+    const gradient = ctx.createLinearGradient(0, 0, centerX, 0);
+    gradient.addColorStop(0, 'rgba(123, 47, 255, 0.7)');
+    gradient.addColorStop(1, 'rgba(255, 107, 53, 0.7)');
+
+    ctx.beginPath();
+    ctx.strokeStyle = gradient;
+    ctx.lineWidth = 1.2;
+
+    for (let px = 0; px < centerX; px++) {
+      const sampleIdx = Math.floor(currentSample - (centerX - px) * samplesPerPixel);
+      if (sampleIdx < 0 || sampleIdx >= totalSamples) continue;
+      const s = this.cachedWaveform[sampleIdx]!;
+      const yMin = halfH + s.min * halfH;
+      const yMax = halfH + s.max * halfH;
+      ctx.moveTo(px, yMin);
+      ctx.lineTo(px, yMax);
+    }
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.strokeStyle = 'rgba(123, 47, 255, 0.2)';
+    ctx.lineWidth = 1;
+
+    for (let px = centerX; px < w; px++) {
+      const sampleIdx = Math.floor(currentSample + (px - centerX) * samplesPerPixel);
+      if (sampleIdx < 0 || sampleIdx >= totalSamples) continue;
+      const s = this.cachedWaveform[sampleIdx]!;
+      const yMin = halfH + s.min * halfH;
+      const yMax = halfH + s.max * halfH;
+      ctx.moveTo(px, yMin);
+      ctx.lineTo(px, yMax);
+    }
+    ctx.stroke();
+
+    ctx.beginPath();
+    const playheadGrad = ctx.createLinearGradient(centerX, 0, centerX, h);
+    playheadGrad.addColorStop(0, 'rgba(255, 255, 255, 0)');
+    playheadGrad.addColorStop(0.3, 'rgba(255, 255, 255, 0.8)');
+    playheadGrad.addColorStop(0.7, 'rgba(255, 255, 255, 0.8)');
+    playheadGrad.addColorStop(1, 'rgba(255, 255, 255, 0)');
+    ctx.strokeStyle = playheadGrad;
+    ctx.lineWidth = 2;
+    ctx.moveTo(centerX, 0);
+    ctx.lineTo(centerX, h);
     ctx.stroke();
   }
 
@@ -202,7 +308,9 @@ class App {
       this.currentPlaybackFraction = duration > 0 ? current / duration : 0;
 
       if (this.visualizer.getIsPlaying()) {
-        this.drawPlayingWaveform();
+        this.drawPlayingScrollingWaveform();
+      } else {
+        this.drawPausedScrollingWaveform();
       }
     };
     loop();

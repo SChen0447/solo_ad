@@ -12,9 +12,11 @@ export class Controls {
   private sliderRadius: HTMLInputElement;
   private sliderSize: HTMLInputElement;
   private sliderRotation: HTMLInputElement;
+  private sliderParticles: HTMLInputElement;
   private valRadius: HTMLElement;
   private valSize: HTMLElement;
   private valRotation: HTMLElement;
+  private valParticles: HTMLElement;
   private gradientBtns: NodeListOf<HTMLButtonElement>;
   private modeBtns: NodeListOf<HTMLButtonElement>;
   private btnPlay: HTMLButtonElement;
@@ -30,9 +32,11 @@ export class Controls {
     this.sliderRadius = document.getElementById('slider-radius') as HTMLInputElement;
     this.sliderSize = document.getElementById('slider-size') as HTMLInputElement;
     this.sliderRotation = document.getElementById('slider-rotation') as HTMLInputElement;
+    this.sliderParticles = document.getElementById('slider-particles') as HTMLInputElement;
     this.valRadius = document.getElementById('val-radius')!;
     this.valSize = document.getElementById('val-size')!;
     this.valRotation = document.getElementById('val-rotation')!;
+    this.valParticles = document.getElementById('val-particles')!;
     this.gradientBtns = document.querySelectorAll('.gradient-btn');
     this.modeBtns = document.querySelectorAll('.mode-btn');
     this.btnPlay = document.getElementById('btn-play') as HTMLButtonElement;
@@ -69,6 +73,12 @@ export class Controls {
       const val = parseInt(this.sliderRotation.value, 10);
       this.valRotation.textContent = val.toString();
       this.emitParams({ rotationSpeed: val });
+    });
+
+    this.sliderParticles.addEventListener('input', () => {
+      const val = parseInt(this.sliderParticles.value, 10);
+      this.valParticles.textContent = val.toString();
+      this.emitParams({ particleCount: val });
     });
   }
 

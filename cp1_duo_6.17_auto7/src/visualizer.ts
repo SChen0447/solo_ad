@@ -6,80 +6,146 @@ export interface VisualizerParams {
   rotationSpeed: number;
   gradientMode: GradientMode;
   renderMode: RenderMode;
+  particleCount: number;
 }
 
 export type GradientMode = 'aurora' | 'lava' | 'ocean' | 'neon';
 export type RenderMode = 'roam' | 'wave';
 
-interface GradientStop {
+interface RGB {
   r: number;
   g: number;
   b: number;
 }
 
-interface GradientPreset {
-  stops: [GradientStop, GradientStop, GradientStop];
+interface BandGradient {
+  lowStart: RGB;
+  lowEnd: RGB;
+  midStart: RGB;
+  midEnd: RGB;
+  highStart: RGB;
+  highEnd: RGB;
 }
 
-const GRADIENT_PRESETS: Record<GradientMode, GradientPreset> = {
+const GRADIENT_PRESETS: Record<GradientMode, BandGradient> = {
   aurora: {
-    stops: [
-      { r: 0.04, g: 0.04, b: 0.18 },
-      { r: 0.48, g: 0.18, b: 1.0 },
-      { r: 1.0, g: 0.42, b: 0.21 },
-    ],
+    lowStart: { r: 0.039, g: 0.039, b: 0.18 },
+    lowEnd: { r: 0.3, g: 0.1, b: 0.8 },
+    midStart: { r: 0.3, g: 0.1, b: 0.8 },
+    midEnd: { r: 0.6, g: 0.3, b: 1.0 },
+    highStart: { r: 0.6, g: 0.3, b: 1.0 },
+    highEnd: { r: 1.0, g: 0.42, b: 0.21 },
   },
   lava: {
-    stops: [
-      { r: 0.1, g: 0.0, b: 0.0 },
-      { r: 1.0, g: 0.27, b: 0.0 },
-      { r: 1.0, g: 0.84, b: 0.0 },
-    ],
+    lowStart: { r: 0.1, g: 0.0, b: 0.0 },
+    lowEnd: { r: 0.6, g: 0.1, b: 0.0 },
+    midStart: { r: 0.6, g: 0.1, b: 0.0 },
+    midEnd: { r: 1.0, g: 0.4, b: 0.0 },
+    highStart: { r: 1.0, g: 0.4, b: 0.0 },
+    highEnd: { r: 1.0, g: 0.84, b: 0.0 },
   },
   ocean: {
-    stops: [
-      { r: 0.0, g: 0.0, b: 0.13 },
-      { r: 0.0, g: 0.41, b: 0.58 },
-      { r: 0.0, g: 1.0, b: 0.8 },
-    ],
+    lowStart: { r: 0.0, g: 0.0, b: 0.13 },
+    lowEnd: { r: 0.0, g: 0.2, b: 0.4 },
+    midStart: { r: 0.0, g: 0.2, b: 0.4 },
+    midEnd: { r: 0.0, g: 0.6, b: 0.8 },
+    highStart: { r: 0.0, g: 0.6, b: 0.8 },
+    highEnd: { r: 0.0, g: 1.0, b: 0.8 },
   },
   neon: {
-    stops: [
-      { r: 0.05, g: 0.01, b: 0.13 },
-      { r: 1.0, g: 0.0, b: 1.0 },
-      { r: 0.0, g: 1.0, b: 1.0 },
-    ],
+    lowStart: { r: 0.05, g: 0.01, b: 0.13 },
+    lowEnd: { r: 0.5, g: 0.0, b: 0.5 },
+    midStart: { r: 0.5, g: 0.0, b: 0.5 },
+    midEnd: { r: 1.0, g: 0.0, b: 1.0 },
+    highStart: { r: 1.0, g: 0.0, b: 1.0 },
+    highEnd: { r: 0.0, g: 1.0, b: 1.0 },
   },
 };
 
-const PARTICLE_COUNT = 6000;
+const DEFAULT_PARTICLE_COUNT = 6000;
+const MIN_PARTICLE_COUNT = 1000;
+const MAX_PARTICLE_COUNT = 10000;
 const COLOR_LERP_DURATION = 0.8;
 const MODE_TRANSITION_DURATION = 1.2;
+const LOW_FREQ_END = 250;
+const MID_FREQ_END = 2000;
+const HIGH_FREQ_END = 20000;
+
+class ParticleSystem {
+  geometry: THREE.BufferGeometry;
+  material: THREE.PointsMaterial;
+  points: THREE.Points;
+  positions: Float32Array;
+  colors: Float32Array;
+  targetColors: Float32Array;
+  sizes: Float32Array;
+  baseAngles: Float32Array;
+  baseRadii: Float32Array;
+  baseY: Float32Array;
+  basePhases: Float32Array;
+  roamPositions: Float32Array;
+  wavePositions: Float32Array;
+  count: number;
+
+  constructor(count: number, particleTexture: THREE.Texture) {
+    this.count = count;
+    this.positions = new Float32Array(count * 3);
+    this.colors = new Float32Array(count * 3);
+    this.targetColors = new Float32Array(count * 3);
+    this.sizes = new Float32Array(count);
+    this.baseAngles = new Float32Array(count);
+    this.baseRadii = new Float32Array(count);
+    this.baseY = new Float32Array(count);
+    this.basePhases = new Float32Array(count);
+    this.roamPositions = new Float32Array(count * 3);
+    this.wavePositions = new Float32Array(count * 3);
+
+    this.geometry = new THREE.BufferGeometry();
+    this.geometry.setAttribute('position', new THREE.BufferAttribute(this.positions, 3));
+    this.geometry.setAttribute('color', new THREE.BufferAttribute(this.colors, 3));
+
+    this.material = new THREE.PointsMaterial({
+      size: 0.5,
+      map: particleTexture,
+      vertexColors: true,
+      transparent: true,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+      sizeAttenuation: true,
+      opacity: 1,
+    });
+
+    this.points = new THREE.Points(this.geometry, this.material);
+  }
+
+  markAttributesDirty(): void {
+    const posAttr = this.geometry.attributes.position as THREE.BufferAttribute;
+    const colorAttr = this.geometry.attributes.color as THREE.BufferAttribute;
+    posAttr.needsUpdate = true;
+    colorAttr.needsUpdate = true;
+  }
+
+  dispose(): void {
+    this.geometry.dispose();
+    this.material.dispose();
+  }
+}
 
 export class AudioVisualizer {
   private scene: THREE.Scene;
   private camera: THREE.PerspectiveCamera;
   private renderer: THREE.WebGLRenderer;
-  private particleGeometry: THREE.BufferGeometry;
-  private particleMaterial: THREE.PointsMaterial;
-  private particleSystem: THREE.Points;
 
-  private positions: Float32Array;
-  private colors: Float32Array;
-  private sizes: Float32Array;
-  private targetColors: Float32Array;
-  private baseAngles: Float32Array;
-  private baseRadii: Float32Array;
-  private baseY: Float32Array;
-  private basePhases: Float32Array;
-  private roamPositions: Float32Array;
-  private wavePositions: Float32Array;
+  private particleSystem: ParticleSystem | null = null;
+  private transitionSystem: ParticleSystem | null = null;
+  private particleTexture: THREE.Texture | null = null;
 
   private audioContext: AudioContext | null = null;
   private analyser: AnalyserNode | null = null;
   private sourceNode: AudioBufferSourceNode | null = null;
   private audioBuffer: AudioBuffer | null = null;
   private frequencyData: Uint8Array<ArrayBuffer> = new Uint8Array(0);
+  private sampleRate = 44100;
 
   private params: VisualizerParams = {
     spreadRadius: 15,
@@ -87,16 +153,18 @@ export class AudioVisualizer {
     rotationSpeed: 30,
     gradientMode: 'aurora',
     renderMode: 'roam',
+    particleCount: DEFAULT_PARTICLE_COUNT,
   };
 
-  private currentColors: GradientPreset = GRADIENT_PRESETS.aurora;
-  private previousColors: GradientPreset = GRADIENT_PRESETS.aurora;
+  private currentColors: BandGradient = GRADIENT_PRESETS.aurora;
+  private previousColors: BandGradient = GRADIENT_PRESETS.aurora;
   private colorLerpProgress = 1.0;
   private colorLerpStartTime = 0;
 
+  private targetRenderMode: RenderMode = 'roam';
   private modeTransitionProgress = 1.0;
   private modeTransitionStartTime = 0;
-  private currentRenderMode: RenderMode = 'roam';
+  private isTransitioningMode = false;
 
   private isPlaying = false;
   private startTime = 0;
@@ -109,6 +177,13 @@ export class AudioVisualizer {
 
   private groundRing: THREE.Mesh | null = null;
   private ringScale = 0;
+
+  private fpsHistory: number[] = [];
+  private fpsCheckTimer = 0;
+  private autoPerformanceMode = false;
+  private frameCount = 0;
+  private fpsTimer = 0;
+  private currentFps = 60;
 
   constructor(container: HTMLElement) {
     this.scene = new THREE.Scene();
@@ -123,60 +198,17 @@ export class AudioVisualizer {
     this.renderer.setClearColor(0x000000, 0);
     container.appendChild(this.renderer.domElement);
 
-    const count = PARTICLE_COUNT;
+    this.createParticleTexture();
+    this.createGroundRing();
+    this.createLights();
+    this.rebuildParticleSystem(this.params.particleCount, false);
 
-    this.positions = new Float32Array(count * 3);
-    this.colors = new Float32Array(count * 3);
-    this.targetColors = new Float32Array(count * 3);
-    this.sizes = new Float32Array(count);
-    this.baseAngles = new Float32Array(count);
-    this.baseRadii = new Float32Array(count);
-    this.baseY = new Float32Array(count);
-    this.basePhases = new Float32Array(count);
-    this.roamPositions = new Float32Array(count * 3);
-    this.wavePositions = new Float32Array(count * 3);
+    window.addEventListener('resize', this.onResize);
+    this.lastFrameTime = performance.now();
+    this.animate();
+  }
 
-    for (let i = 0; i < count; i++) {
-      const angle = Math.random() * Math.PI * 2;
-      const radius = Math.random() * this.params.spreadRadius + 1;
-      const y = (Math.random() - 0.5) * this.params.spreadRadius * 0.8;
-
-      this.baseAngles[i] = angle;
-      this.baseRadii[i] = radius;
-      this.baseY[i] = y;
-      this.basePhases[i] = Math.random() * Math.PI * 2;
-
-      this.roamPositions[i * 3] = Math.cos(angle) * radius;
-      this.roamPositions[i * 3 + 1] = y;
-      this.roamPositions[i * 3 + 2] = Math.sin(angle) * radius;
-
-      const u = (i % Math.ceil(Math.sqrt(count))) / Math.ceil(Math.sqrt(count));
-      const v = Math.floor(i / Math.ceil(Math.sqrt(count))) / Math.ceil(Math.sqrt(count));
-      this.wavePositions[i * 3] = (u - 0.5) * this.params.spreadRadius * 2;
-      this.wavePositions[i * 3 + 1] = 0;
-      this.wavePositions[i * 3 + 2] = (v - 0.5) * this.params.spreadRadius * 2;
-
-      this.positions[i * 3] = this.roamPositions[i * 3] as number;
-      this.positions[i * 3 + 1] = this.roamPositions[i * 3 + 1] as number;
-      this.positions[i * 3 + 2] = this.roamPositions[i * 3 + 2] as number;
-
-      const t = i / count;
-      const color = this.sampleGradient(this.currentColors.stops, t);
-      this.colors[i * 3] = color.r;
-      this.colors[i * 3 + 1] = color.g;
-      this.colors[i * 3 + 2] = color.b;
-      this.targetColors[i * 3] = color.r;
-      this.targetColors[i * 3 + 1] = color.g;
-      this.targetColors[i * 3 + 2] = color.b;
-
-      this.sizes[i] = 0.5;
-    }
-
-    this.particleGeometry = new THREE.BufferGeometry();
-    this.particleGeometry.setAttribute('position', new THREE.BufferAttribute(this.positions, 3));
-    this.particleGeometry.setAttribute('color', new THREE.BufferAttribute(this.colors, 3));
-    this.particleGeometry.setAttribute('size', new THREE.BufferAttribute(this.sizes, 1));
-
+  private createParticleTexture(): void {
     const canvas = document.createElement('canvas');
     canvas.width = 64;
     canvas.height = 64;
@@ -188,27 +220,7 @@ export class AudioVisualizer {
     grad.addColorStop(1, 'rgba(255,255,255,0)');
     ctx.fillStyle = grad;
     ctx.fillRect(0, 0, 64, 64);
-    const particleTexture = new THREE.CanvasTexture(canvas);
-
-    this.particleMaterial = new THREE.PointsMaterial({
-      size: 0.5,
-      map: particleTexture,
-      vertexColors: true,
-      transparent: true,
-      blending: THREE.AdditiveBlending,
-      depthWrite: false,
-      sizeAttenuation: true,
-    });
-
-    this.particleSystem = new THREE.Points(this.particleGeometry, this.particleMaterial);
-    this.scene.add(this.particleSystem);
-
-    this.createGroundRing();
-    this.createLights();
-
-    window.addEventListener('resize', this.onResize);
-    this.lastFrameTime = performance.now();
-    this.animate();
+    this.particleTexture = new THREE.CanvasTexture(canvas);
   }
 
   private createGroundRing(): void {
@@ -232,48 +244,140 @@ export class AudioVisualizer {
     this.scene.add(ambient);
   }
 
-  private sampleGradient(stops: [GradientStop, GradientStop, GradientStop], t: number): GradientStop {
-    const clampedT = Math.max(0, Math.min(1, t));
-    if (clampedT < 0.5) {
-      const lt = clampedT * 2;
-      return {
-        r: stops[0].r + (stops[1].r - stops[0].r) * lt,
-        g: stops[0].g + (stops[1].g - stops[0].g) * lt,
-        b: stops[0].b + (stops[1].b - stops[0].b) * lt,
-      };
-    } else {
-      const lt = (clampedT - 0.5) * 2;
-      return {
-        r: stops[1].r + (stops[2].r - stops[1].r) * lt,
-        g: stops[1].g + (stops[2].g - stops[1].g) * lt,
-        b: stops[1].b + (stops[2].b - stops[1].b) * lt,
-      };
+  private rebuildParticleSystem(count: number, transition = false): void {
+    if (!this.particleTexture) return;
+
+    const oldSystem = this.particleSystem;
+    const newSystem = new ParticleSystem(count, this.particleTexture);
+    this.initParticleData(newSystem);
+
+    if (transition && oldSystem) {
+      if (this.transitionSystem) {
+        this.scene.remove(this.transitionSystem.points);
+        this.transitionSystem.dispose();
+      }
+      this.transitionSystem = oldSystem;
+      this.transitionSystem.material.opacity = 1;
+      newSystem.material.opacity = 0;
+    }
+
+    this.particleSystem = newSystem;
+    this.scene.add(newSystem.points);
+
+    if (oldSystem && !transition) {
+      this.scene.remove(oldSystem.points);
+      oldSystem.dispose();
     }
   }
 
-  private lerpGradient(
-    from: [GradientStop, GradientStop, GradientStop],
-    to: [GradientStop, GradientStop, GradientStop],
-    t: number
-  ): [GradientStop, GradientStop, GradientStop] {
+  private initParticleData(system: ParticleSystem): void {
+    const count = system.count;
+    const radius = this.params.spreadRadius;
+
+    for (let i = 0; i < count; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const r = Math.random() * radius + 1;
+      const y = (Math.random() - 0.5) * radius * 0.8;
+
+      system.baseAngles[i] = angle;
+      system.baseRadii[i] = r;
+      system.baseY[i] = y;
+      system.basePhases[i] = Math.random() * Math.PI * 2;
+
+      system.roamPositions[i * 3] = Math.cos(angle) * r;
+      system.roamPositions[i * 3 + 1] = y;
+      system.roamPositions[i * 3 + 2] = Math.sin(angle) * r;
+
+      const gridSize = Math.ceil(Math.sqrt(count));
+      const u = (i % gridSize) / gridSize;
+      const v = Math.floor(i / gridSize) / gridSize;
+      system.wavePositions[i * 3] = (u - 0.5) * radius * 2;
+      system.wavePositions[i * 3 + 1] = 0;
+      system.wavePositions[i * 3 + 2] = (v - 0.5) * radius * 2;
+
+      system.positions[i * 3] = system.roamPositions[i * 3] as number;
+      system.positions[i * 3 + 1] = system.roamPositions[i * 3 + 1] as number;
+      system.positions[i * 3 + 2] = system.roamPositions[i * 3 + 2] as number;
+
+      const color = this.colorFromIndex(i, count, this.currentColors);
+      system.colors[i * 3] = color.r;
+      system.colors[i * 3 + 1] = color.g;
+      system.colors[i * 3 + 2] = color.b;
+      system.targetColors[i * 3] = color.r;
+      system.targetColors[i * 3 + 1] = color.g;
+      system.targetColors[i * 3 + 2] = color.b;
+
+      system.sizes[i] = 0.5;
+    }
+  }
+
+  private colorFromIndex(index: number, total: number, gradient: BandGradient): RGB {
+    const t = index / total;
+
+    if (t < 0.33) {
+      const lt = t / 0.33;
+      return this.lerpRGB(gradient.lowStart, gradient.lowEnd, lt);
+    } else if (t < 0.66) {
+      const lt = (t - 0.33) / 0.33;
+      return this.lerpRGB(gradient.midStart, gradient.midEnd, lt);
+    } else {
+      const lt = (t - 0.66) / 0.34;
+      return this.lerpRGB(gradient.highStart, gradient.highEnd, lt);
+    }
+  }
+
+  private colorFromFrequency(freqBinIndex: number, binCount: number, gradient: BandGradient): RGB {
+    if (binCount === 0) return gradient.midStart;
+
+    const nyquist = this.sampleRate / 2;
+    const freq = (freqBinIndex / binCount) * nyquist;
+
+    const lowEnd = LOW_FREQ_END;
+    const midEnd = MID_FREQ_END;
+    const highEnd = HIGH_FREQ_END;
+
+    const lowBand = Math.min(1, Math.max(0, (freq - 20) / (lowEnd - 20)));
+    const midBand = Math.min(1, Math.max(0, (freq - lowEnd) / (midEnd - lowEnd)));
+    const highBand = Math.min(1, Math.max(0, (freq - midEnd) / (highEnd - midEnd)));
+
+    const lowColor = this.lerpRGB(gradient.lowStart, gradient.lowEnd, lowBand);
+    const midColor = this.lerpRGB(gradient.midStart, gradient.midEnd, midBand);
+    const highColor = this.lerpRGB(gradient.highStart, gradient.highEnd, highBand);
+
+    if (freq < lowEnd) {
+      return lowColor;
+    } else if (freq < lowEnd * 1.5) {
+      const t = (freq - lowEnd) / (lowEnd * 0.5);
+      return this.lerpRGB(lowColor, midColor, t * 0.5 + 0.5);
+    } else if (freq < midEnd * 0.8) {
+      return midColor;
+    } else if (freq < midEnd) {
+      const t = (freq - midEnd * 0.8) / (midEnd * 0.2);
+      return this.lerpRGB(midColor, highColor, t * 0.5);
+    } else {
+      return highColor;
+    }
+  }
+
+  private lerpRGB(a: RGB, b: RGB, t: number): RGB {
+    const clamped = Math.max(0, Math.min(1, t));
+    return {
+      r: a.r + (b.r - a.r) * clamped,
+      g: a.g + (b.g - a.g) * clamped,
+      b: a.b + (b.b - a.b) * clamped,
+    };
+  }
+
+  private lerpBandGradient(from: BandGradient, to: BandGradient, t: number): BandGradient {
     const ease = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
-    return [
-      {
-        r: from[0].r + (to[0].r - from[0].r) * ease,
-        g: from[0].g + (to[0].g - from[0].g) * ease,
-        b: from[0].b + (to[0].b - from[0].b) * ease,
-      },
-      {
-        r: from[1].r + (to[1].r - from[1].r) * ease,
-        g: from[1].g + (to[1].g - from[1].g) * ease,
-        b: from[1].b + (to[1].b - from[1].b) * ease,
-      },
-      {
-        r: from[2].r + (to[2].r - from[2].r) * ease,
-        g: from[2].g + (to[2].g - from[2].g) * ease,
-        b: from[2].b + (to[2].b - from[2].b) * ease,
-      },
-    ];
+    return {
+      lowStart: this.lerpRGB(from.lowStart, to.lowStart, ease),
+      lowEnd: this.lerpRGB(from.lowEnd, to.lowEnd, ease),
+      midStart: this.lerpRGB(from.midStart, to.midStart, ease),
+      midEnd: this.lerpRGB(from.midEnd, to.midEnd, ease),
+      highStart: this.lerpRGB(from.highStart, to.highStart, ease),
+      highEnd: this.lerpRGB(from.highEnd, to.highEnd, ease),
+    };
   }
 
   async loadAudio(file: File): Promise<void> {
@@ -286,6 +390,7 @@ export class AudioVisualizer {
 
     const arrayBuffer = await file.arrayBuffer();
     this.audioBuffer = await this.audioContext.decodeAudioData(arrayBuffer);
+    this.sampleRate = this.audioBuffer.sampleRate;
 
     this.analyser = this.audioContext.createAnalyser();
     this.analyser.fftSize = 2048;
@@ -391,42 +496,64 @@ export class AudioVisualizer {
   updateParams(params: Partial<VisualizerParams>): void {
     const gradientChanged = params.gradientMode && params.gradientMode !== this.params.gradientMode;
     const modeChanged = params.renderMode && params.renderMode !== this.params.renderMode;
+    const particleCountChanged = params.particleCount && params.particleCount !== this.params.particleCount;
 
     Object.assign(this.params, params);
 
     if (gradientChanged && params.gradientMode) {
-      this.previousColors = { ...this.currentColors, stops: this.currentColors.stops.map(s => ({ ...s })) as [GradientStop, GradientStop, GradientStop] };
+      this.previousColors = { ...this.currentColors };
       this.colorLerpStartTime = performance.now() / 1000;
       this.colorLerpProgress = 0;
     }
 
     if (modeChanged && params.renderMode) {
-      this.recalculateTargetPositions();
+      this.targetRenderMode = params.renderMode;
       this.modeTransitionStartTime = performance.now() / 1000;
       this.modeTransitionProgress = 0;
-      this.currentRenderMode = params.renderMode;
+      this.isTransitioningMode = true;
+    }
+
+    if (particleCountChanged && params.particleCount && this.particleSystem) {
+      const clamped = Math.max(MIN_PARTICLE_COUNT, Math.min(MAX_PARTICLE_COUNT, params.particleCount));
+      if (clamped !== this.particleSystem.count) {
+        this.rebuildParticleSystem(clamped, true);
+      }
     }
   }
 
-  private recalculateTargetPositions(): void {
-    const count = PARTICLE_COUNT;
-    const radius = this.params.spreadRadius;
+  getFps(): number {
+    return this.currentFps;
+  }
 
-    for (let i = 0; i < count; i++) {
-      const angle = this.baseAngles[i]!;
-      const r = this.baseRadii[i]! * (radius / 15);
-      const y = this.baseY[i]! * (radius / 15);
+  getParticleCount(): number {
+    return this.particleSystem?.count ?? 0;
+  }
 
-      this.roamPositions[i * 3] = Math.cos(angle) * r;
-      this.roamPositions[i * 3 + 1] = y;
-      this.roamPositions[i * 3 + 2] = Math.sin(angle) * r;
+  private updatePerformance(delta: number): void {
+    this.frameCount++;
+    this.fpsTimer += delta;
 
-      const gridSize = Math.ceil(Math.sqrt(count));
-      const u = (i % gridSize) / gridSize;
-      const v = Math.floor(i / gridSize) / gridSize;
-      this.wavePositions[i * 3] = (u - 0.5) * radius * 2;
-      this.wavePositions[i * 3 + 1] = 0;
-      this.wavePositions[i * 3 + 2] = (v - 0.5) * radius * 2;
+    if (this.fpsTimer >= 0.5) {
+      this.currentFps = this.frameCount / this.fpsTimer;
+      this.frameCount = 0;
+      this.fpsTimer = 0;
+
+      this.fpsHistory.push(this.currentFps);
+      if (this.fpsHistory.length > 10) {
+        this.fpsHistory.shift();
+      }
+    }
+
+    this.fpsCheckTimer += delta;
+    if (this.fpsCheckTimer >= 2 && this.autoPerformanceMode && this.particleSystem) {
+      this.fpsCheckTimer = 0;
+      const avgFps = this.fpsHistory.reduce((a, b) => a + b, 0) / this.fpsHistory.length;
+
+      if (avgFps < 55 && this.particleSystem.count > MIN_PARTICLE_COUNT) {
+        const newCount = Math.max(MIN_PARTICLE_COUNT, this.particleSystem.count - 500);
+        this.params.particleCount = newCount;
+        this.rebuildParticleSystem(newCount, true);
+      }
     }
   }
 
@@ -436,17 +563,17 @@ export class AudioVisualizer {
     this.renderer.setSize(window.innerWidth, window.innerHeight);
   };
 
-  private getFrequencyBands(): { low: number; mid: number; high: number } {
+  private getFrequencyBands(): { low: number; mid: number; high: number; rawBins: number } {
     if (!this.analyser || !this.isPlaying) {
-      return { low: 0, mid: 0, high: 0 };
+      return { low: 0, mid: 0, high: 0, rawBins: 0 };
     }
 
     this.analyser.getByteFrequencyData(this.frequencyData);
 
-    const nyquist = this.audioContext!.sampleRate / 2;
+    const nyquist = this.sampleRate / 2;
     const binCount = this.frequencyData.length;
-    const lowEnd = Math.floor((300 / nyquist) * binCount);
-    const midEnd = Math.floor((2000 / nyquist) * binCount);
+    const lowEnd = Math.floor((LOW_FREQ_END / nyquist) * binCount);
+    const midEnd = Math.floor((MID_FREQ_END / nyquist) * binCount);
 
     let lowSum = 0;
     for (let i = 0; i < lowEnd; i++) lowSum += this.frequencyData[i]!;
@@ -460,7 +587,95 @@ export class AudioVisualizer {
     for (let i = midEnd; i < binCount; i++) highSum += this.frequencyData[i]!;
     const high = binCount > midEnd ? highSum / (binCount - midEnd) / 255 : 0;
 
-    return { low, mid, high };
+    return { low, mid, high, rawBins: binCount };
+  }
+
+  private updateParticleSystem(
+    system: ParticleSystem,
+    targetMode: RenderMode,
+    time: number,
+    delta: number,
+    bands: { low: number; mid: number; high: number; rawBins: number },
+    colors: BandGradient,
+    opacity: number
+  ): void {
+    const count = system.count;
+    const radius = this.params.spreadRadius;
+    const sizeScale = this.params.sizeScale;
+    const rotSpeed = this.params.rotationSpeed * (Math.PI / 180);
+    const rotationAngle = time * rotSpeed;
+
+    for (let i = 0; i < count; i++) {
+      const i3 = i * 3;
+      const phase = system.basePhases[i]!;
+      const angle = system.baseAngles[i]! + rotationAngle;
+      const r = system.baseRadii[i]! * (radius / 15);
+      const baseY = system.baseY[i]! * (radius / 15);
+
+      const pulseOffset = bands.low * 2;
+      const rx = Math.cos(angle) * (r + pulseOffset * Math.sin(phase + time * 2));
+      const ry = baseY + Math.sin(phase + time * 0.5) * (1 + bands.mid * 3);
+      const rz = Math.sin(angle) * (r + pulseOffset * Math.sin(phase + time * 2));
+
+      const spread = 1 + bands.high * 2;
+
+      system.roamPositions[i3] = rx * spread;
+      system.roamPositions[i3 + 1] = ry;
+      system.roamPositions[i3 + 2] = rz * spread;
+
+      const gridSize = Math.ceil(Math.sqrt(count));
+      const u = (i % gridSize) / gridSize;
+      const v = Math.floor(i / gridSize) / gridSize;
+      const wx = (u - 0.5) * radius * 2;
+      const wz = (v - 0.5) * radius * 2;
+      const dist = Math.sqrt(wx * wx + wz * wz);
+      const amplitude = bands.mid * 5 + bands.low * 3;
+      const wy = Math.sin(dist * 0.5 - time * 3 + phase) * amplitude
+        + Math.cos(wx * 0.3 + time * 2) * bands.high * 2;
+
+      system.wavePositions[i3] = wx;
+      system.wavePositions[i3 + 1] = wy;
+      system.wavePositions[i3 + 2] = wz;
+
+      let tx: number, ty: number, tz: number;
+      if (targetMode === 'roam') {
+        tx = system.roamPositions[i3] as number;
+        ty = system.roamPositions[i3 + 1] as number;
+        tz = system.roamPositions[i3 + 2] as number;
+      } else {
+        tx = system.wavePositions[i3] as number;
+        ty = system.wavePositions[i3 + 1] as number;
+        tz = system.wavePositions[i3 + 2] as number;
+      }
+
+      system.positions[i3] = system.positions[i3]! + (tx - system.positions[i3]!) * Math.min(1, delta * 5);
+      system.positions[i3 + 1] = system.positions[i3 + 1]! + (ty - system.positions[i3 + 1]!) * Math.min(1, delta * 5);
+      system.positions[i3 + 2] = system.positions[i3 + 2]! + (tz - system.positions[i3 + 2]!) * Math.min(1, delta * 5);
+
+      const freqT = i / count;
+      const binIndex = Math.floor(freqT * bands.rawBins);
+      const color = this.colorFromFrequency(binIndex, bands.rawBins, colors);
+      system.targetColors[i3] = color.r;
+      system.targetColors[i3 + 1] = color.g;
+      system.targetColors[i3 + 2] = color.b;
+
+      const colorLerpSpeed = delta * 4;
+      system.colors[i3] = system.colors[i3]! + (system.targetColors[i3]! - system.colors[i3]!) * colorLerpSpeed;
+      system.colors[i3 + 1] = system.colors[i3 + 1]! + (system.targetColors[i3 + 1]! - system.colors[i3 + 1]!) * colorLerpSpeed;
+      system.colors[i3 + 2] = system.colors[i3 + 2]! + (system.targetColors[i3 + 2]! - system.colors[i3 + 2]!) * colorLerpSpeed;
+
+      let baseSize = 0.3 + freqT * 0.7;
+      if (bands.low > 0.5) baseSize += bands.low * 0.4;
+      if (bands.mid > 0.3) baseSize += bands.mid * 0.3;
+      if (bands.high > 0.3) baseSize += bands.high * 0.2;
+      baseSize = Math.max(0.1, Math.min(1.5, baseSize));
+      const targetSize = baseSize * sizeScale;
+      system.sizes[i] = system.sizes[i]! + (targetSize - system.sizes[i]!) * Math.min(1, delta * 6);
+    }
+
+    system.markAttributesDirty();
+    system.material.size = 0.5 * sizeScale;
+    system.material.opacity = opacity;
   }
 
   private animate = (): void => {
@@ -471,110 +686,63 @@ export class AudioVisualizer {
     const delta = (now - this.lastFrameTime) / 1000;
     this.lastFrameTime = now;
 
+    this.updatePerformance(delta);
+
     if (this.colorLerpProgress < 1) {
       const elapsed = time - this.colorLerpStartTime;
       this.colorLerpProgress = Math.min(1, elapsed / COLOR_LERP_DURATION);
       const targetPreset = GRADIENT_PRESETS[this.params.gradientMode];
-      this.currentColors = {
-        stops: this.lerpGradient(this.previousColors.stops, targetPreset.stops, this.colorLerpProgress),
-      };
+      this.currentColors = this.lerpBandGradient(this.previousColors, targetPreset, this.colorLerpProgress);
+    }
+
+    if (this.isTransitioningMode && this.particleSystem) {
+      const elapsed = time - this.modeTransitionStartTime;
+      this.modeTransitionProgress = Math.min(1, elapsed / MODE_TRANSITION_DURATION);
+
+      if (this.modeTransitionProgress >= 1) {
+        this.isTransitioningMode = false;
+        if (this.transitionSystem) {
+          this.scene.remove(this.transitionSystem.points);
+          this.transitionSystem.dispose();
+          this.transitionSystem = null;
+        }
+        this.particleSystem.material.opacity = 1;
+      }
     }
 
     const bands = this.getFrequencyBands();
-    const count = PARTICLE_COUNT;
-    const radius = this.params.spreadRadius;
-    const sizeScale = this.params.sizeScale;
-    const rotSpeed = this.params.rotationSpeed * (Math.PI / 180);
-    const rotationAngle = time * rotSpeed;
 
-    if (this.modeTransitionProgress < 1) {
-      const elapsed = time - this.modeTransitionStartTime;
-      this.modeTransitionProgress = Math.min(1, elapsed / MODE_TRANSITION_DURATION);
-    }
-
-    this.recalculateTargetPositions();
-
-    for (let i = 0; i < count; i++) {
-      const i3 = i * 3;
-      const phase = this.basePhases[i]!;
-
-      let rx: number, ry: number, rz: number;
-      let wx: number, wy: number, wz: number;
-
-      const angle = this.baseAngles[i]! + rotationAngle;
-      const r = this.baseRadii[i]! * (radius / 15);
-      const baseY = this.baseY[i]! * (radius / 15);
-
-      const pulseOffset = bands.low * 2;
-      rx = Math.cos(angle) * (r + pulseOffset * Math.sin(phase + time * 2));
-      ry = baseY + Math.sin(phase + time * 0.5) * (1 + bands.mid * 3);
-      rz = Math.sin(angle) * (r + pulseOffset * Math.sin(phase + time * 2));
-
-      const spread = 1 + bands.high * 2;
-      rx *= spread;
-      rz *= spread;
-
-      this.roamPositions[i3] = rx;
-      this.roamPositions[i3 + 1] = ry;
-      this.roamPositions[i3 + 2] = rz;
-
-      const gridSize = Math.ceil(Math.sqrt(count));
-      const u = (i % gridSize) / gridSize;
-      const v = Math.floor(i / gridSize) / gridSize;
-      wx = (u - 0.5) * radius * 2;
-      wz = (v - 0.5) * radius * 2;
-      const dist = Math.sqrt(wx * wx + wz * wz);
-      const amplitude = bands.mid * 5 + bands.low * 3;
-      wy = Math.sin(dist * 0.5 - time * 3 + phase) * amplitude;
-      wy += Math.cos(wx * 0.3 + time * 2) * bands.high * 2;
-
-      this.wavePositions[i3] = wx;
-      this.wavePositions[i3 + 1] = wy;
-      this.wavePositions[i3 + 2] = wz;
-
-      let factor: number;
-      if (this.currentRenderMode === 'roam') {
-        factor = 1 - this.easeInOutCubic(this.modeTransitionProgress);
-      } else {
-        factor = this.easeInOutCubic(this.modeTransitionProgress);
+    if (this.particleSystem) {
+      let opacity = 1;
+      if (this.isTransitioningMode) {
+        opacity = this.easeInOutCubic(this.modeTransitionProgress);
       }
-
-      const tx = this.roamPositions[i3]! * (1 - factor) + this.wavePositions[i3]! * factor;
-      const ty = this.roamPositions[i3 + 1]! * (1 - factor) + this.wavePositions[i3 + 1]! * factor;
-      const tz = this.roamPositions[i3 + 2]! * (1 - factor) + this.wavePositions[i3 + 2]! * factor;
-
-      this.positions[i3] = this.positions[i3]! + (tx - this.positions[i3]!) * Math.min(1, delta * 5);
-      this.positions[i3 + 1] = this.positions[i3 + 1]! + (ty - this.positions[i3 + 1]!) * Math.min(1, delta * 5);
-      this.positions[i3 + 2] = this.positions[i3 + 2]! + (tz - this.positions[i3 + 2]!) * Math.min(1, delta * 5);
-
-      const freqT = this.getFrequencyT(i, bands);
-      const color = this.sampleGradient(this.currentColors.stops, freqT);
-      this.targetColors[i3] = color.r;
-      this.targetColors[i3 + 1] = color.g;
-      this.targetColors[i3 + 2] = color.b;
-
-      const colorLerpSpeed = delta * 4;
-      this.colors[i3] = this.colors[i3]! + (this.targetColors[i3]! - this.colors[i3]!) * colorLerpSpeed;
-      this.colors[i3 + 1] = this.colors[i3 + 1]! + (this.targetColors[i3 + 1]! - this.colors[i3 + 1]!) * colorLerpSpeed;
-      this.colors[i3 + 2] = this.colors[i3 + 2]! + (this.targetColors[i3 + 2]! - this.colors[i3 + 2]!) * colorLerpSpeed;
-
-      let baseSize = 0.3 + freqT * 0.7;
-      if (bands.low > 0.5) baseSize += bands.low * 0.4;
-      if (bands.mid > 0.3) baseSize += bands.mid * 0.3;
-      if (bands.high > 0.3) baseSize += bands.high * 0.2;
-      baseSize = Math.max(0.1, Math.min(1.5, baseSize));
-      const targetSize = baseSize * sizeScale;
-      this.sizes[i] = this.sizes[i]! + (targetSize - this.sizes[i]!) * Math.min(1, delta * 6);
+      this.updateParticleSystem(
+        this.particleSystem,
+        this.targetRenderMode,
+        time,
+        delta,
+        bands,
+        this.currentColors,
+        opacity
+      );
     }
 
-    const posAttr = this.particleGeometry.attributes.position as THREE.BufferAttribute;
-    const colorAttr = this.particleGeometry.attributes.color as THREE.BufferAttribute;
-    const sizeAttr = this.particleGeometry.attributes.size as THREE.BufferAttribute;
-    posAttr.needsUpdate = true;
-    colorAttr.needsUpdate = true;
-    sizeAttr.needsUpdate = true;
-
-    this.particleMaterial.size = 0.5 * sizeScale;
+    if (this.transitionSystem && this.isTransitioningMode) {
+      const fadeOutOpacity = 1 - this.easeInOutCubic(this.modeTransitionProgress);
+      const currentMode = this.params.renderMode === this.targetRenderMode
+        ? (this.targetRenderMode === 'roam' ? 'wave' : 'roam')
+        : this.params.renderMode;
+      this.updateParticleSystem(
+        this.transitionSystem,
+        currentMode,
+        time,
+        delta,
+        bands,
+        this.currentColors,
+        fadeOutOpacity
+      );
+    }
 
     if (this.groundRing) {
       if (bands.low > 0.3) {
@@ -586,6 +754,7 @@ export class AudioVisualizer {
         this.groundRing.scale.set(Math.max(0.1, this.ringScale), Math.max(0.1, this.ringScale), 1);
         (this.groundRing.material as THREE.MeshBasicMaterial).opacity *= 0.92;
       }
+      this.groundRing.position.y = -this.params.spreadRadius * 0.4;
     }
 
     const cameraRadius = 35 + Math.sin(time * 0.1) * 3;
@@ -600,24 +769,7 @@ export class AudioVisualizer {
     }
 
     this.renderer.render(this.scene, this.camera);
-  }
-
-  private getFrequencyT(index: number, bands: { low: number; mid: number; high: number }): number {
-    const t = index / PARTICLE_COUNT;
-
-    if (this.isPlaying) {
-      const normalizedIndex = index / PARTICLE_COUNT;
-      if (normalizedIndex < 0.33) {
-        return Math.min(1, t * 3 * (0.3 + bands.low * 0.7));
-      } else if (normalizedIndex < 0.66) {
-        return 0.3 + 0.4 * bands.mid + (t - 0.33) * 0.5;
-      } else {
-        return 0.7 + 0.3 * bands.high + (t - 0.66) * 0.2;
-      }
-    }
-
-    return t;
-  }
+  };
 
   private easeInOutCubic(t: number): number {
     return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
@@ -626,8 +778,16 @@ export class AudioVisualizer {
   destroy(): void {
     cancelAnimationFrame(this.animationId);
     window.removeEventListener('resize', this.onResize);
-    this.particleGeometry.dispose();
-    this.particleMaterial.dispose();
+
+    if (this.particleSystem) {
+      this.particleSystem.dispose();
+    }
+    if (this.transitionSystem) {
+      this.transitionSystem.dispose();
+    }
+    if (this.particleTexture) {
+      this.particleTexture.dispose();
+    }
     this.renderer.dispose();
 
     if (this.sourceNode) {
