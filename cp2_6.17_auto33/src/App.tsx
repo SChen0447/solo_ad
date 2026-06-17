@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import TerrainViewer from './components/TerrainViewer';
-import ControlPanel from './components/ControlPanel';
+import ControlPanel, { TerrainPreset, TERRAIN_PRESETS } from './components/ControlPanel';
 import { HeightMap } from '../server/terrainGenerator';
 import { ParticlePath } from '../server/erosionSimulator';
 
@@ -22,7 +22,12 @@ const App: React.FC = () => {
     isComplete: false
   });
   const [isNarrowScreen, setIsNarrowScreen] = useState(false);
+  const [currentPreset, setCurrentPreset] = useState<TerrainPreset>('custom');
   const heightMapRef = useRef<HeightMap | null>(null);
+
+  const handlePresetChange = useCallback((preset: TerrainPreset) => {
+    setCurrentPreset(preset);
+  }, []);
 
   useEffect(() => {
     const checkScreenWidth = () => {
@@ -119,6 +124,9 @@ const App: React.FC = () => {
       <div style={styles.statusBar}>
         <div style={styles.statusBarContent}>
           <span style={styles.statusText}>{statusText}</span>
+          <span style={styles.statusPreset}>
+            当前地貌：{TERRAIN_PRESETS[currentPreset].label}
+          </span>
           <div style={styles.statusProgressContainer}>
             <div
               style={{
@@ -154,6 +162,8 @@ const App: React.FC = () => {
               onSimulatingChange={handleSimulatingChange}
               onIterationChange={handleIterationChange}
               onTotalIterationsChange={handleTotalIterationsChange}
+              currentPreset={currentPreset}
+              onPresetChange={handlePresetChange}
             />
           </div>
         )}
@@ -169,6 +179,8 @@ const App: React.FC = () => {
             onSimulatingChange={handleSimulatingChange}
             onIterationChange={handleIterationChange}
             onTotalIterationsChange={handleTotalIterationsChange}
+            currentPreset={currentPreset}
+            onPresetChange={handlePresetChange}
           />
         )}
       </div>
@@ -217,6 +229,19 @@ const styles: Record<string, React.CSSProperties> = {
     fontWeight: 500,
     whiteSpace: 'nowrap',
     flexShrink: 0,
+    letterSpacing: '0.3px'
+  },
+
+  statusPreset: {
+    fontSize: '14px',
+    color: '#e0e0e0',
+    fontWeight: 500,
+    whiteSpace: 'nowrap',
+    flexShrink: 0,
+    padding: '4px 12px',
+    backgroundColor: 'rgba(79, 195, 247, 0.1)',
+    borderRadius: '4px',
+    border: '1px solid rgba(79, 195, 247, 0.2)',
     letterSpacing: '0.3px'
   },
 

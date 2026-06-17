@@ -1,4 +1,4 @@
-import { HeightMap, HeightPoint } from './terrainGenerator';
+import { HeightMap } from './terrainGenerator';
 
 interface WaterParticle {
   x: number;

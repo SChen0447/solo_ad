@@ -2,6 +2,24 @@ import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { HeightMap } from '../server/terrainGenerator';
 import { ParticlePath } from '../server/erosionSimulator';
 
+export type TerrainPreset = 'custom' | 'plain' | 'hills' | 'mountains' | 'canyon';
+
+export interface TerrainPresetConfig {
+  name: string;
+  label: string;
+  size: number;
+  heightRange: number;
+  seed: number;
+}
+
+export const TERRAIN_PRESETS: Record<TerrainPreset, TerrainPresetConfig> = {
+  custom: { name: 'custom', label: '自定义', size: 30, heightRange: 60, seed: 0 },
+  plain: { name: 'plain', label: '平原', size: 40, heightRange: 15, seed: 1234 },
+  hills: { name: 'hills', label: '丘陵', size: 35, heightRange: 35, seed: 5678 },
+  mountains: { name: 'mountains', label: '山地', size: 30, heightRange: 80, seed: 9012 },
+  canyon: { name: 'canyon', label: '峡谷', size: 45, heightRange: 65, seed: 3456 }
+};
+
 interface ControlPanelProps {
   onTerrainGenerated: (heightMap: HeightMap, size: number) => void;
   onErosionIteration: (heightMap: HeightMap, paths: ParticlePath[]) => void;
@@ -12,6 +30,8 @@ interface ControlPanelProps {
   onSimulatingChange: (simulating: boolean) => void;
   onIterationChange: (iteration: number) => void;
   onTotalIterationsChange: (total: number) => void;
+  currentPreset: TerrainPreset;
+  onPresetChange: (preset: TerrainPreset) => void;
 }
 
 interface Ripple {
@@ -221,7 +241,9 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
   isSimulating,
   onSimulatingChange,
   onIterationChange,
-  onTotalIterationsChange
+  onTotalIterationsChange,
+  currentPreset,
+  onPresetChange
 }) => {
   const [terrainSize, setTerrainSize] = useState(30);
   const [heightRange, setHeightRange] = useState(60);
@@ -230,6 +252,21 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [isNarrowScreen, setIsNarrowScreen] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
+
+  useEffect(() => {
+    if (currentPreset !== 'custom') {
+      const preset = TERRAIN_PRESETS[currentPreset];
+      setTerrainSize(preset.size);
+      setHeightRange(preset.heightRange);
+      setSeed(preset.seed);
+    }
+  }, [currentPreset]);
+
+  const handleParamChange = useCallback(() => {
+    if (currentPreset !== 'custom') {
+      onPresetChange('custom');
+    }
+  }, [currentPreset, onPresetChange]);
 
   useEffect(() => {
     const checkScreenWidth = () => {
@@ -305,7 +342,8 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
 
   const handleRandomSeed = useCallback(() => {
     setSeed(Math.floor(Math.random() * 10000));
-  }, []);
+    handleParamChange();
+  }, [handleParamChange]);
 
   const panelContent = (
     <>
@@ -325,13 +363,32 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
 
       <div style={styles.panelContent}>
         <CollapsibleGroup title="地形参数" icon={<MountainIcon />} defaultOpen={true}>
+          <div style={styles.presetContainer}>
+            <label style={styles.presetLabel}>地貌预设</label>
+            <select
+              value={currentPreset}
+              onChange={(e) => onPresetChange(e.target.value as TerrainPreset)}
+              style={styles.presetSelect}
+              disabled={isGenerating || isSimulating}
+            >
+              {Object.values(TERRAIN_PRESETS).map((preset) => (
+                <option key={preset.name} value={preset.name}>
+                  {preset.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
           <SliderControl
             label="地形大小"
             value={terrainSize}
             min={10}
             max={50}
-            unit="×" + terrainSize
-            onChange={setTerrainSize}
+            unit={`×${terrainSize}`}
+            onChange={(val) => {
+              setTerrainSize(val);
+              handleParamChange();
+            }}
           />
           <SliderControl
             label="高度范围"
@@ -339,7 +396,10 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
             min={0}
             max={100}
             unit="单位"
-            onChange={setHeightRange}
+            onChange={(val) => {
+              setHeightRange(val);
+              handleParamChange();
+            }}
           />
           <div style={styles.seedRow}>
             <SliderControl
@@ -347,7 +407,10 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
               value={seed}
               min={0}
               max={9999}
-              onChange={setSeed}
+              onChange={(val) => {
+                setSeed(val);
+                handleParamChange();
+              }}
             />
             <button
               onClick={handleRandomSeed}
@@ -583,6 +646,39 @@ const styles: Record<string, React.CSSProperties> = {
     transition: 'max-height 0.35s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease, padding 0.3s ease',
     paddingLeft: '14px',
     paddingRight: '14px'
+  },
+
+  presetContainer: {
+    marginBottom: '16px',
+    paddingBottom: '12px',
+    borderBottom: '1px solid rgba(79, 195, 247, 0.15)'
+  },
+
+  presetLabel: {
+    display: 'block',
+    fontSize: '12px',
+    color: '#b0b0b0',
+    marginBottom: '6px'
+  },
+
+  presetSelect: {
+    width: '100%',
+    padding: '10px 12px',
+    fontSize: '12px',
+    fontFamily: "'Segoe UI', sans-serif",
+    color: '#e0e0e0',
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    border: '1px solid rgba(79, 195, 247, 0.4)',
+    borderRadius: '4px',
+    cursor: 'pointer',
+    transition: 'all 0.15s ease',
+    outline: 'none',
+    appearance: 'none',
+    WebkitAppearance: 'none',
+    backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%234FC3F7' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E")`,
+    backgroundRepeat: 'no-repeat',
+    backgroundPosition: 'right 10px center',
+    paddingRight: '36px'
   },
 
   sliderContainer: {
