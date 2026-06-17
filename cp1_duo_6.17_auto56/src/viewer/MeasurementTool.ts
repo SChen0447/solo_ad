@@ -172,6 +172,15 @@ export class MeasurementTool {
     animate();
   }
 
+  private hasBond(atomIdx1: number, atomIdx2: number): boolean {
+    const data = this.model.getCurrentData();
+    if (!data) return false;
+    return data.bonds.some(bond =>
+      (bond.from === atomIdx1 && bond.to === atomIdx2) ||
+      (bond.from === atomIdx2 && bond.to === atomIdx1)
+    );
+  }
+
   private updateMeasurementVisuals(): void {
     this.clearLines();
     this.clearLabels();
@@ -182,8 +191,14 @@ export class MeasurementTool {
       this.createDistanceLine(1);
     }
     if (n >= 3) {
+      const hasBond12 = this.hasBond(this.selectedAtoms[0].index, this.selectedAtoms[1].index);
+      const hasBond23 = this.hasBond(this.selectedAtoms[1].index, this.selectedAtoms[2].index);
+
       this.createDistanceLine(2);
-      this.createAngleArc();
+
+      if (hasBond12 && hasBond23) {
+        this.createAngleArc();
+      }
     }
   }
 
@@ -412,7 +427,14 @@ export class MeasurementTool {
       const v1 = new THREE.Vector3().subVectors(p1, p2).normalize();
       const v2 = new THREE.Vector3().subVectors(p3, p2).normalize();
       distance2 = p2.distanceTo(p3);
-      angle = v1.angleTo(v2) * (180 / Math.PI);
+
+      const hasBond12 = this.hasBond(this.selectedAtoms[0].index, this.selectedAtoms[1].index);
+      const hasBond23 = this.hasBond(this.selectedAtoms[1].index, this.selectedAtoms[2].index);
+      if (hasBond12 && hasBond23) {
+        angle = v1.angleTo(v2) * (180 / Math.PI);
+      } else {
+        angle = null;
+      }
     }
 
     let hint = '测量模式：点击空白退出';
@@ -424,8 +446,14 @@ export class MeasurementTool {
       hint = '请点击第2个原子（顶点B）- 距离测量';
     } else if (n === 2) {
       hint = '请点击第3个原子（顶点C）- 键角测量';
-    } else {
-      hint = '测量完成！点击任意原子重新开始，或点击空白退出';
+    } else if (n === 3) {
+      const hasBond12 = this.hasBond(this.selectedAtoms[0].index, this.selectedAtoms[1].index);
+      const hasBond23 = this.hasBond(this.selectedAtoms[1].index, this.selectedAtoms[2].index);
+      if (hasBond12 && hasBond23) {
+        hint = '测量完成！键角已显示。点击任意原子重新开始，或点击空白退出';
+      } else {
+        hint = '警告：所选原子未形成连续键合，无法计算键角。点击任意原子重新开始';
+      }
     }
 
     this.onUpdate({ distance1, distance2, angle }, hint);

@@ -86,29 +86,54 @@ export class MolecularModel {
     this.spawnTransitionParticles();
   }
 
+  private getSafeElementColor(element: string): number {
+    const color = this.dataService.getElementColor(element);
+    if (color === undefined || color === null || isNaN(color)) {
+      console.warn(`[MolecularModel] 元素 ${element} 没有定义颜色，使用默认颜色`);
+      return 0x8888ff;
+    }
+    return color;
+  }
+
   private spawnTransitionParticles(): void {
     const colors: number[] = [];
     if (this.fadeOutTarget) {
       const uniqueElements = new Set(this.fadeOutTarget.atoms.map(a => a.element));
-      uniqueElements.forEach(el => colors.push(this.dataService.getElementColor(el)));
+      uniqueElements.forEach(el => {
+        const color = this.getSafeElementColor(el);
+        if (color !== undefined && !isNaN(color)) {
+          colors.push(color);
+        }
+      });
     }
     if (this.fadeInTarget) {
       const uniqueElements = new Set(this.fadeInTarget.atoms.map(a => a.element));
-      uniqueElements.forEach(el => colors.push(this.dataService.getElementColor(el)));
+      uniqueElements.forEach(el => {
+        const color = this.getSafeElementColor(el);
+        if (color !== undefined && !isNaN(color)) {
+          colors.push(color);
+        }
+      });
     }
 
     let avgColor = 0x8888ff;
     if (colors.length > 0) {
       let r = 0, g = 0, b = 0;
+      let validCount = 0;
       colors.forEach(c => {
-        r += (c >> 16) & 255;
-        g += (c >> 8) & 255;
-        b += c & 255;
+        if (c !== undefined && !isNaN(c)) {
+          r += (c >> 16) & 255;
+          g += (c >> 8) & 255;
+          b += c & 255;
+          validCount++;
+        }
       });
-      r = Math.floor(r / colors.length);
-      g = Math.floor(g / colors.length);
-      b = Math.floor(b / colors.length);
-      avgColor = (r << 16) | (g << 8) | b;
+      if (validCount > 0) {
+        r = Math.floor(r / validCount);
+        g = Math.floor(g / validCount);
+        b = Math.floor(b / validCount);
+        avgColor = (r << 16) | (g << 8) | b;
+      }
     }
 
     const positions = new Float32Array(this.particleCount * 3);
@@ -167,10 +192,10 @@ export class MolecularModel {
     if (this.isAnimating) {
       this.updateTransition();
     }
-    this.updateParticles();
+    this.updateParticles(delta);
   }
 
-  private updateParticles(): void {
+  private updateParticles(delta: number): void {
     const now = performance.now();
     for (let i = this.particleSystems.length - 1; i >= 0; i--) {
       const points = this.particleSystems[i];
@@ -312,13 +337,16 @@ export class MolecularModel {
     if (atomInfo.haloMesh) return atomInfo.haloMesh;
 
     const radius = this.dataService.getElementRadius(atomInfo.atom.element) * 1.2;
-    const color = this.dataService.getElementColor(atomInfo.atom.element);
+    const atomMat = atomInfo.mesh.material as THREE.MeshStandardMaterial;
+    const baseColor = atomMat.color.getHex();
+    const elementColor = this.getSafeElementColor(atomInfo.atom.element);
+    const haloColor = baseColor !== undefined && !isNaN(baseColor) ? baseColor : elementColor;
 
     const haloGeo = new THREE.SphereGeometry(radius, 24, 16);
     const haloMat = new THREE.MeshBasicMaterial({
-      color: color,
+      color: haloColor,
       transparent: true,
-      opacity: 0.3,
+      opacity: 0.45,
       side: THREE.BackSide,
       depthWrite: false,
       blending: THREE.AdditiveBlending

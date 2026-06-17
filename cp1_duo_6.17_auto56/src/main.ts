@@ -258,45 +258,38 @@ class MoleculeViewerApp {
   }
 
   private animateBackgroundTransition(): void {
-    this.bgPhase = 0;
-    this.bgAnimating = true;
+    const colorStages = [
+      { r: 0x0b / 255, g: 0x0d / 255, b: 0x17 / 255 },
+      { r: 0x2a / 255, g: 0x1e / 255, b: 0x55 / 255 },
+      { r: 0x0b / 255, g: 0x0d / 255, b: 0x17 / 255 }
+    ];
+
+    const state = { stage: 0, t: 0 };
+
+    new TWEEN.Tween(state)
+      .to({ t: 1 }, 250)
+      .easing(TWEEN.Easing.Quadratic.InOut)
+      .onUpdate(() => {
+        const r = colorStages[0].r + (colorStages[1].r - colorStages[0].r) * state.t;
+        const g = colorStages[0].g + (colorStages[1].g - colorStages[0].g) * state.t;
+        const b = colorStages[0].b + (colorStages[1].b - colorStages[0].b) * state.t;
+        this.updateAppBackground(r, g, b);
+      })
+      .chain(
+        new TWEEN.Tween(state)
+          .to({ t: 1 }, 250)
+          .easing(TWEEN.Easing.Quadratic.InOut)
+          .onUpdate(() => {
+            const r = colorStages[1].r + (colorStages[2].r - colorStages[1].r) * state.t;
+            const g = colorStages[1].g + (colorStages[2].g - colorStages[1].g) * state.t;
+            const b = colorStages[1].b + (colorStages[2].b - colorStages[1].b) * state.t;
+            this.updateAppBackground(r, g, b);
+          })
+      )
+      .start();
   }
 
   private updateBackgroundTransition(delta: number): void {
-    if (!this.bgAnimating) return;
-
-    this.bgPhase += delta / 0.5;
-    const t = this.bgPhase;
-
-    if (t <= 1) {
-      const ease = t < 0.5
-        ? 2 * t * t
-        : 1 - Math.pow(-2 * t + 2, 2) / 2;
-
-      let startColor, midColor, endColor;
-      if (t < 0.5) {
-        startColor = { r: 0x0b / 255, g: 0x0d / 255, b: 0x17 / 255 };
-        midColor = { r: 0x1a / 255, g: 0x14 / 255, b: 0x40 / 255 };
-        const k = t * 2;
-        const r = startColor.r + (midColor.r - startColor.r) * k;
-        const g = startColor.g + (midColor.g - startColor.g) * k;
-        const b = startColor.b + (midColor.b - startColor.b) * k;
-        this.updateAppBackground(r, g, b);
-      } else {
-        midColor = { r: 0x1a / 255, g: 0x14 / 255, b: 0x40 / 255 };
-        endColor = { r: 0x0b / 255, g: 0x0d / 255, b: 0x17 / 255 };
-        const k = (t - 0.5) * 2;
-        const r = midColor.r + (endColor.r - midColor.r) * k;
-        const g = midColor.g + (endColor.g - midColor.g) * k;
-        const b = midColor.b + (endColor.b - midColor.b) * k;
-        this.updateAppBackground(r, g, b);
-      }
-
-      if (this.bgPhase >= 1) {
-        this.bgAnimating = false;
-        this.updateAppBackground(0x0b / 255, 0x0d / 255, 0x17 / 255);
-      }
-    }
   }
 
   private updateAppBackground(r: number, g: number, b: number): void {
@@ -524,6 +517,9 @@ class MoleculeViewerApp {
     };
     const toTarget = snapshot.target;
 
+    const fromZoom = this.camera.zoom;
+    const toZoom = snapshot.zoom || 1;
+
     new TWEEN.Tween({ t: 0 })
       .to({ t: 1 }, 600)
       .easing(TWEEN.Easing.Cubic.InOut)
@@ -537,9 +533,14 @@ class MoleculeViewerApp {
         this.controls.target.y = fromTarget.y + (toTarget.y - fromTarget.y) * t;
         this.controls.target.z = fromTarget.z + (toTarget.z - fromTarget.z) * t;
 
+        this.camera.zoom = fromZoom + (toZoom - fromZoom) * t;
+        this.camera.updateProjectionMatrix();
+
         this.controls.update();
       })
       .onComplete(() => {
+        this.camera.zoom = toZoom;
+        this.camera.updateProjectionMatrix();
         this.interactionEndTime = performance.now();
       })
       .start();
@@ -549,3 +550,49 @@ class MoleculeViewerApp {
     const width = this.container.clientWidth || window.innerWidth;
     const height = this.container.clientHeight || window.innerHeight;
     this.camera.aspect = width / height;
+    this.camera.updateProjectionMatrix();
+    this.renderer.setSize(width, height);
+  };
+
+  private animate = (): void => {
+    if (!this.isRunning) return;
+    requestAnimationFrame(this.animate);
+
+    const delta = this.clock.getDelta();
+
+    TWEEN.update();
+
+    this.updateAutoRotation(delta);
+
+    this.model.update(delta);
+
+    this.measurement?.update();
+
+    this.controls.update();
+
+    this.renderer.render(this.scene, this.camera);
+  };
+
+  private updateAutoRotation(delta: number): void {
+    if (!this.model.getCurrentData()) return;
+
+    if (this.isInteracting) {
+      return;
+    }
+
+    const now = performance.now();
+    if (now - this.interactionEndTime > this.RESUME_DELAY) {
+      if (!this.autoRotate) {
+        this.autoRotate = true;
+      }
+    }
+
+    if (this.autoRotate) {
+      this.model.getGroup().rotation.y += this.ROTATION_SPEED * delta;
+    }
+  }
+}
+
+window.addEventListener('DOMContentLoaded', () => {
+  new MoleculeViewerApp();
+});
