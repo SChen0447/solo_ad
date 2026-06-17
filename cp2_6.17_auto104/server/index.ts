@@ -1,6 +1,7 @@
 import express, { type Request, type Response } from 'express'
 import cors from 'cors'
 import { v4 as uuidv4 } from 'uuid'
+
 import type {
   Stage,
   Comment,
@@ -11,7 +12,7 @@ import type {
 } from '../shared/types.js'
 
 const app = express()
-const PORT = process.env.PORT || 3001
+const PORT = process.env.PORT || 3002
 
 app.use(cors())
 app.use(express.json())

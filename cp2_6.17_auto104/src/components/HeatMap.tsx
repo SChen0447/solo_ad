@@ -5,24 +5,52 @@ interface HeatMapProps {
   ratings: StageRatings[]
 }
 
-const HEATMAP_COLORS = {
+/**
+ * RGB颜色对象
+ * @property r - 红色通道值 (0-255)
+ * @property g - 绿色通道值 (0-255)
+ * @property b - 蓝色通道值 (0-255)
+ */
+interface RGBColor {
+  r: number
+  g: number
+  b: number
+}
+
+/**
+ * 热力图颜色配置
+ * - LOW: 最低分对应的红色 (#ff4d4f)
+ * - HIGH: 最高分对应的绿色 (#52c41a)
+ * - EMPTY: 未投票舞台的占位色
+ */
+const HEATMAP_COLORS: Record<string, RGBColor> = {
   LOW: { r: 255, g: 77, b: 79 },
-  MID: { r: 250, g: 219, b: 20 },
   HIGH: { r: 82, g: 196, b: 26 },
   EMPTY: { r: 42, g: 42, b: 74 },
 }
 
-function interpolateRGB(
-  c1: { r: number; g: number; b: number },
-  c2: { r: number; g: number; b: number },
-  t: number
-): string {
+/**
+ * 在两个RGB颜色之间进行线性插值
+ * @param c1 - 起始颜色
+ * @param c2 - 结束颜色
+ * @param t - 插值比例 (0-1)，0 返回 c1，1 返回 c2
+ * @returns rgb() 格式的颜色字符串
+ */
+function interpolateRGB(c1: RGBColor, c2: RGBColor, t: number): string {
   const r = Math.round(c1.r + (c2.r - c1.r) * t)
   const g = Math.round(c1.g + (c2.g - c1.g) * t)
   const b = Math.round(c1.b + (c2.b - c1.b) * t)
   return `rgb(${r},${g},${b})`
 }
 
+/**
+ * 基于动态分数范围计算舞台热力图颜色
+ * 最低分映射为红色，最高分映射为绿色，中间分数线性插值
+ * @param score - 舞台平均分
+ * @param minScore - 当前所有舞台的最低分
+ * @param maxScore - 当前所有舞台的最高分
+ * @returns rgb() 格式的颜色字符串
+ */
 function getScoreColorDynamic(
   score: number,
   minScore: number,
@@ -36,18 +64,7 @@ function getScoreColorDynamic(
     return interpolateRGB(HEATMAP_COLORS.LOW, HEATMAP_COLORS.HIGH, 0.5)
   }
   const normalized = (score - minScore) / (maxScore - minScore)
-  if (normalized < 0.5) {
-    return interpolateRGB(
-      HEATMAP_COLORS.LOW,
-      HEATMAP_COLORS.MID,
-      normalized * 2
-    )
-  }
-  return interpolateRGB(
-    HEATMAP_COLORS.MID,
-    HEATMAP_COLORS.HIGH,
-    (normalized - 0.5) * 2
-  )
+  return interpolateRGB(HEATMAP_COLORS.LOW, HEATMAP_COLORS.HIGH, normalized)
 }
 
 const HeatMap: React.FC<HeatMapProps> = ({ ratings }) => {
@@ -75,16 +92,16 @@ const HeatMap: React.FC<HeatMapProps> = ({ ratings }) => {
             boxShadow: '0 4px 20px rgba(0,128,255,0.3)',
           }}
         >
-          <h3 className="text-white font-bold text-[14px] drop-shadow-md text-center">
+          <h3 className="text-white font-bold text-lg drop-shadow-md text-center">
             {block.stageName}
           </h3>
           <p
-            className="text-white font-extrabold drop-shadow-lg mt-1"
-            style={{ fontSize: '32px', lineHeight: 1.2 }}
+            className="text-white font-bold drop-shadow-lg mt-1"
+            style={{ fontSize: '16px', lineHeight: 1.4 }}
           >
             {block.averageScore > 0 ? block.averageScore.toFixed(1) : '-'}
           </p>
-          <p className="text-white/80 text-xs mt-0.5">
+          <p className="text-white/80 text-xs mt-1">
             {block.voteCount} 人投票
           </p>
         </div>
