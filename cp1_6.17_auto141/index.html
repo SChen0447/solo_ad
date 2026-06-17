@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>气象雷达3D可视化系统</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Source+Sans+3:wght@300;400;600&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    :root {
+      --bg: #0a0e1a;
+      --fg: #e0e6f0;
+      --muted: #6b7a99;
+      --accent: #00d4ff;
+      --accent2: #ff6b3d;
+      --toolbar-bg: rgba(20, 30, 60, 0.6);
+      --border: rgba(100, 140, 200, 0.2);
+      --glow: 0 0 12px rgba(0, 212, 255, 0.4);
+      --font-display: 'Rajdhani', sans-serif;
+      --font-body: 'Source Sans 3', sans-serif;
+    }
+
+    html, body {
+      width: 100%; height: 100%;
+      overflow: hidden;
+      background: var(--bg);
+      color: var(--fg);
+      font-family: var(--font-body);
+    }
+
+    #app {
+      width: 100%; height: 100%;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+    }
+
+    #canvas-container {
+      flex: 1;
+      position: relative;
+      overflow: hidden;
+    }
+
+    #canvas-container canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+
+    .app-title {
+      position: absolute;
+      top: 16px;
+      left: 20px;
+      z-index: 20;
+      font-family: var(--font-display);
+      font-size: 22px;
+      font-weight: 700;
+      color: rgba(255, 255, 255, 0.85);
+      text-shadow: 0 0 20px rgba(0, 212, 255, 0.5), 0 0 40px rgba(0, 212, 255, 0.2);
+      letter-spacing: 1.5px;
+      pointer-events: none;
+      user-select: none;
+    }
+
+    .app-title span {
+      color: var(--accent);
+    }
+
+    .toolbar {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 15;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 24px;
+      background: var(--toolbar-bg);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .toolbar-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .toolbar-separator {
+      width: 1px;
+      height: 24px;
+      background: var(--border);
+    }
+
+    .btn {
+      font-family: var(--font-body);
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--fg);
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 6px 14px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      white-space: nowrap;
+      user-select: none;
+    }
+
+    .btn:hover {
+      background: rgba(0, 212, 255, 0.12);
+      border-color: rgba(0, 212, 255, 0.4);
+      transform: scale(1.05);
+      box-shadow: var(--glow);
+    }
+
+    .btn.active {
+      background: rgba(0, 212, 255, 0.2);
+      border-color: var(--accent);
+      color: var(--accent);
+      box-shadow: var(--glow);
+    }
+
+    .btn-icon {
+      padding: 6px 10px;
+      font-size: 16px;
+    }
+
+    .btn-upload {
+      background: rgba(0, 212, 255, 0.1);
+      border-color: rgba(0, 212, 255, 0.3);
+    }
+
+    .btn-upload:hover {
+      background: rgba(0, 212, 255, 0.2);
+    }
+
+    .time-axis-container {
+      position: absolute;
+      bottom: 40px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 15;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 8px 20px;
+      background: var(--toolbar-bg);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      border-radius: 24px;
+      border: 1px solid var(--border);
+    }
+
+    .time-track {
+      position: relative;
+      width: 320px;
+      height: 6px;
+      background: linear-gradient(90deg, #0a2a4a, #00d4ff, #ff6b3d);
+      border-radius: 3px;
+      cursor: pointer;
+    }
+
+    .time-track-fill {
+      position: absolute;
+      top: 0; left: 0;
+      height: 100%;
+      border-radius: 3px;
+      background: linear-gradient(90deg, rgba(0, 212, 255, 0.5), rgba(255, 107, 61, 0.5));
+      pointer-events: none;
+    }
+
+    .time-thumb {
+      position: absolute;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: var(--accent);
+      box-shadow: 0 0 12px var(--accent), 0 0 24px rgba(0, 212, 255, 0.3);
+      cursor: grab;
+      transition: box-shadow 0.2s ease;
+    }
+
+    .time-thumb.playing {
+      animation: pulse-glow 1s ease-in-out infinite;
+    }
+
+    @keyframes pulse-glow {
+      0%, 100% { box-shadow: 0 0 12px var(--accent), 0 0 24px rgba(0, 212, 255, 0.3); }
+      50% { box-shadow: 0 0 20px var(--accent), 0 0 40px rgba(0, 212, 255, 0.5); }
+    }
+
+    .time-label {
+      font-family: var(--font-display);
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--accent);
+      min-width: 80px;
+      text-align: center;
+    }
+
+    .btn-play {
+      width: 32px;
+      height: 32px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0;
+      border-radius: 50%;
+      font-size: 14px;
+    }
+
+    .status-bar {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      z-index: 15;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 24px;
+      padding: 6px 24px;
+      background: rgba(10, 14, 26, 0.7);
+      backdrop-filter: blur(4px);
+      -webkit-backdrop-filter: blur(4px);
+      border-top: 1px solid var(--border);
+      font-size: 12px;
+      color: var(--muted);
+      font-family: var(--font-display);
+    }
+
+    .status-bar .status-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .status-bar .status-value {
+      color: var(--fg);
+      font-weight: 600;
+    }
+
+    .clipping-panel-overlay {
+      position: absolute;
+      z-index: 10;
+      display: none;
+    }
+
+    .clipping-panel-overlay.visible {
+      display: block;
+    }
+
+    .hamburger {
+      display: none;
+      background: none;
+      border: none;
+      color: var(--fg);
+      font-size: 20px;
+      cursor: pointer;
+      padding: 4px 8px;
+    }
+
+    .toolbar-content {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    @media (max-width: 768px) {
+      .hamburger { display: block; }
+      .toolbar-content { display: none; }
+      .toolbar-content.open { display: flex; flex-direction: column; position: absolute; top: 100%; left: 0; right: 0; background: var(--toolbar-bg); backdrop-filter: blur(8px); padding: 12px; border-bottom: 1px solid var(--border); }
+      .btn .btn-text { display: none; }
+      .btn { padding: 6px 10px; }
+      .time-track { width: 180px; }
+    }
+
+    #file-input { display: none; }
+
+    .loading-overlay {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      z-index: 30;
+      font-family: var(--font-display);
+      font-size: 18px;
+      color: var(--accent);
+      text-shadow: 0 0 12px rgba(0, 212, 255, 0.4);
+      display: none;
+    }
+
+    .loading-overlay.visible {
+      display: block;
+      animation: fade-pulse 1.5s ease-in-out infinite;
+    }
+
+    @keyframes fade-pulse {
+      0%, 100% { opacity: 0.6; }
+      50% { opacity: 1; }
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <div id="canvas-container"></div>
+
+    <div class="app-title">RADAR <span>3D</span> VISION</div>
+
+    <div class="toolbar">
+      <button class="hamburger" id="hamburger-btn">&#9776;</button>
+      <div class="toolbar-content" id="toolbar-content">
+        <div class="toolbar-group">
+          <input type="file" id="file-input" multiple accept=".png" />
+          <button class="btn btn-upload" id="upload-btn">&#9650; <span class="btn-text">上传雷达图像</span></button>
+        </div>
+        <div class="toolbar-separator"></div>
+        <div class="toolbar-group">
+          <button class="btn btn-icon" id="clip-x-btn" data-axis="x" title="X轴剖切">X</button>
+          <button class="btn btn-icon" id="clip-y-btn" data-axis="y" title="Y轴剖切">Y</button>
+          <button class="btn btn-icon" id="clip-z-btn" data-axis="z" title="Z轴剖切">Z</button>
+        </div>
+        <div class="toolbar-separator"></div>
+        <div class="toolbar-group">
+          <button class="btn btn-icon" id="reset-view-btn" title="重置视角">&#8634;</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="time-axis-container" id="time-axis">
+      <button class="btn btn-play" id="play-btn" title="播放/暂停">&#9654;</button>
+      <div class="time-track" id="time-track">
+        <div class="time-track-fill" id="time-fill"></div>
+        <div class="time-thumb" id="time-thumb"></div>
+      </div>
+      <div class="time-label" id="time-label">--:--</div>
+    </div>
+
+    <div class="status-bar" id="status-bar">
+      <div class="status-item">时刻: <span class="status-value" id="status-time">--</span></div>
+      <div class="status-item">海拔: <span class="status-value" id="status-alt">--</span></div>
+      <div class="status-item">体素: <span class="status-value" id="status-voxels">0</span></div>
+    </div>
+
+    <div class="loading-overlay" id="loading">加载数据中...</div>
+  </div>
+
+  <script type="module" src="/src/visualizer/main.ts"></script>
+</body>
+</html>
