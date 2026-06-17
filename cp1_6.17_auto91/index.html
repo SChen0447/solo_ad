@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Rhythm Runner - 节奏跑酷</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #0a0014;
+      font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif;
+      color: #fff;
+    }
+
+    #gameCanvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      position: absolute;
+      top: 0;
+      left: 0;
+    }
+
+    #uiOverlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 10;
+    }
+
+    .hud-top {
+      position: absolute;
+      top: 24px;
+      left: 24px;
+      right: 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+    }
+
+    .score-panel, .lives-panel {
+      background: rgba(20, 0, 40, 0.7);
+      border: 2px solid;
+      border-radius: 12px;
+      padding: 12px 24px;
+      backdrop-filter: blur(8px);
+      animation: pulse-glow 2s ease-in-out infinite;
+    }
+
+    .score-panel {
+      border-color: #ff4fd8;
+      box-shadow: 0 0 20px rgba(255, 79, 216, 0.4), inset 0 0 20px rgba(255, 79, 216, 0.1);
+    }
+
+    .lives-panel {
+      border-color: #00f0ff;
+      box-shadow: 0 0 20px rgba(0, 240, 255, 0.4), inset 0 0 20px rgba(0, 240, 255, 0.1);
+    }
+
+    .panel-label {
+      font-size: 11px;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      opacity: 0.8;
+      margin-bottom: 4px;
+    }
+
+    .score-panel .panel-label { color: #ff4fd8; }
+    .lives-panel .panel-label { color: #00f0ff; }
+
+    .panel-value {
+      font-size: 32px;
+      font-weight: 700;
+      text-shadow: 0 0 10px currentColor;
+    }
+
+    .score-panel .panel-value { color: #ff7ae6; }
+    .lives-panel .panel-value { color: #66f5ff; }
+
+    .lives-hearts {
+      display: flex;
+      gap: 6px;
+      font-size: 24px;
+    }
+
+    .heart {
+      filter: drop-shadow(0 0 6px #00f0ff);
+      transition: transform 0.2s, opacity 0.3s;
+    }
+
+    .heart.lost {
+      opacity: 0.2;
+      filter: grayscale(1);
+      transform: scale(0.8);
+    }
+
+    .rhythm-panel {
+      position: absolute;
+      right: 24px;
+      top: 50%;
+      transform: translateY(-50%);
+      display: flex;
+      gap: 12px;
+      background: rgba(20, 0, 40, 0.7);
+      border: 2px solid #8a2be2;
+      border-radius: 16px;
+      padding: 16px;
+      backdrop-filter: blur(8px);
+      box-shadow: 0 0 30px rgba(138, 43, 226, 0.5), inset 0 0 30px rgba(138, 43, 226, 0.1);
+    }
+
+    .frequency-bar {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .bar-container {
+      width: 36px;
+      height: 180px;
+      background: rgba(0, 0, 0, 0.5);
+      border-radius: 8px;
+      overflow: hidden;
+      position: relative;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .bar-fill {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      border-radius: 8px;
+      transition: height 0.05s ease-out;
+    }
+
+    .bar-fill::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 8px;
+      background: rgba(255, 255, 255, 0.6);
+      border-radius: 4px;
+      filter: blur(2px);
+    }
+
+    .bar-fill.low {
+      background: linear-gradient(to top, #ff1744, #ff5252, #ff8a80);
+      box-shadow: 0 0 20px rgba(255, 23, 68, 0.8);
+    }
+
+    .bar-fill.mid {
+      background: linear-gradient(to top, #00e676, #69f0ae, #b9f6ca);
+      box-shadow: 0 0 20px rgba(0, 230, 118, 0.8);
+    }
+
+    .bar-fill.high {
+      background: linear-gradient(to top, #2979ff, #448aff, #82b1ff);
+      box-shadow: 0 0 20px rgba(41, 121, 255, 0.8);
+    }
+
+    .bar-label {
+      font-size: 10px;
+      letter-spacing: 2px;
+      font-weight: 600;
+      text-transform: uppercase;
+    }
+
+    .bar-label.low { color: #ff5252; }
+    .bar-label.mid { color: #69f0ae; }
+    .bar-label.high { color: #448aff; }
+
+    .threshold-line {
+      position: absolute;
+      left: 0;
+      right: 0;
+      height: 2px;
+      background: rgba(255, 255, 255, 0.6);
+      box-shadow: 0 0 8px rgba(255, 255, 255, 0.8);
+    }
+
+    .center-overlay {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      text-align: center;
+      pointer-events: auto;
+    }
+
+    .game-title {
+      font-size: 64px;
+      font-weight: 900;
+      letter-spacing: 8px;
+      background: linear-gradient(135deg, #ff4fd8, #00f0ff, #ff4fd8);
+      background-size: 200% 200%;
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      text-shadow: none;
+      filter: drop-shadow(0 0 30px rgba(255, 79, 216, 0.6));
+      animation: gradient-shift 3s ease infinite, title-bounce 2s ease-in-out infinite;
+      margin-bottom: 16px;
+    }
+
+    .game-subtitle {
+      font-size: 18px;
+      color: #a89cc8;
+      letter-spacing: 4px;
+      margin-bottom: 48px;
+      opacity: 0.9;
+    }
+
+    .action-btn {
+      background: linear-gradient(135deg, rgba(255, 79, 216, 0.3), rgba(0, 240, 255, 0.3));
+      border: 2px solid transparent;
+      border-image: linear-gradient(135deg, #ff4fd8, #00f0ff) 1;
+      color: #fff;
+      font-size: 18px;
+      font-weight: 600;
+      letter-spacing: 3px;
+      padding: 16px 48px;
+      cursor: pointer;
+      border-radius: 4px;
+      transition: all 0.3s;
+      backdrop-filter: blur(4px);
+      text-transform: uppercase;
+      pointer-events: auto;
+    }
+
+    .action-btn:hover {
+      transform: translateY(-2px) scale(1.02);
+      box-shadow: 0 10px 40px rgba(255, 79, 216, 0.5), 0 10px 40px rgba(0, 240, 255, 0.3);
+      background: linear-gradient(135deg, rgba(255, 79, 216, 0.5), rgba(0, 240, 255, 0.5));
+    }
+
+    .action-btn:active {
+      transform: translateY(0) scale(0.98);
+    }
+
+    .controls-info {
+      position: absolute;
+      bottom: 24px;
+      left: 24px;
+      background: rgba(20, 0, 40, 0.7);
+      border: 1px solid rgba(138, 43, 226, 0.5);
+      border-radius: 12px;
+      padding: 16px 20px;
+      backdrop-filter: blur(8px);
+      font-size: 13px;
+      line-height: 2;
+      max-width: 320px;
+    }
+
+    .controls-info h3 {
+      font-size: 12px;
+      letter-spacing: 3px;
+      color: #c77dff;
+      margin-bottom: 8px;
+      text-transform: uppercase;
+    }
+
+    .control-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      color: #d4c5f0;
+    }
+
+    .freq-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      display: inline-block;
+    }
+
+    .freq-dot.low { background: #ff5252; box-shadow: 0 0 8px #ff5252; }
+    .freq-dot.mid { background: #69f0ae; box-shadow: 0 0 8px #69f0ae; }
+    .freq-dot.high { background: #448aff; box-shadow: 0 0 8px #448aff; }
+
+    .toggle-controls-btn {
+      position: absolute;
+      bottom: 24px;
+      left: 24px;
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, rgba(255, 79, 216, 0.4), rgba(0, 240, 255, 0.4));
+      border: 2px solid #c77dff;
+      color: #fff;
+      font-size: 20px;
+      cursor: pointer;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      backdrop-filter: blur(8px);
+      box-shadow: 0 0 20px rgba(138, 43, 226, 0.5);
+      pointer-events: auto;
+      z-index: 20;
+    }
+
+    .game-over-panel {
+      display: none;
+      background: rgba(10, 0, 20, 0.92);
+      border: 2px solid #ff4fd8;
+      border-radius: 20px;
+      padding: 40px 60px;
+      box-shadow: 0 0 60px rgba(255, 79, 216, 0.5), inset 0 0 40px rgba(255, 79, 216, 0.1);
+    }
+
+    .game-over-title {
+      font-size: 48px;
+      font-weight: 900;
+      letter-spacing: 6px;
+      color: #ff4fd8;
+      text-shadow: 0 0 20px rgba(255, 79, 216, 0.8);
+      margin-bottom: 12px;
+    }
+
+    .final-score {
+      font-size: 20px;
+      color: #d4c5f0;
+      margin-bottom: 32px;
+    }
+
+    .final-score span {
+      color: #00f0ff;
+      font-size: 32px;
+      font-weight: 700;
+      text-shadow: 0 0 15px rgba(0, 240, 255, 0.7);
+    }
+
+    .status-paused {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 56px;
+      font-weight: 900;
+      letter-spacing: 12px;
+      color: rgba(0, 240, 255, 0.8);
+      text-shadow: 0 0 30px rgba(0, 240, 255, 0.8);
+      display: none;
+    }
+
+    @keyframes pulse-glow {
+      0%, 100% { box-shadow: 0 0 15px currentColor, inset 0 0 15px rgba(255,255,255,0.05); }
+      50% { box-shadow: 0 0 30px currentColor, inset 0 0 25px rgba(255,255,255,0.1); }
+    }
+
+    @keyframes gradient-shift {
+      0%, 100% { background-position: 0% 50%; }
+      50% { background-position: 100% 50%; }
+    }
+
+    @keyframes title-bounce {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-8px); }
+    }
+
+    @media (max-width: 768px) {
+      .game-title { font-size: 36px; letter-spacing: 4px; }
+      .game-subtitle { font-size: 13px; letter-spacing: 2px; margin-bottom: 32px; }
+      .hud-top { top: 12px; left: 12px; right: 12px; }
+      .score-panel, .lives-panel { padding: 8px 14px; }
+      .panel-value { font-size: 22px; }
+      .rhythm-panel { right: 12px; padding: 10px; gap: 8px; }
+      .bar-container { width: 26px; height: 120px; }
+      .controls-info { display: none; }
+      .controls-info.expanded { display: block; bottom: 80px; left: 12px; max-width: 280px; }
+      .toggle-controls-btn { display: flex; }
+      .game-over-panel { padding: 28px 36px; }
+      .game-over-title { font-size: 32px; }
+      .action-btn { font-size: 14px; padding: 12px 32px; }
+    }
+  </style>
+</head>
+<body>
+  <canvas id="gameCanvas"></canvas>
+
+  <div id="uiOverlay">
+    <div class="hud-top">
+      <div class="score-panel">
+        <div class="panel-label">Score</div>
+        <div class="panel-value" id="scoreValue">0</div>
+      </div>
+      <div class="lives-panel">
+        <div class="panel-label">Lives</div>
+        <div class="lives-hearts" id="livesHearts">
+          <span class="heart">💙</span>
+          <span class="heart">💙</span>
+          <span class="heart">💙</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="rhythm-panel" id="rhythmPanel">
+      <div class="frequency-bar">
+        <div class="bar-label low">LOW</div>
+        <div class="bar-container">
+          <div class="bar-fill low" id="barLow" style="height: 0%"></div>
+          <div class="threshold-line" id="threshLow" style="bottom: 55%"></div>
+        </div>
+      </div>
+      <div class="frequency-bar">
+        <div class="bar-label mid">MID</div>
+        <div class="bar-container">
+          <div class="bar-fill mid" id="barMid" style="height: 0%"></div>
+          <div class="threshold-line" id="threshMid" style="bottom: 50%"></div>
+        </div>
+      </div>
+      <div class="frequency-bar">
+        <div class="bar-label high">HIGH</div>
+        <div class="bar-container">
+          <div class="bar-fill high" id="barHigh" style="height: 0%"></div>
+          <div class="threshold-line" id="threshHigh" style="bottom: 60%"></div>
+        </div>
+      </div>
+    </div>
+
+    <button class="toggle-controls-btn" id="toggleControls" style="pointer-events: auto;">❓</button>
+
+    <div class="controls-info" id="controlsInfo">
+      <h3>🎤 声控操作</h3>
+      <div class="control-item"><span class="freq-dot low"></span>低音/鼓点 → 跳跃</div>
+      <div class="control-item"><span class="freq-dot mid"></span>中音/人声 → 滑铲</div>
+      <div class="control-item"><span class="freq-dot high"></span>高音/旋律 → 加速</div>
+      <h3 style="margin-top:12px;">⌨️ 键盘操作</h3>
+      <div class="control-item"><span style="color:#ff5252">空格/↑</span> → 跳跃</div>
+      <div class="control-item"><span style="color:#69f0ae">↓</span> → 滑铲</div>
+      <div class="control-item"><span style="color:#448aff">→</span> → 加速</div>
+      <div class="control-item"><span style="color:#c77dff">P</span> → 暂停</div>
+    </div>
+
+    <div class="status-paused" id="statusPaused">PAUSED</div>
+
+    <div class="center-overlay" id="startOverlay">
+      <div class="game-title">RHYTHM RUNNER</div>
+      <div class="game-subtitle">用你的声音驱动节奏 · 声控跑酷</div>
+      <button class="action-btn" id="startBtn">开始游戏</button>
+    </div>
+
+    <div class="center-overlay game-over-panel" id="gameOverOverlay">
+      <div class="game-over-title">GAME OVER</div>
+      <div class="final-score">最终分数: <span id="finalScore">0</span></div>
+      <button class="action-btn" id="restartBtn">再来一次</button>
+    </div>
+  </div>
+
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
