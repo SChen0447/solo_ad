@@ -207,7 +207,7 @@ function CardFolder() {
         ) : (
           <div className="cards-grid">
             {cards.map(card => (
-              <div key={card.id} className="card-item card">
+              <div key={card.id} className="card-item">
                 <div className="card-info" onClick={() => viewProfile(card.id)}>
                   <div className="card-avatar">
                     {card.avatarUrl ? (
@@ -227,11 +227,11 @@ function CardFolder() {
                   <p className="card-date">交换于 {formatDate(card.exchangedAt)}</p>
                 </div>
                 <div className="card-actions">
-                  <button className="card-btn" onClick={() => openNoteModal(card)}>
+                  <button className="card-btn edit-btn" onClick={() => openNoteModal(card)}>
                     <i className="fas fa-edit"></i>
                     编辑备注
                   </button>
-                  <button className="card-btn delete" onClick={() => openDeleteModal(card)}>
+                  <button className="card-btn delete-btn" onClick={() => openDeleteModal(card)}>
                     <i className="fas fa-trash"></i>
                     删除
                   </button>

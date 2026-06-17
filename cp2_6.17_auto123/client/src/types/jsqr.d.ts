@@ -25,12 +25,12 @@ declare module 'jsqr' {
     inversionAttempts?: 'dontInvert' | 'onlyInvert' | 'attemptBoth' | 'invertFirst';
   }
 
-  function default(
+  function jsqr(
     data: Uint8ClampedArray,
     width: number,
     height: number,
     options?: Options
   ): QrResult | null;
 
-  export default default;
+  export = jsqr;
 }

@@ -720,13 +720,13 @@ a {
   display: flex;
   flex-direction: column;
   background: var(--white);
-  box-shadow: var(--shadow-md);
-  transition: all 0.3s ease;
+  box-shadow: var(--shadow-sm);
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
 }
 
 .card-item:hover {
   transform: translateY(-2px);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.1);
 }
 
 .card-info {
@@ -805,13 +805,14 @@ a {
 
 .card-actions {
   display: flex;
+  justify-content: space-between;
+  align-items: center;
   border-top: 1px solid var(--gray-200);
   padding: 8px 12px;
-  gap: 8px;
 }
 
 .card-btn {
-  padding: 10px 12px;
+  padding: 8px 14px;
   font-size: 13px;
   color: var(--text-secondary);
   background: transparent;
@@ -819,22 +820,26 @@ a {
   border-radius: 8px;
   display: flex;
   align-items: center;
-  justify-content: center;
   gap: 6px;
   transition: all 0.2s ease;
 }
 
-.card-btn:first-child {
-  margin-right: auto;
+.card-btn.edit-btn {
+  justify-content: flex-start;
 }
 
-.card-btn:hover {
+.card-btn.delete-btn {
+  justify-content: flex-end;
+}
+
+.card-btn.edit-btn:hover {
   color: var(--primary-color);
   background: var(--gray-100);
 }
 
-.card-btn.delete:hover {
+.card-btn.delete-btn:hover {
   color: #ef4444;
+  background: var(--gray-100);
 }
 
 .empty-state {
