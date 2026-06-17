@@ -1,11 +1,10 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import type { OverflowElement } from '../modules/analyzer';
-import { analyzeWithServer, analyzeDom } from '../modules/analyzer';
 import { exportAsPNG, exportAsJSON, type ExportReportData } from '../modules/exporter';
 
 export const BREAKPOINTS: number[] = [320, 480, 768, 1024, 1280, 1440, 1920, 2560];
 
-const DEFAULT_HTML = `<div class="container">
+export const DEFAULT_HTML = `<div class="container">
   <header class="header">
     <h1>响应式布局测试页面</h1>
     <nav class="nav">
@@ -42,7 +41,7 @@ const DEFAULT_HTML = `<div class="container">
   </main>
 </div>`;
 
-const DEFAULT_CSS = `.container {
+export const DEFAULT_CSS = `.container {
   max-width: 1200px;
   margin: 0 auto;
   padding: 20px;
@@ -113,7 +112,7 @@ const DEFAULT_CSS = `.container {
   color: #92400e;
 }`;
 
-interface SliderProps {
+interface KnobSliderProps {
   label: string;
   value: number;
   min: number;
@@ -123,35 +122,75 @@ interface SliderProps {
   onChange: (value: number) => void;
 }
 
-function KnobSlider({ label, value, min, max, step, unit, onChange }: SliderProps) {
+function KnobSlider({ label, value, min, max, step, unit, onChange }: KnobSliderProps) {
   const trackRef = useRef<HTMLDivElement>(null);
   const [isDragging, setIsDragging] = useState(false);
-  const percent = ((value - min) / (max - min)) * 100;
+  const displayValueRef = useRef(value);
+  const animationRef = useRef<number | null>(null);
+  const targetValueRef = useRef(value);
 
-  const handleMouseDown = (e: React.MouseEvent) => {
-    setIsDragging(true);
-    updateValue(e.clientX);
-    e.preventDefault();
-  };
+  const snapToStep = useCallback(
+    (raw: number) => {
+      const snapped = Math.round(raw / step) * step;
+      return Math.max(min, Math.min(max, snapped));
+    },
+    [min, max, step]
+  );
 
-  const updateValue = useCallback(
+  const updateWithDamping = useCallback(() => {
+    const current = displayValueRef.current;
+    const target = targetValueRef.current;
+    const diff = target - current;
+
+    if (Math.abs(diff) < step / 10) {
+      displayValueRef.current = target;
+      animationRef.current = null;
+      return;
+    }
+
+    const damping = 0.25;
+    displayValueRef.current = current + diff * damping;
+    animationRef.current = requestAnimationFrame(updateWithDamping);
+  }, [step]);
+
+  const updateTargetValue = useCallback(
     (clientX: number) => {
       if (!trackRef.current) return;
       const rect = trackRef.current.getBoundingClientRect();
       const x = Math.max(0, Math.min(clientX - rect.left, rect.width));
       const pct = x / rect.width;
-      let rawValue = min + pct * (max - min);
-      rawValue = Math.round(rawValue / step) * step;
-      rawValue = Math.max(min, Math.min(max, rawValue));
-      onChange(rawValue);
+      const rawValue = min + pct * (max - min);
+      const snapped = snapToStep(rawValue);
+      targetValueRef.current = snapped;
+      onChange(snapped);
     },
-    [min, max, step, onChange]
+    [min, max, snapToStep, onChange]
   );
+
+  const handleMouseDown = useCallback(
+    (e: React.MouseEvent) => {
+      setIsDragging(true);
+      updateTargetValue(e.clientX);
+      if (animationRef.current) {
+        cancelAnimationFrame(animationRef.current);
+      }
+      updateWithDamping();
+      e.preventDefault();
+    },
+    [updateTargetValue, updateWithDamping]
+  );
+
+  useEffect(() => {
+    targetValueRef.current = value;
+    if (!isDragging && animationRef.current === null) {
+      updateWithDamping();
+    }
+  }, [value, isDragging, updateWithDamping]);
 
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
       if (isDragging) {
-        updateValue(e.clientX);
+        updateTargetValue(e.clientX);
       }
     };
     const handleMouseUp = () => {
@@ -165,7 +204,17 @@ function KnobSlider({ label, value, min, max, step, unit, onChange }: SliderProp
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mouseup', handleMouseUp);
     };
-  }, [isDragging, updateValue]);
+  }, [isDragging, updateTargetValue]);
+
+  useEffect(() => {
+    return () => {
+      if (animationRef.current) {
+        cancelAnimationFrame(animationRef.current);
+      }
+    };
+  }, []);
+
+  const displayPercent = ((displayValueRef.current - min) / (max - min)) * 100;
 
   return (
     <div className="slider-group">
@@ -181,11 +230,163 @@ function KnobSlider({ label, value, min, max, step, unit, onChange }: SliderProp
         className={`slider-track ${isDragging ? 'dragging' : ''}`}
         onMouseDown={handleMouseDown}
       >
-        <div className="slider-fill" style={{ width: `${percent}%` }} />
+        <div className="slider-fill" style={{ width: `${displayPercent}%` }} />
         <div
           className={`slider-knob ${isDragging ? 'active' : ''}`}
-          style={{ left: `calc(${percent}% - 12px)` }}
-        />
+          style={{ left: `calc(${displayPercent}% - 12px)` }}
+        >
+          <div className="knob-inner" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+interface LazyBreakpointCardProps {
+  bp: number;
+  htmlCode: string;
+  cssCode: string;
+  fontScale: number;
+  lineHeightScale: number;
+  containerPadding: number;
+  overflowCount: number;
+  selected: boolean;
+  onIframeRef: (bp: number, el: HTMLIFrameElement | null) => void;
+  onClick: () => void;
+}
+
+function LazyBreakpointCard({
+  bp,
+  htmlCode,
+  cssCode,
+  fontScale,
+  lineHeightScale,
+  containerPadding,
+  overflowCount,
+  selected,
+  onIframeRef,
+  onClick,
+}: LazyBreakpointCardProps) {
+  const cardRef = useRef<HTMLDivElement>(null);
+  const [isVisible, setIsVisible] = useState(false);
+  const iframeRef = useRef<HTMLIFrameElement | null>(null);
+  const scale = 160 / Math.max(bp, 320);
+  const displayWidth = Math.min(bp * scale, 160);
+  const displayHeight = displayWidth * 0.65;
+
+  useEffect(() => {
+    const card = cardRef.current;
+    if (!card) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            setIsVisible(true);
+            observer.disconnect();
+          }
+        });
+      },
+      { threshold: 0.1, rootMargin: '100px' }
+    );
+
+    observer.observe(card);
+    return () => observer.disconnect();
+  }, []);
+
+  useEffect(() => {
+    if (!isVisible) return;
+    const iframe = iframeRef.current;
+    if (!iframe) return;
+
+    const doc = iframe.contentDocument || iframe.contentWindow?.document;
+    if (doc) {
+      const styleId = '__diag_style__';
+      let styleEl = doc.getElementById(styleId) as HTMLStyleElement | null;
+      if (!styleEl) {
+        styleEl = doc.createElement('style');
+        styleEl.id = styleId;
+        doc.head.appendChild(styleEl);
+      }
+      styleEl.textContent = `
+        ${cssCode}
+        * {
+          font-size: calc(1em * ${fontScale}) !important;
+          line-height: calc(1.5 * ${lineHeightScale}) !important;
+        }
+        html, body {
+          margin: 0;
+          padding: ${containerPadding}px;
+          box-sizing: border-box;
+          background: #ffffff;
+          font-family: system-ui, sans-serif;
+        }
+        *, *::before, *::after { box-sizing: inherit; }
+      `;
+      if (doc.body.innerHTML !== htmlCode) {
+        doc.body.innerHTML = htmlCode;
+      }
+    }
+  }, [isVisible, htmlCode, cssCode, fontScale, lineHeightScale, containerPadding]);
+
+  const handleRef = (el: HTMLIFrameElement | null) => {
+    iframeRef.current = el;
+    onIframeRef(bp, el);
+  };
+
+  return (
+    <div
+      ref={cardRef}
+      className={`breakpoint-card ${selected ? 'selected' : ''}`}
+      onClick={onClick}
+    >
+      <div className="breakpoint-width-tag">{bp}px</div>
+      <div
+        className="breakpoint-viewport"
+        style={{ width: displayWidth, height: displayHeight }}
+      >
+        {isVisible ? (
+          <div
+            className="thumbnail-iframe-container"
+            style={{
+              width: displayWidth,
+              height: displayHeight,
+            }}
+          >
+            <iframe
+              ref={handleRef}
+              title={`preview-${bp}`}
+              className="thumbnail-iframe"
+              style={{
+                width: bp,
+                height: bp * 0.65,
+                transform: `scale(${scale})`,
+                transformOrigin: 'top left',
+              }}
+              sandbox="allow-same-origin allow-scripts"
+            />
+          </div>
+        ) : (
+          <div className="breakpoint-placeholder">
+            <div className="placeholder-skeleton">
+              <div className="ph-bar ph-header" />
+              <div className="ph-bar ph-hero" />
+              <div className="ph-cards">
+                <div className="ph-card" />
+                <div className="ph-card" />
+                <div className="ph-card" />
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+      <div className="breakpoint-info">
+        <span className="breakpoint-name">{bp}</span>
+        {overflowCount > 0 ? (
+          <span className="overflow-badge">{overflowCount} 溢出</span>
+        ) : (
+          <span className="ok-badge">OK</span>
+        )}
       </div>
     </div>
   );
@@ -228,7 +429,7 @@ export default function ControlPanel({
 }: ControlPanelProps) {
   const [activeTab, setActiveTab] = useState<'code' | 'params'>('code');
 
-  const handleExportPNG = async () => {
+  const handleExportPNG = useCallback(async () => {
     const bp = selectedBreakpoint ?? 1024;
     const iframe = iframesRef.current[bp];
     const overflowElements = overflowMap[bp] || [];
@@ -239,9 +440,9 @@ export default function ControlPanel({
         console.error('Export PNG failed:', err);
       }
     }
-  };
+  }, [selectedBreakpoint, overflowMap, iframesRef]);
 
-  const handleExportJSON = async () => {
+  const handleExportJSON = useCallback(async () => {
     const reportData: ExportReportData = {
       exportedAt: new Date().toISOString(),
       breakpoints: BREAKPOINTS.map((bp) => ({
@@ -256,7 +457,46 @@ export default function ControlPanel({
       cssCode,
     };
     await exportAsJSON(reportData);
-  };
+  }, [overflowMap, fontScale, lineHeightScale, containerPadding, htmlCode, cssCode]);
+
+  const handleIframeRef = useCallback(
+    (bp: number, el: HTMLIFrameElement | null) => {
+      iframesRef.current[bp] = el;
+    },
+    [iframesRef]
+  );
+
+  const cards = useMemo(
+    () =>
+      BREAKPOINTS.map((bp) => (
+        <LazyBreakpointCard
+          key={bp}
+          bp={bp}
+          htmlCode={htmlCode}
+          cssCode={cssCode}
+          fontScale={fontScale}
+          lineHeightScale={lineHeightScale}
+          containerPadding={containerPadding}
+          overflowCount={(overflowMap[bp] || []).length}
+          selected={selectedBreakpoint === bp}
+          onIframeRef={handleIframeRef}
+          onClick={() =>
+            setSelectedBreakpoint(selectedBreakpoint === bp ? null : bp)
+          }
+        />
+      )),
+    [
+      htmlCode,
+      cssCode,
+      fontScale,
+      lineHeightScale,
+      containerPadding,
+      overflowMap,
+      selectedBreakpoint,
+      handleIframeRef,
+      setSelectedBreakpoint,
+    ]
+  );
 
   return (
     <div className="control-panel">
@@ -265,42 +505,9 @@ export default function ControlPanel({
         <p className="app-subtitle">Responsive Layout Diagnostic</p>
       </div>
 
-      <div className="breakpoint-grid">
+      <div className="breakpoint-grid-section">
         <div className="section-title">断点预览（点击进入详情）</div>
-        <div className="breakpoint-cards">
-          {BREAKPOINTS.map((bp) => {
-            const overflowCount = (overflowMap[bp] || []).length;
-            const isSelected = selectedBreakpoint === bp;
-            return (
-              <div
-                key={bp}
-                className={`breakpoint-card ${isSelected ? 'selected' : ''}`}
-                onClick={() => setSelectedBreakpoint(isSelected ? null : bp)}
-              >
-                <div className="breakpoint-width-tag">{bp}px</div>
-                <div className="breakpoint-viewport">
-                  <div className="mini-viewport-content">
-                    <div className="mini-bar header-bar" />
-                    <div className="mini-bar hero-bar" />
-                    <div className="mini-grid">
-                      <div className="mini-card" />
-                      <div className="mini-card" />
-                      <div className="mini-card" />
-                    </div>
-                  </div>
-                </div>
-                <div className="breakpoint-info">
-                  <span className="breakpoint-name">{bp}</span>
-                  {overflowCount > 0 ? (
-                    <span className="overflow-badge">{overflowCount} 溢出</span>
-                  ) : (
-                    <span className="ok-badge">OK</span>
-                  )}
-                </div>
-              </div>
-            );
-          })}
-        </div>
+        <div className="breakpoint-cards">{cards}</div>
       </div>
 
       <div className="tabs">
