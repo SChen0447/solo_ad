@@ -138,6 +138,17 @@ export class TransformControlsModule {
   }
 
   private updateMatrixDisplay(matrix: number[][]): void {
+    this.highlightTimeouts.forEach((t) => clearTimeout(t));
+    this.highlightTimeouts = [];
+
+    for (let i = 0; i < 4; i++) {
+      for (let j = 0; j < 4; j++) {
+        this.matrixCells[i][j].classList.remove('highlight');
+      }
+    }
+
+    const changedCells: [number, number][] = [];
+
     for (let i = 0; i < 4; i++) {
       for (let j = 0; j < 4; j++) {
         const val = matrix[i][j];
@@ -148,12 +159,19 @@ export class TransformControlsModule {
         cell.textContent = rounded.toFixed(3);
 
         if (Math.abs(rounded - prev) > 0.0005) {
-          cell.classList.add('highlight');
-          this.clearHighlight(cell);
+          changedCells.push([i, j]);
         }
 
         this.prevMatrix[i][j] = rounded;
       }
+    }
+
+    for (const [i, j] of changedCells) {
+      const cell = this.matrixCells[i][j];
+      cell.classList.remove('highlight');
+      void cell.offsetWidth;
+      cell.classList.add('highlight');
+      this.clearHighlight(cell);
     }
   }
 

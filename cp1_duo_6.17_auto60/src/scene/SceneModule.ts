@@ -1,10 +1,12 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { TransformControls } from 'three/addons/controls/TransformControls.js';
 import { ModelPreset, TransformParams, computeCombinedMatrix } from '../types';
 import { transformStore } from '../store/useTransformStore';
 
 const LERP_DURATION = 300;
 const MODEL_TRANSITION_DURATION = 1000;
+const MATRIX_UPDATE_THROTTLE_MS = 20;
 
 function easeOutCubic(t: number): number {
   return 1 - Math.pow(1 - t, 3);
@@ -26,13 +28,21 @@ type ModelTransitionState = {
   startTime: number;
   fromModel: ModelPreset | null;
   toModel: ModelPreset | null;
+  startScale: number;
+  targetScale: number;
+  startOpacity: number;
+  targetOpacity: number;
 };
+
+type GeometryCache = Record<ModelPreset, THREE.BufferGeometry[]>;
+type MaterialCache = Record<ModelPreset, THREE.MeshPhongMaterial | THREE.MeshPhongMaterial[]>;
 
 export class SceneModule {
   private scene: THREE.Scene;
   private camera: THREE.PerspectiveCamera;
   private renderer: THREE.WebGLRenderer;
   private controls: OrbitControls;
+  private transformControls: TransformControls;
   private modelGroup: THREE.Group;
   private wireframeGroup: THREE.Group;
   private currentModel: ModelPreset;
@@ -42,12 +52,18 @@ export class SceneModule {
   private gridHelper: THREE.GridHelper;
   private axesGroup: THREE.Group;
   private container: HTMLElement;
+  private geometryCache: GeometryCache;
+  private materialCache: MaterialCache;
+  private lastMatrixUpdate: number = 0;
+  private transformControlsEnabled: boolean = false;
+  private transformControlsEnabledTime: number = 0;
+  private conflictWarningShown: boolean = false;
 
   constructor(container: HTMLElement) {
     this.container = container;
     this.currentModel = ModelPreset.Cube;
     this.interp = { startParams: { translateX: 0, rotateY: 0, scale: 1, shearX: 0 }, targetParams: { translateX: 0, rotateY: 0, scale: 1, shearX: 0 }, startTime: 0, active: false };
-    this.modelTransition = { phase: 'idle', startTime: 0, fromModel: null, toModel: null };
+    this.modelTransition = { phase: 'idle', startTime: 0, fromModel: null, toModel: null, startScale: 1, targetScale: 1, startOpacity: 1, targetOpacity: 1 };
 
     this.scene = new THREE.Scene();
 
@@ -70,6 +86,14 @@ export class SceneModule {
     this.controls.maxDistance = 20;
     this.controls.target.set(0, 0, 0);
 
+    this.transformControls = new TransformControls(this.camera, this.renderer.domElement);
+    this.transformControls.addEventListener('dragging-changed', (event) => {
+      this.controls.enabled = !event.value;
+    });
+    this.transformControls.addEventListener('objectChange', () => {
+      this.onTransformControlsChange();
+    });
+
     const ambient = new THREE.AmbientLight(0xffffff, 0.6);
     this.scene.add(ambient);
     const directional = new THREE.DirectionalLight(0xffffff, 0.8);
@@ -90,12 +114,92 @@ export class SceneModule {
     this.scene.add(this.modelGroup);
     this.scene.add(this.wireframeGroup);
 
+    this.geometryCache = this.precomputeGeometries();
+    this.materialCache = this.precomputeMaterials();
+
     this.loadModel(ModelPreset.Cube);
     this.applyTransformImmediate(transformStore.getState().params);
 
     window.addEventListener('resize', this.onResize);
+    window.addEventListener('keydown', this.onKeyDown);
 
     this.animate();
+  }
+
+  private precomputeGeometries(): GeometryCache {
+    return {
+      [ModelPreset.Cube]: [new THREE.BoxGeometry(2, 2, 2)],
+      [ModelPreset.Icosahedron]: [new THREE.IcosahedronGeometry(1.4, 0)],
+      [ModelPreset.TorusKnot]: [new THREE.TorusKnotGeometry(1, 0.35, 100, 16)],
+      [ModelPreset.Compound]: [
+        new THREE.OctahedronGeometry(0.9, 0),
+        new THREE.TetrahedronGeometry(0.7, 0),
+        new THREE.DodecahedronGeometry(0.6, 0),
+      ],
+    };
+  }
+
+  private precomputeMaterials(): MaterialCache {
+    const colored = () => [
+      new THREE.MeshPhongMaterial({ color: 0xff4444, shininess: 60 }),
+      new THREE.MeshPhongMaterial({ color: 0x44ff44, shininess: 60 }),
+      new THREE.MeshPhongMaterial({ color: 0x4444ff, shininess: 60 }),
+      new THREE.MeshPhongMaterial({ color: 0xffff44, shininess: 60 }),
+      new THREE.MeshPhongMaterial({ color: 0xff44ff, shininess: 60 }),
+      new THREE.MeshPhongMaterial({ color: 0x44ffff, shininess: 60 }),
+    ];
+    return {
+      [ModelPreset.Cube]: colored(),
+      [ModelPreset.Icosahedron]: colored(),
+      [ModelPreset.TorusKnot]: new THREE.MeshPhongMaterial({
+        color: 0x6c6cff,
+        shininess: 80,
+        specular: 0xffffff,
+      }),
+      [ModelPreset.Compound]: [
+        new THREE.MeshPhongMaterial({ color: 0xff6644, shininess: 60 }),
+        new THREE.MeshPhongMaterial({ color: 0x44ff88, shininess: 60 }),
+        new THREE.MeshPhongMaterial({ color: 0x4488ff, shininess: 60 }),
+      ],
+    };
+  }
+
+  private onKeyDown = (e: KeyboardEvent): void => {
+    if (e.key === 't' || e.key === 'T') {
+      this.toggleTransformControls();
+    }
+  };
+
+  private toggleTransformControls(): void {
+    this.transformControlsEnabled = !this.transformControlsEnabled;
+    if (this.transformControlsEnabled) {
+      if (this.modelGroup.children.length > 0) {
+        this.transformControls.attach(this.modelGroup);
+        this.scene.add(this.transformControls as unknown as THREE.Object3D);
+      }
+      this.transformControlsEnabledTime = performance.now();
+      if (!this.conflictWarningShown) {
+        console.warn('[TransformControls] 已激活。注意：TransformControls 与自定义滑块控制可能存在冲突，因为两者都会修改模型的变换矩阵。当用户使用 TransformControls 拖拽时，滑块值不会自动同步；反之亦然。建议同一时间只使用一种控制方式。按 T 键可切换。');
+        this.conflictWarningShown = true;
+      }
+    } else {
+      this.transformControls.detach();
+      this.scene.remove(this.transformControls as unknown as THREE.Object3D);
+    }
+  }
+
+  private onTransformControlsChange(): void {
+    if (!this.transformControlsEnabled) return;
+    const now = performance.now();
+    if (now - this.transformControlsEnabledTime < 500) return;
+    const mat = this.modelGroup.matrix;
+    const elements = mat.elements;
+    const scaleX = Math.sqrt(elements[0] * elements[0] + elements[1] * elements[1] + elements[2] * elements[2]);
+    const scaleY = Math.sqrt(elements[4] * elements[4] + elements[5] * elements[5] + elements[6] * elements[6]);
+    const scaleZ = Math.sqrt(elements[8] * elements[8] + elements[9] * elements[9] + elements[10] * elements[10]);
+    if (Math.abs(scaleX - scaleY) > 0.01 || Math.abs(scaleY - scaleZ) > 0.01) {
+      console.warn('[TransformControls Conflict] 检测到非均匀缩放或错切。TransformControls 无法完全表示所有参数化变换，自定义滑块将不会自动同步。这是预期的行为差异。');
+    }
   }
 
   private createGrid(): THREE.GridHelper {
@@ -133,17 +237,6 @@ export class SceneModule {
     return group;
   }
 
-  private createColoredMaterial(): THREE.MeshPhongMaterial[] {
-    return [
-      new THREE.MeshPhongMaterial({ color: 0xff4444, shininess: 60 }),
-      new THREE.MeshPhongMaterial({ color: 0x44ff44, shininess: 60 }),
-      new THREE.MeshPhongMaterial({ color: 0x4444ff, shininess: 60 }),
-      new THREE.MeshPhongMaterial({ color: 0xffff44, shininess: 60 }),
-      new THREE.MeshPhongMaterial({ color: 0xff44ff, shininess: 60 }),
-      new THREE.MeshPhongMaterial({ color: 0x44ffff, shininess: 60 }),
-    ];
-  }
-
   private createWireframe(geometry: THREE.BufferGeometry): THREE.LineSegments {
     const edges = new THREE.EdgesGeometry(geometry, 15);
     const mat = new THREE.LineBasicMaterial({ color: 0xffffff, opacity: 0.5, transparent: true });
@@ -153,87 +246,43 @@ export class SceneModule {
   private loadModel(preset: ModelPreset): void {
     this.clearModelGroup();
 
-    let geometry: THREE.BufferGeometry;
-    let mesh: THREE.Mesh;
+    const geometries = this.geometryCache[preset];
+    const materials = this.materialCache[preset];
+    const materialArr = Array.isArray(materials) ? materials : [materials];
 
-    switch (preset) {
-      case ModelPreset.Cube:
-        geometry = new THREE.BoxGeometry(2, 2, 2);
-        mesh = new THREE.Mesh(geometry, this.createColoredMaterial());
-        break;
+    if (preset === ModelPreset.Compound) {
+      const positions = [
+        new THREE.Vector3(0, 0, 0),
+        new THREE.Vector3(1.2, 0, 0),
+        new THREE.Vector3(-0.8, 0.9, 0.3),
+      ];
+      for (let i = 0; i < geometries.length; i++) {
+        const geom = geometries[i];
+        const mat = materialArr[i % materialArr.length];
+        const mesh = new THREE.Mesh(geom, mat);
+        mesh.position.copy(positions[i]);
+        this.modelGroup.add(mesh);
 
-      case ModelPreset.Icosahedron:
-        geometry = new THREE.IcosahedronGeometry(1.4, 0);
-        mesh = new THREE.Mesh(geometry, this.createColoredMaterial());
-        break;
-
-      case ModelPreset.TorusKnot:
-        geometry = new THREE.TorusKnotGeometry(1, 0.35, 100, 16);
-        mesh = new THREE.Mesh(geometry, new THREE.MeshPhongMaterial({
-          color: 0x6c6cff,
-          shininess: 80,
-          specular: 0xffffff,
-        }));
-        break;
-
-      case ModelPreset.Compound: {
-        const g1 = new THREE.OctahedronGeometry(0.9, 0);
-        const m1 = new THREE.Mesh(g1, new THREE.MeshPhongMaterial({ color: 0xff6644, shininess: 60 }));
-        this.modelGroup.add(m1);
-
-        const g2 = new THREE.TetrahedronGeometry(0.7, 0);
-        const m2 = new THREE.Mesh(g2, new THREE.MeshPhongMaterial({ color: 0x44ff88, shininess: 60 }));
-        m2.position.set(1.2, 0, 0);
-        this.modelGroup.add(m2);
-
-        const g3 = new THREE.DodecahedronGeometry(0.6, 0);
-        const m3 = new THREE.Mesh(g3, new THREE.MeshPhongMaterial({ color: 0x4488ff, shininess: 60 }));
-        m3.position.set(-0.8, 0.9, 0.3);
-        this.modelGroup.add(m3);
-
-        this.wireframeGroup.add(this.createWireframe(g1));
-        const wf2 = this.createWireframe(g2);
-        wf2.position.copy(m2.position);
-        this.wireframeGroup.add(wf2);
-        const wf3 = this.createWireframe(g3);
-        wf3.position.copy(m3.position);
-        this.wireframeGroup.add(wf3);
-
-        this.currentModel = preset;
-        return;
+        const wf = this.createWireframe(geom);
+        wf.position.copy(positions[i]);
+        this.wireframeGroup.add(wf);
       }
-
-      default:
-        geometry = new THREE.BoxGeometry(2, 2, 2);
-        mesh = new THREE.Mesh(geometry, this.createColoredMaterial());
+    } else {
+      const mesh = new THREE.Mesh(geometries[0], materials);
+      this.modelGroup.add(mesh);
+      this.wireframeGroup.add(this.createWireframe(geometries[0]));
     }
 
-    this.modelGroup.add(mesh);
-    this.wireframeGroup.add(this.createWireframe(geometry));
     this.currentModel = preset;
   }
 
   private clearModelGroup(): void {
     while (this.modelGroup.children.length > 0) {
-      const child = this.modelGroup.children[0];
-      this.modelGroup.remove(child);
-      if (child instanceof THREE.Mesh) {
-        child.geometry.dispose();
-        const mat = child.material;
-        if (Array.isArray(mat)) {
-          mat.forEach((m) => m.dispose());
-        } else {
-          mat.dispose();
-        }
-      }
+      this.modelGroup.children[0];
+      this.modelGroup.remove(this.modelGroup.children[0]);
     }
     while (this.wireframeGroup.children.length > 0) {
-      const child = this.wireframeGroup.children[0];
-      this.wireframeGroup.remove(child);
-      if (child instanceof THREE.LineSegments) {
-        child.geometry.dispose();
-        child.material.dispose();
-      }
+      this.wireframeGroup.remove(this.wireframeGroup.children[0]);
     }
   }
 
@@ -258,7 +307,10 @@ export class SceneModule {
   switchModel(model: ModelPreset): void {
     if (model === this.currentModel && this.modelTransition.phase === 'idle') return;
     const now = performance.now();
-    if (this.modelTransition.phase === 'fadeOut' || this.modelTransition.phase === 'fadeIn') {
+    const currentScale = this.modelGroup.scale.x;
+    const currentOpacity = this.getCurrentOpacity();
+
+    if (this.modelTransition.phase !== 'idle') {
       if (this.modelTransition.toModel) {
         this.loadModel(this.modelTransition.toModel);
         this.currentModel = this.modelTransition.toModel;
@@ -269,12 +321,28 @@ export class SceneModule {
       this.wireframeGroup.scale.setScalar(1);
       this.setModelOpacity(1);
     }
+
     this.modelTransition = {
       phase: 'fadeOut',
       startTime: now,
       fromModel: this.currentModel,
       toModel: model,
+      startScale: currentScale,
+      targetScale: 0,
+      startOpacity: currentOpacity,
+      targetOpacity: 0,
     };
+  }
+
+  private getCurrentOpacity(): number {
+    if (this.modelGroup.children.length === 0) return 1;
+    const first = this.modelGroup.children[0];
+    if (first instanceof THREE.Mesh) {
+      const mat = first.material;
+      const m = Array.isArray(mat) ? mat[0] : mat;
+      return m.opacity;
+    }
+    return 1;
   }
 
   private lerpParams(a: TransformParams, b: TransformParams, t: number): TransformParams {
@@ -287,6 +355,10 @@ export class SceneModule {
   }
 
   private applyMatrixFromParams(params: TransformParams): void {
+    const now = performance.now();
+    if (now - this.lastMatrixUpdate < MATRIX_UPDATE_THROTTLE_MS) return;
+    this.lastMatrixUpdate = now;
+
     const m4 = computeCombinedMatrix(params);
     const matrix = new THREE.Matrix4();
     matrix.set(
@@ -320,10 +392,11 @@ export class SceneModule {
       const elapsed = now - this.modelTransition.startTime;
       const rawT = Math.min(elapsed / MODEL_TRANSITION_DURATION, 1);
       const t = easeInOutCubic(rawT);
-      const s = 1 - t;
-      this.modelGroup.scale.setScalar(Math.max(s, 0.001));
-      this.wireframeGroup.scale.setScalar(Math.max(s, 0.001));
-      this.setModelOpacity(1 - t);
+      const currentScale = this.modelTransition.startScale + (this.modelTransition.targetScale - this.modelTransition.startScale) * t;
+      const currentOpacity = this.modelTransition.startOpacity + (this.modelTransition.targetOpacity - this.modelTransition.startOpacity) * t;
+      this.modelGroup.scale.setScalar(Math.max(currentScale, 0.001));
+      this.wireframeGroup.scale.setScalar(Math.max(currentScale, 0.001));
+      this.setModelOpacity(currentOpacity);
       if (rawT >= 1) {
         if (this.modelTransition.toModel) {
           this.loadModel(this.modelTransition.toModel);
@@ -331,8 +404,16 @@ export class SceneModule {
           const storeParams = transformStore.getState().params;
           this.applyTransformImmediate(storeParams);
         }
-        this.modelTransition.phase = 'fadeIn';
-        this.modelTransition.startTime = now;
+        this.modelTransition = {
+          phase: 'fadeIn',
+          startTime: now,
+          fromModel: this.modelTransition.fromModel,
+          toModel: this.modelTransition.toModel,
+          startScale: 0,
+          targetScale: 1,
+          startOpacity: 0,
+          targetOpacity: 1,
+        };
       }
     }
 
@@ -340,13 +421,24 @@ export class SceneModule {
       const elapsed = now - this.modelTransition.startTime;
       const rawT = Math.min(elapsed / MODEL_TRANSITION_DURATION, 1);
       const t = easeOutCubic(rawT);
-      this.modelGroup.scale.setScalar(Math.max(t, 0.001));
-      this.wireframeGroup.scale.setScalar(Math.max(t, 0.001));
-      this.setModelOpacity(t);
+      const currentScale = this.modelTransition.startScale + (this.modelTransition.targetScale - this.modelTransition.startScale) * t;
+      const currentOpacity = this.modelTransition.startOpacity + (this.modelTransition.targetOpacity - this.modelTransition.startOpacity) * t;
+      this.modelGroup.scale.setScalar(Math.max(currentScale, 0.001));
+      this.wireframeGroup.scale.setScalar(Math.max(currentScale, 0.001));
+      this.setModelOpacity(currentOpacity);
       if (rawT >= 1) {
         this.modelGroup.scale.setScalar(1);
         this.wireframeGroup.scale.setScalar(1);
-        this.modelTransition.phase = 'idle';
+        this.modelTransition = {
+          phase: 'idle',
+          startTime: 0,
+          fromModel: null,
+          toModel: null,
+          startScale: 1,
+          targetScale: 1,
+          startOpacity: 1,
+          targetOpacity: 1,
+        };
       }
     }
 
@@ -384,9 +476,22 @@ export class SceneModule {
   dispose(): void {
     cancelAnimationFrame(this.animationId);
     window.removeEventListener('resize', this.onResize);
+    window.removeEventListener('keydown', this.onKeyDown);
     this.controls.dispose();
+    this.transformControls.dispose();
     this.renderer.dispose();
     this.clearModelGroup();
+    for (const key of Object.keys(this.geometryCache) as ModelPreset[]) {
+      this.geometryCache[key].forEach((g) => g.dispose());
+    }
+    for (const key of Object.keys(this.materialCache) as ModelPreset[]) {
+      const mat = this.materialCache[key];
+      if (Array.isArray(mat)) {
+        mat.forEach((m) => m.dispose());
+      } else {
+        mat.dispose();
+      }
+    }
     if (this.renderer.domElement.parentNode) {
       this.renderer.domElement.parentNode.removeChild(this.renderer.domElement);
     }

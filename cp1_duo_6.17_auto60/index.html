@@ -404,7 +404,62 @@
     }
 
     /* Responsive */
-    @media (max-width: 767px) {
+    @media (max-width: 374px) {
+      #app {
+        flex-direction: column;
+      }
+
+      #control-panel {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        width: 100%;
+        min-width: unset;
+        height: auto;
+        max-height: 70vh;
+        border-right: none;
+        border-top: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 16px 16px 0 0;
+        transform: translateY(100%);
+        z-index: 30;
+        padding: 14px;
+      }
+
+      #control-panel.open {
+        transform: translateY(0);
+      }
+
+      #drawer-toggle {
+        display: flex;
+        width: 44px;
+        height: 44px;
+        font-size: 18px;
+      }
+
+      #matrix-display {
+        top: 6px;
+        right: 6px;
+        padding: 8px;
+      }
+
+      #matrix-display .matrix-cell {
+        width: 42px;
+        height: 22px;
+        font-size: 9px;
+      }
+
+      .param-group {
+        margin-bottom: 4px;
+        padding: 6px 0;
+      }
+
+      .control-panel .panel-title {
+        font-size: 16px;
+        margin-bottom: 12px;
+      }
+    }
+
+    @media (min-width: 375px) and (max-width: 767px) {
       #app {
         flex-direction: column;
       }
@@ -454,8 +509,22 @@
 
     @media (min-width: 1920px) {
       #control-panel {
+        position: fixed;
+        top: 0;
+        left: 0;
         width: 280px;
         min-width: 280px;
+        max-width: 320px;
+        height: 100vh;
+      }
+
+      #canvas-container {
+        margin-left: 280px;
+      }
+
+      #matrix-display {
+        top: 24px;
+        right: 24px;
       }
 
       #matrix-display .matrix-cell {
@@ -526,6 +595,12 @@
           <span class="toggle-track"></span>
           <span class="toggle-knob"></span>
         </label>
+      </div>
+
+      <div style="margin-top: 16px; padding-top: 16px; border-top: 1px solid rgba(255,255,255,0.08); font-size: 11px; color: rgba(176, 176, 208, 0.7); line-height: 1.5;">
+        <div style="font-family: var(--font-display); font-size: 10px; font-weight: 500; letter-spacing: 0.5px; text-transform: uppercase; margin-bottom: 6px; color: rgba(108, 108, 255, 0.9);">键盘快捷键</div>
+        <div><span style="display: inline-block; padding: 1px 5px; background: rgba(108, 108, 255, 0.2); border-radius: 3px; font-family: 'JetBrains Mono', monospace; font-size: 10px; color: #fff; margin-right: 4px;">T</span>切换 TransformControls</div>
+        <div style="margin-top: 4px; font-size: 10px; color: rgba(176, 176, 208, 0.5);">注意：TransformControls 与自定义滑块可能存在状态同步冲突</div>
       </div>
     </div>
 
