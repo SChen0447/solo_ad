@@ -36,6 +36,14 @@ interface Neurotransmitter {
   colorEnd: THREE.Color;
 }
 
+interface HaloExplosion {
+  mesh: THREE.Mesh;
+  life: number;
+  maxLife: number;
+  active: boolean;
+  maxRadius: number;
+}
+
 export class Synapse {
   public group: THREE.Group;
   private presynapticMembrane: THREE.Mesh;
@@ -54,6 +62,9 @@ export class Synapse {
 
   private dendriteSparks: DendriteSpark[] = [];
   private maxDendriteSparks: number = 30;
+
+  private haloExplosions: HaloExplosion[] = [];
+  private maxHaloExplosions: number = 20;
 
   public status: SynapseStatus = {
     phase: 'waiting',
@@ -289,6 +300,7 @@ export class Synapse {
     this.rippleActive = true;
     this.postsynapticMaterial.uniforms.uActive.value = 1.0;
     this.receiverNeuron.setActivityLevel(1);
+    this.receiverNeuron.triggerReceiveResponse(this.signalIntensity);
 
     for (let i = 0; i < 3; i++) {
       this.spawnDendriteSpark();
@@ -332,6 +344,37 @@ export class Synapse {
     });
 
     this.group.add(mesh);
+  }
+
+  private createHaloExplosion(position: THREE.Vector3): void {
+    if (this.haloExplosions.length >= this.maxHaloExplosions) return;
+
+    const geometry = new THREE.RingGeometry(0.02, 0.04, 32);
+    const material = new THREE.MeshBasicMaterial({
+      color: 0xffbb44,
+      transparent: true,
+      opacity: 1.0,
+      side: THREE.DoubleSide
+    });
+    const mesh = new THREE.Mesh(geometry, material);
+    mesh.position.copy(position);
+    mesh.lookAt(this.cameraPosition || new THREE.Vector3(0, 0, 10));
+
+    this.haloExplosions.push({
+      mesh,
+      life: 0,
+      maxLife: 0.5,
+      active: true,
+      maxRadius: 0.2
+    });
+
+    this.group.add(mesh);
+  }
+
+  private cameraPosition: THREE.Vector3 | null = null;
+
+  public setCameraPosition(pos: THREE.Vector3): void {
+    this.cameraPosition = pos.clone();
   }
 
   private completeSignal(): void {
@@ -401,6 +444,49 @@ export class Synapse {
     this.updateVesicles(deltaTime);
     this.updateNeurotransmitters(deltaTime);
     this.updateDendriteSparks(deltaTime);
+    this.updateHaloExplosions(deltaTime);
+  }
+
+  private updateHaloExplosions(deltaTime: number): void {
+    for (let i = this.haloExplosions.length - 1; i >= 0; i--) {
+      const h = this.haloExplosions[i];
+      if (!h.active) continue;
+
+      h.life += deltaTime;
+      const t = h.life / h.maxLife;
+
+      if (t >= 1) {
+        h.active = false;
+        this.group.remove(h.mesh);
+        h.mesh.geometry.dispose();
+        (h.mesh.material as THREE.Material).dispose();
+        this.haloExplosions.splice(i, 1);
+        continue;
+      }
+
+      const easeT = t;
+      const currentRadius = 0.02 + easeT * h.maxRadius;
+      const ringWidth = 0.04 + easeT * 0.08;
+
+      h.mesh.geometry.dispose();
+      h.mesh.geometry = new THREE.RingGeometry(
+        Math.max(0.01, currentRadius - ringWidth),
+        currentRadius,
+        32
+      );
+
+      const material = h.mesh.material as THREE.MeshBasicMaterial;
+      material.opacity = 1.0 * (1 - t);
+      material.color.setRGB(
+        1.0,
+        0.8 - t * 0.3,
+        0.3 + t * 0.1
+      );
+
+      if (this.cameraPosition) {
+        h.mesh.lookAt(this.cameraPosition);
+      }
+    }
   }
 
   private updateVesicles(deltaTime: number): void {
@@ -413,6 +499,7 @@ export class Synapse {
 
       if (t >= 1) {
         v.active = false;
+        this.createHaloExplosion(v.targetPos.clone());
         this.group.remove(v.mesh);
         v.mesh.geometry.dispose();
         (v.mesh.material as THREE.Material).dispose();
@@ -513,9 +600,14 @@ export class Synapse {
       s.mesh.geometry.dispose();
       (s.mesh.material as THREE.Material).dispose();
     });
+    this.haloExplosions.forEach((h) => {
+      h.mesh.geometry.dispose();
+      (h.mesh.material as THREE.Material).dispose();
+    });
     this.vesicles = [];
     this.neurotransmitters = [];
     this.dendriteSparks = [];
+    this.haloExplosions = [];
 
     this.group.traverse((obj) => {
       if (obj instanceof THREE.Mesh) {

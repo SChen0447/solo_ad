@@ -342,6 +342,7 @@ class NeuralSynapseSimulator {
 
     this.senderNeuron.update(deltaTime);
     this.receiverNeuron.update(deltaTime);
+    this.synapse.setCameraPosition(this.camera.position);
     this.synapse.update(deltaTime);
 
     this.updateBackgroundParticles(deltaTime);

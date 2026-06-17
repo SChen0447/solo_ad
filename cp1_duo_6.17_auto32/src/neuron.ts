@@ -17,18 +17,27 @@ export class Neuron {
   public group: THREE.Group;
   public soma: THREE.Mesh;
   public nucleus: THREE.Mesh;
+  public receiverNucleus: THREE.Mesh | null = null;
   public dendrites: THREE.Group;
   public axon: THREE.Group;
   public axonCurve: THREE.CatmullRomCurve3;
   public axonTerminal: THREE.Vector3;
   public dendriteTerminals: THREE.Vector3[];
+  public dendriteTerminalMeshes: THREE.Mesh[] = [];
   public isSender: boolean;
 
   private somaMaterial: THREE.MeshPhongMaterial;
   private nucleusMaterial: THREE.MeshBasicMaterial;
+  private receiverNucleusMaterial: THREE.MeshBasicMaterial | null = null;
   private pulseTime: number = 0;
   private activityLevel: number = 0;
   private basePulseFrequency: number = 1.0;
+
+  private receiveResponseActive: boolean = false;
+  private receiveResponseTime: number = 0;
+  private receiveResponseDuration: number = 3.0;
+  private receivedSignalIntensity: number = 5;
+  private dendritePulseTime: number = 0;
 
   public actionPotential: ActionPotentialState = {
     active: false,
@@ -79,6 +88,20 @@ export class Neuron {
       this.nucleusMaterial
     );
     this.group.add(this.nucleus);
+
+    if (!this.isSender) {
+      this.receiverNucleusMaterial = new THREE.MeshBasicMaterial({
+        color: 0xaa66ff,
+        transparent: true,
+        opacity: 0.8
+      });
+      this.receiverNucleus = new THREE.Mesh(
+        new THREE.SphereGeometry(0.18, 20, 20),
+        this.receiverNucleusMaterial
+      );
+      this.receiverNucleus.position.set(0.1, 0.05, 0.1);
+      this.group.add(this.receiverNucleus);
+    }
 
     this.dendrites = this.createDendrites();
     this.group.add(this.dendrites);
@@ -147,18 +170,20 @@ export class Neuron {
     const tube = new THREE.Mesh(tubeGeometry, material);
     group.add(tube);
 
+    const terminalMaterial = new THREE.MeshPhongMaterial({
+      color: this.isSender ? 0x7cc4f0 : 0x7cf0a4,
+      transparent: true,
+      opacity: 0.9,
+      emissive: this.isSender ? 0x3a7ab5 : 0x3ab576,
+      emissiveIntensity: 0.2
+    });
     const terminal = new THREE.Mesh(
       new THREE.SphereGeometry(0.1, 16, 16),
-      new THREE.MeshPhongMaterial({
-        color: this.isSender ? 0x7cc4f0 : 0x7cf0a4,
-        transparent: true,
-        opacity: 0.9,
-        emissive: this.isSender ? 0x3a7ab5 : 0x3ab576,
-        emissiveIntensity: 0.2
-      })
+      terminalMaterial
     );
     terminal.position.copy(terminalPos);
     group.add(terminal);
+    this.dendriteTerminalMeshes.push(terminal);
 
     return group;
   }
@@ -284,6 +309,51 @@ export class Neuron {
 
     this.somaMaterial.emissiveIntensity = 0.1 + this.activityLevel * 0.4;
 
+    if (this.receiveResponseActive && !this.isSender) {
+      this.receiveResponseTime += deltaTime;
+      this.dendritePulseTime += deltaTime;
+
+      const fadeFactor = 1 - Math.min(1, this.receiveResponseTime / this.receiveResponseDuration);
+
+      if (this.receiverNucleus && this.receiverNucleusMaterial) {
+        const receiverPulseFreq = 1.5 + (this.receivedSignalIntensity / 10) * 4;
+        const receiverNucleusScale = 1 + Math.sin(this.receiveResponseTime * receiverPulseFreq * Math.PI * 2) * 0.25;
+        this.receiverNucleus.scale.setScalar(receiverNucleusScale * (0.7 + fadeFactor * 0.3));
+        this.receiverNucleusMaterial.opacity = 0.5 + Math.sin(this.receiveResponseTime * receiverPulseFreq * Math.PI * 2) * 0.3;
+        const colorIntensity = 0.6 + (this.receivedSignalIntensity / 10) * 0.4;
+        this.receiverNucleusMaterial.color.setRGB(
+          0.6 * colorIntensity * fadeFactor,
+          0.3 * colorIntensity,
+          1.0 * colorIntensity
+        );
+      }
+
+      const dendritePulseFreq = 1.0;
+      const dendritePulse = Math.sin(this.dendritePulseTime * dendritePulseFreq * Math.PI * 2) * 0.5 + 0.5;
+      this.dendriteTerminalMeshes.forEach((mesh, index) => {
+        const phaseOffset = index * 0.2;
+        const phasePulse = Math.sin((this.dendritePulseTime + phaseOffset) * dendritePulseFreq * Math.PI * 2) * 0.5 + 0.5;
+        const material = mesh.material as THREE.MeshPhongMaterial;
+        material.emissiveIntensity = 0.2 + phasePulse * 0.8 * fadeFactor;
+        material.emissive.setRGB(
+          0.4 * fadeFactor,
+          1.0 * (0.6 + phasePulse * 0.4),
+          0.6 * fadeFactor
+        );
+        mesh.scale.setScalar(1 + phasePulse * 0.3 * fadeFactor);
+      });
+
+      if (this.receiveResponseTime >= this.receiveResponseDuration) {
+        this.receiveResponseActive = false;
+        this.dendriteTerminalMeshes.forEach((mesh) => {
+          const material = mesh.material as THREE.MeshPhongMaterial;
+          material.emissiveIntensity = 0.2;
+          material.emissive.setHex(0x3ab576);
+          mesh.scale.setScalar(1);
+        });
+      }
+    }
+
     if (this.actionPotential.active) {
       this.actionPotential.progress += (deltaTime * 0.5 * this.signalSpeed) / 5.0;
 
@@ -359,6 +429,15 @@ export class Neuron {
 
   public setActivityLevel(level: number): void {
     this.activityLevel = Math.max(0, Math.min(1, level));
+  }
+
+  public triggerReceiveResponse(intensity: number = 5): void {
+    if (this.isSender) return;
+    this.receiveResponseActive = true;
+    this.receiveResponseTime = 0;
+    this.receivedSignalIntensity = intensity;
+    this.dendritePulseTime = 0;
+    this.activityLevel = 1;
   }
 
   public dispose(): void {
