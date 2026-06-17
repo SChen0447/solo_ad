@@ -52,7 +52,7 @@ class App {
 
   private readonly DOT_SPEED = 0.8;
   private readonly DEFAULT_CAMERA_POSITION = new THREE.Vector3(15, 12, 15);
-  private readonly DEFAULT_CAMERA_TARGET = new THREE.Vector3(0, 2, 0);
+  private readonly DEFAULT_CAMERA_TARGET = new THREE.Vector3(0, 0, 0);
   private readonly REFLECTION_COLORS: number[] = [
     0xffffff,
     0xff4444,
@@ -95,7 +95,7 @@ class App {
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
     this.controls.enableDamping = true;
     this.controls.dampingFactor = 0.05;
-    this.controls.target.set(0, 2, 0);
+    this.controls.target.set(0, 0, 0);
 
     this.roomManager = new RoomManager(this.scene);
     this.rayTracer = new RayTracer(this.roomManager);
@@ -161,6 +161,7 @@ class App {
     this.sourceMesh.position.copy(this.sourcePosition);
     this.sourceMesh.castShadow = true;
     this.sourceMesh.userData.isSource = true;
+    this.sourceMesh.userData.dragTarget = 'source';
     this.scene.add(this.sourceMesh);
 
     const pulseGeometry = new THREE.SphereGeometry(0.25, 32, 32);
@@ -188,34 +189,35 @@ class App {
     this.receiverMesh.position.copy(this.receiverPosition);
     this.receiverMesh.castShadow = true;
     this.receiverMesh.userData.isReceiver = true;
+    this.receiverMesh.userData.dragTarget = 'receiver';
     this.scene.add(this.receiverMesh);
   }
 
   private createDragHandles(): void {
-    const ringGeometry = new THREE.TorusGeometry(0.35, 0.02, 8, 32);
+    const ringGeometry = new THREE.TorusGeometry(0.45, 0.025, 8, 32);
 
     const sourceRingMaterial = new THREE.MeshBasicMaterial({
       color: 0x4488ff,
       transparent: true,
-      opacity: 0.4,
+      opacity: 0.5,
       side: THREE.DoubleSide
     });
     this.sourceRing = new THREE.Mesh(ringGeometry, sourceRingMaterial);
     this.sourceRing.position.copy(this.sourcePosition);
     this.sourceRing.rotation.x = Math.PI / 2;
-    this.sourceRing.userData.isDragHandle = true;
+    this.sourceRing.userData.dragTarget = 'source';
     this.scene.add(this.sourceRing);
 
     const receiverRingMaterial = new THREE.MeshBasicMaterial({
       color: 0xffcc00,
       transparent: true,
-      opacity: 0.4,
+      opacity: 0.5,
       side: THREE.DoubleSide
     });
     this.receiverRing = new THREE.Mesh(ringGeometry.clone(), receiverRingMaterial);
     this.receiverRing.position.copy(this.receiverPosition);
     this.receiverRing.rotation.x = Math.PI / 2;
-    this.receiverRing.userData.isDragHandle = true;
+    this.receiverRing.userData.dragTarget = 'receiver';
     this.scene.add(this.receiverRing);
 
     this.sourceAxes = this.createMiniAxes(0x4488ff);
@@ -229,7 +231,7 @@ class App {
 
   private createMiniAxes(tint: number): THREE.Group {
     const group = new THREE.Group();
-    const axisLength = 0.5;
+    const axisLength = 1.0;
     const colors = [0xff4444, 0x44ff44, 0x4444ff];
     const directions = [
       new THREE.Vector3(1, 0, 0),
@@ -245,16 +247,17 @@ class App {
       const material = new THREE.LineBasicMaterial({
         color: colors[i],
         transparent: true,
-        opacity: 0.5
+        opacity: 0.7,
+        linewidth: 2
       });
       const line = new THREE.Line(geometry, material);
       group.add(line);
 
-      const coneGeometry = new THREE.ConeGeometry(0.04, 0.12, 6);
+      const coneGeometry = new THREE.ConeGeometry(0.07, 0.2, 8);
       const coneMaterial = new THREE.MeshBasicMaterial({
         color: colors[i],
         transparent: true,
-        opacity: 0.5
+        opacity: 0.7
       });
       const cone = new THREE.Mesh(coneGeometry, coneMaterial);
       cone.position.copy(dir);
@@ -266,11 +269,13 @@ class App {
     const tintMaterial = new THREE.MeshBasicMaterial({
       color: tint,
       transparent: true,
-      opacity: 0.15
+      opacity: 0.1
     });
-    const sphereGeometry = new THREE.SphereGeometry(0.5, 16, 16);
+    const sphereGeometry = new THREE.SphereGeometry(0.8, 16, 16);
     const tintSphere = new THREE.Mesh(sphereGeometry, tintMaterial);
     group.add(tintSphere);
+
+    group.position.y = 0.6;
 
     return group;
   }
@@ -311,7 +316,8 @@ class App {
       axisGroup.add(cone);
     }
 
-    axisGroup.position.set(0, 0.01, 0);
+    const floorOffset = 0.03;
+    axisGroup.position.set(0, floorOffset, 0);
     this.scene.add(axisGroup);
   }
 
@@ -322,6 +328,9 @@ class App {
   }
 
   private updateDragHandlePositions(): void {
+    this.sourceMesh.position.copy(this.sourcePosition);
+    this.receiverMesh.position.copy(this.receiverPosition);
+    this.sourcePulse.position.copy(this.sourcePosition);
     this.sourceRing.position.copy(this.sourcePosition);
     this.receiverRing.position.copy(this.receiverPosition);
     this.sourceAxes.position.copy(this.sourcePosition);
@@ -348,20 +357,28 @@ class App {
       this.receiverMesh,
       this.sourceRing,
       this.receiverRing
-    ]);
+    ], true);
 
     if (intersects.length > 0) {
-      const object = intersects[0].object;
-      if (object === this.sourceMesh || object === this.sourceRing) {
+      let hitTarget: string | null = null;
+      for (const hit of intersects) {
+        if (hit.object.userData && hit.object.userData.dragTarget) {
+          hitTarget = hit.object.userData.dragTarget;
+          break;
+        }
+      }
+
+      if (hitTarget === 'source') {
         this.isDraggingSource = true;
         this.controls.enabled = false;
         this.setupDragPlane(intersects[0].point);
-      } else if (object === this.receiverMesh || object === this.receiverRing) {
+        return;
+      } else if (hitTarget === 'receiver') {
         this.isDraggingReceiver = true;
         this.controls.enabled = false;
         this.setupDragPlane(intersects[0].point);
+        return;
       }
-      return;
     }
 
     if (e.button === 0) {
@@ -743,8 +760,6 @@ class App {
     this.updatePulseAnimation(time);
     this.sourceRing.lookAt(this.camera.position);
     this.receiverRing.lookAt(this.camera.position);
-    this.sourceAxes.lookAt(this.camera.position);
-    this.receiverAxes.lookAt(this.camera.position);
     this.controls.update();
 
     this.renderer.render(this.scene, this.camera);
