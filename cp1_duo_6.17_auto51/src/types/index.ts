@@ -25,6 +25,7 @@ export interface Hero {
   kills: number;
   damageDealt: number;
   damageTaken: number;
+  createdAt: number;
 }
 
 export interface GridPosition {

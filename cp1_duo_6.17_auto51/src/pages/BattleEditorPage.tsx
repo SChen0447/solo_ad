@@ -10,6 +10,13 @@ import './BattleEditorPage.css';
 type SortField = 'default' | 'name' | 'maxHp' | 'attack' | 'defense' | 'speed';
 type SortOrder = 'asc' | 'desc';
 
+const getSortValue = (hero: Hero, field: SortField): string | number => {
+  if (field === 'default') return hero.createdAt ?? 0;
+  const val = hero[field as keyof Hero];
+  if (val === undefined || val === null) return 0;
+  return val as string | number;
+};
+
 export default function BattleEditorPage() {
   const { state, getFormationStats, startSimulation, selectWave } = useAppStore();
   const navigate = useNavigate();
@@ -22,20 +29,24 @@ export default function BattleEditorPage() {
 
   const sortedHeroes = useMemo(() => {
     if (sortField === 'default') {
-      return state.heroes;
+      return [...state.heroes].sort((a, b) => {
+        const valA = a.createdAt ?? 0;
+        const valB = b.createdAt ?? 0;
+        return sortOrder === 'asc' ? valA - valB : valB - valA;
+      });
     }
     const heroes = [...state.heroes];
     heroes.sort((a, b) => {
-      let valA: string | number = a[sortField as keyof Hero] as string | number;
-      let valB: string | number = b[sortField as keyof Hero] as string | number;
+      const valA = getSortValue(a, sortField);
+      const valB = getSortValue(b, sortField);
       if (typeof valA === 'string' && typeof valB === 'string') {
-        valA = valA.toLowerCase();
-        valB = valB.toLowerCase();
-        return sortOrder === 'asc' ? valA.localeCompare(valB as string) : (valB as string).localeCompare(valA as string);
+        return sortOrder === 'asc'
+          ? valA.localeCompare(valB, 'zh-CN')
+          : valB.localeCompare(valA, 'zh-CN');
       }
-      valA = Number(valA);
-      valB = Number(valB);
-      return sortOrder === 'asc' ? valA - valB : valB - valA;
+      const numA = Number(valA) || 0;
+      const numB = Number(valB) || 0;
+      return sortOrder === 'asc' ? numA - numB : numB - numA;
     });
     return heroes;
   }, [state.heroes, sortField, sortOrder]);

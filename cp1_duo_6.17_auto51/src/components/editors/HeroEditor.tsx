@@ -32,8 +32,9 @@ export default function HeroEditor({ hero, onClose }: HeroEditorProps) {
   };
 
   const hasSignificantChange = (stat: string, current: number): boolean => {
-    const initial = initialValues.current[stat] || current;
-    if (initial === 0) return current > 0;
+    const initial = initialValues.current[stat];
+    if (initial === undefined || initial === null) return false;
+    if (initial === 0) return current !== 0;
     const change = Math.abs((current - initial) / initial);
     return change > 0.1;
   };

@@ -16,6 +16,7 @@ export const PRESET_HEROES: Hero[] = [
     kills: 0,
     damageDealt: 0,
     damageTaken: 0,
+    createdAt: 1,
   },
   {
     id: 'mage-1',
@@ -31,6 +32,7 @@ export const PRESET_HEROES: Hero[] = [
     kills: 0,
     damageDealt: 0,
     damageTaken: 0,
+    createdAt: 2,
   },
   {
     id: 'archer-1',
@@ -46,6 +48,7 @@ export const PRESET_HEROES: Hero[] = [
     kills: 0,
     damageDealt: 0,
     damageTaken: 0,
+    createdAt: 3,
   },
   {
     id: 'tank-1',
@@ -61,6 +64,7 @@ export const PRESET_HEROES: Hero[] = [
     kills: 0,
     damageDealt: 0,
     damageTaken: 0,
+    createdAt: 4,
   },
   {
     id: 'assassin-1',
@@ -76,6 +80,7 @@ export const PRESET_HEROES: Hero[] = [
     kills: 0,
     damageDealt: 0,
     damageTaken: 0,
+    createdAt: 5,
   },
   {
     id: 'support-1',
@@ -91,6 +96,7 @@ export const PRESET_HEROES: Hero[] = [
     kills: 0,
     damageDealt: 0,
     damageTaken: 0,
+    createdAt: 6,
   },
 ];
 

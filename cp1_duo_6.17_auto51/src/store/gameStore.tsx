@@ -43,7 +43,11 @@ function gameReducer(state: GameState, action: GameAction): GameState {
   return produce(state, (draft) => {
     switch (action.type) {
       case 'ADD_HERO':
-        draft.heroes.push(action.hero);
+        const newHero = {
+          ...action.hero,
+          createdAt: action.hero.createdAt || Date.now(),
+        };
+        draft.heroes.push(newHero);
         break;
       case 'REMOVE_HERO':
         draft.heroes = draft.heroes.filter((h) => h.id !== action.heroId);
