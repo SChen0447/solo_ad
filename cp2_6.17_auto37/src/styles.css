@@ -319,9 +319,21 @@ body {
 }
 
 .column-title {
-  font-size: 15px;
-  font-weight: 600;
+  font-size: 16px;
+  font-weight: bold;
   color: #333333;
+}
+
+.board-column.todo .column-title {
+  color: #9E9E9E;
+}
+
+.board-column.in-progress .column-title {
+  color: #6C63FF;
+}
+
+.board-column.done .column-title {
+  color: #4CAF50;
 }
 
 .column-count {
