@@ -47,6 +47,52 @@ const parseDateToOrder = (dateStr: string): number => {
   return 0;
 };
 
+const CHAR_WIDTH_APPROX = 12;
+const NODE_PADDING = 24;
+const NODE_MIN_WIDTH_FOR_LABEL = 60;
+
+function computeNodeLabelVisibility(
+  nodes: EventNode[],
+  zoom: number,
+): Map<string, boolean> {
+  const visibility = new Map<string, boolean>();
+
+  if (nodes.length === 0) return visibility;
+
+  const minGapForLabel = NODE_MIN_WIDTH_FOR_LABEL + 16;
+
+  if (zoom < 0.5) {
+    nodes.forEach(n => visibility.set(n.id, false));
+    return visibility;
+  }
+
+  const sortedByX = [...nodes].sort((a, b) => a.x - b.x);
+
+  for (let i = 0; i < sortedByX.length; i++) {
+    const node = sortedByX[i];
+    const textLen = Math.min(node.event.name.length, 8);
+    const textWidth = textLen * CHAR_WIDTH_APPROX + NODE_PADDING;
+    const availableWidth = node.width;
+
+    if (availableWidth < textWidth && zoom < 1.5) {
+      visibility.set(node.id, false);
+      continue;
+    }
+
+    const gapLeft =
+      i > 0 ? node.x - sortedByX[i - 1].x : minGapForLabel + 1;
+    const gapRight =
+      i < sortedByX.length - 1
+        ? sortedByX[i + 1].x - node.x
+        : minGapForLabel + 1;
+    const minGap = Math.min(gapLeft, gapRight);
+
+    visibility.set(node.id, minGap >= minGapForLabel);
+  }
+
+  return visibility;
+}
+
 function EventNodeComponent({
   node,
   onClick,
@@ -138,28 +184,48 @@ function PopupEditPanel({
   const [type, setType] = useState<EventType>(event.type);
   const [description, setDescription] = useState(event.description || '');
   const panelRef = useRef<HTMLDivElement>(null);
+  const [adjustedPos, setAdjustedPos] = useState({ top: 0, left: 0 });
   const [placement, setPlacement] = useState<'bottom' | 'top'>('bottom');
-  const [align, setAlign] = useState<'left' | 'right'>('left');
+
+  const PANEL_WIDTH = 380;
+  const PANEL_MARGIN = 20;
+  const ARROW_OFFSET = 16;
 
   useEffect(() => {
-    if (panelRef.current) {
-      const panelRect = panelRef.current.getBoundingClientRect();
-      const viewportWidth = window.innerWidth;
-      const viewportHeight = window.innerHeight;
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
 
-      if (position.y + 20 + panelRect.height > viewportHeight) {
-        setPlacement('top');
-      } else {
-        setPlacement('bottom');
-      }
+    const estimatedHeight = 460;
 
-      if (position.x + panelRect.width > viewportWidth - 20) {
-        setAlign('right');
-      } else {
-        setAlign('left');
-      }
+    let place: 'bottom' | 'top' = 'bottom';
+    if (position.y + ARROW_OFFSET + estimatedHeight > vh - PANEL_MARGIN) {
+      place = 'top';
     }
+    setPlacement(place);
+
+    let top: number;
+    if (place === 'bottom') {
+      top = position.y + ARROW_OFFSET;
+    } else {
+      top = position.y - ARROW_OFFSET - estimatedHeight;
+    }
+    top = Math.max(PANEL_MARGIN, Math.min(top, vh - estimatedHeight - PANEL_MARGIN));
+
+    let left = position.x - 20;
+    if (left + PANEL_WIDTH > vw - PANEL_MARGIN) {
+      left = vw - PANEL_WIDTH - PANEL_MARGIN;
+    }
+    if (left < PANEL_MARGIN) {
+      left = PANEL_MARGIN;
+    }
+
+    setAdjustedPos({ top, left });
   }, [position]);
+
+  const arrowLeftOffset = Math.max(
+    12,
+    Math.min(position.x - adjustedPos.left, PANEL_WIDTH - 28),
+  );
 
   const handleSave = () => {
     onSave({ name, date, type, description });
@@ -172,31 +238,29 @@ function PopupEditPanel({
 
   const panelStyle: React.CSSProperties = {
     position: 'fixed',
+    top: adjustedPos.top,
+    left: adjustedPos.left,
     backgroundColor: '#1E293B',
     borderRadius: '12px',
     boxShadow: '0 10px 40px rgba(0,0,0,0.5)',
     border: '1px solid #334155',
     padding: '20px',
-    width: '380px',
-    maxWidth: 'calc(100vw - 40px)',
-    maxHeight: 'calc(100vh - 120px)',
+    width: `${PANEL_WIDTH}px`,
+    maxWidth: `calc(100vw - ${PANEL_MARGIN * 2}px)`,
+    maxHeight: `calc(100vh - ${PANEL_MARGIN * 2}px)`,
     overflowY: 'auto',
     zIndex: 1000,
     animation: 'popupFadeIn 0.2s ease-out',
-    ...(placement === 'bottom'
-      ? { top: position.y + 16 }
-      : { bottom: window.innerHeight - position.y + 16 }),
-    ...(align === 'left'
-      ? { left: position.x }
-      : { right: window.innerWidth - position.x }),
   };
 
-  const arrowStyle: React.CSSProperties = {
+  const arrowOuterStyle: React.CSSProperties = {
     position: 'absolute',
     width: 0,
     height: 0,
     borderLeft: '8px solid transparent',
     borderRight: '8px solid transparent',
+    left: arrowLeftOffset,
+    transform: 'translateX(-50%)',
     ...(placement === 'bottom'
       ? {
           top: -8,
@@ -206,7 +270,6 @@ function PopupEditPanel({
           bottom: -8,
           borderTop: '8px solid #334155',
         }),
-    ...(align === 'left' ? { left: 20 } : { right: 20 }),
   };
 
   const arrowInnerStyle: React.CSSProperties = {
@@ -215,6 +278,8 @@ function PopupEditPanel({
     height: 0,
     borderLeft: '7px solid transparent',
     borderRight: '7px solid transparent',
+    left: arrowLeftOffset + 1,
+    transform: 'translateX(-50%)',
     ...(placement === 'bottom'
       ? {
           top: -6,
@@ -224,12 +289,11 @@ function PopupEditPanel({
           bottom: -6,
           borderTop: '7px solid #1E293B',
         }),
-    ...(align === 'left' ? { left: 21 } : { right: 21 }),
   };
 
   return (
     <div ref={panelRef} style={panelStyle}>
-      <div style={arrowStyle} />
+      <div style={arrowOuterStyle} />
       <div style={arrowInnerStyle} />
 
       <div
@@ -603,12 +667,12 @@ function TimelineView() {
   const [panX, setPanX] = useState(0);
   const [selectedEvent, setSelectedEvent] = useState<TimelineEvent | null>(null);
   const [popupPosition, setPopupPosition] = useState({ x: 0, y: 0 });
-  const [selectedNodePos, setSelectedNodePos] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, panX: 0 });
   const [dimensions, setDimensions] = useState({ width: 800, height: 600 });
+  const [prevShowLabelState, setPrevShowLabelState] = useState(true);
 
-  const showLabels = zoom >= 0.8;
+  const shouldUseLabels = zoom >= 0.5;
 
   const nodes = useMemo<EventNode[]>(() => {
     if (events.length === 0) return [];
@@ -626,12 +690,16 @@ function TimelineView() {
     const initialNodes = sorted.map((event, i) => {
       const order = parseDateToOrder(event.date);
       const x = startX + ((order - minOrder) / range) * baseWidth * zoom;
+      const textLen = Math.min(event.name.length, 8);
+      const width = shouldUseLabels
+        ? Math.max(textLen * CHAR_WIDTH_APPROX + NODE_PADDING, NODE_MIN_WIDTH_FOR_LABEL)
+        : 32;
       return {
         id: event.id,
         x,
         y: dimensions.height / 2,
         event,
-        width: showLabels ? 100 : 32,
+        width,
         height: 36,
       };
     });
@@ -646,12 +714,21 @@ function TimelineView() {
       )
       .stop();
 
-    for (let i = 0; i < 50; i++) {
+    const tickCount = shouldUseLabels !== prevShowLabelState ? 80 : 50;
+    for (let i = 0; i < tickCount; i++) {
       simulation.tick();
     }
 
     return simulation.nodes() as unknown as EventNode[];
-  }, [events, dimensions, zoom, showLabels]);
+  }, [events, dimensions, zoom, shouldUseLabels, prevShowLabelState]);
+
+  useEffect(() => {
+    setPrevShowLabelState(shouldUseLabels);
+  }, [shouldUseLabels]);
+
+  const labelVisibility = useMemo(() => {
+    return computeNodeLabelVisibility(nodes, zoom);
+  }, [nodes, zoom]);
 
   const handleWheel = useCallback((e: React.WheelEvent) => {
     e.preventDefault();
@@ -707,7 +784,6 @@ function TimelineView() {
         x: rect.left + nodeX + panX,
         y: rect.top + nodeY,
       });
-      setSelectedNodePos({ x: nodeX + panX, y: nodeY });
     }
     setSelectedEvent(event);
   };
@@ -841,7 +917,7 @@ function TimelineView() {
                 node={node}
                 onClick={e => handleNodeClick(e, node.event, node.x, node.y)}
                 isSelected={selectedEvent?.id === node.id}
-                showLabel={showLabels}
+                showLabel={labelVisibility.get(node.id) ?? false}
               />
             ))}
           </g>

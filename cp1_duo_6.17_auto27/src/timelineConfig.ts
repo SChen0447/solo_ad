@@ -38,19 +38,20 @@ export const TIMELINE_SCALES = [
 
 export type TimelineScaleKey = typeof TIMELINE_SCALES[number]['key'];
 
+export const TIMELINE_ZOOM_MIN = TIMELINE_SCALES[0].zoomRange[0];
+export const TIMELINE_ZOOM_MAX = TIMELINE_SCALES[TIMELINE_SCALES.length - 1].zoomRange[1];
+
 export const getScaleKeyByZoom = (zoom: number): TimelineScaleKey => {
   for (const scale of TIMELINE_SCALES) {
     if (zoom >= scale.zoomRange[0] && zoom < scale.zoomRange[1]) {
       return scale.key;
     }
   }
-  return zoom < 0.3 ? 'year' : 'day';
+  if (zoom < TIMELINE_ZOOM_MIN) return TIMELINE_SCALES[0].key;
+  return TIMELINE_SCALES[TIMELINE_SCALES.length - 1].key;
 };
 
 export const getScaleLabelByZoom = (zoom: number): string => {
   const key = getScaleKeyByZoom(zoom);
   return TIMELINE_SCALES.find(s => s.key === key)?.label || '年';
 };
-
-export const TIMELINE_ZOOM_MIN = 0.3;
-export const TIMELINE_ZOOM_MAX = 5;
