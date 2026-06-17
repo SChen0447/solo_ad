@@ -313,44 +313,46 @@ export class Neuron {
       this.receiveResponseTime += deltaTime;
       this.dendritePulseTime += deltaTime;
 
-      const fadeFactor = 1 - Math.min(1, this.receiveResponseTime / this.receiveResponseDuration);
+      const totalDuration = this.receiveResponseDuration;
+      const fadeStartTime = totalDuration - 1.0;
+      let pulseAmplitude = 1.0;
+      if (this.receiveResponseTime > fadeStartTime) {
+        pulseAmplitude = 1 - (this.receiveResponseTime - fadeStartTime) / 1.0;
+        pulseAmplitude = Math.max(0, pulseAmplitude);
+      }
 
       if (this.receiverNucleus && this.receiverNucleusMaterial) {
-        const receiverPulseFreq = 1.5 + (this.receivedSignalIntensity / 10) * 4;
-        const receiverNucleusScale = 1 + Math.sin(this.receiveResponseTime * receiverPulseFreq * Math.PI * 2) * 0.25;
-        this.receiverNucleus.scale.setScalar(receiverNucleusScale * (0.7 + fadeFactor * 0.3));
-        this.receiverNucleusMaterial.opacity = 0.5 + Math.sin(this.receiveResponseTime * receiverPulseFreq * Math.PI * 2) * 0.3;
-        const colorIntensity = 0.6 + (this.receivedSignalIntensity / 10) * 0.4;
+        const receiverPulseFreq = 1.5 + Math.max(0, this.receivedSignalIntensity) * 4;
+        const pulseWave = Math.sin(this.receiveResponseTime * receiverPulseFreq * Math.PI * 2) * 0.5 + 0.5;
+        const receiverNucleusScale = 0.7 + pulseWave * 0.5 * pulseAmplitude;
+        this.receiverNucleus.scale.setScalar(receiverNucleusScale);
+        this.receiverNucleusMaterial.opacity = 0.4 + pulseWave * 0.5 * pulseAmplitude;
+        const colorIntensity = 0.6 + this.receivedSignalIntensity * 0.4;
         this.receiverNucleusMaterial.color.setRGB(
-          0.6 * colorIntensity * fadeFactor,
-          0.3 * colorIntensity,
+          0.6 * colorIntensity * pulseAmplitude,
+          0.3 * colorIntensity * pulseAmplitude,
           1.0 * colorIntensity
         );
       }
 
       const dendritePulseFreq = 1.0;
-      const dendritePulse = Math.sin(this.dendritePulseTime * dendritePulseFreq * Math.PI * 2) * 0.5 + 0.5;
       this.dendriteTerminalMeshes.forEach((mesh, index) => {
         const phaseOffset = index * 0.2;
-        const phasePulse = Math.sin((this.dendritePulseTime + phaseOffset) * dendritePulseFreq * Math.PI * 2) * 0.5 + 0.5;
+        const pulseWave = Math.sin((this.dendritePulseTime + phaseOffset) * dendritePulseFreq * Math.PI * 2) * 0.5 + 0.5;
         const material = mesh.material as THREE.MeshPhongMaterial;
-        material.emissiveIntensity = 0.2 + phasePulse * 0.8 * fadeFactor;
+        const baseEmissive = 0.2;
+        material.emissiveIntensity = baseEmissive + pulseWave * 0.8 * pulseAmplitude;
+        const greenBase = 0.6;
         material.emissive.setRGB(
-          0.4 * fadeFactor,
-          1.0 * (0.6 + phasePulse * 0.4),
-          0.6 * fadeFactor
+          0.4 * pulseAmplitude,
+          greenBase + pulseWave * 0.4 * pulseAmplitude,
+          0.6 * pulseAmplitude
         );
-        mesh.scale.setScalar(1 + phasePulse * 0.3 * fadeFactor);
+        mesh.scale.setScalar(1 + pulseWave * 0.3 * pulseAmplitude);
       });
 
       if (this.receiveResponseTime >= this.receiveResponseDuration) {
         this.receiveResponseActive = false;
-        this.dendriteTerminalMeshes.forEach((mesh) => {
-          const material = mesh.material as THREE.MeshPhongMaterial;
-          material.emissiveIntensity = 0.2;
-          material.emissive.setHex(0x3ab576);
-          mesh.scale.setScalar(1);
-        });
       }
     }
 
@@ -435,7 +437,7 @@ export class Neuron {
     if (this.isSender) return;
     this.receiveResponseActive = true;
     this.receiveResponseTime = 0;
-    this.receivedSignalIntensity = intensity;
+    this.receivedSignalIntensity = Math.min(1, Math.max(0, intensity / 10));
     this.dendritePulseTime = 0;
     this.activityLevel = 1;
   }

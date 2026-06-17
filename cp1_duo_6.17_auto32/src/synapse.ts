@@ -16,6 +16,7 @@ interface Vesicle {
   life: number;
   maxLife: number;
   active: boolean;
+  hasTriggeredHalo: boolean;
 }
 
 interface DendriteSpark {
@@ -249,7 +250,8 @@ export class Synapse {
       targetPos,
       life: 0,
       maxLife: 1.5 / this.signalSpeed,
-      active: true
+      active: true,
+      hasTriggeredHalo: false
     });
 
     this.group.add(mesh);
@@ -498,8 +500,11 @@ export class Synapse {
       const t = v.life / v.maxLife;
 
       if (t >= 1) {
+        if (!v.hasTriggeredHalo) {
+          v.hasTriggeredHalo = true;
+          this.createHaloExplosion(v.targetPos.clone());
+        }
         v.active = false;
-        this.createHaloExplosion(v.targetPos.clone());
         this.group.remove(v.mesh);
         v.mesh.geometry.dispose();
         (v.mesh.material as THREE.Material).dispose();
