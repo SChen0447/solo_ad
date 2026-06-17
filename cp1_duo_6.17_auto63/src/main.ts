@@ -4,24 +4,25 @@
  * 职责：组装各模块，建立调用关系
  *
  * 调用关系图：
- *   ┌──────────────┐   updateHUD   ┌──────────────┐
- *   │  GameScene   │──────────────▶│  HUDPanel.ts │ (DOM渲染)
- *   │ (Phaser)     │◀──────────────│              │ (虚拟方向键/重玩按钮)
- *   └──────┬───────┘   direction   └──────┬───────┘
- *          │                              │
- *          │ fetchMaze / localGen         │ showResult
- *          ▼                              ▼
+ *   ┌──────────────┐   EventEmitter   ┌──────────────┐
+ *   │  GameScene   │─────────────────▶│  HUDPanel.ts │ (DOM渲染)
+ *   │ (Phaser)     │◀─────────────────│              │ (虚拟方向键/重玩按钮)
+ *   └──────┬───────┘   setDirection   └──────┬───────┘
+ *          │ fetchMaze + validate            │ showResult
+ *          ▼                                 ▼
  *   ┌──────────────┐             ┌──────────────────┐
  *   │ MazeService  │             │  ScoreManager    │
- *   │              │◀────────────│  (计时/金币/提交) │
+ *   │ 带重试/校验  │◀────────────│ 计时/金币/提交   │
  *   └──────┬───────┘   BFS寻路   └────────┬─────────┘
  *          │                              │
- *          │ HTTP GET                     │ POST / GET
+ *          │ HTTP GET (AppConfig)        │ HTTP POST/GET (AppConfig)
  *          ▼                              ▼
  *   ╔═════════════════════════════════════════════╗
  *   ║       Flask  backend/app.py                 ║
  *   ║  /maze/seed  |  /scores  |  Socket.IO       ║
  *   ╚═════════════════════════════════════════════╝
+ *
+ * 所有配置集中在 src/config/AppConfig.ts，从Vite环境变量读取
  */
 
 import Phaser from 'phaser';
@@ -47,7 +48,6 @@ const hud = new HUDPanel({
 });
 
 function buildPhaserConfig(): Phaser.Types.Core.GameConfig {
-  const isMobile = window.innerWidth < 768;
   return {
     type: Phaser.AUTO,
     parent: document.body,
@@ -74,29 +74,40 @@ function buildPhaserConfig(): Phaser.Types.Core.GameConfig {
   };
 }
 
+function wireSceneEvents(scene: GameScene) {
+  scene.onEvent('set:totalCoins', (total: number) => hud.setTotalCoins(total));
+  scene.onEvent('update:time', (ms: number) => hud.updateTime(ms));
+  scene.onEvent('update:coins', (count: number) => hud.updateCoins(count));
+  scene.onEvent('update:rank', (rank: number | string) => hud.updateRank(rank));
+  scene.onEvent('update:players', (count: number) => hud.updatePlayers(count));
+  scene.onEvent(
+    'show:result',
+    (finished: boolean, timeMs: number, coins: number, submitResult: any) => {
+      hud.showResult(finished, timeMs, coins, submitResult);
+    }
+  );
+
+  scoreMgr.on('update', (ms: number, coins: number) => {
+    hud.updateTime(ms);
+    hud.updateCoins(coins);
+  });
+}
+
 function startGame(playerName: string) {
   if (!phaserGame) {
-    gameScene = new GameScene(
-      {
-        onUpdateTime: (ms) => hud.updateTime(ms),
-        onUpdateCoins: (c) => hud.updateCoins(c),
-        onUpdateRank: (r) => hud.updateRank(r),
-        onUpdatePlayers: (n) => hud.updatePlayers(n),
-        onSetTotalCoins: (total) => hud.setTotalCoins(total),
-        onShowResult: (finished, timeMs, coins, submitResult) =>
-          hud.showResult(finished, timeMs, coins, submitResult),
-      },
-      scoreMgr
-    );
+    gameScene = new GameScene(scoreMgr);
+    wireSceneEvents(gameScene);
 
     const config = buildPhaserConfig();
     (config as any).scene = [gameScene];
     phaserGame = new Phaser.Game(config);
-  }
 
-  setTimeout(() => {
-    if (gameScene) gameScene.initNewGame(playerName);
-  }, 120);
+    phaserGame.events.once('ready', () => {
+      setTimeout(() => gameScene?.initNewGame(playerName), 80);
+    });
+  } else {
+    setTimeout(() => gameScene?.initNewGame(playerName), 80);
+  }
 }
 
 window.addEventListener('resize', () => {
@@ -106,7 +117,10 @@ window.addEventListener('resize', () => {
 });
 
 window.addEventListener('keydown', (e) => {
-  if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' '].includes(e.key)) {
+  if (
+    ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' '].includes(e.key) &&
+    (e.target as HTMLElement)?.tagName !== 'INPUT'
+  ) {
     e.preventDefault();
   }
 });
