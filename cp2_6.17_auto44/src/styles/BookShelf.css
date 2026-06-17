@@ -272,6 +272,89 @@
   }
 }
 
+/* ============ 时间线展开按钮 ============ */
+.history-toggle-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 12px;
+  background-color: #2d333b;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  color: #b0b0b0;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.25s ease;
+}
+
+.history-toggle-btn:hover {
+  border-color: #58a6ff;
+  color: #e0e0e0;
+  box-shadow: 0 0 12px rgba(88, 166, 255, 0.2);
+  background-color: #30363d;
+}
+
+.history-icon {
+  font-size: 14px;
+}
+
+.history-chevron {
+  font-size: 10px;
+  transition: transform 0.25s ease;
+}
+
+.history-chevron.up {
+  transform: rotate(180deg);
+}
+
+/* ============ 时间线增量徽章 ============ */
+.history-date-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.history-delta {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.history-delta.positive {
+  background-color: rgba(81, 207, 102, 0.15);
+  color: #51cf66;
+  border: 1px solid rgba(81, 207, 102, 0.3);
+}
+
+.history-delta.negative {
+  background-color: rgba(255, 107, 107, 0.15);
+  color: #ff6b6b;
+  border: 1px solid rgba(255, 107, 107, 0.3);
+}
+
+/* ============ 时间线圆点+连接线 ============ */
+.timeline-line-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 20px;
+  flex-shrink: 0;
+}
+
+.history-connector {
+  width: 2px;
+  flex: 1;
+  min-height: 16px;
+  background: linear-gradient(180deg, #6a11cb 0%, rgba(106, 17, 203, 0) 100%);
+  margin-top: 2px;
+}
+
 @media (max-width: 768px) {
   .books-grid {
     grid-template-columns: 1fr;
