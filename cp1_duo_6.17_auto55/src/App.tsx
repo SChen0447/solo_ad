@@ -55,7 +55,10 @@ const EditorPage: React.FC<EditorPageProps> = ({ userId }) => {
   const contentRef = useRef<string>('');
   const lastContentRef = useRef<string>('');
 
-  const userColor = USER_COLORS[users.findIndex(u => u.id === userId) % USER_COLORS.length];
+  const userColor = USER_COLORS[(users.findIndex(u => u.id === userId) % USER_COLORS.length + USER_COLORS.length) % USER_COLORS.length];
+  const myCursorPosRef = useRef<number>(0);
+  const myLastEditRef = useRef<{ pos: number; time: number } | null>(null);
+  const CONFLICT_THRESHOLD_MS = 1000;
 
   const showNotification = useCallback((message: string, duration = 2000) => {
     setNotification(message);
@@ -94,6 +97,19 @@ const EditorPage: React.FC<EditorPageProps> = ({ userId }) => {
     const handleContentUpdate = (data: unknown) => {
       const payload = data as { content: string; cursorPosition: number; userId: string };
       if (payload.userId !== userId) {
+        const myLastEdit = myLastEditRef.current;
+        const now = Date.now();
+        const otherPos = payload.cursorPosition;
+
+        if (myLastEdit) {
+          const timeDiff = now - myLastEdit.time;
+          const posDiff = Math.abs(myLastEdit.pos - otherPos);
+
+          if (timeDiff < CONFLICT_THRESHOLD_MS && posDiff <= 10) {
+            showNotification('检测到编辑冲突，已自动合并');
+          }
+        }
+
         setContent(payload.content);
         contentRef.current = payload.content;
         lastContentRef.current = payload.content;
@@ -181,6 +197,10 @@ const EditorPage: React.FC<EditorPageProps> = ({ userId }) => {
     setContent(newContent);
     contentRef.current = newContent;
     setPreviewContent(newContent);
+    myLastEditRef.current = {
+      pos: myCursorPosRef.current,
+      time: Date.now()
+    };
   }, []);
 
   const handleSave = useCallback(async () => {
@@ -388,6 +408,9 @@ const EditorPage: React.FC<EditorPageProps> = ({ userId }) => {
               userId={userId}
               users={users}
               lastContentRef={lastContentRef}
+              onCursorChange={(pos) => {
+                myCursorPosRef.current = pos;
+              }}
             />
           </div>
 
