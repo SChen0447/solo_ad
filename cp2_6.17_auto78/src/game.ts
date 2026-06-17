@@ -28,6 +28,8 @@ export class Game {
   private fightHovered: boolean;
   private p1ColorIdx: number;
   private p2ColorIdx: number;
+  private p1Selected: boolean;
+  private p2Selected: boolean;
   private canvas: HTMLCanvasElement;
 
   constructor(canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D) {
@@ -57,6 +59,8 @@ export class Game {
     this.fightHovered = false;
     this.p1ColorIdx = 0;
     this.p2ColorIdx = 1;
+    this.p1Selected = false;
+    this.p2Selected = false;
 
     this.handleMouseMove = this.handleMouseMove.bind(this);
     this.handleClick = this.handleClick.bind(this);
@@ -90,6 +94,16 @@ export class Game {
 
   private startFight(): void {
     this.reset();
+  }
+
+  private goToSelect(): void {
+    this.status = 'selecting';
+    this.winnerText = null;
+    this.restartHovered = false;
+    this.fightHovered = false;
+    this.p1Selected = false;
+    this.p2Selected = false;
+    this.effects.length = 0;
   }
 
   public update(dt: number): void {
@@ -146,12 +160,16 @@ export class Game {
 
   public render(dt: number): void {
     if (this.status === 'selecting') {
-      const canStart = this.p1ColorIdx !== this.p2ColorIdx;
+      const sameColor = this.p1ColorIdx === this.p2ColorIdx;
+      const bothSelected = this.p1Selected && this.p2Selected;
+      const canStart = bothSelected && !sameColor;
       this.renderer.renderSelectScreen(
         dt,
         this.p1ColorIdx,
         this.p2ColorIdx,
         canStart,
+        sameColor,
+        bothSelected,
         this.fightHovered
       );
       return;
@@ -173,19 +191,28 @@ export class Game {
 
   private updateSelecting(): void {
     const colors = FIGHTER_COLORS.length;
+    let p1Changed = false;
+    let p2Changed = false;
 
     if (this.input.consumeP1Left()) {
       this.p1ColorIdx = (this.p1ColorIdx - 1 + colors) % colors;
+      p1Changed = true;
     }
     if (this.input.consumeP1Right()) {
       this.p1ColorIdx = (this.p1ColorIdx + 1) % colors;
+      p1Changed = true;
     }
     if (this.input.consumeP2Left()) {
       this.p2ColorIdx = (this.p2ColorIdx - 1 + colors) % colors;
+      p2Changed = true;
     }
     if (this.input.consumeP2Right()) {
       this.p2ColorIdx = (this.p2ColorIdx + 1) % colors;
+      p2Changed = true;
     }
+
+    if (p1Changed) this.p1Selected = true;
+    if (p2Changed) this.p2Selected = true;
   }
 
   private resolveBodyCollision(): void {
@@ -285,9 +312,13 @@ export class Game {
       this.restartHovered = this.renderer.isRestartButton(x, y);
       this.canvas.style.cursor = this.restartHovered ? 'pointer' : 'default';
     } else if (this.status === 'selecting') {
-      const canStart = this.p1ColorIdx !== this.p2ColorIdx;
+      const sameColor = this.p1ColorIdx === this.p2ColorIdx;
+      const bothSelected = this.p1Selected && this.p2Selected;
+      const canStart = bothSelected && !sameColor;
       this.fightHovered = canStart && this.renderer.isFightButton(x, y);
       this.canvas.style.cursor = this.fightHovered ? 'pointer' : 'default';
+    } else {
+      this.canvas.style.cursor = 'default';
     }
   }
 
@@ -295,10 +326,12 @@ export class Game {
     const { x, y } = this.getCanvasMouse(e);
     if (this.status === 'ended') {
       if (this.renderer.isRestartButton(x, y)) {
-        this.reset();
+        this.goToSelect();
       }
     } else if (this.status === 'selecting') {
-      const canStart = this.p1ColorIdx !== this.p2ColorIdx;
+      const sameColor = this.p1ColorIdx === this.p2ColorIdx;
+      const bothSelected = this.p1Selected && this.p2Selected;
+      const canStart = bothSelected && !sameColor;
       if (canStart && this.renderer.isFightButton(x, y)) {
         this.startFight();
       }

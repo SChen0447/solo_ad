@@ -464,6 +464,8 @@ export class Renderer {
     p1ColorIdx: number,
     p2ColorIdx: number,
     canStart: boolean,
+    sameColor: boolean,
+    bothSelected: boolean,
     fightHovered: boolean
   ): void {
     const ctx = this.ctx;
@@ -569,16 +571,25 @@ export class Renderer {
       ctx.fillText('FIGHT!', cx, btnY + btnH / 2);
       ctx.restore();
     } else {
+      let hintText = '';
+      let hintColor = '#666';
+      if (!bothSelected) {
+        hintText = 'BOTH PLAYERS MUST SELECT';
+        hintColor = '#888';
+      } else if (sameColor) {
+        hintText = 'PLEASE CHOOSE DIFFERENT COLORS';
+        hintColor = '#ff6b6b';
+      }
       ctx.save();
       ctx.font = '12px "Press Start 2P", monospace';
-      ctx.fillStyle = '#666';
+      ctx.fillStyle = hintColor;
       ctx.strokeStyle = '#000';
       ctx.lineWidth = 2;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       const y = CANVAS_H - 80;
-      ctx.strokeText('BOTH PLAYERS MUST SELECT', cx, y);
-      ctx.fillText('BOTH PLAYERS MUST SELECT', cx, y);
+      ctx.strokeText(hintText, cx, y);
+      ctx.fillText(hintText, cx, y);
       ctx.restore();
     }
   }
@@ -593,33 +604,29 @@ export class Renderer {
   ): void {
     const ctx = this.ctx;
     const pulse = Math.sin((this.selectAnimAge + colorIdx * 200) / 300) * 0.15 + 1;
-    const scaleW = CHAR_WIDTH * 1.8 * pulse;
-    const scaleH = CHAR_HEIGHT * 1.8 * pulse;
-    const x = cx - scaleW / 2;
-    const y = cy - scaleH / 2;
+    const scale = 1.8 * pulse;
+
+    const mock = {
+      x: -CHAR_WIDTH / 2,
+      y: -CHAR_HEIGHT / 2,
+      color,
+      facing,
+      state: 'idle' as const,
+      playerId: 0,
+      getHurtAlpha: () => 1,
+      getAttackProgress: () => 0,
+      hp: 100,
+      maxHp: 100,
+      vx: 0,
+      vy: 0
+    } as unknown as Character;
 
     ctx.save();
     ctx.shadowColor = glowColor;
-    ctx.shadowBlur = 20;
-    ctx.fillStyle = color;
-    ctx.fillRect(x, y, scaleW, scaleH);
-    ctx.shadowBlur = 0;
-    ctx.strokeStyle = '#fff';
-    ctx.lineWidth = 3;
-    ctx.strokeRect(x + 1.5, y + 1.5, scaleW - 3, scaleH - 3);
-
-    const eyeSize = scaleW * 0.15;
-    const eyeGap = scaleW * 0.12;
-    const eyeY = y + scaleH * 0.25;
-    const eyeBaseX = facing === 1 ? cx + eyeGap * 0.3 : cx - eyeGap * 0.3 - eyeSize;
-    ctx.fillStyle = '#fff';
-    ctx.fillRect(eyeBaseX - eyeSize - eyeGap / 2, eyeY, eyeSize, eyeSize);
-    ctx.fillRect(eyeBaseX + eyeGap / 2, eyeY, eyeSize, eyeSize);
-
-    ctx.fillStyle = '#000';
-    const pOff = facing === 1 ? eyeSize * 0.33 : 0;
-    ctx.fillRect(eyeBaseX - eyeSize - eyeGap / 2 + pOff, eyeY + eyeSize * 0.33, eyeSize * 0.33, eyeSize * 0.33);
-    ctx.fillRect(eyeBaseX + eyeGap / 2 + pOff, eyeY + eyeSize * 0.33, eyeSize * 0.33, eyeSize * 0.33);
+    ctx.shadowBlur = 24;
+    ctx.translate(cx, cy);
+    ctx.scale(scale, scale);
+    this.drawCharacter(mock);
     ctx.restore();
   }
 
