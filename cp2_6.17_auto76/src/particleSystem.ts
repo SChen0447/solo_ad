@@ -21,6 +21,8 @@ export class ParticleSystem {
   private minVelocity: number;
   private maxVelocity: number;
 
+  private activeCount: number;
+
   constructor(count: number, particleRadius: number) {
     this.count = count;
     this.particleRadius = particleRadius;
@@ -30,6 +32,7 @@ export class ParticleSystem {
     this.colorTransition = 1.0;
     this.minVelocity = 0;
     this.maxVelocity = 10;
+    this.activeCount = count;
 
     this.colors = new Float32Array(count * 3);
     this.originalColors = new Array(count);
@@ -142,12 +145,21 @@ export class ParticleSystem {
     }
 
     let velSum = 0;
+    let active = 0;
 
     for (let i = 0; i < count; i++) {
+      const px = position[i * 3];
+      const py = position[i * 3 + 1];
+      const pz = position[i * 3 + 2];
+      const distSq = px * px + py * py + pz * pz;
+
+      if (distSq < 25) {
+        active++;
+      }
       this.dummy.position.set(
-        position[i * 3],
-        position[i * 3 + 1],
-        position[i * 3 + 2]
+        px,
+        py,
+        pz
       );
       this.dummy.scale.setScalar(this.particleRadius);
       this.dummy.updateMatrix();
@@ -185,9 +197,14 @@ export class ParticleSystem {
     const avgVel = velSum / count;
     this.minVelocity = Math.min(this.minVelocity, avgVel * 0.5);
     this.maxVelocity = Math.max(this.maxVelocity, avgVel * 1.5);
+    this.activeCount = active;
 
     this.mesh.instanceMatrix.needsUpdate = true;
     this.mesh.instanceColor!.needsUpdate = true;
+  }
+
+  public getActiveCount(): number {
+    return this.activeCount;
   }
 
   public dispose(): void {

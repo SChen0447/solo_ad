@@ -62,11 +62,12 @@
       border-bottom: 1px solid rgba(0, 229, 255, 0.2);
     }
     .panel-title {
-      font-size: 18px;
+      font-size: 20px;
       font-weight: 600;
       color: #00e5ff;
       margin-bottom: 12px;
       letter-spacing: 1px;
+      text-shadow: 0 0 8px rgba(0, 229, 255, 0.3), 0 0 16px rgba(0, 229, 255, 0.15);
     }
     .stats {
       display: flex;
@@ -131,6 +132,42 @@
     }
     input[type="range"]:hover {
       background: rgba(255, 255, 255, 0.15);
+    }
+    .control-input-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .control-input-row input[type="range"] {
+      flex: 1;
+    }
+    .param-input {
+      width: 60px;
+      padding: 4px 6px;
+      background: rgba(0, 229, 255, 0.05);
+      border: 1px solid rgba(0, 229, 255, 0.4);
+      border-radius: 4px;
+      color: #00e5ff;
+      font-family: 'Consolas', 'Monaco', monospace;
+      font-size: 12px;
+      text-align: center;
+      outline: none;
+      transition: all 0.3s ease;
+      -moz-appearance: textfield;
+    }
+    .param-input::-webkit-outer-spin-button,
+    .param-input::-webkit-inner-spin-button {
+      -webkit-appearance: none;
+      margin: 0;
+    }
+    .param-input:focus {
+      border-color: #00e5ff;
+      background: rgba(0, 229, 255, 0.1);
+      box-shadow: 0 0 8px rgba(0, 229, 255, 0.3);
+    }
+    .param-input:hover {
+      border-color: rgba(0, 229, 255, 0.7);
+      background: rgba(0, 229, 255, 0.08);
     }
     #preset-buttons {
       position: absolute;
@@ -223,7 +260,7 @@
 
     <div id="control-panel">
       <div class="panel-header">
-        <div class="panel-title">流体参数控制</div>
+        <div class="panel-title">流体控制面板</div>
         <div class="stats">
           <span>FPS: <span id="fps-value">60</span></span>
           <span>粒子: <span id="particle-count">1500</span></span>
@@ -233,49 +270,61 @@
       <div class="control-group">
         <div class="control-label">
           <span>粘度</span>
-          <span class="control-value" id="viscosity-value">1.0</span>
         </div>
-        <input type="range" id="viscosity" min="0.1" max="10" step="0.1" value="1.0" />
+        <div class="control-input-row">
+          <input type="range" id="viscosity" min="0.1" max="10" step="0.1" value="1.0" />
+          <input type="text" class="param-input" id="viscosity-input" value="1.0" data-min="0.1" data-max="10" data-step="0.1" data-param="viscosity" />
+        </div>
       </div>
 
       <div class="control-group">
         <div class="control-label">
           <span>密度</span>
-          <span class="control-value" id="density-value">1.0</span>
         </div>
-        <input type="range" id="density" min="0.5" max="2.0" step="0.05" value="1.0" />
+        <div class="control-input-row">
+          <input type="range" id="density" min="0.5" max="2.0" step="0.05" value="1.0" />
+          <input type="text" class="param-input" id="density-input" value="1.0" data-min="0.5" data-max="2.0" data-step="0.05" data-param="density" />
+        </div>
       </div>
 
       <div class="control-group">
         <div class="control-label">
           <span>压力场强度</span>
-          <span class="control-value" id="pressure-value">500</span>
         </div>
-        <input type="range" id="pressure" min="100" max="1000" step="10" value="500" />
+        <div class="control-input-row">
+          <input type="range" id="pressure" min="100" max="1000" step="10" value="500" />
+          <input type="text" class="param-input" id="pressure-input" value="500" data-min="100" data-max="1000" data-step="10" data-param="pressureStrength" />
+        </div>
       </div>
 
       <div class="control-group">
         <div class="control-label">
           <span>粒子半径</span>
-          <span class="control-value" id="radius-value">0.1</span>
         </div>
-        <input type="range" id="radius" min="0.05" max="0.2" step="0.01" value="0.1" />
+        <div class="control-input-row">
+          <input type="range" id="radius" min="0.05" max="0.2" step="0.01" value="0.1" />
+          <input type="text" class="param-input" id="radius-input" value="0.1" data-min="0.05" data-max="0.2" data-step="0.01" data-param="particleRadius" />
+        </div>
       </div>
 
       <div class="control-group">
         <div class="control-label">
           <span>速度阻尼</span>
-          <span class="control-value" id="damping-value">0.98</span>
         </div>
-        <input type="range" id="damping" min="0.9" max="1.0" step="0.005" value="0.98" />
+        <div class="control-input-row">
+          <input type="range" id="damping" min="0.9" max="1.0" step="0.005" value="0.98" />
+          <input type="text" class="param-input" id="damping-input" value="0.98" data-min="0.9" data-max="1.0" data-step="0.005" data-param="velocityDamping" />
+        </div>
       </div>
 
       <div class="control-group">
         <div class="control-label">
           <span>边界恢复力</span>
-          <span class="control-value" id="boundary-value">0.5</span>
         </div>
-        <input type="range" id="boundary" min="0.1" max="1.0" step="0.05" value="0.5" />
+        <div class="control-input-row">
+          <input type="range" id="boundary" min="0.1" max="1.0" step="0.05" value="0.5" />
+          <input type="text" class="param-input" id="boundary-input" value="0.5" data-min="0.1" data-max="1.0" data-step="0.05" data-param="boundaryForce" />
+        </div>
       </div>
     </div>
 

@@ -79,11 +79,15 @@ class App {
 
   private fpsElement: HTMLElement;
   private pauseIndicator: HTMLElement;
+  private particleCountElement: HTMLElement;
+  private lastParticleCountUpdate: number;
 
   constructor() {
     this.container = document.getElementById('canvas-container')!;
     this.fpsElement = document.getElementById('fps-value')!;
     this.pauseIndicator = document.getElementById('pause-indicator')!;
+    this.particleCountElement = document.getElementById('particle-count')!;
+    this.lastParticleCountUpdate = 0;
 
     this.currentParams = { ...presets.water.params };
     this.isPaused = false;
@@ -197,35 +201,73 @@ class App {
   }
 
   private setupControlPanel(): void {
-    const controls: Array<{ id: string; param: keyof FluidParams; transform?: (v: number) => number }> = [
-      { id: 'viscosity', param: 'viscosity' },
-      { id: 'density', param: 'density' },
-      { id: 'pressure', param: 'pressureStrength', transform: (v) => v },
-      { id: 'radius', param: 'particleRadius' },
-      { id: 'damping', param: 'velocityDamping' },
-      { id: 'boundary', param: 'boundaryForce' }
+    const controls: Array<{ id: string; param: keyof FluidParams; decimals: number }> = [
+      { id: 'viscosity', param: 'viscosity', decimals: 1 },
+      { id: 'density', param: 'density', decimals: 2 },
+      { id: 'pressure', param: 'pressureStrength', decimals: 0 },
+      { id: 'radius', param: 'particleRadius', decimals: 2 },
+      { id: 'damping', param: 'velocityDamping', decimals: 3 },
+      { id: 'boundary', param: 'boundaryForce', decimals: 2 }
     ];
 
-    controls.forEach(({ id, param, transform }) => {
+    controls.forEach(({ id, param, decimals }) => {
       const slider = document.getElementById(id) as HTMLInputElement;
-      const valueDisplay = document.getElementById(`${id}-value`)!;
+      const input = document.getElementById(`${id}-input`) as HTMLInputElement;
 
-      if (slider && valueDisplay) {
+      if (slider && input) {
+        const min = parseFloat(input.dataset.min!);
+        const max = parseFloat(input.dataset.max!);
+        const step = parseFloat(input.dataset.step!);
+
         slider.addEventListener('input', () => {
-          let value = parseFloat(slider.value);
-          if (transform) value = transform(value);
-          this.currentParams[param] = value;
-          this.fluidSimulator.setParams({ [param]: value });
-          valueDisplay.textContent = value.toFixed(param === 'pressureStrength' ? 0 : 2);
+          const value = parseFloat(slider.value);
+          this.applyParam(param, value, decimals, slider, input);
+        });
 
-          if (param === 'particleRadius') {
-            this.particleSystem.setParticleRadius(value);
+        input.addEventListener('input', () => {
+          const raw = input.value.replace(/[^0-9.]/g, '');
+          const parts = raw.split('.');
+          if (parts.length > 2) {
+            input.value = parts[0] + '.' + parts.slice(1).join('');
+          } else {
+            input.value = raw;
+          }
+        });
+
+        input.addEventListener('blur', () => {
+          let value = parseFloat(input.value);
+          if (isNaN(value)) {
+            value = parseFloat(slider.value);
+          }
+          value = Math.round(value / step) * step;
+          value = Math.max(min, Math.min(max, value));
+          this.applyParam(param, value, decimals, slider, input);
+        });
+
+        input.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter') {
+            input.blur();
           }
         });
       }
     });
+  }
 
-    document.getElementById('particle-count')!.textContent = PARTICLE_COUNT.toString();
+  private applyParam(
+    param: keyof FluidParams,
+    value: number,
+    decimals: number,
+    slider: HTMLInputElement,
+    input: HTMLInputElement
+  ): void {
+    this.currentParams[param] = value;
+    this.fluidSimulator.setParams({ [param]: value });
+    slider.value = value.toString();
+    input.value = value.toFixed(decimals);
+
+    if (param === 'particleRadius') {
+      this.particleSystem.setParticleRadius(value);
+    }
   }
 
   private setupPresetButtons(): void {
@@ -250,22 +292,22 @@ class App {
 
   private updateSliderValues(params: FluidParams): void {
     (document.getElementById('viscosity') as HTMLInputElement).value = params.viscosity.toString();
-    document.getElementById('viscosity-value')!.textContent = params.viscosity.toFixed(1);
+    (document.getElementById('viscosity-input') as HTMLInputElement).value = params.viscosity.toFixed(1);
 
     (document.getElementById('density') as HTMLInputElement).value = params.density.toString();
-    document.getElementById('density-value')!.textContent = params.density.toFixed(2);
+    (document.getElementById('density-input') as HTMLInputElement).value = params.density.toFixed(2);
 
     (document.getElementById('pressure') as HTMLInputElement).value = params.pressureStrength.toString();
-    document.getElementById('pressure-value')!.textContent = params.pressureStrength.toFixed(0);
+    (document.getElementById('pressure-input') as HTMLInputElement).value = params.pressureStrength.toFixed(0);
 
     (document.getElementById('radius') as HTMLInputElement).value = params.particleRadius.toString();
-    document.getElementById('radius-value')!.textContent = params.particleRadius.toFixed(2);
+    (document.getElementById('radius-input') as HTMLInputElement).value = params.particleRadius.toFixed(2);
 
     (document.getElementById('damping') as HTMLInputElement).value = params.velocityDamping.toString();
-    document.getElementById('damping-value')!.textContent = params.velocityDamping.toFixed(3);
+    (document.getElementById('damping-input') as HTMLInputElement).value = params.velocityDamping.toFixed(3);
 
     (document.getElementById('boundary') as HTMLInputElement).value = params.boundaryForce.toString();
-    document.getElementById('boundary-value')!.textContent = params.boundaryForce.toFixed(2);
+    (document.getElementById('boundary-input') as HTMLInputElement).value = params.boundaryForce.toFixed(2);
   }
 
   private onWindowResize(): void {
@@ -355,6 +397,11 @@ class App {
     this.lastTime = currentTime;
 
     this.updateFPS(currentTime);
+
+    if (currentTime - this.lastParticleCountUpdate >= 1000) {
+      this.particleCountElement.textContent = this.particleSystem.getActiveCount().toString();
+      this.lastParticleCountUpdate = currentTime;
+    }
 
     if (!this.isPaused) {
       const particleData = this.fluidSimulator.step(deltaTime);
