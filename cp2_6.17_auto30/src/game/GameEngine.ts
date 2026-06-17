@@ -39,11 +39,9 @@ export class GameEngine {
   running: boolean = false;
   lastTime: number = 0;
   animationId: number = 0;
-  waveIndex: number = 0;
   waveNumber: number = 0;
   waveSpawnTimer: number = 0;
   waveSpawnInterval: number = 5000;
-  waveTypes: WaveType[] = ['line', 'v', 'diamond'];
   onStatsChange?: (stats: GameStats) => void;
   mouseX: number;
   mouseY: number;
@@ -104,7 +102,6 @@ export class GameEngine {
     this.score = 0;
     this.enemiesDestroyed = 0;
     this.gameOver = false;
-    this.waveIndex = 0;
     this.waveNumber = 0;
     this.waveSpawnTimer = 0;
     this.waveSpawnInterval = 5000;
@@ -164,7 +161,7 @@ export class GameEngine {
     if (this.gameOver) return;
 
     for (const star of this.stars) {
-      star.y += star.speed * (deltaTime / 16);
+      star.y += star.speed * (deltaTime / 16.67);
       if (star.y > this.height) {
         star.y = 0;
         star.x = Math.random() * this.width;
@@ -181,8 +178,8 @@ export class GameEngine {
 
     for (let i = this.bullets.length - 1; i >= 0; i--) {
       const b = this.bullets[i];
-      b.x += b.vx * (deltaTime / 16);
-      b.y += b.vy * (deltaTime / 16);
+      b.x += b.vx * (deltaTime / 16.67);
+      b.y += b.vy * (deltaTime / 16.67);
       if (b.x < -10 || b.x > this.width + 10 || b.y < -10 || b.y > this.height + 10) {
         this.bullets.splice(i, 1);
       }
@@ -329,6 +326,10 @@ export class GameEngine {
 
   drawHUD(ctx: CanvasRenderingContext2D) {
     ctx.save();
+    const hudX = 15;
+    const hudStartY = 15;
+    const lineGap = 4;
+
     ctx.font = '18px monospace';
     ctx.textAlign = 'left';
     ctx.textBaseline = 'top';
@@ -339,21 +340,28 @@ export class GameEngine {
     ctx.shadowBlur = 4;
 
     const scoreText = `分数: ${this.score}`;
-    ctx.strokeText(scoreText, 15, 15);
-    ctx.fillText(scoreText, 15, 15);
+    ctx.strokeText(scoreText, hudX, hudStartY);
+    ctx.fillText(scoreText, hudX, hudStartY);
+
+    const scoreMetrics = ctx.measureText(scoreText);
+    const scoreHeight = scoreMetrics.actualBoundingBoxDescent + scoreMetrics.actualBoundingBoxAscent;
+    const waveY = hudStartY + scoreHeight + lineGap;
 
     ctx.font = '16px monospace';
     ctx.shadowColor = '#00ff88';
     const waveText = `波次: ${this.waveNumber}`;
-    ctx.strokeText(waveText, 15, 42);
-    ctx.fillText(waveText, 15, 42);
+    ctx.strokeText(waveText, hudX, waveY);
+    ctx.fillText(waveText, hudX, waveY);
+
+    const waveMetrics = ctx.measureText(waveText);
+    const waveHeight = waveMetrics.actualBoundingBoxDescent + waveMetrics.actualBoundingBoxAscent;
+    const heartsY = waveY + waveHeight + lineGap + 2;
 
     ctx.shadowBlur = 0;
     for (let i = 0; i < this.player.maxLives; i++) {
-      const x = 15 + i * 24;
-      const y = 70;
+      const x = hudX + i * 24;
       const active = i < this.player.lives;
-      this.drawHeart(ctx, x, y, 16, active ? '#ff3366' : '#444444');
+      this.drawHeart(ctx, x, heartsY, 16, active ? '#ff3366' : '#444444');
     }
 
     ctx.restore();

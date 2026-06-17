@@ -200,6 +200,7 @@ export class EnemyWave {
 
   createCircleFormation(count: number) {
     const radius = Math.min(120, 40 + count * 8);
+    const offset = this.size / 2;
     for (let i = 0; i < count; i++) {
       const angle = (Math.PI * 2 * i) / count - Math.PI / 2;
       this.enemies.push({
@@ -209,8 +210,8 @@ export class EnemyWave {
         color: this.color,
         speed: this.speed,
         alive: true,
-        formationOffsetX: Math.cos(angle) * radius,
-        formationOffsetY: Math.sin(angle) * radius,
+        formationOffsetX: Math.cos(angle) * (radius + offset),
+        formationOffsetY: Math.sin(angle) * (radius + offset),
         spawnDelay: i * 100,
         spawned: false
       });
@@ -220,31 +221,44 @@ export class EnemyWave {
   createScatterFormation(count: number, canvasWidth: number) {
     const positions: { x: number; y: number }[] = [];
     const minDist = 40;
-    const maxAttempts = 200;
+    const maxGlobalRetries = 3;
+    const maxAttemptsPerPoint = 300;
     const spreadWidth = Math.min(canvasWidth * 0.7, 300 + count * 20);
     const spreadHeight = 80 + count * 8;
 
-    for (let i = 0; i < count && positions.length < count; i++) {
-      let attempts = 0;
-      while (attempts < maxAttempts) {
-        const x = (Math.random() - 0.5) * spreadWidth;
-        const y = (Math.random() - 0.5) * spreadHeight;
+    for (let globalRetry = 0; globalRetry < maxGlobalRetries; globalRetry++) {
+      positions.length = 0;
 
-        let valid = true;
-        for (const p of positions) {
-          const dx = x - p.x;
-          const dy = y - p.y;
-          if (Math.sqrt(dx * dx + dy * dy) < minDist) {
-            valid = false;
+      for (let i = 0; i < count; i++) {
+        let placed = false;
+        for (let attempts = 0; attempts < maxAttemptsPerPoint; attempts++) {
+          const x = (Math.random() - 0.5) * spreadWidth;
+          const y = (Math.random() - 0.5) * spreadHeight;
+
+          let valid = true;
+          for (const p of positions) {
+            const dx = x - p.x;
+            const dy = y - p.y;
+            if (dx * dx + dy * dy < minDist * minDist) {
+              valid = false;
+              break;
+            }
+          }
+
+          if (valid) {
+            positions.push({ x, y });
+            placed = true;
             break;
           }
         }
 
-        if (valid) {
-          positions.push({ x, y });
+        if (!placed) {
           break;
         }
-        attempts++;
+      }
+
+      if (positions.length === count) {
+        break;
       }
     }
 
@@ -270,7 +284,7 @@ export class EnemyWave {
 
   update(deltaTime: number, canvasHeight: number) {
     this.waveTimer += deltaTime;
-    this.centerY += this.speed * (deltaTime / 16);
+    this.centerY += this.speed * (deltaTime / 16.67);
 
     this.allSpawned = true;
     for (const enemy of this.enemies) {
@@ -290,8 +304,8 @@ export class EnemyWave {
 
     for (let i = this.particles.length - 1; i >= 0; i--) {
       const p = this.particles[i];
-      p.x += p.vx * (deltaTime / 16);
-      p.y += p.vy * (deltaTime / 16);
+      p.x += p.vx * (deltaTime / 16.67);
+      p.y += p.vy * (deltaTime / 16.67);
       p.life -= deltaTime;
       if (p.life <= 0) {
         this.particles.splice(i, 1);
