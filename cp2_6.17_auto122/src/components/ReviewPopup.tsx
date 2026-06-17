@@ -35,6 +35,7 @@ function ReviewPopup({ lineNumber, existingReview, containerRef, onSubmit, onDel
   const [posStyle, setPosStyle] = useState<React.CSSProperties>({});
   const triggerRef = useRef<HTMLDivElement>(null);
   const popupRef = useRef<HTMLDivElement>(null);
+  const closeTimeoutRef = useRef<number | null>(null);
 
   const calculatePosition = useCallback(() => {
     if (!triggerRef.current || !containerRef.current) return;
@@ -46,6 +47,7 @@ function ReviewPopup({ lineNumber, existingReview, containerRef, onSubmit, onDel
     const spaceRight = viewportW - triggerRect.right;
     const spaceLeft = triggerRect.left;
     const spaceBelow = viewportH - triggerRect.bottom;
+    const spaceAbove = triggerRect.top;
 
     let pos: PopupPosition = 'right';
     let style: React.CSSProperties = {};
@@ -68,11 +70,18 @@ function ReviewPopup({ lineNumber, existingReview, containerRef, onSubmit, onDel
         left: Math.max(0, triggerRect.left - containerRect.left),
         top: triggerRect.bottom - containerRect.top + 4,
       };
-    } else {
+    } else if (spaceAbove >= POPUP_HEIGHT_EST) {
       pos = 'top';
       style = {
         left: Math.max(0, triggerRect.left - containerRect.left),
         bottom: containerRect.bottom - triggerRect.top + 4,
+      };
+    } else {
+      pos = spaceBelow >= spaceAbove ? 'bottom' : 'top';
+      style = {
+        left: Math.max(0, triggerRect.left - containerRect.left),
+        top: pos === 'bottom' ? triggerRect.bottom - containerRect.top + 4 : undefined,
+        bottom: pos === 'top' ? containerRect.bottom - triggerRect.top + 4 : undefined,
       };
     }
 
@@ -92,12 +101,17 @@ function ReviewPopup({ lineNumber, existingReview, containerRef, onSubmit, onDel
   }, [isOpen, existingReview, calculatePosition]);
 
   const handleClose = useCallback(() => {
+    if (closeTimeoutRef.current) {
+      clearTimeout(closeTimeoutRef.current);
+      closeTimeoutRef.current = null;
+    }
     setIsClosing(true);
-    setTimeout(() => {
+    closeTimeoutRef.current = window.setTimeout(() => {
       setIsOpen(false);
       setIsClosing(false);
       setComment('');
       setRating(null);
+      closeTimeoutRef.current = null;
     }, 200);
   }, []);
 
@@ -111,23 +125,33 @@ function ReviewPopup({ lineNumber, existingReview, containerRef, onSubmit, onDel
       timestamp: Date.now(),
     };
     onSubmit(review);
+    if (closeTimeoutRef.current) {
+      clearTimeout(closeTimeoutRef.current);
+      closeTimeoutRef.current = null;
+    }
     setIsClosing(true);
-    setTimeout(() => {
+    closeTimeoutRef.current = window.setTimeout(() => {
       setIsOpen(false);
       setIsClosing(false);
       setComment('');
       setRating(null);
+      closeTimeoutRef.current = null;
     }, 200);
   }, [rating, comment, lineNumber, existingReview, onSubmit]);
 
   const handleDelete = useCallback(() => {
     onDelete(lineNumber);
+    if (closeTimeoutRef.current) {
+      clearTimeout(closeTimeoutRef.current);
+      closeTimeoutRef.current = null;
+    }
     setIsClosing(true);
-    setTimeout(() => {
+    closeTimeoutRef.current = window.setTimeout(() => {
       setIsOpen(false);
       setIsClosing(false);
       setComment('');
       setRating(null);
+      closeTimeoutRef.current = null;
     }, 200);
   }, [lineNumber, onDelete]);
 
@@ -156,7 +180,7 @@ function ReviewPopup({ lineNumber, existingReview, containerRef, onSubmit, onDel
 
   const charCount = comment.length;
   const isOverLimit = charCount > MAX_COMMENT;
-  const isNearLimit = charCount >= MAX_COMMENT * 0.9 && !isOverLimit;
+  const isNearLimit = charCount >= MAX_COMMENT * 0.8 && charCount > 0 && !isOverLimit;
   let countColor = '#6c757d';
   if (isNearLimit) countColor = '#ffc107';
   if (isOverLimit) countColor = '#dc3545';
