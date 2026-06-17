@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>炼金术士工坊</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Georgia', 'Times New Roman', serif;
+      background-color: #2F2F2F;
+      color: #ffffff;
+      overflow: hidden;
+      width: 100vw;
+      height: 100vh;
+    }
+
+    #game-container {
+      width: 100%;
+      height: 100%;
+      position: relative;
+    }
+
+    #game-canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      cursor: default;
+    }
+
+    #ui-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+    }
+
+    .info-panel {
+      position: absolute;
+      padding: 12px 16px;
+      background: rgba(0, 0, 0, 0.6);
+      border: 1px solid rgba(255, 215, 0, 0.3);
+      border-radius: 8px;
+      color: #FFD700;
+      font-size: 14px;
+      line-height: 1.6;
+      pointer-events: none;
+    }
+
+    #top-left-info {
+      top: 20px;
+      left: 20px;
+    }
+
+    #bottom-left-info {
+      bottom: 20px;
+      left: 20px;
+    }
+
+    #synthesis-message {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 32px;
+      font-family: 'Georgia', serif;
+      color: #FFD700;
+      text-shadow: 0 0 20px rgba(255, 215, 0, 0.8);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.3s ease;
+    }
+
+    #synthesis-message.show {
+      opacity: 1;
+    }
+
+    #element-panel {
+      position: absolute;
+      left: 20px;
+      top: 50%;
+      transform: translateY(-50%);
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      pointer-events: auto;
+    }
+
+    .element-btn {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      border: 2px solid rgba(255, 255, 255, 0.3);
+      cursor: grab;
+      position: relative;
+      transition: transform 0.2s ease;
+    }
+
+    .element-btn:hover {
+      transform: scale(1.1);
+    }
+
+    .element-btn:active {
+      cursor: grabbing;
+    }
+
+    .element-btn .glow {
+      position: absolute;
+      top: -4px;
+      left: -4px;
+      right: -4px;
+      bottom: -4px;
+      border-radius: 50%;
+      opacity: 0.5;
+      filter: blur(6px);
+    }
+
+    .element-count {
+      position: absolute;
+      bottom: -6px;
+      right: -6px;
+      background: rgba(0, 0, 0, 0.8);
+      color: white;
+      font-size: 11px;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: 1px solid rgba(255, 255, 255, 0.3);
+    }
+
+    #mode-indicator {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      padding: 10px 16px;
+      background: rgba(0, 0, 0, 0.6);
+      border: 1px solid rgba(255, 215, 0, 0.5);
+      border-radius: 8px;
+      color: #FFD700;
+      font-size: 14px;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.3s ease;
+    }
+
+    #mode-indicator.active {
+      opacity: 1;
+    }
+
+    #instructions {
+      position: absolute;
+      bottom: 20px;
+      right: 20px;
+      padding: 10px 14px;
+      background: rgba(0, 0, 0, 0.5);
+      border-radius: 8px;
+      color: #aaa;
+      font-size: 12px;
+      line-height: 1.8;
+      pointer-events: none;
+    }
+  </style>
+</head>
+<body>
+  <div id="game-container">
+    <canvas id="game-canvas"></canvas>
+    <div id="ui-overlay">
+      <div class="info-panel" id="top-left-info">
+        <div>炼金知识库: <span id="knowledge-level">1</span> 级</div>
+        <div>已解锁配方: <span id="unlocked-count">0</span> / <span id="total-recipes">0</span></div>
+      </div>
+
+      <div class="info-panel" id="bottom-left-info">
+        <div style="margin-bottom: 6px; color: #FFD700;">基础元素库存</div>
+        <div id="element-counts" style="font-size: 12px; color: #ccc;"></div>
+      </div>
+
+      <div id="element-panel"></div>
+
+      <div id="mode-indicator">⚗ 合成模式 (点击两个相邻元素)</div>
+
+      <div id="synthesis-message"></div>
+
+      <div id="instructions">
+        拖拽元素到格子 | 右键移除元素<br/>
+        按空格键切换合成模式 | 空格+点击相邻元素合成
+      </div>
+    </div>
+  </div>
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
