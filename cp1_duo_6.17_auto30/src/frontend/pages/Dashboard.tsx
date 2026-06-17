@@ -125,7 +125,8 @@ const RingChart: React.FC<{ ratio: number; size?: number }> = ({ ratio, size = 1
 const Dashboard: React.FC = () => {
   const [data, setData] = useState<InventoryData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [expandedWarehouse, setExpandedWarehouse] = useState<string | null>(null);
+  const [selectedWarehouse, setSelectedWarehouse] = useState<Warehouse | null>(null);
+  const [drawerVisible, setDrawerVisible] = useState(false);
   const [alerts, setAlerts] = useState<AlertItem[]>([]);
   const [alertBanner, setAlertBanner] = useState<string | null>(null);
   const [snapshots, setSnapshots] = useState<SnapshotInfo[]>([]);
@@ -134,6 +135,21 @@ const Dashboard: React.FC = () => {
   const [diffs, setDiffs] = useState<DiffItem[]>([]);
   const [diffSearch, setDiffSearch] = useState('');
   const [showDiffs, setShowDiffs] = useState(false);
+  const [blinkFinished, setBlinkFinished] = useState<Record<string, boolean>>({});
+
+  useEffect(() => {
+    if (!data) return;
+    const timers: ReturnType<typeof setTimeout>[] = [];
+    data.warehouses.forEach((wh) => {
+      if (wh.below_threshold && !blinkFinished[wh.id]) {
+        const timer = setTimeout(() => {
+          setBlinkFinished((prev) => ({ ...prev, [wh.id]: true }));
+        }, 3000);
+        timers.push(timer);
+      }
+    });
+    return () => timers.forEach((t) => clearTimeout(t));
+  }, [data]);
 
   const fetchData = useCallback(async () => {
     try {
@@ -393,19 +409,22 @@ const Dashboard: React.FC = () => {
         gap: 20,
       }}>
         {data.warehouses.map((wh) => {
-          const isExpanded = expandedWarehouse === wh.id;
           const isAlert = wh.below_threshold;
+          const isBlinking = isAlert && !blinkFinished[wh.id];
           return (
             <div
               key={wh.id}
-              onClick={() => setExpandedWarehouse(isExpanded ? null : wh.id)}
+              onClick={() => {
+                setSelectedWarehouse(wh);
+                setDrawerVisible(true);
+              }}
               style={{
                 background: '#fff',
                 borderRadius: 12,
                 padding: 24,
                 boxShadow: '0 2px 12px rgba(0,0,0,0.06)',
                 border: isAlert ? '2px solid #e74c3c' : '2px solid transparent',
-                animation: isAlert ? 'blink 1.5s ease-in-out infinite' : 'none',
+                animation: isBlinking ? 'blink 1s ease-in-out 3' : 'none',
                 cursor: 'pointer',
                 transition: 'transform 0.3s, box-shadow 0.3s',
               }}
@@ -453,60 +472,154 @@ const Dashboard: React.FC = () => {
                 )}
               </div>
 
-              {isExpanded && (
-                <div style={{ borderTop: '1px solid #eee', paddingTop: 12, marginTop: 8 }}>
-                  <h4 style={{ color: '#0f4c81', marginBottom: 8, fontSize: 14 }}>SKU详情</h4>
-                  <div style={{ maxHeight: 280, overflowY: 'auto' }}>
-                    {wh.skus.map((sku) => (
-                      <div key={sku.sku_id} style={{
-                        padding: '8px 0',
-                        borderBottom: '1px solid #f5f5f5',
-                        fontSize: 13,
-                      }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <span style={{ fontWeight: 600, color: sku.quantity < sku.safety_threshold ? '#e74c3c' : '#333' }}>
-                            {sku.sku_name}
-                          </span>
-                          <span style={{
-                            fontSize: 11,
-                            padding: '2px 8px',
-                            borderRadius: 10,
-                            background: sku.quantity < sku.safety_threshold ? '#fdecea' : '#e8f5e9',
-                            color: sku.quantity < sku.safety_threshold ? '#e74c3c' : '#27ae60',
-                          }}>
-                            库存 {sku.quantity} / 阈值 {sku.safety_threshold}
-                          </span>
-                        </div>
-                        <div style={{ color: '#888', fontSize: 12, marginTop: 2 }}>
-                          在途: {sku.in_transit}
-                        </div>
-                        <div style={{ marginTop: 4 }}>
-                          {sku.recent_records.slice(0, 5).map((rec, ri) => (
-                            <span key={ri} style={{
-                              display: 'inline-block',
-                              fontSize: 11,
-                              margin: '2px 4px 2px 0',
-                              padding: '2px 6px',
-                              borderRadius: 4,
-                              background: rec.direction === 'in' ? '#e8f5e9' : '#fdecea',
-                              color: rec.direction === 'in' ? '#27ae60' : '#e74c3c',
-                            }}>
-                              {rec.direction === 'in' ? '入库' : '出库'} {rec.amount}
-                              <span style={{ color: '#aaa', marginLeft: 4 }}>
-                                {dayjs(rec.timestamp).format('HH:mm')}
-                              </span>
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
+              <div style={{ textAlign: 'right' }}>
+                <span style={{ fontSize: 12, color: '#0f4c81', fontWeight: 500 }}>
+                  查看详情 →
+                </span>
+              </div>
             </div>
           );
         })}
       </div>
+
+      {drawerVisible && selectedWarehouse && (
+        <>
+          <div
+            onClick={() => setDrawerVisible(false)}
+            style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              background: 'rgba(0,0,0,0.4)',
+              zIndex: 1500,
+              animation: 'fadeIn 0.2s ease-out',
+            }}
+          />
+          <div style={{
+            position: 'fixed',
+            top: 0,
+            right: 0,
+            width: 'min(480px, 90vw)',
+            height: '100vh',
+            background: '#fff',
+            boxShadow: '-4px 0 20px rgba(0,0,0,0.15)',
+            zIndex: 1600,
+            animation: 'slideInDrawer 0.3s ease-out',
+            display: 'flex',
+            flexDirection: 'column',
+            overflow: 'hidden',
+          }}>
+            <div style={{
+              padding: '20px 24px',
+              borderBottom: '1px solid #eee',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              background: '#fff',
+            }}>
+              <div>
+                <h3 style={{ color: '#0f4c81', margin: 0, fontSize: 18 }}>
+                  {selectedWarehouse.name}
+                </h3>
+                <span style={{ fontSize: 12, color: '#888' }}>
+                  库存总量 {selectedWarehouse.total_quantity} / 容量 {selectedWarehouse.capacity}
+                </span>
+              </div>
+              <button
+                onClick={() => setDrawerVisible(false)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  fontSize: 22,
+                  color: '#999',
+                  cursor: 'pointer',
+                  padding: '4px 8px',
+                  lineHeight: 1,
+                }}
+              >
+                ✕
+              </button>
+            </div>
+
+            <div style={{
+              display: 'flex',
+              justifyContent: 'center',
+              padding: '20px 0',
+              background: '#f9fafb',
+              borderBottom: '1px solid #eee',
+            }}>
+              <RingChart ratio={selectedWarehouse.capacity_ratio} size={140} />
+            </div>
+
+            <div style={{ padding: '16px 24px', flex: 1, overflowY: 'auto' }}>
+              <h4 style={{ color: '#0f4c81', margin: '0 0 12px 0', fontSize: 14 }}>
+                SKU详情（{selectedWarehouse.skus.length}个）
+              </h4>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {selectedWarehouse.skus.map((sku) => (
+                  <div key={sku.sku_id} style={{
+                    padding: 12,
+                    borderRadius: 8,
+                    background: '#f9fafb',
+                    fontSize: 13,
+                    border: sku.quantity < sku.safety_threshold ? '1px solid #fdecea' : '1px solid transparent',
+                  }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                      <span style={{ fontWeight: 600, color: sku.quantity < sku.safety_threshold ? '#e74c3c' : '#333' }}>
+                        {sku.sku_name}
+                      </span>
+                      <span style={{
+                        fontSize: 11,
+                        padding: '2px 8px',
+                        borderRadius: 10,
+                        background: sku.quantity < sku.safety_threshold ? '#fdecea' : '#e8f5e9',
+                        color: sku.quantity < sku.safety_threshold ? '#e74c3c' : '#27ae60',
+                        fontWeight: 600,
+                      }}>
+                        {sku.quantity < sku.safety_threshold ? '⚠ 低于阈值' : '正常'}
+                      </span>
+                    </div>
+                    <div style={{ display: 'flex', gap: 16, marginBottom: 8 }}>
+                      <span style={{ color: '#666' }}>
+                        当前库存: <strong style={{ color: '#333' }}>{sku.quantity}</strong>
+                      </span>
+                      <span style={{ color: '#666' }}>
+                        安全阈值: <strong style={{ color: '#333' }}>{sku.safety_threshold}</strong>
+                      </span>
+                    </div>
+                    <div style={{ color: '#888', fontSize: 12, marginBottom: 8 }}>
+                      在途数量: {sku.in_transit}
+                    </div>
+                    <div style={{ fontSize: 11, color: '#999', marginBottom: 4 }}>最近5次出入库：</div>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                      {sku.recent_records.slice(0, 5).map((rec, ri) => (
+                        <span key={ri} style={{
+                          display: 'inline-block',
+                          fontSize: 11,
+                          padding: '3px 8px',
+                          borderRadius: 4,
+                          background: rec.direction === 'in' ? '#e8f5e9' : '#fdecea',
+                          color: rec.direction === 'in' ? '#27ae60' : '#e74c3c',
+                        }}>
+                          {rec.direction === 'in' ? '入库 +' : '出库 -'}{rec.amount}
+                          <span style={{ color: '#aaa', marginLeft: 4 }}>
+                            {dayjs(rec.timestamp).format('MM-DD HH:mm')}
+                          </span>
+                        </span>
+                      ))}
+                      {sku.recent_records.length === 0 && (
+                        <span style={{ color: '#bbb', fontSize: 11 }}>暂无记录</span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </>
+      )}
 
       <div style={{
         background: '#fff',

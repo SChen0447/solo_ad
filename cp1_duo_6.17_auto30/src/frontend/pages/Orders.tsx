@@ -51,6 +51,8 @@ const Orders: React.FC = () => {
   const [filterStatus, setFilterStatus] = useState<string>('');
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [batchProgress, setBatchProgress] = useState(false);
+  const [batchProgressNum, setBatchProgressNum] = useState(0);
+  const [batchTotal, setBatchTotal] = useState(0);
   const [batchResult, setBatchResult] = useState<{ success: number; failed: number } | null>(null);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const perPage = 10;
@@ -95,10 +97,25 @@ const Orders: React.FC = () => {
 
   const handleBatch = async (operation: string) => {
     if (selected.size === 0) return;
+    const total = selected.size;
+    setBatchTotal(total);
     setBatchProgress(true);
     setBatchResult(null);
+    setBatchProgressNum(0);
+
+    const intervalMs = Math.max(800 / total, 50);
+    let current = 0;
+    const interval = setInterval(() => {
+      current += 1;
+      if (current >= total) {
+        clearInterval(interval);
+        setBatchProgressNum(total);
+      } else {
+        setBatchProgressNum(current);
+      }
+    }, intervalMs);
+
     try {
-      await new Promise((r) => setTimeout(r, 400));
       const res = await axios.post('/api/orders/batch', {
         operation,
         order_ids: Array.from(selected),
@@ -109,10 +126,15 @@ const Orders: React.FC = () => {
       });
       setSelected(new Set());
       fetchOrders(page);
-    } catch { /* ignore */ }
+    } catch { /* ignore */ } finally {
+      clearInterval(interval);
+      setBatchProgressNum(total);
+    }
     setTimeout(() => {
       setBatchProgress(false);
       setBatchResult(null);
+      setBatchProgressNum(0);
+      setBatchTotal(0);
     }, 3000);
   };
 
@@ -195,20 +217,26 @@ const Orders: React.FC = () => {
           marginBottom: 16,
           boxShadow: '0 2px 12px rgba(0,0,0,0.06)',
         }}>
-          <div style={{ fontSize: 13, color: '#666', marginBottom: 8 }}>
-            批量操作进行中...
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+            <span style={{ fontSize: 13, color: '#666' }}>
+              批量操作进行中...
+            </span>
+            <span style={{ fontSize: 13, fontWeight: 600, color: '#0f4c81' }}>
+              处理中: {batchProgressNum} / {batchTotal}
+            </span>
           </div>
           <div style={{
-            height: 8,
+            height: 10,
             background: '#e8ecf1',
-            borderRadius: 4,
+            borderRadius: 5,
             overflow: 'hidden',
           }}>
             <div style={{
               height: '100%',
+              width: `${(batchProgressNum / (batchTotal || 1)) * 100}%`,
               background: 'linear-gradient(90deg, #0f4c81, #f07b3f)',
-              borderRadius: 4,
-              animation: 'progressFill 0.4s ease-out forwards',
+              borderRadius: 5,
+              transition: 'width 0.08s linear',
             }} />
           </div>
         </div>

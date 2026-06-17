@@ -27,7 +27,11 @@ const globalStyles = `
   }
   @keyframes blink {
     0%, 100% { opacity: 1; }
-    50% { opacity: 0.4; }
+    50% { opacity: 0.5; }
+  }
+  @keyframes blink-3times {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
   }
   @keyframes slideInRight {
     from { transform: translateX(100%); opacity: 0; }
@@ -37,9 +41,21 @@ const globalStyles = `
     from { transform: translateX(0); opacity: 1; }
     to { transform: translateX(100%); opacity: 0; }
   }
+  @keyframes slideInDrawer {
+    from { transform: translateX(100%); }
+    to { transform: translateX(0); }
+  }
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
   @keyframes progressFill {
     from { width: 0%; }
     to { width: 100%; }
+  }
+  @keyframes shimmer {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
   }
 `;
 
