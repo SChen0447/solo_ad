@@ -60,6 +60,55 @@ body {
   background: #e0e0e0;
 }
 
+.filter-toolbar {
+  height: 44px;
+  background: #FFFFFF;
+  padding: 0 24px;
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  border-bottom: 1px solid #E8E8E8;
+}
+
+.filter-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.filter-label {
+  font-size: 14px;
+  color: #666666;
+}
+
+.filter-select,
+.filter-input {
+  height: 32px;
+  padding: 0 10px;
+  border: 1px solid #E0E0E0;
+  border-radius: 6px;
+  font-size: 14px;
+  background: #ffffff;
+  outline: none;
+  transition: border-color 0.3s, box-shadow 0.3s;
+  color: #333333;
+}
+
+.filter-select {
+  min-width: 100px;
+  cursor: pointer;
+}
+
+.filter-input {
+  min-width: 180px;
+}
+
+.filter-select:focus,
+.filter-input:focus {
+  border-color: #6C63FF;
+  box-shadow: 0 0 0 2px rgba(108, 99, 255, 0.1);
+}
+
 .success-toast {
   position: fixed;
   top: -60px;
@@ -309,6 +358,16 @@ body {
   display: flex;
   flex-direction: column;
   gap: 12px;
+  animation: cardsFadeIn 0.3s ease;
+}
+
+@keyframes cardsFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 .task-card {

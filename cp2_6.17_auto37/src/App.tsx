@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback } from 'react';
-import type { Task, CreateTaskData, UpdateTaskData } from './types';
+import { useState, useEffect, useCallback, useMemo } from 'react';
+import type { Task, CreateTaskData, UpdateTaskData, TaskPriority } from './types';
 import Board from './components/Board';
 import TaskDetail from './components/TaskDetail';
 import CreateTaskModal from './components/CreateTaskModal';
@@ -11,6 +11,9 @@ function App() {
   const [createModalDefaultStatus, setCreateModalDefaultStatus] = useState<Task['status']>('todo');
   const [showSuccessToast, setShowSuccessToast] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [priorityFilter, setPriorityFilter] = useState<TaskPriority | 'all'>('all');
+  const [assigneeFilter, setAssigneeFilter] = useState('');
+  const [filterKey, setFilterKey] = useState(0);
 
   const fetchTasks = useCallback(async () => {
     try {
@@ -115,6 +118,31 @@ function App() {
 
   const selectedTask = tasks.find(t => t.id === selectedTaskId) || null;
 
+  const filteredTasks = useMemo(() => {
+    return tasks.filter(task => {
+      if (priorityFilter !== 'all' && task.priority !== priorityFilter) {
+        return false;
+      }
+      if (assigneeFilter.trim()) {
+        const search = assigneeFilter.trim().toLowerCase();
+        if (!task.assignee || !task.assignee.toLowerCase().includes(search)) {
+          return false;
+        }
+      }
+      return true;
+    });
+  }, [tasks, priorityFilter, assigneeFilter]);
+
+  const handlePriorityChange = (value: TaskPriority | 'all') => {
+    setPriorityFilter(value);
+    setFilterKey(prev => prev + 1);
+  };
+
+  const handleAssigneeChange = (value: string) => {
+    setAssigneeFilter(value);
+    setFilterKey(prev => prev + 1);
+  };
+
   return (
     <div className="app-container">
       <nav className="navbar">
@@ -129,9 +157,36 @@ function App() {
         操作成功！
       </div>
 
+      <div className="filter-toolbar">
+        <div className="filter-item">
+          <label className="filter-label">优先级：</label>
+          <select
+            className="filter-select"
+            value={priorityFilter}
+            onChange={(e) => handlePriorityChange(e.target.value as TaskPriority | 'all')}
+          >
+            <option value="all">全部</option>
+            <option value="high">高</option>
+            <option value="medium">中</option>
+            <option value="low">低</option>
+          </select>
+        </div>
+        <div className="filter-item">
+          <label className="filter-label">负责人：</label>
+          <input
+            type="text"
+            className="filter-input"
+            placeholder="输入负责人姓名"
+            value={assigneeFilter}
+            onChange={(e) => handleAssigneeChange(e.target.value)}
+          />
+        </div>
+      </div>
+
       {!loading && (
         <Board
-          tasks={tasks}
+          key={filterKey}
+          tasks={filteredTasks}
           onSelectTask={setSelectedTaskId}
           onOpenCreateModal={handleOpenCreateModal}
           onUpdateTaskStatus={handleUpdateTaskStatus}
