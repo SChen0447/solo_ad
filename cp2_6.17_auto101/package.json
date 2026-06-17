@@ -21,11 +21,16 @@
     "@codemirror/view": "^6.23.0",
     "@codemirror/commands": "^6.3.0",
     "@codemirror/language": "^6.9.0",
+    "@tiptap/react": "^2.2.4",
+    "@tiptap/pm": "^2.2.4",
+    "@tiptap/starter-kit": "^2.2.4",
+    "@tiptap/extension-placeholder": "^2.2.4",
     "express": "^4.18.2",
     "cors": "^2.8.5",
     "body-parser": "^1.20.2",
     "uuid": "^9.0.1",
-    "vm2": "^3.9.19"
+    "vm2": "^3.9.19",
+    "jsdom": "^23.2.0"
   },
   "devDependencies": {
     "@types/react": "^18.2.43",
