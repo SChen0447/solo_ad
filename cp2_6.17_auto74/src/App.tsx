@@ -90,13 +90,16 @@ const App: React.FC = () => {
   }, [fetchStalls]);
 
   const filteredStalls = useMemo(() => {
-    if (!searchText.trim()) return stalls;
-    const keyword = searchText.trim().toLowerCase();
-    return stalls.filter(
-      s =>
-        s.name.toLowerCase().includes(keyword) ||
-        s.ownerNickname.toLowerCase().includes(keyword)
-    );
+    const trimmedSearch = searchText.trim();
+    if (trimmedSearch.length === 0) {
+      return stalls;
+    }
+    const keyword = trimmedSearch.toLowerCase();
+    return stalls.filter(s => {
+      const nameLower = s.name.toLowerCase();
+      const ownerLower = s.ownerNickname.toLowerCase();
+      return nameLower.includes(keyword) || ownerLower.includes(keyword);
+    });
   }, [stalls, searchText]);
 
   const handleViewDetail = (stallId: string) => {
@@ -243,19 +246,17 @@ const App: React.FC = () => {
     const savedContent = commentForm.content;
     setCommentForm({ nickname: savedNickname, content: '' });
 
+    let requestFailed = false;
     const rollback = () => {
-      setCurrentStall(prev =>
-        prev
-          ? {
-              ...prev,
-              comments: originalComments,
-              commentsCount: originalCommentsCount,
-              interactionCount: originalInteractionCount
-            }
-          : prev
-      );
-      setStalls(prev =>
-        prev.map(s =>
+      requestFailed = true;
+      setCurrentStall(() => ({
+        ...currentStall,
+        comments: originalComments,
+        commentsCount: originalCommentsCount,
+        interactionCount: originalInteractionCount
+      }));
+      setStalls(prevStalls =>
+        prevStalls.map(s =>
           s.id === currentStall.id
             ? {
                 ...s,
@@ -266,6 +267,7 @@ const App: React.FC = () => {
         )
       );
       setCommentForm({ nickname: savedNickname, content: savedContent });
+      setCommentSubmitting(false);
     };
 
     setCommentSubmitting(true);
@@ -279,7 +281,7 @@ const App: React.FC = () => {
         })
       });
       const json = await res.json();
-      if (res.ok) {
+      if (res.ok && !requestFailed) {
         setCurrentStall(prev =>
           prev
             ? {
@@ -290,15 +292,21 @@ const App: React.FC = () => {
               }
             : prev
         );
-      } else {
+      } else if (!res.ok && !requestFailed) {
         rollback();
         alert(json.error || '留言失败，请重试');
+        return;
       }
     } catch {
-      rollback();
-      alert('网络错误，留言失败');
+      if (!requestFailed) {
+        rollback();
+        alert('网络错误，留言失败');
+      }
+      return;
     } finally {
-      setCommentSubmitting(false);
+      if (!requestFailed) {
+        setCommentSubmitting(false);
+      }
     }
   };
 

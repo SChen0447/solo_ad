@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 
 export interface LeaderboardItem {
   id: string;
@@ -12,6 +12,8 @@ export interface LeaderboardItem {
 const Leaderboard: React.FC = () => {
   const [items, setItems] = useState<LeaderboardItem[]>([]);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const cancelledRef = useRef(false);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const fetchLeaderboard = useCallback(async (): Promise<LeaderboardItem[]> => {
     try {
@@ -24,22 +26,49 @@ const Leaderboard: React.FC = () => {
   }, []);
 
   const refreshData = useCallback(async () => {
+    if (cancelledRef.current || isRefreshing) return;
     setIsRefreshing(true);
     try {
       const data = await fetchLeaderboard();
-      setItems(prev => {
-        if (JSON.stringify(prev) === JSON.stringify(data)) return prev;
-        return data;
-      });
+      if (!cancelledRef.current) {
+        setItems(prev => {
+          if (
+            prev.length === data.length &&
+            prev.every((item, i) => {
+              const d = data[i];
+              return (
+                d &&
+                item.id === d.id &&
+                item.interactionCount === d.interactionCount &&
+                item.likesCount === d.likesCount &&
+                item.commentsCount === d.commentsCount
+              );
+            })
+          ) {
+            return prev;
+          }
+          return data;
+        });
+      }
     } finally {
-      setIsRefreshing(false);
+      if (!cancelledRef.current) {
+        setIsRefreshing(false);
+      }
     }
-  }, [fetchLeaderboard]);
+  }, [fetchLeaderboard, isRefreshing]);
 
   useEffect(() => {
+    cancelledRef.current = false;
     refreshData();
-    const intervalId = setInterval(refreshData, 10000);
-    return () => clearInterval(intervalId);
+    timerRef.current = setInterval(refreshData, 10000);
+
+    return () => {
+      cancelledRef.current = true;
+      if (timerRef.current !== null) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
+    };
   }, [refreshData]);
 
   const getRankBadge = (index: number) => {

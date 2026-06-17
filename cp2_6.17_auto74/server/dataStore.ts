@@ -185,7 +185,11 @@ class DataStore {
       this.stalls[idx].images = data.images.filter(img => img.trim().length > 0);
     }
 
-    return { ...this.stalls[idx], likes: [...this.stalls[idx].likes], comments: [...this.stalls[idx].comments] };
+    return {
+      ...this.stalls[idx],
+      likes: [...this.stalls[idx].likes],
+      comments: this.sortCommentsDesc(this.stalls[idx].comments)
+    };
   }
 
   deleteStall(id: string): boolean {
@@ -199,13 +203,12 @@ class DataStore {
     const stall = this.stalls.find(s => s.id === stallId);
     if (!stall) return { success: false, liked: false, likesCount: 0 };
 
-    const debounceKey = `${stallId}:${ip}`;
     const now = Date.now();
-    const lastLikeTime = this.likeDebounceMap.get(debounceKey);
+    const lastLikeTime = this.likeDebounceMap.get(ip);
     if (lastLikeTime !== undefined && now - lastLikeTime < 500) {
       return { success: false, liked: false, likesCount: stall.likes.length };
     }
-    this.likeDebounceMap.set(debounceKey, now);
+    this.likeDebounceMap.set(ip, now);
 
     const likeIdx = stall.likes.indexOf(ip);
     if (likeIdx === -1) {
