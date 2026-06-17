@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 
 export interface BuildingParams {
   floors: number;
@@ -47,33 +48,134 @@ function createWindowMaterial(isLit: boolean): THREE.MeshStandardMaterial {
   });
 }
 
-function createWindows(
+function createArchedWindowGeometry(width: number, height: number, styleIndex: number): THREE.BufferGeometry {
+  if (styleIndex <= 0.8) {
+    const shape = new THREE.Shape();
+    const archHeight = height * 0.25;
+    const bodyHeight = height - archHeight;
+    
+    shape.moveTo(-width / 2, 0);
+    shape.lineTo(-width / 2, bodyHeight);
+    shape.quadraticCurveTo(-width / 2, height, 0, height);
+    shape.quadraticCurveTo(width / 2, height, width / 2, bodyHeight);
+    shape.lineTo(width / 2, 0);
+    shape.lineTo(-width / 2, 0);
+    
+    return new THREE.ShapeGeometry(shape);
+  }
+  
+  const shape = new THREE.Shape();
+  const archHeight = height * 0.3;
+  const bodyHeight = height - archHeight;
+  const segments = 8;
+  
+  shape.moveTo(-width / 2, 0);
+  shape.lineTo(-width / 2, bodyHeight);
+  
+  for (let i = 0; i <= segments; i++) {
+    const t = i / segments;
+    const angle = Math.PI * t;
+    const x = -width / 2 + (width / 2) * (1 + Math.cos(Math.PI - angle));
+    const y = bodyHeight + archHeight * Math.sin(angle);
+    shape.lineTo(x, y);
+  }
+  
+  shape.lineTo(width / 2, 0);
+  shape.lineTo(-width / 2, 0);
+  
+  return new THREE.ShapeGeometry(shape);
+}
+
+function createWindowFrame(
   width: number,
   height: number,
+  styleIndex: number,
+  frameColor: THREE.Color
+): THREE.Mesh | null {
+  if (styleIndex <= 0.8) return null;
+  
+  const frameThickness = 0.15;
+  const archHeight = height * 0.3;
+  const bodyHeight = height - archHeight;
+  const geometries: THREE.BufferGeometry[] = [];
+  
+  const leftFrame = new THREE.BoxGeometry(frameThickness, height, frameThickness);
+  leftFrame.translate(-width / 2 - frameThickness / 2, height / 2, 0);
+  geometries.push(leftFrame);
+  
+  const rightFrame = new THREE.BoxGeometry(frameThickness, height, frameThickness);
+  rightFrame.translate(width / 2 + frameThickness / 2, height / 2, 0);
+  geometries.push(rightFrame);
+  
+  const bottomFrame = new THREE.BoxGeometry(width + frameThickness * 2, frameThickness, frameThickness);
+  bottomFrame.translate(0, -frameThickness / 2, 0);
+  geometries.push(bottomFrame);
+  
+  const archSegments = 12;
+  for (let i = 0; i < archSegments; i++) {
+    const t1 = i / archSegments;
+    const t2 = (i + 1) / archSegments;
+    const a1 = Math.PI * t1;
+    const a2 = Math.PI * t2;
+    
+    const x1 = -width / 2 + (width / 2) * (1 + Math.cos(Math.PI - a1));
+    const y1 = bodyHeight + archHeight * Math.sin(a1);
+    const x2 = -width / 2 + (width / 2) * (1 + Math.cos(Math.PI - a2));
+    const y2 = bodyHeight + archHeight * Math.sin(a2);
+    
+    const dx = x2 - x1;
+    const dy = y2 - y1;
+    const segLen = Math.sqrt(dx * dx + dy * dy);
+    const angle = Math.atan2(dy, dx);
+    
+    const archSeg = new THREE.BoxGeometry(segLen + 0.02, frameThickness, frameThickness);
+    const midX = (x1 + x2) / 2;
+    const midY = (y1 + y2) / 2;
+    archSeg.translate(midX, midY, 0);
+    archSeg.rotateZ(angle);
+    geometries.push(archSeg);
+  }
+  
+  const merged = mergeGeometries(geometries, false);
+  const frameMaterial = new THREE.MeshStandardMaterial({
+    color: frameColor,
+    roughness: 0.6,
+    metalness: 0.2
+  });
+  
+  const frame = new THREE.Mesh(merged, frameMaterial);
+  frame.castShadow = true;
+  
+  return frame;
+}
+
+function createWindows(
+  width: number,
+  _height: number,
   depth: number,
   buildingHeight: number,
   styleIndex: number,
   isFront: boolean,
-  isSide: boolean
-): WindowData[] {
+  isSide: boolean,
+  frameColor: THREE.Color
+): { windows: WindowData[]; frames: THREE.Mesh[] } {
   const windows: WindowData[] = [];
+  const frames: THREE.Mesh[] = [];
   
-  const windowWidth = styleIndex > 0.5 ? 1.2 : 1.5;
-  const windowHeight = styleIndex > 0.5 ? 1.8 : 2.0;
+  const windowWidth = styleIndex > 0.6 ? 1.1 : 1.5;
+  const windowHeight = styleIndex > 0.6 ? 1.9 : 2.0;
   const floorHeight = buildingHeight / Math.max(1, Math.floor(buildingHeight / 3));
-  
-  const cols = Math.floor((width - 2) / (windowWidth + 1.5));
-  const rows = Math.floor((buildingHeight - 2) / (floorHeight * 0.8));
   
   const faceWidth = isSide ? depth : width;
   const actualCols = Math.floor((faceWidth - 2) / (windowWidth + 1.5));
+  const rows = Math.floor((buildingHeight - 2) / (floorHeight * 0.8));
   
   for (let row = 0; row < rows; row++) {
     for (let col = 0; col < actualCols; col++) {
       if (Math.random() > 0.85) continue;
       
-      const offsetX = (Math.random() - 0.5) * 0.5;
-      const offsetY = (Math.random() - 0.5) * 0.3;
+      const offsetX = (Math.random() - 0.5) * 0.3;
+      const offsetY = (Math.random() - 0.5) * 0.2;
       
       const x = -faceWidth / 2 + 1.5 + col * (windowWidth + 1.5) + windowWidth / 2 + offsetX;
       const y = 2 + row * floorHeight * 0.8 + floorHeight * 0.3 + offsetY;
@@ -84,13 +186,13 @@ function createWindows(
       
       let wWidth = windowWidth;
       let wHeight = windowHeight;
-      if (styleIndex > 0.7 && Math.random() > 0.7) {
-        wWidth *= 1.3;
-        wHeight *= 1.2;
+      if (styleIndex > 0.7 && Math.random() > 0.5) {
+        wWidth *= 1.2;
+        wHeight *= 1.15;
       }
       
       const geometry = styleIndex > 0.5
-        ? createArchedWindowGeometry(wWidth, wHeight)
+        ? createArchedWindowGeometry(wWidth, wHeight, styleIndex)
         : new THREE.PlaneGeometry(wWidth, wHeight);
       
       const material = createWindowMaterial(isLit);
@@ -113,34 +215,186 @@ function createWindows(
         windowMesh.position.set(x, y, -depth / 2 - 0.01);
         windowMesh.rotation.y = Math.PI;
       }
+      
+      if (styleIndex > 0.8) {
+        const frame = createWindowFrame(wWidth, wHeight, styleIndex, frameColor);
+        if (frame) {
+          if (isFront) {
+            frame.position.set(x, y, depth / 2 + 0.02);
+          } else if (!isSide) {
+            frame.position.set(x, y, -depth / 2 - 0.02);
+            frame.rotation.y = Math.PI;
+          }
+          frames.push(frame);
+        }
+      }
     }
   }
   
-  return windows;
+  return { windows, frames };
 }
 
-function createArchedWindowGeometry(width: number, height: number): THREE.BufferGeometry {
-  const shape = new THREE.Shape();
-  const archHeight = height * 0.25;
-  const bodyHeight = height - archHeight;
+function createPilasterDecorations(
+  width: number,
+  height: number,
+  depth: number,
+  styleIndex: number,
+  buildingColor: THREE.Color
+): THREE.Mesh {
+  const decorations: THREE.BufferGeometry[] = [];
   
-  shape.moveTo(-width / 2, 0);
-  shape.lineTo(-width / 2, bodyHeight);
+  const hsl = { h: 0, s: 0, l: 0 };
+  buildingColor.getHSL(hsl);
+  const trimColor = new THREE.Color().setHSL(
+    hsl.h,
+    hsl.s,
+    Math.min(0.95, hsl.l + 0.1)
+  );
   
-  shape.quadraticCurveTo(-width / 2, height, 0, height);
-  shape.quadraticCurveTo(width / 2, height, width / 2, bodyHeight);
+  const pilasterWidth = Math.min(0.8, Math.max(0.4, width * 0.04));
+  const pilasterDepth = 0.3;
+  const pilasterHeight = height * 0.92;
+  const startY = height * 0.04;
   
-  shape.lineTo(width / 2, 0);
-  shape.lineTo(-width / 2, 0);
+  const cornerPositions: Array<[number, number, number, number]> = [
+    [-width / 2, 0, depth / 2, 0],
+    [width / 2, 0, depth / 2, 0],
+    [-width / 2, 0, -depth / 2, 0],
+    [width / 2, 0, -depth / 2, 0],
+    [0, 0, depth / 2, Math.PI / 2],
+    [0, 0, -depth / 2, Math.PI / 2],
+  ];
   
-  return new THREE.ShapeGeometry(shape);
+  for (const [px, _py, pz, rotY] of cornerPositions) {
+    const isSidePos = rotY !== 0;
+    const w = isSidePos ? pilasterDepth : pilasterWidth;
+    const d = isSidePos ? pilasterWidth : pilasterDepth;
+    
+    const geo = new THREE.BoxGeometry(w, pilasterHeight, d);
+    geo.translate(px, startY + pilasterHeight / 2, pz);
+    decorations.push(geo);
+    
+    const capHeight = 0.3;
+    const capWidth = w * 1.5;
+    const capDepth = d * 1.5;
+    const capGeo = new THREE.BoxGeometry(capWidth, capHeight, capDepth);
+    capGeo.translate(px, startY + pilasterHeight + capHeight / 2, pz);
+    decorations.push(capGeo);
+    
+    const baseGeo = new THREE.BoxGeometry(capWidth, capHeight, capDepth);
+    baseGeo.translate(px, startY - capHeight / 2, pz);
+    decorations.push(baseGeo);
+  }
+  
+  if (styleIndex > 0.75) {
+    const midCount = Math.max(1, Math.floor(width / 15) - 1);
+    for (let i = 0; i < midCount; i++) {
+      const t = (i + 1) / (midCount + 1);
+      const mx = -width / 2 + width * t;
+      
+      const geo = new THREE.BoxGeometry(pilasterWidth * 0.8, pilasterHeight * 0.85, pilasterDepth);
+      geo.translate(mx, startY + pilasterHeight * 0.425, depth / 2);
+      decorations.push(geo);
+      
+      const geoBack = geo.clone();
+      geoBack.translate(0, 0, -depth);
+      decorations.push(geoBack);
+    }
+    
+    const midSideCount = Math.max(0, Math.floor(depth / 15) - 1);
+    for (let i = 0; i < midSideCount; i++) {
+      const t = (i + 1) / (midSideCount + 1);
+      const mz = -depth / 2 + depth * t;
+      
+      const geo = new THREE.BoxGeometry(pilasterDepth, pilasterHeight * 0.85, pilasterWidth * 0.8);
+      geo.translate(width / 2, startY + pilasterHeight * 0.425, mz);
+      decorations.push(geo);
+      
+      const geoBack = geo.clone();
+      geoBack.translate(-width, 0, 0);
+      decorations.push(geoBack);
+    }
+  }
+  
+  const merged = mergeGeometries(decorations, false);
+  const material = new THREE.MeshStandardMaterial({
+    color: trimColor,
+    roughness: 0.65,
+    metalness: 0.1
+  });
+  
+  const mesh = new THREE.Mesh(merged, material);
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
+  
+  return mesh;
+}
+
+function createFacadeBanding(
+  width: number,
+  height: number,
+  depth: number,
+  styleIndex: number,
+  buildingColor: THREE.Color
+): THREE.Mesh | null {
+  if (styleIndex <= 0.55) return null;
+  
+  const hsl = { h: 0, s: 0, l: 0 };
+  buildingColor.getHSL(hsl);
+  const bandColor = new THREE.Color().setHSL(
+    hsl.h,
+    Math.max(0, hsl.s - 0.1),
+    Math.min(0.9, hsl.l + 0.08)
+  );
+  
+  const floorHeight = height / Math.max(1, Math.floor(height / 3));
+  const bandHeight = 0.2;
+  const bandDepth = 0.15;
+  const geometries: THREE.BufferGeometry[] = [];
+  
+  const numBands = Math.floor(height / floorHeight);
+  for (let i = 1; i <= numBands; i++) {
+    const y = i * floorHeight;
+    if (y > height - 1) break;
+    
+    const frontBand = new THREE.BoxGeometry(width + bandDepth * 2, bandHeight, bandDepth);
+    frontBand.translate(0, y, depth / 2 + bandDepth / 2);
+    geometries.push(frontBand);
+    
+    const backBand = frontBand.clone();
+    backBand.translate(0, 0, -depth - bandDepth);
+    geometries.push(backBand);
+    
+    const leftBand = new THREE.BoxGeometry(bandDepth, bandHeight, depth);
+    leftBand.translate(-width / 2 - bandDepth / 2, y, 0);
+    geometries.push(leftBand);
+    
+    const rightBand = leftBand.clone();
+    rightBand.translate(width + bandDepth, 0, 0);
+    geometries.push(rightBand);
+  }
+  
+  const merged = mergeGeometries(geometries, false);
+  const material = new THREE.MeshStandardMaterial({
+    color: bandColor,
+    roughness: 0.7,
+    metalness: 0.05
+  });
+  
+  const mesh = new THREE.Mesh(merged, material);
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
+  
+  return mesh;
 }
 
 function createGableRoof(
   width: number,
   depth: number,
+  styleIndex: number,
   slopeAngle: number = 30
-): { mesh: THREE.Mesh; height: number } {
+): { group: THREE.Group; height: number } {
+  const roofGroup = new THREE.Group();
   const slopeRad = (slopeAngle * Math.PI) / 180;
   const roofHeight = (width / 2) * Math.tan(slopeRad);
   
@@ -157,34 +411,160 @@ function createGableRoof(
   
   const geometry = new THREE.ExtrudeGeometry(shape, extrudeSettings);
   
-  const material = new THREE.MeshStandardMaterial({
+  const roofMaterial = new THREE.MeshStandardMaterial({
     color: new THREE.Color('#8B4513'),
     roughness: 0.9,
-    metalness: 0.1
+    metalness: 0.05
   });
   
-  const roof = new THREE.Mesh(geometry, material);
-  roof.rotation.x = 0;
+  const roof = new THREE.Mesh(geometry, roofMaterial);
   roof.position.z = -depth / 2;
   roof.castShadow = true;
   roof.receiveShadow = true;
+  roofGroup.add(roof);
   
-  return { mesh: roof, height: roofHeight };
+  if (styleIndex > 0.7) {
+    const hsl = { h: 0.05, s: 0.4, l: 0 };
+    new THREE.Color('#8B4513').getHSL(hsl);
+    const corniceColor = new THREE.Color().setHSL(
+      hsl.h,
+      hsl.s,
+      Math.min(0.85, hsl.l + 0.25)
+    );
+    
+    const corniceHeight = 0.4;
+    const corniceDepth = 0.5;
+    const corniceWidth = width + 1.0;
+    
+    const corniceGeos: THREE.BufferGeometry[] = [];
+    
+    const frontCornice = new THREE.BoxGeometry(corniceWidth, corniceHeight, corniceDepth);
+    frontCornice.translate(0, -corniceHeight / 2, depth / 2 + corniceDepth / 2);
+    corniceGeos.push(frontCornice);
+    
+    const backCornice = frontCornice.clone();
+    backCornice.translate(0, 0, -depth - corniceDepth);
+    corniceGeos.push(backCornice);
+    
+    const overhang = 0.8;
+    const leftGeo = new THREE.BoxGeometry(
+      overhang,
+      corniceHeight,
+      depth + corniceDepth * 2 + overhang * 0.5
+    );
+    leftGeo.translate(
+      -width / 2 - overhang / 2,
+      -corniceHeight / 2,
+      0
+    );
+    corniceGeos.push(leftGeo);
+    
+    const rightGeo = leftGeo.clone();
+    rightGeo.translate(width + overhang, 0, 0);
+    corniceGeos.push(rightGeo);
+    
+    const mergedCornice = mergeGeometries(corniceGeos, false);
+    const corniceMaterial = new THREE.MeshStandardMaterial({
+      color: corniceColor,
+      roughness: 0.7,
+      metalness: 0.15
+    });
+    const cornice = new THREE.Mesh(mergedCornice, corniceMaterial);
+    cornice.castShadow = true;
+    cornice.receiveShadow = true;
+    roofGroup.add(cornice);
+    
+    const blockSize = 0.35;
+    const blockHeight = 0.5;
+    const blockSpacing = 0.6;
+    const blockGeos: THREE.BufferGeometry[] = [];
+    
+    const frontBlocks = Math.floor((corniceWidth - blockSize) / blockSpacing);
+    for (let i = 0; i < frontBlocks; i++) {
+      if (Math.random() < 0.85) {
+        const bx = -corniceWidth / 2 + blockSpacing / 2 + i * blockSpacing + blockSize / 2;
+        const block = new THREE.BoxGeometry(blockSize, blockHeight, blockSize);
+        block.translate(bx, corniceHeight / 2 + blockHeight / 2 - corniceHeight / 2, depth / 2 + corniceDepth / 2);
+        blockGeos.push(block);
+      }
+    }
+    
+    const backBlocks = frontBlocks;
+    for (let i = 0; i < backBlocks; i++) {
+      if (Math.random() < 0.85) {
+        const bx = -corniceWidth / 2 + blockSpacing / 2 + i * blockSpacing + blockSize / 2;
+        const block = new THREE.BoxGeometry(blockSize, blockHeight, blockSize);
+        block.translate(bx, corniceHeight / 2 + blockHeight / 2 - corniceHeight / 2, -depth / 2 - corniceDepth / 2);
+        blockGeos.push(block);
+      }
+    }
+    
+    if (blockGeos.length > 0) {
+      const mergedBlocks = mergeGeometries(blockGeos, false);
+      const blockMaterial = new THREE.MeshStandardMaterial({
+        color: corniceColor.clone().offsetHSL(0, 0, -0.05),
+        roughness: 0.75,
+        metalness: 0.1
+      });
+      const blocks = new THREE.Mesh(mergedBlocks, blockMaterial);
+      blocks.castShadow = true;
+      roofGroup.add(blocks);
+    }
+    
+    if (styleIndex > 0.85 && roofHeight > 3) {
+      const ridgeLength = depth;
+      const ridgeWidth = 0.4;
+      const ridgeHeight = 0.3;
+      const ridgeGeo = new THREE.BoxGeometry(ridgeWidth, ridgeHeight, ridgeLength);
+      ridgeGeo.translate(0, roofHeight + ridgeHeight / 2, 0);
+      const ridgeMat = new THREE.MeshStandardMaterial({
+        color: corniceColor,
+        roughness: 0.7,
+        metalness: 0.15
+      });
+      const ridge = new THREE.Mesh(ridgeGeo, ridgeMat);
+      ridge.castShadow = true;
+      roofGroup.add(ridge);
+      
+      const finialGeo = new THREE.SphereGeometry(0.25, 8, 8);
+      const finialMat = new THREE.MeshStandardMaterial({
+        color: new THREE.Color('#B8860B'),
+        metalness: 0.6,
+        roughness: 0.4
+      });
+      const finial1 = new THREE.Mesh(finialGeo, finialMat);
+      finial1.position.set(0, roofHeight + ridgeHeight + 0.25, -depth / 2 - 0.2);
+      finial1.castShadow = true;
+      roofGroup.add(finial1);
+      
+      const finial2 = finial1.clone();
+      finial2.position.z = depth / 2 + 0.2;
+      roofGroup.add(finial2);
+    }
+  }
+  
+  return { group: roofGroup, height: roofHeight };
 }
 
 function createFlatRoof(
   width: number,
   depth: number,
-  buildingHeight: number
+  _buildingHeight: number,
+  styleIndex: number
 ): THREE.Group {
   const roofGroup = new THREE.Group();
   
   const parapetHeight = 1.5;
   const parapetThickness = 0.5;
   
+  const hsl = { h: 0, s: 0, l: 0 };
+  new THREE.Color('#555555').getHSL(hsl);
+  const parapetColor = new THREE.Color().setHSL(hsl.h, hsl.s, hsl.l);
+  
   const parapetMaterial = new THREE.MeshStandardMaterial({
-    color: new THREE.Color('#555555'),
-    roughness: 0.8
+    color: parapetColor,
+    roughness: 0.8,
+    metalness: 0.05
   });
   
   const frontParapet = new THREE.Mesh(
@@ -210,6 +590,51 @@ function createFlatRoof(
   const rightParapet = leftParapet.clone();
   rightParapet.position.x = width / 2;
   roofGroup.add(rightParapet);
+  
+  if (styleIndex > 0.5) {
+    const corniceHeight = 0.3;
+    const corniceOverhang = 0.6;
+    const corniceGeos: THREE.BufferGeometry[] = [];
+    
+    const fCornice = new THREE.BoxGeometry(
+      width + parapetThickness * 2 + corniceOverhang * 2,
+      corniceHeight,
+      corniceOverhang
+    );
+    fCornice.translate(0, -corniceHeight / 2, depth / 2 + corniceOverhang / 2 + parapetThickness / 2);
+    corniceGeos.push(fCornice);
+    
+    const bCornice = fCornice.clone();
+    bCornice.translate(0, 0, -depth - corniceOverhang - parapetThickness);
+    corniceGeos.push(bCornice);
+    
+    const lCornice = new THREE.BoxGeometry(
+      corniceOverhang,
+      corniceHeight,
+      depth + corniceOverhang * 2
+    );
+    lCornice.translate(
+      -width / 2 - corniceOverhang / 2 - parapetThickness / 2,
+      -corniceHeight / 2,
+      0
+    );
+    corniceGeos.push(lCornice);
+    
+    const rCornice = lCornice.clone();
+    rCornice.translate(width + corniceOverhang + parapetThickness, 0, 0);
+    corniceGeos.push(rCornice);
+    
+    const mergedCornice = mergeGeometries(corniceGeos, false);
+    const corniceMaterial = new THREE.MeshStandardMaterial({
+      color: parapetColor.clone().offsetHSL(0, 0, 0.05),
+      roughness: 0.7,
+      metalness: 0.1
+    });
+    const cornice = new THREE.Mesh(mergedCornice, corniceMaterial);
+    cornice.castShadow = true;
+    cornice.receiveShadow = true;
+    roofGroup.add(cornice);
+  }
   
   const roofSurface = new THREE.Mesh(
     new THREE.BoxGeometry(width, 0.3, depth),
@@ -304,10 +729,11 @@ function createColumns(
 function createBase(
   width: number,
   depth: number,
-  styleIndex: number
+  styleIndex: number,
+  buildingColor: THREE.Color
 ): THREE.Mesh {
-  const baseHeight = 0.8;
-  const baseExpand = styleIndex > 0.5 ? 0.8 : 0.3;
+  const baseHeight = styleIndex > 0.6 ? 1.0 : 0.8;
+  const baseExpand = styleIndex > 0.6 ? 1.0 : 0.3;
   
   const baseGeometry = new THREE.BoxGeometry(
     width + baseExpand * 2,
@@ -315,9 +741,18 @@ function createBase(
     depth + baseExpand * 2
   );
   
+  const hsl = { h: 0, s: 0, l: 0 };
+  buildingColor.getHSL(hsl);
+  const baseColor = new THREE.Color().setHSL(
+    hsl.h,
+    hsl.s,
+    Math.max(0.1, hsl.l - 0.15)
+  );
+  
   const baseMaterial = new THREE.MeshStandardMaterial({
-    color: new THREE.Color(styleIndex > 0.5 ? '#8B7355' : '#555555'),
-    roughness: 0.9
+    color: baseColor,
+    roughness: 0.9,
+    metalness: 0.05
   });
   
   const base = new THREE.Mesh(baseGeometry, baseMaterial);
@@ -332,8 +767,15 @@ export function createBuilding(params: BuildingParams): THREE.Group {
   const buildingGroup = new THREE.Group();
   
   const adjustedColor = adjustColor(params.color);
-  
   const windowData: WindowData[] = [];
+  
+  const hsl = { h: 0, s: 0, l: 0 };
+  adjustedColor.getHSL(hsl);
+  const frameColor = new THREE.Color().setHSL(
+    hsl.h,
+    hsl.s,
+    Math.max(0.1, hsl.l - 0.25)
+  );
   
   const mainGeometry = new THREE.BoxGeometry(
     params.width,
@@ -353,57 +795,91 @@ export function createBuilding(params: BuildingParams): THREE.Group {
   mainMesh.receiveShadow = true;
   buildingGroup.add(mainMesh);
   
-  const base = createBase(params.width, params.depth, params.styleIndex);
+  const base = createBase(params.width, params.depth, params.styleIndex, adjustedColor);
   buildingGroup.add(base);
   
-  const frontWindows = createWindows(
+  if (params.styleIndex > 0.55) {
+    const banding = createFacadeBanding(
+      params.width, params.height, params.depth,
+      params.styleIndex, adjustedColor
+    );
+    if (banding) buildingGroup.add(banding);
+  }
+  
+  const frontResult = createWindows(
     params.width, params.height, params.depth,
-    params.height, params.styleIndex, true, false
+    params.height, params.styleIndex, true, false, frameColor
   );
-  frontWindows.forEach(w => {
+  frontResult.windows.forEach(w => {
     buildingGroup.add(w.mesh);
     windowData.push(w);
   });
+  frontResult.frames.forEach(f => buildingGroup.add(f));
   
-  const backWindows = createWindows(
+  const backResult = createWindows(
     params.width, params.height, params.depth,
-    params.height, params.styleIndex, false, false
+    params.height, params.styleIndex, false, false, frameColor
   );
-  backWindows.forEach(w => {
+  backResult.windows.forEach(w => {
     buildingGroup.add(w.mesh);
     windowData.push(w);
   });
+  backResult.frames.forEach(f => buildingGroup.add(f));
   
-  const leftWindows = createWindows(
+  const leftResult = createWindows(
     params.depth, params.height, params.width,
-    params.height, params.styleIndex, true, true
+    params.height, params.styleIndex, true, true, frameColor
   );
-  leftWindows.forEach(w => {
+  leftResult.windows.forEach(w => {
     const tempX = w.mesh.position.x;
     w.mesh.rotation.y = -Math.PI / 2;
     w.mesh.position.set(-params.width / 2 - 0.01, w.mesh.position.y, -tempX);
     buildingGroup.add(w.mesh);
     windowData.push(w);
   });
+  leftResult.frames.forEach(f => {
+    const tempX = f.position.x;
+    f.rotation.y = -Math.PI / 2;
+    f.position.set(-params.width / 2 - 0.02, f.position.y, -tempX);
+    buildingGroup.add(f);
+  });
   
-  const rightWindows = createWindows(
+  const rightResult = createWindows(
     params.depth, params.height, params.width,
-    params.height, params.styleIndex, false, true
+    params.height, params.styleIndex, false, true, frameColor
   );
-  rightWindows.forEach(w => {
+  rightResult.windows.forEach(w => {
     const tempX = w.mesh.position.x;
     w.mesh.rotation.y = Math.PI / 2;
     w.mesh.position.set(params.width / 2 + 0.01, w.mesh.position.y, tempX);
     buildingGroup.add(w.mesh);
     windowData.push(w);
   });
+  rightResult.frames.forEach(f => {
+    const tempX = f.position.x;
+    f.rotation.y = Math.PI / 2;
+    f.position.set(params.width / 2 + 0.02, f.position.y, tempX);
+    buildingGroup.add(f);
+  });
+  
+  if (params.styleIndex > 0.6) {
+    const pilasters = createPilasterDecorations(
+      params.width, params.height, params.depth,
+      params.styleIndex, adjustedColor
+    );
+    buildingGroup.add(pilasters);
+  }
   
   if (params.styleIndex > 0.7) {
-    const roofResult = createGableRoof(params.width, params.depth, 30);
-    roofResult.mesh.position.y = params.height;
-    buildingGroup.add(roofResult.mesh);
+    const roofResult = createGableRoof(
+      params.width, params.depth, params.styleIndex, 30
+    );
+    roofResult.group.position.y = params.height;
+    buildingGroup.add(roofResult.group);
   } else {
-    const roofGroup = createFlatRoof(params.width, params.depth, params.height);
+    const roofGroup = createFlatRoof(
+      params.width, params.depth, params.height, params.styleIndex
+    );
     roofGroup.position.y = params.height;
     buildingGroup.add(roofGroup);
   }
