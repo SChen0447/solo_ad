@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>像素塔防</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      background-color: #1e1e2e;
+      color: #fff;
+      font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      user-select: none;
+    }
+
+    #app {
+      display: flex;
+      gap: 20px;
+      padding: 20px;
+    }
+
+    #game-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+    }
+
+    #top-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      width: 600px;
+    }
+
+    #start-wave-btn {
+      background-color: #28a745;
+      color: white;
+      border: none;
+      padding: 10px 24px;
+      border-radius: 8px;
+      font-size: 16px;
+      font-family: inherit;
+      cursor: pointer;
+      transition: background-color 0.15s, transform 0.2s;
+    }
+
+    #start-wave-btn:hover {
+      background-color: #1e7e34;
+    }
+
+    #start-wave-btn:active {
+      transform: scale(0.96);
+    }
+
+    #start-wave-btn:disabled {
+      background-color: #555;
+      cursor: not-allowed;
+    }
+
+    #game-title {
+      font-size: 22px;
+      font-weight: bold;
+      color: #f0c040;
+      letter-spacing: 2px;
+    }
+
+    #hud {
+      width: 200px;
+      background-color: #2d2d44;
+      border-radius: 8px;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .hud-item {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .hud-label {
+      font-size: 12px;
+      color: #aaa;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .hud-value {
+      font-size: 24px;
+      font-weight: bold;
+    }
+
+    .hud-value.resources { color: #ffd700; }
+    .hud-value.wave { color: #66ccff; }
+    .hud-value.enemies { color: #ff6666; }
+    .hud-value.score { color: #66ff99; }
+    .hud-value.lives { color: #ff99cc; }
+
+    #tower-shop {
+      margin-top: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .shop-title {
+      font-size: 14px;
+      color: #ccc;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 4px;
+    }
+
+    .tower-btn {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background-color: #3d3d5c;
+      border: 2px solid transparent;
+      border-radius: 8px;
+      padding: 10px;
+      cursor: pointer;
+      transition: all 0.15s;
+      font-family: inherit;
+      color: white;
+      text-align: left;
+    }
+
+    .tower-btn:hover {
+      background-color: #4d4d70;
+      border-color: #666;
+    }
+
+    .tower-btn.selected {
+      border-color: #f0c040;
+      background-color: #4a4a6a;
+    }
+
+    .tower-btn.disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .tower-icon {
+      width: 32px;
+      height: 32px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .tower-info {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      flex: 1;
+    }
+
+    .tower-name {
+      font-size: 14px;
+      font-weight: bold;
+    }
+
+    .tower-cost {
+      font-size: 12px;
+      color: #ffd700;
+    }
+
+    #tower-info-panel {
+      margin-top: 10px;
+      padding: 12px;
+      background-color: #3d3d5c;
+      border-radius: 8px;
+      display: none;
+    }
+
+    #tower-info-panel.visible {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .tower-action-btns {
+      display: flex;
+      gap: 8px;
+      margin-top: 8px;
+    }
+
+    .action-btn {
+      flex: 1;
+      padding: 8px;
+      border: none;
+      border-radius: 6px;
+      font-family: inherit;
+      font-size: 12px;
+      cursor: pointer;
+      transition: transform 0.2s, background-color 0.15s;
+      color: white;
+    }
+
+    .action-btn:active {
+      transform: scale(0.92);
+    }
+
+    .upgrade-btn {
+      background-color: #28a745;
+    }
+
+    .upgrade-btn:hover:not(:disabled) {
+      background-color: #1e7e34;
+    }
+
+    .upgrade-btn:disabled {
+      background-color: #555;
+      cursor: not-allowed;
+    }
+
+    .sell-btn {
+      background-color: #dc3545;
+    }
+
+    .sell-btn:hover {
+      background-color: #a71d2a;
+    }
+
+    #game-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(0, 0, 0, 0.8);
+      display: none;
+      justify-content: center;
+      align-items: center;
+      z-index: 100;
+    }
+
+    #game-overlay.visible {
+      display: flex;
+    }
+
+    .overlay-content {
+      background-color: #2d2d44;
+      padding: 40px;
+      border-radius: 12px;
+      text-align: center;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .overlay-title {
+      font-size: 36px;
+      font-weight: bold;
+    }
+
+    .overlay-title.victory { color: #66ff99; }
+    .overlay-title.defeat { color: #ff6666; }
+
+    .overlay-score {
+      font-size: 20px;
+      color: #ffd700;
+    }
+
+    .restart-btn {
+      background-color: #28a745;
+      color: white;
+      border: none;
+      padding: 12px 32px;
+      border-radius: 8px;
+      font-size: 18px;
+      font-family: inherit;
+      cursor: pointer;
+      transition: background-color 0.15s;
+    }
+
+    .restart-btn:hover {
+      background-color: #1e7e34;
+    }
+
+    canvas {
+      display: block;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <div id="hud">
+      <div class="hud-item">
+        <span class="hud-label">资源</span>
+        <span class="hud-value resources" id="resources">100</span>
+      </div>
+      <div class="hud-item">
+        <span class="hud-label">波次</span>
+        <span class="hud-value wave" id="wave">0 / 10</span>
+      </div>
+      <div class="hud-item">
+        <span class="hud-label">剩余敌人</span>
+        <span class="hud-value enemies" id="enemies">0</span>
+      </div>
+      <div class="hud-item">
+        <span class="hud-label">得分</span>
+        <span class="hud-value score" id="score">0</span>
+      </div>
+      <div class="hud-item">
+        <span class="hud-label">生命值</span>
+        <span class="hud-value lives" id="lives">20</span>
+      </div>
+
+      <div id="tower-shop">
+        <div class="shop-title">防御塔商店</div>
+        <button class="tower-btn" data-tower="arrow">
+          <div class="tower-icon">
+            <svg width="24" height="24" viewBox="0 0 24 24">
+              <polygon points="12,4 20,20 4,20" fill="#00cc00" />
+            </svg>
+          </div>
+          <div class="tower-info">
+            <span class="tower-name">箭塔</span>
+            <span class="tower-cost">50 金币</span>
+          </div>
+        </button>
+        <button class="tower-btn" data-tower="cannon">
+          <div class="tower-icon">
+            <svg width="24" height="24" viewBox="0 0 24 24">
+              <rect x="6" y="6" width="12" height="12" fill="#cc0000" />
+            </svg>
+          </div>
+          <div class="tower-info">
+            <span class="tower-name">炮塔</span>
+            <span class="tower-cost">80 金币</span>
+          </div>
+        </button>
+        <button class="tower-btn" data-tower="magic">
+          <div class="tower-icon">
+            <svg width="24" height="24" viewBox="0 0 24 24">
+              <polygon points="12,3 21,12 12,21 3,12" fill="#0066ff" />
+            </svg>
+          </div>
+          <div class="tower-info">
+            <span class="tower-name">魔法塔</span>
+            <span class="tower-cost">120 金币</span>
+          </div>
+        </button>
+      </div>
+
+      <div id="tower-info-panel">
+        <div id="selected-tower-name" style="font-size:16px;font-weight:bold;"></div>
+        <div id="selected-tower-level" style="font-size:12px;color:#aaa;"></div>
+        <div id="selected-tower-stats" style="font-size:12px;color:#ccc;line-height:1.6;"></div>
+        <div class="tower-action-btns">
+          <button class="action-btn upgrade-btn" id="upgrade-btn">升级</button>
+          <button class="action-btn sell-btn" id="sell-btn">出售</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="game-container">
+      <div id="top-bar">
+        <span id="game-title">像素塔防</span>
+        <button id="start-wave-btn">开始波次</button>
+      </div>
+      <canvas id="game-canvas" width="600" height="600"></canvas>
+    </div>
+  </div>
+
+  <div id="game-overlay">
+    <div class="overlay-content">
+      <div class="overlay-title" id="overlay-title"></div>
+      <div class="overlay-score" id="overlay-score"></div>
+      <button class="restart-btn" id="restart-btn">重新开始</button>
+    </div>
+  </div>
+
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
