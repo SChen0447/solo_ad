@@ -17,7 +17,9 @@ let mouse: THREE.Vector2;
 let currentMoleculeGroup: THREE.Group | null = null;
 
 let autoRotate = false;
-const ROTATION_SPEED = 0.5;
+let rotationSpeed = 1.0;
+
+const DEG_TO_RAD = Math.PI / 180;
 
 let appState: AppState = {
   currentMoleculeId: 'h2o',
@@ -25,7 +27,8 @@ let appState: AppState = {
   cameraDistance: 10,
   backgroundColor: '#0a0a2e',
   displayMode: 'solid',
-  autoRotate: false
+  autoRotate: false,
+  rotationSpeed: 1.0
 };
 
 let backgroundColorTarget = new THREE.Color('#0a0a2e');
@@ -127,13 +130,17 @@ function setupEventBus(): void {
     appState.displayMode = mode;
     if (currentMoleculeGroup) {
       updateDisplayMode(currentMoleculeGroup, mode);
-      currentMoleculeGroup.rotation.y = 0;
     }
   });
 
   eventBus.on('autoRotate:change', (enabled) => {
     autoRotate = enabled;
     appState.autoRotate = enabled;
+  });
+
+  eventBus.on('rotationSpeed:change', (speed) => {
+    rotationSpeed = speed;
+    appState.rotationSpeed = speed;
   });
 }
 
@@ -153,7 +160,9 @@ function changeMolecule(moleculeId: string): void {
 
   appState.currentMoleculeId = moleculeId;
 
+  let savedRotationY = 0;
   if (currentMoleculeGroup) {
+    savedRotationY = currentMoleculeGroup.rotation.y;
     scene.remove(currentMoleculeGroup);
     currentMoleculeGroup.traverse((obj) => {
       if (obj instanceof THREE.Mesh) {
@@ -169,7 +178,7 @@ function changeMolecule(moleculeId: string): void {
 
   const newGroup = createMoleculeGroup(molecule, appState.atomScale, appState.displayMode);
   (newGroup.userData as { molecule: Molecule }).molecule = molecule;
-  newGroup.rotation.y = 0;
+  newGroup.rotation.y = savedRotationY;
   scene.add(newGroup);
   currentMoleculeGroup = newGroup;
 
@@ -255,12 +264,10 @@ let lastTime = 0;
 function animate(): void {
   requestAnimationFrame(animate);
 
-  const currentTime = performance.now();
-  const deltaTime = (currentTime - lastTime) / 1000;
-  lastTime = currentTime;
+  lastTime = performance.now();
 
   if (autoRotate && currentMoleculeGroup) {
-    currentMoleculeGroup.rotation.y += ROTATION_SPEED * deltaTime;
+    currentMoleculeGroup.rotation.y += rotationSpeed * DEG_TO_RAD;
   }
 
   if (isAnimatingBackground) {

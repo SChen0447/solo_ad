@@ -11,6 +11,7 @@ let controllers: {
   backgroundColor?: dat.GUIController;
   displayMode?: dat.GUIController;
   autoRotate?: dat.GUIController;
+  rotationSpeed?: dat.GUIController;
 } = {};
 
 const BACKGROUND_COLORS: Record<string, string> = {
@@ -89,6 +90,21 @@ export function initControlPanel(
     eventBus.emit('autoRotate:change', value);
   });
   controllers.autoRotate = autoRotateController;
+
+  const rotationSpeedController = moleculeFolder.add(
+    { rotationSpeed: 1.0 },
+    'rotationSpeed',
+    0,
+    5,
+    0.1
+  );
+  rotationSpeedController.name('旋转速度(度/帧)');
+  rotationSpeedController.onChange(
+    throttle((value: number) => {
+      eventBus.emit('rotationSpeed:change', value);
+    }, 16)
+  );
+  controllers.rotationSpeed = rotationSpeedController;
 
   const paramsFolder = gui.addFolder('显示参数');
   paramsFolder.open();
@@ -176,6 +192,9 @@ export function updateControlState(state: Partial<AppState>): void {
   }
   if (state.autoRotate !== undefined && controllers.autoRotate) {
     controllers.autoRotate.setValue(state.autoRotate);
+  }
+  if (state.rotationSpeed !== undefined && controllers.rotationSpeed) {
+    controllers.rotationSpeed.setValue(state.rotationSpeed);
   }
 }
 

@@ -30,6 +30,7 @@ export interface AppState {
   backgroundColor: string;
   displayMode: DisplayMode;
   autoRotate: boolean;
+  rotationSpeed: number;
 }
 
 type EventType =
@@ -39,6 +40,7 @@ type EventType =
   | 'backgroundColor:change'
   | 'displayMode:change'
   | 'autoRotate:change'
+  | 'rotationSpeed:change'
   | 'molecule:loaded'
   | 'atom:doubleClick';
 
@@ -49,6 +51,7 @@ interface EventPayloadMap {
   'backgroundColor:change': string;
   'displayMode:change': DisplayMode;
   'autoRotate:change': boolean;
+  'rotationSpeed:change': number;
   'molecule:loaded': Molecule;
   'atom:doubleClick': Atom;
 }
