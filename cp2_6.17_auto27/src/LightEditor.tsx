@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect, useMemo } from 'react';
+import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { Camera, Sun, Moon, Plus, Trash2 } from 'lucide-react';
 import { SceneManager, LightEntry } from './SceneManager';
 import { MAX_LIGHTS, ROOM, InitialLight } from './roomData';
@@ -13,31 +13,54 @@ export const LightEditor: React.FC<LightEditorProps> = ({ sceneManager }) => {
   const [isNight, setIsNight] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [newLightType, setNewLightType] = useState<'point' | 'spot'>('point');
-  const [, forceTick] = useState(0);
+
+  const [posX, setPosX] = useState(0);
+  const [posY, setPosY] = useState(0);
+  const [posZ, setPosZ] = useState(0);
+  const [intensity, setIntensity] = useState(0);
+  const [color, setColor] = useState('#ffffff');
+
+  const dragFrameRef = useRef<number | null>(null);
+  const dragStateRef = useRef<{ id: string } | null>(null);
 
   const selectedLight = useMemo(
     () => lights.find((l) => l.id === selectedLightId),
     [lights, selectedLightId]
   );
 
-  const refreshLights = useCallback(() => {
-    if (!sceneManager) return;
-    setLights([...sceneManager.lights]);
-    forceTick((t) => t + 1);
-  }, [sceneManager]);
+  const syncFromSelected = useCallback(() => {
+    if (!selectedLight) return;
+    setPosX(Number(selectedLight.light.position.x.toFixed(2)));
+    setPosY(Number(selectedLight.light.position.y.toFixed(2)));
+    setPosZ(Number(selectedLight.light.position.z.toFixed(2)));
+    setIntensity(Number((selectedLight.light.intensity / 50).toFixed(2)));
+    setColor(`#${selectedLight.light.color.getHexString()}`);
+  }, [selectedLight]);
 
   useEffect(() => {
     if (!sceneManager) return;
-    setLights([...sceneManager.lights]);
-    if (sceneManager.lights.length > 0 && !selectedLightId) {
-      setSelectedLightId(sceneManager.lights[0].id);
+    const fresh = [...sceneManager.lights];
+    setLights(fresh);
+    if (fresh.length > 0 && !selectedLightId) {
+      setSelectedLightId(fresh[0].id);
     }
   }, [sceneManager, selectedLightId]);
 
   useEffect(() => {
-    const id = window.setInterval(refreshLights, 150);
-    return () => window.clearInterval(id);
-  }, [refreshLights]);
+    syncFromSelected();
+  }, [syncFromSelected]);
+
+  const scheduleDragFrame = useCallback(
+    (id: string, apply: () => void) => {
+      dragStateRef.current = { id };
+      apply();
+      if (dragFrameRef.current !== null) cancelAnimationFrame(dragFrameRef.current);
+      dragFrameRef.current = requestAnimationFrame(() => {
+        dragFrameRef.current = null;
+      });
+    },
+    []
+  );
 
   const handleAddLight = () => {
     if (!sceneManager || lights.length >= MAX_LIGHTS) return;
@@ -52,7 +75,8 @@ export const LightEditor: React.FC<LightEditorProps> = ({ sceneManager }) => {
     };
     const entry = sceneManager.addLight(config);
     if (entry) {
-      refreshLights();
+      const fresh = [...sceneManager.lights];
+      setLights(fresh);
       setSelectedLightId(entry.id);
     }
   };
@@ -60,9 +84,9 @@ export const LightEditor: React.FC<LightEditorProps> = ({ sceneManager }) => {
   const handleRemoveLight = () => {
     if (!sceneManager || !selectedLightId) return;
     sceneManager.removeLight(selectedLightId);
-    refreshLights();
-    const remaining = sceneManager.lights;
-    setSelectedLightId(remaining.length > 0 ? remaining[0].id : '');
+    const fresh = [...sceneManager.lights];
+    setLights(fresh);
+    setSelectedLightId(fresh.length > 0 ? fresh[0].id : '');
   };
 
   const handleSelectedTypeChange = (type: 'point' | 'spot') => {
@@ -70,29 +94,45 @@ export const LightEditor: React.FC<LightEditorProps> = ({ sceneManager }) => {
     const current = sceneManager.lights.find((l) => l.id === selectedLightId);
     if (!current || current.type === type) return;
     const newEntry = sceneManager.convertLightType(selectedLightId, type);
-    refreshLights();
+    const fresh = [...sceneManager.lights];
+    setLights(fresh);
     if (newEntry) setSelectedLightId(newEntry.id);
   };
 
-  const handlePositionChange = (axis: 'x' | 'y' | 'z', value: number) => {
-    if (!sceneManager || !selectedLightId || !selectedLight) return;
-    const x = axis === 'x' ? value : selectedLight.light.position.x;
-    const y = axis === 'y' ? value : selectedLight.light.position.y;
-    const z = axis === 'z' ? value : selectedLight.light.position.z;
-    sceneManager.updateLightPosition(selectedLightId, x, y, z);
-    forceTick((t) => t + 1);
+  const handlePositionInput = (axis: 'x' | 'y' | 'z', rawValue: string) => {
+    if (!sceneManager || !selectedLightId) return;
+    const value = parseFloat(rawValue);
+    if (Number.isNaN(value)) return;
+    const setter =
+      axis === 'x' ? setPosX : axis === 'y' ? setPosY : setPosZ;
+    setter(Number(value.toFixed(2)));
+    scheduleDragFrame(selectedLightId, () => {
+      const entry = sceneManager.lights.find((l) => l.id === selectedLightId);
+      if (!entry) return;
+      const p = entry.light.position;
+      const nx = axis === 'x' ? value : p.x;
+      const ny = axis === 'y' ? value : p.y;
+      const nz = axis === 'z' ? value : p.z;
+      sceneManager.updateLightPosition(selectedLightId, nx, ny, nz);
+    });
   };
 
-  const handleColorChange = (color: string) => {
+  const handleColorInput = (raw: string) => {
     if (!sceneManager || !selectedLightId) return;
-    sceneManager.updateLightColor(selectedLightId, color);
-    forceTick((t) => t + 1);
+    setColor(raw);
+    scheduleDragFrame(selectedLightId, () => {
+      sceneManager.updateLightColor(selectedLightId, raw);
+    });
   };
 
-  const handleIntensityChange = (intensity: number) => {
+  const handleIntensityInput = (rawValue: string) => {
     if (!sceneManager || !selectedLightId) return;
-    sceneManager.updateLightIntensity(selectedLightId, intensity);
-    forceTick((t) => t + 1);
+    const value = parseFloat(rawValue);
+    if (Number.isNaN(value)) return;
+    setIntensity(Number(value.toFixed(2)));
+    scheduleDragFrame(selectedLightId, () => {
+      sceneManager.updateLightIntensity(selectedLightId, value);
+    });
   };
 
   const handleNightToggle = () => {
@@ -112,37 +152,40 @@ export const LightEditor: React.FC<LightEditorProps> = ({ sceneManager }) => {
     }
   };
 
-  const pos = selectedLight
-    ? {
-        x: selectedLight.light.position.x,
-        y: selectedLight.light.position.y,
-        z: selectedLight.light.position.z,
-      }
-    : { x: 0, y: 0, z: 0 };
-
-  const intensity = selectedLight ? selectedLight.light.intensity / 50 : 0;
-  const color = selectedLight
-    ? `#${selectedLight.light.color.getHexString()}`
-    : '#ffffff';
-
   const selectedType: 'point' | 'spot' = selectedLight?.type ?? 'point';
+  const previewColor = selectedLight ? `#${selectedLight.light.color.getHexString()}` : '#ffffff';
 
   return (
     <div className="light-panel" style={panelStyle}>
       <div style={controlsStyle}>
         <div style={cellStyle}>
           <label style={labelStyle}>光源</label>
-          <select
-            value={selectedLightId}
-            onChange={(e) => setSelectedLightId(e.target.value)}
-            style={selectStyle}
-          >
-            {lights.map((l) => (
-              <option key={l.id} value={l.id}>
-                {l.name}
-              </option>
-            ))}
-          </select>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span
+              title={previewColor}
+              style={{
+                width: 12,
+                height: 12,
+                borderRadius: '50%',
+                background: previewColor,
+                boxShadow: `0 0 6px ${previewColor}aa`,
+                border: '1px solid rgba(255,255,255,0.15)',
+                flexShrink: 0,
+                display: selectedLight ? 'inline-block' : 'none',
+              }}
+            />
+            <select
+              value={selectedLightId}
+              onChange={(e) => setSelectedLightId(e.target.value)}
+              style={selectStyle}
+            >
+              {lights.map((l) => (
+                <option key={l.id} value={l.id}>
+                  {l.name} · {l.type === 'point' ? '点光源' : '聚光灯'}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
 
         <div style={cellStyle}>
@@ -190,67 +233,80 @@ export const LightEditor: React.FC<LightEditorProps> = ({ sceneManager }) => {
         {selectedLight && (
           <>
             <div style={cellStyle}>
-              <label style={labelSmallStyle}>X</label>
+              <label style={axisLabelStyle('x')}>X</label>
               <input
                 type="range"
                 min={0}
                 max={5}
                 step={0.1}
-                value={Number(pos.x.toFixed(1))}
-                onChange={(e) => handlePositionChange('x', parseFloat(e.target.value))}
+                value={Number(posX.toFixed(1))}
+                onInput={(e) => handlePositionInput('x', (e.target as HTMLInputElement).value)}
                 style={sliderStyle}
               />
-              <span style={valueStyle}>{pos.x.toFixed(1)}</span>
+              <span style={valueTagStyle}>{posX.toFixed(1)}</span>
             </div>
             <div style={cellStyle}>
-              <label style={labelSmallStyle}>Y</label>
+              <label style={axisLabelStyle('y')}>Y</label>
               <input
                 type="range"
                 min={0}
                 max={5}
                 step={0.1}
-                value={Number(pos.y.toFixed(1))}
-                onChange={(e) => handlePositionChange('y', parseFloat(e.target.value))}
+                value={Number(posY.toFixed(1))}
+                onInput={(e) => handlePositionInput('y', (e.target as HTMLInputElement).value)}
                 style={sliderStyle}
               />
-              <span style={valueStyle}>{pos.y.toFixed(1)}</span>
+              <span style={valueTagStyle}>{posY.toFixed(1)}</span>
             </div>
             <div style={cellStyle}>
-              <label style={labelSmallStyle}>Z</label>
+              <label style={axisLabelStyle('z')}>Z</label>
               <input
                 type="range"
                 min={0}
                 max={5}
                 step={0.1}
-                value={Number(pos.z.toFixed(1))}
-                onChange={(e) => handlePositionChange('z', parseFloat(e.target.value))}
+                value={Number(posZ.toFixed(1))}
+                onInput={(e) => handlePositionInput('z', (e.target as HTMLInputElement).value)}
                 style={sliderStyle}
               />
-              <span style={valueStyle}>{pos.z.toFixed(1)}</span>
+              <span style={valueTagStyle}>{posZ.toFixed(1)}</span>
             </div>
 
             <div style={cellStyle}>
               <label style={labelSmallStyle}>颜色</label>
-              <input
-                type="color"
-                value={color}
-                onChange={(e) => handleColorChange(e.target.value)}
-                style={colorPickerStyle}
-              />
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span
+                  style={{
+                    width: 14,
+                    height: 14,
+                    borderRadius: '50%',
+                    background: color,
+                    boxShadow: `0 0 6px ${color}aa`,
+                    border: '1px solid rgba(255,255,255,0.12)',
+                  }}
+                />
+                <input
+                  type="color"
+                  value={color}
+                  onInput={(e) => handleColorInput((e.target as HTMLInputElement).value)}
+                  onChange={(e) => handleColorInput(e.target.value)}
+                  style={colorPickerStyle}
+                />
+              </div>
             </div>
 
             <div style={cellStyle}>
-              <label style={labelSmallStyle}>强度</label>
+              <label style={intensityLabelStyle}>强度</label>
               <input
                 type="range"
                 min={0}
                 max={2}
                 step={0.1}
                 value={Number(intensity.toFixed(1))}
-                onChange={(e) => handleIntensityChange(parseFloat(e.target.value))}
+                onInput={(e) => handleIntensityInput((e.target as HTMLInputElement).value)}
                 style={sliderStyle}
               />
-              <span style={valueStyle}>{intensity.toFixed(1)}</span>
+              <span style={{ ...valueTagStyle, minWidth: 30 }}>{intensity.toFixed(1)}</span>
             </div>
           </>
         )}
@@ -286,6 +342,24 @@ export const LightEditor: React.FC<LightEditorProps> = ({ sceneManager }) => {
   );
 };
 
+const axisLabelStyle = (axis: 'x' | 'y' | 'z'): React.CSSProperties => {
+  const colorMap = { x: '#ff6b6b', y: '#51cf66', z: '#4dabf7' };
+  return {
+    color: colorMap[axis],
+    fontSize: 11,
+    fontWeight: 700,
+    minWidth: 16,
+    textShadow: `0 0 4px ${colorMap[axis]}66`,
+  };
+};
+
+const intensityLabelStyle: React.CSSProperties = {
+  color: '#ffa726',
+  fontSize: 11,
+  fontWeight: 700,
+  minWidth: 32,
+};
+
 const customCss = `
   .light-panel {
     position: fixed;
@@ -298,21 +372,21 @@ const customCss = `
   .light-panel input[type="range"] {
     -webkit-appearance: none;
     appearance: none;
-    width: 72px;
+    width: 80px;
     height: 4px;
     border-radius: 2px;
-    background: #4fc3f7;
+    background: linear-gradient(90deg, #2a4a63, #4fc3f7);
     outline: none;
     cursor: pointer;
-    transition: background 0.2s ease, box-shadow 0.2s ease;
+    transition: background 0.18s ease, box-shadow 0.18s ease;
   }
   .light-panel input[type="range"]:hover {
-    background: #6fcbf7;
+    background: linear-gradient(90deg, #2e5570, #6fcbf7);
   }
   .light-panel input[type="range"]:active,
   .light-panel input[type="range"]:focus {
-    background: #81d4fa;
-    box-shadow: 0 0 6px rgba(79, 195, 247, 0.6);
+    background: linear-gradient(90deg, #335f7e, #81d4fa);
+    box-shadow: 0 0 8px rgba(79, 195, 247, 0.55);
   }
   .light-panel input[type="range"]::-webkit-slider-thumb {
     -webkit-appearance: none;
@@ -322,13 +396,18 @@ const customCss = `
     border-radius: 50%;
     background: #4fc3f7;
     border: 2px solid #1a1a2e;
-    cursor: pointer;
-    transition: background 0.2s ease, transform 0.15s ease;
-    box-shadow: 0 0 4px rgba(79, 195, 247, 0.5);
+    cursor: grab;
+    transition: background 0.15s ease, transform 0.12s ease, box-shadow 0.15s ease;
+    box-shadow: 0 0 5px rgba(79, 195, 247, 0.65);
   }
-  .light-panel input[type="range"]::-webkit-slider-thumb:hover {
+  .light-panel input[type="range"]:hover::-webkit-slider-thumb {
     background: #81d4fa;
     transform: scale(1.15);
+  }
+  .light-panel input[type="range"]:active::-webkit-slider-thumb {
+    cursor: grabbing;
+    box-shadow: 0 0 9px rgba(79, 195, 247, 0.9);
+    transform: scale(1.2);
   }
   .light-panel input[type="range"]::-moz-range-thumb {
     width: 16px;
@@ -336,26 +415,44 @@ const customCss = `
     border-radius: 50%;
     background: #4fc3f7;
     border: 2px solid #1a1a2e;
-    cursor: pointer;
+    cursor: grab;
   }
 
   .light-panel button {
-    transition: all 0.25s ease;
+    transition: all 0.22s ease;
   }
   .light-panel button:hover:not(:disabled) {
-    filter: brightness(1.15);
+    filter: brightness(1.18);
   }
   .light-panel button:active:not(:disabled) {
     transform: scale(0.95);
   }
 
+  .light-panel select {
+    transition: border-color 0.2s ease, background 0.2s ease;
+  }
+  .light-panel select:hover {
+    border-color: rgba(79, 195, 247, 0.45);
+    background: rgba(255, 255, 255, 0.1);
+  }
+  .light-panel select:focus {
+    border-color: rgba(79, 195, 247, 0.7);
+    box-shadow: 0 0 0 2px rgba(79, 195, 247, 0.15);
+  }
+
+  .light-panel input[type="color"] {
+    transition: border-color 0.2s ease, transform 0.15s ease;
+  }
+  .light-panel input[type="color"]:hover {
+    transform: scale(1.06);
+  }
+  .light-panel input[type="color"]:active {
+    transform: scale(0.96);
+  }
+
   @keyframes spin360 {
     from { transform: rotate(0deg); }
     to { transform: rotate(360deg); }
-  }
-
-  .snapshot-spinner {
-    animation: spin360 1s linear infinite;
   }
 
   @media (max-width: 1280px) {
@@ -377,12 +474,12 @@ const controlsStyle: React.CSSProperties = {
   padding: '8px 22px',
   height: 60,
   background: 'rgba(30, 30, 40, 0.85)',
-  backdropFilter: 'blur(14px)',
-  WebkitBackdropFilter: 'blur(14px)',
+  backdropFilter: 'blur(16px) saturate(140%)',
+  WebkitBackdropFilter: 'blur(16px) saturate(140%)',
   borderRadius: 12,
   border: '1px solid rgba(79, 195, 247, 0.18)',
   boxShadow:
-    '0 4px 24px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(255,255,255,0.02) inset',
+    '0 6px 28px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255,255,255,0.025) inset',
 };
 
 const cellStyle: React.CSSProperties = {
@@ -404,7 +501,7 @@ const labelSmallStyle: React.CSSProperties = {
   color: '#cfd2e0',
   fontSize: 11,
   fontWeight: 700,
-  minWidth: 18,
+  minWidth: 30,
 };
 
 const selectStyle: React.CSSProperties = {
@@ -416,7 +513,6 @@ const selectStyle: React.CSSProperties = {
   fontSize: 12,
   outline: 'none',
   cursor: 'pointer',
-  transition: 'border-color 0.2s, background 0.2s',
 };
 
 const iconBtnStyle: React.CSSProperties = {
@@ -434,13 +530,21 @@ const iconBtnStyle: React.CSSProperties = {
 
 const sliderStyle: React.CSSProperties = {};
 
-const valueStyle: React.CSSProperties = {
-  color: '#b8bccb',
+const valueTagStyle: React.CSSProperties = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  minWidth: 32,
+  padding: '1px 6px',
+  color: '#e8f3ff',
   fontSize: 10,
-  minWidth: 28,
-  textAlign: 'right',
+  fontWeight: 600,
   fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
   fontVariantNumeric: 'tabular-nums',
+  background: 'rgba(79, 195, 247, 0.12)',
+  border: '1px solid rgba(79, 195, 247, 0.25)',
+  borderRadius: 4,
+  letterSpacing: '0.3px',
 };
 
 const colorPickerStyle: React.CSSProperties = {
