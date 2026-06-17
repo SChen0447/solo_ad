@@ -1,4 +1,4 @@
-import type { Idea, IdeaWithName, Group } from '../types';
+import type { Idea, IdeaWithName, Group, LikesInfo } from '../types';
 
 const API_BASE = '/api';
 
@@ -64,3 +64,30 @@ export async function groupIdeas(groupSize: number): Promise<Group[]> {
   }
   return response.json();
 }
+
+export async function likeIdea(id: string, voterId: string): Promise<{ likes: number; liked: boolean }> {
+  const response = await fetch(`${API_BASE}/ideas/${id}/like`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ voterId }),
+  });
+  const data = await response.json();
+  if (!response.ok && response.status !== 409) {
+    throw new Error(data.error || 'Failed to like idea');
+  }
+  return { likes: data.likes, liked: data.liked };
+}
+
+export async function getIdeaLikes(id: string, voterId?: string): Promise<LikesInfo> {
+  const url = voterId
+    ? `${API_BASE}/ideas/${id}/likes?voterId=${encodeURIComponent(voterId)}`
+    : `${API_BASE}/ideas/${id}/likes`;
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error('Failed to fetch likes');
+  }
+  return response.json();
+}
+

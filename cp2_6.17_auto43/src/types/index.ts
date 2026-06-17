@@ -12,10 +12,16 @@ export interface Idea {
   avatarColor: string;
   initials: string;
   createdAt: string;
+  likes: number;
 }
 
 export interface IdeaWithName extends Idea {
   participantName: string;
+}
+
+export interface LikesInfo {
+  likes: number;
+  liked: boolean;
 }
 
 export type Group = Idea[];

@@ -4,6 +4,8 @@ import type { Idea, Group } from '../types';
 interface IdeaBoardProps {
   ideas: Idea[];
   groups: Group[];
+  likedIds: Set<string>;
+  onLike: (ideaId: string) => Promise<boolean>;
   onRandomGroup: (groupSize: number) => void;
   onExportMarkdown: () => Promise<boolean>;
   onClearGroups: () => void;
@@ -37,15 +39,26 @@ function getCardColor(id: string): string {
   return CARD_PASTEL_COLORS[Math.abs(hash) % CARD_PASTEL_COLORS.length];
 }
 
-function IdeaBoard({ ideas, groups, onRandomGroup, onExportMarkdown, onClearGroups, isLoading }: IdeaBoardProps) {
+function IdeaBoard({ ideas, groups, likedIds, onLike, onRandomGroup, onExportMarkdown, onClearGroups, isLoading }: IdeaBoardProps) {
   const [groupSize, setGroupSize] = useState(3);
   const [showCopied, setShowCopied] = useState(false);
+  const [sortByLikes, setSortByLikes] = useState(false);
   const prevIdeaIdsRef = useRef<Set<string>>(new Set());
   const [newIds, setNewIds] = useState<Set<string>>(new Set());
+  const [pendingLike, setPendingLike] = useState<Set<string>>(new Set());
 
   const displayIdeas = useMemo(() => {
-    return ideas.slice(0, MAX_DISPLAY);
-  }, [ideas]);
+    const base = ideas.slice(0, MAX_DISPLAY);
+    if (!sortByLikes) return base;
+    return [...base].sort((a, b) => b.likes - a.likes || a.number - b.number);
+  }, [ideas, sortByLikes]);
+
+  const sortedGroups = useMemo(() => {
+    if (!sortByLikes) return groups;
+    return groups.map(group =>
+      [...group].sort((a, b) => b.likes - a.likes || a.number - b.number)
+    );
+  }, [groups, sortByLikes]);
 
   useEffect(() => {
     const currentIds = new Set(ideas.map(i => i.id));
@@ -78,6 +91,28 @@ function IdeaBoard({ ideas, groups, onRandomGroup, onExportMarkdown, onClearGrou
 
   const renderIdeaCard = (idea: Idea, groupColor?: string) => {
     const isNew = newIds.has(idea.id);
+    const alreadyLiked = likedIds.has(idea.id);
+    const isLikePending = pendingLike.has(idea.id);
+
+    const handleLikeClick = async (e: React.MouseEvent) => {
+      e.stopPropagation();
+      if (alreadyLiked || isLikePending) return;
+      setPendingLike(prev => {
+        const next = new Set(prev);
+        next.add(idea.id);
+        return next;
+      });
+      try {
+        await onLike(idea.id);
+      } finally {
+        setPendingLike(prev => {
+          const next = new Set(prev);
+          next.delete(idea.id);
+          return next;
+        });
+      }
+    };
+
     return (
       <div
         key={idea.id}
@@ -97,6 +132,20 @@ function IdeaBoard({ ideas, groups, onRandomGroup, onExportMarkdown, onClearGrou
           </div>
         </div>
         <p className="idea-content">{idea.content}</p>
+        <div className="card-footer">
+          <button
+            type="button"
+            className={`like-btn${alreadyLiked ? ' liked' : ''}`}
+            onClick={handleLikeClick}
+            disabled={alreadyLiked || isLikePending}
+            title={alreadyLiked ? '已点赞' : '点赞'}
+          >
+            <span className="like-icon" aria-hidden="true">
+              {alreadyLiked ? '❤️' : '🤍'}
+            </span>
+            <span className="like-count">{idea.likes || 0}</span>
+          </button>
+        </div>
       </div>
     );
   };
@@ -104,22 +153,35 @@ function IdeaBoard({ ideas, groups, onRandomGroup, onExportMarkdown, onClearGrou
   return (
     <div className="idea-board-container">
       <div className="board-header">
-        <h2 className="board-title">
-          {groups.length > 0 ? '分组结果' : '想法看板'}
-          <span className="idea-count">
-            ({groups.length > 0 ? `${groups.length}组` : `${ideas.length}条`})
-          </span>
-        </h2>
-        {groups.length > 0 && (
-          <button className="clear-groups-btn" onClick={onClearGroups}>
-            取消分组
-          </button>
-        )}
+        <div className="board-header-left">
+          <h2 className="board-title">
+            {groups.length > 0 ? '分组结果' : '想法看板'}
+            <span className="idea-count">
+              ({groups.length > 0 ? `${groups.length}组` : `${ideas.length}条`})
+            </span>
+          </h2>
+        </div>
+        <div className="board-header-right">
+          <label className="sort-switch">
+            <input
+              type="checkbox"
+              checked={sortByLikes}
+              onChange={(e) => setSortByLikes(e.target.checked)}
+              disabled={ideas.length === 0}
+            />
+            <span className="sort-switch-label">按点赞数排序</span>
+          </label>
+          {groups.length > 0 && (
+            <button className="clear-groups-btn" onClick={onClearGroups}>
+              取消分组
+            </button>
+          )}
+        </div>
       </div>
 
-      {groups.length > 0 ? (
+      {sortedGroups.length > 0 ? (
         <div className="groups-container">
-          {groups.map((group, groupIndex) => (
+          {sortedGroups.map((group, groupIndex) => (
             <div
               key={groupIndex}
               className="group-section"
@@ -210,6 +272,45 @@ function IdeaBoard({ ideas, groups, onRandomGroup, onExportMarkdown, onClearGrou
           align-items: center;
           justify-content: space-between;
           margin-bottom: 20px;
+          flex-wrap: wrap;
+          gap: 12px;
+        }
+        
+        .board-header-left {
+          display: flex;
+          align-items: center;
+        }
+        
+        .board-header-right {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+        }
+        
+        .sort-switch {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          cursor: pointer;
+          user-select: none;
+          font-size: 13px;
+          color: #555;
+        }
+        
+        .sort-switch input[type="checkbox"] {
+          width: 16px;
+          height: 16px;
+          cursor: pointer;
+          accent-color: #4A90D9;
+        }
+        
+        .sort-switch input[type="checkbox"]:disabled {
+          cursor: not-allowed;
+          opacity: 0.5;
+        }
+        
+        .sort-switch-label {
+          font-weight: 500;
         }
         
         .board-title {
@@ -311,6 +412,63 @@ function IdeaBoard({ ideas, groups, onRandomGroup, onExportMarkdown, onClearGrou
           line-height: 1.5;
           word-wrap: break-word;
           margin: 0;
+        }
+        
+        .card-footer {
+          margin-top: 12px;
+          padding-top: 10px;
+          border-top: 1px solid rgba(0, 0, 0, 0.06);
+          display: flex;
+          justify-content: flex-end;
+          align-items: center;
+        }
+        
+        .like-btn {
+          display: inline-flex;
+          align-items: center;
+          gap: 4px;
+          padding: 4px 10px;
+          background: rgba(255, 255, 255, 0.6);
+          border: 1px solid rgba(0, 0, 0, 0.08);
+          border-radius: 14px;
+          color: #555;
+          font-size: 12px;
+          font-weight: 500;
+          cursor: pointer;
+          transition: all 0.15s ease;
+        }
+        
+        .like-btn:hover:not(:disabled) {
+          background: #ffffff;
+          border-color: #e53935;
+          color: #e53935;
+          transform: scale(1.04);
+        }
+        
+        .like-btn:active:not(:disabled) {
+          transform: scale(0.97);
+        }
+        
+        .like-btn.liked {
+          background: #ffebee;
+          border-color: #ef9a9a;
+          color: #e53935;
+          cursor: default;
+        }
+        
+        .like-btn:disabled:not(.liked) {
+          opacity: 0.5;
+          cursor: wait;
+        }
+        
+        .like-icon {
+          font-size: 13px;
+          line-height: 1;
+        }
+        
+        .like-count {
+          min-width: 16px;
+          text-align: center;
         }
         
         .empty-state {

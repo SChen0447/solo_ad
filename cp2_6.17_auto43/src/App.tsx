@@ -3,9 +3,23 @@ import TimerPanel from './components/TimerPanel';
 import IdeaInput from './components/IdeaInput';
 import IdeaBoard from './components/IdeaBoard';
 import { getTimerState, startTimer, resetTimer } from './services/timeService';
-import { getIdeas, submitIdea, groupIdeas, getAllIdeasWithNames } from './services/ideaService';
+import { getIdeas, submitIdea, groupIdeas, getAllIdeasWithNames, likeIdea } from './services/ideaService';
 import { playEndSound } from './utils/audio';
 import type { TimerState, Idea, Group, IdeaWithName } from './types';
+
+const VOTER_ID_KEY = 'brainstorm_voter_id';
+
+function getOrCreateVoterId(): string {
+  let id = localStorage.getItem(VOTER_ID_KEY);
+  if (!id) {
+    id =
+      Date.now().toString(36) +
+      '-' +
+      Math.random().toString(36).slice(2, 10);
+    localStorage.setItem(VOTER_ID_KEY, id);
+  }
+  return id;
+}
 
 function App() {
   const [timerState, setTimerState] = useState<TimerState>({
@@ -18,6 +32,8 @@ function App() {
   const [groups, setGroups] = useState<Group[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [participantName, setParticipantName] = useState('');
+  const [likedIds, setLikedIds] = useState<Set<string>>(new Set());
+  const voterIdRef = useRef<string>(getOrCreateVoterId());
   const hasPlayedSoundRef = useRef(false);
   const prevIsLockedRef = useRef(false);
 
@@ -85,6 +101,7 @@ function App() {
       setTimerState(newState);
       setIdeas([]);
       setGroups([]);
+      setLikedIds(new Set());
       hasPlayedSoundRef.current = false;
       prevIsLockedRef.current = false;
     } catch (error) {
@@ -162,6 +179,29 @@ function App() {
     setGroups([]);
   };
 
+  const handleLike = async (ideaId: string) => {
+    if (likedIds.has(ideaId)) return false;
+    try {
+      const voterId = voterIdRef.current;
+      const result = await likeIdea(ideaId, voterId);
+      setLikedIds(prev => {
+        const next = new Set(prev);
+        next.add(ideaId);
+        return next;
+      });
+      setIdeas(prev => prev.map(idea =>
+        idea.id === ideaId ? { ...idea, likes: result.likes } : idea
+      ));
+      setGroups(prev => prev.map(group =>
+        group.map(idea => idea.id === ideaId ? { ...idea, likes: result.likes } : idea)
+      ));
+      return result.liked;
+    } catch (error) {
+      console.error('Failed to like idea:', error);
+      return false;
+    }
+  };
+
   return (
     <div className="app-container">
       <div className="content-wrapper">
@@ -187,6 +227,8 @@ function App() {
         <IdeaBoard
           ideas={ideas}
           groups={groups}
+          likedIds={likedIds}
+          onLike={handleLike}
           onRandomGroup={handleRandomGroup}
           onExportMarkdown={handleExportMarkdown}
           onClearGroups={handleClearGroups}

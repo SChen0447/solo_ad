@@ -4,7 +4,7 @@ import bodyParser from 'body-parser';
 import { v4 as uuidv4 } from 'uuid';
 
 const app = express();
-const PORT = 3002;
+const PORT = 3003;
 
 app.use(cors());
 app.use(bodyParser.json());
@@ -21,6 +21,7 @@ let timerState = {
 let ideas = [];
 let ideaNumberCounter = 1;
 let timerInterval = null;
+const likeStore = new Map();
 
 const AVATAR_COLORS = [
   '#4A90D9', '#E53935', '#43A047', '#FF8C00',
@@ -106,6 +107,7 @@ app.post('/timer/reset', (req, res) => {
   resetTimer();
   ideas = [];
   ideaNumberCounter = 1;
+  likeStore.clear();
   res.json({
     remaining: timerState.remaining,
     duration: timerState.duration,
@@ -114,15 +116,30 @@ app.post('/timer/reset', (req, res) => {
   });
 });
 
-app.get('/ideas', (req, res) => {
-  const publicIdeas = ideas.map(idea => ({
+function getLikesForIdea(ideaId) {
+  const store = likeStore.get(ideaId);
+  if (!store) return { count: 0, likers: [] };
+  return {
+    count: store.size,
+    likers: Array.from(store)
+  };
+}
+
+function getPublicIdea(idea) {
+  const likes = getLikesForIdea(idea.id);
+  return {
     id: idea.id,
     number: idea.number,
     content: idea.content,
     avatarColor: idea.avatarColor,
     initials: idea.initials,
-    createdAt: idea.createdAt
-  }));
+    createdAt: idea.createdAt,
+    likes: likes.count
+  };
+}
+
+app.get('/ideas', (req, res) => {
+  const publicIdeas = ideas.map(getPublicIdea);
   res.json(publicIdeas);
 });
 
@@ -156,17 +173,9 @@ app.post('/ideas', (req, res) => {
   };
   
   ideas.push(newIdea);
+  likeStore.set(newIdea.id, new Set());
   
-  const publicIdea = {
-    id: newIdea.id,
-    number: newIdea.number,
-    content: newIdea.content,
-    avatarColor: newIdea.avatarColor,
-    initials: newIdea.initials,
-    createdAt: newIdea.createdAt
-  };
-  
-  res.status(201).json(publicIdea);
+  res.status(201).json(getPublicIdea(newIdea));
 });
 
 app.delete('/ideas/:id', (req, res) => {
@@ -178,12 +187,14 @@ app.delete('/ideas/:id', (req, res) => {
   }
   
   ideas.splice(index, 1);
+  likeStore.delete(id);
   res.json({ success: true });
 });
 
 app.delete('/ideas', (req, res) => {
   ideas = [];
   ideaNumberCounter = 1;
+  likeStore.clear();
   res.json({ success: true });
 });
 
@@ -199,17 +210,70 @@ app.post('/ideas/group', (req, res) => {
   const groups = [];
   
   for (let i = 0; i < shuffled.length; i += size) {
-    const group = shuffled.slice(i, i + size).map(idea => ({
-      id: idea.id,
-      number: idea.number,
-      content: idea.content,
-      avatarColor: idea.avatarColor,
-      initials: idea.initials
-    }));
+    const group = shuffled.slice(i, i + size).map(idea => {
+      const publicIdea = getPublicIdea(idea);
+      return publicIdea;
+    });
     groups.push(group);
   }
   
   res.json(groups);
+});
+
+app.post('/ideas/:id/like', (req, res) => {
+  const { id } = req.params;
+  const { voterId } = req.body;
+
+  const idea = ideas.find(i => i.id === id);
+  if (!idea) {
+    return res.status(404).json({ error: 'Idea not found.' });
+  }
+
+  if (!voterId || typeof voterId !== 'string' || !voterId.trim()) {
+    return res.status(400).json({ error: 'voterId is required.' });
+  }
+
+  let store = likeStore.get(id);
+  if (!store) {
+    store = new Set();
+    likeStore.set(id, store);
+  }
+
+  const trimmedVoter = voterId.trim();
+  const alreadyLiked = store.has(trimmedVoter);
+
+  if (alreadyLiked) {
+    return res.status(409).json({
+      error: 'Already liked.',
+      likes: store.size,
+      liked: true
+    });
+  }
+
+  store.add(trimmedVoter);
+  res.json({
+    success: true,
+    likes: store.size,
+    liked: true
+  });
+});
+
+app.get('/ideas/:id/likes', (req, res) => {
+  const { id } = req.params;
+  const { voterId } = req.query;
+
+  const idea = ideas.find(i => i.id === id);
+  if (!idea) {
+    return res.status(404).json({ error: 'Idea not found.' });
+  }
+
+  const likes = getLikesForIdea(id);
+  const liked = voterId && typeof voterId === 'string' && likes.likers.includes(voterId);
+
+  res.json({
+    likes: likes.count,
+    liked: !!liked
+  });
 });
 
 app.listen(PORT, () => {
