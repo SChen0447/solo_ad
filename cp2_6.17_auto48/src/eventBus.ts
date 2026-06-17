@@ -1,4 +1,4 @@
-import { DialogueNode } from './types/DialogueNode';
+import type { DialogueNode } from './types/DialogueNode';
 
 export interface EditorToRendererEvents {
   PREVIEW_NODE: [nodeId: string];
@@ -10,89 +10,154 @@ export interface RendererToEditorEvents {
   NODE_CLICKED: [nodeId: string];
 }
 
-type EventMap = Record<string, unknown[]>;
+type EventName = string | symbol;
 
-class TypedEventBus<EmitEvents extends EventMap, OnEvents extends EventMap> {
-  private events: Map<keyof (EmitEvents & OnEvents), Array<(...args: never[]) => void>> = new Map();
+type InternalCallback = (...args: unknown[]) => void;
 
-  on<K extends keyof OnEvents>(event: K, callback: (...args: OnEvents[K]) => void): void {
-    const key = event as keyof (EmitEvents & OnEvents);
-    if (!this.events.has(key)) {
-      this.events.set(key, []);
-    }
-    this.events.get(key)!.push(callback as (...args: never[]) => void);
+class EventBusCore {
+  private callbacks: Map<EventName, InternalCallback[]> = new Map();
+
+  get(event: EventName): InternalCallback[] {
+    return this.callbacks.get(event) || [];
   }
 
-  off<K extends keyof OnEvents>(event: K, callback: (...args: OnEvents[K]) => void): void {
-    const key = event as keyof (EmitEvents & OnEvents);
-    const callbacks = this.events.get(key);
-    if (callbacks) {
-      const index = callbacks.indexOf(callback as (...args: never[]) => void);
+  add(event: EventName, callback: InternalCallback): void {
+    const cbs = this.callbacks.get(event) || [];
+    cbs.push(callback);
+    this.callbacks.set(event, cbs);
+  }
+
+  remove(event: EventName, callback: InternalCallback): void {
+    const cbs = this.callbacks.get(event);
+    if (cbs) {
+      const index = cbs.indexOf(callback);
       if (index > -1) {
-        callbacks.splice(index, 1);
+        cbs.splice(index, 1);
       }
     }
   }
 
-  emit<K extends keyof EmitEvents>(event: K, ...args: EmitEvents[K]): void {
-    const key = event as keyof (EmitEvents & OnEvents);
-    const callbacks = this.events.get(key);
-    if (callbacks) {
-      callbacks.forEach((callback) => {
-        try {
-          callback(...(args as never[]));
-        } catch (error) {
-          console.error(`Error in event handler for ${String(event)}:`, error);
-        }
-      });
-    }
-  }
-
   clear(): void {
-    this.events.clear();
+    this.callbacks.clear();
   }
 }
 
-type EditorBus = TypedEventBus<EditorToRendererEvents, RendererToEditorEvents>;
-type RendererBus = TypedEventBus<RendererToEditorEvents, EditorToRendererEvents>;
+export interface EditorEventBus {
+  emit<K extends keyof EditorToRendererEvents>(
+    event: K,
+    ...args: EditorToRendererEvents[K]
+  ): void;
+  on<K extends keyof RendererToEditorEvents>(
+    event: K,
+    callback: (...args: RendererToEditorEvents[K]) => void
+  ): () => void;
+  off<K extends keyof RendererToEditorEvents>(
+    event: K,
+    callback: (...args: RendererToEditorEvents[K]) => void
+  ): void;
+  clear(): void;
+}
 
-class SharedEventBus {
-  private editorBus: EditorBus;
-  private rendererBus: RendererBus;
+export interface RendererEventBus {
+  emit<K extends keyof RendererToEditorEvents>(
+    event: K,
+    ...args: RendererToEditorEvents[K]
+  ): void;
+  on<K extends keyof EditorToRendererEvents>(
+    event: K,
+    callback: (...args: EditorToRendererEvents[K]) => void
+  ): () => void;
+  off<K extends keyof EditorToRendererEvents>(
+    event: K,
+    callback: (...args: EditorToRendererEvents[K]) => void
+  ): void;
+  clear(): void;
+}
+
+class EventBusFactory {
+  private core: EventBusCore;
+  private _editor: EditorEventBus;
+  private _renderer: RendererEventBus;
 
   constructor() {
-    const sharedEvents = new Map<string, Array<(...args: never[]) => void>>();
+    this.core = new EventBusCore();
 
-    this.editorBus = new TypedEventBus<EditorToRendererEvents, RendererToEditorEvents>();
-    this.rendererBus = new TypedEventBus<RendererToEditorEvents, EditorToRendererEvents>();
+    this._editor = {
+      emit: (event, ...args) => {
+        const callbacks = this.core.get(event as EventName);
+        callbacks.forEach((cb) => {
+          try {
+            cb(...args);
+          } catch (error) {
+            console.error(
+              `[EventBus] Error in handler for event "${String(event)}":`,
+              error
+            );
+          }
+        });
+      },
+      on: (event, callback) => {
+        const cb = callback as InternalCallback;
+        this.core.add(event as EventName, cb);
+        return () => this.core.remove(event as EventName, cb);
+      },
+      off: (event, callback) => {
+        this.core.remove(event as EventName, callback as InternalCallback);
+      },
+      clear: () => {
+        this.core.clear();
+      },
+    };
 
-    (this.editorBus as unknown as { events: typeof sharedEvents }).events = sharedEvents;
-    (this.rendererBus as unknown as { events: typeof sharedEvents }).events = sharedEvents;
+    this._renderer = {
+      emit: (event, ...args) => {
+        const callbacks = this.core.get(event as EventName);
+        callbacks.forEach((cb) => {
+          try {
+            cb(...args);
+          } catch (error) {
+            console.error(
+              `[EventBus] Error in handler for event "${String(event)}":`,
+              error
+            );
+          }
+        });
+      },
+      on: (event, callback) => {
+        const cb = callback as InternalCallback;
+        this.core.add(event as EventName, cb);
+        return () => this.core.remove(event as EventName, cb);
+      },
+      off: (event, callback) => {
+        this.core.remove(event as EventName, callback as InternalCallback);
+      },
+      clear: () => {
+        this.core.clear();
+      },
+    };
   }
 
-  forEditor(): EditorBus {
-    return this.editorBus;
+  forEditor(): EditorEventBus {
+    return this._editor;
   }
 
-  forRenderer(): RendererBus {
-    return this.rendererBus;
-  }
-
-  clear(): void {
-    this.editorBus.clear();
+  forRenderer(): RendererEventBus {
+    return this._renderer;
   }
 }
 
-export const eventBusHub = new SharedEventBus();
-export const editorBus = eventBusHub.forEditor();
-export const rendererBus = eventBusHub.forRenderer();
+export const eventBusHub = new EventBusFactory();
 
-export const EDITOR_EVENTS: Record<keyof EditorToRendererEvents, keyof EditorToRendererEvents> = {
+export const editorBus: EditorEventBus = eventBusHub.forEditor();
+
+export const rendererBus: RendererEventBus = eventBusHub.forRenderer();
+
+export const EDITOR_EVENTS: { [K in keyof EditorToRendererEvents]: K } = {
   PREVIEW_NODE: 'PREVIEW_NODE',
   UPDATE_TREE: 'UPDATE_TREE',
 };
 
-export const RENDERER_EVENTS: Record<keyof RendererToEditorEvents, keyof RendererToEditorEvents> = {
+export const RENDERER_EVENTS: { [K in keyof RendererToEditorEvents]: K } = {
   OPTION_CLICKED: 'OPTION_CLICKED',
   NODE_CLICKED: 'NODE_CLICKED',
 };

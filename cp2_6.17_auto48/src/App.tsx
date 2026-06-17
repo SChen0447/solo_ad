@@ -45,18 +45,125 @@ const buildConnections = (nodes: DialogueNode[]): NodeConnection[] => {
   return connections;
 };
 
-const validateNextNodeIds = (nodes: DialogueNode[]): Set<string> => {
-  const invalid = new Set<string>();
+interface ValidationIssue {
+  type: 'missing_node' | 'circular_ref' | 'no_root' | 'unreachable';
+  message: string;
+  targetNodeId?: string;
+}
+
+const validateDialogueTree = (
+  nodes: DialogueNode[],
+  rootNodeId?: string
+): { invalidNodeIds: Set<string>; invalidInfo: Map<string, ValidationIssue[]> } => {
+  const invalidInfo = new Map<string, ValidationIssue[]>();
   const validIds = new Set(nodes.map(n => n.id));
+
+  const addIssue = (nodeId: string, issue: ValidationIssue) => {
+    if (!invalidInfo.has(nodeId)) {
+      invalidInfo.set(nodeId, []);
+    }
+    invalidInfo.get(nodeId)!.push(issue);
+  };
+
   for (const node of nodes) {
     for (const option of node.options) {
       if (option.nextNodeId && !validIds.has(option.nextNodeId)) {
-        invalid.add(node.id);
-        break;
+        addIssue(node.id, {
+          type: 'missing_node',
+          message: `分支指向不存在的节点: ${option.nextNodeId}`,
+          targetNodeId: option.nextNodeId,
+        });
       }
     }
   }
-  return invalid;
+
+  const visited = new Set<string>();
+  const inStack = new Set<string>();
+
+  const detectCycle = (nodeId: string, path: string[]): boolean => {
+    if (inStack.has(nodeId)) {
+      const cycleStart = path.indexOf(nodeId);
+      const cycleNodes = path.slice(cycleStart);
+      cycleNodes.forEach((nid) => {
+        addIssue(nid, {
+          type: 'circular_ref',
+          message: `循环引用: ${cycleNodes.join(' → ')}`,
+        });
+      });
+      return true;
+    }
+    if (visited.has(nodeId)) return false;
+
+    visited.add(nodeId);
+    inStack.add(nodeId);
+    path.push(nodeId);
+
+    const node = nodes.find(n => n.id === nodeId);
+    if (node) {
+      for (const opt of node.options) {
+        if (opt.nextNodeId && validIds.has(opt.nextNodeId)) {
+          detectCycle(opt.nextNodeId, [...path]);
+        }
+      }
+    }
+
+    inStack.delete(nodeId);
+    return false;
+  };
+
+  for (const node of nodes) {
+    if (!visited.has(node.id)) {
+      detectCycle(node.id, []);
+    }
+  }
+
+  const allTargets = new Set<string>();
+  for (const node of nodes) {
+    for (const opt of node.options) {
+      if (opt.nextNodeId) {
+        allTargets.add(opt.nextNodeId);
+      }
+    }
+  }
+
+  const rootCandidates = nodes.filter(n => !allTargets.has(n.id));
+  if (rootCandidates.length === 0 && nodes.length > 0) {
+    nodes.forEach((n) => {
+      addIssue(n.id, {
+        type: 'no_root',
+        message: '没有根节点：所有节点都被其他节点引用',
+      });
+    });
+  }
+
+  if (rootNodeId && validIds.has(rootNodeId)) {
+    const reachable = new Set<string>();
+    const stack = [rootNodeId];
+    while (stack.length > 0) {
+      const current = stack.pop()!;
+      if (reachable.has(current)) continue;
+      reachable.add(current);
+      const node = nodes.find(n => n.id === current);
+      if (node) {
+        for (const opt of node.options) {
+          if (opt.nextNodeId && validIds.has(opt.nextNodeId)) {
+            stack.push(opt.nextNodeId);
+          }
+        }
+      }
+    }
+    for (const node of nodes) {
+      if (!reachable.has(node.id)) {
+        addIssue(node.id, {
+          type: 'unreachable',
+          message: '从根节点无法到达此节点',
+        });
+      }
+    }
+  }
+
+  const invalidNodeIds = new Set(invalidInfo.keys());
+  return { invalidNodeIds, invalidInfo };
 };
 
 const createInitialNodes = (): DialogueNode[] => [
@@ -106,6 +213,7 @@ const EditorPanelComp = forwardRef<EditorPanelHandle, EditorPanelProps>(({ onSta
   const [connections, setConnections] = useState<NodeConnection[]>(() => buildConnections(createInitialNodes()));
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [invalidNodeIds, setInvalidNodeIds] = useState<Set<string>>(new Set());
+  const [invalidInfo, setInvalidInfo] = useState<Map<string, ValidationIssue[]>>(new Map());
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useImperativeHandle(ref, () => ({
@@ -164,11 +272,15 @@ const EditorPanelComp = forwardRef<EditorPanelHandle, EditorPanelProps>(({ onSta
           throw new Error('Invalid format: nodes array missing');
         }
 
-        const invalidSet = validateNextNodeIds(parsed.nodes);
+        const { invalidNodeIds: invalidSet, invalidInfo: info } = validateDialogueTree(
+          parsed.nodes,
+          parsed.rootNodeId
+        );
 
         setNodes(parsed.nodes);
         setConnections(buildConnections(parsed.nodes));
         setInvalidNodeIds(invalidSet);
+        setInvalidInfo(info);
         setSelectedNodeId(parsed.nodes[0]?.id || null);
       } catch (error) {
         alert(`Failed to import: ${(error as Error).message}`);
@@ -277,7 +389,9 @@ const EditorPanelComp = forwardRef<EditorPanelHandle, EditorPanelProps>(({ onSta
         }
         return n;
       });
-      setInvalidNodeIds(validateNextNodeIds(updated));
+      const { invalidNodeIds: inv, invalidInfo: info } = validateDialogueTree(updated);
+      setInvalidNodeIds(inv);
+      setInvalidInfo(info);
       return updated;
     });
     setConnections(prev => {
@@ -298,7 +412,9 @@ const EditorPanelComp = forwardRef<EditorPanelHandle, EditorPanelProps>(({ onSta
         options: n.options.filter(opt => opt.nextNodeId !== selectedNodeId),
       }));
       setConnections(buildConnections(cleaned));
-      setInvalidNodeIds(validateNextNodeIds(cleaned));
+      const { invalidNodeIds: inv, invalidInfo: info } = validateDialogueTree(cleaned);
+      setInvalidNodeIds(inv);
+      setInvalidInfo(info);
       return cleaned;
     });
     setSelectedNodeId(null);
@@ -365,6 +481,7 @@ const EditorPanelComp = forwardRef<EditorPanelHandle, EditorPanelProps>(({ onSta
           connections={connections}
           selectedNodeId={selectedNodeId}
           invalidNodeIds={invalidNodeIds}
+          invalidInfo={invalidInfo}
           onNodeSelect={handleNodeSelect}
           onNodeMove={handleNodeMove}
           onCanvasDoubleClick={handleCanvasDoubleClick}
@@ -379,18 +496,21 @@ const EditorPanelComp = forwardRef<EditorPanelHandle, EditorPanelProps>(({ onSta
           right: 0,
           top: 0,
           bottom: 0,
-          width: selectedNode ? '240px' : '0px',
+          width: '240px',
           backgroundColor: '#333',
           borderRadius: '8px 0 0 8px',
           overflow: 'hidden',
-          transition: 'width 0.3s ease, padding 0.3s ease',
+          transform: selectedNodeId ? 'translateX(0)' : 'translateX(100%)',
+          opacity: selectedNodeId ? 1 : 0,
+          transition: 'transform 0.3s ease, opacity 0.3s ease',
           zIndex: 10,
-          borderLeft: selectedNode ? '1px solid #555' : 'none',
-          padding: selectedNode ? '16px' : '0px',
+          borderLeft: '1px solid #555',
+          padding: '16px',
           boxSizing: 'border-box',
           display: 'flex',
           flexDirection: 'column',
           gap: '12px',
+          pointerEvents: selectedNodeId ? 'auto' : 'none',
         }}
       >
         {selectedNode && (

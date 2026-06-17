@@ -6,6 +6,7 @@ interface NodeGraphProps {
   connections: NodeConnection[];
   selectedNodeId: string | null;
   invalidNodeIds: Set<string>;
+  invalidInfo?: Map<string, { type: string; message: string; targetNodeId?: string }[]>;
   onNodeSelect: (nodeId: string | null) => void;
   onNodeMove: (nodeId: string, x: number, y: number) => void;
   onCanvasDoubleClick: (x: number, y: number) => void;
@@ -17,11 +18,31 @@ const NODE_WIDTH = 180;
 const NODE_HEIGHT = 100;
 const GRID_SIZE = 20;
 
+interface DragState {
+  nodeId: string;
+  startMouseX: number;
+  startMouseY: number;
+  startNodeX: number;
+  startNodeY: number;
+}
+
+interface BendDragState {
+  fromId: string;
+  toId: string;
+  optIndex: number;
+  bendIndex: number;
+  startMouseX: number;
+  startMouseY: number;
+  startPointX: number;
+  startPointY: number;
+}
+
 export const NodeGraph: React.FC<NodeGraphProps> = ({
   nodes,
   connections,
   selectedNodeId,
   invalidNodeIds,
+  invalidInfo,
   onNodeSelect,
   onNodeMove,
   onCanvasDoubleClick,
@@ -30,15 +51,10 @@ export const NodeGraph: React.FC<NodeGraphProps> = ({
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
-  const [draggingNodeId, setDraggingNodeId] = useState<string | null>(null);
-  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
-  const [draggingBend, setDraggingBend] = useState<{ fromId: string; toId: string; optIndex: number; bendIndex: number } | null>(null);
+  const [dragState, setDragState] = useState<DragState | null>(null);
+  const [bendDragState, setBendDragState] = useState<BendDragState | null>(null);
   const [throttled, setThrottled] = useState(false);
-
-  const getNodeCenter = useCallback((node: DialogueNode) => ({
-    x: node.x + NODE_WIDTH / 2,
-    y: node.y + NODE_HEIGHT / 2,
-  }), []);
+  const [showTooltip, setShowTooltip] = useState<{ x: number; y: number; nodeId: string } | null>(null);
 
   const getNodeTop = useCallback((node: DialogueNode) => ({
     x: node.x + NODE_WIDTH / 2,
@@ -54,65 +70,61 @@ export const NodeGraph: React.FC<NodeGraphProps> = ({
     e.stopPropagation();
     const node = nodes.find(n => n.id === nodeId);
     if (!node) return;
-    
-    const rect = containerRef.current?.getBoundingClientRect();
-    if (!rect) return;
-    
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-    
-    setDraggingNodeId(nodeId);
-    setDragOffset({
-      x: x - node.x,
-      y: y - node.y,
+
+    setDragState({
+      nodeId,
+      startMouseX: e.clientX,
+      startMouseY: e.clientY,
+      startNodeX: node.x,
+      startNodeY: node.y,
     });
     onNodeSelect(nodeId);
   }, [nodes, onNodeSelect]);
 
   const handleMouseMove = useCallback((e: MouseEvent) => {
     if (!containerRef.current || throttled) return;
-    
-    const rect = containerRef.current.getBoundingClientRect();
-    const mouseX = e.clientX - rect.left;
-    const mouseY = e.clientY - rect.top;
 
     setThrottled(true);
     requestAnimationFrame(() => {
       setThrottled(false);
-      
-      if (draggingNodeId) {
-        let newX = mouseX - dragOffset.x;
-        let newY = mouseY - dragOffset.y;
-        
+      const rect = containerRef.current!.getBoundingClientRect();
+
+      if (dragState) {
+        const dx = e.clientX - dragState.startMouseX;
+        const dy = e.clientY - dragState.startMouseY;
+
+        let newX = dragState.startNodeX + dx;
+        let newY = dragState.startNodeY + dy;
+
         newX = Math.max(0, Math.min(newX, rect.width - NODE_WIDTH));
         newY = Math.max(0, Math.min(newY, rect.height - NODE_HEIGHT));
-        
+
         const snappedX = Math.round(newX / GRID_SIZE) * GRID_SIZE;
         const snappedY = Math.round(newY / GRID_SIZE) * GRID_SIZE;
-        onNodeMove(draggingNodeId, snappedX, snappedY);
+        onNodeMove(dragState.nodeId, snappedX, snappedY);
       }
-      
-      if (draggingBend) {
-        const containerRect = containerRef.current?.getBoundingClientRect();
-        if (containerRect) {
-          onConnectionBendMove(
-            draggingBend.fromId,
-            draggingBend.toId,
-            draggingBend.optIndex,
-            draggingBend.bendIndex,
-            {
-              x: e.clientX - containerRect.left,
-              y: e.clientY - containerRect.top,
-            }
-          );
-        }
+
+      if (bendDragState) {
+        const dx = e.clientX - bendDragState.startMouseX;
+        const dy = e.clientY - bendDragState.startMouseY;
+
+        onConnectionBendMove(
+          bendDragState.fromId,
+          bendDragState.toId,
+          bendDragState.optIndex,
+          bendDragState.bendIndex,
+          {
+            x: bendDragState.startPointX + dx,
+            y: bendDragState.startPointY + dy,
+          }
+        );
       }
     });
-  }, [draggingNodeId, dragOffset, draggingBend, throttled, onNodeMove, onConnectionBendMove]);
+  }, [dragState, bendDragState, throttled, onNodeMove, onConnectionBendMove]);
 
   const handleMouseUp = useCallback(() => {
-    setDraggingNodeId(null);
-    setDraggingBend(null);
+    setDragState(null);
+    setBendDragState(null);
   }, []);
 
   const handleCanvasMouseDown = useCallback((e: React.MouseEvent) => {
@@ -126,10 +138,10 @@ export const NodeGraph: React.FC<NodeGraphProps> = ({
     const rect = containerRef.current.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
-    
+
     const snappedX = Math.round((x - NODE_WIDTH / 2) / GRID_SIZE) * GRID_SIZE;
     const snappedY = Math.round((y - NODE_HEIGHT / 2) / GRID_SIZE) * GRID_SIZE;
-    
+
     onCanvasDoubleClick(
       Math.max(0, snappedX),
       Math.max(0, snappedY)
@@ -146,9 +158,34 @@ export const NodeGraph: React.FC<NodeGraphProps> = ({
     });
   }, [onConnectionBendAdd]);
 
-  const handleBendMouseDown = useCallback((e: React.MouseEvent, fromId: string, toId: string, optIndex: number, bendIndex: number) => {
+  const handleBendMouseDown = useCallback((e: React.MouseEvent, fromId: string, toId: string, optIndex: number, bendIndex: number, point: ConnectionPoint) => {
     e.stopPropagation();
-    setDraggingBend({ fromId, toId, optIndex, bendIndex });
+    setBendDragState({
+      fromId,
+      toId,
+      optIndex,
+      bendIndex,
+      startMouseX: e.clientX,
+      startMouseY: e.clientY,
+      startPointX: point.x,
+      startPointY: point.y,
+    });
+  }, []);
+
+  const handleInvalidIconEnter = useCallback((e: React.MouseEvent, nodeId: string) => {
+    const rect = (e.target as HTMLElement).getBoundingClientRect();
+    const containerRect = containerRef.current?.getBoundingClientRect();
+    if (containerRect) {
+      setShowTooltip({
+        x: rect.left - containerRect.left + rect.width / 2,
+        y: rect.bottom - containerRect.top + 4,
+        nodeId,
+      });
+    }
+  }, []);
+
+  const handleInvalidIconLeave = useCallback(() => {
+    setShowTooltip(null);
   }, []);
 
   useEffect(() => {
@@ -163,20 +200,17 @@ export const NodeGraph: React.FC<NodeGraphProps> = ({
   const renderConnectionPath = (conn: NodeConnection, fromNode: DialogueNode, toNode: DialogueNode): string => {
     const start = getNodeBottom(fromNode);
     const end = getNodeTop(toNode);
-    
+
     const points: ConnectionPoint[] = [start, ...conn.bendPoints, end];
-    
+
     if (points.length === 2) {
       return `M ${start.x} ${start.y} L ${end.x} ${end.y}`;
     }
-    
+
     let path = `M ${points[0].x} ${points[0].y}`;
     for (let i = 1; i < points.length - 1; i++) {
-      const prev = points[i - 1];
       const curr = points[i];
       const next = points[i + 1];
-      const midX1 = (prev.x + curr.x) / 2;
-      const midY1 = (prev.y + curr.y) / 2;
       const midX2 = (curr.x + next.x) / 2;
       const midY2 = (curr.y + next.y) / 2;
       path += ` Q ${curr.x} ${curr.y} ${midX2} ${midY2}`;
@@ -189,20 +223,31 @@ export const NodeGraph: React.FC<NodeGraphProps> = ({
     const end = getNodeTop(toNode);
     const arrowSize = 10;
     const arrowY = end.y + arrowSize;
-    
+
     return `M ${end.x} ${end.y} L ${end.x - arrowSize / 2} ${arrowY} L ${end.x + arrowSize / 2} ${arrowY} Z`;
+  };
+
+  const getInvalidMessages = (nodeId: string): string[] => {
+    if (!invalidInfo) return [];
+    const info = invalidInfo.get(nodeId);
+    return info ? info.map(i => i.message) : [];
   };
 
   return (
     <div
       ref={containerRef}
       className="node-graph-container"
+      style={{
+        position: 'relative',
+        width: '100%',
+        height: '100%',
+        cursor: dragState ? 'grabbing' : 'default',
+      }}
       onMouseDown={handleCanvasMouseDown}
       onDoubleClick={handleCanvasDoubleClick}
     >
       <svg
         ref={svgRef}
-        className="connections-layer"
         style={{
           position: 'absolute',
           top: 0,
@@ -212,28 +257,15 @@ export const NodeGraph: React.FC<NodeGraphProps> = ({
           pointerEvents: 'none',
         }}
       >
-        <defs>
-          <marker
-            id="arrowhead"
-            markerWidth="10"
-            markerHeight="10"
-            refX="5"
-            refY="5"
-            orient="auto"
-          >
-            <polygon points="0 0, 10 5, 0 10" fill="#888" />
-          </marker>
-        </defs>
-        
         {connections.map((conn) => {
           const fromNode = nodes.find(n => n.id === conn.fromNodeId);
           const toNode = nodes.find(n => n.id === conn.toNodeId);
           if (!fromNode || !toNode) return null;
-          
+
           const pathD = renderConnectionPath(conn, fromNode, toNode);
           const arrowD = renderArrowHead(toNode);
           const connectionKey = `${conn.fromNodeId}-${conn.toNodeId}-${conn.optionIndex}`;
-          
+
           return (
             <g key={connectionKey}>
               <path
@@ -266,23 +298,23 @@ export const NodeGraph: React.FC<NodeGraphProps> = ({
                   stroke="#fff"
                   strokeWidth="1"
                   style={{ pointerEvents: 'all', cursor: 'move' }}
-                  onMouseDown={(e) => handleBendMouseDown(e, conn.fromNodeId, conn.toNodeId, conn.optionIndex, index)}
+                  onMouseDown={(e) => handleBendMouseDown(e, conn.fromNodeId, conn.toNodeId, conn.optionIndex, index, point)}
                 />
               ))}
             </g>
           );
         })}
       </svg>
-      
+
       {nodes.map((node) => {
         const isSelected = node.id === selectedNodeId;
         const isInvalid = invalidNodeIds.has(node.id);
         const displayText = node.text.length > 20 ? node.text.substring(0, 17) + '...' : node.text;
-        
+        const invalidMessages = getInvalidMessages(node.id);
+
         return (
           <div
             key={node.id}
-            className={`node-card ${isSelected ? 'selected' : ''} ${draggingNodeId === node.id ? 'dragging' : ''}`}
             style={{
               position: 'absolute',
               left: node.x,
@@ -294,11 +326,11 @@ export const NodeGraph: React.FC<NodeGraphProps> = ({
               borderRadius: '4px',
               padding: '8px',
               boxSizing: 'border-box',
-              cursor: 'move',
+              cursor: dragState?.nodeId === node.id ? 'grabbing' : 'grab',
               boxShadow: isSelected ? '0 0 6px #00e5ff' : 'none',
-              transition: 'transform 0.2s ease-out, opacity 0.2s ease-out',
               overflow: 'hidden',
               userSelect: 'none',
+              zIndex: isSelected ? 2 : 1,
             }}
             onMouseDown={(e) => handleMouseDown(e, node.id)}
           >
@@ -306,12 +338,17 @@ export const NodeGraph: React.FC<NodeGraphProps> = ({
               <div
                 style={{
                   position: 'absolute',
-                  top: '4px',
+                  top: '2px',
                   right: '6px',
                   color: '#ff4444',
                   fontWeight: 'bold',
-                  fontSize: '14px',
+                  fontSize: '16px',
+                  cursor: 'help',
+                  zIndex: 3,
+                  textShadow: '0 0 4px rgba(255, 0, 0, 0.5)',
                 }}
+                onMouseEnter={(e) => handleInvalidIconEnter(e, node.id)}
+                onMouseLeave={handleInvalidIconLeave}
               >
                 !
               </div>
@@ -322,6 +359,7 @@ export const NodeGraph: React.FC<NodeGraphProps> = ({
                 fontSize: '11px',
                 fontFamily: 'monospace',
                 marginBottom: '4px',
+                paddingRight: isInvalid ? '16px' : '0',
               }}
             >
               ID: {node.id}
@@ -365,6 +403,30 @@ export const NodeGraph: React.FC<NodeGraphProps> = ({
           </div>
         );
       })}
+
+      {showTooltip && (
+        <div
+          style={{
+            position: 'absolute',
+            left: showTooltip.x,
+            top: showTooltip.y,
+            transform: 'translateX(-50%)',
+            backgroundColor: 'rgba(0, 0, 0, 0.9)',
+            color: '#ff6666',
+            padding: '8px 10px',
+            borderRadius: '4px',
+            fontSize: '11px',
+            whiteSpace: 'nowrap',
+            zIndex: 100,
+            pointerEvents: 'none',
+            border: '1px solid #ff4444',
+          }}
+        >
+          {getInvalidMessages(showTooltip.nodeId).map((msg, i) => (
+            <div key={i}>{msg}</div>
+          ))}
+        </div>
+      )}
     </div>
   );
 };
