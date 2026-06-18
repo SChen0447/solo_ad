@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getProtocols } from '../utils/api';
 import type { Protocol, FilterStatus, ProtocolStatus } from '../types';
-import { formatDate } from '../utils/markdown';
+import { relativeTime, excerpt } from '../utils/markdown';
 
 const statusLabel: Record<ProtocolStatus, string> = {
   pending: '待签',
@@ -20,13 +20,17 @@ const filters: { key: FilterStatus; label: string }[] = [
 export default function ProtocolList() {
   const [protocols, setProtocols] = useState<Protocol[]>([]);
   const [loading, setLoading] = useState(true);
+  const [fadeIn, setFadeIn] = useState(false);
   const [filter, setFilter] = useState<FilterStatus>('all');
   const navigate = useNavigate();
 
   useEffect(() => {
     getProtocols()
       .then((data) => setProtocols(data))
-      .finally(() => setLoading(false));
+      .finally(() => {
+        setLoading(false);
+        requestAnimationFrame(() => setFadeIn(true));
+      });
   }, []);
 
   const filtered =
@@ -57,7 +61,10 @@ export default function ProtocolList() {
       </div>
 
       {loading ? (
-        <div className="loading">加载中...</div>
+        <div className="loading">
+          <div className="spinner" />
+          <div style={{ marginTop: 16 }}>正在加载协议数据...</div>
+        </div>
       ) : filtered.length === 0 ? (
         <div className="empty-state">
           <div className="empty-state-icon">📄</div>
@@ -74,7 +81,7 @@ export default function ProtocolList() {
           </button>
         </div>
       ) : (
-        <div className="card-grid">
+        <div className={`card-grid ${fadeIn ? 'card-grid--visible' : ''}`}>
           {filtered.map((p) => (
             <div
               key={p.id}
@@ -90,17 +97,17 @@ export default function ProtocolList() {
                     {statusLabel[p.status]}
                   </span>
                 </div>
+                <div className="card-excerpt">
+                  {excerpt(p.content, 60)}
+                </div>
                 <div className="card-meta">
-                  <div>
-                    发起人：跨部门协作平台
-                  </div>
                   <div>
                     签署进度：{signedCount(p)} / {p.parties.length}
                   </div>
                 </div>
               </div>
               <div className="card-footer">
-                <span>创建于 {formatDate(p.createdAt)}</span>
+                <span>{relativeTime(p.createdAt)}</span>
                 <span>查看详情 →</span>
               </div>
             </div>

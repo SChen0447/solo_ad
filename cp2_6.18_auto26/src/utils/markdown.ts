@@ -37,6 +37,46 @@ export function renderMarkdown(md: string): string {
   return `<div class="markdown-body">${wrapped}</div>`;
 }
 
+export function stripMarkdown(md: string): string {
+  if (!md) return '';
+  return md
+    .replace(/^#{1,6}\s+/gm, '')
+    .replace(/\*\*(.*?)\*\*/g, '$1')
+    .replace(/\*(.*?)\*/g, '$1')
+    .replace(/^\s*[-*+]\s+/gm, '')
+    .replace(/^\s*\d+\.\s+/gm, '')
+    .replace(/\n{2,}/g, ' ')
+    .replace(/\n/g, ' ')
+    .trim();
+}
+
+export function excerpt(text: string, maxLen: number = 60): string {
+  const plain = stripMarkdown(text);
+  if (plain.length <= maxLen) return plain;
+  return plain.slice(0, maxLen) + '...';
+}
+
+export function relativeTime(isoString: string | null): string {
+  if (!isoString) return '';
+  const now = Date.now();
+  const then = new Date(isoString).getTime();
+  const diff = now - then;
+  if (diff < 0) return '刚刚';
+
+  const seconds = Math.floor(diff / 1000);
+  const minutes = Math.floor(seconds / 60);
+  const hours = Math.floor(minutes / 60);
+  const days = Math.floor(hours / 24);
+
+  if (seconds < 60) return '刚刚';
+  if (minutes < 60) return `${minutes}分钟前`;
+  if (hours < 24) return `${hours}小时前`;
+  if (days === 1) return '昨天';
+  if (days < 7) return `${days}天前`;
+
+  return formatDate(isoString);
+}
+
 export function formatDate(isoString: string | null): string {
   if (!isoString) return '';
   const d = new Date(isoString);
