@@ -1,0 +1,410 @@
+.workbench {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.topBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.title {
+  font-size: 24px;
+  font-weight: 700;
+  background: linear-gradient(135deg, #e2a76f 0%, #c9a86c 50%, #d18b47 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  letter-spacing: 2px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.titleIcon {
+  font-size: 28px;
+  -webkit-text-fill-color: initial;
+}
+
+.recipeBookBtn {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #3a3a5c, #2a2a4a);
+  border: 2px solid #5a5a7c;
+  font-size: 24px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--duration-fast) var(--easing-standard);
+  position: relative;
+  overflow: visible;
+}
+
+.recipeBookBtn:hover {
+  border-color: var(--color-accent-gold);
+  transform: scale(1.05);
+  box-shadow: var(--shadow-gold-glow);
+}
+
+.recipeBookBtn.hasRecipes {
+  border-color: var(--color-accent-gold);
+  filter: grayscale(0%) brightness(1);
+}
+
+.recipeBookBtn.noRecipes {
+  filter: grayscale(100%) brightness(0.6);
+}
+
+.recipeBookBtn.unlocking {
+  animation: unlock-icon var(--duration-slow) var(--easing-standard) forwards;
+}
+
+.unlockGlow {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0;
+  height: 0;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(226, 167, 111, 0.8) 0%, rgba(201, 168, 108, 0.4) 50%, transparent 70%);
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+.unlockGlow.active {
+  animation: unlock-glow var(--duration-slow) ease-out forwards;
+}
+
+.mainArea {
+  flex: 1;
+  display: flex;
+  gap: 28px;
+  align-items: stretch;
+  min-height: 0;
+}
+
+.materialPanel {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 20px;
+  background: rgba(58, 58, 92, 0.6);
+  border-radius: var(--radius-card);
+  border: 1px solid rgba(201, 168, 108, 0.2);
+  box-shadow: var(--shadow-card);
+  backdrop-filter: blur(8px);
+}
+
+.panelTitle {
+  font-size: var(--font-size-title);
+  font-weight: 600;
+  color: var(--color-accent-light-gold);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.searchBox {
+  width: 100%;
+  padding: 8px 14px;
+  background: rgba(26, 26, 46, 0.8);
+  border: 1px solid #5a5a7c;
+  border-radius: var(--radius-button);
+  color: var(--color-text-primary);
+  font-size: var(--font-size-body);
+  outline: none;
+  transition: all var(--duration-fast) var(--easing-standard);
+}
+
+.searchBox::placeholder {
+  color: var(--color-text-secondary);
+}
+
+.searchBox:focus {
+  border-color: var(--color-accent-gold);
+  box-shadow: 0 0 0 2px rgba(226, 167, 111, 0.2);
+}
+
+.materialGrid {
+  display: grid;
+  grid-template-columns: repeat(6, var(--size-material-cell));
+  gap: 10px;
+  padding: 4px;
+}
+
+.materialCell {
+  width: var(--size-material-cell);
+  height: var(--size-material-cell);
+  border-radius: var(--radius-cell);
+  background: var(--color-bg-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  cursor: grab;
+  position: relative;
+  transition: all var(--duration-fast) var(--easing-standard);
+  border: 1px solid rgba(90, 90, 124, 0.6);
+}
+
+.materialCell:hover {
+  background: linear-gradient(135deg, #e2a76f 0%, #d18b47 100%);
+  transform: scale(1.05);
+  border-color: var(--color-accent-light-gold);
+  box-shadow: 0 2px 10px rgba(226, 167, 111, 0.4);
+  z-index: 2;
+}
+
+.materialCell:active {
+  cursor: grabbing;
+}
+
+.materialCell.disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.materialCell.disabled:hover {
+  background: var(--color-bg-secondary);
+  transform: none;
+  border-color: rgba(90, 90, 124, 0.6);
+  box-shadow: none;
+}
+
+.badge {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  min-width: var(--size-badge);
+  height: var(--size-badge);
+  border-radius: 50%;
+  font-size: var(--font-size-badge);
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 4px;
+  color: #1a1a2e;
+  border: 1.5px solid rgba(26, 26, 46, 0.9);
+  line-height: 1;
+}
+
+.craftArea {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 28px;
+  padding: 24px;
+  background: rgba(58, 58, 92, 0.4);
+  border-radius: var(--radius-card);
+  border: 1px solid rgba(201, 168, 108, 0.15);
+  box-shadow: var(--shadow-card);
+  backdrop-filter: blur(8px);
+  min-width: 0;
+}
+
+.slotsContainer {
+  position: relative;
+  padding: 16px;
+  border: 2px solid var(--color-accent-light-gold);
+  border-radius: 16px;
+  background: rgba(26, 26, 46, 0.6);
+}
+
+.slotsContainer.failing {
+  animation: craft-fail var(--duration-fail) var(--easing-standard),
+    craft-fail-bg var(--duration-fail) var(--easing-standard);
+}
+
+.craftingGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 72px);
+  gap: 10px;
+}
+
+.slot {
+  width: 72px;
+  height: 72px;
+  border-radius: var(--radius-cell);
+  background: rgba(26, 26, 46, 0.8);
+  border: 2px dashed var(--color-dashed-placeholder);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 30px;
+  position: relative;
+  transition: all var(--duration-fast) var(--easing-standard);
+}
+
+.slot.dragOver {
+  border-style: solid;
+  border-color: var(--color-accent-gold);
+  background: rgba(226, 167, 111, 0.15);
+  transform: scale(1.03);
+  box-shadow: inset 0 0 16px rgba(226, 167, 111, 0.2);
+}
+
+.slot.filled {
+  border-style: solid;
+  border-color: var(--color-accent-light-gold);
+  background: rgba(58, 58, 92, 0.8);
+  cursor: pointer;
+}
+
+.slot.filled:hover {
+  border-color: var(--color-error);
+  background: rgba(248, 113, 113, 0.15);
+}
+
+.slot.filled.animating {
+  animation: craft-success var(--duration-craft) ease-out forwards;
+}
+
+.slotBadge {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  min-width: var(--size-badge);
+  height: var(--size-badge);
+  border-radius: 50%;
+  font-size: var(--font-size-badge);
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 4px;
+  background: var(--color-accent-gold);
+  color: #1a1a2e;
+  border: 1.5px solid rgba(26, 26, 46, 0.9);
+  line-height: 1;
+}
+
+.previewArea {
+  min-height: 100px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+
+.outputCard {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 16px 28px;
+  background: linear-gradient(135deg, rgba(226, 167, 111, 0.2), rgba(201, 168, 108, 0.1));
+  border: 1.5px solid var(--color-accent-gold);
+  border-radius: var(--radius-card);
+}
+
+.outputIcon {
+  font-size: 48px;
+  animation: craft-appear 0.8s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+  filter: drop-shadow(0 0 12px rgba(226, 167, 111, 0.6));
+}
+
+.outputName {
+  font-size: var(--font-size-title);
+  font-weight: 600;
+  color: var(--color-accent-light-gold);
+}
+
+.outputQty {
+  font-size: var(--font-size-body);
+  color: var(--color-success);
+  font-weight: 600;
+}
+
+.failHint {
+  padding: 12px 24px;
+  color: var(--color-error);
+  font-size: var(--font-size-body);
+  background: rgba(248, 113, 113, 0.1);
+  border: 1px solid rgba(248, 113, 113, 0.3);
+  border-radius: var(--radius-button);
+}
+
+.craftButton {
+  width: var(--size-craft-button-width);
+  height: var(--size-craft-button-height);
+  border-radius: var(--radius-button);
+  border: none;
+  background: linear-gradient(135deg, #e2a76f 0%, #d18b47 100%);
+  color: var(--color-bg-primary);
+  font-size: var(--font-size-title);
+  font-weight: 700;
+  letter-spacing: 2px;
+  cursor: pointer;
+  transition: all var(--duration-fast) var(--easing-standard);
+  box-shadow: 0 2px 8px rgba(226, 167, 111, 0.3);
+}
+
+.craftButton:hover:not(:disabled) {
+  box-shadow: var(--shadow-gold-glow);
+  transform: translateY(-1px);
+}
+
+.craftButton:active:not(:disabled) {
+  transform: scale(0.95);
+  transition: transform 0.05s;
+}
+
+.craftButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  filter: grayscale(40%);
+}
+
+@media (max-width: 768px) {
+  .workbench {
+    padding: 16px;
+    gap: 16px;
+    overflow-y: auto;
+  }
+
+  .mainArea {
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .materialPanel {
+    width: 100%;
+  }
+
+  .materialGrid {
+    grid-template-columns: repeat(4, var(--size-material-cell));
+    justify-content: center;
+  }
+
+  .craftArea {
+    padding: 16px;
+  }
+
+  .craftingGrid {
+    grid-template-columns: repeat(3, 60px);
+  }
+
+  .slot {
+    width: 60px;
+    height: 60px;
+    font-size: 24px;
+  }
+
+  .title {
+    font-size: 18px;
+  }
+}
