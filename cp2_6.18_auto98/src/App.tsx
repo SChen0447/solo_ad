@@ -20,7 +20,8 @@ function App() {
   const [selectedTopicId, setSelectedTopicId] = useState<string | null>(null);
   const [nickname, setNickname] = useState<string>('');
   const [userId, setUserId] = useState<string>('');
-  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
+  const [isAnimating, setIsAnimating] = useState(false);
 
   useEffect(() => {
     setNickname(generateNickname());
@@ -28,11 +29,17 @@ function App() {
   }, []);
 
   const handleRefreshNickname = useCallback(() => {
-    setIsRefreshing(true);
-    setTimeout(() => {
-      setNickname(generateNickname());
-      setIsRefreshing(false);
-    }, 500);
+    setIsAnimating(false);
+    setNickname(generateNickname());
+    setRefreshKey(prev => prev + 1);
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        setIsAnimating(true);
+        setTimeout(() => {
+          setIsAnimating(false);
+        }, 500);
+      });
+    });
   }, []);
 
   const handleTopicClick = useCallback((topicId: string) => {
@@ -88,8 +95,9 @@ function App() {
               {nickname}
             </div>
             <button
+              key={refreshKey}
               onClick={handleRefreshNickname}
-              className={isRefreshing ? 'spin' : ''}
+              className={isAnimating ? 'spin' : ''}
               style={{
                 width: '32px',
                 height: '32px',
