@@ -13,8 +13,12 @@ const formatDate = (timestamp: number): string => {
 };
 
 const truncateText = (text: string, maxLength: number): string => {
-  if (text.length <= maxLength) return text;
-  return text.slice(0, maxLength) + '...';
+  const trimmed = text.trim();
+  if (!trimmed) {
+    return '（无内容）';
+  }
+  if (trimmed.length <= maxLength) return trimmed;
+  return trimmed.slice(0, maxLength) + '...';
 };
 
 function TrashIcon() {
@@ -47,6 +51,7 @@ interface CodeLineProps {
   onMouseDown: (line: number) => void;
   onMouseEnter: (line: number) => void;
   onDeleteAnnotation: (annotationId: string) => void;
+  onAnnotationDeleted?: () => void;
 }
 
 function CodeLine({
@@ -59,12 +64,20 @@ function CodeLine({
   onMouseDown,
   onMouseEnter,
   onDeleteAnnotation,
+  onAnnotationDeleted,
 }: CodeLineProps) {
   const [tooltipVisible, setTooltipVisible] = useState(false);
   const [tooltipTimer, setTooltipTimer] = useState<number | null>(null);
   const [keepTooltipOpen, setKeepTooltipOpen] = useState(false);
 
   const lineAnnotations = annotations.filter((a) => a.lineNumber === lineNumber);
+
+  useEffect(() => {
+    if (lineAnnotations.length === 0 && tooltipVisible) {
+      setTooltipVisible(false);
+      setKeepTooltipOpen(false);
+    }
+  }, [lineAnnotations.length, tooltipVisible]);
 
   const highlightedContent = useMemo(() => {
     try {
@@ -118,11 +131,16 @@ function CodeLine({
   };
 
   const handleDeleteClick = (annotationId: string, annotationContent: string) => {
-    const confirmed = window.confirm(`确定删除批注"${truncateText(annotationContent, 30)}"吗？`);
+    const displayText = truncateText(annotationContent, 30);
+    const confirmed = window.confirm(`确定删除批注"${displayText}"吗？`);
     if (confirmed) {
-      onDeleteAnnotation(annotationId);
+      clearTooltipTimer();
       setKeepTooltipOpen(false);
       setTooltipVisible(false);
+      onDeleteAnnotation(annotationId);
+      if (onAnnotationDeleted) {
+        onAnnotationDeleted();
+      }
     }
   };
 
