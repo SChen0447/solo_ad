@@ -105,7 +105,7 @@ function NavLink({ to, active, icon, label }: NavLinkProps) {
   );
 }
 
-function App() {
+export default function App() {
   return (
     <BrowserRouter>
       <div style={{ minHeight: '100vh', background: '#fafafa' }}>
@@ -120,3 +120,10 @@ function App() {
           <Routes>
             <Route path="/" element={<Dashboard />} />
             <Route path="/time-entry" element={<TimeEntry />} />
+            <Route path="/members/:id" element={<MemberDetail />} />
+          </Routes>
+        </main>
+      </div>
+    </BrowserRouter>
+  );
+}
