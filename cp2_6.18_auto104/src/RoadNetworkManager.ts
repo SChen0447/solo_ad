@@ -97,26 +97,28 @@ export class RoadNetworkManager {
 
     this.paintAsphaltNoise(ctx, canvasW, canvasH);
 
-    const edgeLineX = 6;
+    const edgeLineOffset = canvasW * 0.01;
     ctx.strokeStyle = 'rgba(255, 255, 255, 0.7)';
     ctx.lineWidth = 2;
     ctx.beginPath();
-    ctx.moveTo(0, edgeLineX);
-    ctx.lineTo(canvasW, edgeLineX);
+    ctx.moveTo(0, edgeLineOffset);
+    ctx.lineTo(canvasW, edgeLineOffset);
     ctx.stroke();
     ctx.beginPath();
-    ctx.moveTo(0, canvasH - edgeLineX);
-    ctx.lineTo(canvasW, canvasH - edgeLineX);
+    ctx.moveTo(0, canvasH - edgeLineOffset);
+    ctx.lineTo(canvasW, canvasH - edgeLineOffset);
     ctx.stroke();
 
-    const curbWidth = 3;
+    const curbHeight = canvasW * 0.005;
     ctx.fillStyle = 'rgba(180, 180, 180, 0.4)';
-    ctx.fillRect(0, 0, canvasW, 3);
-    ctx.fillRect(0, canvasH - 3, canvasW, 3);
+    ctx.fillRect(0, 0, canvasW, curbHeight);
+    ctx.fillRect(0, canvasH - curbHeight, canvasW, curbHeight);
 
+    const dashLen = canvasW * 0.03;
+    const dashGap = canvasW * 0.03;
     ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
     ctx.lineWidth = 2;
-    ctx.setLineDash([20, 14]);
+    ctx.setLineDash([dashLen, dashGap]);
     ctx.beginPath();
     ctx.moveTo(0, canvasH / 2);
     ctx.lineTo(canvasW, canvasH / 2);
@@ -141,21 +143,23 @@ export class RoadNetworkManager {
     ctx.fillStyle = '#000000';
     ctx.fillRect(0, 0, canvasW, canvasH);
 
-    const edgeLineX = 6;
+    const edgeLineOffset = canvasW * 0.01;
     ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
     ctx.lineWidth = 2;
     ctx.beginPath();
-    ctx.moveTo(0, edgeLineX);
-    ctx.lineTo(canvasW, edgeLineX);
+    ctx.moveTo(0, edgeLineOffset);
+    ctx.lineTo(canvasW, edgeLineOffset);
     ctx.stroke();
     ctx.beginPath();
-    ctx.moveTo(0, canvasH - edgeLineX);
-    ctx.lineTo(canvasW, canvasH - edgeLineX);
+    ctx.moveTo(0, canvasH - edgeLineOffset);
+    ctx.lineTo(canvasW, canvasH - edgeLineOffset);
     ctx.stroke();
 
+    const dashLen = canvasW * 0.03;
+    const dashGap = canvasW * 0.03;
     ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
     ctx.lineWidth = 2;
-    ctx.setLineDash([20, 14]);
+    ctx.setLineDash([dashLen, dashGap]);
     ctx.beginPath();
     ctx.moveTo(0, canvasH / 2);
     ctx.lineTo(canvasW, canvasH / 2);
@@ -181,10 +185,11 @@ export class RoadNetworkManager {
 
     this.paintAsphaltNoise(ctx, size, size);
 
-    const stripeW = 8;
-    const stripeGap = 8;
-    const stripeCount = 4;
-    const roadEdgeMargin = 20;
+    const stripeW = size * 0.03;
+    const stripeGap = size * 0.03;
+    const roadEdgeMargin = size * 0.08;
+    const availableWidth = size - 2 * roadEdgeMargin;
+    const stripeCount = Math.floor(availableWidth / (stripeW + stripeGap));
 
     ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
 
@@ -230,10 +235,11 @@ export class RoadNetworkManager {
     ctx.fillStyle = '#000000';
     ctx.fillRect(0, 0, size, size);
 
-    const stripeW = 8;
-    const stripeGap = 8;
-    const stripeCount = 4;
-    const roadEdgeMargin = 20;
+    const stripeW = size * 0.03;
+    const stripeGap = size * 0.03;
+    const roadEdgeMargin = size * 0.08;
+    const availableWidth = size - 2 * roadEdgeMargin;
+    const stripeCount = Math.floor(availableWidth / (stripeW + stripeGap));
 
     ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
 
@@ -257,10 +263,11 @@ export class RoadNetworkManager {
   }
 
   private paintAsphaltNoise(ctx: CanvasRenderingContext2D, w: number, h: number): void {
+    const maxNoiseOffset = (w + h) / 2 * 0.01;
     const imageData = ctx.getImageData(0, 0, w, h);
     const data = imageData.data;
     for (let i = 0; i < data.length; i += 4) {
-      const noise = (Math.random() - 0.5) * 18;
+      const noise = (Math.random() - 0.5) * 2 * maxNoiseOffset;
       data[i] = Math.max(0, Math.min(255, data[i] + noise));
       data[i + 1] = Math.max(0, Math.min(255, data[i + 1] + noise));
       data[i + 2] = Math.max(0, Math.min(255, data[i + 2] + noise));
@@ -348,7 +355,7 @@ export class RoadNetworkManager {
       map: this.roadTexture,
       emissiveMap: this.roadEmissiveTexture,
       emissive: new THREE.Color(0x444444),
-      emissiveIntensity: 0.15,
+      emissiveIntensity: this.getEmissiveIntensity(0),
       side: THREE.DoubleSide,
       transparent: true,
       opacity: 0.9
@@ -424,7 +431,7 @@ export class RoadNetworkManager {
           map: this.intersectionTexture,
           emissiveMap: this.intersectionEmissiveTexture,
           emissive: new THREE.Color(0x444444),
-          emissiveIntensity: 0.15,
+          emissiveIntensity: this.getEmissiveIntensity(0),
           side: THREE.DoubleSide,
           transparent: true,
           opacity: 0.9
@@ -580,6 +587,8 @@ export class RoadNetworkManager {
         } else {
           material.color.copy(color);
         }
+
+        material.emissiveIntensity = this.getEmissiveIntensity(density);
       }
     });
 
@@ -620,6 +629,7 @@ export class RoadNetworkManager {
       const color = this.getHeatColor(avgDensity);
       const material = mesh.material as THREE.MeshLambertMaterial;
       material.color.copy(color);
+      material.emissiveIntensity = this.getEmissiveIntensity(avgDensity);
     });
   }
 
@@ -633,6 +643,11 @@ export class RoadNetworkManager {
       const localT = (t - 0.5) / 0.5;
       return COLOR_MID.clone().lerp(COLOR_HIGH, localT);
     }
+  }
+
+  private getEmissiveIntensity(density: number): number {
+    const t = Math.max(0, Math.min(1, density / 200));
+    return 0.3 - (0.3 - 0.05) * t;
   }
 
   setSegmentHighlight(segmentId: string, highlight: boolean): void {
@@ -657,6 +672,8 @@ export class RoadNetworkManager {
       } else {
         material.color.copy(baseColor);
       }
+
+      material.emissiveIntensity = this.getEmissiveIntensity(density);
     }
 
     if (border) {
