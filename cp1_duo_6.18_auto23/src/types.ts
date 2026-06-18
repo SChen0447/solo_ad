@@ -75,6 +75,13 @@ export interface EnemyState {
   flashTimer: number;
   flashCount: number;
   active: boolean;
+  wobbleTimer: number;
+  wobbleInterval: number;
+  wobbleOffset: number;
+  wobblePhase: number;
+  speedBoostTimer: number;
+  speedBoostCooldown: number;
+  isSpeedBoosted: boolean;
 }
 
 export interface Fragment {

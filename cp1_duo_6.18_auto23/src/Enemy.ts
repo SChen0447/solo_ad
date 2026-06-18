@@ -14,6 +14,13 @@ const FRAGMENT_SIZE = 6;
 const FRAGMENT_SPEED = 0.5;
 const FROZEN_DURATION = 120;
 const FLASH_DURATION = 8;
+const WOBBLE_MIN_INTERVAL = 90;
+const WOBBLE_MAX_INTERVAL = 180;
+const WOBBLE_MIN_OFFSET = 20;
+const WOBBLE_MAX_OFFSET = 40;
+const BOOST_SPEED = 2.2;
+const BOOST_DURATION = 48;
+const BOOST_TRIGGER_DISTANCE = 100;
 
 export class EnemyManager {
   private enemies: EnemyState[] = [];
@@ -62,8 +69,43 @@ export class EnemyManager {
       const dist = Math.sqrt(dx * dx + dy * dy);
 
       if (dist > 0) {
-        enemy.position.x += (dx / dist) * ENEMY_SPEED;
-        enemy.position.y += (dy / dist) * ENEMY_SPEED;
+        let currentSpeed = ENEMY_SPEED;
+
+        if (enemy.speedBoostCooldown > 0) {
+          enemy.speedBoostCooldown--;
+        }
+        if (enemy.isSpeedBoosted) {
+          enemy.speedBoostTimer--;
+          if (enemy.speedBoostTimer <= 0) {
+            enemy.isSpeedBoosted = false;
+          } else {
+            currentSpeed = BOOST_SPEED;
+          }
+        } else if (dist < BOOST_TRIGGER_DISTANCE && enemy.speedBoostCooldown <= 0) {
+          enemy.isSpeedBoosted = true;
+          enemy.speedBoostTimer = BOOST_DURATION;
+          enemy.speedBoostCooldown = BOOST_DURATION + 120;
+          currentSpeed = BOOST_SPEED;
+        }
+
+        enemy.wobbleTimer++;
+        if (enemy.wobbleTimer >= enemy.wobbleInterval) {
+          enemy.wobbleTimer = 0;
+          enemy.wobbleInterval = WOBBLE_MIN_INTERVAL + Math.random() * (WOBBLE_MAX_INTERVAL - WOBBLE_MIN_INTERVAL);
+          const targetOffset = (Math.random() > 0.5 ? 1 : -1) * (WOBBLE_MIN_OFFSET + Math.random() * (WOBBLE_MAX_OFFSET - WOBBLE_MIN_OFFSET));
+          enemy.wobbleOffset = targetOffset;
+        }
+
+        const t = enemy.wobbleTimer / enemy.wobbleInterval;
+        const wobbleAmount = enemy.wobbleOffset * Math.sin(t * Math.PI * 2);
+
+        const forwardX = dx / dist;
+        const forwardY = dy / dist;
+        const perpX = -forwardY;
+        const perpY = forwardX;
+
+        enemy.position.x += forwardX * currentSpeed + perpX * (wobbleAmount * 0.02);
+        enemy.position.y += forwardY * currentSpeed + perpY * (wobbleAmount * 0.02);
       }
     }
 
@@ -112,6 +154,9 @@ export class EnemyManager {
     const element = elements[Math.floor(Math.random() * elements.length)];
     const color = RANDOM_COLORS[Math.floor(Math.random() * RANDOM_COLORS.length)];
 
+    const initialWobbleInterval = WOBBLE_MIN_INTERVAL + Math.random() * (WOBBLE_MAX_INTERVAL - WOBBLE_MIN_INTERVAL);
+    const initialWobbleOffset = (Math.random() > 0.5 ? 1 : -1) * (WOBBLE_MIN_OFFSET + Math.random() * (WOBBLE_MAX_OFFSET - WOBBLE_MIN_OFFSET));
+
     this.enemies.push({
       id: this.enemyIdCounter++,
       position: { x, y },
@@ -122,7 +167,14 @@ export class EnemyManager {
       flashing: false,
       flashTimer: 0,
       flashCount: 0,
-      active: true
+      active: true,
+      wobbleTimer: 0,
+      wobbleInterval: initialWobbleInterval,
+      wobbleOffset: initialWobbleOffset,
+      wobblePhase: 0,
+      speedBoostTimer: 0,
+      speedBoostCooldown: 0,
+      isSpeedBoosted: false
     });
   }
 
