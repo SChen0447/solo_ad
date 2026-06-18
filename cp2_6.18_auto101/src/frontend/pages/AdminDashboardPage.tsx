@@ -70,11 +70,23 @@ function itemTdStyle(align: 'left' | 'center' | 'right'): React.CSSProperties {
   };
 }
 
+type AdminStatusFilter = 'all' | 'pending' | 'approved' | 'rejected' | 'delivered';
+
+const adminStatusOptions: { value: AdminStatusFilter; label: string }[] = [
+  { value: 'all', label: '全部状态' },
+  { value: 'pending', label: '待审批' },
+  { value: 'approved', label: '已批准' },
+  { value: 'rejected', label: '已拒绝' },
+  { value: 'delivered', label: '已送达' },
+];
+
 export function AdminDashboardPage() {
   const [requests, setRequests] = useState<PurchaseRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
+  const [searchKeyword, setSearchKeyword] = useState('');
+  const [statusFilter, setStatusFilter] = useState<AdminStatusFilter>('all');
   const isLoggedIn = useAppStore((state) => state.isLoggedIn);
   const showToast = useAppStore((state) => state.showToast);
   const location = useLocation();
@@ -136,6 +148,30 @@ export function AdminDashboardPage() {
   const approvedRequests = requests.filter((r) => r.status === 'approved');
   const rejectedRequests = requests.filter((r) => r.status === 'rejected');
   const deliveredRequests = requests.filter((r) => r.status === 'delivered');
+
+  const filteredRequests = useMemo(() => {
+    const keyword = searchKeyword.trim().toLowerCase();
+    return requests.filter((req) => {
+      if (statusFilter !== 'all' && req.status !== statusFilter) {
+        return false;
+      }
+      if (keyword) {
+        const matchTitle = req.title.toLowerCase().includes(keyword);
+        const matchApplicant = req.applicant.toLowerCase().includes(keyword);
+        if (!matchTitle && !matchApplicant) {
+          return false;
+        }
+      }
+      return true;
+    });
+  }, [requests, searchKeyword, statusFilter]);
+
+  const hasActiveFilter = searchKeyword.trim() !== '' || statusFilter !== 'all';
+
+  const clearFilters = () => {
+    setSearchKeyword('');
+    setStatusFilter('all');
+  };
 
   if (loading) {
     return (
@@ -324,43 +360,229 @@ export function AdminDashboardPage() {
     );
   };
 
+  const getSectionTitle = (): { title: string; hint?: string; showDeliver: boolean } => {
+    switch (statusFilter) {
+      case 'pending':
+        return { title: '待审批申购单', hint: '点击左侧箭头展开查看物品明细', showDeliver: false };
+      case 'approved':
+        return { title: '已批准（可标记送达）', showDeliver: true };
+      case 'rejected':
+        return { title: '已拒绝申购单', showDeliver: false };
+      case 'delivered':
+        return { title: '已送达申购单', showDeliver: false };
+      default:
+        return { title: '全部申购单', hint: '点击左侧箭头展开查看物品明细', showDeliver: false };
+    }
+  };
+
+  const sectionInfo = getSectionTitle();
+
+  const getListForCurrentFilter = () => {
+    if (statusFilter !== 'all') {
+      return filteredRequests;
+    }
+    return filteredRequests;
+  };
+
+  const shouldShowDeliverButton = (status: PurchaseRequest['status']) => {
+    return status === 'approved';
+  };
+
   return (
     <div style={pageStyle}>
       <div style={containerStyle}>
         <h1 style={titleStyle}>审批仪表板</h1>
 
         <div style={statsStyle}>
-          <div style={statCardStyle('#fef3c7', '#92400e')}>
+          <div
+            onClick={() => setStatusFilter('pending')}
+            style={{
+              ...statCardStyle('#fef3c7', '#92400e'),
+              cursor: 'pointer',
+              transition: 'all 0.2s ease-out',
+              border: statusFilter === 'pending' ? '2px solid #f59e0b' : '2px solid transparent',
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.transform = 'translateY(-2px)')}
+            onMouseLeave={(e) => (e.currentTarget.style.transform = 'translateY(0)')}
+          >
             <div style={{ fontSize: '28px', fontWeight: 'bold' }}>{pendingRequests.length}</div>
             <div style={{ fontSize: '13px' }}>待审批</div>
           </div>
-          <div style={statCardStyle('#dcfce7', '#166534')}>
+          <div
+            onClick={() => setStatusFilter('approved')}
+            style={{
+              ...statCardStyle('#dcfce7', '#166534'),
+              cursor: 'pointer',
+              transition: 'all 0.2s ease-out',
+              border: statusFilter === 'approved' ? '2px solid #22c55e' : '2px solid transparent',
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.transform = 'translateY(-2px)')}
+            onMouseLeave={(e) => (e.currentTarget.style.transform = 'translateY(0)')}
+          >
             <div style={{ fontSize: '28px', fontWeight: 'bold' }}>{approvedRequests.length}</div>
             <div style={{ fontSize: '13px' }}>已批准</div>
           </div>
-          <div style={statCardStyle('#fee2e2', '#991b1b')}>
+          <div
+            onClick={() => setStatusFilter('rejected')}
+            style={{
+              ...statCardStyle('#fee2e2', '#991b1b'),
+              cursor: 'pointer',
+              transition: 'all 0.2s ease-out',
+              border: statusFilter === 'rejected' ? '2px solid #ef4444' : '2px solid transparent',
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.transform = 'translateY(-2px)')}
+            onMouseLeave={(e) => (e.currentTarget.style.transform = 'translateY(0)')}
+          >
             <div style={{ fontSize: '28px', fontWeight: 'bold' }}>{rejectedRequests.length}</div>
             <div style={{ fontSize: '13px' }}>已驳回</div>
           </div>
-          <div style={statCardStyle('#dbeafe', '#1e40af')}>
+          <div
+            onClick={() => setStatusFilter('delivered')}
+            style={{
+              ...statCardStyle('#dbeafe', '#1e40af'),
+              cursor: 'pointer',
+              transition: 'all 0.2s ease-out',
+              border: statusFilter === 'delivered' ? '2px solid #3b82f6' : '2px solid transparent',
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.transform = 'translateY(-2px)')}
+            onMouseLeave={(e) => (e.currentTarget.style.transform = 'translateY(0)')}
+          >
             <div style={{ fontSize: '28px', fontWeight: 'bold' }}>{deliveredRequests.length}</div>
             <div style={{ fontSize: '13px' }}>已送达</div>
           </div>
         </div>
 
-        <div style={sectionStyle}>
-          <h2 style={sectionTitleStyle}>
-            待审批申购单
-            <span style={{ fontSize: '14px', fontWeight: 'normal', color: '#9ca3af', marginLeft: '10px' }}>
-              点击左侧箭头展开查看物品明细
-            </span>
-          </h2>
-          {renderTable(pendingRequests, false)}
+        <div style={adminFilterBarStyle}>
+          <div style={adminSearchBoxStyle}>
+            <Search size={16} color="#9ca3af" style={{ flexShrink: 0 }} />
+            <input
+              type="text"
+              value={searchKeyword}
+              onChange={(e) => setSearchKeyword(e.target.value)}
+              placeholder="搜索标题或申请人..."
+              style={adminSearchInputStyle}
+            />
+            {searchKeyword && (
+              <button
+                onClick={() => setSearchKeyword('')}
+                style={clearIconStyle}
+                title="清除搜索"
+              >
+                <X size={14} />
+              </button>
+            )}
+          </div>
+
+          <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value as AdminStatusFilter)}
+              style={adminSelectStyle}
+            >
+              {adminStatusOptions.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {hasActiveFilter && (
+            <button onClick={clearFilters} style={adminClearBtnStyle}>
+              <X size={14} />
+              重置
+            </button>
+          )}
+
+          <div style={adminResultStyle}>
+            共 {filteredRequests.length} 条
+            {hasActiveFilter && (
+              <span style={{ color: '#9ca3af', marginLeft: '4px' }}>
+                / {requests.length}
+              </span>
+            )}
+          </div>
         </div>
 
         <div style={sectionStyle}>
-          <h2 style={sectionTitleStyle}>已批准（可标记送达）</h2>
-          {renderTable(approvedRequests, true)}
+          <h2 style={sectionTitleStyle}>
+            {sectionInfo.title}
+            {sectionInfo.hint && (
+              <span style={{ fontSize: '14px', fontWeight: 'normal', color: '#9ca3af', marginLeft: '10px' }}>
+                {sectionInfo.hint}
+              </span>
+            )}
+          </h2>
+
+          {filteredRequests.length === 0 ? (
+            <div style={adminEmptyStyle}>
+              <div style={{ fontSize: '36px', marginBottom: '10px' }}>🔍</div>
+              {hasActiveFilter ? (
+                <>
+                  <div style={{ fontSize: '14px', color: '#374151', fontWeight: 500, marginBottom: '6px' }}>
+                    没有匹配的申购单
+                  </div>
+                  <div style={{ fontSize: '13px', color: '#9ca3af', marginBottom: '14px' }}>
+                    试试清除搜索或更换筛选状态
+                  </div>
+                  <button onClick={clearFilters} style={adminClearBigStyle}>
+                    清除筛选
+                  </button>
+                </>
+              ) : (
+                <div style={{ fontSize: '14px', color: '#9ca3af' }}>暂无申购单</div>
+              )}
+            </div>
+          ) : statusFilter === 'all' ? (
+            <>
+              {pendingRequests.length > 0 && (
+                <div style={{ marginBottom: '20px' }}>
+                  <h3 style={subSectionTitleStyle}>
+                    待审批 ({pendingRequests.length})
+                  </h3>
+                  {renderTable(
+                    filteredRequests.filter((r) => r.status === 'pending'),
+                    false
+                  )}
+                </div>
+              )}
+              {approvedRequests.length > 0 && (
+                <div style={{ marginBottom: '20px' }}>
+                  <h3 style={subSectionTitleStyle}>
+                    已批准 ({approvedRequests.length})
+                  </h3>
+                  {renderTable(
+                    filteredRequests.filter((r) => r.status === 'approved'),
+                    true
+                  )}
+                </div>
+              )}
+              {rejectedRequests.length > 0 && (
+                <div style={{ marginBottom: '20px' }}>
+                  <h3 style={subSectionTitleStyle}>
+                    已拒绝 ({rejectedRequests.length})
+                  </h3>
+                  {renderTable(
+                    filteredRequests.filter((r) => r.status === 'rejected'),
+                    false
+                  )}
+                </div>
+              )}
+              {deliveredRequests.length > 0 && (
+                <div>
+                  <h3 style={subSectionTitleStyle}>
+                    已送达 ({deliveredRequests.length})
+                  </h3>
+                  {renderTable(
+                    filteredRequests.filter((r) => r.status === 'delivered'),
+                    false
+                  )}
+                </div>
+              )}
+            </>
+          ) : (
+            renderTable(getListForCurrentFilter(), sectionInfo.showDeliver)
+          )}
         </div>
       </div>
     </div>
