@@ -91,7 +91,7 @@
 
 .grid-column {
   flex: 1;
-  border-left: 1px solid #f0f0f0;
+  border-left: 1px solid #e0e0e0;
 }
 
 .grid-column:first-child {

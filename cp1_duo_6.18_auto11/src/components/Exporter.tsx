@@ -26,13 +26,14 @@ function getCardGridStyle(card: CardData): string {
 
 function generateCardHTML(card: CardData): string {
   const baseStyle = 'background: #fff; border-radius: 12px; overflow: hidden; box-shadow: 0 2px 12px rgba(0,0,0,0.15); transition: transform 0.3s ease, box-shadow 0.3s ease; display: flex; flex-direction: column;';
+  const hoverClass = 'card-hover';
   
   let contentHTML = '';
   
   switch (card.type) {
     case 'project':
       contentHTML = `
-        <div class="card project-card" style="${baseStyle}">
+        <div class="card project-card ${hoverClass}" style="${baseStyle}">
           ${card.image ? `<div style="width: 100%; height: 60%; background-image: url('${card.image}'); background-size: cover; background-position: center;"></div>` : ''}
           <div style="padding: 14px 16px; flex: 1; display: flex; flex-direction: column; gap: 6px;">
             <h3 style="font-size: 15px; font-weight: 600; color: #333; margin: 0; line-height: 1.3;">${card.title || '项目标题'}</h3>
@@ -44,7 +45,7 @@ function generateCardHTML(card: CardData): string {
       
     case 'text':
       contentHTML = `
-        <div class="card text-card" style="${baseStyle} padding: 16px;">
+        <div class="card text-card ${hoverClass}" style="${baseStyle} padding: 16px;">
           <div style="font-size: 14px; color: #333; line-height: 1.6; word-break: break-word;">
             ${parseContentForExport(card.content || '在这里输入文本内容...')}
           </div>
@@ -70,7 +71,7 @@ function generateCardHTML(card: CardData): string {
       }).join('') || '';
       
       contentHTML = `
-        <div class="card contact-card" style="${baseStyle} padding: 20px 16px; align-items: center; gap: 12px;">
+        <div class="card contact-card ${hoverClass}" style="${baseStyle} padding: 20px 16px; align-items: center; gap: 12px;">
           <h3 style="font-size: 15px; font-weight: 600; color: #333; margin: 0;">${card.title || '联系方式'}</h3>
           <div style="display: flex; gap: 16px; flex-wrap: wrap; justify-content: center;">
             ${linksHTML}
@@ -153,6 +154,7 @@ function Exporter() {
     .card em { font-style: italic; }
     .card a { color: #4da6ff; text-decoration: none; border-bottom: 1px solid rgba(77,166,255,0.3); }
     .card a:hover { color: #3a8feb; border-bottom-color: #3a8feb; }
+    .card-hover:hover { transform: scale(1.05); box-shadow: 0 4px 24px rgba(0,0,0,0.2); }
   </style>
 </head>
 <body>

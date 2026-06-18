@@ -107,10 +107,10 @@
 
 .phone-frame {
   width: 320px;
-  height: 640px;
+  height: 800px;
   background-color: #1a1a1a;
-  border-radius: 36px;
-  padding: 12px;
+  border-radius: 40px;
+  padding: 14px;
   box-shadow: 0 10px 40px rgba(0, 0, 0, 0.4);
 }
 
