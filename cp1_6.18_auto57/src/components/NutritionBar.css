@@ -1,0 +1,142 @@
+.nutrition-bar {
+  width: 100%;
+}
+
+.nutrition-bar__calories {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.nutrition-bar__calories-value {
+  font-family: 'Lora', serif;
+  font-size: 36px;
+  font-weight: 700;
+  color: #E53935;
+  line-height: 1;
+  transition: color 0.3s ease;
+}
+
+.nutrition-bar__calories-label {
+  font-size: 14px;
+  color: #8D6E63;
+  font-weight: 500;
+}
+
+.nutrition-bar__track {
+  display: flex;
+  width: 100%;
+  height: 14px;
+  border-radius: 7px;
+  overflow: hidden;
+  background: #EFEBE9;
+  margin-bottom: 14px;
+}
+
+.nutrition-bar.compact .nutrition-bar__track {
+  height: 8px;
+  border-radius: 4px;
+  margin-bottom: 8px;
+}
+
+.nutrition-bar__segment {
+  position: relative;
+  min-width: 4px;
+  transition: width 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+  cursor: pointer;
+}
+
+.nutrition-bar__segment:hover {
+  transform: scaleY(1.3);
+  z-index: 2;
+}
+
+.nutrition-bar.compact .nutrition-bar__segment:hover {
+  transform: scaleY(1.5);
+}
+
+.segment--calories {
+  background: linear-gradient(135deg, #FF6F60, #E53935);
+}
+
+.segment--protein {
+  background: linear-gradient(135deg, #64B5F6, #1976D2);
+}
+
+.segment--fat {
+  background: linear-gradient(135deg, #FFD54F, #F9A825);
+}
+
+.segment--carbs {
+  background: linear-gradient(135deg, #81C784, #388E3C);
+}
+
+.nutrition-bar__tooltip {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%) translateY(4px);
+  background: #3E2723;
+  color: white;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: all 0.2s ease;
+}
+
+.nutrition-bar__segment:hover .nutrition-bar__tooltip {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+.nutrition-bar__tooltip::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 5px solid transparent;
+  border-top-color: #3E2723;
+}
+
+.nutrition-bar__legend {
+  display: flex;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+.nutrition-bar__legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: #5D4037;
+  font-weight: 500;
+}
+
+.dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.dot--protein { background: #1976D2; }
+.dot--fat { background: #F9A825; }
+.dot--carbs { background: #388E3C; }
+
+.nutrition-bar__compact-values {
+  display: flex;
+  gap: 12px;
+  font-size: 12px;
+  color: #6D4C41;
+}
+
+.nutrition-bar__compact-values .val--cal { color: #E53935; font-weight: 600; }
+.nutrition-bar__compact-values .val--p { color: #1976D2; }
+.nutrition-bar__compact-values .val--f { color: #F9A825; }
+.nutrition-bar__compact-values .val--c { color: #388E3C; }
