@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { ArrowLeft, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { fetchMemberDetail, type MemberDetail, type AnomalyItem } from '@/api';
 
 function getBarColor(hours: number): string {
@@ -94,12 +94,15 @@ function AnomalyList({ anomalies }: { anomalies: AnomalyItem[] }) {
         style={{
           textAlign: 'center',
           padding: '32px 0',
-          color: '#9ca3af',
+          color: '#22c55e',
           fontSize: 14,
         }}
       >
-        <AlertTriangle size={32} style={{ marginBottom: 8, opacity: 0.3 }} />
-        <div>暂无异常工时记录</div>
+        <CheckCircle2 size={32} style={{ marginBottom: 8, opacity: 0.6 }} />
+        <div style={{ fontWeight: 500 }}>当前无异常工时记录</div>
+        <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 4 }}>
+          所有记录正常，未检测到超时或周末加班
+        </div>
       </div>
     );
   }

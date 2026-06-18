@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { TrendingUp, TrendingDown, Minus } from 'lucide-react';
 import {
@@ -41,7 +41,7 @@ function StatCard({
         width: 220,
         height: 120,
         borderRadius: 16,
-        background: 'linear-gradient(135deg, #e0f2fe 0%, #ede9fe 100%)',
+        background: 'linear-gradient(to bottom, #e0f2fe, #ede9fe)',
         padding: '16px 20px',
         display: 'flex',
         flexDirection: 'column',
@@ -97,7 +97,11 @@ function RankingList({ ranking }: { ranking: RankingItem[] }) {
       </h3>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
         {ranking.map((item, idx) => {
+          const isOverflow = item.weeklyHours > MAX_HOURS;
           const pct = Math.min((item.weeklyHours / MAX_HOURS) * 100, 100);
+          const overflowHours = isOverflow
+            ? Math.round((item.weeklyHours - MAX_HOURS) * 10) / 10
+            : 0;
           const color = getAvatarColor(item.name);
           return (
             <Link
@@ -147,6 +151,7 @@ function RankingList({ ranking }: { ranking: RankingItem[] }) {
                       display: 'flex',
                       justifyContent: 'space-between',
                       marginBottom: 4,
+                      alignItems: 'center',
                     }}
                   >
                     <span
@@ -162,6 +167,11 @@ function RankingList({ ranking }: { ranking: RankingItem[] }) {
                       style={{ fontSize: 13, color: '#6b7280', flexShrink: 0 }}
                     >
                       {item.weeklyHours}h
+                      {isOverflow && (
+                        <span style={{ color: '#ef4444', fontSize: 11, marginLeft: 4 }}>
+                          +{overflowHours}h
+                        </span>
+                      )}
                     </span>
                   </div>
                   <div
@@ -169,7 +179,8 @@ function RankingList({ ranking }: { ranking: RankingItem[] }) {
                       height: 8,
                       borderRadius: 4,
                       background: '#e5e7eb',
-                      overflow: 'hidden',
+                      overflow: 'visible',
+                      position: 'relative',
                     }}
                   >
                     <div
@@ -177,10 +188,35 @@ function RankingList({ ranking }: { ranking: RankingItem[] }) {
                         height: '100%',
                         width: `${pct}%`,
                         borderRadius: 4,
-                        background: 'linear-gradient(90deg, #86efac 0%, #22c55e 100%)',
+                        background: isOverflow
+                          ? 'linear-gradient(90deg, #86efac 0%, #22c55e 70%, #ef4444 100%)'
+                          : 'linear-gradient(90deg, #86efac 0%, #22c55e 100%)',
                         transition: 'width 0.6s ease-out',
+                        position: 'relative',
                       }}
                     />
+                    {isOverflow && (
+                      <div
+                        style={{
+                          position: 'absolute',
+                          right: -2,
+                          top: -3,
+                          width: 14,
+                          height: 14,
+                          borderRadius: '50%',
+                          background: '#ef4444',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          color: '#fff',
+                          fontSize: 9,
+                          fontWeight: 700,
+                          lineHeight: 1,
+                        }}
+                      >
+                        !
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -228,6 +264,8 @@ function TrendChart({ data }: { data: TrendPoint[] }) {
   const yTicks = 5;
   const yStep = Math.ceil(maxVal / yTicks);
 
+  const containerRef = useRef<HTMLDivElement>(null);
+
   const handleMouseMove = useCallback(
     (e: React.MouseEvent<SVGSVGElement>) => {
       const svg = e.currentTarget;
@@ -244,14 +282,23 @@ function TrendChart({ data }: { data: TrendPoint[] }) {
         }
       }
 
+      const container = containerRef.current;
+      let offsetX = 0;
+      let offsetY = 0;
+      if (container) {
+        const containerRect = container.getBoundingClientRect();
+        offsetX = rect.left - containerRect.left + container.scrollLeft;
+        offsetY = rect.top - containerRect.top + container.scrollTop;
+      }
+
       setTooltip({
-        x: closest.x,
-        y: closest.y,
+        x: closest.x + offsetX,
+        y: closest.y + offsetY,
         value: closest.totalHours,
         date: closest.date,
       });
     },
-    [points]
+    [points, containerRef]
   );
 
   const handleMouseLeave = useCallback(() => {
@@ -270,7 +317,7 @@ function TrendChart({ data }: { data: TrendPoint[] }) {
       >
         项目工时趋势（近30天）
       </h3>
-      <div style={{ position: 'relative', width: WIDTH, height: HEIGHT }}>
+      <div ref={containerRef} style={{ position: 'relative', width: WIDTH, height: HEIGHT }}>
         <svg
           width={WIDTH}
           height={HEIGHT}
