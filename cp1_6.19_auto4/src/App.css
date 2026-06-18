@@ -1,0 +1,241 @@
+.app-container {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  background: #f8fafc;
+  overflow: hidden;
+}
+
+.app-header {
+  display: flex;
+  align-items: center;
+  height: 56px;
+  background: #1e3a5f;
+  color: white;
+  padding: 0 16px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  z-index: 10;
+}
+
+.sidebar-toggle {
+  background: rgba(255, 255, 255, 0.1);
+  border: none;
+  color: white;
+  width: 36px;
+  height: 36px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 300ms ease-out;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sidebar-toggle:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.sidebar-toggle.collapsed {
+  transform: rotate(180deg);
+}
+
+.header-title {
+  flex: 1;
+  text-align: center;
+}
+
+.header-title h1 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.user-badge {
+  background: rgba(255, 255, 255, 0.15);
+  padding: 6px 12px;
+  border-radius: 16px;
+  font-size: 13px;
+}
+
+.export-btn {
+  padding: 10px 20px;
+  background: linear-gradient(135deg, #3b82f6, #2563eb);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 200ms ease;
+  box-shadow: 0 2px 6px rgba(59, 130, 246, 0.3);
+}
+
+.export-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+  background: linear-gradient(135deg, #2563eb, #1d4ed8);
+}
+
+.export-btn:active {
+  transform: translateY(0);
+}
+
+.main-content {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+.sidebar {
+  width: 320px;
+  flex-shrink: 0;
+  padding: 16px;
+  transition: width 300ms ease-out, padding 300ms ease-out;
+  overflow: hidden;
+}
+
+.sidebar.collapsed {
+  width: 0;
+  padding: 0;
+}
+
+.editor-section {
+  flex: 1;
+  padding: 16px;
+  min-width: 0;
+}
+
+.login-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  background: linear-gradient(135deg, #1e3a5f, #2563eb);
+}
+
+.login-card {
+  background: white;
+  padding: 40px;
+  border-radius: 16px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
+  text-align: center;
+  width: 100%;
+  max-width: 400px;
+}
+
+.login-card h1 {
+  color: #1e3a5f;
+  margin: 0 0 8px 0;
+  font-size: 24px;
+}
+
+.login-card p {
+  color: #64748b;
+  margin: 0 0 24px 0;
+  font-size: 14px;
+}
+
+.username-input {
+  width: 100%;
+  padding: 12px 16px;
+  border: 2px solid #e2e8f0;
+  border-radius: 8px;
+  font-size: 16px;
+  outline: none;
+  transition: border-color 200ms ease;
+  box-sizing: border-box;
+}
+
+.username-input:focus {
+  border-color: #3b82f6;
+}
+
+.join-btn {
+  width: 100%;
+  margin-top: 16px;
+  padding: 12px;
+  background: linear-gradient(135deg, #3b82f6, #2563eb);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 200ms ease;
+}
+
+.join-btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+}
+
+.join-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+@media (max-width: 768px) {
+  .app-header {
+    padding: 0 10px;
+    height: 48px;
+  }
+
+  .sidebar-toggle {
+    width: 32px;
+    height: 32px;
+    font-size: 12px;
+  }
+
+  .header-title h1 {
+    font-size: 15px;
+  }
+
+  .user-badge {
+    display: none;
+  }
+
+  .export-btn {
+    padding: 8px 14px;
+    font-size: 12px;
+  }
+
+  .main-content {
+    flex-direction: column;
+  }
+
+  .sidebar {
+    width: 100%;
+    padding: 8px;
+    max-height: 200px;
+    flex-shrink: 0;
+  }
+
+  .sidebar.collapsed {
+    height: 0;
+    max-height: 0;
+    width: 100%;
+    padding: 0;
+  }
+
+  .editor-section {
+    padding: 8px;
+    flex: 1;
+    min-height: 0;
+  }
+
+  .login-card {
+    padding: 24px;
+    margin: 20px;
+  }
+
+  .login-card h1 {
+    font-size: 20px;
+  }
+}
