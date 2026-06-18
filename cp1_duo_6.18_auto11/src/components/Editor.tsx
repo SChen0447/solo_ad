@@ -19,7 +19,7 @@ const iconOptions = [
 ];
 
 function Editor() {
-  const { cards, selectedCardId, addCard, updateCard, updateLayout, selectCard, removeCard, layoutConfig } = usePortfolioStore();
+  const { cards, selectedCardId, addCard, updateCard, updateLayout, selectCard, removeCard, layoutConfig, undo, redo, history, redoStack } = usePortfolioStore();
   const [draggedType, setDraggedType] = useState<CardType | null>(null);
   const [isResizing, setIsResizing] = useState(false);
   const gridRef = useRef<HTMLDivElement>(null);
@@ -260,14 +260,41 @@ function Editor() {
         </div>
       </div>
 
-      <div
-        className="grid-container-wrapper"
-        onDragOver={handleDragOver}
-        onDrop={handleDrop}
-        onClick={handleBackgroundClick}
-        ref={gridRef}
-      >
-        <div className="grid-background">
+      <div className="main-editor-area">
+        <div className="editor-toolbar">
+          <div className="toolbar-left">
+            <button
+              className={`tool-btn-undo ${history.length === 0 ? 'disabled' : ''}`}
+              onClick={undo}
+              disabled={history.length === 0}
+              title="撤销 (Ctrl+Z)"
+            >
+              <i className="fas fa-undo"></i>
+              <span>撤销</span>
+            </button>
+            <button
+              className={`tool-btn-redo ${redoStack.length === 0 ? 'disabled' : ''}`}
+              onClick={redo}
+              disabled={redoStack.length === 0}
+              title="重做 (Ctrl+Y)"
+            >
+              <i className="fas fa-redo"></i>
+              <span>重做</span>
+            </button>
+          </div>
+          <div className="toolbar-right">
+            <span className="history-counter">历史: {history.length}/50</span>
+          </div>
+        </div>
+
+        <div
+          className="grid-container-wrapper"
+          onDragOver={handleDragOver}
+          onDrop={handleDrop}
+          onClick={handleBackgroundClick}
+          ref={gridRef}
+        >
+          <div className="grid-background">
           {Array.from({ length: 12 }).map((_, i) => (
             <div key={i} className="grid-column" />
           ))}
