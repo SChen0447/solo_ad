@@ -1,4 +1,4 @@
-import { useRef, useEffect, useCallback, useState } from 'react';
+import { useRef, useEffect, useCallback, useState, useMemo } from 'react';
 import { RotateCcw } from 'lucide-react';
 import { useAppStore } from '@/store/useAppStore';
 
@@ -20,20 +20,79 @@ export default function DualPanel() {
   const resetView = useAppStore((s) => s.resetView);
 
   const containerRef = useRef<HTMLDivElement>(null);
-  const leftCanvasRef = useRef<HTMLCanvasElement>(null);
-  const rightCanvasRef = useRef<HTMLCanvasElement>(null);
-  const heatmapCanvasRef = useRef<HTMLCanvasElement>(null);
-  const revealCanvasRef = useRef<HTMLCanvasElement>(null);
+  const leftPanelRef = useRef<HTMLDivElement>(null);
+  const rightPanelRef = useRef<HTMLDivElement>(null);
   const originalImgRef = useRef<HTMLImageElement | null>(null);
   const simulatedImgRef = useRef<HTMLImageElement | null>(null);
+  const leftContentRef = useRef<HTMLDivElement>(null);
+  const rightContentRef = useRef<HTMLDivElement>(null);
+  const revealContentRef = useRef<HTMLDivElement>(null);
 
   const [isDraggingSlider, setIsDraggingSlider] = useState(false);
   const [isDraggingSplit, setIsDraggingSplit] = useState(false);
   const [isPanning, setIsPanning] = useState(false);
   const [panStart, setPanStart] = useState({ x: 0, y: 0 });
   const [showResetTooltip, setShowResetTooltip] = useState(false);
+  const [isTransitioning, setIsTransitioning] = useState(false);
+  const [panelSize, setPanelSize] = useState({ width: 0, height: 0 });
 
   const hasContent = !!(uploadedImageUrl || inputText);
+
+  const imageSize = useMemo(() => {
+    if (originalImageData) {
+      return { width: originalImageData.width, height: originalImageData.height };
+    }
+    if (inputText) {
+      return { width: 800, height: 600 };
+    }
+    return { width: 0, height: 0 };
+  }, [originalImageData, inputText]);
+
+  const edgeShadows = useMemo(() => {
+    if (!hasContent || imageSize.width === 0 || panelSize.width === 0) {
+      return { left: false, right: false, top: false, bottom: false };
+    }
+
+    const scaledWidth = imageSize.width * zoom;
+    const scaledHeight = imageSize.height * zoom;
+
+    const contentLeft = (panelSize.width - scaledWidth) / 2 + pan.x;
+    const contentRight = contentLeft + scaledWidth;
+    const contentTop = (panelSize.height - scaledHeight) / 2 + pan.y;
+    const contentBottom = contentTop + scaledHeight;
+
+    return {
+      left: contentLeft < 0,
+      right: contentRight > panelSize.width,
+      top: contentTop < 0,
+      bottom: contentBottom > panelSize.height,
+    };
+  }, [zoom, pan, imageSize, hasContent, panelSize]);
+
+  useEffect(() => {
+    if (!hasContent) return;
+    const panel = leftPanelRef.current;
+    if (!panel) return;
+
+    const updateSize = () => {
+      setPanelSize({
+        width: panel.clientWidth,
+        height: panel.clientHeight,
+      });
+    };
+
+    updateSize();
+
+    const observer = new ResizeObserver(updateSize);
+    observer.observe(panel);
+
+    window.addEventListener('resize', updateSize);
+
+    return () => {
+      observer.disconnect();
+      window.removeEventListener('resize', updateSize);
+    };
+  }, [hasContent, panelSplit]);
 
   useEffect(() => {
     if (!uploadedImageUrl) {
@@ -67,120 +126,66 @@ export default function DualPanel() {
     img.src = canvas.toDataURL();
   }, [simulatedImageData]);
 
-  const drawPanel = useCallback(
-    (canvas: HTMLCanvasElement | null, img: HTMLImageElement | null, isText: boolean) => {
-      if (!canvas) return;
-      const ctx = canvas.getContext('2d');
-      if (!ctx) return;
-
-      const rect = canvas.getBoundingClientRect();
-      const dpr = window.devicePixelRatio || 1;
-      canvas.width = rect.width * dpr;
-      canvas.height = rect.height * dpr;
-      ctx.scale(dpr, dpr);
-      ctx.clearRect(0, 0, rect.width, rect.height);
-
-      ctx.save();
-      ctx.translate(pan.x, pan.y);
-      ctx.scale(zoom, zoom);
+  const renderContentImage = useCallback(
+    (img: HTMLImageElement | null, isText: boolean) => {
+      if (!hasContent || imageSize.width === 0) return null;
 
       if (isText && inputText) {
-        ctx.fillStyle = '#333333';
-        ctx.font = '16px monospace';
-        const lines = inputText.split('\n');
-        const lineHeight = 24;
-        const maxWidth = rect.width / zoom - 40;
-        let y = 30;
-        for (const line of lines) {
-          const words = line || ' ';
-          ctx.fillText(words, 20, y, maxWidth);
-          y += lineHeight;
-          if (y > rect.height / zoom) break;
-        }
-      } else if (img) {
-        const imgW = img.width;
-        const imgH = img.height;
-        const canvasW = rect.width / zoom;
-        const canvasH = rect.height / zoom;
-        const scale = Math.min(canvasW / imgW, canvasH / imgH, 1);
-        const drawW = imgW * scale;
-        const drawH = imgH * scale;
-        const offsetX = (canvasW - drawW) / 2;
-        const offsetY = (canvasH - drawH) / 2;
-        ctx.drawImage(img, offsetX, offsetY, drawW, drawH);
+        return (
+          <div
+            className="content-text"
+            style={{ width: imageSize.width, height: imageSize.height }}
+          >
+            {inputText}
+          </div>
+        );
       }
 
-      ctx.restore();
+      if (img) {
+        return (
+          <img
+            src={img.src}
+            alt=""
+            style={{ width: imageSize.width, height: imageSize.height }}
+            draggable={false}
+          />
+        );
+      }
+
+      return null;
     },
-    [zoom, pan, inputText]
+    [inputText, hasContent, imageSize]
   );
 
-  const drawHeatmap = useCallback(
-    (canvas: HTMLCanvasElement | null) => {
-      if (!canvas || !metrics?.heatmapData || !originalImageData) return;
-      const ctx = canvas.getContext('2d');
-      if (!ctx) return;
+  const renderHeatmap = useCallback(() => {
+    if (!metrics?.heatmapData || !originalImageData) return null;
 
-      const rect = canvas.getBoundingClientRect();
-      const dpr = window.devicePixelRatio || 1;
-      canvas.width = rect.width * dpr;
-      canvas.height = rect.height * dpr;
-      ctx.scale(dpr, dpr);
-      ctx.clearRect(0, 0, rect.width, rect.height);
+    const canvas = document.createElement('canvas');
+    canvas.width = originalImageData.width;
+    canvas.height = originalImageData.height;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return null;
 
-      const heatImageData = new ImageData(
-        new Uint8ClampedArray(metrics.heatmapData),
-        originalImageData.width,
-        originalImageData.height
-      );
-      const tempCanvas = document.createElement('canvas');
-      tempCanvas.width = originalImageData.width;
-      tempCanvas.height = originalImageData.height;
-      const tempCtx = tempCanvas.getContext('2d');
-      if (!tempCtx) return;
-      tempCtx.putImageData(heatImageData, 0, 0);
+    const heatImageData = new ImageData(
+      new Uint8ClampedArray(metrics.heatmapData),
+      originalImageData.width,
+      originalImageData.height
+    );
+    ctx.putImageData(heatImageData, 0, 0);
 
-      ctx.save();
-      ctx.translate(pan.x, pan.y);
-      ctx.scale(zoom, zoom);
+    return (
+      <img
+        src={canvas.toDataURL()}
+        alt=""
+        className="heatmap-image"
+        style={{ width: imageSize.width, height: imageSize.height }}
+        draggable={false}
+      />
+    );
+  }, [metrics, originalImageData, imageSize]);
 
-      const imgW = originalImageData.width;
-      const imgH = originalImageData.height;
-      const canvasW = rect.width / zoom;
-      const canvasH = rect.height / zoom;
-      const scale = Math.min(canvasW / imgW, canvasH / imgH, 1);
-      const drawW = imgW * scale;
-      const drawH = imgH * scale;
-      const offsetX = (canvasW - drawW) / 2;
-      const offsetY = (canvasH - drawH) / 2;
-      ctx.drawImage(tempCanvas, offsetX, offsetY, drawW, drawH);
-
-      ctx.restore();
-    },
-    [metrics, originalImageData, zoom, pan]
-  );
-
-  useEffect(() => {
-    if (!hasContent) return;
-    const isText = !uploadedImageUrl && !!inputText;
-    drawPanel(leftCanvasRef.current, originalImgRef.current, isText);
-    drawPanel(rightCanvasRef.current, simulatedImgRef.current, isText);
-    drawPanel(revealCanvasRef.current, originalImgRef.current, isText);
-    drawHeatmap(heatmapCanvasRef.current);
-  }, [hasContent, uploadedImageUrl, inputText, drawPanel, drawHeatmap, simulatedImageData]);
-
-  useEffect(() => {
-    const handleResize = () => {
-      if (!hasContent) return;
-      const isText = !uploadedImageUrl && !!inputText;
-      drawPanel(leftCanvasRef.current, originalImgRef.current, isText);
-      drawPanel(rightCanvasRef.current, simulatedImgRef.current, isText);
-      drawPanel(revealCanvasRef.current, originalImgRef.current, isText);
-      drawHeatmap(heatmapCanvasRef.current);
-    };
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, [hasContent, uploadedImageUrl, inputText, drawPanel, drawHeatmap]);
+  const contentTransform = `translate(-50%, -50%) translate(${pan.x}px, ${pan.y}px) scale(${zoom})`;
+  const transformOrigin = 'center center';
 
   const handleSliderMouseDown = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
@@ -197,13 +202,11 @@ export default function DualPanel() {
     if (!isDraggingSlider) return;
 
     const handleMove = (clientX: number) => {
-      const container = containerRef.current;
+      const container = rightPanelRef.current;
       if (!container) return;
       const rect = container.getBoundingClientRect();
-      const rightPanelStart = rect.left + rect.width * panelSplit;
-      const rightPanelWidth = rect.width * (1 - panelSplit);
-      const x = clientX - rightPanelStart;
-      const pos = Math.max(0, Math.min(1, x / rightPanelWidth));
+      const x = clientX - rect.left;
+      const pos = Math.max(0, Math.min(1, x / rect.width));
       setSliderPosition(pos);
     };
 
@@ -224,7 +227,7 @@ export default function DualPanel() {
       window.removeEventListener('touchmove', handleTouchMove);
       window.removeEventListener('touchend', handleUp);
     };
-  }, [isDraggingSlider, panelSplit, setSliderPosition]);
+  }, [isDraggingSlider, setSliderPosition]);
 
   const handleSplitMouseDown = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
@@ -265,9 +268,11 @@ export default function DualPanel() {
   const handleWheel = useCallback(
     (e: React.WheelEvent) => {
       e.preventDefault();
+      setIsTransitioning(true);
       const delta = e.deltaY > 0 ? 0.9 : 1.1;
       const newZoom = Math.max(0.5, Math.min(3, zoom * delta));
       setZoom(newZoom);
+      setTimeout(() => setIsTransitioning(false), 200);
     },
     [zoom, setZoom]
   );
@@ -275,12 +280,14 @@ export default function DualPanel() {
   const handleZoomSliderChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
       const newZoom = parseFloat(e.target.value);
+      setIsTransitioning(true);
       setZoom(newZoom);
+      setTimeout(() => setIsTransitioning(false), 200);
     },
     [setZoom]
   );
 
-  const handleCanvasMouseDown = useCallback(
+  const handleContentMouseDown = useCallback(
     (e: React.MouseEvent) => {
       if (e.button === 1 || (e.button === 0 && e.altKey)) {
         e.preventDefault();
@@ -305,27 +312,25 @@ export default function DualPanel() {
     };
   }, [isPanning, panStart, setPan]);
 
+  const handleResetView = useCallback(() => {
+    setIsTransitioning(true);
+    resetView();
+    setTimeout(() => setIsTransitioning(false), 200);
+  }, [resetView]);
+
   const getContrastColor = (val: number) => {
     if (val < 1.0) return '#2e7d32';
     if (val < 2.0) return '#f57f17';
     return '#c62828';
   };
 
-  const getImageDimensions = () => {
-    if (originalImageData) {
-      return `${originalImageData.width}x${originalImageData.height}`;
-    }
-    if (inputText) {
-      return '800x600';
-    }
-    return '';
-  };
-
-  const imageDimensions = getImageDimensions();
+  const zoomPercent = Math.round(zoom * 100);
 
   if (!hasContent) {
     return null;
   }
+
+  const isText = !uploadedImageUrl && !!inputText;
 
   return (
     <div
@@ -335,7 +340,7 @@ export default function DualPanel() {
     >
       <button
         className="reset-view-btn"
-        onClick={resetView}
+        onClick={handleResetView}
         onMouseEnter={() => setShowResetTooltip(true)}
         onMouseLeave={() => setShowResetTooltip(false)}
       >
@@ -343,19 +348,48 @@ export default function DualPanel() {
         {showResetTooltip && <span className="reset-tooltip">重置视图</span>}
       </button>
 
+      <div key={zoomPercent} className="zoom-percent-indicator">
+        {zoomPercent}%
+      </div>
+
       <div
+        ref={leftPanelRef}
         className="panel panel-left"
         style={{ width: `${panelSplit * 100}%` }}
       >
         <div className="panel-label">原始视图</div>
-        {imageDimensions && (
-          <div className="dimension-label">{imageDimensions}</div>
+        {imageSize.width > 0 && (
+          <div className="dimension-label">
+            {imageSize.width}x{imageSize.height}
+          </div>
         )}
-        <canvas
-          ref={leftCanvasRef}
-          className="panel-canvas"
-          onMouseDown={handleCanvasMouseDown}
+
+        <div
+          className={`edge-shadow edge-shadow-left ${edgeShadows.left ? 'visible' : ''}`}
         />
+        <div
+          className={`edge-shadow edge-shadow-right ${edgeShadows.right ? 'visible' : ''}`}
+        />
+        <div
+          className={`edge-shadow edge-shadow-top ${edgeShadows.top ? 'visible' : ''}`}
+        />
+        <div
+          className={`edge-shadow edge-shadow-bottom ${edgeShadows.bottom ? 'visible' : ''}`}
+        />
+
+        <div
+          ref={leftContentRef}
+          className={`content-wrapper ${isTransitioning ? 'with-transition' : ''}`}
+          style={{
+            transform: contentTransform,
+            transformOrigin,
+            width: imageSize.width,
+            height: imageSize.height,
+          }}
+          onMouseDown={handleContentMouseDown}
+        >
+          {renderContentImage(originalImgRef.current, isText)}
+        </div>
       </div>
 
       <div
@@ -366,22 +400,63 @@ export default function DualPanel() {
       </div>
 
       <div
+        ref={rightPanelRef}
         className="panel panel-right"
         style={{ width: `${(1 - panelSplit) * 100}%` }}
       >
         <div className="panel-label">模拟视图</div>
-        {imageDimensions && (
-          <div className="dimension-label">{imageDimensions}</div>
+        {imageSize.width > 0 && (
+          <div className="dimension-label">
+            {imageSize.width}x{imageSize.height}
+          </div>
         )}
-        <canvas
-          ref={rightCanvasRef}
-          className="panel-canvas"
-          onMouseDown={handleCanvasMouseDown}
+
+        <div
+          className={`edge-shadow edge-shadow-left ${edgeShadows.left ? 'visible' : ''}`}
         />
-        <canvas
-          ref={heatmapCanvasRef}
-          className="heatmap-overlay"
+        <div
+          className={`edge-shadow edge-shadow-right ${edgeShadows.right ? 'visible' : ''}`}
         />
+        <div
+          className={`edge-shadow edge-shadow-top ${edgeShadows.top ? 'visible' : ''}`}
+        />
+        <div
+          className={`edge-shadow edge-shadow-bottom ${edgeShadows.bottom ? 'visible' : ''}`}
+        />
+
+        <div
+          ref={rightContentRef}
+          className={`content-wrapper ${isTransitioning ? 'with-transition' : ''}`}
+          style={{
+            transform: contentTransform,
+            transformOrigin,
+            width: imageSize.width,
+            height: imageSize.height,
+          }}
+          onMouseDown={handleContentMouseDown}
+        >
+          {renderContentImage(simulatedImgRef.current, isText)}
+          {renderHeatmap()}
+        </div>
+
+        <div
+          className="slider-reveal"
+          style={{ width: `${sliderPosition * 100}%` }}
+        >
+          <div
+            ref={revealContentRef}
+            className={`content-wrapper ${isTransitioning ? 'with-transition' : ''}`}
+            style={{
+              transform: contentTransform,
+              transformOrigin,
+              width: imageSize.width,
+              height: imageSize.height,
+            }}
+            onMouseDown={handleContentMouseDown}
+          >
+            {renderContentImage(originalImgRef.current, isText)}
+          </div>
+        </div>
 
         <div
           className="comparison-slider"
@@ -391,17 +466,6 @@ export default function DualPanel() {
         >
           <div className="slider-line" />
           <div className="slider-handle" />
-        </div>
-
-        <div
-          className="slider-reveal"
-          style={{ width: `${sliderPosition * 100}%` }}
-        >
-          <canvas
-            ref={revealCanvasRef}
-            className="panel-canvas reveal-canvas"
-            onMouseDown={handleCanvasMouseDown}
-          />
         </div>
       </div>
 
