@@ -80,10 +80,11 @@ export class Renderer {
     const ctx = this.ctx;
     const { position, radius, color, trail } = particle;
 
-    for (let i = trail.length - 1; i >= 0; i--) {
+    for (let i = 0; i < trail.length; i++) {
       const t = trail[i];
-      const alpha = (0.8 * (TRAIL_LENGTH - i)) / TRAIL_LENGTH;
-      const trailRadius = radius * (1 - i / TRAIL_LENGTH * 0.5);
+      const age = i / TRAIL_LENGTH;
+      const alpha = 0.8 * (i + 1) / TRAIL_LENGTH;
+      const trailRadius = radius * (1 - age * 0.5);
       ctx.beginPath();
       ctx.arc(t.x, t.y, trailRadius, 0, Math.PI * 2);
       ctx.fillStyle = this.hexToRgba(color, alpha * 0.5);

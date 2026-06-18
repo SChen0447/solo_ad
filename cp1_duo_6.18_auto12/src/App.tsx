@@ -4,14 +4,28 @@ import {
   updatePhysics,
   createParticle,
   createObstacle,
+  addObstacle,
+  addParticle,
+  removeObstacle,
+  clearParticles,
+  clearAll,
+  createWorld,
   isPointInPolygon,
   DEFAULT_GRAVITY,
   MAX_PARTICLES,
   MAX_OBSTACLES,
   CANVAS_WIDTH,
   CANVAS_HEIGHT,
+  recomputeObstacleBounds,
 } from "./physics";
-import type { Particle, PolygonObstacle, Vector2, Gravity } from "./physics";
+import type {
+  Particle,
+  PolygonObstacle,
+  Vector2,
+  Gravity,
+  PhysicsWorld,
+  PerformanceStats,
+} from "./physics";
 
 const PARTICLE_COLORS = [
   "#ff4d4d",
@@ -22,120 +36,167 @@ const PARTICLE_COLORS = [
   "#b366ff",
 ];
 
+const MOUSE_DIR_HISTORY = 5;
+
 function App() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const rendererRef = useRef<Renderer | null>(null);
   const animationIdRef = useRef<number>(0);
   const lastTimeRef = useRef<number>(0);
 
-  const particlesRef = useRef<Particle[]>([]);
-  const obstaclesRef = useRef<PolygonObstacle[]>([]);
+  const worldRef = useRef<PhysicsWorld>(createWorld());
   const currentDrawingRef = useRef<Vector2[] | null>(null);
   const selectedIdRef = useRef<number | null>(null);
-  const gravityRef = useRef<Gravity>({ ...DEFAULT_GRAVITY });
   const mousePosRef = useRef<Vector2>({ x: 0, y: 0 });
-  const lastMousePosRef = useRef<Vector2>({ x: 0, y: 0 });
+  const mouseDirHistoryRef = useRef<Vector2[]>([]);
+  const mouseDirRef = useRef<Vector2>({ x: 1, y: 0 });
   const isDrawingRef = useRef<boolean>(false);
 
   const [particleCount, setParticleCount] = useState(0);
   const [obstacleCount, setObstacleCount] = useState(0);
   const [gravityX, setGravityX] = useState(DEFAULT_GRAVITY.x);
   const [gravityY, setGravityY] = useState(DEFAULT_GRAVITY.y);
+  const [stats, setStats] = useState<PerformanceStats>({
+    fps: 0,
+    frameTime: 0,
+    physicsTime: 0,
+    collisionChecks: 0,
+  });
 
-  const getCanvasMousePos = useCallback((e: React.MouseEvent<HTMLCanvasElement>): Vector2 => {
-    const canvas = canvasRef.current;
-    if (!canvas) return { x: 0, y: 0 };
-    const rect = canvas.getBoundingClientRect();
-    const scaleX = canvas.width / rect.width;
-    const scaleY = canvas.height / rect.height;
-    return {
-      x: (e.clientX - rect.left) * scaleX,
-      y: (e.clientY - rect.top) * scaleY,
-    };
+  const getCanvasMousePos = useCallback(
+    (e: React.MouseEvent<HTMLCanvasElement>): Vector2 => {
+      const canvas = canvasRef.current;
+      if (!canvas) return { x: 0, y: 0 };
+      const rect = canvas.getBoundingClientRect();
+      const scaleX = canvas.width / rect.width;
+      const scaleY = canvas.height / rect.height;
+      return {
+        x: (e.clientX - rect.left) * scaleX,
+        y: (e.clientY - rect.top) * scaleY,
+      };
+    },
+    []
+  );
+
+  const updateMouseDirection = useCallback((newPos: Vector2, oldPos: Vector2) => {
+    const dx = newPos.x - oldPos.x;
+    const dy = newPos.y - oldPos.y;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+
+    if (dist > 2) {
+      const dir = { x: dx / dist, y: dy / dist };
+      mouseDirHistoryRef.current.push(dir);
+      if (mouseDirHistoryRef.current.length > MOUSE_DIR_HISTORY) {
+        mouseDirHistoryRef.current.shift();
+      }
+
+      let avgX = 0,
+        avgY = 0;
+      for (const d of mouseDirHistoryRef.current) {
+        avgX += d.x;
+        avgY += d.y;
+      }
+      const len = mouseDirHistoryRef.current.length;
+      const avgLen = Math.sqrt(avgX * avgX + avgY * avgY);
+      if (avgLen > 0.1) {
+        mouseDirRef.current = { x: avgX / len / avgLen, y: avgY / len / avgLen };
+      }
+    }
   }, []);
 
-  const handleMouseDown = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
-    const pos = getCanvasMousePos(e);
-    mousePosRef.current = pos;
-    lastMousePosRef.current = pos;
+  const handleMouseDown = useCallback(
+    (e: React.MouseEvent<HTMLCanvasElement>) => {
+      const pos = getCanvasMousePos(e);
+      mousePosRef.current = pos;
 
-    if (e.button === 0) {
-      let clickedObstacle: PolygonObstacle | null = null;
-      for (let i = obstaclesRef.current.length - 1; i >= 0; i--) {
-        const obs = obstaclesRef.current[i];
-        if (obs.vertices.length >= 3 && isPointInPolygon(pos, obs.vertices)) {
-          clickedObstacle = obs;
-          break;
+      if (e.button === 0) {
+        let clickedObstacle: PolygonObstacle | null = null;
+        for (let i = worldRef.current.obstacles.length - 1; i >= 0; i--) {
+          const obs = worldRef.current.obstacles[i];
+          if (obs.vertices.length >= 3 && isPointInPolygon(pos, obs.vertices)) {
+            clickedObstacle = obs;
+            break;
+          }
+        }
+
+        if (clickedObstacle) {
+          worldRef.current.obstacles.forEach((o) => (o.isSelected = false));
+          clickedObstacle.isSelected = true;
+          selectedIdRef.current = clickedObstacle.id;
+          setObstacleCount(worldRef.current.obstacles.length);
+        } else {
+          worldRef.current.obstacles.forEach((o) => (o.isSelected = false));
+          selectedIdRef.current = null;
+
+          if (worldRef.current.obstacles.length < MAX_OBSTACLES) {
+            isDrawingRef.current = true;
+            currentDrawingRef.current = [pos];
+          }
+        }
+      } else if (e.button === 2) {
+        e.preventDefault();
+        let clickedObstacle: PolygonObstacle | null = null;
+        for (let i = worldRef.current.obstacles.length - 1; i >= 0; i--) {
+          const obs = worldRef.current.obstacles[i];
+          if (obs.vertices.length >= 3 && isPointInPolygon(pos, obs.vertices)) {
+            clickedObstacle = obs;
+            break;
+          }
+        }
+
+        worldRef.current.obstacles.forEach((o) => (o.isSelected = false));
+        if (clickedObstacle) {
+          clickedObstacle.isSelected = true;
+          selectedIdRef.current = clickedObstacle.id;
+        } else {
+          selectedIdRef.current = null;
+        }
+        setObstacleCount(worldRef.current.obstacles.length);
+      }
+    },
+    [getCanvasMousePos]
+  );
+
+  const handleMouseMove = useCallback(
+    (e: React.MouseEvent<HTMLCanvasElement>) => {
+      const oldPos = mousePosRef.current;
+      const newPos = getCanvasMousePos(e);
+      updateMouseDirection(newPos, oldPos);
+      mousePosRef.current = newPos;
+
+      if (isDrawingRef.current && currentDrawingRef.current) {
+        const points = currentDrawingRef.current;
+        const lastPoint = points[points.length - 1];
+        const dist = Math.sqrt(
+          Math.pow(newPos.x - lastPoint.x, 2) + Math.pow(newPos.y - lastPoint.y, 2)
+        );
+        if (dist > 8) {
+          points.push(newPos);
         }
       }
+    },
+    [getCanvasMousePos, updateMouseDirection]
+  );
 
-      if (clickedObstacle) {
-        obstaclesRef.current.forEach((o) => (o.isSelected = false));
-        clickedObstacle.isSelected = true;
-        selectedIdRef.current = clickedObstacle.id;
-        setObstacleCount(obstaclesRef.current.length);
-      } else {
-        obstaclesRef.current.forEach((o) => (o.isSelected = false));
-        selectedIdRef.current = null;
-
-        if (obstaclesRef.current.length < MAX_OBSTACLES) {
-          isDrawingRef.current = true;
-          currentDrawingRef.current = [pos];
+  const handleMouseUp = useCallback(
+    (e: React.MouseEvent<HTMLCanvasElement>) => {
+      if (e.button === 0 && isDrawingRef.current) {
+        isDrawingRef.current = false;
+        if (
+          currentDrawingRef.current &&
+          currentDrawingRef.current.length >= 3
+        ) {
+          const vertices = currentDrawingRef.current;
+          const obstacle = addObstacle(worldRef.current, vertices);
+          if (obstacle) {
+            setObstacleCount(worldRef.current.obstacles.length);
+          }
         }
+        currentDrawingRef.current = null;
       }
-    } else if (e.button === 2) {
-      e.preventDefault();
-      let clickedObstacle: PolygonObstacle | null = null;
-      for (let i = obstaclesRef.current.length - 1; i >= 0; i--) {
-        const obs = obstaclesRef.current[i];
-        if (obs.vertices.length >= 3 && isPointInPolygon(pos, obs.vertices)) {
-          clickedObstacle = obs;
-          break;
-        }
-      }
-
-      obstaclesRef.current.forEach((o) => (o.isSelected = false));
-      if (clickedObstacle) {
-        clickedObstacle.isSelected = true;
-        selectedIdRef.current = clickedObstacle.id;
-      } else {
-        selectedIdRef.current = null;
-      }
-      setObstacleCount(obstaclesRef.current.length);
-    }
-  }, [getCanvasMousePos]);
-
-  const handleMouseMove = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
-    const pos = getCanvasMousePos(e);
-    lastMousePosRef.current = mousePosRef.current;
-    mousePosRef.current = pos;
-
-    if (isDrawingRef.current && currentDrawingRef.current) {
-      const points = currentDrawingRef.current;
-      const lastPoint = points[points.length - 1];
-      const dist = Math.sqrt(
-        Math.pow(pos.x - lastPoint.x, 2) + Math.pow(pos.y - lastPoint.y, 2)
-      );
-      if (dist > 8) {
-        points.push(pos);
-      }
-    }
-  }, [getCanvasMousePos]);
-
-  const handleMouseUp = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (e.button === 0 && isDrawingRef.current) {
-      isDrawingRef.current = false;
-      if (
-        currentDrawingRef.current &&
-        currentDrawingRef.current.length >= 3
-      ) {
-        const obstacle = createObstacle(currentDrawingRef.current);
-        obstaclesRef.current.push(obstacle);
-        setObstacleCount(obstaclesRef.current.length);
-      }
-      currentDrawingRef.current = null;
-    }
-  }, []);
+    },
+    []
+  );
 
   const handleContextMenu = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
@@ -144,55 +205,43 @@ function App() {
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
     if (e.key === "Delete" || e.key === "Backspace") {
       if (selectedIdRef.current !== null) {
-        obstaclesRef.current = obstaclesRef.current.filter(
-          (o) => o.id !== selectedIdRef.current
-        );
+        removeObstacle(worldRef.current, selectedIdRef.current);
         selectedIdRef.current = null;
-        setObstacleCount(obstaclesRef.current.length);
+        setObstacleCount(worldRef.current.obstacles.length);
       }
     }
   }, []);
 
   const spawnParticle = useCallback(() => {
-    if (particlesRef.current.length >= MAX_PARTICLES) return;
+    if (worldRef.current.particles.length >= MAX_PARTICLES) return;
 
     const speed = 120 + Math.random() * 60;
     const radius = 8 + Math.random() * 8;
     const color = PARTICLE_COLORS[Math.floor(Math.random() * PARTICLE_COLORS.length)];
 
-    const dir = {
-      x: mousePosRef.current.x - lastMousePosRef.current.x,
-      y: mousePosRef.current.y - lastMousePosRef.current.y,
+    const dir = mouseDirRef.current;
+    const velocity = {
+      x: dir.x * speed,
+      y: dir.y * speed,
     };
-    const dirLen = Math.sqrt(dir.x * dir.x + dir.y * dir.y);
 
-    let velocity: Vector2;
-    if (dirLen > 0.1) {
-      velocity = {
-        x: (dir.x / dirLen) * speed,
-        y: (dir.y / dirLen) * speed,
-      };
-    } else {
-      const angle = Math.random() * Math.PI * 2;
-      velocity = {
-        x: Math.cos(angle) * speed,
-        y: Math.sin(angle) * speed,
-      };
-    }
-
-    const particle = createParticle(mousePosRef.current, velocity, color, radius);
-    particlesRef.current.push(particle);
-    setParticleCount(particlesRef.current.length);
+    addParticle(
+      worldRef.current,
+      mousePosRef.current,
+      velocity,
+      color,
+      radius
+    );
+    setParticleCount(worldRef.current.particles.length);
   }, []);
 
   const clearAllParticles = useCallback(() => {
-    particlesRef.current = [];
+    clearParticles(worldRef.current);
     setParticleCount(0);
   }, []);
 
   const resetCanvas = useCallback(() => {
-    particlesRef.current = [];
-    obstaclesRef.current = [];
+    clearAll(worldRef.current);
     currentDrawingRef.current = null;
     selectedIdRef.current = null;
     isDrawingRef.current = false;
@@ -202,12 +251,12 @@ function App() {
 
   const handleGravityXChange = useCallback((value: number) => {
     setGravityX(value);
-    gravityRef.current.x = value;
+    worldRef.current.gravity.x = value;
   }, []);
 
   const handleGravityYChange = useCallback((value: number) => {
     setGravityY(value);
-    gravityRef.current.y = value;
+    worldRef.current.gravity.y = value;
   }, []);
 
   useEffect(() => {
@@ -224,18 +273,14 @@ function App() {
       const dt = Math.min((timestamp - lastTimeRef.current) / 1000, 1 / 30);
       lastTimeRef.current = timestamp;
 
-      particlesRef.current = updatePhysics(
-        particlesRef.current,
-        obstaclesRef.current,
-        gravityRef.current,
-        dt
-      );
-      setParticleCount(particlesRef.current.length);
+      const newStats = updatePhysics(worldRef.current, dt);
+      setStats(newStats);
+      setParticleCount(worldRef.current.particles.length);
 
       if (rendererRef.current) {
         rendererRef.current.render({
-          particles: particlesRef.current,
-          obstacles: obstaclesRef.current,
+          particles: worldRef.current.particles,
+          obstacles: worldRef.current.obstacles,
           currentDrawing: currentDrawingRef.current,
           selectedObstacleId: selectedIdRef.current,
           isDrawingMode: isDrawingRef.current,
@@ -279,7 +324,10 @@ function App() {
               发射粒子
             </button>
             <div style={styles.panelInfo}>
-              <span>障碍物: {obstacleCount}/{MAX_OBSTACLES}</span>
+              <div>障碍物: {obstacleCount}/{MAX_OBSTACLES}</div>
+              <div style={styles.fpsInfo}>
+                FPS: {stats.fps.toFixed(0)} | 碰撞: {stats.collisionChecks}
+              </div>
             </div>
           </div>
         </div>
@@ -347,7 +395,7 @@ const styles: Record<string, React.CSSProperties> = {
     margin: 0,
     padding: 0,
     overflow: "hidden",
-    fontFamily: 'Arial, sans-serif',
+    fontFamily: "Arial, sans-serif",
   },
   canvasWrapper: {
     position: "relative",
@@ -395,6 +443,11 @@ const styles: Record<string, React.CSSProperties> = {
     color: "#666",
     textAlign: "center",
   },
+  fpsInfo: {
+    marginTop: 4,
+    fontSize: 11,
+    color: "#888",
+  },
   rightPanel: {
     position: "absolute",
     right: -60,
@@ -441,7 +494,7 @@ const styles: Record<string, React.CSSProperties> = {
     transform: "rotate(-90deg)",
     cursor: "pointer",
     WebkitAppearance: "none",
-    appearance: "none",
+    appearance: "none" as const,
     background: "transparent",
   },
   bottomRightPanel: {
