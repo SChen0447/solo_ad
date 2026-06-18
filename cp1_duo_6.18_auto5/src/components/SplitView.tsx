@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback } from 'react'
+import { useEffect, useRef, useCallback, useMemo } from 'react'
 import { useAppStore } from '../store'
 import './SplitView.css'
 
@@ -7,96 +7,74 @@ interface SplitViewProps {
   diffRightLines?: number[]
 }
 
+const LINE_HEIGHT = 24
+
+function buildDiffBackground(lines: number[], color: string): string {
+  if (lines.length === 0) return 'transparent'
+  const parts: string[] = []
+  lines.forEach((lineNum) => {
+    const top = lineNum * LINE_HEIGHT
+    parts.push(`${color} ${top}px, ${color} ${top + LINE_HEIGHT}px, transparent ${top + LINE_HEIGHT}px`)
+  })
+  return `linear-gradient(to bottom, ${parts.join(', ')})`
+}
+
 export function SplitView({ diffLeftLines = [], diffRightLines = [] }: SplitViewProps) {
   const leftIframeRef = useRef<HTMLIFrameElement>(null)
   const rightIframeRef = useRef<HTMLIFrameElement>(null)
-  const leftScrollRef = useRef(0)
-  const rightScrollRef = useRef(0)
   const isSyncingRef = useRef(false)
 
   const { appliedLeftCode, appliedRightCode, zoom, syncScroll, diffEnabled } = useAppStore()
 
-  const injectDiffHighlight = useCallback((doc: Document, lines: number[], isLeft: boolean) => {
-    if (!diffEnabled || lines.length === 0) return
+  const leftOverlayBg = useMemo(
+    () => buildDiffBackground(diffLeftLines, 'rgba(255, 107, 107, 0.35)'),
+    [diffLeftLines]
+  )
+  const rightOverlayBg = useMemo(
+    () => buildDiffBackground(diffRightLines, 'rgba(81, 207, 102, 0.35)'),
+    [diffRightLines]
+  )
 
-    const styleId = 'diff-highlight-style'
-    let style = doc.getElementById(styleId) as HTMLStyleElement
-    if (!style) {
-      style = doc.createElement('style')
-      style.id = styleId
-      doc.head.appendChild(style)
+  const handleScrollSync = useCallback((source: 'left' | 'right') => {
+    if (!syncScroll || isSyncingRef.current) return
+    const leftIframe = leftIframeRef.current
+    const rightIframe = rightIframeRef.current
+    if (!leftIframe?.contentDocument || !rightIframe?.contentDocument) return
+
+    const leftDoc = leftIframe.contentDocument
+    const rightDoc = rightIframe.contentDocument
+
+    if (source === 'left') {
+      const leftBody = leftDoc.body
+      const scrollTop = leftDoc.documentElement.scrollTop || leftBody.scrollTop
+      const scrollHeight = leftDoc.documentElement.scrollHeight || leftBody.scrollHeight
+      const clientHeight = leftDoc.documentElement.clientHeight || leftBody.clientHeight
+      const scrollRatio = scrollTop / Math.max(scrollHeight - clientHeight, 1)
+
+      const rightBody = rightDoc.body
+      const rightScrollHeight = rightDoc.documentElement.scrollHeight || rightBody.scrollHeight
+      const rightClientHeight = rightDoc.documentElement.clientHeight || rightBody.clientHeight
+      const targetScrollTop = scrollRatio * Math.max(rightScrollHeight - rightClientHeight, 0)
+
+      isSyncingRef.current = true
+      rightDoc.documentElement.scrollTop = targetScrollTop
+      rightBody.scrollTop = targetScrollTop
+    } else {
+      const rightBody = rightDoc.body
+      const scrollTop = rightDoc.documentElement.scrollTop || rightBody.scrollTop
+      const scrollHeight = rightDoc.documentElement.scrollHeight || rightBody.scrollHeight
+      const clientHeight = rightDoc.documentElement.clientHeight || rightBody.clientHeight
+      const scrollRatio = scrollTop / Math.max(scrollHeight - clientHeight, 1)
+
+      const leftBody = leftDoc.body
+      const leftScrollHeight = leftDoc.documentElement.scrollHeight || leftBody.scrollHeight
+      const leftClientHeight = leftDoc.documentElement.clientHeight || leftBody.clientHeight
+      const targetScrollTop = scrollRatio * Math.max(leftScrollHeight - leftClientHeight, 0)
+
+      isSyncingRef.current = true
+      leftDoc.documentElement.scrollTop = targetScrollTop
+      leftBody.scrollTop = targetScrollTop
     }
-
-    const color = isLeft ? '#ffcccc' : '#ccffcc'
-    style.textContent = `
-      body {
-        background: linear-gradient(to bottom,
-          ${lines.map((_, i) => `
-            ${color} ${i * 24}px,
-            ${color} ${(i + 1) * 24}px,
-            transparent ${(i + 1) * 24}px,
-            transparent ${(i + 1) * 24 + 24}px
-          `).join(',')}
-        );
-        background-attachment: local;
-      }
-    `
-  }, [diffEnabled])
-
-  const handleLeftScroll = useCallback(() => {
-    if (!syncScroll || isSyncingRef.current) return
-    const leftIframe = leftIframeRef.current
-    const rightIframe = rightIframeRef.current
-    if (!leftIframe?.contentDocument || !rightIframe?.contentDocument) return
-
-    const leftDoc = leftIframe.contentDocument
-    const rightDoc = rightIframe.contentDocument
-    const leftBody = leftDoc.body
-    const rightBody = rightDoc.body
-
-    const scrollTop = leftDoc.documentElement.scrollTop || leftBody.scrollTop
-    const scrollHeight = leftDoc.documentElement.scrollHeight || leftBody.scrollHeight
-    const clientHeight = leftDoc.documentElement.clientHeight || leftBody.clientHeight
-    const scrollRatio = scrollTop / (scrollHeight - clientHeight || 1)
-
-    const rightScrollHeight = rightDoc.documentElement.scrollHeight || rightBody.scrollHeight
-    const rightClientHeight = rightDoc.documentElement.clientHeight || rightBody.clientHeight
-    const targetScrollTop = scrollRatio * (rightScrollHeight - rightClientHeight)
-
-    isSyncingRef.current = true
-    rightDoc.documentElement.scrollTop = targetScrollTop
-    rightBody.scrollTop = targetScrollTop
-    rightScrollRef.current = targetScrollTop
-
-    requestAnimationFrame(() => {
-      isSyncingRef.current = false
-    })
-  }, [syncScroll])
-
-  const handleRightScroll = useCallback(() => {
-    if (!syncScroll || isSyncingRef.current) return
-    const leftIframe = leftIframeRef.current
-    const rightIframe = rightIframeRef.current
-    if (!leftIframe?.contentDocument || !rightIframe?.contentDocument) return
-
-    const leftDoc = leftIframe.contentDocument
-    const rightDoc = rightIframe.contentDocument
-    const leftBody = leftDoc.body
-    const rightBody = rightDoc.body
-
-    const scrollTop = rightDoc.documentElement.scrollTop || rightBody.scrollTop
-    const scrollHeight = rightDoc.documentElement.scrollHeight || rightBody.scrollHeight
-    const clientHeight = rightDoc.documentElement.clientHeight || rightBody.clientHeight
-    const scrollRatio = scrollTop / (scrollHeight - clientHeight || 1)
-
-    const leftScrollHeight = leftDoc.documentElement.scrollHeight || leftBody.scrollHeight
-    const leftClientHeight = leftDoc.documentElement.clientHeight || leftBody.clientHeight
-    const targetScrollTop = scrollRatio * (leftScrollHeight - leftClientHeight)
-
-    isSyncingRef.current = true
-    leftDoc.documentElement.scrollTop = targetScrollTop
-    leftBody.scrollTop = targetScrollTop
-    leftScrollRef.current = targetScrollTop
 
     requestAnimationFrame(() => {
       isSyncingRef.current = false
@@ -107,11 +85,11 @@ export function SplitView({ diffLeftLines = [], diffRightLines = [] }: SplitView
     const leftIframe = leftIframeRef.current
     if (!leftIframe) return
 
+    const handleLeftScroll = () => handleScrollSync('left')
     const handleLoad = () => {
       const doc = leftIframe.contentDocument
       if (!doc) return
       doc.addEventListener('scroll', handleLeftScroll, true)
-      injectDiffHighlight(doc, diffLeftLines, true)
     }
 
     leftIframe.addEventListener('load', handleLoad)
@@ -120,17 +98,17 @@ export function SplitView({ diffLeftLines = [], diffRightLines = [] }: SplitView
       const doc = leftIframe.contentDocument
       if (doc) doc.removeEventListener('scroll', handleLeftScroll, true)
     }
-  }, [handleLeftScroll, injectDiffHighlight, diffLeftLines])
+  }, [handleScrollSync])
 
   useEffect(() => {
     const rightIframe = rightIframeRef.current
     if (!rightIframe) return
 
+    const handleRightScroll = () => handleScrollSync('right')
     const handleLoad = () => {
       const doc = rightIframe.contentDocument
       if (!doc) return
       doc.addEventListener('scroll', handleRightScroll, true)
-      injectDiffHighlight(doc, diffRightLines, false)
     }
 
     rightIframe.addEventListener('load', handleLoad)
@@ -139,7 +117,7 @@ export function SplitView({ diffLeftLines = [], diffRightLines = [] }: SplitView
       const doc = rightIframe.contentDocument
       if (doc) doc.removeEventListener('scroll', handleRightScroll, true)
     }
-  }, [handleRightScroll, injectDiffHighlight, diffRightLines])
+  }, [handleScrollSync])
 
   const scale = zoom / 100
 
@@ -154,7 +132,7 @@ export function SplitView({ diffLeftLines = [], diffRightLines = [] }: SplitView
             className="iframe-wrapper"
             style={{
               transform: `scale(${scale})`,
-              transformOrigin: 'top left',
+              transformOrigin: 'left top',
               width: `${100 / scale}%`,
               height: `${100 / scale}%`,
             }}
@@ -166,6 +144,12 @@ export function SplitView({ diffLeftLines = [], diffRightLines = [] }: SplitView
               className="preview-iframe"
             />
           </div>
+          {diffEnabled && diffLeftLines.length > 0 && (
+            <div
+              className="diff-overlay"
+              style={{ background: leftOverlayBg }}
+            />
+          )}
         </div>
       </div>
 
@@ -180,7 +164,7 @@ export function SplitView({ diffLeftLines = [], diffRightLines = [] }: SplitView
             className="iframe-wrapper"
             style={{
               transform: `scale(${scale})`,
-              transformOrigin: 'top left',
+              transformOrigin: 'left top',
               width: `${100 / scale}%`,
               height: `${100 / scale}%`,
             }}
@@ -192,6 +176,12 @@ export function SplitView({ diffLeftLines = [], diffRightLines = [] }: SplitView
               className="preview-iframe"
             />
           </div>
+          {diffEnabled && diffRightLines.length > 0 && (
+            <div
+              className="diff-overlay"
+              style={{ background: rightOverlayBg }}
+            />
+          )}
         </div>
       </div>
     </div>

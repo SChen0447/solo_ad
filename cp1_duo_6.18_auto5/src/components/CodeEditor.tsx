@@ -1,4 +1,4 @@
-import { useRef, useEffect, useCallback } from 'react'
+import { useRef, useEffect, useCallback, useState } from 'react'
 import './CodeEditor.css'
 
 interface CodeEditorProps {
@@ -23,8 +23,32 @@ export function CodeEditor({
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const highlightRef = useRef<HTMLPreElement>(null)
   const lineNumbersRef = useRef<HTMLDivElement>(null)
+  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const [localValue, setLocalValue] = useState(value)
 
-  const lineCount = value.split('\n').length
+  useEffect(() => {
+    setLocalValue(value)
+  }, [value])
+
+  const handleChange = useCallback((newValue: string) => {
+    setLocalValue(newValue)
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current)
+    }
+    debounceTimerRef.current = setTimeout(() => {
+      onChange(newValue)
+    }, 300)
+  }, [onChange])
+
+  useEffect(() => {
+    return () => {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current)
+      }
+    }
+  }, [])
+
+  const lineCount = localValue.split('\n').length
 
   const handleScroll = useCallback(() => {
     const textarea = textareaRef.current
@@ -45,27 +69,13 @@ export function CodeEditor({
     if (textarea) {
       handleScroll()
     }
-  }, [value, handleScroll])
+  }, [localValue, handleScroll])
 
-  const renderHighlightedLines = () => {
-    if (!diffEnabled || diffLineNumbers.length === 0) {
-      return value
-    }
-
-    const lines = value.split('\n')
-    const diffSet = new Set(diffLineNumbers)
-
-    return lines.map((line, index) => {
-      const isDiff = diffSet.has(index)
-      if (isDiff) {
-        return line
-      }
-      return line
-    }).join('\n')
-  }
-
-  const bgColor = variant === 'left' ? 'rgba(255, 107, 107, 0.15)' : 'rgba(81, 207, 102, 0.15)'
+  const bgColor = variant === 'left' ? 'rgba(255, 107, 107, 0.25)' : 'rgba(81, 207, 102, 0.25)'
+  const solidBgColor = variant === 'left' ? '#ffcccc' : '#ccffcc'
   const borderColor = variant === 'left' ? '#ff6b6b' : '#51cf66'
+
+  const diffSet = new Set(diffLineNumbers)
 
   return (
     <div className="code-editor">
@@ -87,8 +97,8 @@ export function CodeEditor({
           {Array.from({ length: lineCount }, (_, i) => (
             <div
               key={i}
-              className={`line-number ${diffEnabled && diffLineNumbers.includes(i) ? 'diff-line' : ''}`}
-              style={diffEnabled && diffLineNumbers.includes(i) ? { background: bgColor } : {}}
+              className={`line-number ${diffEnabled && diffSet.has(i) ? 'diff-line' : ''}`}
+              style={diffEnabled && diffSet.has(i) ? { background: solidBgColor, color: '#333' } : {}}
             >
               {i + 1}
             </div>
@@ -102,11 +112,11 @@ export function CodeEditor({
               className="code-highlight"
               aria-hidden="true"
             >
-              {value.split('\n').map((line, index) => (
+              {localValue.split('\n').map((line, index) => (
                 <div
                   key={index}
-                  className={`highlight-line ${diffLineNumbers.includes(index) ? 'diff' : ''}`}
-                  style={diffLineNumbers.includes(index) ? { background: bgColor } : {}}
+                  className={`highlight-line ${diffSet.has(index) ? 'diff' : ''}`}
+                  style={diffSet.has(index) ? { background: solidBgColor } : {}}
                 >
                   {line || ' '}
                 </div>
@@ -116,8 +126,8 @@ export function CodeEditor({
 
           <textarea
             ref={textareaRef}
-            value={value}
-            onChange={(e) => onChange(e.target.value)}
+            value={localValue}
+            onChange={(e) => handleChange(e.target.value)}
             onScroll={handleScroll}
             className="code-textarea"
             spellCheck={false}

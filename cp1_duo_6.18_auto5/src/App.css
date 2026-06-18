@@ -168,29 +168,51 @@
 }
 
 @media (max-width: 768px) {
+  .app-container {
+    overflow-y: auto;
+    overflow-x: hidden;
+  }
+
   .editors-section {
     flex-direction: column;
     height: auto;
-    min-height: 300px;
+    min-height: 400px;
+    flex-shrink: 0;
   }
 
   .editor-wrapper {
-    height: 200px;
+    height: 240px;
+    flex-shrink: 0;
   }
 
   .editor-divider {
     width: 100%;
     height: 4px;
     cursor: row-resize;
+    flex-shrink: 0;
+  }
+
+  .preview-section {
+    min-height: 400px;
+    flex-shrink: 0;
   }
 
   .control-bar {
     flex-wrap: wrap;
     gap: 16px;
     padding: 10px 16px;
+    flex-shrink: 0;
+  }
+
+  .control-group {
+    gap: 8px;
   }
 
   .zoom-slider {
     width: 100px;
+  }
+
+  .label-text {
+    font-size: 12px;
   }
 }

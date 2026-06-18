@@ -1,6 +1,6 @@
-import { useEffect } from 'react'
+import { useEffect, useMemo } from 'react'
 import { diffLines } from 'diff'
-import { useAppStore, DiffLine } from '../store'
+import { useAppStore } from '../store'
 
 interface DiffHighlighterProps {
   children?: React.ReactNode
@@ -12,8 +12,6 @@ export function DiffHighlighter({ children }: DiffHighlighterProps) {
     rightCode,
     diffEnabled,
     setDiffLines,
-    leftDiffLines,
-    rightDiffLines,
   } = useAppStore()
 
   useEffect(() => {
@@ -24,8 +22,11 @@ export function DiffHighlighter({ children }: DiffHighlighterProps) {
 
     const changes = diffLines(leftCode, rightCode)
 
-    const leftLines: DiffLine[] = []
-    const rightLines: DiffLine[] = []
+    const leftDiffLineNumbers: number[] = []
+    const rightDiffLineNumbers: number[] = []
+
+    let leftLineIdx = 0
+    let rightLineIdx = 0
 
     changes.forEach((change) => {
       const lines = change.value.split('\n')
@@ -33,78 +34,67 @@ export function DiffHighlighter({ children }: DiffHighlighterProps) {
         lines.pop()
       }
 
-      lines.forEach((line) => {
-        if (change.added) {
-          rightLines.push({ value: line, added: true })
-        } else if (change.removed) {
-          leftLines.push({ value: line, removed: true })
-        } else {
-          leftLines.push({ value: line })
-          rightLines.push({ value: line })
-        }
-      })
+      if (change.added) {
+        lines.forEach(() => {
+          rightDiffLineNumbers.push(rightLineIdx)
+          rightLineIdx++
+        })
+      } else if (change.removed) {
+        lines.forEach(() => {
+          leftDiffLineNumbers.push(leftLineIdx)
+          leftLineIdx++
+        })
+      } else {
+        lines.forEach(() => {
+          leftLineIdx++
+          rightLineIdx++
+        })
+      }
     })
+
+    const leftLines = leftCode.split('\n').map((value, index) => ({
+      value,
+      removed: leftDiffLineNumbers.includes(index),
+    }))
+    const rightLines = rightCode.split('\n').map((value, index) => ({
+      value,
+      added: rightDiffLineNumbers.includes(index),
+    }))
 
     setDiffLines(leftLines, rightLines)
   }, [leftCode, rightCode, diffEnabled, setDiffLines])
 
-  const getLeftDiffLineNumbers = (): number[] => {
-    const lineNumbers: number[] = []
-    leftDiffLines.forEach((line, index) => {
-      if (line.removed) {
-        lineNumbers.push(index + 1)
-      }
-    })
-    return lineNumbers
-  }
-
-  const getRightDiffLineNumbers = (): number[] => {
-    const lineNumbers: number[] = []
-    rightDiffLines.forEach((line, index) => {
-      if (line.added) {
-        lineNumbers.push(index + 1)
-      }
-    })
-    return lineNumbers
-  }
-
-  if (children) {
-    return <>{children}</>
-  }
-
-  return null
+  return <>{children}</>
 }
 
 export function useDiffLines() {
   const { leftDiffLines, rightDiffLines, diffEnabled } = useAppStore()
 
-  const getLeftDiffLineNumbers = (): number[] => {
+  const leftLineNumbers = useMemo(() => {
     if (!diffEnabled) return []
-    const lineNumbers: number[] = []
+    const result: number[] = []
     leftDiffLines.forEach((line, index) => {
-      if (line.removed) {
-        lineNumbers.push(index)
-      }
+      if (line.removed) result.push(index)
     })
-    return lineNumbers
-  }
+    return result
+  }, [leftDiffLines, diffEnabled])
 
-  const getRightDiffLineNumbers = (): number[] => {
+  const rightLineNumbers = useMemo(() => {
     if (!diffEnabled) return []
-    const lineNumbers: number[] = []
+    const result: number[] = []
     rightDiffLines.forEach((line, index) => {
-      if (line.added) {
-        lineNumbers.push(index)
-      }
+      if (line.added) result.push(index)
     })
-    return lineNumbers
-  }
+    return result
+  }, [rightDiffLines, diffEnabled])
 
   return {
     leftDiffLines,
     rightDiffLines,
     diffEnabled,
-    getLeftDiffLineNumbers,
-    getRightDiffLineNumbers,
+    getLeftDiffLineNumbers: () => leftLineNumbers,
+    getRightDiffLineNumbers: () => rightLineNumbers,
+    leftLineNumbers,
+    rightLineNumbers,
   }
 }

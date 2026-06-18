@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from 'react'
+import { useMemo } from 'react'
 import { useAppStore } from './store'
 import { CodeEditor } from './components/CodeEditor'
 import { SplitView } from './components/SplitView'
@@ -68,10 +68,7 @@ function AppContent() {
     diffEnabled,
   } = useAppStore()
 
-  const { getLeftDiffLineNumbers, getRightDiffLineNumbers } = useDiffLines()
-
-  const leftDiffLines = useMemo(() => getLeftDiffLineNumbers(), [getLeftDiffLineNumbers, diffEnabled, leftCode, rightCode])
-  const rightDiffLines = useMemo(() => getRightDiffLineNumbers(), [getRightDiffLineNumbers, diffEnabled, leftCode, rightCode])
+  const { leftLineNumbers, rightLineNumbers } = useDiffLines()
 
   return (
     <div className="app-container">
@@ -83,7 +80,7 @@ function AppContent() {
             onApply={applyLeftCode}
             label="版本 A 代码"
             variant="left"
-            diffLineNumbers={leftDiffLines}
+            diffLineNumbers={leftLineNumbers}
             diffEnabled={diffEnabled}
           />
         </div>
@@ -95,7 +92,7 @@ function AppContent() {
             onApply={applyRightCode}
             label="版本 B 代码"
             variant="right"
-            diffLineNumbers={rightDiffLines}
+            diffLineNumbers={rightLineNumbers}
             diffEnabled={diffEnabled}
           />
         </div>
@@ -103,8 +100,8 @@ function AppContent() {
 
       <div className="preview-section">
         <SplitView
-          diffLeftLines={leftDiffLines}
-          diffRightLines={rightDiffLines}
+          diffLeftLines={leftLineNumbers}
+          diffRightLines={rightLineNumbers}
         />
       </div>
 
