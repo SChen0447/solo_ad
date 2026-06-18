@@ -3,6 +3,9 @@ import { Canvas, useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import type { TimeRemaining } from '../modules/timeManager';
 
+const MAX_PARTICLES = 200;
+const UPDATE_INTERVAL = 60;
+
 interface SandParticlesProps {
   remainingTime: TimeRemaining;
   totalDuration: number;
@@ -11,9 +14,11 @@ interface SandParticlesProps {
 function SandParticles({ remainingTime, totalDuration }: SandParticlesProps) {
   const particlesRef = useRef<THREE.Points>(null);
   const frameCount = useRef(0);
+  const progressRef = useRef(0);
 
-  const { positions, velocities } = useMemo(() => {
-    const particleCount = 200;
+  const particleCount = Math.min(MAX_PARTICLES, 200);
+
+  const geometryData = useMemo(() => {
     const positions = new Float32Array(particleCount * 3);
     const velocities = new Float32Array(particleCount * 3);
 
@@ -30,42 +35,50 @@ function SandParticles({ remainingTime, totalDuration }: SandParticlesProps) {
     }
 
     return { positions, velocities };
-  }, []);
+  }, [particleCount]);
 
   useFrame(() => {
     frameCount.current++;
+    progressRef.current = totalDuration > 0 ? 1 - remainingTime.total / totalDuration : 1;
 
-    if (frameCount.current % 60 !== 0 || !particlesRef.current) return;
+    if (frameCount.current % UPDATE_INTERVAL !== 0 || !particlesRef.current) return;
 
-    const positions = particlesRef.current.geometry.attributes.position.array as Float32Array;
-    const progress = totalDuration > 0 ? 1 - remainingTime.total / totalDuration : 1;
+    const positionAttr = particlesRef.current.geometry.attributes.position;
+    const positions = positionAttr.array as Float32Array;
+    const progress = progressRef.current;
+    const { velocities } = geometryData;
+    let needsUpdate = false;
 
-    for (let i = 0; i < positions.length / 3; i++) {
+    for (let i = 0; i < particleCount; i++) {
       if (progress > Math.random()) {
-        positions[i * 3] += velocities[i * 3];
-        positions[i * 3 + 1] += velocities[i * 3 + 1];
-        positions[i * 3 + 2] += velocities[i * 3 + 2];
+        const idx = i * 3;
+        positions[idx] += velocities[idx];
+        positions[idx + 1] += velocities[idx + 1];
+        positions[idx + 2] += velocities[idx + 2];
 
-        if (positions[i * 3 + 1] < -0.8) {
+        if (positions[idx + 1] < -0.8) {
           const theta = Math.random() * Math.PI * 2;
           const radius = Math.random() * 0.15;
-          positions[i * 3] = Math.cos(theta) * radius;
-          positions[i * 3 + 1] = 0.8 + Math.random() * 0.3;
-          positions[i * 3 + 2] = Math.sin(theta) * radius;
+          positions[idx] = Math.cos(theta) * radius;
+          positions[idx + 1] = 0.8 + Math.random() * 0.3;
+          positions[idx + 2] = Math.sin(theta) * radius;
         }
+        needsUpdate = true;
       }
     }
 
-    particlesRef.current.geometry.attributes.position.needsUpdate = true;
+    if (needsUpdate) {
+      positionAttr.needsUpdate = true;
+    }
   });
 
   return (
-    <points ref={particlesRef}>
+    <points ref={particlesRef} frustumCulled={false}>
       <bufferGeometry>
         <bufferAttribute
           attach="attributes-position"
-          count={200}
-          array={positions}
+          count={particleCount}
+          array={geometryData.positions}
           itemSize={3}
         />
       </bufferGeometry>
@@ -75,6 +88,7 @@ function SandParticles({ remainingTime, totalDuration }: SandParticlesProps) {
         transparent
         opacity={0.9}
         sizeAttenuation
+        depthWrite={false}
       />
     </points>
   );
@@ -144,6 +158,7 @@ function SandTop() {
         transparent
         opacity={0.8}
         side={THREE.DoubleSide}
+        depthWrite={false}
       />
     </mesh>
   );
@@ -181,7 +196,8 @@ export default function Hourglass({ remainingTime, totalDuration }: HourglassPro
     <div className="hourglass-container">
       <Canvas
         camera={{ position: [0, 0, 3], fov: 60 }}
-        gl={{ antialias: true, alpha: true }}
+        gl={{ antialias: true, alpha: true, powerPreference: 'high-performance' }}
+        dpr={[1, 2]}
       >
         <fog attach="fog" args={['#0a192f', 5, 15]} />
         <HourglassScene remainingTime={remainingTime} totalDuration={totalDuration} />
