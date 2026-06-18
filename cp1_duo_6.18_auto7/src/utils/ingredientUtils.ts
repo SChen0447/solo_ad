@@ -27,13 +27,57 @@ const CATEGORY_MAP: Record<string, string> = {
   '粉条': '主食', '米线': '主食', '意大利面': '主食', '通心粉': '主食',
 };
 
+const INGREDIENT_ALIASES: Record<string, string> = {
+  '西红柿': '番茄',
+  '洋柿子': '番茄',
+  '马铃薯': '土豆',
+  '洋芋': '土豆',
+  '地瓜': '红薯',
+  '番薯': '红薯',
+  '甘薯': '红薯',
+  '白薯': '红薯',
+  '高丽菜': '卷心菜',
+  '包菜': '卷心菜',
+  '圆白菜': '卷心菜',
+  '莲花白': '卷心菜',
+  '花菜': '花椰菜',
+  '菜花': '花椰菜',
+  '西蓝花': '西兰花',
+  '蒜': '大蒜',
+  '蒜头': '大蒜',
+  '葱': '大葱',
+  '香葱': '大葱',
+  '姜': '生姜',
+  '黄姜': '生姜',
+  '蛋': '鸡蛋',
+  '鸡子': '鸡蛋',
+  '芫荽': '香菜',
+  '芫茜': '香菜',
+  '油': '食用油',
+  '菜油': '食用油',
+  '豆油': '食用油',
+  '植物油': '食用油',
+  '生抽': '酱油',
+  '老抽': '酱油',
+  '味精': '鸡精',
+  '味素': '鸡精',
+  '料酒': '黄酒',
+  '米酒': '黄酒',
+};
+
 export function getCategory(ingredientName: string): string {
+  const canonical = getCanonicalName(ingredientName);
   for (const [key, category] of Object.entries(CATEGORY_MAP)) {
-    if (ingredientName.includes(key)) {
+    if (canonical.includes(key) || ingredientName.includes(key)) {
       return category;
     }
   }
   return '其他';
+}
+
+export function getCanonicalName(name: string): string {
+  const trimmed = name.trim().toLowerCase();
+  return INGREDIENT_ALIASES[trimmed] ?? INGREDIENT_ALIASES[name.trim()] ?? name.trim();
 }
 
 function gcd(a: number, b: number): number {
@@ -90,70 +134,126 @@ export function formatFraction(value: number): string {
   return `${intPart} ${num}/${den}`;
 }
 
-const UNIT_PRIORITY: Record<string, number> = {
-  '克': 10, 'kg': 20, '千克': 20, '公斤': 20,
-  'ml': 10, 'l': 20, '升': 20,
-  '杯': 5, '勺': 3, '大勺': 4, '小勺': 2,
-  '个': 1, '片': 1, '根': 1, '瓣': 1, '块': 1, '把': 1, '小块': 1,
+export function formatIngredientAmount(amount: number, unit: string): string {
+  const formattedAmount = formatFraction(amount);
+  if (!unit) return formattedAmount;
+  return `${formattedAmount}${unit}`;
+}
+
+type UnitType = 'weight' | 'volume' | 'count' | 'other';
+
+interface UnitInfo {
+  type: UnitType;
+  priority: number;
+  toBase: number;
+  baseUnit: string;
+}
+
+const UNIT_INFO: Record<string, UnitInfo> = {
+  '克': { type: 'weight', priority: 10, toBase: 1, baseUnit: '克' },
+  '千克': { type: 'weight', priority: 30, toBase: 1000, baseUnit: '克' },
+  '公斤': { type: 'weight', priority: 30, toBase: 1000, baseUnit: '克' },
+  'kg': { type: 'weight', priority: 30, toBase: 1000, baseUnit: '克' },
+  '斤': { type: 'weight', priority: 20, toBase: 500, baseUnit: '克' },
+  '两': { type: 'weight', priority: 15, toBase: 50, baseUnit: '克' },
+
+  'ml': { type: 'volume', priority: 10, toBase: 1, baseUnit: 'ml' },
+  '毫升': { type: 'volume', priority: 10, toBase: 1, baseUnit: 'ml' },
+  'l': { type: 'volume', priority: 30, toBase: 1000, baseUnit: 'ml' },
+  '升': { type: 'volume', priority: 30, toBase: 1000, baseUnit: 'ml' },
+
+  '杯': { type: 'volume', priority: 25, toBase: 240, baseUnit: 'ml' },
+  '大勺': { type: 'volume', priority: 18, toBase: 15, baseUnit: 'ml' },
+  '汤匙': { type: 'volume', priority: 18, toBase: 15, baseUnit: 'ml' },
+  '勺': { type: 'volume', priority: 15, toBase: 10, baseUnit: 'ml' },
+  '小勺': { type: 'volume', priority: 12, toBase: 5, baseUnit: 'ml' },
+  '茶匙': { type: 'volume', priority: 12, toBase: 5, baseUnit: 'ml' },
+
+  '个': { type: 'count', priority: 10, toBase: 1, baseUnit: '个' },
+  '片': { type: 'count', priority: 5, toBase: 1, baseUnit: '个' },
+  '根': { type: 'count', priority: 5, toBase: 1, baseUnit: '个' },
+  '瓣': { type: 'count', priority: 5, toBase: 1, baseUnit: '个' },
+  '块': { type: 'count', priority: 5, toBase: 1, baseUnit: '个' },
+  '把': { type: 'count', priority: 5, toBase: 1, baseUnit: '个' },
+  '小块': { type: 'count', priority: 3, toBase: 1, baseUnit: '个' },
+  '只': { type: 'count', priority: 5, toBase: 1, baseUnit: '个' },
+  '颗': { type: 'count', priority: 5, toBase: 1, baseUnit: '个' },
 };
 
-const UNIT_CONVERSIONS: Record<string, { to: string; factor: number }[]> = {
-  '千克': [{ to: '克', factor: 1000 }],
-  '公斤': [{ to: '克', factor: 1000 }],
-  'kg': [{ to: '克', factor: 1000 }],
-  '大勺': [{ to: '勺', factor: 1 }],
-  '小勺': [{ to: '勺', factor: 1 }],
-  'l': [{ to: 'ml', factor: 1000 }],
-  '升': [{ to: 'ml', factor: 1000 }],
-};
+function getUnitInfo(unit: string): UnitInfo {
+  return UNIT_INFO[unit] ?? { type: 'other', priority: 1, toBase: 1, baseUnit: unit };
+}
 
-function normalizeUnit(unit: string, amount: number): { unit: string; amount: number } {
-  const conversions = UNIT_CONVERSIONS[unit];
-  if (conversions) {
-    const conv = conversions[0];
-    return { unit: conv.to, amount: amount * conv.factor };
-  }
-  return { unit, amount };
+function toBaseUnit(unit: string, amount: number): { amount: number; baseUnit: string; type: UnitType } {
+  const info = getUnitInfo(unit);
+  return {
+    amount: amount * info.toBase,
+    baseUnit: info.baseUnit,
+    type: info.type,
+  };
+}
+
+function fromBaseUnit(baseUnit: string, baseAmount: number, targetUnit: string): number {
+  const info = getUnitInfo(targetUnit);
+  if (info.baseUnit !== baseUnit) return baseAmount;
+  return baseAmount / info.toBase;
 }
 
 export function mergeIngredients(ingredients: Ingredient[]): Ingredient[] {
-  const normalized = ingredients.map((ing) => {
-    const n = normalizeUnit(ing.unit, ing.amount);
-    return { name: ing.name, amount: n.amount, unit: n.unit };
-  });
+  const canonicalMap = new Map<
+    string,
+    Map<string, { baseAmount: number; originalUnits: Map<string, number> }>
+  >();
 
-  const merged = new Map<string, { amount: number; unit: string; priority: number }>();
+  for (const ing of ingredients) {
+    const canonicalName = getCanonicalName(ing.name);
+    const { baseAmount, baseUnit, type } = toBaseUnit(ing.unit, ing.amount);
 
-  for (const ing of normalized) {
-    const key = `${ing.name.toLowerCase()}|${ing.unit}`;
-    const existing = merged.get(key);
-    if (existing) {
-      existing.amount += ing.amount;
-    } else {
-      const priority = UNIT_PRIORITY[ing.unit] ?? 0;
-      merged.set(key, { amount: ing.amount, unit: ing.unit, priority });
+    if (!canonicalMap.has(canonicalName)) {
+      canonicalMap.set(canonicalName, new Map());
     }
-  }
+    const unitGroups = canonicalMap.get(canonicalName)!;
 
-  const nameGroups = new Map<string, { amount: number; unit: string; priority: number }[]>();
-  for (const [key, val] of merged) {
-    const [name] = key.split('|');
-    if (!nameGroups.has(name)) {
-      nameGroups.set(name, []);
+    const groupKey = type === 'other' ? ing.unit : baseUnit;
+
+    if (!unitGroups.has(groupKey)) {
+      unitGroups.set(groupKey, { baseAmount: 0, originalUnits: new Map() });
     }
-    nameGroups.get(name)!.push(val);
+    const group = unitGroups.get(groupKey)!;
+    group.baseAmount += type === 'other' ? ing.amount : baseAmount;
+
+    const unitKey = ing.unit;
+    const currentPriority = getUnitInfo(unitKey).priority;
+    const existingBest = group.originalUnits;
+    if (!existingBest.has(unitKey)) {
+      existingBest.set(unitKey, currentPriority);
+    }
   }
 
   const result: Ingredient[] = [];
-  for (const [name, entries] of nameGroups) {
-    if (entries.length === 1) {
-      result.push({ name, amount: entries[0].amount, unit: entries[0].unit });
-    } else {
-      const totalAmount = entries.reduce((sum, e) => sum + e.amount, 0);
-      const bestEntry = entries.reduce((best, e) =>
-        e.priority > best.priority ? e : best
-      , entries[0]);
-      result.push({ name, amount: totalAmount, unit: bestEntry.unit });
+
+  for (const [canonicalName, unitGroups] of canonicalMap) {
+    for (const [, group] of unitGroups) {
+      let bestUnit = '';
+      let bestPriority = -1;
+
+      for (const [unit, priority] of group.originalUnits) {
+        if (priority > bestPriority) {
+          bestPriority = priority;
+          bestUnit = unit;
+        }
+      }
+
+      const bestInfo = getUnitInfo(bestUnit);
+      const displayAmount = bestInfo.type === 'other'
+        ? group.baseAmount
+        : fromBaseUnit(bestInfo.baseUnit, group.baseAmount, bestUnit);
+
+      result.push({
+        name: canonicalName,
+        amount: Math.round(displayAmount * 1000) / 1000,
+        unit: bestUnit,
+      });
     }
   }
 

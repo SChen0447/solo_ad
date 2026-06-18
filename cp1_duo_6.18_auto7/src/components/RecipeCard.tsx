@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import type { Recipe } from '../types';
-import { formatFraction } from '../utils/ingredientUtils';
+import { formatFraction, formatIngredientAmount } from '../utils/ingredientUtils';
 import { useRecipeStore } from '../store/recipeStore';
 import './RecipeCard.css';
 
@@ -35,6 +35,20 @@ export function RecipeCard({ recipe, onDelete, isNew }: RecipeCardProps) {
     if (!isNaN(value) && value > 0) {
       updateScaleFactor(recipe.id, value);
     }
+  };
+
+  const handleScaleIncrease = () => {
+    const newValue = Math.round((recipe.scaleFactor + 0.1) * 10) / 10;
+    updateScaleFactor(recipe.id, newValue);
+  };
+
+  const handleScaleDecrease = () => {
+    const newValue = Math.max(0.1, Math.round((recipe.scaleFactor - 0.1) * 10) / 10);
+    updateScaleFactor(recipe.id, newValue);
+  };
+
+  const handleScaleReset = () => {
+    updateScaleFactor(recipe.id, 1);
   };
 
   const scaledServings = recipe.servings * recipe.scaleFactor;
@@ -85,15 +99,42 @@ export function RecipeCard({ recipe, onDelete, isNew }: RecipeCardProps) {
         </div>
 
         <div className="scale-control">
-          <label>份量缩放：</label>
-          <input
-            type="number"
-            min="0.1"
-            step="0.1"
-            value={recipe.scaleFactor}
-            onChange={handleScaleChange}
-          />
-          <span className="scale-suffix">倍</span>
+          <label className="scale-label">份量缩放</label>
+          <div className="scale-buttons">
+            <button
+              type="button"
+              className="scale-btn"
+              onClick={handleScaleDecrease}
+              aria-label="减少份量"
+            >
+              −
+            </button>
+            <input
+              type="number"
+              className="scale-input"
+              min="0.1"
+              step="0.1"
+              value={recipe.scaleFactor}
+              onChange={handleScaleChange}
+            />
+            <button
+              type="button"
+              className="scale-btn"
+              onClick={handleScaleIncrease}
+              aria-label="增加份量"
+            >
+              +
+            </button>
+            <button
+              type="button"
+              className="scale-reset-btn"
+              onClick={handleScaleReset}
+              aria-label="重置份量"
+              title="重置为1倍"
+            >
+              ↺
+            </button>
+          </div>
         </div>
 
         {recipe.scaleFactor !== 1 && (
@@ -116,7 +157,7 @@ export function RecipeCard({ recipe, onDelete, isNew }: RecipeCardProps) {
                 <li key={idx} className="ingredient-item">
                   <span className="ingredient-name">{ing.name}</span>
                   <span className="ingredient-amount">
-                    {formatFraction(ing.amount * recipe.scaleFactor)} {ing.unit}
+                    {formatIngredientAmount(ing.amount * recipe.scaleFactor, ing.unit)}
                   </span>
                 </li>
               ))}

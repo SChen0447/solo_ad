@@ -61,10 +61,8 @@
 }
 
 .recipe-grid {
-  column-count: auto;
   column-width: 250px;
   column-gap: 16px;
-  align-items: start;
   will-change: scroll-position;
 }
 

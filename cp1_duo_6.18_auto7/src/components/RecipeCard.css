@@ -1,16 +1,16 @@
 .recipe-card {
   width: 100%;
+  max-width: 250px;
   background-color: #faf3e0;
   border-radius: 12px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
   overflow: hidden;
   transition: transform 0.3s ease, box-shadow 0.3s ease;
-  margin-bottom: 16px;
+  margin: 0 auto 16px;
+  display: inline-block;
   break-inside: avoid;
   will-change: transform;
   contain: layout style paint;
-  content-visibility: auto;
-  contain-intrinsic-size: auto 400px;
 }
 
 .recipe-card:hover {
@@ -180,23 +180,95 @@
 
 .scale-control {
   display: flex;
-  align-items: center;
+  flex-direction: column;
   gap: 6px;
   margin-bottom: 8px;
   font-size: 13px;
   color: #555;
 }
 
-.scale-control input {
-  width: 60px;
-  padding: 4px 8px;
+.scale-label {
+  font-weight: 500;
+  color: #444;
+}
+
+.scale-buttons {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.scale-btn {
+  width: 28px;
+  height: 28px;
+  border: 1px solid #ddd;
+  background: white;
+  border-radius: 6px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #555;
+  transition: all 0.1s ease;
+  line-height: 1;
+  padding: 0;
+}
+
+.scale-btn:hover {
+  border-color: #f76c2f;
+  color: #f76c2f;
+  background: #fff5ef;
+}
+
+.scale-btn:active {
+  transform: scale(0.95);
+}
+
+.scale-input {
+  width: 52px;
+  padding: 4px 6px;
   border: 1px solid #ddd;
   border-radius: 6px;
   font-size: 13px;
+  text-align: center;
+  color: #333;
+  font-weight: 500;
+  -moz-appearance: textfield;
 }
 
-.scale-suffix {
+.scale-input::-webkit-inner-spin-button,
+.scale-input::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.scale-reset-btn {
+  width: 28px;
+  height: 28px;
+  border: 1px solid #ddd;
+  background: white;
+  border-radius: 6px;
+  font-size: 14px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   color: #888;
+  transition: all 0.1s ease;
+  padding: 0;
+  margin-left: 2px;
+}
+
+.scale-reset-btn:hover {
+  border-color: #f76c2f;
+  color: #f76c2f;
+  background: #fff5ef;
+}
+
+.scale-reset-btn:active {
+  transform: scale(0.95);
 }
 
 .scale-hint {
@@ -289,7 +361,8 @@
 @media (max-width: 768px) {
   .recipe-card {
     width: 100%;
-    margin-bottom: 16px;
+    max-width: 100%;
+    margin: 0 0 16px 0;
     content-visibility: auto;
     contain-intrinsic-size: auto 400px;
   }
