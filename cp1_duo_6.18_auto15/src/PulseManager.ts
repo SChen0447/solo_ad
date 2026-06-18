@@ -20,8 +20,16 @@ interface Pulse {
   justSplit: boolean;
 }
 
+interface FireRing {
+  x: number;
+  y: number;
+  anim: number;
+  duration: number;
+}
+
 export class PulseManager {
   private pulses: Pulse[] = [];
+  private fireRings: FireRing[] = [];
   private width: number;
   private height: number;
   private scene: Scene;
@@ -52,6 +60,12 @@ export class PulseManager {
       trail: [],
       alive: true,
       justSplit: false
+    });
+    this.fireRings.push({
+      x,
+      y,
+      anim: 0,
+      duration: 0.15
     });
   }
 
@@ -90,6 +104,11 @@ export class PulseManager {
     }
 
     this.pulses = this.pulses.filter(p => p.alive);
+
+    for (const ring of this.fireRings) {
+      ring.anim += dt;
+    }
+    this.fireRings = this.fireRings.filter(r => r.anim < r.duration);
   }
 
   private handleBounce(pulse: Pulse): void {
@@ -239,6 +258,21 @@ export class PulseManager {
   }
 
   public draw(ctx: CanvasRenderingContext2D): void {
+    for (const ring of this.fireRings) {
+      const t = ring.anim / ring.duration;
+      const r = 2 + 10 * t;
+      const alpha = 0.8 * (1 - t);
+      ctx.save();
+      ctx.strokeStyle = `rgba(0, 191, 255, ${alpha})`;
+      ctx.lineWidth = 2;
+      ctx.shadowColor = '#00bfff';
+      ctx.shadowBlur = 15;
+      ctx.beginPath();
+      ctx.arc(ring.x, ring.y, r, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+    }
+
     for (const pulse of this.pulses) {
       if (!pulse.alive) continue;
 

@@ -20,6 +20,7 @@ export class Player {
   private lastMoveY: number = 0;
   private fireCallback: ((event: FirePulseEvent) => void) | null = null;
   private lowEnergyFlash: number = 0;
+  private pulseTime: number = 0;
 
   constructor(width: number, height: number) {
     this.width = width;
@@ -107,6 +108,8 @@ export class Player {
       this.lowEnergyFlash -= dt;
       if (this.lowEnergyFlash < 0) this.lowEnergyFlash = 0;
     }
+
+    this.pulseTime += dt;
   }
 
   private checkCollision(x: number, y: number, obstacles: Obstacle[]): boolean {
@@ -148,11 +151,23 @@ export class Player {
 
     const fillH = (this.energy / 100) * barH;
     ctx.save();
-    ctx.shadowColor = '#00bfff';
-    ctx.shadowBlur = 10;
+    if (this.energy < 30) {
+      const pulsePhase = (Math.sin(this.pulseTime * Math.PI * 2) + 1) / 2;
+      const glowAlpha = 0.3 + 0.3 * pulsePhase;
+      ctx.shadowColor = `rgba(255, 60, 80, ${glowAlpha})`;
+      ctx.shadowBlur = 18;
+    } else {
+      ctx.shadowColor = '#00bfff';
+      ctx.shadowBlur = 10;
+    }
     const gradient = ctx.createLinearGradient(barX, barY + barH, barX, barY);
-    gradient.addColorStop(0, '#0044aa');
-    gradient.addColorStop(1, '#00bfff');
+    if (this.energy < 30) {
+      gradient.addColorStop(0, '#aa2233');
+      gradient.addColorStop(1, '#ff4455');
+    } else {
+      gradient.addColorStop(0, '#0044aa');
+      gradient.addColorStop(1, '#00bfff');
+    }
     ctx.fillStyle = gradient;
     ctx.fillRect(barX, barY + (barH - fillH), barW, fillH);
     ctx.restore();

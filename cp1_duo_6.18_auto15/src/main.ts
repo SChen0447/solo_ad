@@ -45,6 +45,10 @@ function drawUI(ctx: CanvasRenderingContext2D): void {
   ctx.restore();
 
   ctx.save();
+  ctx.shadowColor = 'rgba(0, 191, 255, 0.4)';
+  ctx.shadowBlur = 4;
+  ctx.shadowOffsetX = 1;
+  ctx.shadowOffsetY = 1;
   ctx.fillStyle = '#ffffff';
   ctx.font = '16px "Segoe UI", Arial, sans-serif';
   ctx.textBaseline = 'middle';
@@ -54,6 +58,10 @@ function drawUI(ctx: CanvasRenderingContext2D): void {
   ctx.restore();
 
   ctx.save();
+  ctx.shadowColor = 'rgba(0, 191, 255, 0.4)';
+  ctx.shadowBlur = 4;
+  ctx.shadowOffsetX = 1;
+  ctx.shadowOffsetY = 1;
   ctx.fillStyle = '#aaaaaa';
   ctx.font = '14px "Segoe UI", Arial, sans-serif';
   ctx.textBaseline = 'middle';

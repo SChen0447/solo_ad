@@ -18,6 +18,7 @@ export interface Receiver {
   radius: number;
   hit: boolean;
   hitAnim: number;
+  fadeIn: number;
 }
 
 export class Scene {
@@ -141,7 +142,7 @@ export class Scene {
       attempts++;
     }
 
-    return { x, y, radius: 30, hit: false, hitAnim: 0 };
+    return { x, y, radius: 30, hit: false, hitAnim: 0, fadeIn: 0.4 };
   }
 
   public update(dt: number): void {
@@ -155,18 +156,26 @@ export class Scene {
         this.receiver = this.generateReceiver();
       }
     }
+
+    if (this.receiver.fadeIn > 0) {
+      this.receiver.fadeIn -= dt;
+      if (this.receiver.fadeIn < 0) this.receiver.fadeIn = 0;
+    }
   }
 
   public draw(ctx: CanvasRenderingContext2D): void {
     for (const obs of this.obstacles) {
       ctx.save();
-      ctx.shadowColor = 'rgba(58, 58, 74, 0.6)';
-      ctx.shadowBlur = 12;
+      ctx.shadowColor = 'rgba(90, 90, 106, 0.8)';
+      ctx.shadowBlur = 18;
+      ctx.shadowOffsetX = 0;
+      ctx.shadowOffsetY = 0;
       ctx.fillStyle = '#3a3a4a';
       ctx.fillRect(obs.x, obs.y, obs.width, obs.height);
-      ctx.strokeStyle = '#5a5a6a';
-      ctx.lineWidth = 1;
-      ctx.strokeRect(obs.x, obs.y, obs.width, obs.height);
+      ctx.shadowBlur = 0;
+      ctx.strokeStyle = '#6a6a7a';
+      ctx.lineWidth = 1.5;
+      ctx.strokeRect(obs.x + 0.5, obs.y + 0.5, obs.width - 1, obs.height - 1);
       ctx.restore();
     }
 
@@ -175,10 +184,12 @@ export class Scene {
       ctx.translate(prism.x, prism.y);
       ctx.rotate(prism.angle);
       ctx.shadowColor = '#00d4ff';
-      ctx.shadowBlur = 20;
+      ctx.shadowBlur = 30;
+      ctx.shadowOffsetX = 0;
+      ctx.shadowOffsetY = 0;
       ctx.strokeStyle = '#00d4ff';
-      ctx.fillStyle = 'rgba(0, 212, 255, 0.15)';
-      ctx.lineWidth = 2.5;
+      ctx.fillStyle = 'rgba(0, 212, 255, 0.2)';
+      ctx.lineWidth = 3;
       ctx.beginPath();
       const h = prism.size * Math.sqrt(3) / 2;
       ctx.moveTo(0, -h * 2 / 3);
@@ -192,6 +203,8 @@ export class Scene {
 
     const rec = this.receiver;
     ctx.save();
+    const fadeAlpha = rec.fadeIn > 0 ? 1 - (rec.fadeIn / 0.4) : 1;
+    ctx.globalAlpha = fadeAlpha;
     if (rec.hit) {
       const progress = rec.hitAnim / 0.8;
       const r = 30 + 90 * progress;
