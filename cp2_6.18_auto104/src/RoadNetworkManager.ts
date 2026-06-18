@@ -1,0 +1,499 @@
+import * as THREE from 'three';
+import { RoadSegment } from './AppController';
+
+const GRID_SIZE = 5;
+const ROAD_WIDTH = 4;
+const ROAD_LENGTH = 20;
+const INTERSECTION_SIZE = 8;
+const GRID_SPACING = 24;
+
+const COLOR_LOW = new THREE.Color(0x22c55e);
+const COLOR_MID = new THREE.Color(0xeab308);
+const COLOR_HIGH = new THREE.Color(0xef4444);
+const COLOR_ROAD_BASE = new THREE.Color(0x333333);
+
+export class RoadNetworkManager {
+  private scene: THREE.Scene;
+
+  private roadGroup: THREE.Group;
+  private lowDetailGroup: THREE.Group;
+  private intersectionGroup: THREE.Group;
+  private glowGroup: THREE.Group;
+  private gridLineGroup: THREE.Group;
+  private pathLineGroup: THREE.Group;
+
+  private roadSegments: RoadSegment[] = [];
+  private intersections: THREE.Vector3[] = [];
+  private segmentMeshes: Map<string, THREE.Mesh> = new Map();
+  private highlightBorders: Map<string, THREE.LineSegments> = new Map();
+  private highlightedSegments: Set<string> = new Set();
+
+  private lodLevel: 'high' | 'medium' | 'low' = 'high';
+  private densityMap: Map<string, number> = new Map();
+
+  private raycastMeshes: THREE.Mesh[] = [];
+
+  constructor(scene: THREE.Scene) {
+    this.scene = scene;
+
+    this.roadGroup = new THREE.Group();
+    this.lowDetailGroup = new THREE.Group();
+    this.intersectionGroup = new THREE.Group();
+    this.glowGroup = new THREE.Group();
+    this.gridLineGroup = new THREE.Group();
+    this.pathLineGroup = new THREE.Group();
+
+    this.roadGroup.name = 'roads_high';
+    this.lowDetailGroup.name = 'roads_low';
+    this.intersectionGroup.name = 'intersections';
+    this.glowGroup.name = 'glows';
+    this.gridLineGroup.name = 'gridlines';
+    this.pathLineGroup.name = 'pathlines';
+  }
+
+  init(): void {
+    this.buildRoadNetwork();
+    this.buildIntersections();
+    this.buildGlowEffects();
+    this.buildGridLines();
+    this.buildLowDetailMeshes();
+    this.buildPathLines();
+
+    this.scene.add(this.roadGroup);
+    this.scene.add(this.lowDetailGroup);
+    this.scene.add(this.intersectionGroup);
+    this.scene.add(this.glowGroup);
+    this.scene.add(this.gridLineGroup);
+    this.scene.add(this.pathLineGroup);
+
+    this.lowDetailGroup.visible = false;
+    this.pathLineGroup.visible = false;
+  }
+
+  private buildRoadNetwork(): void {
+    const offset = (GRID_SIZE - 1) * GRID_SPACING / 2;
+
+    for (let i = 0; i < GRID_SIZE; i++) {
+      for (let j = 0; j < GRID_SIZE - 1; j++) {
+        const startX = j * GRID_SPACING - offset;
+        const endX = (j + 1) * GRID_SPACING - offset;
+        const z = i * GRID_SPACING - offset;
+
+        const segment: RoadSegment = {
+          id: `h_${i}_${j}`,
+          startX,
+          startZ: z,
+          endX,
+          endZ: z,
+          width: ROAD_WIDTH,
+          density: 0,
+          direction: 'x',
+          isIntersection: false
+        };
+        this.roadSegments.push(segment);
+        this.createRoadMesh(segment);
+      }
+    }
+
+    for (let i = 0; i < GRID_SIZE - 1; i++) {
+      for (let j = 0; j < GRID_SIZE; j++) {
+        const x = j * GRID_SPACING - offset;
+        const startZ = i * GRID_SPACING - offset;
+        const endZ = (i + 1) * GRID_SPACING - offset;
+
+        const segment: RoadSegment = {
+          id: `v_${i}_${j}`,
+          startX: x,
+          startZ,
+          endX: x,
+          endZ,
+          width: ROAD_WIDTH,
+          density: 0,
+          direction: 'z',
+          isIntersection: false
+        };
+        this.roadSegments.push(segment);
+        this.createRoadMesh(segment);
+      }
+    }
+  }
+
+  private createRoadMesh(segment: RoadSegment): void {
+    const length = segment.direction === 'x'
+      ? Math.abs(segment.endX - segment.startX)
+      : Math.abs(segment.endZ - segment.startZ);
+
+    const geometry = new THREE.PlaneGeometry(length, segment.width, Math.max(1, Math.floor(length / 2)), 1);
+
+    const material = new THREE.MeshLambertMaterial({
+      color: COLOR_ROAD_BASE.clone(),
+      side: THREE.DoubleSide,
+      transparent: true,
+      opacity: 0.9
+    });
+
+    const mesh = new THREE.Mesh(geometry, material);
+    mesh.rotation.x = -Math.PI / 2;
+
+    if (segment.direction === 'x') {
+      mesh.position.set(
+        (segment.startX + segment.endX) / 2,
+        0.01,
+        segment.startZ
+      );
+    } else {
+      mesh.position.set(
+        segment.startX,
+        0.01,
+        (segment.startZ + segment.endZ) / 2
+      );
+    }
+
+    mesh.userData.segmentId = segment.id;
+    mesh.userData.segment = segment;
+
+    this.roadGroup.add(mesh);
+    this.segmentMeshes.set(segment.id, mesh);
+    this.raycastMeshes.push(mesh);
+
+    this.createHighlightBorder(segment, mesh);
+  }
+
+  private createHighlightBorder(segment: RoadSegment, mesh: THREE.Mesh): void {
+    const edges = new THREE.EdgesGeometry(mesh.geometry);
+    const lineMaterial = new THREE.LineBasicMaterial({
+      color: 0xffffff,
+      transparent: true,
+      opacity: 0,
+      linewidth: 1
+    });
+    const border = new THREE.LineSegments(edges, lineMaterial);
+    border.position.copy(mesh.position);
+    border.rotation.copy(mesh.rotation);
+    border.userData.segmentId = segment.id;
+
+    this.roadGroup.add(border);
+    this.highlightBorders.set(segment.id, border);
+  }
+
+  private buildIntersections(): void {
+    const offset = (GRID_SIZE - 1) * GRID_SPACING / 2;
+
+    for (let i = 0; i < GRID_SIZE; i++) {
+      for (let j = 0; j < GRID_SIZE; j++) {
+        const x = j * GRID_SPACING - offset;
+        const z = i * GRID_SPACING - offset;
+
+        this.intersections.push(new THREE.Vector3(x, 0, z));
+
+        const geometry = new THREE.PlaneGeometry(INTERSECTION_SIZE, INTERSECTION_SIZE);
+        const material = new THREE.MeshLambertMaterial({
+          color: COLOR_ROAD_BASE.clone(),
+          side: THREE.DoubleSide,
+          transparent: true,
+          opacity: 0.9
+        });
+
+        const mesh = new THREE.Mesh(geometry, material);
+        mesh.rotation.x = -Math.PI / 2;
+        mesh.position.set(x, 0.005, z);
+        mesh.userData.intersection = true;
+
+        this.intersectionGroup.add(mesh);
+      }
+    }
+  }
+
+  private buildGlowEffects(): void {
+    const glowTexture = this.createGlowTexture();
+
+    this.intersections.forEach((pos) => {
+      const spriteMaterial = new THREE.SpriteMaterial({
+        map: glowTexture,
+        color: 0xffffff,
+        transparent: true,
+        opacity: 0.15,
+        blending: THREE.AdditiveBlending
+      });
+
+      const sprite = new THREE.Sprite(spriteMaterial);
+      sprite.position.set(pos.x, 0.1, pos.z);
+      sprite.scale.set(10, 10, 1);
+
+      this.glowGroup.add(sprite);
+    });
+  }
+
+  private createGlowTexture(): THREE.Texture {
+    const canvas = document.createElement('canvas');
+    canvas.width = 256;
+    canvas.height = 256;
+    const ctx = canvas.getContext('2d')!;
+
+    const gradient = ctx.createRadialGradient(128, 128, 0, 128, 128, 128);
+    gradient.addColorStop(0, 'rgba(255, 255, 255, 1)');
+    gradient.addColorStop(0.3, 'rgba(255, 255, 255, 0.4)');
+    gradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
+
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, 256, 256);
+
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.needsUpdate = true;
+    return texture;
+  }
+
+  private buildGridLines(): void {
+    const offset = (GRID_SIZE - 1) * GRID_SPACING / 2;
+    const material = new THREE.LineBasicMaterial({
+      color: 0xffffff,
+      transparent: true,
+      opacity: 0.2,
+      linewidth: 0.5
+    });
+
+    this.roadSegments.forEach((segment) => {
+      const points: THREE.Vector3[] = [];
+
+      if (segment.direction === 'x') {
+        const halfWidth = segment.width / 2;
+        points.push(new THREE.Vector3(segment.startX, 0.02, segment.startZ - halfWidth));
+        points.push(new THREE.Vector3(segment.endX, 0.02, segment.startZ - halfWidth));
+        points.push(new THREE.Vector3(segment.endX, 0.02, segment.startZ + halfWidth));
+        points.push(new THREE.Vector3(segment.startX, 0.02, segment.startZ + halfWidth));
+      } else {
+        const halfWidth = segment.width / 2;
+        points.push(new THREE.Vector3(segment.startX - halfWidth, 0.02, segment.startZ));
+        points.push(new THREE.Vector3(segment.startX - halfWidth, 0.02, segment.endZ));
+        points.push(new THREE.Vector3(segment.startX + halfWidth, 0.02, segment.endZ));
+        points.push(new THREE.Vector3(segment.startX + halfWidth, 0.02, segment.startZ));
+      }
+
+      const geometry = new THREE.BufferGeometry().setFromPoints(points);
+      const line = new THREE.LineLoop(geometry, material);
+      this.gridLineGroup.add(line);
+    });
+  }
+
+  private buildLowDetailMeshes(): void {
+    const offset = (GRID_SIZE - 1) * GRID_SPACING / 2;
+
+    for (let i = 0; i < GRID_SIZE - 1; i += 2) {
+      for (let j = 0; j < GRID_SIZE - 1; j += 2) {
+        const x = ((j + 0.5) * GRID_SPACING) - offset;
+        const z = ((i + 0.5) * GRID_SPACING) - offset;
+
+        const geometry = new THREE.PlaneGeometry(GRID_SPACING * 2, GRID_SPACING * 2);
+        const material = new THREE.MeshLambertMaterial({
+          color: COLOR_ROAD_BASE.clone(),
+          side: THREE.DoubleSide,
+          transparent: true,
+          opacity: 0.7
+        });
+
+        const mesh = new THREE.Mesh(geometry, material);
+        mesh.rotation.x = -Math.PI / 2;
+        mesh.position.set(x, 0.001, z);
+        mesh.userData.isLowDetail = true;
+
+        this.lowDetailGroup.add(mesh);
+      }
+    }
+  }
+
+  private buildPathLines(): void {
+    const material = new THREE.LineDashedMaterial({
+      color: 0xffffff,
+      transparent: true,
+      opacity: 0.1,
+      linewidth: 0.5,
+      dashSize: 1,
+      gapSize: 0.5
+    });
+
+    this.roadSegments.forEach((segment) => {
+      const points: THREE.Vector3[] = [];
+
+      if (segment.direction === 'x') {
+        points.push(new THREE.Vector3(segment.startX, 0.03, segment.startZ));
+        points.push(new THREE.Vector3(segment.endX, 0.03, segment.endZ));
+      } else {
+        points.push(new THREE.Vector3(segment.startX, 0.03, segment.startZ));
+        points.push(new THREE.Vector3(segment.endX, 0.03, segment.endZ));
+      }
+
+      const geometry = new THREE.BufferGeometry().setFromPoints(points);
+      const line = new THREE.Line(geometry, material);
+      line.computeLineDistances();
+      this.pathLineGroup.add(line);
+    });
+  }
+
+  setTrafficDensity(densityMap: Map<string, number>): void {
+    this.densityMap = densityMap;
+
+    densityMap.forEach((density, segmentId) => {
+      const mesh = this.segmentMeshes.get(segmentId);
+      if (mesh) {
+        const color = this.getHeatColor(density);
+        const material = mesh.material as THREE.MeshLambertMaterial;
+
+        if (this.highlightedSegments.has(segmentId)) {
+          const brightColor = color.clone();
+          brightColor.offsetHSL(0, 0, 0.15);
+          material.color.copy(brightColor);
+        } else {
+          material.color.copy(color);
+        }
+      }
+    });
+
+    this.updateIntersectionColors();
+  }
+
+  private updateIntersectionColors(): void {
+    const offset = (GRID_SIZE - 1) * GRID_SPACING / 2;
+
+    this.intersectionGroup.children.forEach((child, index) => {
+      const mesh = child as THREE.Mesh;
+      const i = Math.floor(index / GRID_SIZE);
+      const j = index % GRID_SIZE;
+
+      let totalDensity = 0;
+      let count = 0;
+
+      if (j > 0) {
+        const id = `h_${i}_${j - 1}`;
+        totalDensity += this.densityMap.get(id) || 0;
+        count++;
+      }
+      if (j < GRID_SIZE - 1) {
+        const id = `h_${i}_${j}`;
+        totalDensity += this.densityMap.get(id) || 0;
+        count++;
+      }
+      if (i > 0) {
+        const id = `v_${i - 1}_${j}`;
+        totalDensity += this.densityMap.get(id) || 0;
+        count++;
+      }
+      if (i < GRID_SIZE - 1) {
+        const id = `v_${i}_${j}`;
+        totalDensity += this.densityMap.get(id) || 0;
+        count++;
+      }
+
+      const avgDensity = count > 0 ? totalDensity / count : 0;
+      const color = this.getHeatColor(avgDensity);
+      const material = mesh.material as THREE.MeshLambertMaterial;
+      material.color.copy(color);
+    });
+  }
+
+  private getHeatColor(density: number): THREE.Color {
+    const t = Math.max(0, Math.min(1, density / 200));
+
+    if (t < 0.5) {
+      const localT = t / 0.5;
+      return COLOR_LOW.clone().lerp(COLOR_MID, localT);
+    } else {
+      const localT = (t - 0.5) / 0.5;
+      return COLOR_MID.clone().lerp(COLOR_HIGH, localT);
+    }
+  }
+
+  setSegmentHighlight(segmentId: string, highlight: boolean): void {
+    const mesh = this.segmentMeshes.get(segmentId);
+    const border = this.highlightBorders.get(segmentId);
+
+    if (highlight) {
+      this.highlightedSegments.add(segmentId);
+    } else {
+      this.highlightedSegments.delete(segmentId);
+    }
+
+    if (mesh) {
+      const density = this.densityMap.get(segmentId) || 0;
+      const baseColor = this.getHeatColor(density);
+      const material = mesh.material as THREE.MeshLambertMaterial;
+
+      if (highlight) {
+        const brightColor = baseColor.clone();
+        brightColor.offsetHSL(0, 0, 0.15);
+        material.color.copy(brightColor);
+      } else {
+        material.color.copy(baseColor);
+      }
+    }
+
+    if (border) {
+      const material = border.material as THREE.LineBasicMaterial;
+      material.opacity = highlight ? 1 : 0;
+    }
+  }
+
+  updateLOD(cameraDistance: number): void {
+    let newLevel: 'high' | 'medium' | 'low';
+
+    if (cameraDistance < 40) {
+      newLevel = 'high';
+    } else if (cameraDistance < 80) {
+      newLevel = 'medium';
+    } else {
+      newLevel = 'low';
+    }
+
+    if (newLevel !== this.lodLevel) {
+      this.lodLevel = newLevel;
+      this.applyLOD();
+    }
+
+    this.pathLineGroup.visible = cameraDistance < 30;
+  }
+
+  private applyLOD(): void {
+    switch (this.lodLevel) {
+      case 'high':
+        this.roadGroup.visible = true;
+        this.intersectionGroup.visible = true;
+        this.lowDetailGroup.visible = false;
+        this.gridLineGroup.visible = true;
+        this.glowGroup.visible = true;
+        break;
+      case 'medium':
+        this.roadGroup.visible = true;
+        this.intersectionGroup.visible = true;
+        this.lowDetailGroup.visible = false;
+        this.gridLineGroup.visible = false;
+        this.glowGroup.visible = true;
+        break;
+      case 'low':
+        this.roadGroup.visible = false;
+        this.intersectionGroup.visible = false;
+        this.lowDetailGroup.visible = true;
+        this.gridLineGroup.visible = false;
+        this.glowGroup.visible = true;
+        break;
+    }
+  }
+
+  getRoadSegments(): RoadSegment[] {
+    return this.roadSegments;
+  }
+
+  getIntersections(): THREE.Vector3[] {
+    return this.intersections;
+  }
+
+  getRaycastMeshes(): THREE.Mesh[] {
+    return this.raycastMeshes;
+  }
+
+  getSegmentById(id: string): RoadSegment | undefined {
+    return this.roadSegments.find(s => s.id === id);
+  }
+
+  getLODLevel(): 'high' | 'medium' | 'low' {
+    return this.lodLevel;
+  }
+}
