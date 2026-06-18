@@ -26,25 +26,28 @@ input {
 @keyframes fadeIn {
   from {
     opacity: 0;
+    transform: translateY(10px);
   }
   to {
     opacity: 1;
+    transform: translateY(0);
   }
 }
 
 @keyframes spin {
-  from {
+  0% {
     transform: rotate(0deg);
   }
-  to {
+  100% {
     transform: rotate(360deg);
   }
 }
 
 .fade-in {
-  animation: fadeIn 0.5s ease;
+  animation: fadeIn 0.5s ease forwards;
 }
 
 .spin {
   animation: spin 0.5s ease-in-out;
+  animation-iteration-count: 1;
 }
