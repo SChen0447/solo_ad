@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>重力迷宫 Gravity Maze</title>
+  <link rel="stylesheet" href="./src/styles.css" />
+</head>
+<body>
+  <div id="app">
+    <canvas id="game-canvas"></canvas>
+    
+    <div id="menu-bar" class="menu-bar glass">
+      <button id="hamburger-btn" class="hamburger-btn" title="菜单">
+        <span></span><span></span><span></span>
+      </button>
+      <div class="menu-title">重力迷宫</div>
+      <div class="menu-actions">
+        <button id="clear-btn" class="action-btn" title="清空关卡">清空</button>
+        <button id="test-btn" class="action-btn primary" title="测试关卡">▶ 测试</button>
+        <button id="stop-btn" class="action-btn danger hidden" title="停止测试">■ 停止</button>
+      </div>
+    </div>
+
+    <div id="sidebar" class="sidebar glass">
+      <div class="sidebar-header">工具箱</div>
+      <div id="toolbar" class="toolbar"></div>
+    </div>
+
+    <div id="panel" class="panel glass">
+      <div class="panel-header">关卡参数</div>
+      <div class="panel-body">
+        <div class="param-group">
+          <label class="param-label">
+            <span>重力大小</span>
+            <input type="number" id="gravity-input" class="param-input" min="0.1" max="3" step="0.1" value="0.5" />
+          </label>
+          <div class="slider-wrap">
+            <canvas id="gravity-curve" class="curve-canvas" width="240" height="40"></canvas>
+            <input type="range" id="gravity-slider" class="param-slider" min="0.1" max="3" step="0.1" value="0.5" />
+          </div>
+        </div>
+        <div class="param-group">
+          <label class="param-label">
+            <span>摩擦系数</span>
+            <input type="number" id="friction-input" class="param-input" min="0" max="1" step="0.01" value="0.02" />
+          </label>
+          <div class="slider-wrap">
+            <canvas id="friction-curve" class="curve-canvas" width="240" height="40"></canvas>
+            <input type="range" id="friction-slider" class="param-slider" min="0" max="1" step="0.01" value="0.02" />
+          </div>
+        </div>
+        <div class="param-group">
+          <label class="param-label">
+            <span>最少步数目标</span>
+            <input type="number" id="minsteps-input" class="param-input" min="1" max="100" step="1" value="20" />
+          </label>
+          <div class="slider-wrap">
+            <canvas id="minsteps-curve" class="curve-canvas" width="240" height="40"></canvas>
+            <input type="range" id="minsteps-slider" class="param-slider" min="1" max="100" step="1" value="20" />
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="context-menu" class="context-menu glass hidden">
+      <div class="context-item" data-action="delete">删除格子</div>
+      <div class="context-item" data-action="clear">清空区域</div>
+    </div>
+
+    <div id="hud" class="hud hidden">
+      <div class="hud-item glass">
+        <span class="hud-label">时间</span>
+        <span id="hud-timer" class="hud-value">00:00.00</span>
+      </div>
+      <div class="hud-item glass">
+        <span class="hud-label">步数</span>
+        <span id="hud-steps" class="hud-value">0</span>
+      </div>
+    </div>
+
+    <div id="edge-flash" class="edge-flash"></div>
+
+    <div id="victory-overlay" class="victory-overlay hidden">
+      <div class="victory-content glass">
+        <div id="victory-text" class="victory-text">Level Clear!</div>
+        <div id="result-panel" class="result-panel">
+          <div class="result-row">
+            <span>用时</span>
+            <span id="result-time">00:00.00</span>
+          </div>
+          <div class="result-row">
+            <span>步数</span>
+            <span id="result-steps">0</span>
+          </div>
+          <div class="result-row">
+            <span>目标步数</span>
+            <span id="result-target">20</span>
+          </div>
+          <div class="result-row star-row">
+            <span>评分</span>
+            <span id="result-stars" class="stars">★★★</span>
+          </div>
+        </div>
+        <div class="result-actions">
+          <button id="retry-btn" class="action-btn">重试</button>
+          <button id="back-btn" class="action-btn primary">返回编辑</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="tooltip" class="tooltip hidden"></div>
+  </div>
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
