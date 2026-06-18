@@ -153,6 +153,36 @@ export function MapRenderer(): JSX.Element {
     [travelData]
   );
 
+  const traveledPath = useMemo(() => {
+    if (!animatedPosition || travelData.length === 0) return [];
+
+    const points: [number, number][] = [];
+    const nearestIdx = animatedPosition.nearestPointIndex;
+
+    for (let i = 0; i <= nearestIdx && i < travelData.length; i++) {
+      points.push([travelData[i].lat, travelData[i].lng]);
+    }
+
+    points.push([animatedPosition.lat, animatedPosition.lng]);
+
+    return points;
+  }, [animatedPosition, travelData]);
+
+  const remainingPath = useMemo(() => {
+    if (!animatedPosition || travelData.length === 0) return polylinePoints;
+
+    const points: [number, number][] = [
+      [animatedPosition.lat, animatedPosition.lng],
+    ];
+    const nearestIdx = animatedPosition.nearestPointIndex;
+
+    for (let i = nearestIdx + 1; i < travelData.length; i++) {
+      points.push([travelData[i].lat, travelData[i].lng]);
+    }
+
+    return points;
+  }, [animatedPosition, travelData, polylinePoints]);
+
   const isAtPoint = useMemo(() => {
     if (!animatedPosition || travelData.length === 0) return false;
     const nearestPoint = travelData[animatedPosition.nearestPointIndex];
@@ -201,16 +231,30 @@ export function MapRenderer(): JSX.Element {
         <MapController travelData={travelData} currentTime={currentTime} />
 
         {polylinePoints.length >= 2 && (
-          <Polyline
-            positions={polylinePoints}
-            pathOptions={{
-              color: '#ff7043',
-              weight: 3,
-              opacity: 0.8,
-              lineCap: 'round',
-              lineJoin: 'round',
-            }}
-          />
+          <>
+            <Polyline
+              positions={remainingPath}
+              pathOptions={{
+                color: '#ff7043',
+                weight: 3,
+                opacity: 0.35,
+                lineCap: 'round',
+                lineJoin: 'round',
+                dashArray: '8, 8',
+              }}
+            />
+            <Polyline
+              positions={traveledPath}
+              pathOptions={{
+                color: '#7c4dff',
+                weight: 5,
+                opacity: 0.9,
+                lineCap: 'round',
+                lineJoin: 'round',
+                className: 'traveled-path',
+              }}
+            />
+          </>
         )}
 
         {travelData.map((point, index) => (

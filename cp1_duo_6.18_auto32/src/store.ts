@@ -38,5 +38,7 @@ export const useTravelStore = create<TravelStore>((set) => ({
 
   togglePlayback: () => set((state) => ({ isPlaying: !state.isPlaying })),
 
+  stopPlayback: () => set({ isPlaying: false }),
+
   toggleGallery: () => set((state) => ({ isGalleryOpen: !state.isGalleryOpen })),
 }));

@@ -4,6 +4,7 @@ import { useTravelStore } from './store';
 import { findNearestPointIndex } from './utils/path';
 
 const DAY_IN_MS = 24 * 60 * 60 * 1000;
+const PLAYBACK_INTERVAL_MS = 1000;
 
 function formatDate(timestamp: number): string {
   const date = new Date(timestamp);
@@ -14,12 +15,10 @@ export function TimelineController(): JSX.Element {
   const travelData = useTravelStore((state) => state.travelData);
   const currentTime = useTravelStore((state) => state.currentTime);
   const isPlaying = useTravelStore((state) => state.isPlaying);
-  const setCurrentTime = useTravelStore((state) => state.setCurrentTime);
   const togglePlayback = useTravelStore((state) => state.togglePlayback);
-  const selectPoint = useTravelStore((state) => state.selectPoint);
 
-  const animationRef = useRef<number | null>(null);
-  const lastTimeRef = useRef<number>(0);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const currentIndexRef = useRef<number>(0);
 
   const timeRange = useMemo(() => {
     if (travelData.length === 0) {
@@ -33,10 +32,10 @@ export function TimelineController(): JSX.Element {
 
   const dateTicks = useMemo(() => {
     if (travelData.length === 0 || timeRange.totalDays === 0) return [];
-    
+
     const ticks: { time: number; label: string }[] = [];
     const numTicks = Math.min(5, travelData.length);
-    
+
     for (let i = 0; i < numTicks; i++) {
       const index = Math.round((i * (travelData.length - 1)) / (numTicks - 1));
       const point = travelData[index];
@@ -46,7 +45,7 @@ export function TimelineController(): JSX.Element {
         label: point.date,
       });
     }
-    
+
     return ticks;
   }, [travelData, timeRange.totalDays]);
 
@@ -55,83 +54,90 @@ export function TimelineController(): JSX.Element {
     return ((currentTime - timeRange.min) / (timeRange.max - timeRange.min)) * 100;
   }, [currentTime, timeRange]);
 
-  const animate = useCallback(
-    (timestamp: number) => {
-      if (!lastTimeRef.current) {
-        lastTimeRef.current = timestamp;
-      }
-
-      const delta = timestamp - lastTimeRef.current;
-      lastTimeRef.current = timestamp;
-
-      const playbackSpeed = 10;
-      const timeIncrement = (delta / 1000) * DAY_IN_MS * playbackSpeed;
-
-      setCurrentTime((prevTime) => {
-        let newTime = prevTime + timeIncrement;
-        if (newTime >= timeRange.max) {
-          newTime = timeRange.min;
-        }
-        
-        const nearestIndex = findNearestPointIndex(travelData, newTime);
-        if (nearestIndex >= 0) {
-          const pointTime = new Date(travelData[nearestIndex].date).getTime();
-          if (Math.abs(newTime - pointTime) < timeIncrement / 2) {
-            selectPoint(nearestIndex);
-          }
-        }
-
-        return newTime;
-      });
-
-      animationRef.current = requestAnimationFrame(animate);
-    },
-    [timeRange, travelData, setCurrentTime, selectPoint]
-  );
+  useEffect(() => {
+    currentIndexRef.current = findNearestPointIndex(travelData, currentTime);
+  }, [travelData, currentTime]);
 
   useEffect(() => {
     if (isPlaying && travelData.length > 0) {
-      lastTimeRef.current = 0;
-      animationRef.current = requestAnimationFrame(animate);
+      const store = useTravelStore.getState();
+
+      currentIndexRef.current = findNearestPointIndex(travelData, store.currentTime);
+
+      if (currentIndexRef.current >= travelData.length - 1) {
+        currentIndexRef.current = 0;
+        const firstPointTime = new Date(travelData[0].date).getTime();
+        store.setCurrentTime(firstPointTime);
+        store.selectPoint(0);
+      }
+
+      intervalRef.current = setInterval(() => {
+        const s = useTravelStore.getState();
+        const data = s.travelData;
+        if (data.length === 0) {
+          s.stopPlayback();
+          return;
+        }
+
+        const nextIndex = currentIndexRef.current + 1;
+
+        if (nextIndex >= data.length) {
+          currentIndexRef.current = data.length - 1;
+          s.stopPlayback();
+          return;
+        }
+
+        const nextPointTime = new Date(data[nextIndex].date).getTime();
+        currentIndexRef.current = nextIndex;
+        s.setCurrentTime(nextPointTime);
+        s.selectPoint(nextIndex);
+      }, PLAYBACK_INTERVAL_MS);
     } else {
-      if (animationRef.current) {
-        cancelAnimationFrame(animationRef.current);
-        animationRef.current = null;
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
       }
     }
 
     return () => {
-      if (animationRef.current) {
-        cancelAnimationFrame(animationRef.current);
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
       }
     };
-  }, [isPlaying, travelData.length, animate]);
+  }, [isPlaying, travelData]);
 
   const handleSliderChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
       const value = parseInt(e.target.value, 10);
       const newTime = timeRange.min + value * DAY_IN_MS;
-      setCurrentTime(newTime);
+      const store = useTravelStore.getState();
+      store.setCurrentTime(newTime);
 
       const nearestIndex = findNearestPointIndex(travelData, newTime);
       if (nearestIndex >= 0) {
-        selectPoint(nearestIndex);
+        currentIndexRef.current = nearestIndex;
+        store.selectPoint(nearestIndex);
       }
     },
-    [timeRange.min, travelData, setCurrentTime, selectPoint]
+    [timeRange.min, travelData]
   );
 
   const handleSkipBack = useCallback(() => {
     if (travelData.length === 0) return;
-    setCurrentTime(timeRange.min);
-    selectPoint(0);
-  }, [travelData.length, timeRange.min, setCurrentTime, selectPoint]);
+    currentIndexRef.current = 0;
+    const store = useTravelStore.getState();
+    store.setCurrentTime(timeRange.min);
+    store.selectPoint(0);
+  }, [travelData.length, timeRange.min]);
 
   const handleSkipForward = useCallback(() => {
     if (travelData.length === 0) return;
-    setCurrentTime(timeRange.max);
-    selectPoint(travelData.length - 1);
-  }, [travelData.length, timeRange.max, setCurrentTime, selectPoint]);
+    currentIndexRef.current = travelData.length - 1;
+    const store = useTravelStore.getState();
+    store.setCurrentTime(timeRange.max);
+    store.selectPoint(travelData.length - 1);
+  }, [travelData.length, timeRange.max]);
 
   if (travelData.length === 0) {
     return (
@@ -159,7 +165,7 @@ export function TimelineController(): JSX.Element {
           <SkipBack size={20} />
         </button>
         <button
-          className="control-btn play-btn"
+          className={`control-btn play-btn ${isPlaying ? 'playing' : ''}`}
           onClick={togglePlayback}
           title={isPlaying ? '暂停' : '播放'}
         >

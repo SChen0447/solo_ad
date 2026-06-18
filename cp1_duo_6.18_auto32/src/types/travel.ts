@@ -16,6 +16,7 @@ export interface TravelStore {
   selectPoint: (index: number | null) => void;
   setCurrentTime: (time: number) => void;
   togglePlayback: () => void;
+  stopPlayback: () => void;
   toggleGallery: () => void;
 }
 
