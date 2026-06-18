@@ -86,7 +86,7 @@ export function RequestCard({ request }: RequestCardProps) {
 
       <div
         style={{
-          maxHeight: isExpanded ? '200px' : '0',
+          maxHeight: isExpanded ? '360px' : '0',
           overflow: 'hidden',
           transition: 'max-height 0.4s ease-out',
           marginTop: isExpanded ? '16px' : '0',
@@ -114,32 +114,46 @@ export function RequestCard({ request }: RequestCardProps) {
           <div style={{ fontSize: '13px', fontWeight: 500, color: '#374151', marginBottom: '8px' }}>
             物品清单：
           </div>
-          <table style={{ width: '100%', fontSize: '12px', borderCollapse: 'collapse' }}>
-            <thead>
-              <tr style={{ color: '#6b7280' }}>
-                <th style={{ textAlign: 'left', paddingBottom: '4px', fontWeight: 'normal' }}>物品名</th>
-                <th style={{ textAlign: 'center', paddingBottom: '4px', fontWeight: 'normal' }}>数量</th>
-                <th style={{ textAlign: 'right', paddingBottom: '4px', fontWeight: 'normal' }}>单价</th>
-                <th style={{ textAlign: 'right', paddingBottom: '4px', fontWeight: 'normal' }}>小计</th>
-              </tr>
-            </thead>
-            <tbody>
-              {request.items.map((item, index) => (
-                <tr key={index}>
-                  <td style={{ padding: '4px 0', color: '#374151' }}>{item.name}</td>
-                  <td style={{ padding: '4px 0', textAlign: 'center', color: '#374151' }}>
-                    {item.quantity}
+          <div style={{ maxHeight: '220px', overflowY: 'auto' }}>
+            <table style={{ width: '100%', fontSize: '12px', borderCollapse: 'collapse' }}>
+              <thead style={{ position: 'sticky', top: 0, backgroundColor: '#f9fafb' }}>
+                <tr style={{ color: '#6b7280', borderBottom: '1px solid #e5e7eb' }}>
+                  <th style={{ textAlign: 'center', padding: '6px 4px', fontWeight: 600, width: '32px' }}>序号</th>
+                  <th style={{ textAlign: 'left', padding: '6px 4px', fontWeight: 600 }}>物品名称</th>
+                  <th style={{ textAlign: 'center', padding: '6px 4px', fontWeight: 600, width: '50px' }}>数量</th>
+                  <th style={{ textAlign: 'right', padding: '6px 4px', fontWeight: 600, width: '60px' }}>单价</th>
+                  <th style={{ textAlign: 'right', padding: '6px 4px', fontWeight: 600, width: '60px' }}>小计</th>
+                </tr>
+              </thead>
+              <tbody>
+                {request.items.map((item, index) => (
+                  <tr key={index} style={{ borderBottom: index < request.items.length - 1 ? '1px solid #f3f4f6' : 'none' }}>
+                    <td style={{ padding: '6px 4px', textAlign: 'center', color: '#6b7280' }}>{index + 1}</td>
+                    <td style={{ padding: '6px 4px', color: '#374151' }}>{item.name}</td>
+                    <td style={{ padding: '6px 4px', textAlign: 'center', color: '#374151' }}>
+                      {item.quantity}
+                    </td>
+                    <td style={{ padding: '6px 4px', textAlign: 'right', color: '#374151' }}>
+                      ¥{item.unitPrice.toLocaleString()}
+                    </td>
+                    <td style={{ padding: '6px 4px', textAlign: 'right', color: '#1f2937', fontWeight: 500 }}>
+                      ¥{(item.quantity * item.unitPrice).toLocaleString()}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr style={{ borderTop: '2px solid #e5e7eb' }}>
+                  <td colSpan={4} style={{ padding: '8px 4px', textAlign: 'right', color: '#374151', fontWeight: 600 }}>
+                    合计：
                   </td>
-                  <td style={{ padding: '4px 0', textAlign: 'right', color: '#374151' }}>
-                    ¥{item.unitPrice}
-                  </td>
-                  <td style={{ padding: '4px 0', textAlign: 'right', color: '#374151' }}>
-                    ¥{(item.quantity * item.unitPrice).toLocaleString()}
+                  <td style={{ padding: '8px 4px', textAlign: 'right', color: '#1f2937', fontWeight: 700 }}>
+                    ¥{request.total.toLocaleString()}
                   </td>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </tfoot>
+            </table>
+          </div>
         </div>
       </div>
     </div>

@@ -1,15 +1,80 @@
-import { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import type { PurchaseRequest } from '../../backend/types';
 import { fetchRequests, updateStatus } from '../Api';
 import { StatusBadge } from '../components/StatusBadge';
 import { useAppStore } from '../store';
-import { CheckCircle2, XCircle, Package } from 'lucide-react';
+import { CheckCircle2, XCircle, Package, ChevronDown, ChevronRight } from 'lucide-react';
+
+function ItemsDetailTable({ request }: { request: PurchaseRequest }) {
+  return (
+    <div style={{ padding: '0 16px 16px 16px', backgroundColor: '#fafafa' }}>
+      <div style={{ fontSize: '13px', fontWeight: 600, color: '#374151', marginBottom: '10px' }}>
+        📋 物品清单
+      </div>
+      <table style={{ width: '100%', fontSize: '12px', borderCollapse: 'collapse', backgroundColor: '#ffffff', borderRadius: '8px', overflow: 'hidden', border: '1px solid #e5e7eb' }}>
+        <thead>
+          <tr style={{ backgroundColor: '#f3f4f6' }}>
+            <th style={itemThStyle('center', '40px')}>序号</th>
+            <th style={itemThStyle('left')}>物品名称</th>
+            <th style={itemThStyle('center', '60px')}>数量</th>
+            <th style={itemThStyle('right', '80px')}>单价(¥)</th>
+            <th style={itemThStyle('right', '90px')}>小计(¥)</th>
+          </tr>
+        </thead>
+        <tbody>
+          {request.items.map((item, index) => (
+            <tr key={index} style={{ borderBottom: index < request.items.length - 1 ? '1px solid #f3f4f6' : 'none' }}>
+              <td style={itemTdStyle('center')}>{index + 1}</td>
+              <td style={itemTdStyle('left')}>{item.name}</td>
+              <td style={itemTdStyle('center')}>{item.quantity}</td>
+              <td style={itemTdStyle('right')}>{item.unitPrice.toLocaleString()}</td>
+              <td style={{ ...itemTdStyle('right'), fontWeight: 600, color: '#1f2937' }}>
+                {(item.quantity * item.unitPrice).toLocaleString()}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+        <tfoot>
+          <tr style={{ backgroundColor: '#f9fafb', borderTop: '2px solid #e5e7eb' }}>
+            <td colSpan={4} style={{ padding: '8px 10px', textAlign: 'right', fontSize: '12px', fontWeight: 600, color: '#374151' }}>
+              合计：
+            </td>
+            <td style={{ padding: '8px 10px', textAlign: 'right', fontSize: '13px', fontWeight: 700, color: '#1f2937' }}>
+              ¥{request.total.toLocaleString()}
+            </td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+  );
+}
+
+function itemThStyle(align: 'left' | 'center' | 'right', width?: string): React.CSSProperties {
+  return {
+    textAlign: align,
+    padding: '8px 10px',
+    fontWeight: 600,
+    color: '#374151',
+    fontSize: '12px',
+    ...(width ? { width } : {}),
+  };
+}
+
+function itemTdStyle(align: 'left' | 'center' | 'right'): React.CSSProperties {
+  return {
+    textAlign: align,
+    padding: '7px 10px',
+    color: '#4b5563',
+    fontSize: '12px',
+  };
+}
 
 export function AdminDashboardPage() {
   const [requests, setRequests] = useState<PurchaseRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const isLoggedIn = useAppStore((state) => state.isLoggedIn);
   const showToast = useAppStore((state) => state.showToast);
   const location = useLocation();
@@ -29,6 +94,18 @@ export function AdminDashboardPage() {
       loadRequests();
     }
   }, [isLoggedIn]);
+
+  const toggleExpand = useCallback((id: string) => {
+    setExpandedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  }, []);
 
   const handleUpdateStatus = useCallback(
     async (id: string, status: 'approved' | 'rejected' | 'delivered') => {
@@ -70,6 +147,183 @@ export function AdminDashboardPage() {
     );
   }
 
+  const renderTable = (
+    dataList: PurchaseRequest[],
+    showDeliverButton: boolean = false
+  ) => {
+    if (dataList.length === 0) {
+      return <div style={emptyStyle}>暂无数据</div>;
+    }
+
+    return (
+      <div style={tableContainerStyle}>
+        <div style={{ overflowX: 'auto' }}>
+          <table style={tableStyle}>
+            <thead>
+              <tr style={tableHeaderStyle}>
+                <th style={{ ...thStyle('center'), width: '40px' }}>
+                  <span title="展开查看物品明细">📎</span>
+                </th>
+                <th style={thStyle('left')}>标题</th>
+                <th style={thStyle('left')}>申请人</th>
+                <th style={thStyle('right')}>总金额</th>
+                <th style={thStyle('center')}>状态</th>
+                <th style={thStyle('right')}>操作</th>
+              </tr>
+            </thead>
+            <tbody>
+              {dataList.map((request, index) => {
+                const isExpanded = expandedIds.has(request.id);
+                const baseBg = index % 2 === 0 ? '#f9fafb' : '#ffffff';
+                return (
+                  <React.Fragment key={request.id}>
+                    <tr
+                      style={{
+                        ...tableRowStyle,
+                        backgroundColor: baseBg,
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = '#e5e7eb';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = baseBg;
+                      }}
+                    >
+                      <td style={{ ...tdStyle('center'), padding: '8px 12px' }}>
+                        <button
+                          onClick={() => toggleExpand(request.id)}
+                          style={{
+                            background: 'none',
+                            border: 'none',
+                            cursor: 'pointer',
+                            padding: '4px',
+                            borderRadius: '4px',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            color: '#6b7280',
+                            transition: 'all 0.2s ease-out',
+                          }}
+                          title={isExpanded ? '收起明细' : '展开查看物品明细'}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.backgroundColor = '#d1d5db';
+                            e.currentTarget.style.color = '#1f2937';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.backgroundColor = 'transparent';
+                            e.currentTarget.style.color = '#6b7280';
+                          }}
+                        >
+                          {isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                        </button>
+                      </td>
+                      <td style={tdStyle('left')}>
+                        <div style={{ fontWeight: 500, color: '#1f2937' }}>{request.title}</div>
+                        <div style={{ fontSize: '11px', color: '#9ca3af', marginTop: '2px' }}>
+                          {new Date(request.createdAt).toLocaleString('zh-CN', {
+                            month: '2-digit',
+                            day: '2-digit',
+                            hour: '2-digit',
+                            minute: '2-digit',
+                          })}
+                        </div>
+                      </td>
+                      <td style={tdStyle('left')}>{request.applicant}</td>
+                      <td style={{ ...tdStyle('right'), fontWeight: 600, color: '#1f2937' }}>
+                        ¥{request.total.toLocaleString()}
+                      </td>
+                      <td style={tdStyle('center')}>
+                        <StatusBadge status={request.status} />
+                      </td>
+                      <td style={{ ...tdStyle('right'), padding: '8px 12px' }}>
+                        <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                          {!showDeliverButton ? (
+                            <>
+                              <button
+                                onClick={() => handleUpdateStatus(request.id, 'approved')}
+                                disabled={updatingId === request.id}
+                                style={getActionButtonStyle('#22c55e')}
+                                onMouseEnter={(e) =>
+                                  (e.currentTarget.style.backgroundColor = '#16a34a')
+                                }
+                                onMouseLeave={(e) =>
+                                  (e.currentTarget.style.backgroundColor = '#22c55e')
+                                }
+                              >
+                                <CheckCircle2 size={16} />
+                                批准
+                              </button>
+                              <button
+                                onClick={() => handleUpdateStatus(request.id, 'rejected')}
+                                disabled={updatingId === request.id}
+                                style={getActionButtonStyle('#ef4444')}
+                                onMouseEnter={(e) =>
+                                  (e.currentTarget.style.backgroundColor = '#dc2626')
+                                }
+                                onMouseLeave={(e) =>
+                                  (e.currentTarget.style.backgroundColor = '#ef4444')
+                                }
+                              >
+                                <XCircle size={16} />
+                                驳回
+                              </button>
+                            </>
+                          ) : (
+                            <button
+                              onClick={() => handleUpdateStatus(request.id, 'delivered')}
+                              disabled={updatingId === request.id}
+                              style={getActionButtonStyle('#3b82f6')}
+                              onMouseEnter={(e) =>
+                                (e.currentTarget.style.backgroundColor = '#2563eb')
+                              }
+                              onMouseLeave={(e) =>
+                                (e.currentTarget.style.backgroundColor = '#3b82f6')
+                              }
+                            >
+                              <Package size={16} />
+                              标记送达
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                    <tr
+                      style={{
+                        transition: 'all 0.35s ease-out',
+                      }}
+                    >
+                      <td
+                        colSpan={6}
+                        style={{
+                          padding: 0,
+                          maxHeight: isExpanded ? '600px' : '0',
+                          overflow: 'hidden',
+                          transition: 'all 0.35s ease-out',
+                          backgroundColor: '#fafafa',
+                          borderBottom: isExpanded ? '1px solid #e5e7eb' : 'none',
+                        }}
+                      >
+                        <div
+                          style={{
+                            opacity: isExpanded ? 1 : 0,
+                            transform: isExpanded ? 'translateY(0)' : 'translateY(-8px)',
+                            transition: 'all 0.3s ease-out 0.05s',
+                          }}
+                        >
+                          {isExpanded && <ItemsDetailTable request={request} />}
+                        </div>
+                      </td>
+                    </tr>
+                  </React.Fragment>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div style={pageStyle}>
       <div style={containerStyle}>
@@ -95,115 +349,18 @@ export function AdminDashboardPage() {
         </div>
 
         <div style={sectionStyle}>
-          <h2 style={sectionTitleStyle}>待审批申购单</h2>
-          {pendingRequests.length === 0 ? (
-            <div style={emptyStyle}>暂无待审批的申购单</div>
-          ) : (
-            <div style={tableContainerStyle}>
-              <table style={tableStyle}>
-                <thead>
-                  <tr style={tableHeaderStyle}>
-                    <th style={thStyle('left')}>标题</th>
-                    <th style={thStyle('left')}>申请人</th>
-                    <th style={thStyle('right')}>总金额</th>
-                    <th style={thStyle('center')}>状态</th>
-                    <th style={thStyle('right')}>操作</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {pendingRequests.map((request, index) => (
-                    <tr
-                      key={request.id}
-                      style={{
-                        ...tableRowStyle,
-                        backgroundColor: index % 2 === 0 ? '#f9fafb' : '#ffffff',
-                      }}
-                    >
-                      <td style={tdStyle('left')}>{request.title}</td>
-                      <td style={tdStyle('left')}>{request.applicant}</td>
-                      <td style={tdStyle('right')}>¥{request.total.toLocaleString()}</td>
-                      <td style={tdStyle('center')}>
-                        <StatusBadge status={request.status} />
-                      </td>
-                      <td style={{ ...tdStyle('right'), display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-                        <button
-                          onClick={() => handleUpdateStatus(request.id, 'approved')}
-                          disabled={updatingId === request.id}
-                          style={getActionButtonStyle('#22c55e')}
-                          onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#16a34a')}
-                          onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#22c55e')}
-                        >
-                          <CheckCircle2 size={16} />
-                          批准
-                        </button>
-                        <button
-                          onClick={() => handleUpdateStatus(request.id, 'rejected')}
-                          disabled={updatingId === request.id}
-                          style={getActionButtonStyle('#ef4444')}
-                          onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#dc2626')}
-                          onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#ef4444')}
-                        >
-                          <XCircle size={16} />
-                          驳回
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
+          <h2 style={sectionTitleStyle}>
+            待审批申购单
+            <span style={{ fontSize: '14px', fontWeight: 'normal', color: '#9ca3af', marginLeft: '10px' }}>
+              点击左侧箭头展开查看物品明细
+            </span>
+          </h2>
+          {renderTable(pendingRequests, false)}
         </div>
 
         <div style={sectionStyle}>
           <h2 style={sectionTitleStyle}>已批准（可标记送达）</h2>
-          {approvedRequests.length === 0 ? (
-            <div style={emptyStyle}>暂无已批准的申购单</div>
-          ) : (
-            <div style={tableContainerStyle}>
-              <table style={tableStyle}>
-                <thead>
-                  <tr style={tableHeaderStyle}>
-                    <th style={thStyle('left')}>标题</th>
-                    <th style={thStyle('left')}>申请人</th>
-                    <th style={thStyle('right')}>总金额</th>
-                    <th style={thStyle('center')}>状态</th>
-                    <th style={thStyle('right')}>操作</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {approvedRequests.map((request, index) => (
-                    <tr
-                      key={request.id}
-                      style={{
-                        ...tableRowStyle,
-                        backgroundColor: index % 2 === 0 ? '#f9fafb' : '#ffffff',
-                      }}
-                    >
-                      <td style={tdStyle('left')}>{request.title}</td>
-                      <td style={tdStyle('left')}>{request.applicant}</td>
-                      <td style={tdStyle('right')}>¥{request.total.toLocaleString()}</td>
-                      <td style={tdStyle('center')}>
-                        <StatusBadge status={request.status} />
-                      </td>
-                      <td style={{ ...tdStyle('right'), display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-                        <button
-                          onClick={() => handleUpdateStatus(request.id, 'delivered')}
-                          disabled={updatingId === request.id}
-                          style={getActionButtonStyle('#3b82f6')}
-                          onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#2563eb')}
-                          onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#3b82f6')}
-                        >
-                          <Package size={16} />
-                          标记送达
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
+          {renderTable(approvedRequests, true)}
         </div>
       </div>
     </div>
@@ -224,6 +381,7 @@ function getActionButtonStyle(color: string): React.CSSProperties {
     fontWeight: 500,
     cursor: 'pointer',
     transition: 'all 0.2s ease-out',
+    whiteSpace: 'nowrap' as const,
   };
 }
 
@@ -269,6 +427,8 @@ const sectionTitleStyle: React.CSSProperties = {
   fontWeight: 'bold',
   color: '#374151',
   margin: '0 0 16px 0',
+  display: 'flex',
+  alignItems: 'center',
 };
 
 const tableContainerStyle: React.CSSProperties = {
@@ -282,6 +442,7 @@ const tableContainerStyle: React.CSSProperties = {
 const tableStyle: React.CSSProperties = {
   width: '100%',
   borderCollapse: 'collapse',
+  minWidth: '720px',
 };
 
 const tableHeaderStyle: React.CSSProperties = {
@@ -293,15 +454,6 @@ const tableRowStyle: React.CSSProperties = {
   height: '48px',
   transition: 'background-color 0.2s ease-out',
   cursor: 'default',
-};
-
-const tableRowHoverProps = {
-  onMouseEnter: (e: React.MouseEvent<HTMLTableRowElement>) => {
-    e.currentTarget.style.backgroundColor = '#e5e7eb';
-  },
-  onMouseLeave: (e: React.MouseEvent<HTMLTableRowElement>, index: number) => {
-    e.currentTarget.style.backgroundColor = index % 2 === 0 ? '#f9fafb' : '#ffffff';
-  },
 };
 
 const thStyle = (align: 'left' | 'center' | 'right'): React.CSSProperties => ({
@@ -318,6 +470,7 @@ const tdStyle = (align: 'left' | 'center' | 'right'): React.CSSProperties => ({
   fontSize: '14px',
   color: '#374151',
   borderBottom: '1px solid #f3f4f6',
+  verticalAlign: 'middle',
 });
 
 const emptyStyle: React.CSSProperties = {
