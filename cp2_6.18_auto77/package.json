@@ -1,0 +1,32 @@
+{
+  "name": "office-supply-system",
+  "version": "1.0.0",
+  "description": "团队办公用品申购与审批跟踪系统",
+  "scripts": {
+    "dev:server": "tsx src/backend/server.ts",
+    "dev:client": "vite",
+    "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\"",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.18.2",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "uuid": "^9.0.0"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.13",
+    "@types/express": "^4.17.17",
+    "@types/node": "^20.4.2",
+    "@types/react": "^18.2.15",
+    "@types/react-dom": "^18.2.7",
+    "@types/uuid": "^9.0.2",
+    "@vitejs/plugin-react": "^4.0.3",
+    "concurrently": "^8.2.0",
+    "tsx": "^3.12.7",
+    "typescript": "^5.1.6",
+    "vite": "^4.4.4"
+  }
+}
