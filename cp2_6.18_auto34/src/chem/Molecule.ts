@@ -83,26 +83,40 @@ export class Molecule {
   }
 
   static createWater(): Molecule {
-    const atoms: Atom[] = [
-      {
-        element: 'O',
-        position: new THREE.Vector3(0, 0, 0),
-        radius: 0.6,
-        color: 0xff0000
-      },
-      {
-        element: 'H',
-        position: new THREE.Vector3(0.75, 0.6, 0),
-        radius: 0.3,
-        color: 0xffffff
-      },
-      {
-        element: 'H',
-        position: new THREE.Vector3(-0.75, 0.6, 0),
-        radius: 0.3,
-        color: 0xffffff
-      }
-    ]
+    const bondAngle = 104.5
+    const bondLength = 0.96
+    const halfAngle = (bondAngle / 2) * Math.PI / 180
+
+    const oxygen: Atom = {
+      element: 'O',
+      position: new THREE.Vector3(0, 0, 0),
+      radius: 0.6,
+      color: 0xff0000
+    }
+
+    const h1: Atom = {
+      element: 'H',
+      position: new THREE.Vector3(
+        Math.sin(halfAngle) * bondLength,
+        Math.cos(halfAngle) * bondLength,
+        0
+      ),
+      radius: 0.3,
+      color: 0xffffff
+    }
+
+    const h2: Atom = {
+      element: 'H',
+      position: new THREE.Vector3(
+        -Math.sin(halfAngle) * bondLength,
+        Math.cos(halfAngle) * bondLength,
+        0
+      ),
+      radius: 0.3,
+      color: 0xffffff
+    }
+
+    const atoms: Atom[] = [oxygen, h1, h2]
 
     const bonds: Bond[] = [
       { atomIndex1: 0, atomIndex2: 1, type: 'single' },

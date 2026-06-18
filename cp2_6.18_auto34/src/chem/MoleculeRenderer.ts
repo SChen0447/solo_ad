@@ -14,8 +14,6 @@ export interface RendererOptions {
 interface AtomMeshData {
   mesh: THREE.InstancedMesh
   material: THREE.MeshStandardMaterial
-  glowMaterial: THREE.MeshBasicMaterial
-  glowMesh: THREE.InstancedMesh
   dummy: THREE.Object3D
   indices: Map<number, number>
 }
@@ -50,6 +48,7 @@ export class MoleculeRenderer {
   private isTransitioning: boolean = false
   private atomGeometry: THREE.SphereGeometry
   private bondGeometry: THREE.CylinderGeometry
+  private hoverGlow: THREE.Mesh
 
   constructor(options: RendererOptions) {
     this.container = options.container
@@ -103,6 +102,17 @@ export class MoleculeRenderer {
     this.scene.add(this.anglesGroup)
 
     this.setupLighting()
+
+    const glowGeometry = new THREE.SphereGeometry(1, 16, 16)
+    const glowMaterial = new THREE.MeshBasicMaterial({
+      color: 0x4fc3f7,
+      transparent: true,
+      opacity: 0,
+      side: THREE.BackSide
+    })
+    this.hoverGlow = new THREE.Mesh(glowGeometry, glowMaterial)
+    this.hoverGlow.visible = false
+    this.scene.add(this.hoverGlow)
 
     this.raycaster = new THREE.Raycaster()
     this.mouse = new THREE.Vector2()
@@ -168,6 +178,7 @@ export class MoleculeRenderer {
     this.createAngleAnnotations(molecule)
     this.updateLabelsVisibility(this.settings.showLabels)
     this.updateAnglesVisibility(this.settings.showAngles)
+    this.setAllOpacity(0)
 
     await this.fadeInNew()
     this.isTransitioning = false
@@ -175,16 +186,16 @@ export class MoleculeRenderer {
 
   private async fadeOutCurrent(): Promise<void> {
     const duration = 500
-    const startTime = Date.now()
-    const startOpacity = 1
+    const startTime = performance.now()
 
     return new Promise((resolve) => {
       const animate = () => {
-        const elapsed = Date.now() - startTime
+        const elapsed = performance.now() - startTime
         const progress = Math.min(elapsed / duration, 1)
-        const opacity = startOpacity * (1 - progress)
+        const easeProgress = this.easeInOutCubic(progress)
+        const opacity = 1 - easeProgress
 
-        this.setGroupOpacity(this.moleculeGroup, opacity)
+        this.setAllOpacity(opacity)
 
         if (progress < 1) {
           requestAnimationFrame(animate)
@@ -198,18 +209,20 @@ export class MoleculeRenderer {
 
   private async fadeInNew(): Promise<void> {
     const duration = 500
-    const startTime = Date.now()
+    const startTime = performance.now()
 
     return new Promise((resolve) => {
       const animate = () => {
-        const elapsed = Date.now() - startTime
+        const elapsed = performance.now() - startTime
         const progress = Math.min(elapsed / duration, 1)
+        const easeProgress = this.easeInOutCubic(progress)
 
-        this.setGroupOpacity(this.moleculeGroup, progress)
+        this.setAllOpacity(easeProgress)
 
         if (progress < 1) {
           requestAnimationFrame(animate)
         } else {
+          this.resetGlowOpacity()
           resolve()
         }
       }
@@ -217,20 +230,43 @@ export class MoleculeRenderer {
     })
   }
 
-  private setGroupOpacity(group: THREE.Group, opacity: number): void {
-    group.traverse((obj) => {
-      if (obj instanceof THREE.Mesh) {
-        const material = obj.material as THREE.Material | THREE.Material[]
-        if (Array.isArray(material)) {
-          material.forEach((m) => {
-            m.opacity = opacity
-            m.transparent = opacity < 1
-          })
-        } else {
-          material.opacity = opacity
-          material.transparent = opacity < 1
-        }
+  private easeInOutCubic(t: number): number {
+    return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2
+  }
+
+  private setAllOpacity(opacity: number): void {
+    this.atomMeshes.forEach((data) => {
+      data.material.opacity = opacity
+      data.material.transparent = opacity < 1
+      data.glowMaterial.opacity = opacity * 0.5
+      data.glowMaterial.transparent = true
+    })
+
+    this.bondMeshes.forEach((data) => {
+      data.material.opacity = opacity
+      data.material.transparent = opacity < 1
+    })
+
+    this.labelObjects.forEach((label) => {
+      const element = label.element as HTMLElement
+      element.style.opacity = String(opacity)
+    })
+
+    this.angleObjects.forEach((obj) => {
+      if (obj instanceof THREE.Line) {
+        const material = obj.material as THREE.LineDashedMaterial
+        material.opacity = opacity * 0.8
+        material.transparent = true
+      } else if (obj instanceof CSS2DObject) {
+        const element = obj.element as HTMLElement
+        element.style.opacity = String(opacity)
       }
+    })
+  }
+
+  private resetGlowOpacity(): void {
+    this.atomMeshes.forEach((data) => {
+      data.glowMaterial.opacity = 0
     })
   }
 
@@ -238,10 +274,7 @@ export class MoleculeRenderer {
     this.atomMeshes.forEach((data) => {
       data.mesh.geometry.dispose()
       data.material.dispose()
-      data.glowMaterial.dispose()
-      data.glowMesh.geometry.dispose()
       this.moleculeGroup.remove(data.mesh)
-      this.moleculeGroup.remove(data.glowMesh)
     })
     this.atomMeshes.clear()
 
@@ -291,27 +324,12 @@ export class MoleculeRenderer {
         opacity: 0
       })
 
-      const glowMaterial = new THREE.MeshBasicMaterial({
-        color: firstAtom.color,
-        transparent: true,
-        opacity: 0,
-        side: THREE.BackSide
-      })
-
       const instancedMesh = new THREE.InstancedMesh(
         this.atomGeometry,
         material,
         atomsData.length
       )
       instancedMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage)
-
-      const glowMesh = new THREE.InstancedMesh(
-        this.atomGeometry,
-        glowMaterial,
-        atomsData.length
-      )
-      glowMesh.scale.set(1.2, 1.2, 1.2)
-      glowMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage)
 
       const dummy = new THREE.Object3D()
       const indices = new Map<number, number>()
@@ -321,23 +339,18 @@ export class MoleculeRenderer {
         dummy.scale.setScalar(atom.radius)
         dummy.updateMatrix()
         instancedMesh.setMatrixAt(i, dummy.matrix)
-        glowMesh.setMatrixAt(i, dummy.matrix)
         indices.set(originalIndex, i)
         ;(instancedMesh as any).atomIndex = originalIndex
       })
 
       instancedMesh.instanceMatrix.needsUpdate = true
-      glowMesh.instanceMatrix.needsUpdate = true
 
       this.moleculeGroup.add(instancedMesh)
-      this.moleculeGroup.add(glowMesh)
       this.allAtomMeshes.push(instancedMesh as any)
 
       this.atomMeshes.set(element, {
         mesh: instancedMesh,
         material,
-        glowMaterial,
-        glowMesh,
         dummy,
         indices
       })
@@ -370,7 +383,13 @@ export class MoleculeRenderer {
       bonds.forEach((bond, i) => {
         const atom1 = molecule.atoms[bond.atomIndex1]
         const atom2 = molecule.atoms[bond.atomIndex2]
-        this.setupBondTransform(dummy, atom1.position, atom2.position)
+        this.setupBondTransform(
+          dummy,
+          atom1.position,
+          atom2.position,
+          atom1.radius,
+          atom2.radius
+        )
         instancedMesh.setMatrixAt(i, dummy.matrix)
       })
 
@@ -388,16 +407,23 @@ export class MoleculeRenderer {
   private setupBondTransform(
     dummy: THREE.Object3D,
     from: THREE.Vector3,
-    to: THREE.Vector3
+    to: THREE.Vector3,
+    radiusFrom: number,
+    radiusTo: number
   ): void {
     const direction = to.clone().sub(from)
-    const length = direction.length()
+    const totalLength = direction.length()
+    const normalizedDir = direction.clone().normalize()
 
-    dummy.position.copy(from.clone().add(to).multiplyScalar(0.5))
-    dummy.scale.set(1, length, 1)
+    const startPoint = from.clone().add(normalizedDir.clone().multiplyScalar(radiusFrom))
+    const endPoint = to.clone().add(normalizedDir.clone().multiplyScalar(-radiusTo))
+    const bondLength = endPoint.distanceTo(startPoint)
+
+    dummy.position.copy(startPoint.clone().add(endPoint).multiplyScalar(0.5))
+    dummy.scale.set(1, bondLength, 1)
     dummy.quaternion.setFromUnitVectors(
       new THREE.Vector3(0, 1, 0),
-      direction.clone().normalize()
+      normalizedDir
     )
     dummy.updateMatrix()
   }
@@ -537,22 +563,19 @@ export class MoleculeRenderer {
     if (!this.molecule) return
 
     const atom = this.molecule.atoms[atomIndex]
-    const atomData = this.atomMeshes.get(atom.element)
 
-    if (!atomData) return
-
-    const instanceIdx = atomData.indices.get(atomIndex)
-    if (instanceIdx === undefined) return
-
-    const dummy = new THREE.Object3D()
-    const scale = highlight ? atom.radius * 1.3 : atom.radius
-    dummy.position.copy(atom.position)
-    dummy.scale.setScalar(scale)
-    dummy.updateMatrix()
-
-    atomData.glowMesh.setMatrixAt(instanceIdx, dummy.matrix)
-    atomData.glowMesh.instanceMatrix.needsUpdate = true
-    atomData.glowMaterial.opacity = highlight ? 0.5 : 0
+    if (highlight) {
+      this.hoverGlow.position.copy(atom.position)
+      this.hoverGlow.scale.setScalar(atom.radius * 1.4)
+      const material = this.hoverGlow.material as THREE.MeshBasicMaterial
+      material.opacity = 0.4
+      material.color.setHex(atom.color)
+      this.hoverGlow.visible = true
+    } else {
+      this.hoverGlow.visible = false
+      const material = this.hoverGlow.material as THREE.MeshBasicMaterial
+      material.opacity = 0
+    }
   }
 
   private clearHover(): void {
