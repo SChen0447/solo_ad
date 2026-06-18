@@ -1,0 +1,35 @@
+[
+  {
+    "id": "bug-1",
+    "projectId": "proj-1",
+    "title": "战斗结算画面卡死",
+    "severity": "critical",
+    "description": "大规模舰队战斗结束后，结算画面偶尔卡死无法继续",
+    "reporter": "张三",
+    "status": "open",
+    "createdAt": "2025-06-10T08:00:00.000Z",
+    "updatedAt": "2025-06-10T08:00:00.000Z"
+  },
+  {
+    "id": "bug-2",
+    "projectId": "proj-1",
+    "title": "贸易路线显示异常",
+    "severity": "medium",
+    "description": "贸易路线在某些缩放级别下显示不正确",
+    "reporter": "李四",
+    "status": "in-progress",
+    "createdAt": "2025-06-12T08:00:00.000Z",
+    "updatedAt": "2025-06-15T08:00:00.000Z"
+  },
+  {
+    "id": "bug-3",
+    "projectId": "proj-1",
+    "title": "教程文字溢出",
+    "severity": "minor",
+    "description": "新手教程中部分说明文字超出对话框边界",
+    "reporter": "王五",
+    "status": "closed",
+    "createdAt": "2025-06-05T08:00:00.000Z",
+    "updatedAt": "2025-06-08T08:00:00.000Z"
+  }
+]

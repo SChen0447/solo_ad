@@ -1,0 +1,29 @@
+[
+  {
+    "id": "ver-1",
+    "projectId": "proj-1",
+    "version": "1.2.0",
+    "date": "2025-06-01",
+    "summary": "新增星际贸易系统与战斗平衡调整",
+    "items": [
+      { "id": "item-1", "category": "added", "description": "新增星际贸易市场系统" },
+      { "id": "item-2", "category": "modified", "description": "优化舰队战斗AI策略" },
+      { "id": "item-3", "category": "fixed", "description": "修复星球资源计算溢出问题" },
+      { "id": "item-4", "category": "removed", "description": "移除旧版星图导航界面" }
+    ],
+    "createdAt": "2025-06-01T08:00:00.000Z"
+  },
+  {
+    "id": "ver-2",
+    "projectId": "proj-1",
+    "version": "1.1.0",
+    "date": "2025-04-20",
+    "summary": "多人联机模式与UI优化",
+    "items": [
+      { "id": "item-5", "category": "added", "description": "新增4人合作联机模式" },
+      { "id": "item-6", "category": "modified", "description": "重新设计主菜单UI" },
+      { "id": "item-7", "category": "fixed", "description": "修复存档加载时偶发的崩溃" }
+    ],
+    "createdAt": "2025-04-20T08:00:00.000Z"
+  }
+]
