@@ -1,5 +1,5 @@
 interface UndoNode {
-  imageData: ImageData;
+  dataUrl: string;
   prev: UndoNode | null;
   next: UndoNode | null;
 }
@@ -38,17 +38,24 @@ export class UndoManager {
     this.onChangeCallbacks.forEach(cb => cb());
   }
 
-  pushState(imageData: ImageData): void {
+  pushState(dataUrl: string): void {
     const node: UndoNode = {
-      imageData,
+      dataUrl,
       prev: null,
       next: null,
     };
 
     if (this.current) {
+      let next = this.current.next;
+      while (next) {
+        const n = next;
+        next = next.next;
+        n.prev = null;
+        n.next = null;
+        this._size--;
+      }
       this.current.next = null;
       node.prev = this.current;
-      this._size -= this._countForward(this.current);
     }
 
     this.current = node;
@@ -66,33 +73,36 @@ export class UndoManager {
         this.head.prev = null;
       }
       oldHead.next = null;
+      oldHead.dataUrl = '';
       this._size--;
     }
 
     this.notify();
   }
 
-  undo(): ImageData | null {
+  undo(): string | null {
     if (!this.current || !this.current.prev) return null;
     this.current = this.current.prev;
     this.notify();
-    return this.current.imageData;
+    return this.current.dataUrl;
   }
 
-  redo(): ImageData | null {
+  redo(): string | null {
     if (!this.current || !this.current.next) return null;
     this.current = this.current.next;
     this.notify();
-    return this.current.imageData;
+    return this.current.dataUrl;
   }
 
-  private _countForward(node: UndoNode): number {
-    let count = 0;
-    let n = node.next;
-    while (n) {
-      count++;
-      n = n.next;
-    }
-    return count;
+  peekCurrent(): string | null {
+    return this.current ? this.current.dataUrl : null;
+  }
+
+  peekPrev(): string | null {
+    return this.current?.prev?.dataUrl ?? null;
+  }
+
+  peekNext(): string | null {
+    return this.current?.next?.dataUrl ?? null;
   }
 }

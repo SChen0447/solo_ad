@@ -3,6 +3,7 @@ import { CanvasRenderer, ToolType } from './CanvasRenderer';
 import { UndoManager } from './UndoManager';
 import ToolPanel from './ToolPanel';
 import ColorPalette from './ColorPalette';
+import './toast.css';
 
 const BREAKPOINT = 768;
 
@@ -17,8 +18,11 @@ function App() {
   const [canUndo, setCanUndo] = useState(false);
   const [canRedo, setCanRedo] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
-  const [toast, setToast] = useState<{ message: string; phase: 'in' | 'show' | 'out' } | null>(null);
-  const [undoFade, setUndoFade] = useState(false);
+  const [toastVisible, setToastVisible] = useState(false);
+  const [toastMessage, setToastMessage] = useState('');
+  const [fadeState, setFadeState] = useState<'idle' | 'fading-out' | 'fading-in'>('idle');
+
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     const checkMobile = () => setIsMobile(window.innerWidth < BREAKPOINT);
@@ -40,7 +44,14 @@ function App() {
     if (!canvasRef.current) return;
     const renderer = new CanvasRenderer(canvasRef.current, undoManagerRef.current);
     rendererRef.current = renderer;
+
+    const unsubStroke = renderer.onStrokeEnd(() => {
+      setCanUndo(undoManagerRef.current.canUndo);
+      setCanRedo(undoManagerRef.current.canRedo);
+    });
+
     return () => {
+      unsubStroke();
       renderer.unbindEvents();
       rendererRef.current = null;
     };
@@ -70,39 +81,53 @@ function App() {
   }, [currentTool]);
 
   const showToast = useCallback((message: string) => {
-    setToast({ message, phase: 'in' });
-    setTimeout(() => setToast({ message, phase: 'show' }), 300);
-    setTimeout(() => setToast({ message, phase: 'out' }), 2300);
-    setTimeout(() => setToast(null), 2800);
+    setToastMessage(message);
+    if (toastTimerRef.current) {
+      clearTimeout(toastTimerRef.current);
+    }
+    requestAnimationFrame(() => {
+      setToastVisible(true);
+    });
+    toastTimerRef.current = setTimeout(() => {
+      setToastVisible(false);
+    }, 2000);
   }, []);
 
-  const handleUndo = useCallback(() => {
+  const handleUndo = useCallback(async () => {
     if (!rendererRef.current || !undoManagerRef.current.canUndo) return;
-    setUndoFade(true);
-    setTimeout(() => {
-      const imgData = rendererRef.current!.undo();
-      if (imgData) {
-        rendererRef.current!.restoreFromImageData(imgData);
-      }
-      setUndoFade(false);
-    }, 200);
-  }, []);
+    if (fadeState !== 'idle') return;
 
-  const handleRedo = useCallback(() => {
-    if (!rendererRef.current || !undoManagerRef.current.canRedo) return;
-    setUndoFade(true);
-    setTimeout(() => {
-      const imgData = rendererRef.current!.redo();
-      if (imgData) {
-        rendererRef.current!.restoreFromImageData(imgData);
-      }
-      setUndoFade(false);
+    setFadeState('fading-out');
+
+    setTimeout(async () => {
+      await rendererRef.current?.undo();
+      setFadeState('fading-in');
+      setTimeout(() => {
+        setFadeState('idle');
+      }, 200);
     }, 200);
-  }, []);
+  }, [fadeState]);
+
+  const handleRedo = useCallback(async () => {
+    if (!rendererRef.current || !undoManagerRef.current.canRedo) return;
+    if (fadeState !== 'idle') return;
+
+    setFadeState('fading-out');
+
+    setTimeout(async () => {
+      await rendererRef.current?.redo();
+      setFadeState('fading-in');
+      setTimeout(() => {
+        setFadeState('idle');
+      }, 200);
+    }, 200);
+  }, [fadeState]);
 
   const handleSave = useCallback(() => {
-    if (!rendererRef.current) return;
-    const dataURL = rendererRef.current.toDataURL();
+    if (!rendererRef.current || !canvasRef.current) return;
+
+    const dataUrl = rendererRef.current.getCanvasDataUrlForSave();
+
     const link = document.createElement('a');
     const now = new Date();
     const ts = [
@@ -115,8 +140,11 @@ function App() {
       String(now.getSeconds()).padStart(2, '0'),
     ].join('');
     link.download = `graffiti_${ts}.png`;
-    link.href = dataURL;
+    link.href = dataUrl;
+    document.body.appendChild(link);
     link.click();
+    document.body.removeChild(link);
+
     showToast('作品已保存！');
   }, [showToast]);
 
@@ -124,20 +152,9 @@ function App() {
     setCurrentColor(color);
   }, []);
 
-  const toastOpacity = toast
-    ? toast.phase === 'in'
-      ? 0
-      : toast.phase === 'show'
-        ? 1
-        : 0
-    : 0;
-
-  const toastTransition = toast
-    ? toast.phase === 'in'
-      ? 'opacity 0.3s ease-in'
-      : toast.phase === 'out'
-        ? 'opacity 0.5s ease-out'
-        : 'none'
+  const canvasOpacity = fadeState === 'fading-out' ? 0.5 : 1;
+  const canvasTransition = fadeState !== 'idle'
+    ? 'opacity 0.2s ease-out'
     : 'none';
 
   if (isMobile) {
@@ -193,8 +210,8 @@ function App() {
               width: '100%',
               height: '100%',
               cursor: currentTool === 'eraser' ? 'cell' : 'crosshair',
-              opacity: undoFade ? 0.5 : 1,
-              transition: undoFade ? 'opacity 0.2s ease-out' : 'opacity 0.1s ease-in',
+              opacity: canvasOpacity,
+              transition: canvasTransition,
               touchAction: 'none',
             }}
           />
@@ -211,26 +228,11 @@ function App() {
           />
         </div>
 
-        {toast && (
-          <div style={{
-            position: 'fixed',
-            top: 20,
-            left: '50%',
-            transform: 'translateX(-50%)',
-            background: 'rgba(74, 144, 217, 0.9)',
-            color: '#fff',
-            padding: '10px 24px',
-            borderRadius: 8,
-            fontSize: 14,
-            fontWeight: 500,
-            opacity: toastOpacity,
-            transition: toastTransition,
-            zIndex: 1000,
-            pointerEvents: 'none',
-          }}>
-            {toast.message}
-          </div>
-        )}
+        <div
+          className={`graffiti-toast ${toastVisible ? 'visible' : ''}`}
+        >
+          {toastMessage}
+        </div>
       </div>
     );
   }
@@ -372,8 +374,8 @@ function App() {
               width: '100%',
               height: '100%',
               cursor: currentTool === 'eraser' ? 'cell' : 'crosshair',
-              opacity: undoFade ? 0.5 : 1,
-              transition: undoFade ? 'opacity 0.2s ease-out' : 'opacity 0.1s ease-in',
+              opacity: canvasOpacity,
+              transition: canvasTransition,
               touchAction: 'none',
             }}
           />
@@ -391,26 +393,11 @@ function App() {
         </div>
       </div>
 
-      {toast && (
-        <div style={{
-          position: 'fixed',
-          top: 20,
-          left: '50%',
-          transform: 'translateX(-50%)',
-          background: 'rgba(74, 144, 217, 0.9)',
-          color: '#fff',
-          padding: '10px 24px',
-          borderRadius: 8,
-          fontSize: 14,
-          fontWeight: 500,
-          opacity: toastOpacity,
-          transition: toastTransition,
-          zIndex: 1000,
-          pointerEvents: 'none',
-        }}>
-          {toast.message}
-        </div>
-      )}
+      <div
+        className={`graffiti-toast ${toastVisible ? 'visible' : ''}`}
+      >
+        {toastMessage}
+      </div>
     </div>
   );
 }
