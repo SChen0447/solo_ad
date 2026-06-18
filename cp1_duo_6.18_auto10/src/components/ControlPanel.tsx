@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import { useStore } from '../store/useStore'
 
 interface ColorPickerProps {
@@ -7,24 +7,54 @@ interface ColorPickerProps {
   onChange: (color: string) => void
 }
 
+const isValidHex = (val: string): boolean => {
+  return /^#?[0-9A-Fa-f]{6}$/.test(val)
+}
+
+const normalizeHex = (val: string): string => {
+  if (val.startsWith('#')) return val
+  return '#' + val
+}
+
 const ColorPicker = ({ label, value, onChange }: ColorPickerProps) => {
   const [inputValue, setInputValue] = useState(value)
+  const [isInvalid, setIsInvalid] = useState(false)
+  const lastValidColor = useRef(value)
 
   useEffect(() => {
     setInputValue(value)
+    setIsInvalid(false)
+    lastValidColor.current = value
   }, [value])
 
   const handleHexChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const val = e.target.value
-    setInputValue(val)
-    if (/^#[0-9A-Fa-f]{6}$/.test(val)) {
-      onChange(val)
+    const raw = e.target.value
+    setInputValue(raw)
+
+    if (isValidHex(raw)) {
+      const normalized = normalizeHex(raw)
+      setIsInvalid(false)
+      lastValidColor.current = normalized
+      onChange(normalized)
+    } else if (raw === '' || raw === '#') {
+      setIsInvalid(false)
+    } else {
+      setIsInvalid(true)
+    }
+  }
+
+  const handleHexBlur = () => {
+    if (isInvalid || !isValidHex(inputValue)) {
+      setInputValue(lastValidColor.current)
+      setIsInvalid(false)
     }
   }
 
   const handleColorChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value
     setInputValue(val)
+    setIsInvalid(false)
+    lastValidColor.current = val
     onChange(val)
   }
 
@@ -42,8 +72,12 @@ const ColorPicker = ({ label, value, onChange }: ColorPickerProps) => {
           type="text"
           value={inputValue}
           onChange={handleHexChange}
+          onBlur={handleHexBlur}
           placeholder="#000000"
-          style={styles.hexInput}
+          style={{
+            ...styles.hexInput,
+            border: isInvalid ? '1px solid rgba(255, 80, 80, 0.8)' : '1px solid rgba(255, 255, 255, 0.1)'
+          }}
         />
       </div>
     </div>

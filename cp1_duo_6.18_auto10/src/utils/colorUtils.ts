@@ -51,19 +51,24 @@ export const generateHarmoniousSchemes = (count: number): ColorScheme[] => {
 
   for (let i = 0; i < count; i++) {
     const baseHue = Math.random()
-    const hueVariance = (Math.random() - 0.5) * (40 / 360)
-    const hueStep = 120 / 360 + hueVariance
+    const offset1 = (Math.random() - 0.5) * (40 / 360)
+    const offset2 = (Math.random() - 0.5) * (40 / 360)
 
     const h1 = baseHue
-    const h2 = (baseHue + hueStep) % 1
-    const h3 = (baseHue + hueStep * 2) % 1
+    const h2 = (baseHue + 120 / 360 + offset1) % 1
+    const h3 = (baseHue + 240 / 360 + offset2) % 1
 
-    const s = 0.5 + Math.random() * 0.3
-    const l = 0.4 + Math.random() * 0.2
+    const s1 = 0.55 + Math.random() * 0.25
+    const s2 = 0.55 + Math.random() * 0.25
+    const s3 = 0.55 + Math.random() * 0.25
 
-    const [r1, g1, b1] = hslToRgb(h1, s, l)
-    const [r2, g2, b2] = hslToRgb(h2, s, l)
-    const [r3, g3, b3] = hslToRgb(h3, s, l)
+    const l1 = 0.4 + Math.random() * 0.15
+    const l2 = 0.4 + Math.random() * 0.15
+    const l3 = 0.35 + Math.random() * 0.15
+
+    const [r1, g1, b1] = hslToRgb(h1, s1, l1)
+    const [r2, g2, b2] = hslToRgb(h2, s2, l2)
+    const [r3, g3, b3] = hslToRgb(h3, s3, l3)
 
     schemes.push({
       shade: rgbToHex(r1, g1, b1),

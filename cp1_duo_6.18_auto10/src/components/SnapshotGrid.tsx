@@ -112,7 +112,7 @@ const styles = {
   },
   card: {
     position: 'relative' as const,
-    width: '130px',
+    width: '140px',
     padding: '8px',
     background: 'rgba(0, 0, 0, 0.2)',
     borderRadius: '12px',
@@ -143,12 +143,13 @@ const styles = {
     transition: 'background 0.2s ease'
   },
   thumbnailContainer: {
-    width: '100%',
-    height: '80px',
+    width: '120px',
+    height: '120px',
     borderRadius: '8px',
     overflow: 'hidden',
     background: '#16213e',
-    marginBottom: '8px'
+    marginBottom: '8px',
+    margin: '0 auto 8px auto'
   },
   thumbnail: {
     width: '100%',

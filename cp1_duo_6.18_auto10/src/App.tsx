@@ -14,7 +14,7 @@ const App = () => {
   const handleRendererReady = useCallback((
     renderer: THREE.WebGLRenderer,
     scene: THREE.Scene,
-    camera: THREE.Camera
+    _camera: THREE.Camera
   ) => {
     rendererRef.current = renderer
     sceneRef.current = scene
