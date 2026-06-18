@@ -1,6 +1,7 @@
 export const CANVAS_WIDTH = 900;
 export const CANVAS_HEIGHT = 600;
 export const PANEL_WIDTH = 200;
+export const OCEAN_SURFACE_Y = 0;
 
 export const BG_COLOR_TOP = '#0b3d60';
 export const BG_COLOR_BOTTOM = '#0b6e8f';

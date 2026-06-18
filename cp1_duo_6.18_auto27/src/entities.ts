@@ -21,6 +21,7 @@ import {
   JELLYFISH_TRAIL_LENGTH,
   TURTLE_TRAIL_WIDTH,
   TURTLE_TRAIL_LENGTH,
+  OCEAN_SURFACE_Y,
   GlobalParams,
   DEFAULT_PARAMS,
 } from './config.js';
@@ -70,6 +71,7 @@ export class Fish {
     const angle = Math.random() * Math.PI * 2;
     const speed = 1 + Math.random() * 2;
     this.vel = { x: Math.cos(angle) * speed, y: Math.sin(angle) * speed };
+    this.prevVel = { x: this.vel.x, y: this.vel.y };
     this.acc = { x: 0, y: 0 };
     this.id = Fish.nextId++;
   }
@@ -113,8 +115,11 @@ export class Fish {
     const prevAngle = Math.atan2(this.prevVel.y, this.prevVel.x);
     const currAngle = Math.atan2(this.vel.y, this.vel.x);
     let angleDiff = Math.abs(currAngle - prevAngle);
+    if (!isFinite(angleDiff)) angleDiff = 0;
     if (angleDiff > Math.PI) angleDiff = Math.PI * 2 - angleDiff;
+    if (!isFinite(angleDiff)) angleDiff = 0;
     this.turnRate = this.turnRate * 0.9 + angleDiff * 0.1;
+    if (!isFinite(this.turnRate)) this.turnRate = 0;
     this.prevVel = { x: this.vel.x, y: this.vel.y };
 
     this.pos.x += this.vel.x;
@@ -130,18 +135,20 @@ export class Fish {
   }
 
   getSpeed(): number {
-    return mag(this.vel);
+    const s = mag(this.vel);
+    return isFinite(s) ? s : 0;
   }
 
   getTurnRate(): number {
-    return this.turnRate;
+    return isFinite(this.turnRate) ? this.turnRate : 0;
   }
 
   getNearestNeighborCount(fishes: Fish[]): number {
     let count = 0;
     for (const f of fishes) {
       if (f === this || !f.alive) continue;
-      if (dist(this.pos, f.pos) < BOID_PERCEPTION_RADIUS) {
+      const d = dist(this.pos, f.pos);
+      if (isFinite(d) && d < BOID_PERCEPTION_RADIUS) {
         count++;
       }
     }
@@ -284,6 +291,7 @@ export class Jellyfish {
     this.pos = { x, y };
     const angle = Math.random() * Math.PI * 2;
     this.vel = { x: Math.cos(angle) * JELLYFISH_DRIFT_SPEED, y: Math.sin(angle) * JELLYFISH_DRIFT_SPEED };
+    this.prevVel = { x: this.vel.x, y: this.vel.y };
     this.pulsePhase = Math.random() * Math.PI * 2;
     this.pulseSpeed = 0.03 + Math.random() * 0.02;
   }
@@ -316,8 +324,11 @@ export class Jellyfish {
     const prevAngle = Math.atan2(this.prevVel.y, this.prevVel.x);
     const currAngle = Math.atan2(this.vel.y, this.vel.x);
     let angleDiff = Math.abs(currAngle - prevAngle);
+    if (!isFinite(angleDiff)) angleDiff = 0;
     if (angleDiff > Math.PI) angleDiff = Math.PI * 2 - angleDiff;
+    if (!isFinite(angleDiff)) angleDiff = 0;
     this.turnRate = this.turnRate * 0.9 + angleDiff * 0.1;
+    if (!isFinite(this.turnRate)) this.turnRate = 0;
     this.prevVel = { x: this.vel.x, y: this.vel.y };
 
     this.trail.unshift({ x: this.pos.x, y: this.pos.y });
@@ -327,19 +338,22 @@ export class Jellyfish {
   }
 
   getSpeed(): number {
-    return mag(this.vel);
+    const s = mag(this.vel);
+    return isFinite(s) ? s : 0;
   }
 
   getTurnRate(): number {
-    return this.turnRate;
+    return isFinite(this.turnRate) ? this.turnRate : 0;
   }
 
   getPulsePhasePercent(): number {
-    return ((this.pulsePhase % (Math.PI * 2)) / (Math.PI * 2)) * 100;
+    const pct = ((this.pulsePhase % (Math.PI * 2)) / (Math.PI * 2)) * 100;
+    return isFinite(pct) ? pct : 0;
   }
 
   getDepth(): number {
-    return this.pos.y;
+    const depth = this.pos.y - OCEAN_SURFACE_Y;
+    return isFinite(depth) ? Math.max(0, depth) : 0;
   }
 
   private boundaryForce(): Vec2 {
@@ -428,6 +442,7 @@ export class Turtle {
   constructor(x: number, y: number) {
     this.pos = { x, y };
     this.vel = { x: TURTLE_PATROL_SPEED, y: 0 };
+    this.prevVel = { x: this.vel.x, y: this.vel.y };
     this.patrolPoints = this.generatePatrolPath();
     this.facingAngle = 0;
   }
@@ -509,8 +524,11 @@ export class Turtle {
     const prevAngle = Math.atan2(this.prevVel.y, this.prevVel.x);
     const currAngle = Math.atan2(this.vel.y, this.vel.x);
     let angleDiff = Math.abs(currAngle - prevAngle);
+    if (!isFinite(angleDiff)) angleDiff = 0;
     if (angleDiff > Math.PI) angleDiff = Math.PI * 2 - angleDiff;
+    if (!isFinite(angleDiff)) angleDiff = 0;
     this.turnRate = this.turnRate * 0.9 + angleDiff * 0.1;
+    if (!isFinite(this.turnRate)) this.turnRate = 0;
     this.prevVel = { x: this.vel.x, y: this.vel.y };
 
     if (mag(this.vel) > 0.1) {
@@ -524,11 +542,12 @@ export class Turtle {
   }
 
   getSpeed(): number {
-    return mag(this.vel);
+    const s = mag(this.vel);
+    return isFinite(s) ? s : 0;
   }
 
   getTurnRate(): number {
-    return this.turnRate;
+    return isFinite(this.turnRate) ? this.turnRate : 0;
   }
 
   getPatrolProgress(): string {

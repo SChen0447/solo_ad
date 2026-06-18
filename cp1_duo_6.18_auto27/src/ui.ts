@@ -33,7 +33,7 @@ export class UI {
   private jellyfishCount: number = 0;
   private turtleCatchCount: number = 0;
   private ecoActivity: number = 0;
-  private sliders: { x: number; y: number; w: number; h: number; key: keyof GlobalParams; min: number; max: number; label: string; unit: string }[] = [];
+  private sliders: { x: number; y: number; w: number; h: number; key: keyof GlobalParams; min: number; max: number; label: string; unit: string; displayValue: string }[] = [];
   private draggingSlider: string | null = null;
 
   constructor(onParamChange: ParamCallback) {
@@ -47,11 +47,20 @@ export class UI {
     const sx = this.panelX + 15;
     const sw = PANEL_WIDTH - 30;
     this.sliders = [
-      { x: sx, y: 80, w: sw, h: 12, key: 'fishSeparation', min: 20, max: 60, label: '鱼群分离距离', unit: 'px' },
-      { x: sx, y: 160, w: sw, h: 12, key: 'fishMaxSpeed', min: 2, max: 6, label: '鱼群最大速度', unit: 'px/帧' },
-      { x: sx, y: 240, w: sw, h: 12, key: 'jellyfishDensity', min: 5, max: 15, label: '水母密度', unit: '只' },
-      { x: sx, y: 320, w: sw, h: 12, key: 'turtleCount', min: 1, max: 3, label: '海龟数量', unit: '只' },
+      { x: sx, y: 80, w: sw, h: 12, key: 'fishSeparation', min: 20, max: 60, label: '鱼群分离距离', unit: 'px', displayValue: '35px' },
+      { x: sx, y: 160, w: sw, h: 12, key: 'fishMaxSpeed', min: 2, max: 6, label: '鱼群最大速度', unit: 'px/帧', displayValue: '3.0px/帧' },
+      { x: sx, y: 240, w: sw, h: 12, key: 'jellyfishDensity', min: 5, max: 15, label: '水母密度', unit: '只', displayValue: '10只' },
+      { x: sx, y: 320, w: sw, h: 12, key: 'turtleCount', min: 1, max: 3, label: '海龟数量', unit: '只', displayValue: '2只' },
     ];
+    for (const s of this.sliders) {
+      this.refreshSliderDisplayValue(s);
+    }
+  }
+
+  private refreshSliderDisplayValue(s: { key: keyof GlobalParams; min: number; max: number; unit: string; displayValue: string }): void {
+    const value = this.params[s.key] as number;
+    const displayVal = Number.isInteger(value) ? value.toString() : value.toFixed(1);
+    s.displayValue = `${displayVal}${s.unit}`;
   }
 
   getParams(): GlobalParams {
@@ -95,16 +104,21 @@ export class UI {
   setTooltip(x: number, y: number, name: string, status: string): void {
     this.tooltipX = x;
     this.tooltipY = y;
-    this.tooltipText = name;
-    this.tooltipSubText = status;
+    this.tooltipText = name ?? '';
+    this.tooltipSubText = status ?? '';
     this.targetTooltipAlpha = 1;
   }
 
   setTooltipDetails(x: number, y: number, name: string, details: string[]): void {
     this.tooltipX = x;
     this.tooltipY = y;
-    this.tooltipText = name;
-    this.tooltipSubText = details.join('|');
+    this.tooltipText = (typeof name === 'string' && name.length > 0) ? name : '未知实体';
+    if (!Array.isArray(details) || details.length === 0) {
+      this.tooltipSubText = '暂无状态信息';
+    } else {
+      const safeDetails = details.map((d) => (typeof d === 'string' ? d : ''));
+      this.tooltipSubText = safeDetails.join('|');
+    }
     this.targetTooltipAlpha = 1;
   }
 
@@ -112,7 +126,7 @@ export class UI {
     this.targetTooltipAlpha = 0;
   }
 
-  private updateSliderValue(slider: { key: keyof GlobalParams; min: number; max: number; w: number; x: number }, mx: number): void {
+  private updateSliderValue(slider: { key: keyof GlobalParams; min: number; max: number; w: number; x: number; unit: string; displayValue: string }, mx: number): void {
     let t = (mx - slider.x) / slider.w;
     t = Math.max(0, Math.min(1, t));
     let value = slider.min + t * (slider.max - slider.min);
@@ -122,6 +136,7 @@ export class UI {
       value = Math.round(value * 10) / 10;
     }
     (this.params as any)[slider.key] = value;
+    this.refreshSliderDisplayValue(slider);
     this.onParamChange({ ...this.params });
   }
 
@@ -225,7 +240,7 @@ export class UI {
     ctx.restore();
   }
 
-  private renderSlider(ctx: CanvasRenderingContext2D, s: { x: number; y: number; w: number; h: number; key: keyof GlobalParams; min: number; max: number; label: string; unit: string }): void {
+  private renderSlider(ctx: CanvasRenderingContext2D, s: { x: number; y: number; w: number; h: number; key: keyof GlobalParams; min: number; max: number; label: string; unit: string; displayValue: string }): void {
     const value = this.params[s.key] as number;
     const t = (value - s.min) / (s.max - s.min);
     const handleX = s.x + t * s.w;
@@ -237,8 +252,7 @@ export class UI {
 
     ctx.textAlign = 'right';
     ctx.fillStyle = CYAN_BORDER;
-    const displayVal = Number.isInteger(value) ? value.toString() : value.toFixed(1);
-    ctx.fillText(`${displayVal}${s.unit}`, s.x + s.w, s.y - 12);
+    ctx.fillText(s.displayValue, s.x + s.w, s.y - 12);
 
     ctx.beginPath();
     ctx.roundRect(s.x, s.y, s.w, s.h, 6);

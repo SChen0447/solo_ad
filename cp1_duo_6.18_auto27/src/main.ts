@@ -31,6 +31,10 @@ class OceanSimulation {
   private time: number = 0;
   private bgGradient: CanvasGradient;
   private animFrameId: number = 0;
+  private maxSpeedEMA: number = 1;
+  private maxTurnRateEMA: number = 0.1;
+  private readonly EMA_WINDOW: number = 300;
+  private readonly EMA_ALPHA: number = 2 / (300 + 1);
 
   constructor() {
     this.canvas = document.getElementById('ocean') as HTMLCanvasElement;
@@ -124,32 +128,36 @@ class OceanSimulation {
 
       let found = false;
       for (const t of this.turtles) {
+        if (!t || typeof t !== 'object' || !t.pos) continue;
         const dx = mx - t.pos.x;
         const dy = my - t.pos.y;
         if (Math.sqrt(dx * dx + dy * dy) < TURTLE_RADIUS * 1.5) {
-          const patrol = t.getPatrolProgress();
-          const lastCatch = t.getTimeSinceLastCatch();
-          this.ui.setTooltipDetails(mx, my, '海龟', [
-            `捕获: ${t.catchCount}条鱼`,
-            `巡逻: ${patrol}`,
-            `上次捕食: ${lastCatch}`
-          ]);
+          const patrol = (typeof t.getPatrolProgress === 'function') ? t.getPatrolProgress() : 'N/A';
+          const lastCatch = (typeof t.getTimeSinceLastCatch === 'function') ? t.getTimeSinceLastCatch() : 'N/A';
+          const catches = typeof t.catchCount === 'number' ? t.catchCount : 0;
+          const details: string[] = [];
+          details.push(`捕获: ${catches}条鱼`);
+          details.push(`巡逻: ${patrol}`);
+          details.push(`上次捕食: ${lastCatch}`);
+          this.ui.setTooltipDetails(mx, my, '海龟', details);
           found = true;
           break;
         }
       }
       if (!found) {
         for (const f of this.fishes) {
-          if (!f.alive) continue;
+          if (!f || !f.alive || typeof f !== 'object' || !f.pos) continue;
           const dx = mx - f.pos.x;
           const dy = my - f.pos.y;
           if (Math.sqrt(dx * dx + dy * dy) < FISH_RADIUS * 2) {
-            const speed = f.getSpeed().toFixed(2);
-            const neighbors = f.getNearestNeighborCount(this.fishes);
-            this.ui.setTooltipDetails(mx, my, '小鱼', [
-              `速度: ${speed}px/帧`,
-              `邻居: ${neighbors}只`
-            ]);
+            const speedVal = (typeof f.getSpeed === 'function') ? f.getSpeed() : NaN;
+            const speed = isFinite(speedVal) ? speedVal.toFixed(2) : '0.00';
+            const neighborsVal = (typeof f.getNearestNeighborCount === 'function') ? f.getNearestNeighborCount(this.fishes) : 0;
+            const neighbors = isFinite(neighborsVal) ? neighborsVal : 0;
+            const details: string[] = [];
+            details.push(`速度: ${speed}px/帧`);
+            details.push(`邻居: ${neighbors}只`);
+            this.ui.setTooltipDetails(mx, my, '小鱼', details);
             found = true;
             break;
           }
@@ -157,15 +165,18 @@ class OceanSimulation {
       }
       if (!found) {
         for (const j of this.jellyfishes) {
+          if (!j || typeof j !== 'object' || !j.pos) continue;
           const dx = mx - j.pos.x;
           const dy = my - j.pos.y;
           if (Math.sqrt(dx * dx + dy * dy) < JELLYFISH_RADIUS * 1.5) {
-            const pulse = Math.round(j.getPulsePhasePercent());
-            const depth = Math.round(j.getDepth());
-            this.ui.setTooltipDetails(mx, my, '水母', [
-              `脉动: ${pulse}%`,
-              `深度: ${depth}px`
-            ]);
+            const pulseVal = (typeof j.getPulsePhasePercent === 'function') ? j.getPulsePhasePercent() : NaN;
+            const pulse = isFinite(pulseVal) ? Math.round(pulseVal) : 0;
+            const depthVal = (typeof j.getDepth === 'function') ? j.getDepth() : NaN;
+            const depth = isFinite(depthVal) ? Math.round(depthVal) : 0;
+            const details: string[] = [];
+            details.push(`脉动: ${pulse}%`);
+            details.push(`深度: ${depth}px`);
+            this.ui.setTooltipDetails(mx, my, '水母', details);
             found = true;
             break;
           }
