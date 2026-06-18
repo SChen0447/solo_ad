@@ -1,0 +1,184 @@
+:root {
+  --brand-green: #2e7d6f;
+  --brand-green-dark: #1b4332;
+  --brand-green-light: #c8e6c9;
+  --warm-beige: #fdf6e3;
+  --deep-brown: #4a3b2f;
+  --tag-bg: #a5d6a7;
+  --tag-text: #1b4332;
+  --mood-happy: #ffb74d;
+  --mood-calm: #81c784;
+  --mood-moved: #ce93d8;
+  --mood-anxious: #ef5350;
+  --mood-tired: #90a4ae;
+  --mood-surprise: #4fc3f7;
+  --gray-light: #e0e0e0;
+  --gray-medium: #757575;
+  --white: #ffffff;
+  --shadow-card: rgba(0, 0, 0, 0.08);
+  --shadow-soft: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body, #root {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  background: #f5f0e8;
+  color: #333;
+  -webkit-font-smoothing: antialiased;
+}
+
+@keyframes bounce-scale {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.25); }
+  100% { transform: scale(1); }
+}
+
+@keyframes slide-up {
+  from { transform: translateY(100%); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+@keyframes slide-down {
+  from { transform: translateY(0); opacity: 1; }
+  to { transform: translateY(100%); opacity: 0; }
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes fade-out {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+@keyframes expand-down {
+  from { max-height: 0; opacity: 0; }
+  to { max-height: 1000px; opacity: 1; }
+}
+
+@keyframes collapse-up {
+  from { max-height: 1000px; opacity: 1; }
+  to { max-height: 0; opacity: 0; }
+}
+
+.bounce-anim {
+  animation: bounce-scale 0.4s ease-out;
+}
+
+.fade-in {
+  animation: fade-in 0.2s ease-out forwards;
+}
+
+.fade-out {
+  animation: fade-out 0.2s ease-out forwards;
+}
+
+.btn {
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.btn:hover {
+  transform: translateY(-1px);
+}
+
+.btn:active {
+  transform: translateY(0);
+}
+
+.btn-primary {
+  background: var(--brand-green);
+  color: var(--white);
+  padding: 8px 16px;
+}
+
+.btn-primary:hover {
+  background: var(--brand-green-dark);
+}
+
+.card {
+  background: var(--warm-beige);
+  border-radius: 16px;
+  box-shadow: inset 0 0 0 1px var(--shadow-card), inset 0 4px 20px var(--shadow-card);
+  padding: 24px;
+}
+
+.pill-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--tag-bg);
+  color: var(--tag-text);
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 500;
+  position: relative;
+  transition: all 0.15s ease;
+}
+
+.pill-tag .tag-delete {
+  display: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.1);
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 10px;
+  line-height: 1;
+}
+
+.pill-tag:hover .tag-delete {
+  display: inline-flex;
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.15);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.3);
+}
+
+input, textarea {
+  font-family: inherit;
+  font-size: 14px;
+  outline: none;
+}
+
+input:focus, textarea:focus {
+  border-color: var(--brand-green);
+}
