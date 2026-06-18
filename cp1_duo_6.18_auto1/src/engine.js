@@ -148,9 +148,9 @@ export class GameEngine {
     }
     getParticleColor(distance) {
         const t = (distance - 50) / 150;
-        const r = Math.floor(255 - t * 128);
-        const g = Math.floor(50 - t * 50);
-        const b = Math.floor(50 + t * 150);
+        const r = Math.floor(255 - t * 155);
+        const g = Math.floor(80 - t * 40);
+        const b = Math.floor(40 + t * 215);
         return `rgb(${r}, ${g}, ${b})`;
     }
     generateGravityBodies() {
@@ -216,11 +216,12 @@ export class GameEngine {
         }
         this.gravityBodies.forEach(body => {
             body.rotation += body.rotationSpeed * dt;
+            body.stripeOffset += 0.015 * dt;
         });
         this.ringCheckpoints.forEach(ring => {
             ring.rotation += 0.005 * dt;
             if (ring.flashTime > 0) {
-                ring.flashTime -= deltaTime;
+                ring.flashTime = Math.max(0, ring.flashTime - deltaTime);
             }
         });
         this.updateBlackHoleParticles(dt);

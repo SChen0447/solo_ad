@@ -278,9 +278,9 @@ export class Renderer {
         }
     }
     getChargeColor(power) {
-        const r = Math.floor(50 + power * 205);
-        const g = Math.floor(100 + power * 100);
-        const b = Math.floor(255 - power * 155);
+        const r = Math.floor(60 + power * 195);
+        const g = Math.floor(140 - power * 60);
+        const b = Math.floor(255 - power * 225);
         return `rgb(${r}, ${g}, ${b})`;
     }
     drawRingCounter(passed, total) {
@@ -300,20 +300,38 @@ export class Renderer {
         this.ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
         this.ctx.fillText('光环', x, y + 25);
     }
+    easeOutCubic(t) {
+        return 1 - Math.pow(1 - t, 3);
+    }
+    easeOutElastic(t) {
+        const c4 = (2 * Math.PI) / 3;
+        if (t === 0)
+            return 0;
+        if (t === 1)
+            return 1;
+        return Math.pow(2, -10 * t) * Math.sin((t * 10 - 0.75) * c4) + 1;
+    }
+    easeOutBack(t) {
+        const c1 = 1.70158;
+        const c3 = c1 + 1;
+        return 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2);
+    }
     drawWinScreen(animationTime) {
         this.ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
         this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
         let scale = 1;
-        const duration = 1000;
-        if (animationTime < duration) {
-            const t = animationTime / duration;
-            if (t < 0.5) {
-                scale = 0.5 + t * 1.4;
-            }
-            else {
-                const bounceT = (t - 0.5) / 0.5;
-                scale = 1.2 - bounceT * 0.2;
-            }
+        const totalDuration = 1000;
+        const scaleUpDuration = 500;
+        const bounceDuration = 500;
+        if (animationTime < scaleUpDuration) {
+            const t = animationTime / scaleUpDuration;
+            const easedT = this.easeOutCubic(t);
+            scale = 0.5 + easedT * 0.7;
+        }
+        else if (animationTime < totalDuration) {
+            const t = (animationTime - scaleUpDuration) / bounceDuration;
+            const easedT = this.easeOutBack(t);
+            scale = 1.2 - easedT * 0.2;
         }
         const centerX = this.canvas.width / 2;
         const centerY = this.canvas.height / 2 - 40;
