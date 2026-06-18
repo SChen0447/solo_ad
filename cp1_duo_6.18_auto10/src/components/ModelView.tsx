@@ -1,0 +1,152 @@
+import { useRef, useEffect, useMemo, forwardRef } from 'react'
+import { Canvas, useFrame, useThree } from '@react-three/fiber'
+import { OrbitControls } from '@react-three/drei'
+import * as THREE from 'three'
+import { hexToThreeColor } from '../utils/colorUtils'
+
+interface LampProps {
+  shadeColor: string
+  poleColor: string
+  baseColor: string
+}
+
+interface AnimatableMeshProps {
+  targetColor: string
+  metalness?: number
+  roughness?: number
+  name?: string
+  children: React.ReactNode
+}
+
+const AnimatableMesh = forwardRef<THREE.Mesh, AnimatableMeshProps>((
+  { targetColor, metalness = 0.1, roughness = 0.6, name, children },
+  ref
+) => {
+  const materialRef = useRef<THREE.MeshStandardMaterial>(null)
+  const currentColor = useRef(new THREE.Color(targetColor))
+  const targetColorObj = useMemo(() => hexToThreeColor(targetColor), [targetColor])
+
+  useFrame((_, delta) => {
+    if (materialRef.current) {
+      currentColor.current.lerp(targetColorObj, Math.min(1, delta * 3))
+      materialRef.current.color.copy(currentColor.current)
+    }
+  })
+
+  return (
+    <mesh ref={ref} name={name}>
+      <meshStandardMaterial
+        ref={materialRef}
+        color={targetColor}
+        metalness={metalness}
+        roughness={roughness}
+      />
+      {children}
+    </mesh>
+  )
+})
+
+AnimatableMesh.displayName = 'AnimatableMesh'
+
+const Lamp = ({ shadeColor, poleColor, baseColor }: LampProps) => {
+  return (
+    <group position={[0, 0, 0]}>
+      <AnimatableMesh targetColor={baseColor} name="base">
+        <cylinderGeometry args={[0.8, 1, 0.3, 32]} />
+      </AnimatableMesh>
+
+      <AnimatableMesh targetColor={poleColor} name="pole">
+        <cylinderGeometry args={[0.08, 0.08, 2, 16]} />
+      </AnimatableMesh>
+
+      <group position={[0, 1.2, 0]}>
+        <AnimatableMesh targetColor={poleColor} name="pole">
+          <cylinderGeometry args={[0.06, 0.06, 0.8, 16]} />
+        </AnimatableMesh>
+      </group>
+
+      <group position={[0, 1.8, 0]}>
+        <AnimatableMesh targetColor={shadeColor} name="shade">
+          <cylinderGeometry args={[0.3, 0.6, 0.5, 32, 1, true]} />
+        </AnimatableMesh>
+        <AnimatableMesh targetColor={shadeColor} name="shade">
+          <circleGeometry args={[0.3, 32]} />
+        </AnimatableMesh>
+      </group>
+    </group>
+  )
+}
+
+interface SceneProps {
+  shadeColor: string
+  poleColor: string
+  baseColor: string
+  onThumbnailReady?: (renderer: THREE.WebGLRenderer, scene: THREE.Scene, camera: THREE.Camera) => void
+}
+
+const Scene = ({ shadeColor, poleColor, baseColor, onThumbnailReady }: SceneProps) => {
+  const { scene, camera, gl } = useThree()
+
+  useEffect(() => {
+    if (onThumbnailReady) {
+      onThumbnailReady(gl, scene, camera)
+    }
+  }, [gl, scene, camera, onThumbnailReady])
+
+  return (
+    <>
+      <ambientLight intensity={0.4} />
+      <directionalLight
+        position={[5, 5, 5]}
+        intensity={1}
+        castShadow
+      />
+      <directionalLight
+        position={[-3, 3, -3]}
+        intensity={0.4}
+      />
+      <pointLight position={[0, 2, 0]} intensity={0.3} />
+
+      <Lamp shadeColor={shadeColor} poleColor={poleColor} baseColor={baseColor} />
+
+      <OrbitControls
+        enableDamping
+        dampingFactor={0.05}
+        minDistance={3.2}
+        maxDistance={32}
+        minPolarAngle={0}
+        maxPolarAngle={Math.PI / 2.2}
+        enableZoom={true}
+      />
+    </>
+  )
+}
+
+interface ModelViewProps {
+  shadeColor: string
+  poleColor: string
+  baseColor: string
+  onRendererReady?: (renderer: THREE.WebGLRenderer, scene: THREE.Scene, camera: THREE.Camera) => void
+}
+
+const ModelView = ({ shadeColor, poleColor, baseColor, onRendererReady }: ModelViewProps) => {
+  return (
+    <Canvas
+      shadows
+      camera={{ position: [4, 3, 4], fov: 45 }}
+      gl={{ antialias: true, preserveDrawingBuffer: true }}
+      style={{ width: '100%', height: '100%' }}
+    >
+      <color attach="background" args={['#16213e']} />
+      <fog attach="fog" args={['#16213e', 10, 30]} />
+      <Scene
+        shadeColor={shadeColor}
+        poleColor={poleColor}
+        baseColor={baseColor}
+        onThumbnailReady={onRendererReady}
+      />
+    </Canvas>
+  )
+}
+
+export default ModelView
