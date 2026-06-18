@@ -51,7 +51,7 @@ const App: React.FC = () => {
     }
     searchTimeoutRef.current = window.setTimeout(() => {
       fetchCards(category, keyword);
-    }, 100);
+    }, 300);
 
     return () => {
       if (searchTimeoutRef.current) {
@@ -99,14 +99,41 @@ const App: React.FC = () => {
 
   const handleFavoriteClick = (id: string) => {
     setSidebarOpen(false);
+    
     const element = document.getElementById(`card-${id}`);
-    if (element) {
-      element.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      element.classList.add('card-highlight');
-      setTimeout(() => {
-        element.classList.remove('card-highlight');
-      }, 2000);
+    if (!element) {
+      if (category !== 'all' || keyword !== '') {
+        setCategory('all');
+        setKeyword('');
+        setTimeout(() => {
+          const targetElement = document.getElementById(`card-${id}`);
+          if (targetElement) {
+            scrollToCardSmooth(targetElement);
+          }
+        }, 350);
+      }
+      return;
     }
+    
+    scrollToCardSmooth(element);
+  };
+  
+  const scrollToCardSmooth = (element: HTMLElement) => {
+    const rect = element.getBoundingClientRect();
+    const isInViewport = rect.top >= 0 && rect.bottom <= window.innerHeight;
+    
+    if (!isInViewport) {
+      const scrollTop = window.scrollY + rect.top - 100;
+      window.scrollTo({
+        top: scrollTop,
+        behavior: 'smooth'
+      });
+    }
+    
+    element.classList.add('card-highlight');
+    setTimeout(() => {
+      element.classList.remove('card-highlight');
+    }, 2000);
   };
 
   const handleCreateCard = async (data: { title: string; category: Category; content: string; difficulty: number }) => {

@@ -190,7 +190,7 @@ const CardDetail: React.FC<CardDetailProps> = ({ cardId, onBack, onDelete, onUpd
         </div>
       </div>
 
-      <div className="detail-body">
+      <div className={`detail-body ${isEditing ? 'editing' : ''}`}>
         <div className="detail-content">
           {isEditing ? (
             <div className="edit-form">
@@ -231,12 +231,13 @@ const CardDetail: React.FC<CardDetailProps> = ({ cardId, onBack, onDelete, onUpd
                     value={editContent}
                     onChange={(e) => setEditContent(e.target.value)}
                     className="markdown-editor"
+                    placeholder="在此输入 Markdown 内容..."
                   />
                 </div>
                 <div className="preview-pane">
                   <label>实时预览</label>
                   <div
-                    className="markdown-preview"
+                    className="markdown-preview detail-markdown"
                     dangerouslySetInnerHTML={getHtmlContent(editContent)}
                   />
                 </div>
