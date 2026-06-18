@@ -6,6 +6,18 @@ export interface HitEvent {
   enemyId: number; damage: number; bulletType: string;
 }
 
+export interface PlayerHitEvent {
+  damage: number;
+}
+
+export interface HealEvent {
+  amount: number;
+}
+
+export interface BlinkEvent {
+  triggered: boolean;
+}
+
 export interface Bullet {
   id: number; x: number; y: number; vx: number; vy: number;
   type: 'arrow' | 'fireball' | 'sword_slash' | 'fireball_skill' | 'heal_wave' | 'blink_effect' | 'enemy_bullet';
@@ -122,7 +134,7 @@ export class BulletSystem {
     }
   }
 
-  createEnemyBullet(x: number, y: number, vx: number, vy: number): void {
+  createEnemyBullet(x: number, y: number, vx: number, vy: number, damage: number = 5): void {
     if (this.bullets.length >= this.MAX_BULLETS) return;
 
     this.bullets.push({
@@ -132,7 +144,7 @@ export class BulletSystem {
       vx,
       vy,
       type: 'enemy_bullet',
-      damage: 0,
+      damage,
       radius: 5,
       tracking: false,
       targetId: -1,
@@ -141,8 +153,18 @@ export class BulletSystem {
     });
   }
 
-  update(dt: number, enemies: Enemy[]): HitEvent[] {
+  update(
+    dt: number,
+    enemies: Enemy[],
+    playerX: number,
+    playerY: number,
+    playerW: number,
+    playerH: number
+  ): { hits: HitEvent[]; playerHits: PlayerHitEvent[]; heals: HealEvent[]; blinks: BlinkEvent[] } {
     const hits: HitEvent[] = [];
+    const playerHits: PlayerHitEvent[] = [];
+    const heals: HealEvent[] = [];
+    const blinks: BlinkEvent[] = [];
     const frameMul = dt * 60;
 
     for (let i = this.bullets.length - 1; i >= 0; i--) {
@@ -166,6 +188,16 @@ export class BulletSystem {
       if (b.type === 'heal_wave') {
         const progress = 1 - b.lifetime / b.maxLifetime;
         b.radius = 10 + progress * 80;
+        if (progress > 0.05 && progress < 0.1) {
+          heals.push({ amount: 30 });
+        }
+      }
+
+      if (b.type === 'blink_effect') {
+        const progress = 1 - b.lifetime / b.maxLifetime;
+        if (progress > 0.05 && progress < 0.1) {
+          blinks.push({ triggered: true });
+        }
       }
 
       b.x += b.vx * frameMul;
@@ -181,27 +213,39 @@ export class BulletSystem {
         continue;
       }
 
-      for (const enemy of enemies) {
-        const ex = enemy.x;
-        const ey = enemy.y;
-        const ew = enemy.width;
-        const eh = enemy.height;
-
-        const closestX = Math.max(ex, Math.min(b.x, ex + ew));
-        const closestY = Math.max(ey, Math.min(b.y, ey + eh));
+      if (b.type === 'enemy_bullet') {
+        const closestX = Math.max(playerX, Math.min(b.x, playerX + playerW));
+        const closestY = Math.max(playerY, Math.min(b.y, playerY + playerH));
         const distX = b.x - closestX;
         const distY = b.y - closestY;
-        const distSq = distX * distX + distY * distY;
-
-        if (distSq <= b.radius * b.radius) {
-          hits.push({ enemyId: enemy.id, damage: b.damage, bulletType: b.type });
+        if (distX * distX + distY * distY <= b.radius * b.radius) {
+          playerHits.push({ damage: b.damage });
           this.bullets.splice(i, 1);
-          break;
+          continue;
+        }
+      } else {
+        for (const enemy of enemies) {
+          const ex = enemy.x;
+          const ey = enemy.y;
+          const ew = enemy.width;
+          const eh = enemy.height;
+
+          const closestX = Math.max(ex, Math.min(b.x, ex + ew));
+          const closestY = Math.max(ey, Math.min(b.y, ey + eh));
+          const distX = b.x - closestX;
+          const distY = b.y - closestY;
+          const distSq = distX * distX + distY * distY;
+
+          if (distSq <= b.radius * b.radius) {
+            hits.push({ enemyId: enemy.id, damage: b.damage, bulletType: b.type });
+            this.bullets.splice(i, 1);
+            break;
+          }
         }
       }
     }
 
-    return hits;
+    return { hits, playerHits, heals, blinks };
   }
 
   render(ctx: CanvasRenderingContext2D): void {
