@@ -1,7 +1,7 @@
 /// <reference types="@react-three/fiber" />
 import React, { useMemo, useRef, useEffect } from 'react';
-import { Canvas } from '@react-three/fiber';
-import { OrbitControls } from '@react-three/drei';
+import { Canvas, useFrame, useThree } from '@react-three/fiber';
+import { OrbitControls, Grid, Html } from '@react-three/drei';
 import * as THREE from 'three';
 import type { DistributionData, SurfaceData, BarData } from './DistributionEngine';
 
@@ -56,8 +56,8 @@ const SurfaceMesh: React.FC<SurfaceMeshProps> = ({ data, color, transparent = fa
         side={THREE.DoubleSide}
         transparent={transparent}
         opacity={opacity}
-        metalness={0.1}
-        roughness={0.6}
+        metalness={0.15}
+        roughness={0.45}
       />
     </mesh>
   );
@@ -77,10 +77,10 @@ const BarChart: React.FC<BarChartProps> = ({ data, colorBottom, colorTop, transp
 
   const { barCount, barWidth, barDepth, maxY } = useMemo(() => {
     return {
-      barCount: data.bars.length,
+      barCount: Math.max(data.bars.length, 1),
       barWidth: data.barWidth,
       barDepth: data.barDepth,
-      maxY: data.maxDensity
+      maxY: data.maxDensity || 1
     };
   }, [data]);
 
@@ -123,8 +123,8 @@ const BarChart: React.FC<BarChartProps> = ({ data, colorBottom, colorTop, transp
         vertexColors
         transparent={transparent}
         opacity={opacity}
-        metalness={0.2}
-        roughness={0.5}
+        metalness={0.25}
+        roughness={0.4}
       />
     </instancedMesh>
   );
@@ -133,30 +133,96 @@ const BarChart: React.FC<BarChartProps> = ({ data, colorBottom, colorTop, transp
 const BarGlowLights: React.FC<{ data: BarData; color: string }> = ({ data, color }) => {
   return (
     <>
-      {data.bars.slice(0, 50).map((bar, i) => (
+      {data.bars.slice(0, 30).map((bar, i) => (
         <pointLight
           key={i}
           position={[bar.x, bar.y + 0.05, bar.z]}
           color={color}
-          intensity={0.3}
-          distance={1}
+          intensity={0.4}
+          distance={1.2}
+          decay={2}
         />
       ))}
     </>
   );
 };
 
-interface GridFloorProps {
-  size: number;
-  divisions: number;
+interface AxisLabelProps {
+  position: [number, number, number];
+  label: string;
+  color?: string;
 }
 
-const GridFloor: React.FC<GridFloorProps> = ({ size, divisions }) => {
+const AxisLabel: React.FC<AxisLabelProps> = ({ position, label, color = '#e6edf3' }) => {
+  const groupRef = useRef<THREE.Group>(null);
+  const { camera } = useThree();
+
+  useFrame(() => {
+    if (groupRef.current && camera) {
+      groupRef.current.quaternion.copy(camera.quaternion);
+    }
+  });
+
   return (
-    <gridHelper
-      args={[size, divisions, 0xffffff33, 0xffffff11]}
-      position={[0, 0, 0]}
-    />
+    <group ref={groupRef} position={position}>
+      <Html
+        center
+        distanceFactor={8}
+        style={{
+          color,
+          fontSize: '10px',
+          fontWeight: 600,
+          fontFamily: 'Inter, sans-serif',
+          textShadow: '0 1px 3px rgba(0,0,0,0.9)',
+          pointerEvents: 'none',
+          userSelect: 'none',
+          whiteSpace: 'nowrap',
+          padding: '3px 6px',
+          backgroundColor: 'rgba(13, 17, 23, 0.85)',
+          backdropFilter: 'blur(4px)',
+          borderRadius: '4px',
+          border: '1px solid rgba(255,255,255,0.1)',
+          lineHeight: 1.2
+        }}
+      >
+        {label}
+      </Html>
+    </group>
+  );
+};
+
+interface AxesLabelsProps {
+  gridSize: number;
+}
+
+const AxesLabels: React.FC<AxesLabelsProps> = ({ gridSize }) => {
+  const halfSize = gridSize / 2;
+  const labels = useMemo(() => [
+    { pos: [halfSize + 0.5, 0, 0], label: '+X', color: '#ff6b6b' },
+    { pos: [-halfSize - 0.5, 0, 0], label: '-X', color: '#ff6b6b' },
+    { pos: [0, 1.2, halfSize + 0.5], label: '+Z', color: '#4ecdc4' },
+    { pos: [0, 1.2, -halfSize - 0.5], label: '-Z', color: '#4ecdc4' },
+    { pos: [-halfSize - 0.3, 1.5, -halfSize - 0.3], label: 'Y (密度)', color: '#ffe66d' },
+    { pos: [-halfSize, 0.2, -halfSize], label: '-4', color: '#8b949e' },
+    { pos: [-halfSize, 0.2, 0], label: '-2', color: '#8b949e' },
+    { pos: [0, 0.2, -halfSize], label: '-4', color: '#8b949e' },
+    { pos: [halfSize, 0.2, -halfSize], label: '0', color: '#8b949e' },
+    { pos: [halfSize, 0.2, 0], label: '2', color: '#8b949e' },
+    { pos: [0, 0.2, halfSize], label: '0', color: '#8b949e' },
+    { pos: [halfSize, 0.2, halfSize], label: '4', color: '#8b949e' }
+  ], [halfSize]);
+
+  return (
+    <>
+      {labels.map((item, i) => (
+        <AxisLabel
+          key={i}
+          position={item.pos as [number, number, number]}
+          label={item.label}
+          color={item.color}
+        />
+      ))}
+    </>
   );
 };
 
@@ -176,6 +242,15 @@ const SceneContent: React.FC<SceneContentProps> = ({
   secondaryColor = '#FF8C00'
 }) => {
   const gridSize = 10;
+  const lightRef = useRef<THREE.DirectionalLight>(null);
+
+  useFrame((state) => {
+    if (lightRef.current) {
+      const t = state.clock.elapsedTime;
+      lightRef.current.position.x = Math.sin(t * 0.3) * 6;
+      lightRef.current.position.z = Math.cos(t * 0.3) * 6;
+    }
+  });
 
   const renderDistribution = (data: DistributionData, color: string, isSecondary: boolean) => {
     const opacity = isSecondary ? 0.5 : 0.75;
@@ -211,12 +286,73 @@ const SceneContent: React.FC<SceneContentProps> = ({
 
   return (
     <>
-      <ambientLight intensity={0.4} />
-      <directionalLight position={[5, 8, 5]} intensity={0.8} castShadow />
-      <directionalLight position={[-5, 5, -5]} intensity={0.3} />
-      <pointLight position={[0, 5, 0]} intensity={0.5} color="#ffffff" />
+      <ambientLight intensity={0.35} color="#ffffff" />
 
-      <GridFloor size={gridSize} divisions={10} />
+      <directionalLight
+        ref={lightRef}
+        position={[5, 7, 5]}
+        intensity={1.0}
+        castShadow
+        shadow-mapSize-width={2048}
+        shadow-mapSize-height={2048}
+        shadow-camera-left={-8}
+        shadow-camera-right={8}
+        shadow-camera-top={8}
+        shadow-camera-bottom={-8}
+        shadow-camera-near={0.5}
+        shadow-camera-far={50}
+      />
+
+      <directionalLight
+        position={[-5, 4, -5]}
+        intensity={0.4}
+        color="#a0c4ff"
+      />
+
+      <pointLight position={[0, 6, 0]} intensity={0.6} color="#ffffff" distance={15} decay={1.5} />
+
+      <pointLight position={[-4, 3, 4]} intensity={0.25} color="#58a6ff" distance={12} />
+
+      <Grid
+        position={[0, 0, 0]}
+        args={[gridSize, gridSize]}
+        cellSize={1}
+        cellThickness={0.5}
+        cellColor="#ffffff22"
+        sectionSize={5}
+        sectionThickness={1}
+        sectionColor="#ffffff44"
+      />
+
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.001, 0]} receiveShadow>
+        <planeGeometry args={[gridSize, gridSize]} />
+        <meshStandardMaterial
+          color="#0d1117"
+          transparent
+          opacity={0.6}
+          roughness={1}
+        />
+      </mesh>
+
+      <group position={[0, 0.01, 0]}>
+        <lineSegments>
+          <bufferGeometry>
+            <bufferAttribute
+              attach="attributes-position"
+              count={6}
+              array={new Float32Array([
+                -gridSize / 2, 0, 0, gridSize / 2, 0, 0,
+                0, 0, -gridSize / 2, 0, 0, gridSize / 2,
+                0, 0, 0, 0, 2.5, 0
+              ])}
+              itemSize={3}
+            />
+          </bufferGeometry>
+          <lineBasicMaterial color="#ffffff88" />
+        </lineSegments>
+      </group>
+
+      <AxesLabels gridSize={gridSize} />
 
       {renderDistribution(primaryData, primaryColor, false)}
 
@@ -226,12 +362,17 @@ const SceneContent: React.FC<SceneContentProps> = ({
 
       <OrbitControls
         enableDamping
-        dampingFactor={0.05}
-        minDistance={2}
-        maxDistance={20}
+        dampingFactor={0.08}
+        minDistance={3}
+        maxDistance={18}
         autoRotate={false}
-        target={[0, 0.3, 0]}
-        maxPolarAngle={Math.PI / 2.2}
+        target={[0, 0.4, 0]}
+        maxPolarAngle={Math.PI / 2.1}
+        minPolarAngle={0.1}
+        enablePan={true}
+        panSpeed={0.8}
+        zoomSpeed={0.9}
+        rotateSpeed={0.8}
       />
     </>
   );
@@ -253,9 +394,10 @@ const SceneRenderer: React.FC<SceneRendererProps> = ({
       camera={{ position: [6, 5, 6], fov: 50 }}
       gl={{ antialias: true, alpha: false }}
       dpr={[1, 2]}
+      shadows
       style={{ background: 'linear-gradient(to bottom, #0d1117, #161b22)' }}
     >
-      <fog attach="fog" args={['#0d1117', 8, 25]} />
+      <fog attach="fog" args={['#0d1117', 6, 28]} />
       <SceneContent
         primaryData={primaryData}
         secondaryData={secondaryData}
