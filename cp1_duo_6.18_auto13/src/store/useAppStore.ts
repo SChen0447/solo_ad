@@ -2,6 +2,11 @@ import { create } from 'zustand';
 import type { ColorBlindType } from '@/utils/colorBlindMatrices';
 import type { ContrastMetrics } from '@/utils/contrastCalculator';
 
+interface PanState {
+  x: number;
+  y: number;
+}
+
 interface AppState {
   colorBlindType: ColorBlindType;
   originalImageData: ImageData | null;
@@ -12,6 +17,8 @@ interface AppState {
   uploadedImageUrl: string | null;
   isDraggingFile: boolean;
   panelSplit: number;
+  zoom: number;
+  pan: PanState;
 
   setColorBlindType: (type: ColorBlindType) => void;
   setOriginalImageData: (data: ImageData | null) => void;
@@ -22,8 +29,16 @@ interface AppState {
   setUploadedImageUrl: (url: string | null) => void;
   setIsDraggingFile: (dragging: boolean) => void;
   setPanelSplit: (split: number) => void;
+  setZoom: (zoom: number) => void;
+  setPan: (pan: PanState) => void;
+  resetView: () => void;
   reset: () => void;
 }
+
+const initialViewState = {
+  zoom: 1,
+  pan: { x: 0, y: 0 },
+};
 
 const initialState = {
   colorBlindType: 'protanopia' as ColorBlindType,
@@ -35,6 +50,7 @@ const initialState = {
   uploadedImageUrl: null as string | null,
   isDraggingFile: false,
   panelSplit: 0.5,
+  ...initialViewState,
 };
 
 export const useAppStore = create<AppState>((set) => ({
@@ -49,5 +65,8 @@ export const useAppStore = create<AppState>((set) => ({
   setUploadedImageUrl: (url) => set({ uploadedImageUrl: url }),
   setIsDraggingFile: (dragging) => set({ isDraggingFile: dragging }),
   setPanelSplit: (split) => set({ panelSplit: Math.max(0.2, Math.min(0.8, split)) }),
+  setZoom: (zoom) => set({ zoom: Math.max(0.5, Math.min(3, zoom)) }),
+  setPan: (pan) => set({ pan }),
+  resetView: () => set(initialViewState),
   reset: () => set(initialState),
 }));

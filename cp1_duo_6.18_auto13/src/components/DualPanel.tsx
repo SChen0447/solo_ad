@@ -1,4 +1,5 @@
 import { useRef, useEffect, useCallback, useState } from 'react';
+import { RotateCcw } from 'lucide-react';
 import { useAppStore } from '@/store/useAppStore';
 
 export default function DualPanel() {
@@ -12,20 +13,25 @@ export default function DualPanel() {
   const panelSplit = useAppStore((s) => s.panelSplit);
   const setPanelSplit = useAppStore((s) => s.setPanelSplit);
   const colorBlindType = useAppStore((s) => s.colorBlindType);
+  const zoom = useAppStore((s) => s.zoom);
+  const setZoom = useAppStore((s) => s.setZoom);
+  const pan = useAppStore((s) => s.pan);
+  const setPan = useAppStore((s) => s.setPan);
+  const resetView = useAppStore((s) => s.resetView);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const leftCanvasRef = useRef<HTMLCanvasElement>(null);
   const rightCanvasRef = useRef<HTMLCanvasElement>(null);
   const heatmapCanvasRef = useRef<HTMLCanvasElement>(null);
+  const revealCanvasRef = useRef<HTMLCanvasElement>(null);
   const originalImgRef = useRef<HTMLImageElement | null>(null);
   const simulatedImgRef = useRef<HTMLImageElement | null>(null);
 
   const [isDraggingSlider, setIsDraggingSlider] = useState(false);
   const [isDraggingSplit, setIsDraggingSplit] = useState(false);
-  const [zoom, setZoom] = useState(1);
-  const [pan, setPan] = useState({ x: 0, y: 0 });
   const [isPanning, setIsPanning] = useState(false);
   const [panStart, setPanStart] = useState({ x: 0, y: 0 });
+  const [showResetTooltip, setShowResetTooltip] = useState(false);
 
   const hasContent = !!(uploadedImageUrl || inputText);
 
@@ -159,6 +165,7 @@ export default function DualPanel() {
     const isText = !uploadedImageUrl && !!inputText;
     drawPanel(leftCanvasRef.current, originalImgRef.current, isText);
     drawPanel(rightCanvasRef.current, simulatedImgRef.current, isText);
+    drawPanel(revealCanvasRef.current, originalImgRef.current, isText);
     drawHeatmap(heatmapCanvasRef.current);
   }, [hasContent, uploadedImageUrl, inputText, drawPanel, drawHeatmap, simulatedImageData]);
 
@@ -168,6 +175,7 @@ export default function DualPanel() {
       const isText = !uploadedImageUrl && !!inputText;
       drawPanel(leftCanvasRef.current, originalImgRef.current, isText);
       drawPanel(rightCanvasRef.current, simulatedImgRef.current, isText);
+      drawPanel(revealCanvasRef.current, originalImgRef.current, isText);
       drawHeatmap(heatmapCanvasRef.current);
     };
     window.addEventListener('resize', handleResize);
@@ -176,10 +184,12 @@ export default function DualPanel() {
 
   const handleSliderMouseDown = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
+    e.stopPropagation();
     setIsDraggingSlider(true);
   }, []);
 
   const handleSliderTouchStart = useCallback((e: React.TouchEvent) => {
+    e.stopPropagation();
     setIsDraggingSlider(true);
   }, []);
 
@@ -218,6 +228,7 @@ export default function DualPanel() {
 
   const handleSplitMouseDown = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
+    e.stopPropagation();
     setIsDraggingSplit(true);
   }, []);
 
@@ -251,15 +262,28 @@ export default function DualPanel() {
     };
   }, [isDraggingSplit, setPanelSplit]);
 
-  const handleWheel = useCallback((e: React.WheelEvent) => {
-    e.preventDefault();
-    const delta = e.deltaY > 0 ? 0.9 : 1.1;
-    setZoom((z) => Math.max(0.1, Math.min(10, z * delta)));
-  }, []);
+  const handleWheel = useCallback(
+    (e: React.WheelEvent) => {
+      e.preventDefault();
+      const delta = e.deltaY > 0 ? 0.9 : 1.1;
+      const newZoom = Math.max(0.5, Math.min(3, zoom * delta));
+      setZoom(newZoom);
+    },
+    [zoom, setZoom]
+  );
+
+  const handleZoomSliderChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const newZoom = parseFloat(e.target.value);
+      setZoom(newZoom);
+    },
+    [setZoom]
+  );
 
   const handleCanvasMouseDown = useCallback(
     (e: React.MouseEvent) => {
       if (e.button === 1 || (e.button === 0 && e.altKey)) {
+        e.preventDefault();
         setIsPanning(true);
         setPanStart({ x: e.clientX - pan.x, y: e.clientY - pan.y });
       }
@@ -279,13 +303,25 @@ export default function DualPanel() {
       window.removeEventListener('mousemove', handleMove);
       window.removeEventListener('mouseup', handleUp);
     };
-  }, [isPanning, panStart]);
+  }, [isPanning, panStart, setPan]);
 
   const getContrastColor = (val: number) => {
     if (val < 1.0) return '#2e7d32';
     if (val < 2.0) return '#f57f17';
     return '#c62828';
   };
+
+  const getImageDimensions = () => {
+    if (originalImageData) {
+      return `${originalImageData.width}x${originalImageData.height}`;
+    }
+    if (inputText) {
+      return '800x600';
+    }
+    return '';
+  };
+
+  const imageDimensions = getImageDimensions();
 
   if (!hasContent) {
     return null;
@@ -297,11 +333,24 @@ export default function DualPanel() {
       className="dual-panel-container"
       onWheel={handleWheel}
     >
+      <button
+        className="reset-view-btn"
+        onClick={resetView}
+        onMouseEnter={() => setShowResetTooltip(true)}
+        onMouseLeave={() => setShowResetTooltip(false)}
+      >
+        <RotateCcw size={16} />
+        {showResetTooltip && <span className="reset-tooltip">重置视图</span>}
+      </button>
+
       <div
         className="panel panel-left"
         style={{ width: `${panelSplit * 100}%` }}
       >
         <div className="panel-label">原始视图</div>
+        {imageDimensions && (
+          <div className="dimension-label">{imageDimensions}</div>
+        )}
         <canvas
           ref={leftCanvasRef}
           className="panel-canvas"
@@ -321,6 +370,9 @@ export default function DualPanel() {
         style={{ width: `${(1 - panelSplit) * 100}%` }}
       >
         <div className="panel-label">模拟视图</div>
+        {imageDimensions && (
+          <div className="dimension-label">{imageDimensions}</div>
+        )}
         <canvas
           ref={rightCanvasRef}
           className="panel-canvas"
@@ -346,7 +398,7 @@ export default function DualPanel() {
           style={{ width: `${sliderPosition * 100}%` }}
         >
           <canvas
-            ref={leftCanvasRef}
+            ref={revealCanvasRef}
             className="panel-canvas reveal-canvas"
             onMouseDown={handleCanvasMouseDown}
           />
@@ -381,6 +433,20 @@ export default function DualPanel() {
           </div>
         </div>
       )}
+
+      <div className="zoom-control-bar">
+        <span className="zoom-label">缩放</span>
+        <input
+          type="range"
+          min="0.5"
+          max="3"
+          step="0.1"
+          value={zoom}
+          onChange={handleZoomSliderChange}
+          className="zoom-slider"
+        />
+        <span className="zoom-value">{zoom.toFixed(1)}x</span>
+      </div>
     </div>
   );
 }
