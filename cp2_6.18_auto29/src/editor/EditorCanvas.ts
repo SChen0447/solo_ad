@@ -145,6 +145,9 @@ function drawWeapon(ctx: CanvasRenderingContext2D, weapon: string) {
 export class EditorCanvas {
   private canvas: HTMLCanvasElement;
   private ctx: CanvasRenderingContext2D;
+  private pulseTimer: number = 0;
+  private rafId: number | null = null;
+  private lastChar: CharacterConfig | null = null;
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
@@ -156,7 +159,36 @@ export class EditorCanvas {
     this.ctx.imageSmoothingEnabled = false;
   }
 
-  render(character: CharacterConfig): void {
+  triggerPulse(): void {
+    this.pulseTimer = 0.3;
+    if (this.rafId === null) {
+      this.startLoop();
+    }
+  }
+
+  private startLoop(): void {
+    let last = performance.now();
+    const tick = (now: number) => {
+      const dt = Math.min(0.05, (now - last) / 1000);
+      last = now;
+      this.pulseTimer = Math.max(0, this.pulseTimer - dt);
+      if (this.lastChar) {
+        this.drawFrame(this.lastChar, this.pulseTimer);
+      }
+      if (this.pulseTimer > 0) {
+        this.rafId = requestAnimationFrame(tick);
+      } else {
+        this.rafId = null;
+      }
+    };
+    this.rafId = requestAnimationFrame(tick);
+  }
+
+  private drawFrame(character: CharacterConfig, pulse: number): void {
+    const t = 1 - pulse / 0.3;
+    const scaleT = 1 + Math.sin(t * Math.PI) * 0.08;
+    const flash = Math.sin(t * Math.PI) * 0.5;
+
     this.ctx.clearRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
     this.ctx.fillStyle = '#16213e';
     this.ctx.fillRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
@@ -174,10 +206,38 @@ export class EditorCanvas {
       this.ctx.stroke();
     }
 
+    this.ctx.save();
+    this.ctx.translate(CANVAS_SIZE / 2, CANVAS_SIZE / 2);
+    this.ctx.scale(scaleT, scaleT);
+    this.ctx.translate(-CANVAS_SIZE / 2, -CANVAS_SIZE / 2);
+
     drawHead(this.ctx, character.head.hatColor, character.head.hairStyle);
     drawBody(this.ctx, character.body.shirtColor, character.body.armorStyle);
     drawLegs(this.ctx, character.legs.pantsColor, character.legs.shoeStyle);
     drawWeapon(this.ctx, character.weapon);
+
+    if (flash > 0) {
+      this.ctx.globalCompositeOperation = 'source-atop';
+      this.ctx.fillStyle = `rgba(255,255,255,${flash})`;
+      this.ctx.fillRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
+    }
+    this.ctx.restore();
+
+    if (pulse > 0) {
+      this.ctx.save();
+      this.ctx.globalAlpha = pulse;
+      this.ctx.strokeStyle = '#e94560';
+      this.ctx.lineWidth = 3;
+      this.ctx.strokeRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
+      this.ctx.restore();
+    }
+  }
+
+  render(character: CharacterConfig): void {
+    this.lastChar = character;
+    if (this.pulseTimer <= 0) {
+      this.drawFrame(character, 0);
+    }
   }
 
   get size(): number {

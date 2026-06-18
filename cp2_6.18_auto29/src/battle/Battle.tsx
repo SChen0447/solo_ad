@@ -41,9 +41,21 @@ interface FloatingText {
   color: string;
 }
 
+interface DeathParticle {
+  id: number;
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  size: number;
+  color: string;
+  remaining: number;
+}
+
 const ENEMY_COLORS = ['#e74c3c', '#9b59b6', '#2ecc71', '#f39c12', '#3498db'];
 const WEAPON_EMOJI: Record<string, string> = { sword: '⚔️', bow: '🏹', staff: '🔮' };
 const SKILL_EMOJI: Record<string, string> = { fireball: '🔥', heal: '💚', blink: '⚡' };
+const WEAPON_ORDER: Array<'sword' | 'bow' | 'staff'> = ['sword', 'bow', 'staff'];
 
 export default function Battle() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -61,6 +73,7 @@ export default function Battle() {
     enemies: [] as EnemyExt[],
     orbs: [] as ProgressOrb[],
     floats: [] as FloatingText[],
+    particles: [] as DeathParticle[],
     bulletSystem: new BulletSystem(),
     lastSpawn: 0,
     elapsed: 0,
@@ -71,11 +84,13 @@ export default function Battle() {
     enemyIdCounter: 1,
     orbIdCounter: 1,
     floatIdCounter: 1,
+    particleIdCounter: 1,
     bossSpawned: false,
     bossDefeated: false,
     playerDied: false,
     gameEnded: false,
     fadeInT: 0,
+    weaponSwitchFlash: 0,
     character: character,
   });
 

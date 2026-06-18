@@ -33,6 +33,10 @@ export default function Editor() {
   const setGamePhase = useGameStore((s) => s.setGamePhase);
   const resetBattle = useGameStore((s) => s.resetBattle);
 
+  const pulse = () => {
+    if (editorCanvasRef.current) editorCanvasRef.current.triggerPulse();
+  };
+
   useEffect(() => {
     if (canvasRef.current && !editorCanvasRef.current) {
       editorCanvasRef.current = new EditorCanvas(canvasRef.current);
@@ -76,7 +80,7 @@ export default function Editor() {
                       key={c}
                       className={`editor-swatch ${character.head.hatColor === c ? 'editor-swatch-active' : ''}`}
                       style={{ background: c }}
-                      onClick={() => updateCharacter({ head: { ...character.head, hatColor: c } })}
+                      onClick={() => { pulse(); updateCharacter({ head: { ...character.head, hatColor: c } }); }}
                     />
                   ))}
                 </div>
@@ -86,7 +90,7 @@ export default function Editor() {
                 <select
                   className="editor-select"
                   value={character.head.hairStyle}
-                  onChange={(e) => updateCharacter({ head: { ...character.head, hairStyle: Number(e.target.value) } })}
+                  onChange={(e) => { pulse(); updateCharacter({ head: { ...character.head, hairStyle: Number(e.target.value) } }); }}
                 >
                   {HAIR_STYLES.map((s, i) => (
                     <option key={i} value={i}>{s}</option>
@@ -105,7 +109,7 @@ export default function Editor() {
                       key={c}
                       className={`editor-swatch ${character.body.shirtColor === c ? 'editor-swatch-active' : ''}`}
                       style={{ background: c }}
-                      onClick={() => updateCharacter({ body: { ...character.body, shirtColor: c } })}
+                      onClick={() => { pulse(); updateCharacter({ body: { ...character.body, shirtColor: c } }); }}
                     />
                   ))}
                 </div>
@@ -115,7 +119,7 @@ export default function Editor() {
                 <select
                   className="editor-select"
                   value={character.body.armorStyle}
-                  onChange={(e) => updateCharacter({ body: { ...character.body, armorStyle: Number(e.target.value) } })}
+                  onChange={(e) => { pulse(); updateCharacter({ body: { ...character.body, armorStyle: Number(e.target.value) } }); }}
                 >
                   {ARMOR_STYLES.map((s, i) => (
                     <option key={i} value={i}>{s}</option>
@@ -134,7 +138,7 @@ export default function Editor() {
                       key={c}
                       className={`editor-swatch ${character.legs.pantsColor === c ? 'editor-swatch-active' : ''}`}
                       style={{ background: c }}
-                      onClick={() => updateCharacter({ legs: { ...character.legs, pantsColor: c } })}
+                      onClick={() => { pulse(); updateCharacter({ legs: { ...character.legs, pantsColor: c } }); }}
                     />
                   ))}
                 </div>
@@ -144,7 +148,7 @@ export default function Editor() {
                 <select
                   className="editor-select"
                   value={character.legs.shoeStyle}
-                  onChange={(e) => updateCharacter({ legs: { ...character.legs, shoeStyle: Number(e.target.value) } })}
+                  onChange={(e) => { pulse(); updateCharacter({ legs: { ...character.legs, shoeStyle: Number(e.target.value) } }); }}
                 >
                   {SHOE_STYLES.map((s, i) => (
                     <option key={i} value={i}>{s}</option>
@@ -163,7 +167,7 @@ export default function Editor() {
                     <button
                       key={w}
                       className={`editor-bar-item ${active ? 'editor-bar-item-active' : ''}`}
-                      onClick={() => updateCharacter({ weapon: w })}
+                      onClick={() => { pulse(); updateCharacter({ weapon: w }); }}
                     >
                       <span className="editor-bar-icon">{info.emoji}</span>
                       <span className="editor-bar-name">{info.name}</span>
@@ -184,7 +188,7 @@ export default function Editor() {
                     <button
                       key={s}
                       className={`editor-bar-item ${active ? 'editor-bar-item-active' : ''}`}
-                      onClick={() => updateCharacter({ skill: s })}
+                      onClick={() => { pulse(); updateCharacter({ skill: s }); }}
                     >
                       <span className="editor-bar-icon">{info.emoji}</span>
                       <span className="editor-bar-name">{info.name}</span>
