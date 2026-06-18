@@ -1,0 +1,20 @@
+{
+  "name": "city-traffic-3d",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build"
+  },
+  "dependencies": {
+    "three": "^0.164.1",
+    "dat.gui": "^0.7.9",
+    "stats.js": "^0.17.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.5",
+    "vite": "^5.2.10",
+    "@types/three": "^0.164.0"
+  }
+}

@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>智慧城市 - 3D车流热力可视化</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #000000;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    }
+    #scene-container {
+      width: 100%;
+      height: 100%;
+      position: absolute;
+      top: 0;
+      left: 0;
+    }
+    #scene-container canvas {
+      display: block;
+    }
+    #tooltip {
+      position: absolute;
+      pointer-events: none;
+      display: none;
+      background: rgba(0,0,0,0.8);
+      color: #ffffff;
+      font-size: 12px;
+      padding: 6px 10px;
+      border-radius: 4px;
+      white-space: nowrap;
+      z-index: 100;
+      line-height: 1.5;
+    }
+    #control-panel {
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      width: 220px;
+      background: rgba(0,0,0,0.7);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      border: 1px solid rgba(255,255,255,0.15);
+      border-radius: 8px;
+      padding: 14px;
+      z-index: 50;
+      color: #ffffff;
+    }
+    #control-panel .panel-title {
+      font-size: 13px;
+      font-weight: 600;
+      margin-bottom: 10px;
+      color: rgba(255,255,255,0.9);
+      letter-spacing: 0.5px;
+    }
+    #control-panel label {
+      display: block;
+      font-size: 11px;
+      color: rgba(255,255,255,0.6);
+      margin-bottom: 4px;
+    }
+    #control-panel .slider-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    #control-panel input[type="range"] {
+      flex: 1;
+      -webkit-appearance: none;
+      appearance: none;
+      height: 4px;
+      background: rgba(255,255,255,0.2);
+      border-radius: 2px;
+      outline: none;
+    }
+    #control-panel input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: #ffffff;
+      cursor: pointer;
+    }
+    #control-panel .slider-value {
+      font-size: 12px;
+      color: #ffffff;
+      min-width: 36px;
+      text-align: right;
+    }
+    #fps-warning {
+      position: absolute;
+      bottom: 16px;
+      right: 16px;
+      display: none;
+      z-index: 60;
+    }
+    #fps-warning svg {
+      width: 32px;
+      height: 32px;
+      animation: pulse-warn 0.5s ease-in-out infinite alternate;
+    }
+    @keyframes pulse-warn {
+      0% { transform: scale(1); opacity: 0.8; }
+      100% { transform: scale(1.3); opacity: 1; }
+    }
+    #stats-panel {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      z-index: 50;
+    }
+    #stats-panel canvas {
+      display: block;
+    }
+  </style>
+</head>
+<body>
+  <div id="scene-container"></div>
+  <div id="tooltip"></div>
+  <div id="control-panel">
+    <div class="panel-title">🚦 车流仿真控制</div>
+    <label>速度倍率</label>
+    <div class="slider-row">
+      <input type="range" id="speed-slider" min="0.5" max="3" step="0.1" value="1">
+      <span class="slider-value" id="speed-value">1.0x</span>
+    </div>
+  </div>
+  <div id="fps-warning">
+    <svg viewBox="0 0 24 24" fill="none">
+      <path d="M12 2L1 21h22L12 2z" fill="#ef4444" stroke="#ef4444" stroke-width="1"/>
+      <text x="12" y="17" text-anchor="middle" fill="#fff" font-size="10" font-weight="bold">!</text>
+    </svg>
+  </div>
+  <div id="stats-panel"></div>
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
