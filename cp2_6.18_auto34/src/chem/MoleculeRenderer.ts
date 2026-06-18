@@ -167,21 +167,41 @@ export class MoleculeRenderer {
 
     this.isTransitioning = true
 
+    const oldCenter = this.getMoleculeCenter()
+
     if (this.molecule) {
       await this.fadeOutCurrent()
     }
 
     this.clearMolecule()
     this.molecule = molecule
-    this.createMoleculeMeshes(molecule)
-    this.createLabels(molecule)
-    this.createAngleAnnotations(molecule)
+
+    const newCenter = this.calculateMoleculeCenter(molecule)
+    const offset = oldCenter.clone().sub(newCenter)
+
+    this.createMoleculeMeshes(molecule, offset)
+    this.createLabels(molecule, offset)
+    this.createAngleAnnotations(molecule, offset)
     this.updateLabelsVisibility(this.settings.showLabels)
     this.updateAnglesVisibility(this.settings.showAngles)
     this.setAllOpacity(0)
 
     await this.fadeInNew()
     this.isTransitioning = false
+  }
+
+  private calculateMoleculeCenter(molecule: Molecule): THREE.Vector3 {
+    if (molecule.atoms.length === 0) {
+      return new THREE.Vector3(0, 0, 0)
+    }
+
+    const center = new THREE.Vector3()
+    molecule.atoms.forEach((atom) => {
+      center.add(atom.position)
+    })
+    center.divideScalar(molecule.atoms.length)
+
+    return center
   }
 
   private async fadeOutCurrent(): Promise<void> {
@@ -222,7 +242,9 @@ export class MoleculeRenderer {
         if (progress < 1) {
           requestAnimationFrame(animate)
         } else {
-          this.resetGlowOpacity()
+          this.hoverGlow.visible = false
+          const material = this.hoverGlow.material as THREE.MeshBasicMaterial
+          material.opacity = 0
           resolve()
         }
       }
@@ -238,8 +260,6 @@ export class MoleculeRenderer {
     this.atomMeshes.forEach((data) => {
       data.material.opacity = opacity
       data.material.transparent = opacity < 1
-      data.glowMaterial.opacity = opacity * 0.5
-      data.glowMaterial.transparent = true
     })
 
     this.bondMeshes.forEach((data) => {
@@ -262,12 +282,25 @@ export class MoleculeRenderer {
         element.style.opacity = String(opacity)
       }
     })
+
+    if (this.hoverGlow) {
+      const material = this.hoverGlow.material as THREE.MeshBasicMaterial
+      material.opacity = opacity > 0 ? 0 : 0
+    }
   }
 
-  private resetGlowOpacity(): void {
-    this.atomMeshes.forEach((data) => {
-      data.glowMaterial.opacity = 0
+  private getMoleculeCenter(): THREE.Vector3 {
+    if (!this.molecule || this.molecule.atoms.length === 0) {
+      return new THREE.Vector3(0, 0, 0)
+    }
+
+    const center = new THREE.Vector3()
+    this.molecule.atoms.forEach((atom) => {
+      center.add(atom.position)
     })
+    center.divideScalar(this.molecule.atoms.length)
+
+    return center
   }
 
   private clearMolecule(): void {
@@ -304,7 +337,7 @@ export class MoleculeRenderer {
     this.molecule = null
   }
 
-  private createMoleculeMeshes(molecule: Molecule): void {
+  private createMoleculeMeshes(molecule: Molecule, offset: THREE.Vector3): void {
     const atomsByElement = new Map<string, { atom: Atom; originalIndex: number }[]>()
 
     molecule.atoms.forEach((atom, index) => {
@@ -335,7 +368,7 @@ export class MoleculeRenderer {
       const indices = new Map<number, number>()
 
       atomsData.forEach(({ atom, originalIndex }, i) => {
-        dummy.position.copy(atom.position)
+        dummy.position.copy(atom.position).add(offset)
         dummy.scale.setScalar(atom.radius)
         dummy.updateMatrix()
         instancedMesh.setMatrixAt(i, dummy.matrix)
@@ -383,10 +416,12 @@ export class MoleculeRenderer {
       bonds.forEach((bond, i) => {
         const atom1 = molecule.atoms[bond.atomIndex1]
         const atom2 = molecule.atoms[bond.atomIndex2]
+        const pos1 = atom1.position.clone().add(offset)
+        const pos2 = atom2.position.clone().add(offset)
         this.setupBondTransform(
           dummy,
-          atom1.position,
-          atom2.position,
+          pos1,
+          pos2,
           atom1.radius,
           atom2.radius
         )
@@ -428,7 +463,7 @@ export class MoleculeRenderer {
     dummy.updateMatrix()
   }
 
-  private createLabels(molecule: Molecule): void {
+  private createLabels(molecule: Molecule, offset: THREE.Vector3): void {
     molecule.atoms.forEach((atom) => {
       const div = document.createElement('div')
       div.className = 'atom-label'
@@ -442,14 +477,14 @@ export class MoleculeRenderer {
       div.style.userSelect = 'none'
 
       const label = new CSS2DObject(div)
-      label.position.copy(atom.position)
+      label.position.copy(atom.position).add(offset)
       label.position.y += atom.radius + 0.2
       this.labelsGroup.add(label)
       this.labelObjects.push(label)
     })
   }
 
-  private createAngleAnnotations(molecule: Molecule): void {
+  private createAngleAnnotations(molecule: Molecule, offset: THREE.Vector3): void {
     const angles = molecule.getBondAngles()
 
     angles.forEach((angleData) => {
@@ -457,53 +492,113 @@ export class MoleculeRenderer {
       const atom1 = molecule.atoms[angleData.atomIndex1]
       const atom2 = molecule.atoms[angleData.atomIndex2]
 
-      const v1 = atom1.position.clone().sub(centerAtom.position).normalize()
-      const v2 = atom2.position.clone().sub(centerAtom.position).normalize()
+      const centerPos = centerAtom.position.clone().add(offset)
+      const pos1 = atom1.position.clone().add(offset)
+      const pos2 = atom2.position.clone().add(offset)
 
-      const arcRadius = Math.min(centerAtom.radius * 2, 0.8)
-      const segments = 20
+      const v1 = pos1.clone().sub(centerPos).normalize()
+      const v2 = pos2.clone().sub(centerPos).normalize()
+
+      const angleRad = Math.acos(Math.max(-1, Math.min(1, v1.dot(v2))))
+      const arcRadius = Math.min(centerAtom.radius * 2.5, 1.0)
+      const segments = Math.max(12, Math.floor(angleRad * 10))
+
+      const up = new THREE.Vector3(0, 1, 0)
+      if (Math.abs(v1.dot(up)) > 0.9) {
+        up.set(0, 0, 1)
+      }
+      const normal = new THREE.Vector3().crossVectors(v1, v2).normalize()
+      if (normal.lengthSq() < 0.001) {
+        normal.crossVectors(v1, up).normalize()
+      }
+
       const points: THREE.Vector3[] = []
-
       for (let i = 0; i <= segments; i++) {
         const t = i / segments
-        const interpolated = v1.clone().lerp(v2, t).normalize()
-        points.push(
-          centerAtom.position.clone().add(interpolated.multiplyScalar(arcRadius))
-        )
+        const angle = angleRad * t
+        const rotated = v1.clone()
+          .applyAxisAngle(normal, angle)
+          .multiplyScalar(arcRadius)
+        points.push(centerPos.clone().add(rotated))
       }
 
       const geometry = new THREE.BufferGeometry().setFromPoints(points)
       const material = new THREE.LineDashedMaterial({
         color: 0x888888,
-        dashSize: 0.1,
-        gapSize: 0.05,
+        dashSize: 0.08,
+        gapSize: 0.06,
         transparent: true,
-        opacity: 0.8
+        opacity: 0.8,
+        linewidth: 2
       })
 
-      const line = new THREE.Line(geometry, material)
-      line.computeLineDistances()
-      this.anglesGroup.add(line)
-      this.angleObjects.push(line)
+      const arc = new THREE.Line(geometry, material)
+      arc.computeLineDistances()
+      this.anglesGroup.add(arc)
+      this.angleObjects.push(arc)
 
-      const midVector = v1.clone().add(v2).normalize()
-      const labelPos = centerAtom.position.clone().add(midVector.multiplyScalar(arcRadius + 0.3))
+      this.createArrow(centerPos.clone().add(v1.clone().multiplyScalar(arcRadius * 0.9)), v1.clone(), normal)
+      this.createArrow(centerPos.clone().add(v2.clone().multiplyScalar(arcRadius * 0.9)), v2.clone().negate(), normal)
+
+      const midAngle = angleRad / 2
+      const midDir = v1.clone().applyAxisAngle(normal, midAngle).normalize()
+      const labelPos = centerPos.clone().add(midDir.multiplyScalar(arcRadius + 0.35))
 
       const div = document.createElement('div')
       div.className = 'angle-label'
       div.textContent = `${angleData.angle.toFixed(1)}°`
-      div.style.color = '#aaaaaa'
-      div.style.fontSize = '12px'
+      div.style.color = '#4fc3f7'
+      div.style.fontSize = '13px'
       div.style.fontFamily = 'sans-serif'
-      div.style.textShadow = '1px 1px 2px #000000'
+      div.style.fontWeight = '600'
+      div.style.textShadow = '1px 1px 3px #000000, -1px -1px 2px #000000'
       div.style.pointerEvents = 'none'
       div.style.userSelect = 'none'
+      div.style.padding = '2px 6px'
+      div.style.background = 'rgba(0, 0, 0, 0.5)'
+      div.style.borderRadius = '4px'
 
       const label = new CSS2DObject(div)
       label.position.copy(labelPos)
       this.anglesGroup.add(label)
       this.angleObjects.push(label)
     })
+  }
+
+  private createArrow(pos: THREE.Vector3, dir: THREE.Vector3, normal: THREE.Vector3): void {
+    const arrowLength = 0.12
+    const arrowWidth = 0.06
+
+    const dirNorm = dir.clone().normalize()
+    const perp = new THREE.Vector3().crossVectors(dirNorm, normal).normalize()
+
+    const tip = pos.clone().add(dirNorm.clone().multiplyScalar(arrowLength))
+    const base = pos.clone()
+    const left = base.clone().add(perp.clone().multiplyScalar(arrowWidth / 2))
+    const right = base.clone().add(perp.clone().multiplyScalar(-arrowWidth / 2))
+
+    const shape = new THREE.Shape()
+    shape.moveTo(tip.x, tip.y)
+    shape.lineTo(left.x, left.y)
+    shape.lineTo(right.x, right.y)
+    shape.lineTo(tip.x, tip.y)
+
+    const geometry = new THREE.ShapeGeometry(shape)
+    const material = new THREE.MeshBasicMaterial({
+      color: 0x888888,
+      transparent: true,
+      opacity: 0.8,
+      side: THREE.DoubleSide
+    })
+
+    const arrow = new THREE.Mesh(geometry, material)
+    arrow.position.set(0, 0, pos.z)
+
+    const planeNormal = normal.clone()
+    arrow.lookAt(arrow.position.clone().add(planeNormal))
+
+    this.anglesGroup.add(arrow)
+    this.angleObjects.push(arrow)
   }
 
   updateLabelsVisibility(show: boolean): void {
