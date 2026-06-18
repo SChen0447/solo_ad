@@ -1,0 +1,293 @@
+.container {
+  background: var(--bg-card);
+  border-radius: 16px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.title {
+  margin: 0 0 4px 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.sectionLabel {
+  font-size: 13px;
+  color: #a0a0b8;
+  font-weight: 500;
+}
+
+.stopsList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.stopItem {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  transition: border-color 0.2s ease-out, transform 0.15s ease-out;
+}
+
+.stopItem:hover {
+  border-color: var(--accent);
+}
+
+.stopItem.dragging {
+  opacity: 0.5;
+  transform: scale(0.98);
+}
+
+.stopItem.dragOver {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.25);
+}
+
+.dragHandle {
+  cursor: grab;
+  color: #808098;
+  display: flex;
+  align-items: center;
+  padding: 4px;
+  border-radius: 6px;
+  transition: color 0.2s ease-out, background 0.2s ease-out;
+  user-select: none;
+}
+
+.dragHandle:hover {
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.dragHandle:active {
+  cursor: grabbing;
+}
+
+.colorInput {
+  flex-shrink: 0;
+}
+
+.stopPosition {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.stopPosition input[type='range'] {
+  flex: 1;
+}
+
+.positionValue {
+  font-size: 12px;
+  color: #a0a0b8;
+  min-width: 36px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.removeBtn {
+  background: none;
+  border: 1px solid var(--border);
+  color: #ff6b8a;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease-out;
+  padding: 0;
+}
+
+.removeBtn:hover {
+  background: #ff6b8a;
+  color: #fff;
+  border-color: #ff6b8a;
+}
+
+.removeBtn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.addBtn {
+  background: var(--bg-input);
+  border: 1px dashed var(--border);
+  color: var(--text);
+  padding: 10px;
+  border-radius: 10px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-size: 13px;
+  transition: all 0.2s ease-out;
+}
+
+.addBtn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: rgba(59, 130, 246, 0.08);
+}
+
+.addBtn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.typeSwitch {
+  display: inline-flex;
+  background: var(--bg-input);
+  border-radius: 10px;
+  padding: 4px;
+  gap: 4px;
+  border: 1px solid var(--border);
+}
+
+.typeBtn {
+  background: none;
+  border: none;
+  color: #a0a0b8;
+  padding: 8px 18px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  transition: all 0.2s ease-out;
+}
+
+.typeBtn.active {
+  background: var(--accent);
+  color: #fff;
+  box-shadow: 0 2px 6px rgba(59, 130, 246, 0.4);
+}
+
+.typeBtn:not(.active):hover {
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.angleControl {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+}
+
+.angleDialWrapper {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.angleDial {
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  background: conic-gradient(
+    from 0deg,
+    #ff7e5f,
+    #feb47b,
+    #86e3ce,
+    #00b4db,
+    #a18cd1,
+    #fbc2eb,
+    #ff6a88,
+    #ff7e5f
+  );
+  position: relative;
+  cursor: grab;
+  box-shadow: 0 0 0 4px var(--bg-input), 0 0 0 5px var(--border),
+    0 8px 24px rgba(0, 0, 0, 0.35);
+  transition: box-shadow 0.2s ease-out;
+}
+
+.angleDial:active {
+  cursor: grabbing;
+}
+
+.angleDialInner {
+  position: absolute;
+  inset: 14px;
+  border-radius: 50%;
+  background: var(--bg-card);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.arrowIndicator {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: 0;
+  height: 0;
+  margin-left: -6px;
+  margin-top: -2px;
+  border-left: 6px solid transparent;
+  border-right: 6px solid transparent;
+  border-top: 10px solid #fff;
+  filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.5));
+  transform-origin: 6px 62px;
+}
+
+.angleValue {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+.angleUnit {
+  font-size: 11px;
+  color: #a0a0b8;
+  margin-top: 2px;
+}
+
+.anglePresets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  flex: 1;
+}
+
+.presetBtn {
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 8px 14px;
+  border-radius: 8px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s ease-out;
+}
+
+.presetBtn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.presetBtn.active {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}

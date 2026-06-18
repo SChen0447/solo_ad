@@ -1,0 +1,170 @@
+.previewContainer {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.previewWrapper {
+  width: 600px;
+  height: 400px;
+  border-radius: 16px;
+  overflow: hidden;
+  position: relative;
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
+  will-change: background-image;
+}
+
+.previewCanvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  will-change: background-position, background-image;
+}
+
+.previewLabel {
+  position: absolute;
+  top: 14px;
+  left: 16px;
+  background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(8px);
+  padding: 6px 14px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #fff;
+  letter-spacing: 0.3px;
+}
+
+.controlsRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.playBtn {
+  position: relative;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  border: none;
+  background: var(--accent);
+  color: #fff;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 16px rgba(59, 130, 246, 0.4);
+  transition: all 0.3s ease-out;
+  padding: 0;
+  overflow: hidden;
+}
+
+.playBtn:hover {
+  background: var(--accent-hover);
+  transform: scale(1.06);
+  box-shadow: 0 6px 20px rgba(59, 130, 246, 0.55);
+}
+
+.playBtn:active {
+  transform: scale(0.98);
+}
+
+.iconWrapper {
+  position: relative;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.iconBase {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: opacity 0.3s ease-out, transform 0.3s ease-out;
+}
+
+.iconHidden {
+  opacity: 0;
+  transform: scale(0.7);
+  pointer-events: none;
+}
+
+.iconVisible {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.pauseIcon {
+  display: flex;
+  gap: 5px;
+  align-items: center;
+  justify-content: center;
+}
+
+.pauseBar {
+  width: 5px;
+  height: 18px;
+  background: #fff;
+  border-radius: 2px;
+}
+
+.stopBtn {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: var(--bg-input);
+  color: var(--text);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease-out;
+  padding: 0;
+}
+
+.stopBtn:hover {
+  background: #4a4a5e;
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.stopBtn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.progressTrack {
+  flex: 1;
+  height: 6px;
+  background: var(--bg-input);
+  border-radius: 3px;
+  overflow: hidden;
+  position: relative;
+  border: 1px solid var(--border);
+}
+
+.progressFill {
+  height: 100%;
+  background: linear-gradient(90deg, #3b82f6, #8b5cf6);
+  border-radius: 3px;
+  transition: width 0.08s linear;
+}
+
+.speedBadge {
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: #a0a0b8;
+  padding: 4px 10px;
+  background: var(--bg-input);
+  border-radius: 6px;
+  border: 1px solid var(--border);
+}
