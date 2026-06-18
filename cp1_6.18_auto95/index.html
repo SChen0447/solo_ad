@@ -1,0 +1,584 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>粒子生命沙盘 | Particle Life Sandbox</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Noto+Sans+SC:wght@400;500;700&display=swap" rel="stylesheet" />
+  <style>
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html,
+    body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #0a0a1a;
+      font-family: 'Noto Sans SC', 'JetBrains Mono', system-ui, sans-serif;
+      color: #e5e7eb;
+      -webkit-font-smoothing: antialiased;
+      user-select: none;
+    }
+
+    #game-app {
+      position: relative;
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    #game-canvas {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      display: block;
+      background: #0a0a1a;
+      cursor: crosshair;
+    }
+
+    /* ===== 背景装饰 ===== */
+    #game-app::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background:
+        radial-gradient(ellipse 60% 40% at 20% 10%, rgba(0, 212, 255, 0.06), transparent 70%),
+        radial-gradient(ellipse 50% 50% at 80% 90%, rgba(168, 85, 247, 0.05), transparent 70%),
+        repeating-linear-gradient(0deg, transparent 0, transparent 49px, rgba(255, 255, 255, 0.02) 49px, rgba(255, 255, 255, 0.02) 50px),
+        repeating-linear-gradient(90deg, transparent 0, transparent 49px, rgba(255, 255, 255, 0.02) 49px, rgba(255, 255, 255, 0.02) 50px);
+      pointer-events: none;
+      z-index: 1;
+    }
+
+    /* ===== 顶部工具栏 ===== */
+    #toolbar {
+      position: fixed;
+      top: 16px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 14px;
+      background: rgba(255, 255, 255, 0.08);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 14px;
+      z-index: 100;
+      transition: all 0.3s ease-out;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
+    }
+
+    .toolbar-divider {
+      width: 1px;
+      height: 28px;
+      background: rgba(255, 255, 255, 0.12);
+      margin: 0 4px;
+    }
+
+    .type-btn {
+      position: relative;
+      width: 32px;
+      height: 32px;
+      border: 2px solid transparent;
+      border-radius: 50%;
+      cursor: pointer;
+      transition: all 0.3s ease-out;
+      padding: 0;
+      outline: none;
+    }
+
+    .type-btn:hover {
+      transform: scale(1.15) translateY(-1px);
+      box-shadow: 0 0 16px currentColor;
+    }
+
+    .type-btn.active {
+      transform: scale(1.18);
+      border-color: #fff;
+      box-shadow: 0 0 20px currentColor, 0 0 40px currentColor;
+    }
+
+    .type-btn[data-type='red'] { background: #ff4d4d; color: #ff4d4d; }
+    .type-btn[data-type='blue'] { background: #4d79ff; color: #4d79ff; }
+    .type-btn[data-type='green'] { background: #4dff88; color: #4dff88; }
+    .type-btn[data-type='yellow'] { background: #ffdd4d; color: #ffdd4d; }
+    .type-btn[data-type='purple'] { background: #c84dff; color: #c84dff; }
+    .type-btn[data-type='cyan'] { background: #4dffff; color: #4dffff; }
+
+    .action-btn {
+      position: relative;
+      padding: 7px 12px;
+      font-size: 13px;
+      font-weight: 500;
+      font-family: inherit;
+      background: rgba(0, 212, 255, 0.12);
+      color: #00d4ff;
+      border: 1px solid rgba(0, 212, 255, 0.35);
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.3s ease-out;
+      white-space: nowrap;
+      backdrop-filter: blur(4px);
+    }
+
+    .action-btn:hover {
+      background: rgba(168, 85, 247, 0.18);
+      color: #a855f7;
+      border-color: rgba(168, 85, 247, 0.6);
+      box-shadow: 0 0 16px rgba(168, 85, 247, 0.35);
+      transform: translateY(-1px);
+    }
+
+    .action-btn:active { transform: translateY(0); }
+
+    .action-btn.btn-danger:hover {
+      background: rgba(255, 77, 77, 0.18);
+      color: #ff6b6b;
+      border-color: rgba(255, 77, 77, 0.6);
+      box-shadow: 0 0 16px rgba(255, 77, 77, 0.35);
+    }
+
+    /* ===== 统计面板 ===== */
+    #stats-panel {
+      position: fixed;
+      top: 16px;
+      left: 16px;
+      padding: 12px 16px;
+      background: rgba(255, 255, 255, 0.06);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 12px;
+      z-index: 100;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12.5px;
+      line-height: 1.8;
+      min-width: 180px;
+      transition: all 0.3s ease-out;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
+    }
+
+    #stats-panel .stat-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+    }
+
+    #stats-panel .stat-label {
+      color: rgba(255, 255, 255, 0.6);
+      font-weight: 400;
+    }
+
+    #stats-panel .stat-value {
+      color: #00d4ff;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+    }
+
+    #stats-panel .perf-mode-tag {
+      display: inline-block;
+      margin-top: 6px;
+      padding: 2px 8px;
+      font-size: 10.5px;
+      font-weight: 700;
+      background: rgba(255, 221, 77, 0.15);
+      color: #ffdd4d;
+      border-radius: 20px;
+      letter-spacing: 0.3px;
+    }
+
+    #stats-panel .fps-warn-tag {
+      display: inline-block;
+      margin-top: 4px;
+      margin-left: 6px;
+      padding: 2px 8px;
+      font-size: 10.5px;
+      font-weight: 700;
+      background: rgba(255, 77, 77, 0.2);
+      color: #ff6b6b;
+      border-radius: 20px;
+      animation: pulse-warn 1.2s ease-in-out infinite;
+    }
+
+    @keyframes pulse-warn {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(255, 77, 77, 0.5); }
+      50% { box-shadow: 0 0 0 6px rgba(255, 77, 77, 0); }
+    }
+
+    /* ===== 规则面板 ===== */
+    #rule-panel {
+      position: fixed;
+      top: 50%;
+      right: 16px;
+      transform: translateY(-50%);
+      z-index: 100;
+      display: flex;
+      align-items: flex-start;
+      transition: all 0.3s ease-out;
+    }
+
+    #rule-panel.collapsed .rule-panel-body { transform: translateX(calc(100% + 24px)); opacity: 0; pointer-events: none; }
+    #rule-panel.collapsed .rule-toggle-btn { transform: rotate(180deg); }
+
+    .rule-toggle-btn {
+      flex-shrink: 0;
+      width: 28px;
+      height: 56px;
+      margin-top: 12px;
+      margin-right: -1px;
+      background: rgba(255, 255, 255, 0.08);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-right: none;
+      border-radius: 10px 0 0 10px;
+      color: #00d4ff;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+      font-weight: 700;
+      z-index: 2;
+      transition: all 0.3s ease-out;
+    }
+
+    .rule-toggle-btn:hover {
+      background: rgba(168, 85, 247, 0.2);
+      color: #a855f7;
+    }
+
+    .rule-panel-body {
+      width: 300px;
+      padding: 16px;
+      background: rgba(255, 255, 255, 0.06);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 14px;
+      box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4);
+      transition: all 0.3s ease-out;
+    }
+
+    .rule-panel-title {
+      font-size: 14px;
+      font-weight: 700;
+      color: #fff;
+      margin-bottom: 4px;
+      letter-spacing: 0.3px;
+    }
+
+    .rule-panel-hint {
+      font-size: 11px;
+      color: rgba(255, 255, 255, 0.45);
+      margin-bottom: 14px;
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .rule-grid {
+      display: grid;
+      grid-template-columns: 44px repeat(6, 1fr);
+      grid-template-rows: 30px repeat(6, 40px);
+      gap: 4px;
+    }
+
+    .rule-corner { grid-area: 1 / 1 / 2 / 2; }
+
+    .rule-header-col {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .rule-header-col .dot {
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      box-shadow: 0 0 8px currentColor;
+    }
+
+    .rule-header-row {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .rule-header-row .dot {
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      box-shadow: 0 0 8px currentColor;
+    }
+
+    .rule-label {
+      font-size: 9.5px;
+      color: rgba(255, 255, 255, 0.4);
+      text-align: center;
+      padding-top: 10px;
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .rule-cell select {
+      width: 100%;
+      height: 100%;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10.5px;
+      padding: 2px 4px;
+      background: rgba(0, 212, 255, 0.08);
+      color: #e5e7eb;
+      border: 1px solid rgba(0, 212, 255, 0.25);
+      border-radius: 6px;
+      cursor: pointer;
+      outline: none;
+      transition: all 0.3s ease-out;
+      appearance: none;
+      -webkit-appearance: none;
+      text-align: center;
+      text-align-last: center;
+    }
+
+    .rule-cell select:hover,
+    .rule-cell select:focus {
+      background: rgba(168, 85, 247, 0.15);
+      border-color: rgba(168, 85, 247, 0.6);
+      color: #fff;
+      box-shadow: 0 0 10px rgba(168, 85, 247, 0.3);
+    }
+
+    .rule-cell select option {
+      background: #14142b;
+      color: #e5e7eb;
+      font-size: 12px;
+    }
+
+    .rule-direction {
+      margin-top: 10px;
+      padding: 6px 10px;
+      font-size: 10.5px;
+      color: rgba(255, 255, 255, 0.5);
+      background: rgba(255, 255, 255, 0.04);
+      border-radius: 6px;
+      font-family: 'JetBrains Mono', monospace;
+      text-align: center;
+    }
+
+    .rule-direction span { color: #00d4ff; font-weight: 600; }
+
+    /* ===== 加载遮罩 ===== */
+    #load-modal {
+      position: fixed;
+      inset: 0;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      background: rgba(10, 10, 26, 0.75);
+      backdrop-filter: blur(6px);
+      z-index: 1000;
+      animation: fadeIn 0.2s ease-out;
+    }
+
+    #load-modal.visible { display: flex; }
+
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+    .modal-box {
+      width: 520px;
+      max-width: calc(100vw - 40px);
+      padding: 24px;
+      background: rgba(20, 20, 43, 0.95);
+      border: 1px solid rgba(0, 212, 255, 0.3);
+      border-radius: 16px;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6), 0 0 30px rgba(0, 212, 255, 0.12);
+      animation: modalIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    @keyframes modalIn {
+      from { opacity: 0; transform: translateY(12px) scale(0.96); }
+      to { opacity: 1; transform: translateY(0) scale(1); }
+    }
+
+    .modal-title {
+      font-size: 16px;
+      font-weight: 700;
+      color: #fff;
+      margin-bottom: 6px;
+    }
+
+    .modal-desc {
+      font-size: 12px;
+      color: rgba(255, 255, 255, 0.5);
+      margin-bottom: 14px;
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .modal-textarea {
+      width: 100%;
+      min-height: 160px;
+      padding: 12px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      line-height: 1.5;
+      background: rgba(0, 0, 0, 0.3);
+      color: #e5e7eb;
+      border: 1px solid rgba(0, 212, 255, 0.25);
+      border-radius: 10px;
+      resize: vertical;
+      outline: none;
+      transition: all 0.3s ease-out;
+    }
+
+    .modal-textarea:focus {
+      border-color: rgba(168, 85, 247, 0.6);
+      box-shadow: 0 0 16px rgba(168, 85, 247, 0.2);
+    }
+
+    .modal-actions {
+      margin-top: 16px;
+      display: flex;
+      gap: 10px;
+      justify-content: flex-end;
+    }
+
+    .toast {
+      position: fixed;
+      bottom: 32px;
+      left: 50%;
+      transform: translateX(-50%) translateY(20px);
+      padding: 10px 20px;
+      background: rgba(0, 212, 255, 0.18);
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(0, 212, 255, 0.45);
+      border-radius: 30px;
+      color: #00d4ff;
+      font-size: 13px;
+      font-weight: 500;
+      z-index: 2000;
+      opacity: 0;
+      pointer-events: none;
+      transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+    }
+
+    .toast.visible {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+
+    .toast.error {
+      background: rgba(255, 77, 77, 0.18);
+      border-color: rgba(255, 77, 77, 0.5);
+      color: #ff8a8a;
+    }
+
+    /* ===== 响应式 ===== */
+    @media (max-width: 768px) {
+      #toolbar {
+        top: auto;
+        bottom: 12px;
+        left: 50%;
+        width: calc(100vw - 24px);
+        max-width: 100%;
+        padding: 8px 10px;
+        gap: 6px;
+        overflow-x: auto;
+        border-radius: 14px;
+        flex-wrap: nowrap;
+        justify-content: flex-start;
+      }
+      #toolbar::-webkit-scrollbar { display: none; }
+      .action-btn { padding: 6px 10px; font-size: 12px; }
+      .type-btn { width: 28px; height: 28px; flex-shrink: 0; }
+      #stats-panel {
+        top: 12px;
+        left: 12px;
+        padding: 10px 12px;
+        min-width: 150px;
+        font-size: 11.5px;
+      }
+      #rule-panel { top: 80px; right: 8px; transform: none; }
+      .rule-panel-body { width: 270px; padding: 12px; }
+      .rule-direction { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <div id="game-app">
+    <canvas id="game-canvas"></canvas>
+
+    <!-- 统计面板 -->
+    <div id="stats-panel" aria-live="polite">
+      <div class="stat-row">
+        <span class="stat-label">粒子</span>
+        <span class="stat-value" id="stat-count">0</span>
+      </div>
+      <div class="stat-row">
+        <span class="stat-label">帧率</span>
+        <span class="stat-value" id="stat-fps">0 FPS</span>
+      </div>
+      <div class="stat-row">
+        <span class="stat-label">速度</span>
+        <span class="stat-value" id="stat-speed">0.00 px/f</span>
+      </div>
+      <div id="stat-tags"></div>
+    </div>
+
+    <!-- 顶部工具栏 -->
+    <div id="toolbar" role="toolbar">
+      <button class="type-btn active" data-type="red" title="红色粒子"></button>
+      <button class="type-btn" data-type="blue" title="蓝色粒子"></button>
+      <button class="type-btn" data-type="green" title="绿色粒子"></button>
+      <button class="type-btn" data-type="yellow" title="黄色粒子"></button>
+      <button class="type-btn" data-type="purple" title="紫色粒子"></button>
+      <button class="type-btn" data-type="cyan" title="青色粒子 (默认：跟随者)"></button>
+      <span class="toolbar-divider"></span>
+      <button class="action-btn btn-danger" id="btn-clear" title="清除所有粒子 (C)">清除 (C)</button>
+      <button class="action-btn" id="btn-reset" title="重置规则 (R)">重置规则 (R)</button>
+      <span class="toolbar-divider"></span>
+      <button class="action-btn" id="btn-save" title="保存配置到剪贴板">保存配置</button>
+      <button class="action-btn" id="btn-load" title="从剪贴板加载配置">加载配置</button>
+    </div>
+
+    <!-- 规则面板 -->
+    <div id="rule-panel">
+      <button class="rule-toggle-btn" id="rule-toggle" title="折叠/展开规则面板">‹</button>
+      <div class="rule-panel-body">
+        <div class="rule-panel-title">行为规则矩阵</div>
+        <div class="rule-panel-hint">主体 → 对目标的作用力</div>
+        <div class="rule-grid" id="rule-grid"></div>
+        <div class="rule-direction">
+          行：<span>主体类型</span> ｜ 列：<span>目标类型</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 加载配置弹窗 -->
+    <div id="load-modal" role="dialog" aria-modal="true">
+      <div class="modal-box">
+        <div class="modal-title">加载场景配置</div>
+        <div class="modal-desc">粘贴保存的 JSON 配置字符串，然后点击确定恢复场景</div>
+        <textarea class="modal-textarea" id="load-textarea" spellcheck="false" placeholder='{"version":1,"rules":[...],"particles":[...]}'></textarea>
+        <div class="modal-actions">
+          <button class="action-btn" id="load-cancel">取消</button>
+          <button class="action-btn" id="load-confirm">确定加载</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="toast" id="toast"></div>
+  </div>
+
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
