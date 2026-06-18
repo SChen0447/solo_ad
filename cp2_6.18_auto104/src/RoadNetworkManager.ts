@@ -33,6 +33,11 @@ export class RoadNetworkManager {
 
   private raycastMeshes: THREE.Mesh[] = [];
 
+  private roadTexture!: THREE.CanvasTexture;
+  private intersectionTexture!: THREE.CanvasTexture;
+  private roadEmissiveTexture!: THREE.CanvasTexture;
+  private intersectionEmissiveTexture!: THREE.CanvasTexture;
+
   constructor(scene: THREE.Scene) {
     this.scene = scene;
 
@@ -52,6 +57,8 @@ export class RoadNetworkManager {
   }
 
   init(): void {
+    this.generateTextures();
+
     this.buildRoadNetwork();
     this.buildIntersections();
     this.buildGlowEffects();
@@ -68,6 +75,213 @@ export class RoadNetworkManager {
 
     this.lowDetailGroup.visible = false;
     this.pathLineGroup.visible = false;
+  }
+
+  private generateTextures(): void {
+    this.roadTexture = this.createRoadTexture();
+    this.roadEmissiveTexture = this.createRoadEmissiveTexture();
+    this.intersectionTexture = this.createIntersectionTexture();
+    this.intersectionEmissiveTexture = this.createIntersectionEmissiveTexture();
+  }
+
+  private createRoadTexture(): THREE.CanvasTexture {
+    const canvasW = 640;
+    const canvasH = 128;
+    const canvas = document.createElement('canvas');
+    canvas.width = canvasW;
+    canvas.height = canvasH;
+    const ctx = canvas.getContext('2d')!;
+
+    ctx.fillStyle = '#3a3a3a';
+    ctx.fillRect(0, 0, canvasW, canvasH);
+
+    this.paintAsphaltNoise(ctx, canvasW, canvasH);
+
+    const edgeLineX = 6;
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.7)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(0, edgeLineX);
+    ctx.lineTo(canvasW, edgeLineX);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(0, canvasH - edgeLineX);
+    ctx.lineTo(canvasW, canvasH - edgeLineX);
+    ctx.stroke();
+
+    const curbWidth = 3;
+    ctx.fillStyle = 'rgba(180, 180, 180, 0.4)';
+    ctx.fillRect(0, 0, canvasW, 3);
+    ctx.fillRect(0, canvasH - 3, canvasW, 3);
+
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
+    ctx.lineWidth = 2;
+    ctx.setLineDash([20, 14]);
+    ctx.beginPath();
+    ctx.moveTo(0, canvasH / 2);
+    ctx.lineTo(canvasW, canvasH / 2);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.wrapS = THREE.RepeatWrapping;
+    texture.wrapT = THREE.ClampToEdgeWrapping;
+    texture.needsUpdate = true;
+    return texture;
+  }
+
+  private createRoadEmissiveTexture(): THREE.CanvasTexture {
+    const canvasW = 640;
+    const canvasH = 128;
+    const canvas = document.createElement('canvas');
+    canvas.width = canvasW;
+    canvas.height = canvasH;
+    const ctx = canvas.getContext('2d')!;
+
+    ctx.fillStyle = '#000000';
+    ctx.fillRect(0, 0, canvasW, canvasH);
+
+    const edgeLineX = 6;
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(0, edgeLineX);
+    ctx.lineTo(canvasW, edgeLineX);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(0, canvasH - edgeLineX);
+    ctx.lineTo(canvasW, canvasH - edgeLineX);
+    ctx.stroke();
+
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
+    ctx.lineWidth = 2;
+    ctx.setLineDash([20, 14]);
+    ctx.beginPath();
+    ctx.moveTo(0, canvasH / 2);
+    ctx.lineTo(canvasW, canvasH / 2);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.wrapS = THREE.RepeatWrapping;
+    texture.wrapT = THREE.ClampToEdgeWrapping;
+    texture.needsUpdate = true;
+    return texture;
+  }
+
+  private createIntersectionTexture(): THREE.CanvasTexture {
+    const size = 256;
+    const canvas = document.createElement('canvas');
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext('2d')!;
+
+    ctx.fillStyle = '#3a3a3a';
+    ctx.fillRect(0, 0, size, size);
+
+    this.paintAsphaltNoise(ctx, size, size);
+
+    const stripeW = 8;
+    const stripeGap = 8;
+    const stripeCount = 4;
+    const roadEdgeMargin = 20;
+
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
+
+    for (let s = 0; s < stripeCount; s++) {
+      const x = roadEdgeMargin + s * (stripeW + stripeGap);
+      ctx.fillRect(x, 0, stripeW, roadEdgeMargin - 2);
+      ctx.fillRect(x, size - roadEdgeMargin + 2, stripeW, roadEdgeMargin - 2);
+    }
+
+    for (let s = 0; s < stripeCount; s++) {
+      const y = roadEdgeMargin + s * (stripeW + stripeGap);
+      ctx.fillRect(0, y, roadEdgeMargin - 2, stripeW);
+      ctx.fillRect(size - roadEdgeMargin + 2, y, roadEdgeMargin - 2, stripeW);
+    }
+
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.25)';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([4, 4]);
+    ctx.beginPath();
+    ctx.moveTo(size / 2, roadEdgeMargin);
+    ctx.lineTo(size / 2, size - roadEdgeMargin);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(roadEdgeMargin, size / 2);
+    ctx.lineTo(size - roadEdgeMargin, size / 2);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.wrapS = THREE.ClampToEdgeWrapping;
+    texture.wrapT = THREE.ClampToEdgeWrapping;
+    texture.needsUpdate = true;
+    return texture;
+  }
+
+  private createIntersectionEmissiveTexture(): THREE.CanvasTexture {
+    const size = 256;
+    const canvas = document.createElement('canvas');
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext('2d')!;
+
+    ctx.fillStyle = '#000000';
+    ctx.fillRect(0, 0, size, size);
+
+    const stripeW = 8;
+    const stripeGap = 8;
+    const stripeCount = 4;
+    const roadEdgeMargin = 20;
+
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
+
+    for (let s = 0; s < stripeCount; s++) {
+      const x = roadEdgeMargin + s * (stripeW + stripeGap);
+      ctx.fillRect(x, 0, stripeW, roadEdgeMargin - 2);
+      ctx.fillRect(x, size - roadEdgeMargin + 2, stripeW, roadEdgeMargin - 2);
+    }
+
+    for (let s = 0; s < stripeCount; s++) {
+      const y = roadEdgeMargin + s * (stripeW + stripeGap);
+      ctx.fillRect(0, y, roadEdgeMargin - 2, stripeW);
+      ctx.fillRect(size - roadEdgeMargin + 2, y, roadEdgeMargin - 2, stripeW);
+    }
+
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.wrapS = THREE.ClampToEdgeWrapping;
+    texture.wrapT = THREE.ClampToEdgeWrapping;
+    texture.needsUpdate = true;
+    return texture;
+  }
+
+  private paintAsphaltNoise(ctx: CanvasRenderingContext2D, w: number, h: number): void {
+    const imageData = ctx.getImageData(0, 0, w, h);
+    const data = imageData.data;
+    for (let i = 0; i < data.length; i += 4) {
+      const noise = (Math.random() - 0.5) * 18;
+      data[i] = Math.max(0, Math.min(255, data[i] + noise));
+      data[i + 1] = Math.max(0, Math.min(255, data[i + 1] + noise));
+      data[i + 2] = Math.max(0, Math.min(255, data[i + 2] + noise));
+    }
+    ctx.putImageData(imageData, 0, 0);
+
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.03)';
+    ctx.lineWidth = 0.5;
+    const gridSize = 12;
+    for (let x = 0; x < w; x += gridSize) {
+      ctx.beginPath();
+      ctx.moveTo(x, 0);
+      ctx.lineTo(x, h);
+      ctx.stroke();
+    }
+    for (let y = 0; y < h; y += gridSize) {
+      ctx.beginPath();
+      ctx.moveTo(0, y);
+      ctx.lineTo(w, y);
+      ctx.stroke();
+    }
   }
 
   private buildRoadNetwork(): void {
@@ -125,8 +339,16 @@ export class RoadNetworkManager {
 
     const geometry = new THREE.PlaneGeometry(length, segment.width, Math.max(1, Math.floor(length / 2)), 1);
 
+    if (segment.direction === 'z') {
+      this.rotateUVsForVerticalRoad(geometry);
+    }
+
     const material = new THREE.MeshLambertMaterial({
       color: COLOR_ROAD_BASE.clone(),
+      map: this.roadTexture,
+      emissiveMap: this.roadEmissiveTexture,
+      emissive: new THREE.Color(0x444444),
+      emissiveIntensity: 0.15,
       side: THREE.DoubleSide,
       transparent: true,
       opacity: 0.9
@@ -159,6 +381,16 @@ export class RoadNetworkManager {
     this.createHighlightBorder(segment, mesh);
   }
 
+  private rotateUVsForVerticalRoad(geometry: THREE.PlaneGeometry): void {
+    const uvAttribute = geometry.attributes.uv;
+    for (let i = 0; i < uvAttribute.count; i++) {
+      const u = uvAttribute.getX(i);
+      const v = uvAttribute.getY(i);
+      uvAttribute.setXY(i, v, 1 - u);
+    }
+    uvAttribute.needsUpdate = true;
+  }
+
   private createHighlightBorder(segment: RoadSegment, mesh: THREE.Mesh): void {
     const edges = new THREE.EdgesGeometry(mesh.geometry);
     const lineMaterial = new THREE.LineBasicMaterial({
@@ -189,6 +421,10 @@ export class RoadNetworkManager {
         const geometry = new THREE.PlaneGeometry(INTERSECTION_SIZE, INTERSECTION_SIZE);
         const material = new THREE.MeshLambertMaterial({
           color: COLOR_ROAD_BASE.clone(),
+          map: this.intersectionTexture,
+          emissiveMap: this.intersectionEmissiveTexture,
+          emissive: new THREE.Color(0x444444),
+          emissiveIntensity: 0.15,
           side: THREE.DoubleSide,
           transparent: true,
           opacity: 0.9
@@ -244,7 +480,6 @@ export class RoadNetworkManager {
   }
 
   private buildGridLines(): void {
-    const offset = (GRID_SIZE - 1) * GRID_SPACING / 2;
     const material = new THREE.LineBasicMaterial({
       color: 0xffffff,
       transparent: true,
@@ -352,8 +587,6 @@ export class RoadNetworkManager {
   }
 
   private updateIntersectionColors(): void {
-    const offset = (GRID_SIZE - 1) * GRID_SPACING / 2;
-
     this.intersectionGroup.children.forEach((child, index) => {
       const mesh = child as THREE.Mesh;
       const i = Math.floor(index / GRID_SIZE);
