@@ -1,5 +1,6 @@
 import { useState, useRef, useCallback } from 'react'
 import type { Task, ScheduleSuggestion } from './types'
+import { getUrgencyColor } from './App'
 
 interface Props {
   tasks: Task[]
@@ -12,12 +13,6 @@ const ROW_HEIGHT = 80
 const DAY_START = 9
 const DAY_END = 18
 const TOTAL_HOURS = DAY_END - DAY_START
-
-const urgencyColors: Record<Task['urgency'], string> = {
-  high: '#ef4444',
-  medium: '#f59e0b',
-  low: '#22c55e'
-}
 
 export default function Timeline({ tasks, suggestions, onSchedule }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -164,7 +159,8 @@ export default function Timeline({ tasks, suggestions, onSchedule }: Props) {
                 top: 0,
                 bottom: 0,
                 width: 1,
-                backgroundColor: '#f0f1f3',
+                backgroundColor: '#e5e7eb',
+                opacity: 0.5,
                 zIndex: 0
               }} />
             ))}
@@ -231,7 +227,7 @@ export default function Timeline({ tasks, suggestions, onSchedule }: Props) {
                     left: 0,
                     width: 5,
                     height: '100%',
-                    backgroundColor: urgencyColors[task.urgency],
+                    backgroundColor: getUrgencyColor(task.urgency),
                     transition: 'background-color 0.2s ease'
                   }} />
                   <div style={{ padding: '8px 10px 8px 14px', height: '100%', display: 'flex', flexDirection: 'column' }}>

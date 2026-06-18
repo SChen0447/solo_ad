@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
 import type { Task } from './types'
-import { calcPriority } from './App'
+import { calcPriority, getUrgencyColor } from './App'
 
 interface Props {
   tasks: Task[]
@@ -83,7 +83,7 @@ export default function TaskList({ tasks, onSchedule }: Props) {
                 left: 0,
                 width: 6,
                 height: '100%',
-                backgroundColor: urgencyColors[task.urgency],
+                backgroundColor: getUrgencyColor(task.urgency),
                 transition: 'background-color 0.2s ease'
               }} />
               <div style={{ padding: '12px 14px 12px 18px' }}>
@@ -110,13 +110,13 @@ export default function TaskList({ tasks, onSchedule }: Props) {
                   <span style={{
                     fontSize: 11, padding: '3px 8px', borderRadius: 6,
                     background: task.urgency === 'high' ? '#fef2f2' : task.urgency === 'medium' ? '#fffbeb' : '#f0fdf4',
-                    color: urgencyColors[task.urgency],
+                    color: getUrgencyColor(task.urgency),
                     fontWeight: 500
-                  }}>紧急：{urgencyLabels[task.urgency]}</span>
+                  }}>紧急：{urgencyLabels[task.urgency] ?? '中'}</span>
                   <span style={{
                     fontSize: 11, padding: '3px 8px', borderRadius: 6,
                     background: '#f3f4f6', color: '#4b5563', fontWeight: 500
-                  }}>精力：{energyLabels[task.energy]}</span>
+                  }}>精力：{energyLabels[task.energy] ?? '中'}</span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <span style={{ fontSize: 12, color: '#6b7280' }}>

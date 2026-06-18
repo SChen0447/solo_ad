@@ -161,7 +161,8 @@ export default function App() {
         background: '#f3f4f6',
         display: 'flex',
         flexDirection: 'column',
-        borderLeft: '1px solid #e5e7eb'
+        borderLeft: '1px solid #e5e7eb',
+        overflow: 'hidden'
       }}>
         <div style={{ padding: 20, borderBottom: '1px solid #d1d5db' }}>
           <h2 style={{ fontSize: 17, fontWeight: 700, color: '#111827', marginBottom: 16 }}>智能建议</h2>
@@ -186,7 +187,7 @@ export default function App() {
             </button>
           )}
         </div>
-        <div style={{ padding: 16, overflowY: 'auto', flex: 1 }}>
+        <div style={{ padding: 16, overflowY: 'auto', overflowX: 'hidden', flex: 1, minWidth: 0 }}>
           {suggestions.length === 0 ? (
             <p style={{ fontSize: 13, color: '#6b7280', lineHeight: 1.6 }}>
               点击"一键优化建议"按钮，系统将根据任务优先级和可用时段为您智能推荐日程排布方案。
@@ -204,9 +205,11 @@ export default function App() {
                 return (
                   <div key={sug.taskId} style={{
                     background: 'white', padding: 12, borderRadius: 8,
-                    border: '2px dashed #3b82f6'
+                    border: '2px dashed #3b82f6',
+                    overflow: 'hidden',
+                    minWidth: 0
                   }}>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: '#111827', marginBottom: 4 }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: '#111827', marginBottom: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       {task.title}
                     </div>
                     <div style={{ fontSize: 12, color: '#3b82f6', fontWeight: 500 }}>
@@ -290,13 +293,22 @@ export default function App() {
 }
 
 export function calcPriority(task: Task): number {
-  const urgencyScore = task.urgency === 'high' ? 100 : task.urgency === 'medium' ? 60 : 30
+  const u = task.urgency ?? 'medium'
+  const e = task.energy ?? 'medium'
+  const urgencyScore = u === 'high' ? 100 : u === 'medium' ? 60 : 30
   const now = new Date()
   now.setHours(0, 0, 0, 0)
   const due = new Date(task.dueDate)
   due.setHours(0, 0, 0, 0)
   const diffDays = Math.max(0, Math.ceil((due.getTime() - now.getTime()) / 86400000))
   const dueScore = diffDays === 0 ? 100 : diffDays <= 1 ? 90 : diffDays <= 2 ? 75 : diffDays <= 3 ? 55 : diffDays <= 5 ? 35 : 20
-  const energyScore = task.energy === 'high' ? 100 : task.energy === 'medium' ? 55 : 25
+  const energyScore = e === 'high' ? 100 : e === 'medium' ? 55 : 25
   return urgencyScore * 0.5 + dueScore * 0.3 + energyScore * 0.2
+}
+
+export function getUrgencyColor(urgency?: Task['urgency']): string {
+  if (urgency === 'high') return '#ef4444'
+  if (urgency === 'medium') return '#f59e0b'
+  if (urgency === 'low') return '#22c55e'
+  return '#9ca3af'
 }
