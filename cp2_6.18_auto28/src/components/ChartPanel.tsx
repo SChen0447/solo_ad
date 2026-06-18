@@ -30,6 +30,7 @@ ChartJS.register(
 
 interface ChartPanelProps {
   assets: Asset[]
+  onChartUpdated?: () => void
 }
 
 const categoryColors: Record<string, { bg: string; border: string }> = {
@@ -47,9 +48,10 @@ const generateCustomColor = (index: number) => {
   }
 }
 
-export default function ChartPanel({ assets }: ChartPanelProps) {
+export default function ChartPanel({ assets, onChartUpdated }: ChartPanelProps) {
   const pieChartRef = useRef<ChartJS<'pie'>>(null)
   const lineChartRef = useRef<ChartJS<'line'>>(null)
+  const isFirstRender = useRef(true)
 
   const dates = useMemo(() => {
     return Array.from(new Set(assets.map((a) => a.date))).sort()
@@ -157,6 +159,9 @@ export default function ChartPanel({ assets }: ChartPanelProps) {
     animation: {
       duration: 200,
     },
+    layout: {
+      padding: 0,
+    },
     plugins: {
       legend: {
         position: 'bottom',
@@ -180,14 +185,20 @@ export default function ChartPanel({ assets }: ChartPanelProps) {
         cornerRadius: 8,
         callbacks: {
           label: (context) => {
-            const value = context.parsed
-            const total = context.dataset.data.reduce((a: number, b: number) => a + b, 0)
-            const percentage = ((value / total) * 100).toFixed(1)
+            const rawValue = context.parsed
+            const value = typeof rawValue === 'number' && !isNaN(rawValue) ? rawValue : 0
+            const datasetData = context.dataset.data
+            const total = datasetData.reduce(
+              (sum: number, val) => sum + (typeof val === 'number' ? val : 0),
+              0,
+            )
+            const percentage = total > 0 ? ((value / total) * 100).toFixed(1) : '0.0'
             const formattedValue = value.toLocaleString('zh-CN', {
               minimumFractionDigits: 2,
               maximumFractionDigits: 2,
             })
-            return `${context.label}: ¥${formattedValue} (${percentage}%)`
+            const label = context.label || '未知'
+            return `${label}: ¥${formattedValue} (${percentage}%)`
           },
         },
       },
@@ -249,12 +260,14 @@ export default function ChartPanel({ assets }: ChartPanelProps) {
         cornerRadius: 8,
         callbacks: {
           label: (context) => {
-            const value = context.parsed.y ?? 0
+            const rawValue = context.parsed.y
+            const value = typeof rawValue === 'number' && !isNaN(rawValue) ? rawValue : 0
             const formattedValue = value.toLocaleString('zh-CN', {
               minimumFractionDigits: 2,
               maximumFractionDigits: 2,
             })
-            return `净值: ¥${formattedValue}`
+            const datasetLabel = context.dataset.label || '净值'
+            return `${datasetLabel}: ¥${formattedValue}`
           },
         },
       },
@@ -262,21 +275,39 @@ export default function ChartPanel({ assets }: ChartPanelProps) {
   }
 
   useEffect(() => {
+    if (isFirstRender.current) {
+      isFirstRender.current = false
+      return
+    }
     if (pieChartRef.current) {
       pieChartRef.current.update()
     }
     if (lineChartRef.current) {
       lineChartRef.current.update()
     }
-  }, [assets, pieData, lineData])
+    if (onChartUpdated) {
+      requestAnimationFrame(() => {
+        onChartUpdated()
+      })
+    }
+  }, [assets, pieData, lineData, onChartUpdated])
 
   return (
     <>
       <div className="chart-card pie-chart-card">
         <h3>资产配置比例</h3>
-        <div className="pie-chart-container">
+        <div
+          className="pie-chart-container"
+          style={{ width: 300, height: 300, maxWidth: 300, maxHeight: 300 }}
+        >
           {dates.length > 0 ? (
-            <Pie ref={pieChartRef} data={pieData} options={pieOptions} />
+            <Pie
+              ref={pieChartRef}
+              data={pieData}
+              options={pieOptions}
+              width={300}
+              height={300}
+            />
           ) : (
             <div className="empty-state" style={{ padding: '100px 0' }}>
               暂无数据
@@ -287,9 +318,18 @@ export default function ChartPanel({ assets }: ChartPanelProps) {
 
       <div className="chart-card line-chart-card">
         <h3>净值走势曲线</h3>
-        <div className="line-chart-container">
+        <div
+          className="line-chart-container"
+          style={{ width: 400, height: 250, maxWidth: 400, maxHeight: 250 }}
+        >
           {dates.length > 0 ? (
-            <Line ref={lineChartRef} data={lineData} options={lineOptions} />
+            <Line
+              ref={lineChartRef}
+              data={lineData}
+              options={lineOptions}
+              width={400}
+              height={250}
+            />
           ) : (
             <div className="empty-state" style={{ padding: '80px 0' }}>
               暂无数据

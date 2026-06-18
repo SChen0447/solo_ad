@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useRef, useCallback } from 'react'
 import AssetForm from './components/AssetForm'
 import ChartPanel from './components/ChartPanel'
 
@@ -33,18 +33,29 @@ const defaultAssets: Asset[] = [
 
 export default function App() {
   const [assets, setAssets] = useState<Asset[]>(defaultAssets)
+  const updateStartTimeRef = useRef<number>(0)
 
-  const handleAddAsset = (newAsset: Omit<Asset, 'id'>) => {
+  const handleAddAsset = useCallback((newAsset: Omit<Asset, 'id'>) => {
+    updateStartTimeRef.current = performance.now()
     const asset: Asset = {
       ...newAsset,
       id: Date.now().toString(),
     }
     setAssets((prev) => [...prev, asset])
-  }
+  }, [])
 
-  const handleDeleteAsset = (id: string) => {
+  const handleDeleteAsset = useCallback((id: string) => {
+    updateStartTimeRef.current = performance.now()
     setAssets((prev) => prev.filter((a) => a.id !== id))
-  }
+  }, [])
+
+  const handleChartUpdated = useCallback(() => {
+    if (updateStartTimeRef.current > 0) {
+      const elapsed = performance.now() - updateStartTimeRef.current
+      console.log(`[Performance] 图表更新耗时: ${elapsed.toFixed(2)}ms (目标: <=200ms)`)
+      updateStartTimeRef.current = 0
+    }
+  }, [])
 
   const { netWorth, change, sortedAssets } = useMemo(() => {
     if (assets.length === 0) {
@@ -116,7 +127,7 @@ export default function App() {
         </div>
 
         <div className="charts-row">
-          <ChartPanel assets={assets} />
+          <ChartPanel assets={assets} onChartUpdated={handleChartUpdated} />
         </div>
 
         <AssetForm onAdd={handleAddAsset} />

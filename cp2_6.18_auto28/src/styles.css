@@ -218,8 +218,12 @@ body {
 .error-message {
   font-size: 12px;
   color: #ef4444;
+  min-height: 16px;
+  line-height: 16px;
+  margin-top: 2px;
   opacity: 0;
   animation: fadeIn 0.3s ease forwards;
+  display: block;
 }
 
 @keyframes fadeIn {

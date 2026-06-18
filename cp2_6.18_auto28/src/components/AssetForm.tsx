@@ -1,4 +1,4 @@
-import { useState, FormEvent, ChangeEvent } from 'react'
+import { useState, FormEvent, ChangeEvent, ClipboardEvent, useRef } from 'react'
 import type { Asset } from '../App'
 
 interface AssetFormProps {
@@ -30,6 +30,7 @@ export default function AssetForm({ onAdd }: AssetFormProps) {
   const [name, setName] = useState('')
   const [rawValue, setRawValue] = useState('')
   const [errors, setErrors] = useState<FormErrors>({})
+  const valueInputRef = useRef<HTMLInputElement>(null)
 
   const formatNumber = (value: string) => {
     const cleanValue = value.replace(/,/g, '')
@@ -40,19 +41,89 @@ export default function AssetForm({ onAdd }: AssetFormProps) {
     return integerPart + decimalPart
   }
 
+  const countValidChars = (str: string, upToIndex: number): number => {
+    let count = 0
+    for (let i = 0; i < upToIndex && i < str.length; i++) {
+      if ((str[i] >= '0' && str[i] <= '9') || str[i] === '.') {
+        count++
+      }
+    }
+    return count
+  }
+
+  const findPositionByCharCount = (str: string, targetCount: number): number => {
+    let count = 0
+    for (let i = 0; i < str.length; i++) {
+      if ((str[i] >= '0' && str[i] <= '9') || str[i] === '.') {
+        if (count >= targetCount) {
+          return i
+        }
+        count++
+      }
+    }
+    return str.length
+  }
+
+  const processValueInput = (inputValue: string, cursorPos: number) => {
+    const cleanInput = inputValue.replace(/[^0-9.]/g, '')
+    const dotIndex = cleanInput.indexOf('.')
+    let processedInput = cleanInput
+    if (dotIndex !== -1) {
+      const secondDotIndex = cleanInput.indexOf('.', dotIndex + 1)
+      if (secondDotIndex !== -1) {
+        processedInput =
+          cleanInput.slice(0, secondDotIndex) + cleanInput.slice(secondDotIndex + 1)
+      }
+    }
+    const formatted = formatNumber(processedInput)
+    const validCharsBefore = countValidChars(inputValue, cursorPos)
+    const newCursorPos = findPositionByCharCount(formatted, validCharsBefore)
+    return { formatted, newCursorPos }
+  }
+
   const handleValueChange = (e: ChangeEvent<HTMLInputElement>) => {
     const input = e.target
-    const inputValue = input.value
     const selectionStart = input.selectionStart || 0
-    const originalLength = inputValue.replace(/[^0-9]/g, '').length
-    const cleanInput = inputValue.replace(/[^0-9.]/g, '')
-    const formatted = formatNumber(cleanInput)
-    const newLength = formatted.replace(/[^0-9]/g, '').length
-    const diff = newLength - originalLength
+    const { formatted, newCursorPos } = processValueInput(input.value, selectionStart)
     setRawValue(formatted)
+    if (errors.value) {
+      setErrors((prev) => {
+        const newErrors = { ...prev }
+        delete newErrors.value
+        return newErrors
+      })
+    }
     requestAnimationFrame(() => {
-      input.selectionStart = selectionStart + diff
-      input.selectionEnd = selectionStart + diff
+      if (valueInputRef.current) {
+        valueInputRef.current.selectionStart = newCursorPos
+        valueInputRef.current.selectionEnd = newCursorPos
+      }
+    })
+  }
+
+  const handleValuePaste = (e: ClipboardEvent<HTMLInputElement>) => {
+    e.preventDefault()
+    const input = e.currentTarget
+    const pasteText = e.clipboardData.getData('text')
+    const selectionStart = input.selectionStart || 0
+    const selectionEnd = input.selectionEnd || 0
+    const newValue =
+      input.value.slice(0, selectionStart) + pasteText + input.value.slice(selectionEnd)
+    const newCursorPos = selectionStart + pasteText.replace(/[^0-9.]/g, '').length
+    const { formatted, newCursorPos: finalCursorPos } = processValueInput(newValue, newCursorPos)
+    setRawValue(formatted)
+    if (errors.value) {
+      setErrors((prev) => {
+        const newErrors = { ...prev }
+        delete newErrors.value
+        return newErrors
+      })
+    }
+    requestAnimationFrame(() => {
+      if (valueInputRef.current) {
+        valueInputRef.current.selectionStart = finalCursorPos
+        valueInputRef.current.selectionEnd = finalCursorPos
+      }
     })
   }
 
@@ -190,10 +261,12 @@ export default function AssetForm({ onAdd }: AssetFormProps) {
           <div className="form-group">
             <label>资产市值 (CNY)</label>
             <input
+              ref={valueInputRef}
               type="text"
               placeholder="0.00"
               value={rawValue}
               onChange={handleValueChange}
+              onPaste={handleValuePaste}
               className={errors.value ? 'error' : ''}
             />
             {errors.value && <span className="error-message">{errors.value}</span>}
