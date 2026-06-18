@@ -8,13 +8,20 @@ interface ChainNode {
   icon: string;
   color: string;
   idleColor: string;
+  haloColor: string;
   element: HTMLDivElement;
   iconBox: HTMLDivElement;
+  glowLayer: HTMLDivElement;
   valueEl: HTMLElement;
   currentValue: number;
   targetValue: number;
   currentColor: string;
   targetColor: string;
+  currentHaloAlpha: number;
+  targetHaloAlpha: number;
+  currentBorderWidth: number;
+  targetBorderWidth: number;
+  isEmphasized: boolean;
   animStart: number;
   lastDeployedCount: number;
 }
@@ -41,6 +48,21 @@ const IDLE_NODE_COLORS: Record<string, string> = {
   sell: '#065f46',
 };
 
+const HALO_COLORS: Record<string, string> = {
+  mine: '#9ca3af',
+  transport: '#1e3a8a',
+  refine: '#6d28d9',
+  sell: '#fbbf24',
+};
+
+const HALO_CYCLE_SEC = 2.0;
+const HALO_MIN_ALPHA = 0.1;
+const HALO_MAX_ALPHA = 0.3;
+const HALO_EMPHASIZED_ALPHA = 0.4;
+const EMPHASIS_BORDER_WIDTH = 4;
+const DEFAULT_BORDER_WIDTH = 2;
+const EMPHASIS_TRANSITION_SEC = 0.3;
+
 class App {
   private app: HTMLElement;
   private hexMap!: HexMap;
@@ -54,14 +76,16 @@ class App {
   private financialIncome: number = 0;
   private lastFrameTime: number = 0;
   private gameStartTime: number = 0;
+  private elapsedTime: number = 0;
 
   private cachedRatePerSec: number = 0;
   private cachedRateDirty: boolean = true;
-  private lastDeployedIds: string = '';
   private lastDeployedHash: string = '';
 
   private pendingStatusUpdate: StatusBarData | null = null;
   private statusRafPending: boolean = false;
+
+  private isMineSelected: boolean = false;
 
   constructor() {
     const appEl = document.getElementById('app');
@@ -89,9 +113,30 @@ class App {
         gap: 8px;
         min-width: 100px;
         flex-shrink: 0;
+        position: relative;
         transition: transform 0.5s cubic-bezier(0.4, 0, 0.2, 1);
       }
+      .chain-node-icon-holder {
+        position: relative;
+        width: 52px;
+        height: 52px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .chain-node-glow {
+        position: absolute;
+        top: -16px;
+        left: -16px;
+        width: 84px;
+        height: 84px;
+        border-radius: 50%;
+        pointer-events: none;
+        transition: opacity ${EMPHASIS_TRANSITION_SEC}s ease-out;
+        filter: blur(8px);
+      }
       .chain-node-iconbox {
+        position: relative;
         width: 52px;
         height: 52px;
         border-radius: 14px;
@@ -99,11 +144,12 @@ class App {
         align-items: center;
         justify-content: center;
         font-size: 24px;
-        border-width: 2px;
         border-style: solid;
+        z-index: 1;
         transition: background-color 0.5s ease-out,
                     border-color 0.5s ease-out,
-                    box-shadow 0.5s ease-out,
+                    border-width ${EMPHASIS_TRANSITION_SEC}s ease-out,
+                    box-shadow ${EMPHASIS_TRANSITION_SEC}s ease-out,
                     transform 0.5s cubic-bezier(0.4, 0, 0.2, 1);
       }
       .chain-node-label {
@@ -217,7 +263,8 @@ class App {
       const config = nodeConfigs[i];
       const baseColor = BASE_NODE_COLORS[config.key];
       const idleColor = IDLE_NODE_COLORS[config.key];
-      const node = this.createChainNode(config.label, config.icon, idleColor, baseColor);
+      const haloColor = HALO_COLORS[config.key];
+      const node = this.createChainNode(config.label, config.icon, idleColor, baseColor, haloColor);
       this.chainContainer.appendChild(node.element);
       this.chainNodes.push({
         key: config.key,
@@ -225,13 +272,20 @@ class App {
         icon: config.icon,
         color: baseColor,
         idleColor,
+        haloColor,
         element: node.element,
         iconBox: node.iconBox,
+        glowLayer: node.glowLayer,
         valueEl: node.valueEl,
         currentValue: 0,
         targetValue: 0,
         currentColor: idleColor,
         targetColor: idleColor,
+        currentHaloAlpha: HALO_MIN_ALPHA,
+        targetHaloAlpha: HALO_MIN_ALPHA,
+        currentBorderWidth: DEFAULT_BORDER_WIDTH,
+        targetBorderWidth: DEFAULT_BORDER_WIDTH,
+        isEmphasized: false,
         animStart: 0,
         lastDeployedCount: 0,
       });
@@ -250,16 +304,42 @@ class App {
     }
   }
 
-  private createChainNode(label: string, icon: string, _idleColor: string, baseColor: string) {
+  private createChainNode(
+    label: string,
+    icon: string,
+    _idleColor: string,
+    _baseColor: string,
+    haloColor: string
+  ) {
     const wrap = document.createElement('div');
     wrap.className = 'chain-node-wrap';
 
+    const holder = document.createElement('div');
+    holder.className = 'chain-node-icon-holder';
+
+    const glowLayer = document.createElement('div');
+    glowLayer.className = 'chain-node-glow';
+    glowLayer.style.background = `radial-gradient(circle, ${haloColor} 0%, transparent 70%)`;
+    glowLayer.style.opacity = HALO_MIN_ALPHA.toString();
+
     const iconBox = document.createElement('div');
     iconBox.className = 'chain-node-iconbox';
-    iconBox.style.background = `${IDLE_NODE_COLORS[label === '矿场' ? 'mine' : label === '运输' ? 'transport' : label === '精炼' ? 'refine' : 'sell']}20`;
-    iconBox.style.borderColor = IDLE_NODE_COLORS[label === '矿场' ? 'mine' : label === '运输' ? 'transport' : label === '精炼' ? 'refine' : 'sell'];
-    iconBox.style.boxShadow = `0 0 8px ${IDLE_NODE_COLORS[label === '矿场' ? 'mine' : label === '运输' ? 'transport' : label === '精炼' ? 'refine' : 'sell']}30`;
+    const key =
+      label === '矿场'
+        ? 'mine'
+        : label === '运输'
+        ? 'transport'
+        : label === '精炼'
+        ? 'refine'
+        : 'sell';
+    iconBox.style.background = `${IDLE_NODE_COLORS[key]}20`;
+    iconBox.style.borderColor = IDLE_NODE_COLORS[key];
+    iconBox.style.borderWidth = `${DEFAULT_BORDER_WIDTH}px`;
+    iconBox.style.boxShadow = `0 0 8px ${IDLE_NODE_COLORS[key]}30`;
     iconBox.textContent = icon;
+
+    holder.appendChild(glowLayer);
+    holder.appendChild(iconBox);
 
     const labelEl = document.createElement('div');
     labelEl.className = 'chain-node-label';
@@ -267,14 +347,14 @@ class App {
 
     const valueEl = document.createElement('div');
     valueEl.className = 'chain-node-value';
-    valueEl.style.color = IDLE_NODE_COLORS[label === '矿场' ? 'mine' : label === '运输' ? 'transport' : label === '精炼' ? 'refine' : 'sell'];
+    valueEl.style.color = IDLE_NODE_COLORS[key];
     valueEl.textContent = '0.00 吨/秒';
 
-    wrap.appendChild(iconBox);
+    wrap.appendChild(holder);
     wrap.appendChild(labelEl);
     wrap.appendChild(valueEl);
 
-    return { element: wrap, iconBox, valueEl };
+    return { element: wrap, iconBox, glowLayer, valueEl };
   }
 
   private createChainArrow(_index: number) {
@@ -322,10 +402,23 @@ class App {
     this.hexMap.startLoop();
   }
 
-  private onHexSelect(_cell: HexCell | null): void {
-    this.controlPanel.setCell(_cell);
+  private onHexSelect(cell: HexCell | null): void {
+    this.controlPanel.setCell(cell);
     this.cachedRateDirty = true;
     this.scheduleStatusUpdate();
+
+    this.isMineSelected = cell !== null;
+    for (const node of this.chainNodes) {
+      if (node.key === 'mine') {
+        node.isEmphasized = this.isMineSelected;
+        node.targetHaloAlpha = this.isMineSelected
+          ? HALO_EMPHASIZED_ALPHA
+          : HALO_MIN_ALPHA;
+        node.targetBorderWidth = this.isMineSelected
+          ? EMPHASIS_BORDER_WIDTH
+          : DEFAULT_BORDER_WIDTH;
+      }
+    }
   }
 
   private onHexUpdate(cell: HexCell): void {
@@ -380,13 +473,42 @@ class App {
     return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
   }
 
+  private hexToRgb(hex: string): { r: number; g: number; b: number } {
+    return {
+      r: parseInt(hex.slice(1, 3), 16),
+      g: parseInt(hex.slice(3, 5), 16),
+      b: parseInt(hex.slice(5, 7), 16),
+    };
+  }
+
+  private rgbaString(r: number, g: number, b: number, alpha: number): string {
+    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+  }
+
+  private computePulseHaloAlpha(elapsedSec: number, emphasized: boolean): number {
+    if (emphasized) {
+      const phase =
+        (Math.sin((elapsedSec / HALO_CYCLE_SEC) * Math.PI * 2) + 1) / 2;
+      const baseRange = HALO_EMPHASIZED_ALPHA - HALO_MAX_ALPHA;
+      return HALO_MAX_ALPHA + phase * baseRange;
+    } else {
+      const phase =
+        (Math.sin((elapsedSec / HALO_CYCLE_SEC) * Math.PI * 2 - Math.PI / 2) + 1) / 2;
+      const range = HALO_MAX_ALPHA - HALO_MIN_ALPHA;
+      return HALO_MIN_ALPHA + phase * range;
+    }
+  }
+
   private updateChainNodes(dt: number): void {
+    this.elapsedTime += dt;
     const rate = this.getDeployedRatePerSec();
     const deployed = this.hexMap.getDeployedCells();
     const deployedCount = deployed.length;
     const hasActivity = rate > 0.001;
     const activityT = Math.min(rate * 2, 1);
     const easeT = 1 - Math.pow(1 - activityT, 3);
+
+    const transitionSpeed = 1 / EMPHASIS_TRANSITION_SEC;
 
     for (let i = 0; i < this.chainNodes.length; i++) {
       const node = this.chainNodes[i];
@@ -403,19 +525,70 @@ class App {
 
       if (node.currentColor !== node.targetColor) {
         const colT = Math.min(dt * 3, 1);
-        node.currentColor = this.interpolateColor(node.currentColor, node.targetColor, colT);
+        node.currentColor = this.interpolateColor(
+          node.currentColor,
+          node.targetColor,
+          colT
+        );
       }
+
+      const pulse = this.computePulseHaloAlpha(this.elapsedTime, node.isEmphasized);
+      if (node.key === 'mine' && node.isEmphasized) {
+        node.targetHaloAlpha = Math.max(HALO_MAX_ALPHA, pulse);
+      } else {
+        node.targetHaloAlpha = pulse;
+      }
+
+      const haloDiff = node.targetHaloAlpha - node.currentHaloAlpha;
+      node.currentHaloAlpha += haloDiff * Math.min(dt * transitionSpeed, 1);
+      if (Math.abs(haloDiff) < 0.001) {
+        node.currentHaloAlpha = node.targetHaloAlpha;
+      }
+
+      const borderDiff = node.targetBorderWidth - node.currentBorderWidth;
+      node.currentBorderWidth += borderDiff * Math.min(dt * transitionSpeed, 1);
+      if (Math.abs(borderDiff) < 0.01) {
+        node.currentBorderWidth = node.targetBorderWidth;
+      }
+
+      const haloRgb = this.hexToRgb(node.haloColor);
+      const alpha1 = node.currentHaloAlpha;
+      const alpha2 = Math.max(0, node.currentHaloAlpha * 0.6);
+      const baseGlow = this.rgbaString(haloRgb.r, haloRgb.g, haloRgb.b, alpha1);
+      const outerGlow = this.rgbaString(haloRgb.r, haloRgb.g, haloRgb.b, alpha2);
+      node.glowLayer.style.background = `radial-gradient(circle, ${baseGlow} 0%, ${outerGlow} 40%, transparent 75%)`;
+      node.glowLayer.style.opacity = '1';
 
       const displayVal = node.currentValue;
       node.valueEl.textContent = `${displayVal.toFixed(2)} 吨/秒`;
       node.valueEl.style.color = node.currentColor;
       node.valueEl.style.transform = hasActivity ? 'scale(1.05)' : 'scale(1)';
 
+      const activityGlowSize = hasActivity ? 18 + 10 * easeT : 8;
+      const activityGlowAlpha = hasActivity
+        ? (40 + 30 * easeT) / 255
+        : 48 / 255;
+      const colRgb = this.hexToRgb(node.currentColor);
+      const activityShadow = this.rgbaString(
+        colRgb.r,
+        colRgb.g,
+        colRgb.b,
+        activityGlowAlpha
+      );
+      const haloShadowSize = node.isEmphasized ? 22 : 12;
+      const haloShadow = this.rgbaString(
+        haloRgb.r,
+        haloRgb.g,
+        haloRgb.b,
+        node.currentHaloAlpha
+      );
+
       node.iconBox.style.background = `${node.currentColor}20`;
       node.iconBox.style.borderColor = node.currentColor;
-      node.iconBox.style.boxShadow = hasActivity
-        ? `0 0 ${20 + 10 * easeT}px ${node.currentColor}${Math.round(40 + 30 * easeT).toString(16).padStart(2, '0')}`
-        : `0 0 8px ${node.currentColor}30`;
+      node.iconBox.style.borderWidth = `${node.currentBorderWidth}px`;
+      node.iconBox.style.boxShadow =
+        `0 0 ${activityGlowSize}px ${activityShadow}, ` +
+        `0 0 ${haloShadowSize}px ${haloShadow}`;
 
       const labelEl = node.element.querySelector('.chain-node-label') as HTMLElement;
       if (labelEl) {
@@ -442,7 +615,9 @@ class App {
         ? this.interpolateColor(fromColor, toColor, easeT)
         : fromColor;
       arrow.path.setAttribute('stroke', arrowCol);
-      arrow.element.style.opacity = hasActivity ? `${0.6 + 0.4 * easeT}` : '0.4';
+      arrow.element.style.opacity = hasActivity
+        ? `${0.6 + 0.4 * easeT}`
+        : '0.4';
 
       const prevNode = this.chainNodes[i];
       const nextNode = this.chainNodes[i + 1];
