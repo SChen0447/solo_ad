@@ -1,0 +1,22 @@
+{
+  "name": "emspectrum-3d-explorer",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Interactive 3D visualization of electromagnetic spectrum",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "three": "^0.160.0",
+    "dat.gui": "^0.7.9",
+    "stats.js": "^0.17.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.3",
+    "vite": "^5.0.10",
+    "@types/three": "^0.160.0",
+    "@types/dat.gui": "^0.7.12"
+  }
+}
