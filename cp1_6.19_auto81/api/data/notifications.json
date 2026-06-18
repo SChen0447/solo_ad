@@ -1,0 +1,7 @@
+[
+  {"id":"n1","type":"new_order","content":"张三提交了新订单","createdAt":"2026-06-19T10:30:00.000Z","read":false},
+  {"id":"n2","type":"low_stock","content":"车厘子库存不足，仅剩20件","createdAt":"2026-06-19T09:15:00.000Z","read":false},
+  {"id":"n3","type":"order_completed","content":"李四的订单已完成配送","createdAt":"2026-06-18T16:00:00.000Z","read":false},
+  {"id":"n4","type":"new_order","content":"王五提交了新订单","createdAt":"2026-06-19T11:00:00.000Z","read":false},
+  {"id":"n5","type":"sort_done","content":"6月18日分拣已完成","createdAt":"2026-06-18T18:30:00.000Z","read":true}
+]

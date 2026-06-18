@@ -1,0 +1,22 @@
+[
+  {"id":"p1","name":"草莓","category":"水果蔬菜","price":15.9,"stock":50},
+  {"id":"p2","name":"蓝莓","category":"水果蔬菜","price":25.8,"stock":30},
+  {"id":"p3","name":"车厘子","category":"水果蔬菜","price":39.9,"stock":20},
+  {"id":"p4","name":"生菜","category":"水果蔬菜","price":5.9,"stock":100},
+  {"id":"p5","name":"西红柿","category":"水果蔬菜","price":6.8,"stock":80},
+  {"id":"p6","name":"土鸡蛋","category":"肉禽蛋奶","price":28.8,"stock":60},
+  {"id":"p7","name":"五花肉","category":"肉禽蛋奶","price":22.5,"stock":40},
+  {"id":"p8","name":"鸡胸肉","category":"肉禽蛋奶","price":18.9,"stock":50},
+  {"id":"p9","name":"牛奶","category":"肉禽蛋奶","price":12.5,"stock":100},
+  {"id":"p10","name":"排骨","category":"肉禽蛋奶","price":35.8,"stock":30},
+  {"id":"p11","name":"生抽","category":"调味品","price":9.9,"stock":80},
+  {"id":"p12","name":"老抽","category":"调味品","price":8.5,"stock":60},
+  {"id":"p13","name":"蚝油","category":"调味品","price":12.8,"stock":50},
+  {"id":"p14","name":"香醋","category":"调味品","price":7.9,"stock":70},
+  {"id":"p15","name":"料酒","category":"调味品","price":6.5,"stock":90},
+  {"id":"p16","name":"坚果礼盒","category":"零食饮料","price":45.9,"stock":25},
+  {"id":"p17","name":"牛肉干","category":"零食饮料","price":32.8,"stock":35},
+  {"id":"p18","name":"酸奶","category":"零食饮料","price":8.8,"stock":120},
+  {"id":"p19","name":"橙汁","category":"零食饮料","price":15.5,"stock":60},
+  {"id":"p20","name":"薯片","category":"零食饮料","price":9.9,"stock":90}
+]
