@@ -1,0 +1,168 @@
+.inventory-container {
+  width: 100%;
+}
+
+.inventory-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+}
+
+.inventory-header h2 {
+  font-size: 24px;
+  color: var(--accent-color);
+}
+
+.inventory-card {
+  padding: 24px;
+}
+
+.inventory-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.inventory-table th,
+.inventory-table td {
+  padding: 14px 16px;
+  text-align: left;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.inventory-table th {
+  font-weight: 600;
+  color: var(--text-color);
+  background-color: var(--secondary-color);
+  font-size: 14px;
+}
+
+.inventory-table th:first-child {
+  border-radius: 8px 0 0 0;
+}
+
+.inventory-table th:last-child {
+  border-radius: 0 8px 0 0;
+}
+
+.inventory-table tbody tr:hover {
+  background-color: var(--bg-color);
+}
+
+.item-name {
+  font-weight: 500;
+}
+
+.low-stock {
+  color: #ff4757;
+  font-weight: 700;
+}
+
+.low-stock-row {
+  background-color: #fff5f5;
+}
+
+.low-stock-row:hover {
+  background-color: #ffeaea !important;
+}
+
+.loading {
+  text-align: center;
+  padding: 40px 0;
+  color: var(--text-light);
+}
+
+.restock-modal {
+  max-width: 700px;
+  animation: slideUp 0.4s ease-out;
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(100%);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 24px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.modal-header h3 {
+  color: var(--accent-color);
+  font-size: 18px;
+}
+
+.modal-close {
+  background: none;
+  border: none;
+  font-size: 24px;
+  cursor: pointer;
+  color: var(--text-light);
+  line-height: 1;
+  padding: 0 8px;
+}
+
+.modal-close:hover {
+  color: var(--text-color);
+}
+
+.modal-body {
+  padding: 0 24px 24px;
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+.restock-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 16px;
+}
+
+.restock-table th,
+.restock-table td {
+  padding: 12px 14px;
+  text-align: left;
+  border-bottom: 1px solid var(--border-color);
+  font-size: 14px;
+}
+
+.restock-table th {
+  font-weight: 600;
+  color: var(--text-color);
+  background-color: var(--secondary-color);
+}
+
+.empty-records {
+  text-align: center;
+  padding: 40px 0;
+  color: var(--text-light);
+}
+
+@media (max-width: 768px) {
+  .inventory-card {
+    padding: 16px;
+    overflow-x: auto;
+  }
+
+  .inventory-table {
+    min-width: 500px;
+  }
+
+  .restock-modal {
+    width: 95%;
+    max-height: 85vh;
+  }
+
+  .modal-body {
+    padding: 0 16px 16px;
+  }
+}
