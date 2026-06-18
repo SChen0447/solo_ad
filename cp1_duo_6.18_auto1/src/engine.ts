@@ -98,6 +98,8 @@ export interface GravityBodyState {
   rotation: number;
   rotationSpeed: number;
   stripeOffset: number;
+  stripePulsePeriod: number;
+  stripePulsePhase: number;
 }
 
 export interface RingCheckpointState {
@@ -268,7 +270,9 @@ export class GameEngine {
         color: colors[Math.floor(Math.random() * colors.length)],
         rotation: Math.random() * Math.PI * 2,
         rotationSpeed: (Math.random() - 0.5) * 0.02,
-        stripeOffset: Math.random() * Math.PI
+        stripeOffset: Math.random() * Math.PI,
+        stripePulsePeriod: 2000 + Math.random() * 2000,
+        stripePulsePhase: Math.random() * Math.PI * 2
       });
     }
   }

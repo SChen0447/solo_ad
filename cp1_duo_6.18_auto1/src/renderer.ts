@@ -105,11 +105,15 @@ export class Renderer {
       this.ctx.arc(0, 0, body.radius, 0, Math.PI * 2);
       this.ctx.clip();
 
-      this.ctx.strokeStyle = this.darkenColor(body.color, 20) + '60';
+      const pulseBrightness = 0.9 + 0.1 * Math.sin(2 * Math.PI * this.time / body.stripePulsePeriod + body.stripePulsePhase);
+
       this.ctx.lineWidth = 2;
       for (let i = 0; i < 4; i++) {
         const y = (i - 1.5) * (body.radius * 0.5);
         const waveOffset = Math.sin(body.stripeOffset + i) * 5;
+        const stripeBaseColor = this.darkenColor(body.color, 20);
+        const stripeAlpha = Math.floor(96 * pulseBrightness).toString(16).padStart(2, '0');
+        this.ctx.strokeStyle = stripeBaseColor + stripeAlpha;
         this.ctx.beginPath();
         this.ctx.moveTo(-body.radius, y + waveOffset);
         this.ctx.quadraticCurveTo(0, y + waveOffset * 2, body.radius, y + waveOffset);
@@ -122,15 +126,58 @@ export class Renderer {
   }
 
   private drawRingCheckpoints(rings: RingCheckpointState[]): void {
+    const flashDuration = 500;
+    const colors = ['#ff0080', '#ff8c00', '#ffff00', '#00ff80', '#00ffff', '#0080ff', '#8000ff', '#ff0080'];
+
     rings.forEach(ring => {
       this.ctx.save();
       this.ctx.translate(ring.position.x, ring.position.y);
       this.ctx.rotate(ring.rotation);
 
-      const flashAlpha = ring.flashTime > 0 ? (1 - ring.flashTime / 500) : 0;
       const ringRadius = ring.radius;
+      let pulseScale = 1;
 
-      const colors = ['#ff0080', '#ff8c00', '#ffff00', '#00ff80', '#00ffff', '#0080ff', '#8000ff', '#ff0080'];
+      if (ring.flashTime > 0) {
+        const flashProgress = 1 - ring.flashTime / flashDuration;
+        const pulseT = flashProgress;
+        if (pulseT < 0.4) {
+          const upT = pulseT / 0.4;
+          pulseScale = 1 + 0.2 * this.easeOutCubic(upT);
+        } else {
+          const downT = (pulseT - 0.4) / 0.6;
+          pulseScale = 1.2 - 0.2 * this.easeOutCubic(downT);
+        }
+
+        const shockwaveRadius = ringRadius * (1 + flashProgress);
+        const shockwaveWidth = 6 + flashProgress * 8;
+        const r = Math.floor(255 - flashProgress * 105);
+        const g = Math.floor(255 - flashProgress * 55);
+        const b = 255;
+        const shockwaveAlpha = (1 - flashProgress) * 0.9;
+        const shockwaveGlow = (1 - flashProgress) * 0.3;
+
+        this.ctx.beginPath();
+        this.ctx.arc(0, 0, shockwaveRadius + 10, 0, Math.PI * 2);
+        this.ctx.strokeStyle = `rgba(${r}, ${g}, ${b}, ${shockwaveGlow})`;
+        this.ctx.lineWidth = shockwaveWidth + 8;
+        this.ctx.stroke();
+
+        this.ctx.beginPath();
+        this.ctx.arc(0, 0, shockwaveRadius, 0, Math.PI * 2);
+        this.ctx.strokeStyle = `rgba(${r}, ${g}, ${b}, ${shockwaveAlpha})`;
+        this.ctx.lineWidth = shockwaveWidth;
+        this.ctx.stroke();
+
+        const innerAlpha = (1 - flashProgress) * 0.4;
+        const innerRadius = ringRadius * (0.5 + flashProgress * 0.5);
+        this.ctx.beginPath();
+        this.ctx.arc(0, 0, innerRadius, 0, Math.PI * 2);
+        this.ctx.strokeStyle = `rgba(255, 255, 255, ${innerAlpha})`;
+        this.ctx.lineWidth = 2;
+        this.ctx.stroke();
+      }
+
+      const drawRadius = ringRadius * pulseScale;
 
       for (let i = 0; i < ring.segments; i++) {
         const startAngle = (i / ring.segments) * Math.PI * 2;
@@ -138,7 +185,7 @@ export class Renderer {
         const colorIndex = i % colors.length;
 
         this.ctx.beginPath();
-        this.ctx.arc(0, 0, ringRadius, startAngle, endAngle);
+        this.ctx.arc(0, 0, drawRadius, startAngle, endAngle);
         this.ctx.strokeStyle = colors[colorIndex] + '80';
         this.ctx.lineWidth = 4;
         this.ctx.lineCap = 'round';
@@ -146,25 +193,11 @@ export class Renderer {
 
         if (ring.passed) {
           this.ctx.beginPath();
-          this.ctx.arc(0, 0, ringRadius, startAngle, endAngle);
+          this.ctx.arc(0, 0, drawRadius, startAngle, endAngle);
           this.ctx.strokeStyle = colors[colorIndex];
           this.ctx.lineWidth = 3;
           this.ctx.stroke();
         }
-      }
-
-      if (flashAlpha > 0) {
-        this.ctx.beginPath();
-        this.ctx.arc(0, 0, ringRadius + flashAlpha * 20, 0, Math.PI * 2);
-        this.ctx.strokeStyle = `rgba(255, 255, 255, ${flashAlpha})`;
-        this.ctx.lineWidth = 6;
-        this.ctx.stroke();
-
-        this.ctx.beginPath();
-        this.ctx.arc(0, 0, ringRadius + flashAlpha * 40, 0, Math.PI * 2);
-        this.ctx.strokeStyle = `rgba(255, 255, 255, ${flashAlpha * 0.5})`;
-        this.ctx.lineWidth = 3;
-        this.ctx.stroke();
       }
 
       this.ctx.restore();
@@ -306,13 +339,13 @@ export class Renderer {
     for (let i = 0; i < waveCount; i++) {
       const wavePhase = (this.time * 0.003 + i / waveCount) % 1;
       const waveRadius = ball.radius + wavePhase * (30 + chargePower * 50);
-      const waveAlpha = (1 - wavePhase) * 0.6;
-      
-      const color = this.getChargeColor(chargePower);
+      const waveAlphaInner = 0.8;
+      const waveAlphaOuter = 0.2;
+      const waveAlpha = (waveAlphaInner + (waveAlphaOuter - waveAlphaInner) * wavePhase) * (1 - wavePhase * 0.4);
       
       this.ctx.beginPath();
       this.ctx.arc(pos.x, pos.y, waveRadius, 0, Math.PI * 2);
-      this.ctx.strokeStyle = color + Math.floor(waveAlpha * 255).toString(16).padStart(2, '0');
+      this.ctx.strokeStyle = this.getChargeColorRgba(chargePower, waveAlpha);
       this.ctx.lineWidth = 2 + chargePower * 2;
       this.ctx.stroke();
     }
@@ -328,8 +361,7 @@ export class Renderer {
       this.ctx.beginPath();
       this.ctx.moveTo(pos.x, pos.y);
       this.ctx.lineTo(arrowEnd.x, arrowEnd.y);
-      const arrowColor = this.getChargeColor(chargePower);
-      this.ctx.strokeStyle = arrowColor + 'cc';
+      this.ctx.strokeStyle = this.getChargeColorRgba(chargePower, 0.8);
       this.ctx.lineWidth = 2 + chargePower * 3;
       this.ctx.stroke();
 
@@ -350,11 +382,37 @@ export class Renderer {
     }
   }
 
+  private hslToRgb(h: number, s: number, l: number): [number, number, number] {
+    h = ((h % 360) + 360) % 360;
+    s /= 100;
+    l /= 100;
+    const c = (1 - Math.abs(2 * l - 1)) * s;
+    const x = c * (1 - Math.abs((h / 60) % 2 - 1));
+    const m = l - c / 2;
+    let r = 0, g = 0, b = 0;
+    if (h < 60) { r = c; g = x; b = 0; }
+    else if (h < 120) { r = x; g = c; b = 0; }
+    else if (h < 180) { r = 0; g = c; b = x; }
+    else if (h < 240) { r = 0; g = x; b = c; }
+    else if (h < 300) { r = x; g = 0; b = c; }
+    else { r = c; g = 0; b = x; }
+    return [Math.round((r + m) * 255), Math.round((g + m) * 255), Math.round((b + m) * 255)];
+  }
+
   private getChargeColor(power: number): string {
-    const r = Math.floor(60 + power * 195);
-    const g = Math.floor(140 - power * 60);
-    const b = Math.floor(255 - power * 225);
+    const startH = 220;
+    const endH = 20;
+    const h = startH - power * (startH - endH);
+    const [r, g, b] = this.hslToRgb(h, 100, 58);
     return `rgb(${r}, ${g}, ${b})`;
+  }
+
+  private getChargeColorRgba(power: number, alpha: number): string {
+    const startH = 220;
+    const endH = 20;
+    const h = startH - power * (startH - endH);
+    const [r, g, b] = this.hslToRgb(h, 100, 58);
+    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
   }
 
   private drawRingCounter(passed: number, total: number): void {
