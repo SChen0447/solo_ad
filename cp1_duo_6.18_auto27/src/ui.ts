@@ -32,7 +32,8 @@ export class UI {
   private fishAlive: number = 0;
   private jellyfishCount: number = 0;
   private turtleCatchCount: number = 0;
-  private sliders: { x: number; y: number; w: number; h: number; key: keyof GlobalParams; min: number; max: number; label: string }[] = [];
+  private ecoActivity: number = 0;
+  private sliders: { x: number; y: number; w: number; h: number; key: keyof GlobalParams; min: number; max: number; label: string; unit: string }[] = [];
   private draggingSlider: string | null = null;
 
   constructor(onParamChange: ParamCallback) {
@@ -46,10 +47,10 @@ export class UI {
     const sx = this.panelX + 15;
     const sw = PANEL_WIDTH - 30;
     this.sliders = [
-      { x: sx, y: 80, w: sw, h: 12, key: 'fishSeparation', min: 20, max: 60, label: '鱼群分离距离' },
-      { x: sx, y: 160, w: sw, h: 12, key: 'fishMaxSpeed', min: 2, max: 6, label: '鱼群最大速度' },
-      { x: sx, y: 240, w: sw, h: 12, key: 'jellyfishDensity', min: 5, max: 15, label: '水母密度' },
-      { x: sx, y: 320, w: sw, h: 12, key: 'turtleCount', min: 1, max: 3, label: '海龟数量' },
+      { x: sx, y: 80, w: sw, h: 12, key: 'fishSeparation', min: 20, max: 60, label: '鱼群分离距离', unit: 'px' },
+      { x: sx, y: 160, w: sw, h: 12, key: 'fishMaxSpeed', min: 2, max: 6, label: '鱼群最大速度', unit: 'px/帧' },
+      { x: sx, y: 240, w: sw, h: 12, key: 'jellyfishDensity', min: 5, max: 15, label: '水母密度', unit: '只' },
+      { x: sx, y: 320, w: sw, h: 12, key: 'turtleCount', min: 1, max: 3, label: '海龟数量', unit: '只' },
     ];
   }
 
@@ -57,11 +58,12 @@ export class UI {
     return { ...this.params };
   }
 
-  updateStats(fps: number, fishAlive: number, jellyfishCount: number, turtleCatchCount: number): void {
+  updateStats(fps: number, fishAlive: number, jellyfishCount: number, turtleCatchCount: number, ecoActivity: number): void {
     this.fps = fps;
     this.fishAlive = fishAlive;
     this.jellyfishCount = jellyfishCount;
     this.turtleCatchCount = turtleCatchCount;
+    this.ecoActivity = ecoActivity;
   }
 
   handleMouseDown(mx: number, my: number): boolean {
@@ -95,6 +97,14 @@ export class UI {
     this.tooltipY = y;
     this.tooltipText = name;
     this.tooltipSubText = status;
+    this.targetTooltipAlpha = 1;
+  }
+
+  setTooltipDetails(x: number, y: number, name: string, details: string[]): void {
+    this.tooltipX = x;
+    this.tooltipY = y;
+    this.tooltipText = name;
+    this.tooltipSubText = details.join('|');
     this.targetTooltipAlpha = 1;
   }
 
@@ -132,7 +142,7 @@ export class UI {
     ctx.save();
     ctx.globalAlpha = this.infoPanelOpacity;
 
-    const px = 12, py = 12, pw = 170, ph = 85, pr = 12;
+    const px = 12, py = 12, pw = 180, ph = 115, pr = 12;
     ctx.beginPath();
     ctx.moveTo(px + pr, py);
     ctx.lineTo(px + pw - pr, py);
@@ -160,6 +170,24 @@ export class UI {
     ctx.fillText(`水母: ${this.jellyfishCount}`, px + 12, py + 56);
     ctx.fillStyle = '#5ae09a';
     ctx.fillText(`海龟捕获: ${this.turtleCatchCount}`, px + 12, py + 74);
+
+    ctx.fillStyle = '#ffcc66';
+    ctx.fillText(`生态活跃度: ${Math.round(this.ecoActivity)}`, px + 12, py + 94);
+
+    const barX = px + 105, barY = py + 88, barW = 65, barH = 7;
+    ctx.beginPath();
+    ctx.roundRect(barX, barY, barW, barH, 3);
+    ctx.fillStyle = 'rgba(0, 212, 255, 0.15)';
+    ctx.fill();
+
+    const fillW = Math.max(0, Math.min(barW, (this.ecoActivity / 100) * barW));
+    const activityGrad = ctx.createLinearGradient(barX, 0, barX + barW, 0);
+    activityGrad.addColorStop(0, '#ffcc66');
+    activityGrad.addColorStop(1, '#ff9933');
+    ctx.beginPath();
+    ctx.roundRect(barX, barY, fillW, barH, 3);
+    ctx.fillStyle = activityGrad;
+    ctx.fill();
 
     ctx.restore();
   }
@@ -197,7 +225,7 @@ export class UI {
     ctx.restore();
   }
 
-  private renderSlider(ctx: CanvasRenderingContext2D, s: { x: number; y: number; w: number; h: number; key: keyof GlobalParams; min: number; max: number; label: string }): void {
+  private renderSlider(ctx: CanvasRenderingContext2D, s: { x: number; y: number; w: number; h: number; key: keyof GlobalParams; min: number; max: number; label: string; unit: string }): void {
     const value = this.params[s.key] as number;
     const t = (value - s.min) / (s.max - s.min);
     const handleX = s.x + t * s.w;
@@ -210,7 +238,7 @@ export class UI {
     ctx.textAlign = 'right';
     ctx.fillStyle = CYAN_BORDER;
     const displayVal = Number.isInteger(value) ? value.toString() : value.toFixed(1);
-    ctx.fillText(displayVal, s.x + s.w, s.y - 12);
+    ctx.fillText(`${displayVal}${s.unit}`, s.x + s.w, s.y - 12);
 
     ctx.beginPath();
     ctx.roundRect(s.x, s.y, s.w, s.h, 6);
@@ -237,11 +265,18 @@ export class UI {
     ctx.save();
     ctx.globalAlpha = this.tooltipAlpha;
 
-    const text = this.tooltipText;
-    const sub = this.tooltipSubText;
+    const title = this.tooltipText;
+    const subLines = this.tooltipSubText.includes('|')
+      ? this.tooltipSubText.split('|')
+      : [this.tooltipSubText];
     ctx.font = 'bold 12px "Segoe UI", sans-serif';
-    const tw = Math.max(ctx.measureText(text).width, ctx.measureText(sub).width) + 20;
-    const th = 42;
+    let maxW = ctx.measureText(title).width;
+    for (const line of subLines) {
+      const w = ctx.measureText(line).width;
+      if (w > maxW) maxW = w;
+    }
+    const tw = maxW + 24;
+    const th = 24 + subLines.length * 16;
     let tx = this.tooltipX + 15;
     let ty = this.tooltipY - 20;
     if (tx + tw > CANVAS_WIDTH - PANEL_WIDTH) tx = this.tooltipX - tw - 10;
@@ -257,10 +292,13 @@ export class UI {
 
     ctx.textAlign = 'left';
     ctx.fillStyle = '#ffffff';
-    ctx.fillText(text, tx + 10, ty + 16);
+    ctx.fillText(title, tx + 12, ty + 18);
+
     ctx.font = '11px "Segoe UI", sans-serif';
-    ctx.fillStyle = '#88bbcc';
-    ctx.fillText(sub, tx + 10, ty + 33);
+    ctx.fillStyle = '#aaccdd';
+    for (let i = 0; i < subLines.length; i++) {
+      ctx.fillText(subLines[i], tx + 12, ty + 36 + i * 16);
+    }
 
     ctx.restore();
   }

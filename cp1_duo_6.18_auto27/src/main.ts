@@ -127,7 +127,13 @@ class OceanSimulation {
         const dx = mx - t.pos.x;
         const dy = my - t.pos.y;
         if (Math.sqrt(dx * dx + dy * dy) < TURTLE_RADIUS * 1.5) {
-          this.ui.setTooltip(mx, my, '海龟', `捕获: ${t.catchCount}条鱼`);
+          const patrol = t.getPatrolProgress();
+          const lastCatch = t.getTimeSinceLastCatch();
+          this.ui.setTooltipDetails(mx, my, '海龟', [
+            `捕获: ${t.catchCount}条鱼`,
+            `巡逻: ${patrol}`,
+            `上次捕食: ${lastCatch}`
+          ]);
           found = true;
           break;
         }
@@ -138,7 +144,12 @@ class OceanSimulation {
           const dx = mx - f.pos.x;
           const dy = my - f.pos.y;
           if (Math.sqrt(dx * dx + dy * dy) < FISH_RADIUS * 2) {
-            this.ui.setTooltip(mx, my, '小鱼', '鱼群成员');
+            const speed = f.getSpeed().toFixed(2);
+            const neighbors = f.getNearestNeighborCount(this.fishes);
+            this.ui.setTooltipDetails(mx, my, '小鱼', [
+              `速度: ${speed}px/帧`,
+              `邻居: ${neighbors}只`
+            ]);
             found = true;
             break;
           }
@@ -149,7 +160,12 @@ class OceanSimulation {
           const dx = mx - j.pos.x;
           const dy = my - j.pos.y;
           if (Math.sqrt(dx * dx + dy * dy) < JELLYFISH_RADIUS * 1.5) {
-            this.ui.setTooltip(mx, my, '水母', '飘流中');
+            const pulse = Math.round(j.getPulsePhasePercent());
+            const depth = Math.round(j.getDepth());
+            this.ui.setTooltipDetails(mx, my, '水母', [
+              `脉动: ${pulse}%`,
+              `深度: ${depth}px`
+            ]);
             found = true;
             break;
           }
@@ -213,8 +229,45 @@ class OceanSimulation {
     for (const t of this.turtles) {
       totalCatches += t.catchCount;
     }
-    this.ui.updateStats(this.currentFps, fishAlive, jellyCount, totalCatches);
+
+    const ecoActivity = this.calculateEcoActivity();
+
+    this.ui.updateStats(this.currentFps, fishAlive, jellyCount, totalCatches, ecoActivity);
     this.ui.update();
+  }
+
+  private calculateEcoActivity(): number {
+    let totalSpeed = 0;
+    let totalTurnRate = 0;
+    let count = 0;
+
+    for (const fish of this.fishes) {
+      if (!fish.alive) continue;
+      totalSpeed += fish.getSpeed();
+      totalTurnRate += fish.getTurnRate();
+      count++;
+    }
+    for (const jelly of this.jellyfishes) {
+      totalSpeed += jelly.getSpeed() * 2;
+      totalTurnRate += jelly.getTurnRate();
+      count++;
+    }
+    for (const turtle of this.turtles) {
+      totalSpeed += turtle.getSpeed() * 1.5;
+      totalTurnRate += turtle.getTurnRate();
+      count++;
+    }
+
+    if (count === 0) return 0;
+
+    const avgSpeed = totalSpeed / count;
+    const avgTurnRate = totalTurnRate / count;
+
+    const speedScore = Math.min(100, (avgSpeed / 4) * 100);
+    const turnScore = Math.min(100, (avgTurnRate / 0.5) * 100);
+
+    const activity = (speedScore * 0.5 + turnScore * 0.5);
+    return Math.max(0, Math.min(100, activity));
   }
 
   private render(): void {
@@ -227,6 +280,8 @@ class OceanSimulation {
     this.renderLightRays(ctx);
 
     this.env.render(ctx, this.time);
+
+    this.renderTurtlePatrolPaths(ctx);
 
     for (const jelly of this.jellyfishes) {
       jelly.render(ctx);
@@ -241,6 +296,41 @@ class OceanSimulation {
     }
 
     this.ui.render(ctx);
+  }
+
+  private renderTurtlePatrolPaths(ctx: CanvasRenderingContext2D): void {
+    ctx.save();
+    for (const t of this.turtles) {
+      const points = t.patrolPoints;
+      if (points.length < 2) continue;
+
+      ctx.beginPath();
+      ctx.setLineDash([5, 5]);
+      ctx.moveTo(points[0].x, points[0].y);
+      for (let i = 1; i < points.length; i++) {
+        ctx.lineTo(points[i].x, points[i].y);
+      }
+      ctx.lineTo(points[0].x, points[0].y);
+      ctx.strokeStyle = 'rgba(46, 204, 113, 0.3)';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      for (let i = 0; i < points.length; i++) {
+        const p = points[i];
+        const isActive = i === t.currentPatrolIndex;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, isActive ? 5 : 3, 0, Math.PI * 2);
+        ctx.fillStyle = isActive ? 'rgba(46, 204, 113, 0.6)' : 'rgba(46, 204, 113, 0.25)';
+        ctx.fill();
+        if (isActive) {
+          ctx.strokeStyle = 'rgba(46, 204, 113, 0.8)';
+          ctx.lineWidth = 1;
+          ctx.stroke();
+        }
+      }
+    }
+    ctx.restore();
   }
 
   private renderLightRays(ctx: CanvasRenderingContext2D): void {

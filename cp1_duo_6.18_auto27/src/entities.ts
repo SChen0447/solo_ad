@@ -61,6 +61,8 @@ export class Fish {
   alive: boolean = true;
   trail: TrailPoint[] = [];
   id: number;
+  private prevVel: Vec2 = { x: 0, y: 0 };
+  private turnRate: number = 0;
   private static nextId = 0;
 
   constructor(x: number, y: number) {
@@ -108,6 +110,13 @@ export class Fish {
       this.vel.y *= 0.5;
     }
 
+    const prevAngle = Math.atan2(this.prevVel.y, this.prevVel.x);
+    const currAngle = Math.atan2(this.vel.y, this.vel.x);
+    let angleDiff = Math.abs(currAngle - prevAngle);
+    if (angleDiff > Math.PI) angleDiff = Math.PI * 2 - angleDiff;
+    this.turnRate = this.turnRate * 0.9 + angleDiff * 0.1;
+    this.prevVel = { x: this.vel.x, y: this.vel.y };
+
     this.pos.x += this.vel.x;
     this.pos.y += this.vel.y;
 
@@ -118,6 +127,25 @@ export class Fish {
     if (this.trail.length > FISH_TRAIL_LENGTH) {
       this.trail.pop();
     }
+  }
+
+  getSpeed(): number {
+    return mag(this.vel);
+  }
+
+  getTurnRate(): number {
+    return this.turnRate;
+  }
+
+  getNearestNeighborCount(fishes: Fish[]): number {
+    let count = 0;
+    for (const f of fishes) {
+      if (f === this || !f.alive) continue;
+      if (dist(this.pos, f.pos) < BOID_PERCEPTION_RADIUS) {
+        count++;
+      }
+    }
+    return count;
   }
 
   private cohesion(fishes: Fish[]): Vec2 {
@@ -249,6 +277,8 @@ export class Jellyfish {
   pulsePhase: number;
   pulseSpeed: number;
   trail: TrailPoint[] = [];
+  private prevVel: Vec2 = { x: 0, y: 0 };
+  private turnRate: number = 0;
 
   constructor(x: number, y: number) {
     this.pos = { x, y };
@@ -283,10 +313,33 @@ export class Jellyfish {
     this.pos.x = Math.max(JELLYFISH_RADIUS, Math.min(CANVAS_WIDTH - JELLYFISH_RADIUS, this.pos.x));
     this.pos.y = Math.max(JELLYFISH_RADIUS, Math.min(CANVAS_HEIGHT - JELLYFISH_RADIUS, this.pos.y));
 
+    const prevAngle = Math.atan2(this.prevVel.y, this.prevVel.x);
+    const currAngle = Math.atan2(this.vel.y, this.vel.x);
+    let angleDiff = Math.abs(currAngle - prevAngle);
+    if (angleDiff > Math.PI) angleDiff = Math.PI * 2 - angleDiff;
+    this.turnRate = this.turnRate * 0.9 + angleDiff * 0.1;
+    this.prevVel = { x: this.vel.x, y: this.vel.y };
+
     this.trail.unshift({ x: this.pos.x, y: this.pos.y });
     if (this.trail.length > JELLYFISH_TRAIL_LENGTH) {
       this.trail.pop();
     }
+  }
+
+  getSpeed(): number {
+    return mag(this.vel);
+  }
+
+  getTurnRate(): number {
+    return this.turnRate;
+  }
+
+  getPulsePhasePercent(): number {
+    return ((this.pulsePhase % (Math.PI * 2)) / (Math.PI * 2)) * 100;
+  }
+
+  getDepth(): number {
+    return this.pos.y;
   }
 
   private boundaryForce(): Vec2 {
@@ -368,6 +421,9 @@ export class Turtle {
   targetFish: Fish | null = null;
   trail: TrailPoint[] = [];
   facingAngle: number = 0;
+  lastCatchTime: number = 0;
+  private prevVel: Vec2 = { x: 0, y: 0 };
+  private turnRate: number = 0;
 
   constructor(x: number, y: number) {
     this.pos = { x, y };
@@ -445,9 +501,17 @@ export class Turtle {
       if (catchDist < TURTLE_CATCH_RANGE) {
         this.targetFish.alive = false;
         this.catchCount++;
+        this.lastCatchTime = Date.now();
         this.targetFish = null;
       }
     }
+
+    const prevAngle = Math.atan2(this.prevVel.y, this.prevVel.x);
+    const currAngle = Math.atan2(this.vel.y, this.vel.x);
+    let angleDiff = Math.abs(currAngle - prevAngle);
+    if (angleDiff > Math.PI) angleDiff = Math.PI * 2 - angleDiff;
+    this.turnRate = this.turnRate * 0.9 + angleDiff * 0.1;
+    this.prevVel = { x: this.vel.x, y: this.vel.y };
 
     if (mag(this.vel) > 0.1) {
       this.facingAngle = Math.atan2(this.vel.y, this.vel.x);
@@ -457,6 +521,26 @@ export class Turtle {
     if (this.trail.length > TURTLE_TRAIL_LENGTH) {
       this.trail.pop();
     }
+  }
+
+  getSpeed(): number {
+    return mag(this.vel);
+  }
+
+  getTurnRate(): number {
+    return this.turnRate;
+  }
+
+  getPatrolProgress(): string {
+    return `${this.currentPatrolIndex + 1}/${this.patrolPoints.length}`;
+  }
+
+  getTimeSinceLastCatch(): string {
+    if (this.lastCatchTime === 0) return '尚未捕食';
+    const seconds = Math.floor((Date.now() - this.lastCatchTime) / 1000);
+    if (seconds < 60) return `${seconds}秒前`;
+    const minutes = Math.floor(seconds / 60);
+    return `${minutes}分${seconds % 60}秒前`;
   }
 
   render(ctx: CanvasRenderingContext2D): void {
