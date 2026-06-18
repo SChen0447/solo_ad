@@ -77,9 +77,7 @@ export class MapRenderer {
           ctx.fillStyle = COLORS.plain;
           ctx.fillRect(px, py, TILE_SIZE, TILE_SIZE);
         } else if (tile.biome === 'mountain') {
-          ctx.fillStyle = COLORS.mountain;
-          ctx.fillRect(px, py, TILE_SIZE, TILE_SIZE);
-          this.drawMountainElevation(tile.elevation, px, py);
+          this.drawMountainTile(tile, px, py);
         } else if (tile.biome === 'water') {
           ctx.fillStyle = COLORS.water;
           ctx.fillRect(px, py, TILE_SIZE, TILE_SIZE);
@@ -89,24 +87,70 @@ export class MapRenderer {
     }
   }
 
-  private drawMountainElevation(elevation: number[] | undefined, px: number, py: number): void {
-    if (!elevation || elevation.length < 2) return;
+  private drawMountainTile(tile: MapTile, px: number, py: number): void {
     const ctx = this.ctx;
+    ctx.fillStyle = COLORS.mountain;
+    ctx.fillRect(px, py, TILE_SIZE, TILE_SIZE);
+
     const cx = px + TILE_SIZE / 2;
     const cy = py + TILE_SIZE / 2;
-    ctx.strokeStyle = 'rgba(0,0,0,0.25)';
-    ctx.lineWidth = 1.2;
 
-    for (let i = 0; i < elevation.length; i++) {
-      const angle1 = (i / elevation.length) * Math.PI * 2;
-      const angle2 = ((i + 1) / elevation.length) * Math.PI * 2;
-      const r1 = 4 + elevation[i] * 0.6;
-      const r2 = 4 + elevation[(i + 1) % elevation.length] * 0.6;
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(px, py, TILE_SIZE, TILE_SIZE);
+    ctx.clip();
+
+    const elev = tile.elevation;
+    if (elev && elev.length >= 2) {
+      const vertices: Array<{ x: number; y: number }> = [];
+      for (let i = 0; i < elev.length; i++) {
+        const angle = (i / elev.length) * Math.PI * 2 - Math.PI / 2;
+        const r = 6 + elev[i] * 0.7;
+        vertices.push({
+          x: cx + Math.cos(angle) * r,
+          y: cy + Math.sin(angle) * r
+        });
+      }
+
+      for (let ring = 0; ring < 3; ring++) {
+        const scale = 1 - ring * 0.28;
+        const alpha = 0.15 + ring * 0.08;
+        ctx.strokeStyle = `rgba(0,0,0,${alpha})`;
+        ctx.lineWidth = 1.2 - ring * 0.3;
+        ctx.beginPath();
+        for (let i = 0; i <= vertices.length; i++) {
+          const v = vertices[i % vertices.length];
+          const sx = cx + (v.x - cx) * scale;
+          const sy = cy + (v.y - cy) * scale;
+          if (i === 0) ctx.moveTo(sx, sy);
+          else ctx.lineTo(sx, sy);
+        }
+        ctx.closePath();
+        ctx.stroke();
+      }
+
+      ctx.fillStyle = 'rgba(0,0,0,0.12)';
       ctx.beginPath();
-      ctx.moveTo(cx + Math.cos(angle1) * r1, cy + Math.sin(angle1) * r1);
-      ctx.lineTo(cx + Math.cos(angle2) * r2, cy + Math.sin(angle2) * r2);
+      ctx.moveTo(cx, cy);
+      for (let i = 0; i <= vertices.length; i++) {
+        const v = vertices[i % vertices.length];
+        ctx.lineTo(v.x, v.y);
+      }
+      ctx.closePath();
+      ctx.fill();
+
+      ctx.strokeStyle = 'rgba(255,255,255,0.1)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      for (let i = 0; i < vertices.length; i++) {
+        const v = vertices[i];
+        ctx.moveTo(cx, cy);
+        ctx.lineTo(v.x, v.y);
+      }
       ctx.stroke();
     }
+
+    ctx.restore();
   }
 
   private drawWaterWaves(px: number, py: number, t: number): void {
@@ -259,15 +303,16 @@ export class MapRenderer {
     for (let y = 0; y < state.tiles.length; y++) {
       for (let x = 0; x < state.tiles[y].length; x++) {
         const tile = state.tiles[y][x];
-        if (tile.biome === 'plain') miniCtx.fillStyle = COLORS.plain;
+        if (tile.obstacle) miniCtx.fillStyle = COLORS.obstacle;
+        else if (tile.biome === 'plain') miniCtx.fillStyle = COLORS.plain;
         else if (tile.biome === 'mountain') miniCtx.fillStyle = COLORS.mountain;
         else miniCtx.fillStyle = COLORS.water;
         miniCtx.fillRect(Math.floor(x * sx), Math.floor(y * sy), Math.ceil(sx), Math.ceil(sy));
       }
     }
-    const t = this.animationTime * 0.01;
+    const t = this.animationTime * 0.008;
     for (const u of state.units) {
-      const flick = 0.5 + 0.5 * Math.abs(Math.sin(t + u.x * 0.01));
+      const flick = 0.4 + 0.6 * Math.abs(Math.sin(t + u.x * 0.01 + u.y * 0.01));
       miniCtx.fillStyle = `rgba(255, 0, 0, ${flick})`;
       const mx = (u.x / TILE_SIZE) * sx;
       const my = (u.y / TILE_SIZE) * sy;
@@ -275,5 +320,9 @@ export class MapRenderer {
       miniCtx.arc(mx, my, Math.max(1.5, sx * 0.4), 0, Math.PI * 2);
       miniCtx.fill();
     }
+
+    miniCtx.strokeStyle = 'rgba(255,255,255,0.3)';
+    miniCtx.lineWidth = 1;
+    miniCtx.strokeRect(0, 0, mw, mh);
   }
 }

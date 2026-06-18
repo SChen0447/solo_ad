@@ -22,14 +22,33 @@ export interface PathResult {
   path: Array<{ x: number; y: number }>;
 }
 
+export interface PathPerfLog {
+  startX: number;
+  startY: number;
+  endX: number;
+  endY: number;
+  durationMs: number;
+  pathLength: number;
+  isReroute: boolean;
+  exceeded: boolean;
+}
+
+const PATHFIND_LIMIT_MS = 15;
+const REROUTE_LIMIT_MS = 10;
+
 export class Pathfinder {
+  private perfLogs: PathPerfLog[] = [];
+
   findPath(
     tiles: MapTile[][],
     startGridX: number,
     startGridY: number,
     endGridX: number,
-    endGridY: number
+    endGridY: number,
+    isReroute: boolean = false
   ): Array<{ x: number; y: number }> {
+    const t0 = performance.now();
+
     if (
       startGridX < 0 || startGridX >= MAP_WIDTH ||
       startGridY < 0 || startGridY >= MAP_HEIGHT ||
@@ -133,7 +152,11 @@ export class Pathfinder {
       }
     }
 
-    if (!endNode) return [];
+    if (!endNode) {
+      this.logPerf(t0, startGridX, startGridY, endGridX, endGridY, 0, isReroute);
+      return [];
+    }
+
     const gridPath: Array<{ x: number; y: number }> = [];
     let node: PFNode | null = endNode;
     while (node) {
@@ -142,7 +165,56 @@ export class Pathfinder {
     }
     gridPath.reverse();
 
-    return this.smoothPath(gridPath);
+    const result = this.smoothPath(gridPath);
+    this.logPerf(t0, startGridX, startGridY, endGridX, endGridY, result.length, isReroute);
+    return result;
+  }
+
+  private logPerf(
+    t0: number,
+    sx: number,
+    sy: number,
+    ex: number,
+    ey: number,
+    pathLen: number,
+    isReroute: boolean
+  ): void {
+    const durationMs = performance.now() - t0;
+    const limit = isReroute ? REROUTE_LIMIT_MS : PATHFIND_LIMIT_MS;
+    const exceeded = durationMs > limit;
+
+    const log: PathPerfLog = {
+      startX: sx,
+      startY: sy,
+      endX: ex,
+      endY: ey,
+      durationMs: Math.round(durationMs * 100) / 100,
+      pathLength: pathLen,
+      isReroute,
+      exceeded
+    };
+    this.perfLogs.push(log);
+
+    if (exceeded) {
+      console.warn(
+        `[Pathfinder] ${isReroute ? 'REROUTE' : 'PATHFIND'} TIMEOUT: ` +
+        `${log.durationMs}ms > ${limit}ms ` +
+        `(${sx},${sy})→(${ex},${ey}) pathLen=${pathLen}`
+      );
+    } else {
+      console.debug(
+        `[Pathfinder] ${isReroute ? 'Reroute' : 'Find'}: ` +
+        `${log.durationMs}ms (${sx},${sy})→(${ex},${ey}) pathLen=${pathLen}`
+      );
+    }
+  }
+
+  getPerfLogs(): PathPerfLog[] {
+    return [...this.perfLogs];
+  }
+
+  clearPerfLogs(): void {
+    this.perfLogs = [];
   }
 
   private smoothPath(gridPath: Array<{ x: number; y: number }>): Array<{ x: number; y: number }> {

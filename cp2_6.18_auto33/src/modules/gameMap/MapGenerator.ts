@@ -136,10 +136,14 @@ export class MapGenerator {
   }
 
   private generateElevation(): number[] {
-    const points = 5 + Math.floor(this.rand.next() * 3);
+    const numVertices = 5 + Math.floor(this.rand.next() * 4);
     const elev: number[] = [];
-    for (let i = 0; i < points; i++) {
-      elev.push(8 + this.rand.next() * 16);
+    for (let i = 0; i < numVertices; i++) {
+      const angle = (i / numVertices) * Math.PI * 2;
+      const baseHeight = 6 + this.rand.next() * 14;
+      const jitter = this.rand.next() * 4 - 2;
+      const height = Math.max(4, baseHeight + jitter * Math.sin(angle * 2));
+      elev.push(height);
     }
     return elev;
   }
