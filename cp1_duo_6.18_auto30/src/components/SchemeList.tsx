@@ -94,14 +94,13 @@ function SchemeCard({
     <div
       className={`relative rounded-xl p-4 cursor-pointer transition-all duration-150 ${
         isHovered ? 'bg-[#f1f5f9]' : 'bg-white'
-      } ${
-        isSelected
-          ? 'ring-2'
-          : 'shadow-[0_1px_3px_rgba(0,0,0,0.1)] border border-gray-100'
       }`}
       style={{
-        --tw-ring-color: scheme.primary,
-      } as React.CSSProperties}
+        boxShadow: isSelected
+          ? `0 0 0 2px ${scheme.primary}`
+          : '0 1px 3px rgba(0,0,0,0.1)',
+        border: isSelected ? 'none' : '1px solid #f1f5f9',
+      }}
       onClick={onSelect}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
