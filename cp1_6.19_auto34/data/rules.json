@@ -1,0 +1,13 @@
+[
+  {
+    "id": "f91cad94-ece2-4764-a2ff-06c515717d3a",
+    "title": "夏季大促销",
+    "subtitle": "全场低至5折",
+    "productLink": "https://example.com/product",
+    "bgColor": "#f0f4ff",
+    "triggerType": "dwell",
+    "triggerValue": 5,
+    "maxDailyShows": 3,
+    "createdAt": 1781809756402
+  }
+]

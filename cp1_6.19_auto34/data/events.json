@@ -1,0 +1,23 @@
+[
+  {
+    "id": "6f224d12-88ab-4908-a527-e76631fdd00e",
+    "ruleId": "f91cad94-ece2-4764-a2ff-06c515717d3a",
+    "sessionId": "test1",
+    "timestamp": 1781809756411,
+    "type": "impression"
+  },
+  {
+    "id": "4bd9aad2-66d7-40b8-a42f-363211aeed05",
+    "ruleId": "f91cad94-ece2-4764-a2ff-06c515717d3a",
+    "sessionId": "test1",
+    "timestamp": 1781809756411,
+    "type": "click"
+  },
+  {
+    "id": "cb34117d-eab0-473b-926c-f8b494c6665f",
+    "ruleId": "f91cad94-ece2-4764-a2ff-06c515717d3a",
+    "sessionId": "test2",
+    "timestamp": 1781809756411,
+    "type": "impression"
+  }
+]
