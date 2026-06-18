@@ -1,0 +1,14 @@
+{
+  "name": "echo-explorer",
+  "version": "1.0.0",
+  "description": "Echo Explorer - A 2D side-scrolling puzzle game with sonar mechanics",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.0",
+    "vite": "^5.2.0"
+  }
+}
