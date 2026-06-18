@@ -12,6 +12,7 @@ export interface Particle {
   life: number;
   maxLife: number;
   trail: Vector2[];
+  age: number;
 }
 
 export interface PolygonObstacle {
@@ -39,7 +40,10 @@ export const RESTITUTION = 0.6;
 export const MAX_PARTICLES = 120;
 export const MAX_OBSTACLES = 20;
 export const PARTICLE_LIFETIME = 60;
-export const TRAIL_LENGTH = 8;
+export const TRAIL_LENGTH = 20;
+export const TRAIL_LENGTH_HIGH_LOAD = 10;
+export const HIGH_LOAD_THRESHOLD = 90;
+export const SPAWN_DURATION = 0.2;
 export const DEFAULT_GRAVITY: Gravity = { x: 0, y: 500 };
 export const GRID_CELL_SIZE = 100;
 
@@ -333,6 +337,7 @@ export function addParticle(
     life: PARTICLE_LIFETIME,
     maxLife: PARTICLE_LIFETIME,
     trail: [],
+    age: 0,
   };
   world.particles.push(particle);
   return particle;
@@ -354,14 +359,21 @@ export function updatePhysics(
   const startTime = performance.now();
   let collisionChecks = 0;
 
+  const particleCount = world.particles.length;
+  const maxTrail = particleCount >= HIGH_LOAD_THRESHOLD
+    ? TRAIL_LENGTH_HIGH_LOAD
+    : TRAIL_LENGTH;
+
   const aliveParticles: Particle[] = [];
 
   for (const particle of world.particles) {
     particle.life -= dt;
     if (particle.life <= 0) continue;
 
+    particle.age += dt;
+
     particle.trail.push({ ...particle.position });
-    if (particle.trail.length > TRAIL_LENGTH) {
+    while (particle.trail.length > maxTrail) {
       particle.trail.shift();
     }
 
@@ -422,6 +434,7 @@ export function createParticle(
     life: PARTICLE_LIFETIME,
     maxLife: PARTICLE_LIFETIME,
     trail: [],
+    age: 0,
   };
 }
 

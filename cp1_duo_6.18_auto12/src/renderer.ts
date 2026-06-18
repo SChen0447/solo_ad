@@ -3,7 +3,14 @@ import type {
   PolygonObstacle,
   Vector2,
 } from "./physics";
-import { CANVAS_WIDTH, CANVAS_HEIGHT, TRAIL_LENGTH } from "./physics";
+import {
+  CANVAS_WIDTH,
+  CANVAS_HEIGHT,
+  TRAIL_LENGTH,
+  SPAWN_DURATION,
+  HIGH_LOAD_THRESHOLD,
+  TRAIL_LENGTH_HIGH_LOAD,
+} from "./physics";
 
 export interface RenderState {
   particles: Particle[];
@@ -76,28 +83,83 @@ export class Renderer {
     }
   }
 
-  drawParticle(particle: Particle): void {
+  drawParticleTrail(particle: Particle): void {
     const ctx = this.ctx;
-    const { position, radius, color, trail } = particle;
+    const { trail, color, radius } = particle;
+    if (trail.length < 2) return;
 
-    for (let i = 0; i < trail.length; i++) {
-      const t = trail[i];
-      const age = i / TRAIL_LENGTH;
-      const alpha = 0.8 * (i + 1) / TRAIL_LENGTH;
-      const trailRadius = radius * (1 - age * 0.5);
+    const { r, g, b } = this.hexToRgb(color);
+
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+
+    for (let i = 0; i < trail.length - 1; i++) {
+      const from = trail[i];
+      const to = trail[i + 1];
+
+      const progress = (i + 1) / trail.length;
+      const alpha = progress;
+      const lineRadius = radius * progress * 0.8;
+
       ctx.beginPath();
-      ctx.arc(t.x, t.y, trailRadius, 0, Math.PI * 2);
-      ctx.fillStyle = this.hexToRgba(color, alpha * 0.5);
+      ctx.moveTo(from.x, from.y);
+      ctx.lineTo(to.x, to.y);
+      ctx.strokeStyle = `rgba(${r}, ${g}, ${b}, ${alpha})`;
+      ctx.lineWidth = lineRadius * 2;
+      ctx.stroke();
+    }
+
+    const lastTrail = trail[trail.length - 1];
+    const progress = 1;
+    const alpha = progress;
+    ctx.beginPath();
+    ctx.moveTo(lastTrail.x, lastTrail.y);
+    ctx.lineTo(particle.position.x, particle.position.y);
+    ctx.strokeStyle = `rgba(${r}, ${g}, ${b}, ${alpha})`;
+    ctx.lineWidth = radius * 2 * 0.8;
+    ctx.stroke();
+  }
+
+  drawParticle(particle: Particle, particleCount: number): void {
+    const ctx = this.ctx;
+    const { position, radius, color, age } = particle;
+
+    this.drawParticleTrail(particle);
+
+    const spawnProgress = Math.min(age / SPAWN_DURATION, 1);
+    const eased = 1 - Math.pow(1 - spawnProgress, 3);
+    const displayRadius = radius * eased;
+
+    if (displayRadius < 0.5) return;
+
+    if (spawnProgress < 1) {
+      const glowRadius = radius * (1 + (1 - spawnProgress) * 2);
+      const { r, g, b } = this.hexToRgb(color);
+      const gradient = ctx.createRadialGradient(
+        position.x, position.y, displayRadius * 0.5,
+        position.x, position.y, glowRadius
+      );
+      gradient.addColorStop(0, `rgba(${r}, ${g}, ${b}, 0.6)`);
+      gradient.addColorStop(1, `rgba(${r}, ${g}, ${b}, 0)`);
+      ctx.beginPath();
+      ctx.arc(position.x, position.y, glowRadius, 0, Math.PI * 2);
+      ctx.fillStyle = gradient;
       ctx.fill();
     }
 
     ctx.beginPath();
-    ctx.arc(position.x, position.y, radius, 0, Math.PI * 2);
+    ctx.arc(position.x, position.y, displayRadius, 0, Math.PI * 2);
     ctx.fillStyle = color;
     ctx.fill();
 
     ctx.beginPath();
-    ctx.arc(position.x - radius * 0.3, position.y - radius * 0.3, radius * 0.3, 0, Math.PI * 2);
+    ctx.arc(
+      position.x - displayRadius * 0.3,
+      position.y - displayRadius * 0.3,
+      displayRadius * 0.3,
+      0,
+      Math.PI * 2
+    );
     ctx.fillStyle = "rgba(255, 255, 255, 0.4)";
     ctx.fill();
   }
@@ -145,10 +207,16 @@ export class Renderer {
     ctx.closePath();
   }
 
+  private hexToRgb(hex: string): { r: number; g: number; b: number } {
+    return {
+      r: parseInt(hex.slice(1, 3), 16),
+      g: parseInt(hex.slice(3, 5), 16),
+      b: parseInt(hex.slice(5, 7), 16),
+    };
+  }
+
   private hexToRgba(hex: string, alpha: number): string {
-    const r = parseInt(hex.slice(1, 3), 16);
-    const g = parseInt(hex.slice(3, 5), 16);
-    const b = parseInt(hex.slice(5, 7), 16);
+    const { r, g, b } = this.hexToRgb(hex);
     return `rgba(${r}, ${g}, ${b}, ${alpha})`;
   }
 
@@ -163,10 +231,11 @@ export class Renderer {
       this.drawCurrentDrawing(state.currentDrawing);
     }
 
+    const particleCount = state.particles.length;
     for (const particle of state.particles) {
-      this.drawParticle(particle);
+      this.drawParticle(particle, particleCount);
     }
 
-    this.drawParticleCount(state.particles.length);
+    this.drawParticleCount(particleCount);
   }
 }
