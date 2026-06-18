@@ -1,7 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { X, Plus, Check, GitCompare } from 'lucide-react';
 import { useThemeStore, ColorScheme } from '@/stores/themeStore';
-import { getContrastColor } from '@/utils/colorUtils';
 
 interface SchemeCardProps {
   scheme: ColorScheme;
@@ -87,8 +86,6 @@ function SchemeCard({
     e.stopPropagation();
     onToggleCompare();
   };
-
-  const textColor = getContrastColor(scheme.background);
 
   return (
     <div

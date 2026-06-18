@@ -7,6 +7,7 @@ import {
   rgbToHex,
   isValidHex,
   normalizeHex,
+  getContrastColor,
 } from '@/utils/colorUtils';
 
 interface ColorPickerProps {
@@ -31,6 +32,9 @@ export function ColorPicker({ compact = false }: ColorPickerProps) {
     const rgb = hexToRgb(currentColor);
     return rgb ? { r: rgb.r, g: rgb.g, b: rgb.b } : { r: 59, g: 130, b: 246 };
   });
+
+  const [isDraggingHue, setIsDraggingHue] = useState(false);
+  const [isDraggingSL, setIsDraggingSL] = useState(false);
 
   useEffect(() => {
     setHexInput(currentColor);
@@ -121,59 +125,99 @@ export function ColorPicker({ compact = false }: ColorPickerProps) {
     drawSLSquare();
   }, [drawHueWheel, drawSLSquare]);
 
-  const handleHueClick = useCallback(
-    (e: React.MouseEvent<HTMLCanvasElement>) => {
+  const getHueFromEvent = useCallback(
+    (clientX: number, clientY: number) => {
       const canvas = hueCanvasRef.current;
-      if (!canvas) return;
+      if (!canvas) return null;
 
       const rect = canvas.getBoundingClientRect();
-      const x = e.clientX - rect.left - rect.width / 2;
-      const y = e.clientY - rect.top - rect.height / 2;
+      const x = clientX - rect.left - rect.width / 2;
+      const y = clientY - rect.top - rect.height / 2;
 
       let angle = Math.atan2(y, x) * (180 / Math.PI);
       if (angle < 0) angle += 360;
 
-      const newHex = hslToHex(Math.round(angle), currentHsl.s, currentHsl.l);
-      setTempColor(editingColor, newHex);
+      return Math.round(angle);
     },
-    [editingColor, currentHsl.s, currentHsl.l, setTempColor]
+    []
   );
 
-  const handleHueDrag = useCallback(
-    (e: React.MouseEvent<HTMLCanvasElement>) => {
-      if (e.buttons === 1) {
-        handleHueClick(e);
-      }
-    },
-    [handleHueClick]
-  );
-
-  const handleSLClick = useCallback(
-    (e: React.MouseEvent<HTMLCanvasElement>) => {
+  const getSLFromEvent = useCallback(
+    (clientX: number, clientY: number) => {
       const canvas = slCanvasRef.current;
-      if (!canvas) return;
+      if (!canvas) return null;
 
       const rect = canvas.getBoundingClientRect();
-      const x = Math.max(0, Math.min(rect.width, e.clientX - rect.left));
-      const y = Math.max(0, Math.min(rect.height, e.clientY - rect.top));
+      const x = Math.max(0, Math.min(rect.width, clientX - rect.left));
+      const y = Math.max(0, Math.min(rect.height, clientY - rect.top));
 
-      const s = Math.round((x / rect.width) * 100);
-      const l = Math.round((1 - y / rect.height) * 100);
-
-      const newHex = hslToHex(currentHsl.h, s, l);
-      setTempColor(editingColor, newHex);
+      return {
+        s: Math.round((x / rect.width) * 100),
+        l: Math.round((1 - y / rect.height) * 100),
+      };
     },
-    [editingColor, currentHsl.h, setTempColor]
+    []
   );
 
-  const handleSLDrag = useCallback(
+  const handleHueMouseDown = useCallback(
     (e: React.MouseEvent<HTMLCanvasElement>) => {
-      if (e.buttons === 1) {
-        handleSLClick(e);
+      e.preventDefault();
+      setIsDraggingHue(true);
+      const angle = getHueFromEvent(e.clientX, e.clientY);
+      if (angle !== null) {
+        const newHex = hslToHex(angle, currentHsl.s, currentHsl.l);
+        setTempColor(editingColor, newHex);
       }
     },
-    [handleSLClick]
+    [editingColor, currentHsl.s, currentHsl.l, setTempColor, getHueFromEvent]
   );
+
+  const handleSLMouseDown = useCallback(
+    (e: React.MouseEvent<HTMLCanvasElement>) => {
+      e.preventDefault();
+      setIsDraggingSL(true);
+      const sl = getSLFromEvent(e.clientX, e.clientY);
+      if (sl) {
+        const newHex = hslToHex(currentHsl.h, sl.s, sl.l);
+        setTempColor(editingColor, newHex);
+      }
+    },
+    [editingColor, currentHsl.h, setTempColor, getSLFromEvent]
+  );
+
+  useEffect(() => {
+    if (!isDraggingHue && !isDraggingSL) return;
+
+    const handleMouseMove = (e: MouseEvent) => {
+      if (isDraggingHue) {
+        const angle = getHueFromEvent(e.clientX, e.clientY);
+        if (angle !== null) {
+          const newHex = hslToHex(angle, currentHsl.s, currentHsl.l);
+          setTempColor(editingColor, newHex);
+        }
+      }
+      if (isDraggingSL) {
+        const sl = getSLFromEvent(e.clientX, e.clientY);
+        if (sl) {
+          const newHex = hslToHex(currentHsl.h, sl.s, sl.l);
+          setTempColor(editingColor, newHex);
+        }
+      }
+    };
+
+    const handleMouseUp = () => {
+      setIsDraggingHue(false);
+      setIsDraggingSL(false);
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isDraggingHue, isDraggingSL, editingColor, currentHsl, setTempColor, getHueFromEvent, getSLFromEvent]);
 
   const handleHexChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
@@ -213,16 +257,15 @@ export function ColorPicker({ compact = false }: ColorPickerProps) {
               onClick={() => setEditingColor(type.key)}
               className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-all ${
                 editingColor === type.key
-                  ? 'ring-2 ring-offset-2'
+                  ? 'ring-2 ring-offset-2 ring-blue-500'
                   : 'hover:opacity-90'
               }`}
               style={{
                 backgroundColor: tempColors[type.key],
                 color:
                   type.key === 'background'
-                    ? tempColors.text || '#000'
+                    ? getContrastColor(tempColors.background)
                     : '#ffffff',
-                ringColor: tempColors.primary,
               }}
             >
               {type.label}
@@ -230,22 +273,20 @@ export function ColorPicker({ compact = false }: ColorPickerProps) {
           ))}
         </div>
 
-        <div className="flex gap-4">
+        <div className="flex gap-4 justify-center">
           <canvas
             ref={hueCanvasRef}
             width={160}
             height={160}
-            className="rounded-full cursor-crosshair"
-            onClick={handleHueClick}
-            onMouseMove={handleHueDrag}
+            className="rounded-full cursor-crosshair select-none"
+            onMouseDown={handleHueMouseDown}
           />
           <canvas
             ref={slCanvasRef}
             width={160}
             height={160}
-            className="rounded-lg cursor-crosshair"
-            onClick={handleSLClick}
-            onMouseMove={handleSLDrag}
+            className="rounded-lg cursor-crosshair select-none"
+            onMouseDown={handleSLMouseDown}
           />
         </div>
 
@@ -299,18 +340,15 @@ export function ColorPicker({ compact = false }: ColorPickerProps) {
             onClick={() => setEditingColor(type.key)}
             className={`flex-1 py-3 px-4 rounded-xl text-sm font-medium transition-all btn-bounce btn-hover ${
               editingColor === type.key
-                ? 'ring-2 ring-offset-2'
+                ? 'ring-2 ring-offset-2 ring-blue-500'
                 : 'hover:opacity-90'
             }`}
             style={{
               backgroundColor: tempColors[type.key],
               color:
                 type.key === 'background'
-                  ? currentHsl.l > 50
-                    ? '#000000'
-                    : '#ffffff'
+                  ? getContrastColor(tempColors.background)
                   : '#ffffff',
-              ringColor: tempColors.primary,
             }}
           >
             {type.label}
@@ -328,9 +366,8 @@ export function ColorPicker({ compact = false }: ColorPickerProps) {
             ref={hueCanvasRef}
             width={200}
             height={200}
-            className="rounded-full cursor-crosshair shadow-md"
-            onClick={handleHueClick}
-            onMouseMove={handleHueDrag}
+            className="rounded-full cursor-crosshair shadow-md select-none"
+            onMouseDown={handleHueMouseDown}
           />
         </div>
         <div className="text-center">
@@ -341,9 +378,8 @@ export function ColorPicker({ compact = false }: ColorPickerProps) {
             ref={slCanvasRef}
             width={200}
             height={200}
-            className="rounded-xl cursor-crosshair shadow-md border border-gray-200"
-            onClick={handleSLClick}
-            onMouseMove={handleSLDrag}
+            className="rounded-xl cursor-crosshair shadow-md border border-gray-200 select-none"
+            onMouseDown={handleSLMouseDown}
           />
         </div>
       </div>
@@ -371,7 +407,7 @@ export function ColorPicker({ compact = false }: ColorPickerProps) {
         <div className="flex items-center gap-4">
           <label className="text-sm font-medium text-gray-700 w-20">RGB</label>
           <div className="flex-1 flex gap-2">
-            {(['r', 'g', 'b'] as const).map((channel, index) => (
+            {(['r', 'g', 'b'] as const).map((channel) => (
               <div key={channel} className="flex-1">
                 <div className="text-xs text-gray-400 mb-1 text-center">
                   {channel.toUpperCase()}

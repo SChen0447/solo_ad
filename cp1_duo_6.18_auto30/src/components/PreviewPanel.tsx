@@ -81,10 +81,7 @@ function PreviewCard({ scheme, showUIElements = false }: PreviewCardProps) {
           <input
             type="text"
             placeholder="默认状态"
-            className="px-4 py-2.5 rounded-xl border border-gray-300 text-sm focus:outline-none transition-all"
-            style={{
-              '--tw-ring-color': scheme.primary,
-            } as React.CSSProperties}
+            className="px-4 py-2.5 rounded-xl border border-gray-300 text-sm focus:outline-none transition-all focus:border-blue-500"
           />
           <input
             type="text"
@@ -226,7 +223,6 @@ function PreviewCard({ scheme, showUIElements = false }: PreviewCardProps) {
 
 export function PreviewPanel() {
   const {
-    currentScheme,
     isCompareMode,
     selectedForCompare,
     schemes,
