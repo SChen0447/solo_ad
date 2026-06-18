@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <title>节奏光剑</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet">
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: linear-gradient(135deg, #0a0a2e 0%, #1a0a2e 100%);
+      font-family: 'Orbitron', sans-serif;
+    }
+
+    #app {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+    }
+
+    #gameCanvas {
+      border-radius: 12px;
+      box-shadow: 0 0 60px rgba(138, 43, 226, 0.3),
+                  0 0 120px rgba(0, 212, 255, 0.2),
+                  inset 0 0 60px rgba(0, 0, 0, 0.5);
+      cursor: none;
+      touch-action: none;
+    }
+
+    #fileInput {
+      display: none;
+    }
+
+    .ui-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 10;
+    }
+
+    .menu-button, .gameover-button {
+      pointer-events: auto;
+      cursor: pointer;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .menu-button:hover, .gameover-button:hover {
+      transform: scale(1.05);
+    }
+
+    .menu-button:active, .gameover-button:active {
+      transform: scale(0.95);
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <canvas id="gameCanvas"></canvas>
+    <input type="file" id="fileInput" accept=".mp3,.wav,audio/*" />
+    <div class="ui-overlay" id="uiOverlay"></div>
+  </div>
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
