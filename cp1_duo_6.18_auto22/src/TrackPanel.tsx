@@ -21,11 +21,44 @@ const EQKnob: React.FC<EQKnobProps> = ({ value, min, max, step, label, onChange 
   const range = max - min;
   const normalized = (value - min) / range;
   const angle = -135 + normalized * 270;
+  const midPoint = (0 - min) / range;
 
-  const getGradientColor = () => {
-    if (value > 0) return `conic-gradient(from 135deg, #ff5252 0%, #ff9800 ${normalized * 75}%, transparent ${normalized * 75}%)`;
-    if (value < 0) return `conic-gradient(from 135deg, #2196f3 0%, #2196f3 ${normalized * 75}%, transparent ${normalized * 75}%)`;
-    return 'transparent';
+  const getRingStyle = (): React.CSSProperties => {
+    if (value === 0) {
+      return {
+        background: 'transparent',
+      };
+    }
+
+    const totalAngle = 270;
+    const startAngle = 135;
+    const valuePercent = Math.abs(value) / 12;
+
+    if (value > 0) {
+      const midAngle = startAngle + midPoint * totalAngle;
+      const endAngle = midAngle + valuePercent * (totalAngle / 2);
+      return {
+        background: `conic-gradient(from ${startAngle}deg, 
+          transparent 0deg, 
+          transparent ${midAngle}deg, 
+          #66bb6a ${midAngle}deg, 
+          #4caf50 ${endAngle}deg, 
+          transparent ${endAngle}deg, 
+          transparent 360deg)`,
+      };
+    } else {
+      const midAngle = startAngle + midPoint * totalAngle;
+      const startNegAngle = midAngle - valuePercent * (totalAngle / 2);
+      return {
+        background: `conic-gradient(from ${startAngle}deg, 
+          transparent 0deg, 
+          transparent ${startNegAngle}deg, 
+          #ef5350 ${startNegAngle}deg, 
+          #e53935 ${midAngle}deg, 
+          transparent ${midAngle}deg, 
+          transparent 360deg)`,
+      };
+    }
   };
 
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
@@ -57,26 +90,34 @@ const EQKnob: React.FC<EQKnobProps> = ({ value, min, max, step, label, onChange 
   }, [value, min, max, step, range, onChange]);
 
   return (
-    <div className="eq-knob-wrap" style={styles.knobWrap}>
+    <div style={styles.knobWrap}>
       <div style={styles.knobLabel}>{label}</div>
       <div
         ref={knobRef}
         style={{
           ...styles.knobOuter,
-          background: getGradientColor(),
+          ...getRingStyle(),
         }}
         onMouseDown={handleMouseDown}
       >
-        <div style={styles.knobInner}>
-          <div
-            style={{
-              ...styles.knobIndicator,
-              transform: `rotate(${angle}deg)`,
-            }}
-          />
+        <div style={styles.knobTrack}>
+          <div style={styles.knobInner}>
+            <div
+              style={{
+                ...styles.knobIndicator,
+                transform: `rotate(${angle}deg)`,
+                backgroundColor: value !== 0 ? (value > 0 ? '#4caf50' : '#e53935') : '#bdbdbd',
+              }}
+            />
+          </div>
         </div>
       </div>
-      <div style={styles.knobValue}>{value.toFixed(1)}dB</div>
+      <div style={{
+        ...styles.knobValue,
+        color: value > 0 ? '#4caf50' : value < 0 ? '#e53935' : '#666',
+      }}>
+        {value > 0 ? '+' : ''}{value.toFixed(1)}dB
+      </div>
     </div>
   );
 };
@@ -530,19 +571,32 @@ const styles: Record<string, React.CSSProperties> = {
     alignItems: 'center',
     justifyContent: 'center',
     cursor: 'grab',
-    padding: 2,
+    padding: 0,
     boxSizing: 'border-box',
-    transition: 'all 0.2s ease-in-out',
+    transition: 'all 0.15s ease-in-out',
+    position: 'relative',
+    backgroundColor: 'transparent',
   },
-  knobInner: {
+  knobTrack: {
     width: 16,
     height: 16,
+    borderRadius: '50%',
+    backgroundColor: '#bdbdbd',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'absolute',
+  },
+  knobInner: {
+    width: 14,
+    height: 14,
     borderRadius: '50%',
     backgroundColor: '#424242',
     position: 'relative',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
+    boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.3)',
   },
   knobIndicator: {
     position: 'absolute',

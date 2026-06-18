@@ -143,7 +143,7 @@ const MainTimeline: React.FC<MainTimelineProps> = ({
     const rect = container.getBoundingClientRect();
     const scrollLeft = container.scrollLeft;
     const x = e.clientX - rect.left + scrollLeft;
-    const time = Math.max(0, Math.min(duration || 0, x / pixelsPerSecond);
+    const time = Math.max(0, Math.min(duration || 0, x / pixelsPerSecond));
     onSeek(time);
   };
 
@@ -184,7 +184,9 @@ const MainTimeline: React.FC<MainTimelineProps> = ({
     for (let s = 0; s <= totalSeconds; s++) {
       const isMajor = s % 5 === 0;
       const x = s * pixelsPerSecond;
-      const height = isMajor ? RULER_HEIGHT * 0.7 : RULER_HEIGHT * 0.4;
+      const height = isMajor ? RULER_HEIGHT * 0.85 : RULER_HEIGHT * 0.4;
+      const width = isMajor ? 2 : 1;
+      const color = isMajor ? '#e0e0e0' : '#666';
       ticks.push(
         <div
           key={`tick-${s}`}
@@ -192,9 +194,9 @@ const MainTimeline: React.FC<MainTimelineProps> = ({
             position: 'absolute',
             left: x,
             bottom: 0,
-            width: 1,
+            width,
             height: `${height}px`,
-            backgroundColor: isMajor ? '#888' : '#555',
+            backgroundColor: color,
           }}
         />
       );
@@ -204,11 +206,13 @@ const MainTimeline: React.FC<MainTimelineProps> = ({
             key={`label-${s}`}
             style={{
               position: 'absolute',
-              left: x + 3,
+              left: x + 4,
               top: 2,
-              fontSize: 10,
+              fontSize: 11,
+              fontWeight: 600,
               fontFamily: 'JetBrains Mono, monospace',
-              color: '#bbb',
+              color: '#e0e0e0',
+              textShadow: '0 1px 2px rgba(0,0,0,0.5)',
             }}
           >
             {formatTime(s)}
