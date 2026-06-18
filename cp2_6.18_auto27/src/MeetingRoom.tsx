@@ -10,6 +10,21 @@ function hashColor(id: string): string {
   return `hsl(${hue}, 70%, 55%)`;
 }
 
+function useIsMobile(breakpoint = 768): boolean {
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < breakpoint);
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, [breakpoint]);
+
+  return isMobile;
+}
+
 interface MeetingRoomProps {
   meetingId: string;
   userId: string;
@@ -31,6 +46,7 @@ export default function MeetingRoom({ meetingId, userId, onMeetingLoad }: Meetin
   const listRef = useRef<HTMLDivElement>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [loadingMore, setLoadingMore] = useState(false);
+  const isMobile = useIsMobile(768);
 
   const sortIdeas = useCallback((ideasList: Idea[]): Idea[] => {
     return [...ideasList].sort((a, b) => {
@@ -294,16 +310,17 @@ export default function MeetingRoom({ meetingId, userId, onMeetingLoad }: Meetin
   const meetingHeaderStyles: React.CSSProperties = {
     backgroundColor: '#1f2937',
     borderRadius: '12px',
-    padding: '20px 24px',
+    padding: isMobile ? '16px' : '20px 24px',
     marginBottom: '24px',
     border: '1px solid #374151',
   };
 
   const meetingTitleStyles: React.CSSProperties = {
-    fontSize: '24px',
+    fontSize: isMobile ? '20px' : '24px',
     fontWeight: 700,
     color: '#f9fafb',
     margin: '0 0 8px 0',
+    wordBreak: 'break-word',
   };
 
   const meetingDescStyles: React.CSSProperties = {
@@ -311,14 +328,23 @@ export default function MeetingRoom({ meetingId, userId, onMeetingLoad }: Meetin
     color: '#9ca3af',
     margin: '0 0 16px 0',
     lineHeight: 1.6,
+    wordBreak: 'break-word',
   };
 
   const meetingMetaStyles: React.CSSProperties = {
     display: 'flex',
-    flexWrap: 'wrap',
-    gap: '24px',
-    alignItems: 'center',
+    flexDirection: isMobile ? 'column' : 'row',
+    alignItems: isMobile ? 'flex-start' : 'center',
+    gap: isMobile ? '16px' : '24px',
     justifyContent: 'space-between',
+  };
+
+  const metaInfoContainerStyles: React.CSSProperties = {
+    display: 'flex',
+    flexDirection: isMobile ? 'column' : 'row',
+    gap: isMobile ? '12px' : '24px',
+    flexWrap: 'wrap',
+    width: isMobile ? '100%' : 'auto',
   };
 
   const metaItemStyles: React.CSSProperties = {
@@ -330,23 +356,34 @@ export default function MeetingRoom({ meetingId, userId, onMeetingLoad }: Meetin
   };
 
   const timerStyles: React.CSSProperties = {
-    fontSize: '16px',
+    fontSize: isMobile ? '14px' : '16px',
     fontWeight: 600,
     color: isMeetingClosed ? '#6b7280' : '#f59e0b',
     fontFamily: 'monospace',
+    wordBreak: 'break-all',
+  };
+
+  const actionContainerStyles: React.CSSProperties = {
+    display: 'flex',
+    flexDirection: isMobile ? 'row' : 'row',
+    alignItems: 'center',
+    gap: '12px',
+    width: isMobile ? '100%' : 'auto',
+    justifyContent: isMobile ? 'space-between' : 'flex-start',
   };
 
   const votesRemainingStyles: React.CSSProperties = {
-    padding: '4px 12px',
+    padding: isMobile ? '6px 14px' : '4px 12px',
     backgroundColor: '#3b82f6',
     color: '#ffffff',
     borderRadius: '20px',
-    fontSize: '13px',
+    fontSize: isMobile ? '14px' : '13px',
     fontWeight: 500,
+    whiteSpace: 'nowrap',
   };
 
   const endButtonStyles: React.CSSProperties = {
-    padding: '10px 20px',
+    padding: isMobile ? '10px 18px' : '10px 20px',
     backgroundColor: isMeetingClosed ? 'transparent' : '#ef4444',
     color: isMeetingClosed ? '#6b7280' : '#ffffff',
     border: isMeetingClosed ? '1px solid #374151' : 'none',
@@ -355,69 +392,77 @@ export default function MeetingRoom({ meetingId, userId, onMeetingLoad }: Meetin
     cursor: isMeetingClosed ? 'default' : 'pointer',
     minHeight: '44px',
     minWidth: '44px',
+    whiteSpace: 'nowrap',
   };
 
   const addButtonStyles: React.CSSProperties = {
     width: '100%',
-    padding: '16px',
+    padding: isMobile ? '18px 16px' : '16px',
     backgroundColor: 'transparent',
     color: '#3b82f6',
     border: '2px dashed #374151',
     borderRadius: '12px',
-    fontSize: '15px',
+    fontSize: isMobile ? '16px' : '15px',
     cursor: 'pointer',
     marginBottom: '20px',
-    minHeight: '52px',
+    minHeight: '56px',
     transition: 'all 0.2s',
+    touchAction: 'manipulation',
   };
 
   const addFormStyles: React.CSSProperties = {
     backgroundColor: '#1f2937',
     borderRadius: '12px',
-    padding: '20px',
+    padding: isMobile ? '16px' : '20px',
     marginBottom: '20px',
     border: '1px solid #374151',
   };
 
   const inputStyles: React.CSSProperties = {
     width: '100%',
-    padding: '12px 14px',
+    padding: '14px',
     backgroundColor: '#111827',
     color: '#f9fafb',
     border: '1px solid #374151',
     borderRadius: '8px',
-    fontSize: '14px',
+    fontSize: '16px',
     boxSizing: 'border-box',
-    minHeight: '44px',
+    minHeight: '48px',
     marginBottom: '12px',
+    touchAction: 'manipulation',
   };
 
   const textareaStyles: React.CSSProperties = {
     ...inputStyles,
-    minHeight: '80px',
+    minHeight: '100px',
     resize: 'vertical',
     fontFamily: 'inherit',
+    lineHeight: 1.5,
   };
 
   const formButtonRowStyles: React.CSSProperties = {
     display: 'flex',
     gap: '12px',
-    justifyContent: 'flex-end',
+    justifyContent: isMobile ? 'stretch' : 'flex-end',
+    flexDirection: isMobile ? 'row' : 'row',
   };
 
   const formCancelBtnStyles: React.CSSProperties = {
-    padding: '10px 20px',
+    flex: isMobile ? 1 : 'none',
+    padding: '12px 20px',
     backgroundColor: 'transparent',
     color: '#9ca3af',
     border: '1px solid #374151',
     borderRadius: '8px',
     fontSize: '14px',
     cursor: 'pointer',
-    minHeight: '44px',
+    minHeight: '48px',
+    touchAction: 'manipulation',
   };
 
   const formSubmitBtnStyles: React.CSSProperties = {
-    padding: '10px 24px',
+    flex: isMobile ? 1 : 'none',
+    padding: '12px 24px',
     backgroundColor: '#3b82f6',
     color: '#ffffff',
     border: 'none',
@@ -425,7 +470,8 @@ export default function MeetingRoom({ meetingId, userId, onMeetingLoad }: Meetin
     fontSize: '14px',
     fontWeight: 500,
     cursor: 'pointer',
-    minHeight: '44px',
+    minHeight: '48px',
+    touchAction: 'manipulation',
   };
 
   const errorStyles: React.CSSProperties = {
@@ -445,14 +491,15 @@ export default function MeetingRoom({ meetingId, userId, onMeetingLoad }: Meetin
   const ideasListStyles: React.CSSProperties = {
     display: 'flex',
     flexDirection: 'column',
-    gap: '12px',
-    maxHeight: 'calc(100vh - 400px)',
+    gap: isMobile ? '14px' : '12px',
+    maxHeight: isMobile ? 'calc(100vh - 480px)' : 'calc(100vh - 400px)',
     overflowY: 'auto',
     padding: '4px',
+    WebkitOverflowScrolling: 'touch',
   };
 
   const sectionTitleStyles: React.CSSProperties = {
-    fontSize: '18px',
+    fontSize: isMobile ? '16px' : '18px',
     fontWeight: 600,
     color: '#f9fafb',
     margin: '0 0 16px 0',
@@ -472,12 +519,12 @@ export default function MeetingRoom({ meetingId, userId, onMeetingLoad }: Meetin
   const reportCardStyles: React.CSSProperties = {
     backgroundColor: '#1f2937',
     borderRadius: '16px',
-    padding: '24px',
+    padding: isMobile ? '16px' : '24px',
     border: '2px solid #f59e0b',
   };
 
   const reportTitleStyles: React.CSSProperties = {
-    fontSize: '20px',
+    fontSize: isMobile ? '18px' : '20px',
     fontWeight: 700,
     color: '#f59e0b',
     margin: '0 0 16px 0',
@@ -488,7 +535,7 @@ export default function MeetingRoom({ meetingId, userId, onMeetingLoad }: Meetin
 
   const reportStatsStyles: React.CSSProperties = {
     display: 'flex',
-    gap: '32px',
+    gap: isMobile ? '16px' : '32px',
     marginBottom: '20px',
     flexWrap: 'wrap',
   };
@@ -497,6 +544,7 @@ export default function MeetingRoom({ meetingId, userId, onMeetingLoad }: Meetin
     display: 'flex',
     flexDirection: 'column',
     gap: '4px',
+    flex: isMobile ? '1 1 40%' : 'none',
   };
 
   const reportStatLabelStyles: React.CSSProperties = {
@@ -505,7 +553,7 @@ export default function MeetingRoom({ meetingId, userId, onMeetingLoad }: Meetin
   };
 
   const reportStatValueStyles: React.CSSProperties = {
-    fontSize: '24px',
+    fontSize: isMobile ? '20px' : '24px',
     fontWeight: 700,
     color: '#f9fafb',
   };
@@ -517,10 +565,11 @@ export default function MeetingRoom({ meetingId, userId, onMeetingLoad }: Meetin
   const reportItemStyles: React.CSSProperties = {
     display: 'flex',
     alignItems: 'center',
-    padding: '12px 16px',
+    padding: isMobile ? '10px 12px' : '12px 16px',
     backgroundColor: '#111827',
     borderRadius: '8px',
     marginBottom: '8px',
+    gap: isMobile ? '8px' : '12px',
   };
 
   const reportRankStyles: React.CSSProperties = {
@@ -534,7 +583,6 @@ export default function MeetingRoom({ meetingId, userId, onMeetingLoad }: Meetin
     justifyContent: 'center',
     fontSize: '14px',
     fontWeight: 600,
-    marginRight: '16px',
     flexShrink: 0,
   };
 
@@ -545,27 +593,31 @@ export default function MeetingRoom({ meetingId, userId, onMeetingLoad }: Meetin
     overflow: 'hidden',
     textOverflow: 'ellipsis',
     whiteSpace: 'nowrap',
+    minWidth: 0,
   };
 
   const reportItemVotesStyles: React.CSSProperties = {
     fontSize: '14px',
     fontWeight: 600,
     color: '#3b82f6',
-    minWidth: '60px',
+    minWidth: isMobile ? '48px' : '60px',
     textAlign: 'right',
+    flexShrink: 0,
   };
 
   const copyButtonStyles: React.CSSProperties = {
-    padding: '12px 24px',
+    padding: isMobile ? '14px 20px' : '12px 24px',
     backgroundColor: '#f59e0b',
     color: '#1f2937',
     border: 'none',
     borderRadius: '8px',
-    fontSize: '14px',
+    fontSize: isMobile ? '15px' : '14px',
     fontWeight: 600,
     cursor: 'pointer',
-    minHeight: '44px',
+    minHeight: '48px',
+    width: isMobile ? '100%' : 'auto',
     marginTop: '20px',
+    touchAction: 'manipulation',
   };
 
   const loadMoreStyles: React.CSSProperties = {
@@ -581,7 +633,7 @@ export default function MeetingRoom({ meetingId, userId, onMeetingLoad }: Meetin
         <h2 style={meetingTitleStyles}>{meeting.title}</h2>
         <p style={meetingDescStyles}>{meeting.description || '暂无描述'}</p>
         <div style={meetingMetaStyles}>
-          <div style={{ display: 'flex', gap: '24px', flexWrap: 'wrap' }}>
+          <div style={metaInfoContainerStyles}>
             <div style={metaItemStyles}>
               <span>⏱️</span>
               <span style={timerStyles}>{timeLeft}</span>
@@ -595,7 +647,7 @@ export default function MeetingRoom({ meetingId, userId, onMeetingLoad }: Meetin
               <span>{voterCount} 人参与</span>
             </div>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+          <div style={actionContainerStyles}>
             <span style={votesRemainingStyles}>剩余 {userVotesLeft} 票</span>
             {!isMeetingClosed && (
               <button style={endButtonStyles} onClick={handleEndMeeting}>
@@ -648,7 +700,7 @@ export default function MeetingRoom({ meetingId, userId, onMeetingLoad }: Meetin
       {displayedIdeas.length > 0 && displayedIdeas.slice(0, 3).some(i => i.votes > 0) && (
         <div style={top3SectionStyles}>
           <h3 style={sectionTitleStyles}>🏆 热门点子</h3>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '20px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: isMobile ? '14px' : '12px', marginBottom: '20px' }}>
             {displayedIdeas
               .filter(i => i.votes > 0)
               .slice(0, 3)
@@ -665,6 +717,7 @@ export default function MeetingRoom({ meetingId, userId, onMeetingLoad }: Meetin
                   onVote={handleVote}
                   expanded={expandedId === idea.id}
                   onToggleExpand={() => setExpandedId(expandedId === idea.id ? null : idea.id)}
+                  isMobile={isMobile}
                 />
               ))}
           </div>
@@ -689,6 +742,7 @@ export default function MeetingRoom({ meetingId, userId, onMeetingLoad }: Meetin
             onVote={handleVote}
             expanded={expandedId === idea.id}
             onToggleExpand={() => setExpandedId(expandedId === idea.id ? null : idea.id)}
+            isMobile={isMobile}
           />
         ))}
         {loadingMore && (
@@ -711,7 +765,7 @@ export default function MeetingRoom({ meetingId, userId, onMeetingLoad }: Meetin
             <div style={reportStatsStyles}>
               <div style={reportStatItemStyles}>
                 <span style={reportStatLabelStyles}>会议标题</span>
-                <span style={{ ...reportStatValueStyles, fontSize: '18px' }}>{meeting.title}</span>
+                <span style={{ ...reportStatValueStyles, fontSize: isMobile ? '16px' : '18px', wordBreak: 'break-word' }}>{meeting.title}</span>
               </div>
               <div style={reportStatItemStyles}>
                 <span style={reportStatLabelStyles}>参与投票人数</span>
@@ -758,6 +812,7 @@ interface IdeaCardProps {
   onVote: (ideaId: string) => void;
   expanded: boolean;
   onToggleExpand: () => void;
+  isMobile: boolean;
 }
 
 function IdeaCard({
@@ -771,6 +826,7 @@ function IdeaCard({
   onVote,
   expanded,
   onToggleExpand,
+  isMobile,
 }: IdeaCardProps) {
   const sideColor = hashColor(idea.id);
   
@@ -778,19 +834,20 @@ function IdeaCard({
     width: '100%',
     borderRadius: '12px',
     backgroundColor: '#f9fafb',
-    padding: '16px 18px',
+    padding: isMobile ? '14px 14px 14px 12px' : '16px 18px',
     boxSizing: 'border-box',
     border: isTop3 ? '2px solid #f59e0b' : '1px solid transparent',
     display: 'flex',
     alignItems: 'stretch',
-    gap: '14px',
+    gap: isMobile ? '10px' : '14px',
     position: 'relative',
   };
 
+  const sideBarWidth = isMobile ? '3px' : '4px';
   const sideBarStyles: React.CSSProperties = {
-    width: '4px',
+    width: sideBarWidth,
     minHeight: '100%',
-    borderRadius: '2px',
+    borderRadius: isMobile ? '1.5px' : '2px',
     backgroundColor: sideColor,
     flexShrink: 0,
   };
@@ -800,13 +857,14 @@ function IdeaCard({
     display: 'flex',
     flexDirection: 'column',
     gap: '8px',
+    minWidth: 0,
   };
 
   const titleRowStyles: React.CSSProperties = {
     display: 'flex',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     justifyContent: 'space-between',
-    gap: '12px',
+    gap: '10px',
   };
 
   const titleStyles: React.CSSProperties = {
@@ -817,53 +875,86 @@ function IdeaCard({
     flex: 1,
     overflow: 'hidden',
     textOverflow: 'ellipsis',
-    whiteSpace: 'nowrap',
+    whiteSpace: 'normal',
+    wordBreak: 'break-word',
+    lineHeight: 1.4,
   };
 
   const votesBadgeStyles: React.CSSProperties = {
-    fontSize: '14px',
+    fontSize: isMobile ? '13px' : '14px',
     fontWeight: 700,
     color: '#3b82f6',
     backgroundColor: '#dbeafe',
-    padding: '4px 10px',
+    padding: isMobile ? '4px 10px' : '4px 10px',
     borderRadius: '20px',
     whiteSpace: 'nowrap',
     transition: 'all 0.3s',
     transform: isVoting ? 'scale(1.15)' : 'scale(1)',
+    flexShrink: 0,
+    alignSelf: 'flex-start',
+  };
+
+  const descContainerStyles: React.CSSProperties = {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '4px',
   };
 
   const descStyles: React.CSSProperties = {
     fontSize: '14px',
     color: '#6b7280',
-    lineHeight: 1.5,
+    lineHeight: 1.55,
     margin: 0,
-    cursor: idea.description ? 'pointer' : 'default',
     display: expanded ? 'block' : '-webkit-box',
     WebkitLineClamp: expanded ? 'unset' : 3,
     WebkitBoxOrient: 'vertical',
     overflow: 'hidden',
+    wordBreak: 'break-word',
   };
 
+  const expandButtonStyles: React.CSSProperties = {
+    fontSize: '14px',
+    color: '#3b82f6',
+    textDecoration: 'underline',
+    textDecorationColor: '#3b82f6',
+    textUnderlineOffset: '2px',
+    fontWeight: 500,
+    backgroundColor: 'transparent',
+    border: 'none',
+    padding: isMobile ? '8px 2px' : '4px 2px',
+    cursor: 'pointer',
+    alignSelf: 'flex-start',
+    minHeight: isMobile ? '44px' : 'auto',
+    minWidth: isMobile ? '80px' : 'auto',
+    textAlign: 'left',
+    touchAction: 'manipulation',
+  };
+
+  const voteButtonPadding = isMobile ? '12px 24px' : '10px 20px';
+  const voteButtonMinWidth = isMobile ? '96px' : '80px';
   const voteButtonStyles: React.CSSProperties = {
-    padding: '8px 16px',
+    padding: voteButtonPadding,
     backgroundColor: isClosed ? '#d1d5db' : (hasVoted ? '#93c5fd' : '#3b82f6'),
     color: isClosed ? '#9ca3af' : '#ffffff',
     border: 'none',
-    borderRadius: '8px',
-    fontSize: '14px',
+    borderRadius: '10px',
+    fontSize: isMobile ? '15px' : '14px',
     fontWeight: 500,
     cursor: isClosed || hasVoted || !canVote ? 'not-allowed' : 'pointer',
-    minHeight: '44px',
-    minWidth: '80px',
+    minHeight: '48px',
+    minWidth: voteButtonMinWidth,
     transition: 'all 0.3s',
     transform: isVoting ? 'scale(1.1)' : 'scale(1)',
-    alignSelf: 'flex-start',
+    alignSelf: 'flex-end',
+    width: isMobile ? '100%' : 'auto',
+    touchAction: 'manipulation',
+    boxShadow: !isClosed && !hasVoted && canVote ? '0 2px 6px rgba(59, 130, 246, 0.25)' : 'none',
   };
 
   const rankBadgeStyles: React.CSSProperties = {
     position: 'absolute',
     top: '-10px',
-    right: '20px',
+    right: isMobile ? '12px' : '20px',
     width: '28px',
     height: '28px',
     borderRadius: '50%',
@@ -874,6 +965,7 @@ function IdeaCard({
     justifyContent: 'center',
     fontSize: '14px',
     fontWeight: 700,
+    zIndex: 1,
   };
 
   return (
@@ -886,17 +978,26 @@ function IdeaCard({
           <span style={votesBadgeStyles}>{idea.votes} 票</span>
         </div>
         {idea.description && (
-          <p style={descStyles} onClick={onToggleExpand}>
-            {idea.description}
-          </p>
+          <div style={descContainerStyles}>
+            <p style={descStyles}>
+              {idea.description}
+            </p>
+            <button
+              type="button"
+              style={expandButtonStyles}
+              onClick={onToggleExpand}
+            >
+              {expanded ? '收起内容 ↑' : '展开全文 ↓'}
+            </button>
+          </div>
         )}
-        <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+        <div style={{ display: 'flex', justifyContent: isMobile ? 'stretch' : 'flex-end' }}>
           <button
             style={voteButtonStyles}
             onClick={() => !isClosed && !hasVoted && canVote && onVote(idea.id)}
             disabled={isClosed || hasVoted || !canVote}
           >
-            {isClosed ? '已结束' : hasVoted ? '已投票' : '投票'}
+            {isClosed ? '已结束' : hasVoted ? '已投票' : '👍 投票'}
           </button>
         </div>
       </div>
