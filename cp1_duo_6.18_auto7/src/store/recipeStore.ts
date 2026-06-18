@@ -8,11 +8,13 @@ interface RecipeState {
   recipes: Recipe[];
   shoppingGroups: ShoppingGroup[];
   shoppingCompletedMap: Record<string, boolean>;
+  newlyAddedIds: string[];
 
-  addRecipe: (recipe: Omit<Recipe, 'id' | 'scaleFactor' | 'selected'>) => void;
+  addRecipe: (recipe: Omit<Recipe, 'id' | 'scaleFactor' | 'selected'>) => string;
   deleteRecipe: (id: string) => void;
   updateScaleFactor: (id: string, factor: number) => void;
   toggleRecipeSelected: (id: string) => void;
+  clearNewlyAdded: () => void;
 
   generateShoppingList: () => void;
   toggleShoppingItem: (name: string, unit: string) => void;
@@ -20,12 +22,15 @@ interface RecipeState {
   clearShoppingList: () => void;
 }
 
+const SAMPLE_IDS = ['sample-1', 'sample-2', 'sample-3'];
+
 const sampleRecipes: Recipe[] = [
   {
-    id: uuidv4(),
+    id: SAMPLE_IDS[0],
     name: '番茄炒蛋',
     cookTime: 15,
     difficulty: '简单',
+    servings: 4,
     coverImage: 'https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=chinese%20tomato%20egg%20stir%20fry%20dish%20delicious%20food%20photography&image_size=square',
     ingredients: [
       { name: '番茄', amount: 2, unit: '个' },
@@ -47,10 +52,11 @@ const sampleRecipes: Recipe[] = [
     selected: false,
   },
   {
-    id: uuidv4(),
+    id: SAMPLE_IDS[1],
     name: '红烧肉',
     cookTime: 90,
     difficulty: '中等',
+    servings: 4,
     coverImage: 'https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=chinese%20braised%20pork%20belly%20hongshao%20rou%20delicious%20food%20photography&image_size=square',
     ingredients: [
       { name: '猪肉', amount: 500, unit: '克' },
@@ -77,10 +83,11 @@ const sampleRecipes: Recipe[] = [
     selected: false,
   },
   {
-    id: uuidv4(),
+    id: SAMPLE_IDS[2],
     name: '清炒时蔬',
     cookTime: 10,
     difficulty: '简单',
+    servings: 2,
     coverImage: 'https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=stir%20fried%20green%20vegetables%20chinese%20style%20healthy%20food%20photography&image_size=square',
     ingredients: [
       { name: '青菜', amount: 300, unit: '克' },
@@ -99,26 +106,44 @@ const sampleRecipes: Recipe[] = [
   },
 ];
 
+function migrateState(state: Record<string, unknown>): Record<string, unknown> {
+  const recipes = state.recipes as Recipe[] | undefined;
+  if (recipes) {
+    state.recipes = recipes.map((r: Recipe) => ({
+      ...r,
+      servings: r.servings ?? 4,
+    }));
+  }
+  return state;
+}
+
 export const useRecipeStore = create<RecipeState>()(
   persist(
     (set, get) => ({
       recipes: sampleRecipes,
       shoppingGroups: [],
       shoppingCompletedMap: {},
+      newlyAddedIds: [],
 
       addRecipe: (recipeData) => {
+        const id = uuidv4();
         const newRecipe: Recipe = {
           ...recipeData,
-          id: uuidv4(),
+          id,
           scaleFactor: 1,
           selected: false,
         };
-        set((state) => ({ recipes: [newRecipe, ...state.recipes] }));
+        set((state) => ({
+          recipes: [newRecipe, ...state.recipes],
+          newlyAddedIds: [...state.newlyAddedIds, id],
+        }));
+        return id;
       },
 
       deleteRecipe: (id) => {
         set((state) => ({
           recipes: state.recipes.filter((r) => r.id !== id),
+          newlyAddedIds: state.newlyAddedIds.filter((nid) => nid !== id),
         }));
       },
 
@@ -136,6 +161,10 @@ export const useRecipeStore = create<RecipeState>()(
             r.id === id ? { ...r, selected: !r.selected } : r
           ),
         }));
+      },
+
+      clearNewlyAdded: () => {
+        set({ newlyAddedIds: [] });
       },
 
       generateShoppingList: () => {
@@ -195,6 +224,18 @@ export const useRecipeStore = create<RecipeState>()(
     }),
     {
       name: 'recipe-shopping-storage',
+      version: 2,
+      migrate: (persistedState, version) => {
+        let state = persistedState as Record<string, unknown>;
+        if (version < 2) {
+          state = migrateState(state);
+        }
+        return state as unknown as RecipeState;
+      },
+      partialize: (state) => ({
+        recipes: state.recipes,
+        shoppingCompletedMap: state.shoppingCompletedMap,
+      }),
     }
   )
 );

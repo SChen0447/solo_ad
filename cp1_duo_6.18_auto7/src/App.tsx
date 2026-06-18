@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { RecipeLibrary } from './components/RecipeLibrary';
 import { ShoppingList } from './components/ShoppingList';
 import { useRecipeStore } from './store/recipeStore';
@@ -7,26 +7,43 @@ import './App.css';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<TabType>('recipes');
-  const [slideDirection, setSlideDirection] = useState<'left' | 'right'>('left');
-  const [isAnimating, setIsAnimating] = useState(false);
+  const [displayTab, setDisplayTab] = useState<TabType>('recipes');
+  const [animClass, setAnimClass] = useState('');
   const [menuOpen, setMenuOpen] = useState(false);
   const generateShoppingList = useRecipeStore((s) => s.generateShoppingList);
 
-  const handleTabChange = (tab: TabType) => {
-    if (tab === activeTab || isAnimating) return;
-    setSlideDirection(tab === 'shopping' ? 'left' : 'right');
-    setIsAnimating(true);
-    setActiveTab(tab);
-    setMenuOpen(false);
-    setTimeout(() => setIsAnimating(false), 400);
-  };
+  const handleTabChange = useCallback((tab: TabType) => {
+    if (tab === activeTab) return;
+
+    const direction = tab === 'shopping' ? 'slide-in-left' : 'slide-in-right';
+    setAnimClass(`tab-exit ${tab === 'shopping' ? 'slide-out-left' : 'slide-out-right'}`);
+
+    setTimeout(() => {
+      setActiveTab(tab);
+      setDisplayTab(tab);
+      setAnimClass(direction);
+      setMenuOpen(false);
+
+      setTimeout(() => {
+        setAnimClass('');
+      }, 400);
+    }, 200);
+  }, [activeTab]);
 
   const handleGenerateShoppingList = () => {
     generateShoppingList();
-    setSlideDirection('left');
-    setIsAnimating(true);
-    setActiveTab('shopping');
-    setTimeout(() => setIsAnimating(false), 400);
+    setAnimClass('tab-exit slide-out-left');
+
+    setTimeout(() => {
+      setActiveTab('shopping');
+      setDisplayTab('shopping');
+      setAnimClass('slide-in-left');
+      setMenuOpen(false);
+
+      setTimeout(() => {
+        setAnimClass('');
+      }, 400);
+    }, 200);
   };
 
   useEffect(() => {
@@ -93,11 +110,8 @@ export default function App() {
       </nav>
 
       <main className="main-content">
-        <div
-          className={`tab-panel ${isAnimating ? `slide-${slideDirection}` : ''}`}
-          key={activeTab}
-        >
-          {activeTab === 'recipes' ? (
+        <div className={`tab-panel ${animClass}`}>
+          {displayTab === 'recipes' ? (
             <RecipeLibrary onGenerateShoppingList={handleGenerateShoppingList} />
           ) : (
             <ShoppingList />

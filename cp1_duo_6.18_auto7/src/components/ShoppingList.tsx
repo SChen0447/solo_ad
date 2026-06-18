@@ -55,35 +55,42 @@ export function ShoppingList() {
               className="group-header"
               onClick={() => toggleGroupCollapsed(group.category)}
             >
-              <span className="group-arrow">{group.collapsed ? '▶' : '▼'}</span>
+              <span className={`group-arrow ${group.collapsed ? '' : 'expanded'}`}>▶</span>
               <h3 className="group-title">{group.category}</h3>
               <span className="group-count">
-                {group.items.filter((i) => i.completed).length}/{group.items.length}
+                {group.items.length} 种配料
+                {group.collapsed && group.items.length > 0 && (
+                  <span className="group-collapsed-hint">
+                    · 已完成 {group.items.filter((i) => i.completed).length}
+                  </span>
+                )}
               </span>
             </div>
 
-            <div className="group-content">
-              <ul className="item-list">
-                {group.items.map((item) => (
-                  <li
-                    key={`${item.name}-${item.unit}`}
-                    className={`shopping-item ${item.completed ? 'completed' : ''}`}
-                  >
-                    <label className="item-checkbox">
-                      <input
-                        type="checkbox"
-                        checked={item.completed}
-                        onChange={() => toggleShoppingItem(item.name, item.unit)}
-                      />
-                      <span className="checkmark" />
-                    </label>
-                    <span className="item-name">{item.name}</span>
-                    <span className="item-amount">
-                      {formatFraction(item.amount)} {item.unit}
-                    </span>
-                  </li>
-                ))}
-              </ul>
+            <div className="group-content-wrapper">
+              <div className="group-content">
+                <ul className="item-list">
+                  {group.items.map((item) => (
+                    <li
+                      key={`${item.name}-${item.unit}`}
+                      className={`shopping-item ${item.completed ? 'completed' : ''}`}
+                    >
+                      <label className="item-checkbox">
+                        <input
+                          type="checkbox"
+                          checked={item.completed}
+                          onChange={() => toggleShoppingItem(item.name, item.unit)}
+                        />
+                        <span className="checkmark" />
+                      </label>
+                      <span className="item-name">{item.name}</span>
+                      <span className="item-amount">
+                        {formatFraction(item.amount)} {item.unit}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
             </div>
           </div>
         ))}

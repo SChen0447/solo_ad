@@ -76,6 +76,11 @@
   font-size: 10px;
   color: #f76c2f;
   transition: transform 0.3s ease;
+  display: inline-block;
+}
+
+.group-arrow.expanded {
+  transform: rotate(90deg);
 }
 
 .group-title {
@@ -92,15 +97,23 @@
   background: rgba(0, 0, 0, 0.06);
   padding: 2px 8px;
   border-radius: 10px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
 }
 
-.group-content {
-  max-height: 1000px;
+.group-collapsed-hint {
+  color: #a5d6a7;
+  font-weight: 500;
+}
+
+.group-content-wrapper {
   overflow: hidden;
   transition: max-height 0.4s ease;
+  max-height: 2000px;
 }
 
-.shopping-group.collapsed .group-content {
+.shopping-group.collapsed .group-content-wrapper {
   max-height: 0;
 }
 

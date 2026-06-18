@@ -36,74 +36,125 @@ export function getCategory(ingredientName: string): string {
   return '其他';
 }
 
+function gcd(a: number, b: number): number {
+  a = Math.abs(Math.round(a));
+  b = Math.abs(Math.round(b));
+  while (b) {
+    [a, b] = [b, a % b];
+  }
+  return a;
+}
+
 export function formatFraction(value: number): string {
+  if (value === 0) return '0';
+
   if (Number.isInteger(value)) {
     return value.toString();
   }
 
-  const fractions: { val: number; str: string }[] = [
-    { val: 0.125, str: '1/8' },
-    { val: 0.25, str: '1/4' },
-    { val: 0.333, str: '1/3' },
-    { val: 0.375, str: '3/8' },
-    { val: 0.5, str: '1/2' },
-    { val: 0.625, str: '5/8' },
-    { val: 0.666, str: '2/3' },
-    { val: 0.75, str: '3/4' },
-    { val: 0.875, str: '7/8' },
-  ];
+  const tolerance = 1e-6;
+  const maxDenominator = 64;
 
   const intPart = Math.floor(value);
   const fracPart = value - intPart;
 
-  let closestFrac = fractions[0];
-  let minDiff = Math.abs(fracPart - closestFrac.val);
+  let bestNum = 0;
+  let bestDen = 1;
+  let bestErr = Math.abs(fracPart);
 
-  for (const frac of fractions) {
-    const diff = Math.abs(fracPart - frac.val);
-    if (diff < minDiff) {
-      minDiff = diff;
-      closestFrac = frac;
+  for (let den = 2; den <= maxDenominator; den++) {
+    const num = Math.round(fracPart * den);
+    const err = Math.abs(fracPart - num / den);
+    if (err < bestErr) {
+      bestNum = num;
+      bestDen = den;
+      bestErr = err;
     }
+    if (bestErr < tolerance) break;
   }
 
-  if (minDiff > 0.05) {
-    return value.toFixed(1).replace(/\.0$/, '');
+  if (bestErr > 0.01) {
+    const rounded = Math.round(value * 10) / 10;
+    if (Number.isInteger(rounded)) return rounded.toString();
+    return rounded.toFixed(1);
   }
+
+  const g = gcd(bestNum, bestDen);
+  const num = bestNum / g;
+  const den = bestDen / g;
 
   if (intPart === 0) {
-    return closestFrac.str;
+    return `${num}/${den}`;
   }
 
-  return `${intPart} ${closestFrac.str}`;
+  return `${intPart} ${num}/${den}`;
+}
+
+const UNIT_PRIORITY: Record<string, number> = {
+  '克': 10, 'kg': 20, '千克': 20, '公斤': 20,
+  'ml': 10, 'l': 20, '升': 20,
+  '杯': 5, '勺': 3, '大勺': 4, '小勺': 2,
+  '个': 1, '片': 1, '根': 1, '瓣': 1, '块': 1, '把': 1, '小块': 1,
+};
+
+const UNIT_CONVERSIONS: Record<string, { to: string; factor: number }[]> = {
+  '千克': [{ to: '克', factor: 1000 }],
+  '公斤': [{ to: '克', factor: 1000 }],
+  'kg': [{ to: '克', factor: 1000 }],
+  '大勺': [{ to: '勺', factor: 1 }],
+  '小勺': [{ to: '勺', factor: 1 }],
+  'l': [{ to: 'ml', factor: 1000 }],
+  '升': [{ to: 'ml', factor: 1000 }],
+};
+
+function normalizeUnit(unit: string, amount: number): { unit: string; amount: number } {
+  const conversions = UNIT_CONVERSIONS[unit];
+  if (conversions) {
+    const conv = conversions[0];
+    return { unit: conv.to, amount: amount * conv.factor };
+  }
+  return { unit, amount };
 }
 
 export function mergeIngredients(ingredients: Ingredient[]): Ingredient[] {
-  const merged = new Map<string, { amount: number; unit: string }>();
+  const normalized = ingredients.map((ing) => {
+    const n = normalizeUnit(ing.unit, ing.amount);
+    return { name: ing.name, amount: n.amount, unit: n.unit };
+  });
 
-  for (const ing of ingredients) {
+  const merged = new Map<string, { amount: number; unit: string; priority: number }>();
+
+  for (const ing of normalized) {
     const key = `${ing.name.toLowerCase()}|${ing.unit}`;
     const existing = merged.get(key);
     if (existing) {
       existing.amount += ing.amount;
     } else {
-      merged.set(key, { amount: ing.amount, unit: ing.unit });
+      const priority = UNIT_PRIORITY[ing.unit] ?? 0;
+      merged.set(key, { amount: ing.amount, unit: ing.unit, priority });
     }
+  }
+
+  const nameGroups = new Map<string, { amount: number; unit: string; priority: number }[]>();
+  for (const [key, val] of merged) {
+    const [name] = key.split('|');
+    if (!nameGroups.has(name)) {
+      nameGroups.set(name, []);
+    }
+    nameGroups.get(name)!.push(val);
   }
 
   const result: Ingredient[] = [];
-  const nameMap = new Map<string, { amount: number; unit: string }>();
-
-  for (const [key, val] of merged) {
-    const [name] = key.split('|');
-    const existing = nameMap.get(name);
-    if (!existing || val.amount > existing.amount) {
-      nameMap.set(name, val);
+  for (const [name, entries] of nameGroups) {
+    if (entries.length === 1) {
+      result.push({ name, amount: entries[0].amount, unit: entries[0].unit });
+    } else {
+      const totalAmount = entries.reduce((sum, e) => sum + e.amount, 0);
+      const bestEntry = entries.reduce((best, e) =>
+        e.priority > best.priority ? e : best
+      , entries[0]);
+      result.push({ name, amount: totalAmount, unit: bestEntry.unit });
     }
-  }
-
-  for (const [name, val] of nameMap) {
-    result.push({ name, amount: val.amount, unit: val.unit });
   }
 
   return result;

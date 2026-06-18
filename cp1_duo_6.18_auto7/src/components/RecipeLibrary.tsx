@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { RecipeCard } from './RecipeCard';
 import { useRecipeStore } from '../store/recipeStore';
 import type { Difficulty, Ingredient } from '../types';
@@ -9,17 +9,28 @@ interface RecipeLibraryProps {
 }
 
 export function RecipeLibrary({ onGenerateShoppingList }: RecipeLibraryProps) {
-  const { recipes, addRecipe, deleteRecipe } = useRecipeStore();
+  const { recipes, addRecipe, deleteRecipe, newlyAddedIds, clearNewlyAdded } = useRecipeStore();
   const [showModal, setShowModal] = useState(false);
   const [newRecipe, setNewRecipe] = useState({
     name: '',
     cookTime: 30,
     difficulty: '简单' as Difficulty,
+    servings: 4,
     coverImage: '',
     ingredients: [{ name: '', amount: 0, unit: '克' }] as Ingredient[],
     steps: [''],
   });
   const selectedCount = recipes.filter((r) => r.selected).length;
+  const prevCountRef = useRef(recipes.length);
+
+  useEffect(() => {
+    if (newlyAddedIds.length > 0) {
+      const timer = setTimeout(() => {
+        clearNewlyAdded();
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [newlyAddedIds, clearNewlyAdded]);
 
   const handleAddRecipe = () => {
     if (!newRecipe.name.trim()) return;
@@ -39,16 +50,20 @@ export function RecipeLibrary({ onGenerateShoppingList }: RecipeLibraryProps) {
       name: newRecipe.name.trim(),
       cookTime: newRecipe.cookTime,
       difficulty: newRecipe.difficulty,
+      servings: newRecipe.servings,
       coverImage,
       ingredients: validIngredients,
       steps: validSteps,
     });
+
+    prevCountRef.current = recipes.length + 1;
 
     setShowModal(false);
     setNewRecipe({
       name: '',
       cookTime: 30,
       difficulty: '简单',
+      servings: 4,
       coverImage: '',
       ingredients: [{ name: '', amount: 0, unit: '克' }],
       steps: [''],
@@ -115,12 +130,12 @@ export function RecipeLibrary({ onGenerateShoppingList }: RecipeLibraryProps) {
       </div>
 
       <div className="recipe-grid">
-        {recipes.map((recipe, index) => (
+        {recipes.map((recipe) => (
           <RecipeCard
             key={recipe.id}
             recipe={recipe}
             onDelete={deleteRecipe}
-            isNew={index === 0 && recipes.length > 0}
+            isNew={newlyAddedIds.includes(recipe.id)}
           />
         ))}
       </div>
@@ -170,6 +185,17 @@ export function RecipeLibrary({ onGenerateShoppingList }: RecipeLibraryProps) {
                   <option value="中等">中等</option>
                   <option value="困难">困难</option>
                 </select>
+              </div>
+              <div className="form-group">
+                <label>份量（人份）</label>
+                <input
+                  type="number"
+                  min="1"
+                  value={newRecipe.servings}
+                  onChange={(e) =>
+                    setNewRecipe({ ...newRecipe, servings: parseInt(e.target.value) || 1 })
+                  }
+                />
               </div>
             </div>
 

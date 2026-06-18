@@ -12,6 +12,7 @@ export interface Recipe {
   cookTime: number;
   difficulty: Difficulty;
   coverImage: string;
+  servings: number;
   ingredients: Ingredient[];
   steps: string[];
   scaleFactor: number;

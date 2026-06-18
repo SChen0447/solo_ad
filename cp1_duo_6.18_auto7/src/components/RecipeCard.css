@@ -1,5 +1,5 @@
 .recipe-card {
-  width: 250px;
+  width: 100%;
   background-color: #faf3e0;
   border-radius: 12px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
@@ -7,6 +7,10 @@
   transition: transform 0.3s ease, box-shadow 0.3s ease;
   margin-bottom: 16px;
   break-inside: avoid;
+  will-change: transform;
+  contain: layout style paint;
+  content-visibility: auto;
+  contain-intrinsic-size: auto 400px;
 }
 
 .recipe-card:hover {
@@ -53,11 +57,50 @@
   z-index: 1;
 }
 
-.recipe-select {
-  width: 18px;
-  height: 18px;
+.recipe-select-label {
   cursor: pointer;
-  accent-color: #f76c2f;
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.recipe-select {
+  position: absolute;
+  opacity: 0;
+  cursor: pointer;
+  width: 0;
+  height: 0;
+}
+
+.select-checkmark {
+  width: 20px;
+  height: 20px;
+  border: 2px solid #ccc;
+  border-radius: 4px;
+  background: #fff;
+  transition: all 0.15s ease;
+  position: relative;
+}
+
+.recipe-select-label:hover .select-checkmark {
+  border-color: #f76c2f;
+}
+
+.recipe-select:checked + .select-checkmark {
+  background: #f76c2f;
+  border-color: #f76c2f;
+}
+
+.recipe-select:checked + .select-checkmark:after {
+  content: '';
+  position: absolute;
+  left: 5px;
+  top: 1px;
+  width: 6px;
+  height: 10px;
+  border: solid white;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
 }
 
 .delete-btn {
@@ -247,5 +290,7 @@
   .recipe-card {
     width: 100%;
     margin-bottom: 16px;
+    content-visibility: auto;
+    contain-intrinsic-size: auto 400px;
   }
 }

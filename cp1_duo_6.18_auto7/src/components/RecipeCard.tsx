@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import type { Recipe } from '../types';
 import { formatFraction } from '../utils/ingredientUtils';
 import { useRecipeStore } from '../store/recipeStore';
@@ -7,13 +7,21 @@ import './RecipeCard.css';
 interface RecipeCardProps {
   recipe: Recipe;
   onDelete: (id: string) => void;
-  isNew?: boolean;
+  isNew: boolean;
 }
 
 export function RecipeCard({ recipe, onDelete, isNew }: RecipeCardProps) {
   const [isDeleting, setIsDeleting] = useState(false);
   const [expanded, setExpanded] = useState(false);
+  const [showEnterAnim, setShowEnterAnim] = useState(isNew);
   const { updateScaleFactor, toggleRecipeSelected } = useRecipeStore();
+
+  useEffect(() => {
+    if (isNew) {
+      const timer = setTimeout(() => setShowEnterAnim(false), 400);
+      return () => clearTimeout(timer);
+    }
+  }, [isNew]);
 
   const handleDelete = () => {
     setIsDeleting(true);
@@ -29,6 +37,8 @@ export function RecipeCard({ recipe, onDelete, isNew }: RecipeCardProps) {
     }
   };
 
+  const scaledServings = recipe.servings * recipe.scaleFactor;
+
   const difficultyColors: Record<string, string> = {
     '简单': '#a5d6a7',
     '中等': '#fff59d',
@@ -37,23 +47,25 @@ export function RecipeCard({ recipe, onDelete, isNew }: RecipeCardProps) {
 
   return (
     <div
-      className={`recipe-card ${isDeleting ? 'deleting' : ''} ${isNew ? 'card-enter' : ''}`}
-      style={{ animationDelay: isNew ? '0s' : undefined }}
+      className={`recipe-card ${isDeleting ? 'deleting' : ''} ${showEnterAnim ? 'card-enter' : ''}`}
     >
       <div className="card-header">
-        <input
-          type="checkbox"
-          className="recipe-select"
-          checked={recipe.selected}
-          onChange={() => toggleRecipeSelected(recipe.id)}
-        />
+        <label className="recipe-select-label">
+          <input
+            type="checkbox"
+            className="recipe-select"
+            checked={recipe.selected}
+            onChange={() => toggleRecipeSelected(recipe.id)}
+          />
+          <span className="select-checkmark" />
+        </label>
         <button className="delete-btn" onClick={handleDelete}>
           ×
         </button>
       </div>
 
       <div className="card-cover">
-        <img src={recipe.coverImage} alt={recipe.name} />
+        <img src={recipe.coverImage} alt={recipe.name} loading="lazy" />
       </div>
 
       <div className="card-content">
@@ -86,7 +98,7 @@ export function RecipeCard({ recipe, onDelete, isNew }: RecipeCardProps) {
 
         {recipe.scaleFactor !== 1 && (
           <p className="scale-hint">
-            准备 {formatFraction(recipe.scaleFactor * 4)} 人份材料
+            准备 {formatFraction(scaledServings)} 人份材料
           </p>
         )}
 
