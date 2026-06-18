@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { useSceneStore } from '../store/sceneStore';
 import { importScene } from '../utils/exportImport';
 import './SceneList.css';
@@ -11,9 +11,27 @@ const SceneList: React.FC = () => {
   const [showPreview, setShowPreview] = useState(false);
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
+  const [longPressedIndex, setLongPressedIndex] = useState<number | null>(null);
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const isDraggable = useRef(false);
+  const dragStartPos = useRef<{ x: number; y: number } | null>(null);
+  const hasMoved = useRef(false);
+
+  useEffect(() => {
+    const handleGlobalMouseUp = () => {
+      if (longPressTimer.current) {
+        clearTimeout(longPressTimer.current);
+        longPressTimer.current = null;
+      }
+      setLongPressedIndex(null);
+      setDraggedIndex(null);
+      setDragOverIndex(null);
+      dragStartPos.current = null;
+      hasMoved.current = false;
+    };
+    document.addEventListener('mouseup', handleGlobalMouseUp);
+    return () => document.removeEventListener('mouseup', handleGlobalMouseUp);
+  }, []);
 
   const handleCreateScene = () => {
     if (newName.trim()) {
@@ -25,40 +43,61 @@ const SceneList: React.FC = () => {
     }
   };
 
-  const handleSceneClick = (sceneId: string) => {
-    if (!isDraggable.current) {
-      setActiveScene(sceneId);
-    }
-  };
-
-  const handleMouseDown = (index: number) => {
-    isDraggable.current = false;
+  const handleMouseDown = (index: number, e: React.MouseEvent) => {
+    dragStartPos.current = { x: e.clientX, y: e.clientY };
+    hasMoved.current = false;
     longPressTimer.current = setTimeout(() => {
-      isDraggable.current = true;
+      setLongPressedIndex(index);
     }, 300);
   };
 
-  const handleMouseUp = () => {
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (dragStartPos.current && !hasMoved.current) {
+      const dx = Math.abs(e.clientX - dragStartPos.current.x);
+      const dy = Math.abs(e.clientY - dragStartPos.current.y);
+      if (dx > 3 || dy > 3) {
+        if (longPressTimer.current) {
+          clearTimeout(longPressTimer.current);
+          longPressTimer.current = null;
+        }
+      }
+    }
+  };
+
+  const handleMouseUpOnCard = (index: number) => {
     if (longPressTimer.current) {
       clearTimeout(longPressTimer.current);
       longPressTimer.current = null;
     }
+    const wasLongPressed = longPressedIndex === index;
+    const wasDragged = draggedIndex !== null;
     setTimeout(() => {
-      isDraggable.current = false;
-    }, 100);
+      if (!wasLongPressed && !wasDragged && !hasMoved.current) {
+        setActiveScene(scenes[index].id);
+      }
+      setLongPressedIndex(null);
+      setDraggedIndex(null);
+      setDragOverIndex(null);
+      dragStartPos.current = null;
+      hasMoved.current = false;
+    }, 10);
   };
 
   const handleDragStart = (e: React.DragEvent, index: number) => {
-    if (!isDraggable.current) {
+    if (longPressedIndex !== index) {
       e.preventDefault();
       return;
     }
+    hasMoved.current = true;
     setDraggedIndex(index);
     e.dataTransfer.effectAllowed = 'move';
     e.dataTransfer.setData('text/plain', index.toString());
+    const target = e.currentTarget as HTMLElement;
+    target.style.opacity = '0.5';
   };
 
   const handleDragOver = (e: React.DragEvent, index: number) => {
+    if (draggedIndex === null) return;
     e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
     if (dragOverIndex !== index) {
@@ -68,19 +107,26 @@ const SceneList: React.FC = () => {
 
   const handleDrop = (e: React.DragEvent, index: number) => {
     e.preventDefault();
+    const target = e.currentTarget as HTMLElement;
+    target.style.opacity = '';
     if (draggedIndex === null || draggedIndex === index) {
       setDraggedIndex(null);
       setDragOverIndex(null);
+      setLongPressedIndex(null);
       return;
     }
     reorderScenes(draggedIndex, index);
     setDraggedIndex(null);
     setDragOverIndex(null);
+    setLongPressedIndex(null);
   };
 
-  const handleDragEnd = () => {
+  const handleDragEnd = (e: React.DragEvent) => {
+    const target = e.currentTarget as HTMLElement;
+    target.style.opacity = '';
     setDraggedIndex(null);
     setDragOverIndex(null);
+    setLongPressedIndex(null);
   };
 
   const handleImportClick = () => {
@@ -103,6 +149,7 @@ const SceneList: React.FC = () => {
   };
 
   const renderMarkdownPreview = useCallback((text: string): string => {
+    if (!text.trim()) return '<span class="placeholder">暂无内容，在"编辑"标签中输入 Markdown 内容</span>';
     let html = text
       .replace(/^### (.*$)/gim, '<h3>$1</h3>')
       .replace(/^## (.*$)/gim, '<h2>$1</h2>')
@@ -110,7 +157,9 @@ const SceneList: React.FC = () => {
       .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
       .replace(/\*(.*?)\*/g, '<em>$1</em>')
       .replace(/`(.*?)`/g, '<code>$1</code>')
+      .replace(/^- (.*$)/gim, '<li>$1</li>')
       .replace(/\n/g, '<br />');
+    html = html.replace(/(<li>.*<\/li>)/gs, '<ul>$1</ul>');
     return html;
   }, []);
 
@@ -118,6 +167,8 @@ const SceneList: React.FC = () => {
     if (text.length <= maxLength) return text;
     return text.slice(0, maxLength) + '...';
   };
+
+  const isDraggable = (index: number) => longPressedIndex === index;
 
   return (
     <div className="scene-list">
@@ -132,21 +183,29 @@ const SceneList: React.FC = () => {
         {scenes.map((scene, index) => (
           <div
             key={scene.id}
-            className={`scene-card ${activeSceneId === scene.id ? 'active' : ''} ${draggedIndex === index ? 'dragging' : ''} ${dragOverIndex === index && draggedIndex !== index ? 'drag-over' : ''}`}
-            onClick={() => handleSceneClick(scene.id)}
-            draggable={draggedIndex === index}
+            className={`scene-card ${activeSceneId === scene.id ? 'active' : ''} ${draggedIndex === index ? 'dragging' : ''} ${dragOverIndex === index && draggedIndex !== null && draggedIndex !== index ? 'drag-over' : ''} ${longPressedIndex === index ? 'long-pressed' : ''}`}
+            draggable={isDraggable(index)}
             onDragStart={(e) => handleDragStart(e, index)}
             onDragOver={(e) => handleDragOver(e, index)}
             onDrop={(e) => handleDrop(e, index)}
             onDragEnd={handleDragEnd}
-            onMouseDown={() => handleMouseDown(index)}
-            onMouseUp={handleMouseUp}
-            onMouseLeave={handleMouseUp}
+            onMouseDown={(e) => handleMouseDown(index, e)}
+            onMouseMove={handleMouseMove}
+            onMouseUp={() => handleMouseUpOnCard(index)}
+            onMouseLeave={() => {
+              if (longPressTimer.current) {
+                clearTimeout(longPressTimer.current);
+                longPressTimer.current = null;
+              }
+            }}
           >
             <div className="scene-card-name">{scene.name}</div>
             <div className="scene-card-desc">
               {scene.worldBackground ? truncateDescription(scene.worldBackground) : '暂无描述'}
             </div>
+            {longPressedIndex === index && (
+              <div className="drag-hint">拖拽移动</div>
+            )}
           </div>
         ))}
         {scenes.length === 0 && (
@@ -194,41 +253,49 @@ const SceneList: React.FC = () => {
                     <button
                       className={`tab ${!showPreview ? 'active' : ''}`}
                       onClick={() => setShowPreview(false)}
+                      type="button"
                     >
-                      编辑
+                      ✏️ 编辑
                     </button>
                     <button
                       className={`tab ${showPreview ? 'active' : ''}`}
                       onClick={() => setShowPreview(true)}
+                      type="button"
                     >
-                      预览
+                      👁️ 预览
                     </button>
                   </div>
                   {!showPreview ? (
                     <textarea
                       value={newBackground}
                       onChange={(e) => setNewBackground(e.target.value)}
-                      placeholder="描述这个世界的背景设定..."
+                      placeholder={'描述这个世界的背景设定...\n\n支持 Markdown：\n# 标题\n**粗体** *斜体*\n`代码`\n- 列表项'}
                       className="form-textarea"
                       rows={8}
                     />
                   ) : (
                     <div
                       className="markdown-preview"
-                      dangerouslySetInnerHTML={{ __html: renderMarkdownPreview(newBackground) || '<span class="placeholder">暂无内容</span>' }}
+                      dangerouslySetInnerHTML={{ __html: renderMarkdownPreview(newBackground) }}
                     />
                   )}
                 </div>
+                {showPreview && newBackground && (
+                  <div className="preview-source-hint">
+                    点击"编辑"标签修改内容
+                  </div>
+                )}
               </div>
             </div>
             <div className="modal-footer">
-              <button className="btn btn-cancel" onClick={() => setShowModal(false)}>
+              <button className="btn btn-cancel" onClick={() => setShowModal(false)} type="button">
                 取消
               </button>
               <button
                 className="btn btn-primary"
                 onClick={handleCreateScene}
                 disabled={!newName.trim()}
+                type="button"
               >
                 创建
               </button>
