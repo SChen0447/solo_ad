@@ -1,0 +1,14 @@
+{
+  "name": "lightcone-echo",
+  "version": "1.0.0",
+  "description": "光锥回声 - 2D空间解谜游戏",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.3",
+    "vite": "^5.0.12"
+  }
+}
