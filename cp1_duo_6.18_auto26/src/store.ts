@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { encryptContent, decryptContent, generateKeyFromDate, hashDate } from './modules/encryption';
+import { encryptContent, decryptContentWithTolerance, generateKeyFromDate, hashDate } from './modules/encryption';
 import { getRemainingTime, validateTargetDate } from './modules/timeManager';
 
 export interface Capsule {
@@ -33,6 +33,7 @@ interface AppState {
   celebratingCapsuleId: string | null;
   formData: CapsuleFormData;
   currentStep: number;
+  celebrationTimer: ReturnType<typeof setTimeout> | null;
   addCapsule: (capsule: Omit<Capsule, 'id' | 'createdAt' | 'isUnlocked' | 'encryptionKeyHash'>) => Promise<void>;
   unlockCapsule: (id: string) => Promise<string | null>;
   setCurrentCapsule: (capsule: Capsule | null) => void;
@@ -43,6 +44,7 @@ interface AppState {
   setCurrentStep: (step: number) => void;
   resetForm: () => void;
   checkAndUnlockExpired: () => void;
+  cleanup: () => void;
 }
 
 const initialFormData: CapsuleFormData = {
@@ -62,6 +64,7 @@ export const useStore = create<AppState>()(
       isModalOpen: false,
       isPreviewOpen: false,
       celebratingCapsuleId: null,
+      celebrationTimer: null,
       formData: initialFormData,
       currentStep: 1,
 
@@ -100,15 +103,19 @@ export const useStore = create<AppState>()(
         if (remaining.total > 0) return null;
 
         try {
-          const key = await generateKeyFromDate(new Date(capsule.targetDate));
-          const content = await decryptContent(capsule.encryptedContent, key);
-          
+          const content = await decryptContentWithTolerance(
+            capsule.encryptedContent,
+            new Date(capsule.targetDate)
+          );
+
+          if (content === null) return null;
+
           set((state) => ({
             capsules: state.capsules.map(c =>
               c.id === id ? { ...c, isUnlocked: true } : c
             ),
           }));
-          
+
           return content;
         } catch {
           return null;
@@ -129,8 +136,23 @@ export const useStore = create<AppState>()(
 
       resetForm: () => set({ formData: initialFormData, currentStep: 1 }),
 
+      setCelebratingCapsuleId: (id) => {
+        const state = get();
+        if (state.celebrationTimer) {
+          clearTimeout(state.celebrationTimer);
+        }
+        if (id !== null) {
+          const timer = setTimeout(() => {
+            set({ celebratingCapsuleId: null, celebrationTimer: null });
+          }, 3000);
+          set({ celebratingCapsuleId: id, celebrationTimer: timer });
+        } else {
+          set({ celebratingCapsuleId: null, celebrationTimer: null });
+        }
+      },
+
       checkAndUnlockExpired: () => {
-        const { capsules } = get();
+        const { capsules, celebratingCapsuleId } = get();
         capsules.forEach((capsule) => {
           if (!capsule.isUnlocked) {
             const remaining = getRemainingTime(new Date(capsule.targetDate));
@@ -139,8 +161,11 @@ export const useStore = create<AppState>()(
                 capsules: state.capsules.map(c =>
                   c.id === capsule.id ? { ...c, isUnlocked: true } : c
                 ),
-                celebratingCapsuleId: capsule.id,
               }));
+
+              if (!celebratingCapsuleId) {
+                get().setCelebratingCapsuleId(capsule.id);
+              }
 
               if (capsule.reminderType === 'browser' && 'Notification' in window) {
                 if (Notification.permission === 'granted') {
@@ -149,13 +174,17 @@ export const useStore = create<AppState>()(
                   });
                 }
               }
-
-              setTimeout(() => {
-                set({ celebratingCapsuleId: null });
-              }, 3000);
             }
           }
         });
+      },
+
+      cleanup: () => {
+        const { celebrationTimer } = get();
+        if (celebrationTimer) {
+          clearTimeout(celebrationTimer);
+          set({ celebrationTimer: null });
+        }
       },
     }),
     {

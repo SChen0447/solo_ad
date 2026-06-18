@@ -1,10 +1,14 @@
-import { useRef, useMemo } from 'react';
+import { useRef, useMemo, useEffect } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import type { TimeRemaining } from '../modules/timeManager';
 
 const MAX_PARTICLES = 200;
 const UPDATE_INTERVAL = 60;
+const TARGET_FPS = 55;
+const FRAME_TIME_THRESHOLD = 1000 / TARGET_FPS;
+const BATCH_SIZE = 40;
+const ENABLE_FPS_LOG = false;
 
 interface SandParticlesProps {
   remainingTime: TimeRemaining;
@@ -15,12 +19,17 @@ function SandParticles({ remainingTime, totalDuration }: SandParticlesProps) {
   const particlesRef = useRef<THREE.Points>(null);
   const frameCount = useRef(0);
   const progressRef = useRef(0);
+  const lastUpdateTime = useRef(0);
+  const fpsFrames = useRef(0);
+  const fpsLastTime = useRef(performance.now());
+  const batchOffset = useRef(0);
 
   const particleCount = Math.min(MAX_PARTICLES, 200);
 
   const geometryData = useMemo(() => {
     const positions = new Float32Array(particleCount * 3);
     const velocities = new Float32Array(particleCount * 3);
+    const activeFlags = new Uint8Array(particleCount);
 
     for (let i = 0; i < particleCount; i++) {
       const theta = Math.random() * Math.PI * 2;
@@ -32,40 +41,76 @@ function SandParticles({ remainingTime, totalDuration }: SandParticlesProps) {
       velocities[i * 3] = (Math.random() - 0.5) * 0.002;
       velocities[i * 3 + 1] = -0.005 - Math.random() * 0.01;
       velocities[i * 3 + 2] = (Math.random() - 0.5) * 0.002;
+
+      activeFlags[i] = 0;
     }
 
-    return { positions, velocities };
+    return { positions, velocities, activeFlags };
   }, [particleCount]);
+
+  useEffect(() => {
+    if (ENABLE_FPS_LOG) {
+      const logInterval = setInterval(() => {
+        const now = performance.now();
+        const elapsed = now - fpsLastTime.current;
+        const fps = (fpsFrames.current * 1000) / elapsed;
+        console.debug(`[Hourglass FPS]: ${fps.toFixed(1)}`);
+        fpsFrames.current = 0;
+        fpsLastTime.current = now;
+      }, 2000);
+      return () => clearInterval(logInterval);
+    }
+  }, []);
 
   useFrame(() => {
     frameCount.current++;
+    if (ENABLE_FPS_LOG) fpsFrames.current++;
+
     progressRef.current = totalDuration > 0 ? 1 - remainingTime.total / totalDuration : 1;
 
-    if (frameCount.current % UPDATE_INTERVAL !== 0 || !particlesRef.current) return;
+    if (!particlesRef.current) return;
+
+    const now = performance.now();
+    if (frameCount.current % UPDATE_INTERVAL !== 0) return;
+
+    const frameTime = now - lastUpdateTime.current;
+    if (frameTime < FRAME_TIME_THRESHOLD && lastUpdateTime.current > 0) {
+      return;
+    }
+    lastUpdateTime.current = now;
 
     const positionAttr = particlesRef.current.geometry.attributes.position;
     const positions = positionAttr.array as Float32Array;
     const progress = progressRef.current;
-    const { velocities } = geometryData;
+    const { velocities, activeFlags } = geometryData;
     let needsUpdate = false;
 
-    for (let i = 0; i < particleCount; i++) {
-      if (progress > Math.random()) {
-        const idx = i * 3;
-        positions[idx] += velocities[idx];
-        positions[idx + 1] += velocities[idx + 1];
-        positions[idx + 2] += velocities[idx + 2];
+    const startIdx = batchOffset.current;
+    const endIdx = Math.min(startIdx + BATCH_SIZE, particleCount);
 
-        if (positions[idx + 1] < -0.8) {
-          const theta = Math.random() * Math.PI * 2;
-          const radius = Math.random() * 0.15;
-          positions[idx] = Math.cos(theta) * radius;
-          positions[idx + 1] = 0.8 + Math.random() * 0.3;
-          positions[idx + 2] = Math.sin(theta) * radius;
-        }
-        needsUpdate = true;
+    for (let i = startIdx; i < endIdx; i++) {
+      const isActive = activeFlags[i] === 1 || progress > Math.random();
+
+      if (!isActive) continue;
+
+      activeFlags[i] = 1;
+      const idx = i * 3;
+      positions[idx] += velocities[idx];
+      positions[idx + 1] += velocities[idx + 1];
+      positions[idx + 2] += velocities[idx + 2];
+
+      if (positions[idx + 1] < -0.8) {
+        const theta = Math.random() * Math.PI * 2;
+        const radius = Math.random() * 0.15;
+        positions[idx] = Math.cos(theta) * radius;
+        positions[idx + 1] = 0.8 + Math.random() * 0.3;
+        positions[idx + 2] = Math.sin(theta) * radius;
       }
+
+      needsUpdate = true;
     }
+
+    batchOffset.current = endIdx >= particleCount ? 0 : endIdx;
 
     if (needsUpdate) {
       positionAttr.needsUpdate = true;
