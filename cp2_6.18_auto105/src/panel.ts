@@ -18,6 +18,8 @@ const RESOURCE_COLORS: Record<ResourceType, string> = {
   obstacle: '#4b5563',
 };
 
+const SLIDER_THROTTLE_MS = 16;
+
 export class ControlPanel {
   private container: HTMLElement;
   private panel: HTMLDivElement;
@@ -37,9 +39,22 @@ export class ControlPanel {
   private lastDisplayedOutput: number = 0;
   private outputAnimStart: number = 0;
 
+  private isDragging = false;
+  private lastSliderUpdate = 0;
+  private pendingSliderValue: number | null = null;
+
+  private boundGlobalMouseMove: (e: MouseEvent) => void;
+  private boundGlobalMouseUp: (e: MouseEvent) => void;
+  private boundSliderMouseDown: (e: MouseEvent) => void;
+
   constructor(container: HTMLElement, events: PanelEvents) {
     this.container = container;
     this.events = events;
+
+    this.boundGlobalMouseMove = (e) => this.onGlobalMouseMove(e);
+    this.boundGlobalMouseUp = (e) => this.onGlobalMouseUp(e);
+    this.boundSliderMouseDown = (e) => this.onSliderMouseDown(e);
+
     this.panel = this.createPanel();
     this.injectStyles();
     this.container.appendChild(this.panel);
@@ -57,6 +72,8 @@ export class ControlPanel {
         border-radius: 3px;
         outline: none;
         cursor: pointer;
+        user-select: none;
+        touch-action: none;
       }
       .panel-slider::-webkit-slider-thumb {
         -webkit-appearance: none;
@@ -68,7 +85,8 @@ export class ControlPanel {
         cursor: pointer;
         transition: background 0.2s ease;
       }
-      .panel-slider::-webkit-slider-thumb:hover {
+      .panel-slider::-webkit-slider-thumb:hover,
+      .panel-slider.dragging::-webkit-slider-thumb {
         background: #60a5fa;
       }
       .panel-slider::-moz-range-thumb {
@@ -80,7 +98,8 @@ export class ControlPanel {
         cursor: pointer;
         transition: background 0.2s ease;
       }
-      .panel-slider::-moz-range-thumb:hover {
+      .panel-slider::-moz-range-thumb:hover,
+      .panel-slider.dragging::-moz-range-thumb {
         background: #60a5fa;
       }
       .output-animated {
@@ -205,6 +224,8 @@ export class ControlPanel {
     this.slider.step = '0.1';
     this.slider.value = '1.0';
     this.slider.className = 'panel-slider';
+    this.slider.addEventListener('mousedown', this.boundSliderMouseDown);
+    this.slider.addEventListener('touchstart', this.boundSliderMouseDown as any, { passive: true });
     this.slider.addEventListener('input', () => this.onSliderInput());
     sliderSection.appendChild(this.slider);
 
@@ -261,9 +282,56 @@ export class ControlPanel {
     return { box, valueEl };
   }
 
+  private onSliderMouseDown(_e: MouseEvent | TouchEvent): void {
+    if (this.isDragging) return;
+    this.isDragging = true;
+    this.slider.classList.add('dragging');
+
+    document.addEventListener('mousemove', this.boundGlobalMouseMove, true);
+    document.addEventListener('mouseup', this.boundGlobalMouseUp, true);
+    document.addEventListener('touchmove', this.boundGlobalMouseMove as any, true);
+    document.addEventListener('touchend', this.boundGlobalMouseUp as any, true);
+  }
+
+  private onGlobalMouseMove(_e: MouseEvent | TouchEvent): void {
+    if (!this.isDragging) return;
+    this.onSliderInput();
+  }
+
+  private onGlobalMouseUp(_e: MouseEvent | TouchEvent): void {
+    if (!this.isDragging) return;
+    this.isDragging = false;
+    this.slider.classList.remove('dragging');
+
+    if (this.pendingSliderValue !== null) {
+      this.applySliderValue(this.pendingSliderValue, true);
+      this.pendingSliderValue = null;
+    }
+
+    document.removeEventListener('mousemove', this.boundGlobalMouseMove, true);
+    document.removeEventListener('mouseup', this.boundGlobalMouseUp, true);
+    document.removeEventListener('touchmove', this.boundGlobalMouseMove as any, true);
+    document.removeEventListener('touchend', this.boundGlobalMouseUp as any, true);
+  }
+
   private onSliderInput(): void {
-    if (!this.currentCell) return;
     const val = parseFloat(this.slider.value);
+    const now = performance.now();
+    const elapsed = now - this.lastSliderUpdate;
+
+    if (elapsed < SLIDER_THROTTLE_MS) {
+      this.pendingSliderValue = val;
+      this.efficiencyValueEl.textContent = val.toFixed(1) + 'x';
+      return;
+    }
+
+    this.lastSliderUpdate = now;
+    this.applySliderValue(val, false);
+    this.pendingSliderValue = null;
+  }
+
+  private applySliderValue(val: number, _force: boolean): void {
+    if (!this.currentCell) return;
     this.efficiencyValueEl.textContent = val.toFixed(1) + 'x';
     this.currentCell.efficiency = val;
     this.animateOutputTo(this.currentCell.annualOutput * val);

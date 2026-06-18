@@ -12,8 +12,13 @@ export interface HexCell {
   exploration: number;
   efficiency: number;
   hoverScale: number;
+  targetHoverScale: number;
   clickScale: number;
   clickAnimTime: number;
+  isDirty: boolean;
+  prevHoverScale: number;
+  prevClickScale: number;
+  prevIsSelected: boolean;
 }
 
 export interface HexMapState {
@@ -55,12 +60,25 @@ export class HexMap {
   private cells: HexCell[] = [];
   private selectedId: string | null = null;
   private hoveredId: string | null = null;
+  private prevHoveredId: string | null = null;
   private events: HexMapEvents;
   private lastTime = 0;
   private explorationTimer = 0;
   private rotationTime = 0;
   private offsetX = 0;
   private offsetY = 0;
+  private dpr = 1;
+
+  private offscreenCanvas: HTMLCanvasElement | null = null;
+  private offscreenCtx: CanvasRenderingContext2D | null = null;
+  private offscreenValid = false;
+  private canvasWidth = 0;
+  private canvasHeight = 0;
+
+  private dirtyCells: Set<string> = new Set();
+  private globalDirty = true;
+
+  private boundResize: () => void;
 
   constructor(canvas: HTMLCanvasElement, events: HexMapEvents = {}) {
     this.canvas = canvas;
@@ -68,6 +86,7 @@ export class HexMap {
     if (!ctx) throw new Error('Failed to get canvas context');
     this.ctx = ctx;
     this.events = events;
+    this.boundResize = () => this.resize();
     this.generateMap();
     this.bindEvents();
     this.resize();
@@ -117,20 +136,28 @@ export class HexMap {
           exploration: 0,
           efficiency: 1.0,
           hoverScale: 1,
+          targetHoverScale: 1,
           clickScale: 1,
           clickAnimTime: -1,
+          isDirty: true,
+          prevHoverScale: 0,
+          prevClickScale: 0,
+          prevIsSelected: false,
         };
         this.cells.push(cell);
       }
     }
-    this.updatePositions();
+    this.globalDirty = true;
+    this.offscreenValid = false;
   }
 
   private updatePositions(): void {
     const mapWidth = COLS * HEX_WIDTH * 0.75 + HEX_WIDTH * 0.25;
     const mapHeight = ROWS * HEX_HEIGHT + HEX_HEIGHT * 0.5;
-    this.offsetX = (this.canvas.width - mapWidth) / 2 + HEX_RADIUS;
-    this.offsetY = (this.canvas.height - mapHeight) / 2 + HEX_HEIGHT / 2;
+    const cssWidth = this.canvas.getBoundingClientRect().width;
+    const cssHeight = this.canvas.getBoundingClientRect().height;
+    this.offsetX = (cssWidth - mapWidth) / 2 + HEX_RADIUS;
+    this.offsetY = (cssHeight - mapHeight) / 2 + HEX_HEIGHT / 2;
 
     for (const cell of this.cells) {
       const x = this.offsetX + cell.col * HEX_WIDTH * 0.75;
@@ -145,20 +172,33 @@ export class HexMap {
 
   resize(): void {
     const rect = this.canvas.getBoundingClientRect();
-    const dpr = window.devicePixelRatio || 1;
-    this.canvas.width = rect.width * dpr;
-    this.canvas.height = rect.height * dpr;
-    this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    this.dpr = window.devicePixelRatio || 1;
+    this.canvas.width = rect.width * this.dpr;
+    this.canvas.height = rect.height * this.dpr;
+    this.canvasWidth = rect.width;
+    this.canvasHeight = rect.height;
+    this.ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
     this.canvas.style.width = `${rect.width}px`;
     this.canvas.style.height = `${rect.height}px`;
+
+    this.offscreenCanvas = document.createElement('canvas');
+    this.offscreenCanvas.width = this.canvas.width;
+    this.offscreenCanvas.height = this.canvas.height;
+    this.offscreenCtx = this.offscreenCanvas.getContext('2d');
+    if (this.offscreenCtx) {
+      this.offscreenCtx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+    }
+
     this.updatePositions();
+    this.globalDirty = true;
+    this.offscreenValid = false;
   }
 
   private bindEvents(): void {
     this.canvas.addEventListener('mousemove', (e) => this.onMouseMove(e));
     this.canvas.addEventListener('mouseleave', () => this.onMouseLeave());
     this.canvas.addEventListener('click', (e) => this.onClick(e));
-    window.addEventListener('resize', () => this.resize());
+    window.addEventListener('resize', this.boundResize);
   }
 
   private onMouseMove(e: MouseEvent): void {
@@ -168,12 +208,38 @@ export class HexMap {
     const cell = this.findCellAt(x, y);
     const newId = cell ? cell.id : null;
     if (newId !== this.hoveredId) {
+      if (this.hoveredId) {
+        const prevCell = this.cells.find((c) => c.id === this.hoveredId);
+        if (prevCell) {
+          prevCell.targetHoverScale = 1;
+          prevCell.isDirty = true;
+          this.dirtyCells.add(prevCell.id);
+        }
+      }
       this.hoveredId = newId;
+      if (newId) {
+        const newCell = this.cells.find((c) => c.id === newId);
+        if (newCell) {
+          newCell.targetHoverScale = 1.05;
+          newCell.isDirty = true;
+          this.dirtyCells.add(newCell.id);
+        }
+      }
+      this.globalDirty = true;
     }
   }
 
   private onMouseLeave(): void {
-    this.hoveredId = null;
+    if (this.hoveredId) {
+      const prevCell = this.cells.find((c) => c.id === this.hoveredId);
+      if (prevCell) {
+        prevCell.targetHoverScale = 1;
+        prevCell.isDirty = true;
+        this.dirtyCells.add(prevCell.id);
+      }
+      this.hoveredId = null;
+      this.globalDirty = true;
+    }
   }
 
   private onClick(e: MouseEvent): void {
@@ -184,6 +250,8 @@ export class HexMap {
     if (!cell || cell.resource === 'obstacle') return;
 
     cell.clickAnimTime = 0;
+    cell.isDirty = true;
+    this.dirtyCells.add(cell.id);
 
     if (this.selectedId === cell.id) {
       cell.isSelected = false;
@@ -191,11 +259,16 @@ export class HexMap {
       this.events.onSelect?.(null);
     } else {
       const prevSelected = this.cells.find((c) => c.id === this.selectedId);
-      if (prevSelected) prevSelected.isSelected = false;
+      if (prevSelected) {
+        prevSelected.isSelected = false;
+        prevSelected.isDirty = true;
+        this.dirtyCells.add(prevSelected.id);
+      }
       cell.isSelected = true;
       this.selectedId = cell.id;
       this.events.onSelect?.(cell);
     }
+    this.globalDirty = true;
   }
 
   private findCellAt(x: number, y: number): HexCell | null {
@@ -208,31 +281,88 @@ export class HexMap {
     return null;
   }
 
-  private drawHexagon(
+  private drawHexagonPath(
+    ctx: CanvasRenderingContext2D,
     cx: number,
     cy: number,
     radius: number,
     scale: number = 1
   ): void {
     const r = radius * scale;
-    this.ctx.beginPath();
+    ctx.beginPath();
     for (let i = 0; i < 6; i++) {
       const angle = (Math.PI / 3) * i - Math.PI / 6;
       const px = cx + r * Math.cos(angle);
       const py = cy + r * Math.sin(angle);
-      if (i === 0) this.ctx.moveTo(px, py);
-      else this.ctx.lineTo(px, py);
+      if (i === 0) ctx.moveTo(px, py);
+      else ctx.lineTo(px, py);
     }
-    this.ctx.closePath();
+    ctx.closePath();
+  }
+
+  private drawStaticLayer(): void {
+    if (!this.offscreenCtx || !this.offscreenCanvas) return;
+    const ctx = this.offscreenCtx;
+
+    ctx.save();
+    ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+    ctx.clearRect(0, 0, this.canvasWidth, this.canvasHeight);
+
+    ctx.fillStyle = '#0b0f19';
+    ctx.fillRect(0, 0, this.canvasWidth, this.canvasHeight);
+
+    for (const cell of this.cells) {
+      ctx.save();
+      this.drawHexagonPath(ctx, cell.centerX, cell.centerY, HEX_RADIUS, 1);
+      ctx.fillStyle = RESOURCE_COLORS[cell.resource];
+      ctx.fill();
+      ctx.strokeStyle = '#1f2937';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      ctx.restore();
+
+      if (cell.resource !== 'obstacle') {
+        ctx.save();
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold 11px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(
+          RESOURCE_NAMES[cell.resource],
+          cell.centerX,
+          cell.centerY
+        );
+        ctx.restore();
+      }
+    }
+
+    ctx.restore();
+    this.offscreenValid = true;
+  }
+
+  private getCellBBox(cell: HexCell): {
+    x: number;
+    y: number;
+    w: number;
+    h: number;
+  } {
+    const padding = 20;
+    const maxRadius = HEX_RADIUS * 1.1 + padding;
+    return {
+      x: Math.floor(cell.centerX - maxRadius),
+      y: Math.floor(cell.centerY - maxRadius),
+      w: Math.ceil(maxRadius * 2),
+      h: Math.ceil(maxRadius * 2),
+    };
   }
 
   private drawGlowRing(
+    ctx: CanvasRenderingContext2D,
     cx: number,
     cy: number,
     rotation: number
   ): void {
     const ringRadius = HEX_RADIUS + 10;
-    const ctx = this.ctx;
 
     ctx.save();
     ctx.translate(cx, cy);
@@ -245,20 +375,63 @@ export class HexMap {
     ctx.lineCap = 'round';
 
     const totalArc = Math.PI * 1.2;
-    const start = 0;
-    const end = start + totalArc;
-
     ctx.beginPath();
-    ctx.arc(0, 0, ringRadius, start, end);
+    ctx.arc(0, 0, ringRadius, 0, totalArc);
     ctx.stroke();
 
     ctx.restore();
+  }
+
+  private redrawCellOverlays(cell: HexCell): void {
+    const ctx = this.ctx;
+    const totalScale = cell.hoverScale * cell.clickScale;
+
+    if (cell.hoverScale !== 1 || cell.clickScale !== 1) {
+      const bbox = this.getCellBBox(cell);
+      ctx.save();
+      if (cell.hoverScale > 1 && cell.resource !== 'obstacle') {
+        ctx.shadowColor = '#9ca3af';
+        ctx.shadowBlur = 10;
+      }
+      this.drawHexagonPath(ctx, cell.centerX, cell.centerY, HEX_RADIUS, totalScale);
+      ctx.fillStyle = RESOURCE_COLORS[cell.resource];
+      ctx.fill();
+      ctx.restore();
+
+      ctx.save();
+      this.drawHexagonPath(ctx, cell.centerX, cell.centerY, HEX_RADIUS, totalScale);
+      ctx.strokeStyle = cell.isSelected ? '#e0f2fe' : '#1f2937';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      ctx.restore();
+
+      if (cell.resource !== 'obstacle') {
+        ctx.save();
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold 11px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(
+          RESOURCE_NAMES[cell.resource],
+          cell.centerX,
+          cell.centerY
+        );
+        ctx.restore();
+      }
+      void bbox;
+    }
+
+    if (cell.isSelected) {
+      this.drawGlowRing(ctx, cell.centerX, cell.centerY, this.rotationTime * 2);
+    }
   }
 
   update(deltaTime: number): void {
     this.rotationTime += deltaTime;
 
     for (const cell of this.cells) {
+      let changed = false;
+
       if (cell.clickAnimTime >= 0) {
         cell.clickAnimTime += deltaTime;
         const t = Math.min(cell.clickAnimTime / 0.3, 1);
@@ -271,6 +444,29 @@ export class HexMap {
           cell.clickAnimTime = -1;
           cell.clickScale = 1;
         }
+        changed = true;
+      }
+
+      if (cell.hoverScale !== cell.targetHoverScale) {
+        const diff = cell.targetHoverScale - cell.hoverScale;
+        cell.hoverScale += diff * 0.2;
+        if (Math.abs(cell.hoverScale - cell.targetHoverScale) < 0.001) {
+          cell.hoverScale = cell.targetHoverScale;
+        }
+        changed = true;
+      }
+
+      if (
+        changed ||
+        cell.hoverScale !== cell.prevHoverScale ||
+        cell.clickScale !== cell.prevClickScale ||
+        cell.isSelected !== cell.prevIsSelected
+      ) {
+        cell.isDirty = true;
+        this.dirtyCells.add(cell.id);
+        cell.prevHoverScale = cell.hoverScale;
+        cell.prevClickScale = cell.clickScale;
+        cell.prevIsSelected = cell.isSelected;
       }
     }
 
@@ -287,54 +483,100 @@ export class HexMap {
   }
 
   render(): void {
-    const { ctx, canvas } = this;
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    const ctx = this.ctx;
 
-    ctx.fillStyle = '#0b0f19';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    if (!this.offscreenValid) {
+      this.drawStaticLayer();
+    }
 
-    for (const cell of this.cells) {
-      const isHovered = this.hoveredId === cell.id;
-      const targetHoverScale = isHovered ? 1.05 : 1;
-      cell.hoverScale += (targetHoverScale - cell.hoverScale) * 0.2;
-
-      const totalScale = cell.hoverScale * cell.clickScale;
-
-      if (isHovered && cell.resource !== 'obstacle') {
-        ctx.save();
-        ctx.shadowColor = '#9ca3af';
-        ctx.shadowBlur = 10;
-        this.drawHexagon(cell.centerX, cell.centerY, HEX_RADIUS, totalScale);
-        ctx.fillStyle = RESOURCE_COLORS[cell.resource];
-        ctx.fill();
-        ctx.restore();
-      } else {
-        this.drawHexagon(cell.centerX, cell.centerY, HEX_RADIUS, totalScale);
-        ctx.fillStyle = RESOURCE_COLORS[cell.resource];
-        ctx.fill();
+    if (this.dirtyCells.size === 0 && !this.globalDirty) {
+      if (this.selectedId) {
+        const selected = this.cells.find((c) => c.id === this.selectedId);
+        if (selected) {
+          const bbox = this.getCellBBox(selected);
+          ctx.clearRect(bbox.x - 2, bbox.y - 2, bbox.w + 4, bbox.h + 4);
+          if (this.offscreenCanvas) {
+            ctx.drawImage(
+              this.offscreenCanvas,
+              (bbox.x - 2) * this.dpr,
+              (bbox.y - 2) * this.dpr,
+              (bbox.w + 4) * this.dpr,
+              (bbox.h + 4) * this.dpr,
+              bbox.x - 2,
+              bbox.y - 2,
+              bbox.w + 4,
+              bbox.h + 4
+            );
+          }
+          this.drawGlowRing(
+            ctx,
+            selected.centerX,
+            selected.centerY,
+            this.rotationTime * 2
+          );
+        }
       }
+      return;
+    }
 
-      ctx.save();
-      ctx.strokeStyle = cell.isSelected ? '#e0f2fe' : '#1f2937';
-      ctx.lineWidth = 2;
-      this.drawHexagon(cell.centerX, cell.centerY, HEX_RADIUS, totalScale);
-      ctx.stroke();
-      ctx.restore();
+    ctx.clearRect(0, 0, this.canvasWidth, this.canvasHeight);
+    if (this.offscreenCanvas) {
+      ctx.drawImage(
+        this.offscreenCanvas,
+        0,
+        0,
+        this.canvasWidth,
+        this.canvasHeight
+      );
+    }
 
-      if (cell.resource !== 'obstacle') {
-        ctx.save();
-        ctx.fillStyle = '#ffffff';
-        ctx.font = 'bold 11px sans-serif';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText(RESOURCE_NAMES[cell.resource], cell.centerX, cell.centerY);
-        ctx.restore();
-      }
+    const affectedCells: Set<string> = new Set();
+    for (const id of this.dirtyCells) {
+      affectedCells.add(id);
+    }
+    if (this.selectedId) {
+      affectedCells.add(this.selectedId);
+    }
+    if (this.prevHoveredId) {
+      affectedCells.add(this.prevHoveredId);
+    }
 
-      if (cell.isSelected) {
-        this.drawGlowRing(cell.centerX, cell.centerY, this.rotationTime * 2);
+    const bboxes: Array<{ x: number; y: number; w: number; h: number }> = [];
+    for (const id of affectedCells) {
+      const cell = this.cells.find((c) => c.id === id);
+      if (cell) {
+        bboxes.push(this.getCellBBox(cell));
+        cell.isDirty = false;
       }
     }
+
+    for (const bbox of bboxes) {
+      if (this.offscreenCanvas) {
+        ctx.clearRect(bbox.x - 2, bbox.y - 2, bbox.w + 4, bbox.h + 4);
+        ctx.drawImage(
+          this.offscreenCanvas,
+          (bbox.x - 2) * this.dpr,
+          (bbox.y - 2) * this.dpr,
+          (bbox.w + 4) * this.dpr,
+          (bbox.h + 4) * this.dpr,
+          bbox.x - 2,
+          bbox.y - 2,
+          bbox.w + 4,
+          bbox.h + 4
+        );
+      }
+    }
+
+    for (const id of affectedCells) {
+      const cell = this.cells.find((c) => c.id === id);
+      if (cell) {
+        this.redrawCellOverlays(cell);
+      }
+    }
+
+    this.dirtyCells.clear();
+    this.prevHoveredId = this.hoveredId;
+    this.globalDirty = false;
   }
 
   startLoop(): void {
