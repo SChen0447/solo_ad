@@ -7,7 +7,7 @@ import {
   Rect,
 } from './Map'
 import { PlayerController, Decoy } from './Player'
-import { Enemy, EnemyStateData, createEnemies, ENEMY_VISION_RADIUS } from './EnemyAI'
+import { Enemy, EnemyStateData, createEnemies } from './EnemyAI'
 
 export interface GameState {
   mapWidth: number
@@ -178,5 +178,3 @@ export const useGameStore = create<GameStore>((set, get) => ({
     })
   },
 }))
-
-export { ENEMY_VISION_RADIUS }

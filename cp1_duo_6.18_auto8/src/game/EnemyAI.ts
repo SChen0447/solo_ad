@@ -4,8 +4,15 @@ import { Decoy } from './Player'
 export type EnemyState = 'patrol' | 'alert' | 'chase'
 
 export const ENEMY_SIZE = 20
-export const ENEMY_VISION_ANGLE = Math.PI / 2
-export const ENEMY_VISION_RADIUS = 120
+
+export const VISION_PATROL_ANGLE = Math.PI / 3
+export const VISION_PATROL_RADIUS = 120
+export const VISION_ALERT_ANGLE = (Math.PI * 2) / 3
+export const VISION_ALERT_RADIUS = 150
+export const VISION_CHASE_ANGLE = Math.PI / 2
+export const VISION_CHASE_RADIUS = 180
+export const ALERT_VISION_DURATION = 3000
+
 export const ENEMY_PATROL_SPEED = 1
 export const ENEMY_CHASE_SPEED = 3
 export const ALERT_DURATION = 2000
@@ -28,6 +35,9 @@ export interface EnemyStateData {
   decoyTargetY: number
   decoyArrivalTime: number
   isVisible: boolean
+  visionAngle: number
+  visionRadius: number
+  wideVisionTimer: number
 }
 
 export class Enemy {
@@ -38,8 +48,6 @@ export class Enemy {
   state: EnemyState = 'patrol'
 
   size = ENEMY_SIZE
-  visionAngle = ENEMY_VISION_ANGLE
-  visionRadius = ENEMY_VISION_RADIUS
   patrolSpeed = ENEMY_PATROL_SPEED
   chaseSpeed = ENEMY_CHASE_SPEED
 
@@ -57,6 +65,8 @@ export class Enemy {
   decoyTargetY = 0
   decoyArrivalTime = 0
 
+  wideVisionTimer = 0
+
   constructor(id: number, path: { x: number; y: number }[]) {
     this.id = id
     this.patrolPath = path
@@ -67,6 +77,20 @@ export class Enemy {
     this.angle = Math.atan2(dy, dx)
   }
 
+  getCurrentVision(): { angle: number; radius: number } {
+    if (this.state === 'chase') {
+      return { angle: VISION_CHASE_ANGLE, radius: VISION_CHASE_RADIUS }
+    }
+    if (this.state === 'alert' || this.wideVisionTimer > 0) {
+      return { angle: VISION_ALERT_ANGLE, radius: VISION_ALERT_RADIUS }
+    }
+    return { angle: VISION_PATROL_ANGLE, radius: VISION_PATROL_RADIUS }
+  }
+
+  triggerWideVision(): void {
+    this.wideVisionTimer = ALERT_VISION_DURATION
+  }
+
   update(
     playerX: number,
     playerY: number,
@@ -75,6 +99,11 @@ export class Enemy {
     deltaTime: number
   ): void {
     const now = performance.now()
+
+    if (this.wideVisionTimer > 0) {
+      this.wideVisionTimer -= deltaTime
+      if (this.wideVisionTimer < 0) this.wideVisionTimer = 0
+    }
 
     const canSeePlayer = this.canSeeTarget(playerX, playerY, playerRadius)
 
@@ -87,6 +116,7 @@ export class Enemy {
         this.state = 'alert'
         this.alertTime = ALERT_DURATION
         this.hasDecoyTarget = false
+        this.triggerWideVision()
       } else if (this.state === 'alert') {
         this.alertTime -= deltaTime
         if (this.alertTime <= 0) {
@@ -106,6 +136,7 @@ export class Enemy {
         if (this.lostSightTimer <= 0) {
           this.state = 'patrol'
           this.hasDecoyTarget = false
+          this.triggerWideVision()
         } else {
           this.moveToward(this.lastSeenPlayerX, this.lastSeenPlayerY, this.chaseSpeed)
           if (
@@ -115,7 +146,11 @@ export class Enemy {
           }
         }
       } else if (this.state === 'patrol') {
+        const hadDecoyTarget = this.hasDecoyTarget
         this.handleDecoyResponse(decoys, now)
+        if (this.hasDecoyTarget && !hadDecoyTarget) {
+          this.triggerWideVision()
+        }
 
         if (this.hasDecoyTarget) {
           const distToDecoy = Math.hypot(
@@ -218,23 +253,25 @@ export class Enemy {
   }
 
   canSeeTarget(tx: number, ty: number, tRadius: number): boolean {
+    const vision = this.getCurrentVision()
     const dx = tx - this.x
     const dy = ty - this.y
     const dist = Math.hypot(dx, dy)
 
-    if (dist > this.visionRadius + tRadius) return false
+    if (dist > vision.radius + tRadius) return false
 
     const angleToTarget = Math.atan2(dy, dx)
     let angleDiff = angleToTarget - this.angle
     while (angleDiff > Math.PI) angleDiff -= Math.PI * 2
     while (angleDiff < -Math.PI) angleDiff += Math.PI * 2
 
-    if (Math.abs(angleDiff) > this.visionAngle / 2) return false
+    if (Math.abs(angleDiff) > vision.angle / 2) return false
 
     return isLineOfSightClear(this.x, this.y, tx, ty)
   }
 
   getStateData(isVisible: boolean): EnemyStateData {
+    const vision = this.getCurrentVision()
     return {
       id: this.id,
       x: this.x,
@@ -250,6 +287,9 @@ export class Enemy {
       decoyTargetY: this.decoyTargetY,
       decoyArrivalTime: this.decoyArrivalTime,
       isVisible,
+      visionAngle: vision.angle,
+      visionRadius: vision.radius,
+      wideVisionTimer: this.wideVisionTimer,
     }
   }
 }

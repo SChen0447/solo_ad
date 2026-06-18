@@ -1,12 +1,41 @@
 import { useEffect, useRef, useState } from 'react'
 import { useGameStore } from '../game/GameLoop'
 import { MAP_WIDTH, MAP_HEIGHT, BG_COLOR, OBSTACLE_COLOR, obstacles, getRayObstacleIntersection } from '../game/Map'
-import { EnemyStateData, ENEMY_SIZE, ENEMY_VISION_ANGLE, ENEMY_VISION_RADIUS } from '../game/EnemyAI'
+import { EnemyStateData, ENEMY_SIZE } from '../game/EnemyAI'
 import { DECOY_RADIUS, DECOY_BLINK_PERIOD, DECOY_DURATION, DECOY_COOLDOWN } from '../game/Player'
 
 const UI_BG = '#1a1a2e'
 const UI_PADDING = 15
 const UI_WIDTH = 220
+
+interface VisionParticle {
+  angleOffset: number
+  distOffset: number
+  size: number
+  speed: number
+  phase: number
+}
+
+const visionParticlesMap: Map<number, VisionParticle[]> = new Map()
+
+function getVisionParticles(enemyId: number): VisionParticle[] {
+  let particles = visionParticlesMap.get(enemyId)
+  if (!particles) {
+    particles = []
+    const count = 5 + Math.floor(Math.random() * 4)
+    for (let i = 0; i < count; i++) {
+      particles.push({
+        angleOffset: (Math.random() - 0.5) * 0.3,
+        distOffset: Math.random() * 0.15,
+        size: 1.5 + Math.random() * 2,
+        speed: 0.5 + Math.random() * 1.5,
+        phase: Math.random() * Math.PI * 2,
+      })
+    }
+    visionParticlesMap.set(enemyId, particles)
+  }
+  return particles
+}
 
 export default function GameCanvas() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -102,8 +131,9 @@ function drawScene(ctx: CanvasRenderingContext2D, state: any) {
 
   drawGrid(ctx)
   drawObstacles(ctx)
+  drawEnemyGlow(ctx, state.enemies)
+  drawVisionCones(ctx, state.enemies, now)
   drawDecoys(ctx, state.decoys, now)
-  drawVisionCones(ctx, state.enemies)
   drawEnemies(ctx, state.enemies, now)
   drawPlayer(ctx, state.player)
   drawOccludedEnemyHints(ctx, state.enemies, state.player)
@@ -225,15 +255,35 @@ function drawExclamationMark(ctx: CanvasRenderingContext2D, enemy: EnemyStateDat
   ctx.fillText('!', x, y)
 }
 
-function drawVisionCones(ctx: CanvasRenderingContext2D, enemies: EnemyStateData[]) {
+function drawEnemyGlow(ctx: CanvasRenderingContext2D, enemies: EnemyStateData[]) {
   for (const enemy of enemies) {
     if (!enemy.isVisible) continue
 
-    const startAngle = enemy.angle - ENEMY_VISION_ANGLE / 2
-    const endAngle = enemy.angle + ENEMY_VISION_ANGLE / 2
+    const glowRadius = enemy.visionRadius + 20
+    const gradient = ctx.createRadialGradient(
+      enemy.x, enemy.y, enemy.visionRadius * 0.5,
+      enemy.x, enemy.y, glowRadius
+    )
+    gradient.addColorStop(0, 'rgba(255, 50, 50, 0)')
+    gradient.addColorStop(0.7, 'rgba(255, 50, 50, 0.03)')
+    gradient.addColorStop(1, 'rgba(255, 50, 50, 0.05)')
+
+    ctx.fillStyle = gradient
+    ctx.beginPath()
+    ctx.arc(enemy.x, enemy.y, glowRadius, 0, Math.PI * 2)
+    ctx.fill()
+  }
+}
+
+function drawVisionCones(ctx: CanvasRenderingContext2D, enemies: EnemyStateData[], now: number) {
+  for (const enemy of enemies) {
+    if (!enemy.isVisible) continue
+
+    const startAngle = enemy.angle - enemy.visionAngle / 2
+    const endAngle = enemy.angle + enemy.visionAngle / 2
 
     let fillColor = 'rgba(255, 50, 50, 0.15)'
-    if (enemy.state === 'alert') {
+    if (enemy.state === 'alert' || enemy.wideVisionTimer > 0) {
       fillColor = 'rgba(255, 150, 0, 0.25)'
     } else if (enemy.state === 'chase') {
       fillColor = 'rgba(255, 0, 0, 0.3)'
@@ -242,7 +292,7 @@ function drawVisionCones(ctx: CanvasRenderingContext2D, enemies: EnemyStateData[
     ctx.fillStyle = fillColor
     ctx.beginPath()
     ctx.moveTo(enemy.x, enemy.y)
-    ctx.arc(enemy.x, enemy.y, ENEMY_VISION_RADIUS, startAngle, endAngle)
+    ctx.arc(enemy.x, enemy.y, enemy.visionRadius, startAngle, endAngle)
     ctx.closePath()
     ctx.fill()
 
@@ -251,15 +301,44 @@ function drawVisionCones(ctx: CanvasRenderingContext2D, enemies: EnemyStateData[
     ctx.beginPath()
     ctx.moveTo(enemy.x, enemy.y)
     ctx.lineTo(
-      enemy.x + Math.cos(startAngle) * ENEMY_VISION_RADIUS,
-      enemy.y + Math.sin(startAngle) * ENEMY_VISION_RADIUS
+      enemy.x + Math.cos(startAngle) * enemy.visionRadius,
+      enemy.y + Math.sin(startAngle) * enemy.visionRadius
     )
     ctx.moveTo(enemy.x, enemy.y)
     ctx.lineTo(
-      enemy.x + Math.cos(endAngle) * ENEMY_VISION_RADIUS,
-      enemy.y + Math.sin(endAngle) * ENEMY_VISION_RADIUS
+      enemy.x + Math.cos(endAngle) * enemy.visionRadius,
+      enemy.y + Math.sin(endAngle) * enemy.visionRadius
     )
     ctx.stroke()
+
+    drawVisionEdgeParticles(ctx, enemy, now)
+  }
+}
+
+function drawVisionEdgeParticles(
+  ctx: CanvasRenderingContext2D,
+  enemy: EnemyStateData,
+  now: number
+) {
+  const particles = getVisionParticles(enemy.id)
+  const arcStart = enemy.angle - enemy.visionAngle / 2
+  const arcLength = enemy.visionAngle
+
+  for (const p of particles) {
+    const t = ((now / 1000) * p.speed + p.phase) % 1
+    const angle = arcStart + arcLength * (0.5 + Math.sin(t * Math.PI * 2) * p.angleOffset)
+    const dist = enemy.visionRadius * (1 + Math.sin(t * Math.PI * 2 + p.phase) * p.distOffset)
+
+    const px = enemy.x + Math.cos(angle) * dist
+    const py = enemy.y + Math.sin(angle) * dist
+
+    const alpha = 0.2 + Math.sin(t * Math.PI * 2) * 0.15
+    const size = p.size * (0.8 + Math.sin(t * Math.PI * 2 + p.phase * 2) * 0.4)
+
+    ctx.fillStyle = `rgba(255, 255, 255, ${alpha})`
+    ctx.beginPath()
+    ctx.arc(px, py, size, 0, Math.PI * 2)
+    ctx.fill()
   }
 }
 
@@ -316,21 +395,33 @@ function drawOccludedEnemyHints(
     const nx = dx / dist
     const ny = dy / dist
 
-    const hintRadius = ENEMY_SIZE * 0.8
+    const hintRadius = enemy.visionRadius + 20
 
-    let hintX = intersection.x + nx * 5
-    let hintY = intersection.y + ny * 5
+    let hintX = intersection.x + nx * 2
+    let hintY = intersection.y + ny * 2
 
     if (Math.hypot(hintX - player.x, hintY - player.y) > dist) {
       hintX = enemy.x
       hintY = enemy.y
     }
 
+    const gradient = ctx.createRadialGradient(
+      hintX, hintY, hintRadius * 0.5,
+      hintX, hintY, hintRadius
+    )
+    gradient.addColorStop(0, 'rgba(255, 50, 50, 0)')
+    gradient.addColorStop(0.6, 'rgba(255, 50, 50, 0.1)')
+    gradient.addColorStop(1, 'rgba(255, 50, 50, 0.3)')
+
     ctx.save()
-    ctx.globalAlpha = 0.4
-    ctx.strokeStyle = '#FF4444'
+    ctx.fillStyle = gradient
+    ctx.beginPath()
+    ctx.arc(hintX, hintY, hintRadius, 0, Math.PI * 2)
+    ctx.fill()
+
+    ctx.strokeStyle = 'rgba(255, 80, 80, 0.5)'
     ctx.lineWidth = 2
-    ctx.setLineDash([4, 4])
+    ctx.setLineDash([5, 5])
     ctx.beginPath()
     ctx.arc(hintX, hintY, hintRadius, 0, Math.PI * 2)
     ctx.stroke()
