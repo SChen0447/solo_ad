@@ -1,0 +1,26 @@
+[
+  {
+    "id": "band-001",
+    "name": "星光摇滚乐队",
+    "adminEmail": "admin@band.com",
+    "schedule": {
+      "dayOfWeek": 2,
+      "startTime": "19:00",
+      "endTime": "21:00",
+      "location": "城市音乐工作室A室"
+    },
+    "createdAt": "2024-01-01T00:00:00.000Z"
+  },
+  {
+    "id": "band-002",
+    "name": "蓝调爵士乐团",
+    "adminEmail": "admin@jazz.com",
+    "schedule": {
+      "dayOfWeek": 4,
+      "startTime": "20:00",
+      "endTime": "22:00",
+      "location": "地下音乐酒吧"
+    },
+    "createdAt": "2024-01-05T00:00:00.000Z"
+  }
+]

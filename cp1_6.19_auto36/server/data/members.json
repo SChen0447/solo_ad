@@ -1,0 +1,8 @@
+[
+  {"id": "member-001", "bandId": "band-001", "email": "zhangsan@band.com", "name": "张三", "avatar": "https://api.dicebear.com/7.x/avataaars/svg?seed=zhangsan", "role": "admin", "joinedAt": "2024-01-01T00:00:00.000Z"},
+  {"id": "member-002", "bandId": "band-001", "email": "lisi@band.com", "name": "李四", "avatar": "https://api.dicebear.com/7.x/avataaars/svg?seed=lisi", "role": "member", "joinedAt": "2024-01-02T00:00:00.000Z"},
+  {"id": "member-003", "bandId": "band-001", "email": "wangwu@band.com", "name": "王五", "avatar": "https://api.dicebear.com/7.x/avataaars/svg?seed=wangwu", "role": "member", "joinedAt": "2024-01-03T00:00:00.000Z"},
+  {"id": "member-004", "bandId": "band-001", "email": "zhaoliu@band.com", "name": "赵六", "avatar": "https://api.dicebear.com/7.x/avataaars/svg?seed=zhaoliu", "role": "member", "joinedAt": "2024-01-04T00:00:00.000Z"},
+  {"id": "member-005", "bandId": "band-002", "email": "chenqi@jazz.com", "name": "陈七", "avatar": "https://api.dicebear.com/7.x/avataaars/svg?seed=chenqi", "role": "admin", "joinedAt": "2024-01-05T00:00:00.000Z"},
+  {"id": "member-006", "bandId": "band-002", "email": "zhouba@jazz.com", "name": "周八", "avatar": "https://api.dicebear.com/7.x/avataaars/svg?seed=zhouba", "role": "member", "joinedAt": "2024-01-06T00:00:00.000Z"}
+]

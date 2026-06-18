@@ -1,0 +1,6 @@
+[
+  {"id": "sheet-001", "eventId": "event-001", "fileName": "海阔天空_主谱.pdf", "fileSize": 1048576, "uploadedAt": "2026-05-26T10:00:00.000Z", "annotation": "第3页第12小节需重点练习，注意节奏变化", "url": "/uploads/sample.pdf", "version": 1},
+  {"id": "sheet-002", "eventId": "event-002", "fileName": "光辉岁月_吉他谱.pdf", "fileSize": 2097152, "uploadedAt": "2026-06-02T14:30:00.000Z", "annotation": "前奏solo部分需要提速练习", "url": "/uploads/sample.pdf", "version": 1},
+  {"id": "sheet-003", "eventId": "event-003", "fileName": "真的爱你_贝斯谱.pdf", "fileSize": 524288, "uploadedAt": "2026-06-09T09:15:00.000Z", "annotation": "副歌部分贝斯slap技巧", "url": "/uploads/sample.pdf", "version": 2},
+  {"id": "sheet-004", "eventId": "event-006", "fileName": "Take_Five_爵士谱.pdf", "fileSize": 1572864, "uploadedAt": "2026-05-29T16:45:00.000Z", "annotation": "5/4拍节奏，注意即兴段落", "url": "/uploads/sample.pdf", "version": 1}
+]
