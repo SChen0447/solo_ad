@@ -33,14 +33,21 @@ export class CanvasRenderer {
   private rafId: number | null = null;
   private lastFrameTime: number = 0;
   private frameInterval: number = 1000 / 30;
+  private frameCount: number = 0;
+  private fps: number = 0;
+  private fpsLastTime: number = 0;
 
-  private sprayLastTime: number = 0;
+  private sprayAccumTime: number = 0;
   private sprayInterval: number = 50;
 
   private offscreenCanvas: HTMLCanvasElement;
   private offscreenCtx: CanvasRenderingContext2D;
 
   private onStrokeEndCallbacks: (() => void)[] = [];
+  private onUndoStateChangeCallbacks: (() => void)[] = [];
+
+  private pendingSave: ImageData | null = null;
+  private saveScheduled: boolean = false;
 
   constructor(canvas: HTMLCanvasElement, undoManager: UndoManager) {
     this.canvas = canvas;
@@ -74,6 +81,10 @@ export class CanvasRenderer {
     return this.undoManager;
   }
 
+  get currentFps(): number {
+    return this.fps;
+  }
+
   onStrokeEnd(cb: () => void): () => void {
     this.onStrokeEndCallbacks.push(cb);
     return () => {
@@ -81,8 +92,19 @@ export class CanvasRenderer {
     };
   }
 
+  onUndoStateChange(cb: () => void): () => void {
+    this.onUndoStateChangeCallbacks.push(cb);
+    return () => {
+      this.onUndoStateChangeCallbacks = this.onUndoStateChangeCallbacks.filter(c => c !== cb);
+    };
+  }
+
   private notifyStrokeEnd(): void {
     this.onStrokeEndCallbacks.forEach(cb => cb());
+  }
+
+  private notifyUndoStateChange(): void {
+    this.onUndoStateChangeCallbacks.forEach(cb => cb());
   }
 
   private bindEvents(): void {
@@ -112,14 +134,33 @@ export class CanvasRenderer {
   }
 
   private startRenderLoop(): void {
+    this.lastFrameTime = performance.now();
+    this.fpsLastTime = this.lastFrameTime;
+
     const loop = (time: number) => {
       this.rafId = requestAnimationFrame(loop);
+
       const delta = time - this.lastFrameTime;
-      if (delta >= this.frameInterval) {
-        this.lastFrameTime = time - (delta % this.frameInterval);
-        this.renderFrame(time);
+      if (delta < this.frameInterval) {
+        return;
+      }
+
+      const frameCount = Math.floor(delta / this.frameInterval);
+      const usedTime = frameCount * this.frameInterval;
+      this.lastFrameTime += usedTime;
+
+      this.renderFrame(time, frameCount);
+
+      this.frameCount += frameCount;
+      if (time - this.fpsLastTime >= 1000) {
+        this.fps = Math.round(
+          (this.frameCount * 1000) / (time - this.fpsLastTime)
+        );
+        this.frameCount = 0;
+        this.fpsLastTime = time;
       }
     };
+
     this.rafId = requestAnimationFrame(loop);
   }
 
@@ -130,14 +171,14 @@ export class CanvasRenderer {
     }
   }
 
-  private renderFrame(time: number): void {
+  private renderFrame(_time: number, frameCount: number): void {
     if (!this.drawState.isDrawing) return;
 
     if (this._currentTool === 'spray') {
-      const delta = time - this.sprayLastTime;
-      if (delta >= this.sprayInterval) {
-        this.sprayLastTime = time - (delta % this.sprayInterval);
-        this.drawSprayContinuous();
+      this.sprayAccumTime += frameCount * this.frameInterval;
+      while (this.sprayAccumTime >= this.sprayInterval) {
+        this.sprayAccumTime -= this.sprayInterval;
+        this.drawSpray(this.drawState.currentX, this.drawState.currentY);
       }
       return;
     }
@@ -216,12 +257,12 @@ export class CanvasRenderer {
     this.drawState.currentX = x;
     this.drawState.currentY = y;
     this.drawState.dirty = false;
-    this.sprayLastTime = performance.now();
+    this.sprayAccumTime = 0;
 
     if (this._currentTool !== 'spray') {
       this.draw(x, y);
     } else {
-      this.drawSprayContinuous();
+      this.drawSpray(x, y);
     }
   }
 
@@ -235,7 +276,7 @@ export class CanvasRenderer {
     if (!this.drawState.isDrawing) return;
     this.drawState.isDrawing = false;
     this.drawState.dirty = false;
-    this.saveState();
+    this.saveStateAsync();
     this.notifyStrokeEnd();
   }
 
@@ -243,9 +284,6 @@ export class CanvasRenderer {
     switch (this._currentTool) {
       case 'brush':
         this.drawBrush(x, y);
-        break;
-      case 'spray':
-        this.drawSpray(x, y);
         break;
       case 'eraser':
         this.drawEraser(x, y);
@@ -255,7 +293,7 @@ export class CanvasRenderer {
 
   private drawLine(x1: number, y1: number, x2: number, y2: number): void {
     const dist = Math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2);
-    const step = this._currentTool === 'spray' ? 4 : 2;
+    const step = 2;
     const steps = Math.max(1, Math.ceil(dist / step));
 
     for (let i = 0; i <= steps; i++) {
@@ -275,8 +313,8 @@ export class CanvasRenderer {
 
   private drawSpray(x: number, y: number): void {
     const area = Math.PI * this._sprayRadius * this._sprayRadius;
-    const dotsPerUnit = 0.01;
-    const dots = Math.floor(area * dotsPerUnit * this._sprayDensity * 10);
+    const dotsPerSqPixel = 0.008;
+    const dots = Math.floor(area * dotsPerSqPixel * this._sprayDensity * 10);
     this.ctx.fillStyle = this._currentColor;
     for (let i = 0; i < dots; i++) {
       const angle = Math.random() * Math.PI * 2;
@@ -285,10 +323,6 @@ export class CanvasRenderer {
       const dy = y + r * Math.sin(angle);
       this.ctx.fillRect(dx, dy, 1.5, 1.5);
     }
-  }
-
-  private drawSprayContinuous(): void {
-    this.drawSpray(this.drawState.currentX, this.drawState.currentY);
   }
 
   private drawEraser(x: number, y: number): void {
@@ -300,12 +334,46 @@ export class CanvasRenderer {
     this.ctx.restore();
   }
 
-  private saveState(): void {
-    this.offscreenCanvas.width = this.canvas.width;
-    this.offscreenCanvas.height = this.canvas.height;
-    this.offscreenCtx.drawImage(this.canvas, 0, 0);
-    const dataUrl = this.offscreenCanvas.toDataURL('image/png');
-    this.undoManager.pushState(dataUrl);
+  private saveStateAsync(): void {
+    try {
+      const imageData = this.ctx.getImageData(0, 0, this.canvas.width, this.canvas.height);
+      this.pendingSave = imageData;
+    } catch (e) {
+      console.error('Failed to capture image data:', e);
+      return;
+    }
+
+    if (this.saveScheduled) return;
+    this.saveScheduled = true;
+
+    const doCompress = () => {
+      if (!this.pendingSave) {
+        this.saveScheduled = false;
+        return;
+      }
+
+      const imgData = this.pendingSave;
+      this.pendingSave = null;
+
+      try {
+        this.offscreenCanvas.width = imgData.width;
+        this.offscreenCanvas.height = imgData.height;
+        this.offscreenCtx.putImageData(imgData, 0, 0);
+        const dataUrl = this.offscreenCanvas.toDataURL('image/png');
+        this.undoManager.pushState(dataUrl);
+        this.notifyUndoStateChange();
+      } catch (e) {
+        console.error('Failed to compress state:', e);
+      } finally {
+        this.saveScheduled = false;
+      }
+    };
+
+    if ('requestIdleCallback' in window) {
+      (window as any).requestIdleCallback(doCompress, { timeout: 500 });
+    } else {
+      setTimeout(doCompress, 0);
+    }
   }
 
   initCanvas(width: number, height: number): void {
@@ -314,7 +382,16 @@ export class CanvasRenderer {
     this.ctx.fillStyle = '#ffffff';
     this.ctx.fillRect(0, 0, width, height);
     this.drawGrid();
-    this.saveState();
+    this.saveStateImmediate();
+  }
+
+  private saveStateImmediate(): void {
+    this.offscreenCanvas.width = this.canvas.width;
+    this.offscreenCanvas.height = this.canvas.height;
+    this.offscreenCtx.drawImage(this.canvas, 0, 0);
+    const dataUrl = this.offscreenCanvas.toDataURL('image/png');
+    this.undoManager.pushState(dataUrl);
+    this.notifyUndoStateChange();
   }
 
   private drawGrid(): void {
@@ -359,6 +436,7 @@ export class CanvasRenderer {
     const dataUrl = this.undoManager.undo();
     if (dataUrl) {
       await this.restoreFromDataUrl(dataUrl);
+      this.notifyUndoStateChange();
     }
     return dataUrl;
   }
@@ -367,6 +445,7 @@ export class CanvasRenderer {
     const dataUrl = this.undoManager.redo();
     if (dataUrl) {
       await this.restoreFromDataUrl(dataUrl);
+      this.notifyUndoStateChange();
     }
     return dataUrl;
   }
@@ -375,8 +454,41 @@ export class CanvasRenderer {
     return this.canvas.toDataURL('image/png');
   }
 
-  getCanvasDataUrlForSave(): string {
-    return this.canvas.toDataURL('image/png');
+  getCanvasDataUrlForSave(
+    options: {
+      quality?: number;
+      watermark?: string;
+      format?: 'image/png' | 'image/jpeg';
+    } = {}
+  ): string {
+    const { quality = 0.92, watermark, format = 'image/png' } = options;
+
+    this.offscreenCanvas.width = this.canvas.width;
+    this.offscreenCanvas.height = this.canvas.height;
+    this.offscreenCtx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+
+    if (format === 'image/jpeg') {
+      this.offscreenCtx.fillStyle = '#ffffff';
+      this.offscreenCtx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+    }
+
+    this.offscreenCtx.drawImage(this.canvas, 0, 0);
+
+    if (watermark) {
+      this.offscreenCtx.save();
+      this.offscreenCtx.font = 'bold 14px sans-serif';
+      this.offscreenCtx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+      this.offscreenCtx.textAlign = 'right';
+      this.offscreenCtx.textBaseline = 'bottom';
+      this.offscreenCtx.fillText(
+        watermark,
+        this.canvas.width - 16,
+        this.canvas.height - 12
+      );
+      this.offscreenCtx.restore();
+    }
+
+    return this.offscreenCanvas.toDataURL(format, quality);
   }
 
   resize(width: number, height: number): void {

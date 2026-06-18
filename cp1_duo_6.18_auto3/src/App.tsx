@@ -6,12 +6,14 @@ import ColorPalette from './ColorPalette';
 import './toast.css';
 
 const BREAKPOINT = 768;
+const FADE_DURATION = 200;
 
 function App() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const rendererRef = useRef<CanvasRenderer | null>(null);
   const undoManagerRef = useRef<UndoManager>(new UndoManager(50));
   const containerRef = useRef<HTMLDivElement>(null);
+  const canvasWrapperRef = useRef<HTMLDivElement>(null);
 
   const [currentTool, setCurrentTool] = useState<ToolType>('brush');
   const [currentColor, setCurrentColor] = useState('#FF0000');
@@ -20,9 +22,10 @@ function App() {
   const [isMobile, setIsMobile] = useState(false);
   const [toastVisible, setToastVisible] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
-  const [fadeState, setFadeState] = useState<'idle' | 'fading-out' | 'fading-in'>('idle');
+  const [fadePhase, setFadePhase] = useState<'idle' | 'fade-out' | 'redraw' | 'fade-in'>('idle');
 
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const fadeAnimatingRef = useRef(false);
 
   useEffect(() => {
     const checkMobile = () => setIsMobile(window.innerWidth < BREAKPOINT);
@@ -32,26 +35,17 @@ function App() {
   }, []);
 
   useEffect(() => {
-    const um = undoManagerRef.current;
-    const unsub = um.onChange(() => {
-      setCanUndo(um.canUndo);
-      setCanRedo(um.canRedo);
-    });
-    return unsub;
-  }, []);
-
-  useEffect(() => {
     if (!canvasRef.current) return;
     const renderer = new CanvasRenderer(canvasRef.current, undoManagerRef.current);
     rendererRef.current = renderer;
 
-    const unsubStroke = renderer.onStrokeEnd(() => {
+    const unsubUndo = renderer.onUndoStateChange(() => {
       setCanUndo(undoManagerRef.current.canUndo);
       setCanRedo(undoManagerRef.current.canRedo);
     });
 
     return () => {
-      unsubStroke();
+      unsubUndo();
       renderer.unbindEvents();
       rendererRef.current = null;
     };
@@ -93,40 +87,68 @@ function App() {
     }, 2000);
   }, []);
 
-  const handleUndo = useCallback(async () => {
-    if (!rendererRef.current || !undoManagerRef.current.canUndo) return;
-    if (fadeState !== 'idle') return;
-
-    setFadeState('fading-out');
-
-    setTimeout(async () => {
-      await rendererRef.current?.undo();
-      setFadeState('fading-in');
+  const waitForTransition = useCallback((element: HTMLElement, duration: number): Promise<void> => {
+    return new Promise((resolve) => {
+      const onEnd = () => {
+        element.removeEventListener('transitionend', onEnd);
+        resolve();
+      };
+      element.addEventListener('transitionend', onEnd);
       setTimeout(() => {
-        setFadeState('idle');
-      }, 200);
-    }, 200);
-  }, [fadeState]);
+        element.removeEventListener('transitionend', onEnd);
+        resolve();
+      }, duration + 50);
+    });
+  }, []);
 
-  const handleRedo = useCallback(async () => {
-    if (!rendererRef.current || !undoManagerRef.current.canRedo) return;
-    if (fadeState !== 'idle') return;
+  const performUndoRedo = useCallback(async (action: 'undo' | 'redo') => {
+    if (!rendererRef.current || !canvasWrapperRef.current) return;
+    if (fadeAnimatingRef.current) return;
 
-    setFadeState('fading-out');
+    const um = undoManagerRef.current;
+    if (action === 'undo' && !um.canUndo) return;
+    if (action === 'redo' && !um.canRedo) return;
 
-    setTimeout(async () => {
-      await rendererRef.current?.redo();
-      setFadeState('fading-in');
-      setTimeout(() => {
-        setFadeState('idle');
-      }, 200);
-    }, 200);
-  }, [fadeState]);
+    fadeAnimatingRef.current = true;
+    const canvasEl = canvasRef.current;
+    if (!canvasEl) return;
+
+    try {
+      setFadePhase('fade-out');
+      await waitForTransition(canvasEl, FADE_DURATION);
+
+      setFadePhase('redraw');
+      if (action === 'undo') {
+        await rendererRef.current!.undo();
+      } else {
+        await rendererRef.current!.redo();
+      }
+
+      setFadePhase('fade-in');
+      await waitForTransition(canvasEl, FADE_DURATION);
+
+      setFadePhase('idle');
+    } finally {
+      fadeAnimatingRef.current = false;
+    }
+  }, [waitForTransition]);
+
+  const handleUndo = useCallback(() => {
+    performUndoRedo('undo');
+  }, [performUndoRedo]);
+
+  const handleRedo = useCallback(() => {
+    performUndoRedo('redo');
+  }, [performUndoRedo]);
 
   const handleSave = useCallback(() => {
-    if (!rendererRef.current || !canvasRef.current) return;
+    if (!rendererRef.current) return;
 
-    const dataUrl = rendererRef.current.getCanvasDataUrlForSave();
+    const dataUrl = rendererRef.current.getCanvasDataUrlForSave({
+      format: 'image/png',
+      quality: 0.92,
+      watermark: 'Graffiti Wall',
+    });
 
     const link = document.createElement('a');
     const now = new Date();
@@ -152,10 +174,28 @@ function App() {
     setCurrentColor(color);
   }, []);
 
-  const canvasOpacity = fadeState === 'fading-out' ? 0.5 : 1;
-  const canvasTransition = fadeState !== 'idle'
-    ? 'opacity 0.2s ease-out'
-    : 'none';
+  const getCanvasOpacity = (): number => {
+    switch (fadePhase) {
+      case 'fade-out':
+        return 0.5;
+      case 'redraw':
+        return 0.5;
+      case 'fade-in':
+      case 'idle':
+      default:
+        return 1;
+    }
+  };
+
+  const getCanvasTransition = (): string => {
+    if (fadePhase === 'fade-out' || fadePhase === 'fade-in') {
+      return `opacity ${FADE_DURATION}ms ease-out`;
+    }
+    return 'none';
+  };
+
+  const canvasOpacity = getCanvasOpacity();
+  const canvasTransition = getCanvasTransition();
 
   if (isMobile) {
     return (
@@ -203,18 +243,23 @@ function App() {
             overflow: 'hidden',
           }}
         >
-          <canvas
-            ref={canvasRef}
-            style={{
-              display: 'block',
-              width: '100%',
-              height: '100%',
-              cursor: currentTool === 'eraser' ? 'cell' : 'crosshair',
-              opacity: canvasOpacity,
-              transition: canvasTransition,
-              touchAction: 'none',
-            }}
-          />
+          <div
+            ref={canvasWrapperRef}
+            style={{ width: '100%', height: '100%' }}
+          >
+            <canvas
+              ref={canvasRef}
+              style={{
+                display: 'block',
+                width: '100%',
+                height: '100%',
+                cursor: currentTool === 'eraser' ? 'cell' : 'crosshair',
+                opacity: canvasOpacity,
+                transition: canvasTransition,
+                touchAction: 'none',
+              }}
+            />
+          </div>
         </div>
 
         <div style={{
@@ -367,18 +412,23 @@ function App() {
             background: '#1a1a1a',
           }}
         >
-          <canvas
-            ref={canvasRef}
-            style={{
-              display: 'block',
-              width: '100%',
-              height: '100%',
-              cursor: currentTool === 'eraser' ? 'cell' : 'crosshair',
-              opacity: canvasOpacity,
-              transition: canvasTransition,
-              touchAction: 'none',
-            }}
-          />
+          <div
+            ref={canvasWrapperRef}
+            style={{ width: '100%', height: '100%' }}
+          >
+            <canvas
+              ref={canvasRef}
+              style={{
+                display: 'block',
+                width: '100%',
+                height: '100%',
+                cursor: currentTool === 'eraser' ? 'cell' : 'crosshair',
+                opacity: canvasOpacity,
+                transition: canvasTransition,
+                touchAction: 'none',
+              }}
+            />
+          </div>
         </div>
 
         <div style={{
