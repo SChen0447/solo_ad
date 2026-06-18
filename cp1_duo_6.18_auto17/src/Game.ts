@@ -89,8 +89,6 @@ export class Game {
   }
 
   private handleClick(e: MouseEvent): void {
-    if (this.paused) return;
-
     const rect = this.canvas.getBoundingClientRect();
     const scaleX = this.canvas.width / rect.width;
     const scaleY = this.canvas.height / rect.height;
@@ -101,6 +99,8 @@ export class Game {
       this.togglePause();
       return;
     }
+
+    if (this.paused) return;
 
     const mapX = canvasX - MAP_OFFSET_X;
     const mapY = canvasY - MAP_OFFSET_Y;
@@ -155,8 +155,13 @@ export class Game {
   private gameLoop(timestamp: number): void {
     this.animFrameId = requestAnimationFrame(this.gameLoop);
 
-    const deltaMs = timestamp - this.lastTimestamp;
+    const deltaMs = Math.min(timestamp - this.lastTimestamp, 100);
     this.lastTimestamp = timestamp;
+
+    if (this.coreHitFlashTimer > 0) {
+      this.coreHitFlashTimer -= deltaMs;
+      if (this.coreHitFlashTimer < 0) this.coreHitFlashTimer = 0;
+    }
 
     if (this.paused) {
       this.render();
@@ -174,9 +179,6 @@ export class Game {
     const { hitCore } = this.enemySpawner.update(deltaMs);
     if (hitCore) {
       this.coreHitFlashTimer = 200;
-    }
-    if (this.coreHitFlashTimer > 0) {
-      this.coreHitFlashTimer -= deltaMs;
     }
 
     this.checkCollisions();
@@ -215,12 +217,6 @@ export class Game {
         const a = relVx * relVx + relVy * relVy;
         const b = 2 * (dx * relVx + dy * relVy);
         const c = dx * dx + dy * dy - radiusSq;
-
-        if (c <= 0) {
-          proj.alive = false;
-          this.enemySpawner.damageEnemy(enemy.id, proj.damage);
-          break;
-        }
 
         if (a < 0.0001) continue;
 
@@ -578,7 +574,7 @@ export class Game {
     ctx.translate(MAP_OFFSET_X, MAP_OFFSET_Y);
 
     for (const drop of this.enemySpawner.energyDrops) {
-      if (drop.collected) continue;
+      if (drop.collected || drop.expired) continue;
 
       const flash = 0.5 + 0.5 * Math.sin(drop.flashPhase);
       const alpha = Math.min(1, (drop.duration - drop.timer) / 500);

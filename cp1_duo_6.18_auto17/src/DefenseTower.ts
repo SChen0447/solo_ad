@@ -37,6 +37,7 @@ export interface RippleEffect {
 }
 
 const MAX_PROJECTILES = 100;
+const FRAME_TIME = 16;
 
 export class DefenseTower {
   towers: Tower[] = [];
@@ -124,7 +125,7 @@ export class DefenseTower {
         continue;
       }
 
-      tower.haloAngle += 0.5 * (deltaMs / 16);
+      tower.haloAngle += 0.5 * (deltaMs / FRAME_TIME);
       if (tower.flashTimer > 0) tower.flashTimer -= deltaMs;
       if (tower.upgradeAnimTimer > 0) tower.upgradeAnimTimer -= deltaMs;
 
@@ -180,11 +181,11 @@ export class DefenseTower {
 
     this._projectiles.push(...newProjectiles.filter(p => p.alive));
 
-    const dtFactor = deltaMs / 16;
+    const dtScale = deltaMs / FRAME_TIME;
     for (const p of this._projectiles) {
       if (!p.alive) continue;
-      p.x += p.vx * dtFactor;
-      p.y += p.vy * dtFactor;
+      p.x += p.vx * dtScale;
+      p.y += p.vy * dtScale;
       if (p.x < -20 || p.x > 820 || p.y < -20 || p.y > 620) {
         p.alive = false;
       }

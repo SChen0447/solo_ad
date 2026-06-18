@@ -21,6 +21,7 @@ export interface EnergyDrop {
   duration: number;
   flashPhase: number;
   collected: boolean;
+  expired: boolean;
 }
 
 export interface Entrance {
@@ -38,6 +39,7 @@ const ENEMY_SIZE = 12;
 const ENERGY_DROP_AMOUNT = 3;
 const ENERGY_DROP_DURATION = 2000;
 const CORE_RADIUS = 15;
+const FRAME_TIME = 16;
 
 export class EnemySpawner {
   enemies: Enemy[] = [];
@@ -100,7 +102,7 @@ export class EnemySpawner {
       this.spawnWave();
     }
 
-    const dtFactor = deltaMs / 16;
+    const dtScale = deltaMs / FRAME_TIME;
 
     for (const enemy of this.enemies) {
       if (!enemy.alive) continue;
@@ -122,22 +124,25 @@ export class EnemySpawner {
       if (dist > 0) {
         enemy.vx = (dx / dist) * enemy.speed;
         enemy.vy = (dy / dist) * enemy.speed;
-        enemy.x += enemy.vx * dtFactor;
-        enemy.y += enemy.vy * dtFactor;
+        enemy.x += enemy.vx * dtScale;
+        enemy.y += enemy.vy * dtScale;
       }
     }
 
     for (const entrance of this.entrances) {
-      entrance.arrowPhase += 0.03 * (deltaMs / 16);
+      entrance.arrowPhase += 0.03 * dtScale;
     }
 
     for (const drop of this.energyDrops) {
-      if (drop.collected) continue;
+      if (drop.collected || drop.expired) continue;
       drop.timer += deltaMs;
-      drop.flashPhase += 0.1 * (deltaMs / 16);
+      drop.flashPhase += 0.1 * dtScale;
+      if (drop.timer >= drop.duration) {
+        drop.expired = true;
+      }
     }
 
-    this.energyDrops = this.energyDrops.filter(d => !d.collected && d.timer < d.duration);
+    this.energyDrops = this.energyDrops.filter(d => !d.collected && !d.expired);
 
     return { hitCore };
   }
@@ -159,6 +164,7 @@ export class EnemySpawner {
         duration: ENERGY_DROP_DURATION,
         flashPhase: 0,
         collected: false,
+        expired: false,
       });
       return true;
     }
@@ -168,7 +174,7 @@ export class EnemySpawner {
   tryCollectDrop(mx: number, my: number): number {
     let total = 0;
     for (const drop of this.energyDrops) {
-      if (drop.collected) continue;
+      if (drop.collected || drop.expired) continue;
       const dx = mx - drop.x;
       const dy = my - drop.y;
       if (Math.sqrt(dx * dx + dy * dy) < 20) {
