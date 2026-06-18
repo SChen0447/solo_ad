@@ -40,14 +40,18 @@ export class FontLoader {
           const fontName = file.name.replace(/\.(woff|ttf)$/i, '');
           const fontFamily = `Custom_${fontName.replace(/[^a-zA-Z0-9]/g, '_')}`;
 
-          const fontUrl = this.createFontFace(fontFamily, buffer, file.type);
+          this.createFontFace(fontFamily, buffer, file.type);
+
+          if (onProgress) onProgress(90);
+
+          await this.waitForFontLoad(`'${fontFamily}'`);
 
           if (onProgress) onProgress(100);
 
           const fontData: ParsedFontData = {
             name: fontName,
             buffer,
-            fontUrl,
+            fontUrl: null,
             family: `'${fontFamily}', sans-serif`,
             isCustom: true,
             opentypeFont,

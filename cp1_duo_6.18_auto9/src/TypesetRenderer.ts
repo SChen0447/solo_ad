@@ -21,6 +21,7 @@ export class TypesetRenderer {
   private canvas: HTMLCanvasElement;
   private ctx: CanvasRenderingContext2D;
   private animationFrameId: number | null = null;
+  private pendingResolve: (() => void) | null = null;
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
@@ -31,14 +32,31 @@ export class TypesetRenderer {
     this.ctx = ctx;
   }
 
-  render(config: RenderConfig): void {
-    if (this.animationFrameId !== null) {
-      cancelAnimationFrame(this.animationFrameId);
-    }
+  render(config: RenderConfig): Promise<void> {
+    return new Promise((resolve) => {
+      if (this.animationFrameId !== null) {
+        cancelAnimationFrame(this.animationFrameId);
+        this.animationFrameId = null;
+      }
 
-    this.animationFrameId = requestAnimationFrame(() => {
-      this.performRender(config);
-      this.animationFrameId = null;
+      if (this.pendingResolve) {
+        this.pendingResolve();
+        this.pendingResolve = null;
+      }
+
+      this.pendingResolve = resolve;
+
+      this.animationFrameId = requestAnimationFrame(() => {
+        try {
+          this.performRender(config);
+        } finally {
+          this.animationFrameId = null;
+          if (this.pendingResolve) {
+            this.pendingResolve();
+            this.pendingResolve = null;
+          }
+        }
+      });
     });
   }
 
@@ -199,6 +217,11 @@ export class TypesetRenderer {
   destroy(): void {
     if (this.animationFrameId !== null) {
       cancelAnimationFrame(this.animationFrameId);
+      this.animationFrameId = null;
+    }
+    if (this.pendingResolve) {
+      this.pendingResolve();
+      this.pendingResolve = null;
     }
     this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
   }
@@ -227,13 +250,10 @@ export class TypesetRenderer {
       const tempCanvas = document.createElement('canvas');
       const renderer = new TypesetRenderer(tempCanvas);
 
-      await new Promise<void>((resolve) => {
-        renderer.render({
-          ...config,
-          height: exportHeight,
-          scale,
-        });
-        setTimeout(resolve, 50);
+      await renderer.render({
+        ...config,
+        height: exportHeight,
+        scale,
       });
 
       ctx.drawImage(

@@ -20,6 +20,13 @@ export const PreviewPanel: React.FC<{ onExport: () => void }> = ({ onExport }) =
     selectedColumnId,
   } = useAppStore();
 
+  const handleAddColumn = useCallback(() => {
+    if (columns.length >= 4) {
+      return;
+    }
+    addColumn();
+  }, [columns.length, addColumn]);
+
   const containerRef = useRef<HTMLDivElement>(null);
   const [columnRenderers, setColumnRenderers] = useState<Map<string, ColumnRenderer>>(new Map());
   const [containerWidth, setContainerWidth] = useState(800);
@@ -143,12 +150,13 @@ export const PreviewPanel: React.FC<{ onExport: () => void }> = ({ onExport }) =
         </div>
         <div style={styles.headerActions}>
           <button
-            onClick={addColumn}
+            onClick={handleAddColumn}
             disabled={columns.length >= 4}
             style={{
               ...styles.button,
               ...styles.addButton,
               opacity: columns.length >= 4 ? 0.5 : 1,
+              cursor: columns.length >= 4 ? 'not-allowed' : 'pointer',
             }}
           >
             + Add Column
