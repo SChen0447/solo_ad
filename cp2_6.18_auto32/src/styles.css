@@ -71,7 +71,7 @@ body {
   justify-content: space-between;
   position: relative;
   overflow: hidden;
-  border: 1px solid transparent;
+  border: 1px solid rgba(167, 139, 250, 0);
 }
 
 .project-card::before {
@@ -99,7 +99,7 @@ body {
   font-size: 16px;
   color: #8b5cf6;
   opacity: 0.75;
-  transition: transform 0.3s ease-out, opacity 0.3s ease-out;
+  transition: opacity 0.3s ease-out, transform 0.3s ease-out;
   pointer-events: none;
   font-weight: 600;
 }
@@ -136,7 +136,7 @@ body {
   transition: background-color 0.2s ease-out;
 }
 
-.project-card:hover .task-badge {
+.task-badge:hover {
   background: var(--success-dark);
 }
 
