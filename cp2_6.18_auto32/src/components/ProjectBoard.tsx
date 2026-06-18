@@ -44,6 +44,7 @@ export default function ProjectBoard({ projects, onProjectClick, onAddProject }:
                 </span>
                 <span className="project-card-date">总工时 {stats.totalHours}h</span>
               </div>
+              <span className="project-card-arrow">→</span>
             </div>
           );
         })}
