@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>3D 粒子星系探索</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #0a0a1a;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+
+    #app {
+      width: 100vw;
+      height: 100vh;
+      display: block;
+    }
+
+    #stats {
+      position: fixed;
+      top: 20px;
+      left: 20px;
+      pointer-events: none;
+      z-index: 100;
+    }
+
+    #info-panel {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      padding: 12px 16px;
+      background: rgba(0, 0, 0, 0.5);
+      border-radius: 8px;
+      font-size: 14px;
+      color: #cccccc;
+      line-height: 1.6;
+      pointer-events: none;
+      z-index: 100;
+      backdrop-filter: blur(4px);
+    }
+
+    #info-panel .label {
+      color: #8888aa;
+      margin-right: 8px;
+    }
+
+    #info-panel .value {
+      color: #cccccc;
+      font-weight: 500;
+    }
+
+    #selection-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 50;
+    }
+
+    #selection-rect {
+      position: absolute;
+      border: 2px solid rgba(100, 160, 255, 0.8);
+      background: rgba(100, 160, 255, 0.15);
+      border-radius: 2px;
+      display: none;
+    }
+
+    .dg.ac {
+      z-index: 200 !important;
+    }
+
+    .dg.main .close-button {
+      background: rgba(20, 20, 40, 0.8) !important;
+    }
+
+    .dg.main {
+      background: rgba(15, 15, 35, 0.75) !important;
+      backdrop-filter: blur(12px) !important;
+      -webkit-backdrop-filter: blur(12px) !important;
+      border-radius: 16px !important;
+      padding: 20px !important;
+      width: 260px !important;
+      margin-top: 20px !important;
+      margin-right: 20px !important;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3) !important;
+      border: 1px solid rgba(255, 255, 255, 0.08) !important;
+    }
+
+    .dg.main .c {
+      background: transparent !important;
+    }
+
+    .dg .cr.function {
+      background: transparent !important;
+    }
+
+    .dg .cr.number input[type=text] {
+      background: rgba(255, 255, 255, 0.06) !important;
+      color: #ccc !important;
+      border: 1px solid rgba(255, 255, 255, 0.1) !important;
+    }
+
+    .dg .c .slider {
+      background: rgba(255, 255, 255, 0.06) !important;
+    }
+
+    .dg .c .slider-fg {
+      background: linear-gradient(90deg, #ffaa33, #3366ff) !important;
+    }
+
+    .dg .c select {
+      background: rgba(255, 255, 255, 0.06) !important;
+      color: #ccc !important;
+      border: 1px solid rgba(255, 255, 255, 0.1) !important;
+    }
+
+    .dg .property-name {
+      color: #aaaacc !important;
+    }
+
+    .dg .cr.function button {
+      background: linear-gradient(135deg, rgba(100, 120, 200, 0.8), rgba(80, 100, 180, 0.8)) !important;
+      color: white !important;
+      border: none !important;
+      border-radius: 6px !important;
+      padding: 6px 12px !important;
+      cursor: pointer !important;
+      transition: all 0.2s ease !important;
+    }
+
+    .dg .cr.function button:hover {
+      background: linear-gradient(135deg, rgba(120, 140, 220, 0.9), rgba(100, 120, 200, 0.9)) !important;
+      transform: translateY(-1px) !important;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="app"></canvas>
+  <div id="stats"></div>
+  <div id="info-panel">
+    <div><span class="label">粒子数量:</span><span class="value" id="particle-count">0</span></div>
+    <div><span class="label">旋转速度:</span><span class="value" id="rotation-speed">0</span></div>
+  </div>
+  <div id="selection-overlay">
+    <div id="selection-rect"></div>
+  </div>
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
