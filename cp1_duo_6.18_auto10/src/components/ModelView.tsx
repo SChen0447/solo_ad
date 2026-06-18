@@ -12,34 +12,49 @@ interface LampProps {
 
 interface AnimatableMeshProps {
   targetColor: string
-  metalness?: number
-  roughness?: number
+  shininess?: number
   name?: string
   children: React.ReactNode
 }
 
+const easeOutCubic = (t: number): number => {
+  return 1 - Math.pow(1 - t, 3)
+}
+
 const AnimatableMesh = forwardRef<THREE.Mesh, AnimatableMeshProps>((
-  { targetColor, metalness = 0.1, roughness = 0.6, name, children },
+  { targetColor, shininess = 30, name, children },
   ref
 ) => {
-  const materialRef = useRef<THREE.MeshStandardMaterial>(null)
+  const materialRef = useRef<THREE.MeshPhongMaterial>(null)
+  const startColor = useRef(new THREE.Color(targetColor))
   const currentColor = useRef(new THREE.Color(targetColor))
   const targetColorObj = useMemo(() => hexToThreeColor(targetColor), [targetColor])
+  const animationProgress = useRef(1)
+  const prevTargetColor = useRef(targetColor)
+
+  useEffect(() => {
+    if (prevTargetColor.current !== targetColor) {
+      startColor.current.copy(currentColor.current)
+      animationProgress.current = 0
+      prevTargetColor.current = targetColor
+    }
+  }, [targetColor])
 
   useFrame((_, delta) => {
-    if (materialRef.current) {
-      currentColor.current.lerp(targetColorObj, Math.min(1, delta * 3))
+    if (materialRef.current && animationProgress.current < 1) {
+      animationProgress.current = Math.min(1, animationProgress.current + delta / 0.4)
+      const easedProgress = easeOutCubic(animationProgress.current)
+      currentColor.current.copy(startColor.current).lerp(targetColorObj, easedProgress)
       materialRef.current.color.copy(currentColor.current)
     }
   })
 
   return (
     <mesh ref={ref} name={name}>
-      <meshStandardMaterial
+      <meshPhongMaterial
         ref={materialRef}
         color={targetColor}
-        metalness={metalness}
-        roughness={roughness}
+        shininess={shininess}
       />
       {children}
     </mesh>
@@ -150,3 +165,46 @@ const ModelView = ({ shadeColor, poleColor, baseColor, onRendererReady }: ModelV
 }
 
 export default ModelView
+
+export const captureSnapshotThumbnail = (
+  renderer: THREE.WebGLRenderer,
+  scene: THREE.Scene,
+  colors: { shade: string; pole: string; base: string }
+): string => {
+  const originalColors: Record<string, string> = {}
+
+  scene.traverse((obj) => {
+    const mesh = obj as THREE.Mesh
+    if (mesh.material && (mesh.name === 'shade' || mesh.name === 'pole' || mesh.name === 'base')) {
+      const mat = mesh.material as THREE.MeshPhongMaterial
+      originalColors[mesh.uuid] = mat.color.getStyle()
+      if (mesh.name === 'shade') mat.color.set(colors.shade)
+      else if (mesh.name === 'pole') mat.color.set(colors.pole)
+      else if (mesh.name === 'base') mat.color.set(colors.base)
+    }
+  })
+
+  const thumbnailCamera = new THREE.PerspectiveCamera(45, 1, 0.1, 1000)
+  thumbnailCamera.position.set(0, 5, 5)
+  thumbnailCamera.lookAt(0, 1, 0)
+
+  const size = 120
+  const originalSize = new THREE.Vector2()
+  renderer.getSize(originalSize)
+  renderer.setSize(size, size)
+
+  renderer.render(scene, thumbnailCamera)
+  const dataUrl = renderer.domElement.toDataURL('image/png')
+
+  renderer.setSize(originalSize.x, originalSize.y)
+
+  scene.traverse((obj) => {
+    const mesh = obj as THREE.Mesh
+    if (mesh.material && originalColors[mesh.uuid]) {
+      const mat = mesh.material as THREE.MeshPhongMaterial
+      mat.color.set(originalColors[mesh.uuid])
+    }
+  })
+
+  return dataUrl
+}

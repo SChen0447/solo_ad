@@ -1,6 +1,6 @@
 import { useRef, useCallback } from 'react'
 import * as THREE from 'three'
-import ModelView from './components/ModelView'
+import ModelView, { captureSnapshotThumbnail } from './components/ModelView'
 import ControlPanel from './components/ControlPanel'
 import SnapshotGrid from './components/SnapshotGrid'
 import { useStore } from './store/useStore'
@@ -10,7 +10,6 @@ const App = () => {
   const { showToast, toastMessage, shadeColor, poleColor, baseColor } = useStore()
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null)
   const sceneRef = useRef<THREE.Scene | null>(null)
-  const cameraRef = useRef<THREE.Camera | null>(null)
 
   const handleRendererReady = useCallback((
     renderer: THREE.WebGLRenderer,
@@ -19,51 +18,15 @@ const App = () => {
   ) => {
     rendererRef.current = renderer
     sceneRef.current = scene
-    cameraRef.current = camera
   }, [])
 
   const generateThumbnail = useCallback((colors?: ColorScheme): string => {
-    if (!rendererRef.current || !sceneRef.current || !cameraRef.current) {
+    if (!rendererRef.current || !sceneRef.current) {
       return generateSimpleThumbnail(colors || { shade: shadeColor, pole: poleColor, base: baseColor })
     }
 
     const targetColors = colors || { shade: shadeColor, pole: poleColor, base: baseColor }
-
-    const originalColors: Record<string, string> = {}
-    sceneRef.current.traverse((obj) => {
-      const mesh = obj as THREE.Mesh
-      if (mesh.material && (mesh.name === 'shade' || mesh.name === 'pole' || mesh.name === 'base')) {
-        const mat = mesh.material as THREE.MeshStandardMaterial
-        originalColors[mesh.uuid] = mat.color.getStyle()
-        if (mesh.name === 'shade') mat.color.set(targetColors.shade)
-        else if (mesh.name === 'pole') mat.color.set(targetColors.pole)
-        else if (mesh.name === 'base') mat.color.set(targetColors.base)
-      }
-    })
-
-    const thumbnailCamera = cameraRef.current.clone() as THREE.PerspectiveCamera
-    thumbnailCamera.position.set(0, 5, 5)
-    thumbnailCamera.lookAt(0, 1, 0)
-
-    const size = 120
-    const originalSize = new THREE.Vector2()
-    rendererRef.current.getSize(originalSize)
-    rendererRef.current.setSize(size, size)
-
-    rendererRef.current.render(sceneRef.current, thumbnailCamera)
-    const dataUrl = rendererRef.current.domElement.toDataURL('image/png')
-
-    rendererRef.current.setSize(originalSize.x, originalSize.y)
-
-    sceneRef.current.traverse((obj) => {
-      const mesh = obj as THREE.Mesh
-      if (mesh.material && originalColors[mesh.uuid]) {
-        const mat = mesh.material as THREE.MeshStandardMaterial
-        mat.color.set(originalColors[mesh.uuid])
-      }
-    })
-
-    return dataUrl
+    return captureSnapshotThumbnail(rendererRef.current, sceneRef.current, targetColors)
   }, [shadeColor, poleColor, baseColor])
 
   const generateSimpleThumbnail = (colors: ColorScheme): string => {

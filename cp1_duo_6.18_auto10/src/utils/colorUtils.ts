@@ -51,12 +51,12 @@ export const generateHarmoniousSchemes = (count: number): ColorScheme[] => {
 
   for (let i = 0; i < count; i++) {
     const baseHue = Math.random()
-    const hueOffset1 = 120 / 360 + (Math.random() - 0.5) * (40 / 360)
-    const hueOffset2 = 240 / 360 + (Math.random() - 0.5) * (40 / 360)
+    const hueVariance = (Math.random() - 0.5) * (40 / 360)
+    const hueStep = 120 / 360 + hueVariance
 
     const h1 = baseHue
-    const h2 = (baseHue + hueOffset1) % 1
-    const h3 = (baseHue + hueOffset2) % 1
+    const h2 = (baseHue + hueStep) % 1
+    const h3 = (baseHue + hueStep * 2) % 1
 
     const s = 0.5 + Math.random() * 0.3
     const l = 0.4 + Math.random() * 0.2
