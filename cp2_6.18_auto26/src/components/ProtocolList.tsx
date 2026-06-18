@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getProtocols } from '../utils/api';
 import type { Protocol, FilterStatus, ProtocolStatus } from '../types';
-import { relativeTime, excerpt } from '../utils/markdown';
+import { relativeTime, excerpt, formatCardDate } from '../utils/markdown';
 
 const statusLabel: Record<ProtocolStatus, string> = {
   pending: '待签',
@@ -40,6 +40,55 @@ export default function ProtocolList() {
 
   const signedCount = (p: Protocol) =>
     p.parties.filter((x) => x.signedAt !== null).length;
+
+  const renderRingProgress = (p: Protocol) => {
+    const total = p.parties.length;
+    const done = signedCount(p);
+    const percent = total === 0 ? 0 : (done / total) * 100;
+    const radius = 14;
+    const circumference = 2 * Math.PI * radius;
+    const dashOffset = circumference - (percent / 100) * circumference;
+    const colorVar =
+      p.status === 'pending'
+        ? 'var(--accent-orange)'
+        : p.status === 'signed'
+          ? 'var(--accent-green)'
+          : 'var(--primary-blue)';
+
+    return (
+      <div className="ring-progress" title={`签署进度：${done}/${total}`}>
+        <svg width="36" height="36" viewBox="0 0 36 36">
+          <circle
+            cx="18"
+            cy="18"
+            r={radius}
+            fill="none"
+            stroke="var(--border-light)"
+            strokeWidth="3"
+          />
+          <circle
+            cx="18"
+            cy="18"
+            r={radius}
+            fill="none"
+            stroke={colorVar}
+            strokeWidth="3"
+            strokeLinecap="round"
+            strokeDasharray={circumference}
+            strokeDashoffset={dashOffset}
+            transform="rotate(-90 18 18)"
+            style={{ transition: 'stroke-dashoffset 0.4s ease-out' }}
+          />
+        </svg>
+        <span
+          className="ring-progress-text"
+          style={{ color: colorVar }}
+        >
+          {done}/{total}
+        </span>
+      </div>
+    );
+  };
 
   return (
     <div>
@@ -94,6 +143,7 @@ export default function ProtocolList() {
                     {p.title}
                   </div>
                   <span className={`status-tag status-${p.status}`}>
+                    <span className={`status-dot status-dot-${p.status}`} />
                     {statusLabel[p.status]}
                   </span>
                 </div>
@@ -101,14 +151,14 @@ export default function ProtocolList() {
                   {excerpt(p.content, 60)}
                 </div>
                 <div className="card-meta">
-                  <div>
-                    签署进度：{signedCount(p)} / {p.parties.length}
+                  <div style={{ color: 'var(--text-muted)', fontSize: 12, marginTop: 2 }}>
+                    {signedCount(p)} / {p.parties.length} 方参与
                   </div>
                 </div>
               </div>
               <div className="card-footer">
-                <span>{relativeTime(p.createdAt)}</span>
-                <span>查看详情 →</span>
+                <span>{formatCardDate(p.createdAt)}</span>
+                {renderRingProgress(p)}
               </div>
             </div>
           ))}

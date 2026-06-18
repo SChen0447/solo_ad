@@ -77,6 +77,30 @@ export function relativeTime(isoString: string | null): string {
   return formatDate(isoString);
 }
 
+export function formatCardDate(isoString: string | null): string {
+  if (!isoString) return '';
+  const d = new Date(isoString);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const timeStr = `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+
+  const now = new Date();
+  const isSameDay =
+    d.getFullYear() === now.getFullYear() &&
+    d.getMonth() === now.getMonth() &&
+    d.getDate() === now.getDate();
+  if (isSameDay) return `今天 ${timeStr}`;
+
+  const yesterday = new Date();
+  yesterday.setDate(yesterday.getDate() - 1);
+  const isYesterday =
+    d.getFullYear() === yesterday.getFullYear() &&
+    d.getMonth() === yesterday.getMonth() &&
+    d.getDate() === yesterday.getDate();
+  if (isYesterday) return `昨天 ${timeStr}`;
+
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${timeStr}`;
+}
+
 export function formatDate(isoString: string | null): string {
   if (!isoString) return '';
   const d = new Date(isoString);

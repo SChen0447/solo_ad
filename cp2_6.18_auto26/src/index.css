@@ -188,6 +188,29 @@ body {
   font-weight: 600;
   color: #ffffff;
   white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.85);
+  animation: dotPulse 1.8s ease-in-out infinite;
+}
+
+@keyframes dotPulse {
+  0%,
+  100% {
+    opacity: 0.6;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.25);
+  }
 }
 
 .status-pending {
@@ -229,6 +252,19 @@ body {
   padding-top: 10px;
   display: flex;
   justify-content: space-between;
+  align-items: center;
+}
+
+.ring-progress {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.ring-progress-text {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.2px;
 }
 
 .page-title {
