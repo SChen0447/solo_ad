@@ -7,6 +7,8 @@ export interface NeuronNode {
   type: 'presynaptic' | 'postsynaptic'
   isHighlighted: boolean
   flashTime: number
+  pulseTime: number
+  pulseType: 'emit' | 'receive' | null
 }
 
 export interface Connection {
@@ -52,6 +54,8 @@ export class NeuronManager {
         type: 'presynaptic',
         isHighlighted: false,
         flashTime: 0,
+        pulseTime: 0,
+        pulseType: null,
       })
 
       this.postsynapticNodes.push({
@@ -61,6 +65,8 @@ export class NeuronManager {
         type: 'postsynaptic',
         isHighlighted: false,
         flashTime: 0,
+        pulseTime: 0,
+        pulseType: null,
       })
     }
   }
@@ -189,6 +195,38 @@ export class NeuronManager {
     const node = this.getNodeById(postsynapticId)
     if (node && node.type === 'postsynaptic') {
       node.flashTime = Date.now()
+      node.pulseTime = Date.now()
+      node.pulseType = 'receive'
+    }
+  }
+
+  public triggerEmitPulse(presynapticId: number): void {
+    const node = this.getNodeById(presynapticId)
+    if (node && node.type === 'presynaptic') {
+      node.pulseTime = Date.now()
+      node.pulseType = 'emit'
+    }
+  }
+
+  public getPulseIntensity(nodeId: number, pulseDurationMs: number = 200): number {
+    const node = this.getNodeById(nodeId)
+    if (!node || !node.pulseTime || !node.pulseType) return 0
+
+    const elapsed = Date.now() - node.pulseTime
+    if (elapsed >= pulseDurationMs) return 0
+
+    const t = 1 - elapsed / pulseDurationMs
+    return t * t
+  }
+
+  public getPulseColor(nodeId: number): string | null {
+    const node = this.getNodeById(nodeId)
+    if (!node || !node.pulseType) return null
+
+    if (node.pulseType === 'emit') {
+      return '#80c8ff'
+    } else {
+      return '#a5d6a7'
     }
   }
 

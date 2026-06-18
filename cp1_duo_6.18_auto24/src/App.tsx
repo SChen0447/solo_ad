@@ -82,6 +82,8 @@ const NeuronNodes: React.FC<{
           key={node.id}
           node={node}
           isFlashing={neuronManager.isFlashing(node.id, transmissionDelay)}
+          pulseIntensity={neuronManager.getPulseIntensity(node.id)}
+          pulseColor={neuronManager.getPulseColor(node.id)}
           onHover={onHover}
         />
       ))}
@@ -92,27 +94,51 @@ const NeuronNodes: React.FC<{
 const NeuronSphere: React.FC<{
   node: NeuronNode
   isFlashing: boolean
+  pulseIntensity: number
+  pulseColor: string | null
   onHover: (id: number | null) => void
-}> = ({ node, isFlashing, onHover }) => {
-  const displayColor = isFlashing ? '#ffffff' : node.color
-  const scale = node.isHighlighted ? 1.2 : 1
-  const emissiveIntensity = isFlashing ? 1.5 : 0.4
+}> = ({ node, isFlashing, pulseIntensity, pulseColor, onHover }) => {
+  const meshRef = useRef<THREE.Mesh>(null)
+  const glowRef = useRef<THREE.Mesh>(null)
+  const timeRef = useRef(Math.random() * Math.PI * 2)
+
+  useFrame((_, delta) => {
+    timeRef.current += delta
+    const breathePeriod = 2
+    const breathePhase = (timeRef.current / breathePeriod) * Math.PI * 2
+    const breatheScale = 1 + Math.sin(breathePhase) * 0.05
+
+    const highlightScale = node.isHighlighted ? 1.2 : 1
+    const totalScale = breatheScale * highlightScale
+
+    if (meshRef.current) {
+      meshRef.current.scale.setScalar(totalScale)
+    }
+    if (glowRef.current) {
+      glowRef.current.scale.setScalar(totalScale * 1.25)
+    }
+  })
+
+  const baseColor = isFlashing ? '#ffffff' : node.color
+  const finalColor = pulseIntensity > 0 && pulseColor ? pulseColor : baseColor
+  const emissiveIntensity = isFlashing ? 1.5 : 0.4 + pulseIntensity * 0.8
+  const glowOpacity = 0.3 + pulseIntensity * 0.4
 
   return (
     <group position={node.position.toArray()}>
-      <mesh scale={[scale * 1.25, scale * 1.25, scale * 1.25]}>
+      <mesh ref={glowRef}>
         <sphereGeometry args={[0.4, 32, 32]} />
         <meshBasicMaterial
-          color={displayColor}
+          color={finalColor}
           transparent
-          opacity={0.3}
+          opacity={glowOpacity}
           side={THREE.BackSide}
           depthWrite={false}
         />
       </mesh>
 
       <mesh
-        scale={[scale, scale, scale]}
+        ref={meshRef}
         onPointerOver={(e) => {
           e.stopPropagation()
           onHover(node.id)
@@ -121,8 +147,8 @@ const NeuronSphere: React.FC<{
       >
         <sphereGeometry args={[0.4, 32, 32]} />
         <meshStandardMaterial
-          color={displayColor}
-          emissive={displayColor}
+          color={finalColor}
+          emissive={finalColor}
           emissiveIntensity={emissiveIntensity}
           metalness={0.2}
           roughness={0.6}

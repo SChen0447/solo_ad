@@ -151,6 +151,8 @@ export class SignalTransmitter {
       return
     }
 
+    this.neuronManager.triggerEmitPulse(connection.presynapticId)
+
     const particleId = `particle-${connection.id}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
 
     const particle: Particle = {
