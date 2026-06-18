@@ -1,0 +1,134 @@
+.info-display {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  width: 280px;
+  background: rgba(15, 23, 55, 0.85);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 16px;
+  z-index: 100;
+  color: #e2e8f0;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+  transition: all 0.3s ease;
+}
+
+.info-display.empty {
+  opacity: 0.7;
+}
+
+.info-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #f1f5f9;
+  margin-bottom: 14px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.info-hint {
+  font-size: 12px;
+  color: #64748b;
+  text-align: center;
+  padding: 20px 0;
+}
+
+.info-coords {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 14px;
+  padding: 8px 10px;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 8px;
+}
+
+.coord-label {
+  font-size: 11px;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.coord-value {
+  font-size: 12px;
+  font-family: 'Courier New', monospace;
+  color: #94a3b8;
+}
+
+.info-item {
+  display: grid;
+  grid-template-columns: 24px 40px 1fr;
+  grid-template-rows: auto auto;
+  gap: 4px 8px;
+  align-items: center;
+  padding: 8px 10px;
+  margin-bottom: 8px;
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: 8px;
+  transition: all 0.3s ease;
+}
+
+.info-item:last-child {
+  margin-bottom: 0;
+}
+
+.info-item:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.info-icon {
+  grid-row: span 2;
+  font-size: 16px;
+}
+
+.info-label {
+  font-size: 11px;
+  color: #64748b;
+}
+
+.info-value {
+  font-size: 14px;
+  font-weight: 600;
+  color: #f1f5f9;
+  font-family: 'Courier New', monospace;
+}
+
+.info-bar {
+  grid-column: 2 / -1;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.info-bar-fill {
+  height: 100%;
+  border-radius: 2px;
+  transition: width 0.3s ease;
+}
+
+.temp-fill {
+  background: linear-gradient(90deg, #3b82f6, #ef4444);
+}
+
+.wind-fill {
+  background: linear-gradient(90deg, #4ade80, #ef4444);
+}
+
+.pressure-fill {
+  background: linear-gradient(90deg, #a78bfa, #eab308);
+}
+
+@media (max-width: 1440px) {
+  .info-display {
+    width: 240px;
+    padding: 14px;
+  }
+
+  .info-value {
+    font-size: 13px;
+  }
+}
