@@ -21,6 +21,7 @@ export const TYPE_CONFIG: Record<CommentType, { label: string; color: string; bg
 interface CommentStore {
   comments: Comment[]
   selectedCommentId: string | null
+  flashKey: number
   addComment: (comment: Omit<Comment, 'id'>) => void
   removeComment: (id: string) => void
   updateComment: (id: string, updates: Partial<Pick<Comment, 'content' | 'type'>>) => void
@@ -31,6 +32,7 @@ interface CommentStore {
 export const useCommentStore = create<CommentStore>((set) => ({
   comments: [],
   selectedCommentId: null,
+  flashKey: 0,
   addComment: (comment) =>
     set((state) => ({
       comments: [...state.comments, { ...comment, id: crypto.randomUUID() }],
@@ -44,6 +46,10 @@ export const useCommentStore = create<CommentStore>((set) => ({
     set((state) => ({
       comments: state.comments.map((c) => (c.id === id ? { ...c, ...updates } : c)),
     })),
-  selectComment: (id) => set({ selectedCommentId: id }),
-  clearAll: () => set({ comments: [], selectedCommentId: null }),
+  selectComment: (id) =>
+    set((state) => ({
+      selectedCommentId: id,
+      flashKey: id ? state.flashKey + 1 : state.flashKey,
+    })),
+  clearAll: () => set({ comments: [], selectedCommentId: null, flashKey: 0 }),
 }))

@@ -64,6 +64,9 @@ const CommentCard: React.FC<{ comment: Comment }> = ({ comment }) => {
   }
 
   const config = TYPE_CONFIG[comment.type]
+  const textPreview = comment.text.length > 10
+    ? comment.text.slice(0, 10) + '...'
+    : comment.text
 
   return (
     <div
@@ -87,7 +90,7 @@ const CommentCard: React.FC<{ comment: Comment }> = ({ comment }) => {
           ✕
         </button>
       </div>
-      <div className="comment-text-snippet">"{comment.text}"</div>
+      <div className="comment-text-snippet">"{textPreview}"</div>
       <div className="comment-content" onDoubleClick={handleDoubleClick}>
         {editing ? (
           <input

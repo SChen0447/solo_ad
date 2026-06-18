@@ -67,11 +67,11 @@ interface TooltipState {
 }
 
 export const TextHighlight: React.FC = () => {
-  const { comments, selectedCommentId, addComment, selectComment } = useCommentStore()
+  const { comments, selectedCommentId, flashKey, addComment, selectComment } = useCommentStore()
   const containerRef = useRef<HTMLDivElement>(null)
   const [toolbar, setToolbar] = useState<ToolbarState | null>(null)
   const [tooltip, setTooltip] = useState<TooltipState | null>(null)
-  const [flashId, setFlashId] = useState<string | null>(null)
+  const [flashingId, setFlashingId] = useState<string | null>(null)
 
   const segments = buildSegments(SAMPLE_TEXT, comments)
 
@@ -127,17 +127,20 @@ export const TextHighlight: React.FC = () => {
   )
 
   useEffect(() => {
-    if (!selectedCommentId) return
+    if (!selectedCommentId || flashKey === 0) return
     const el = containerRef.current?.querySelector(
       `[data-comment-ids*="${selectedCommentId}"]`
     ) as HTMLElement | null
     if (el) {
       el.scrollIntoView({ behavior: 'smooth', block: 'center' })
-      setFlashId(selectedCommentId)
-      const timer = setTimeout(() => setFlashId(null), 600)
+      setFlashingId(null)
+      requestAnimationFrame(() => {
+        setFlashingId(selectedCommentId)
+      })
+      const timer = setTimeout(() => setFlashingId(null), 600)
       return () => clearTimeout(timer)
     }
-  }, [selectedCommentId])
+  }, [selectedCommentId, flashKey])
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -187,7 +190,7 @@ export const TextHighlight: React.FC = () => {
           }
           const lastComment = seg.comments[seg.comments.length - 1]
           const config = TYPE_CONFIG[lastComment.type]
-          const isFlashing = seg.comments.some((c) => c.id === flashId)
+          const isFlashing = seg.comments.some((c) => c.id === flashingId)
           const isSelected = seg.comments.some((c) => c.id === selectedCommentId)
           const commentIds = seg.comments.map((c) => c.id).join(',')
           return (
