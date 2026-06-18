@@ -93,16 +93,14 @@ export default function App() {
         if (msg.elements && msg.users) applySync(msg.elements, msg.users)
         return
       }
-      if (msg.type === 'sync' || msg.type === 'init') {
+      if (msg.type === 'sync') {
         if (msg.elements) {
           const allUsers = [
             ...new Map(
               [...(msg.users || []), ...users].map((u) => [u.id, u])
             ).values(),
           ]
-          if (msg.elements.length > 0 || msg.users) {
-            applySync(msg.elements || [], allUsers.length > 0 ? allUsers : users)
-          }
+          applySync(msg.elements, allUsers.length > 0 ? allUsers : users)
         }
         return
       }

@@ -1,9 +1,8 @@
 import type { BoardElement, ToolType, Point } from './types'
-import { CANVAS_BG, GRID_COLOR, TEXT_FONT_SIZE } from './types'
+import { CANVAS_BG, GRID_COLOR, GRID_SIZE, TEXT_FONT_SIZE } from './types'
 import useStore from './StateManager'
 
 const FADE_DURATION = 200
-const GRID_SIZE = 5
 
 export interface Viewport {
   offsetX: number
@@ -419,10 +418,10 @@ class CanvasHandler {
     ctx.fillStyle = CANVAS_BG
     ctx.fillRect(0, 0, w, h)
 
+    this.drawGrid(ctx, w, h)
+
     ctx.translate(this.viewport.offsetX, this.viewport.offsetY)
     ctx.scale(this.viewport.scale, this.viewport.scale)
-
-    this.drawGrid(ctx, w, h)
 
     const elements = useStore.getState().elements
     for (const el of elements) {
@@ -437,29 +436,21 @@ class CanvasHandler {
   }
 
   private drawGrid(ctx: CanvasRenderingContext2D, screenW: number, screenH: number) {
-    const s = this.viewport.scale
     const { offsetX, offsetY } = this.viewport
-    const topLeftX = -offsetX / s
-    const topLeftY = -offsetY / s
-    const bottomRightX = (screenW - offsetX) / s
-    const bottomRightY = (screenH - offsetY) / s
+
+    const originX = ((offsetX % GRID_SIZE) + GRID_SIZE) % GRID_SIZE
+    const originY = ((offsetY % GRID_SIZE) + GRID_SIZE) % GRID_SIZE
 
     ctx.strokeStyle = GRID_COLOR
-    ctx.lineWidth = 1 / s
-
-    const startX = Math.floor(topLeftX / GRID_SIZE) * GRID_SIZE
-    const endX = Math.ceil(bottomRightX / GRID_SIZE) * GRID_SIZE
-    const startY = Math.floor(topLeftY / GRID_SIZE) * GRID_SIZE
-    const endY = Math.ceil(bottomRightY / GRID_SIZE) * GRID_SIZE
-
+    ctx.lineWidth = 1
     ctx.beginPath()
-    for (let x = startX; x <= endX; x += GRID_SIZE) {
-      ctx.moveTo(x, topLeftY)
-      ctx.lineTo(x, bottomRightY)
+    for (let x = originX; x <= screenW; x += GRID_SIZE) {
+      ctx.moveTo(x, 0)
+      ctx.lineTo(x, screenH)
     }
-    for (let y = startY; y <= endY; y += GRID_SIZE) {
-      ctx.moveTo(topLeftX, y)
-      ctx.lineTo(bottomRightX, y)
+    for (let y = originY; y <= screenH; y += GRID_SIZE) {
+      ctx.moveTo(0, y)
+      ctx.lineTo(screenW, y)
     }
     ctx.stroke()
   }

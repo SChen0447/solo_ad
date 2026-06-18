@@ -58,7 +58,7 @@ export const LINE_WIDTHS = [2, 4, 6]
 export const AVATAR_COLORS = PRESET_COLORS
 
 export const CANVAS_BG = '#f5f0e8'
-export const GRID_COLOR = '#e0d8c8'
+export const GRID_COLOR = '#d6cebe'
 export const GRID_SIZE = 20
 
 export const TEXT_FONT_SIZE = 16
