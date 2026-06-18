@@ -421,7 +421,7 @@ input[type="range"]::-moz-range-track {
   font-family: 'Fira Code', monospace;
   line-height: 1.6;
   position: relative;
-  transition: background 0.3s ease;
+  transition: background 0.3s ease, font-family 0.3s ease;
 }
 
 .preview-card-code code {
@@ -440,8 +440,9 @@ input[type="range"]::-moz-range-track {
 
 .preview-card-footer {
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-start;
   align-items: center;
+  gap: 12px;
   margin-top: 16px;
 }
 
@@ -453,9 +454,26 @@ input[type="range"]::-moz-range-track {
   transition: background 0.3s ease, color 0.3s ease;
 }
 
+.stats-tag {
+  font-size: 10px;
+  font-weight: 400;
+  transition: color 0.3s ease;
+  display: flex;
+  align-items: center;
+}
+
+.stats-tag::before {
+  content: '·';
+  margin: 0 10px 0 0;
+  font-weight: 700;
+  font-size: 12px;
+  line-height: 1;
+}
+
 .watermark {
   font-size: 10px;
   transition: color 0.3s ease;
+  margin-left: auto;
 }
 
 .card-line-numbers {
@@ -472,6 +490,7 @@ input[type="range"]::-moz-range-track {
   pointer-events: none;
   overflow: hidden;
   border-right: 1px solid rgba(255, 255, 255, 0.06);
+  transition: font-family 0.3s ease, background 0.3s ease, color 0.3s ease;
 }
 
 .card-line-numbers span {
