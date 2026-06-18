@@ -1,0 +1,109 @@
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  background: #1a2332;
+  color: #e0e6ed;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+::selection {
+  background: rgba(96, 165, 250, 0.3);
+  color: #fff;
+}
+
+@keyframes shine {
+  0% {
+    transform: translate(-50%, -50%) rotate(135deg);
+    opacity: 0;
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    transform: translate(50%, 50%) rotate(135deg);
+    opacity: 0;
+  }
+}
+
+.bead-shine {
+  width: 150%;
+  height: 150%;
+  top: 50%;
+  left: 50%;
+}
+
+@keyframes slideUp {
+  0% {
+    transform: translateY(100%);
+    opacity: 0;
+  }
+  100% {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes scaleIn {
+  0% {
+    transform: scale(0.9);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes exportFly {
+  0% {
+    transform: translate(-50%, 0) scale(1);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(-50%, 120px) scale(2);
+    opacity: 0;
+  }
+}
+
+input,
+button {
+  font-family: inherit;
+}
+
+button:active {
+  transform: scale(0.97);
+}
