@@ -113,10 +113,33 @@
 
     .dg .c .slider {
       background: rgba(255, 255, 255, 0.06) !important;
+      transition: box-shadow 0.2s ease !important;
+      border-radius: 4px !important;
+    }
+
+    .dg .c .slider:hover,
+    .dg li:hover .c .slider {
+      box-shadow: 0 0 8px rgba(255, 170, 51, 0.4), 0 0 16px rgba(51, 102, 255, 0.2) !important;
+    }
+
+    .dg .c .slider:active,
+    .dg li:active .c .slider {
+      box-shadow: 0 0 12px rgba(255, 170, 51, 0.6), 0 0 24px rgba(51, 102, 255, 0.4) !important;
     }
 
     .dg .c .slider-fg {
       background: linear-gradient(90deg, #ffaa33, #3366ff) !important;
+      transition: box-shadow 0.15s ease !important;
+    }
+
+    .dg .c .slider:hover .slider-fg,
+    .dg li:hover .c .slider .slider-fg {
+      box-shadow: 0 0 6px rgba(255, 170, 51, 0.5) !important;
+    }
+
+    .dg .c .slider:active .slider-fg,
+    .dg li:active .c .slider .slider-fg {
+      box-shadow: 0 0 10px rgba(255, 170, 51, 0.7), 0 0 4px rgba(51, 102, 255, 0.5) !important;
     }
 
     .dg .c select {
@@ -137,11 +160,19 @@
       padding: 6px 12px !important;
       cursor: pointer !important;
       transition: all 0.2s ease !important;
+      transform: scale(1) !important;
     }
 
     .dg .cr.function button:hover {
       background: linear-gradient(135deg, rgba(120, 140, 220, 0.9), rgba(100, 120, 200, 0.9)) !important;
-      transform: translateY(-1px) !important;
+      transform: translateY(-1px) scale(1.02) !important;
+      box-shadow: 0 2px 8px rgba(100, 120, 200, 0.4) !important;
+    }
+
+    .dg .cr.function button:active {
+      background: linear-gradient(135deg, rgba(140, 160, 240, 1), rgba(120, 140, 220, 1)) !important;
+      transform: scale(0.95) !important;
+      box-shadow: 0 0 12px rgba(140, 160, 240, 0.6) !important;
     }
   </style>
 </head>

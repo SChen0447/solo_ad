@@ -3,9 +3,9 @@ import { Config, ColorTheme, ColorThemes, GalaxyParams, DefaultGalaxyParams } fr
 
 interface ParticleState {
   basePosition: THREE.Vector3;
+  baseAngle: number;
   rippleTarget: THREE.Vector3 | null;
   rippleStartTime: number;
-  highlightStartTime: number;
   explosionStartTime: number;
   explosionActive: boolean;
 }
@@ -18,7 +18,7 @@ export class Galaxy {
   private material: THREE.PointsMaterial | null = null;
   private particleStates: ParticleState[] = [];
   private highlightedIndex: number = -1;
-  private highlightedTimer: number = 0;
+  private highlightStartTime: number = 0;
   private particleTexture: THREE.Texture;
 
   constructor(scene: THREE.Scene, params: Partial<GalaxyParams> = {}) {
@@ -64,18 +64,35 @@ export class Galaxy {
     return color;
   }
 
-  private getParticleColor(distanceRatio: number, theme: ColorTheme): THREE.Color {
+  private getParticleColor(distanceRatio: number, theme: ColorTheme, angularOffset: number = 0): THREE.Color {
     const themeColors = ColorThemes[theme];
     if (theme === 'rainbow') {
       return this.getRainbowColor(distanceRatio);
     }
     const centerColor = this.hexToRgb(themeColors.center);
     const edgeColor = this.hexToRgb(themeColors.edge);
-    return this.lerpColor(centerColor, edgeColor, distanceRatio);
+    const baseColor = this.lerpColor(centerColor, edgeColor, distanceRatio);
+
+    if (angularOffset !== 0) {
+      const hsl = { h: 0, s: 0, l: 0 };
+      baseColor.getHSL(hsl);
+      hsl.h = (hsl.h + angularOffset + 1) % 1;
+      baseColor.setHSL(hsl.h, hsl.s, hsl.l);
+    }
+
+    return baseColor;
   }
 
   private getParticleSize(distanceRatio: number): number {
     return Config.PARTICLE_SIZE_CENTER + (Config.PARTICLE_SIZE_EDGE - Config.PARTICLE_SIZE_CENTER) * distanceRatio;
+  }
+
+  private easeOutCubic(t: number): number {
+    return 1 - Math.pow(1 - t, 3);
+  }
+
+  private easeOutQuad(t: number): number {
+    return 1 - (1 - t) * (1 - t);
   }
 
   private createGalaxy(): void {
@@ -109,7 +126,8 @@ export class Galaxy {
       positions[i * 3 + 1] = y;
       positions[i * 3 + 2] = z;
 
-      const color = this.getParticleColor(distanceRatio, this.params.colorTheme);
+      const angularOffset = Config.ANGULAR_HUE_SHIFT * Math.sin(angle * 2);
+      const color = this.getParticleColor(distanceRatio, this.params.colorTheme, angularOffset);
       colors[i * 3] = color.r;
       colors[i * 3 + 1] = color.g;
       colors[i * 3 + 2] = color.b;
@@ -118,9 +136,9 @@ export class Galaxy {
 
       this.particleStates[i] = {
         basePosition: basePos.clone(),
+        baseAngle: angle,
         rippleTarget: null,
         rippleStartTime: 0,
-        highlightStartTime: 0,
         explosionStartTime: 0,
         explosionActive: false,
       };
@@ -161,8 +179,29 @@ export class Galaxy {
     const expandDuration = Config.EXPLOSION_EXPAND_DURATION;
     const recoverDuration = Config.EXPLOSION_RECOVER_DURATION;
     const expandRatio = Config.EXPLOSION_EXPAND_RATIO;
+    const highlightHoldDuration = Config.HIGHLIGHT_HOLD_DURATION;
+    const highlightFadeDuration = Config.HIGHLIGHT_FADE_DURATION;
+    const highlightTotalDuration = highlightHoldDuration + highlightFadeDuration;
 
-    let anyHighlightActive = false;
+    let highlightFadeT = 0;
+    let highlightActive = false;
+
+    if (this.highlightedIndex >= 0) {
+      const elapsed = currentTime - this.highlightStartTime;
+      if (elapsed < highlightHoldDuration) {
+        highlightFadeT = 1;
+        highlightActive = true;
+      } else if (elapsed < highlightTotalDuration) {
+        highlightFadeT = 1 - this.easeOutCubic((elapsed - highlightHoldDuration) / highlightFadeDuration);
+        highlightActive = true;
+      } else {
+        this.highlightedIndex = -1;
+        highlightFadeT = 0;
+        highlightActive = false;
+      }
+    }
+
+    const currentRotation = this.particles.rotation.y;
 
     for (let i = 0; i < count; i++) {
       const state = this.particleStates[i];
@@ -192,11 +231,12 @@ export class Galaxy {
           const progress = elapsed / rippleDuration;
           let attractT: number;
           if (progress < 0.5) {
-            attractT = progress * 2;
+            const t = progress * 2;
+            attractT = this.easeOutQuad(t);
           } else {
-            attractT = (1 - progress) * 2;
+            const t = (progress - 0.5) * 2;
+            attractT = 1 - this.easeOutQuad(t);
           }
-          attractT = Math.sin(attractT * Math.PI);
           const strength = this.params.attractStrength * attractT;
           pos.lerp(state.rippleTarget, strength * 0.3);
         } else {
@@ -209,23 +249,27 @@ export class Galaxy {
       positions[i * 3 + 1] = pos.y;
       positions[i * 3 + 2] = pos.z;
 
-      const distanceRatio = state.basePosition.length() / Config.GALAXY_RADIUS;
+      const distanceRatio = Math.min(state.basePosition.length() / Config.GALAXY_RADIUS, 1);
       let baseSize = this.getParticleSize(distanceRatio);
-      let color = this.getParticleColor(distanceRatio, this.params.colorTheme);
 
-      if (this.highlightedIndex >= 0) {
+      const effectiveAngle = state.baseAngle + currentRotation;
+      const angularOffset = Config.ANGULAR_HUE_SHIFT * Math.sin(effectiveAngle * 2);
+      let color = this.getParticleColor(distanceRatio, this.params.colorTheme, angularOffset);
+
+      if (highlightActive && this.highlightedIndex >= 0) {
         const highlightState = this.particleStates[this.highlightedIndex];
         if (highlightState) {
-          const highlightPos = highlightState.basePosition;
-          const distToHighlight = pos.distanceTo(highlightPos);
-
           if (i === this.highlightedIndex) {
-            baseSize *= Config.HIGHLIGHT_SCALE;
-            color = this.hexToRgb(Config.HIGHLIGHT_COLOR);
-            anyHighlightActive = true;
-          } else if (distToHighlight < rippleRadius) {
-            const rippleT = 1 - (distToHighlight / rippleRadius);
-            baseSize *= 1 + rippleT * 0.5;
+            const highlightColor = this.hexToRgb(Config.HIGHLIGHT_COLOR);
+            color = this.lerpColor(color, highlightColor, highlightFadeT);
+            baseSize *= 1 + (Config.HIGHLIGHT_SCALE - 1) * highlightFadeT;
+          } else {
+            const highlightPos = highlightState.basePosition;
+            const distToHighlight = pos.distanceTo(highlightPos);
+            if (distToHighlight < rippleRadius) {
+              const rippleT = 1 - (distToHighlight / rippleRadius);
+              baseSize *= 1 + rippleT * 0.5 * highlightFadeT;
+            }
           }
         }
       }
@@ -236,10 +280,6 @@ export class Galaxy {
       colors[i * 3 + 2] = color.b;
     }
 
-    if (!anyHighlightActive && this.highlightedIndex >= 0) {
-      this.highlightedIndex = -1;
-    }
-
     this.geometry.attributes.position.needsUpdate = true;
     this.geometry.attributes.color.needsUpdate = true;
     this.geometry.attributes.size.needsUpdate = true;
@@ -248,6 +288,7 @@ export class Galaxy {
   public highlightParticle(index: number, worldPoint: THREE.Vector3, currentTime: number): void {
     if (index < 0 || index >= this.params.particleCount) return;
     this.highlightedIndex = index;
+    this.highlightStartTime = currentTime;
 
     const localPoint = this.particles!.worldToLocal(worldPoint.clone());
 
@@ -259,15 +300,13 @@ export class Galaxy {
       const state = this.particleStates[i];
       const dist = state.basePosition.distanceTo(localPoint);
       if (dist < rippleRadius) {
-        const state_i = this.particleStates[i];
-        state_i.rippleTarget = localPoint.clone();
-        state_i.rippleStartTime = currentTime;
+        state.rippleTarget = localPoint.clone();
+        state.rippleStartTime = currentTime;
       }
     }
   }
 
   public clearHighlight(): void {
-    this.highlightedIndex = -1;
   }
 
   public triggerExplosion(min: THREE.Vector2, max: THREE.Vector2, camera: THREE.Camera, currentTime: number): void {

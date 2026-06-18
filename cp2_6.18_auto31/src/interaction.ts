@@ -154,7 +154,6 @@ export class Interaction {
         this.container.style.cursor = 'pointer';
       } else {
         if (this.hoveredIndex !== -1) {
-          this.galaxy.clearHighlight();
           this.hoveredIndex = -1;
         }
         this.container.style.cursor = 'grab';
@@ -222,10 +221,7 @@ export class Interaction {
   };
 
   private onPointerLeave = (): void => {
-    if (this.hoveredIndex !== -1) {
-      this.galaxy.clearHighlight();
-      this.hoveredIndex = -1;
-    }
+    this.hoveredIndex = -1;
     if (this.mode === 'select' && this.isDragging) {
       this.isDragging = false;
       this.controls.enabled = true;

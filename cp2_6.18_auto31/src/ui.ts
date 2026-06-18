@@ -35,6 +35,11 @@ export class UIControlPanel {
 
   private explodeButtonDisabled: boolean = true;
 
+  private countEl: HTMLElement | null = null;
+  private speedEl: HTMLElement | null = null;
+  private lastDisplayedCount: number = -1;
+  private lastDisplayedSpeed: number = -1;
+
   constructor(galaxy: Galaxy, interaction: Interaction) {
     this.galaxy = galaxy;
     this.interaction = interaction;
@@ -54,7 +59,10 @@ export class UIControlPanel {
 
     this.setupUI();
     this.bindInteractionEvents();
-    this.updateInfoPanel();
+
+    this.countEl = document.getElementById('particle-count');
+    this.speedEl = document.getElementById('rotation-speed');
+    this.syncInfoPanel();
   }
 
   private setupUI(): void {
@@ -66,7 +74,7 @@ export class UIControlPanel {
       .name('粒子数量')
       .onChange((value: number) => {
         this.galaxy.updateParams({ particleCount: value });
-        this.updateInfoPanel();
+        this.syncInfoPanel();
       });
 
     this.rotationSpeedController = galaxyFolder
@@ -74,7 +82,7 @@ export class UIControlPanel {
       .name('旋转速度')
       .onChange((value: number) => {
         this.galaxy.updateParams({ rotationSpeed: value });
-        this.updateInfoPanel();
+        this.syncInfoPanel();
       });
 
     this.attractStrengthController = galaxyFolder
@@ -190,22 +198,25 @@ export class UIControlPanel {
     this.interaction.setMode('explore');
     this.interaction.clearSelection();
 
-    this.updateInfoPanel();
+    this.syncInfoPanel();
   }
 
-  private updateInfoPanel(): void {
-    const countEl = document.getElementById('particle-count');
-    const speedEl = document.getElementById('rotation-speed');
-    if (countEl) {
-      countEl.textContent = this.galaxy.getParticleCount().toLocaleString();
+  private syncInfoPanel(): void {
+    const count = this.galaxy.getParticleCount();
+    const speed = this.galaxy.getRotationSpeed();
+
+    if (count !== this.lastDisplayedCount && this.countEl) {
+      this.countEl.textContent = count.toLocaleString();
+      this.lastDisplayedCount = count;
     }
-    if (speedEl) {
-      speedEl.textContent = this.galaxy.getRotationSpeed().toFixed(1);
+    if (speed !== this.lastDisplayedSpeed && this.speedEl) {
+      this.speedEl.textContent = speed.toFixed(1);
+      this.lastDisplayedSpeed = speed;
     }
   }
 
   public update(): void {
-    this.updateInfoPanel();
+    this.syncInfoPanel();
   }
 
   public dispose(): void {
