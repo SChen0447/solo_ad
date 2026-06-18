@@ -233,23 +233,65 @@ export class Enemy {
     const dx = targetX - this.x
     const dy = targetY - this.y
     const dist = Math.hypot(dx, dy)
-
     if (dist < 0.1) return
 
-    this.angle = Math.atan2(dy, dx)
+    const baseAngle = Math.atan2(dy, dx)
+    this.angle = baseAngle
 
-    const moveX = (dx / dist) * speed
-    const moveY = (dy / dist) * speed
+    const direct = this.tryMoveInDirection(baseAngle, speed)
+    const directProgress = Math.hypot(direct.x - this.x, direct.y - this.y)
 
-    const newX = this.x + moveX
-    const newY = this.y + moveY
-
-    if (isPositionValid(newX, this.y, this.size / 2)) {
-      this.x = newX
+    if (directProgress >= speed * 0.5) {
+      this.x = direct.x
+      this.y = direct.y
+      return
     }
-    if (isPositionValid(this.x, newY, this.size / 2)) {
-      this.y = newY
+
+    const offsets = [
+      Math.PI / 6, -Math.PI / 6,
+      Math.PI / 3, -Math.PI / 3,
+      Math.PI / 2, -Math.PI / 2,
+      (2 * Math.PI) / 3, -(2 * Math.PI) / 3,
+    ]
+
+    let bestX = direct.x
+    let bestY = direct.y
+    let bestDist = Math.hypot(targetX - direct.x, targetY - direct.y)
+    let bestProgress = directProgress
+    let bestAngle = baseAngle
+
+    for (const offset of offsets) {
+      const angle = baseAngle + offset
+      const result = this.tryMoveInDirection(angle, speed)
+      const newDist = Math.hypot(targetX - result.x, targetY - result.y)
+      const progress = Math.hypot(result.x - this.x, result.y - this.y)
+
+      if (progress > 0.1 && (newDist < bestDist || (progress > bestProgress && newDist <= bestDist))) {
+        bestDist = newDist
+        bestX = result.x
+        bestY = result.y
+        bestProgress = progress
+        bestAngle = angle
+      }
     }
+
+    this.x = bestX
+    this.y = bestY
+    this.angle = bestAngle
+  }
+
+  private tryMoveInDirection(angle: number, speed: number): { x: number; y: number } {
+    const moveX = Math.cos(angle) * speed
+    const moveY = Math.sin(angle) * speed
+    let newX = this.x
+    let newY = this.y
+    if (isPositionValid(newX + moveX, newY, this.size / 2)) {
+      newX += moveX
+    }
+    if (isPositionValid(newX, newY + moveY, this.size / 2)) {
+      newY += moveY
+    }
+    return { x: newX, y: newY }
   }
 
   canSeeTarget(tx: number, ty: number, tRadius: number): boolean {
