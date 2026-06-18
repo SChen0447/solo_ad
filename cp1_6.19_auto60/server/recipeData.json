@@ -1,0 +1,499 @@
+[
+  {
+    "id": "1",
+    "name": "番茄炒蛋",
+    "cuisine": "中餐",
+    "difficulty": "简单",
+    "cookTime": 15,
+    "icon": "🍳",
+    "ingredients": [
+      { "name": "番茄", "amount": 2, "unit": "个" },
+      { "name": "鸡蛋", "amount": 3, "unit": "个" },
+      { "name": "盐", "amount": 3, "unit": "克" },
+      { "name": "糖", "amount": 5, "unit": "克" },
+      { "name": "食用油", "amount": 15, "unit": "毫升" }
+    ],
+    "steps": [
+      "番茄切块，鸡蛋打散备用",
+      "热锅放油，倒入蛋液炒至凝固盛出",
+      "锅中再放少许油，放入番茄翻炒出汁",
+      "加入盐和糖调味",
+      "倒入炒好的鸡蛋翻匀出锅"
+    ]
+  },
+  {
+    "id": "2",
+    "name": "红烧肉",
+    "cuisine": "中餐",
+    "difficulty": "中等",
+    "cookTime": 60,
+    "icon": "🥩",
+    "ingredients": [
+      { "name": "五花肉", "amount": 500, "unit": "克" },
+      { "name": "冰糖", "amount": 30, "unit": "克" },
+      { "name": "生抽", "amount": 30, "unit": "毫升" },
+      { "name": "老抽", "amount": 15, "unit": "毫升" },
+      { "name": "料酒", "amount": 30, "unit": "毫升" },
+      { "name": "姜", "amount": 10, "unit": "克" },
+      { "name": "八角", "amount": 2, "unit": "个" }
+    ],
+    "steps": [
+      "五花肉切块焯水备用",
+      "锅中放冰糖小火炒糖色",
+      "放入肉块翻炒上色",
+      "加入葱姜、八角、料酒、生抽、老抽",
+      "加开水没过肉块，大火烧开转小火炖40分钟",
+      "大火收汁即可"
+    ]
+  },
+  {
+    "id": "3",
+    "name": "意大利面",
+    "cuisine": "西餐",
+    "difficulty": "简单",
+    "cookTime": 25,
+    "icon": "🍝",
+    "ingredients": [
+      { "name": "意大利面", "amount": 200, "unit": "克" },
+      { "name": "番茄酱", "amount": 100, "unit": "克" },
+      { "name": "洋葱", "amount": 50, "unit": "克" },
+      { "name": "大蒜", "amount": 10, "unit": "克" },
+      { "name": "橄榄油", "amount": 20, "unit": "毫升" },
+      { "name": "盐", "amount": 5, "unit": "克" },
+      { "name": "黑胡椒", "amount": 2, "unit": "克" }
+    ],
+    "steps": [
+      "煮锅加水烧开，加盐，放入意面煮8分钟",
+      "洋葱大蒜切碎",
+      "平底锅加橄榄油，炒香洋葱大蒜",
+      "加入番茄酱煮5分钟",
+      "意面沥干放入酱中拌匀",
+      "撒黑胡椒即可"
+    ]
+  },
+  {
+    "id": "4",
+    "name": "寿司卷",
+    "cuisine": "日料",
+    "difficulty": "中等",
+    "cookTime": 40,
+    "icon": "🍣",
+    "ingredients": [
+      { "name": "寿司米", "amount": 300, "unit": "克" },
+      { "name": "海苔", "amount": 4, "unit": "片" },
+      { "name": "黄瓜", "amount": 1, "unit": "根" },
+      { "name": "胡萝卜", "amount": 50, "unit": "克" },
+      { "name": "火腿", "amount": 100, "unit": "克" },
+      { "name": "寿司醋", "amount": 30, "unit": "毫升" },
+      { "name": "肉松", "amount": 50, "unit": "克" }
+    ],
+    "steps": [
+      "寿司米洗净蒸熟，拌入寿司醋放凉",
+      "黄瓜、胡萝卜、火腿切条",
+      "海苔铺在竹帘上，均匀铺上米饭",
+      "放上黄瓜、胡萝卜、火腿和肉松",
+      "用竹帘卷起压紧",
+      "刀沾水切段即可"
+    ]
+  },
+  {
+    "id": "5",
+    "name": "麻婆豆腐",
+    "cuisine": "中餐",
+    "difficulty": "简单",
+    "cookTime": 20,
+    "icon": "🥘",
+    "ingredients": [
+      { "name": "嫩豆腐", "amount": 400, "unit": "克" },
+      { "name": "肉末", "amount": 100, "unit": "克" },
+      { "name": "豆瓣酱", "amount": 20, "unit": "克" },
+      { "name": "花椒粉", "amount": 3, "unit": "克" },
+      { "name": "葱", "amount": 10, "unit": "克" },
+      { "name": "姜", "amount": 10, "unit": "克" },
+      { "name": "蒜", "amount": 10, "unit": "克" },
+      { "name": "生抽", "amount": 15, "unit": "毫升" }
+    ],
+    "steps": [
+      "豆腐切小块用盐水焯一下",
+      "葱姜蒜切末",
+      "热锅放油炒香肉末",
+      "加入豆瓣酱、葱姜蒜炒出红油",
+      "加水烧开，放入豆腐",
+      "加生抽调味，勾芡撒花椒粉和葱花"
+    ]
+  },
+  {
+    "id": "6",
+    "name": "凯撒沙拉",
+    "cuisine": "西餐",
+    "difficulty": "简单",
+    "cookTime": 10,
+    "icon": "🥗",
+    "ingredients": [
+      { "name": "生菜", "amount": 200, "unit": "克" },
+      { "name": "鸡胸肉", "amount": 150, "unit": "克" },
+      { "name": "面包丁", "amount": 50, "unit": "克" },
+      { "name": "帕玛森芝士", "amount": 30, "unit": "克" },
+      { "name": "凯撒酱", "amount": 50, "unit": "克" },
+      { "name": "柠檬", "amount": 0.5, "unit": "个" }
+    ],
+    "steps": [
+      "鸡胸肉煎熟切片",
+      "生菜洗净撕成小块",
+      "面包丁烤箱烤至金黄",
+      "所有食材放入大碗",
+      "淋上凯撒酱，挤柠檬汁",
+      "撒帕玛森芝士拌匀"
+    ]
+  },
+  {
+    "id": "7",
+    "name": "天妇罗",
+    "cuisine": "日料",
+    "difficulty": "中等",
+    "cookTime": 30,
+    "icon": "🍤",
+    "ingredients": [
+      { "name": "大虾", "amount": 200, "unit": "克" },
+      { "name": "茄子", "amount": 100, "unit": "克" },
+      { "name": "南瓜", "amount": 100, "unit": "克" },
+      { "name": "天妇罗粉", "amount": 100, "unit": "克" },
+      { "name": "冰水", "amount": 150, "unit": "毫升" },
+      { "name": "食用油", "amount": 500, "unit": "毫升" }
+    ],
+    "steps": [
+      "大虾去壳留尾，茄子南瓜切片",
+      "天妇罗粉加冰水调成面糊",
+      "油锅加热至180度",
+      "食材裹上面糊",
+      "放入油锅炸至金黄",
+      "捞出沥油即可"
+    ]
+  },
+  {
+    "id": "8",
+    "name": "宫保鸡丁",
+    "cuisine": "中餐",
+    "difficulty": "中等",
+    "cookTime": 25,
+    "icon": "🌶️",
+    "ingredients": [
+      { "name": "鸡胸肉", "amount": 300, "unit": "克" },
+      { "name": "花生米", "amount": 50, "unit": "克" },
+      { "name": "干辣椒", "amount": 10, "unit": "克" },
+      { "name": "花椒", "amount": 3, "unit": "克" },
+      { "name": "葱", "amount": 10, "unit": "克" },
+      { "name": "姜", "amount": 10, "unit": "克" },
+      { "name": "蒜", "amount": 10, "unit": "克" },
+      { "name": "生抽", "amount": 20, "unit": "毫升" },
+      { "name": "醋", "amount": 15, "unit": "毫升" },
+      { "name": "糖", "amount": 15, "unit": "克" }
+    ],
+    "steps": [
+      "鸡胸肉切丁用料酒淀粉腌制",
+      "调碗汁：生抽、醋、糖、淀粉、水",
+      "热锅冷油爆香花椒干辣椒",
+      "放入鸡丁炒至变色",
+      "加入葱姜蒜翻炒",
+      "倒入碗汁，加花生米翻炒均匀"
+    ]
+  },
+  {
+    "id": "9",
+    "name": "法式牛排",
+    "cuisine": "西餐",
+    "difficulty": "困难",
+    "cookTime": 45,
+    "icon": "🥩",
+    "ingredients": [
+      { "name": "牛排", "amount": 300, "unit": "克" },
+      { "name": "黄油", "amount": 30, "unit": "克" },
+      { "name": "大蒜", "amount": 15, "unit": "克" },
+      { "name": "迷迭香", "amount": 5, "unit": "克" },
+      { "name": "百里香", "amount": 5, "unit": "克" },
+      { "name": "盐", "amount": 5, "unit": "克" },
+      { "name": "黑胡椒", "amount": 3, "unit": "克" },
+      { "name": "橄榄油", "amount": 20, "unit": "毫升" }
+    ],
+    "steps": [
+      "牛排室温放置30分钟，用厨房纸吸干水分",
+      "两面撒盐和黑胡椒腌制",
+      "平底锅加油烧热，放入牛排",
+      "每面煎2分钟，加入黄油、大蒜和香草",
+      "用勺子将黄油浇在牛排上",
+      "醒肉5分钟切片"
+    ]
+  },
+  {
+    "id": "10",
+    "name": "味噌汤",
+    "cuisine": "日料",
+    "difficulty": "简单",
+    "cookTime": 15,
+    "icon": "🍜",
+    "ingredients": [
+      { "name": "味噌", "amount": 30, "unit": "克" },
+      { "name": "豆腐", "amount": 150, "unit": "克" },
+      { "name": "海带", "amount": 10, "unit": "克" },
+      { "name": "葱花", "amount": 10, "unit": "克" },
+      { "name": "木鱼花", "amount": 10, "unit": "克" },
+      { "name": "水", "amount": 500, "unit": "毫升" }
+    ],
+    "steps": [
+      "海带泡发，豆腐切小块",
+      "锅中加水放海带煮10分钟",
+      "捞出海带，加入木鱼花煮2分钟过滤",
+      "味噌用少许汤汁化开",
+      "放入豆腐块煮至微开",
+      "关火加入味噌，撒葱花"
+    ]
+  },
+  {
+    "id": "11",
+    "name": "蒜蓉西兰花",
+    "cuisine": "中餐",
+    "difficulty": "简单",
+    "cookTime": 10,
+    "icon": "🥦",
+    "ingredients": [
+      { "name": "西兰花", "amount": 300, "unit": "克" },
+      { "name": "大蒜", "amount": 20, "unit": "克" },
+      { "name": "盐", "amount": 5, "unit": "克" },
+      { "name": "食用油", "amount": 20, "unit": "毫升" }
+    ],
+    "steps": [
+      "西兰花切小朵洗净",
+      "大蒜切末",
+      "锅中水烧开加盐，西兰花焯水1分钟",
+      "热锅放油爆香蒜末",
+      "放入西兰花翻炒",
+      "加盐调味出锅"
+    ]
+  },
+  {
+    "id": "12",
+    "name": "奶油蘑菇汤",
+    "cuisine": "西餐",
+    "difficulty": "中等",
+    "cookTime": 30,
+    "icon": "🍄",
+    "ingredients": [
+      { "name": "蘑菇", "amount": 200, "unit": "克" },
+      { "name": "洋葱", "amount": 50, "unit": "克" },
+      { "name": "黄油", "amount": 30, "unit": "克" },
+      { "name": "面粉", "amount": 20, "unit": "克" },
+      { "name": "淡奶油", "amount": 100, "unit": "毫升" },
+      { "name": "牛奶", "amount": 200, "unit": "毫升" },
+      { "name": "盐", "amount": 5, "unit": "克" },
+      { "name": "黑胡椒", "amount": 2, "unit": "克" }
+    ],
+    "steps": [
+      "蘑菇切片，洋葱切碎",
+      "黄油融化炒香洋葱",
+      "加入蘑菇炒至出水",
+      "撒面粉翻炒均匀",
+      "加入牛奶和淡奶油煮开",
+      "加盐和黑胡椒调味"
+    ]
+  },
+  {
+    "id": "13",
+    "name": "照烧鸡腿饭",
+    "cuisine": "日料",
+    "difficulty": "简单",
+    "cookTime": 25,
+    "icon": "🍚",
+    "ingredients": [
+      { "name": "鸡腿", "amount": 2, "unit": "个" },
+      { "name": "米饭", "amount": 200, "unit": "克" },
+      { "name": "酱油", "amount": 30, "unit": "毫升" },
+      { "name": "味淋", "amount": 30, "unit": "毫升" },
+      { "name": "糖", "amount": 20, "unit": "克" },
+      { "name": "料酒", "amount": 20, "unit": "毫升" },
+      { "name": "姜", "amount": 10, "unit": "克" }
+    ],
+    "steps": [
+      "鸡腿去骨用料酒姜片腌制",
+      "调照烧汁：酱油、味淋、糖",
+      "鸡腿皮朝下煎至金黄",
+      "翻面继续煎",
+      "倒入照烧汁小火收汁",
+      "切片铺在米饭上，淋上酱汁"
+    ]
+  },
+  {
+    "id": "14",
+    "name": "糖醋里脊",
+    "cuisine": "中餐",
+    "difficulty": "中等",
+    "cookTime": 30,
+    "icon": "🍖",
+    "ingredients": [
+      { "name": "猪里脊", "amount": 300, "unit": "克" },
+      { "name": "番茄酱", "amount": 50, "unit": "克" },
+      { "name": "糖", "amount": 40, "unit": "克" },
+      { "name": "醋", "amount": 30, "unit": "毫升" },
+      { "name": "淀粉", "amount": 50, "unit": "克" },
+      { "name": "鸡蛋", "amount": 1, "unit": "个" },
+      { "name": "食用油", "amount": 500, "unit": "毫升" },
+      { "name": "盐", "amount": 3, "unit": "克" }
+    ],
+    "steps": [
+      "里脊切条，用盐、料酒、蛋液、淀粉腌制",
+      "调糖醋汁：番茄酱、糖、醋、水、淀粉",
+      "油温六成热下肉条炸至金黄",
+      "升高油温复炸至酥脆",
+      "锅留底油倒入糖醋汁熬至浓稠",
+      "放入肉条翻匀出锅"
+    ]
+  },
+  {
+    "id": "15",
+    "name": "三文鱼刺身",
+    "cuisine": "日料",
+    "difficulty": "困难",
+    "cookTime": 15,
+    "icon": "🐟",
+    "ingredients": [
+      { "name": "三文鱼", "amount": 200, "unit": "克" },
+      { "name": "芥末", "amount": 10, "unit": "克" },
+      { "name": "酱油", "amount": 30, "unit": "毫升" },
+      { "name": "白萝卜", "amount": 50, "unit": "克" }
+    ],
+    "steps": [
+      "三文鱼去皮去刺",
+      "白萝卜切丝垫盘底",
+      "刀沾水将三文鱼切片",
+      "摆放在萝卜丝上",
+      "准备芥末和酱油蘸料",
+      "直接食用"
+    ]
+  },
+  {
+    "id": "16",
+    "name": "罗宋汤",
+    "cuisine": "西餐",
+    "difficulty": "中等",
+    "cookTime": 50,
+    "icon": "🍲",
+    "ingredients": [
+      { "name": "牛肉", "amount": 300, "unit": "克" },
+      { "name": "土豆", "amount": 150, "unit": "克" },
+      { "name": "胡萝卜", "amount": 100, "unit": "克" },
+      { "name": "洋葱", "amount": 100, "unit": "克" },
+      { "name": "番茄", "amount": 200, "unit": "克" },
+      { "name": "番茄酱", "amount": 30, "unit": "克" },
+      { "name": "黄油", "amount": 20, "unit": "克" },
+      { "name": "盐", "amount": 5, "unit": "克" }
+    ],
+    "steps": [
+      "牛肉切块焯水",
+      "土豆胡萝卜切块，洋葱番茄切碎",
+      "黄油融化炒香洋葱",
+      "加入番茄和番茄酱炒出红油",
+      "加入牛肉、土豆、胡萝卜和水",
+      "炖40分钟加盐调味"
+    ]
+  },
+  {
+    "id": "17",
+    "name": "蛋炒饭",
+    "cuisine": "中餐",
+    "difficulty": "简单",
+    "cookTime": 10,
+    "icon": "🍚",
+    "ingredients": [
+      { "name": "米饭", "amount": 300, "unit": "克" },
+      { "name": "鸡蛋", "amount": 2, "unit": "个" },
+      { "name": "葱花", "amount": 10, "unit": "克" },
+      { "name": "盐", "amount": 3, "unit": "克" },
+      { "name": "食用油", "amount": 20, "unit": "毫升" }
+    ],
+    "steps": [
+      "鸡蛋打散备用",
+      "热锅放油倒入蛋液",
+      "蛋液半凝固时加入米饭",
+      "快速翻炒让米粒裹上蛋液",
+      "加盐调味",
+      "撒葱花出锅"
+    ]
+  },
+  {
+    "id": "18",
+    "name": "土豆泥",
+    "cuisine": "西餐",
+    "difficulty": "简单",
+    "cookTime": 20,
+    "icon": "🥔",
+    "ingredients": [
+      { "name": "土豆", "amount": 300, "unit": "克" },
+      { "name": "牛奶", "amount": 50, "unit": "毫升" },
+      { "name": "黄油", "amount": 20, "unit": "克" },
+      { "name": "盐", "amount": 3, "unit": "克" },
+      { "name": "黑胡椒", "amount": 2, "unit": "克" }
+    ],
+    "steps": [
+      "土豆去皮切块蒸熟",
+      "趁热压成泥",
+      "加入黄油搅拌至融化",
+      "加入牛奶调至合适稠度",
+      "加盐和黑胡椒调味",
+      "装盘即可"
+    ]
+  },
+  {
+    "id": "19",
+    "name": "日式咖喱饭",
+    "cuisine": "日料",
+    "difficulty": "中等",
+    "cookTime": 40,
+    "icon": "🍛",
+    "ingredients": [
+      { "name": "咖喱块", "amount": 100, "unit": "克" },
+      { "name": "鸡腿肉", "amount": 200, "unit": "克" },
+      { "name": "土豆", "amount": 150, "unit": "克" },
+      { "name": "胡萝卜", "amount": 100, "unit": "克" },
+      { "name": "洋葱", "amount": 100, "unit": "克" },
+      { "name": "米饭", "amount": 200, "unit": "克" },
+      { "name": "食用油", "amount": 20, "unit": "毫升" }
+    ],
+    "steps": [
+      "鸡腿肉切块，土豆胡萝卜洋葱切块",
+      "热锅放油炒香洋葱",
+      "加入鸡肉炒至变色",
+      "加入土豆胡萝卜翻炒",
+      "加水没过食材煮15分钟",
+      "关火加入咖喱块融化，再小火煮5分钟，浇在米饭上"
+    ]
+  },
+  {
+    "id": "20",
+    "name": "鱼香肉丝",
+    "cuisine": "中餐",
+    "difficulty": "困难",
+    "cookTime": 25,
+    "icon": "🥡",
+    "ingredients": [
+      { "name": "猪里脊", "amount": 250, "unit": "克" },
+      { "name": "胡萝卜", "amount": 50, "unit": "克" },
+      { "name": "木耳", "amount": 30, "unit": "克" },
+      { "name": "青椒", "amount": 50, "unit": "克" },
+      { "name": "泡椒", "amount": 20, "unit": "克" },
+      { "name": "姜", "amount": 10, "unit": "克" },
+      { "name": "蒜", "amount": 10, "unit": "克" },
+      { "name": "葱", "amount": 10, "unit": "克" },
+      { "name": "醋", "amount": 20, "unit": "毫升" },
+      { "name": "糖", "amount": 20, "unit": "克" },
+      { "name": "生抽", "amount": 15, "unit": "毫升" },
+      { "name": "淀粉", "amount": 10, "unit": "克" }
+    ],
+    "steps": [
+      "里脊切丝用料酒淀粉腌制",
+      "调鱼香汁：醋、糖、生抽、淀粉、水",
+      "胡萝卜木耳青椒切丝",
+      "热锅放油炒肉丝至变色盛出",
+      "爆香泡椒姜蒜，加入蔬菜丝翻炒",
+      "倒入肉丝和鱼香汁翻匀撒葱花"
+    ]
+  }
+]
