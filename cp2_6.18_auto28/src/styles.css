@@ -141,6 +141,24 @@ body {
   min-width: 480px;
 }
 
+.pie-chart-container {
+  width: 300px;
+  height: 300px;
+  margin: 0 auto;
+}
+
+.line-chart-container {
+  width: 400px;
+  height: 250px;
+  margin: 0 auto;
+}
+
+.pie-chart-container canvas,
+.line-chart-container canvas {
+  width: 100% !important;
+  height: 100% !important;
+}
+
 .form-card {
   background: #2a2a3e;
   border-radius: 16px;
@@ -318,19 +336,19 @@ body {
 }
 
 .delete-btn {
-  padding: 6px 12px;
-  background: rgba(239, 68, 68, 0.15);
-  color: #ef4444;
+  padding: 6px 16px;
+  background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
+  color: white;
   border: none;
-  border-radius: 6px;
+  border-radius: 8px;
   font-size: 12px;
   font-weight: 600;
   cursor: pointer;
-  transition: background 0.2s ease;
+  transition: filter 0.2s ease;
 }
 
 .delete-btn:hover {
-  background: rgba(239, 68, 68, 0.3);
+  filter: brightness(1.1);
 }
 
 .empty-state {

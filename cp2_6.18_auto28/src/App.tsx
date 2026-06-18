@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import AssetForm from './components/AssetForm'
 import ChartPanel from './components/ChartPanel'
 
@@ -46,10 +46,14 @@ export default function App() {
     setAssets((prev) => prev.filter((a) => a.id !== id))
   }
 
-  const getLatestDateNetWorth = () => {
-    if (assets.length === 0) return { netWorth: 0, change: 0, prevNetWorth: 0 }
+  const { netWorth, change, sortedAssets } = useMemo(() => {
+    if (assets.length === 0) {
+      return { netWorth: 0, change: 0, prevNetWorth: 0, sortedAssets: [] }
+    }
     const dates = Array.from(new Set(assets.map((a) => a.date))).sort()
-    if (dates.length === 0) return { netWorth: 0, change: 0, prevNetWorth: 0 }
+    if (dates.length === 0) {
+      return { netWorth: 0, change: 0, prevNetWorth: 0, sortedAssets: [] }
+    }
     const latestDate = dates[dates.length - 1]
     const latestNetWorth = assets
       .filter((a) => a.date === latestDate)
@@ -62,10 +66,9 @@ export default function App() {
         .reduce((sum, a) => sum + a.value, 0)
     }
     const change = prevNetWorth > 0 ? ((latestNetWorth - prevNetWorth) / prevNetWorth) * 100 : 0
-    return { netWorth: latestNetWorth, change, prevNetWorth }
-  }
-
-  const { netWorth, change } = getLatestDateNetWorth()
+    const sortedAssets = [...assets].sort((a, b) => b.date.localeCompare(a.date))
+    return { netWorth: latestNetWorth, change, prevNetWorth, sortedAssets }
+  }, [assets])
 
   const formatCurrency = (value: number) => {
     return value.toLocaleString('zh-CN', {
@@ -134,28 +137,26 @@ export default function App() {
                 </tr>
               </thead>
               <tbody>
-                {[...assets]
-                  .sort((a, b) => b.date.localeCompare(a.date))
-                  .map((asset) => (
-                    <tr key={asset.id}>
-                      <td>{asset.date}</td>
-                      <td>
-                        <span className={`category-badge ${getCategoryClass(asset.category)}`}>
-                          {asset.category}
-                        </span>
-                      </td>
-                      <td>{asset.name}</td>
-                      <td>¥ {formatCurrency(asset.value)}</td>
-                      <td>
-                        <button
-                          className="delete-btn"
-                          onClick={() => handleDeleteAsset(asset.id)}
-                        >
-                          删除
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
+                {sortedAssets.map((asset) => (
+                  <tr key={asset.id}>
+                    <td>{asset.date}</td>
+                    <td>
+                      <span className={`category-badge ${getCategoryClass(asset.category)}`}>
+                        {asset.category}
+                      </span>
+                    </td>
+                    <td>{asset.name}</td>
+                    <td>¥ {formatCurrency(asset.value)}</td>
+                    <td>
+                      <button
+                        className="delete-btn"
+                        onClick={() => handleDeleteAsset(asset.id)}
+                      >
+                        删除
+                      </button>
+                    </td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           )}

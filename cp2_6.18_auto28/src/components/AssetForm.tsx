@@ -41,10 +41,31 @@ export default function AssetForm({ onAdd }: AssetFormProps) {
   }
 
   const handleValueChange = (e: ChangeEvent<HTMLInputElement>) => {
-    const input = e.target.value
-    const cleanInput = input.replace(/[^0-9.]/g, '')
+    const input = e.target
+    const inputValue = input.value
+    const selectionStart = input.selectionStart || 0
+    const originalLength = inputValue.replace(/[^0-9]/g, '').length
+    const cleanInput = inputValue.replace(/[^0-9.]/g, '')
     const formatted = formatNumber(cleanInput)
+    const newLength = formatted.replace(/[^0-9]/g, '').length
+    const diff = newLength - originalLength
     setRawValue(formatted)
+    requestAnimationFrame(() => {
+      input.selectionStart = selectionStart + diff
+      input.selectionEnd = selectionStart + diff
+    })
+  }
+
+  const handleNameChange = (e: ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value
+    setName(value)
+    if (errors.name && value.trim()) {
+      setErrors((prev) => {
+        const newErrors = { ...prev }
+        delete newErrors.name
+        return newErrors
+      })
+    }
   }
 
   const handleCategoryChange = (e: ChangeEvent<HTMLSelectElement>) => {
@@ -160,7 +181,7 @@ export default function AssetForm({ onAdd }: AssetFormProps) {
               placeholder="例如：贵州茅台"
               value={name}
               maxLength={30}
-              onChange={(e) => setName(e.target.value)}
+              onChange={handleNameChange}
               className={errors.name ? 'error' : ''}
             />
             {errors.name && <span className="error-message">{errors.name}</span>}

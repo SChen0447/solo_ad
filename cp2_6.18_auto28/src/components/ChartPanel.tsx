@@ -55,7 +55,7 @@ export default function ChartPanel({ assets }: ChartPanelProps) {
     return Array.from(new Set(assets.map((a) => a.date))).sort()
   }, [assets])
 
-  const getPieData = (): ChartData<'pie'> => {
+  const pieData = useMemo((): ChartData<'pie'> => {
     if (dates.length === 0) {
       return { labels: [], datasets: [] }
     }
@@ -101,9 +101,9 @@ export default function ChartPanel({ assets }: ChartPanelProps) {
         },
       ],
     }
-  }
+  }, [assets, dates])
 
-  const getLineData = (): ChartData<'line'> => {
+  const lineData = useMemo((): ChartData<'line'> => {
     const netWorths = dates.map((date) => {
       return assets
         .filter((a) => a.date === date)
@@ -141,7 +141,7 @@ export default function ChartPanel({ assets }: ChartPanelProps) {
           pointBackgroundColor: '#ffffff',
           pointBorderColor: '#3b82f6',
           pointBorderWidth: 2,
-          pointRadius: 5,
+          pointRadius: 4,
           pointHoverRadius: 7,
           tension: 0.3,
           fill: true,
@@ -149,7 +149,7 @@ export default function ChartPanel({ assets }: ChartPanelProps) {
         },
       ],
     }
-  }
+  }, [assets, dates])
 
   const pieOptions: ChartOptions<'pie'> = {
     responsive: false,
@@ -268,16 +268,13 @@ export default function ChartPanel({ assets }: ChartPanelProps) {
     if (lineChartRef.current) {
       lineChartRef.current.update()
     }
-  }, [assets])
-
-  const pieData = getPieData()
-  const lineData = getLineData()
+  }, [assets, pieData, lineData])
 
   return (
     <>
       <div className="chart-card pie-chart-card">
         <h3>资产配置比例</h3>
-        <div style={{ width: 300, height: 300, margin: '0 auto' }}>
+        <div className="pie-chart-container">
           {dates.length > 0 ? (
             <Pie ref={pieChartRef} data={pieData} options={pieOptions} />
           ) : (
@@ -290,7 +287,7 @@ export default function ChartPanel({ assets }: ChartPanelProps) {
 
       <div className="chart-card line-chart-card">
         <h3>净值走势曲线</h3>
-        <div style={{ width: 400, height: 250, margin: '0 auto' }}>
+        <div className="line-chart-container">
           {dates.length > 0 ? (
             <Line ref={lineChartRef} data={lineData} options={lineOptions} />
           ) : (
