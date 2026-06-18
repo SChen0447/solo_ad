@@ -3,7 +3,7 @@ import cors from 'cors';
 import { v4 as uuidv4 } from 'uuid';
 
 const app = express();
-const PORT = 3003;
+const PORT = 3010;
 
 app.use(cors());
 app.use(express.json());
@@ -225,7 +225,12 @@ app.get('/api/leaderboard', (_req, res) => {
       ratingCount: p.ratings.length,
       ratings: p.ratings.map(r => r.score)
     }))
-    .sort((a, b) => b.averageScore - a.averageScore);
+    .sort((a, b) => {
+      if (b.averageScore !== a.averageScore) {
+        return b.averageScore - a.averageScore;
+      }
+      return a.title.localeCompare(b.title, 'zh-CN');
+    });
   res.json(result);
 });
 
