@@ -1,0 +1,219 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --color-primary: #8d6e63;
+  --color-secondary: #a5d6a7;
+  --color-secondary-hover: #81c784;
+  --color-background: #faf3e0;
+  --color-booking-card: #fff8e1;
+  --color-date-highlight: #b39ddb;
+  --color-status-pending: #ffd54f;
+  --color-status-picked: #81c784;
+  --color-status-cancelled: #bdbdbd;
+  --color-reminder-start: #fff3e0;
+  --color-reminder-end: #ffe0b2;
+  --color-chart-bar: #9575cd;
+  --color-chart-bar-hover: #7e57c2;
+  --color-border-default: #bdbdbd;
+  --color-border-focus: #8d6e63;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  background-color: var(--color-background);
+  color: #333;
+  min-height: 100vh;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+@layer components {
+  .btn-primary {
+    @apply bg-secondary text-white px-6 py-3 rounded-lg font-medium transition-all duration-250 ease;
+    @apply hover:bg-secondary-hover hover:-translate-y-0.5;
+    min-height: 44px;
+  }
+
+  .btn-secondary {
+    @apply bg-white text-primary border-2 border-primary px-6 py-3 rounded-lg font-medium transition-all duration-250 ease;
+    @apply hover:bg-primary/5;
+    min-height: 44px;
+  }
+
+  .btn-danger {
+    @apply bg-red-500 text-white px-6 py-3 rounded-lg font-medium transition-all duration-250 ease;
+    @apply hover:bg-red-600 hover:-translate-y-0.5;
+    min-height: 44px;
+  }
+
+  .input-field {
+    @apply w-full px-4 py-3 border-2 border-border-default rounded-lg outline-none transition-all duration-200 ease;
+    @apply focus:border-border-focus;
+    min-height: 44px;
+  }
+
+  .card {
+    @apply bg-white rounded-xl shadow-card transition-all duration-300 ease;
+    @apply hover:shadow-card-hover hover:scale-102;
+  }
+
+  .booking-card {
+    @apply bg-booking-card rounded-xl shadow-card transition-all duration-300 ease relative overflow-hidden;
+    @apply hover:shadow-card-hover hover:scale-102;
+    width: 280px;
+  }
+
+  .status-indicator {
+    @apply absolute top-0 left-0 w-3 h-full;
+  }
+
+  .status-pending {
+    @apply bg-status-pending;
+  }
+
+  .status-picked {
+    @apply bg-status-picked;
+  }
+
+  .status-cancelled {
+    @apply bg-status-cancelled;
+  }
+
+  .reminder-banner {
+    background: linear-gradient(135deg, var(--color-reminder-start) 0%, var(--color-reminder-end) 100%);
+    animation: fadeIn 0.5s ease;
+  }
+
+  .chart-bar {
+    @apply bg-chart-bar transition-all duration-200 ease cursor-pointer;
+    width: 40px;
+    @apply hover:bg-chart-bar-hover;
+  }
+
+  .date-available {
+    @apply bg-date-highlight/20 text-date-highlight font-semibold;
+  }
+
+  .date-unavailable {
+    @apply bg-gray-100 text-gray-400 cursor-not-allowed;
+  }
+
+  .timeslot-option {
+    @apply p-4 border-2 border-border-default rounded-lg cursor-pointer transition-all duration-200 ease;
+    @apply hover:border-border-focus;
+  }
+
+  .timeslot-option.selected {
+    @apply border-border-focus bg-primary/5;
+  }
+
+  .timeslot-option.disabled {
+    @apply opacity-50 cursor-not-allowed hover:border-border-default;
+  }
+
+  .modal-overlay {
+    @apply fixed inset-0 bg-black/50 flex items-center justify-center z-50;
+    animation: fadeIn 0.2s ease;
+  }
+
+  .modal-content {
+    @apply bg-white rounded-2xl p-6 max-w-md w-full mx-4 shadow-card;
+    animation: slideUp 0.3s ease;
+  }
+
+  .nav-link {
+    @apply text-white/80 hover:text-white transition-colors duration-200 ease px-3 py-2 rounded-lg;
+    @apply hover:bg-white/10;
+  }
+
+  .nav-link.active {
+    @apply text-white bg-white/10;
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+.animate-pulse-slow {
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+.book-cover {
+  width: 160px;
+  height: 220px;
+  object-fit: cover;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+@media (max-width: 768px) {
+  .book-cover {
+    width: 120px;
+    height: 165px;
+  }
+}
+
+.container-transition {
+  transition: width 0.3s ease, padding 0.3s ease;
+}
+
+.stock-tag {
+  @apply px-3 py-1 rounded-full text-xs font-medium;
+}
+
+.stock-tag.in-stock {
+  @apply bg-green-100 text-green-700;
+}
+
+.stock-tag.low-stock {
+  @apply bg-yellow-100 text-yellow-700;
+}
+
+.stock-tag.out-of-stock {
+  @apply bg-red-100 text-red-700;
+}
+
+.loading-skeleton {
+  @apply bg-gray-200 animate-pulse;
+}
