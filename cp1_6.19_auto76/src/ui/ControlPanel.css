@@ -1,0 +1,236 @@
+.control-panel {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  width: 300px;
+  padding: 20px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 12px;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  font-family: 'Orbitron', sans-serif;
+  color: #ffffff;
+  z-index: 100;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+}
+
+.panel-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: #00ff88;
+  margin: 0 0 20px 0;
+  text-align: center;
+  text-shadow: 0 0 10px rgba(0, 255, 136, 0.5);
+  letter-spacing: 2px;
+}
+
+.panel-section {
+  margin-bottom: 20px;
+}
+
+.panel-section:last-child {
+  margin-bottom: 0;
+}
+
+.section-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: #aabbcc;
+  margin: 0 0 10px 0;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.strategy-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.strategy-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 12px 16px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  color: #ccddee;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-family: 'Orbitron', sans-serif;
+  text-align: left;
+}
+
+.strategy-btn:hover {
+  background: rgba(0, 255, 136, 0.1);
+  border-color: rgba(0, 255, 136, 0.3);
+  box-shadow: 0 0 12px rgba(0, 255, 136, 0.2);
+}
+
+.strategy-btn.active {
+  background: rgba(0, 255, 136, 0.15);
+  border-color: #00ff88;
+  color: #00ff88;
+  box-shadow: 0 0 12px rgba(0, 255, 136, 0.4);
+}
+
+.strategy-btn.pulse {
+  animation: pulse 0.2s ease-in-out;
+}
+
+@keyframes pulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+  100% { transform: scale(1); }
+}
+
+.strategy-label {
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 2px;
+}
+
+.strategy-desc {
+  font-size: 10px;
+  opacity: 0.6;
+  font-weight: 400;
+}
+
+.speed-control {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.speed-label {
+  font-size: 10px;
+  color: #8899aa;
+  min-width: 30px;
+}
+
+.speed-slider {
+  flex: 1;
+  -webkit-appearance: none;
+  appearance: none;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 2px;
+  outline: none;
+  cursor: pointer;
+}
+
+.speed-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  background: #00ff88;
+  border-radius: 50%;
+  cursor: pointer;
+  box-shadow: 0 0 8px rgba(0, 255, 136, 0.6);
+  transition: transform 0.2s ease;
+}
+
+.speed-slider::-webkit-slider-thumb:hover {
+  transform: scale(1.2);
+}
+
+.speed-slider::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  background: #00ff88;
+  border-radius: 50%;
+  cursor: pointer;
+  border: none;
+  box-shadow: 0 0 8px rgba(0, 255, 136, 0.6);
+}
+
+.speed-value {
+  text-align: center;
+  font-size: 14px;
+  font-weight: 700;
+  color: #00ff88;
+  text-shadow: 0 0 8px rgba(0, 255, 136, 0.5);
+}
+
+.control-btn {
+  width: 100%;
+  padding: 12px 20px;
+  border: 1px solid #00ff88;
+  border-radius: 8px;
+  background: transparent;
+  color: #00ff88;
+  font-family: 'Orbitron', sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  letter-spacing: 1px;
+}
+
+.control-btn:hover {
+  background: rgba(0, 255, 136, 0.1);
+  box-shadow: 0 0 12px rgba(0, 255, 136, 0.4);
+}
+
+.control-btn.pause {
+  border-color: #ff6666;
+  color: #ff6666;
+}
+
+.control-btn.pause:hover {
+  background: rgba(255, 102, 102, 0.1);
+  box-shadow: 0 0 12px rgba(255, 102, 102, 0.4);
+}
+
+.generate-btn {
+  width: 100%;
+  padding: 14px 20px;
+  border: none;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #00ff88 0%, #00cc66 100%);
+  color: #001111;
+  font-family: 'Orbitron', sans-serif;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+.generate-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 20px rgba(0, 255, 136, 0.5);
+}
+
+.generate-btn:active {
+  transform: translateY(0);
+}
+
+.hint-text {
+  font-size: 10px;
+  color: #667788;
+  text-align: center;
+  margin: 8px 0 0 0;
+}
+
+@media (max-width: 1200px) {
+  .control-panel {
+    width: 260px;
+    padding: 16px;
+  }
+}
+
+@media (max-width: 800px) {
+  .control-panel {
+    top: auto;
+    bottom: 20px;
+    right: 20px;
+    left: 20px;
+    width: auto;
+  }
+}

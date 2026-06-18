@@ -1,0 +1,162 @@
+.info-overlay {
+  position: absolute;
+  top: 20px;
+  left: 20px;
+  width: 260px;
+  padding: 20px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 12px;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  font-family: 'Orbitron', sans-serif;
+  color: #ffffff;
+  z-index: 100;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+}
+
+.overlay-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: #00ff88;
+  margin: 0 0 16px 0;
+  text-align: center;
+  text-shadow: 0 0 10px rgba(0, 255, 136, 0.5);
+  letter-spacing: 2px;
+}
+
+.stats-container {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.stat-item {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding: 10px 12px;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.stat-label {
+  font-size: 11px;
+  color: #8899aa;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.stat-value {
+  font-size: 20px;
+  font-weight: 700;
+  margin: 0 4px;
+}
+
+.stat-value.active-drones {
+  color: #00ff88;
+  text-shadow: 0 0 8px rgba(0, 255, 136, 0.5);
+}
+
+.stat-value.delivered {
+  color: #ffffff;
+  text-shadow: 0 0 8px rgba(255, 255, 255, 0.3);
+}
+
+.stat-value.distance {
+  color: #ffaa00;
+  text-shadow: 0 0 8px rgba(255, 170, 0, 0.5);
+}
+
+.stat-unit {
+  font-size: 10px;
+  color: #667788;
+  font-weight: 400;
+}
+
+.timeline-section {
+  padding-top: 16px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.timeline-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.timeline-label {
+  font-size: 11px;
+  color: #8899aa;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.timeline-time {
+  font-size: 12px;
+  font-weight: 700;
+  color: #00ff88;
+  font-family: 'Orbitron', monospace;
+}
+
+.timeline-bar {
+  height: 6px;
+  background: #333;
+  border-radius: 3px;
+  overflow: hidden;
+  position: relative;
+}
+
+.timeline-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #00ff88 0%, #00cc66 100%);
+  border-radius: 3px;
+  transition: width 0.1s linear;
+  box-shadow: 0 0 8px rgba(0, 255, 136, 0.5);
+}
+
+.timeline-footer {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 6px;
+  font-size: 9px;
+  color: #556677;
+  font-family: 'Orbitron', monospace;
+}
+
+@media (max-width: 1200px) {
+  .info-overlay {
+    width: 220px;
+    padding: 16px;
+  }
+
+  .stat-value {
+    font-size: 18px;
+  }
+}
+
+@media (max-width: 800px) {
+  .info-overlay {
+    top: 20px;
+    left: 20px;
+    right: 20px;
+    width: auto;
+    bottom: auto;
+  }
+
+  .stats-container {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .stat-item {
+    flex: 1;
+    min-width: 80px;
+  }
+}

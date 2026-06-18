@@ -1,0 +1,41 @@
+.minimap-container {
+  position: absolute;
+  bottom: 20px;
+  left: 20px;
+  z-index: 100;
+}
+
+.minimap-title {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 10px;
+  font-weight: 600;
+  color: #00ff88;
+  text-align: center;
+  margin-bottom: 6px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  text-shadow: 0 0 6px rgba(0, 255, 136, 0.5);
+}
+
+.minimap-canvas {
+  width: 150px;
+  height: 150px;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.5);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+  display: block;
+}
+
+@media (max-width: 800px) {
+  .minimap-container {
+    bottom: auto;
+    top: 20px;
+    right: 20px;
+    left: auto;
+  }
+
+  .minimap-canvas {
+    width: 100px;
+    height: 100px;
+  }
+}

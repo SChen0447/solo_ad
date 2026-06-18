@@ -1,0 +1,148 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body, #root {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+body {
+  font-family: 'Orbitron', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: linear-gradient(135deg, #0a1a2a 0%, #162a3a 100%);
+  color: #ffffff;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.app-container {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  background: linear-gradient(135deg, #0a1a2a 0%, #162a3a 100%);
+}
+
+.scene-container {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.app-header {
+  position: absolute;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  text-align: center;
+  z-index: 50;
+  pointer-events: none;
+}
+
+.app-title {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 24px;
+  font-weight: 700;
+  color: #ffffff;
+  text-shadow: 0 0 20px rgba(0, 255, 136, 0.3);
+  letter-spacing: 3px;
+  margin-bottom: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+
+.title-icon {
+  color: #00ff88;
+  font-size: 28px;
+  text-shadow: 0 0 10px rgba(0, 255, 136, 0.6);
+  animation: float 3s ease-in-out infinite;
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-5px); }
+}
+
+.app-subtitle {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 11px;
+  font-weight: 400;
+  color: #667788;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+}
+
+button {
+  font-family: 'Orbitron', sans-serif;
+  cursor: pointer;
+  outline: none;
+}
+
+button:focus {
+  outline: none;
+}
+
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  background: transparent;
+}
+
+input[type="range"]:focus {
+  outline: none;
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(0, 255, 136, 0.3);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 255, 136, 0.5);
+}
+
+@media (max-width: 1200px) {
+  .app-title {
+    font-size: 20px;
+  }
+
+  .app-subtitle {
+    font-size: 10px;
+  }
+}
+
+@media (max-width: 800px) {
+  .app-header {
+    top: 10px;
+  }
+
+  .app-title {
+    font-size: 16px;
+    letter-spacing: 1px;
+  }
+
+  .title-icon {
+    font-size: 20px;
+  }
+
+  .app-subtitle {
+    display: none;
+  }
+}
