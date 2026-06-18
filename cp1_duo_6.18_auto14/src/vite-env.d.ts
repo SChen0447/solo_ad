@@ -1,35 +1,29 @@
 /// <reference types="vite/client" />
 
-import type * as THREE from 'three';
-import type {
-  MeshProps,
-  InstancedMeshProps,
-  MaterialProps,
-  LightProps,
-  Object3DProps,
-  BufferGeometryProps
-} from '@react-three/fiber';
+declare module '*.png';
+declare module '*.svg';
+declare module '*.jpg';
+declare module '*.jpeg';
+declare module '*.gif';
 
-type ThreeElement<T, P> = React.DetailedHTMLProps<React.HTMLAttributes<T> & P, T>;
-
-declare global {
-  namespace JSX {
-    interface IntrinsicElements {
-      mesh: ThreeElement<THREE.Mesh, any>;
-      instancedMesh: ThreeElement<THREE.InstancedMesh, any>;
-      group: ThreeElement<THREE.Group, any>;
-      ambientLight: ThreeElement<THREE.AmbientLight, any>;
-      directionalLight: ThreeElement<THREE.DirectionalLight, any>;
-      pointLight: ThreeElement<THREE.PointLight, any>;
-      gridHelper: ThreeElement<THREE.GridHelper, any>;
-      fog: ThreeElement<THREE.Fog, any>;
-      meshStandardMaterial: ThreeElement<THREE.MeshStandardMaterial, any>;
-      meshBasicMaterial: ThreeElement<THREE.MeshBasicMaterial, any>;
-      planeGeometry: ThreeElement<THREE.PlaneGeometry, any>;
-      boxGeometry: ThreeElement<THREE.BoxGeometry, any>;
-      bufferGeometry: ThreeElement<THREE.BufferGeometry, any>;
-    }
+declare namespace JSX {
+  interface IntrinsicElements {
+    mesh: any;
+    instancedMesh: any;
+    group: any;
+    ambientLight: any;
+    directionalLight: any;
+    pointLight: any;
+    spotLight: any;
+    gridHelper: any;
+    fog: any;
+    meshStandardMaterial: any;
+    meshBasicMaterial: any;
+    meshPhongMaterial: any;
+    planeGeometry: any;
+    boxGeometry: any;
+    sphereGeometry: any;
+    bufferGeometry: any;
+    primitive: any;
   }
 }
-
-export {};

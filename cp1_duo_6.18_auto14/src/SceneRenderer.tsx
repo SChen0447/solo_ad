@@ -1,5 +1,5 @@
 /// <reference types="@react-three/fiber" />
-import React, { useMemo, useRef } from 'react';
+import React, { useMemo, useRef, useEffect } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls } from '@react-three/drei';
 import * as THREE from 'three';
@@ -84,7 +84,7 @@ const BarChart: React.FC<BarChartProps> = ({ data, colorBottom, colorTop, transp
     };
   }, [data]);
 
-  useMemo(() => {
+  useEffect(() => {
     if (!meshRef.current) return;
 
     const bottomColor = new THREE.Color(colorBottom);
@@ -173,13 +173,13 @@ const SceneContent: React.FC<SceneContentProps> = ({
   secondaryData,
   comparisonMode,
   primaryColor = '#2196f3',
-  secondaryColor = '#ff9800'
+  secondaryColor = '#FF8C00'
 }) => {
   const gridSize = 10;
 
   const renderDistribution = (data: DistributionData, color: string, isSecondary: boolean) => {
-    const opacity = isSecondary ? 0.5 : 1;
-    const transparent = isSecondary;
+    const opacity = isSecondary ? 0.5 : 0.75;
+    const transparent = true;
 
     if (data.type === 'surface') {
       return (
@@ -192,8 +192,8 @@ const SceneContent: React.FC<SceneContentProps> = ({
         />
       );
     } else {
-      const bottomColor = isSecondary ? '#995500' : '#004d99';
-      const topColor = isSecondary ? '#ff9800' : '#00e5ff';
+      const bottomColor = isSecondary ? '#7a4400' : '#004d99';
+      const topColor = isSecondary ? '#FF8C00' : '#00e5ff';
       return (
         <group key={isSecondary ? 'secondary-bars' : 'primary-bars'}>
           <BarChart

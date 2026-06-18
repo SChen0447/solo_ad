@@ -29,10 +29,30 @@ function useDebounce<T>(value: T, delay: number): T {
 interface LegendProps {
   primaryType: DistributionType;
   secondaryType: DistributionType;
+  primaryParams: DistributionParams[DistributionType];
+  secondaryParams: DistributionParams[DistributionType];
   visible: boolean;
 }
 
-const ColorLegend: React.FC<LegendProps> = ({ primaryType, secondaryType, visible }) => {
+const formatParams = (type: DistributionType, params: DistributionParams[DistributionType]): string => {
+  const p = params as Record<string, number>;
+  switch (type) {
+    case 'normal':
+      return `μ=${p.mean.toFixed(1)}, σ=${p.std.toFixed(1)}`;
+    case 'uniform':
+      return `a=${p.a.toFixed(1)}, b=${p.b.toFixed(1)}`;
+    case 'exponential':
+      return `λ=${p.lambda.toFixed(1)}`;
+    case 'poisson':
+      return `μ=${p.mu.toFixed(0)}`;
+    case 'binomial':
+      return `n=${p.n.toFixed(0)}, p=${p.p.toFixed(2)}`;
+    default:
+      return '';
+  }
+};
+
+const ColorLegend: React.FC<LegendProps> = ({ primaryType, secondaryType, primaryParams, secondaryParams, visible }) => {
   if (!visible) return null;
 
   return (
@@ -40,54 +60,75 @@ const ColorLegend: React.FC<LegendProps> = ({ primaryType, secondaryType, visibl
       position: 'fixed',
       bottom: '24px',
       right: '24px',
-      padding: '14px 18px',
-      backgroundColor: 'rgba(22, 27, 34, 0.8)',
-      backdropFilter: 'blur(10px)',
-      WebkitBackdropFilter: 'blur(10px)',
+      padding: '16px 20px',
+      backgroundColor: 'rgba(22, 27, 34, 0.85)',
+      backdropFilter: 'blur(12px)',
+      WebkitBackdropFilter: 'blur(12px)',
       border: '1px solid rgba(255,255,255,0.2)',
-      borderRadius: '10px',
+      borderRadius: '12px',
+      boxShadow: '0 8px 32px rgba(0,0,0,0.3)',
       zIndex: 100,
-      animation: 'fadeIn 0.3s ease-in-out'
+      animation: 'fadeIn 0.3s ease-in-out',
+      minWidth: '220px'
     }}>
       <div style={{
         color: '#e6edf3',
-        fontSize: '12px',
+        fontSize: '13px',
         fontWeight: 600,
-        marginBottom: '10px'
+        marginBottom: '12px',
+        paddingBottom: '8px',
+        borderBottom: '1px solid rgba(255,255,255,0.1)'
       }}>
-        图例
+        分布图例
       </div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <div style={{
-            width: '16px',
-            height: '16px',
-            borderRadius: '3px',
-            backgroundColor: '#2196f3',
-            boxShadow: '0 0 6px rgba(33, 150, 243, 0.5)'
-          }} />
-          <span style={{ color: '#e6edf3', fontSize: '12px' }}>
-            分布 1: {distributionNames[primaryType]}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <div style={{
+              width: '18px',
+              height: '18px',
+              borderRadius: '4px',
+              backgroundColor: '#2196f3',
+              boxShadow: '0 0 8px rgba(33, 150, 243, 0.6)',
+              opacity: 0.75
+            }} />
+            <span style={{ color: '#e6edf3', fontSize: '13px', fontWeight: 500 }}>
+              主分布: {distributionNames[primaryType]}
+            </span>
+          </div>
+          <span style={{ color: '#8b949e', fontSize: '11px', paddingLeft: '28px', fontFamily: 'monospace' }}>
+            {formatParams(primaryType, primaryParams)}
           </span>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <div style={{
-            width: '16px',
-            height: '16px',
-            borderRadius: '3px',
-            backgroundColor: '#ff9800',
-            opacity: 0.6,
-            boxShadow: '0 0 6px rgba(255, 152, 0, 0.5)'
-          }} />
-          <span style={{ color: '#e6edf3', fontSize: '12px' }}>
-            分布 2: {distributionNames[secondaryType]}
+
+        <div style={{
+          height: '1px',
+          backgroundColor: 'rgba(255,255,255,0.08)'
+        }} />
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <div style={{
+              width: '18px',
+              height: '18px',
+              borderRadius: '4px',
+              backgroundColor: '#FF8C00',
+              boxShadow: '0 0 8px rgba(255, 140, 0, 0.6)',
+              opacity: 0.5
+            }} />
+            <span style={{ color: '#e6edf3', fontSize: '13px', fontWeight: 500 }}>
+              对比分布: {distributionNames[secondaryType]}
+            </span>
+          </div>
+          <span style={{ color: '#8b949e', fontSize: '11px', paddingLeft: '28px', fontFamily: 'monospace' }}>
+            {formatParams(secondaryType, secondaryParams)}
           </span>
         </div>
       </div>
       <style>{`
         @keyframes fadeIn {
-          from { opacity: 0; transform: translateY(10px); }
-          to { opacity: 1; transform: translateY(0); }
+          from { opacity: 0; transform: translateY(10px) scale(0.95); }
+          to { opacity: 1; transform: translateY(0) scale(1); }
         }
       `}</style>
     </div>
@@ -157,6 +198,8 @@ const App: React.FC = () => {
       <ColorLegend
         primaryType={primaryType}
         secondaryType={secondaryType}
+        primaryParams={debouncedPrimaryParams}
+        secondaryParams={debouncedSecondaryParams}
         visible={comparisonMode}
       />
 

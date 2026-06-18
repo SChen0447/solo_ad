@@ -401,7 +401,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                 }}>
                   <DistributionControls
                     title="分布 2"
-                    color="#ff9800"
+                    color="#FF8C00"
                     distributionType={secondaryType}
                     params={secondaryParams}
                     onTypeChange={handleSecondaryTypeChange}
@@ -481,7 +481,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
         }}>
           <DistributionControls
             title="分布 2"
-            color="#ff9800"
+            color="#FF8C00"
             distributionType={secondaryType}
             params={secondaryParams}
             onTypeChange={handleSecondaryTypeChange}
