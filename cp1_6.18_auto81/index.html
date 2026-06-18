@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>微观分子沙盘</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif;
+      background: linear-gradient(135deg, #0a0a1a 0%, #1a1035 50%, #0d1a30 100%);
+      color: #e0e6ff;
+      user-select: none;
+    }
+
+    #app {
+      width: 100%;
+      height: 100%;
+      position: relative;
+    }
+
+    #canvas-container {
+      width: 100%;
+      height: 100%;
+      position: absolute;
+      top: 0;
+      left: 0;
+    }
+
+    canvas {
+      display: block;
+    }
+
+    .glass-panel {
+      background: rgba(20, 25, 60, 0.45);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(100, 140, 255, 0.25);
+      border-radius: 16px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4),
+                  inset 0 1px 0 rgba(255, 255, 255, 0.1);
+    }
+
+    #atom-selector {
+      position: absolute;
+      display: none;
+      padding: 16px;
+      z-index: 100;
+      min-width: 200px;
+      transform-origin: center;
+      animation: panelFadeIn 0.25s ease-out;
+    }
+
+    @keyframes panelFadeIn {
+      from {
+        opacity: 0;
+        transform: scale(0.85);
+      }
+      to {
+        opacity: 1;
+        transform: scale(1);
+      }
+    }
+
+    #atom-selector h3 {
+      font-size: 14px;
+      color: #7eb8ff;
+      margin-bottom: 12px;
+      text-align: center;
+      letter-spacing: 1px;
+    }
+
+    .atom-options {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 10px;
+    }
+
+    .atom-btn {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 12px 8px;
+      border: 1px solid rgba(100, 140, 255, 0.3);
+      border-radius: 12px;
+      background: rgba(30, 40, 80, 0.4);
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .atom-btn:hover {
+      transform: scale(1.08);
+      border-color: rgba(100, 220, 255, 0.6);
+      box-shadow: 0 0 20px rgba(100, 220, 255, 0.2);
+      background: rgba(50, 70, 120, 0.5);
+    }
+
+    .atom-btn:active {
+      transform: scale(0.95);
+    }
+
+    .atom-sphere {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      margin-bottom: 6px;
+      box-shadow: 0 0 15px currentColor;
+    }
+
+    .atom-btn span {
+      font-size: 12px;
+      color: #c0d0ff;
+    }
+
+    #control-panel {
+      position: absolute;
+      top: 24px;
+      right: 24px;
+      width: 240px;
+      padding: 20px;
+      z-index: 50;
+    }
+
+    #control-panel h2 {
+      font-size: 16px;
+      color: #7eb8ff;
+      margin-bottom: 16px;
+      text-align: center;
+      letter-spacing: 2px;
+    }
+
+    .control-group {
+      margin-bottom: 16px;
+    }
+
+    .control-group label {
+      display: block;
+      font-size: 12px;
+      color: #a0b0e0;
+      margin-bottom: 8px;
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .control-group label span {
+      color: #64e0ff;
+      font-weight: bold;
+    }
+
+    .slider {
+      -webkit-appearance: none;
+      width: 100%;
+      height: 6px;
+      border-radius: 3px;
+      background: rgba(60, 80, 140, 0.5);
+      outline: none;
+      cursor: pointer;
+    }
+
+    .slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #64e0ff, #4080ff);
+      cursor: pointer;
+      box-shadow: 0 0 10px rgba(100, 224, 255, 0.6);
+      transition: transform 0.2s ease;
+    }
+
+    .slider::-webkit-slider-thumb:hover {
+      transform: scale(1.2);
+    }
+
+    .slider::-webkit-slider-thumb:active {
+      transform: scale(0.9);
+    }
+
+    #info-panel {
+      position: absolute;
+      bottom: 24px;
+      left: 24px;
+      padding: 14px 18px;
+      z-index: 50;
+      font-size: 12px;
+      line-height: 1.8;
+    }
+
+    #info-panel .title {
+      color: #ffb060;
+      font-weight: bold;
+      margin-bottom: 6px;
+      font-size: 13px;
+    }
+
+    #info-panel .tip {
+      color: #90a0d0;
+    }
+
+    #info-panel kbd {
+      display: inline-block;
+      padding: 2px 8px;
+      background: rgba(100, 140, 255, 0.2);
+      border: 1px solid rgba(100, 140, 255, 0.4);
+      border-radius: 4px;
+      font-size: 11px;
+      color: #7eb8ff;
+      margin: 0 2px;
+    }
+
+    #stats {
+      position: absolute;
+      top: 24px;
+      left: 24px;
+      padding: 12px 16px;
+      z-index: 50;
+      font-size: 12px;
+    }
+
+    #stats .stat-item {
+      display: flex;
+      justify-content: space-between;
+      gap: 20px;
+      margin-bottom: 4px;
+    }
+
+    #stats .stat-label {
+      color: #90a0d0;
+    }
+
+    #stats .stat-value {
+      color: #64e0ff;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <div id="canvas-container"></div>
+
+    <div id="stats" class="glass-panel">
+      <div class="stat-item">
+        <span class="stat-label">原子数</span>
+        <span class="stat-value" id="atom-count">0</span>
+      </div>
+      <div class="stat-item">
+        <span class="stat-label">化学键</span>
+        <span class="stat-value" id="bond-count">0</span>
+      </div>
+      <div class="stat-item">
+        <span class="stat-label">FPS</span>
+        <span class="stat-value" id="fps-count">60</span>
+      </div>
+    </div>
+
+    <div id="control-panel" class="glass-panel">
+      <h2>分子参数</h2>
+      <div class="control-group">
+        <label>振动幅度 <span id="vib-value">30</span></label>
+        <input type="range" class="slider" id="vibration-slider" min="0" max="100" value="30">
+      </div>
+      <div class="control-group">
+        <label>旋转速度 <span id="rot-value">20</span></label>
+        <input type="range" class="slider" id="rotation-slider" min="0" max="100" value="20">
+      </div>
+      <div class="control-group">
+        <label>光晕强度 <span id="glow-value">50</span></label>
+        <input type="range" class="slider" id="glow-slider" min="0" max="100" value="50">
+      </div>
+    </div>
+
+    <div id="atom-selector" class="glass-panel">
+      <h3>选择原子</h3>
+      <div class="atom-options">
+        <div class="atom-btn" data-atom="carbon">
+          <div class="atom-sphere" style="background: radial-gradient(circle at 35% 35%, #606060, #2a2a2a); color: #666;"></div>
+          <span>碳 C</span>
+        </div>
+        <div class="atom-btn" data-atom="oxygen">
+          <div class="atom-sphere" style="background: radial-gradient(circle at 35% 35%, #ff5050, #a01010); color: #f55;"></div>
+          <span>氧 O</span>
+        </div>
+        <div class="atom-btn" data-atom="hydrogen">
+          <div class="atom-sphere" style="background: radial-gradient(circle at 35% 35%, #ffffff, #c0c0c0); color: #fff;"></div>
+          <span>氢 H</span>
+        </div>
+        <div class="atom-btn" data-atom="nitrogen">
+          <div class="atom-sphere" style="background: radial-gradient(circle at 35% 35%, #5080ff, #2030a0); color: #58f;"></div>
+          <span>氮 N</span>
+        </div>
+      </div>
+    </div>
+
+    <div id="info-panel" class="glass-panel">
+      <div class="title">操作说明</div>
+      <div class="tip">点击空白处：添加原子</div>
+      <div class="tip"><kbd>Shift</kbd> + 点击两个原子：创建化学键</div>
+      <div class="tip">拖拽原子：调整分子构型</div>
+      <div class="tip">鼠标滚轮：缩放视角</div>
+    </div>
+  </div>
+
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
