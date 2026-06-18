@@ -27,10 +27,6 @@ export class AudioEngine {
   public fileName = ''
   public onTimeUpdate: ((currentTime: number) => void) | null = null
 
-  private dBToLinear(dB: number): number {
-    return Math.pow(10, dB / 20)
-  }
-
   async loadFile(file: File): Promise<void> {
     if (file.size > MAX_FILE_SIZE) {
       throw new Error(`文件大小超过限制（最大10MB），当前文件大小：${(file.size / 1024 / 1024).toFixed(2)}MB`)
@@ -64,7 +60,7 @@ export class AudioEngine {
     this.frequencyData = new Uint8Array(bufferLength)
 
     this.gainNode = this.audioContext.createGain()
-    this.gainNode.gain.value = this.dBToLinear(0)
+    this.gainNode.gain.value = 1
 
     this.filters = BAND_CONFIGS.map(config => {
       const filter = this.audioContext!.createBiquadFilter()
@@ -151,9 +147,9 @@ export class AudioEngine {
     }
   }
 
-  setBandGain(bandIndex: number, dB: number): void {
+  setBandGain(bandIndex: number, gainDb: number): void {
     if (bandIndex >= 0 && bandIndex < this.filters.length && this.audioContext) {
-      const clampedDb = Math.max(-12, Math.min(12, dB))
+      const clampedDb = Math.max(-12, Math.min(12, gainDb))
       this.filters[bandIndex].gain.setTargetAtTime(clampedDb, this.audioContext.currentTime, 0.01)
     }
   }

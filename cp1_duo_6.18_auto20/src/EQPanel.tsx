@@ -2,7 +2,7 @@ import React, { useState, useCallback, useRef } from 'react'
 import { BAND_LABELS } from './AudioEngine'
 
 interface EQPanelProps {
-  onGainChange: (bandIndex: number, gain: number) => void
+  onGainChange: (bandIndex: number, gainDb: number) => void
   gains: number[]
 }
 

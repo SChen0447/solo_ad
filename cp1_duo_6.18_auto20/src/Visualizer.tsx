@@ -20,10 +20,44 @@ export const Visualizer: React.FC<VisualizerProps> = ({
   const waveformCanvasRef = useRef<HTMLCanvasElement>(null)
   const spectrumCanvasRef = useRef<HTMLCanvasElement>(null)
   const animationRef = useRef<number>(0)
-  const [waveformSize, setWaveformSize] = useState({ width: 480, height: 200 })
-  const [spectrumSize, setSpectrumSize] = useState({ width: 480, height: 150 })
+  const [waveformSize, setWaveformSize] = useState({ width: 0, height: 0 })
+  const [spectrumSize, setSpectrumSize] = useState({ width: 0, height: 0 })
   const containerRef = useRef<HTMLDivElement>(null)
-  const logIndexMapRef = useRef<number[]>([])
+  const logIndexMapRef = useRef<{ startBin: number; endBin: number; xStart: number; width: number }[]>([])
+
+  const computeCanvasSize = useCallback((containerWidth: number) => {
+    const isMobile = containerWidth < 480
+    const scale = isMobile ? Math.max(0.6, containerWidth / 480) : 1
+    return {
+      waveform: {
+        width: Math.round(480 * scale),
+        height: Math.round(200 * scale)
+      },
+      spectrum: {
+        width: Math.round(480 * scale),
+        height: Math.round(150 * scale)
+      }
+    }
+  }, [])
+
+  useEffect(() => {
+    const container = containerRef.current
+    if (!container) return
+
+    const updateSizes = () => {
+      const containerWidth = container.getBoundingClientRect().width - 24
+      const sizes = computeCanvasSize(containerWidth)
+      setWaveformSize(sizes.waveform)
+      setSpectrumSize(sizes.spectrum)
+    }
+
+    updateSizes()
+
+    const observer = new ResizeObserver(updateSizes)
+    observer.observe(container)
+
+    return () => observer.disconnect()
+  }, [computeCanvasSize])
 
   const buildLogIndexMap = useCallback((fftSize: number, sampleRate: number, numBars: number) => {
     const nyquist = sampleRate / 2
@@ -32,41 +66,31 @@ export const Visualizer: React.FC<VisualizerProps> = ({
     const maxLog = Math.log10(Math.min(MAX_FREQ, nyquist))
     const logRange = maxLog - minLog
 
-    const indices: number[] = []
-    for (let i = 0; i <= numBars; i++) {
-      const logFreq = minLog + (i / numBars) * logRange
-      const freq = Math.pow(10, logFreq)
-      const binIndex = Math.round((freq / nyquist) * binCount)
-      indices.push(Math.min(binIndex, binCount - 1))
-    }
-    return indices
-  }, [])
+    const bars: { startBin: number; endBin: number; xStart: number; width: number }[] = []
+    let xCursor = 0
+    const totalLogWidth = logRange
 
-  useEffect(() => {
-    const updateSizes = () => {
-      const isMobile = window.innerWidth < 768
-      const baseWidth = Math.min(480, window.innerWidth - 48)
-      const scale = isMobile ? Math.max(0.6, baseWidth / 480) : 1
-
-      setWaveformSize({
-        width: Math.round(480 * scale),
-        height: Math.round(200 * scale)
-      })
-      setSpectrumSize({
-        width: Math.round(480 * scale),
-        height: Math.round(150 * scale)
-      })
+    for (let i = 0; i < numBars; i++) {
+      const logLow = minLog + (i / numBars) * totalLogWidth
+      const logHigh = minLog + ((i + 1) / numBars) * totalLogWidth
+      const freqLow = Math.pow(10, logLow)
+      const freqHigh = Math.pow(10, logHigh)
+      const startBin = Math.min(Math.round((freqLow / nyquist) * binCount), binCount - 1)
+      const endBin = Math.min(Math.round((freqHigh / nyquist) * binCount), binCount - 1)
+      const barWidth = ((logHigh - logLow) / totalLogWidth) * 100
+      bars.push({ startBin, endBin, xStart: xCursor, width: barWidth })
+      xCursor += barWidth
     }
 
-    updateSizes()
-    window.addEventListener('resize', updateSizes)
-    return () => window.removeEventListener('resize', updateSizes)
+    return bars
   }, [])
 
   useEffect(() => {
     const sampleRate = getSampleRate()
-    const numBars = Math.floor(spectrumSize.width / 4)
-    logIndexMapRef.current = buildLogIndexMap(FFT_SIZE, sampleRate, numBars)
+    const numBars = Math.min(64, Math.floor(spectrumSize.width / 6))
+    if (numBars > 0) {
+      logIndexMapRef.current = buildLogIndexMap(FFT_SIZE, sampleRate, numBars)
+    }
   }, [spectrumSize.width, buildLogIndexMap, getSampleRate])
 
   const drawWaveform = useCallback(() => {
@@ -77,6 +101,7 @@ export const Visualizer: React.FC<VisualizerProps> = ({
     if (!ctx) return
 
     const { width, height } = waveformSize
+    if (width === 0 || height === 0) return
     canvas.width = width * window.devicePixelRatio
     canvas.height = height * window.devicePixelRatio
     ctx.scale(window.devicePixelRatio, window.devicePixelRatio)
@@ -154,6 +179,7 @@ export const Visualizer: React.FC<VisualizerProps> = ({
     if (!ctx) return
 
     const { width, height } = spectrumSize
+    if (width === 0 || height === 0) return
     canvas.width = width * window.devicePixelRatio
     canvas.height = height * window.devicePixelRatio
     ctx.scale(window.devicePixelRatio, window.devicePixelRatio)
@@ -172,20 +198,21 @@ export const Visualizer: React.FC<VisualizerProps> = ({
     }
 
     const freqData = getFrequencyData()
-    const indexMap = logIndexMapRef.current
-    if (indexMap.length < 2) return
+    const bars = logIndexMapRef.current
+    if (bars.length < 1) return
 
-    const barCount = indexMap.length - 1
-    const barWidth = (width - 20) / barCount - 2
+    const drawWidth = width - 20
     const startX = 10
+    const barGap = 1
 
-    for (let i = 0; i < barCount; i++) {
-      const startBin = indexMap[i]
-      const endBin = indexMap[i + 1]
+    for (let i = 0; i < bars.length; i++) {
+      const bar = bars[i]
+      const barPixelWidth = Math.max(2, (bar.width / 100) * drawWidth - barGap)
+      const x = startX + (bar.xStart / 100) * drawWidth
 
       let sum = 0
       let count = 0
-      for (let j = startBin; j <= endBin; j++) {
+      for (let j = bar.startBin; j <= bar.endBin; j++) {
         sum += freqData[j] || 0
         count++
       }
@@ -193,11 +220,9 @@ export const Visualizer: React.FC<VisualizerProps> = ({
 
       const normalizedValue = isPlaying ? avgValue / 255 : Math.max(avgValue / 255, 0.05)
       const barHeight = normalizedValue * (height - 20)
-
-      const x = startX + i * (barWidth + 2)
       const y = height - barHeight - 10
 
-      const hue = 120 - (i / barCount) * 120
+      const hue = 120 - (i / bars.length) * 120
       const saturation = 100
       const lightness = 50 + normalizedValue * 10
       const gradient = ctx.createLinearGradient(0, y, 0, height - 10)
@@ -205,10 +230,10 @@ export const Visualizer: React.FC<VisualizerProps> = ({
       gradient.addColorStop(1, `hsl(${Math.max(0, hue - 30)}, ${saturation}%, ${Math.max(30, lightness - 20)}%)`)
 
       ctx.fillStyle = gradient
-      ctx.fillRect(x, y, barWidth, barHeight)
+      ctx.fillRect(x, y, barPixelWidth, barHeight)
 
       ctx.fillStyle = 'rgba(255, 255, 255, 0.3)'
-      ctx.fillRect(x, y, barWidth, 2)
+      ctx.fillRect(x, y, barPixelWidth, 2)
     }
 
     const labelFreqs = [20, 100, 500, 1000, 5000, 10000, 20000]

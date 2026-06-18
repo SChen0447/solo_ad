@@ -57,9 +57,16 @@ const App: React.FC = () => {
       setFileName(file.name)
       setDuration(audioEngineRef.current.duration)
       setIsPlaying(true)
+      setCurrentTime(0)
       setGains([0, 0, 0, 0, 0, 0])
     } catch (err) {
-      setError(err instanceof Error ? err.message : '文件加载失败')
+      const message = err instanceof Error ? err.message : '文件加载失败'
+      setError(message)
+      setIsPlaying(false)
+      setDuration(0)
+      setCurrentTime(0)
+      setFileName('')
+      setGains([0, 0, 0, 0, 0, 0])
     }
     if (fileInputRef.current) {
       fileInputRef.current.value = ''
@@ -83,11 +90,11 @@ const App: React.FC = () => {
     }
   }
 
-  const handleGainChange = useCallback((bandIndex: number, gain: number) => {
-    audioEngineRef.current.setBandGain(bandIndex, gain)
+  const handleGainChange = useCallback((bandIndex: number, gainDb: number) => {
+    audioEngineRef.current.setBandGain(bandIndex, gainDb)
     setGains(prev => {
       const updated = [...prev]
-      updated[bandIndex] = gain
+      updated[bandIndex] = gainDb
       return updated
     })
   }, [])
@@ -107,17 +114,12 @@ const App: React.FC = () => {
       if (!isDraggingRef.current || !progressRef.current) return
       const moveRect = progressRef.current.getBoundingClientRect()
       const movePercentage = Math.max(0, Math.min(1, (moveEvent.clientX - moveRect.left) / moveRect.width))
-      const moveTime = movePercentage * duration
+      const moveTime = Math.max(0, Math.min(movePercentage * duration, duration))
       setCurrentTime(moveTime)
+      audioEngineRef.current.seek(moveTime)
     }
 
-    const handleMouseUp = (upEvent: MouseEvent) => {
-      if (!progressRef.current) return
-      const upRect = progressRef.current.getBoundingClientRect()
-      const upPercentage = Math.max(0, Math.min(1, (upEvent.clientX - upRect.left) / upRect.width))
-      const upTime = upPercentage * duration
-      audioEngineRef.current.seek(upTime)
-      setCurrentTime(upTime)
+    const handleMouseUp = () => {
       isDraggingRef.current = false
       document.removeEventListener('mousemove', handleMouseMove)
       document.removeEventListener('mouseup', handleMouseUp)
@@ -144,8 +146,9 @@ const App: React.FC = () => {
       const moveTouch = moveEvent.touches[0]
       const moveRect = progressRef.current.getBoundingClientRect()
       const movePercentage = Math.max(0, Math.min(1, (moveTouch.clientX - moveRect.left) / moveRect.width))
-      const moveTime = movePercentage * duration
+      const moveTime = Math.max(0, Math.min(movePercentage * duration, duration))
       setCurrentTime(moveTime)
+      audioEngineRef.current.seek(moveTime)
     }
 
     const handleTouchEnd = () => {
