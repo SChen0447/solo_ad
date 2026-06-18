@@ -1,0 +1,353 @@
+import { Vector } from './engine';
+export class Renderer {
+    ctx;
+    canvas;
+    stars = [];
+    time = 0;
+    constructor(canvas) {
+        this.canvas = canvas;
+        const ctx = canvas.getContext('2d');
+        if (!ctx)
+            throw new Error('Failed to get 2D context');
+        this.ctx = ctx;
+        this.generateStars();
+    }
+    generateStars() {
+        this.stars = [];
+        for (let i = 0; i < 200; i++) {
+            this.stars.push({
+                x: Math.random() * this.canvas.width,
+                y: Math.random() * this.canvas.height,
+                size: Math.random() * 2 + 0.5,
+                brightness: Math.random() * 0.5 + 0.5,
+                twinkleSpeed: Math.random() * 0.02 + 0.01,
+                phase: Math.random() * Math.PI * 2
+            });
+        }
+    }
+    resize(width, height) {
+        this.canvas.width = width;
+        this.canvas.height = height;
+        this.generateStars();
+    }
+    render(engine, deltaTime) {
+        this.time += deltaTime;
+        this.drawBackground();
+        this.drawStars();
+        this.drawGravityBodies(engine.gravityBodies);
+        this.drawRingCheckpoints(engine.ringCheckpoints);
+        this.drawBlackHole(engine.blackHole);
+        this.drawEnergyBallTrail(engine.energyBall);
+        this.drawEnergyBall(engine.energyBall);
+        this.drawChargeEffect(engine.energyBall);
+        this.drawRingCounter(engine.passedRings, engine.totalRings);
+        if (engine.isGameWon) {
+            this.drawWinScreen(engine.winAnimationTime);
+        }
+    }
+    drawBackground() {
+        const gradient = this.ctx.createRadialGradient(this.canvas.width / 2, this.canvas.height / 2, 0, this.canvas.width / 2, this.canvas.height / 2, Math.max(this.canvas.width, this.canvas.height) / 1.5);
+        gradient.addColorStop(0, '#1a1a4e');
+        gradient.addColorStop(0.5, '#2d1b4e');
+        gradient.addColorStop(1, '#0a0a1a');
+        this.ctx.fillStyle = gradient;
+        this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+    }
+    drawStars() {
+        this.stars.forEach(star => {
+            const twinkle = Math.sin(this.time * star.twinkleSpeed + star.phase) * 0.3 + 0.7;
+            const alpha = star.brightness * twinkle;
+            this.ctx.beginPath();
+            this.ctx.arc(star.x, star.y, star.size, 0, Math.PI * 2);
+            this.ctx.fillStyle = `rgba(255, 255, 255, ${alpha})`;
+            this.ctx.fill();
+        });
+    }
+    drawGravityBodies(bodies) {
+        bodies.forEach(body => {
+            this.ctx.save();
+            this.ctx.translate(body.position.x, body.position.y);
+            this.ctx.rotate(body.rotation);
+            const glowGradient = this.ctx.createRadialGradient(0, 0, 0, 0, 0, body.radius * 2);
+            glowGradient.addColorStop(0, body.color + '40');
+            glowGradient.addColorStop(1, body.color + '00');
+            this.ctx.fillStyle = glowGradient;
+            this.ctx.beginPath();
+            this.ctx.arc(0, 0, body.radius * 2, 0, Math.PI * 2);
+            this.ctx.fill();
+            const bodyGradient = this.ctx.createRadialGradient(-body.radius * 0.3, -body.radius * 0.3, 0, 0, 0, body.radius);
+            bodyGradient.addColorStop(0, this.lightenColor(body.color, 30));
+            bodyGradient.addColorStop(0.7, body.color);
+            bodyGradient.addColorStop(1, this.darkenColor(body.color, 40));
+            this.ctx.beginPath();
+            this.ctx.arc(0, 0, body.radius, 0, Math.PI * 2);
+            this.ctx.fillStyle = bodyGradient;
+            this.ctx.fill();
+            this.ctx.save();
+            this.ctx.beginPath();
+            this.ctx.arc(0, 0, body.radius, 0, Math.PI * 2);
+            this.ctx.clip();
+            this.ctx.strokeStyle = this.darkenColor(body.color, 20) + '60';
+            this.ctx.lineWidth = 2;
+            for (let i = 0; i < 4; i++) {
+                const y = (i - 1.5) * (body.radius * 0.5);
+                const waveOffset = Math.sin(body.stripeOffset + i) * 5;
+                this.ctx.beginPath();
+                this.ctx.moveTo(-body.radius, y + waveOffset);
+                this.ctx.quadraticCurveTo(0, y + waveOffset * 2, body.radius, y + waveOffset);
+                this.ctx.stroke();
+            }
+            this.ctx.restore();
+            this.ctx.restore();
+        });
+    }
+    drawRingCheckpoints(rings) {
+        rings.forEach(ring => {
+            this.ctx.save();
+            this.ctx.translate(ring.position.x, ring.position.y);
+            this.ctx.rotate(ring.rotation);
+            const flashAlpha = ring.flashTime > 0 ? (1 - ring.flashTime / 500) : 0;
+            const ringRadius = ring.radius;
+            const colors = ['#ff0080', '#ff8c00', '#ffff00', '#00ff80', '#00ffff', '#0080ff', '#8000ff', '#ff0080'];
+            for (let i = 0; i < ring.segments; i++) {
+                const startAngle = (i / ring.segments) * Math.PI * 2;
+                const endAngle = ((i + 1) / ring.segments) * Math.PI * 2;
+                const colorIndex = i % colors.length;
+                this.ctx.beginPath();
+                this.ctx.arc(0, 0, ringRadius, startAngle, endAngle);
+                this.ctx.strokeStyle = colors[colorIndex] + '80';
+                this.ctx.lineWidth = 4;
+                this.ctx.lineCap = 'round';
+                this.ctx.stroke();
+                if (ring.passed) {
+                    this.ctx.beginPath();
+                    this.ctx.arc(0, 0, ringRadius, startAngle, endAngle);
+                    this.ctx.strokeStyle = colors[colorIndex];
+                    this.ctx.lineWidth = 3;
+                    this.ctx.stroke();
+                }
+            }
+            if (flashAlpha > 0) {
+                this.ctx.beginPath();
+                this.ctx.arc(0, 0, ringRadius + flashAlpha * 20, 0, Math.PI * 2);
+                this.ctx.strokeStyle = `rgba(255, 255, 255, ${flashAlpha})`;
+                this.ctx.lineWidth = 6;
+                this.ctx.stroke();
+                this.ctx.beginPath();
+                this.ctx.arc(0, 0, ringRadius + flashAlpha * 40, 0, Math.PI * 2);
+                this.ctx.strokeStyle = `rgba(255, 255, 255, ${flashAlpha * 0.5})`;
+                this.ctx.lineWidth = 3;
+                this.ctx.stroke();
+            }
+            this.ctx.restore();
+        });
+    }
+    drawBlackHole(blackHole) {
+        this.ctx.save();
+        this.ctx.translate(blackHole.position.x, blackHole.position.y);
+        blackHole.particles.forEach(particle => {
+            this.ctx.save();
+            this.ctx.translate(particle.position.x - blackHole.position.x, particle.position.y - blackHole.position.y);
+            this.ctx.globalAlpha = particle.life;
+            this.ctx.fillStyle = particle.color;
+            this.ctx.beginPath();
+            this.ctx.arc(0, 0, particle.size, 0, Math.PI * 2);
+            this.ctx.fill();
+            this.ctx.restore();
+        });
+        this.ctx.rotate(blackHole.rotation);
+        const attractGradient = this.ctx.createRadialGradient(0, 0, blackHole.radius, 0, 0, blackHole.attractRadius);
+        attractGradient.addColorStop(0, 'rgba(80, 0, 0, 0.3)');
+        attractGradient.addColorStop(0.5, 'rgba(50, 0, 30, 0.15)');
+        attractGradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
+        this.ctx.fillStyle = attractGradient;
+        this.ctx.beginPath();
+        this.ctx.arc(0, 0, blackHole.attractRadius, 0, Math.PI * 2);
+        this.ctx.fill();
+        for (let i = 0; i < 3; i++) {
+            const ringRadius = blackHole.radius + 15 + i * 10;
+            this.ctx.beginPath();
+            this.ctx.arc(0, 0, ringRadius, 0, Math.PI * 2);
+            const alpha = 0.3 - i * 0.1;
+            this.ctx.strokeStyle = `rgba(139, 0, 0, ${alpha})`;
+            this.ctx.lineWidth = 2;
+            this.ctx.setLineDash([5, 5]);
+            this.ctx.lineDashOffset = -blackHole.rotation * 50;
+            this.ctx.stroke();
+            this.ctx.setLineDash([]);
+        }
+        const coreGradient = this.ctx.createRadialGradient(0, 0, 0, 0, 0, blackHole.radius);
+        coreGradient.addColorStop(0, '#000000');
+        coreGradient.addColorStop(0.7, '#1a0000');
+        coreGradient.addColorStop(1, '#3d0000');
+        this.ctx.beginPath();
+        this.ctx.arc(0, 0, blackHole.radius, 0, Math.PI * 2);
+        this.ctx.fillStyle = coreGradient;
+        this.ctx.fill();
+        const eventHorizon = this.ctx.createRadialGradient(0, 0, blackHole.radius * 0.8, 0, 0, blackHole.radius);
+        eventHorizon.addColorStop(0, 'rgba(255, 100, 100, 0)');
+        eventHorizon.addColorStop(0.8, 'rgba(255, 50, 50, 0.3)');
+        eventHorizon.addColorStop(1, 'rgba(255, 0, 100, 0.5)');
+        this.ctx.beginPath();
+        this.ctx.arc(0, 0, blackHole.radius, 0, Math.PI * 2);
+        this.ctx.strokeStyle = eventHorizon;
+        this.ctx.lineWidth = 4;
+        this.ctx.stroke();
+        this.ctx.restore();
+    }
+    drawEnergyBallTrail(ball) {
+        if (ball.trail.length < 2)
+            return;
+        this.ctx.beginPath();
+        this.ctx.moveTo(ball.trail[0].x, ball.trail[0].y);
+        for (let i = 1; i < ball.trail.length; i++) {
+            this.ctx.lineTo(ball.trail[i].x, ball.trail[i].y);
+        }
+        const gradient = this.ctx.createLinearGradient(ball.trail[0].x, ball.trail[0].y, ball.position.x, ball.position.y);
+        gradient.addColorStop(0, 'rgba(255, 255, 255, 0)');
+        gradient.addColorStop(1, 'rgba(255, 255, 255, 0.6)');
+        this.ctx.strokeStyle = gradient;
+        this.ctx.lineWidth = 3;
+        this.ctx.lineCap = 'round';
+        this.ctx.stroke();
+    }
+    drawEnergyBall(ball) {
+        if (ball.isAbsorbed)
+            return;
+        const pos = ball.position;
+        const glowGradient = this.ctx.createRadialGradient(pos.x, pos.y, 0, pos.x, pos.y, ball.radius * 2.5);
+        glowGradient.addColorStop(0, 'rgba(255, 255, 255, 0.5)');
+        glowGradient.addColorStop(0.5, 'rgba(200, 220, 255, 0.2)');
+        glowGradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
+        this.ctx.fillStyle = glowGradient;
+        this.ctx.beginPath();
+        this.ctx.arc(pos.x, pos.y, ball.radius * 2.5, 0, Math.PI * 2);
+        this.ctx.fill();
+        const ballGradient = this.ctx.createRadialGradient(pos.x - ball.radius * 0.3, pos.y - ball.radius * 0.3, 0, pos.x, pos.y, ball.radius);
+        ballGradient.addColorStop(0, 'rgba(255, 255, 255, 0.95)');
+        ballGradient.addColorStop(0.5, 'rgba(220, 240, 255, 0.8)');
+        ballGradient.addColorStop(1, 'rgba(180, 200, 255, 0.5)');
+        this.ctx.beginPath();
+        this.ctx.arc(pos.x, pos.y, ball.radius, 0, Math.PI * 2);
+        this.ctx.fillStyle = ballGradient;
+        this.ctx.fill();
+        this.ctx.beginPath();
+        this.ctx.arc(pos.x - ball.radius * 0.4, pos.y - ball.radius * 0.4, ball.radius * 0.25, 0, Math.PI * 2);
+        this.ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+        this.ctx.fill();
+    }
+    drawChargeEffect(ball) {
+        if (!ball.isCharging || !ball.chargeStart || !ball.chargeCurrent)
+            return;
+        const pos = ball.position;
+        const dragVector = new Vector(ball.chargeCurrent.x - ball.chargeStart.x, ball.chargeCurrent.y - ball.chargeStart.y);
+        const distance = dragVector.length();
+        const maxDistance = 200;
+        const chargePower = Math.min(distance / maxDistance, 1);
+        const waveCount = 3;
+        for (let i = 0; i < waveCount; i++) {
+            const wavePhase = (this.time * 0.003 + i / waveCount) % 1;
+            const waveRadius = ball.radius + wavePhase * (30 + chargePower * 50);
+            const waveAlpha = (1 - wavePhase) * 0.6;
+            const color = this.getChargeColor(chargePower);
+            this.ctx.beginPath();
+            this.ctx.arc(pos.x, pos.y, waveRadius, 0, Math.PI * 2);
+            this.ctx.strokeStyle = color + Math.floor(waveAlpha * 255).toString(16).padStart(2, '0');
+            this.ctx.lineWidth = 2 + chargePower * 2;
+            this.ctx.stroke();
+        }
+        if (distance > 10) {
+            const direction = dragVector.normalize().mul(-1);
+            const arrowLength = 30 + chargePower * 80;
+            const arrowEnd = new Vector(pos.x + direction.x * arrowLength, pos.y + direction.y * arrowLength);
+            this.ctx.beginPath();
+            this.ctx.moveTo(pos.x, pos.y);
+            this.ctx.lineTo(arrowEnd.x, arrowEnd.y);
+            const arrowColor = this.getChargeColor(chargePower);
+            this.ctx.strokeStyle = arrowColor + 'cc';
+            this.ctx.lineWidth = 2 + chargePower * 3;
+            this.ctx.stroke();
+            const arrowHeadLength = 10 + chargePower * 10;
+            const angle = Math.atan2(direction.y, direction.x);
+            this.ctx.beginPath();
+            this.ctx.moveTo(arrowEnd.x, arrowEnd.y);
+            this.ctx.lineTo(arrowEnd.x - arrowHeadLength * Math.cos(angle - Math.PI / 6), arrowEnd.y - arrowHeadLength * Math.sin(angle - Math.PI / 6));
+            this.ctx.moveTo(arrowEnd.x, arrowEnd.y);
+            this.ctx.lineTo(arrowEnd.x - arrowHeadLength * Math.cos(angle + Math.PI / 6), arrowEnd.y - arrowHeadLength * Math.sin(angle + Math.PI / 6));
+            this.ctx.stroke();
+        }
+    }
+    getChargeColor(power) {
+        const r = Math.floor(50 + power * 205);
+        const g = Math.floor(100 + power * 100);
+        const b = Math.floor(255 - power * 155);
+        return `rgb(${r}, ${g}, ${b})`;
+    }
+    drawRingCounter(passed, total) {
+        const x = this.canvas.width - 100;
+        const y = 40;
+        this.ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+        this.ctx.fillRect(x - 60, y - 20, 120, 40);
+        this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+        this.ctx.lineWidth = 1;
+        this.ctx.strokeRect(x - 60, y - 20, 120, 40);
+        this.ctx.fillStyle = '#ffffff';
+        this.ctx.font = 'bold 20px Arial';
+        this.ctx.textAlign = 'center';
+        this.ctx.textBaseline = 'middle';
+        this.ctx.fillText(`${passed} / ${total}`, x, y);
+        this.ctx.font = '12px Arial';
+        this.ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+        this.ctx.fillText('光环', x, y + 25);
+    }
+    drawWinScreen(animationTime) {
+        this.ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+        this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+        let scale = 1;
+        const duration = 1000;
+        if (animationTime < duration) {
+            const t = animationTime / duration;
+            if (t < 0.5) {
+                scale = 0.5 + t * 1.4;
+            }
+            else {
+                const bounceT = (t - 0.5) / 0.5;
+                scale = 1.2 - bounceT * 0.2;
+            }
+        }
+        const centerX = this.canvas.width / 2;
+        const centerY = this.canvas.height / 2 - 40;
+        this.ctx.save();
+        this.ctx.translate(centerX, centerY);
+        this.ctx.scale(scale, scale);
+        const textGradient = this.ctx.createLinearGradient(-150, 0, 150, 0);
+        textGradient.addColorStop(0, '#ffd700');
+        textGradient.addColorStop(0.5, '#ffffff');
+        textGradient.addColorStop(1, '#ffd700');
+        this.ctx.font = 'bold 48px Arial';
+        this.ctx.textAlign = 'center';
+        this.ctx.textBaseline = 'middle';
+        this.ctx.fillStyle = textGradient;
+        this.ctx.strokeStyle = '#8b4513';
+        this.ctx.lineWidth = 3;
+        this.ctx.strokeText('恭喜通关！', 0, 0);
+        this.ctx.fillText('恭喜通关！', 0, 0);
+        this.ctx.restore();
+    }
+    lightenColor(color, percent) {
+        const num = parseInt(color.replace('#', ''), 16);
+        const amt = Math.round(2.55 * percent);
+        const R = Math.min(255, (num >> 16) + amt);
+        const G = Math.min(255, ((num >> 8) & 0x00FF) + amt);
+        const B = Math.min(255, (num & 0x0000FF) + amt);
+        return `rgb(${R}, ${G}, ${B})`;
+    }
+    darkenColor(color, percent) {
+        const num = parseInt(color.replace('#', ''), 16);
+        const amt = Math.round(2.55 * percent);
+        const R = Math.max(0, (num >> 16) - amt);
+        const G = Math.max(0, ((num >> 8) & 0x00FF) - amt);
+        const B = Math.max(0, (num & 0x0000FF) - amt);
+        return `rgb(${R}, ${G}, ${B})`;
+    }
+}
