@@ -15,6 +15,7 @@ function easeInOutSine(t: number): number {
 }
 
 export default function GeometryModule() {
+  const groupRef = useRef<THREE.Group>(null)
   const meshRef = useRef<THREE.Mesh>(null)
   const materialRef = useRef<THREE.ShaderMaterial>(null)
   const edgesRef = useRef<THREE.LineSegments>(null)
@@ -65,7 +66,7 @@ export default function GeometryModule() {
   }, [manualBreath])
 
   useFrame((_, delta) => {
-    if (!meshRef.current || !materialRef.current || !edgesRef.current || !edgeMaterialRef.current) return
+    if (!groupRef.current || !materialRef.current || !edgeMaterialRef.current) return
 
     timeRef.current += delta
 
@@ -105,10 +106,8 @@ export default function GeometryModule() {
       breathScale = isPlaying ? Math.max(breathScale, manualScale) : manualScale
     }
 
-    meshRef.current.scale.setScalar(breathScale)
-    meshRef.current.rotation.y += delta * 0.1
-    edgesRef.current.scale.setScalar(breathScale)
-    edgesRef.current.rotation.y += delta * 0.1
+    groupRef.current.scale.setScalar(breathScale)
+    groupRef.current.rotation.y += delta * 0.1
 
     const posAttr = geometry.getAttribute('position') as THREE.BufferAttribute
     const noiseOffsets = generateVertexNoiseOffsets(
@@ -153,7 +152,7 @@ export default function GeometryModule() {
   `
 
   return (
-    <>
+    <group ref={groupRef}>
       <mesh ref={meshRef} geometry={geometry}>
         <shaderMaterial
           ref={materialRef}
@@ -170,6 +169,6 @@ export default function GeometryModule() {
           opacity={0.3}
         />
       </lineSegments>
-    </>
+    </group>
   )
 }

@@ -3,6 +3,7 @@ import { OrbitControls } from '@react-three/drei'
 import { create } from 'zustand'
 import GeometryModule from './scene/GeometryModule'
 import ParticleHalo from './scene/ParticleHalo'
+import StarField from './scene/StarField'
 import ControlPanel from './ui/ControlPanel'
 
 export type ColorTheme = 'deepBlue' | 'purpleRed' | 'greenYellow'
@@ -69,6 +70,7 @@ export default function App() {
         <ambientLight intensity={0.4} />
         <pointLight position={[10, 10, 10]} intensity={1} />
         <pointLight position={[-10, -10, -10]} intensity={0.5} color="#3498db" />
+        <StarField />
         <GeometryModule />
         <ParticleHalo />
         <OrbitControls
