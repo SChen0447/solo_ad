@@ -19,7 +19,7 @@ const PRESET_COLORS = [
   '#dbeafe',
   '#dcfce7',
   '#e0e7ff',
-  '#fce7f3',
+  '#f3e8ff',
   '#fed7aa',
   '#cffafe',
   '#fef9c3',
@@ -151,30 +151,31 @@ const Toolbar: React.FC<ToolbarProps> = ({
 
         .color-grid {
           display: grid;
-          grid-template-columns: repeat(4, 1fr);
+          grid-template-columns: repeat(4, 20px);
           gap: 8px;
+          justify-content: space-between;
         }
 
         .color-swatch {
-          width: 100%;
-          aspect-ratio: 1;
-          min-height: 40px;
-          border-radius: 8px;
+          width: 20px;
+          height: 20px;
+          border-radius: 4px;
           border: 2px solid #e5e7eb;
           cursor: pointer;
           transition: all 0.2s ease-out;
           padding: 0;
           position: relative;
+          flex-shrink: 0;
         }
 
         .color-swatch:hover {
-          transform: scale(1.08);
+          transform: scale(1.15);
           border-color: #3b82f6;
         }
 
         .color-swatch.active {
           border-color: #3b82f6;
-          box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+          box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.3);
         }
 
         .color-swatch.active::after {
@@ -183,11 +184,10 @@ const Toolbar: React.FC<ToolbarProps> = ({
           top: 50%;
           left: 50%;
           transform: translate(-50%, -50%);
-          width: 8px;
-          height: 8px;
+          width: 6px;
+          height: 6px;
           border-radius: 50%;
           background: #3b82f6;
-          box-shadow: 0 0 0 2px white;
         }
 
         .border-options {
@@ -277,6 +277,13 @@ const Toolbar: React.FC<ToolbarProps> = ({
           padding-top: 4px;
         }
 
+        @media (max-width: 1280px) {
+          .toolbar {
+            width: 220px;
+            padding: 16px;
+          }
+        }
+
         @media (max-width: 1024px) {
           .toolbar {
             width: 100%;
@@ -289,6 +296,22 @@ const Toolbar: React.FC<ToolbarProps> = ({
           .toolbar-section {
             flex: 1;
             min-width: 200px;
+          }
+
+          .color-grid {
+            grid-template-columns: repeat(6, 20px);
+            justify-content: flex-start;
+          }
+        }
+
+        @media (max-width: 768px) {
+          .toolbar {
+            padding: 12px;
+            gap: 12px;
+          }
+
+          .toolbar-section {
+            min-width: 150px;
           }
         }
       `}</style>

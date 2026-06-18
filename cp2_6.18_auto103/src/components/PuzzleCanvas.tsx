@@ -17,34 +17,31 @@ interface PuzzleCanvasProps {
   borderStyle: BorderStyle;
   layoutMode: LayoutMode;
   onImagesChange: (images: ImageItem[]) => void;
-  canvasRef?: React.RefObject<HTMLDivElement | null>;
 }
 
-const CELL_SIZE = 100;
 const CANVAS_WIDTH = 1000;
 const COMPACT_GAP = 8;
 const LOOSE_GAP = 20;
 
-const PuzzleCanvas: React.FC<PuzzleCanvasProps> = ({
+const PuzzleCanvas = React.forwardRef<HTMLDivElement, PuzzleCanvasProps>(({
   images,
   backgroundColor,
   borderStyle,
   layoutMode,
-  onImagesChange,
-  canvasRef: externalRef
-}) => {
+  onImagesChange
+}, forwardedRef) => {
   const internalRef = useRef<HTMLDivElement>(null);
-  const canvasRef = externalRef || internalRef;
+  const canvasRef = (forwardedRef as React.RefObject<HTMLDivElement | null>) || internalRef;
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [draggingId, setDraggingId] = useState<string | null>(null);
-  const [dragPosition, setDragPosition] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
-  const [dragOffset, setDragOffset] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
-  const [isDragging, setIsDragging] = useState(false);
+  const [dragMousePos, setDragMousePos] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+  const [dragElementOffset, setDragElementOffset] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isLayoutTransition, setIsLayoutTransition] = useState(false);
 
   const gap = layoutMode === 'compact' ? COMPACT_GAP : LOOSE_GAP;
-  const cellsPerRow = Math.floor((CANVAS_WIDTH + gap) / (CELL_SIZE + gap));
+  const cellsPerRow = Math.floor((CANVAS_WIDTH + gap) / (100 + gap));
   const actualCellSize = (CANVAS_WIDTH - gap * (cellsPerRow - 1)) / cellsPerRow;
 
   const getPosition = useCallback((index: number) => {
@@ -59,7 +56,13 @@ const PuzzleCanvas: React.FC<PuzzleCanvasProps> = ({
   const totalRows = Math.max(1, Math.ceil(images.length / cellsPerRow));
   const canvasHeight = totalRows * actualCellSize + (totalRows - 1) * gap;
 
-  const getBorderStyle = () => {
+  useEffect(() => {
+    setIsLayoutTransition(true);
+    const timer = setTimeout(() => setIsLayoutTransition(false), 500);
+    return () => clearTimeout(timer);
+  }, [layoutMode]);
+
+  const getBorderStyle = (): React.CSSProperties => {
     switch (borderStyle) {
       case 'white-solid':
         return {
@@ -97,11 +100,11 @@ const PuzzleCanvas: React.FC<PuzzleCanvasProps> = ({
       try {
         const processed = await processImage(file);
         newImages.push({
-          id: Date.now().toString(36) + Math.random().toString(36).substr(2, 9),
+          id: Date.now().toString(36) + Math.random().toString(36).substr(2, 9) + i,
           thumbnail: processed.thumbnail,
           original: processed.original
         });
-      } catch (err) {
+      } catch {
         setError(`处理图片 ${file.name} 时出错`);
       }
     }
@@ -117,14 +120,16 @@ const PuzzleCanvas: React.FC<PuzzleCanvasProps> = ({
     onImagesChange(images.filter(img => img.id !== id));
   };
 
-  const findDropIndex = (x: number, y: number): number => {
+  const findDropIndex = useCallback((clientX: number, clientY: number): number => {
     if (!canvasRef.current) return images.length;
     const rect = canvasRef.current.getBoundingClientRect();
-    const relativeX = x - rect.left;
-    const relativeY = y - rect.top;
+    const scaleX = CANVAS_WIDTH / rect.width;
+    const scaleY = canvasHeight / rect.height;
+    const relativeX = (clientX - rect.left) * scaleX;
+    const relativeY = (clientY - rect.top) * scaleY;
 
-    const col = Math.round(relativeX / (actualCellSize + gap));
-    const row = Math.round(relativeY / (actualCellSize + gap));
+    const col = Math.floor(relativeX / (actualCellSize + gap));
+    const row = Math.floor(relativeY / (actualCellSize + gap));
     const clampedCol = Math.max(0, Math.min(cellsPerRow - 1, col));
     const clampedRow = Math.max(0, row);
 
@@ -132,112 +137,132 @@ const PuzzleCanvas: React.FC<PuzzleCanvasProps> = ({
     index = Math.min(Math.max(0, index), images.length);
 
     return index;
-  };
+  }, [canvasRef, actualCellSize, gap, cellsPerRow, images.length, canvasHeight]);
 
-  const handleMouseDown = (e: React.MouseEvent, imageId: string, index: number) => {
+  const handleMouseDown = useCallback((e: React.MouseEvent, imageId: string) => {
     e.preventDefault();
     const target = e.currentTarget as HTMLElement;
     const rect = target.getBoundingClientRect();
 
     setDraggingId(imageId);
-    setIsDragging(true);
-    setDragOffset({
+    setDragElementOffset({
       x: e.clientX - rect.left,
       y: e.clientY - rect.top
     });
-    setDragPosition({
-      x: e.clientX - rect.left,
-      y: e.clientY - rect.top
+    setDragMousePos({
+      x: e.clientX,
+      y: e.clientY
     });
 
-    const startIndex = index;
-    let lastDropIndex = startIndex;
+    const currentImages = [...images];
 
     const handleMouseMove = (moveEvent: MouseEvent) => {
-      requestAnimationFrame(() => {
-        setDragPosition({
-          x: moveEvent.clientX - (canvasRef.current?.getBoundingClientRect().left || 0) - dragOffset.x,
-          y: moveEvent.clientY - (canvasRef.current?.getBoundingClientRect().top || 0) - dragOffset.y
-        });
-
-        const dropIndex = findDropIndex(moveEvent.clientX, moveEvent.clientY);
-        if (dropIndex !== lastDropIndex) {
-          lastDropIndex = dropIndex;
-          const currentIndex = images.findIndex(img => img.id === imageId);
-          if (currentIndex !== -1) {
-            const newImages = [...images];
-            const [removed] = newImages.splice(currentIndex, 1);
-            const targetIndex = dropIndex > currentIndex ? dropIndex - 1 : dropIndex;
-            newImages.splice(targetIndex, 0, removed);
-            onImagesChange(newImages);
-          }
-        }
+      moveEvent.preventDefault();
+      setDragMousePos({
+        x: moveEvent.clientX,
+        y: moveEvent.clientY
       });
     };
 
-    const handleMouseUp = () => {
-      setDraggingId(null);
-      setIsDragging(false);
+    const handleMouseUp = (upEvent: MouseEvent) => {
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
+
+      const dropIndex = findDropIndex(upEvent.clientX, upEvent.clientY);
+      const currentIndex = currentImages.findIndex(img => img.id === imageId);
+
+      if (currentIndex !== -1 && dropIndex !== currentIndex) {
+        const reordered = [...currentImages];
+        const [removed] = reordered.splice(currentIndex, 1);
+        const targetIdx = dropIndex > currentIndex ? dropIndex - 1 : dropIndex;
+        reordered.splice(targetIdx, 0, removed);
+        onImagesChange(reordered);
+      }
+
+      setDraggingId(null);
     };
 
     document.addEventListener('mousemove', handleMouseMove);
     document.addEventListener('mouseup', handleMouseUp);
-  };
+  }, [images, findDropIndex, onImagesChange]);
 
-  const handleTouchStart = (e: React.TouchEvent, imageId: string, index: number) => {
+  const handleTouchStart = useCallback((e: React.TouchEvent, imageId: string) => {
     const touch = e.touches[0];
     const target = e.currentTarget as HTMLElement;
     const rect = target.getBoundingClientRect();
 
     setDraggingId(imageId);
-    setIsDragging(true);
-    setDragOffset({
+    setDragElementOffset({
       x: touch.clientX - rect.left,
       y: touch.clientY - rect.top
     });
+    setDragMousePos({
+      x: touch.clientX,
+      y: touch.clientY
+    });
 
-    let lastDropIndex = index;
+    const currentImages = [...images];
 
     const handleTouchMove = (moveEvent: TouchEvent) => {
       moveEvent.preventDefault();
       const moveTouch = moveEvent.touches[0];
-      requestAnimationFrame(() => {
-        setDragPosition({
-          x: moveTouch.clientX - (canvasRef.current?.getBoundingClientRect().left || 0) - dragOffset.x,
-          y: moveTouch.clientY - (canvasRef.current?.getBoundingClientRect().top || 0) - dragOffset.y
-        });
-
-        const dropIndex = findDropIndex(moveTouch.clientX, moveTouch.clientY);
-        if (dropIndex !== lastDropIndex) {
-          lastDropIndex = dropIndex;
-          const currentIndex = images.findIndex(img => img.id === imageId);
-          if (currentIndex !== -1) {
-            const newImages = [...images];
-            const [removed] = newImages.splice(currentIndex, 1);
-            const targetIndex = dropIndex > currentIndex ? dropIndex - 1 : dropIndex;
-            newImages.splice(targetIndex, 0, removed);
-            onImagesChange(newImages);
-          }
-        }
+      setDragMousePos({
+        x: moveTouch.clientX,
+        y: moveTouch.clientY
       });
     };
 
-    const handleTouchEnd = () => {
-      setDraggingId(null);
-      setIsDragging(false);
+    const handleTouchEnd = (endEvent: TouchEvent) => {
       document.removeEventListener('touchmove', handleTouchMove);
       document.removeEventListener('touchend', handleTouchEnd);
+
+      const lastTouch = endEvent.changedTouches[0];
+      const dropIndex = findDropIndex(lastTouch.clientX, lastTouch.clientY);
+      const currentIndex = currentImages.findIndex(img => img.id === imageId);
+
+      if (currentIndex !== -1 && dropIndex !== currentIndex) {
+        const reordered = [...currentImages];
+        const [removed] = reordered.splice(currentIndex, 1);
+        const targetIdx = dropIndex > currentIndex ? dropIndex - 1 : dropIndex;
+        reordered.splice(targetIdx, 0, removed);
+        onImagesChange(reordered);
+      }
+
+      setDraggingId(null);
     };
 
     document.addEventListener('touchmove', handleTouchMove, { passive: false });
     document.addEventListener('touchend', handleTouchEnd);
-  };
+  }, [images, findDropIndex, onImagesChange]);
 
   useEffect(() => {
-    setError(null);
+    if (images.length > 0) {
+      setError(null);
+    }
   }, [images]);
+
+  const getDragStyle = (): React.CSSProperties => {
+    if (!canvasRef.current || !draggingId) return {};
+    const rect = canvasRef.current.getBoundingClientRect();
+    const scaleX = rect.width / CANVAS_WIDTH;
+    const scaleY = rect.height / canvasHeight;
+    return {
+      position: 'fixed',
+      left: dragMousePos.x - dragElementOffset.x,
+      top: dragMousePos.y - dragElementOffset.y,
+      width: actualCellSize * scaleX,
+      height: actualCellSize * scaleY,
+      zIndex: 9999,
+      opacity: 0.6,
+      pointerEvents: 'none',
+      transform: 'scale(1.08)',
+      boxShadow: '0 12px 32px rgba(0,0,0,0.2)',
+      transition: 'opacity 0.15s ease-out, transform 0.15s ease-out',
+      ...getBorderStyle()
+    };
+  };
+
+  const draggingImage = draggingId ? images.find(img => img.id === draggingId) : null;
 
   return (
     <div className="puzzle-canvas-wrapper">
@@ -274,7 +299,7 @@ const PuzzleCanvas: React.FC<PuzzleCanvasProps> = ({
           backgroundColor,
           width: `${CANVAS_WIDTH}px`,
           height: `${canvasHeight}px`,
-          transition: 'background-color 0.4s ease-out',
+          transition: 'background-color 0.4s ease-out, height 0.3s ease-out',
           position: 'relative',
           borderRadius: '12px',
           overflow: 'hidden'
@@ -294,28 +319,27 @@ const PuzzleCanvas: React.FC<PuzzleCanvasProps> = ({
           return (
             <div
               key={image.id}
-              className={`puzzle-image ${isDragging ? 'dragging' : ''}`}
+              className={`puzzle-image ${isDragging ? 'dragging-source' : ''}`}
               style={{
-                position: isDragging ? 'fixed' : 'absolute',
-                left: isDragging ? undefined : `${pos.x}px`,
-                top: isDragging ? undefined : `${pos.y}px`,
+                position: 'absolute',
+                left: `${pos.x}px`,
+                top: `${pos.y}px`,
                 width: `${actualCellSize}px`,
                 height: `${actualCellSize}px`,
                 cursor: isDragging ? 'grabbing' : 'grab',
-                zIndex: isDragging ? 9999 : 1,
-                opacity: isDragging ? 0.6 : 1,
-                transform: isDragging
-                  ? `translate(${dragPosition.x}px, ${dragPosition.y}px) scale(1.05)`
-                  : undefined,
+                zIndex: isDragging ? 0 : 1,
+                opacity: isDragging ? 0.3 : 1,
                 transition: isDragging
-                  ? 'opacity 0.15s ease-out, transform 0.15s ease-out'
-                  : 'left 0.3s ease-out, top 0.3s ease-out',
+                  ? 'opacity 0.15s ease-out'
+                  : isLayoutTransition
+                    ? 'left 0.5s ease-out, top 0.5s ease-out, opacity 0.15s ease-out'
+                    : 'left 0.3s ease-out, top 0.3s ease-out, opacity 0.15s ease-out',
                 userSelect: 'none',
                 touchAction: 'none',
                 ...getBorderStyle()
               }}
-              onMouseDown={(e) => handleMouseDown(e, image.id, index)}
-              onTouchStart={(e) => handleTouchStart(e, image.id, index)}
+              onMouseDown={(e) => handleMouseDown(e, image.id)}
+              onTouchStart={(e) => handleTouchStart(e, image.id)}
             >
               <img
                 src={image.thumbnail}
@@ -325,7 +349,8 @@ const PuzzleCanvas: React.FC<PuzzleCanvasProps> = ({
                   width: '100%',
                   height: '100%',
                   objectFit: 'cover',
-                  borderRadius: 'inherit'
+                  borderRadius: 'inherit',
+                  pointerEvents: 'none'
                 }}
               />
               <button
@@ -338,6 +363,23 @@ const PuzzleCanvas: React.FC<PuzzleCanvasProps> = ({
           );
         })}
       </div>
+
+      {draggingImage && (
+        <div className="puzzle-drag-ghost" style={getDragStyle()}>
+          <img
+            src={draggingImage.thumbnail}
+            alt=""
+            draggable={false}
+            style={{
+              width: '100%',
+              height: '100%',
+              objectFit: 'cover',
+              borderRadius: 'inherit',
+              pointerEvents: 'none'
+            }}
+          />
+        </div>
+      )}
 
       <style>{`
         .puzzle-canvas-wrapper {
@@ -413,8 +455,14 @@ const PuzzleCanvas: React.FC<PuzzleCanvasProps> = ({
           background: #e5e7eb;
         }
 
-        .puzzle-image.dragging {
-          box-shadow: 0 12px 32px rgba(0, 0, 0, 0.2);
+        .puzzle-image.dragging-source {
+          opacity: 0.3;
+        }
+
+        .puzzle-drag-ghost {
+          box-sizing: border-box;
+          overflow: hidden;
+          background: #e5e7eb;
         }
 
         .remove-btn {
@@ -444,16 +492,43 @@ const PuzzleCanvas: React.FC<PuzzleCanvasProps> = ({
           background: rgba(239, 68, 68, 0.9);
         }
 
+        @media (max-width: 1280px) {
+          .puzzle-canvas {
+            transform: scale(0.9);
+            transform-origin: top center;
+            margin-bottom: -60px;
+          }
+        }
+
         @media (max-width: 1024px) {
           .puzzle-canvas {
-            transform: scale(0.85);
+            transform: scale(0.75);
             transform-origin: top center;
-            margin-bottom: -100px;
+            margin-bottom: -160px;
+          }
+        }
+
+        @media (max-width: 768px) {
+          .puzzle-canvas {
+            transform: scale(0.55);
+            transform-origin: top center;
+            margin-bottom: -300px;
+          }
+
+          .puzzle-upload-area {
+            padding: 12px;
+          }
+
+          .upload-trigger {
+            font-size: 13px;
+            gap: 6px;
           }
         }
       `}</style>
     </div>
   );
-};
+});
+
+PuzzleCanvas.displayName = 'PuzzleCanvas';
 
 export default PuzzleCanvas;

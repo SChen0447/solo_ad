@@ -98,7 +98,7 @@ const App: React.FC = () => {
         <div className="workspace">
           <div className="canvas-area">
             <PuzzleCanvas
-              ref={canvasRef as React.RefObject<HTMLDivElement>}
+              ref={canvasRef}
               images={images}
               backgroundColor={backgroundColor}
               borderStyle={borderStyle}
@@ -292,6 +292,7 @@ const App: React.FC = () => {
         .canvas-area {
           flex: 1;
           min-width: 0;
+          overflow: hidden;
         }
 
         .sidebar {
@@ -350,4 +351,265 @@ const App: React.FC = () => {
           font-weight: 600;
           cursor: pointer;
           transition: all 0.2s ease-out;
-          box-shadow: 0 4px 12px rgba(59,
+          box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+        }
+
+        .share-btn:hover:not(:disabled) {
+          background: #2563eb;
+          box-shadow: 0 6px 16px rgba(37, 99, 235, 0.4);
+          transform: translateY(-1px);
+        }
+
+        .share-btn:active:not(:disabled) {
+          transform: translateY(0);
+        }
+
+        .share-btn:disabled {
+          opacity: 0.5;
+          cursor: not-allowed;
+        }
+
+        .preview-error {
+          width: 100%;
+          color: #ef4444;
+          font-size: 13px;
+          padding: 8px 12px;
+          background: #fef2f2;
+          border-radius: 6px;
+          border: 1px solid #fecaca;
+        }
+
+        .modal-overlay {
+          position: fixed;
+          inset: 0;
+          background: rgba(0, 0, 0, 0.5);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          z-index: 10000;
+          padding: 24px;
+          animation: fadeIn 0.2s ease-out;
+        }
+
+        @keyframes fadeIn {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+
+        .modal-content {
+          background: white;
+          border-radius: 16px;
+          max-width: 800px;
+          width: 100%;
+          max-height: 90vh;
+          display: flex;
+          flex-direction: column;
+          box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+          animation: slideUp 0.3s ease-out;
+        }
+
+        @keyframes slideUp {
+          from { transform: translateY(20px); opacity: 0; }
+          to { transform: translateY(0); opacity: 1; }
+        }
+
+        .modal-header {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          padding: 20px 24px;
+          border-bottom: 1px solid #f3f4f6;
+        }
+
+        .modal-header h3 {
+          font-size: 18px;
+          font-weight: 600;
+        }
+
+        .close-btn {
+          width: 36px;
+          height: 36px;
+          border-radius: 8px;
+          border: none;
+          background: #f3f4f6;
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          transition: all 0.2s ease-out;
+          color: #6b7280;
+        }
+
+        .close-btn:hover {
+          background: #e5e7eb;
+          color: #374151;
+        }
+
+        .modal-body {
+          padding: 24px;
+          overflow-y: auto;
+          flex: 1;
+        }
+
+        .preview-wrapper {
+          display: flex;
+          justify-content: center;
+        }
+
+        .preview-image {
+          max-width: 100%;
+          border-radius: 8px;
+          box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+        }
+
+        .preview-placeholder {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          height: 200px;
+          color: #9ca3af;
+        }
+
+        .modal-footer {
+          display: flex;
+          gap: 12px;
+          padding: 20px 24px;
+          border-top: 1px solid #f3f4f6;
+          justify-content: center;
+        }
+
+        .action-btn {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          padding: 10px 20px;
+          border-radius: 8px;
+          border: 1px solid #d1d5db;
+          background: white;
+          cursor: pointer;
+          font-size: 14px;
+          color: #374151;
+          transition: all 0.2s ease-out;
+        }
+
+        .action-btn:hover:not(:disabled) {
+          border-color: #3b82f6;
+          background: #eff6ff;
+          color: #3b82f6;
+        }
+
+        .action-btn.primary {
+          background: #3b82f6;
+          color: white;
+          border-color: #3b82f6;
+        }
+
+        .action-btn.primary:hover:not(:disabled) {
+          background: #2563eb;
+          border-color: #2563eb;
+        }
+
+        .action-btn:disabled {
+          opacity: 0.5;
+          cursor: not-allowed;
+        }
+
+        .action-btn.success {
+          background: #10b981;
+          color: white;
+          border-color: #10b981;
+          pointer-events: none;
+        }
+
+        .action-btn.success span {
+          display: flex;
+          align-items: center;
+          gap: 4px;
+        }
+
+        @keyframes spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+
+        .spinning {
+          animation: spin 1s linear infinite;
+        }
+
+        @media (max-width: 1280px) {
+          .main-content {
+            padding: 24px;
+          }
+
+          .workspace {
+            gap: 16px;
+          }
+        }
+
+        @media (max-width: 1024px) {
+          .main-content {
+            padding: 16px;
+          }
+
+          .workspace {
+            flex-direction: column;
+            align-items: stretch;
+          }
+
+          .sidebar {
+            position: static;
+          }
+
+          .app-header {
+            padding: 16px 20px;
+          }
+
+          .logo h1 {
+            font-size: 18px;
+          }
+
+          .subtitle {
+            font-size: 12px;
+            margin-left: 32px;
+          }
+        }
+
+        @media (max-width: 768px) {
+          .main-content {
+            padding: 12px;
+          }
+
+          .app-header {
+            padding: 12px 16px;
+          }
+
+          .share-section {
+            padding: 16px;
+            flex-direction: column;
+            align-items: stretch;
+          }
+
+          .share-btn {
+            justify-content: center;
+          }
+
+          .modal-content {
+            max-width: 100%;
+            border-radius: 12px;
+          }
+
+          .modal-footer {
+            flex-direction: column;
+            gap: 8px;
+          }
+
+          .action-btn {
+            justify-content: center;
+          }
+        }
+      `}</style>
+    </div>
+  );
+};
+
+export default App;

@@ -16,10 +16,6 @@ export function validateImageFile(file: File): { valid: boolean; error?: string 
   return { valid: true };
 }
 
-function generateId(): string {
-  return Date.now().toString(36) + Math.random().toString(36).substr(2, 9);
-}
-
 export function readFileAsDataURL(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -29,7 +25,7 @@ export function readFileAsDataURL(file: File): Promise<string> {
   });
 }
 
-export function generateThumbnail(dataUrl: string, size: number = 200): Promise<string> {
+export function generateThumbnail(dataUrl: string, size: number = 100): Promise<string> {
   return new Promise((resolve, reject) => {
     const img = new Image();
     img.onload = () => {
@@ -60,28 +56,6 @@ export async function processImage(file: File): Promise<ProcessedImage> {
     throw new Error(validation.error);
   }
   const original = await readFileAsDataURL(file);
-  const thumbnail = await generateThumbnail(original, 200);
+  const thumbnail = await generateThumbnail(original, 100);
   return { thumbnail, original };
-}
-
-export function canvasToBase64(element: HTMLElement, backgroundColor: string): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const canvas = document.createElement('canvas');
-    const scale = 2;
-    const width = 1200;
-    const rect = element.getBoundingClientRect();
-    const aspectRatio = rect.height / rect.width;
-    const height = Math.round(width * aspectRatio);
-    canvas.width = width * scale;
-    canvas.height = height * scale;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) {
-      reject(new Error('无法创建 canvas 上下文'));
-      return;
-    }
-    ctx.scale(scale, scale);
-    ctx.fillStyle = backgroundColor;
-    ctx.fillRect(0, 0, width, height);
-    resolve('');
-  });
 }

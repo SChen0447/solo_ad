@@ -22,20 +22,70 @@ export async function copyLink(): Promise<boolean> {
 
 export async function copyImage(imageBase64: string): Promise<boolean> {
   try {
-    const response = await fetch(imageBase64);
-    const blob = await response.blob();
-    if (navigator.clipboard && window.ClipboardItem) {
-      await navigator.clipboard.write([
-        new ClipboardItem({
-          [blob.type]: blob
-        })
-      ]);
-      return true;
+    const blob = base64ToBlob(imageBase64);
+    if (!blob) return false;
+
+    if (navigator.clipboard && typeof window.ClipboardItem !== 'undefined') {
+      try {
+        const pngBlob = blob.type === 'image/png'
+          ? blob
+          : await convertToPng(imageBase64);
+
+        await navigator.clipboard.write([
+          new ClipboardItem({
+            [pngBlob.type]: pngBlob
+          })
+        ]);
+        return true;
+      } catch {
+        return await fallbackCopyImage(imageBase64);
+      }
     }
-    return false;
+
+    return await fallbackCopyImage(imageBase64);
   } catch {
     return false;
   }
+}
+
+async function fallbackCopyImage(imageBase64: string): Promise<boolean> {
+  try {
+    const link = document.createElement('a');
+    link.href = imageBase64;
+    link.download = `puzzle-collage-${Date.now()}.png`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function convertToPng(dataUrl: string): Promise<Blob> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = img.width;
+      canvas.height = img.height;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        reject(new Error('无法创建 canvas'));
+        return;
+      }
+      ctx.drawImage(img, 0, 0);
+      canvas.toBlob((blob) => {
+        if (blob) {
+          resolve(blob);
+        } else {
+          reject(new Error('转换 PNG 失败'));
+        }
+      }, 'image/png');
+    };
+    img.onerror = reject;
+    img.src = dataUrl;
+  });
 }
 
 export function base64ToBlob(base64: string): Blob | null {
