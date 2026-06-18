@@ -2,6 +2,8 @@ export interface Enemy {
   id: number;
   x: number;
   y: number;
+  vx: number;
+  vy: number;
   hp: number;
   maxHp: number;
   speed: number;
@@ -42,7 +44,7 @@ export class EnemySpawner {
   energyDrops: EnergyDrop[] = [];
   entrances: Entrance[] = [];
   waveNumber: number = 0;
-  lastWaveTime: number = 0;
+  private waveTimer: number = WAVE_INTERVAL;
   private nextId: number = 0;
   coreX: number = 0;
   coreY: number = 0;
@@ -61,12 +63,10 @@ export class EnemySpawner {
     return this.enemies.filter(e => e.alive).length;
   }
 
-  trySpawnWave(timestamp: number): boolean {
-    if (timestamp - this.lastWaveTime < WAVE_INTERVAL && this.lastWaveTime > 0) return false;
-    if (this.aliveEnemyCount >= MAX_ENEMIES) return false;
+  private spawnWave(): void {
+    if (this.aliveEnemyCount >= MAX_ENEMIES) return;
 
     this.waveNumber++;
-    this.lastWaveTime = timestamp;
 
     const count = Math.min(ENEMIES_PER_WAVE, MAX_ENEMIES - this.aliveEnemyCount);
 
@@ -77,6 +77,8 @@ export class EnemySpawner {
         id: this.nextId++,
         x: entrance.x,
         y: entrance.y,
+        vx: 0,
+        vy: 0,
         hp: ENEMY_HP,
         maxHp: ENEMY_HP,
         speed: ENEMY_SPEED,
@@ -87,17 +89,24 @@ export class EnemySpawner {
       };
       this.enemies.push(enemy);
     }
-    return true;
   }
 
-  update(): { hitCore: boolean } {
+  update(deltaMs: number): { hitCore: boolean } {
     let hitCore = false;
+
+    this.waveTimer += deltaMs;
+    if (this.waveTimer >= WAVE_INTERVAL) {
+      this.waveTimer -= WAVE_INTERVAL;
+      this.spawnWave();
+    }
+
+    const dtFactor = deltaMs / 16;
 
     for (const enemy of this.enemies) {
       if (!enemy.alive) continue;
 
       if (enemy.hitFlashTimer > 0) {
-        enemy.hitFlashTimer -= 16;
+        enemy.hitFlashTimer -= deltaMs;
       }
 
       const dx = this.coreX - enemy.x;
@@ -111,19 +120,21 @@ export class EnemySpawner {
       }
 
       if (dist > 0) {
-        enemy.x += (dx / dist) * enemy.speed;
-        enemy.y += (dy / dist) * enemy.speed;
+        enemy.vx = (dx / dist) * enemy.speed;
+        enemy.vy = (dy / dist) * enemy.speed;
+        enemy.x += enemy.vx * dtFactor;
+        enemy.y += enemy.vy * dtFactor;
       }
     }
 
     for (const entrance of this.entrances) {
-      entrance.arrowPhase += 0.03;
+      entrance.arrowPhase += 0.03 * (deltaMs / 16);
     }
 
     for (const drop of this.energyDrops) {
       if (drop.collected) continue;
-      drop.timer += 16;
-      drop.flashPhase += 0.1;
+      drop.timer += deltaMs;
+      drop.flashPhase += 0.1 * (deltaMs / 16);
     }
 
     this.energyDrops = this.energyDrops.filter(d => !d.collected && d.timer < d.duration);

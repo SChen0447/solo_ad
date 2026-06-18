@@ -169,11 +169,9 @@ export class Game {
   }
 
   private update(timestamp: number, deltaMs: number): void {
-    this.enemySpawner.trySpawnWave(timestamp);
+    this.defenseTower.update(timestamp, deltaMs, this.enemySpawner.enemies);
 
-    this.defenseTower.update(timestamp, this.enemySpawner.enemies);
-
-    const { hitCore } = this.enemySpawner.update();
+    const { hitCore } = this.enemySpawner.update(deltaMs);
     if (hitCore) {
       this.coreHitFlashTimer = 200;
     }
@@ -187,24 +185,60 @@ export class Game {
     this.enemySpawner.cleanupEnemies();
 
     this.resourceManager.updateFlash(deltaMs);
-
-    for (const tower of this.defenseTower.towers) {
-      if (tower.buildAnimTimer > 0) {
-        tower.buildAnimTimer -= deltaMs;
-      }
-    }
   }
 
   private checkCollisions(): void {
-    for (const proj of this.defenseTower.projectiles) {
+    const projectiles = this.defenseTower.getProjectiles();
+    const dtFactor = 1;
+
+    for (const proj of projectiles) {
       if (!proj.alive) continue;
+
+      const projPrevX = proj.x - proj.vx * dtFactor;
+      const projPrevY = proj.y - proj.vy * dtFactor;
 
       for (const enemy of this.enemySpawner.enemies) {
         if (!enemy.alive) continue;
-        const dx = proj.x - enemy.x;
-        const dy = proj.y - enemy.y;
-        const dist = Math.sqrt(dx * dx + dy * dy);
-        if (dist < enemy.size + proj.radius) {
+
+        const enemyPrevX = enemy.x - enemy.vx * dtFactor;
+        const enemyPrevY = enemy.y - enemy.vy * dtFactor;
+
+        const relVx = proj.vx - enemy.vx;
+        const relVy = proj.vy - enemy.vy;
+
+        const dx = projPrevX - enemyPrevX;
+        const dy = projPrevY - enemyPrevY;
+
+        const radiusSum = enemy.size + proj.radius;
+        const radiusSq = radiusSum * radiusSum;
+
+        const a = relVx * relVx + relVy * relVy;
+        const b = 2 * (dx * relVx + dy * relVy);
+        const c = dx * dx + dy * dy - radiusSq;
+
+        if (c <= 0) {
+          proj.alive = false;
+          this.enemySpawner.damageEnemy(enemy.id, proj.damage);
+          break;
+        }
+
+        if (a < 0.0001) continue;
+
+        const discriminant = b * b - 4 * a * c;
+        if (discriminant < 0) continue;
+
+        const sqrtDisc = Math.sqrt(discriminant);
+        const t1 = (-b - sqrtDisc) / (2 * a);
+        const t2 = (-b + sqrtDisc) / (2 * a);
+
+        let hitT = -1;
+        if (t1 >= 0 && t1 <= 1) {
+          hitT = t1;
+        } else if (t2 >= 0 && t2 <= 1) {
+          hitT = t2;
+        }
+
+        if (hitT >= 0) {
           proj.alive = false;
           this.enemySpawner.damageEnemy(enemy.id, proj.damage);
           break;
@@ -503,7 +537,8 @@ export class Game {
     ctx.save();
     ctx.translate(MAP_OFFSET_X, MAP_OFFSET_Y);
 
-    for (const proj of this.defenseTower.projectiles) {
+    const projectiles = this.defenseTower.getProjectiles();
+    for (const proj of projectiles) {
       if (!proj.alive) continue;
 
       ctx.fillStyle = proj.color;
@@ -667,12 +702,21 @@ export class Game {
   private renderCoreHitFlash(ctx: CanvasRenderingContext2D): void {
     if (this.coreHitFlashTimer <= 0) return;
 
-    const alpha = (this.coreHitFlashTimer / 200) * 0.3;
+    const intensity = Math.min(1, this.coreHitFlashTimer / 200);
     ctx.save();
 
-    ctx.strokeStyle = `rgba(255, 30, 30, ${alpha})`;
-    ctx.lineWidth = 20;
-    ctx.strokeRect(MAP_OFFSET_X, MAP_OFFSET_Y, MAP_WIDTH, MAP_HEIGHT);
+    const gradient = ctx.createRadialGradient(
+      CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2, Math.min(MAP_WIDTH, MAP_HEIGHT) * 0.3,
+      CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2, Math.max(MAP_WIDTH, MAP_HEIGHT) * 0.7
+    );
+    gradient.addColorStop(0, `rgba(255, 0, 0, 0)`);
+    gradient.addColorStop(1, `rgba(255, 30, 30, ${0.5 * intensity})`);
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+
+    ctx.strokeStyle = `rgba(255, 50, 50, ${0.8 * intensity})`;
+    ctx.lineWidth = 8;
+    ctx.strokeRect(4, 4, CANVAS_WIDTH - 8, CANVAS_HEIGHT - 8);
 
     ctx.restore();
   }

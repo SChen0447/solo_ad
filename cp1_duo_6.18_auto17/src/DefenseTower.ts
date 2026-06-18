@@ -40,7 +40,7 @@ const MAX_PROJECTILES = 100;
 
 export class DefenseTower {
   towers: Tower[] = [];
-  projectiles: Projectile[] = [];
+  private _projectiles: Projectile[] = [];
   ripples: RippleEffect[] = [];
 
   private getTowerStats(level: number): { range: number; damage: number; fireInterval: number } {
@@ -111,15 +111,22 @@ export class DefenseTower {
     return -1;
   }
 
-  update(timestamp: number, enemies: { id: number; x: number; y: number; hp: number; alive: boolean }[]): Projectile[] {
+  getProjectiles(): Projectile[] {
+    return this._projectiles;
+  }
+
+  update(timestamp: number, deltaMs: number, enemies: { id: number; x: number; y: number; hp: number; alive: boolean; speed: number; vx: number; vy: number }[]): Projectile[] {
     const newProjectiles: Projectile[] = [];
 
     for (const tower of this.towers) {
-      if (tower.buildAnimTimer > 0) continue;
+      if (tower.buildAnimTimer > 0) {
+        tower.buildAnimTimer -= deltaMs;
+        continue;
+      }
 
-      tower.haloAngle += 0.5;
-      if (tower.flashTimer > 0) tower.flashTimer -= 16;
-      if (tower.upgradeAnimTimer > 0) tower.upgradeAnimTimer -= 16;
+      tower.haloAngle += 0.5 * (deltaMs / 16);
+      if (tower.flashTimer > 0) tower.flashTimer -= deltaMs;
+      if (tower.upgradeAnimTimer > 0) tower.upgradeAnimTimer -= deltaMs;
 
       if (timestamp - tower.lastFireTime < tower.fireInterval) continue;
 
@@ -164,26 +171,27 @@ export class DefenseTower {
       }
     }
 
-    if (this.projectiles.length + newProjectiles.length > MAX_PROJECTILES) {
-      const excess = this.projectiles.length + newProjectiles.length - MAX_PROJECTILES;
-      for (let i = 0; i < excess && i < this.projectiles.length; i++) {
-        this.projectiles[i].alive = false;
+    if (this._projectiles.length + newProjectiles.length > MAX_PROJECTILES) {
+      const excess = this._projectiles.length + newProjectiles.length - MAX_PROJECTILES;
+      for (let i = 0; i < excess && i < this._projectiles.length; i++) {
+        this._projectiles[i].alive = false;
       }
     }
 
-    this.projectiles.push(...newProjectiles.filter(p => p.alive));
+    this._projectiles.push(...newProjectiles.filter(p => p.alive));
 
-    for (const p of this.projectiles) {
+    const dtFactor = deltaMs / 16;
+    for (const p of this._projectiles) {
       if (!p.alive) continue;
-      p.x += p.vx;
-      p.y += p.vy;
+      p.x += p.vx * dtFactor;
+      p.y += p.vy * dtFactor;
       if (p.x < -20 || p.x > 820 || p.y < -20 || p.y > 620) {
         p.alive = false;
       }
     }
 
     this.ripples = this.ripples.filter(r => {
-      r.timer += 16;
+      r.timer += deltaMs;
       return r.timer < r.duration;
     });
 
@@ -191,6 +199,6 @@ export class DefenseTower {
   }
 
   cleanupProjectiles(): void {
-    this.projectiles = this.projectiles.filter(p => p.alive);
+    this._projectiles = this._projectiles.filter(p => p.alive);
   }
 }
