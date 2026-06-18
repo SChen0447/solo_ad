@@ -1,0 +1,190 @@
+import { useState, FormEvent, ChangeEvent } from 'react'
+import type { Asset } from '../App'
+
+interface AssetFormProps {
+  onAdd: (asset: Omit<Asset, 'id'>) => void
+}
+
+interface FormErrors {
+  date?: string
+  category?: string
+  name?: string
+  value?: string
+}
+
+const getToday = () => {
+  const today = new Date()
+  const year = today.getFullYear()
+  const month = String(today.getMonth() + 1).padStart(2, '0')
+  const day = String(today.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+const defaultCategories = ['现金', '股票', '基金', '加密货币']
+
+export default function AssetForm({ onAdd }: AssetFormProps) {
+  const [date, setDate] = useState(getToday())
+  const [category, setCategory] = useState('现金')
+  const [customCategory, setCustomCategory] = useState('')
+  const [isCustomCategory, setIsCustomCategory] = useState(false)
+  const [name, setName] = useState('')
+  const [rawValue, setRawValue] = useState('')
+  const [errors, setErrors] = useState<FormErrors>({})
+
+  const formatNumber = (value: string) => {
+    const cleanValue = value.replace(/,/g, '')
+    if (cleanValue === '') return ''
+    const parts = cleanValue.split('.')
+    const integerPart = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',')
+    const decimalPart = parts.length > 1 ? '.' + parts[1].slice(0, 2) : ''
+    return integerPart + decimalPart
+  }
+
+  const handleValueChange = (e: ChangeEvent<HTMLInputElement>) => {
+    const input = e.target.value
+    const cleanInput = input.replace(/[^0-9.]/g, '')
+    const formatted = formatNumber(cleanInput)
+    setRawValue(formatted)
+  }
+
+  const handleCategoryChange = (e: ChangeEvent<HTMLSelectElement>) => {
+    const value = e.target.value
+    if (value === 'custom') {
+      setIsCustomCategory(true)
+      setCategory('')
+    } else {
+      setIsCustomCategory(false)
+      setCategory(value)
+      setCustomCategory('')
+    }
+  }
+
+  const validate = (): boolean => {
+    const newErrors: FormErrors = {}
+    const finalCategory = isCustomCategory ? customCategory.trim() : category
+    const numericValue = parseFloat(rawValue.replace(/,/g, ''))
+
+    if (!date) {
+      newErrors.date = '请选择日期'
+    }
+
+    if (!finalCategory) {
+      newErrors.category = '请选择或输入资产类别'
+    }
+
+    if (!name.trim()) {
+      newErrors.name = '资产名称不能为空'
+    } else if (name.length > 30) {
+      newErrors.name = '资产名称不能超过30个字符'
+    }
+
+    if (!rawValue || isNaN(numericValue)) {
+      newErrors.value = '请输入资产市值'
+    } else if (numericValue <= 0) {
+      newErrors.value = '市值必须为正数'
+    }
+
+    setErrors(newErrors)
+    return Object.keys(newErrors).length === 0
+  }
+
+  const handleSubmit = (e: FormEvent) => {
+    e.preventDefault()
+    if (!validate()) return
+
+    const finalCategory = isCustomCategory ? customCategory.trim() : category
+    const numericValue = parseFloat(rawValue.replace(/,/g, ''))
+
+    onAdd({
+      date,
+      category: finalCategory,
+      name: name.trim(),
+      value: numericValue,
+    })
+
+    setCategory('现金')
+    setIsCustomCategory(false)
+    setCustomCategory('')
+    setName('')
+    setRawValue('')
+    setErrors({})
+  }
+
+  return (
+    <div className="form-card">
+      <h3>添加资产记录</h3>
+      <form onSubmit={handleSubmit}>
+        <div className="form-grid">
+          <div className="form-group">
+            <label>记录日期</label>
+            <input
+              type="date"
+              value={date}
+              onChange={(e) => setDate(e.target.value)}
+              className={errors.date ? 'error' : ''}
+            />
+            {errors.date && <span className="error-message">{errors.date}</span>}
+          </div>
+
+          <div className="form-group">
+            <label>资产类别</label>
+            {!isCustomCategory ? (
+              <select
+                value={category}
+                onChange={handleCategoryChange}
+                className={errors.category ? 'error' : ''}
+              >
+                {defaultCategories.map((cat) => (
+                  <option key={cat} value={cat}>
+                    {cat}
+                  </option>
+                ))}
+                <option value="custom">自定义...</option>
+              </select>
+            ) : (
+              <input
+                type="text"
+                placeholder="输入自定义类别"
+                value={customCategory}
+                onChange={(e) => setCustomCategory(e.target.value)}
+                className={errors.category ? 'error' : ''}
+              />
+            )}
+            {errors.category && <span className="error-message">{errors.category}</span>}
+          </div>
+
+          <div className="form-group">
+            <label>资产名称 (最多30字)</label>
+            <input
+              type="text"
+              placeholder="例如：贵州茅台"
+              value={name}
+              maxLength={30}
+              onChange={(e) => setName(e.target.value)}
+              className={errors.name ? 'error' : ''}
+            />
+            {errors.name && <span className="error-message">{errors.name}</span>}
+          </div>
+
+          <div className="form-group">
+            <label>资产市值 (CNY)</label>
+            <input
+              type="text"
+              placeholder="0.00"
+              value={rawValue}
+              onChange={handleValueChange}
+              className={errors.value ? 'error' : ''}
+            />
+            {errors.value && <span className="error-message">{errors.value}</span>}
+          </div>
+        </div>
+
+        <div className="form-actions">
+          <button type="submit" className="btn btn-primary">
+            提交记录
+          </button>
+        </div>
+      </form>
+    </div>
+  )
+}
