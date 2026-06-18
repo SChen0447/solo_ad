@@ -1,13 +1,6 @@
 import type { Wall, SoundWave, Receiver } from './store';
 import { CONSTANTS } from './store';
 
-export interface LineSegment {
-  x1: number;
-  y1: number;
-  x2: number;
-  y2: number;
-}
-
 export interface IntersectionResult {
   intersects: boolean;
   x: number;
@@ -91,26 +84,6 @@ export function calculateReflection(
   return Math.atan2(reflectedY, reflectedX);
 }
 
-export function checkReceiverCollision(
-  waveX: number, waveY: number,
-  prevX: number, prevY: number,
-  receivers: Receiver[]
-): { receiverId: number; distance: number } | null {
-  for (const receiver of receivers) {
-    const dist = pointToLineDistance(
-      receiver.x, receiver.y,
-      prevX, prevY, waveX, waveY
-    );
-    if (dist <= CONSTANTS.RECEIVER_RADIUS + 2) {
-      const directDist = Math.sqrt(
-        (waveX - receiver.x) ** 2 + (waveY - receiver.y) ** 2
-      );
-      return { receiverId: receiver.id, distance: directDist };
-    }
-  }
-  return null;
-}
-
 function pointToLineDistance(
   px: number, py: number,
   x1: number, y1: number, x2: number, y2: number
@@ -126,7 +99,7 @@ function pointToLineDistance(
 
   if (lenSq !== 0) param = dot / lenSq;
 
-  let xx, yy;
+  let xx: number, yy: number;
 
   if (param < 0) {
     xx = x1;
@@ -142,173 +115,6 @@ function pointToLineDistance(
   const dx = px - xx;
   const dy = py - yy;
   return Math.sqrt(dx * dx + dy * dy);
-}
-
-export interface PropagationResult {
-  wave: SoundWave;
-  reflected: boolean;
-  reflectionPoint?: { x: number; y: number };
-  newAngle?: number;
-  hitReceiver?: { receiverId: number; intensity: number };
-  dead: boolean;
-}
-
-export function propagateWave(
-  wave: SoundWave,
-  walls: Wall[],
-  receivers: Receiver[],
-  mazeSize: number
-): PropagationResult {
-  const result: PropagationResult = {
-    wave: { ...wave },
-    reflected: false,
-    dead: false,
-  };
-
-  result.wave.prevX = wave.x;
-  result.wave.prevY = wave.y;
-
-  let nextX = wave.x + Math.cos(wave.angle) * CONSTANTS.WAVE_SPEED;
-  let nextY = wave.y + Math.sin(wave.angle) * CONSTANTS.WAVE_SPEED;
-
-  if (nextX < 0 || nextX > mazeSize || nextY < 0 || nextY > mazeSize) {
-    result.dead = true;
-    return result;
-  }
-
-  const intersection = findNearestWallIntersection(
-    wave.x, wave.y, nextX, nextY, walls
-  );
-
-  if (intersection) {
-    result.reflected = true;
-    result.reflectionPoint = { x: intersection.x, y: intersection.y };
-    
-    const wall = walls[intersection.wallIndex];
-    result.newAngle = calculateReflection(wave.angle, wall);
-    
-    result.wave.x = intersection.x;
-    result.wave.y = intersection.y;
-    result.wave.angle = result.newAngle;
-    result.wave.reflections += 1;
-  } else {
-    result.wave.x = nextX;
-    result.wave.y = nextY;
-  }
-
-  result.wave.intensity *= CONSTANTS.WAVE_DECAY;
-  result.wave.age += 1;
-
-  if (result.wave.intensity < 0.01) {
-    result.dead = true;
-    return result;
-  }
-
-  const receiverHit = checkReceiverCollision(
-    result.wave.x, result.wave.y,
-    result.wave.prevX, result.wave.prevY,
-    receivers
-  );
-
-  if (receiverHit) {
-    const intensityContribution = result.wave.intensity * 
-      Math.max(0, 1 - receiverHit.distance / (CONSTANTS.RECEIVER_RADIUS * 2));
-    result.hitReceiver = {
-      receiverId: receiverHit.receiverId,
-      intensity: intensityContribution,
-    };
-  }
-
-  if (result.wave.age > result.wave.maxAge) {
-    result.dead = true;
-  }
-
-  return result;
-}
-
-export interface SimulationResult {
-  updatedWaves: SoundWave[];
-  reflectionPoints: { x: number; y: number }[];
-  receiverUpdates: { id: number; intensityAdd: number }[];
-}
-
-export function simulateFrame(
-  waves: SoundWave[],
-  walls: Wall[],
-  receivers: Receiver[],
-  mazeSize: number
-): SimulationResult {
-  const updatedWaves: SoundWave[] = [];
-  const reflectionPoints: { x: number; y: number }[] = [];
-  const receiverUpdates: Map<number, number> = new Map();
-
-  for (const wave of waves) {
-    const result = propagateWave(wave, walls, receivers, mazeSize);
-
-    if (result.dead) continue;
-
-    updatedWaves.push(result.wave);
-
-    if (result.reflected && result.reflectionPoint) {
-      reflectionPoints.push(result.reflectionPoint);
-    }
-
-    if (result.hitReceiver) {
-      const current = receiverUpdates.get(result.hitReceiver.receiverId) || 0;
-      receiverUpdates.set(
-        result.hitReceiver.receiverId,
-        current + result.hitReceiver.intensity
-      );
-    }
-  }
-
-  return {
-    updatedWaves,
-    reflectionPoints,
-    receiverUpdates: Array.from(receiverUpdates.entries()).map(([id, intensityAdd]) => ({
-      id,
-      intensityAdd,
-    })),
-  };
-}
-
-export function generateWavesFromSource(
-  sourceX: number,
-  sourceY: number,
-  wavesPerDirection: number = CONSTANTS.WAVES_PER_DIRECTION
-): Omit<SoundWave, 'id'>[] {
-  const newWaves: Omit<SoundWave, 'id'>[] = [];
-  const directions = [0, Math.PI / 2, Math.PI, -Math.PI / 2];
-  const halfSector = Math.PI / 4;
-
-  for (const dir of directions) {
-    for (let i = 0; i < wavesPerDirection; i++) {
-      const offset = (i / (wavesPerDirection - 1) - 0.5) * 2 * halfSector;
-      const angle = dir + offset;
-      
-      newWaves.push({
-        x: sourceX,
-        y: sourceY,
-        prevX: sourceX,
-        prevY: sourceY,
-        angle,
-        intensity: 1,
-        age: 0,
-        maxAge: 500,
-        reflections: 0,
-      });
-    }
-  }
-
-  return newWaves;
-}
-
-export function getIntensityColor(intensity: number): string {
-  const clampedIntensity = Math.max(0, Math.min(1, intensity));
-  const r = Math.round(139 * (1 - clampedIntensity));
-  const g = Math.round(0 * (1 - clampedIntensity) + 255 * clampedIntensity);
-  const b = 0;
-  return `rgb(${r}, ${g}, ${b})`;
 }
 
 export function isPointOnWall(
@@ -339,4 +145,218 @@ export function findWallAtPoint(
     }
   }
   return -1;
+}
+
+export interface PropagationResult {
+  wave: SoundWave;
+  reflected: boolean;
+  reflectionPoint?: { x: number; y: number };
+  dead: boolean;
+  traveledDistance: number;
+}
+
+export function propagateWave(
+  wave: SoundWave,
+  walls: Wall[],
+  mazeSize: number
+): PropagationResult {
+  const result: PropagationResult = {
+    wave: { ...wave },
+    reflected: false,
+    dead: false,
+    traveledDistance: 0,
+  };
+
+  result.wave.prevX = wave.x;
+  result.wave.prevY = wave.y;
+
+  let remainingDistance = CONSTANTS.WAVE_SPEED;
+  let currentX = wave.x;
+  let currentY = wave.y;
+  let currentAngle = wave.angle;
+  let totalReflections = 0;
+  let totalTraveled = 0;
+
+  const maxIterations = 5;
+  for (let i = 0; i < maxIterations && remainingDistance > 0.01; i++) {
+    const nextX = currentX + Math.cos(currentAngle) * remainingDistance;
+    const nextY = currentY + Math.sin(currentAngle) * remainingDistance;
+
+    if (nextX < 0 || nextX > mazeSize || nextY < 0 || nextY > mazeSize) {
+      result.dead = true;
+      result.wave.x = nextX;
+      result.wave.y = nextY;
+      result.traveledDistance = totalTraveled + remainingDistance;
+      return result;
+    }
+
+    const intersection = findNearestWallIntersection(
+      currentX, currentY, nextX, nextY, walls
+    );
+
+    if (intersection) {
+      const distToIntersection = Math.sqrt(
+        (intersection.x - currentX) ** 2 + (intersection.y - currentY) ** 2
+      );
+      
+      totalTraveled += distToIntersection;
+      remainingDistance -= distToIntersection;
+      
+      const wall = walls[intersection.wallIndex];
+      currentAngle = calculateReflection(currentAngle, wall);
+      currentX = intersection.x;
+      currentY = intersection.y;
+      totalReflections++;
+
+      if (!result.reflected) {
+        result.reflected = true;
+        result.reflectionPoint = { x: intersection.x, y: intersection.y };
+      }
+    } else {
+      totalTraveled += remainingDistance;
+      currentX = nextX;
+      currentY = nextY;
+      remainingDistance = 0;
+    }
+  }
+
+  result.wave.x = currentX;
+  result.wave.y = currentY;
+  result.wave.angle = currentAngle;
+  result.wave.reflections += totalReflections;
+  result.traveledDistance = totalTraveled;
+
+  const distanceDecay = Math.pow(CONSTANTS.WAVE_DECAY, totalTraveled / CONSTANTS.WAVE_SPEED);
+  const reflectionDecay = Math.pow(0.9, totalReflections);
+  result.wave.intensity = wave.intensity * distanceDecay * reflectionDecay;
+
+  result.wave.age += 1;
+
+  if (result.wave.intensity < 0.01) {
+    result.dead = true;
+  }
+
+  if (result.wave.age > result.wave.maxAge) {
+    result.dead = true;
+  }
+
+  return result;
+}
+
+export function calculateReceiverIntensity(
+  receivers: Receiver[],
+  waves: SoundWave[]
+): Map<number, number> {
+  const intensities = new Map<number, number>();
+
+  for (const receiver of receivers) {
+    let totalIntensity = 0;
+
+    for (const wave of waves) {
+      const dist = pointToLineDistance(
+        receiver.x, receiver.y,
+        wave.prevX, wave.prevY, wave.x, wave.y
+      );
+
+      if (dist < CONSTANTS.RECEIVER_RADIUS * 3) {
+        const waveDist = Math.sqrt(
+          (wave.x - receiver.x) ** 2 + (wave.y - receiver.y) ** 2
+        );
+        
+        if (waveDist < CONSTANTS.RECEIVER_RADIUS * 3) {
+          const normalizedDist = dist / CONSTANTS.RECEIVER_RADIUS;
+          const contribution = wave.intensity * Math.max(0, 1 - normalizedDist * 0.5);
+          totalIntensity += contribution;
+        }
+      }
+    }
+
+    intensities.set(receiver.id, Math.min(1, totalIntensity));
+  }
+
+  return intensities;
+}
+
+export interface SimulationResult {
+  updatedWaves: SoundWave[];
+  reflectionPoints: { x: number; y: number }[];
+  receiverIntensities: Map<number, number>;
+}
+
+export function simulateFrame(
+  waves: SoundWave[],
+  walls: Wall[],
+  receivers: Receiver[],
+  mazeSize: number
+): SimulationResult {
+  const updatedWaves: SoundWave[] = [];
+  const reflectionPoints: { x: number; y: number }[] = [];
+
+  for (const wave of waves) {
+    const result = propagateWave(wave, walls, mazeSize);
+
+    if (result.dead) continue;
+
+    updatedWaves.push(result.wave);
+
+    if (result.reflected && result.reflectionPoint) {
+      reflectionPoints.push(result.reflectionPoint);
+    }
+  }
+
+  const receiverIntensities = calculateReceiverIntensity(receivers, updatedWaves);
+
+  return {
+    updatedWaves,
+    reflectionPoints,
+    receiverIntensities,
+  };
+}
+
+export function generateFanWavesFromSource(
+  sourceX: number,
+  sourceY: number,
+  raysPerDirection: number = CONSTANTS.WAVES_PER_DIRECTION
+): Omit<SoundWave, 'id'>[] {
+  const newWaves: Omit<SoundWave, 'id'>[] = [];
+  const directions = [0, Math.PI / 2, Math.PI, -Math.PI / 2];
+  const halfSector = Math.PI / 4;
+
+  for (const dir of directions) {
+    for (let i = 0; i < raysPerDirection; i++) {
+      const offset = (i / (raysPerDirection - 1) - 0.5) * 2 * halfSector;
+      const angle = dir + offset;
+      
+      newWaves.push({
+        x: sourceX,
+        y: sourceY,
+        prevX: sourceX,
+        prevY: sourceY,
+        angle,
+        intensity: 1,
+        age: 0,
+        maxAge: 500,
+        reflections: 0,
+      });
+    }
+  }
+
+  return newWaves;
+}
+
+export function getIntensityColor(intensity: number): string {
+  const clampedIntensity = Math.max(0, Math.min(1, intensity));
+  const r = Math.round(139 * (1 - clampedIntensity));
+  const g = Math.round(0 * (1 - clampedIntensity) + 255 * clampedIntensity);
+  const b = 0;
+  return `rgb(${r}, ${g}, ${b})`;
+}
+
+export function getWaveColor(wave: SoundWave): { r: number; g: number; b: number; a: number } {
+  const intensity = Math.max(0, Math.min(1, wave.intensity));
+  const r = Math.floor(100 * (1 - intensity) + 100);
+  const g = Math.floor(149 * intensity) + 100;
+  const b = Math.floor(237);
+  const a = Math.min(1, intensity * 2) * 0.6;
+  return { r, g, b, a };
 }

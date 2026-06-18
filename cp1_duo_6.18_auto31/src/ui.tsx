@@ -1,21 +1,19 @@
 import { useEffect, useRef } from 'react';
-import p5 from 'p5.js';
-import type P5 from 'p5.js';
+import p5 from 'p5';
+import type P5 from 'p5';
 import { useGameStore, CONSTANTS, snapToGrid, clampToMaze } from './store';
 import type { Wall, Receiver, SoundWave, Particle } from './store';
 import {
   simulateFrame,
-  generateWavesFromSource,
+  generateFanWavesFromSource,
   getIntensityColor,
   findWallAtPoint,
+  getWaveColor,
 } from './physics';
 
 const MazeCanvas = () => {
   const canvasRef = useRef<HTMLDivElement>(null);
   const p5InstanceRef = useRef<P5 | null>(null);
-  const isDrawingRef = useRef(false);
-  const dragStartRef = useRef<{ x: number; y: number } | null>(null);
-  const tempWallStartRef = useRef<{ x: number; y: number } | null>(null);
   const lastMouseRef = useRef<{ x: number; y: number } | null>(null);
 
   useEffect(() => {
@@ -51,6 +49,7 @@ const MazeCanvas = () => {
 
         const canvas = p.createCanvas(mazeSize, mazeSize);
         canvas.parent(canvasRef.current!);
+        canvas.elt.addEventListener('contextmenu', (e: Event) => e.preventDefault());
         p.frameRate(CONSTANTS.TARGET_FPS);
         p.pixelDensity(window.devicePixelRatio || 1);
 
@@ -105,18 +104,70 @@ const MazeCanvas = () => {
         p.ellipse(state.source.x, state.source.y, CONSTANTS.SOURCE_RADIUS * 2 * pulse, CONSTANTS.SOURCE_RADIUS * 2 * pulse);
       };
 
-      const drawWaves = (waves: SoundWave[]) => {
+      const drawFanWaves = (waves: SoundWave[]) => {
         const state = getStore();
-        p.strokeCap(p.ROUND);
-        
+        const raysPerFan = state.isMobile ? 4 : CONSTANTS.WAVES_PER_DIRECTION;
+        const totalRays = raysPerFan * 4;
+
+        const waveGroups: SoundWave[][] = [];
+        for (let i = 0; i < 4; i++) {
+          waveGroups.push([]);
+        }
+
         for (const wave of waves) {
-          const alpha = Math.min(1, wave.intensity * 2) * 0.8;
-          const r = Math.floor(100 * (1 - wave.intensity) + 100);
-          const g = Math.floor(149 * wave.intensity) + 100;
-          const b = Math.floor(237);
+          let minDist = Infinity;
+          let groupIndex = 0;
+          const directions = [0, Math.PI / 2, Math.PI, -Math.PI / 2];
           
-          p.stroke(r, g, b, alpha * 255);
-          p.strokeWeight(2 + wave.intensity * 2);
+          for (let d = 0; d < 4; d++) {
+            let angleDiff = Math.abs(wave.angle - directions[d]);
+            if (angleDiff > Math.PI) angleDiff = 2 * Math.PI - angleDiff;
+            if (angleDiff < minDist) {
+              minDist = angleDiff;
+              groupIndex = d;
+            }
+          }
+          waveGroups[groupIndex].push(wave);
+        }
+
+        for (const group of waveGroups) {
+          if (group.length < 2) continue;
+
+          group.sort((a, b) => a.angle - b.angle);
+
+          for (let i = 0; i < group.length - 1; i++) {
+            const wave1 = group[i];
+            const wave2 = group[i + 1];
+
+            const avgIntensity = (wave1.intensity + wave2.intensity) / 2;
+            const alpha = Math.min(0.5, avgIntensity * 0.4);
+
+            if (alpha < 0.05) continue;
+
+            p.noStroke();
+            p.fill(100, 149, 237, alpha * 255);
+
+            p.triangle(
+              wave1.prevX, wave1.prevY,
+              wave1.x, wave1.y,
+              wave2.x, wave2.y
+            );
+
+            p.triangle(
+              wave1.prevX, wave1.prevY,
+              wave2.prevX, wave2.prevY,
+              wave2.x, wave2.y
+            );
+          }
+        }
+
+        p.strokeCap(p.ROUND);
+        for (const wave of waves) {
+          const color = getWaveColor(wave);
+          if (color.a < 0.05) continue;
+          
+          p.stroke(color.r, color.g, color.b, color.a * 255);
+          p.strokeWeight(1 + wave.intensity * 1.5);
           p.line(wave.prevX, wave.prevY, wave.x, wave.y);
         }
       };
@@ -166,6 +217,8 @@ const MazeCanvas = () => {
 
         for (const particle of particles) {
           const alpha = particle.life;
+          if (alpha < 0.05) continue;
+          
           p.fill(135, 206, 235, alpha * 255);
           p.noStroke();
           p.ellipse(particle.x, particle.y, 3 * particle.life, 3 * particle.life);
@@ -175,15 +228,22 @@ const MazeCanvas = () => {
       const drawTempWall = () => {
         const state = getStore();
         if (state.isDrawingWall && state.wallStart && lastMouseRef.current) {
-          const endX = snapToGrid(lastMouseRef.current.x);
-          const endY = snapToGrid(lastMouseRef.current.y);
+          const endX = clampToMaze(snapToGrid(lastMouseRef.current.x), state.mazeSize);
+          const endY = clampToMaze(snapToGrid(lastMouseRef.current.y), state.mazeSize);
           
           p.stroke(200, 200, 200, 150);
           p.strokeWeight(CONSTANTS.WALL_THICKNESS);
           p.strokeCap(p.ROUND);
-          p.setLineDash([5, 5]);
+          p.drawingContext.setLineDash([5, 5]);
           p.line(state.wallStart.x, state.wallStart.y, endX, endY);
-          p.setLineDash([]);
+          p.drawingContext.setLineDash([]);
+
+          p.fill(255, 200);
+          p.textSize(11);
+          p.textAlign(p.CENTER, p.BOTTOM);
+          const midX = (state.wallStart.x + endX) / 2;
+          const midY = (state.wallStart.y + endY) / 2;
+          p.text(`${state.walls.length + 1}/${CONSTANTS.MAX_WALLS}`, midX, midY - 10);
         }
       };
 
@@ -237,47 +297,43 @@ const MazeCanvas = () => {
 
         state.updateWaves(simResult.updatedWaves);
 
-        for (const update of simResult.receiverUpdates) {
-          const receiver = state.receivers.find(r => r.id === update.id);
+        for (const [id, intensity] of simResult.receiverIntensities) {
+          const receiver = state.receivers.find(r => r.id === id);
           if (receiver) {
-            const newIntensity = Math.min(1, receiver.intensity + update.intensityAdd);
-            state.updateReceiverIntensity(update.id, newIntensity);
+            const smoothedIntensity = receiver.intensity * 0.7 + intensity * 0.3;
+            state.updateReceiverIntensity(id, smoothedIntensity);
           }
         }
 
         if (!state.isMobile) {
           for (const point of simResult.reflectionPoints) {
-            state.addParticle({
-              x: point.x,
-              y: point.y,
-              vx: (Math.random() - 0.5) * 2,
-              vy: (Math.random() - 0.5) * 2,
-            });
+            if (Math.random() < 0.3) {
+              state.addParticle({
+                x: point.x,
+                y: point.y,
+                vx: (Math.random() - 0.5) * 1.5,
+                vy: (Math.random() - 0.5) * 1.5 - 0.5,
+              });
+            }
           }
         }
 
-        if (state.frameCount % 15 === 0 && !state.isDraggingSource) {
-          const newWaves = generateWavesFromSource(
+        if (state.frameCount % 10 === 0 && !state.isDraggingSource) {
+          const raysPerDir = state.isMobile ? 4 : CONSTANTS.WAVES_PER_DIRECTION;
+          const newWaves = generateFanWavesFromSource(
             state.source.x,
             state.source.y,
-            state.isMobile ? 4 : CONSTANTS.WAVES_PER_DIRECTION
+            raysPerDir
           );
           for (const wave of newWaves) {
             state.addWave(wave);
           }
         }
 
-        if (state.frameCount % 30 === 0) {
-          for (const receiver of state.receivers) {
-            const decayed = Math.max(0, receiver.intensity * 0.95);
-            state.updateReceiverIntensity(receiver.id, decayed);
-          }
-        }
-
         state.updateParticles();
         state.incrementFrameCount();
 
-        drawWaves(state.waves);
+        drawFanWaves(state.waves);
         drawWalls(state.walls);
         drawReceivers(state.receivers);
         drawParticles(state.particles);
@@ -318,14 +374,14 @@ const MazeCanvas = () => {
           return;
         }
 
+        if (event.button !== 0) return;
+
         const distToSource = Math.sqrt(
           (mouse.x - state.source.x) ** 2 + (mouse.y - state.source.y) ** 2
         );
 
-        if (distToSource <= CONSTANTS.SOURCE_RADIUS + 5) {
+        if (distToSource <= CONSTANTS.SOURCE_RADIUS + 8) {
           state.setIsDraggingSource(true);
-          isDrawingRef.current = true;
-          dragStartRef.current = { x: mouse.x, y: mouse.y };
           return;
         }
 
@@ -334,8 +390,7 @@ const MazeCanvas = () => {
           const startY = clampToMaze(snapToGrid(mouse.y), state.mazeSize);
           state.setWallStart({ x: startX, y: startY });
           state.setIsDrawingWall(true);
-          isDrawingRef.current = true;
-          tempWallStartRef.current = { x: startX, y: startY };
+          lastMouseRef.current = { x: mouse.x, y: mouse.y };
         }
       };
 
@@ -347,19 +402,22 @@ const MazeCanvas = () => {
         if (state.isDraggingSource) {
           const newX = clampToMaze(mouse.x, state.mazeSize);
           const newY = clampToMaze(mouse.y, state.mazeSize);
-          state.setSourcePosition(newX, newY);
-          state.resetReceiverIntensities();
+          
+          const snappedX = snapToGrid(newX);
+          const snappedY = snapToGrid(newY);
+          
+          if (Math.abs(snappedX - state.source.x) > 1 || Math.abs(snappedY - state.source.y) > 1) {
+            state.setSourcePosition(snappedX, snappedY);
+          }
         }
       };
 
-      p.mouseReleased = () => {
+      p.mouseReleased = (event: MouseEvent) => {
         const state = getStore();
         const mouse = getCanvasMouse();
 
         if (state.isDraggingSource) {
           state.setIsDraggingSource(false);
-          isDrawingRef.current = false;
-          dragStartRef.current = null;
           return;
         }
 
@@ -367,28 +425,32 @@ const MazeCanvas = () => {
           const endX = clampToMaze(snapToGrid(mouse.x), state.mazeSize);
           const endY = clampToMaze(snapToGrid(mouse.y), state.mazeSize);
 
-          const success = state.addWall({
-            x1: state.wallStart.x,
-            y1: state.wallStart.y,
-            x2: endX,
-            y2: endY,
-          });
+          const dx = Math.abs(endX - state.wallStart.x);
+          const dy = Math.abs(endY - state.wallStart.y);
+          
+          if (dx >= CONSTANTS.GRID_SIZE || dy >= CONSTANTS.GRID_SIZE) {
+            const success = state.addWall({
+              x1: state.wallStart.x,
+              y1: state.wallStart.y,
+              x2: endX,
+              y2: endY,
+            });
 
-          if (success) {
-            state.clearWaves();
-            state.resetReceiverIntensities();
+            if (success) {
+              state.clearWaves();
+              state.resetReceiverIntensities();
+            }
           }
         }
 
         state.setIsDrawingWall(false);
         state.setWallStart(null);
-        isDrawingRef.current = false;
-        tempWallStartRef.current = null;
         lastMouseRef.current = null;
       };
 
-      p.contextMenu = (event: MouseEvent) => {
-        event.preventDefault();
+      p.mouseMoved = () => {
+        const mouse = getCanvasMouse();
+        lastMouseRef.current = { x: mouse.x, y: mouse.y };
       };
     };
 
