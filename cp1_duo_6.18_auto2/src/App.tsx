@@ -3,7 +3,7 @@ import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { OrbitControls } from '@react-three/drei'
 import * as THREE from 'three'
 import MaterialPanel from './MaterialPanel'
-import AnalysisPanel from './AnalysisPanel'
+import AnalysisPanel, { CameraSyncState } from './AnalysisPanel'
 import type {
   MaterialType,
   ModelType,
@@ -19,7 +19,8 @@ interface MainSceneContentProps {
   materialType: MaterialType
   materialParams: MaterialParams
   lightParams: LightParams
-  syncOrbitRef: React.MutableRefObject<any>
+  orbitRef: React.MutableRefObject<any>
+  cameraStateRef: React.MutableRefObject<CameraSyncState | null>
   onMetricsUpdate: (metrics: Metrics) => void
 }
 
@@ -29,75 +30,88 @@ const MainSceneContent: React.FC<MainSceneContentProps> = ({
   materialType,
   materialParams,
   lightParams,
-  syncOrbitRef,
+  orbitRef,
+  cameraStateRef,
   onMetricsUpdate,
 }) => {
   const meshRef = useRef<THREE.Mesh>(null)
-  const geometryRef = useRef<THREE.BufferGeometry | null>(null)
-  const controlsRef = useRef<any>(null)
   const { gl, scene, camera } = useThree()
-  const lastMetricsTime = useRef<number>(0)
   const rotationSpeed = (15 * Math.PI) / 180
+  const [geometry, setGeometry] = useState<THREE.BufferGeometry | null>(null)
+  const [modelScale, setModelScale] = useState(1)
+  const [modelOffsetY, setModelOffsetY] = useState(0)
+  const mountedRef = useRef(true)
 
   useEffect(() => {
-    if (geometryRef.current) {
-      geometryRef.current.dispose()
+    mountedRef.current = true
+    let cancelled = false
+
+    const loadGeo = async () => {
+      const result = await sceneManager.createModel(modelType)
+      if (cancelled || !mountedRef.current) return
+      setGeometry(result.geometry)
+      setModelScale(result.scale)
+      setModelOffsetY(result.positionY)
     }
-    geometryRef.current = sceneManager.createModel(modelType)
-    if (meshRef.current) {
-      meshRef.current.geometry = geometryRef.current
+    loadGeo()
+
+    return () => {
+      cancelled = true
+      mountedRef.current = false
     }
   }, [modelType, sceneManager])
 
   useEffect(() => {
-    if (meshRef.current) {
-      sceneManager.updateMaterial(meshRef.current, materialType, materialParams)
-    }
-  }, [materialType, sceneManager])
+    if (!meshRef.current) return
+    sceneManager.updateMaterial(meshRef.current, materialType, materialParams)
+  }, [materialType, materialParams, sceneManager])
 
   useEffect(() => {
-    if (meshRef.current) {
-      sceneManager.updateMaterialParams(meshRef.current, materialParams)
-    }
+    if (!meshRef.current) return
+    sceneManager.updateMaterialParams(meshRef.current, materialParams)
   }, [materialParams, sceneManager])
 
-  useEffect(() => {
-    sceneManager.updateLightAngle(lightParams.angleY)
-  }, [lightParams.angleY, sceneManager])
-
-  useEffect(() => {
-    ;(syncOrbitRef as any).current = controlsRef.current
-  }, [syncOrbitRef])
+  const lightPos = SceneManager.getLightPosition(lightParams.angleY)
 
   useFrame((_, delta) => {
     if (meshRef.current) {
       meshRef.current.rotation.y += rotationSpeed * delta
     }
 
-    const now = performance.now()
-    if (now - lastMetricsTime.current > 50) {
-      lastMetricsTime.current = now
-      try {
-        const metrics = sceneManager.computeMetrics(gl, scene, camera)
-        onMetricsUpdate(metrics)
-      } catch (e) {
-        // silent
+    if (cameraStateRef && orbitRef.current) {
+      const ctrl = orbitRef.current
+      if (ctrl.object && ctrl.target) {
+        if (!cameraStateRef.current) {
+          cameraStateRef.current = {
+            position: new THREE.Vector3(),
+            target: new THREE.Vector3(),
+          }
+        }
+        cameraStateRef.current.position.copy(ctrl.object.position)
+        cameraStateRef.current.target.copy(ctrl.target)
       }
+    }
+
+    if (onMetricsUpdate) {
+      const metrics = sceneManager.computeMetricsPerFrame(
+        gl,
+        scene,
+        camera,
+        materialParams
+      )
+      onMetricsUpdate(metrics)
     }
   })
 
-  const initialGeometry = geometryRef.current || sceneManager.createModel(modelType)
-  if (!geometryRef.current) geometryRef.current = initialGeometry
+  if (!geometry) {
+    return null
+  }
 
   return (
     <>
       <ambientLight intensity={0.4} />
       <directionalLight
-        position={[
-          Math.sin((lightParams.angleY * Math.PI) / 180) * 6,
-          4,
-          Math.cos((lightParams.angleY * Math.PI) / 180) * 6,
-        ]}
+        position={[lightPos.x, lightPos.y, lightPos.z]}
         intensity={0.8}
         castShadow
         shadow-mapSize-width={2048}
@@ -111,7 +125,14 @@ const MainSceneContent: React.FC<MainSceneContentProps> = ({
         shadow-bias={-0.0001}
       />
 
-      <mesh ref={meshRef} geometry={initialGeometry} castShadow receiveShadow>
+      <mesh
+        ref={meshRef}
+        geometry={geometry}
+        scale={modelScale}
+        position={[0, modelOffsetY, 0]}
+        castShadow
+        receiveShadow
+      >
         <meshStandardMaterial attach="material" />
       </mesh>
 
@@ -121,7 +142,7 @@ const MainSceneContent: React.FC<MainSceneContentProps> = ({
       </mesh>
 
       <OrbitControls
-        ref={controlsRef}
+        ref={orbitRef}
         enableDamping
         dampingFactor={0.08}
         minDistance={1}
@@ -145,6 +166,7 @@ const App: React.FC = () => {
   const [metrics, setMetrics] = useState<Metrics>({ brightness: 128, glossiness: 40 })
 
   const mainOrbitRef = useRef<any>(null)
+  const cameraStateRef = useRef<CameraSyncState | null>(null)
 
   useEffect(() => {
     const defaults = sceneManager.getMaterialDefaults(currentMaterial)
@@ -203,7 +225,8 @@ const App: React.FC = () => {
               materialType={currentMaterial}
               materialParams={materialParams}
               lightParams={lightParams}
-              syncOrbitRef={mainOrbitRef}
+              orbitRef={mainOrbitRef}
+              cameraStateRef={cameraStateRef}
               onMetricsUpdate={handleMetricsUpdate}
             />
           </Canvas>
@@ -219,6 +242,7 @@ const App: React.FC = () => {
         currentMetrics={metrics}
         onMetricsUpdate={handleMetricsUpdate}
         mainOrbitRef={mainOrbitRef}
+        cameraStateRef={cameraStateRef}
       />
     </div>
   )

@@ -1,34 +1,36 @@
-import React, { useRef, useEffect, useState } from 'react'
+import React, { useRef, useState, useEffect } from 'react'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import { OrbitControls } from '@react-three/drei'
-import type { Metrics, MaterialType, ModelType, MaterialParams, LightParams } from './SceneManager'
+import type {
+  Metrics,
+  MaterialType,
+  ModelType,
+  MaterialParams,
+  LightParams,
+} from './SceneManager'
 import { SceneManager } from './SceneManager'
 
-interface SceneCanvasProps {
+export interface CameraSyncState {
+  position: THREE.Vector3
+  target: THREE.Vector3
+}
+
+interface SyncableSceneContentProps {
   sceneManager: SceneManager
   modelType: ModelType
   materialType: MaterialType
   materialParams: MaterialParams
   lightParams: LightParams
   frozen?: boolean
-  onCanvasReady?: (canvas: HTMLCanvasElement) => void
   onMetricsUpdate?: (metrics: Metrics) => void
-  syncOrbitRef?: React.MutableRefObject<any>
+  cameraStateRef?: React.MutableRefObject<CameraSyncState | null>
+  isCameraSource?: boolean
+  orbitRef: React.MutableRefObject<any>
   autoRotateSpeed?: number
 }
 
-const SceneContent: React.FC<{
-  sceneManager: SceneManager
-  modelType: ModelType
-  materialType: MaterialType
-  materialParams: MaterialParams
-  lightParams: LightParams
-  frozen?: boolean
-  onMetricsUpdate?: (metrics: Metrics) => void
-  syncOrbitRef?: React.MutableRefObject<any>
-  autoRotateSpeed?: number
-}> = ({
+const SyncableSceneContent: React.FC<SyncableSceneContentProps> = ({
   sceneManager,
   modelType,
   materialType,
@@ -36,82 +38,101 @@ const SceneContent: React.FC<{
   lightParams,
   frozen = false,
   onMetricsUpdate,
-  syncOrbitRef,
+  cameraStateRef,
+  isCameraSource = false,
+  orbitRef,
   autoRotateSpeed = 15,
 }) => {
   const meshRef = useRef<THREE.Mesh>(null)
-  const geometryRef = useRef<THREE.BufferGeometry | null>(null)
   const { gl, scene, camera } = useThree()
-  const controlsRef = useRef<any>(null)
-  const lastMetricsTime = useRef<number>(0)
   const rotationSpeed = (autoRotateSpeed * Math.PI) / 180
+  const [geometry, setGeometry] = useState<THREE.BufferGeometry | null>(null)
+  const [modelScale, setModelScale] = useState(1)
+  const [modelOffsetY, setModelOffsetY] = useState(0)
+  const mountedRef = useRef(true)
+  const materialRef = useRef<THREE.MeshStandardMaterial | null>(null)
 
   useEffect(() => {
-    if (geometryRef.current) {
-      geometryRef.current.dispose()
+    mountedRef.current = true
+    let cancelled = false
+
+    const loadGeo = async () => {
+      const result = await sceneManager.createModel(modelType)
+      if (cancelled || !mountedRef.current) return
+      setGeometry(result.geometry)
+      setModelScale(result.scale)
+      setModelOffsetY(result.positionY)
     }
-    geometryRef.current = sceneManager.createModel(modelType)
-    if (meshRef.current) {
-      meshRef.current.geometry = geometryRef.current
-    }
+    loadGeo()
+
     return () => {
-      // geometry handled globally
+      cancelled = true
+      mountedRef.current = false
     }
   }, [modelType, sceneManager])
 
   useEffect(() => {
-    if (meshRef.current) {
-      sceneManager.updateMaterial(meshRef.current, materialType, materialParams)
-    }
+    if (!meshRef.current) return
+    sceneManager.updateMaterial(meshRef.current, materialType, materialParams)
+    const m = meshRef.current.material as THREE.MeshStandardMaterial
+    materialRef.current = m
   }, [materialType, sceneManager])
 
   useEffect(() => {
-    if (meshRef.current) {
-      sceneManager.updateMaterialParams(meshRef.current, materialParams)
-    }
+    if (!meshRef.current) return
+    sceneManager.updateMaterialParams(meshRef.current, materialParams)
   }, [materialParams, sceneManager])
 
-  useEffect(() => {
-    sceneManager.updateLightAngle(lightParams.angleY)
-  }, [lightParams.angleY, sceneManager])
-
-  useEffect(() => {
-    if (syncOrbitRef && controlsRef.current) {
-      ;(syncOrbitRef as any).current = controlsRef.current
-    }
-  }, [syncOrbitRef])
+  const lightPos = SceneManager.getLightPosition(lightParams.angleY)
 
   useFrame((_, delta) => {
     if (!frozen && meshRef.current) {
       meshRef.current.rotation.y += rotationSpeed * delta
     }
 
-    if (onMetricsUpdate && !frozen) {
-      const now = performance.now()
-      if (now - lastMetricsTime.current > 50) {
-        lastMetricsTime.current = now
-        try {
-          const metrics = sceneManager.computeMetrics(gl, scene, camera)
-          onMetricsUpdate(metrics)
-        } catch (e) {
-          // skip metrics on error
+    if (isCameraSource && cameraStateRef && orbitRef.current) {
+      const ctrl = orbitRef.current
+      if (ctrl.object && ctrl.target) {
+        if (!cameraStateRef.current) {
+          cameraStateRef.current = {
+            position: new THREE.Vector3(),
+            target: new THREE.Vector3(),
+          }
         }
+        cameraStateRef.current.position.copy(ctrl.object.position)
+        cameraStateRef.current.target.copy(ctrl.target)
       }
+    }
+
+    if (!isCameraSource && cameraStateRef && cameraStateRef.current && orbitRef.current) {
+      const ctrl = orbitRef.current
+      if (ctrl.object && ctrl.target) {
+        ctrl.object.position.copy(cameraStateRef.current.position)
+        ctrl.target.copy(cameraStateRef.current.target)
+        ctrl.update()
+      }
+    }
+
+    if (onMetricsUpdate && !frozen) {
+      const metrics = sceneManager.computeMetricsPerFrame(
+        gl,
+        scene,
+        camera,
+        materialParams
+      )
+      onMetricsUpdate(metrics)
     }
   })
 
-  const initialGeometry = geometryRef.current || sceneManager.createModel(modelType)
-  if (!geometryRef.current) geometryRef.current = initialGeometry
+  if (!geometry) {
+    return null
+  }
 
   return (
     <>
       <ambientLight intensity={0.4} />
       <directionalLight
-        position={[
-          Math.sin((lightParams.angleY * Math.PI) / 180) * 6,
-          4,
-          Math.cos((lightParams.angleY * Math.PI) / 180) * 6,
-        ]}
+        position={[lightPos.x, lightPos.y, lightPos.z]}
         intensity={0.8}
         castShadow
         shadow-mapSize-width={2048}
@@ -125,7 +146,14 @@ const SceneContent: React.FC<{
         shadow-bias={-0.0001}
       />
 
-      <mesh ref={meshRef} geometry={initialGeometry} castShadow receiveShadow>
+      <mesh
+        ref={meshRef}
+        geometry={geometry}
+        scale={modelScale}
+        position={[0, modelOffsetY, 0]}
+        castShadow
+        receiveShadow
+      >
         <meshStandardMaterial attach="material" />
       </mesh>
 
@@ -135,12 +163,14 @@ const SceneContent: React.FC<{
       </mesh>
 
       <OrbitControls
-        ref={controlsRef}
+        ref={orbitRef}
         enableDamping
         dampingFactor={0.08}
         minDistance={1}
         maxDistance={8}
         enablePan={false}
+        enableRotate={!frozen || isCameraSource}
+        enableZoom={!frozen || isCameraSource}
       />
     </>
   )
@@ -155,6 +185,7 @@ interface AnalysisPanelProps {
   currentMetrics: Metrics
   onMetricsUpdate: (metrics: Metrics) => void
   mainOrbitRef: React.MutableRefObject<any>
+  cameraStateRef: React.MutableRefObject<CameraSyncState | null>
 }
 
 const AnalysisPanel: React.FC<AnalysisPanelProps> = ({
@@ -166,6 +197,7 @@ const AnalysisPanel: React.FC<AnalysisPanelProps> = ({
   currentMetrics,
   onMetricsUpdate,
   mainOrbitRef,
+  cameraStateRef,
 }) => {
   const [isLocked, setIsLocked] = useState(false)
   const [referenceState, setReferenceState] = useState<{
@@ -175,43 +207,6 @@ const AnalysisPanel: React.FC<AnalysisPanelProps> = ({
   } | null>(null)
   const [fadeKey, setFadeKey] = useState(0)
   const compareOrbitRef = useRef<any>(null)
-  const syncingRef = useRef(false)
-
-  useEffect(() => {
-    if (!mainOrbitRef.current || !compareOrbitRef.current) return
-
-    const syncControls = () => {
-      if (syncingRef.current) return
-      const source = mainOrbitRef.current
-      const target = compareOrbitRef.current
-      if (!source || !target || !source.object || !target.object) return
-
-      syncingRef.current = true
-      try {
-        target.object.position.copy(source.object.position)
-        target.target.copy(source.target)
-        target.update()
-      } finally {
-        syncingRef.current = false
-      }
-    }
-
-    const source = mainOrbitRef.current
-    if (source) {
-      source.addEventListener?.('change', syncControls)
-      source.addEventListener?.('end', syncControls)
-    }
-
-    const interval = setInterval(syncControls, 100)
-
-    return () => {
-      if (source) {
-        source.removeEventListener?.('change', syncControls)
-        source.removeEventListener?.('end', syncControls)
-      }
-      clearInterval(interval)
-    }
-  }, [mainOrbitRef])
 
   const handleLockReference = () => {
     if (isLocked) {
@@ -228,9 +223,9 @@ const AnalysisPanel: React.FC<AnalysisPanelProps> = ({
     }
   }
 
-  const displayMaterial = isLocked && referenceState ? referenceState.material : currentMaterial
-  const displayParams = isLocked && referenceState ? referenceState.params : materialParams
-  const displayMetrics = isLocked && referenceState ? referenceState.metrics : currentMetrics
+  const refMaterial = isLocked && referenceState ? referenceState.material : currentMaterial
+  const refParams = isLocked && referenceState ? referenceState.params : materialParams
+  const refMetrics = isLocked && referenceState ? referenceState.metrics : currentMetrics
 
   return (
     <section className="analysis-panel">
@@ -257,14 +252,16 @@ const AnalysisPanel: React.FC<AnalysisPanelProps> = ({
           >
             <color attach="background" args={['#1e1e1e']} />
             <fog attach="fog" args={['#1e1e1e', 8, 20]} />
-            <SceneContent
+            <SyncableSceneContent
               sceneManager={sceneManager}
               modelType={modelType}
               materialType={currentMaterial}
               materialParams={materialParams}
               lightParams={lightParams}
               onMetricsUpdate={onMetricsUpdate}
-              syncOrbitRef={mainOrbitRef}
+              cameraStateRef={cameraStateRef}
+              isCameraSource={true}
+              orbitRef={mainOrbitRef}
               autoRotateSpeed={15}
             />
           </Canvas>
@@ -279,11 +276,11 @@ const AnalysisPanel: React.FC<AnalysisPanelProps> = ({
           <div className="metrics-row">
             <div className="metric metric-brightness">
               <span className="metric-label">亮度</span>
-              <span className="metric-value">{displayMetrics.brightness}</span>
+              <span className="metric-value">{refMetrics.brightness}</span>
             </div>
             <div className="metric metric-glossiness">
               <span className="metric-label">光泽</span>
-              <span className="metric-value">{displayMetrics.glossiness}%</span>
+              <span className="metric-value">{refMetrics.glossiness}%</span>
             </div>
           </div>
         </div>
@@ -298,14 +295,16 @@ const AnalysisPanel: React.FC<AnalysisPanelProps> = ({
           >
             <color attach="background" args={['#1e1e1e']} />
             <fog attach="fog" args={['#1e1e1e', 8, 20]} />
-            <SceneContent
+            <SyncableSceneContent
               sceneManager={sceneManager}
               modelType={modelType}
-              materialType={displayMaterial}
-              materialParams={displayParams}
+              materialType={refMaterial}
+              materialParams={refParams}
               lightParams={lightParams}
               frozen={isLocked}
-              syncOrbitRef={compareOrbitRef}
+              cameraStateRef={cameraStateRef}
+              isCameraSource={false}
+              orbitRef={compareOrbitRef}
               autoRotateSpeed={isLocked ? 0 : 15}
             />
           </Canvas>

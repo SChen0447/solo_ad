@@ -1,4 +1,5 @@
 import * as THREE from 'three'
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
 
 export type MaterialType = 'wood' | 'marble' | 'brushedMetal' | 'carbonFiber' | 'redFabric'
 export type ModelType = 'vase' | 'teapot' | 'torusKnot'
@@ -24,326 +25,345 @@ export interface SceneConfig {
   lightParams: LightParams
 }
 
-const generateWoodAlbedo = (size: number): Uint8Array => {
-  const data = new Uint8Array(size * size * 4)
-  const center = size / 2
-  for (let y = 0; y < size; y++) {
-    for (let x = 0; x < size; x++) {
-      const idx = (y * size + x) * 4
-      const dist = Math.sqrt((x - center) ** 2 + (y - center) ** 2)
-      const ring = Math.sin(dist * 0.15 + y * 0.05) * 0.5 + 0.5
-      const grain = Math.sin(x * 0.3 + y * 0.02) * 0.1
-      const base = 0.55 + ring * 0.2 + grain
-      data[idx] = Math.floor(Math.min(1, base * 1.2) * 255)
-      data[idx + 1] = Math.floor(Math.min(1, base * 0.85) * 255)
-      data[idx + 2] = Math.floor(Math.min(1, base * 0.55) * 255)
-      data[idx + 3] = 255
+export interface PBRTextureSet {
+  albedo: THREE.Texture | null
+  roughness: THREE.Texture | null
+  normal: THREE.Texture | null
+}
+
+const TEXTURE_BASE_URLS: Record<MaterialType, { albedo: string; roughness: string; normal: string }> = {
+  wood: {
+    albedo: 'https://threejs.org/examples/textures/hardwood2_diffuse.jpg',
+    roughness: 'https://threejs.org/examples/textures/hardwood2_roughness.jpg',
+    normal: 'https://threejs.org/examples/textures/hardwood2_normal.jpg',
+  },
+  marble: {
+    albedo: 'https://threejs.org/examples/textures/brick_diffuse.jpg',
+    roughness: 'https://threejs.org/examples/textures/brick_roughness.jpg',
+    normal: 'https://threejs.org/examples/textures/brick_normal.jpg',
+  },
+  brushedMetal: {
+    albedo: 'https://threejs.org/examples/textures/metalness.jpg',
+    roughness: 'https://threejs.org/examples/textures/roughness_map.jpg',
+    normal: 'https://threejs.org/examples/textures/normal_map.jpg',
+  },
+  carbonFiber: {
+    albedo: 'https://threejs.org/examples/textures/compressed/weave_iu2_dxt1_basis.ktx2',
+    roughness: 'https://threejs.org/examples/textures/roughness_map.jpg',
+    normal: 'https://threejs.org/examples/textures/normal_map.jpg',
+  },
+  redFabric: {
+    albedo: 'https://threejs.org/examples/textures/terrain/grasslight-big.jpg',
+    roughness: 'https://threejs.org/examples/textures/terrain/grasslight-big-nm.jpg',
+    normal: 'https://threejs.org/examples/textures/terrain/grasslight-big-nm.jpg',
+  },
+}
+
+const MODEL_URLS: Record<ModelType, string> = {
+  vase: 'https://threejs.org/examples/models/gltf/LittlestTokyo.glb',
+  teapot: 'https://threejs.org/examples/models/gltf/SheenChair/SheenChair.glb',
+  torusKnot: 'https://threejs.org/examples/models/gltf/DamagedHelmet/glTF/DamagedHelmet.gltf',
+}
+
+const FALLBACK_MODEL_PARAMS: Record<ModelType, {
+  create: () => THREE.BufferGeometry
+  scale?: number
+  positionY?: number
+}> = {
+  vase: {
+    create: () => {
+      const curvePoints: THREE.Vector2[] = []
+      const segments = 40
+      for (let i = 0; i <= segments; i++) {
+        const t = i / segments
+        let radius: number
+        if (t < 0.05) radius = 0.08 + t * 0.4
+        else if (t < 0.3) radius = 0.3 + Math.sin(((t - 0.05) / 0.25) * Math.PI) * 0.5
+        else if (t < 0.7) radius = 0.8 - ((t - 0.3) / 0.4) * 0.35
+        else if (t < 0.9) radius = 0.45 + Math.sin(((t - 0.7) / 0.2) * Math.PI) * 0.15
+        else radius = 0.6 - ((t - 0.9) / 0.1) * 0.3
+        curvePoints.push(new THREE.Vector2(radius, t * 2.4 - 1.2))
+      }
+      return new THREE.LatheGeometry(curvePoints, 64)
+    },
+    scale: 1,
+    positionY: 0,
+  },
+  teapot: {
+    create: () => {
+      const merged = new THREE.BufferGeometry()
+      const positions: number[] = []
+      const normals: number[] = []
+      const uvs: number[] = []
+      const indices: number[] = []
+      let indexOffset = 0
+
+      const addGeometry = (geo: THREE.BufferGeometry) => {
+        const pos = geo.attributes.position.array as Float32Array
+        const nor = geo.attributes.normal.array as Float32Array
+        const uvAttr = geo.attributes.uv
+        const uv = uvAttr ? (uvAttr.array as Float32Array) : null
+        const ind = geo.index ? (geo.index.array as Uint16Array) : null
+
+        for (let i = 0; i < pos.length; i++) positions.push(pos[i])
+        for (let i = 0; i < nor.length; i++) normals.push(nor[i])
+        if (uv) for (let i = 0; i < uv.length; i++) uvs.push(uv[i])
+        else for (let i = 0; i < pos.length / 3; i++) { uvs.push(0, 0) }
+        if (ind) for (let i = 0; i < ind.length; i++) indices.push(ind[i] + indexOffset)
+        else for (let i = 0; i < pos.length / 3; i++) indices.push(i + indexOffset)
+        indexOffset += pos.length / 3
+      }
+
+      const body = new THREE.SphereGeometry(0.8, 48, 32)
+      body.scale(1, 0.85, 1)
+      addGeometry(body)
+      const lid = new THREE.SphereGeometry(0.35, 32, 16, 0, Math.PI * 2, 0, Math.PI / 2)
+      lid.translate(0, 0.7, 0)
+      addGeometry(lid)
+      const knob = new THREE.SphereGeometry(0.1, 24, 16)
+      knob.translate(0, 0.95, 0)
+      addGeometry(knob)
+      const spoutCurve = new THREE.CatmullRomCurve3([
+        new THREE.Vector3(0.7, 0.2, 0),
+        new THREE.Vector3(1.0, 0.3, 0),
+        new THREE.Vector3(1.2, 0.5, 0),
+        new THREE.Vector3(1.3, 0.7, 0),
+      ])
+      addGeometry(new THREE.TubeGeometry(spoutCurve, 20, 0.1, 12, false))
+      const handleCurve = new THREE.CatmullRomCurve3([
+        new THREE.Vector3(-0.7, 0.15, 0),
+        new THREE.Vector3(-1.1, 0.1, 0),
+        new THREE.Vector3(-1.25, 0.4, 0),
+        new THREE.Vector3(-1.15, 0.65, 0),
+        new THREE.Vector3(-0.7, 0.6, 0),
+      ])
+      addGeometry(new THREE.TubeGeometry(handleCurve, 24, 0.09, 12, false))
+      const base = new THREE.CylinderGeometry(0.45, 0.55, 0.1, 48)
+      base.translate(0, -0.72, 0)
+      addGeometry(base)
+
+      merged.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3))
+      merged.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3))
+      merged.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2))
+      merged.setIndex(indices)
+      merged.computeVertexNormals()
+      return merged
+    },
+    scale: 1,
+    positionY: 0,
+  },
+  torusKnot: {
+    create: () => new THREE.TorusKnotGeometry(0.8, 0.28, 200, 32, 2, 3),
+    scale: 1,
+    positionY: 0,
+  },
+}
+
+const loadingManager = new THREE.LoadingManager()
+const textureLoader = new THREE.TextureLoader(loadingManager)
+const gltfLoader = new GLTFLoader(loadingManager)
+
+const loadedTextures: Map<string, PBRTextureSet> = new Map()
+const loadedGeometries: Map<string, THREE.BufferGeometry> = new Map()
+
+export const loadPBRTextures = async (type: MaterialType): Promise<PBRTextureSet> => {
+  if (loadedTextures.has(type)) {
+    return loadedTextures.get(type)!
+  }
+  const urls = TEXTURE_BASE_URLS[type]
+  try {
+    const [albedo, roughness, normal] = await Promise.all([
+      new Promise<THREE.Texture | null>((resolve) => {
+        textureLoader.load(
+          urls.albedo,
+          (tex) => {
+            tex.wrapS = THREE.RepeatWrapping
+            tex.wrapT = THREE.RepeatWrapping
+            tex.anisotropy = 8
+            tex.colorSpace = THREE.SRGBColorSpace
+            resolve(tex)
+          },
+          undefined,
+          () => resolve(null)
+        )
+      }),
+      new Promise<THREE.Texture | null>((resolve) => {
+        textureLoader.load(
+          urls.roughness,
+          (tex) => {
+            tex.wrapS = THREE.RepeatWrapping
+            tex.wrapT = THREE.RepeatWrapping
+            tex.anisotropy = 8
+            resolve(tex)
+          },
+          undefined,
+          () => resolve(null)
+        )
+      }),
+      new Promise<THREE.Texture | null>((resolve) => {
+        textureLoader.load(
+          urls.normal,
+          (tex) => {
+            tex.wrapS = THREE.RepeatWrapping
+            tex.wrapT = THREE.RepeatWrapping
+            tex.anisotropy = 8
+            resolve(tex)
+          },
+          undefined,
+          () => resolve(null)
+        )
+      }),
+    ])
+    const set: PBRTextureSet = { albedo, roughness, normal }
+    loadedTextures.set(type, set)
+    return set
+  } catch {
+    const set: PBRTextureSet = { albedo: null, roughness: null, normal: null }
+    loadedTextures.set(type, set)
+    return set
+  }
+}
+
+export const loadModelGeometry = async (
+  type: ModelType
+): Promise<{ geometry: THREE.BufferGeometry; scale: number; positionY: number }> => {
+  if (loadedGeometries.has(type)) {
+    const fallback = FALLBACK_MODEL_PARAMS[type]
+    return {
+      geometry: loadedGeometries.get(type)!,
+      scale: fallback.scale ?? 1,
+      positionY: fallback.positionY ?? 0,
     }
   }
-  return data
-}
-
-const generateMarbleAlbedo = (size: number): Uint8Array => {
-  const data = new Uint8Array(size * size * 4)
-  for (let y = 0; y < size; y++) {
-    for (let x = 0; x < size; x++) {
-      const idx = (y * size + x) * 4
-      const noise1 = Math.sin(x * 0.08 + y * 0.06)
-      const noise2 = Math.sin(x * 0.15 - y * 0.12 + 1.5)
-      const noise3 = Math.sin((x + y) * 0.04)
-      const veins = Math.abs(noise1 + noise2 * 0.5 + noise3 * 0.3) * 0.4
-      const base = 0.9 - veins
-      data[idx] = Math.floor(Math.min(1, base * 1.02) * 255)
-      data[idx + 1] = Math.floor(Math.min(1, base * 1.0) * 255)
-      data[idx + 2] = Math.floor(Math.min(1, base * 0.98) * 255)
-      data[idx + 3] = 255
+  const fallback = FALLBACK_MODEL_PARAMS[type]
+  try {
+    const gltf = await new Promise<any>((resolve, reject) => {
+      gltfLoader.load(MODEL_URLS[type], resolve, undefined, reject)
+    })
+    let targetGeometry: THREE.BufferGeometry | null = null
+    gltf.scene.traverse((child: any) => {
+      if (child.isMesh && child.geometry) {
+        const geo = child.geometry.clone()
+        geo.computeVertexNormals()
+        if (!targetGeometry) targetGeometry = geo
+      }
+    })
+    if (targetGeometry) {
+      loadedGeometries.set(type, targetGeometry)
+      return { geometry: targetGeometry, scale: 1.5, positionY: 0 }
+    }
+    return {
+      geometry: fallback.create(),
+      scale: fallback.scale ?? 1,
+      positionY: fallback.positionY ?? 0,
+    }
+  } catch {
+    const geo = fallback.create()
+    loadedGeometries.set(type, geo)
+    return {
+      geometry: geo,
+      scale: fallback.scale ?? 1,
+      positionY: fallback.positionY ?? 0,
     }
   }
-  return data
 }
-
-const generateMetalAlbedo = (size: number): Uint8Array => {
-  const data = new Uint8Array(size * size * 4)
-  for (let y = 0; y < size; y++) {
-    for (let x = 0; x < size; x++) {
-      const idx = (y * size + x) * 4
-      const brush = Math.sin(x * 0.4 + Math.random() * 0.05) * 0.08
-      const base = 0.75 + brush + (Math.random() - 0.5) * 0.04
-      data[idx] = Math.floor(Math.min(1, Math.max(0, base)) * 255)
-      data[idx + 1] = Math.floor(Math.min(1, Math.max(0, base * 0.96)) * 255)
-      data[idx + 2] = Math.floor(Math.min(1, Math.max(0, base * 0.92)) * 255)
-      data[idx + 3] = 255
-    }
-  }
-  return data
-}
-
-const generateCarbonAlbedo = (size: number): Uint8Array => {
-  const data = new Uint8Array(size * size * 4)
-  for (let y = 0; y < size; y++) {
-    for (let x = 0; x < size; x++) {
-      const idx = (y * size + x) * 4
-      const tileX = Math.floor(x / 16)
-      const tileY = Math.floor(y / 16)
-      const inTileX = x % 16
-      const inTileY = y % 16
-      const weave = ((tileX + tileY) % 2 === 0) ? (inTileX / 16) : (inTileY / 16)
-      const noise = (Math.random() - 0.5) * 0.03
-      const base = 0.15 + weave * 0.08 + noise
-      data[idx] = Math.floor(Math.min(1, Math.max(0, base * 1.3)) * 255)
-      data[idx + 1] = Math.floor(Math.min(1, Math.max(0, base * 1.25)) * 255)
-      data[idx + 2] = Math.floor(Math.min(1, Math.max(0, base * 1.35)) * 255)
-      data[idx + 3] = 255
-    }
-  }
-  return data
-}
-
-const generateFabricAlbedo = (size: number): Uint8Array => {
-  const data = new Uint8Array(size * size * 4)
-  for (let y = 0; y < size; y++) {
-    for (let x = 0; x < size; x++) {
-      const idx = (y * size + x) * 4
-      const threadX = Math.sin(x * 0.5) * 0.06
-      const threadY = Math.sin(y * 0.5) * 0.06
-      const noise = (Math.random() - 0.5) * 0.04
-      const base = 0.75 + threadX + threadY + noise
-      data[idx] = Math.floor(Math.min(1, Math.max(0, base * 1.05)) * 255)
-      data[idx + 1] = Math.floor(Math.min(1, Math.max(0, base * 0.3)) * 255)
-      data[idx + 2] = Math.floor(Math.min(1, Math.max(0, base * 0.35)) * 255)
-      data[idx + 3] = 255
-    }
-  }
-  return data
-}
-
-const generateNormalMap = (size: number, intensity: number): Uint8Array => {
-  const data = new Uint8Array(size * size * 4)
-  for (let y = 0; y < size; y++) {
-    for (let x = 0; x < size; x++) {
-      const idx = (y * size + x) * 4
-      const noiseX = (Math.random() - 0.5) * intensity
-      const noiseY = (Math.random() - 0.5) * intensity
-      data[idx] = Math.floor((noiseX * 0.5 + 0.5) * 255)
-      data[idx + 1] = Math.floor((noiseY * 0.5 + 0.5) * 255)
-      data[idx + 2] = Math.floor(0.7 * 255)
-      data[idx + 3] = 255
-    }
-  }
-  return data
-}
-
-const generateRoughnessMap = (size: number, baseRough: number, variance: number): Uint8Array => {
-  const data = new Uint8Array(size * size * 4)
-  for (let y = 0; y < size; y++) {
-    for (let x = 0; x < size; x++) {
-      const idx = (y * size + x) * 4
-      const noise = (Math.random() - 0.5) * variance
-      const val = Math.min(1, Math.max(0, baseRough + noise))
-      const byte = Math.floor(val * 255)
-      data[idx] = byte
-      data[idx + 1] = byte
-      data[idx + 2] = byte
-      data[idx + 3] = 255
-    }
-  }
-  return data
-}
-
-const createTextureFromData = (
-  data: Uint8Array,
-  size: number
-): THREE.DataTexture => {
-  const texture = new THREE.DataTexture(
-    data as unknown as BufferSource,
-    size,
-    size,
-    THREE.RGBAFormat
-  )
-  texture.needsUpdate = true
-  texture.wrapS = THREE.RepeatWrapping
-  texture.wrapT = THREE.RepeatWrapping
-  texture.anisotropy = 8
-  return texture
-}
-
-const TEX_SIZE = 512
 
 export class SceneManager {
   private materialCache: Map<MaterialType, THREE.MeshStandardMaterial> = new Map()
   private currentMaterial: THREE.MeshStandardMaterial | null = null
+  private currentMaterialType: MaterialType = 'wood'
   private directionalLight: THREE.DirectionalLight | null = null
   private ambientLight: THREE.AmbientLight | null = null
   private metricsCallback: ((metrics: Metrics) => void) | null = null
+  private readyMaterials: Set<MaterialType> = new Set()
+  private renderTarget: THREE.WebGLRenderTarget | null = null
+  private pixelBuffer: Uint8Array | null = null
+  private lastBrightness: number = 128
 
   constructor() {
-    this.initMaterials()
+    this.initRenderTarget()
+    this.initPlaceholderMaterials()
+    this.preloadAllAssets()
   }
 
-  private initMaterials(): void {
-    const woodMat = new THREE.MeshStandardMaterial({
-      map: createTextureFromData(generateWoodAlbedo(TEX_SIZE), TEX_SIZE),
-      normalMap: createTextureFromData(generateNormalMap(TEX_SIZE, 0.3), TEX_SIZE),
-      roughnessMap: createTextureFromData(generateRoughnessMap(TEX_SIZE, 0.65, 0.15), TEX_SIZE),
-      metalness: 0.0,
-      roughness: 0.65,
-      normalScale: new THREE.Vector2(0.5, 0.5),
+  private initRenderTarget(): void {
+    this.renderTarget = new THREE.WebGLRenderTarget(128, 128, {
+      minFilter: THREE.LinearFilter,
+      magFilter: THREE.LinearFilter,
+      format: THREE.RGBAFormat,
+      type: THREE.UnsignedByteType,
     })
+    this.pixelBuffer = new Uint8Array(128 * 128 * 4)
+  }
 
-    const marbleMat = new THREE.MeshStandardMaterial({
-      map: createTextureFromData(generateMarbleAlbedo(TEX_SIZE), TEX_SIZE),
-      normalMap: createTextureFromData(generateNormalMap(TEX_SIZE, 0.15), TEX_SIZE),
-      roughnessMap: createTextureFromData(generateRoughnessMap(TEX_SIZE, 0.25, 0.1), TEX_SIZE),
-      metalness: 0.05,
-      roughness: 0.25,
-      normalScale: new THREE.Vector2(0.3, 0.3),
+  private initPlaceholderMaterials(): void {
+    const types: MaterialType[] = ['wood', 'marble', 'brushedMetal', 'carbonFiber', 'redFabric']
+    types.forEach((t) => {
+      const defaults = this.getMaterialDefaults(t)
+      const mat = new THREE.MeshStandardMaterial({
+        color: this.getMaterialFallbackColor(t),
+        metalness: defaults.metalness,
+        roughness: defaults.roughness,
+      })
+      this.materialCache.set(t, mat)
     })
+    this.currentMaterial = this.materialCache.get('wood')!.clone()
+  }
 
-    const metalMat = new THREE.MeshStandardMaterial({
-      map: createTextureFromData(generateMetalAlbedo(TEX_SIZE), TEX_SIZE),
-      normalMap: createTextureFromData(generateNormalMap(TEX_SIZE, 0.5), TEX_SIZE),
-      roughnessMap: createTextureFromData(generateRoughnessMap(TEX_SIZE, 0.35, 0.1), TEX_SIZE),
-      metalness: 0.95,
-      roughness: 0.35,
-      normalScale: new THREE.Vector2(0.8, 0.8),
-    })
+  private getMaterialFallbackColor(type: MaterialType): THREE.ColorRepresentation {
+    switch (type) {
+      case 'wood': return 0x8b5a2b
+      case 'marble': return 0xe8e4d8
+      case 'brushedMetal': return 0xa8a8a8
+      case 'carbonFiber': return 0x1a1a1a
+      case 'redFabric': return 0xb33a3a
+    }
+  }
 
-    const carbonMat = new THREE.MeshStandardMaterial({
-      map: createTextureFromData(generateCarbonAlbedo(TEX_SIZE), TEX_SIZE),
-      normalMap: createTextureFromData(generateNormalMap(TEX_SIZE, 0.4), TEX_SIZE),
-      roughnessMap: createTextureFromData(generateRoughnessMap(TEX_SIZE, 0.45, 0.1), TEX_SIZE),
-      metalness: 0.6,
-      roughness: 0.45,
-      normalScale: new THREE.Vector2(0.6, 0.6),
-    })
+  private async preloadAllAssets(): Promise<void> {
+    const types: MaterialType[] = ['wood', 'marble', 'brushedMetal', 'carbonFiber', 'redFabric']
+    const models: ModelType[] = ['vase', 'teapot', 'torusKnot']
+    try {
+      await Promise.all([
+        ...types.map((t) => this.loadAndApplyMaterial(t)),
+        ...models.map((m) => loadModelGeometry(m)),
+      ])
+    } catch {
+      // silent: fallbacks in place
+    }
+  }
 
-    const fabricMat = new THREE.MeshStandardMaterial({
-      map: createTextureFromData(generateFabricAlbedo(TEX_SIZE), TEX_SIZE),
-      normalMap: createTextureFromData(generateNormalMap(TEX_SIZE, 0.6), TEX_SIZE),
-      roughnessMap: createTextureFromData(generateRoughnessMap(TEX_SIZE, 0.9, 0.05), TEX_SIZE),
-      metalness: 0.0,
-      roughness: 0.9,
-      normalScale: new THREE.Vector2(1.0, 1.0),
-    })
+  private async loadAndApplyMaterial(type: MaterialType): Promise<void> {
+    const textures = await loadPBRTextures(type)
+    const defaults = this.getMaterialDefaults(type)
+    const existing = this.materialCache.get(type)
+    if (existing) {
+      if (textures.albedo) existing.map = textures.albedo
+      if (textures.roughness) existing.roughnessMap = textures.roughness
+      if (textures.normal) {
+        existing.normalMap = textures.normal
+        existing.normalScale = new THREE.Vector2(0.8, 0.8)
+      }
+      existing.metalness = defaults.metalness
+      existing.roughness = defaults.roughness
+      existing.color.set(0xffffff)
+      existing.needsUpdate = true
+    }
+    this.readyMaterials.add(type)
+  }
 
-    this.materialCache.set('wood', woodMat)
-    this.materialCache.set('marble', marbleMat)
-    this.materialCache.set('brushedMetal', metalMat)
-    this.materialCache.set('carbonFiber', carbonMat)
-    this.materialCache.set('redFabric', fabricMat)
-
-    this.currentMaterial = woodMat.clone()
+  isMaterialReady(type: MaterialType): boolean {
+    return this.readyMaterials.has(type)
   }
 
   setMetricsCallback(callback: (metrics: Metrics) => void): void {
     this.metricsCallback = callback
   }
 
-  createModel(modelType: ModelType): THREE.BufferGeometry {
-    switch (modelType) {
-      case 'vase':
-        return this.createVaseGeometry()
-      case 'teapot':
-        return this.createTeapotGeometry()
-      case 'torusKnot':
-        return new THREE.TorusKnotGeometry(0.8, 0.28, 200, 32, 2, 3)
-      default:
-        return this.createVaseGeometry()
-    }
-  }
-
-  private createVaseGeometry(): THREE.BufferGeometry {
-    const curvePoints: THREE.Vector2[] = []
-    const segments = 40
-    for (let i = 0; i <= segments; i++) {
-      const t = i / segments
-      let radius: number
-      if (t < 0.05) {
-        radius = 0.08 + t * 0.4
-      } else if (t < 0.3) {
-        radius = 0.3 + Math.sin((t - 0.05) / 0.25 * Math.PI) * 0.5
-      } else if (t < 0.7) {
-        radius = 0.8 - ((t - 0.3) / 0.4) * 0.35
-      } else if (t < 0.9) {
-        radius = 0.45 + Math.sin((t - 0.7) / 0.2 * Math.PI) * 0.15
-      } else {
-        radius = 0.6 - ((t - 0.9) / 0.1) * 0.3
-      }
-      curvePoints.push(new THREE.Vector2(radius, t * 2.4 - 1.2))
-    }
-    const curve = new THREE.CatmullRomCurve3(
-      curvePoints.map((p) => new THREE.Vector3(p.x, p.y, 0))
-    )
-    return new THREE.LatheGeometry(curvePoints, 64)
-  }
-
-  private createTeapotGeometry(): THREE.BufferGeometry {
-    const merged = new THREE.BufferGeometry()
-    const positions: number[] = []
-    const normals: number[] = []
-    const uvs: number[] = []
-    const indices: number[] = []
-    let indexOffset = 0
-
-    const addGeometry = (geo: THREE.BufferGeometry) => {
-      const pos = geo.attributes.position.array as Float32Array
-      const nor = geo.attributes.normal.array as Float32Array
-      const uv = geo.attributes.uv ? (geo.attributes.uv.array as Float32Array) : null
-      const ind = geo.index ? (geo.index.array as Uint16Array) : null
-
-      for (let i = 0; i < pos.length; i++) positions.push(pos[i])
-      for (let i = 0; i < nor.length; i++) normals.push(nor[i])
-      if (uv) for (let i = 0; i < uv.length; i++) uvs.push(uv[i])
-      else for (let i = 0; i < pos.length / 3; i++) { uvs.push(0, 0) }
-
-      if (ind) for (let i = 0; i < ind.length; i++) indices.push(ind[i] + indexOffset)
-      else for (let i = 0; i < pos.length / 3; i++) indices.push(i + indexOffset)
-
-      indexOffset += pos.length / 3
-    }
-
-    const body = new THREE.SphereGeometry(0.8, 48, 32)
-    body.scale(1, 0.85, 1)
-    body.translate(0, 0, 0)
-    addGeometry(body)
-
-    const lid = new THREE.SphereGeometry(0.35, 32, 16, 0, Math.PI * 2, 0, Math.PI / 2)
-    lid.translate(0, 0.7, 0)
-    addGeometry(lid)
-
-    const knob = new THREE.SphereGeometry(0.1, 24, 16)
-    knob.translate(0, 0.95, 0)
-    addGeometry(knob)
-
-    const spoutCurve = new THREE.CatmullRomCurve3([
-      new THREE.Vector3(0.7, 0.2, 0),
-      new THREE.Vector3(1.0, 0.3, 0),
-      new THREE.Vector3(1.2, 0.5, 0),
-      new THREE.Vector3(1.3, 0.7, 0),
-    ])
-    const spout = new THREE.TubeGeometry(spoutCurve, 20, 0.1, 12, false)
-    addGeometry(spout)
-
-    const handleCurve = new THREE.CatmullRomCurve3([
-      new THREE.Vector3(-0.7, 0.15, 0),
-      new THREE.Vector3(-1.1, 0.1, 0),
-      new THREE.Vector3(-1.25, 0.4, 0),
-      new THREE.Vector3(-1.15, 0.65, 0),
-      new THREE.Vector3(-0.7, 0.6, 0),
-    ])
-    const handle = new THREE.TubeGeometry(handleCurve, 24, 0.09, 12, false)
-    addGeometry(handle)
-
-    const base = new THREE.CylinderGeometry(0.45, 0.55, 0.1, 48)
-    base.translate(0, -0.72, 0)
-    addGeometry(base)
-
-    merged.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3))
-    merged.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3))
-    merged.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2))
-    merged.setIndex(indices)
-    merged.computeVertexNormals()
-    return merged
+  async createModel(
+    modelType: ModelType
+  ): Promise<{ geometry: THREE.BufferGeometry; scale: number; positionY: number }> {
+    return loadModelGeometry(modelType)
   }
 
   getMaterial(type: MaterialType): THREE.MeshStandardMaterial {
@@ -353,6 +373,15 @@ export class SceneManager {
     const sourceMat = this.materialCache.get(type)!
     this.currentMaterial = sourceMat.clone()
     this.currentMaterial.needsUpdate = true
+    this.currentMaterialType = type
+    return this.currentMaterial
+  }
+
+  getCurrentMaterialType(): MaterialType {
+    return this.currentMaterialType
+  }
+
+  getCurrentMaterial(): THREE.MeshStandardMaterial | null {
     return this.currentMaterial
   }
 
@@ -399,16 +428,23 @@ export class SceneManager {
     return this.directionalLight
   }
 
-  updateLightAngle(angleDeg: number): void {
-    if (!this.directionalLight) return
+  static getLightPosition(angleDeg: number): THREE.Vector3 {
     const angleRad = (angleDeg * Math.PI) / 180
     const radius = 6
-    this.directionalLight.position.set(
+    return new THREE.Vector3(
       Math.sin(angleRad) * radius,
       4,
       Math.cos(angleRad) * radius
     )
-    this.directionalLight.target.position.set(0, 0, 0)
+  }
+
+  updateLightAngle(angleDeg: number): void {
+    if (!this.directionalLight) return
+    const pos = SceneManager.getLightPosition(angleDeg)
+    this.directionalLight.position.copy(pos)
+    if (this.directionalLight.target) {
+      this.directionalLight.target.position.set(0, 0, 0)
+    }
   }
 
   createGround(): THREE.Mesh {
@@ -421,59 +457,56 @@ export class SceneManager {
     return mesh
   }
 
-  computeMetrics(renderer: THREE.WebGLRenderer, scene: THREE.Scene, camera: THREE.Camera): Metrics {
-    const rtWidth = 128
-    const rtHeight = 128
-    const renderTarget = new THREE.WebGLRenderTarget(rtWidth, rtHeight, {
-      minFilter: THREE.LinearFilter,
-      magFilter: THREE.LinearFilter,
-      format: THREE.RGBAFormat,
-      type: THREE.UnsignedByteType,
-    })
+  computeMetricsPerFrame(
+    renderer: THREE.WebGLRenderer,
+    scene: THREE.Scene,
+    camera: THREE.Camera,
+    materialParams: MaterialParams
+  ): Metrics {
+    let brightness = this.lastBrightness
 
-    renderer.setRenderTarget(renderTarget)
-    renderer.render(scene, camera)
+    if (this.renderTarget && this.pixelBuffer && renderer) {
+      try {
+        renderer.setRenderTarget(this.renderTarget)
+        renderer.render(scene, camera)
+        renderer.readRenderTargetPixels(
+          this.renderTarget,
+          0,
+          0,
+          128,
+          128,
+          this.pixelBuffer
+        )
+        renderer.setRenderTarget(null)
 
-    const pixelBuffer = new Uint8Array(rtWidth * rtHeight * 4)
-    renderer.readRenderTargetPixels(renderTarget, 0, 0, rtWidth, rtHeight, pixelBuffer)
-    renderer.setRenderTarget(null)
-
-    let totalBrightness = 0
-    let totalReflect = 0
-    let validPixels = 0
-
-    for (let i = 0; i < pixelBuffer.length; i += 4) {
-      const a = pixelBuffer[i + 3]
-      if (a < 10) continue
-
-      const r = pixelBuffer[i]
-      const g = pixelBuffer[i + 1]
-      const b = pixelBuffer[i + 2]
-
-      const lum = 0.299 * r + 0.587 * g + 0.114 * b
-      totalBrightness += lum
-
-      const maxC = Math.max(r, g, b)
-      const minC = Math.min(r, g, b)
-      const range = maxC > 0 ? (maxC - minC) / maxC : 0
-      totalReflect += range * lum
-
-      validPixels++
+        let totalLum = 0
+        let count = 0
+        const buf = this.pixelBuffer
+        const step = 4 * 4
+        for (let i = 0; i < buf.length; i += step) {
+          const a = buf[i + 3]
+          if (a < 8) continue
+          const r = buf[i]
+          const g = buf[i + 1]
+          const b = buf[i + 2]
+          totalLum += 0.299 * r + 0.587 * g + 0.114 * b
+          count++
+        }
+        if (count > 0) {
+          brightness = Math.round(totalLum / count)
+          brightness = Math.max(0, Math.min(255, brightness))
+          this.lastBrightness = brightness
+        }
+      } catch {
+        renderer.setRenderTarget(null)
+      }
     }
 
-    renderTarget.dispose()
-
-    if (validPixels === 0) {
-      return { brightness: 0, glossiness: 0 }
-    }
-
-    const avgBrightness = Math.round(totalBrightness / validPixels)
-    const avgReflect = totalReflect / validPixels
-    const glossiness = Math.min(100, Math.round(avgReflect * 120))
+    const glossiness = Math.round((1 - materialParams.roughness) * 100)
 
     const metrics: Metrics = {
-      brightness: Math.max(0, Math.min(255, avgBrightness)),
-      glossiness: Math.max(0, glossiness),
+      brightness,
+      glossiness: Math.max(0, Math.min(100, glossiness)),
     }
 
     if (this.metricsCallback) {
@@ -509,6 +542,15 @@ export class SceneManager {
     if (this.currentMaterial) {
       this.currentMaterial.dispose()
     }
+    if (this.renderTarget) {
+      this.renderTarget.dispose()
+    }
+    loadedTextures.forEach((set) => {
+      set.albedo?.dispose()
+      set.roughness?.dispose()
+      set.normal?.dispose()
+    })
+    loadedGeometries.forEach((geo) => geo.dispose())
   }
 }
 
