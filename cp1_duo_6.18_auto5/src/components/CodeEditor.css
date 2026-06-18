@@ -1,0 +1,142 @@
+.code-editor {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: #282840;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.editor-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 14px;
+  background: rgba(0, 0, 0, 0.2);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.editor-label {
+  font-size: 13px;
+  font-weight: 500;
+  color: #e0e0f0;
+  padding-left: 8px;
+  border-left: 3px solid;
+}
+
+.apply-btn {
+  padding: 5px 14px;
+  background: #5c6ac4;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.1s ease;
+}
+
+.apply-btn:hover {
+  background: #6c7cd4;
+}
+
+.apply-btn:active {
+  transform: scale(0.95);
+}
+
+.editor-body {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+  position: relative;
+}
+
+.line-numbers {
+  display: flex;
+  flex-direction: column;
+  padding: 12px 8px;
+  background: rgba(0, 0, 0, 0.15);
+  color: #6b6b8b;
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-size: 13px;
+  line-height: 1.6;
+  text-align: right;
+  user-select: none;
+  overflow: hidden;
+  min-width: 40px;
+}
+
+.line-number {
+  height: 20.8px;
+  padding: 0 6px;
+  border-radius: 2px;
+}
+
+.line-number.diff-line {
+  color: #e0e0f0;
+  font-weight: 500;
+}
+
+.editor-content {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+}
+
+.code-highlight {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  margin: 0;
+  padding: 12px;
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-size: 13px;
+  line-height: 1.6;
+  color: transparent;
+  background: transparent;
+  overflow: auto;
+  pointer-events: none;
+  white-space: pre;
+  word-wrap: normal;
+}
+
+.highlight-line {
+  height: 20.8px;
+  margin: 0 -12px;
+  padding: 0 12px;
+  white-space: pre;
+}
+
+.code-textarea {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100%;
+  height: 100%;
+  padding: 12px;
+  border: none;
+  outline: none;
+  resize: none;
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-size: 13px;
+  line-height: 1.6;
+  color: #e0e0f0;
+  background: transparent;
+  white-space: pre;
+  overflow: auto;
+  word-wrap: normal;
+}
+
+.code-textarea::selection {
+  background: rgba(92, 106, 196, 0.4);
+}
+
+@media (max-width: 768px) {
+  .code-editor {
+    min-height: 200px;
+  }
+}
