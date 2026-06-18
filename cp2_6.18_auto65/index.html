@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>太空资源采集矿站</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #0b0f19;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      color: #e5e7eb;
+    }
+
+    #app {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      min-width: 1024px;
+    }
+
+    .main-content {
+      flex: 1;
+      display: flex;
+      overflow: hidden;
+    }
+
+    .left-section {
+      width: 70%;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .map-container {
+      height: 600px;
+      position: relative;
+      background: #0b0f19;
+    }
+
+    .supply-chain {
+      height: 120px;
+      background: #111827;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 20px;
+      padding: 0 20px;
+      flex-shrink: 0;
+    }
+
+    .supply-chain-node {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      z-index: 1;
+    }
+
+    .supply-chain-node-icon {
+      width: 60px;
+      height: 60px;
+      border-radius: 50%;
+      background: #1f2937;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 24px;
+      transition: all 0.5s ease-out;
+      border: 2px solid #374151;
+    }
+
+    .supply-chain-node.active .supply-chain-node-icon {
+      background: #1e3a5f;
+      border-color: #3b82f6;
+      box-shadow: 0 0 20px rgba(59, 130, 246, 0.4);
+    }
+
+    .supply-chain-node-label {
+      font-size: 12px;
+      color: #9ca3af;
+    }
+
+    .supply-chain-node-value {
+      font-size: 14px;
+      font-weight: bold;
+      color: #ffffff;
+      transition: all 0.5s ease-out;
+    }
+
+    .supply-chain-arrow {
+      position: relative;
+      width: 80px;
+      height: 2px;
+      background: repeating-linear-gradient(
+        90deg,
+        #2563eb 0px,
+        #2563eb 6px,
+        transparent 6px,
+        transparent 12px
+      );
+      animation: dashFlow 0.1s linear infinite;
+    }
+
+    @keyframes dashFlow {
+      0% {
+        background-position: 0 0;
+      }
+      100% {
+        background-position: -12px 0;
+      }
+    }
+
+    .panel-container {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      padding: 20px;
+      gap: 20px;
+      background: #0b0f19;
+    }
+
+    .right-panel {
+      width: 280px;
+      background: #1f2937;
+      border-radius: 12px;
+      padding: 20px;
+      color: #e5e7eb;
+    }
+
+    .panel-title {
+      font-size: 16px;
+      font-weight: bold;
+      margin-bottom: 16px;
+      color: #f3f4f6;
+    }
+
+    .panel-info-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px 0;
+      padding: 8px 0;
+    }
+
+    .panel-info-label {
+      font-size: 13px;
+      color: #9ca3af;
+    }
+
+    .panel-info-value {
+      font-size: 14px;
+      font-weight: 600;
+      color: #ffffff;
+      transition: all 0.3s ease-out;
+    }
+
+    .resource-badge {
+      display: inline-block;
+      padding: 4px 10px;
+      border-radius: 12px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .resource-iron {
+      background: rgba(156, 163, 175, 0.2);
+      color: #9ca3af;
+    }
+
+    .resource-crystal {
+      background: rgba(139, 92, 246, 0.2);
+      color: #8b5cf6;
+    }
+
+    .resource-gas {
+      background: rgba(163, 230, 53, 0.2);
+      color: #a3e635;
+    }
+
+    .slider-container {
+      margin-top: 16px;
+    }
+
+    .slider-label {
+      font-size: 13px;
+      color: #9ca3af;
+      margin-bottom: 10px;
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .slider-value {
+      color: #3b82f6;
+      font-weight: 600;
+    }
+
+    input[type="range"] {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 180px;
+      height: 6px;
+      background: #374151;
+      border-radius: 3px;
+      outline: none;
+      cursor: pointer;
+    }
+
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 20px;
+      height: 20px;
+      border-radius: 8px;
+      background: #3b82f6;
+      cursor: pointer;
+      transition: background 0.2s ease;
+    }
+
+    input[type="range"]::-webkit-slider-thumb:hover {
+      background: #60a5fa;
+    }
+
+    input[type="range"]::-moz-range-thumb {
+      width: 20px;
+      height: 20px;
+      border-radius: 8px;
+      background: #3b82f6;
+      cursor: pointer;
+      border: none;
+      transition: background 0.2s ease;
+    }
+
+    input[type="range"]::-moz-range-thumb:hover {
+      background: #60a5fa;
+    }
+
+    .exploration-bar-container {
+      margin-top: 8px;
+      height: 6px;
+      background: #374151;
+      border-radius: 3px;
+      overflow: hidden;
+    }
+
+    .exploration-bar-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #3b82f6, #60a5fa);
+      transition: width 0.3s ease-out;
+    }
+
+    .empty-panel {
+      color: #6b7280;
+      font-size: 14px;
+      text-align: center;
+      padding: 40px 0;
+    }
+
+    .status-bar {
+      height: 48px;
+      background: #0f172a;
+      display: flex;
+      align-items: center;
+      justify-content: space-around;
+      padding: 0 40px;
+      flex-shrink: 0;
+    }
+
+    .status-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .status-label {
+      font-size: 13px;
+      color: #9ca3af;
+    }
+
+    .status-value {
+      font-size: 19px;
+      font-weight: bold;
+      color: #ffffff;
+      min-width: 80px;
+      text-align: left;
+      transition: all 0.5s ease-out;
+    }
+
+    #hexCanvas {
+      display: block;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
