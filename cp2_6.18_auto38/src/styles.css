@@ -157,27 +157,40 @@ body {
   border: none;
   color: #e5e7eb;
   cursor: pointer;
-  padding: 4px;
+  padding: 4px 6px;
   border-radius: 4px;
   display: flex;
   align-items: center;
   justify-content: center;
+  gap: 4px;
   transition: all 0.25s ease-out;
+  font-size: 11px;
+  line-height: 1;
 }
 
-.toggle-all-btn:hover {
+.toggle-all-btn:hover:not(:disabled) {
   background-color: #374151;
   color: #f59e0b;
 }
 
+.toggle-all-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
 .toggle-all-btn svg {
-  width: 16px;
-  height: 16px;
+  width: 14px;
+  height: 14px;
   transition: transform 0.25s ease-out;
+  flex-shrink: 0;
 }
 
 .toggle-all-btn.collapsed svg {
   transform: rotate(-90deg);
+}
+
+.toggle-all-label {
+  white-space: nowrap;
 }
 
 .nav-item {
@@ -337,24 +350,44 @@ body {
   color: #374151;
   font-size: 12px;
   padding: 3px 10px;
-  border-radius: 4px;
+  border-radius: 12px;
   cursor: pointer;
   transition: all 0.25s ease-out;
   user-select: none;
+  border: 1px solid transparent;
 }
 
 .tag-badge:hover {
-  background-color: #e5e7eb;
+  background-color: #dbeafe;
+  color: #1e40af;
+  border-color: #93c5fd;
+  box-shadow: 0 2px 6px rgba(30, 64, 175, 0.12);
   transform: translateY(-1px);
+}
+
+.tag-badge:active {
+  transform: translateY(0);
+  box-shadow: 0 1px 2px rgba(30, 64, 175, 0.08);
 }
 
 .tag-badge.active {
   background-color: #1e40af;
   color: #ffffff;
+  border-color: #1e40af;
+  box-shadow: 0 2px 8px rgba(30, 64, 175, 0.25);
 }
 
 .tag-badge.active:hover {
   background-color: #1e3a8a;
+  border-color: #1e3a8a;
+  box-shadow: 0 4px 12px rgba(30, 64, 175, 0.35);
+  transform: translateY(-1px);
+}
+
+.tag-badge.active:active {
+  background-color: #172554;
+  transform: translateY(0);
+  box-shadow: 0 1px 4px rgba(30, 64, 175, 0.2);
 }
 
 .copy-link-btn {

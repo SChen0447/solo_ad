@@ -40,9 +40,26 @@ const TimelineItem: React.FC<TimelineItemProps> = ({
 
   const handleCopyLink = async (e: React.MouseEvent) => {
     e.stopPropagation();
-    const text = `${record.title} - ${record.date}`;
+    const d = new Date(record.date);
+    const year = d.getFullYear();
+    const month = (d.getMonth() + 1).toString().padStart(2, '0');
+    const day = d.getDate().toString().padStart(2, '0');
+    const formattedDate = `${year}-${month}-${day}`;
+    const text = `${record.title} - ${formattedDate}`;
+
     try {
-      await navigator.clipboard.writeText(text);
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(text);
+      } else {
+        const textarea = document.createElement('textarea');
+        textarea.value = text;
+        textarea.style.position = 'fixed';
+        textarea.style.opacity = '0';
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textarea);
+      }
       setShowCopySuccess(true);
       setTimeout(() => setShowCopySuccess(false), 2000);
     } catch (err) {

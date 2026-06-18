@@ -42,8 +42,8 @@ const Timeline: React.FC = () => {
 
   useEffect(() => {
     const groups = groupByYear(filteredRecords);
-    setYearGroups(groups);
-    if (groups.length > 0 && activeYear === null) {
+    setYearGroups(groups.map(g => ({ ...g, collapsed: false })));
+    if (groups.length > 0) {
       setActiveYear(groups[0].year);
     }
   }, [filteredRecords]);
