@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI Sandbox - 2D Top-Down Shooter</title>
+  <link rel="stylesheet" href="/src/style.css" />
+</head>
+<body>
+  <div id="app">
+    <div id="toolbar" class="panel">
+      <h3 class="panel-title">工具栏</h3>
+      <button id="btn-player" class="tool-btn">
+        <span class="icon player-icon"></span>
+        <span>玩家</span>
+      </button>
+      <button id="btn-patrol" class="tool-btn">
+        <span class="icon patrol-icon"></span>
+        <span>巡逻兵</span>
+      </button>
+      <button id="btn-sniper" class="tool-btn">
+        <span class="icon sniper-icon"></span>
+        <span>狙击手</span>
+      </button>
+      <button id="btn-path" class="tool-btn">
+        <span class="icon path-icon"></span>
+        <span>路径点</span>
+      </button>
+      <button id="btn-clear" class="tool-btn danger">
+        <span class="icon clear-icon"></span>
+        <span>清空</span>
+      </button>
+      <div class="hint">
+        <p>提示：</p>
+        <p>1. 选择工具后点击画布放置</p>
+        <p>2. 巡逻兵需先放置2-4个路径点</p>
+        <p>3. WASD控制玩家移动</p>
+      </div>
+    </div>
+
+    <div id="canvas-container">
+      <canvas id="game-canvas" width="800" height="600"></canvas>
+      <div id="status-panel" class="panel">
+        <div class="status-row">
+          <span class="label">AI总数：</span>
+          <span id="stat-total" class="value">0</span>
+        </div>
+        <div class="status-row">
+          <span class="label">巡逻中：</span>
+          <span id="stat-patrol" class="value">0</span>
+        </div>
+        <div class="status-row">
+          <span class="label">索敌中：</span>
+          <span id="stat-search" class="value">0</span>
+        </div>
+        <div class="status-row">
+          <span class="label">追击中：</span>
+          <span id="stat-chase" class="value">0</span>
+        </div>
+        <div class="status-divider"></div>
+        <div class="status-row">
+          <span class="label">玩家X：</span>
+          <span id="stat-player-x" class="value">0</span>
+        </div>
+        <div class="status-row">
+          <span class="label">玩家Y：</span>
+          <span id="stat-player-y" class="value">0</span>
+        </div>
+      </div>
+    </div>
+
+    <div id="param-panel" class="panel">
+      <h3 class="panel-title">参数调节</h3>
+      <div class="param-group">
+        <label class="param-label">巡逻速度</label>
+        <div class="param-control">
+          <input type="range" id="slider-patrol-speed" min="1" max="5" step="0.5" value="3" class="slider" />
+          <span id="val-patrol-speed" class="param-value">3.0</span>
+        </div>
+      </div>
+      <div class="param-group">
+        <label class="param-label">视野角度</label>
+        <div class="param-control">
+          <input type="range" id="slider-fov-angle" min="30" max="180" step="5" value="90" class="slider" />
+          <span id="val-fov-angle" class="param-value">90°</span>
+        </div>
+      </div>
+      <div class="param-group">
+        <label class="param-label">警戒时间</label>
+        <div class="param-control">
+          <input type="range" id="slider-alert-time" min="1" max="5" step="0.5" value="3" class="slider" />
+          <span id="val-alert-time" class="param-value">3.0s</span>
+        </div>
+      </div>
+      <div class="param-group">
+        <label class="param-label">视野半径</label>
+        <div class="param-control">
+          <input type="range" id="slider-fov-radius" min="50" max="300" step="10" value="150" class="slider" />
+          <span id="val-fov-radius" class="param-value">150</span>
+        </div>
+      </div>
+    </div>
+  </div>
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
