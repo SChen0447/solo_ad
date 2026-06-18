@@ -1,0 +1,288 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body, #root {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: #0a0a1e;
+  font-family: 'Microsoft YaHei', 'PingFang SC', sans-serif;
+  color: #e0e6ff;
+}
+
+.ui-panel {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 10;
+}
+
+.ui-panel > * {
+  pointer-events: auto;
+}
+
+.top-bar {
+  position: absolute;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+
+.hearts {
+  display: flex;
+  gap: 10px;
+}
+
+.heart {
+  width: 32px;
+  height: 32px;
+  transition: all 0.3s ease;
+  filter: drop-shadow(0 0 6px rgba(255, 80, 120, 0.8));
+}
+
+.heart.lost {
+  filter: grayscale(1) brightness(0.4);
+  transform: scale(0.7);
+}
+
+.progress-container {
+  width: 320px;
+  height: 20px;
+  background: rgba(20, 20, 50, 0.7);
+  border: 2px solid rgba(120, 140, 255, 0.6);
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 0 15px rgba(100, 120, 255, 0.4),
+              inset 0 0 10px rgba(0, 0, 0, 0.5);
+}
+
+.progress-bar {
+  height: 100%;
+  background: linear-gradient(90deg, #4466ff, #88aaff, #ffd700);
+  background-size: 200% 100%;
+  animation: shimmer 2s ease-in-out infinite;
+  border-radius: 10px;
+  transition: width 0.4s ease;
+  box-shadow: 0 0 12px rgba(136, 170, 255, 0.8);
+}
+
+.progress-text {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 12px;
+  font-weight: bold;
+  color: #fff;
+  text-shadow: 0 0 4px rgba(0, 0, 0, 0.9);
+  white-space: nowrap;
+}
+
+@keyframes shimmer {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+
+.damage-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: radial-gradient(ellipse at center, transparent 40%, rgba(80, 20, 120, 0.6) 100%);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.1s ease;
+  z-index: 20;
+}
+
+.damage-overlay.active {
+  animation: damageFlash 1s ease-out forwards;
+}
+
+@keyframes damageFlash {
+  0% { opacity: 0; }
+  20% { opacity: 0.6; }
+  100% { opacity: 0; }
+}
+
+.overlay-screen {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(ellipse at center, rgba(10, 10, 40, 0.85) 0%, rgba(5, 5, 20, 0.95) 100%);
+  z-index: 30;
+  backdrop-filter: blur(4px);
+}
+
+.game-title {
+  font-size: 64px;
+  font-weight: 900;
+  background: linear-gradient(135deg, #ffd700, #ffaa00, #ffd700);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  text-shadow: 0 0 40px rgba(255, 215, 0, 0.6);
+  margin-bottom: 24px;
+  letter-spacing: 12px;
+  animation: titleGlow 3s ease-in-out infinite;
+}
+
+@keyframes titleGlow {
+  0%, 100% { filter: drop-shadow(0 0 20px rgba(255, 215, 0, 0.5)); }
+  50% { filter: drop-shadow(0 0 40px rgba(255, 215, 0, 0.9)); }
+}
+
+.game-subtitle {
+  font-size: 18px;
+  color: #8899dd;
+  margin-bottom: 48px;
+  letter-spacing: 4px;
+}
+
+.instruction {
+  background: rgba(20, 25, 60, 0.8);
+  border: 2px solid rgba(120, 140, 255, 0.5);
+  border-radius: 16px;
+  padding: 28px 40px;
+  margin-bottom: 40px;
+  box-shadow: 0 0 30px rgba(80, 100, 220, 0.3),
+              inset 0 0 20px rgba(100, 120, 255, 0.1);
+}
+
+.instruction p {
+  font-size: 15px;
+  line-height: 2.2;
+  color: #c0ccee;
+}
+
+.instruction .key {
+  display: inline-block;
+  padding: 2px 10px;
+  background: linear-gradient(180deg, #2a2f5e, #1a1f3e);
+  border: 1px solid rgba(120, 140, 255, 0.6);
+  border-radius: 6px;
+  font-family: monospace;
+  font-weight: bold;
+  color: #ffd700;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+  margin: 0 3px;
+}
+
+.btn-glow {
+  position: relative;
+  padding: 16px 60px;
+  font-size: 20px;
+  font-weight: bold;
+  color: #0a0a1e;
+  background: linear-gradient(135deg, #ffd700, #ffaa00);
+  border: none;
+  border-radius: 30px;
+  cursor: pointer;
+  letter-spacing: 6px;
+  box-shadow: 0 0 30px rgba(255, 215, 0, 0.6),
+              0 4px 15px rgba(0, 0, 0, 0.4);
+  transition: all 0.3s ease;
+  overflow: hidden;
+}
+
+.btn-glow::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.5), transparent);
+  transition: left 0.6s ease;
+}
+
+.btn-glow:hover {
+  transform: translateY(-2px) scale(1.05);
+  box-shadow: 0 0 50px rgba(255, 215, 0, 0.9),
+              0 6px 20px rgba(0, 0, 0, 0.5);
+}
+
+.btn-glow:hover::before {
+  left: 100%;
+}
+
+.btn-glow:active {
+  transform: translateY(0) scale(1.02);
+}
+
+.victory-title {
+  font-size: 56px;
+  font-weight: 900;
+  background: linear-gradient(135deg, #ffd700, #fff5a0, #ffd700);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  margin-bottom: 20px;
+  letter-spacing: 16px;
+  animation: victoryPulse 1.5s ease-in-out infinite;
+}
+
+@keyframes victoryPulse {
+  0%, 100% {
+    filter: drop-shadow(0 0 20px rgba(255, 215, 0, 0.6));
+    transform: scale(1);
+  }
+  50% {
+    filter: drop-shadow(0 0 50px rgba(255, 215, 0, 1));
+    transform: scale(1.05);
+  }
+}
+
+.victory-subtitle {
+  font-size: 22px;
+  color: #88ddff;
+  margin-bottom: 40px;
+  letter-spacing: 6px;
+  text-shadow: 0 0 15px rgba(100, 200, 255, 0.6);
+}
+
+.gameover-title {
+  font-size: 52px;
+  font-weight: 900;
+  background: linear-gradient(135deg, #ff4466, #aa2244);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  margin-bottom: 20px;
+  letter-spacing: 12px;
+  filter: drop-shadow(0 0 20px rgba(255, 50, 80, 0.6));
+}
+
+.gameover-subtitle {
+  font-size: 18px;
+  color: #cc99aa;
+  margin-bottom: 40px;
+  letter-spacing: 4px;
+}
+
+.particles-canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 31;
+}
