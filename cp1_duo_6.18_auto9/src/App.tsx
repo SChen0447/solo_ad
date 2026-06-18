@@ -26,9 +26,62 @@ export const App: React.FC = () => {
       }
 
       const configs = getConfigs();
+
       if (configs.length === 0) {
         alert('没有可导出的内容');
         return;
+      }
+
+      for (let i = 0; i < configs.length; i++) {
+        const config = configs[i];
+        const columnNum = i + 1;
+
+        if (!config.font || !config.font.family) {
+          alert(`第 ${columnNum} 列的字体数据无效，请检查字体是否已加载`);
+          return;
+        }
+
+        if (!config.params) {
+          alert(`第 ${columnNum} 列的渲染参数无效`);
+          return;
+        }
+
+        const { params } = config;
+        if (typeof params.fontSize !== 'number' || params.fontSize <= 0) {
+          alert(`第 ${columnNum} 列的字号参数无效`);
+          return;
+        }
+        if (typeof params.lineHeight !== 'number' || params.lineHeight <= 0) {
+          alert(`第 ${columnNum} 列的行高参数无效`);
+          return;
+        }
+        if (typeof params.letterSpacing !== 'number') {
+          alert(`第 ${columnNum} 列的字距参数无效`);
+          return;
+        }
+        if (typeof params.fontWeight !== 'number' || params.fontWeight <= 0) {
+          alert(`第 ${columnNum} 列的字重参数无效`);
+          return;
+        }
+        if (!params.color || typeof params.color !== 'string') {
+          alert(`第 ${columnNum} 列的颜色参数无效`);
+          return;
+        }
+
+        if (typeof config.width !== 'number' || config.width <= 0) {
+          alert(`第 ${columnNum} 列的宽度参数无效`);
+          return;
+        }
+
+        try {
+          const fontLoaded = document.fonts.check(`${params.fontWeight} ${params.fontSize}px ${config.font.family}`);
+          if (!fontLoaded) {
+            alert(`第 ${columnNum} 列的字体尚未加载完成，请稍候再试`);
+            return;
+          }
+        } catch {
+          // fonts.check 可能在某些环境下不支持，跳过检查
+        }
       }
 
       const dataUrl = await TypesetRenderer.renderToImage(configs, 400, 2);
@@ -206,8 +259,21 @@ globalStyles.textContent = `
   button:hover {
     filter: brightness(1.1);
   }
+  button:disabled {
+    cursor: not-allowed;
+    filter: none;
+    opacity: 0.5;
+  }
+  button:disabled:hover {
+    transform: none;
+    filter: none;
+    opacity: 0.5;
+  }
   button:active {
     transform: scale(0.98);
+  }
+  button:disabled:active {
+    transform: none;
   }
   .control-panel-scroll::-webkit-scrollbar {
     width: 6px;

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAppStore } from '../store';
 import { FontUploader } from './FontUploader';
 
@@ -13,6 +13,14 @@ export const ControlPanel: React.FC = () => {
 
   const activeParams = typesetParams.find((p) => p.id === activeParamsId);
 
+  const [colorInputValue, setColorInputValue] = useState(activeParams?.color || '#333333');
+
+  useEffect(() => {
+    if (activeParams) {
+      setColorInputValue(activeParams.color);
+    }
+  }, [activeParams?.color, activeParams?.id]);
+
   if (!activeParams) return null;
 
   const handleSliderChange = (
@@ -20,6 +28,26 @@ export const ControlPanel: React.FC = () => {
     value: number | string
   ) => {
     updateActiveParams({ [key]: value });
+  };
+
+  const handleColorInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setColorInputValue(value);
+    if (/^#[0-9A-Fa-f]{6}$/.test(value)) {
+      updateActiveParams({ color: value });
+    }
+  };
+
+  const handleColorInputBlur = () => {
+    if (!/^#[0-9A-Fa-f]{6}$/.test(colorInputValue)) {
+      setColorInputValue(activeParams.color);
+    }
+  };
+
+  const handleColorPickerChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setColorInputValue(value);
+    updateActiveParams({ color: value });
   };
 
   return (
@@ -132,19 +160,16 @@ export const ControlPanel: React.FC = () => {
           <input
             type="color"
             value={activeParams.color}
-            onChange={(e) => handleSliderChange('color', e.target.value)}
+            onChange={handleColorPickerChange}
             style={styles.colorPicker}
           />
           <input
             type="text"
-            value={activeParams.color}
-            onChange={(e) => {
-              const value = e.target.value;
-              if (/^#[0-9A-Fa-f]{6}$/.test(value)) {
-                handleSliderChange('color', value);
-              }
-            }}
+            value={colorInputValue}
+            onChange={handleColorInputChange}
+            onBlur={handleColorInputBlur}
             style={styles.colorInput}
+            placeholder="#RRGGBB"
           />
         </div>
       </div>

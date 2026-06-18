@@ -158,10 +158,49 @@ export class FontLoader {
   }
 
   private static async waitForFontLoad(fontFamily: string): Promise<void> {
-    try {
-      await document.fonts.load(`16px ${fontFamily}`);
-    } catch {
-      await new Promise((resolve) => setTimeout(resolve, 500));
+    const timeout = 3000;
+    const startTime = Date.now();
+
+    const tryLoad = async (): Promise<boolean> => {
+      try {
+        const fontString = `400 16px ${fontFamily}`;
+        const result = await document.fonts.load(fontString);
+        return result && result.length > 0;
+      } catch {
+        return false;
+      }
+    };
+
+    const waitForReady = async (): Promise<boolean> => {
+      try {
+        await document.fonts.ready;
+        return true;
+      } catch {
+        return false;
+      }
+    };
+
+    const loaded = await Promise.race([
+      tryLoad(),
+      waitForReady(),
+      new Promise<boolean>((resolve) => {
+        const check = () => {
+          if (Date.now() - startTime > timeout) {
+            resolve(false);
+            return;
+          }
+          if (document.fonts.check(`400 16px ${fontFamily}`)) {
+            resolve(true);
+            return;
+          }
+          setTimeout(check, 100);
+        };
+        check();
+      }),
+    ]);
+
+    if (!loaded) {
+      await new Promise((resolve) => setTimeout(resolve, 200));
     }
   }
 

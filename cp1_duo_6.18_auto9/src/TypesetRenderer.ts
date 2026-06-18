@@ -21,6 +21,7 @@ export class TypesetRenderer {
   private canvas: HTMLCanvasElement;
   private ctx: CanvasRenderingContext2D;
   private animationFrameId: number | null = null;
+  private pendingConfig: RenderConfig | null = null;
   private pendingResolve: (() => void) | null = null;
 
   constructor(canvas: HTMLCanvasElement) {
@@ -34,21 +35,24 @@ export class TypesetRenderer {
 
   render(config: RenderConfig): Promise<void> {
     return new Promise((resolve) => {
-      if (this.animationFrameId !== null) {
-        cancelAnimationFrame(this.animationFrameId);
-        this.animationFrameId = null;
-      }
+      this.pendingConfig = config;
 
       if (this.pendingResolve) {
         this.pendingResolve();
         this.pendingResolve = null;
       }
-
       this.pendingResolve = resolve;
+
+      if (this.animationFrameId !== null) {
+        return;
+      }
 
       this.animationFrameId = requestAnimationFrame(() => {
         try {
-          this.performRender(config);
+          if (this.pendingConfig) {
+            this.performRender(this.pendingConfig);
+            this.pendingConfig = null;
+          }
         } finally {
           this.animationFrameId = null;
           if (this.pendingResolve) {
@@ -219,6 +223,7 @@ export class TypesetRenderer {
       cancelAnimationFrame(this.animationFrameId);
       this.animationFrameId = null;
     }
+    this.pendingConfig = null;
     if (this.pendingResolve) {
       this.pendingResolve();
       this.pendingResolve = null;
