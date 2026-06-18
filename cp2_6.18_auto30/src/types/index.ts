@@ -14,7 +14,7 @@ export interface GradientScheme {
   angle: number;
 }
 
-export type EasingType = 'ease' | 'ease-in' | 'ease-out' | 'linear' | 'cubic-bezier';
+export type EasingType = 'ease' | 'ease-in' | 'ease-out' | 'ease-in-out' | 'linear' | 'cubic-bezier';
 
 export interface AnimationParams {
   duration: number;

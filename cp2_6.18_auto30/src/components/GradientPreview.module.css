@@ -13,7 +13,6 @@
   border: 1px solid var(--border);
   background: var(--bg-card);
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
-  will-change: background-image;
 }
 
 .previewCanvas {
@@ -21,7 +20,7 @@
   inset: 0;
   width: 100%;
   height: 100%;
-  will-change: background-position, background-image;
+  will-change: background-image;
 }
 
 .previewLabel {
@@ -60,6 +59,7 @@
   transition: all 0.3s ease-out;
   padding: 0;
   overflow: hidden;
+  flex-shrink: 0;
 }
 
 .playBtn:hover {
@@ -72,16 +72,14 @@
   transform: scale(0.98);
 }
 
-.iconWrapper {
+.iconWrap {
   position: relative;
-  width: 24px;
-  height: 24px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  width: 22px;
+  height: 22px;
 }
 
-.iconBase {
+.iconPlay,
+.iconPause {
   position: absolute;
   inset: 0;
   display: flex;
@@ -90,18 +88,18 @@
   transition: opacity 0.3s ease-out, transform 0.3s ease-out;
 }
 
-.iconHidden {
-  opacity: 0;
-  transform: scale(0.7);
-  pointer-events: none;
-}
-
 .iconVisible {
   opacity: 1;
   transform: scale(1);
 }
 
-.pauseIcon {
+.iconHidden {
+  opacity: 0;
+  transform: scale(0.65);
+  pointer-events: none;
+}
+
+.iconPause {
   display: flex;
   gap: 5px;
   align-items: center;
@@ -128,6 +126,7 @@
   justify-content: center;
   transition: all 0.2s ease-out;
   padding: 0;
+  flex-shrink: 0;
 }
 
 .stopBtn:hover {
@@ -167,4 +166,5 @@
   background: var(--bg-input);
   border-radius: 6px;
   border: 1px solid var(--border);
+  flex-shrink: 0;
 }

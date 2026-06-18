@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useMemo } from 'react';
 import { Square } from 'lucide-react';
 import { useGradientStore } from '@/store/gradientStore';
 import { generateGradientCSS } from '@/utils/cssGenerator';
@@ -29,43 +29,43 @@ function rgbToHex(r: number, g: number, b: number): string {
   return `#${to(r)}${to(g)}${to(b)}`;
 }
 
-function applyEasing(t: number, easing: string, cubicBezier: string): number {
+function cubicBezierY(x1: number, y1: number, x2: number, y2: number, t: number): number {
+  let low = 0;
+  let high = 1;
+  for (let i = 0; i < 18; i++) {
+    const mid = (low + high) / 2;
+    const bx =
+      3 * x1 * mid * (1 - mid) ** 2 + 3 * x2 * mid ** 2 * (1 - mid) + mid ** 3;
+    if (bx < t) low = mid;
+    else high = mid;
+  }
+  const s = (low + high) / 2;
+  return 3 * y1 * s * (1 - s) ** 2 + 3 * y2 * s ** 2 * (1 - s) + s ** 3;
+}
+
+function getEasedT(t: number, easing: string, cubicBezier: string): number {
   switch (easing) {
     case 'linear':
       return t;
     case 'ease':
-      return t < 0.5
-        ? 2 * t * t
-        : -1 + (4 - 2 * t) * t;
+      return t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t;
     case 'ease-in':
       return t * t * t;
     case 'ease-out':
       return --t * t * t + 1;
+    case 'ease-in-out':
+      return t < 0.5 ? 4 * t * t * t : (t - 1) * (2 * t - 2) * (2 * t - 2) + 1;
     default: {
       const m = cubicBezier.match(
         /cubic-bezier\(\s*([-\d.]+)\s*,\s*([-\d.]+)\s*,\s*([-\d.]+)\s*,\s*([-\d.]+)\s*\)/
       );
       if (!m) return t;
-      const x1 = parseFloat(m[1]);
-      const y1 = parseFloat(m[2]);
-      const x2 = parseFloat(m[3]);
-      const y2 = parseFloat(m[4]);
-      let low = 0;
-      let high = 1;
-      for (let i = 0; i < 18; i++) {
-        const mid = (low + high) / 2;
-        const bx =
-          3 * x1 * mid * (1 - mid) ** 2 +
-          3 * x2 * mid ** 2 * (1 - mid) +
-          mid ** 3;
-        if (bx < t) low = mid;
-        else high = mid;
-      }
-      const s = (low + high) / 2;
-      return (
-        3 * y1 * s * (1 - s) ** 2 +
-        3 * y2 * s ** 2 * (1 - s) +
-        s ** 3
+      return cubicBezierY(
+        parseFloat(m[1]),
+        parseFloat(m[2]),
+        parseFloat(m[3]),
+        parseFloat(m[4]),
+        t
       );
     }
   }
@@ -81,38 +81,46 @@ export default function GradientPreview() {
 
   const rafRef = useRef<number | null>(null);
   const startTimeRef = useRef<number>(0);
-  const lastPauseRef = useRef<number>(0);
+  const lastPauseElapsedRef = useRef<number>(0);
   const [fps, setFps] = useState(0);
   const framesRef = useRef(0);
   const fpsTimerRef = useRef<number>(0);
 
-  const sortedStops = [...currentScheme.colorStops].sort(
-    (a, b) => a.position - b.position
+  const sortedStops = useMemo(
+    () => [...currentScheme.colorStops].sort((a, b) => a.position - b.position),
+    [currentScheme.colorStops]
   );
 
-  const staticGradient = generateGradientCSS(
-    currentScheme.colorStops,
-    currentScheme.gradientType,
-    currentScheme.angle
+  const staticGradient = useMemo(
+    () =>
+      generateGradientCSS(
+        currentScheme.colorStops,
+        currentScheme.gradientType,
+        currentScheme.angle
+      ),
+    [currentScheme]
   );
 
-  const interpolateStops = (progress: number) => {
+  const computeStopsAtProgress = (progress: number) => {
     if (sortedStops.length < 2) return sortedStops;
-    const count = sortedStops.length;
-    const shift = (progress * 100) % 100;
+    const n = sortedStops.length;
+    const rawOffset = progress * n;
+    const indexOffset = Math.floor(rawOffset) % n;
+    const frac = rawOffset - Math.floor(rawOffset);
+    const easedFrac = getEasedT(
+      frac,
+      animationParams.easing,
+      animationParams.cubicBezierValue
+    );
+
     return sortedStops.map((stop, idx) => {
-      const nextIdx = (idx + 1) % count;
-      const a = hexToRgb(stop.color);
-      const b = hexToRgb(sortedStops[nextIdx].color);
-      const t = Math.min(1, Math.max(0, (shift + idx * (100 / count)) / 100));
-      const tt = applyEasing(
-        t < 0.5 ? t * 2 : 2 - t * 2,
-        animationParams.easing,
-        animationParams.cubicBezierValue
-      );
-      const r = a.r + (b.r - a.r) * tt;
-      const g = a.g + (b.g - a.g) * tt;
-      const bl = a.b + (b.b - a.b) * tt;
+      const colorIdx0 = (idx + indexOffset) % n;
+      const colorIdx1 = (idx + indexOffset + 1) % n;
+      const a = hexToRgb(sortedStops[colorIdx0].color);
+      const b = hexToRgb(sortedStops[colorIdx1].color);
+      const r = a.r + (b.r - a.r) * easedFrac;
+      const g = a.g + (b.g - a.g) * easedFrac;
+      const bl = a.b + (b.b - a.b) * easedFrac;
       return {
         ...stop,
         color: rgbToHex(r, g, bl),
@@ -121,7 +129,7 @@ export default function GradientPreview() {
   };
 
   const getAnimatedGradient = (progress: number) => {
-    const stops = interpolateStops(progress);
+    const stops = computeStopsAtProgress(progress);
     return generateGradientCSS(stops, currentScheme.gradientType, currentScheme.angle);
   };
 
@@ -134,23 +142,28 @@ export default function GradientPreview() {
       return;
     }
 
-    startTimeRef.current = performance.now() - lastPauseRef.current;
+    startTimeRef.current = performance.now() - lastPauseElapsedRef.current;
+    fpsTimerRef.current = 0;
+    framesRef.current = 0;
 
     const loop = (now: number) => {
-      const elapsed = now - startTimeRef.current;
-      const totalMs = (animationParams.delay + animationParams.duration) * 1000;
-      const cycleElapsed = Math.max(0, elapsed - animationParams.delay * 1000);
-      let progress;
-      if (totalMs <= 0) {
+      const totalElapsed = now - startTimeRef.current;
+      const delayMs = animationParams.delay * 1000;
+      const durationMs = animationParams.duration * 1000;
+      const cycleTime = delayMs + durationMs;
+
+      let progress: number;
+      if (cycleTime <= 0) {
         progress = 0;
-      } else if (cycleElapsed <= 0) {
+      } else if (totalElapsed < delayMs) {
         progress = 0;
       } else {
-        const cycleProgress = cycleElapsed / (animationParams.duration * 1000);
-        progress = cycleProgress - Math.floor(cycleProgress);
+        const activeTime = totalElapsed - delayMs;
+        progress = activeTime / durationMs;
       }
-      const smoothed = progress;
-      setAnimProgress(smoothed);
+
+      const clampedProgress = progress - Math.floor(progress);
+      setAnimProgress(clampedProgress);
 
       framesRef.current += 1;
       if (!fpsTimerRef.current) fpsTimerRef.current = now;
@@ -171,16 +184,22 @@ export default function GradientPreview() {
         cancelAnimationFrame(rafRef.current);
         rafRef.current = null;
       }
-      lastPauseRef.current = performance.now() - startTimeRef.current;
+      lastPauseElapsedRef.current = performance.now() - startTimeRef.current;
     };
-  }, [isPlaying, animationParams.duration, animationParams.delay, animationParams.easing, animationParams.cubicBezierValue]);
+  }, [
+    isPlaying,
+    animationParams.duration,
+    animationParams.delay,
+    animationParams.easing,
+    animationParams.cubicBezierValue,
+  ]);
 
   const handleTogglePlay = () => {
     if (isPlaying) {
       setIsPlaying(false);
     } else {
-      if (animProgress >= 1) {
-        lastPauseRef.current = 0;
+      if (animProgress <= 0 || animProgress >= 1) {
+        lastPauseElapsedRef.current = animationParams.delay * 1000;
       }
       setIsPlaying(true);
     }
@@ -188,13 +207,14 @@ export default function GradientPreview() {
 
   const handleStop = () => {
     setIsPlaying(false);
-    lastPauseRef.current = 0;
+    lastPauseElapsedRef.current = 0;
     setAnimProgress(0);
   };
 
-  const displayedGradient = isPlaying || animProgress > 0
-    ? getAnimatedGradient(animProgress)
-    : staticGradient;
+  const displayedGradient =
+    isPlaying || animProgress > 0
+      ? getAnimatedGradient(animProgress)
+      : staticGradient;
 
   return (
     <div className={styles.previewContainer}>
@@ -203,8 +223,6 @@ export default function GradientPreview() {
           className={styles.previewCanvas}
           style={{
             backgroundImage: displayedGradient,
-            backgroundSize: '200% 200%',
-            backgroundPosition: `${animProgress * 100}% ${50}%`,
           }}
         />
         <div className={styles.previewLabel}>
@@ -219,25 +237,23 @@ export default function GradientPreview() {
           title={isPlaying ? '暂停' : '播放'}
           aria-label={isPlaying ? '暂停' : '播放'}
         >
-          <div className={styles.iconWrapper}>
+          <div className={styles.iconWrap}>
             <div
-              className={`${styles.iconBase} ${
+              className={`${styles.iconPlay} ${
                 isPlaying ? styles.iconHidden : styles.iconVisible
               }`}
             >
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
                 <polygon points="7,4 21,12 7,20" />
               </svg>
             </div>
             <div
-              className={`${styles.iconBase} ${
+              className={`${styles.iconPause} ${
                 isPlaying ? styles.iconVisible : styles.iconHidden
               }`}
             >
-              <div className={styles.pauseIcon}>
-                <span className={styles.pauseBar} />
-                <span className={styles.pauseBar} />
-              </div>
+              <span className={styles.pauseBar} />
+              <span className={styles.pauseBar} />
             </div>
           </div>
         </button>
