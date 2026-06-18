@@ -451,15 +451,59 @@ body {
   color: var(--text-muted);
 }
 
-.empty-state svg {
-  width: 64px;
-  height: 64px;
-  margin-bottom: 16px;
-  color: #d1d5db;
+.empty-icon-wrapper {
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  background-color: #f3f4f6;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 20px;
 }
 
-.empty-state p {
-  font-size: 14px;
+.empty-icon-wrapper svg {
+  width: 48px;
+  height: 48px;
+  color: #9ca3af;
+}
+
+.empty-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-bottom: 6px;
+}
+
+.empty-subtitle {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+/* Search Highlight */
+mark.highlight {
+  background-color: #fef08a;
+  color: inherit;
+  padding: 1px 2px;
+  border-radius: 2px;
+  font-weight: 500;
+}
+
+.card-category .highlight {
+  background-color: rgba(255, 255, 255, 0.3);
+  color: white;
+  padding: 0 2px;
+  border-radius: 2px;
+}
+
+.card-title .highlight {
+  background-color: #fef08a;
+  color: inherit;
+}
+
+.card-preview .highlight {
+  background-color: #fef3c7;
+  color: inherit;
 }
 
 /* Loading State */

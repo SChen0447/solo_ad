@@ -87,6 +87,7 @@ export const searchCards = (keyword) => {
   const lowerKeyword = keyword.toLowerCase();
   return cards.filter(card =>
     card.title.toLowerCase().includes(lowerKeyword) ||
-    card.content.toLowerCase().includes(lowerKeyword)
+    card.content.toLowerCase().includes(lowerKeyword) ||
+    card.category.toLowerCase().includes(lowerKeyword)
   );
 };

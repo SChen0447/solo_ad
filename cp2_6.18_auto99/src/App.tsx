@@ -167,7 +167,8 @@ const App: React.FC = () => {
       const lowerKw = keyword.toLowerCase();
       result = result.filter(c =>
         c.title.toLowerCase().includes(lowerKw) ||
-        c.content.toLowerCase().includes(lowerKw)
+        c.content.toLowerCase().includes(lowerKw) ||
+        c.category.toLowerCase().includes(lowerKw)
       );
     }
     return result;
@@ -232,6 +233,7 @@ const App: React.FC = () => {
           <CardList
             cards={filteredCards}
             favorites={favorites}
+            keyword={keyword}
             onToggleFavorite={handleToggleFavorite}
             onCardClick={handleCardClick}
             onFavoriteClick={handleFavoriteClick}

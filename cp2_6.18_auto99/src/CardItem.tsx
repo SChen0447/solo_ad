@@ -4,6 +4,7 @@ import { Card, CATEGORY_COLORS, Category } from './types';
 interface CardItemProps {
   card: Card;
   index: number;
+  keyword: string;
   onToggleFavorite: (id: string) => void;
   onClick: (id: string) => void;
 }
@@ -23,8 +24,35 @@ const StarRating: React.FC<{ rating: number }> = ({ rating }) => {
   );
 };
 
-const CardItem: React.FC<CardItemProps> = ({ card, index, onToggleFavorite, onClick }) => {
+const highlightText = (text: string, keyword: string): React.ReactNode => {
+  if (!keyword.trim()) {
+    return text;
+  }
+
+  const lowerKeyword = keyword.toLowerCase();
+  const lowerText = text.toLowerCase();
+  const index = lowerText.indexOf(lowerKeyword);
+
+  if (index === -1) {
+    return text;
+  }
+
+  const before = text.substring(0, index);
+  const match = text.substring(index, index + keyword.length);
+  const after = text.substring(index + keyword.length);
+
+  return (
+    <>
+      {before}
+      <mark className="highlight">{match}</mark>
+      {after.includes(keyword) ? highlightText(after, keyword) : after}
+    </>
+  );
+};
+
+const CardItem: React.FC<CardItemProps> = ({ card, index, keyword, onToggleFavorite, onClick }) => {
   const categoryColor = CATEGORY_COLORS[card.category as Category];
+  const isCategoryMatch = keyword.trim() && card.category.toLowerCase().includes(keyword.toLowerCase());
 
   const handleFavoriteClick = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -43,8 +71,8 @@ const CardItem: React.FC<CardItemProps> = ({ card, index, onToggleFavorite, onCl
       style={{ animationDelay: `${index * 0.05}s` }}
       onClick={() => onClick(card.id)}
     >
-      <div className="card-category" style={{ backgroundColor: categoryColor }}>
-        {card.category}
+      <div className={`card-category ${isCategoryMatch ? 'category-highlight' : ''}`} style={{ backgroundColor: categoryColor }}>
+        {isCategoryMatch ? highlightText(card.category, keyword) : card.category}
       </div>
 
       <button
@@ -57,8 +85,8 @@ const CardItem: React.FC<CardItemProps> = ({ card, index, onToggleFavorite, onCl
       </button>
 
       <div className="card-content">
-        <h3 className="card-title">{card.title}</h3>
-        <p className="card-preview">{getPreviewText(card.content)}</p>
+        <h3 className="card-title">{highlightText(card.title, keyword)}</h3>
+        <p className="card-preview">{highlightText(getPreviewText(card.content), keyword)}</p>
       </div>
 
       <div className="card-footer">

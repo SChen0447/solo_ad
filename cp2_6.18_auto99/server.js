@@ -17,7 +17,7 @@ import {
 } from './data/favorites.js';
 
 const app = express();
-const PORT = 19999;
+const PORT = 29999;
 
 app.use(cors());
 app.use(express.json());
@@ -34,7 +34,8 @@ app.get('/api/cards', (req, res) => {
     const lowerKeyword = keyword.toLowerCase();
     cards = cards.filter(card =>
       card.title.toLowerCase().includes(lowerKeyword) ||
-      card.content.toLowerCase().includes(lowerKeyword)
+      card.content.toLowerCase().includes(lowerKeyword) ||
+      card.category.toLowerCase().includes(lowerKeyword)
     );
   }
 

@@ -5,6 +5,7 @@ import CardItem from './CardItem';
 interface CardListProps {
   cards: Card[];
   favorites: Card[];
+  keyword: string;
   onToggleFavorite: (id: string) => void;
   onCardClick: (id: string) => void;
   onFavoriteClick: (id: string) => void;
@@ -26,6 +27,7 @@ const FavoriteThumb: React.FC<{ card: Card; onClick: () => void }> = ({ card, on
 const CardList: React.FC<CardListProps> = ({
   cards,
   favorites,
+  keyword,
   onToggleFavorite,
   onCardClick,
   onFavoriteClick
@@ -54,11 +56,18 @@ const CardList: React.FC<CardListProps> = ({
 
       {cards.length === 0 ? (
         <div className="empty-state">
-          <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-            <rect x="3" y="3" width="18" height="18" rx="2" />
-            <path d="M9 9h6M9 13h6M9 17h4" />
-          </svg>
-          <p>没有找到相关卡片</p>
+          <div className="empty-icon-wrapper">
+            <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+              <circle cx="11" cy="11" r="8" />
+              <path d="m21 21-4.35-4.35" />
+            </svg>
+          </div>
+          <p className="empty-title">没有找到相关卡片</p>
+          {keyword && (
+            <p className="empty-subtitle">
+              试试其他关键词，或检查拼写是否正确
+            </p>
+          )}
         </div>
       ) : (
         <div className="card-grid">
@@ -67,6 +76,7 @@ const CardList: React.FC<CardListProps> = ({
               key={card.id}
               card={card}
               index={index}
+              keyword={keyword}
               onToggleFavorite={onToggleFavorite}
               onClick={onCardClick}
             />
