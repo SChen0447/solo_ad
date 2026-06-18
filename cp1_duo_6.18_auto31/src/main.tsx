@@ -4,7 +4,7 @@ import MazeCanvas from './ui';
 import { useGameStore, CONSTANTS } from './store';
 
 const App: React.FC = () => {
-  const { walls, receivers, source, mazeSize, isMobile, resetGame, clearWalls } = useGameStore();
+  const { receivers, mazeSize, isMobile, resetGame, clearWalls } = useGameStore();
 
   const allReceiversActive = receivers.every((r) => r.intensity >= r.threshold);
 

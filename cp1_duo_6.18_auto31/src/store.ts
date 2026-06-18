@@ -10,7 +10,7 @@ export const CONSTANTS = {
   SOURCE_DEFAULT_Y: 50,
   WAVE_SPEED: 3,
   WAVE_DECAY: 0.95,
-  WAVES_PER_DIRECTION: 8,
+  WAVES_PER_DIRECTION: 7,
   MAX_WAVES: 500,
   RECEIVER_RADIUS: 12,
   RECEIVER_THRESHOLD: 0.6,
@@ -66,6 +66,8 @@ export interface SoundWave {
   prevX: number;
   prevY: number;
   angle: number;
+  originAngle: number;
+  fanDirIndex: number;
   intensity: number;
   age: number;
   maxAge: number;

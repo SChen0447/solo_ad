@@ -170,7 +170,7 @@ export function propagateWave(
   result.wave.prevX = wave.x;
   result.wave.prevY = wave.y;
 
-  let remainingDistance = CONSTANTS.WAVE_SPEED;
+  let remainingDistance: number = CONSTANTS.WAVE_SPEED;
   let currentX = wave.x;
   let currentY = wave.y;
   let currentAngle = wave.angle;
@@ -320,11 +320,16 @@ export function generateFanWavesFromSource(
 ): Omit<SoundWave, 'id'>[] {
   const newWaves: Omit<SoundWave, 'id'>[] = [];
   const directions = [0, Math.PI / 2, Math.PI, -Math.PI / 2];
-  const halfSector = Math.PI / 4;
+  const halfSpread = (15 * Math.PI) / 180;
 
-  for (const dir of directions) {
-    for (let i = 0; i < raysPerDirection; i++) {
-      const offset = (i / (raysPerDirection - 1) - 0.5) * 2 * halfSector;
+  for (let dirIdx = 0; dirIdx < directions.length; dirIdx++) {
+    const dir = directions[dirIdx];
+    const rayCount = Math.max(3, raysPerDirection);
+    
+    for (let i = 0; i < rayCount; i++) {
+      const offset = rayCount === 1
+        ? 0
+        : (i / (rayCount - 1) - 0.5) * 2 * halfSpread;
       const angle = dir + offset;
       
       newWaves.push({
@@ -333,6 +338,8 @@ export function generateFanWavesFromSource(
         prevX: sourceX,
         prevY: sourceY,
         angle,
+        originAngle: angle,
+        fanDirIndex: dirIdx,
         intensity: 1,
         age: 0,
         maxAge: 500,

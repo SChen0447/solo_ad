@@ -8,7 +8,6 @@ import {
   generateFanWavesFromSource,
   getIntensityColor,
   findWallAtPoint,
-  getWaveColor,
 } from './physics';
 
 const MazeCanvas = () => {
@@ -18,6 +17,8 @@ const MazeCanvas = () => {
 
   useEffect(() => {
     if (!canvasRef.current) return;
+
+    let resizeHandler: (() => void) | null = null;
 
     const sketch = (p: P5) => {
       const getStore = () => useGameStore.getState();
@@ -39,6 +40,8 @@ const MazeCanvas = () => {
         p.resizeCanvas(newMazeSize, newMazeSize);
         p.pixelDensity(window.devicePixelRatio || 1);
       };
+
+      resizeHandler = handleResize;
 
       p.setup = () => {
         const state = getStore();
@@ -105,69 +108,52 @@ const MazeCanvas = () => {
       };
 
       const drawFanWaves = (waves: SoundWave[]) => {
-        const state = getStore();
-        const raysPerFan = state.isMobile ? 4 : CONSTANTS.WAVES_PER_DIRECTION;
-        const totalRays = raysPerFan * 4;
-
-        const waveGroups: SoundWave[][] = [];
-        for (let i = 0; i < 4; i++) {
-          waveGroups.push([]);
-        }
-
+        const groups: Map<string, SoundWave[]> = new Map();
         for (const wave of waves) {
-          let minDist = Infinity;
-          let groupIndex = 0;
-          const directions = [0, Math.PI / 2, Math.PI, -Math.PI / 2];
-          
-          for (let d = 0; d < 4; d++) {
-            let angleDiff = Math.abs(wave.angle - directions[d]);
-            if (angleDiff > Math.PI) angleDiff = 2 * Math.PI - angleDiff;
-            if (angleDiff < minDist) {
-              minDist = angleDiff;
-              groupIndex = d;
-            }
-          }
-          waveGroups[groupIndex].push(wave);
+          const key = `${wave.fanDirIndex}_${wave.age}`;
+          if (!groups.has(key)) groups.set(key, []);
+          groups.get(key)!.push(wave);
         }
 
-        for (const group of waveGroups) {
-          if (group.length < 2) continue;
+        for (const groupWaves of groups.values()) {
+          if (groupWaves.length < 2) continue;
 
-          group.sort((a, b) => a.angle - b.angle);
+          const sorted = [...groupWaves].sort((a, b) => a.originAngle - b.originAngle);
 
-          for (let i = 0; i < group.length - 1; i++) {
-            const wave1 = group[i];
-            const wave2 = group[i + 1];
+          for (let i = 0; i < sorted.length - 1; i++) {
+            const w1 = sorted[i];
+            const w2 = sorted[i + 1];
+            const avgIntensity = (w1.intensity + w2.intensity) / 2;
 
-            const avgIntensity = (wave1.intensity + wave2.intensity) / 2;
-            const alpha = Math.min(0.5, avgIntensity * 0.4);
+            if (avgIntensity < 0.02) continue;
 
-            if (alpha < 0.05) continue;
+            const fillAlpha = Math.min(0.45, avgIntensity * 0.5);
 
             p.noStroke();
-            p.fill(100, 149, 237, alpha * 255);
+            p.fill(100, 149, 237, fillAlpha * 255);
 
-            p.triangle(
-              wave1.prevX, wave1.prevY,
-              wave1.x, wave1.y,
-              wave2.x, wave2.y
-            );
-
-            p.triangle(
-              wave1.prevX, wave1.prevY,
-              wave2.prevX, wave2.prevY,
-              wave2.x, wave2.y
-            );
+            p.beginShape();
+            p.vertex(w1.prevX, w1.prevY);
+            p.vertex(w1.x, w1.y);
+            p.vertex(w2.x, w2.y);
+            p.vertex(w2.prevX, w2.prevY);
+            p.endShape(p.CLOSE);
           }
         }
 
         p.strokeCap(p.ROUND);
         for (const wave of waves) {
-          const color = getWaveColor(wave);
-          if (color.a < 0.05) continue;
-          
-          p.stroke(color.r, color.g, color.b, color.a * 255);
-          p.strokeWeight(1 + wave.intensity * 1.5);
+          if (wave.intensity < 0.02) continue;
+
+          const strokeW = 1 + wave.intensity * 2;
+          const alpha = Math.min(0.7, wave.intensity * 0.8);
+
+          const r = Math.floor(80 + 70 * (1 - wave.intensity));
+          const g = Math.floor(130 + 70 * wave.intensity);
+          const b = 237;
+
+          p.stroke(r, g, b, alpha * 255);
+          p.strokeWeight(strokeW);
           p.line(wave.prevX, wave.prevY, wave.x, wave.y);
         }
       };
@@ -412,7 +398,7 @@ const MazeCanvas = () => {
         }
       };
 
-      p.mouseReleased = (event: MouseEvent) => {
+      p.mouseReleased = () => {
         const state = getStore();
         const mouse = getCanvasMouse();
 
@@ -457,7 +443,9 @@ const MazeCanvas = () => {
     p5InstanceRef.current = new p5(sketch);
 
     return () => {
-      window.removeEventListener('resize', handleResize);
+      if (resizeHandler) {
+        window.removeEventListener('resize', resizeHandler);
+      }
       p5InstanceRef.current?.remove();
     };
   }, []);
