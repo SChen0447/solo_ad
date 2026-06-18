@@ -28,23 +28,38 @@ export default function ParticleHalo() {
   const prevThemeRef = useRef<ColorTheme>(colorTheme)
   const colorTransitionRef = useRef(1)
 
-  const { positions, distances } = useMemo(() => {
-    const pos = new Float32Array(PARTICLE_COUNT * 3)
-    const dist = new Float32Array(PARTICLE_COUNT)
+  const particleData = useMemo(() => {
+    const positions = new Float32Array(PARTICLE_COUNT * 3)
+    const distances = new Float32Array(PARTICLE_COUNT)
+    const orbitAxes = new Float32Array(PARTICLE_COUNT * 3)
+    const orbitSpeeds = new Float32Array(PARTICLE_COUNT)
+    const sizeFreqs = new Float32Array(PARTICLE_COUNT)
+    const sizePhases = new Float32Array(PARTICLE_COUNT)
 
     for (let i = 0; i < PARTICLE_COUNT; i++) {
       const theta = Math.random() * Math.PI * 2
       const phi = Math.acos(2 * Math.random() - 1)
       const radius = INNER_RADIUS + Math.random() * (OUTER_RADIUS - INNER_RADIUS)
 
-      pos[i * 3] = radius * Math.sin(phi) * Math.cos(theta)
-      pos[i * 3 + 1] = radius * Math.sin(phi) * Math.sin(theta)
-      pos[i * 3 + 2] = radius * Math.cos(phi)
+      positions[i * 3] = radius * Math.sin(phi) * Math.cos(theta)
+      positions[i * 3 + 1] = radius * Math.sin(phi) * Math.sin(theta)
+      positions[i * 3 + 2] = radius * Math.cos(phi)
 
-      dist[i] = (radius - INNER_RADIUS) / (OUTER_RADIUS - INNER_RADIUS)
+      distances[i] = (radius - INNER_RADIUS) / (OUTER_RADIUS - INNER_RADIUS)
+
+      const axisTheta = Math.random() * Math.PI * 2
+      const axisPhi = Math.acos(2 * Math.random() - 1)
+      orbitAxes[i * 3] = Math.sin(axisPhi) * Math.cos(axisTheta)
+      orbitAxes[i * 3 + 1] = Math.sin(axisPhi) * Math.sin(axisTheta)
+      orbitAxes[i * 3 + 2] = Math.cos(axisPhi)
+
+      orbitSpeeds[i] = 0.01 + Math.random() * 0.04
+
+      sizeFreqs[i] = 0.5 + Math.random() * 1.0
+      sizePhases[i] = Math.random() * Math.PI * 2
     }
 
-    return { positions: pos, distances: dist }
+    return { positions, distances, orbitAxes, orbitSpeeds, sizeFreqs, sizePhases }
   }, [])
 
   const uniforms = useMemo(
@@ -103,24 +118,43 @@ export default function ParticleHalo() {
 
     materialRef.current.uniforms.uBreathScale.value = breathScale
     materialRef.current.uniforms.uTime.value = timeRef.current
-
-    pointsRef.current.rotation.y += delta * 0.05
   })
 
   const vertexShader = `
     attribute float aDistance;
+    attribute vec3 aOrbitAxis;
+    attribute float aOrbitSpeed;
+    attribute float aSizeFreq;
+    attribute float aSizePhase;
     uniform float uBreathScale;
     uniform float uTime;
     varying float vDistance;
     varying float vAlpha;
+
+    vec3 rotateAroundAxis(vec3 v, vec3 axis, float angle) {
+      float s = sin(angle);
+      float c = cos(angle);
+      float oc = 1.0 - c;
+      return vec3(
+        v.x * (axis.x * axis.x * oc + c) + v.y * (axis.x * axis.y * oc - axis.z * s) + v.z * (axis.x * axis.z * oc + axis.y * s),
+        v.x * (axis.y * axis.x * oc + axis.z * s) + v.y * (axis.y * axis.y * oc + c) + v.z * (axis.y * axis.z * oc - axis.x * s),
+        v.x * (axis.z * axis.x * oc - axis.y * s) + v.y * (axis.z * axis.y * oc + axis.x * s) + v.z * (axis.z * axis.z * oc + c)
+      );
+    }
+
     void main() {
       vDistance = aDistance;
-      vec3 pos = position;
+
+      float angle = uTime * aOrbitSpeed;
+      vec3 pos = rotateAroundAxis(position, aOrbitAxis, angle);
+
       float noise = sin(uTime * 0.5 + position.x * 2.0 + position.y * 2.0) * 0.05;
       pos += normalize(pos) * noise;
 
+      float sizeWave = sin(uTime * aSizeFreq + aSizePhase) * 0.2 + 1.0;
+
       vec4 mvPosition = modelViewMatrix * vec4(pos, 1.0);
-      gl_PointSize = (6.0 + aDistance * 4.0) * uBreathScale * (300.0 / -mvPosition.z);
+      gl_PointSize = (6.0 + aDistance * 4.0) * uBreathScale * sizeWave * (300.0 / -mvPosition.z);
       gl_Position = projectionMatrix * mvPosition;
       vAlpha = 0.8 * (1.0 - aDistance);
     }
@@ -147,10 +181,14 @@ export default function ParticleHalo() {
 
   const geometry = useMemo(() => {
     const geo = new THREE.BufferGeometry()
-    geo.setAttribute('position', new THREE.BufferAttribute(positions, 3))
-    geo.setAttribute('aDistance', new THREE.BufferAttribute(distances, 1))
+    geo.setAttribute('position', new THREE.BufferAttribute(particleData.positions, 3))
+    geo.setAttribute('aDistance', new THREE.BufferAttribute(particleData.distances, 1))
+    geo.setAttribute('aOrbitAxis', new THREE.BufferAttribute(particleData.orbitAxes, 3))
+    geo.setAttribute('aOrbitSpeed', new THREE.BufferAttribute(particleData.orbitSpeeds, 1))
+    geo.setAttribute('aSizeFreq', new THREE.BufferAttribute(particleData.sizeFreqs, 1))
+    geo.setAttribute('aSizePhase', new THREE.BufferAttribute(particleData.sizePhases, 1))
     return geo
-  }, [positions, distances])
+  }, [particleData])
 
   return (
     <points ref={pointsRef} geometry={geometry}>

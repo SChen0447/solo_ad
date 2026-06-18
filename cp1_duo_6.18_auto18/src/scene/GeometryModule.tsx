@@ -17,6 +17,8 @@ function easeInOutSine(t: number): number {
 export default function GeometryModule() {
   const meshRef = useRef<THREE.Mesh>(null)
   const materialRef = useRef<THREE.ShaderMaterial>(null)
+  const edgesRef = useRef<THREE.LineSegments>(null)
+  const edgeMaterialRef = useRef<THREE.LineBasicMaterial>(null)
 
   const breathFrequency = useAppStore((s) => s.breathFrequency)
   const colorTheme = useAppStore((s) => s.colorTheme)
@@ -28,12 +30,14 @@ export default function GeometryModule() {
   const prevManualBreathRef = useRef(manualBreath)
   const colorTransitionRef = useRef(1)
   const prevThemeRef = useRef<ColorTheme>(colorTheme)
+  const edgeColorTransitionRef = useRef(1)
 
-  const { basePositions, geometry } = useMemo(() => {
+  const { basePositions, geometry, edgesGeometry } = useMemo(() => {
     const geo = new THREE.IcosahedronGeometry(BASE_RADIUS, 4)
     const posAttr = geo.getAttribute('position') as THREE.BufferAttribute
     const base = new Float32Array(posAttr.array)
-    return { basePositions: base, geometry: geo }
+    const edges = new THREE.EdgesGeometry(geo)
+    return { basePositions: base, geometry: geo, edgesGeometry: edges }
   }, [])
 
   const uniforms = useMemo(
@@ -48,6 +52,7 @@ export default function GeometryModule() {
   useEffect(() => {
     if (prevThemeRef.current !== colorTheme) {
       colorTransitionRef.current = 0
+      edgeColorTransitionRef.current = 0
       prevThemeRef.current = colorTheme
     }
   }, [colorTheme])
@@ -60,7 +65,7 @@ export default function GeometryModule() {
   }, [manualBreath])
 
   useFrame((_, delta) => {
-    if (!meshRef.current || !materialRef.current) return
+    if (!meshRef.current || !materialRef.current || !edgesRef.current || !edgeMaterialRef.current) return
 
     timeRef.current += delta
 
@@ -72,6 +77,15 @@ export default function GeometryModule() {
         delta / 0.8
       )
       materialRef.current.uniforms.uColorEnd.value.lerp(
+        new THREE.Color(theme.geometryEnd),
+        delta / 0.8
+      )
+    }
+
+    if (edgeColorTransitionRef.current < 1) {
+      edgeColorTransitionRef.current = Math.min(1, edgeColorTransitionRef.current + delta / 0.8)
+      const theme = themePresets[colorTheme]
+      edgeMaterialRef.current.color.lerp(
         new THREE.Color(theme.geometryEnd),
         delta / 0.8
       )
@@ -93,6 +107,8 @@ export default function GeometryModule() {
 
     meshRef.current.scale.setScalar(breathScale)
     meshRef.current.rotation.y += delta * 0.1
+    edgesRef.current.scale.setScalar(breathScale)
+    edgesRef.current.rotation.y += delta * 0.1
 
     const posAttr = geometry.getAttribute('position') as THREE.BufferAttribute
     const noiseOffsets = generateVertexNoiseOffsets(
@@ -137,13 +153,23 @@ export default function GeometryModule() {
   `
 
   return (
-    <mesh ref={meshRef} geometry={geometry}>
-      <shaderMaterial
-        ref={materialRef}
-        vertexShader={vertexShader}
-        fragmentShader={fragmentShader}
-        uniforms={uniforms}
-      />
-    </mesh>
+    <>
+      <mesh ref={meshRef} geometry={geometry}>
+        <shaderMaterial
+          ref={materialRef}
+          vertexShader={vertexShader}
+          fragmentShader={fragmentShader}
+          uniforms={uniforms}
+        />
+      </mesh>
+      <lineSegments ref={edgesRef} geometry={edgesGeometry}>
+        <lineBasicMaterial
+          ref={edgeMaterialRef}
+          color={themePresets[colorTheme].geometryEnd}
+          transparent
+          opacity={0.3}
+        />
+      </lineSegments>
+    </>
   )
 }
