@@ -5,6 +5,7 @@ interface CodeEditorProps {
   value: string
   onChange: (value: string) => void
   onApply: () => void
+  onClear: () => void
   label: string
   variant: 'left' | 'right'
   diffLineNumbers?: number[]
@@ -15,6 +16,7 @@ export function CodeEditor({
   value,
   onChange,
   onApply,
+  onClear,
   label,
   variant,
   diffLineNumbers = [],
@@ -83,13 +85,22 @@ export function CodeEditor({
         <span className="editor-label" style={{ borderLeftColor: borderColor }}>
           {label}
         </span>
-        <button
-          type="button"
-          className="apply-btn"
-          onClick={onApply}
-        >
-          套用
-        </button>
+        <div className="editor-buttons">
+          <button
+            type="button"
+            className="clear-btn"
+            onClick={onClear}
+          >
+            清空
+          </button>
+          <button
+            type="button"
+            className="apply-btn"
+            onClick={onApply}
+          >
+            套用
+          </button>
+        </div>
       </div>
 
       <div className="editor-body">

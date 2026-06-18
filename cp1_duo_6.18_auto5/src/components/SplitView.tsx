@@ -23,8 +23,18 @@ export function SplitView({ diffLeftLines = [], diffRightLines = [] }: SplitView
   const leftIframeRef = useRef<HTMLIFrameElement>(null)
   const rightIframeRef = useRef<HTMLIFrameElement>(null)
   const isSyncingRef = useRef(false)
+  const containerRef = useRef<HTMLDivElement>(null)
+  const isDraggingRef = useRef(false)
 
-  const { appliedLeftCode, appliedRightCode, zoom, syncScroll, diffEnabled } = useAppStore()
+  const {
+    appliedLeftCode,
+    appliedRightCode,
+    zoom,
+    syncScroll,
+    diffEnabled,
+    leftPaneWidth,
+    setLeftPaneWidth,
+  } = useAppStore()
 
   const leftOverlayBg = useMemo(
     () => buildDiffBackground(diffLeftLines, 'rgba(255, 107, 107, 0.35)'),
@@ -81,6 +91,39 @@ export function SplitView({ diffLeftLines = [], diffRightLines = [] }: SplitView
     })
   }, [syncScroll])
 
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    e.preventDefault()
+    isDraggingRef.current = true
+    document.body.style.cursor = 'col-resize'
+    document.body.style.userSelect = 'none'
+  }, [])
+
+  const handleMouseMove = useCallback((e: MouseEvent) => {
+    if (!isDraggingRef.current || !containerRef.current) return
+
+    const rect = containerRef.current.getBoundingClientRect()
+    const containerWidth = rect.width
+    const mouseX = e.clientX - rect.left
+    const newWidthPercent = (mouseX / containerWidth) * 100
+
+    setLeftPaneWidth(newWidthPercent)
+  }, [setLeftPaneWidth])
+
+  const handleMouseUp = useCallback(() => {
+    isDraggingRef.current = false
+    document.body.style.cursor = ''
+    document.body.style.userSelect = ''
+  }, [])
+
+  useEffect(() => {
+    document.addEventListener('mousemove', handleMouseMove)
+    document.addEventListener('mouseup', handleMouseUp)
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove)
+      document.removeEventListener('mouseup', handleMouseUp)
+    }
+  }, [handleMouseMove, handleMouseUp])
+
   useEffect(() => {
     const leftIframe = leftIframeRef.current
     if (!leftIframe) return
@@ -120,10 +163,11 @@ export function SplitView({ diffLeftLines = [], diffRightLines = [] }: SplitView
   }, [handleScrollSync])
 
   const scale = zoom / 100
+  const rightPaneWidth = 100 - leftPaneWidth
 
   return (
-    <div className="split-view">
-      <div className="split-pane">
+    <div className="split-view" ref={containerRef}>
+      <div className="split-pane" style={{ width: `${leftPaneWidth}%` }}>
         <div className="pane-label version-a">
           <span>版本 A</span>
         </div>
@@ -153,9 +197,9 @@ export function SplitView({ diffLeftLines = [], diffRightLines = [] }: SplitView
         </div>
       </div>
 
-      <div className="divider" />
+      <div className="divider" onMouseDown={handleMouseDown} />
 
-      <div className="split-pane">
+      <div className="split-pane" style={{ width: `${rightPaneWidth}%` }}>
         <div className="pane-label version-b">
           <span>版本 B</span>
         </div>

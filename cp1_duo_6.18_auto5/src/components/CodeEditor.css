@@ -24,9 +24,14 @@
   border-left: 3px solid;
 }
 
+.editor-buttons {
+  display: flex;
+  gap: 8px;
+}
+
+.clear-btn,
 .apply-btn {
   padding: 5px 14px;
-  background: #5c6ac4;
   color: white;
   border: none;
   border-radius: 4px;
@@ -36,10 +41,23 @@
   transition: all 0.1s ease;
 }
 
+.apply-btn {
+  background: #5c6ac4;
+}
+
 .apply-btn:hover {
   background: #6c7cd4;
 }
 
+.clear-btn {
+  background: #e74c3c;
+}
+
+.clear-btn:hover {
+  background: #ec6454;
+}
+
+.clear-btn:active,
 .apply-btn:active {
   transform: scale(0.95);
 }

@@ -81,9 +81,10 @@
 
 .divider {
   width: 4px;
-  background: #444;
+  flex-shrink: 0;
+  background: #666;
   cursor: col-resize;
-  transition: background-color 0.3s ease;
+  transition: background-color 0.3s ease, box-shadow 0.3s ease;
   position: relative;
   z-index: 5;
 }
@@ -91,6 +92,11 @@
 .divider:hover {
   background: #7c8ccc;
   box-shadow: 0 0 12px rgba(124, 140, 204, 0.5);
+}
+
+.divider:active {
+  background: #7c8ccc;
+  box-shadow: 0 0 16px rgba(124, 140, 204, 0.7);
 }
 
 @media (max-width: 768px) {

@@ -16,15 +16,19 @@ interface AppState {
   diffEnabled: boolean
   leftDiffLines: DiffLine[]
   rightDiffLines: DiffLine[]
+  leftPaneWidth: number
 
   setLeftCode: (code: string) => void
   setRightCode: (code: string) => void
   applyLeftCode: () => void
   applyRightCode: () => void
+  clearLeft: () => void
+  clearRight: () => void
   setZoom: (zoom: number) => void
   setSyncScroll: (enabled: boolean) => void
   setDiffEnabled: (enabled: boolean) => void
   setDiffLines: (left: DiffLine[], right: DiffLine[]) => void
+  setLeftPaneWidth: (width: number) => void
 }
 
 const DEFAULT_HTML = `<!DOCTYPE html>
@@ -129,6 +133,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   diffEnabled: false,
   leftDiffLines: [],
   rightDiffLines: [],
+  leftPaneWidth: 50,
 
   setLeftCode: (code: string) => set({ leftCode: code }),
   setRightCode: (code: string) => set({ rightCode: code }),
@@ -136,10 +141,15 @@ export const useAppStore = create<AppState>((set, get) => ({
   applyLeftCode: () => set({ appliedLeftCode: get().leftCode }),
   applyRightCode: () => set({ appliedRightCode: get().rightCode }),
 
+  clearLeft: () => set({ leftCode: '', appliedLeftCode: '' }),
+  clearRight: () => set({ rightCode: '', appliedRightCode: '' }),
+
   setZoom: (zoom: number) => set({ zoom }),
   setSyncScroll: (enabled: boolean) => set({ syncScroll: enabled }),
   setDiffEnabled: (enabled: boolean) => set({ diffEnabled: enabled }),
 
   setDiffLines: (left: DiffLine[], right: DiffLine[]) =>
     set({ leftDiffLines: left, rightDiffLines: right }),
+
+  setLeftPaneWidth: (width: number) => set({ leftPaneWidth: Math.max(10, Math.min(90, width)) }),
 }))

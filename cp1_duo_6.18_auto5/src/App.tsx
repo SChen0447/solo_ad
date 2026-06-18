@@ -65,6 +65,8 @@ function AppContent() {
     setRightCode,
     applyLeftCode,
     applyRightCode,
+    clearLeft,
+    clearRight,
     diffEnabled,
   } = useAppStore()
 
@@ -78,6 +80,7 @@ function AppContent() {
             value={leftCode}
             onChange={setLeftCode}
             onApply={applyLeftCode}
+            onClear={clearLeft}
             label="版本 A 代码"
             variant="left"
             diffLineNumbers={leftLineNumbers}
@@ -90,6 +93,7 @@ function AppContent() {
             value={rightCode}
             onChange={setRightCode}
             onApply={applyRightCode}
+            onClear={clearRight}
             label="版本 B 代码"
             variant="right"
             diffLineNumbers={rightLineNumbers}
