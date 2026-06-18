@@ -1,0 +1,322 @@
+.control-panel {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  width: 280px;
+  max-height: calc(100vh - 40px);
+  overflow-y: auto;
+  background: rgba(28, 35, 48, 0.65);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  border: 1px solid rgba(94, 255, 255, 0.15);
+  border-radius: 14px;
+  padding: 18px;
+  color: #cde4f5;
+  z-index: 10;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
+  transition: opacity 0.3s ease, transform 0.3s ease;
+}
+
+.control-panel.collapsed-overlay {
+  width: 300px;
+  max-height: 90vh;
+}
+
+.panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 14px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid rgba(94, 255, 255, 0.15);
+}
+
+.panel-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: #5effff;
+  letter-spacing: 1px;
+}
+
+.panel-close-btn {
+  background: none;
+  border: none;
+  color: #7ba9d9;
+  font-size: 20px;
+  cursor: pointer;
+  padding: 0 6px;
+  line-height: 1;
+  transition: color 0.15s ease;
+}
+
+.panel-close-btn:hover {
+  color: #5effff;
+}
+
+.panel-toggle-btn {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  width: 44px;
+  height: 44px;
+  background: rgba(28, 35, 48, 0.65);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(94, 255, 255, 0.2);
+  border-radius: 10px;
+  color: #5effff;
+  font-size: 20px;
+  cursor: pointer;
+  z-index: 10;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.panel-toggle-btn:hover {
+  background: rgba(94, 255, 255, 0.12);
+  border-color: rgba(94, 255, 255, 0.4);
+}
+
+.panel-section {
+  margin-bottom: 18px;
+}
+
+.section-title {
+  font-size: 12px;
+  font-weight: 500;
+  color: #7ba9d9;
+  margin-bottom: 10px;
+  letter-spacing: 0.5px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.selected-tag {
+  font-size: 10px;
+  background: rgba(94, 255, 255, 0.15);
+  color: #5effff;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.mode-buttons,
+.shape-selector {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+}
+
+.mode-btn,
+.shape-btn {
+  position: relative;
+  overflow: hidden;
+  background: rgba(45, 58, 78, 0.5);
+  border: 1px solid rgba(94, 255, 255, 0.1);
+  border-radius: 8px;
+  color: #7ba9d9;
+  padding: 10px 4px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+  font-size: 11px;
+}
+
+.mode-btn .icon,
+.shape-btn .icon {
+  font-size: 18px;
+  line-height: 1;
+}
+
+.mode-btn:hover,
+.shape-btn:hover {
+  background: rgba(94, 255, 255, 0.12);
+  border-color: rgba(94, 255, 255, 0.35);
+  color: #5effff;
+}
+
+.mode-btn.active,
+.shape-btn.active {
+  background: rgba(94, 255, 255, 0.18);
+  border-color: rgba(94, 255, 255, 0.55);
+  color: #5effff;
+}
+
+.ripple {
+  position: absolute;
+  border-radius: 50%;
+  background: rgba(94, 255, 255, 0.5);
+  transform: translate(-50%, -50%) scale(0);
+  animation: ripple-anim 0.4s ease-out forwards;
+  pointer-events: none;
+}
+
+@keyframes ripple-anim {
+  to {
+    transform: translate(-50%, -50%) scale(6);
+    opacity: 0;
+  }
+}
+
+.sim-btn {
+  position: relative;
+  overflow: hidden;
+  width: 100%;
+  padding: 13px;
+  background: rgba(94, 255, 255, 0.12);
+  border: 1px solid rgba(94, 255, 255, 0.35);
+  border-radius: 10px;
+  color: #5effff;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: background 0.15s ease, box-shadow 0.15s ease;
+}
+
+.sim-btn:hover {
+  background: rgba(94, 255, 255, 0.2);
+  box-shadow: 0 0 20px rgba(94, 255, 255, 0.15);
+}
+
+.sim-btn.running {
+  background: rgba(255, 100, 100, 0.12);
+  border-color: rgba(255, 120, 120, 0.45);
+  color: #ff8a8a;
+}
+
+.sim-btn.running:hover {
+  background: rgba(255, 100, 100, 0.2);
+  box-shadow: 0 0 20px rgba(255, 100, 100, 0.15);
+}
+
+.sim-icon {
+  font-size: 14px;
+}
+
+.slider-row {
+  margin-bottom: 12px;
+}
+
+.slider-label {
+  display: block;
+  font-size: 12px;
+  color: #9dc4e0;
+  margin-bottom: 5px;
+}
+
+.slider {
+  width: 100%;
+  height: 4px;
+  -webkit-appearance: none;
+  appearance: none;
+  background: rgba(45, 58, 78, 0.8);
+  border-radius: 2px;
+  outline: none;
+  cursor: pointer;
+}
+
+.slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  background: #5effff;
+  border-radius: 50%;
+  cursor: pointer;
+  box-shadow: 0 0 10px rgba(94, 255, 255, 0.4);
+  transition: transform 0.1s ease;
+}
+
+.slider::-webkit-slider-thumb:hover {
+  transform: scale(1.15);
+}
+
+.slider::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  background: #5effff;
+  border-radius: 50%;
+  cursor: pointer;
+  border: none;
+  box-shadow: 0 0 10px rgba(94, 255, 255, 0.4);
+}
+
+.delete-btn {
+  width: 100%;
+  margin-top: 6px;
+  padding: 9px;
+  background: rgba(255, 100, 100, 0.1);
+  border: 1px solid rgba(255, 120, 120, 0.3);
+  border-radius: 8px;
+  color: #ff8a8a;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.delete-btn:hover {
+  background: rgba(255, 100, 100, 0.2);
+}
+
+.panel-hint {
+  font-size: 11px;
+  color: #5a7a95;
+  line-height: 1.5;
+  padding: 10px;
+  background: rgba(45, 58, 78, 0.3);
+  border-radius: 8px;
+}
+
+.status-panel {
+  position: absolute;
+  bottom: 20px;
+  left: 20px;
+  display: flex;
+  gap: 14px;
+  background: rgba(28, 35, 48, 0.6);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid rgba(94, 255, 255, 0.12);
+  border-radius: 12px;
+  padding: 12px 18px;
+  z-index: 10;
+}
+
+.status-item {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.status-label {
+  font-size: 10px;
+  color: #5a7a95;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+
+.status-value {
+  font-size: 16px;
+  font-weight: 600;
+  color: #5effff;
+  font-variant-numeric: tabular-nums;
+}
+
+.control-panel::-webkit-scrollbar {
+  width: 4px;
+}
+
+.control-panel::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.control-panel::-webkit-scrollbar-thumb {
+  background: rgba(94, 255, 255, 0.25);
+  border-radius: 2px;
+}
