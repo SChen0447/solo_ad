@@ -2,7 +2,7 @@ import express, { Request, Response } from 'express'
 import cors from 'cors'
 import {
   getAllQuotes,
-  getQuotesByStatus,
+  getQuotesFiltered,
   getQuoteById,
   createQuote,
   updateQuoteStatus,
@@ -21,13 +21,21 @@ seedMockData()
 
 app.get('/api/quotes', (req: Request, res: Response) => {
   try {
-    const { status } = req.query
-    let quotes
+    const { status, search } = req.query
+    const filterOptions: { status?: QuoteStatus; search?: string } = {}
+
     if (status && Object.values(QuoteStatus).includes(status as QuoteStatus)) {
-      quotes = getQuotesByStatus(status as QuoteStatus)
-    } else {
-      quotes = getAllQuotes()
+      filterOptions.status = status as QuoteStatus
     }
+
+    if (search && typeof search === 'string' && search.trim() !== '') {
+      filterOptions.search = search.trim()
+    }
+
+    const quotes = Object.keys(filterOptions).length > 0
+      ? getQuotesFiltered(filterOptions)
+      : getAllQuotes()
+
     res.json(quotes)
   } catch (error) {
     res.status(500).json({ error: '获取报价列表失败' })

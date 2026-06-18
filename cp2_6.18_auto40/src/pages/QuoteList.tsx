@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Quote, QuoteStatus } from '../types'
 import AddQuoteModal from '../components/AddQuoteModal'
@@ -70,6 +70,22 @@ function QuoteCard({ quote }: { quote: Quote }) {
   )
 }
 
+function useDebounce<T>(value: T, delay: number): T {
+  const [debouncedValue, setDebouncedValue] = useState<T>(value)
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedValue(value)
+    }, delay)
+
+    return () => {
+      clearTimeout(timer)
+    }
+  }, [value, delay])
+
+  return debouncedValue
+}
+
 export default function QuoteList() {
   const [quotes, setQuotes] = useState<Quote[]>([])
   const [loading, setLoading] = useState(true)
@@ -78,8 +94,9 @@ export default function QuoteList() {
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
+  const debouncedSearch = useDebounce(searchQuery, 300)
 
-  const fetchQuotes = async () => {
+  const fetchQuotes = useCallback(async () => {
     setLoading(true)
     setError(null)
 
@@ -88,9 +105,18 @@ export default function QuoteList() {
     }, 200)
 
     try {
-      const url = statusFilter !== 'all'
-        ? `/api/quotes?status=${statusFilter}`
+      const params = new URLSearchParams()
+      if (statusFilter !== 'all') {
+        params.append('status', statusFilter)
+      }
+      if (debouncedSearch.trim() !== '') {
+        params.append('search', debouncedSearch.trim())
+      }
+
+      const url = params.toString()
+        ? `/api/quotes?${params.toString()}`
         : '/api/quotes'
+
       const response = await fetch(url)
       if (!response.ok) {
         throw new Error('获取报价列表失败')
@@ -104,20 +130,20 @@ export default function QuoteList() {
       setLoading(false)
       setShowSkeleton(false)
     }
-  }
+  }, [statusFilter, debouncedSearch])
 
   useEffect(() => {
     fetchQuotes()
-  }, [statusFilter])
+  }, [fetchQuotes])
 
   const handleQuoteCreated = (newQuote: Quote) => {
     setQuotes(prev => [newQuote, ...prev])
     setIsModalOpen(false)
   }
 
-  const filteredQuotes = quotes.filter(quote =>
-    quote.customerName.toLowerCase().includes(searchQuery.toLowerCase())
-  )
+  const handleOpenModal = () => {
+    setIsModalOpen(true)
+  }
 
   const isFiltering = searchQuery !== '' || statusFilter !== 'all'
 
@@ -127,7 +153,7 @@ export default function QuoteList() {
         <h2 className="page-title">报价列表</h2>
         <button
           className="btn btn-primary"
-          onClick={() => setIsModalOpen(true)}
+          onClick={handleOpenModal}
         >
           + 创建报价
         </button>
@@ -185,10 +211,10 @@ export default function QuoteList() {
         </div>
       ) : (
         <div className="quote-grid">
-          {filteredQuotes.map(quote => (
+          {quotes.map(quote => (
             <QuoteCard key={quote.id} quote={quote} />
           ))}
-          {filteredQuotes.length === 0 && !error && (
+          {quotes.length === 0 && !error && (
             <div className="empty-state">
               <div className="empty-icon">📄</div>
               <h3 className="empty-title">
@@ -202,7 +228,7 @@ export default function QuoteList() {
               {!isFiltering && (
                 <button
                   className="btn btn-primary empty-btn"
-                  onClick={() => setIsModalOpen(true)}
+                  onClick={handleOpenModal}
                 >
                   + 创建报价
                 </button>

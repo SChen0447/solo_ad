@@ -73,6 +73,36 @@ export function getQuotesByStatus(status: QuoteStatus): Quote[] {
     }))
 }
 
+export function getQuotesBySearch(search: string): Quote[] {
+  const keyword = search.toLowerCase()
+  return quotes
+    .filter(q => q.customerName.toLowerCase().includes(keyword))
+    .map(q => ({
+      ...q,
+      items: [...q.items],
+      versions: [...q.versions]
+    }))
+}
+
+export function getQuotesFiltered(options: { status?: QuoteStatus; search?: string }): Quote[] {
+  let result = quotes
+
+  if (options.status) {
+    result = result.filter(q => q.status === options.status)
+  }
+
+  if (options.search) {
+    const keyword = options.search.toLowerCase()
+    result = result.filter(q => q.customerName.toLowerCase().includes(keyword))
+  }
+
+  return result.map(q => ({
+    ...q,
+    items: [...q.items],
+    versions: [...q.versions]
+  }))
+}
+
 export function getQuoteById(id: string): Quote | undefined {
   const quote = quotes.find(q => q.id === id)
   return quote ? deepCloneQuote(quote) : undefined
