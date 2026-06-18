@@ -89,9 +89,6 @@ export class MapRenderer {
 
   private drawMountainTile(tile: MapTile, px: number, py: number): void {
     const ctx = this.ctx;
-    ctx.fillStyle = COLORS.mountain;
-    ctx.fillRect(px, py, TILE_SIZE, TILE_SIZE);
-
     const cx = px + TILE_SIZE / 2;
     const cy = py + TILE_SIZE / 2;
 
@@ -100,54 +97,114 @@ export class MapRenderer {
     ctx.rect(px, py, TILE_SIZE, TILE_SIZE);
     ctx.clip();
 
+    const baseGrad = ctx.createRadialGradient(cx, cy - 4, 2, cx, cy, TILE_SIZE / 1.4);
+    baseGrad.addColorStop(0, '#a77a56');
+    baseGrad.addColorStop(0.6, '#8b5e3c');
+    baseGrad.addColorStop(1, '#6b4528');
+    ctx.fillStyle = baseGrad;
+    ctx.fillRect(px, py, TILE_SIZE, TILE_SIZE);
+
     const elev = tile.elevation;
-    if (elev && elev.length >= 2) {
-      const vertices: Array<{ x: number; y: number }> = [];
+    if (elev && elev.length >= 3) {
+      const peaks: Array<{ x: number; y: number; h: number }> = [];
       for (let i = 0; i < elev.length; i++) {
         const angle = (i / elev.length) * Math.PI * 2 - Math.PI / 2;
-        const r = 6 + elev[i] * 0.7;
-        vertices.push({
+        const r = 8 + elev[i] * 0.8;
+        peaks.push({
           x: cx + Math.cos(angle) * r,
-          y: cy + Math.sin(angle) * r
+          y: cy + Math.sin(angle) * r,
+          h: elev[i]
         });
       }
 
-      for (let ring = 0; ring < 3; ring++) {
-        const scale = 1 - ring * 0.28;
-        const alpha = 0.15 + ring * 0.08;
-        ctx.strokeStyle = `rgba(0,0,0,${alpha})`;
-        ctx.lineWidth = 1.2 - ring * 0.3;
+      const avgH = peaks.reduce((s, p) => s + p.h, 0) / peaks.length;
+      const numContours = Math.max(3, Math.min(6, Math.floor(avgH / 4)));
+      const sortedPeaks = [...peaks].sort((a, b) => b.h - a.h);
+
+      for (let ring = 0; ring < numContours; ring++) {
+        const ratio = 1 - ring / numContours;
+        const alpha = 0.08 + ring * 0.05;
+
+        ctx.strokeStyle = `rgba(0, 0, 0, ${alpha})`;
+        ctx.lineWidth = Math.max(0.6, 1.4 - ring * 0.2);
         ctx.beginPath();
-        for (let i = 0; i <= vertices.length; i++) {
-          const v = vertices[i % vertices.length];
-          const sx = cx + (v.x - cx) * scale;
-          const sy = cy + (v.y - cy) * scale;
-          if (i === 0) ctx.moveTo(sx, sy);
-          else ctx.lineTo(sx, sy);
+
+        const contourR = 14 + avgH * 0.5;
+        const scale = ratio;
+
+        for (let i = 0; i <= peaks.length; i++) {
+          const p = peaks[i % peaks.length];
+          const nextP = peaks[(i + 1) % peaks.length];
+
+          const localScale = scale * (0.8 + (p.h / avgH) * 0.4);
+          const sx = cx + (p.x - cx) * localScale;
+          const sy = cy + (p.y - cy) * localScale;
+
+          if (i === 0) {
+            ctx.moveTo(sx, sy);
+          } else {
+            const prevP = peaks[i - 1];
+            const prevLocalScale = scale * (0.8 + (prevP.h / avgH) * 0.4);
+            const prevX = cx + (prevP.x - cx) * prevLocalScale;
+            const prevY = cy + (prevP.y - cy) * prevLocalScale;
+            const cpx = (prevX + sx) / 2 + Math.sin(ring + i) * 2;
+            const cpy = (prevY + sy) / 2 + Math.cos(ring + i) * 2;
+            ctx.quadraticCurveTo(cpx, cpy, sx, sy);
+          }
         }
         ctx.closePath();
         ctx.stroke();
+
+        if (ring === 0) {
+          ctx.fillStyle = `rgba(255, 255, 255, 0.06)`;
+          ctx.fill();
+        }
       }
 
-      ctx.fillStyle = 'rgba(0,0,0,0.12)';
+      const highest = sortedPeaks[0];
+      const highGrad = ctx.createRadialGradient(highest.x, highest.y, 1, highest.x, highest.y, 8 + highest.h * 0.5);
+      highGrad.addColorStop(0, 'rgba(255,255,255,0.35)');
+      highGrad.addColorStop(1, 'rgba(255,255,255,0)');
+      ctx.fillStyle = highGrad;
       ctx.beginPath();
-      ctx.moveTo(cx, cy);
-      for (let i = 0; i <= vertices.length; i++) {
-        const v = vertices[i % vertices.length];
-        ctx.lineTo(v.x, v.y);
-      }
-      ctx.closePath();
+      ctx.arc(highest.x, highest.y, 8 + highest.h * 0.5, 0, Math.PI * 2);
       ctx.fill();
 
-      ctx.strokeStyle = 'rgba(255,255,255,0.1)';
-      ctx.lineWidth = 1;
+      const lowest = sortedPeaks[sortedPeaks.length - 1];
+      const lowGrad = ctx.createRadialGradient(lowest.x, lowest.y, 1, lowest.x, lowest.y, 10);
+      lowGrad.addColorStop(0, 'rgba(0,0,0,0.2)');
+      lowGrad.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = lowGrad;
       ctx.beginPath();
-      for (let i = 0; i < vertices.length; i++) {
-        const v = vertices[i];
+      ctx.arc(lowest.x, lowest.y, 10, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.strokeStyle = 'rgba(0,0,0,0.18)';
+      ctx.lineWidth = 0.8;
+      for (let i = 0; i < peaks.length; i++) {
+        ctx.beginPath();
         ctx.moveTo(cx, cy);
-        ctx.lineTo(v.x, v.y);
+        ctx.lineTo(peaks[i].x, peaks[i].y);
+        ctx.stroke();
       }
-      ctx.stroke();
+
+      for (const p of peaks) {
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, 1.5 + p.h * 0.08, 0, Math.PI * 2);
+        ctx.fillStyle = p.h > avgH ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.3)';
+        ctx.fill();
+      }
+    } else {
+      ctx.fillStyle = COLORS.mountain;
+      ctx.fillRect(px, py, TILE_SIZE, TILE_SIZE);
+      ctx.strokeStyle = 'rgba(0,0,0,0.2)';
+      ctx.lineWidth = 1;
+      for (let i = 0; i < 3; i++) {
+        ctx.beginPath();
+        ctx.moveTo(px + 4, py + 10 + i * 12);
+        ctx.lineTo(px + TILE_SIZE - 4, py + 14 + i * 12);
+        ctx.stroke();
+      }
     }
 
     ctx.restore();
@@ -195,6 +252,16 @@ export class MapRenderer {
       const cx = ob.gridX * TILE_SIZE + TILE_SIZE / 2;
       const cy = ob.gridY * TILE_SIZE + TILE_SIZE / 2;
       const side = 12;
+
+      if (age < 200) {
+        const pulseR = 18 + (age / 200) * 10;
+        const pulseAlpha = 0.6 - (age / 200) * 0.6;
+        ctx.beginPath();
+        ctx.arc(cx, cy, pulseR, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(255, 68, 68, ${pulseAlpha * 0.3})`;
+        ctx.fill();
+      }
+
       ctx.save();
       ctx.translate(cx, cy);
       ctx.beginPath();
@@ -206,11 +273,16 @@ export class MapRenderer {
         else ctx.lineTo(x, y);
       }
       ctx.closePath();
-      ctx.fillStyle = `rgba(255, 68, 68, ${0.5 + flashAlpha * 0.3})`;
+
+      const fillGrad = ctx.createRadialGradient(0, 0, 2, 0, 0, side);
+      fillGrad.addColorStop(0, `rgba(255, 100, 100, ${0.55 + flashAlpha * 0.35})`);
+      fillGrad.addColorStop(1, `rgba(180, 30, 30, ${0.45 + flashAlpha * 0.35})`);
+      ctx.fillStyle = fillGrad;
       ctx.fill();
-      ctx.strokeStyle = `rgba(255, 68, 68, ${0.9 + flashAlpha * 0.1})`;
+      ctx.strokeStyle = `rgba(255, 120, 120, ${0.9 + flashAlpha * 0.1})`;
       ctx.lineWidth = 2;
       ctx.stroke();
+
       ctx.restore();
     }
   }
@@ -229,6 +301,12 @@ export class MapRenderer {
       }
       ctx.stroke();
       ctx.setLineDash([]);
+
+      const end = u.path[u.path.length - 1];
+      ctx.fillStyle = 'rgba(255,255,255,0.5)';
+      ctx.beginPath();
+      ctx.arc(end.x, end.y, 3, 0, Math.PI * 2);
+      ctx.fill();
     }
   }
 
@@ -236,18 +314,30 @@ export class MapRenderer {
     const ctx = this.ctx;
     for (const u of units) {
       if (u.selected) {
+        const pulse = 1 + Math.sin(this.animationTime * 0.01) * 0.05;
         ctx.beginPath();
-        ctx.arc(u.x, u.y, 15, 0, Math.PI * 2);
+        ctx.arc(u.x, u.y, 15 * pulse, 0, Math.PI * 2);
         ctx.strokeStyle = COLORS.selected;
         ctx.lineWidth = 3;
         ctx.stroke();
       }
 
+      const shadowGrad = ctx.createRadialGradient(u.x, u.y + 4, 2, u.x, u.y + 4, 14);
+      shadowGrad.addColorStop(0, 'rgba(0,0,0,0.35)');
+      shadowGrad.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = shadowGrad;
+      ctx.beginPath();
+      ctx.ellipse(u.x, u.y + 8, 12, 4, 0, 0, Math.PI * 2);
+      ctx.fill();
+
       ctx.beginPath();
       ctx.arc(u.x, u.y, UNIT_RADIUS, 0, Math.PI * 2);
-      ctx.fillStyle = COLORS.unit;
+      const bodyGrad = ctx.createRadialGradient(u.x - 3, u.y - 3, 2, u.x, u.y, UNIT_RADIUS);
+      bodyGrad.addColorStop(0, '#7aaaff');
+      bodyGrad.addColorStop(1, COLORS.unit);
+      ctx.fillStyle = bodyGrad;
       ctx.fill();
-      ctx.strokeStyle = '#ffffff';
+      ctx.strokeStyle = 'rgba(255,255,255,0.9)';
       ctx.lineWidth = 1.5;
       ctx.stroke();
 
@@ -255,11 +345,11 @@ export class MapRenderer {
       const barH = 4;
       const barX = u.x - barW / 2;
       const barY = u.y - UNIT_RADIUS - 10;
-      ctx.fillStyle = '#333333';
+      ctx.fillStyle = 'rgba(0,0,0,0.5)';
       ctx.fillRect(barX, barY, barW, barH);
       const hpRatio = Math.max(0, u.hp / u.maxHp);
       const grad = ctx.createLinearGradient(barX, barY, barX + barW, barY);
-      grad.addColorStop(0, COLORS.hpBar);
+      grad.addColorStop(0, hpRatio > 0.3 ? COLORS.hpBar : '#ef4444');
       grad.addColorStop(1, '#86efac');
       ctx.fillStyle = grad;
       ctx.fillRect(barX, barY, barW * hpRatio, barH);
@@ -273,6 +363,9 @@ export class MapRenderer {
     if (hasSelected) {
       ctx.fillStyle = 'rgba(255,255,255,0.314)';
       ctx.fillRect(hover.x * TILE_SIZE, hover.y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+      ctx.strokeStyle = 'rgba(255,255,255,0.6)';
+      ctx.lineWidth = 1.5;
+      ctx.strokeRect(hover.x * TILE_SIZE + 0.5, hover.y * TILE_SIZE + 0.5, TILE_SIZE - 1, TILE_SIZE - 1);
     }
   }
 
@@ -285,9 +378,11 @@ export class MapRenderer {
     const h = Math.abs(box.y2 - box.y1);
     ctx.fillStyle = COLORS.selectionBox;
     ctx.fillRect(x, y, w, h);
-    ctx.strokeStyle = 'rgba(68, 136, 255, 0.7)';
+    ctx.strokeStyle = 'rgba(68, 136, 255, 0.8)';
     ctx.lineWidth = 1.5;
+    ctx.setLineDash([4, 3]);
     ctx.strokeRect(x, y, w, h);
+    ctx.setLineDash([]);
   }
 
   drawMinimap(
@@ -312,17 +407,24 @@ export class MapRenderer {
     }
     const t = this.animationTime * 0.008;
     for (const u of state.units) {
-      const flick = 0.4 + 0.6 * Math.abs(Math.sin(t + u.x * 0.01 + u.y * 0.01));
-      miniCtx.fillStyle = `rgba(255, 0, 0, ${flick})`;
+      const flick = u.selected ? 1 : 0.4 + 0.6 * Math.abs(Math.sin(t + u.x * 0.01 + u.y * 0.01));
+      const color = u.selected ? 'rgba(0, 255, 0, 1)' : `rgba(255, 0, 0, ${flick})`;
+      miniCtx.fillStyle = color;
       const mx = (u.x / TILE_SIZE) * sx;
       const my = (u.y / TILE_SIZE) * sy;
       miniCtx.beginPath();
-      miniCtx.arc(mx, my, Math.max(1.5, sx * 0.4), 0, Math.PI * 2);
+      miniCtx.arc(mx, my, Math.max(u.selected ? 2.5 : 1.8, sx * 0.4), 0, Math.PI * 2);
       miniCtx.fill();
     }
 
-    miniCtx.strokeStyle = 'rgba(255,255,255,0.3)';
+    miniCtx.strokeStyle = 'rgba(255,255,255,0.35)';
     miniCtx.lineWidth = 1;
-    miniCtx.strokeRect(0, 0, mw, mh);
+    miniCtx.strokeRect(0.5, 0.5, mw - 1, mh - 1);
+
+    miniCtx.fillStyle = 'rgba(0,0,0,0.5)';
+    miniCtx.fillRect(4, mh - 14, 48, 10);
+    miniCtx.fillStyle = '#ffffff';
+    miniCtx.font = '8px sans-serif';
+    miniCtx.fillText('小地图', 6, mh - 6);
   }
 }

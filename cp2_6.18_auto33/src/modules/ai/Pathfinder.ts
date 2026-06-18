@@ -31,13 +31,19 @@ export interface PathPerfLog {
   pathLength: number;
   isReroute: boolean;
   exceeded: boolean;
+  timestamp: number;
 }
 
 const PATHFIND_LIMIT_MS = 15;
 const REROUTE_LIMIT_MS = 10;
+const WARN_INTERVAL_MS = 2000;
 
 export class Pathfinder {
   private perfLogs: PathPerfLog[] = [];
+  private timeoutCount = 0;
+  private totalCount = 0;
+  private totalDuration = 0;
+  private lastWarnAt = 0;
 
   findPath(
     tiles: MapTile[][],
@@ -48,6 +54,7 @@ export class Pathfinder {
     isReroute: boolean = false
   ): Array<{ x: number; y: number }> {
     const t0 = performance.now();
+    this.totalCount++;
 
     if (
       startGridX < 0 || startGridX >= MAP_WIDTH ||
@@ -55,10 +62,12 @@ export class Pathfinder {
       endGridX < 0 || endGridX >= MAP_WIDTH ||
       endGridY < 0 || endGridY >= MAP_HEIGHT
     ) {
+      this.logPerf(t0, startGridX, startGridY, endGridX, endGridY, 0, isReroute, 'out_of_bounds');
       return [];
     }
 
     if (startGridX === endGridX && startGridY === endGridY) {
+      this.logPerf(t0, startGridX, startGridY, endGridX, endGridY, 0, isReroute, 'same_point');
       return [];
     }
 
@@ -67,10 +76,16 @@ export class Pathfinder {
     const targetTile = tiles[targetY]?.[targetX];
     if (!targetTile || !this.isWalkable(targetTile)) {
       const nearest = this.findNearestWalkable(tiles, endGridX, endGridY);
-      if (!nearest) return [];
+      if (!nearest) {
+        this.logPerf(t0, startGridX, startGridY, endGridX, endGridY, 0, isReroute, 'no_target');
+        return [];
+      }
       targetX = nearest.x;
       targetY = nearest.y;
-      if (targetX === startGridX && targetY === startGridY) return [];
+      if (targetX === startGridX && targetY === startGridY) {
+        this.logPerf(t0, startGridX, startGridY, endGridX, endGridY, 0, isReroute, 'stuck');
+        return [];
+      }
     }
 
     const openSet: PFNode[] = [];
@@ -153,7 +168,7 @@ export class Pathfinder {
     }
 
     if (!endNode) {
-      this.logPerf(t0, startGridX, startGridY, endGridX, endGridY, 0, isReroute);
+      this.logPerf(t0, startGridX, startGridY, endGridX, endGridY, 0, isReroute, 'no_path');
       return [];
     }
 
@@ -166,7 +181,7 @@ export class Pathfinder {
     gridPath.reverse();
 
     const result = this.smoothPath(gridPath);
-    this.logPerf(t0, startGridX, startGridY, endGridX, endGridY, result.length, isReroute);
+    this.logPerf(t0, startGridX, startGridY, endGridX, endGridY, result.length, isReroute, 'ok');
     return result;
   }
 
@@ -177,11 +192,14 @@ export class Pathfinder {
     ex: number,
     ey: number,
     pathLen: number,
-    isReroute: boolean
+    isReroute: boolean,
+    status: string
   ): void {
     const durationMs = performance.now() - t0;
     const limit = isReroute ? REROUTE_LIMIT_MS : PATHFIND_LIMIT_MS;
     const exceeded = durationMs > limit;
+    this.totalDuration += durationMs;
+    if (exceeded) this.timeoutCount++;
 
     const log: PathPerfLog = {
       startX: sx,
@@ -191,22 +209,66 @@ export class Pathfinder {
       durationMs: Math.round(durationMs * 100) / 100,
       pathLength: pathLen,
       isReroute,
-      exceeded
+      exceeded,
+      timestamp: performance.now()
     };
     this.perfLogs.push(log);
+    if (this.perfLogs.length > 500) this.perfLogs.shift();
 
     if (exceeded) {
-      console.warn(
-        `[Pathfinder] ${isReroute ? 'REROUTE' : 'PATHFIND'} TIMEOUT: ` +
-        `${log.durationMs}ms > ${limit}ms ` +
-        `(${sx},${sy})→(${ex},${ey}) pathLen=${pathLen}`
+      const now = performance.now();
+      const shouldWarn = now - this.lastWarnAt > WARN_INTERVAL_MS;
+      this.lastWarnAt = now;
+
+      const typeTag = isReroute ? '🔄 REROUTE' : '🔍 PATHFIND';
+      const warnMsg = (
+        `%c⚠ [Pathfinder] ${typeTag} TIMEOUT %c${log.durationMs}ms%c > ${limit}ms ` +
+        `│ (${sx},${sy})→(${ex},${ey}) │ pathLen=${pathLen} │ status=${status} ` +
+        `│ 超时率=${this.getTimeoutRate()}%`
       );
+      if (shouldWarn) {
+        console.warn(
+          warnMsg,
+          'color:#ff6b6b;font-weight:bold;background:#2a0a0a;padding:2px 4px;border-radius:3px',
+          'color:#ffd93d;font-weight:bold',
+          'color:#aaa'
+        );
+        console.warn(
+          `%c📊 Pathfinder stats: total=${this.totalCount} ` +
+          `timeouts=${this.timeoutCount} avg=${(this.totalDuration / this.totalCount).toFixed(2)}ms`,
+          'color:#ffa500'
+        );
+      } else {
+        console.debug(
+          warnMsg,
+          'color:#ff6b6b;background:#2a0a0a;padding:2px 4px;border-radius:3px',
+          'color:#ffd93d;font-weight:bold',
+          'color:#aaa'
+        );
+      }
     } else {
+      const typeTag = isReroute ? '🔄 Reroute' : '✅ Find';
       console.debug(
-        `[Pathfinder] ${isReroute ? 'Reroute' : 'Find'}: ` +
-        `${log.durationMs}ms (${sx},${sy})→(${ex},${ey}) pathLen=${pathLen}`
+        `%c${typeTag}%c ${log.durationMs}ms %c(${sx},${sy})→(${ex},${ey}) len=${pathLen} ${status}`,
+        isReroute ? 'color:#f59e0b' : 'color:#22c55e',
+        'color:#94a3b8;font-weight:bold',
+        'color:#64748b'
       );
     }
+  }
+
+  getTimeoutRate(): string {
+    if (this.totalCount === 0) return '0.0';
+    return ((this.timeoutCount / this.totalCount) * 100).toFixed(1);
+  }
+
+  getStats(): { total: number; timeouts: number; avgMs: number; rate: string } {
+    return {
+      total: this.totalCount,
+      timeouts: this.timeoutCount,
+      avgMs: this.totalCount === 0 ? 0 : this.totalDuration / this.totalCount,
+      rate: this.getTimeoutRate()
+    };
   }
 
   getPerfLogs(): PathPerfLog[] {
@@ -215,6 +277,9 @@ export class Pathfinder {
 
   clearPerfLogs(): void {
     this.perfLogs = [];
+    this.timeoutCount = 0;
+    this.totalCount = 0;
+    this.totalDuration = 0;
   }
 
   private smoothPath(gridPath: Array<{ x: number; y: number }>): Array<{ x: number; y: number }> {
