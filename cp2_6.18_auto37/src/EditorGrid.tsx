@@ -19,6 +19,7 @@ interface EditorGridProps {
 }
 
 const PATH_DOT_RADIUS = 3;
+const THROTTLE_MS = 50;
 
 function drawGroundIcon(ctx: CanvasRenderingContext2D, x: number, y: number) {
   ctx.fillStyle = CELL_COLORS[CellType.Ground];
@@ -147,8 +148,8 @@ const EditorGrid: React.FC<EditorGridProps> = ({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const scaleRef = useRef(1);
-  const lastClickRef = useRef(0);
-  const pendingClicksRef = useRef<{ col: number; row: number }[]>([]);
+  const lastThrottleTimeRef = useRef(0);
+  const trailingTimerRef = useRef<number | null>(null);
   const rafPendingRef = useRef(false);
 
   const [canvasSize, setCanvasSize] = React.useState({
@@ -156,30 +157,37 @@ const EditorGrid: React.FC<EditorGridProps> = ({
     height: grid.rows * CELL_SIZE,
   });
 
-  useEffect(() => {
+  const handleResize = useCallback(() => {
     const container = containerRef.current;
     if (!container) return;
 
-    const updateSize = () => {
-      const containerWidth = container.clientWidth - 16;
-      const naturalWidth = grid.cols * CELL_SIZE;
-      const scale = Math.min(1, Math.max(0.3, containerWidth / naturalWidth));
-      scaleRef.current = scale;
-      setCanvasSize({
-        width: Math.floor(naturalWidth * scale),
-        height: Math.floor(grid.rows * CELL_SIZE * scale),
-      });
-    };
-
-    updateSize();
-
-    const observer = new ResizeObserver(() => {
-      updateSize();
+    const containerWidth = container.clientWidth - 16;
+    const naturalWidth = grid.cols * CELL_SIZE;
+    const minScale = 0.25;
+    const scale = Math.min(1, Math.max(minScale, containerWidth / naturalWidth));
+    scaleRef.current = scale;
+    setCanvasSize({
+      width: Math.floor(naturalWidth * scale),
+      height: Math.floor(grid.rows * CELL_SIZE * scale),
     });
-
-    observer.observe(container);
-    return () => observer.disconnect();
   }, [grid.cols, grid.rows]);
+
+  useEffect(() => {
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    const container = containerRef.current;
+    let observer: ResizeObserver | null = null;
+
+    if (container && typeof ResizeObserver !== 'undefined') {
+      observer = new ResizeObserver(() => handleResize());
+      observer.observe(container);
+    }
+
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      if (observer) observer.disconnect();
+    };
+  }, [handleResize]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -196,52 +204,76 @@ const EditorGrid: React.FC<EditorGridProps> = ({
     });
   }, [grid, path, simulationResult, flashCount]);
 
-  const processClicks = useCallback(() => {
-    if (pendingClicksRef.current.length === 0) return;
-    const clicks = [...pendingClicksRef.current];
-    pendingClicksRef.current = [];
-    for (const click of clicks) {
-      onCellClick(click.col, click.row);
+  const invokeCellClick = useCallback(
+    (col: number, row: number) => {
+      onCellClick(col, row);
+    },
+    [onCellClick]
+  );
+
+  const throttledClick = useCallback(
+    (col: number, row: number) => {
+      const now = performance.now();
+      const timeSinceLast = now - lastThrottleTimeRef.current;
+
+      if (timeSinceLast >= THROTTLE_MS) {
+        lastThrottleTimeRef.current = now;
+        if (trailingTimerRef.current) {
+          clearTimeout(trailingTimerRef.current);
+          trailingTimerRef.current = null;
+        }
+        invokeCellClick(col, row);
+      } else {
+        if (trailingTimerRef.current) {
+          clearTimeout(trailingTimerRef.current);
+        }
+        const remaining = THROTTLE_MS - timeSinceLast;
+        trailingTimerRef.current = window.setTimeout(() => {
+          lastThrottleTimeRef.current = performance.now();
+          trailingTimerRef.current = null;
+          invokeCellClick(col, row);
+        }, remaining);
+      }
+    },
+    [invokeCellClick]
+  );
+
+  const getGridPos = useCallback((clientX: number, clientY: number): { col: number; row: number } | null => {
+    const canvas = canvasRef.current;
+    if (!canvas) return null;
+    const rect = canvas.getBoundingClientRect();
+    const scale = scaleRef.current;
+    if (scale <= 0) return null;
+    const x = (clientX - rect.left) / scale;
+    const y = (clientY - rect.top) / scale;
+    const { col, row } = pixelToGrid(x, y);
+    if (col >= 0 && col < grid.cols && row >= 0 && row < grid.rows) {
+      return { col, row };
     }
-  }, [onCellClick]);
+    return null;
+  }, [grid.cols, grid.rows]);
 
   const handleCanvasClick = useCallback(
     (e: React.MouseEvent<HTMLCanvasElement>) => {
-      const now = performance.now();
-      if (now - lastClickRef.current < 16) return;
-      lastClickRef.current = now;
-
-      const canvas = canvasRef.current;
-      if (!canvas) return;
-      const rect = canvas.getBoundingClientRect();
-      const scale = scaleRef.current;
-      const x = (e.clientX - rect.left) / scale;
-      const y = (e.clientY - rect.top) / scale;
-      const { col, row } = pixelToGrid(x, y);
-      if (col >= 0 && col < grid.cols && row >= 0 && row < grid.rows) {
-        pendingClicksRef.current.push({ col, row });
-        requestAnimationFrame(processClicks);
+      const pos = getGridPos(e.clientX, e.clientY);
+      if (pos) {
+        throttledClick(pos.col, pos.row);
       }
     },
-    [grid.cols, grid.rows, processClicks]
+    [getGridPos, throttledClick]
   );
 
   const handleTouchStart = useCallback(
     (e: React.TouchEvent<HTMLCanvasElement>) => {
       e.preventDefault();
-      const canvas = canvasRef.current;
-      if (!canvas) return;
-      const rect = canvas.getBoundingClientRect();
-      const scale = scaleRef.current;
+      if (e.touches.length === 0) return;
       const touch = e.touches[0];
-      const x = (touch.clientX - rect.left) / scale;
-      const y = (touch.clientY - rect.top) / scale;
-      const { col, row } = pixelToGrid(x, y);
-      if (col >= 0 && col < grid.cols && row >= 0 && row < grid.rows) {
-        onCellClick(col, row);
+      const pos = getGridPos(touch.clientX, touch.clientY);
+      if (pos) {
+        throttledClick(pos.col, pos.row);
       }
     },
-    [grid.cols, grid.rows, onCellClick]
+    [getGridPos, throttledClick]
   );
 
   return (

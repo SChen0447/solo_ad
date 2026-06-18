@@ -17,7 +17,7 @@ const GRAVITY = 0.45;
 const INITIAL_VX = 3.0;
 const INITIAL_VY = -6.0;
 const WALK_SPEED = 2.5;
-const PATH_SAMPLE_INTERVAL = 60;
+const PATH_SAMPLE_INTERVAL_MS = 60;
 const MAX_SIMULATION_MS = 2000;
 const PLAYER_HALF = CELL_SIZE * 0.35;
 const FIXED_DT = 1000 / 60;
@@ -31,7 +31,7 @@ function checkPlayerCollision(
   px: number,
   py: number,
   grid: GridData
-): { hitGround: boolean; hitSpike: boolean; hitFinish: boolean; onGround: boolean } {
+): { hitSpike: boolean; hitFinish: boolean } {
   const left = px - PLAYER_HALF;
   const right = px + PLAYER_HALF;
   const top = py - PLAYER_HALF;
@@ -42,30 +42,18 @@ function checkPlayerCollision(
   const minRow = Math.floor(top / CELL_SIZE);
   const maxRow = Math.floor(bottom / CELL_SIZE);
 
-  let hitGround = false;
   let hitSpike = false;
   let hitFinish = false;
-  let onGround = false;
 
   for (let r = minRow; r <= maxRow; r++) {
     for (let c = minCol; c <= maxCol; c++) {
       const cell = getCell(grid, c, r);
-      if (cell === CellType.Ground) hitGround = true;
       if (cell === CellType.Spike) hitSpike = true;
       if (cell === CellType.Finish) hitFinish = true;
     }
   }
 
-  if (!hitGround) {
-    const feetY = py + PLAYER_HALF + 1;
-    const feetRow = Math.floor(feetY / CELL_SIZE);
-    const centerCol = Math.floor(px / CELL_SIZE);
-    if (isSolid(grid, centerCol, feetRow)) {
-      onGround = true;
-    }
-  }
-
-  return { hitGround, hitSpike, hitFinish, onGround };
+  return { hitSpike, hitFinish };
 }
 
 function resolveVerticalCollision(
@@ -130,6 +118,13 @@ function resolveHorizontalCollision(
   return { x: px, vx, blocked: false };
 }
 
+function isOnGround(px: number, py: number, grid: GridData): boolean {
+  const feetY = py + PLAYER_HALF + 1;
+  const feetRow = Math.floor(feetY / CELL_SIZE);
+  const centerCol = Math.floor(px / CELL_SIZE);
+  return isSolid(grid, centerCol, feetRow);
+}
+
 export function runSimulation(grid: GridData): Promise<SimulationOutput> {
   return new Promise((resolve) => {
     const playerPos = findPlayerStart(grid);
@@ -148,36 +143,42 @@ export function runSimulation(grid: GridData): Promise<SimulationOutput> {
     let vx = INITIAL_VX;
     let vy = INITIAL_VY;
     let isWalking = false;
-    let lastSampleTime = 0;
-    let elapsed = 0;
 
     const path: PathPoint[] = [{ x: px, y: py }];
-    let result: SimulationResult = 'timeout';
     let resolved = false;
 
+    const startTimestamp = performance.now();
+    let lastSampleTime = 0;
     let rafId: number;
-    let lastFrameTime = performance.now();
 
-    function step() {
+    function finish(finalResult: SimulationResult, message: string) {
+      if (resolved) return;
+      resolved = true;
+      if (rafId) cancelAnimationFrame(rafId);
+      resolve({
+        path,
+        result: finalResult,
+        resultMessage: message,
+      });
+    }
+
+    function step(currentTime: number) {
       if (resolved) return;
 
-      const now = performance.now();
-      const frameTime = now - lastFrameTime;
-      lastFrameTime = now;
-      elapsed += frameTime;
+      const elapsed = currentTime - startTimestamp;
 
       if (elapsed >= MAX_SIMULATION_MS) {
-        result = 'timeout';
-        resolved = true;
-        resolve({
-          path,
-          result,
-          resultMessage: '模拟完成-超时未到达终点',
-        });
+        path.push({ x: px, y: py });
+        finish('timeout', '模拟完成-超时未到达终点');
         return;
       }
 
-      const steps = Math.max(1, Math.floor(frameTime / FIXED_DT));
+      if (elapsed - lastSampleTime >= PATH_SAMPLE_INTERVAL_MS) {
+        path.push({ x: px, y: py });
+        lastSampleTime = elapsed;
+      }
+
+      const steps = Math.max(1, Math.min(4, Math.ceil(FIXED_DT / FIXED_DT)));
       for (let i = 0; i < steps; i++) {
         if (resolved) break;
 
@@ -191,24 +192,12 @@ export function runSimulation(grid: GridData): Promise<SimulationOutput> {
           vx = hResult.vx;
 
           if (hResult.blocked) {
-            result = 'out_of_bounds';
-            resolved = true;
-            if (elapsed - lastSampleTime >= PATH_SAMPLE_INTERVAL || path.length === 0) {
-              path.push({ x: px, y: py });
-              lastSampleTime = elapsed;
-            }
-            resolve({
-              path,
-              result,
-              resultMessage: '模拟完成-碰到墙壁',
-            });
+            path.push({ x: px, y: py });
+            finish('out_of_bounds', '模拟完成-碰到墙壁');
             return;
           }
 
-          const feetY = py + PLAYER_HALF + 2;
-          const feetRow = Math.floor(feetY / CELL_SIZE);
-          const centerCol = Math.floor(px / CELL_SIZE);
-          if (!isSolid(grid, centerCol, feetRow)) {
+          if (!isOnGround(px, py, grid)) {
             isWalking = false;
             vy = 0;
           }
@@ -236,47 +225,24 @@ export function runSimulation(grid: GridData): Promise<SimulationOutput> {
         const col = Math.floor(px / CELL_SIZE);
         const row = Math.floor(py / CELL_SIZE);
         if (col < -1 || col >= grid.cols + 1 || row < -1 || row >= grid.rows + 1) {
-          result = 'out_of_bounds';
-          resolved = true;
           path.push({ x: px, y: py });
-          resolve({
-            path,
-            result,
-            resultMessage: '模拟完成-超出边界',
-          });
+          finish('out_of_bounds', '模拟完成-超出边界');
           return;
         }
 
         const collision = checkPlayerCollision(px, py, grid);
 
         if (collision.hitSpike) {
-          result = 'hit_spike';
-          resolved = true;
           path.push({ x: px, y: py });
-          resolve({
-            path,
-            result,
-            resultMessage: '模拟完成-经过尖刺',
-          });
+          finish('hit_spike', '模拟完成-经过尖刺');
           return;
         }
 
         if (collision.hitFinish) {
-          result = 'reached_finish';
-          resolved = true;
           path.push({ x: px, y: py });
-          resolve({
-            path,
-            result,
-            resultMessage: '模拟完成-到达终点',
-          });
+          finish('reached_finish', '模拟完成-到达终点');
           return;
         }
-      }
-
-      if (elapsed - lastSampleTime >= PATH_SAMPLE_INTERVAL) {
-        path.push({ x: px, y: py });
-        lastSampleTime = elapsed;
       }
 
       rafId = requestAnimationFrame(step);
@@ -286,16 +252,9 @@ export function runSimulation(grid: GridData): Promise<SimulationOutput> {
 
     setTimeout(() => {
       if (!resolved) {
-        resolved = true;
-        cancelAnimationFrame(rafId);
-        result = 'timeout';
-        resolve({
-          path,
-          result,
-          resultMessage: '模拟完成-超时未到达终点',
-        });
+        finish('timeout', '模拟完成-超时未到达终点');
       }
-    }, MAX_SIMULATION_MS + 50);
+    }, MAX_SIMULATION_MS + 100);
   });
 }
 
