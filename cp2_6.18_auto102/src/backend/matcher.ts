@@ -15,6 +15,48 @@ const STOP_WORDS = new Set([
   '中', '上', '下', '年', '月', '日', '时', '分', '到', '以',
 ]);
 
+const CORPUS_DOCUMENTS: string[] = [
+  '前端工程师需要精通JavaScript TypeScript React Vue HTML CSS Sass Webpack Vite Node.js Express Next.js Nuxt.js Redux MobX Tailwind CSS Responsive Design UI UX Jest Cypress Figma Git Docker CI CD',
+  '后端工程师需要掌握Java Spring SpringBoot SQL MySQL PostgreSQL MongoDB Redis Node.js Python Go REST API GraphQL Microservices Docker Kubernetes AWS Linux Kafka RabbitMQ Elasticsearch Jenkins Nginx',
+  '数据科学家需要熟悉Python SQL Pandas NumPy Scikit learn TensorFlow PyTorch Machine Learning Deep Learning Data Analysis Data Visualization Tableau Spark Hadoop Hive Statistical Modeling NLP Computer Vision AB Testing',
+  '全栈工程师需要JavaScript TypeScript React Vue Node.js Express HTML CSS MongoDB Redis MySQL PostgreSQL REST API GraphQL Docker Kubernetes Git Webpack Vite Jest Cypress AWS Linux',
+  'DevOps工程师需要Linux Docker Kubernetes AWS Azure Terraform Ansible Jenkins GitLab CI CI CD Prometheus Grafana ELK Stack Python Bash Go MySQL Redis Kafka Nginx Istio',
+  '移动端开发需要Swift Kotlin React Native Flutter Objective C Java iOS Android JavaScript TypeScript Redux Git CI CD Xcode Android Studio Firebase App Store',
+  'UI设计师需要Figma Sketch Photoshop Illustrator UI UX Design Prototyping Wireframing User Research Interaction Design Design System Accessibility Typography Color Theory HTML CSS',
+  '测试工程师需要Jest Mocha Cypress Selenium Appium Postman JMeter Python Java JavaScript SQL Git CI CD Test Automation Performance Testing Security Testing Bug Tracking Jira',
+  '产品经理需要Product Management Agile Scrum User Story Requirements Analysis Market Research Data Analysis SQL Tableau Roadmap Prioritization Stakeholder Management UX Design Thinking',
+  '项目经理需要Project Management Agile Scrum Kanban Risk Management Budgeting Scheduling Stakeholder Communication Leadership Jira Confluence MS Project Team Collaboration Timeline Planning',
+  '高级架构师需要System Design Microservices Distributed Systems High Availability Scalability Caching Load Balancing Message Queue Event Driven Architecture Domain Driven Design SOLID Principles Design Patterns Cloud Native AWS Azure GCP',
+  '算法工程师需要Algorithm Data Structure Dynamic Programming Graph Tree Sorting Search Machine Learning Deep Learning Computer Vision NLP Python C++ LeetCode Competitive Programming Optimization Math Statistics',
+];
+
+const PRECOMPUTED_IDF: Map<string, number> = (() => {
+  const tokenizedCorpus = CORPUS_DOCUMENTS.map(doc =>
+    doc
+      .toLowerCase()
+      .replace(/[^a-z0-9\u4e00-\u9fa5+\-#.\s]/g, ' ')
+      .split(/\s+/)
+      .filter(t => t.length > 0 && !STOP_WORDS.has(t))
+  );
+  const totalDocs = tokenizedCorpus.length;
+  const df = new Map<string, number>();
+
+  for (const doc of tokenizedCorpus) {
+    const unique = new Set(doc);
+    for (const token of unique) {
+      df.set(token, (df.get(token) || 0) + 1);
+    }
+  }
+
+  const idf = new Map<string, number>();
+  for (const [token, freq] of df.entries()) {
+    idf.set(token, Math.log((totalDocs + 1) / (freq + 1)) + 1);
+  }
+  return idf;
+})();
+
+const DEFAULT_IDF = Math.log((CORPUS_DOCUMENTS.length + 1) / (0 + 1)) + 1;
+
 function tokenize(text: string): string[] {
   return text
     .toLowerCase()
@@ -33,35 +75,47 @@ function computeTermFrequency(tokens: string[]): Map<string, number> {
   return tf;
 }
 
-function computeDocumentFrequency(documents: string[][]): Map<string, number> {
-  const df = new Map<string, number>();
-  const totalDocs = documents.length;
-  for (const doc of documents) {
-    const uniqueTokens = new Set(doc);
-    for (const token of uniqueTokens) {
-      df.set(token, (df.get(token) || 0) + 1);
-    }
-  }
-  const idf = new Map<string, number>();
-  for (const [token, freq] of df.entries()) {
-    idf.set(token, Math.log((totalDocs + 1) / (freq + 1)) + 1);
-  }
-  return idf;
+function getIDF(token: string): number {
+  return PRECOMPUTED_IDF.get(token) ?? DEFAULT_IDF;
 }
 
-function computeTFIDFVector(
+function computeTFIDFVectorWithCorpus(
   tokens: string[],
-  idf: Map<string, number>,
   vocabulary: Set<string>
 ): Map<string, number> {
   const tf = computeTermFrequency(tokens);
   const tfidf = new Map<string, number>();
   for (const token of vocabulary) {
     const tfVal = tf.get(token) || 0;
-    const idfVal = idf.get(token) || 0;
+    const idfVal = getIDF(token);
     tfidf.set(token, tfVal * idfVal);
   }
   return tfidf;
+}
+
+function computeDynamicIDF(documents: string[][]): Map<string, number> {
+  const totalDocs = CORPUS_DOCUMENTS.length + documents.length;
+  const df = new Map<string, number>();
+
+  for (const [token, baseFreq] of PRECOMPUTED_IDF.entries()) {
+    const origFreq = Math.round(
+      (CORPUS_DOCUMENTS.length + 1) / Math.exp(baseFreq - 1) - 1
+    );
+    df.set(token, Math.max(0, origFreq));
+  }
+
+  for (const doc of documents) {
+    const unique = new Set(doc);
+    for (const token of unique) {
+      df.set(token, (df.get(token) || 0) + 1);
+    }
+  }
+
+  const idf = new Map<string, number>();
+  for (const [token, freq] of df.entries()) {
+    idf.set(token, Math.log((totalDocs + 1) / (freq + 1)) + 1);
+  }
+  return idf;
 }
 
 function cosineSimilarity(
@@ -91,6 +145,9 @@ function buildSkillVocabulary(resumeSkills: string[], jobSkills: string[]): Set<
     const tokens = tokenize(s);
     for (const t of tokens) vocab.add(t);
     vocab.add(normalizeSkill(s));
+  }
+  for (const token of PRECOMPUTED_IDF.keys()) {
+    vocab.add(token);
   }
   return vocab;
 }
@@ -123,10 +180,22 @@ function computeSemanticScore(textA: string, textB: string): number {
     return 0.3;
   }
 
-  const idf = computeDocumentFrequency([tokensA, tokensB]);
-  const vocabulary = new Set([...tokensA, ...tokensB]);
-  const vecA = computeTFIDFVector(tokensA, idf, vocabulary);
-  const vecB = computeTFIDFVector(tokensB, idf, vocabulary);
+  const dynamicIDF = computeDynamicIDF([tokensA, tokensB]);
+  const vocabulary = new Set<string>();
+  for (const t of tokensA) vocabulary.add(t);
+  for (const t of tokensB) vocabulary.add(t);
+  for (const t of PRECOMPUTED_IDF.keys()) vocabulary.add(t);
+
+  const tfA = computeTermFrequency(tokensA);
+  const tfB = computeTermFrequency(tokensB);
+  const vecA = new Map<string, number>();
+  const vecB = new Map<string, number>();
+
+  for (const token of vocabulary) {
+    const idf = dynamicIDF.get(token) ?? PRECOMPUTED_IDF.get(token) ?? DEFAULT_IDF;
+    vecA.set(token, (tfA.get(token) || 0) * idf);
+    vecB.set(token, (tfB.get(token) || 0) * idf);
+  }
 
   return cosineSimilarity(vecA, vecB);
 }
@@ -139,19 +208,15 @@ function computeSkillSemanticScore(
   if (jobReqSkills.length === 0 && jobPrefSkills.length === 0) return 0.5;
 
   const vocab = buildSkillVocabulary(resumeSkills, [...jobReqSkills, ...jobPrefSkills]);
-  const documents: string[][] = [];
 
   const resumeSkillTokens: string[] = [];
   for (const s of resumeSkills) resumeSkillTokens.push(...tokenize(s));
-  documents.push(resumeSkillTokens);
 
   const jobSkillTokens: string[] = [];
   for (const s of [...jobReqSkills, ...jobPrefSkills]) jobSkillTokens.push(...tokenize(s));
-  documents.push(jobSkillTokens);
 
-  const idf = computeDocumentFrequency(documents);
-  const resumeVec = computeTFIDFVector(resumeSkillTokens, idf, vocab);
-  const jobVec = computeTFIDFVector(jobSkillTokens, idf, vocab);
+  const resumeVec = computeTFIDFVectorWithCorpus(resumeSkillTokens, vocab);
+  const jobVec = computeTFIDFVectorWithCorpus(jobSkillTokens, vocab);
 
   const sim = cosineSimilarity(resumeVec, jobVec);
 
@@ -159,13 +224,13 @@ function computeSkillSemanticScore(
   let totalWeight = 0;
   for (const s of jobReqSkills) {
     const sTokens = tokenize(s);
-    const sVec = computeTFIDFVector(sTokens, idf, vocab);
+    const sVec = computeTFIDFVectorWithCorpus(sTokens, vocab);
     const sSim = cosineSimilarity(resumeVec, sVec);
     let bestMatch = 0;
     for (const rs of resumeSkills) {
       if (skillsMatch(rs, s)) { bestMatch = 1; break; }
       const rsTokens = tokenize(rs);
-      const rsVec = computeTFIDFVector(rsTokens, idf, vocab);
+      const rsVec = computeTFIDFVectorWithCorpus(rsTokens, vocab);
       bestMatch = Math.max(bestMatch, cosineSimilarity(rsVec, sVec));
     }
     weighted += Math.max(sSim, bestMatch) * 2;
@@ -173,13 +238,13 @@ function computeSkillSemanticScore(
   }
   for (const s of jobPrefSkills) {
     const sTokens = tokenize(s);
-    const sVec = computeTFIDFVector(sTokens, idf, vocab);
+    const sVec = computeTFIDFVectorWithCorpus(sTokens, vocab);
     const sSim = cosineSimilarity(resumeVec, sVec);
     let bestMatch = 0;
     for (const rs of resumeSkills) {
       if (skillsMatch(rs, s)) { bestMatch = 1; break; }
       const rsTokens = tokenize(rs);
-      const rsVec = computeTFIDFVector(rsTokens, idf, vocab);
+      const rsVec = computeTFIDFVectorWithCorpus(rsTokens, vocab);
       bestMatch = Math.max(bestMatch, cosineSimilarity(rsVec, sVec));
     }
     weighted += Math.max(sSim, bestMatch);

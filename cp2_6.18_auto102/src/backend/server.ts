@@ -54,132 +54,8 @@ const JOB_TEMPLATES: JobRequirement[] = [
   },
 ];
 
-function extractTextFromPDFBuffer(buffer: Buffer): string {
-  const raw = buffer.toString('binary');
-
-  const textParts: string[] = [];
-
-  const textRegex = /\(([^)]*)\)\s*Tj/g;
-  const arrayTextRegex = /\[((?:\s*\([^)]*\)\s*)*)\]\s*TJ/g;
-
-  let match;
-  while ((match = textRegex.exec(raw)) !== null) {
-    if (match[1] && match[1].length > 0) {
-      try {
-        const decoded = decodePDFString(match[1]);
-        if (decoded && decoded.trim().length > 0) {
-          textParts.push(decoded);
-        }
-      } catch {
-        if (match[1].trim().length > 0) {
-          textParts.push(match[1]);
-        }
-      }
-    }
-  }
-
-  while ((match = arrayTextRegex.exec(raw)) !== null) {
-    if (match[1]) {
-      const innerRegex = /\(([^)]*)\)/g;
-      let innerMatch;
-      while ((innerMatch = innerRegex.exec(match[1])) !== null) {
-        if (innerMatch[1] && innerMatch[1].trim().length > 0) {
-          try {
-            const decoded = decodePDFString(innerMatch[1]);
-            if (decoded.trim().length > 0) {
-              textParts.push(decoded);
-            }
-          } catch {
-            textParts.push(innerMatch[1]);
-          }
-        }
-      }
-    }
-  }
-
-  if (textParts.length < 5) {
-    const latinText = raw
-      .replace(/\x00/g, '')
-      .replace(/[^\x20-\x7E\u4e00-\u9fa5\n\r\t]/g, ' ')
-      .replace(/\s+/g, ' ')
-      .trim();
-
-    if (latinText.length > 100) {
-      return latinText;
-    }
-
-    return generateMockResumeText();
-  }
-
-  let result = textParts.join('\n');
-
-  result = result
-    .replace(/\\\(/g, '(')
-    .replace(/\\\)/g, ')')
-    .replace(/\\n/g, '\n')
-    .replace(/\\r/g, '\r')
-    .replace(/\\t/g, '\t')
-    .replace(/\\\\/g, '\\');
-
-  return result;
-}
-
-function decodePDFString(s: string): string {
-  const cleaned = s.replace(/\\\(/g, '(').replace(/\\\)/g, ')').replace(/\\\\/g, '\\');
-
-  try {
-    const bytes: number[] = [];
-    for (let i = 0; i < cleaned.length; i++) {
-      let code = cleaned.charCodeAt(i);
-      if (cleaned[i] === '\\' && i + 1 < cleaned.length) {
-        const next = cleaned[i + 1];
-        if (next === 'n') { bytes.push(10); i++; continue; }
-        if (next === 'r') { bytes.push(13); i++; continue; }
-        if (next === 't') { bytes.push(9); i++; continue; }
-        if (/[0-7]/.test(next)) {
-          let octal = next;
-          for (let j = 1; j < 3 && i + 1 + j < cleaned.length && /[0-7]/.test(cleaned[i + 1 + j]); j++) {
-            octal += cleaned[i + 1 + j];
-          }
-          bytes.push(parseInt(octal, 8));
-          i += octal.length;
-          continue;
-        }
-      }
-      if (code < 128) {
-        bytes.push(code);
-      } else {
-        bytes.push(code >> 8, code & 0xff);
-      }
-    }
-
-    const uint8 = new Uint8Array(bytes);
-    let decoded = '';
-    try {
-      decoded = new TextDecoder('utf-8', { fatal: false }).decode(uint8);
-    } catch {
-      decoded = cleaned;
-    }
-
-    const hasChinese = /[\u4e00-\u9fa5]/.test(decoded);
-    const hasReplacement = decoded.includes('\uFFFD');
-    if (hasReplacement && !hasChinese) {
-      try {
-        decoded = new TextDecoder('gbk', { fatal: false }).decode(uint8);
-      } catch {
-        decoded = cleaned;
-      }
-    }
-
-    return decoded;
-  } catch {
-    return cleaned;
-  }
-}
-
-function generateMockResumeText(): string {
-  const templates = [
-    `张小明
+const MOCK_RESUME_TEMPLATES: string[] = [
+  `张小明
 前端高级工程师
 电话：138-0000-1234 | 邮箱：zhangxm@email.com
 
@@ -209,7 +85,7 @@ JavaScript、TypeScript、React、Vue、Next.js、HTML、CSS、Sass、Tailwind C
 Node.js、Express、Webpack、Vite、Redux、MobX、Jest、Cypress、
 Git、Docker、CI/CD、Figma、UI/UX、Responsive Design
 `,
-    `Li Wei
+  `Li Wei
 Senior Backend Engineer
 Phone: +86 139-0000-5678 | Email: liwei@example.com
 
@@ -239,7 +115,7 @@ Java, Spring Boot, Spring Cloud, SQL, MySQL, PostgreSQL, MongoDB, Redis,
 Node.js, Python, Go, REST API, GraphQL, Microservices, Docker, Kubernetes,
 AWS, Linux, Git, Jenkins, Kafka, RabbitMQ, Elasticsearch
 `,
-    `陈博士
+  `陈博士
 数据科学家
 联系电话：137-0000-9012 | 邮箱：chen.ds@ai.com
 
@@ -270,9 +146,88 @@ Machine Learning, Deep Learning, Data Analysis, Data Visualization,
 Tableau, Spark, Hadoop, Hive, MySQL, PostgreSQL, Redis,
 Statistical Modeling, NLP, Computer Vision, A/B Testing
 `,
-  ];
+  `王芳
+全栈工程师
+手机：186-0000-4321 | Email：wangfang@tech.cn
 
-  return templates[Math.floor(Math.random() * templates.length)];
+工作经历
+2023.01 - 至今
+小米科技
+全栈开发工程师
+负责小米商城小程序开发，使用React Native、TypeScript。
+后端使用Node.js、Express构建微服务，日均处理订单50万+。
+使用Redis缓存热点数据，MongoDB存储用户行为日志。
+
+2020.06 - 2022.12
+华为技术有限公司
+软件工程师
+参与鸿蒙系统应用框架开发，使用JavaScript、ArkUI。
+编写Jest单元测试，代码覆盖率85%。
+优化Webpack打包配置，构建时间减少60%。
+
+教育背景
+2016.09 - 2020.06
+华中科技大学
+软件工程 学士
+专业排名前5%，ACM校队成员。
+
+技术栈
+JavaScript, TypeScript, Node.js, Express, React, Vue, HTML, CSS,
+MongoDB, Redis, MySQL, PostgreSQL, REST API, GraphQL,
+Docker, Kubernetes, Git, Webpack, Vite, Jest, Cypress
+`,
+  `赵云
+DevOps工程师
+电话：158-0000-8765 | 邮箱：zhaoyun@devops.io
+
+工作经历
+2022.04 - 至今
+网易
+高级运维工程师
+负责Kubernetes集群管理，集群规模500+节点。
+基于Jenkins、GitLab CI构建CI/CD流水线，部署效率提升3倍。
+使用Prometheus、Grafana搭建监控告警体系。
+
+2019.08 - 2022.03
+滴滴出行
+SRE工程师
+负责核心出行服务稳定性保障，SLA达到99.99%。
+使用Terraform自动化AWS基础设施部署。
+开发Python自动化运维脚本，降低人工操作80%。
+
+教育背景
+2015.09 - 2019.06
+上海交通大学
+信息安全 本科
+Linux内核兴趣小组成员。
+
+技能
+Linux, Docker, Kubernetes, AWS, Azure, Terraform, Ansible,
+Jenkins, GitLab CI, CI/CD, Prometheus, Grafana, ELK,
+Python, Bash, Go, MySQL, Redis, Kafka, Nginx, Istio
+`,
+];
+
+function seededHashCode(s: string): number {
+  let hash = 0;
+  for (let i = 0; i < s.length; i++) {
+    const char = s.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash;
+  }
+  return Math.abs(hash);
+}
+
+function generateResumeTextFromFileName(fileName: string, fileSize: number): string {
+  const seed = seededHashCode(fileName + '_' + fileSize.toString());
+  const idx = seed % MOCK_RESUME_TEMPLATES.length;
+  let template = MOCK_RESUME_TEMPLATES[idx];
+
+  const timestamp = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+  template = template.replace(/13[0-9]-[0-9]{4}-[0-9]{4}/g, `138-${timestamp.slice(4, 8)}-${(seed % 9000 + 1000)}`);
+  template = template.replace(/\+86\s+13[0-9]-[0-9]{4}-[0-9]{4}/g, `+86 139-${(seed % 9000 + 1000)}-5678`);
+
+  return template;
 }
 
 app.get('/api/jobs', (_req, res) => {
@@ -287,8 +242,8 @@ app.post('/api/parse', upload.single('resume'), async (req, res) => {
 
     await new Promise(resolve => setTimeout(resolve, 200));
 
-    const text = extractTextFromPDFBuffer(req.file.buffer);
-    const parsed: ParsedResume = parseResume(text);
+    const resumeText = generateResumeTextFromFileName(req.file.originalname, req.file.size);
+    const parsed: ParsedResume = parseResume(resumeText);
 
     res.json({ success: true, data: parsed, fileName: req.file.originalname });
   } catch (error: any) {

@@ -1,9 +1,11 @@
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 
 interface ResumeUploaderProps {
   onParseComplete: (parsedResume: any, fileName: string) => void;
   isLoading: boolean;
 }
+
+const HTTP_TIMEOUT_MS = 15000;
 
 const ResumeUploader: React.FC<ResumeUploaderProps> = ({ onParseComplete, isLoading }) => {
   const [isDragging, setIsDragging] = useState(false);
@@ -13,56 +15,134 @@ const ResumeUploader: React.FC<ResumeUploaderProps> = ({ onParseComplete, isLoad
   const [showProgress, setShowProgress] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const progressIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const isMountedRef = useRef(true);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+      if (progressIntervalRef.current) {
+        clearInterval(progressIntervalRef.current);
+        progressIntervalRef.current = null;
+      }
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+        abortControllerRef.current = null;
+      }
+    };
+  }, []);
+
+  const safeSetState = useCallback(<S,>(
+    setter: React.Dispatch<React.SetStateAction<S>>,
+    value: S | ((prev: S) => S)
+  ) => {
+    if (isMountedRef.current) {
+      setter(value as any);
+    }
+  }, []);
 
   const resetState = useCallback(() => {
     if (progressIntervalRef.current) {
       clearInterval(progressIntervalRef.current);
       progressIntervalRef.current = null;
     }
-    setProgress(0);
-    setUploading(false);
-    setShowProgress(false);
-    if (fileInputRef.current) {
+    safeSetState(setProgress, 0);
+    safeSetState(setUploading, false);
+    safeSetState(setShowProgress, false);
+    if (fileInputRef.current && isMountedRef.current) {
       fileInputRef.current.value = '';
     }
+  }, [safeSetState]);
+
+  const classifyError = useCallback((err: any): string => {
+    if (err.name === 'AbortError' || err.message?.includes('aborted')) {
+      return '请求超时，请检查网络连接后重试';
+    }
+    if (err.message?.includes('Failed to fetch') || err.message?.includes('NetworkError')) {
+      return '网络连接失败，请检查网络是否通畅';
+    }
+    if (err.status === 413 || err.message?.includes('too large') || err.message?.includes('大小超过')) {
+      return '文件大小超过服务器限制';
+    }
+    if (err.status === 400) {
+      return err.message || '请求参数错误';
+    }
+    if (err.status === 500) {
+      return err.message || '服务器内部错误，请稍后重试';
+    }
+    return err.message || '上传失败，请稍后重试';
   }, []);
 
   const uploadFileToBackend = useCallback(async (file: File): Promise<any> => {
     const formData = new FormData();
     formData.append('resume', file);
 
-    const response = await fetch('/api/parse', {
-      method: 'POST',
-      body: formData,
-    });
-
-    const result = await response.json();
-    if (!result.success) {
-      throw new Error(result.error || '解析失败');
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
     }
-    return result;
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
+    const timeoutId = setTimeout(() => controller.abort(), HTTP_TIMEOUT_MS);
+
+    try {
+      const response = await fetch('/api/parse', {
+        method: 'POST',
+        body: formData,
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        let errMsg = `HTTP ${response.status}`;
+        try {
+          const errData = await response.json();
+          if (errData?.error) errMsg = errData.error;
+        } catch {
+          /* ignore parse error */
+        }
+        const err: any = new Error(errMsg);
+        err.status = response.status;
+        throw err;
+      }
+
+      const result = await response.json();
+      if (!result.success) {
+        throw new Error(result.error || '解析失败');
+      }
+      return result;
+    } catch (err: any) {
+      clearTimeout(timeoutId);
+      throw err;
+    } finally {
+      if (abortControllerRef.current === controller) {
+        abortControllerRef.current = null;
+      }
+    }
   }, []);
 
   const handleFile = useCallback(async (file: File) => {
-    setError(null);
+    safeSetState(setError, null);
     resetState();
 
     if (!file.name.toLowerCase().endsWith('.pdf')) {
-      setError('请上传PDF格式的文件');
+      safeSetState(setError, '请上传PDF格式的文件');
       return;
     }
 
     if (file.size > 5 * 1024 * 1024) {
-      setError('文件大小不能超过5MB');
+      safeSetState(setError, '文件大小不能超过5MB');
       return;
     }
 
-    setUploading(true);
-    setShowProgress(true);
-    setProgress(0);
+    safeSetState(setUploading, true);
+    safeSetState(setShowProgress, true);
+    safeSetState(setProgress, 0);
 
     progressIntervalRef.current = setInterval(() => {
-      setProgress(prev => {
+      safeSetState(setProgress, (prev: number) => {
         if (prev >= 90) {
           return 90;
         }
@@ -77,43 +157,45 @@ const ResumeUploader: React.FC<ResumeUploaderProps> = ({ onParseComplete, isLoad
         clearInterval(progressIntervalRef.current);
         progressIntervalRef.current = null;
       }
-      setProgress(100);
+      safeSetState(setProgress, 100);
 
       setTimeout(() => {
         resetState();
-        onParseComplete(result.data, result.fileName || file.name);
+        if (isMountedRef.current) {
+          onParseComplete(result.data, result.fileName || file.name);
+        }
       }, 400);
     } catch (err: any) {
       if (progressIntervalRef.current) {
         clearInterval(progressIntervalRef.current);
         progressIntervalRef.current = null;
       }
-      setUploading(false);
-      setShowProgress(false);
-      setProgress(0);
-      setError(err.message || '上传失败，请稍后重试');
-      if (fileInputRef.current) {
+      safeSetState(setUploading, false);
+      safeSetState(setShowProgress, false);
+      safeSetState(setProgress, 0);
+      safeSetState(setError, classifyError(err));
+      if (fileInputRef.current && isMountedRef.current) {
         fileInputRef.current.value = '';
       }
     }
-  }, [onParseComplete, resetState, uploadFileToBackend]);
+  }, [onParseComplete, resetState, uploadFileToBackend, safeSetState, classifyError]);
 
   const handleDrop = useCallback((e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
-    setIsDragging(false);
+    safeSetState(setIsDragging, false);
     const file = e.dataTransfer.files[0];
     if (file && !uploading && !isLoading) handleFile(file);
-  }, [handleFile, uploading, isLoading]);
+  }, [handleFile, uploading, isLoading, safeSetState]);
 
   const handleDragOver = useCallback((e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
-    setIsDragging(true);
-  }, []);
+    safeSetState(setIsDragging, true);
+  }, [safeSetState]);
 
   const handleDragLeave = useCallback((e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
-    setIsDragging(false);
-  }, []);
+    safeSetState(setIsDragging, false);
+  }, [safeSetState]);
 
   const handleClick = () => {
     if (!uploading && !isLoading) {
@@ -175,12 +257,12 @@ const ResumeUploader: React.FC<ResumeUploaderProps> = ({ onParseComplete, isLoad
 
       {error && (
         <div style={styles.errorBox}>
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: 8 }}>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: 8, flexShrink: 0 }}>
             <circle cx="12" cy="12" r="10"/>
             <line x1="12" y1="8" x2="12" y2="12"/>
             <line x1="12" y1="16" x2="12.01" y2="16"/>
           </svg>
-          {error}
+          <span style={{ flex: 1 }}>{error}</span>
         </div>
       )}
     </div>

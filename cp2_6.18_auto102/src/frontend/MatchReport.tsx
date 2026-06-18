@@ -26,22 +26,22 @@ function rgbToHex(r: number, g: number, b: number): string {
 
 function interpolateColorTriple(percentage: number): string {
   const p = Math.max(0, Math.min(100, percentage));
-  const red: [number, number, number] = [239, 68, 68];
-  const yellow: [number, number, number] = [234, 179, 8];
-  const green: [number, number, number] = [34, 197, 94];
+  const pureRed: [number, number, number] = [239, 68, 68];
+  const pureYellow: [number, number, number] = [255, 255, 0];
+  const pureGreen: [number, number, number] = [34, 197, 94];
 
   let r: number, g: number, b: number;
 
   if (p <= 50) {
     const t = p / 50;
-    r = lerp(red[0], yellow[0], t);
-    g = lerp(red[1], yellow[1], t);
-    b = lerp(red[2], yellow[2], t);
+    r = lerp(pureRed[0], pureYellow[0], t);
+    g = lerp(pureRed[1], pureYellow[1], t);
+    b = lerp(pureRed[2], pureYellow[2], t);
   } else {
     const t = (p - 50) / 50;
-    r = lerp(yellow[0], green[0], t);
-    g = lerp(yellow[1], green[1], t);
-    b = lerp(yellow[2], green[2], t);
+    r = lerp(pureYellow[0], pureGreen[0], t);
+    g = lerp(pureYellow[1], pureGreen[1], t);
+    b = lerp(pureYellow[2], pureGreen[2], t);
   }
 
   return rgbToHex(r, g, b);

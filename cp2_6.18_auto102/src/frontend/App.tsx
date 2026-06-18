@@ -42,12 +42,51 @@ const App: React.FC = () => {
   }, []);
 
   const saveHistory = useCallback((newHistory: HistoryRecord[]) => {
-    try {
-      const trimmed = newHistory.slice(0, MAX_HISTORY);
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(trimmed));
-    } catch (err) {
-      console.warn('保存历史记录失败:', err);
-    }
+    const trimmed = newHistory.slice(0, MAX_HISTORY);
+
+    const trySave = (records: HistoryRecord[], attempt: number = 0): boolean => {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(records));
+        return true;
+      } catch (err: any) {
+        const isQuotaError =
+          err?.name === 'QuotaExceededError' ||
+          err?.name === 'NS_ERROR_DOM_QUOTA_REACHED' ||
+          (err && typeof err.message === 'string' && (
+            err.message.includes('quota') ||
+            err.message.includes('Quota') ||
+            err.message.includes('storage') ||
+            err.message.includes('空间不足')
+          ));
+
+        if (isQuotaError && records.length > 1 && attempt < 5) {
+          const reduced = records.slice(0, -1);
+          return trySave(reduced, attempt + 1);
+        }
+
+        if (!isQuotaError) {
+          console.warn('保存历史记录失败:', err);
+        } else {
+          console.warn('存储空间已满，已清理旧数据但仍无法保存');
+          try {
+            localStorage.removeItem(STORAGE_KEY);
+            if (records.length > 0) {
+              const minimal = records.slice(0, 1);
+              try {
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(minimal));
+              } catch {
+                /* ignore */
+              }
+            }
+          } catch {
+            /* ignore */
+          }
+        }
+        return false;
+      }
+    };
+
+    trySave(trimmed);
   }, []);
 
   const addToHistory = useCallback((record: Omit<HistoryRecord, 'id' | 'timestamp'>) => {
