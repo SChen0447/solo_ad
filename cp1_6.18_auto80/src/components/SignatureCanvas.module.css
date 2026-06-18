@@ -1,0 +1,147 @@
+.wrapper {
+  background: #FFFFFF;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: 16px 18px;
+  box-shadow: var(--shadow-sm);
+}
+
+.header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.label {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-primary);
+}
+
+.signer {
+  font-size: 13px;
+  color: var(--color-text-sub);
+}
+
+.canvasContainer {
+  position: relative;
+  width: 100%;
+  border: 1.5px dashed var(--color-border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  background: #FFFFFF;
+}
+
+.canvas {
+  display: block;
+  width: 100%;
+  touch-action: none;
+  cursor: crosshair;
+}
+
+.placeholder {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text-sub);
+  font-size: 13px;
+  pointer-events: none;
+  user-select: none;
+}
+
+.rippling {
+  overflow: hidden;
+}
+
+.ripple {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  border: 2px solid rgba(39, 174, 96, 0.55);
+  border-radius: 50%;
+  width: 120px;
+  height: 120px;
+  margin-left: -60px;
+  margin-top: -60px;
+  opacity: 0;
+  pointer-events: none;
+  transform: scale(0);
+  animation-name: rippleAnim;
+  animation-duration: 650ms;
+  animation-timing-function: ease-out;
+  animation-fill-mode: forwards;
+}
+
+.ripple1 {
+  animation-delay: 0ms;
+}
+
+.ripple2 {
+  animation-delay: 150ms;
+  border-color: rgba(39, 174, 96, 0.4);
+}
+
+.ripple3 {
+  animation-delay: 300ms;
+  border-color: rgba(39, 174, 96, 0.25);
+}
+
+@keyframes rippleAnim {
+  0% {
+    transform: scale(0);
+    opacity: 0.7;
+  }
+  100% {
+    transform: scale(2.6);
+    opacity: 0;
+  }
+}
+
+.actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  margin-top: 12px;
+}
+
+.clearBtn,
+.confirmBtn {
+  height: 34px;
+  padding: 0 18px;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  font-weight: 500;
+  transition: all var(--transition);
+}
+
+.clearBtn {
+  background: #F0F3F7;
+  color: var(--color-text);
+}
+
+.clearBtn:hover {
+  background: #E1E8ED;
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-sm);
+}
+
+.confirmBtn {
+  background: var(--color-accent);
+  color: #FFFFFF;
+}
+
+.confirmBtn:hover:not(.disabled) {
+  background: #2980B9;
+  transform: translateY(-1px);
+  box-shadow: var(--shadow);
+}
+
+.disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  transform: none !important;
+  box-shadow: none !important;
+}
