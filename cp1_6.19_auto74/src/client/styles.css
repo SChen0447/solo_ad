@@ -1,0 +1,40 @@
+.paragraph-block:hover {
+  background-color: #FAFBFC !important;
+}
+
+.paragraph-block.highlighted {
+  background-color: #FFFDE7;
+  transition: background-color 0.5s ease;
+}
+
+.add-paragraph-area:hover {
+  border-color: #2196F3 !important;
+  color: #2196F3 !important;
+}
+
+.fork-btn:hover {
+  border-color: #4CAF50 !important;
+  color: #4CAF50 !important;
+}
+
+.tree-node:hover rect {
+  fill: #FAFBFC;
+}
+
+.splitter:hover {
+  background-color: #2196F3 !important;
+}
+
+.export-btn:hover {
+  border-color: #2196F3 !important;
+  color: #2196F3 !important;
+}
+
+.history-btn:hover {
+  color: #333 !important;
+}
+
+textarea:focus {
+  border-color: #2196F3 !important;
+  box-shadow: 0 0 0 2px rgba(33, 150, 243, 0.1);
+}
