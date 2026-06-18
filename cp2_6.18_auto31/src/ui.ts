@@ -62,6 +62,13 @@ export class UIControlPanel {
 
     this.countEl = document.getElementById('particle-count');
     this.speedEl = document.getElementById('rotation-speed');
+
+    this.galaxy.onParamsChange(() => {
+      this.lastDisplayedCount = -1;
+      this.lastDisplayedSpeed = -1;
+      this.syncInfoPanel();
+    });
+
     this.syncInfoPanel();
   }
 

@@ -111,35 +111,50 @@
       border: 1px solid rgba(255, 255, 255, 0.1) !important;
     }
 
-    .dg .c .slider {
+    .dg .c .slider,
+    .dg .slider {
       background: rgba(255, 255, 255, 0.06) !important;
       transition: box-shadow 0.2s ease !important;
       border-radius: 4px !important;
+      outline: none !important;
+      -webkit-appearance: none !important;
+      appearance: none !important;
     }
 
     .dg .c .slider:hover,
-    .dg li:hover .c .slider {
+    .dg li:hover .c .slider,
+    .dg .slider:hover,
+    .dg li.cr.slider:hover .slider {
       box-shadow: 0 0 8px rgba(255, 170, 51, 0.4), 0 0 16px rgba(51, 102, 255, 0.2) !important;
     }
 
     .dg .c .slider:active,
-    .dg li:active .c .slider {
+    .dg li:active .c .slider,
+    .dg .slider:active,
+    .dg li.cr.slider:active .slider {
       box-shadow: 0 0 12px rgba(255, 170, 51, 0.6), 0 0 24px rgba(51, 102, 255, 0.4) !important;
     }
 
-    .dg .c .slider-fg {
+    .dg .c .slider-fg,
+    .dg .slider > div:first-child,
+    .dg .slider .slider-fg {
       background: linear-gradient(90deg, #ffaa33, #3366ff) !important;
-      transition: box-shadow 0.15s ease !important;
+      transition: box-shadow 0.15s ease, filter 0.15s ease !important;
+      border-radius: 4px !important;
     }
 
     .dg .c .slider:hover .slider-fg,
-    .dg li:hover .c .slider .slider-fg {
+    .dg li:hover .c .slider .slider-fg,
+    .dg li.cr.slider:hover .slider-fg {
       box-shadow: 0 0 6px rgba(255, 170, 51, 0.5) !important;
+      filter: brightness(1.15) !important;
     }
 
     .dg .c .slider:active .slider-fg,
-    .dg li:active .c .slider .slider-fg {
+    .dg li:active .c .slider .slider-fg,
+    .dg li.cr.slider:active .slider-fg {
       box-shadow: 0 0 10px rgba(255, 170, 51, 0.7), 0 0 4px rgba(51, 102, 255, 0.5) !important;
+      filter: brightness(1.3) !important;
     }
 
     .dg .c select {
