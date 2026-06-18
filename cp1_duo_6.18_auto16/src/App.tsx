@@ -168,16 +168,16 @@ function App() {
           </div>
         )}
 
-        {currentView !== 'editor' && currentView !== 'share' && (
+        {currentView === 'preview' && (
           <div className="view-tabs">
             <button
-              className={`view-tab ${currentView === 'editor' ? 'active' : ''}`}
+              className={`view-tab`}
               onClick={() => setView('editor')}
             >
               编辑器
             </button>
             <button
-              className={`view-tab ${currentView === 'preview' ? 'active' : ''}`}
+              className={`view-tab active`}
               onClick={() => setView('preview')}
             >
               预览

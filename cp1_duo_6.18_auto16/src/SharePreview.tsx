@@ -17,6 +17,26 @@ const truncateText = (text: string, maxLength: number): string => {
   return text.slice(0, maxLength) + '...';
 };
 
+function TrashIcon() {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width="14"
+      height="14"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M3 6h18" />
+      <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
+      <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
+    </svg>
+  );
+}
+
 interface CodeLineProps {
   lineNumber: number;
   content: string;
@@ -26,6 +46,7 @@ interface CodeLineProps {
   isBlinking: boolean;
   onMouseDown: (line: number) => void;
   onMouseEnter: (line: number) => void;
+  onDeleteAnnotation: (annotationId: string) => void;
 }
 
 function CodeLine({
@@ -37,9 +58,11 @@ function CodeLine({
   isBlinking,
   onMouseDown,
   onMouseEnter,
+  onDeleteAnnotation,
 }: CodeLineProps) {
   const [tooltipVisible, setTooltipVisible] = useState(false);
   const [tooltipTimer, setTooltipTimer] = useState<number | null>(null);
+  const [keepTooltipOpen, setKeepTooltipOpen] = useState(false);
 
   const lineAnnotations = annotations.filter((a) => a.lineNumber === lineNumber);
 
@@ -52,24 +75,58 @@ function CodeLine({
     }
   }, [content, language]);
 
-  const handleMouseEnter = () => {
-    if (lineAnnotations.length > 0) {
-      const timer = window.setTimeout(() => {
-        setTooltipVisible(true);
-      }, 300);
-      setTooltipTimer(timer);
-    }
-  };
-
-  const handleMouseLeave = () => {
+  const clearTooltipTimer = useCallback(() => {
     if (tooltipTimer) {
       clearTimeout(tooltipTimer);
       setTooltipTimer(null);
     }
+  }, [tooltipTimer]);
+
+  const showTooltipWithDelay = useCallback(() => {
+    clearTooltipTimer();
+    const timer = window.setTimeout(() => {
+      setTooltipVisible(true);
+    }, 300);
+    setTooltipTimer(timer);
+  }, [clearTooltipTimer]);
+
+  const hideTooltip = useCallback(() => {
+    clearTooltipTimer();
+    if (!keepTooltipOpen) {
+      setTooltipVisible(false);
+    }
+  }, [clearTooltipTimer, keepTooltipOpen]);
+
+  const handleMouseEnter = () => {
+    if (lineAnnotations.length > 0) {
+      showTooltipWithDelay();
+    }
+  };
+
+  const handleMouseLeave = () => {
+    hideTooltip();
+  };
+
+  const handleTooltipEnter = () => {
+    setKeepTooltipOpen(true);
+    clearTooltipTimer();
+  };
+
+  const handleTooltipLeave = () => {
+    setKeepTooltipOpen(false);
     setTooltipVisible(false);
   };
 
-  const classes = [
+  const handleDeleteClick = (annotationId: string, annotationContent: string) => {
+    const confirmed = window.confirm(`确定删除批注"${truncateText(annotationContent, 30)}"吗？`);
+    if (confirmed) {
+      onDeleteAnnotation(annotationId);
+      setKeepTooltipOpen(false);
+      setTooltipVisible(false);
+    }
+  };
+
+  const codeLineClasses = [
     'code-line',
     isSelected ? 'selected' : '',
     isBlinking ? 'blink' : '',
@@ -77,40 +134,84 @@ function CodeLine({
     .filter(Boolean)
     .join(' ');
 
+  const gutterLineClasses = [
+    'gutter-line',
+    isSelected ? 'selected' : '',
+    isBlinking ? 'blink' : '',
+  ]
+    .filter(Boolean)
+    .join(' ');
+
   return (
-    <div
-      className={classes}
-      onMouseDown={(e) => {
-        e.preventDefault();
-        onMouseDown(lineNumber);
-      }}
-      onMouseEnter={() => onMouseEnter(lineNumber)}
-      onMouseOver={handleMouseEnter}
-      onMouseOut={handleMouseLeave}
-    >
-      <span className="line-number">{lineNumber}</span>
-      <span
-        className="line-content"
-        dangerouslySetInnerHTML={{ __html: `<code class="hljs language-${language}">${highlightedContent}</code>` }}
-      />
-      {lineAnnotations.length > 0 && (
-        <>
+    <div className="code-row">
+      <div className="line-gutter">
+        <div
+          className={gutterLineClasses}
+          onMouseDown={(e) => {
+            e.preventDefault();
+            onMouseDown(lineNumber);
+          }}
+          onMouseEnter={() => onMouseEnter(lineNumber)}
+        >
+          {lineNumber}
+        </div>
+      </div>
+      <div className="code-content-wrapper">
+        <div className="code-content-inner">
           <div
-            className="annotation-dot"
-            onMouseEnter={handleMouseEnter}
-            onMouseLeave={handleMouseLeave}
-          />
-          {tooltipVisible && (
-            <div className="tooltip visible">
-              {lineAnnotations.map((a) => (
-                <div key={a.id} style={{ marginBottom: lineAnnotations.indexOf(a) < lineAnnotations.length - 1 ? 6 : 0 }}>
-                  {a.content}
-                </div>
-              ))}
-            </div>
-          )}
-        </>
-      )}
+            className={codeLineClasses}
+            onMouseDown={(e) => {
+              e.preventDefault();
+              onMouseDown(lineNumber);
+            }}
+            onMouseEnter={() => onMouseEnter(lineNumber)}
+            onMouseOver={handleMouseEnter}
+            onMouseOut={handleMouseLeave}
+          >
+            <span
+              className="line-content"
+              dangerouslySetInnerHTML={{ __html: `<code class="hljs language-${language}">${highlightedContent}</code>` }}
+            />
+            {lineAnnotations.length > 0 && (
+              <>
+                <div
+                  className="annotation-dot"
+                  onMouseEnter={handleMouseEnter}
+                  onMouseLeave={handleMouseLeave}
+                />
+                {tooltipVisible && (
+                  <div
+                    className="tooltip visible"
+                    onMouseEnter={handleTooltipEnter}
+                    onMouseLeave={handleTooltipLeave}
+                  >
+                    {lineAnnotations.map((annotation, idx) => (
+                      <div
+                        key={annotation.id}
+                        className="tooltip-annotation-item"
+                        style={{
+                          paddingBottom: idx < lineAnnotations.length - 1 ? 4 : 0,
+                        }}
+                      >
+                        <div className="tooltip-header">
+                          <button
+                            className="tooltip-delete-btn"
+                            onClick={() => handleDeleteClick(annotation.id, annotation.content)}
+                            title="删除批注"
+                          >
+                            <TrashIcon />
+                          </button>
+                        </div>
+                        <div className="tooltip-content">{annotation.content}</div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
@@ -121,6 +222,7 @@ export function SharePreview() {
   const selectedLines = useCodeReviewStore((state) => state.selectedLines);
   const setSelectedLines = useCodeReviewStore((state) => state.setSelectedLines);
   const addAnnotation = useCodeReviewStore((state) => state.addAnnotation);
+  const deleteAnnotation = useCodeReviewStore((state) => state.deleteAnnotation);
   const generateShareLink = useCodeReviewStore((state) => state.generateShareLink);
   const saveToLocalStorage = useCodeReviewStore((state) => state.saveToLocalStorage);
   const setView = useCodeReviewStore((state) => state.setView);
@@ -231,6 +333,10 @@ export function SharePreview() {
     setView('share');
   };
 
+  const handleDeleteAnnotation = useCallback((annotationId: string) => {
+    deleteAnnotation(annotationId);
+  }, [deleteAnnotation]);
+
   if (!snippet) {
     return <div>加载中...</div>;
   }
@@ -273,7 +379,7 @@ export function SharePreview() {
           <div className="code-lines" ref={codeLinesRef}>
             {codeLines.map((line, index) => (
               <CodeLine
-                key={index}
+                key={`line-${index}`}
                 lineNumber={index + 1}
                 content={line}
                 language={snippet.language}
@@ -282,6 +388,7 @@ export function SharePreview() {
                 isBlinking={blinkingLine === index + 1}
                 onMouseDown={handleLineMouseDown}
                 onMouseEnter={handleLineMouseEnter}
+                onDeleteAnnotation={handleDeleteAnnotation}
               />
             ))}
           </div>

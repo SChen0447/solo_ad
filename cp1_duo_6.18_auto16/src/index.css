@@ -379,16 +379,72 @@ body {
   font-family: var(--code-font);
   font-size: 13px;
   line-height: 1.6;
-  padding: 16px 0;
   cursor: text;
   user-select: none;
 }
 
+.code-row {
+  display: flex;
+  align-items: stretch;
+}
+
+.line-gutter {
+  width: 40px;
+  flex-shrink: 0;
+  background-color: #e8e8e8;
+  border-right: 1px solid #ddd;
+  display: flex;
+  align-items: stretch;
+}
+
+[data-theme='dark'] .line-gutter {
+  background-color: #2a2a2a;
+  border-right-color: #3c3c3c;
+}
+
+.gutter-line {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding: 0 10px 0 0;
+  font-size: 12px;
+  color: #888;
+  font-family: var(--code-font);
+  transition: background-color 0.15s ease;
+}
+
+[data-theme='dark'] .gutter-line {
+  color: #858585;
+}
+
+.gutter-line.selected {
+  background-color: var(--highlight-bg);
+}
+
+.code-content-wrapper {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: stretch;
+}
+
+.code-content-inner {
+  width: 100%;
+  min-width: 0;
+  overflow-x: auto;
+  display: flex;
+  align-items: stretch;
+}
+
 .code-line {
+  width: 100%;
+  min-width: 0;
   display: flex;
   padding: 0 16px;
   position: relative;
   transition: background-color 0.15s ease;
+  align-items: center;
 }
 
 .code-line:hover {
@@ -401,17 +457,6 @@ body {
 
 .code-line.selected {
   background-color: var(--highlight-bg);
-}
-
-.line-number {
-  display: inline-block;
-  width: 40px;
-  flex-shrink: 0;
-  color: var(--text-secondary);
-  text-align: right;
-  padding-right: 16px;
-  opacity: 0.6;
-  user-select: none;
 }
 
 .line-content {
@@ -456,12 +501,13 @@ body {
   font-size: 12px;
   line-height: 1.4;
   white-space: normal;
-  max-width: 250px;
+  max-width: 280px;
+  min-width: 200px;
   z-index: 20;
-  pointer-events: none;
   opacity: 0;
   transition: opacity 200ms ease;
   box-shadow: var(--shadow-md);
+  pointer-events: auto;
 }
 
 .tooltip.visible {
@@ -476,6 +522,45 @@ body {
   transform: translateY(-50%);
   border: 6px solid transparent;
   border-left-color: var(--tooltip-bg);
+}
+
+.tooltip-header {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.tooltip-delete-btn {
+  background: none;
+  border: none;
+  color: rgba(255, 255, 255, 0.7);
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 3px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 150ms ease;
+  line-height: 1;
+}
+
+.tooltip-delete-btn:hover {
+  color: #ff6b6b;
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+.tooltip-content {
+  color: var(--tooltip-text);
+}
+
+.tooltip-annotation-item {
+  padding: 4px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.tooltip-annotation-item:last-child {
+  border-bottom: none;
 }
 
 .floating-toolbar {

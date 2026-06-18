@@ -32,6 +32,7 @@ interface CodeReviewState {
   createSnippet: (code: string, language: Language) => string;
   updateCurrentSnippet: (code: string, language: Language) => void;
   addAnnotation: (lineNumber: number, content: string) => void;
+  deleteAnnotation: (annotationId: string) => void;
   loadSnippetById: (id: string) => boolean;
   setSelectedLines: (lines: [number, number] | null) => void;
   toggleDarkMode: () => void;
@@ -52,11 +53,11 @@ const generateId = (): string => {
   return result;
 };
 
-const generateUniqueId = (snippets: Record<string, Snippet>): string => {
+const generateUniqueId = <T extends object>(existing: Record<string, T>): string => {
   let id: string;
   do {
     id = generateId();
-  } while (snippets[id]);
+  } while (existing[id]);
   return id;
 };
 
@@ -130,11 +131,12 @@ export const useCodeReviewStore = create<CodeReviewState>((set, get) => ({
   addAnnotation: (lineNumber, content) => {
     const { currentSnippetId, snippets } = get();
     if (!currentSnippetId || !snippets[currentSnippetId]) return;
+    const annotationsMap = snippets[currentSnippetId].annotations.reduce(
+      (acc, a) => ({ ...acc, [a.id]: a }),
+      {} as Record<string, Annotation>
+    );
     const annotation: Annotation = {
-      id: generateUniqueId(snippets[currentSnippetId].annotations.reduce(
-        (acc, a) => ({ ...acc, [a.id]: a }),
-        {} as Record<string, Annotation>
-      )),
+      id: generateUniqueId<Annotation>(annotationsMap),
       lineNumber,
       content,
       createdAt: Date.now(),
@@ -145,6 +147,23 @@ export const useCodeReviewStore = create<CodeReviewState>((set, get) => ({
         [currentSnippetId]: {
           ...state.snippets[currentSnippetId],
           annotations: [...state.snippets[currentSnippetId].annotations, annotation],
+        },
+      },
+    }));
+    get().saveToLocalStorage();
+  },
+
+  deleteAnnotation: (annotationId) => {
+    const { currentSnippetId, snippets } = get();
+    if (!currentSnippetId || !snippets[currentSnippetId]) return;
+    set((state) => ({
+      snippets: {
+        ...state.snippets,
+        [currentSnippetId]: {
+          ...state.snippets[currentSnippetId],
+          annotations: state.snippets[currentSnippetId].annotations.filter(
+            (a) => a.id !== annotationId
+          ),
         },
       },
     }));
