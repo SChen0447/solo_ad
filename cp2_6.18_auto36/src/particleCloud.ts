@@ -15,9 +15,14 @@ export interface ParticleCloudCallbacks {
 
 interface ParticleMetaData {
   dataPoint: AQIDataPoint;
+  dataPointIndex: number;
   originalSize: number;
   originalColor: THREE.Color;
   isHighlighted: boolean;
+}
+
+interface SpatialHashCell {
+  particleIndices: number[];
 }
 
 export class ParticleCloud {
@@ -27,6 +32,7 @@ export class ParticleCloud {
   private material: THREE.PointsMaterial | null = null;
   private dataPoints: AQIDataPoint[] = [];
   private particleMetaData: ParticleMetaData[] = [];
+  private particleGroups: number[][] = [];
   private rotationSpeed = 0.002;
   private sizeScale = 1.0;
   private particlesPerPoint = 30;
@@ -44,6 +50,9 @@ export class ParticleCloud {
   private isTransitioning = false;
   private pendingData: AQIDataPoint[] | null = null;
   private fadeDuration = 0.5;
+  private spatialHash: Map<string, SpatialHashCell> = new Map();
+  private spatialHashCellSize = 0.5;
+  private minFrameDelta = 0.001;
 
   constructor(
     scene: THREE.Scene,
@@ -119,6 +128,87 @@ export class ParticleCloud {
       : { r: 0, g: 1, b: 0 };
   }
 
+  private getSpatialHashKey(x: number, y: number, z: number): string {
+    const cx = Math.floor(x / this.spatialHashCellSize);
+    const cy = Math.floor(y / this.spatialHashCellSize);
+    const cz = Math.floor(z / this.spatialHashCellSize);
+    return `${cx},${cy},${cz}`;
+  }
+
+  private buildSpatialHash(): void {
+    this.spatialHash.clear();
+    if (!this.geometry) return;
+
+    const positions = this.geometry.attributes.position as THREE.BufferAttribute;
+
+    for (let i = 0; i < this.particleMetaData.length; i++) {
+      const x = positions.getX(i);
+      const y = positions.getY(i);
+      const z = positions.getZ(i);
+      const key = this.getSpatialHashKey(x, y, z);
+
+      let cell = this.spatialHash.get(key);
+      if (!cell) {
+        cell = { particleIndices: [] };
+        this.spatialHash.set(key, cell);
+      }
+      cell.particleIndices.push(i);
+    }
+  }
+
+  private generateParticlePositionsWithCollision(
+    center: THREE.Vector3,
+    count: number,
+    spread: number,
+    minDistance: number
+  ): THREE.Vector3[] {
+    const positions: THREE.Vector3[] = [];
+    const maxAttempts = count * 30;
+
+    for (let i = 0; i < count && positions.length < count; i++) {
+      let placed = false;
+      for (let attempt = 0; attempt < maxAttempts / count && !placed; attempt++) {
+        const theta = Math.random() * Math.PI * 2;
+        const phi = Math.acos(2 * Math.random() - 1);
+        const r = Math.cbrt(Math.random()) * spread;
+
+        const x = center.x + r * Math.sin(phi) * Math.cos(theta);
+        const y = center.y + r * Math.sin(phi) * Math.sin(theta);
+        const z = center.z + r * Math.cos(phi);
+
+        let tooClose = false;
+        const checkRadius = minDistance * 1.2;
+        for (const existing of positions) {
+          const dx = existing.x - x;
+          const dy = existing.y - y;
+          const dz = existing.z - z;
+          if (dx * dx + dy * dy + dz * dz < checkRadius * checkRadius) {
+            tooClose = true;
+            break;
+          }
+        }
+
+        if (!tooClose) {
+          positions.push(new THREE.Vector3(x, y, z));
+          placed = true;
+        }
+      }
+
+      if (!placed) {
+        const theta = Math.random() * Math.PI * 2;
+        const phi = Math.acos(2 * Math.random() - 1);
+        const r = Math.cbrt(Math.random()) * spread;
+        positions.push(new THREE.Vector3(
+          center.x + r * Math.sin(phi) * Math.cos(theta),
+          center.y + r * Math.sin(phi) * Math.sin(theta),
+          center.z + r * Math.cos(phi)
+        ));
+      }
+    }
+
+    return positions;
+  }
+
   public async setData(dataPoints: AQIDataPoint[]): Promise<void> {
     if (this.points && !this.isTransitioning) {
       this.isTransitioning = true;
@@ -133,6 +223,7 @@ export class ParticleCloud {
     this.removePoints();
     this.dataPoints = dataPoints;
     this.particleMetaData = [];
+    this.particleGroups = [];
     this.highlightedDataPointIndex = null;
 
     const totalParticles = dataPoints.length * this.particlesPerPoint;
@@ -147,28 +238,43 @@ export class ParticleCloud {
       const rgb = this.hexToRgb(point.color);
       const baseSize = 0.5 + (point.aqi / 300) * 2.5;
 
-      for (let j = 0; j < this.particlesPerPoint; j++) {
-        const spreadFactor = 0.5 + (point.aqi / 300) * 0.6;
-        const offsetX = (Math.random() - 0.5) * spreadFactor * 1.2;
-        const offsetY = (Math.random() - 0.5) * spreadFactor * 1.2;
-        const offsetZ = (Math.random() - 0.5) * spreadFactor * 1.2;
-        const sizeVariation = 0.6 + Math.random() * 0.8;
-        const distFromCenter = Math.sqrt(offsetX * offsetX + offsetY * offsetY + offsetZ * offsetZ);
-        const distFactor = Math.max(0.2, 1 - distFromCenter / (spreadFactor * 0.8));
+      const baseSpread = 0.6;
+      const aqiSpreadBonus = (point.aqi / 300) * 0.9;
+      const spread = baseSpread + aqiSpreadBonus;
+      const minDistance = spread / Math.sqrt(this.particlesPerPoint) * 0.5;
+
+      const center = new THREE.Vector3(point.x, point.y, point.z);
+      const particlePositions = this.generateParticlePositionsWithCollision(
+        center,
+        this.particlesPerPoint,
+        spread,
+        minDistance
+      );
+
+      const groupIndices: number[] = [];
+
+      for (let j = 0; j < particlePositions.length; j++) {
+        const pos = particlePositions[j];
+        const distFromCenter = pos.distanceTo(center);
+        const distFactor = Math.max(0.25, 1 - distFromCenter / (spread * 0.9));
+
+        const sizeVariation = 0.65 + Math.random() * 0.7;
 
         const idx = particleIndex * 3;
-        positions[idx] = point.x + offsetX;
-        positions[idx + 1] = point.y + offsetY;
-        positions[idx + 2] = point.z + offsetZ;
+        positions[idx] = pos.x;
+        positions[idx + 1] = pos.y;
+        positions[idx + 2] = pos.z;
 
-        colors[idx] = rgb.r * (0.7 + 0.3 * distFactor);
-        colors[idx + 1] = rgb.g * (0.7 + 0.3 * distFactor);
-        colors[idx + 2] = rgb.b * (0.7 + 0.3 * distFactor);
+        const brightness = 0.65 + 0.35 * distFactor;
+        colors[idx] = rgb.r * brightness;
+        colors[idx + 1] = rgb.g * brightness;
+        colors[idx + 2] = rgb.b * brightness;
 
-        sizes[particleIndex] = baseSize * sizeVariation * distFactor;
+        sizes[particleIndex] = baseSize * sizeVariation * (0.7 + 0.3 * distFactor);
 
         this.particleMetaData.push({
           dataPoint: point,
+          dataPointIndex: i,
           originalSize: sizes[particleIndex],
           originalColor: new THREE.Color(
             colors[idx],
@@ -178,8 +284,11 @@ export class ParticleCloud {
           isHighlighted: false
         });
 
+        groupIndices.push(particleIndex);
         particleIndex++;
       }
+
+      this.particleGroups.push(groupIndices);
     }
 
     this.geometry = new THREE.BufferGeometry();
@@ -201,6 +310,8 @@ export class ParticleCloud {
     this.points = new THREE.Points(this.geometry, this.material);
     this.group.add(this.points);
 
+    this.buildSpatialHash();
+
     this.transitionOpacity = 0;
     this.targetOpacity = 1;
     this.isTransitioning = true;
@@ -215,6 +326,7 @@ export class ParticleCloud {
     this.sizeScale = scale;
     if (!this.geometry || !this.points) return;
     const sizeAttr = this.geometry.attributes.size as THREE.BufferAttribute;
+
     for (let i = 0; i < this.particleMetaData.length; i++) {
       const meta = this.particleMetaData[i];
       const newSize = meta.isHighlighted
@@ -240,8 +352,8 @@ export class ParticleCloud {
       const particleIndex = intersects[0].index;
       if (particleIndex === undefined || particleIndex >= this.particleMetaData.length) return;
 
-      const dataPointIdx = Math.floor(particleIndex / this.particlesPerPoint);
-      this.highlightDataPoint(dataPointIdx, particleIndex);
+      const dataPointIdx = this.particleMetaData[particleIndex].dataPointIndex;
+      this.highlightDataPoint(dataPointIdx);
 
       const positions = this.geometry.attributes.position as THREE.BufferAttribute;
       const worldPos = new THREE.Vector3(
@@ -263,18 +375,17 @@ export class ParticleCloud {
     }
   }
 
-  private highlightDataPoint(dataPointIdx: number, _triggerParticle: number): void {
+  private highlightDataPoint(dataPointIdx: number): void {
     if (this.highlightedDataPointIndex === dataPointIdx) return;
     this.clearHighlight();
-    if (!this.geometry) return;
-
-    const startIdx = dataPointIdx * this.particlesPerPoint;
-    const endIdx = startIdx + this.particlesPerPoint;
+    if (!this.geometry || !this.particleGroups[dataPointIdx]) return;
 
     const colors = this.geometry.attributes.color as THREE.BufferAttribute;
     const sizes = this.geometry.attributes.size as THREE.BufferAttribute;
+    const indices = this.particleGroups[dataPointIdx];
 
-    for (let i = startIdx; i < endIdx && i < this.particleMetaData.length; i++) {
+    for (let k = 0; k < indices.length; k++) {
+      const i = indices[k];
       this.particleMetaData[i].isHighlighted = true;
       colors.setXYZ(i, 1, 1, 1);
       sizes.setX(i, this.particleMetaData[i].originalSize * this.sizeScale * 1.5);
@@ -292,13 +403,17 @@ export class ParticleCloud {
       return;
     }
 
-    const startIdx = this.highlightedDataPointIndex * this.particlesPerPoint;
-    const endIdx = startIdx + this.particlesPerPoint;
+    const prevIdx = this.highlightedDataPointIndex;
+    this.highlightedDataPointIndex = null;
+
+    if (!this.particleGroups[prevIdx]) return;
 
     const colors = this.geometry.attributes.color as THREE.BufferAttribute;
     const sizes = this.geometry.attributes.size as THREE.BufferAttribute;
+    const indices = this.particleGroups[prevIdx];
 
-    for (let i = startIdx; i < endIdx && i < this.particleMetaData.length; i++) {
+    for (let k = 0; k < indices.length; k++) {
+      const i = indices[k];
       if (this.particleMetaData[i].isHighlighted) {
         this.particleMetaData[i].isHighlighted = false;
         const color = this.particleMetaData[i].originalColor;
@@ -309,7 +424,6 @@ export class ParticleCloud {
 
     colors.needsUpdate = true;
     sizes.needsUpdate = true;
-    this.highlightedDataPointIndex = null;
   }
 
   public handleClick(camera: THREE.Camera): void {
@@ -342,11 +456,13 @@ export class ParticleCloud {
     this.group.rotation.y += this.rotationSpeed;
 
     if (this.isTransitioning && this.material) {
-      const fadeSpeed = deltaTime / this.fadeDuration;
+      const safeDelta = Math.max(this.minFrameDelta, Math.min(deltaTime, 0.1));
+      const fadeAmount = safeDelta / this.fadeDuration;
 
       if (this.targetOpacity === 0) {
-        this.transitionOpacity = Math.max(0, this.transitionOpacity - fadeSpeed);
+        this.transitionOpacity = Math.max(0, this.transitionOpacity - fadeAmount);
         this.material.opacity = this.transitionOpacity;
+        this.material.needsUpdate = true;
 
         if (this.transitionOpacity <= 0) {
           if (this.pendingData) {
@@ -356,8 +472,9 @@ export class ParticleCloud {
           }
         }
       } else if (this.targetOpacity === 1) {
-        this.transitionOpacity = Math.min(1, this.transitionOpacity + fadeSpeed);
+        this.transitionOpacity = Math.min(1, this.transitionOpacity + fadeAmount);
         this.material.opacity = this.transitionOpacity;
+        this.material.needsUpdate = true;
 
         if (this.transitionOpacity >= 1) {
           this.isTransitioning = false;
@@ -388,6 +505,14 @@ export class ParticleCloud {
     return this.dataPoints.length;
   }
 
+  public getParticleCount(): number {
+    return this.particleMetaData.length;
+  }
+
+  public getSpatialHashCellCount(): number {
+    return this.spatialHash.size;
+  }
+
   private removePoints(): void {
     if (this.points) {
       this.group.remove(this.points);
@@ -400,6 +525,8 @@ export class ParticleCloud {
     this.hideTooltip();
     this.dataPoints = [];
     this.particleMetaData = [];
+    this.particleGroups = [];
+    this.spatialHash.clear();
     this.highlightedDataPointIndex = null;
   }
 
