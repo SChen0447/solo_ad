@@ -1,39 +1,51 @@
 import React, { useState, useRef, useCallback } from 'react';
-import * as pdfjsLib from 'pdfjs-dist';
-
-pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js`;
 
 interface ResumeUploaderProps {
-  onTextExtracted: (text: string, fileName: string) => void;
+  onParseComplete: (parsedResume: any, fileName: string) => void;
   isLoading: boolean;
 }
 
-const ResumeUploader: React.FC<ResumeUploaderProps> = ({ onTextExtracted, isLoading }) => {
+const ResumeUploader: React.FC<ResumeUploaderProps> = ({ onParseComplete, isLoading }) => {
   const [isDragging, setIsDragging] = useState(false);
   const [progress, setProgress] = useState(0);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showProgress, setShowProgress] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const progressIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
-  const extractTextFromPDF = async (file: File): Promise<string> => {
-    const arrayBuffer = await file.arrayBuffer();
-    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-    let fullText = '';
-
-    for (let i = 1; i <= pdf.numPages; i++) {
-      const page = await pdf.getPage(i);
-      const textContent = await page.getTextContent();
-      const pageText = textContent.items
-        .map((item: any) => item.str)
-        .join('\n');
-      fullText += pageText + '\n\n';
+  const resetState = useCallback(() => {
+    if (progressIntervalRef.current) {
+      clearInterval(progressIntervalRef.current);
+      progressIntervalRef.current = null;
     }
+    setProgress(0);
+    setUploading(false);
+    setShowProgress(false);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  }, []);
 
-    return fullText;
-  };
+  const uploadFileToBackend = useCallback(async (file: File): Promise<any> => {
+    const formData = new FormData();
+    formData.append('resume', file);
+
+    const response = await fetch('/api/parse', {
+      method: 'POST',
+      body: formData,
+    });
+
+    const result = await response.json();
+    if (!result.success) {
+      throw new Error(result.error || '解析失败');
+    }
+    return result;
+  }, []);
 
   const handleFile = useCallback(async (file: File) => {
     setError(null);
+    resetState();
 
     if (!file.name.toLowerCase().endsWith('.pdf')) {
       setError('请上传PDF格式的文件');
@@ -46,41 +58,52 @@ const ResumeUploader: React.FC<ResumeUploaderProps> = ({ onTextExtracted, isLoad
     }
 
     setUploading(true);
+    setShowProgress(true);
     setProgress(0);
 
-    const progressInterval = setInterval(() => {
+    progressIntervalRef.current = setInterval(() => {
       setProgress(prev => {
-        if (prev >= 95) {
-          clearInterval(progressInterval);
-          return 95;
+        if (prev >= 90) {
+          return 90;
         }
         return prev + 5;
       });
     }, 50);
 
     try {
-      const text = await extractTextFromPDF(file);
+      const result = await uploadFileToBackend(file);
+
+      if (progressIntervalRef.current) {
+        clearInterval(progressIntervalRef.current);
+        progressIntervalRef.current = null;
+      }
       setProgress(100);
-      clearInterval(progressInterval);
 
       setTimeout(() => {
-        setUploading(false);
-        onTextExtracted(text, file.name);
-      }, 200);
-    } catch (err) {
-      clearInterval(progressInterval);
+        resetState();
+        onParseComplete(result.data, result.fileName || file.name);
+      }, 400);
+    } catch (err: any) {
+      if (progressIntervalRef.current) {
+        clearInterval(progressIntervalRef.current);
+        progressIntervalRef.current = null;
+      }
       setUploading(false);
-      setError('PDF解析失败，请检查文件是否损坏');
+      setShowProgress(false);
       setProgress(0);
+      setError(err.message || '上传失败，请稍后重试');
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
     }
-  }, [onTextExtracted]);
+  }, [onParseComplete, resetState, uploadFileToBackend]);
 
   const handleDrop = useCallback((e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     setIsDragging(false);
     const file = e.dataTransfer.files[0];
-    if (file) handleFile(file);
-  }, [handleFile]);
+    if (file && !uploading && !isLoading) handleFile(file);
+  }, [handleFile, uploading, isLoading]);
 
   const handleDragOver = useCallback((e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
@@ -101,7 +124,6 @@ const ResumeUploader: React.FC<ResumeUploaderProps> = ({ onTextExtracted, isLoad
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) handleFile(file);
-    e.target.value = '';
   };
 
   return (
@@ -132,20 +154,20 @@ const ResumeUploader: React.FC<ResumeUploaderProps> = ({ onTextExtracted, isLoad
           </svg>
         </div>
         <p style={styles.title}>
-          {uploading ? '正在处理...' : isLoading ? '正在解析...' : '拖拽PDF到此处，或点击选择文件'}
+          {uploading ? '正在上传...' : isLoading ? '正在解析...' : '拖拽PDF到此处，或点击选择文件'}
         </p>
         <p style={styles.subtitle}>仅支持 .pdf 格式，最大 5MB</p>
 
-        {(uploading || isLoading) && (
+        {showProgress && (
           <div style={styles.progressContainer}>
             <div style={styles.progressBar}>
               <div style={{
                 ...styles.progressFill,
-                width: `${isLoading ? 100 : progress}%`,
+                width: `${progress}%`,
               }} />
             </div>
             <span style={styles.progressText}>
-              {isLoading ? '解析中...' : `${isLoading ? 100 : progress}%`}
+              {progress >= 100 ? '完成' : `${progress}%`}
             </span>
           </div>
         )}
@@ -225,7 +247,7 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: 13,
     fontWeight: 600,
     color: '#3b82f6',
-    minWidth: 60,
+    minWidth: 50,
   },
   errorBox: {
     marginTop: 12,
