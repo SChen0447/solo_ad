@@ -1,0 +1,227 @@
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body,
+#root {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  font-family: 'Space Grotesk', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background: #0a0a2e;
+  color: #e0e0ff;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+}
+
+canvas {
+  display: block;
+  touch-action: none;
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(124, 179, 255, 0.3);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(124, 179, 255, 0.5);
+}
+
+.glass-panel {
+  background: rgba(26, 26, 62, 0.72);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 16px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+}
+
+input[type='file'] {
+  display: none;
+}
+
+select,
+input[type='number'],
+input[type='text'] {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 8px;
+  padding: 8px 12px;
+  color: #e0e0ff;
+  font-family: inherit;
+  font-size: 0.875rem;
+  transition: all 0.2s ease;
+  outline: none;
+  width: 100%;
+}
+
+select:focus,
+input[type='number']:focus,
+input[type='text']:focus {
+  border-color: #7cb3ff;
+  background: rgba(124, 179, 255, 0.08);
+  box-shadow: 0 0 0 2px rgba(124, 179, 255, 0.15);
+}
+
+select option {
+  background: #1a1a4e;
+  color: #e0e0ff;
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+  border: none;
+  transition: all 0.2s ease;
+}
+
+.range-slider-container {
+  position: relative;
+  width: 100%;
+  height: 36px;
+  display: flex;
+  align-items: center;
+}
+
+.range-slider-track {
+  position: absolute;
+  width: 100%;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.range-slider-fill {
+  position: absolute;
+  height: 100%;
+  background: linear-gradient(90deg, #4a6fa5, #7cb3ff);
+  border-radius: 3px;
+  transition: all 0.1s linear;
+}
+
+input[type='range'].dual-slider {
+  position: absolute;
+  width: 100%;
+  height: 6px;
+  background: transparent;
+  -webkit-appearance: none;
+  appearance: none;
+  pointer-events: none;
+  padding: 0;
+  margin: 0;
+  outline: none;
+}
+
+input[type='range'].dual-slider::-webkit-slider-runnable-track {
+  height: 6px;
+  background: transparent;
+  border-radius: 3px;
+}
+
+input[type='range'].dual-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  background: #7cb3ff;
+  border: 2px solid #ffffff;
+  border-radius: 50%;
+  cursor: pointer;
+  pointer-events: auto;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+  margin-top: -6px;
+  transition: all 0.15s ease;
+}
+
+input[type='range'].dual-slider::-webkit-slider-thumb:hover {
+  background: #9ac8ff;
+  transform: scale(1.15);
+}
+
+input[type='range'].dual-slider::-moz-range-track {
+  height: 6px;
+  background: transparent;
+  border-radius: 3px;
+}
+
+input[type='range'].dual-slider::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  background: #7cb3ff;
+  border: 2px solid #ffffff;
+  border-radius: 50%;
+  cursor: pointer;
+  pointer-events: auto;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+  transition: all 0.15s ease;
+}
+
+input[type='range'].dual-slider::-moz-range-thumb:hover {
+  background: #9ac8ff;
+  transform: scale(1.15);
+}
+
+input[type='range'].dual-slider::-webkit-slider-thumb:active {
+  transform: scale(1.1);
+}
+
+.dual-slider-upper {
+  z-index: 3;
+}
+
+.dual-slider-lower {
+  z-index: 4;
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.animate-fade-in-up {
+  animation: fadeInUp 0.4s ease-out both;
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.3s ease-out both;
+}
