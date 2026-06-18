@@ -16,17 +16,17 @@ function LightningBolt({
   end: [number, number, number]
   segments?: number
 }) {
-  const ref = useRef<THREE.Line>(null)
+  const meshRef = useRef<THREE.Mesh>(null)
   const startTimeRef = useRef(performance.now())
 
-  const points = useMemo<[number, number, number][]>(() => {
-    const pts: [number, number, number][] = []
+  const geometry = useMemo(() => {
+    const points: THREE.Vector3[] = []
     const startVec = new THREE.Vector3(...start)
     const endVec = new THREE.Vector3(...end)
     const direction = endVec.clone().sub(startVec)
     const length = direction.length()
 
-    pts.push([startVec.x, startVec.y, startVec.z])
+    points.push(startVec.clone())
 
     for (let i = 1; i < segments; i++) {
       const t = i / segments
@@ -35,32 +35,39 @@ function LightningBolt({
         (Math.random() - 0.5) * 2,
         (Math.random() - 0.5) * 0.5,
         (Math.random() - 0.5) * 2
-      ).normalize().multiplyScalar(length * 0.08 * (1 - Math.abs(t - 0.5) * 1.5))
+      ).normalize().multiplyScalar(length * 0.06 * (1 - Math.abs(t - 0.5) * 1.5))
       basePoint.add(offsetDir)
-      pts.push([basePoint.x, basePoint.y, basePoint.z])
+      points.push(basePoint)
     }
 
-    pts.push([endVec.x, endVec.y, endVec.z])
-    return pts
+    points.push(endVec.clone())
+
+    const curve = new THREE.CatmullRomCurve3(points)
+    curve.curveType = 'catmullrom'
+    curve.tension = 0.3
+
+    const tubeGeo = new THREE.TubeGeometry(curve, segments * 4, 0.3, 6, false)
+    return tubeGeo
   }, [start, end, segments])
 
   useFrame(() => {
-    if (!ref.current) return
+    if (!meshRef.current) return
     const elapsed = performance.now() - startTimeRef.current
-    const material = ref.current.material as THREE.LineBasicMaterial
+    const material = meshRef.current.material as THREE.MeshBasicMaterial
     material.opacity = Math.max(0, 1 - elapsed / 300)
   })
 
   return (
-    <Line
-      ref={ref as any}
-      points={points}
-      color="#ffffff"
-      lineWidth={2}
-      transparent
-      opacity={1}
-      blending={THREE.AdditiveBlending}
-    />
+    <mesh ref={meshRef} geometry={geometry}>
+      <meshBasicMaterial
+        color="#ffffff"
+        transparent
+        opacity={1}
+        side={THREE.DoubleSide}
+        blending={THREE.AdditiveBlending}
+        depthWrite={false}
+      />
+    </mesh>
   )
 }
 
@@ -138,30 +145,72 @@ function Shockwave({
   position: [number, number, number]
   timestamp: number
 }) {
-  const ref = useRef<THREE.Mesh>(null)
+  const outerRef = useRef<THREE.Mesh>(null)
+  const innerRef = useRef<THREE.Mesh>(null)
+  const glowRef = useRef<THREE.Mesh>(null)
 
   useFrame(() => {
-    if (!ref.current) return
     const elapsed = performance.now() - timestamp
-    const t = elapsed / 1000
-    const scale = 1 + t * 20
-    ref.current.scale.set(scale, scale, scale)
-    const material = ref.current.material as THREE.MeshBasicMaterial
-    material.opacity = Math.max(0, 0.8 * (1 - t))
+    const t = Math.min(1, elapsed / 1000)
+
+    const outerScale = 1 + t * 20
+    if (outerRef.current) {
+      outerRef.current.scale.set(outerScale, outerScale, outerScale)
+      const mat = outerRef.current.material as THREE.MeshBasicMaterial
+      mat.opacity = Math.max(0, 0.8 * (1 - t))
+    }
+
+    const innerScale = 0.5 + t * 12
+    if (innerRef.current) {
+      innerRef.current.scale.set(innerScale, innerScale, innerScale)
+      const mat = innerRef.current.material as THREE.MeshBasicMaterial
+      mat.opacity = Math.max(0, 0.6 * (1 - t * 1.2))
+    }
+
+    const glowScale = 0.1 + t * 8
+    if (glowRef.current) {
+      glowRef.current.scale.set(glowScale, glowScale, glowScale)
+      const mat = glowRef.current.material as THREE.MeshBasicMaterial
+      mat.opacity = Math.max(0, 0.3 * (1 - t * 0.8))
+    }
   })
 
   return (
-    <mesh ref={ref} position={[position[0], position[1] + 0.1, position[2]]} rotation={[-Math.PI / 2, 0, 0]}>
-      <ringGeometry args={[0.8, 1, 64]} />
-      <meshBasicMaterial
-        color="#ffffff"
-        transparent
-        opacity={0.8}
-        side={THREE.DoubleSide}
-        blending={THREE.AdditiveBlending}
-        depthWrite={false}
-      />
-    </mesh>
+    <group position={[position[0], position[1] + 0.1, position[2]]} rotation={[-Math.PI / 2, 0, 0]}>
+      <mesh ref={outerRef}>
+        <ringGeometry args={[0.9, 1, 64]} />
+        <meshBasicMaterial
+          color="#ffffff"
+          transparent
+          opacity={0.8}
+          side={THREE.DoubleSide}
+          blending={THREE.AdditiveBlending}
+          depthWrite={false}
+        />
+      </mesh>
+      <mesh ref={innerRef}>
+        <ringGeometry args={[0.7, 0.8, 64]} />
+        <meshBasicMaterial
+          color="#aaddff"
+          transparent
+          opacity={0.6}
+          side={THREE.DoubleSide}
+          blending={THREE.AdditiveBlending}
+          depthWrite={false}
+        />
+      </mesh>
+      <mesh ref={glowRef}>
+        <circleGeometry args={[1, 64]} />
+        <meshBasicMaterial
+          color="#cce0ff"
+          transparent
+          opacity={0.3}
+          side={THREE.DoubleSide}
+          blending={THREE.AdditiveBlending}
+          depthWrite={false}
+        />
+      </mesh>
+    </group>
   )
 }
 

@@ -15,6 +15,68 @@ interface ParticleSystemProps {
   activeTypes: ParticleType[]
 }
 
+const particleVertexShader = /* glsl */ `
+  attribute float size;
+  attribute vec3 color;
+  varying vec3 vColor;
+  varying float vAlpha;
+  uniform float uOpacity;
+  uniform float uPixelRatio;
+
+  void main() {
+    vColor = color;
+    vAlpha = uOpacity;
+    vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+    float dist = -mvPosition.z;
+    float sizeScale = 1.0;
+    if (dist < 20.0) {
+      sizeScale = 2.0 - (20.0 - dist) / 20.0;
+    } else if (dist > 80.0) {
+      sizeScale = max(0.5, 1.0 - (dist - 80.0) / 80.0);
+    } else {
+      sizeScale = 1.0 - (dist - 20.0) / 60.0 * 0.5;
+    }
+    gl_PointSize = size * sizeScale * uPixelRatio * (300.0 / dist);
+    gl_Position = projectionMatrix * mvPosition;
+  }
+`
+
+const particleFragmentShader = /* glsl */ `
+  varying vec3 vColor;
+  varying float vAlpha;
+
+  void main() {
+    vec2 uv = gl_PointCoord - vec2(0.5);
+    float d = length(uv);
+    if (d > 0.5) discard;
+    float alpha = smoothstep(0.5, 0.2, d) * vAlpha;
+    gl_FragColor = vec4(vColor, alpha);
+  }
+`
+
+const rainVertexShader = /* glsl */ `
+  attribute vec3 color;
+  varying vec3 vColor;
+  varying float vAlpha;
+  uniform float uOpacity;
+
+  void main() {
+    vColor = color;
+    vAlpha = uOpacity;
+    vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+    gl_Position = projectionMatrix * mvPosition;
+  }
+`
+
+const rainFragmentShader = /* glsl */ `
+  varying vec3 vColor;
+  varying float vAlpha;
+
+  void main() {
+    gl_FragColor = vec4(vColor, vAlpha);
+  }
+`
+
 function useParticleOpacity(type: 'wind' | 'rain' | 'snow', activeTypes: ParticleType[]): number {
   const { animationTransition, targetParticleType } = useWeatherStore()
 
@@ -48,7 +110,7 @@ function useParticleOpacity(type: 'wind' | 'rain' | 'snow', activeTypes: Particl
 function ParticleSystem({ type, activeTypes }: ParticleSystemProps) {
   const pointsRef = useRef<THREE.Points>(null)
   const lineSegmentsRef = useRef<THREE.LineSegments>(null)
-  const { camera } = useThree()
+  const { camera, gl } = useThree()
   const density = useWeatherStore((s) => s.density)
   const speed = useWeatherStore((s) => s.speed)
   const windDirection = useWeatherStore((s) => s.windDirection)
@@ -67,8 +129,13 @@ function ParticleSystem({ type, activeTypes }: ParticleSystemProps) {
     velocities: new Float32Array(MAX_COUNT * 3),
     alive: new Uint8Array(MAX_COUNT),
     lifetimes: new Float32Array(MAX_COUNT),
+    baseHeights: new Float32Array(MAX_COUNT),
     desiredAliveCount: 0,
     currentAliveCount: 0,
+    spawnIndex: 0,
+    removeIndex: 0,
+    targetDensity: 1,
+    currentDensity: 0,
   })
 
   const geometry = useMemo(() => {
@@ -81,7 +148,7 @@ function ParticleSystem({ type, activeTypes }: ParticleSystemProps) {
       positions[i * 3] = 0
       positions[i * 3 + 1] = -1000
       positions[i * 3 + 2] = 0
-      sizes[i] = isRain ? 1 : (isWind ? 1.5 : 2)
+      sizes[i] = isRain ? 0.3 : (isWind ? 0.6 : 0.9)
     }
 
     geo.setAttribute('position', new THREE.BufferAttribute(positions, 3))
@@ -89,7 +156,7 @@ function ParticleSystem({ type, activeTypes }: ParticleSystemProps) {
     geo.setAttribute('color', new THREE.BufferAttribute(colors, 3))
 
     return geo
-  }, [isRain, isWind, isSnow])
+  }, [isRain, isWind, isSnow, MAX_COUNT])
 
   const lineGeometry = useMemo(() => {
     if (!isRain) return null
@@ -107,7 +174,7 @@ function ParticleSystem({ type, activeTypes }: ParticleSystemProps) {
     geo.setAttribute('position', new THREE.BufferAttribute(positions, 3))
     geo.setAttribute('color', new THREE.BufferAttribute(colors, 3))
     return geo
-  }, [isRain])
+  }, [isRain, MAX_COUNT])
 
   function spawnParticle(i: number, positions: Float32Array) {
     const x = (Math.random() - 0.5) * AREA_HALF * 2
@@ -120,7 +187,9 @@ function ParticleSystem({ type, activeTypes }: ParticleSystemProps) {
     } else if (isSnow) {
       y = terrainH + 10 + Math.random() * 30
     } else {
-      y = terrainH + 0.5 + Math.random() * 12
+      const baseHeight = 0.5 + Math.random() * 12
+      y = terrainH + baseHeight
+      dataRef.current.baseHeights[i] = baseHeight
     }
 
     positions[i * 3] = x
@@ -132,7 +201,7 @@ function ParticleSystem({ type, activeTypes }: ParticleSystemProps) {
       const dir = windDirection + (Math.random() - 0.5) * 0.5
       const windSpeed = 5 + Math.random() * 8
       v[i * 3] = Math.cos(dir) * windSpeed
-      v[i * 3 + 1] = (Math.random() - 0.3) * 1.5
+      v[i * 3 + 1] = 0
       v[i * 3 + 2] = Math.sin(dir) * windSpeed
     } else if (isRain) {
       const dir = windDirection
@@ -158,7 +227,6 @@ function ParticleSystem({ type, activeTypes }: ParticleSystemProps) {
   useEffect(() => {
     const positions = geometry.attributes.position.array as Float32Array
     const colors = geometry.attributes.color.array as Float32Array
-    const sizes = geometry.attributes.size.array as Float32Array
 
     let color: THREE.Color
     if (isWind) color = new THREE.Color(0xffffff)
@@ -169,7 +237,6 @@ function ParticleSystem({ type, activeTypes }: ParticleSystemProps) {
       colors[i * 3] = color.r
       colors[i * 3 + 1] = color.g
       colors[i * 3 + 2] = color.b
-      sizes[i] = isRain ? 1 : (isWind ? 1.2 : 1.8)
     }
 
     if (isRain && lineGeometry) {
@@ -191,12 +258,12 @@ function ParticleSystem({ type, activeTypes }: ParticleSystemProps) {
     if (!pointsRef.current) return
 
     const positions = geometry.attributes.position.array as Float32Array
-    const sizes = geometry.attributes.size.array as Float32Array
     const data = dataRef.current
     const dt = Math.min(delta, 0.05)
+    const pixelRatio = gl.getPixelRatio()
 
     const densityRatio = density / 100
-    data.desiredAliveCount = Math.floor(MAX_COUNT * densityRatio * opacity)
+    data.desiredAliveCount = Math.floor(MAX_COUNT * densityRatio)
 
     let aliveChange = data.desiredAliveCount - data.currentAliveCount
     if (aliveChange > MAX_PARTICLES_CHANGE) aliveChange = MAX_PARTICLES_CHANGE
@@ -204,7 +271,11 @@ function ParticleSystem({ type, activeTypes }: ParticleSystemProps) {
 
     if (aliveChange > 0) {
       let added = 0
-      for (let i = 0; i < MAX_COUNT && added < aliveChange; i++) {
+      let tries = 0
+      while (added < aliveChange && tries < MAX_COUNT) {
+        const i = data.spawnIndex
+        data.spawnIndex = (data.spawnIndex + 1) % MAX_COUNT
+        tries++
         if (!data.alive[i]) {
           spawnParticle(i, positions)
           added++
@@ -213,7 +284,11 @@ function ParticleSystem({ type, activeTypes }: ParticleSystemProps) {
       }
     } else if (aliveChange < 0) {
       let removed = 0
-      for (let i = 0; i < MAX_COUNT && removed < -aliveChange; i++) {
+      let tries = 0
+      while (removed < -aliveChange && tries < MAX_COUNT) {
+        const i = data.removeIndex
+        data.removeIndex = (data.removeIndex + 1) % MAX_COUNT
+        tries++
         if (data.alive[i]) {
           data.alive[i] = 0
           positions[i * 3 + 1] = -1000
@@ -230,7 +305,6 @@ function ParticleSystem({ type, activeTypes }: ParticleSystemProps) {
     }
 
     const cameraPos = camera.position
-    const center = new THREE.Vector3(0, 0, 0)
 
     for (let i = 0; i < MAX_COUNT; i++) {
       if (!data.alive[i]) continue
@@ -245,13 +319,11 @@ function ParticleSystem({ type, activeTypes }: ParticleSystemProps) {
 
       if (isWind) {
         px += v[i * 3] * dt * speed
-        py += v[i * 3 + 1] * dt * speed * 0.5
         pz += v[i * 3 + 2] * dt * speed
 
-        if (py < terrainH + 0.3) {
-          py = terrainH + 0.3 + Math.random() * 2
-          v[i * 3 + 1] = Math.abs(v[i * 3 + 1]) * 0.5
-        }
+        const floatOffset = Math.sin(data.lifetimes[i] * 1.2 + i * 0.05) * 1.5
+        const targetY = terrainH + data.baseHeights[i] + floatOffset
+        py += (targetY - py) * 0.1
       } else if (isRain) {
         px += v[i * 3] * dt * speed
         py += v[i * 3 + 1] * dt * speed
@@ -279,7 +351,7 @@ function ParticleSystem({ type, activeTypes }: ParticleSystemProps) {
       if (isSnow && py < terrainH + 0.3) {
         needsRecycle = true
       }
-      if (isWind && (py > terrainH + 20 || data.lifetimes[i] > 8)) {
+      if (isWind && data.lifetimes[i] > 10) {
         needsRecycle = true
       }
 
@@ -292,15 +364,12 @@ function ParticleSystem({ type, activeTypes }: ParticleSystemProps) {
       positions[i * 3 + 1] = py
       positions[i * 3 + 2] = pz
 
-      const dx = px - cameraPos.x
-      const dy = py - cameraPos.y
-      const dz = pz - cameraPos.z
-      const dist = Math.sqrt(dx * dx + dy * dy + dz * dz)
-      const baseSize = isRain ? 1 : (isWind ? 1.2 : 1.8)
-      const sizeFactor = dist < 15 ? 2 : dist > 60 ? 0.5 : 1.3 - (dist - 15) / 75
-      sizes[i] = baseSize * sizeFactor
-
       if (isRain && rainLinePositions) {
+        const dx = px - cameraPos.x
+        const dy = py - cameraPos.y
+        const dz = pz - cameraPos.z
+        const dist = Math.sqrt(dx * dx + dy * dy + dz * dz)
+        const sizeFactor = dist < 20 ? 1.5 : dist > 80 ? 0.5 : 1 - (dist - 20) / 60 * 0.5
         const lineLen = 0.8 * sizeFactor
         rainLinePositions[i * 6] = px
         rainLinePositions[i * 6 + 1] = py + lineLen
@@ -312,44 +381,47 @@ function ParticleSystem({ type, activeTypes }: ParticleSystemProps) {
     }
 
     geometry.attributes.position.needsUpdate = true
-    geometry.attributes.size.needsUpdate = true
     if (isRain && lineGeometry) {
       lineGeometry.attributes.position.needsUpdate = true
     }
 
-    const material = pointsRef.current.material as THREE.PointsMaterial
-    material.opacity = opacity * (isWind ? 0.5 : isSnow ? 0.85 : 0.7)
+    const material = pointsRef.current.material as THREE.ShaderMaterial
+    material.uniforms.uOpacity.value = opacity * (isWind ? 0.5 : isSnow ? 0.85 : 0.7)
+    material.uniforms.uPixelRatio.value = pixelRatio
+
+    if (isRain && lineSegmentsRef.current) {
+      const rainMat = lineSegmentsRef.current.material as THREE.ShaderMaterial
+      rainMat.uniforms.uOpacity.value = opacity * 0.7
+    }
   })
 
   const baseMaterial = useMemo(() => {
-    return new THREE.PointsMaterial({
-      size: isRain ? 0.15 : (isWind ? 0.25 : 0.4),
-      vertexColors: true,
+    return new THREE.ShaderMaterial({
+      uniforms: {
+        uOpacity: { value: 0 },
+        uPixelRatio: { value: 1 },
+      },
+      vertexShader: particleVertexShader,
+      fragmentShader: particleFragmentShader,
       transparent: true,
-      opacity: 0,
       blending: THREE.AdditiveBlending,
       depthWrite: false,
-      sizeAttenuation: true,
     })
-  }, [isRain, isWind, isSnow])
+  }, [])
 
   const rainLineMaterial = useMemo(() => {
     if (!isRain) return null
-    return new THREE.LineBasicMaterial({
-      vertexColors: true,
+    return new THREE.ShaderMaterial({
+      uniforms: {
+        uOpacity: { value: 0 },
+      },
+      vertexShader: rainVertexShader,
+      fragmentShader: rainFragmentShader,
       transparent: true,
-      opacity: 0,
       blending: THREE.AdditiveBlending,
       depthWrite: false,
-      linewidth: 1,
     })
   }, [isRain])
-
-  useEffect(() => {
-    if (rainLineMaterial) {
-      rainLineMaterial.opacity = opacity * 0.7
-    }
-  }, [opacity, rainLineMaterial])
 
   return (
     <group>

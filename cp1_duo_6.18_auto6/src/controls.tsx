@@ -19,13 +19,23 @@ export default function Controls() {
   const setWindDirection = useWeatherStore((s) => s.setWindDirection)
   const cycleWeather = useWeatherStore((s) => s.cycleWeather)
 
-  const [isMobile, setIsMobile] = useState(false)
+  const [isMobile, setIsMobile] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      return window.innerWidth < 768
+    }
+    return false
+  })
   const [isPanelOpen, setIsPanelOpen] = useState(false)
   const [isPressed, setIsPressed] = useState<string | null>(null)
+  const [isAnimating, setIsAnimating] = useState(false)
 
   useEffect(() => {
     const checkMobile = () => {
-      setIsMobile(window.innerWidth < 768)
+      const mobile = window.innerWidth < 768
+      setIsMobile(mobile)
+      if (!mobile) {
+        setIsPanelOpen(false)
+      }
     }
     checkMobile()
     window.addEventListener('resize', checkMobile)
@@ -36,6 +46,12 @@ export default function Controls() {
     setIsPressed(id)
     action()
     setTimeout(() => setIsPressed(null), 200)
+  }, [])
+
+  const togglePanel = useCallback(() => {
+    setIsAnimating(true)
+    setIsPanelOpen((prev) => !prev)
+    setTimeout(() => setIsAnimating(false), 300)
   }, [])
 
   const sliderStyle: React.CSSProperties = {
@@ -319,13 +335,15 @@ export default function Controls() {
       <>
         {isPanelOpen && (
           <div
-            onClick={() => setIsPanelOpen(false)}
+            onClick={togglePanel}
             style={{
               position: 'fixed',
               inset: 0,
-              background: 'rgba(0,0,0,0.5)',
+              background: 'rgba(0,0,0,0.6)',
               zIndex: 998,
+              opacity: isAnimating && !isPanelOpen ? 0 : 1,
               transition: 'opacity 0.3s ease',
+              pointerEvents: isPanelOpen ? 'auto' : 'none',
             }}
           />
         )}
@@ -333,37 +351,49 @@ export default function Controls() {
           style={{
             position: 'fixed',
             left: 0,
-            top: 0,
+            right: 0,
             bottom: 0,
-            width: '280px',
-            maxWidth: '85vw',
-            background: 'rgba(255,255,255,0.08)',
-            backdropFilter: 'blur(12px)',
-            WebkitBackdropFilter: 'blur(12px)',
-            borderRight: '1px solid rgba(255,255,255,0.1)',
+            maxHeight: '85vh',
+            background: 'rgba(20, 30, 50, 0.95)',
+            backdropFilter: 'blur(20px)',
+            WebkitBackdropFilter: 'blur(20px)',
+            borderTop: '1px solid rgba(255,255,255,0.1)',
+            borderTopLeftRadius: '20px',
+            borderTopRightRadius: '20px',
             zIndex: 999,
-            transform: isPanelOpen ? 'translateX(0)' : 'translateX(-100%)',
-            transition: 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+            transform: isPanelOpen ? 'translateY(0)' : 'translateY(100%)',
+            transition: 'transform 0.35s cubic-bezier(0.4, 0, 0.2, 1)',
             overflowY: 'auto',
             color: '#fff',
             fontFamily: 'system-ui',
+            paddingBottom: 'env(safe-area-inset-bottom, 20px)',
           }}
         >
+          <div
+            style={{
+              width: '40px',
+              height: '4px',
+              background: 'rgba(255,255,255,0.3)',
+              borderRadius: '2px',
+              margin: '12px auto',
+            }}
+          />
           {panelContent}
         </div>
         <button
-          onClick={() => setIsPanelOpen(!isPanelOpen)}
+          onClick={togglePanel}
           style={{
             position: 'fixed',
-            bottom: '24px',
+            bottom: 'calc(24px + env(safe-area-inset-bottom, 0px))',
             right: '24px',
             width: '56px',
             height: '56px',
             borderRadius: '50%',
-            background: 'rgba(100, 150, 255, 0.6)',
+            background: 'linear-gradient(135deg, rgba(100, 150, 255, 0.8), rgba(150, 100, 255, 0.8))',
             backdropFilter: 'blur(8px)',
-            border: '1px solid rgba(255,255,255,0.2)',
-            boxShadow: '0 4px 20px rgba(100, 150, 255, 0.4)',
+            WebkitBackdropFilter: 'blur(8px)',
+            border: '1px solid rgba(255,255,255,0.3)',
+            boxShadow: '0 4px 24px rgba(100, 150, 255, 0.5)',
             color: '#fff',
             fontSize: '24px',
             cursor: 'pointer',
@@ -371,12 +401,15 @@ export default function Controls() {
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            transition: 'all 0.2s ease',
+            transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
             transform: isPressed === 'toggle' ? 'scale(0.9)' : 'scale(1)',
+            opacity: isPanelOpen ? 0 : 1,
+            pointerEvents: isPanelOpen ? 'none' : 'auto',
           }}
           onClickCapture={() => setIsPressed('toggle')}
+          aria-label="控制面板"
         >
-          {isPanelOpen ? '✕' : '⚙️'}
+          ⚙️
         </button>
       </>
     )
