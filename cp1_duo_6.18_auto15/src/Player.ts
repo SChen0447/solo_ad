@@ -21,6 +21,8 @@ export class Player {
   private fireCallback: ((event: FirePulseEvent) => void) | null = null;
   private lowEnergyFlash: number = 0;
   private pulseTime: number = 0;
+  private readonly LOW_ENERGY_THRESHOLD = 30;
+  private readonly PULSE_PERIOD = 1.0;
 
   constructor(width: number, height: number) {
     this.width = width;
@@ -151,8 +153,9 @@ export class Player {
 
     const fillH = (this.energy / 100) * barH;
     ctx.save();
-    if (this.energy < 30) {
-      const pulsePhase = (Math.sin(this.pulseTime * Math.PI * 2) + 1) / 2;
+    const isLowEnergy = this.energy < this.LOW_ENERGY_THRESHOLD;
+    if (isLowEnergy) {
+      const pulsePhase = (Math.sin(this.pulseTime / this.PULSE_PERIOD * Math.PI * 2) + 1) / 2;
       const glowAlpha = 0.3 + 0.3 * pulsePhase;
       ctx.shadowColor = `rgba(255, 60, 80, ${glowAlpha})`;
       ctx.shadowBlur = 18;
@@ -161,7 +164,7 @@ export class Player {
       ctx.shadowBlur = 10;
     }
     const gradient = ctx.createLinearGradient(barX, barY + barH, barX, barY);
-    if (this.energy < 30) {
+    if (isLowEnergy) {
       gradient.addColorStop(0, '#aa2233');
       gradient.addColorStop(1, '#ff4455');
     } else {
@@ -170,6 +173,7 @@ export class Player {
     }
     ctx.fillStyle = gradient;
     ctx.fillRect(barX, barY + (barH - fillH), barW, fillH);
+    ctx.shadowBlur = 0;
     ctx.restore();
 
     ctx.save();

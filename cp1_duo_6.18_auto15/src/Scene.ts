@@ -12,13 +12,15 @@ export interface Prism {
   angle: number;
 }
 
+const RECEIVER_FADE_DURATION = 0.4;
+
 export interface Receiver {
   x: number;
   y: number;
   radius: number;
   hit: boolean;
   hitAnim: number;
-  fadeIn: number;
+  fadeInTime: number;
 }
 
 export class Scene {
@@ -142,7 +144,7 @@ export class Scene {
       attempts++;
     }
 
-    return { x, y, radius: 30, hit: false, hitAnim: 0, fadeIn: 0.4 };
+    return { x, y, radius: 30, hit: false, hitAnim: 0, fadeInTime: RECEIVER_FADE_DURATION };
   }
 
   public update(dt: number): void {
@@ -157,9 +159,11 @@ export class Scene {
       }
     }
 
-    if (this.receiver.fadeIn > 0) {
-      this.receiver.fadeIn -= dt;
-      if (this.receiver.fadeIn < 0) this.receiver.fadeIn = 0;
+    if (this.receiver.fadeInTime > 0) {
+      this.receiver.fadeInTime -= dt;
+      if (this.receiver.fadeInTime < 0) {
+        this.receiver.fadeInTime = 0;
+      }
     }
   }
 
@@ -173,6 +177,7 @@ export class Scene {
       ctx.fillStyle = '#3a3a4a';
       ctx.fillRect(obs.x, obs.y, obs.width, obs.height);
       ctx.shadowBlur = 0;
+      ctx.shadowColor = 'transparent';
       ctx.strokeStyle = '#6a6a7a';
       ctx.lineWidth = 1.5;
       ctx.strokeRect(obs.x + 0.5, obs.y + 0.5, obs.width - 1, obs.height - 1);
@@ -198,12 +203,14 @@ export class Scene {
       ctx.closePath();
       ctx.fill();
       ctx.stroke();
+      ctx.shadowBlur = 0;
+      ctx.shadowColor = 'transparent';
       ctx.restore();
     }
 
     const rec = this.receiver;
     ctx.save();
-    const fadeAlpha = rec.fadeIn > 0 ? 1 - (rec.fadeIn / 0.4) : 1;
+    const fadeAlpha = rec.fadeInTime > 0 ? 1 - (rec.fadeInTime / RECEIVER_FADE_DURATION) : 1;
     ctx.globalAlpha = fadeAlpha;
     if (rec.hit) {
       const progress = rec.hitAnim / 0.8;
@@ -220,6 +227,7 @@ export class Scene {
     ctx.beginPath();
     ctx.arc(rec.x, rec.y, rec.radius, 0, Math.PI * 2);
     ctx.fill();
+    ctx.shadowBlur = 0;
     ctx.fillStyle = '#0f0f1a';
     ctx.beginPath();
     ctx.arc(rec.x, rec.y, rec.radius * 0.55, 0, Math.PI * 2);
