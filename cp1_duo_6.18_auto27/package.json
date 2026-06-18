@@ -1,0 +1,13 @@
+{
+  "name": "ocean-ecosystem-sim",
+  "version": "1.0.0",
+  "description": "2D Ocean Ecosystem Simulation",
+  "scripts": {
+    "build": "npx tsc",
+    "start": "npx live-server --open=index.html"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.0",
+    "live-server": "^1.2.2"
+  }
+}

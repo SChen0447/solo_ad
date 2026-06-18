@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ocean Ecosystem Simulation</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: #0a2a40;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      overflow: hidden;
+    }
+    #app {
+      display: flex;
+      position: relative;
+    }
+    canvas {
+      display: block;
+      border-radius: 8px;
+      box-shadow: 0 0 30px rgba(0, 212, 255, 0.15);
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <canvas id="ocean" width="900" height="600"></canvas>
+  </div>
+  <script src="dist/main.js" type="module"></script>
+</body>
+</html>
