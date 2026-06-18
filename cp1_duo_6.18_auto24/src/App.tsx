@@ -12,24 +12,20 @@ const SceneContent: React.FC<{
   signalTransmitter: SignalTransmitter
 }> = ({ neuronManager, signalTransmitter }) => {
   const { signalStrength, synapseCount, transmissionDelay, randomizeTrigger } = useNeuronStore()
-  const [nodes, setNodes] = useState<NeuronNode[]>(neuronManager.getAllNodes())
-  const [connections, setConnections] = useState<Connection[]>(neuronManager.getConnections())
-  const [particles, setParticles] = useState<Particle[]>([])
+  const [, forceUpdate] = useState({})
   const [hoveredNode, setHoveredNode] = useState<number | null>(null)
 
   useEffect(() => {
     neuronManager.setSynapseCount(synapseCount)
     signalTransmitter.reset()
-    setNodes(neuronManager.getAllNodes())
-    setConnections(neuronManager.getConnections())
+    forceUpdate({})
   }, [synapseCount, neuronManager, signalTransmitter])
 
   useEffect(() => {
     if (randomizeTrigger > 0) {
       neuronManager.randomizePositions()
       signalTransmitter.reset()
-      setNodes([...neuronManager.getAllNodes()])
-      setConnections([...neuronManager.getConnections()])
+      forceUpdate({})
     }
   }, [randomizeTrigger, neuronManager, signalTransmitter])
 
@@ -40,16 +36,16 @@ const SceneContent: React.FC<{
 
   useFrame((_, delta) => {
     signalTransmitter.update(delta * 60)
-    setParticles(signalTransmitter.getParticles())
-    setNodes([...neuronManager.getAllNodes()])
+    forceUpdate({})
   })
 
   const handleNodeHover = (nodeId: number | null) => {
     if (nodeId !== null) {
+      neuronManager.clearAllHighlights()
       neuronManager.highlightNode(nodeId, true)
       setHoveredNode(nodeId)
-    } else if (hoveredNode !== null) {
-      neuronManager.highlightNode(hoveredNode, false)
+    } else {
+      neuronManager.clearAllHighlights()
       setHoveredNode(null)
     }
   }
@@ -59,18 +55,36 @@ const SceneContent: React.FC<{
       <ambientLight intensity={0.3} />
       <directionalLight position={[5, 10, 5]} intensity={0.8} />
 
-      <ConnectionLines connections={connections} neuronManager={neuronManager} />
+      <ConnectionLines neuronManager={neuronManager} />
 
+      <NeuronNodes
+        neuronManager={neuronManager}
+        transmissionDelay={transmissionDelay}
+        onHover={handleNodeHover}
+      />
+
+      <ParticlesSystem signalTransmitter={signalTransmitter} />
+    </group>
+  )
+}
+
+const NeuronNodes: React.FC<{
+  neuronManager: NeuronManager
+  transmissionDelay: number
+  onHover: (id: number | null) => void
+}> = ({ neuronManager, transmissionDelay, onHover }) => {
+  const nodes = neuronManager.getAllNodes()
+
+  return (
+    <group>
       {nodes.map((node) => (
         <NeuronSphere
           key={node.id}
           node={node}
           isFlashing={neuronManager.isFlashing(node.id, transmissionDelay)}
-          onHover={handleNodeHover}
+          onHover={onHover}
         />
       ))}
-
-      <Particles particles={particles} />
     </group>
   )
 }
@@ -80,32 +94,24 @@ const NeuronSphere: React.FC<{
   isFlashing: boolean
   onHover: (id: number | null) => void
 }> = ({ node, isFlashing, onHover }) => {
-  const meshRef = useRef<THREE.Mesh>(null)
-  const glowRef = useRef<THREE.Mesh>(null)
-
-  const baseColor = useMemo(() => {
-    return isFlashing ? '#ffffff' : node.color
-  }, [isFlashing, node.color])
-
+  const displayColor = isFlashing ? '#ffffff' : node.color
   const scale = node.isHighlighted ? 1.2 : 1
+  const emissiveIntensity = isFlashing ? 1.5 : 0.4
 
   return (
     <group position={node.position.toArray()}>
-      <mesh
-        ref={glowRef}
-        scale={[scale * 1.3, scale * 1.3, scale * 1.3]}
-      >
-        <sphereGeometry args={[0.5, 32, 32]} />
+      <mesh scale={[scale * 1.25, scale * 1.25, scale * 1.25]}>
+        <sphereGeometry args={[0.4, 32, 32]} />
         <meshBasicMaterial
-          color={baseColor}
+          color={displayColor}
           transparent
           opacity={0.3}
           side={THREE.BackSide}
+          depthWrite={false}
         />
       </mesh>
 
       <mesh
-        ref={meshRef}
         scale={[scale, scale, scale]}
         onPointerOver={(e) => {
           e.stopPropagation()
@@ -115,11 +121,11 @@ const NeuronSphere: React.FC<{
       >
         <sphereGeometry args={[0.4, 32, 32]} />
         <meshStandardMaterial
-          color={baseColor}
-          emissive={baseColor}
-          emissiveIntensity={isFlashing ? 1 : 0.3}
-          metalness={0.3}
-          roughness={0.5}
+          color={displayColor}
+          emissive={displayColor}
+          emissiveIntensity={emissiveIntensity}
+          metalness={0.2}
+          roughness={0.6}
         />
       </mesh>
     </group>
@@ -127,9 +133,9 @@ const NeuronSphere: React.FC<{
 }
 
 const ConnectionLines: React.FC<{
-  connections: Connection[]
   neuronManager: NeuronManager
-}> = ({ connections, neuronManager }) => {
+}> = ({ neuronManager }) => {
+  const connections = neuronManager.getConnections()
   const lineRef = useRef<THREE.LineSegments>(null)
 
   const { positions, colors } = useMemo(() => {
@@ -160,6 +166,45 @@ const ConnectionLines: React.FC<{
     }
   }, [connections, neuronManager])
 
+  useFrame(() => {
+    if (!lineRef.current) return
+    const posAttr = lineRef.current.geometry.attributes.position as THREE.BufferAttribute
+    const colAttr = lineRef.current.geometry.attributes.color as THREE.BufferAttribute
+    if (!posAttr || !colAttr) return
+
+    const posArray = posAttr.array as Float32Array
+    const colArray = colAttr.array as Float32Array
+
+    connections.forEach((conn, i) => {
+      const preNode = neuronManager.getNodeById(conn.presynapticId)
+      const postNode = neuronManager.getNodeById(conn.postsynapticId)
+
+      if (preNode && postNode) {
+        const idx = i * 6
+        posArray[idx] = preNode.position.x
+        posArray[idx + 1] = preNode.position.y
+        posArray[idx + 2] = preNode.position.z
+        posArray[idx + 3] = postNode.position.x
+        posArray[idx + 4] = postNode.position.y
+        posArray[idx + 5] = postNode.position.z
+
+        const color = conn.isHighlighted
+          ? new THREE.Color('#ffffff')
+          : new THREE.Color('#cccccc')
+
+        colArray[idx] = color.r
+        colArray[idx + 1] = color.g
+        colArray[idx + 2] = color.b
+        colArray[idx + 3] = color.r
+        colArray[idx + 4] = color.g
+        colArray[idx + 5] = color.b
+      }
+    })
+
+    posAttr.needsUpdate = true
+    colAttr.needsUpdate = true
+  })
+
   return (
     <lineSegments ref={lineRef}>
       <bufferGeometry>
@@ -179,86 +224,73 @@ const ConnectionLines: React.FC<{
       <lineBasicMaterial
         vertexColors
         transparent
-        opacity={0.4}
-        linewidth={0.02}
+        opacity={0.5}
       />
     </lineSegments>
   )
 }
 
-const Particles: React.FC<{ particles: Particle[] }> = ({ particles }) => {
-  const meshRef = useRef<THREE.InstancedMesh>(null)
-  const dummy = useMemo(() => new THREE.Object3D(), [])
-
-  const trailGeometries = useMemo(() => {
-    return particles.map(() => new THREE.BufferGeometry())
-  }, [particles.length])
-
-  useFrame(() => {
-    if (!meshRef.current) return
-
-    particles.forEach((particle, i) => {
-      dummy.position.copy(particle.position)
-      dummy.scale.setScalar(0.08)
-      dummy.updateMatrix()
-      meshRef.current!.setMatrixAt(i, dummy.matrix)
-    })
-    meshRef.current.instanceMatrix.needsUpdate = true
-  })
+const ParticlesSystem: React.FC<{ signalTransmitter: SignalTransmitter }> = ({ signalTransmitter }) => {
+  const particles = signalTransmitter.getParticles()
 
   return (
     <group>
-      <instancedMesh
-        ref={meshRef}
-        args={[undefined, undefined, particles.length]}
-      >
-        <sphereGeometry args={[1, 8, 8]} />
-        <meshBasicMaterial color="#4da6ff" transparent opacity={0.9} />
-      </instancedMesh>
-
-      {particles.map((particle, idx) => (
-        <ParticleTrail key={particle.id} particle={particle} index={idx} />
+      {particles.map((particle) => (
+        <ParticleWithTrail key={particle.id} particle={particle} />
       ))}
     </group>
   )
 }
 
-const ParticleTrail: React.FC<{ particle: Particle; index: number }> = ({ particle }) => {
-  const meshRef = useRef<THREE.LineSegments>(null)
-
-  const geometry = useMemo(() => {
-    const geo = new THREE.BufferGeometry()
-    const positions = new Float32Array(8 * 3)
-    geo.setAttribute('position', new THREE.BufferAttribute(positions, 3))
-    return geo
-  }, [])
+const ParticleWithTrail: React.FC<{ particle: Particle }> = ({ particle }) => {
+  const dummy = useMemo(() => new THREE.Object3D(), [])
+  const trailMeshesRef = useRef<(THREE.Mesh | null)[]>([null, null, null, null, null])
 
   useFrame(() => {
-    if (!meshRef.current) return
+    dummy.position.copy(particle.position)
+    dummy.scale.setScalar(0.08)
+    dummy.updateMatrix()
 
-    const positions = geometry.attributes.position.array as Float32Array
-    const trail = particle.trail
+    const history = particle.positionHistory
+    for (let i = 0; i < 5; i++) {
+      const mesh = trailMeshesRef.current[i]
+      if (!mesh) continue
 
-    let idx = 0
-    for (let i = 0; i < trail.length - 1; i++) {
-      positions[idx++] = trail[i].x
-      positions[idx++] = trail[i].y
-      positions[idx++] = trail[i].z
-      positions[idx++] = trail[i + 1].x
-      positions[idx++] = trail[i + 1].y
-      positions[idx++] = trail[i + 1].z
+      if (i < history.length) {
+        mesh.visible = true
+        mesh.position.copy(history[i])
+        const alpha = (1 - i / 5) * 0.5
+        ;(mesh.material as THREE.MeshBasicMaterial).opacity = alpha
+        const scale = 0.08 * (1 - i * 0.15)
+        mesh.scale.setScalar(scale)
+      } else {
+        mesh.visible = false
+      }
     }
-
-    geometry.attributes.position.needsUpdate = true
-    geometry.setDrawRange(0, Math.max(0, (trail.length - 1) * 2))
   })
 
-  const opacity = particle.trail.length > 1 ? 0.4 : 0
-
   return (
-    <lineSegments ref={meshRef} geometry={geometry}>
-      <lineBasicMaterial color="#4da6ff" transparent opacity={opacity} />
-    </lineSegments>
+    <group>
+      <mesh position={particle.position.toArray()} scale={0.08}>
+        <sphereGeometry args={[1, 8, 8]} />
+        <meshBasicMaterial color="#4da6ff" transparent opacity={1} />
+      </mesh>
+
+      {[0, 1, 2, 3, 4].map((i) => (
+        <mesh
+          key={i}
+          ref={(el) => { trailMeshesRef.current[i] = el }}
+        >
+          <sphereGeometry args={[1, 6, 6]} />
+          <meshBasicMaterial
+            color="#4da6ff"
+            transparent
+            opacity={0}
+            depthWrite={false}
+          />
+        </mesh>
+      ))}
+    </group>
   )
 }
 
@@ -280,7 +312,7 @@ const App: React.FC = () => {
   return (
     <div style={{ width: '100%', height: '100%', backgroundColor: '#0a0a1a' }}>
       <Canvas
-        camera={{ position: [8, 4, 10], fov: 60 }}
+        camera={{ position: [8, 4, 10], fov: 60, near: 0.1, far: 1000 }}
         gl={{ antialias: true }}
         onCreated={({ gl }) => {
           gl.setClearColor('#0a0a1a')

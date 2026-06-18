@@ -7,11 +7,16 @@ export interface Particle {
   position: THREE.Vector3
   progress: number
   speed: number
-  trail: THREE.Vector3[]
+  positionHistory: THREE.Vector3[]
   active: boolean
 }
 
 export class SignalTransmitter {
+  private static readonly MAX_TOTAL_PARTICLES: number = 750
+  private static readonly DEFAULT_PARTICLES_PER_CONNECTION: number = 15
+  private static readonly POSITION_HISTORY_LENGTH: number = 5
+  private static readonly POSITION_UPDATE_BUDGET_MS: number = 0.5
+
   private neuronManager: NeuronManager
   private particles: Particle[] = []
   private particlesPerConnection: number = 15
@@ -21,7 +26,19 @@ export class SignalTransmitter {
 
   constructor(neuronManager: NeuronManager) {
     this.neuronManager = neuronManager
+    this.updateParticlesPerConnection()
     this.initParticles()
+  }
+
+  private updateParticlesPerConnection(): void {
+    const connectionCount = this.neuronManager.getSynapseCount()
+    const maxPerConn = Math.floor(
+      SignalTransmitter.MAX_TOTAL_PARTICLES / Math.max(1, connectionCount)
+    )
+    this.particlesPerConnection = Math.min(
+      SignalTransmitter.DEFAULT_PARTICLES_PER_CONNECTION,
+      Math.max(1, maxPerConn)
+    )
   }
 
   private initParticles(): void {
@@ -35,6 +52,7 @@ export class SignalTransmitter {
   }
 
   public reset(): void {
+    this.updateParticlesPerConnection()
     this.initParticles()
   }
 
@@ -52,7 +70,12 @@ export class SignalTransmitter {
     return this.particles.filter((p) => p.active)
   }
 
+  public getParticlesPerConnectionCount(): number {
+    return this.particlesPerConnection
+  }
+
   public update(deltaTime: number = 1): void {
+    const startTime = performance.now()
     const connections = this.neuronManager.getConnections()
     const now = Date.now()
 
@@ -64,47 +87,71 @@ export class SignalTransmitter {
       }
     })
 
-    this.particles.forEach((particle) => {
-      if (!particle.active) return
-
-      const conn = connections.find((c) => c.id === particle.connectionId)
-      if (!conn) return
-
-      const preNode = this.neuronManager.getNodeById(conn.presynapticId)
-      const postNode = this.neuronManager.getNodeById(conn.postsynapticId)
-
-      if (!preNode || !postNode) return
-
-      particle.progress += this.speed * deltaTime
-
-      if (particle.progress >= 1) {
-        particle.active = false
-        this.neuronManager.triggerFlash(conn.postsynapticId)
-        return
-      }
-
-      const newPos = new THREE.Vector3().lerpVectors(
-        preNode.position,
-        postNode.position,
-        particle.progress
-      )
-
-      particle.trail.unshift(particle.position.clone())
-      if (particle.trail.length > 5) {
-        particle.trail.pop()
-      }
-
-      particle.position.copy(newPos)
-    })
+    const activeParticles = this.particles.filter((p) => p.active)
+    for (let i = 0; i < activeParticles.length; i++) {
+      const particle = activeParticles[i]
+      this.updateParticle(particle, deltaTime)
+    }
 
     this.particles = this.particles.filter((p) => p.active)
+
+    const elapsed = performance.now() - startTime
+    if (elapsed > SignalTransmitter.POSITION_UPDATE_BUDGET_MS) {
+      console.warn(
+        `Particle update took ${elapsed.toFixed(3)}ms, exceeds ${SignalTransmitter.POSITION_UPDATE_BUDGET_MS}ms budget`
+      )
+    }
+  }
+
+  private updateParticle(particle: Particle, deltaTime: number): void {
+    const conn = this.neuronManager
+      .getConnections()
+      .find((c) => c.id === particle.connectionId)
+    if (!conn) return
+
+    const preNode = this.neuronManager.getNodeById(conn.presynapticId)
+    const postNode = this.neuronManager.getNodeById(conn.postsynapticId)
+
+    if (!preNode || !postNode) return
+
+    particle.progress += this.speed * deltaTime
+
+    if (particle.progress >= 1) {
+      particle.active = false
+      this.neuronManager.triggerFlash(conn.postsynapticId)
+      return
+    }
+
+    const newPos = new THREE.Vector3().lerpVectors(
+      preNode.position,
+      postNode.position,
+      particle.progress
+    )
+
+    particle.positionHistory.unshift(particle.position.clone())
+    if (particle.positionHistory.length > SignalTransmitter.POSITION_HISTORY_LENGTH) {
+      particle.positionHistory.pop()
+    }
+
+    particle.position.copy(newPos)
   }
 
   private spawnParticle(connection: Connection): void {
+    if (this.particles.filter((p) => p.active).length >= SignalTransmitter.MAX_TOTAL_PARTICLES) {
+      return
+    }
+
     const preNode = this.neuronManager.getNodeById(connection.presynapticId)
     if (!preNode) return
 
-    const particleId = `particle-${connection.id}-${Date.now()}-${Math.random()}`
+    const activeOnConn = this.particles.filter(
+      (p) => p.connectionId === connection.id && p.active
+    ).length
+    if (activeOnConn >= this.particlesPerConnection) {
+      return
+    }
+
+    const particleId = `particle-${connection.id}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
 
     const particle: Particle = {
       id: particleId,
@@ -112,7 +159,7 @@ export class SignalTransmitter {
       position: preNode.position.clone(),
       progress: 0,
       speed: this.speed,
-      trail: [],
+      positionHistory: [],
       active: true,
     }
 

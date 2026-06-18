@@ -20,9 +20,12 @@ export class NeuronManager {
   private presynapticNodes: NeuronNode[] = []
   private postsynapticNodes: NeuronNode[] = []
   private connections: Connection[] = []
+  private nodeToConnectionsMap: Map<number, string[]> = new Map()
   private synapseCount: number = 30
   private readonly distance: number = 6
   private readonly nodeRadius: number = 0.4
+  private readonly presynapticColor: string = '#4da6ff'
+  private readonly postsynapticColor: string = '#66bb6a'
 
   constructor(count: number = 30) {
     this.synapseCount = count
@@ -45,7 +48,7 @@ export class NeuronManager {
       this.presynapticNodes.push({
         id: i,
         position: new THREE.Vector3(-this.distance / 2, yOffset, zOffset),
-        color: '#4da6ff',
+        color: this.presynapticColor,
         type: 'presynaptic',
         isHighlighted: false,
         flashTime: 0,
@@ -54,7 +57,7 @@ export class NeuronManager {
       this.postsynapticNodes.push({
         id: i + count,
         position: new THREE.Vector3(this.distance / 2, yOffset, zOffset),
-        color: '#66bb6a',
+        color: this.postsynapticColor,
         type: 'postsynaptic',
         isHighlighted: false,
         flashTime: 0,
@@ -63,16 +66,37 @@ export class NeuronManager {
   }
 
   private generateConnections(): void {
+    const startTime = performance.now()
     this.connections = []
+    this.nodeToConnectionsMap.clear()
     const count = this.synapseCount
 
     for (let i = 0; i < count; i++) {
+      const connId = `conn-${i}`
+      const preId = i
+      const postId = i + count
+
       this.connections.push({
-        id: `conn-${i}`,
-        presynapticId: i,
-        postsynapticId: i + count,
+        id: connId,
+        presynapticId: preId,
+        postsynapticId: postId,
         isHighlighted: false,
       })
+
+      if (!this.nodeToConnectionsMap.has(preId)) {
+        this.nodeToConnectionsMap.set(preId, [])
+      }
+      this.nodeToConnectionsMap.get(preId)!.push(connId)
+
+      if (!this.nodeToConnectionsMap.has(postId)) {
+        this.nodeToConnectionsMap.set(postId, [])
+      }
+      this.nodeToConnectionsMap.get(postId)!.push(connId)
+    }
+
+    const elapsed = performance.now() - startTime
+    if (elapsed > 20) {
+      console.warn(`Connection generation took ${elapsed.toFixed(2)}ms, exceeds 20ms limit`)
     }
   }
 
@@ -122,11 +146,22 @@ export class NeuronManager {
     return this.connections
   }
 
+  public getConnectionById(id: string): Connection | undefined {
+    return this.connections.find((c) => c.id === id)
+  }
+
   public getNodeById(id: number): NeuronNode | undefined {
     if (id < this.synapseCount) {
       return this.presynapticNodes[id]
     }
     return this.postsynapticNodes[id - this.synapseCount]
+  }
+
+  public getConnectionsForNode(nodeId: number): Connection[] {
+    const connIds = this.nodeToConnectionsMap.get(nodeId) || []
+    return connIds
+      .map((id) => this.getConnectionById(id))
+      .filter((c): c is Connection => c !== undefined)
   }
 
   public getNodeRadius(): number {
@@ -139,11 +174,15 @@ export class NeuronManager {
       node.isHighlighted = highlighted
     }
 
-    this.connections.forEach((conn) => {
-      if (conn.presynapticId === nodeId || conn.postsynapticId === nodeId) {
-        conn.isHighlighted = highlighted
-      }
+    const conns = this.getConnectionsForNode(nodeId)
+    conns.forEach((conn) => {
+      conn.isHighlighted = highlighted
     })
+  }
+
+  public clearAllHighlights(): void {
+    this.getAllNodes().forEach((n) => (n.isHighlighted = false))
+    this.connections.forEach((c) => (c.isHighlighted = false))
   }
 
   public triggerFlash(postsynapticId: number): void {
@@ -157,5 +196,15 @@ export class NeuronManager {
     const node = this.getNodeById(nodeId)
     if (!node) return false
     return Date.now() - node.flashTime < delayMs
+  }
+
+  public getFlashingNodes(delayMs: number): Set<number> {
+    const flashing = new Set<number>()
+    this.postsynapticNodes.forEach((node) => {
+      if (this.isFlashing(node.id, delayMs)) {
+        flashing.add(node.id)
+      }
+    })
+    return flashing
   }
 }
