@@ -98,7 +98,7 @@ const App: React.FC = () => {
         <div className="workspace">
           <div className="canvas-area">
             <PuzzleCanvas
-              ref={canvasRef}
+              canvasRef={canvasRef}
               images={images}
               backgroundColor={backgroundColor}
               borderStyle={borderStyle}

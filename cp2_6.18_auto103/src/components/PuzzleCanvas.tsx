@@ -17,21 +17,23 @@ interface PuzzleCanvasProps {
   borderStyle: BorderStyle;
   layoutMode: LayoutMode;
   onImagesChange: (images: ImageItem[]) => void;
+  canvasRef?: React.MutableRefObject<HTMLDivElement | null>;
 }
 
 const CANVAS_WIDTH = 1000;
 const COMPACT_GAP = 8;
 const LOOSE_GAP = 20;
 
-const PuzzleCanvas = React.forwardRef<HTMLDivElement, PuzzleCanvasProps>(({
+const PuzzleCanvas: React.FC<PuzzleCanvasProps> = ({
   images,
   backgroundColor,
   borderStyle,
   layoutMode,
-  onImagesChange
-}, forwardedRef) => {
+  onImagesChange,
+  canvasRef: externalRef
+}) => {
   const internalRef = useRef<HTMLDivElement>(null);
-  const canvasRef = (forwardedRef as React.RefObject<HTMLDivElement | null>) || internalRef;
+  const canvasRef = externalRef || internalRef;
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [dragMousePos, setDragMousePos] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
@@ -144,6 +146,7 @@ const PuzzleCanvas = React.forwardRef<HTMLDivElement, PuzzleCanvasProps>(({
     const target = e.currentTarget as HTMLElement;
     const rect = target.getBoundingClientRect();
 
+    setIsLayoutTransition(false);
     setDraggingId(imageId);
     setDragElementOffset({
       x: e.clientX - rect.left,
@@ -191,6 +194,7 @@ const PuzzleCanvas = React.forwardRef<HTMLDivElement, PuzzleCanvasProps>(({
     const target = e.currentTarget as HTMLElement;
     const rect = target.getBoundingClientRect();
 
+    setIsLayoutTransition(false);
     setDraggingId(imageId);
     setDragElementOffset({
       x: touch.clientX - rect.left,
@@ -292,6 +296,9 @@ const PuzzleCanvas = React.forwardRef<HTMLDivElement, PuzzleCanvasProps>(({
 
       {error && <div className="error-message">{error}</div>}
 
+      <div className="puzzle-canvas-scaled-wrapper" style={{
+        minHeight: `calc(${canvasHeight}px * var(--canvas-scale, 1))`
+      }}>
       <div
         ref={canvasRef}
         className="puzzle-canvas"
@@ -302,7 +309,8 @@ const PuzzleCanvas = React.forwardRef<HTMLDivElement, PuzzleCanvasProps>(({
           transition: 'background-color 0.4s ease-out, height 0.3s ease-out',
           position: 'relative',
           borderRadius: '12px',
-          overflow: 'hidden'
+          overflow: 'visible',
+          flexShrink: 0
         }}
       >
         {images.length === 0 && (
@@ -363,6 +371,7 @@ const PuzzleCanvas = React.forwardRef<HTMLDivElement, PuzzleCanvasProps>(({
           );
         })}
       </div>
+      </div>
 
       {draggingImage && (
         <div className="puzzle-drag-ghost" style={getDragStyle()}>
@@ -387,6 +396,14 @@ const PuzzleCanvas = React.forwardRef<HTMLDivElement, PuzzleCanvasProps>(({
           flex-direction: column;
           align-items: center;
           gap: 16px;
+          overflow: visible;
+        }
+
+        .puzzle-canvas-scaled-wrapper {
+          width: 100%;
+          overflow: visible;
+          display: flex;
+          justify-content: center;
         }
 
         .puzzle-upload-area {
@@ -493,26 +510,26 @@ const PuzzleCanvas = React.forwardRef<HTMLDivElement, PuzzleCanvasProps>(({
         }
 
         @media (max-width: 1280px) {
+          .puzzle-canvas-scaled-wrapper { --canvas-scale: 0.9; }
           .puzzle-canvas {
             transform: scale(0.9);
             transform-origin: top center;
-            margin-bottom: -60px;
           }
         }
 
         @media (max-width: 1024px) {
+          .puzzle-canvas-scaled-wrapper { --canvas-scale: 0.75; }
           .puzzle-canvas {
             transform: scale(0.75);
             transform-origin: top center;
-            margin-bottom: -160px;
           }
         }
 
         @media (max-width: 768px) {
+          .puzzle-canvas-scaled-wrapper { --canvas-scale: 0.55; }
           .puzzle-canvas {
             transform: scale(0.55);
             transform-origin: top center;
-            margin-bottom: -300px;
           }
 
           .puzzle-upload-area {
@@ -527,8 +544,6 @@ const PuzzleCanvas = React.forwardRef<HTMLDivElement, PuzzleCanvasProps>(({
       `}</style>
     </div>
   );
-});
-
-PuzzleCanvas.displayName = 'PuzzleCanvas';
+};
 
 export default PuzzleCanvas;
