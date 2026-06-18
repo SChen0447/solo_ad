@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>幻境迷城</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #1a1028;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      user-select: none;
+    }
+    #game-canvas {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+    #ui-container {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 10;
+    }
+    #minimap {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      width: 180px;
+      height: 180px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(20, 10, 40, 0.85) 0%, rgba(20, 10, 40, 0.3) 100%);
+      border: 2px solid rgba(120, 80, 200, 0.6);
+      box-shadow: 0 0 20px rgba(120, 80, 200, 0.4), inset 0 0 30px rgba(80, 40, 160, 0.3);
+      overflow: hidden;
+    }
+    #minimap-canvas {
+      width: 100%;
+      height: 100%;
+      border-radius: 50%;
+    }
+    #collect-slots {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      display: flex;
+      gap: 10px;
+    }
+    .slot {
+      width: 48px;
+      height: 48px;
+      border-radius: 12px;
+      background: rgba(20, 10, 40, 0.8);
+      border: 2px solid rgba(255, 200, 80, 0.4);
+      box-shadow: 0 0 10px rgba(255, 200, 80, 0.2);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      position: relative;
+    }
+    .slot.filled {
+      border-color: rgba(255, 220, 100, 0.9);
+      box-shadow: 0 0 20px rgba(255, 220, 100, 0.6);
+    }
+    .slot-inner {
+      width: 28px;
+      height: 28px;
+      border-radius: 8px;
+      background: linear-gradient(135deg, #ffd54a, #ffaa20);
+      box-shadow: 0 0 15px rgba(255, 200, 80, 0.8);
+      opacity: 0;
+      transform: scale(0);
+      transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+    .slot.filled .slot-inner {
+      opacity: 1;
+      transform: scale(1);
+    }
+    #game-info {
+      position: absolute;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      text-align: center;
+      color: rgba(180, 140, 255, 0.95);
+      text-shadow: 0 0 10px rgba(120, 80, 200, 0.8);
+      font-size: 16px;
+      letter-spacing: 2px;
+    }
+    #game-info .floor-num {
+      font-size: 28px;
+      font-weight: bold;
+      color: rgba(255, 220, 150, 0.95);
+      text-shadow: 0 0 15px rgba(255, 200, 100, 0.8);
+    }
+    #game-info .frag-count {
+      font-size: 18px;
+      margin-top: 4px;
+    }
+    #white-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: #fff;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.5s ease;
+      z-index: 100;
+    }
+    #white-overlay.active {
+      opacity: 1;
+    }
+    @keyframes breathe {
+      0%, 100% { opacity: 0.85; }
+      50% { opacity: 1.0; }
+    }
+    #minimap, #collect-slots, #game-info {
+      animation: breathe 4s ease-in-out infinite;
+    }
+    #start-hint {
+      position: absolute;
+      bottom: 40px;
+      left: 50%;
+      transform: translateX(-50%);
+      color: rgba(180, 140, 255, 0.8);
+      font-size: 14px;
+      letter-spacing: 1px;
+      text-shadow: 0 0 10px rgba(120, 80, 200, 0.6);
+      animation: breathe 3s ease-in-out infinite;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="game-canvas"></canvas>
+  <div id="ui-container">
+    <div id="minimap">
+      <canvas id="minimap-canvas"></canvas>
+    </div>
+    <div id="collect-slots">
+      <div class="slot"><div class="slot-inner"></div></div>
+      <div class="slot"><div class="slot-inner"></div></div>
+      <div class="slot"><div class="slot-inner"></div></div>
+      <div class="slot"><div class="slot-inner"></div></div>
+      <div class="slot"><div class="slot-inner"></div></div>
+    </div>
+    <div id="game-info">
+      <div class="floor-num">第 <span id="floor-value">1</span> 层</div>
+      <div class="frag-count">碎片 <span id="frag-value">0</span> / 5</div>
+    </div>
+    <div id="start-hint">WASD 移动 · 鼠标点击锁定视角 · ESC 解锁</div>
+    <div id="white-overlay"></div>
+  </div>
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
