@@ -1,0 +1,291 @@
+*, *::before, *::after {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Nunito', -apple-system, BlinkMacSystemFont, sans-serif;
+  background-color: #fff8f0;
+  color: #4a3728;
+  -webkit-font-smoothing: antialiased;
+}
+
+@keyframes slideIn {
+  from {
+    transform: translateY(-50px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes fadeOut {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+@keyframes slideInRight {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes slideOutLeft {
+  from {
+    transform: translateX(0);
+    opacity: 1;
+  }
+  to {
+    transform: translateX(-100%);
+    opacity: 0;
+  }
+}
+
+@keyframes popUp {
+  from {
+    transform: translateY(20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes heartParticles {
+  0% {
+    opacity: 1;
+    transform: scale(0) translateY(0);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.2) translateY(-30px);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(0.8) translateY(-60px);
+  }
+}
+
+@keyframes healthFlash {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+.pet-card-enter {
+  animation: slideIn 0.5s ease-out forwards;
+}
+
+.interaction-log-enter {
+  animation: fadeIn 0.5s ease forwards;
+}
+
+.interaction-log-exit {
+  animation: fadeOut 0.5s ease forwards;
+}
+
+.notification-slide-in {
+  animation: slideInRight 0.5s ease forwards;
+}
+
+.notification-slide-out {
+  animation: slideOutLeft 0.5s ease forwards;
+}
+
+.toast-pop-up {
+  animation: popUp 0.3s ease forwards;
+}
+
+.health-bar-flash {
+  animation: healthFlash 1s ease-in-out infinite;
+}
+
+.heart-particle {
+  animation: heartParticles 1.5s ease-out forwards;
+  position: absolute;
+  pointer-events: none;
+  font-size: 24px;
+}
+
+.pet-card {
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+  padding: 20px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: visible;
+}
+
+.pet-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+}
+
+.pet-card.drag-over {
+  border: 2px solid #27ae60;
+}
+
+.pet-card.dragging {
+  opacity: 0.5;
+}
+
+.btn-interaction {
+  width: 200px;
+  height: 48px;
+  border: none;
+  border-radius: 8px;
+  color: #fff;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.1s ease;
+  font-family: inherit;
+}
+
+.btn-interaction:hover:not(:disabled) {
+  filter: brightness(1.1);
+}
+
+.btn-interaction:active:not(:disabled) {
+  transform: scale(0.95);
+}
+
+.btn-interaction:disabled {
+  background: #bdc3c7 !important;
+  cursor: not-allowed;
+  color: #7f8c8d;
+}
+
+.progress-bar-container {
+  width: 100%;
+  height: 10px;
+  background: #ecf0f1;
+  border-radius: 5px;
+  overflow: hidden;
+}
+
+.progress-bar-fill {
+  height: 100%;
+  border-radius: 5px;
+  transition: width 0.3s ease, background-color 0.3s ease;
+}
+
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0,0,0,0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+  animation: fadeIn 0.2s ease;
+}
+
+.modal-content {
+  width: 400px;
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.15);
+  padding: 32px;
+  animation: popUp 0.3s ease;
+}
+
+.shop-card {
+  width: 220px;
+  background: #fff;
+  border-radius: 8px;
+  border: 1px solid #eee;
+  overflow: hidden;
+  transition: all 0.3s ease;
+  position: relative;
+}
+
+.shop-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 6px 20px rgba(0,0,0,0.12);
+}
+
+.buy-btn {
+  width: 100%;
+  height: 40px;
+  background: #2ecc71;
+  color: #fff;
+  border: none;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  border-radius: 0 0 8px 8px;
+  transition: background 0.3s ease;
+  font-family: inherit;
+}
+
+.buy-btn:hover {
+  background: #27ae60;
+}
+
+.buy-btn:disabled {
+  background: #bdc3c7;
+  cursor: not-allowed;
+}
+
+.toast-notification {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  background: #27ae60;
+  color: #fff;
+  padding: '12px 24px';
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  z-index: 3000;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+
+@media (max-width: 768px) {
+  .nav-links-desktop {
+    display: none !important;
+  }
+
+  .hamburger-btn {
+    display: block !important;
+  }
+
+  .pet-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .pet-card, .btn-interaction, .shop-card {
+    width: calc(100% - 16px) !important;
+  }
+
+  .detail-layout {
+    flex-direction: column !important;
+  }
+
+  .detail-layout > div {
+    width: 100% !important;
+  }
+
+  body, .pet-card, .shop-card {
+    font-size: 14px;
+  }
+}
