@@ -1,0 +1,62 @@
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+}
+
+button {
+  font-family: inherit;
+}
+
+.skill-tag:hover {
+  transform: scale(1.05);
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+  color: white;
+  border: none;
+  border-radius: 12px;
+  padding: 10px 20px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: filter 0.15s ease, transform 0.1s ease;
+}
+
+.btn-primary:hover {
+  filter: brightness(1.1);
+}
+
+.btn-primary:active {
+  transform: translateY(1px);
+}
+
+.history-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+}
+
+.reset-btn:hover {
+  background: #f3f4f6;
+  border-color: #d1d5db;
+}
+
+.reset-btn:active {
+  transform: translateY(1px);
+}
+
+.clear-btn:hover {
+  background: #fef2f2;
+}
+
+.job-tab:hover:not(.job-tab-active) {
+  background: #f3f4f6;
+  border-color: #d1d5db;
+}
+
+.job-tab:active {
+  transform: translateY(1px);
+}
