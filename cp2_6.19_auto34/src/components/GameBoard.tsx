@@ -3,6 +3,26 @@ import type { WordData, DraggablePart } from '../types';
 import { shuffleArray } from '../data/words';
 import { v4 as uuidv4 } from 'uuid';
 
+/**
+ * GameBoard 核心游戏面板组件
+ *
+ * 调用关系与数据流向：
+ *   ← 接收 App.tsx 传入的 props：
+ *     - wordData: 当前题目数据（含 word 完整词语 和 parts 拆分部件）
+ *     - onCorrect: 答对回调，通知 App.tsx 更新得分和进度
+ *     - disabled: 是否禁用交互（加载下一题期间为 true）
+ *
+ *   → 向 App.tsx 输出：
+ *     - onCorrect() 调用：用户拼对词语后触发，App 据此更新 score、correctCount、roundProgress
+ *
+ * 内部状态：
+ *   - availableParts: 源区域中可拖拽的部件列表（乱序）
+ *   - placedParts: 已放入目标槽位的部件列表（按放入顺序）
+ *   - slotStatus: 槽位当前状态 empty/filling/correct/wrong
+ *   - isDragging + dragPart + dragPosition: 拖拽状态与位置（用于半透明阴影跟随）
+ *   - hoveringSlot: 鼠标/手指是否悬停在目标槽位上方
+ */
+
 interface GameBoardProps {
   wordData: WordData;
   onCorrect: () => void;
@@ -15,12 +35,10 @@ function GameBoard({ wordData, onCorrect, disabled = false }: GameBoardProps) {
   const [slotStatus, setSlotStatus] = useState<'empty' | 'filling' | 'correct' | 'wrong'>('empty');
   const [isDragging, setIsDragging] = useState(false);
   const [dragPart, setDragPart] = useState<DraggablePart | null>(null);
-  const [dragPosition, setDragPosition] = useState({ x: 0, y: 0 });
   const [hoveringSlot, setHoveringSlot] = useState(false);
 
   const slotRef = useRef<HTMLDivElement>(null);
-  const touchStartTime = useRef<number>(0);
-  const touchStartPos = useRef({ x: 0, y: 0 });
+  const ghostRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     const parts: DraggablePart[] = wordData.parts.map((char, index) => ({
@@ -72,6 +90,65 @@ function GameBoard({ wordData, onCorrect, disabled = false }: GameBoardProps) {
     [disabled, slotStatus, placedParts, wordData.word.length, checkAnswer]
   );
 
+  const createGhost = useCallback((char: string, startX: number, startY: number) => {
+    if (ghostRef.current) {
+      ghostRef.current.remove();
+    }
+    const ghost = document.createElement('div');
+    ghost.textContent = char;
+    Object.assign(ghost.style, {
+      position: 'fixed',
+      left: `${startX - 35}px`,
+      top: `${startY - 35}px`,
+      width: '70px',
+      height: '70px',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      fontSize: '32px',
+      fontWeight: 'bold',
+      color: '#F5A623',
+      backgroundColor: 'rgba(255, 255, 255, 0.85)',
+      borderRadius: '12px',
+      boxShadow: '0 8px 24px rgba(0,0,0,0.2)',
+      border: '2px solid #F5A623',
+      pointerEvents: 'none',
+      zIndex: '9999',
+      opacity: '0.9',
+      transition: 'none',
+      touchAction: 'none'
+    });
+    document.body.appendChild(ghost);
+    ghostRef.current = ghost;
+  }, []);
+
+  const updateGhostPosition = useCallback((x: number, y: number) => {
+    if (ghostRef.current) {
+      ghostRef.current.style.left = `${x - 35}px`;
+      ghostRef.current.style.top = `${y - 35}px`;
+    }
+  }, []);
+
+  const removeGhost = useCallback(() => {
+    if (ghostRef.current) {
+      ghostRef.current.remove();
+      ghostRef.current = null;
+    }
+  }, []);
+
+  const isOverSlot = useCallback((clientX: number, clientY: number): boolean => {
+    if (!slotRef.current) return false;
+    const rect = slotRef.current.getBoundingClientRect();
+    return (
+      clientX >= rect.left &&
+      clientX <= rect.right &&
+      clientY >= rect.top &&
+      clientY <= rect.bottom
+    );
+  }, []);
+
+  // ========== 鼠标拖拽 (HTML5 Drag and Drop) ==========
+
   const handleDragStart = (e: React.DragEvent, part: DraggablePart) => {
     if (disabled || slotStatus === 'correct') {
       e.preventDefault();
@@ -79,19 +156,49 @@ function GameBoard({ wordData, onCorrect, disabled = false }: GameBoardProps) {
     }
     setIsDragging(true);
     setDragPart(part);
-    e.dataTransfer.effectAllowed = 'move';
-    e.dataTransfer.setData('text/plain', JSON.stringify(part));
-    const rect = (e.target as HTMLElement).getBoundingClientRect();
-    setDragPosition({
-      x: e.clientX - rect.left,
-      y: e.clientY - rect.top
+
+    const dragImage = document.createElement('div');
+    dragImage.textContent = part.char;
+    Object.assign(dragImage.style, {
+      width: '70px',
+      height: '70px',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      fontSize: '32px',
+      fontWeight: 'bold',
+      color: '#F5A623',
+      backgroundColor: 'rgba(255, 255, 255, 0.9)',
+      borderRadius: '12px',
+      boxShadow: '0 8px 24px rgba(0,0,0,0.2)',
+      border: '2px solid #F5A623',
+      position: 'absolute',
+      top: '-9999px',
+      left: '-9999px'
     });
+    document.body.appendChild(dragImage);
+    e.dataTransfer.setDragImage(dragImage, 35, 35);
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', part.id);
+
+    setTimeout(() => {
+      dragImage.remove();
+    }, 0);
+
+    createGhost(part.char, e.clientX, e.clientY);
+  };
+
+  const handleDrag = (e: React.DragEvent) => {
+    if (e.clientX === 0 && e.clientY === 0) return;
+    updateGhostPosition(e.clientX, e.clientY);
+    setHoveringSlot(isOverSlot(e.clientX, e.clientY));
   };
 
   const handleDragEnd = () => {
     setIsDragging(false);
     setDragPart(null);
     setHoveringSlot(false);
+    removeGhost();
   };
 
   const handleDragOver = (e: React.DragEvent) => {
@@ -112,64 +219,44 @@ function GameBoard({ wordData, onCorrect, disabled = false }: GameBoardProps) {
     }
     setIsDragging(false);
     setDragPart(null);
+    removeGhost();
   };
+
+  // ========== 触摸拖拽 (Touch Events) ==========
 
   const handleTouchStart = (e: React.TouchEvent, part: DraggablePart) => {
     if (disabled || slotStatus === 'correct') return;
+    e.preventDefault();
     const touch = e.touches[0];
-    touchStartTime.current = Date.now();
-    touchStartPos.current = { x: touch.clientX, y: touch.clientY };
     setIsDragging(true);
     setDragPart(part);
-    setDragPosition({
-      x: touch.clientX,
-      y: touch.clientY
-    });
+    createGhost(part.char, touch.clientX, touch.clientY);
   };
 
   const handleTouchMove = (e: React.TouchEvent) => {
     if (!isDragging) return;
+    e.preventDefault();
     const touch = e.touches[0];
-    setDragPosition({
-      x: touch.clientX,
-      y: touch.clientY
-    });
-
-    if (slotRef.current) {
-      const rect = slotRef.current.getBoundingClientRect();
-      const isOver =
-        touch.clientX >= rect.left &&
-        touch.clientX <= rect.right &&
-        touch.clientY >= rect.top &&
-        touch.clientY <= rect.bottom;
-      setHoveringSlot(isOver);
-    }
+    updateGhostPosition(touch.clientX, touch.clientY);
+    setHoveringSlot(isOverSlot(touch.clientX, touch.clientY));
   };
 
   const handleTouchEnd = (e: React.TouchEvent) => {
     if (!isDragging || !dragPart) {
       setIsDragging(false);
       setDragPart(null);
+      removeGhost();
       return;
     }
-
+    e.preventDefault();
     const touch = e.changedTouches[0];
-    if (slotRef.current) {
-      const rect = slotRef.current.getBoundingClientRect();
-      const isOver =
-        touch.clientX >= rect.left &&
-        touch.clientX <= rect.right &&
-        touch.clientY >= rect.top &&
-        touch.clientY <= rect.bottom;
-
-      if (isOver) {
-        handleSlotDrop(dragPart);
-      }
+    if (isOverSlot(touch.clientX, touch.clientY)) {
+      handleSlotDrop(dragPart);
     }
-
     setIsDragging(false);
     setDragPart(null);
     setHoveringSlot(false);
+    removeGhost();
   };
 
   const getSlotBorderStyle = () => {
@@ -239,6 +326,7 @@ function GameBoard({ wordData, onCorrect, disabled = false }: GameBoardProps) {
                 key={part.id}
                 part={part}
                 onDragStart={handleDragStart}
+                onDrag={handleDrag}
                 onDragEnd={handleDragEnd}
                 onTouchStart={handleTouchStart}
                 onTouchMove={handleTouchMove}
@@ -335,33 +423,6 @@ function GameBoard({ wordData, onCorrect, disabled = false }: GameBoardProps) {
         </span>
         <span>字词语</span>
       </div>
-
-      {isDragging && dragPart && (
-        <div
-          style={{
-            position: 'fixed',
-            left: dragPosition.x - 35,
-            top: dragPosition.y - 35,
-            width: '70px',
-            height: '70px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            fontSize: '32px',
-            fontWeight: 'bold',
-            color: '#F5A623',
-            backgroundColor: 'rgba(255, 255, 255, 0.9)',
-            borderRadius: '12px',
-            boxShadow: '0 8px 24px rgba(0,0,0,0.15)',
-            border: '2px solid #F5A623',
-            pointerEvents: 'none',
-            zIndex: 9999,
-            opacity: 0.85
-          }}
-        >
-          {dragPart.char}
-        </div>
-      )}
     </div>
   );
 }
@@ -369,6 +430,7 @@ function GameBoard({ wordData, onCorrect, disabled = false }: GameBoardProps) {
 interface PartCardProps {
   part: DraggablePart;
   onDragStart: (e: React.DragEvent, part: DraggablePart) => void;
+  onDrag: (e: React.DragEvent) => void;
   onDragEnd: () => void;
   onTouchStart: (e: React.TouchEvent, part: DraggablePart) => void;
   onTouchMove: (e: React.TouchEvent) => void;
@@ -380,6 +442,7 @@ interface PartCardProps {
 function PartCard({
   part,
   onDragStart,
+  onDrag,
   onDragEnd,
   onTouchStart,
   onTouchMove,
@@ -393,6 +456,7 @@ function PartCard({
     <div
       draggable={!disabled}
       onDragStart={(e) => onDragStart(e, part)}
+      onDrag={onDrag}
       onDragEnd={onDragEnd}
       onTouchStart={(e) => onTouchStart(e, part)}
       onTouchMove={onTouchMove}

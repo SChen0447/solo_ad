@@ -4,6 +4,53 @@ import ScorePanel from './components/ScorePanel';
 import type { WordData, GameResult } from './types';
 import { getRandomWords, ROUND_SIZE, POINTS_PER_WORD } from './data/words';
 
+/**
+ * App 主组件 — 游戏全局状态管理与布局
+ *
+ * 调用关系与数据流向：
+ *
+ *   data/words.ts (词语库)
+ *       ↓ getRandomWords(5) 返回随机5个 WordData
+ *   App.tsx (本组件)
+ *       ├─ roundWords: WordData[]        当前轮5个词语
+ *       ├─ currentIndex: number          当前题目索引(0-4)
+ *       ├─ score: number                 总得分
+ *       ├─ correctCount: number          答对题数
+ *       ├─ roundProgress: boolean[5]     每题答对标记
+ *       ├─ gamePhase: 'playing'|'finished'
+ *       │
+ *       ├─→ GameBoard.tsx (通过 props 传递)
+ *       │     - wordData={roundWords[currentIndex]}   当前题目
+ *       │     - onCorrect={handleCorrect}              答对回调
+ *       │     - disabled={loadingNext}                 禁用交互
+ *       │
+ *       │   GameBoard 拼对后调用 onCorrect()
+ *       │     ↓
+ *       │   handleCorrect() 在 App 中执行：
+ *       │     - setScore(+10)
+ *       │     - setCorrectCount(+1)
+ *       │     - roundProgress[currentIndex] = true
+ *       │     - 延迟1秒后 currentIndex++ 或进入结算
+ *       │
+ *       ├─→ ScorePanel.tsx (通过 props 传递)
+ *       │     - score={score}                得分（变化时触发 rAF 滚动 + Web Animations API 弹性缩放）
+ *       │     - correctCount={correctCount}  答对数
+ *       │     - roundProgress={roundProgress} 进度标记（变化时触发圆点渐变填充动画）
+ *       │     - scoreAnimating               动画触发信号
+ *       │
+ *       └─→ ResultModal (结算模态框)
+ *             - result={gameResult}           包含 totalScore, correctCount, totalCount, accuracy, timeSpent
+ *             - onRestart={initGame}          重新开始
+ *
+ *   布局结构：
+ *     ┌─ header (60px 固定顶部状态栏：标题 + 得分 + 轮次) ─┐
+ *     │                                                    │
+ *     │         main (游戏区：GameBoard)                    │
+ *     │                                                    │
+ *     └─ footer (ScorePanel 得分面板)                      ┘
+ *     + ResultModal (5题完成后弹出，环形进度条正确率动画)
+ */
+
 function App() {
   const [roundWords, setRoundWords] = useState<WordData[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -140,7 +187,6 @@ function App() {
             <span>/ {ROUND_SIZE}</span>
           </div>
           <div
-            className={scoreAnimating ? 'score-bounce' : ''}
             style={{
               backgroundColor: 'rgba(255,255,255,0.2)',
               padding: '6px 16px',
@@ -197,6 +243,20 @@ function App() {
   );
 }
 
+/**
+ * ResultModal 结算模态框组件
+ *
+ * 数据流向：
+ *   ← App.tsx 传入：
+ *     - result: GameResult (totalScore, correctCount, totalCount, accuracy, timeSpent)
+ *     - onRestart: 重新开始回调 → 调用 App.initGame()
+ *
+ * 环形进度条动画实现：
+ *   - SVG circle + stroke-dasharray/stroke-dashoffset 技术
+ *   - 使用 useRef 获取 circle 元素，通过 requestAnimationFrame 从 0 动画到目标 accuracy
+ *   - 动画时长 1.5s，使用 cubic ease-out 缓动曲线
+ *   - 百分比数字同步从 0 递增到目标值
+ */
 function ResultModal({
   result,
   onRestart
@@ -205,25 +265,38 @@ function ResultModal({
   onRestart: () => void;
 }) {
   const [displayAccuracy, setDisplayAccuracy] = useState(0);
+  const circleRef = useRef<SVGCircleElement>(null);
   const radius = 45;
   const circumference = 2 * Math.PI * radius;
-  const offset = circumference - (displayAccuracy / 100) * circumference;
 
   useEffect(() => {
-    let startTime: number;
+    const circle = circleRef.current;
+    if (!circle) return;
+
+    circle.style.strokeDasharray = `${circumference}`;
+    circle.style.strokeDashoffset = `${circumference}`;
+
+    let startTimestamp: number;
     const duration = 1500;
 
     const animate = (timestamp: number) => {
-      if (!startTime) startTime = timestamp;
-      const progress = Math.min((timestamp - startTime) / duration, 1);
+      if (!startTimestamp) startTimestamp = timestamp;
+      const progress = Math.min((timestamp - startTimestamp) / duration, 1);
       const easeProgress = 1 - Math.pow(1 - progress, 3);
-      setDisplayAccuracy(Math.round(easeProgress * result.accuracy));
+
+      const currentAccuracy = easeProgress * result.accuracy;
+      const currentOffset = circumference - (currentAccuracy / 100) * circumference;
+
+      circle.style.strokeDashoffset = `${currentOffset}`;
+      setDisplayAccuracy(Math.round(currentAccuracy));
+
       if (progress < 1) {
         requestAnimationFrame(animate);
       }
     };
+
     requestAnimationFrame(animate);
-  }, [result.accuracy]);
+  }, [result.accuracy, circumference]);
 
   return (
     <div
@@ -287,6 +360,7 @@ function ResultModal({
                 strokeWidth="10"
               />
               <circle
+                ref={circleRef}
                 cx="60"
                 cy="60"
                 r={radius}
@@ -294,10 +368,7 @@ function ResultModal({
                 stroke="#F5A623"
                 strokeWidth="10"
                 strokeLinecap="round"
-                strokeDasharray={circumference}
-                strokeDashoffset={offset}
                 transform="rotate(-90 60 60)"
-                style={{ transition: 'stroke-dashoffset 0.1s linear' }}
               />
             </svg>
             <div
