@@ -1,0 +1,42 @@
+[
+  {
+    "id": "plant1",
+    "name": "多肉小可爱",
+    "species": "多肉植物",
+    "photoUrl": "https://images.unsplash.com/photo-1459411552884-841db9b3cc2a?w=400",
+    "wateringFrequency": 7,
+    "notes": "喜欢阳光，避免过度浇水",
+    "createdAt": "2026-05-01T10:00:00.000Z",
+    "nextWateringDate": "2026-06-20T10:00:00.000Z"
+  },
+  {
+    "id": "plant2",
+    "name": "绿萝",
+    "species": "观叶植物",
+    "photoUrl": "https://images.unsplash.com/photo-1485955900006-10f4d324d411?w=400",
+    "wateringFrequency": 3,
+    "notes": "适合办公室，耐阴",
+    "createdAt": "2026-05-10T10:00:00.000Z",
+    "nextWateringDate": "2026-06-18T10:00:00.000Z"
+  },
+  {
+    "id": "plant3",
+    "name": "发财树",
+    "species": "观叶植物",
+    "photoUrl": "https://images.unsplash.com/photo-1512428813838-8886e3f04136?w=400",
+    "wateringFrequency": 10,
+    "notes": "寓意吉祥，少浇水",
+    "createdAt": "2026-04-15T10:00:00.000Z",
+    "nextWateringDate": "2026-06-25T10:00:00.000Z"
+  },
+  {
+    "id": "plant4",
+    "name": "薄荷",
+    "species": "香草植物",
+    "photoUrl": "https://images.unsplash.com/photo-1628556270448-4d4e4148e1b1?w=400",
+    "wateringFrequency": 2,
+    "notes": "需要充足水分，可做茶饮",
+    "createdAt": "2026-05-20T10:00:00.000Z",
+    "nextWateringDate": "2026-06-19T10:00:00.000Z"
+  }
+]

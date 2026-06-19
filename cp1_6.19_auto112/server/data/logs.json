@@ -1,0 +1,51 @@
+[
+  {
+    "id": "log1",
+    "plantId": "plant1",
+    "type": "water",
+    "note": "浇了约100ml水",
+    "timestamp": "2026-06-13T10:00:00.000Z"
+  },
+  {
+    "id": "log2",
+    "plantId": "plant1",
+    "type": "fertilize",
+    "note": "使用多肉专用肥",
+    "timestamp": "2026-06-01T10:00:00.000Z"
+  },
+  {
+    "id": "log3",
+    "plantId": "plant2",
+    "type": "water",
+    "note": "土壤干燥，适量浇水",
+    "timestamp": "2026-06-15T09:30:00.000Z"
+  },
+  {
+    "id": "log4",
+    "plantId": "plant2",
+    "type": "water",
+    "note": "正常浇水",
+    "timestamp": "2026-06-12T09:00:00.000Z"
+  },
+  {
+    "id": "log5",
+    "plantId": "plant4",
+    "type": "water",
+    "note": "薄荷需水量大",
+    "timestamp": "2026-06-17T08:00:00.000Z"
+  },
+  {
+    "id": "log6",
+    "plantId": "plant4",
+    "type": "water",
+    "note": "早晨浇水",
+    "timestamp": "2026-06-16T08:00:00.000Z"
+  },
+  {
+    "id": "log7",
+    "plantId": "plant4",
+    "type": "fertilize",
+    "note": "稀释液肥",
+    "timestamp": "2026-06-10T10:00:00.000Z"
+  }
+]
