@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>节奏跑酷 - Rhythm Runner</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #1a1a2e;
+      font-family: 'Courier New', monospace;
+    }
+    #gameCanvas {
+      display: block;
+      width: 100vw;
+      height: 100vh;
+    }
+    #volumeControl {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      z-index: 10;
+      opacity: 0.5;
+      transition: opacity 0.2s, transform 0.2s;
+      cursor: pointer;
+    }
+    #volumeControl:hover {
+      opacity: 1;
+      transform: scale(1.1);
+    }
+    #volumeSlider {
+      width: 120px;
+      height: 6px;
+      -webkit-appearance: none;
+      appearance: none;
+      background: rgba(255, 255, 255, 0.3);
+      border-radius: 3px;
+      outline: none;
+      cursor: pointer;
+    }
+    #volumeSlider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 16px;
+      height: 16px;
+      background: #ff6b6b;
+      border-radius: 50%;
+      cursor: pointer;
+    }
+    #volumeSlider::-moz-range-thumb {
+      width: 16px;
+      height: 16px;
+      background: #ff6b6b;
+      border-radius: 50%;
+      cursor: pointer;
+      border: none;
+    }
+    #volumeLabel {
+      color: white;
+      font-size: 12px;
+      margin-bottom: 4px;
+      text-align: right;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="gameCanvas"></canvas>
+  <div id="volumeControl">
+    <div id="volumeLabel">音量</div>
+    <input type="range" id="volumeSlider" min="0" max="100" value="50" />
+  </div>
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
