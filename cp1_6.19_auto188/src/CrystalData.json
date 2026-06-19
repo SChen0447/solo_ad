@@ -1,0 +1,84 @@
+[
+  {
+    "id": "quartz",
+    "name": "石英晶体",
+    "formula": "SiO₂",
+    "hardness": 7,
+    "formation": "石英是地壳中最常见的矿物之一，形成于火成岩、变质岩和沉积岩中。高温热液脉和伟晶岩是优质石英晶体的主要产地。",
+    "description": "石英晶体呈六方柱状，常带有明显的横纹。纯净的石英无色透明，称为水晶；含杂质时可呈现紫、粉、黄、烟等多种颜色。",
+    "geometry": {
+      "type": "hexagonalPrism",
+      "radius": 0.4,
+      "height": 1.8,
+      "segments": 6
+    },
+    "color": "#9b87ff",
+    "opacity": 0.75,
+    "refraction": 1.458,
+    "emissive": "#4a3a8a"
+  },
+  {
+    "id": "galena",
+    "name": "方铅矿",
+    "formula": "PbS",
+    "hardness": 2.5,
+    "formation": "方铅矿是最主要的铅矿石，形成于中低温热液矿脉中，常与闪锌矿、黄铁矿等共生。具有典型的立方体解理。",
+    "description": "方铅矿呈铅灰色，具有强烈的金属光泽。晶体常为完美的立方体，有时也会出现八面体与立方体的聚形。",
+    "geometry": {
+      "type": "cube",
+      "size": 0.9
+    },
+    "color": "#6b7fb8",
+    "opacity": 0.85,
+    "refraction": 1.5,
+    "emissive": "#2a3a5a"
+  },
+  {
+    "id": "garnet",
+    "name": "石榴石",
+    "formula": "X₃Y₂(SiO₄)₃",
+    "hardness": 7.5,
+    "formation": "石榴石主要形成于变质岩中，是区域变质作用的典型矿物。也产于火成岩和冲积砂矿中。",
+    "description": "石榴石晶体常呈菱形十二面体或四角三八面体。颜色丰富，包括红、橙、黄、绿、紫等多种颜色。",
+    "geometry": {
+      "type": "dodecahedron",
+      "size": 0.7
+    },
+    "color": "#c77dff",
+    "opacity": 0.8,
+    "refraction": 1.74,
+    "emissive": "#5a2a7a"
+  },
+  {
+    "id": "calcite",
+    "name": "方解石",
+    "formula": "CaCO₃",
+    "hardness": 3,
+    "formation": "方解石是分布最广的矿物之一，形成于沉积岩、变质岩和热液矿脉中。是构成石灰岩和大理岩的主要矿物。",
+    "description": "方解石晶体形态多样，常见菱面体。纯净的方解石无色透明，称为冰洲石，具有显著的双折射现象。",
+    "geometry": {
+      "type": "octahedron",
+      "size": 0.8
+    },
+    "color": "#7dd3fc",
+    "opacity": 0.7,
+    "refraction": 1.658,
+    "emissive": "#2a5a7a"
+  },
+  {
+    "id": "fluorite",
+    "name": "萤石",
+    "formula": "CaF₂",
+    "hardness": 4,
+    "formation": "萤石主要形成于热液矿脉中，常与石英、方铅矿、闪锌矿等共生。也产于沉积岩和伟晶岩中。",
+    "description": "萤石晶体常呈立方体、八面体或菱形十二面体。颜色丰富，有紫、蓝、绿、黄等多种颜色，在紫外线照射下会发出荧光。",
+    "geometry": {
+      "type": "cube",
+      "size": 0.75
+    },
+    "color": "#a78bfa",
+    "opacity": 0.65,
+    "refraction": 1.434,
+    "emissive": "#3a2a6a"
+  }
+]
