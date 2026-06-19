@@ -214,10 +214,6 @@ const styles: Record<string, React.CSSProperties> = {
     opacity: 1,
     transition: 'max-height 0.35s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease',
   },
-  cardInfoExpanded: {
-    maxHeight: 220,
-    opacity: 1,
-  },
   cardName: {
     fontSize: 13,
     fontWeight: 600,
@@ -238,7 +234,7 @@ const styles: Record<string, React.CSSProperties> = {
     textOverflow: 'ellipsis',
     whiteSpace: 'nowrap' as const,
     opacity: 0.8,
-    transition: 'opacity 0.3s ease 0.1s',
+    transition: 'opacity 0.3s ease 0.1s, white-space 0s linear 0.2s',
   },
   cardDescExpanded: {
     whiteSpace: 'normal' as const,
@@ -246,6 +242,7 @@ const styles: Record<string, React.CSSProperties> = {
     display: '-webkit-box',
     WebkitBoxOrient: 'vertical',
     opacity: 1,
+    transition: 'opacity 0.3s ease 0.05s',
   },
   cardTags: {
     display: 'flex',
@@ -409,6 +406,21 @@ const styles: Record<string, React.CSSProperties> = {
     fontWeight: 600,
     marginTop: 6,
     textAlign: 'center' as const,
+    transition: 'opacity 0.3s ease, color 0.3s ease',
+  },
+  progressComplete: {
+    fontSize: 12,
+    color: '#065F46',
+    fontWeight: 600,
+    marginTop: 6,
+    textAlign: 'center' as const,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+  },
+  progressBarFillComplete: {
+    background: 'linear-gradient(90deg, #10B981 0%, #059669 100%)',
   },
   modalActions: {
     display: 'flex',
@@ -517,8 +529,12 @@ function App() {
   const [bouncingId, setBouncingId] = useState<string | null>(null);
   const [hoveredCard, setHoveredCard] = useState<string | null>(null);
   const [fadeIn, setFadeIn] = useState(true);
+  const [cardExpandedHeights, setCardExpandedHeights] = useState<Record<string, number>>({});
+  const [uploadComplete, setUploadComplete] = useState(false);
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const cardInfoRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const countAnimRefs = useRef<Record<string, HTMLSpanElement | null>>({});
 
   const showToast = useCallback((message: string, type: 'success' | 'error' = 'success') => {
     setToast({ message, type });
@@ -528,12 +544,12 @@ function App() {
   const fetchAssets = useCallback(async (category?: string | null, tag?: string | null) => {
     try {
       setFadeIn(false);
-      await new Promise((r) => setTimeout(r, 150));
       const data = await getAssets(category || undefined, tag || undefined);
       setAssets(data);
-      setFadeIn(true);
+      requestAnimationFrame(() => setFadeIn(true));
     } catch (err: any) {
       showToast(err.message, 'error');
+      setFadeIn(true);
     }
   }, [showToast]);
 
@@ -544,12 +560,12 @@ function App() {
     }
     try {
       setFadeIn(false);
-      await new Promise((r) => setTimeout(r, 150));
       const data = await searchAssets(query);
       setAssets(data);
-      setFadeIn(true);
+      requestAnimationFrame(() => setFadeIn(true));
     } catch (err: any) {
       showToast(err.message, 'error');
+      setFadeIn(true);
     }
   }, [fetchAssets, selectedCategory, selectedTag, showToast]);
 
@@ -590,20 +606,26 @@ function App() {
     if (!uploadFile) return;
     setUploading(true);
     setUploadProgress(0);
+    setUploadComplete(false);
     try {
       const tags = uploadTags
         .split(/[,，]/)
         .map((t) => t.trim())
         .filter(Boolean);
-      await uploadAsset(uploadFile, uploadCategory, tags, uploadDescription, (p) =>
-        setUploadProgress(p)
-      );
+      await uploadAsset(uploadFile, uploadCategory, tags, uploadDescription, (p) => {
+        setUploadProgress(p);
+        if (p === 100) {
+          setUploadComplete(true);
+        }
+      });
+      await new Promise((r) => setTimeout(r, 800));
       showToast('素材上传成功！');
       setShowUploadModal(false);
       resetUploadForm();
       fetchAssets(selectedCategory, selectedTag);
     } catch (err: any) {
       showToast(err.message, 'error');
+      setUploadComplete(false);
     } finally {
       setUploading(false);
     }
@@ -615,17 +637,17 @@ function App() {
     setUploadTags('');
     setUploadDescription('');
     setUploadProgress(0);
+    setUploadComplete(false);
   };
 
   const handleDownload = async (e: React.MouseEvent, asset: Asset) => {
     e.stopPropagation();
     try {
       await downloadAsset(asset.id);
-      setBouncingId(asset.id);
-      setTimeout(() => setBouncingId(null), 600);
       setAssets((prev) =>
         prev.map((a) => (a.id === asset.id ? { ...a, downloadCount: a.downloadCount + 1 } : a))
       );
+      triggerBounceAnim(asset.id);
     } catch (err: any) {
       showToast(err.message, 'error');
     }
@@ -645,6 +667,41 @@ function App() {
     }
     setUploadFile(file);
   };
+
+  const handleCardMouseEnter = useCallback((assetId: string) => {
+    setHoveredCard(assetId);
+    const el = cardInfoRefs.current[assetId];
+    if (el && !cardExpandedHeights[assetId]) {
+      const prevMaxHeight = el.style.maxHeight;
+      el.style.maxHeight = 'none';
+      const scrollHeight = el.scrollHeight;
+      el.style.maxHeight = prevMaxHeight;
+      setCardExpandedHeights((prev) => ({ ...prev, [assetId]: scrollHeight }));
+    }
+  }, [cardExpandedHeights]);
+
+  const handleCardMouseLeave = useCallback(() => {
+    setHoveredCard(null);
+  }, []);
+
+  const triggerBounceAnim = useCallback((assetId: string) => {
+    const el = countAnimRefs.current[assetId];
+    if (!el) return;
+    el.getAnimations().forEach((a) => a.cancel());
+    el.animate(
+      [
+        { transform: 'scale(1)' },
+        { transform: 'scale(1.5)', offset: 0.25 },
+        { transform: 'scale(0.95)', offset: 0.5 },
+        { transform: 'scale(1.1)', offset: 0.75 },
+        { transform: 'scale(1)' },
+      ],
+      {
+        duration: 500,
+        easing: 'cubic-bezier(0.68, -0.55, 0.265, 1.55)',
+      }
+    );
+  }, []);
 
   return (
     <>
@@ -667,8 +724,9 @@ function App() {
         body { margin: 0; }
         input:focus, select:focus, textarea:focus { border-color: #4F46E5 !important; box-shadow: 0 0 0 3px rgba(79,70,229,0.1); }
         button:hover { filter: brightness(1.05); }
-        .sidebar-tag:hover { background-color: #F3F4F6 !important; }
+        .sidebar-tag:not(.sidebar-tag-selected):hover { background-color: #F3F4F6 !important; }
         .sidebar-tag-selected { background-color: #4F46E5 !important; color: #FFFFFF !important; font-weight: 500; }
+        .sidebar-tag-selected:hover { background-color: #4338CA !important; color: #FFFFFF !important; }
         .download-btn:hover { background-color: #4F46E5 !important; color: #FFFFFF !important; border-color: #4F46E5 !important; }
         .upload-btn:hover { background-color: #4338CA !important; }
         .cancel-btn:hover { background-color: #F9FAFB !important; }
@@ -756,10 +814,7 @@ function App() {
                     <div
                       key={tag}
                       className={`sidebar-tag ${isSelected ? 'sidebar-tag-selected' : ''}`}
-                      style={{
-                        ...styles.tagItem,
-                        ...(isSelected ? styles.tagItemSelected : {}),
-                      }}
+                      style={styles.tagItem}
                       onClick={() => handleTagClick(cat.name, tag)}
                     >
                       {tag}
@@ -825,14 +880,14 @@ function App() {
                 >
                   {assets.map((asset) => {
                     const isHovered = hoveredCard === asset.id;
-                    const isBouncing = bouncingId === asset.id;
+                    const expandedHeight = cardExpandedHeights[asset.id] || 220;
                     return (
                       <div
                         key={asset.id}
                         style={styles.card}
                         className={isHovered ? 'card-hover' : ''}
-                        onMouseEnter={() => setHoveredCard(asset.id)}
-                        onMouseLeave={() => setHoveredCard(null)}
+                        onMouseEnter={() => handleCardMouseEnter(asset.id)}
+                        onMouseLeave={handleCardMouseLeave}
                       >
                         <div style={{ position: 'relative', overflow: 'hidden' }}>
                           <img
@@ -854,10 +909,11 @@ function App() {
                           />
                         </div>
                         <div
+                          ref={(el) => { cardInfoRefs.current[asset.id] = el; }}
                           className="card-info-inner"
                           style={{
                             ...styles.cardInfo,
-                            ...(isHovered ? styles.cardInfoExpanded : {}),
+                            maxHeight: isHovered ? expandedHeight : 72,
                           }}
                         >
                           <div style={styles.cardName}>{asset.originalName}</div>
@@ -885,15 +941,14 @@ function App() {
                         </div>
                         <div style={styles.cardBottom}>
                           <span
+                            ref={(el) => { countAnimRefs.current[asset.id] = el; }}
                             style={{
                               ...styles.downloadCount,
                               display: 'inline-flex',
                             }}
-                            className={isBouncing ? 'bounce-anim' : ''}
-                            key={`${asset.id}-${asset.downloadCount}`}
                           >
                             <span>⬇</span>
-                            <span style={{ display: 'inline-block' }}>
+                            <span style={{ display: 'inline-block', transformOrigin: 'center' }}>
                               {asset.downloadCount}
                             </span>
                           </span>
@@ -996,16 +1051,23 @@ function App() {
               <>
                 <div style={styles.progressBar}>
                   <div
-                    className="progress-fill"
+                    className={uploadProgress > 0 && !uploadComplete ? 'progress-fill' : ''}
                     style={{
                       ...styles.progressBarFill,
+                      ...(uploadComplete ? styles.progressBarFillComplete : {}),
                       width: `${uploadProgress}%`,
                     }}
                   />
                 </div>
-                <div style={styles.progressPercent}>
-                  上传进度：{uploadProgress}%
-                </div>
+                {uploadComplete ? (
+                  <div style={styles.progressComplete}>
+                    ✅ 上传完成
+                  </div>
+                ) : (
+                  <div style={styles.progressPercent}>
+                    上传进度：{uploadProgress}%
+                  </div>
+                )}
               </>
             )}
 
