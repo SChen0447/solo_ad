@@ -15,6 +15,7 @@ const App: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [leftWidth, setLeftWidth] = useState(40);
   const [isDragging, setIsDragging] = useState(false);
+  const [highlightedSkill, setHighlightedSkill] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [isMobile, setIsMobile] = useState(false);
 
@@ -69,12 +70,14 @@ const App: React.FC = () => {
 
   const handleJobChange = useCallback((jobId: string) => {
     setSelectedJobId(jobId);
+    setHighlightedSkill(null);
   }, []);
 
   const handleReset = useCallback(() => {
     setParsedResume(null);
     setMatchResult(null);
     setError(null);
+    setHighlightedSkill(null);
   }, []);
 
   const handleDragStart = useCallback((e: React.MouseEvent) => {
@@ -229,7 +232,12 @@ const App: React.FC = () => {
 
             {parsedResume && matchResult && (
               <div style={{ animation: 'fadeIn 0.5s ease' }}>
-                <ReportView resume={parsedResume} matchResult={matchResult} />
+                <ReportView
+                  resume={parsedResume}
+                  matchResult={matchResult}
+                  highlightedSkill={highlightedSkill}
+                  onSkillHighlight={setHighlightedSkill}
+                />
               </div>
             )}
 
@@ -340,6 +348,8 @@ const App: React.FC = () => {
                   skills={matchResult.skills}
                   jobName={selectedJob?.name || ''}
                   overallScore={matchResult.overallScore}
+                  highlightedSkill={highlightedSkill}
+                  onHighlightChange={setHighlightedSkill}
                 />
               </div>
             )}

@@ -5,9 +5,17 @@ interface SkillMatchingChartProps {
   skills: SkillMatch[];
   jobName: string;
   overallScore: number;
+  highlightedSkill?: string | null;
+  onHighlightChange?: (skill: string | null) => void;
 }
 
-const SkillMatchingChart: React.FC<SkillMatchingChartProps> = ({ skills, jobName, overallScore }) => {
+const SkillMatchingChart: React.FC<SkillMatchingChartProps> = ({
+  skills,
+  jobName,
+  overallScore,
+  highlightedSkill: externalHighlight,
+  onHighlightChange
+}) => {
   const [hoveredSkill, setHoveredSkill] = useState<string | null>(null);
   const [selectedSkill, setSelectedSkill] = useState<SkillMatch | null>(null);
   const [rotation, setRotation] = useState(0);
@@ -115,16 +123,32 @@ const SkillMatchingChart: React.FC<SkillMatchingChartProps> = ({ skills, jobName
     const pos = getPointPosition(index, skill.score);
     const isHovered = hoveredSkill === skill.skill;
     const isSelected = selectedSkill?.skill === skill.skill;
-    const dotRadius = isHovered || isSelected ? 8 : 5;
+    const isExternalHighlight = externalHighlight?.toLowerCase() === skill.skill.toLowerCase();
+    const isHighlighted = isHovered || isSelected || isExternalHighlight;
+    const dotRadius = isHighlighted ? 9 : 5;
+    const glowRadius = isHighlighted ? 16 : 4;
 
     return (
       <g key={`dot-${skill.skill}`}>
+        {isExternalHighlight && (
+          <circle
+            cx={pos.x}
+            cy={pos.y}
+            r={glowRadius}
+            fill={getSkillColor(skill.score)}
+            fillOpacity="0.15"
+            style={{
+              transition: 'all 0.25s ease',
+              animation: 'pulse-glow 1.5s infinite',
+            }}
+          />
+        )}
         <circle
           cx={pos.x}
           cy={pos.y}
           r={dotRadius + 4}
           fill={getSkillColor(skill.score)}
-          fillOpacity="0.3"
+          fillOpacity={isHighlighted ? 0.5 : 0.3}
           style={{
             transition: 'all 0.2s ease',
           }}
@@ -134,17 +158,27 @@ const SkillMatchingChart: React.FC<SkillMatchingChartProps> = ({ skills, jobName
           cy={pos.y}
           r={dotRadius}
           fill={getSkillColor(skill.score)}
-          stroke="#fff"
-          strokeWidth="2"
+          stroke={isExternalHighlight ? '#FF6B35' : '#fff'}
+          strokeWidth={isExternalHighlight ? 3 : 2}
           style={{
             cursor: 'pointer',
             transition: 'all 0.2s ease',
           }}
-          onMouseEnter={() => setHoveredSkill(skill.skill)}
-          onMouseLeave={() => setHoveredSkill(null)}
-          onClick={() => setSelectedSkill(isSelected ? null : skill)}
+          onMouseEnter={() => {
+            setHoveredSkill(skill.skill);
+            onHighlightChange?.(skill.skill);
+          }}
+          onMouseLeave={() => {
+            setHoveredSkill(null);
+            onHighlightChange?.(null);
+          }}
+          onClick={() => {
+            const newSelected = isSelected ? null : skill;
+            setSelectedSkill(newSelected);
+            onHighlightChange?.(newSelected?.skill || null);
+          }}
         />
-        {isHovered && (
+        {isHighlighted && (
           <g>
             <rect
               x={pos.x - 30}
@@ -174,6 +208,8 @@ const SkillMatchingChart: React.FC<SkillMatchingChartProps> = ({ skills, jobName
     const pos = getLabelPosition(index);
     const isHovered = hoveredSkill === skill.skill;
     const isSelected = selectedSkill?.skill === skill.skill;
+    const isExternalHighlight = externalHighlight?.toLowerCase() === skill.skill.toLowerCase();
+    const isHighlighted = isHovered || isSelected || isExternalHighlight;
 
     let textAnchor = 'middle';
     if (pos.x < center - 20) textAnchor = 'end';
@@ -186,18 +222,28 @@ const SkillMatchingChart: React.FC<SkillMatchingChartProps> = ({ skills, jobName
         y={pos.y}
         textAnchor={textAnchor}
         dominantBaseline="middle"
-        fill={isHovered || isSelected ? '#1E3A5F' : '#4A5568'}
-        fontSize={isHovered || isSelected ? '14' : '12'}
-        fontWeight={isHovered || isSelected ? '700' : '500'}
+        fill={isHighlighted ? (isExternalHighlight ? '#FF6B35' : '#1E3A5F') : '#4A5568'}
+        fontSize={isHighlighted ? '14' : '12'}
+        fontWeight={isHighlighted ? '700' : '500'}
         style={{
           cursor: 'pointer',
           transition: 'all 0.2s ease',
-          transform: `scale(${isHovered || isSelected ? 1.1 : 1})`,
+          transform: `scale(${isHighlighted ? 1.15 : 1})`,
           transformOrigin: `${pos.x}px ${pos.y}px`,
         }}
-        onMouseEnter={() => setHoveredSkill(skill.skill)}
-        onMouseLeave={() => setHoveredSkill(null)}
-        onClick={() => setSelectedSkill(isSelected ? null : skill)}
+        onMouseEnter={() => {
+          setHoveredSkill(skill.skill);
+          onHighlightChange?.(skill.skill);
+        }}
+        onMouseLeave={() => {
+          setHoveredSkill(null);
+          onHighlightChange?.(null);
+        }}
+        onClick={() => {
+          const newSelected = isSelected ? null : skill;
+          setSelectedSkill(newSelected);
+          onHighlightChange?.(newSelected?.skill || null);
+        }}
       >
         {skill.skill}
       </text>
@@ -771,6 +817,17 @@ const SkillMatchingChart: React.FC<SkillMatchingChartProps> = ({ skills, jobName
           border-radius: 11px;
           font-weight: 600;
           font-size: 11px;
+        }
+
+        @keyframes pulse-glow {
+          0%, 100% {
+            opacity: 0.15;
+            transform: scale(1);
+          }
+          50% {
+            opacity: 0.4;
+            transform: scale(1.2);
+          }
         }
 
         @keyframes slideInLeft {

@@ -1,12 +1,21 @@
 import React from 'react';
 import { ParsedResume, MatchResult } from '../types';
+import TimelineView from './TimelineView';
+import SkillWordCloud from './SkillWordCloud';
 
 interface ReportViewProps {
   resume: ParsedResume;
   matchResult: MatchResult;
+  highlightedSkill?: string | null;
+  onSkillHighlight?: (skill: string | null) => void;
 }
 
-const ReportView: React.FC<ReportViewProps> = ({ resume, matchResult }) => {
+const ReportView: React.FC<ReportViewProps> = ({
+  resume,
+  matchResult,
+  highlightedSkill,
+  onSkillHighlight
+}) => {
   const getSkillColor = (score: number) => {
     if (score >= 80) return '#10B981';
     if (score >= 60) return '#3B82F6';
@@ -372,6 +381,23 @@ const ReportView: React.FC<ReportViewProps> = ({ resume, matchResult }) => {
           </div>
         )}
       </div>
+
+      {(resume.education.some(e => e.startDate || e.endDate) || resume.projects.some(p => p.startDate || p.endDate)) && (
+        <div className="report-section" style={{ animation: 'fadeIn 0.4s ease 0.35s both' }}>
+          <TimelineView education={resume.education} projects={resume.projects} />
+        </div>
+      )}
+
+      {resume.skills.length > 0 && (
+        <div className="report-section" style={{ animation: 'fadeIn 0.4s ease 0.4s both' }}>
+          <SkillWordCloud
+            skills={resume.skills}
+            skillMatches={matchResult.skills}
+            highlightedSkill={highlightedSkill}
+            onSkillClick={onSkillHighlight}
+          />
+        </div>
+      )}
 
       <style>{`
         .report-view {
