@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>建筑日照与阴影分析工具</title>
+  <link rel="stylesheet" href="/src/style.css" />
+</head>
+<body>
+  <div id="app"></div>
+  <canvas id="scene-canvas"></canvas>
+  
+  <div class="panel panel-left" id="building-panel">
+    <div class="panel-header">
+      <h3>建筑操作</h3>
+      <button class="panel-toggle" data-panel="left">×</button>
+    </div>
+    <div class="panel-content">
+      <div class="section">
+        <h4>添加建筑</h4>
+        <div class="building-buttons">
+          <button class="building-btn" data-type="office">
+            <span class="icon">▢</span>
+            <span>矩形办公楼</span>
+          </button>
+          <button class="building-btn" data-type="residential">
+            <span class="icon">L</span>
+            <span>L形住宅楼</span>
+          </button>
+          <button class="building-btn" data-type="tower">
+            <span class="icon">△</span>
+            <span>锥形塔楼</span>
+          </button>
+        </div>
+        <p class="hint">点击选择建筑类型，然后点击地面放置</p>
+      </div>
+      
+      <div class="section" id="selected-section" style="display: none;">
+        <h4>选中建筑</h4>
+        <div class="property-group">
+          <label>高度: <span id="height-value">50</span>m</label>
+          <input type="range" id="height-slider" min="10" max="200" step="5" value="50" />
+        </div>
+        <div class="property-group">
+          <label>旋转: <span id="rotation-value">0</span>°</label>
+          <input type="range" id="rotation-slider" min="0" max="360" step="1" value="0" />
+        </div>
+        <button class="delete-btn" id="delete-building">删除建筑</button>
+      </div>
+      
+      <div class="section">
+        <h4>建筑列表</h4>
+        <div id="building-list" class="building-list"></div>
+        <p class="counter">最多8栋建筑，已添加: <span id="building-count">0</span>/8</p>
+      </div>
+    </div>
+  </div>
+  
+  <div class="panel panel-right" id="analysis-panel">
+    <div class="panel-header">
+      <h3>阴影分析</h3>
+      <button class="panel-toggle" data-panel="right">×</button>
+    </div>
+    <div class="panel-content">
+      <div class="section">
+        <h4>遮阳统计</h4>
+        <div id="shadow-stats" class="shadow-stats"></div>
+      </div>
+      
+      <div class="section">
+        <h4>时段对比</h4>
+        <div class="time-markers">
+          <button class="marker-btn" id="mark-time-1">
+            <span class="marker-dot" style="background: #0088FF;"></span>
+            <span id="marker-label-1">标记时段1</span>
+          </button>
+          <button class="marker-btn" id="mark-time-2">
+            <span class="marker-dot" style="background: #FF4444;"></span>
+            <span id="marker-label-2">标记时段2</span>
+          </button>
+        </div>
+        <div class="toggle-group">
+          <label>
+            <input type="checkbox" id="show-comparison" checked />
+            显示对比阴影
+          </label>
+        </div>
+      </div>
+      
+      <div class="section">
+        <h4>当前光照</h4>
+        <div class="light-info">
+          <div class="info-row">
+            <span>太阳方位角:</span>
+            <span id="sun-azimuth">0°</span>
+          </div>
+          <div class="info-row">
+            <span>太阳仰角:</span>
+            <span id="sun-elevation">0°</span>
+          </div>
+          <div class="info-row">
+            <span>光照强度:</span>
+            <span id="light-intensity">0%</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <div class="time-slider-container">
+    <div class="time-display">
+      <span id="current-date">2024年6月21日</span>
+      <span id="current-time">12:00</span>
+    </div>
+    <div class="slider-wrapper">
+      <input type="range" id="time-slider" min="6" max="19" step="0.1" value="12" />
+      <div class="time-ticks">
+        <span>6:00</span>
+        <span>9:00</span>
+        <span>12:00</span>
+        <span>15:00</span>
+        <span>19:00</span>
+      </div>
+    </div>
+    <div class="date-picker-wrapper">
+      <label>日期:</label>
+      <input type="date" id="date-picker" value="2024-06-21" />
+    </div>
+  </div>
+  
+  <div class="mobile-toggle mobile-toggle-left" id="mobile-toggle-left" style="display: none;">
+    <span>🏢</span>
+  </div>
+  <div class="mobile-toggle mobile-toggle-right" id="mobile-toggle-right" style="display: none;">
+    <span>📊</span>
+  </div>
+  
+  <div id="gui-container"></div>
+  
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
