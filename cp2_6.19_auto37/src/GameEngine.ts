@@ -1,4 +1,4 @@
-import { Renderer, Particle, RenderState } from './Renderer';
+import { Renderer, RenderState, BallInfo } from './Renderer';
 import { AIController, BallState, PaddleState } from './AIController';
 
 const PADDLE_WIDTH = 15;
@@ -30,7 +30,6 @@ export class GameEngine {
   private isPlayerServing: boolean = true;
   private gameWinner: 'player' | 'ai' | null = null;
 
-  private particles: Particle[] = [];
   private mouseY: number = 0;
   private spacePressed: boolean = false;
 
@@ -149,7 +148,7 @@ export class GameEngine {
     this.aiBoostTimer = 0;
     this.gameWinner = null;
     this.isPlayerServing = true;
-    this.particles = [];
+    this.renderer.clearParticles();
     this.aiController.setSpeedMultiplier(1);
     this.resetBall();
   }
@@ -185,7 +184,7 @@ export class GameEngine {
     if (!this.isRunning) return;
 
     const now = performance.now();
-    const deltaTime = Math.min((now - this.lastFrameTime) / 1000, 1 / 30);
+    const deltaTime = Math.min((now - this.lastFrameTime) / 1000, 1 / 60);
     this.lastFrameTime = now;
 
     this.updateFPS(deltaTime);
@@ -215,7 +214,6 @@ export class GameEngine {
     this.updatePaddles(deltaTime);
     this.updateBall(deltaTime);
     this.updateBoost(deltaTime);
-    this.updateParticles(deltaTime);
     this.checkAIBoostActivation();
   }
 
@@ -247,7 +245,7 @@ export class GameEngine {
     this.ball.y += this.ball.vy * speedMultiplier * deltaTime;
 
     if (this.isPlayerBoost || this.isAIBoost) {
-      this.spawnTrailParticle();
+      this.renderer.spawnTrailParticle(this.ball);
     }
 
     if (this.ball.y - this.ball.radius <= 0) {
@@ -352,33 +350,6 @@ export class GameEngine {
     }
   }
 
-  private spawnTrailParticle(): void {
-    const speed = Math.sqrt(this.ball.vx * this.ball.vx + this.ball.vy * this.ball.vy);
-    const particle: Particle = {
-      x: this.ball.x,
-      y: this.ball.y,
-      vx: -(this.ball.vx / speed) * 50 + (Math.random() - 0.5) * 20,
-      vy: -(this.ball.vy / speed) * 50 + (Math.random() - 0.5) * 20,
-      radius: 2 + Math.random() * 2,
-      life: 0.3,
-      maxLife: 0.3
-    };
-    this.particles.push(particle);
-  }
-
-  private updateParticles(deltaTime: number): void {
-    for (let i = this.particles.length - 1; i >= 0; i--) {
-      const p = this.particles[i];
-      p.x += p.vx * deltaTime;
-      p.y += p.vy * deltaTime;
-      p.life -= deltaTime;
-
-      if (p.life <= 0) {
-        this.particles.splice(i, 1);
-      }
-    }
-  }
-
   private checkWinCondition(): void {
     if (this.playerScore >= WINNING_SCORE) {
       this.gameWinner = 'player';
@@ -393,18 +364,19 @@ export class GameEngine {
       canvasHeight: this.canvas.height,
       playerPaddle: { ...this.playerPaddle },
       aiPaddle: { ...this.aiPaddle },
-      ball: { x: this.ball.x, y: this.ball.y, radius: this.ball.radius },
+      ball: { ...this.ball },
       playerScore: this.playerScore,
       aiScore: this.aiScore,
       playerEnergy: this.playerEnergy,
       aiEnergy: this.aiEnergy,
       isPlayerBoost: this.isPlayerBoost,
       isAIBoost: this.isAIBoost,
+      isBoostActive: this.isPlayerBoost || this.isAIBoost,
       fps: this.currentFPS,
-      particles: [...this.particles],
       gameWinner: this.gameWinner,
       isPlayerServing: this.isPlayerServing,
-      time: this.time
+      time: this.time,
+      deltaTime: Math.min((performance.now() - this.lastFrameTime) / 1000, 1 / 60)
     };
 
     this.renderer.render(state);

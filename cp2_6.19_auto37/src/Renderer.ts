@@ -8,28 +8,38 @@ export interface Particle {
   maxLife: number;
 }
 
+export interface BallInfo {
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  radius: number;
+}
+
 export interface RenderState {
   canvasWidth: number;
   canvasHeight: number;
   playerPaddle: { x: number; y: number; width: number; height: number };
   aiPaddle: { x: number; y: number; width: number; height: number };
-  ball: { x: number; y: number; radius: number };
+  ball: BallInfo;
   playerScore: number;
   aiScore: number;
   playerEnergy: number;
   aiEnergy: number;
   isPlayerBoost: boolean;
   isAIBoost: boolean;
+  isBoostActive: boolean;
   fps: number;
-  particles: Particle[];
   gameWinner: 'player' | 'ai' | null;
   isPlayerServing: boolean;
   time: number;
+  deltaTime: number;
 }
 
 export class Renderer {
   private ctx: CanvasRenderingContext2D;
   private canvas: HTMLCanvasElement;
+  private particles: Particle[] = [];
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
@@ -45,13 +55,48 @@ export class Renderer {
     this.canvas.height = height;
   }
 
+  public spawnTrailParticle(ball: BallInfo): void {
+    const speed = Math.sqrt(ball.vx * ball.vx + ball.vy * ball.vy);
+    if (speed === 0) return;
+
+    const particle: Particle = {
+      x: ball.x,
+      y: ball.y,
+      vx: -(ball.vx / speed) * 50 + (Math.random() - 0.5) * 20,
+      vy: -(ball.vy / speed) * 50 + (Math.random() - 0.5) * 20,
+      radius: 2 + Math.random() * 2,
+      life: 0.3,
+      maxLife: 0.3
+    };
+    this.particles.push(particle);
+  }
+
+  private updateParticles(deltaTime: number): void {
+    for (let i = this.particles.length - 1; i >= 0; i--) {
+      const p = this.particles[i];
+      p.x += p.vx * deltaTime;
+      p.y += p.vy * deltaTime;
+      p.life -= deltaTime;
+
+      if (p.life <= 0) {
+        this.particles.splice(i, 1);
+      }
+    }
+  }
+
+  public clearParticles(): void {
+    this.particles = [];
+  }
+
   public render(state: RenderState): void {
+    this.updateParticles(state.deltaTime);
+
     this.drawBackground(state);
     this.drawCourt(state);
-    this.drawParticles(state.particles);
+    this.drawParticles(this.particles);
     this.drawPaddle(state.playerPaddle, state.isPlayerBoost);
     this.drawPaddle(state.aiPaddle, state.isAIBoost);
-    this.drawBall(state.ball, state.isPlayerBoost || state.isAIBoost);
+    this.drawBall(state.ball, state.isBoostActive);
     this.drawScores(state);
     this.drawEnergyBars(state);
     this.drawFPS(state.fps);
@@ -263,7 +308,10 @@ export class Renderer {
     this.ctx.save();
 
     const text = state.gameWinner === 'player' ? '你赢了！' : 'AI赢了！';
-    const alpha = 0.5 + 0.5 * Math.sin(state.time * Math.PI * 2);
+    const cyclePosition = (state.time % 1) / 1;
+    const isVisiblePhase = cyclePosition < 0.5;
+    const fadeProgress = isVisiblePhase ? cyclePosition * 2 : (cyclePosition - 0.5) * 2;
+    const alpha = isVisiblePhase ? fadeProgress : (1 - fadeProgress);
 
     this.ctx.textAlign = 'center';
     this.ctx.textBaseline = 'middle';
