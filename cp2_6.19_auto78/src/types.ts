@@ -23,6 +23,14 @@ export interface BorrowRecord {
   progress: number;
 }
 
+export interface BorrowHistoryItem {
+  id: string;
+  readerName: string;
+  borrowDate: string;
+  returnDate?: string;
+  status: 'reading' | 'completed';
+}
+
 export interface Notification {
   id: string;
   title: string;

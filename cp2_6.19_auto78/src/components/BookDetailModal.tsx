@@ -1,13 +1,6 @@
 import { useState, useEffect } from 'react';
-import type { Book } from '../types';
-
-interface BorrowHistoryItem {
-  id: string;
-  readerName: string;
-  borrowDate: string;
-  returnDate?: string;
-  status: 'reading' | 'completed';
-}
+import type { Book, BorrowHistoryItem } from '../types';
+import { getCategoryClass } from '../constants';
 
 interface BookDetailModalProps {
   book: Book;
@@ -30,6 +23,7 @@ function BookDetailModal({
   const [confirmAction, setConfirmAction] = useState<'borrow' | 'return' | 'reserve'>('borrow');
   const [borrowHistory, setBorrowHistory] = useState<BorrowHistoryItem[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const isBorrower = book.borrower === currentReader;
   const isInReserveQueue = book.reserveQueue.includes(currentReader);
@@ -37,21 +31,27 @@ function BookDetailModal({
     ? (Date.now() - new Date(book.borrowDate).getTime()) / (1000 * 60 * 60 * 24) > 14
     : false;
 
-  useEffect(() => {
-    const fetchHistory = async () => {
-      setLoadingHistory(true);
-      try {
-        const res = await fetch(`/api/books/${book.id}/records`);
-        if (res.ok) {
-          const data = await res.json();
-          setBorrowHistory(data);
-        }
-      } catch (error) {
-        console.error('Failed to fetch borrow history:', error);
-      } finally {
-        setLoadingHistory(false);
+  const fetchHistory = async () => {
+    setLoadingHistory(true);
+    setLoadError(null);
+    try {
+      const res = await fetch(`/api/books/${book.id}/records`);
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.error || `请求失败 (${res.status})`);
       }
-    };
+      const data: BorrowHistoryItem[] = await res.json();
+      setBorrowHistory(data);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '网络错误，请稍后重试';
+      setLoadError(message);
+      console.error('Failed to fetch borrow history:', error);
+    } finally {
+      setLoadingHistory(false);
+    }
+  };
+
+  useEffect(() => {
     fetchHistory();
   }, [book.id]);
 
@@ -91,18 +91,6 @@ function BookDetailModal({
       default:
         return '';
     }
-  };
-
-  const getCategoryClass = (category: string): string => {
-    const classMap: Record<string, string> = {
-      '文学': 'category-文学',
-      '科技': 'category-科技',
-      '历史': 'category-历史',
-      '艺术': 'category-艺术',
-      '哲学': 'category-哲学',
-      '经济': 'category-经济',
-    };
-    return classMap[category] || '';
   };
 
   return (
@@ -176,7 +164,22 @@ function BookDetailModal({
               📋 最近借阅记录
             </div>
             {loadingHistory ? (
-              <div className="borrow-history-empty">加载中...</div>
+              <div className="borrow-history-empty">
+                <span style={{ display: 'inline-block', animation: 'spin 1s linear infinite' }}>
+                  ⏳
+                </span>{' '}
+                加载中...
+              </div>
+            ) : loadError ? (
+              <div className="borrow-history-empty" style={{ color: '#e74c3c' }}>
+                <div>⚠️ 加载失败</div>
+                <div style={{ fontSize: '12px', marginTop: '4px', marginBottom: '8px' }}>
+                  {loadError}
+                </div>
+                <button className="btn btn-outline" onClick={fetchHistory}>
+                  🔄 重新加载
+                </button>
+              </div>
             ) : borrowHistory.length === 0 ? (
               <div className="borrow-history-empty">暂无借阅记录</div>
             ) : (
