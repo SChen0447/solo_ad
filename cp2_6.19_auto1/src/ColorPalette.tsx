@@ -7,6 +7,36 @@ export interface ColorScheme {
   colors: HSV[];
 }
 
+function clamp(v: number, min: number, max: number): number {
+  return Math.max(min, Math.min(max, v));
+}
+
+function wrapHue(h: number): number {
+  return ((h % 360) + 360) % 360;
+}
+
+function adjustSV(s: number, v: number, sDelta: number, vDelta: number): { s: number; v: number } {
+  return {
+    s: clamp(s + sDelta, 0.05, 1),
+    v: clamp(v + vDelta, 0.08, 1),
+  };
+}
+
+function tint(h: number, s: number, v: number, amount: number): HSV {
+  const adj = adjustSV(s, v, -s * amount * 0.6, (1 - v) * amount * 0.8);
+  return { h, s: adj.s, v: adj.v };
+}
+
+function shade(h: number, s: number, v: number, amount: number): HSV {
+  const adj = adjustSV(s, v, s * amount * 0.3, -v * amount * 0.5);
+  return { h, s: clamp(adj.s, 0.05, 1), v: clamp(adj.v, 0.08, 1) };
+}
+
+function tone(h: number, s: number, v: number, amount: number): HSV {
+  const adj = adjustSV(s, v, -s * amount * 0.4, -v * amount * 0.2);
+  return { h, s: clamp(adj.s, 0.05, 1), v: clamp(adj.v, 0.15, 1) };
+}
+
 function generateSchemes(hsv: HSV): ColorScheme[] {
   const { h, s, v } = hsv;
 
@@ -15,10 +45,10 @@ function generateSchemes(hsv: HSV): ColorScheme[] {
     nameEn: 'Complementary',
     colors: [
       { h, s, v },
-      { h: (h + 180) % 360, s, v },
-      { h, s: Math.max(0.2, s * 0.5), v: Math.min(1, v * 1.2) },
-      { h: (h + 180) % 360, s: Math.max(0.2, s * 0.5), v: Math.min(1, v * 1.2) },
-      { h, s: Math.min(1, s * 1.1), v: Math.max(0.3, v * 0.6) },
+      tint(h, s, v, 0.45),
+      { h: wrapHue(h + 180), s: clamp(s * 0.85, 0.1, 1), v: clamp(v * 1.05, 0.1, 1) },
+      shade(h, s, v, 0.5),
+      { h: wrapHue(h + 180), s: clamp(s * 0.5, 0.08, 0.8), v: clamp(v * 1.15, 0.2, 1) },
     ],
   };
 
@@ -26,11 +56,11 @@ function generateSchemes(hsv: HSV): ColorScheme[] {
     name: '类似色',
     nameEn: 'Analogous',
     colors: [
-      { h: (h - 30 + 360) % 360, s, v },
-      { h: (h - 15 + 360) % 360, s, v },
+      { h: wrapHue(h - 30), s: clamp(s * 0.9, 0.08, 1), v: clamp(v * 1.05, 0.1, 1) },
+      { h: wrapHue(h - 15), s: clamp(s * 0.95, 0.08, 1), v },
       { h, s, v },
-      { h: (h + 15) % 360, s, v },
-      { h: (h + 30) % 360, s, v },
+      { h: wrapHue(h + 15), s: clamp(s * 0.95, 0.08, 1), v },
+      { h: wrapHue(h + 30), s: clamp(s * 0.9, 0.08, 1), v: clamp(v * 1.05, 0.1, 1) },
     ],
   };
 
@@ -39,10 +69,10 @@ function generateSchemes(hsv: HSV): ColorScheme[] {
     nameEn: 'Triadic',
     colors: [
       { h, s, v },
-      { h: (h + 120) % 360, s, v },
-      { h: (h + 240) % 360, s, v },
-      { h, s: Math.max(0.2, s * 0.4), v: Math.min(1, v * 1.15) },
-      { h: (h + 120) % 360, s: Math.max(0.2, s * 0.4), v: Math.min(1, v * 1.15) },
+      { h: wrapHue(h + 120), s: clamp(s * 0.9, 0.1, 1), v: clamp(v * 1.05, 0.1, 1) },
+      { h: wrapHue(h + 240), s: clamp(s * 0.9, 0.1, 1), v: clamp(v * 1.05, 0.1, 1) },
+      tint(h, s, v, 0.4),
+      tone(wrapHue(h + 120), s, v, 0.35),
     ],
   };
 
@@ -51,10 +81,10 @@ function generateSchemes(hsv: HSV): ColorScheme[] {
     nameEn: 'Split-Complementary',
     colors: [
       { h, s, v },
-      { h: (h + 150) % 360, s, v },
-      { h: (h + 210) % 360, s, v },
-      { h: (h + 150) % 360, s: Math.max(0.2, s * 0.6), v: Math.min(1, v * 1.1) },
-      { h: (h + 210) % 360, s: Math.max(0.2, s * 0.6), v: Math.min(1, v * 1.1) },
+      { h: wrapHue(h + 150), s: clamp(s * 0.85, 0.1, 1), v: clamp(v * 1.08, 0.1, 1) },
+      { h: wrapHue(h + 210), s: clamp(s * 0.85, 0.1, 1), v: clamp(v * 1.08, 0.1, 1) },
+      shade(h, s, v, 0.4),
+      tint(wrapHue(h + 180), s * 0.7, v, 0.3),
     ],
   };
 
@@ -63,10 +93,10 @@ function generateSchemes(hsv: HSV): ColorScheme[] {
     nameEn: 'Tetradic',
     colors: [
       { h, s, v },
-      { h: (h + 90) % 360, s, v },
-      { h: (h + 180) % 360, s, v },
-      { h: (h + 270) % 360, s, v },
-      { h, s: Math.max(0.2, s * 0.3), v: Math.min(1, v * 1.2) },
+      { h: wrapHue(h + 90), s: clamp(s * 0.85, 0.1, 1), v: clamp(v * 1.05, 0.1, 1) },
+      { h: wrapHue(h + 180), s: clamp(s * 0.9, 0.1, 1), v: clamp(v * 1.05, 0.1, 1) },
+      { h: wrapHue(h + 270), s: clamp(s * 0.85, 0.1, 1), v: clamp(v * 1.05, 0.1, 1) },
+      tone(h, s, v, 0.4),
     ],
   };
 

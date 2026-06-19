@@ -54,6 +54,7 @@ const appStyles: Record<string, React.CSSProperties> = {
     overflowY: 'auto',
     display: 'flex',
     flexDirection: 'column',
+    alignItems: 'center',
   },
   centerPanel: {
     flex: 1,
@@ -207,7 +208,11 @@ const App: React.FC = () => {
     const rgb = hexToRgb(fav.baseColor);
     if (rgb) {
       const newHsv = rgbToHsv(rgb);
-      setHsv(newHsv);
+      setHsv({
+        h: Math.round(newHsv.h * 10) / 10,
+        s: Math.round(newHsv.s * 1000) / 1000,
+        v: Math.round(newHsv.v * 1000) / 1000,
+      });
     }
   }, []);
 
@@ -335,13 +340,18 @@ const App: React.FC = () => {
           .left-panel {
             width: 100% !important;
             min-width: unset !important;
+            max-width: 100% !important;
             border-right: none !important;
             border-bottom: 1px solid rgba(255,255,255,0.06) !important;
             align-items: center !important;
           }
+          .left-panel > div {
+            max-width: 300px;
+          }
           .right-panel {
             width: 100% !important;
             min-width: unset !important;
+            max-width: 100% !important;
             border-left: none !important;
             border-top: 1px solid rgba(255,255,255,0.06) !important;
           }

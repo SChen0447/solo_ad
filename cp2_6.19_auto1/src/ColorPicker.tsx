@@ -96,6 +96,8 @@ interface ColorPickerProps {
 
 const HUE_RING_SIZE = 220;
 const HUE_RING_THICKNESS = 22;
+const HUE_RING_MIDDLE_RADIUS = HUE_RING_SIZE / 2 - HUE_RING_THICKNESS / 2;
+const HUE_INNER_RADIUS = HUE_RING_SIZE / 2 - HUE_RING_THICKNESS;
 const SV_PANEL_SIZE = 220;
 
 const pickerStyles: Record<string, React.CSSProperties> = {
@@ -104,7 +106,8 @@ const pickerStyles: Record<string, React.CSSProperties> = {
     flexDirection: 'column',
     alignItems: 'center',
     gap: '16px',
-    width: '300px',
+    width: '100%',
+    maxWidth: '300px',
     padding: '20px',
   },
   hueWrapper: {
@@ -128,6 +131,7 @@ const pickerStyles: Record<string, React.CSSProperties> = {
     bottom: HUE_RING_THICKNESS,
     borderRadius: '50%',
     background: '#1a1a2e',
+    pointerEvents: 'none',
   },
   hueThumb: {
     position: 'absolute',
@@ -205,23 +209,26 @@ const pickerStyles: Record<string, React.CSSProperties> = {
   },
 };
 
-function getHueFromEvent(e: React.MouseEvent | MouseEvent, wrapper: HTMLDivElement): number {
+function getHueFromEvent(e: React.MouseEvent | MouseEvent, wrapper: HTMLDivElement): number | null {
   const rect = wrapper.getBoundingClientRect();
   const cx = rect.left + rect.width / 2;
   const cy = rect.top + rect.height / 2;
   const dx = e.clientX - cx;
   const dy = e.clientY - cy;
+  const dist = Math.sqrt(dx * dx + dy * dy);
+  const outerR = rect.width / 2;
+  const innerR = outerR - HUE_RING_THICKNESS;
+  if (dist < innerR || dist > outerR) return null;
   let angle = Math.atan2(dy, dx) * (180 / Math.PI);
   if (angle < 0) angle += 360;
   return angle;
 }
 
 function getHueThumbPos(hue: number): { x: number; y: number } {
-  const radius = HUE_RING_SIZE / 2;
   const rad = (hue - 90) * (Math.PI / 180);
   return {
-    x: radius + radius * Math.cos(rad),
-    y: radius + radius * Math.sin(rad),
+    x: HUE_RING_SIZE / 2 + HUE_RING_MIDDLE_RADIUS * Math.cos(rad),
+    y: HUE_RING_SIZE / 2 + HUE_RING_MIDDLE_RADIUS * Math.sin(rad),
   };
 }
 
@@ -245,12 +252,18 @@ const ColorPicker: React.FC<ColorPickerProps> = ({ hsv, onChange }) => {
   const svRef = useRef<HTMLDivElement>(null);
   const [draggingHue, setDraggingHue] = useState(false);
   const [draggingSV, setDraggingSV] = useState(false);
+  const hsvRef = useRef(hsv);
+  const onChangeRef = useRef(onChange);
+
+  hsvRef.current = hsv;
+  onChangeRef.current = onChange;
 
   const handleHueDown = useCallback(
     (e: React.MouseEvent) => {
       e.preventDefault();
       if (!hueRef.current) return;
       const h = getHueFromEvent(e, hueRef.current);
+      if (h === null) return;
       onChange({ ...hsv, h });
       setDraggingHue(true);
     },
@@ -274,11 +287,13 @@ const ColorPicker: React.FC<ColorPickerProps> = ({ hsv, onChange }) => {
     const handleMove = (e: MouseEvent) => {
       if (draggingHue && hueRef.current) {
         const h = getHueFromEvent(e, hueRef.current);
-        onChange({ ...hsv, h });
+        if (h !== null) {
+          onChangeRef.current({ ...hsvRef.current, h });
+        }
       }
       if (draggingSV && svRef.current) {
         const { s, v } = getSVFromEvent(e, svRef.current);
-        onChange({ h: hsv.h, s, v });
+        onChangeRef.current({ h: hsvRef.current.h, s, v });
       }
     };
 
@@ -293,7 +308,7 @@ const ColorPicker: React.FC<ColorPickerProps> = ({ hsv, onChange }) => {
       window.removeEventListener('mousemove', handleMove);
       window.removeEventListener('mouseup', handleUp);
     };
-  }, [draggingHue, draggingSV, hsv, onChange]);
+  }, [draggingHue, draggingSV]);
 
   const rgb = hsvToRgb(hsv);
   const hex = rgbToHex(rgb);
