@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>3D城市热力图</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background-color: #1a1a2e;
+      font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif;
+    }
+    
+    #app {
+      width: 100%;
+      height: 100%;
+      position: relative;
+    }
+    
+    #canvas-container {
+      width: 100%;
+      height: 100%;
+    }
+    
+    #tooltip {
+      position: absolute;
+      pointer-events: none;
+      background: rgba(0, 0, 0, 0.75);
+      color: white;
+      padding: 6px 12px;
+      border-radius: 6px;
+      font-size: 14px;
+      z-index: 1000;
+      opacity: 0;
+      transition: opacity 0.2s ease;
+      white-space: nowrap;
+    }
+    
+    #tooltip.visible {
+      opacity: 1;
+    }
+    
+    #time-controls {
+      position: absolute;
+      top: 30px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      gap: 0;
+      background: rgba(255, 255, 255, 0.08);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border-radius: 12px;
+      padding: 6px;
+      z-index: 100;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    
+    .time-btn {
+      position: relative;
+      padding: 10px 28px;
+      background: transparent;
+      border: none;
+      color: rgba(255, 255, 255, 0.6);
+      font-size: 15px;
+      cursor: pointer;
+      border-radius: 8px;
+      transition: color 0.3s ease;
+      font-weight: 500;
+    }
+    
+    .time-btn:hover {
+      color: rgba(255, 255, 255, 0.9);
+    }
+    
+    .time-btn.active {
+      color: #00d2ff;
+    }
+    
+    .time-btn .underline {
+      position: absolute;
+      bottom: 2px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 0;
+      height: 2px;
+      background: linear-gradient(90deg, #00d2ff, #3a7bd5);
+      border-radius: 2px;
+      transition: width 0.3s ease;
+    }
+    
+    .time-btn.active .underline {
+      width: 60%;
+    }
+    
+    #current-info {
+      position: absolute;
+      top: 30px;
+      right: 30px;
+      background: rgba(255, 255, 255, 0.08);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border-radius: 12px;
+      padding: 16px 24px;
+      color: white;
+      z-index: 100;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      opacity: 0;
+      animation: fadeIn 0.3s ease forwards;
+    }
+    
+    #current-info .time-label {
+      font-size: 13px;
+      color: rgba(255, 255, 255, 0.6);
+      margin-bottom: 4px;
+    }
+    
+    #current-info .time-value {
+      font-size: 20px;
+      font-weight: 600;
+      background: linear-gradient(90deg, #00d2ff, #3a7bd5);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    
+    #current-info .avg-temp {
+      margin-top: 8px;
+      font-size: 14px;
+      color: rgba(255, 255, 255, 0.8);
+    }
+    
+    #info-panel {
+      position: absolute;
+      top: 50%;
+      left: -400px;
+      transform: translateY(-50%);
+      width: 320px;
+      background: rgba(255, 255, 255, 0.08);
+      backdrop-filter: blur(24px);
+      -webkit-backdrop-filter: blur(24px);
+      border-radius: 16px;
+      padding: 28px;
+      color: white;
+      z-index: 100;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      transition: left 0.3s ease;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    }
+    
+    #info-panel.visible {
+      left: 30px;
+    }
+    
+    #info-panel .panel-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+    }
+    
+    #info-panel .region-id {
+      font-size: 18px;
+      font-weight: 600;
+      background: linear-gradient(90deg, #00d2ff, #3a7bd5);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    
+    #info-panel .close-btn {
+      width: 28px;
+      height: 28px;
+      border: none;
+      background: rgba(255, 255, 255, 0.1);
+      color: rgba(255, 255, 255, 0.6);
+      border-radius: 50%;
+      cursor: pointer;
+      font-size: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s ease;
+    }
+    
+    #info-panel .close-btn:hover {
+      background: rgba(255, 255, 255, 0.2);
+      color: white;
+    }
+    
+    #info-panel .temp-display {
+      text-align: center;
+      margin-bottom: 16px;
+    }
+    
+    #info-panel .temp-value {
+      font-size: 48px;
+      font-weight: 700;
+      line-height: 1;
+      margin-bottom: 8px;
+    }
+    
+    #info-panel .temp-level {
+      font-size: 16px;
+      padding: 6px 16px;
+      border-radius: 20px;
+      display: inline-block;
+      font-weight: 500;
+    }
+    
+    #info-panel .trend-chart-container {
+      margin-top: 24px;
+      padding-top: 20px;
+      border-top: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    
+    #info-panel .chart-title {
+      font-size: 14px;
+      color: rgba(255, 255, 255, 0.6);
+      margin-bottom: 12px;
+    }
+    
+    #info-panel svg {
+      width: 100%;
+      height: 120px;
+    }
+    
+    #hint {
+      position: absolute;
+      bottom: 30px;
+      left: 50%;
+      transform: translateX(-50%);
+      color: rgba(255, 255, 255, 0.4);
+      font-size: 13px;
+      z-index: 100;
+      text-align: center;
+    }
+    
+    @keyframes fadeIn {
+      from {
+        opacity: 0;
+        transform: translateY(-10px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+    
+    .tooltip-chart {
+      position: absolute;
+      pointer-events: none;
+      z-index: 1001;
+      opacity: 0;
+      transition: opacity 0.3s ease;
+    }
+    
+    .tooltip-chart.visible {
+      opacity: 1;
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <div id="canvas-container"></div>
+    
+    <div id="time-controls">
+      <button class="time-btn" data-time="morning">
+        早晨
+        <span class="underline"></span>
+      </button>
+      <button class="time-btn active" data-time="noon">
+        中午
+        <span class="underline"></span>
+      </button>
+      <button class="time-btn" data-time="evening">
+        傍晚
+        <span class="underline"></span>
+      </button>
+    </div>
+    
+    <div id="current-info">
+      <div class="time-label">当前时段</div>
+      <div class="time-value" id="time-label-value">中午</div>
+      <div class="avg-temp">平均温度: <span id="avg-temp-value">--</span>°C</div>
+    </div>
+    
+    <div id="info-panel">
+      <div class="panel-header">
+        <span class="region-id" id="panel-region-id">--</span>
+        <button class="close-btn" id="panel-close">×</button>
+      </div>
+      <div class="temp-display">
+        <div class="temp-value" id="panel-temp-value">--°</div>
+        <div class="temp-level" id="panel-temp-level">--</div>
+      </div>
+      <div class="trend-chart-container">
+        <div class="chart-title">温度趋势</div>
+        <svg id="trend-chart"></svg>
+      </div>
+    </div>
+    
+    <div id="tooltip"></div>
+    
+    <div id="hint">右键拖拽旋转视角 · 滚轮缩放 · 点击网格查看详情</div>
+  </div>
+  
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
