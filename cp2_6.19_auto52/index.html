@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>DNA结构探索器</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(135deg, #0a0a2e 0%, #1a1a4e 100%);
+    }
+
+    #app {
+      width: 100%;
+      height: 100%;
+      position: relative;
+    }
+
+    #canvas-container {
+      width: 100%;
+      height: 100%;
+      position: absolute;
+      top: 0;
+      left: 0;
+    }
+
+    #title-bar {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      z-index: 10;
+      color: rgba(255, 255, 255, 0.75);
+      pointer-events: none;
+      user-select: none;
+    }
+
+    #title-bar h1 {
+      font-size: 18px;
+      font-weight: 300;
+      letter-spacing: 2px;
+      margin-bottom: 6px;
+      text-shadow: 0 0 10px rgba(79, 195, 247, 0.3);
+    }
+
+    #title-bar .sequence-info {
+      font-size: 13px;
+      opacity: 0.6;
+    }
+
+    #info-panel {
+      position: absolute;
+      top: 20px;
+      right: -320px;
+      width: 300px;
+      z-index: 10;
+      background: rgba(0, 0, 0, 0.6);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      border-radius: 12px;
+      border: 1px solid rgba(79, 195, 247, 0.2);
+      padding: 20px;
+      color: white;
+      transition: right 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+    }
+
+    #info-panel.open {
+      right: 20px;
+    }
+
+    #info-panel .panel-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    #info-panel .panel-title {
+      font-size: 16px;
+      font-weight: 500;
+      color: #4fc3f7;
+    }
+
+    #info-panel .close-btn {
+      width: 24px;
+      height: 24px;
+      border: none;
+      background: rgba(255, 255, 255, 0.1);
+      color: white;
+      border-radius: 50%;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+      transition: all 0.1s ease;
+    }
+
+    #info-panel .close-btn:hover {
+      background: rgba(255, 100, 100, 0.4);
+      transform: scale(1.05);
+    }
+
+    #info-panel .close-btn:active {
+      transform: scale(0.95);
+    }
+
+    #info-panel .info-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 10px 0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+      font-size: 14px;
+    }
+
+    #info-panel .info-row:last-child {
+      border-bottom: none;
+    }
+
+    #info-panel .info-label {
+      color: rgba(255, 255, 255, 0.6);
+    }
+
+    #info-panel .info-value {
+      color: white;
+      font-weight: 500;
+      text-align: right;
+    }
+
+    #info-panel .base-color {
+      display: inline-block;
+      width: 12px;
+      height: 12px;
+      border-radius: 3px;
+      margin-left: 6px;
+      vertical-align: middle;
+      box-shadow: 0 0 6px currentColor;
+    }
+
+    .dg.ac {
+      z-index: 100 !important;
+    }
+
+    .dg.main .close-button {
+      background: linear-gradient(135deg, #7c4dff, #4fc3f7) !important;
+      border-radius: 8px !important;
+      margin: 4px !important;
+      color: white !important;
+      font-weight: 500 !important;
+      transition: transform 0.1s ease !important;
+    }
+
+    .dg.main .close-button:hover {
+      transform: scale(1.02);
+    }
+
+    .dg.main .close-button:active {
+      transform: scale(0.98);
+    }
+
+    .dg.main .button {
+      background: linear-gradient(135deg, #4fc3f7, #7c4dff) !important;
+      color: white !important;
+      border-radius: 6px !important;
+      margin: 3px 0 !important;
+      transition: all 0.1s ease !important;
+      text-shadow: none !important;
+    }
+
+    .dg.main .button:hover {
+      filter: brightness(1.1);
+    }
+
+    .dg.main .button:active {
+      transform: scale(0.97);
+    }
+
+    @media (max-width: 768px) {
+      #title-bar h1 {
+        font-size: 14px;
+      }
+
+      #title-bar .sequence-info {
+        font-size: 11px;
+      }
+
+      #info-panel {
+        width: 260px;
+        padding: 14px;
+      }
+
+      #info-panel.open {
+        right: 10px;
+      }
+
+      .dg {
+        font-size: 11px !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <div id="canvas-container"></div>
+    
+    <div id="title-bar">
+      <h1>DNA结构探索器</h1>
+      <div class="sequence-info">当前序列长度: <span id="seq-length">24</span> 碱基对</div>
+    </div>
+
+    <div id="info-panel">
+      <div class="panel-header">
+        <span class="panel-title">碱基详情</span>
+        <button class="close-btn" id="close-panel">×</button>
+      </div>
+      <div class="info-row">
+        <span class="info-label">碱基名称</span>
+        <span class="info-value" id="base-name">-</span>
+      </div>
+      <div class="info-row">
+        <span class="info-label">碱基符号</span>
+        <span class="info-value" id="base-symbol">-</span>
+      </div>
+      <div class="info-row">
+        <span class="info-label">序列位置</span>
+        <span class="info-value" id="base-index">-</span>
+      </div>
+      <div class="info-row">
+        <span class="info-label">配对碱基</span>
+        <span class="info-value" id="base-pair">-</span>
+      </div>
+      <div class="info-row">
+        <span class="info-label">氢键数量</span>
+        <span class="info-value" id="base-hydrogen">-</span>
+      </div>
+    </div>
+  </div>
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
