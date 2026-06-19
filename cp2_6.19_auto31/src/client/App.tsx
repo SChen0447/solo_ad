@@ -99,8 +99,8 @@ const styles: Record<string, React.CSSProperties> = {
     position: 'relative' as const,
   },
   tagItemSelected: {
-    backgroundColor: '#EEF2FF',
-    color: '#4F46E5',
+    backgroundColor: '#4F46E5',
+    color: '#FFFFFF',
     fontWeight: 500,
   },
   main: {
@@ -209,12 +209,14 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     flexDirection: 'column' as const,
     gap: 6,
-    maxHeight: 90,
+    maxHeight: 72,
     overflow: 'hidden',
-    transition: 'max-height 0.3s ease, padding 0.3s ease',
+    opacity: 1,
+    transition: 'max-height 0.35s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease',
   },
   cardInfoExpanded: {
-    maxHeight: 200,
+    maxHeight: 220,
+    opacity: 1,
   },
   cardName: {
     fontSize: 13,
@@ -235,12 +237,29 @@ const styles: Record<string, React.CSSProperties> = {
     overflow: 'hidden',
     textOverflow: 'ellipsis',
     whiteSpace: 'nowrap' as const,
+    opacity: 0.8,
+    transition: 'opacity 0.3s ease 0.1s',
+  },
+  cardDescExpanded: {
+    whiteSpace: 'normal' as const,
+    WebkitLineClamp: 2,
+    display: '-webkit-box',
+    WebkitBoxOrient: 'vertical',
+    opacity: 1,
   },
   cardTags: {
     display: 'flex',
     gap: 4,
     flexWrap: 'wrap' as const,
     marginTop: 2,
+    opacity: 0,
+    maxHeight: 0,
+    overflow: 'hidden',
+    transition: 'opacity 0.3s ease 0.15s, max-height 0.3s ease 0.1s',
+  },
+  cardTagsExpanded: {
+    opacity: 1,
+    maxHeight: 100,
   },
   cardTag: {
     fontSize: 10,
@@ -369,17 +388,27 @@ const styles: Record<string, React.CSSProperties> = {
   },
   progressBar: {
     width: '100%',
-    height: 4,
-    borderRadius: 2,
+    height: 6,
+    borderRadius: 3,
     backgroundColor: '#E5E7EB',
     overflow: 'hidden',
     marginTop: 12,
+    position: 'relative' as const,
   },
   progressBarFill: {
     height: '100%',
-    borderRadius: 2,
-    backgroundColor: '#4F46E5',
-    transition: 'width 0.3s ease',
+    borderRadius: 3,
+    background: 'linear-gradient(90deg, #6366F1 0%, #4F46E5 100%)',
+    transition: 'width 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+    position: 'relative' as const,
+    overflow: 'hidden',
+  },
+  progressPercent: {
+    fontSize: 12,
+    color: '#4F46E5',
+    fontWeight: 600,
+    marginTop: 6,
+    textAlign: 'center' as const,
   },
   modalActions: {
     display: 'flex',
@@ -623,13 +652,23 @@ function App() {
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
         @keyframes scaleIn { from { opacity: 0; transform: scale(0.9); } to { opacity: 1; transform: scale(1); } }
         @keyframes slideIn { from { opacity: 0; transform: translateX(40px); } to { opacity: 1; transform: translateX(0); } }
-        @keyframes bounce { 0% { transform: scale(1); } 40% { transform: scale(1.4); } 100% { transform: scale(1); } }
+        @keyframes bounceCount { 
+          0% { transform: scale(1); } 
+          25% { transform: scale(1.5); } 
+          50% { transform: scale(0.95); } 
+          75% { transform: scale(1.1); } 
+          100% { transform: scale(1); } 
+        }
+        @keyframes shimmer {
+          0% { transform: translateX(-100%); }
+          100% { transform: translateX(200%); }
+        }
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { margin: 0; }
         input:focus, select:focus, textarea:focus { border-color: #4F46E5 !important; box-shadow: 0 0 0 3px rgba(79,70,229,0.1); }
         button:hover { filter: brightness(1.05); }
         .sidebar-tag:hover { background-color: #F3F4F6 !important; }
-        .sidebar-tag-selected { background-color: #EEF2FF !important; color: #4F46E5 !important; font-weight: 500; }
+        .sidebar-tag-selected { background-color: #4F46E5 !important; color: #FFFFFF !important; font-weight: 500; }
         .download-btn:hover { background-color: #4F46E5 !important; color: #FFFFFF !important; border-color: #4F46E5 !important; }
         .upload-btn:hover { background-color: #4338CA !important; }
         .cancel-btn:hover { background-color: #F9FAFB !important; }
@@ -640,12 +679,39 @@ function App() {
           .asset-grid { grid-template-columns: 1fr !important; }
           .sidebar-container { position: fixed !important; left: 0; top: 0; bottom: 0; z-index: 30; box-shadow: 4px 0 20px rgba(0,0,0,0.1); }
         }
-        .bounce-anim { animation: bounce 0.5s ease; }
+        .bounce-anim { 
+          animation: bounceCount 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55) !important; 
+          color: #4F46E5 !important;
+          display: inline-flex !important;
+        }
+        .bounce-anim > * { display: inline-block; }
         .card-hover { transform: translateY(-4px); box-shadow: 0 12px 24px rgba(0,0,0,0.1) !important; }
-        .card-info-expanded { max-height: 200px !important; }
-        .fade-transition { transition: opacity 0.3s ease, transform 0.3s ease; }
-        .fade-out { opacity: 0; transform: translateY(8px); }
-        .fade-in { opacity: 1; transform: translateY(0); }
+        .card-hover .card-info-inner { max-height: 220px !important; }
+        .progress-fill::after {
+          content: '';
+          position: absolute;
+          top: 0;
+          left: 0;
+          width: 40%;
+          height: 100%;
+          background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent);
+          animation: shimmer 1.2s infinite;
+        }
+        .grid-wrapper {
+          position: relative;
+        }
+        .asset-grid { 
+          transition: opacity 0.4s ease, transform 0.4s ease;
+        }
+        .grid-fade-out { 
+          opacity: 0 !important; 
+          transform: translateY(6px) scale(0.995) !important; 
+          transition: opacity 0.25s ease, transform 0.25s ease !important;
+        }
+        .grid-fade-in { 
+          opacity: 1 !important; 
+          transform: translateY(0) scale(1) !important; 
+        }
       `}</style>
 
       <div style={styles.container}>
@@ -684,25 +750,22 @@ function App() {
                   ...(expandedCategories.has(cat.name) ? styles.tagListExpanded : {}),
                 }}
               >
-                {cat.tags.map((tag) => (
-                  <div
-                    key={tag}
-                    className={`sidebar-tag ${
-                      selectedCategory === cat.name && selectedTag === tag
-                        ? 'sidebar-tag-selected'
-                        : ''
-                    }`}
-                    style={{
-                      ...styles.tagItem,
-                      ...(selectedCategory === cat.name && selectedTag === tag
-                        ? styles.tagItemSelected
-                        : {}),
-                    }}
-                    onClick={() => handleTagClick(cat.name, tag)}
-                  >
-                    {tag}
-                  </div>
-                ))}
+                {cat.tags.map((tag) => {
+                  const isSelected = selectedCategory === cat.name && selectedTag === tag;
+                  return (
+                    <div
+                      key={tag}
+                      className={`sidebar-tag ${isSelected ? 'sidebar-tag-selected' : ''}`}
+                      style={{
+                        ...styles.tagItem,
+                        ...(isSelected ? styles.tagItemSelected : {}),
+                      }}
+                      onClick={() => handleTagClick(cat.name, tag)}
+                    >
+                      {tag}
+                    </div>
+                  );
+                })}
               </div>
             </div>
           ))}
@@ -755,82 +818,97 @@ function App() {
                 <div style={styles.emptyDesc}>换个关键词试试</div>
               </div>
             ) : (
-              <div
-                className={`asset-grid fade-transition ${fadeIn ? 'fade-in' : 'fade-out'}`}
-                style={styles.grid}
-              >
-                {assets.map((asset) => (
-                  <div
-                    key={asset.id}
-                    style={styles.card}
-                    className={hoveredCard === asset.id ? 'card-hover' : ''}
-                    onMouseEnter={() => setHoveredCard(asset.id)}
-                    onMouseLeave={() => setHoveredCard(null)}
-                  >
-                    <div style={{ position: 'relative', overflow: 'hidden' }}>
-                      <img
-                        src={asset.url}
-                        alt={asset.originalName}
-                        style={styles.cardThumb}
-                        onError={(e) => {
-                          const target = e.target as HTMLImageElement;
-                          target.style.display = 'none';
-                          const parent = target.parentElement!;
-                          if (!parent.querySelector('.placeholder')) {
-                            const div = document.createElement('div');
-                            div.className = 'placeholder';
-                            div.style.cssText = `width:100%;aspect-ratio:4/3;display:flex;align-items:center;justify-content:center;background:${getPlaceholderColor(asset.id)};color:white;font-size:28px;font-weight:700;`;
-                            div.textContent = asset.originalName.charAt(0).toUpperCase();
-                            parent.appendChild(div);
-                          }
-                        }}
-                      />
-                    </div>
-                    <div
-                      style={{
-                        ...styles.cardInfo,
-                        ...(hoveredCard === asset.id ? styles.cardInfoExpanded : {}),
-                      }}
-                    >
-                      <div style={styles.cardName}>{asset.originalName}</div>
-                      <div style={styles.cardCategory}>{asset.category}</div>
+              <div className="grid-wrapper">
+                <div
+                  className={`asset-grid ${fadeIn ? 'grid-fade-in' : 'grid-fade-out'}`}
+                  style={styles.grid}
+                >
+                  {assets.map((asset) => {
+                    const isHovered = hoveredCard === asset.id;
+                    const isBouncing = bouncingId === asset.id;
+                    return (
                       <div
-                        style={{
-                          ...styles.cardDesc,
-                          ...(hoveredCard === asset.id
-                            ? { whiteSpace: 'normal', WebkitLineClamp: 2, display: '-webkit-box', WebkitBoxOrient: 'vertical' }
-                            : {}),
-                        }}
+                        key={asset.id}
+                        style={styles.card}
+                        className={isHovered ? 'card-hover' : ''}
+                        onMouseEnter={() => setHoveredCard(asset.id)}
+                        onMouseLeave={() => setHoveredCard(null)}
                       >
-                        {asset.description}
-                      </div>
-                      {hoveredCard === asset.id && (
-                        <div style={styles.cardTags}>
-                          {asset.tags.map((tag) => (
-                            <span key={tag} style={styles.cardTag}>
-                              {tag}
-                            </span>
-                          ))}
+                        <div style={{ position: 'relative', overflow: 'hidden' }}>
+                          <img
+                            src={asset.url}
+                            alt={asset.originalName}
+                            style={styles.cardThumb}
+                            onError={(e) => {
+                              const target = e.target as HTMLImageElement;
+                              target.style.display = 'none';
+                              const parent = target.parentElement!;
+                              if (!parent.querySelector('.placeholder')) {
+                                const div = document.createElement('div');
+                                div.className = 'placeholder';
+                                div.style.cssText = `width:100%;aspect-ratio:4/3;display:flex;align-items:center;justify-content:center;background:${getPlaceholderColor(asset.id)};color:white;font-size:28px;font-weight:700;`;
+                                div.textContent = asset.originalName.charAt(0).toUpperCase();
+                                parent.appendChild(div);
+                              }
+                            }}
+                          />
                         </div>
-                      )}
-                    </div>
-                    <div style={styles.cardBottom}>
-                      <span
-                        style={styles.downloadCount}
-                        className={bouncingId === asset.id ? 'bounce-anim' : ''}
-                      >
-                        ⬇ {asset.downloadCount}
-                      </span>
-                      <button
-                        className="download-btn"
-                        style={styles.downloadBtn}
-                        onClick={(e) => handleDownload(e, asset)}
-                      >
-                        下载
-                      </button>
-                    </div>
-                  </div>
-                ))}
+                        <div
+                          className="card-info-inner"
+                          style={{
+                            ...styles.cardInfo,
+                            ...(isHovered ? styles.cardInfoExpanded : {}),
+                          }}
+                        >
+                          <div style={styles.cardName}>{asset.originalName}</div>
+                          <div style={styles.cardCategory}>{asset.category}</div>
+                          <div
+                            style={{
+                              ...styles.cardDesc,
+                              ...(isHovered ? styles.cardDescExpanded : {}),
+                            }}
+                          >
+                            {asset.description}
+                          </div>
+                          <div
+                            style={{
+                              ...styles.cardTags,
+                              ...(isHovered ? styles.cardTagsExpanded : {}),
+                            }}
+                          >
+                            {asset.tags.map((tag) => (
+                              <span key={tag} style={styles.cardTag}>
+                                {tag}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                        <div style={styles.cardBottom}>
+                          <span
+                            style={{
+                              ...styles.downloadCount,
+                              display: 'inline-flex',
+                            }}
+                            className={isBouncing ? 'bounce-anim' : ''}
+                            key={`${asset.id}-${asset.downloadCount}`}
+                          >
+                            <span>⬇</span>
+                            <span style={{ display: 'inline-block' }}>
+                              {asset.downloadCount}
+                            </span>
+                          </span>
+                          <button
+                            className="download-btn"
+                            style={styles.downloadBtn}
+                            onClick={(e) => handleDownload(e, asset)}
+                          >
+                            下载
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             )}
           </div>
@@ -915,14 +993,20 @@ function App() {
             </div>
 
             {uploading && (
-              <div style={styles.progressBar}>
-                <div
-                  style={{
-                    ...styles.progressBarFill,
-                    width: `${uploadProgress}%`,
-                  }}
-                />
-              </div>
+              <>
+                <div style={styles.progressBar}>
+                  <div
+                    className="progress-fill"
+                    style={{
+                      ...styles.progressBarFill,
+                      width: `${uploadProgress}%`,
+                    }}
+                  />
+                </div>
+                <div style={styles.progressPercent}>
+                  上传进度：{uploadProgress}%
+                </div>
+              </>
             )}
 
             <div style={styles.modalActions}>
