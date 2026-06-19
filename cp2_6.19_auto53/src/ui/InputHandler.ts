@@ -130,19 +130,19 @@ export class InputHandler {
   private onKeyDown(e: KeyboardEvent): void {
     if (e.key === '1') {
       this.gameEngine.changeFormation('wedge');
-      this.renderer.triggerFormationAnimation();
+      this.renderer.triggerFormationAnimation('wedge');
       if (this.onFormationChange) {
         this.onFormationChange('wedge');
       }
     } else if (e.key === '2') {
       this.gameEngine.changeFormation('line');
-      this.renderer.triggerFormationAnimation();
+      this.renderer.triggerFormationAnimation('line');
       if (this.onFormationChange) {
         this.onFormationChange('line');
       }
     } else if (e.key === '`' || e.key === '0') {
       this.gameEngine.changeFormation('rect');
-      this.renderer.triggerFormationAnimation();
+      this.renderer.triggerFormationAnimation('rect');
       if (this.onFormationChange) {
         this.onFormationChange('rect');
       }

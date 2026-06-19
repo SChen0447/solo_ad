@@ -306,6 +306,7 @@ export class GameEngine {
       const unit = this.selectedUnits[i];
       const offset = offsets[i] || { x: 0, y: 0 };
       unit.setFormationOffset(offset, true);
+      unit.triggerRipple();
     }
   }
 

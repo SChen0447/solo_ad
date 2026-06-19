@@ -1,5 +1,5 @@
 import type { GameEngine, GameState } from '../game/GameEngine';
-import { Formation } from '../game/Formation';
+import { Formation, type FormationType } from '../game/Formation';
 import type { Unit, Position } from '../game/Unit';
 
 interface SelectionRect {
@@ -18,6 +18,7 @@ export class Renderer {
   private selectionRect: SelectionRect;
   private formationAnimScale: number = 1;
   private formationAnimTime: number = 0;
+  private formationAnimAmplitude: number = 0.3;
   private lastKillCount: number = 0;
   private killCountAnimTime: number = 0;
   private killCountDisplay: number = 0;
@@ -40,8 +41,20 @@ export class Renderer {
     this.selectionRect = { ...rect };
   }
 
-  public triggerFormationAnimation(): void {
+  public triggerFormationAnimation(formationType: FormationType = 'rect'): void {
     this.formationAnimTime = 0;
+    switch (formationType) {
+      case 'wedge':
+        this.formationAnimAmplitude = 0.3;
+        break;
+      case 'line':
+        this.formationAnimAmplitude = 0.15;
+        break;
+      case 'rect':
+      default:
+        this.formationAnimAmplitude = 0.25;
+        break;
+    }
   }
 
   public update(deltaTime: number): void {
@@ -76,10 +89,11 @@ export class Renderer {
   }
 
   private bounceScale(t: number): number {
+    const amp = this.formationAnimAmplitude;
     if (t < 0.5) {
-      return 1 + 0.3 * Math.sin(t * Math.PI);
+      return 1 + amp * Math.sin(t * Math.PI);
     } else {
-      return 1 + 0.3 * Math.sin((1 - t) * Math.PI * 2) * (1 - t) * 2;
+      return 1 + amp * Math.sin((1 - t) * Math.PI * 2) * (1 - t) * 2;
     }
   }
 
@@ -213,6 +227,21 @@ export class Renderer {
     this.ctx.restore();
   }
 
+  private drawRipple(unit: Unit): void {
+    if (!unit.isRippling) return;
+
+    const { x, y } = unit.position;
+
+    this.ctx.save();
+    this.ctx.strokeStyle = unit.rippleColor;
+    this.ctx.globalAlpha = unit.rippleAlpha;
+    this.ctx.lineWidth = 2;
+    this.ctx.beginPath();
+    this.ctx.arc(x, y, unit.rippleRadius, 0, Math.PI * 2);
+    this.ctx.stroke();
+    this.ctx.restore();
+  }
+
   private drawUnit(unit: Unit): void {
     if (unit.isDead()) return;
 
@@ -239,6 +268,7 @@ export class Renderer {
     }
 
     this.drawMoveArrow(unit);
+    this.drawRipple(unit);
 
     this.ctx.save();
 

@@ -82,6 +82,13 @@ export class Unit {
   public bounceDuration: number;
   public bounceAmplitude: number;
   public bounceOffset: number;
+  public isRippling: boolean;
+  public rippleAnimTime: number;
+  public rippleDuration: number;
+  public rippleMaxRadius: number;
+  public rippleColor: string;
+  public rippleRadius: number;
+  public rippleAlpha: number;
 
   constructor(type: UnitType, team: Team, position: Position) {
     this.id = `unit_${++unitIdCounter}`;
@@ -121,6 +128,19 @@ export class Unit {
     this.bounceAmplitude = 3;
     this.bounceOffset = 0;
 
+    this.isRippling = false;
+    this.rippleAnimTime = 0;
+    this.rippleDuration = 0.3;
+    this.rippleMaxRadius = 30;
+    this.rippleColor = '#ffffff';
+    this.rippleRadius = 0;
+    this.rippleAlpha = 0;
+
+    let rippleColor = '#4a9eff';
+    if (type === 'archer') rippleColor = '#4aff6a';
+    else if (type === 'cavalry') rippleColor = '#ff4a4a';
+    this.rippleColor = rippleColor;
+
     const nameList = UNIT_NAMES[type];
     const index = (unitIdCounter - 1) % nameList.length;
     this.name = team === 'enemy' ? `敌方${String.fromCharCode(65 + (unitIdCounter - 1) % 26)}` : nameList[index];
@@ -152,6 +172,13 @@ export class Unit {
     }
   }
 
+  public triggerRipple(): void {
+    this.isRippling = true;
+    this.rippleAnimTime = 0;
+    this.rippleRadius = this.radius;
+    this.rippleAlpha = 0.8;
+  }
+
   public takeDamage(damage: number): void {
     this.hp = Math.max(0, this.hp - damage);
   }
@@ -167,6 +194,18 @@ export class Unit {
 
   public update(deltaTime: number): void {
     if (this.hp <= 0) return;
+
+    if (this.isRippling) {
+      this.rippleAnimTime += deltaTime;
+      if (this.rippleAnimTime >= this.rippleDuration) {
+        this.isRippling = false;
+        this.rippleAlpha = 0;
+      } else {
+        const t = this.rippleAnimTime / this.rippleDuration;
+        this.rippleRadius = this.radius + t * this.rippleMaxRadius;
+        this.rippleAlpha = 0.8 * (1 - t);
+      }
+    }
 
     if (this.isBouncing) {
       this.bounceAnimTime += deltaTime;
