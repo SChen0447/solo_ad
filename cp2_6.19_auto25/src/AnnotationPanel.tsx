@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback, useLayoutEffect } from 'react';
 import {
   Annotation,
   FilterType,
@@ -38,15 +38,8 @@ function ThreadCard({
   const [showReplyForm, setShowReplyForm] = useState(false);
   const contentRef = useRef<HTMLDivElement>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
-  const [measuredHeight, setMeasuredHeight] = useState<number>(0);
   const prevCommentCountRef = useRef(annotation.comments.length);
   const [latestCommentId, setLatestCommentId] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (contentRef.current) {
-      setMeasuredHeight(contentRef.current.scrollHeight);
-    }
-  }, [annotation.comments.length, showReplyForm, collapseState]);
 
   useEffect(() => {
     if (annotation.comments.length > prevCommentCountRef.current) {
@@ -57,33 +50,63 @@ function ThreadCard({
     prevCommentCountRef.current = annotation.comments.length;
   }, [annotation.comments.length]);
 
-  useEffect(() => {
-    if (collapseState === 'collapsing' && wrapperRef.current) {
-      const h = contentRef.current?.scrollHeight ?? 0;
+  useLayoutEffect(() => {
+    if (collapseState === 'collapsing' && wrapperRef.current && contentRef.current) {
+      const h = contentRef.current.scrollHeight;
       wrapperRef.current.style.height = h + 'px';
+      wrapperRef.current.offsetHeight;
       requestAnimationFrame(() => {
         if (wrapperRef.current) {
           wrapperRef.current.style.height = '0px';
         }
       });
-      const timer = setTimeout(() => setCollapseState('collapsed'), 360);
-      return () => clearTimeout(timer);
     }
     if (collapseState === 'expanding' && wrapperRef.current && contentRef.current) {
       const targetH = contentRef.current.scrollHeight;
       wrapperRef.current.style.height = '0px';
+      wrapperRef.current.offsetHeight;
       requestAnimationFrame(() => {
         if (wrapperRef.current) {
           wrapperRef.current.style.height = targetH + 'px';
         }
       });
-      const timer = setTimeout(() => {
+    }
+  }, [collapseState]);
+
+  useEffect(() => {
+    if (collapseState === 'collapsing' && wrapperRef.current) {
+      const onEnd = (e: TransitionEvent) => {
+        if (e.propertyName === 'height' && e.target === wrapperRef.current) {
+          wrapperRef.current?.removeEventListener('transitionend', onEnd);
+          setCollapseState('collapsed');
+        }
+      };
+      wrapperRef.current.addEventListener('transitionend', onEnd);
+      const safety = setTimeout(() => setCollapseState('collapsed'), 400);
+      return () => {
+        wrapperRef.current?.removeEventListener('transitionend', onEnd);
+        clearTimeout(safety);
+      };
+    }
+    if (collapseState === 'expanding' && wrapperRef.current) {
+      const onEnd = (e: TransitionEvent) => {
+        if (e.propertyName === 'height' && e.target === wrapperRef.current) {
+          wrapperRef.current?.removeEventListener('transitionend', onEnd);
+          wrapperRef.current!.style.height = 'auto';
+          setCollapseState('expanded');
+        }
+      };
+      wrapperRef.current.addEventListener('transitionend', onEnd);
+      const safety = setTimeout(() => {
         if (wrapperRef.current) {
           wrapperRef.current.style.height = 'auto';
         }
         setCollapseState('expanded');
-      }, 360);
-      return () => clearTimeout(timer);
+      }, 400);
+      return () => {
+        wrapperRef.current?.removeEventListener('transitionend', onEnd);
+        clearTimeout(safety);
+      };
     }
   }, [collapseState]);
 
@@ -254,26 +277,81 @@ export default function AnnotationPanel({
   const [transitionKey, setTransitionKey] = useState(0);
   const [fadeOut, setFadeOut] = useState(false);
   const [fadeIn, setFadeIn] = useState(false);
+  const listWrapperRef = useRef<HTMLDivElement>(null);
+  const pendingFilterRef = useRef<FilterType | null>(null);
 
   const handleFilterChange = useCallback(
     (type: FilterType) => {
       if (type === filterType) return;
+      pendingFilterRef.current = type;
       setFadeOut(true);
       setFadeIn(false);
-
-      setTimeout(() => {
-        setFadeOut(false);
-        onFilterChange(type);
-        setTransitionKey((k) => k + 1);
-        setFadeIn(true);
-
-        setTimeout(() => {
-          setFadeIn(false);
-        }, 400);
-      }, 200);
     },
-    [filterType, onFilterChange]
+    [filterType]
   );
+
+  useEffect(() => {
+    if (!fadeOut || !listWrapperRef.current) return;
+
+    const el = listWrapperRef.current;
+
+    const onTransitionEnd = (e: TransitionEvent) => {
+      if (e.propertyName !== 'opacity' || e.target !== el) return;
+      el.removeEventListener('transitionend', onTransitionEnd);
+
+      const nextType = pendingFilterRef.current;
+      if (nextType !== null) {
+        onFilterChange(nextType);
+        setTransitionKey((k) => k + 1);
+        pendingFilterRef.current = null;
+      }
+      setFadeOut(false);
+      setFadeIn(true);
+    };
+
+    el.addEventListener('transitionend', onTransitionEnd);
+
+    const safety = setTimeout(() => {
+      el.removeEventListener('transitionend', onTransitionEnd);
+      const nextType = pendingFilterRef.current;
+      if (nextType !== null) {
+        onFilterChange(nextType);
+        setTransitionKey((k) => k + 1);
+        pendingFilterRef.current = null;
+      }
+      setFadeOut(false);
+      setFadeIn(true);
+    }, 300);
+
+    return () => {
+      el.removeEventListener('transitionend', onTransitionEnd);
+      clearTimeout(safety);
+    };
+  }, [fadeOut, onFilterChange]);
+
+  useEffect(() => {
+    if (!fadeIn) return;
+    const el = listWrapperRef.current;
+    if (!el) return;
+
+    const onTransitionEnd = (e: TransitionEvent) => {
+      if (e.propertyName !== 'opacity' || e.target !== el) return;
+      el.removeEventListener('transitionend', onTransitionEnd);
+      setFadeIn(false);
+    };
+
+    el.addEventListener('transitionend', onTransitionEnd);
+
+    const safety = setTimeout(() => {
+      el.removeEventListener('transitionend', onTransitionEnd);
+      setFadeIn(false);
+    }, 400);
+
+    return () => {
+      el.removeEventListener('transitionend', onTransitionEnd);
+      clearTimeout(safety);
+    };
+  }, [fadeIn]);
 
   const filters: { key: FilterType; label: string }[] = [
     { key: 'all', label: '全部' },
@@ -296,7 +374,7 @@ export default function AnnotationPanel({
     opacity: fadeOut ? 0 : fadeIn ? 0 : 1,
     transform: fadeOut ? 'translateY(-4px)' : fadeIn ? 'translateY(6px)' : 'none',
     transition: fadeOut
-      ? 'opacity 0.2s ease, transform 0.2s ease'
+      ? 'opacity 0.2s ease-out, transform 0.2s ease-out'
       : fadeIn
       ? 'opacity 0.35s cubic-bezier(0.4, 0, 0.2, 1), transform 0.35s cubic-bezier(0.4, 0, 0.2, 1)'
       : 'none',
@@ -325,7 +403,7 @@ export default function AnnotationPanel({
         </div>
       </div>
 
-      <div style={listWrapperStyle} key={transitionKey}>
+      <div ref={listWrapperRef} style={listWrapperStyle} key={transitionKey}>
         <div style={styles.list}>
           {annotations.length === 0 && (
             <div style={styles.emptyState}>
