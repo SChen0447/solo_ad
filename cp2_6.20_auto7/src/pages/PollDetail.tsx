@@ -153,7 +153,9 @@ export function PollDetail() {
     return <div className="card empty-state"><h3>投票不存在</h3></div>
   }
 
-  const canVote = !poll.isExpired && !poll.hasVoted && !expired
+  const isPollExpired = poll.isExpired || expired
+  const canVote = !isPollExpired && !poll.hasVoted
+  const showVoteButton = !poll.hasVoted
 
   return (
     <div>
@@ -169,8 +171,8 @@ export function PollDetail() {
           <span>
             总票数：<strong style={{ color: 'var(--primary)' }}>{poll.totalVotes}</strong>
           </span>
-          <span className={`status-badge ${poll.isExpired || expired ? 'status-expired' : 'status-active'}`}>
-            {poll.isExpired || expired ? '已截止' : '进行中'}
+          <span className={`status-badge ${isPollExpired ? 'status-expired' : 'status-active'}`}>
+            {isPollExpired ? '已截止' : '进行中'}
           </span>
         </div>
       </div>
@@ -190,7 +192,7 @@ export function PollDetail() {
             }}>
               ✓ 您已完成投票
             </div>
-          ) : (poll.isExpired || expired) ? (
+          ) : isPollExpired ? (
             <div style={{
               padding: '12px 16px',
               background: '#ffebee',
@@ -232,14 +234,14 @@ export function PollDetail() {
             })}
           </div>
 
-          {canVote && (
+          {showVoteButton && (
             <div className="vote-actions">
               <button
                 className="btn btn-primary"
                 onClick={handleVote}
-                disabled={!selectedOption || voting}
+                disabled={!canVote || !selectedOption || voting}
               >
-                {voting ? '提交中...' : '提交投票'}
+                {isPollExpired ? '投票已截止' : voting ? '提交中...' : '提交投票'}
               </button>
             </div>
           )}

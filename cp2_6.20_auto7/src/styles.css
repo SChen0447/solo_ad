@@ -299,6 +299,7 @@ body {
   padding: 20px;
   cursor: pointer;
   transition: all 0.2s ease;
+  position: relative;
 }
 
 .poll-card:hover {
@@ -306,11 +307,32 @@ body {
   box-shadow: var(--shadow-hover);
 }
 
+.poll-card-status-dot {
+  position: absolute;
+  top: 14px;
+  left: 14px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.status-dot-active {
+  background-color: #43a047;
+  box-shadow: 0 0 0 3px rgba(67, 160, 71, 0.18);
+}
+
+.status-dot-expired {
+  background-color: #9e9e9e;
+  box-shadow: 0 0 0 3px rgba(158, 158, 158, 0.18);
+}
+
 .poll-card-title {
   font-size: 1.1rem;
   font-weight: 600;
   color: var(--primary);
   margin-bottom: 12px;
+  padding-left: 18px;
 }
 
 .poll-card-meta {
