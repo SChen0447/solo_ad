@@ -13,6 +13,23 @@ interface FlyingCard {
   playerIndex: number;
 }
 
+interface ExplosionParticle {
+  id: string;
+  x: number;
+  y: number;
+  angle: number;
+  distance: number;
+  startTime: number;
+  color: string;
+}
+
+interface GlowCardInfo {
+  attack: number;
+  startTime: number;
+  duration: number;
+  color: string;
+}
+
 interface GameBoardProps {
   ws: WebSocket | null;
   roomId: string;
@@ -25,16 +42,39 @@ const ANIM_DURATION = 500;
 const GameBoard: React.FC<GameBoardProps> = ({ ws, roomId, playerId, players }) => {
   const [gameState, setGameState] = useState<GameState | null>(null);
   const [flyingCards, setFlyingCards] = useState<FlyingCard[]>([]);
+  const [explosionParticles, setExplosionParticles] = useState<ExplosionParticle[]>([]);
   const [hitFlash, setHitFlash] = useState<{ [key: number]: boolean }>({});
   const [turnNotification, setTurnNotification] = useState<string | null>(null);
+  const [turnNotifKey, setTurnNotifKey] = useState(0);
   const [showVictory, setShowVictory] = useState(false);
   const [victoryName, setVictoryName] = useState('');
   const [totalTurns, setTotalTurns] = useState(0);
   const [displayHp, setDisplayHp] = useState<[number, number]>([20, 20]);
-  const [glowCards, setGlowCards] = useState<Set<string>>(new Set());
+  const [hpBounce, setHpBounce] = useState<{ [key: number]: number }>({});
+  const [glowCards, setGlowCards] = useState<Map<string, GlowCardInfo>>(new Map());
+  const [animTick, setAnimTick] = useState(0);
   const boardRef = useRef<HTMLDivElement>(null);
   const animFrameRef = useRef<number>(0);
   const myPlayerIndex = players.findIndex((p) => p.id === playerId);
+
+  useEffect(() => {
+    if (explosionParticles.length === 0) return;
+    let running = true;
+    let lastTime = 0;
+    const tick = (time: number) => {
+      if (!running) return;
+      if (time - lastTime >= 16) {
+        setAnimTick((t) => t + 1);
+        lastTime = time;
+      }
+      animFrameRef.current = requestAnimationFrame(tick);
+    };
+    animFrameRef.current = requestAnimationFrame(tick);
+    return () => {
+      running = false;
+      if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
+    };
+  }, [explosionParticles.length]);
 
   useEffect(() => {
     const gs = createInitialGameState(
@@ -96,6 +136,21 @@ const GameBoard: React.FC<GameBoardProps> = ({ ws, roomId, playerId, players }) 
     const startTime = performance.now();
     const duration = 300;
 
+    const changedPlayers: number[] = [];
+    if (targetHp0 !== startHp0) changedPlayers.push(0);
+    if (targetHp1 !== startHp1) changedPlayers.push(1);
+    const bounceTime = Date.now();
+    changedPlayers.forEach((idx) => {
+      setHpBounce((prev) => ({ ...prev, [idx]: bounceTime }));
+      setTimeout(() => {
+        setHpBounce((prev) => {
+          const next = { ...prev };
+          if (next[idx] === bounceTime) delete next[idx];
+          return next;
+        });
+      }, 200);
+    });
+
     const animate = (time: number) => {
       const elapsed = time - startTime;
       const t = Math.min(elapsed / duration, 1);
@@ -112,6 +167,37 @@ const GameBoard: React.FC<GameBoardProps> = ({ ws, roomId, playerId, players }) 
   const triggerHitFlash = useCallback((playerIndex: number) => {
     setHitFlash((prev) => ({ ...prev, [playerIndex]: true }));
     setTimeout(() => setHitFlash((prev) => ({ ...prev, [playerIndex]: false })), 400);
+  }, []);
+
+  const triggerExplosion = useCallback((x: number, y: number) => {
+    const particleCount = Math.floor(Math.random() * 3) + 3;
+    const colors = ['#ffd700', '#ff6b6b', '#fff', '#ffb347'];
+    const particles: ExplosionParticle[] = [];
+    const now = performance.now();
+
+    for (let i = 0; i < particleCount; i++) {
+      particles.push({
+        id: `exp-${now}-${i}`,
+        x,
+        y,
+        angle: (Math.PI * 2 * i) / particleCount + Math.random() * 0.3,
+        distance: 40 + Math.random() * 30,
+        startTime: now,
+        color: colors[Math.floor(Math.random() * colors.length)],
+      });
+    }
+
+    setExplosionParticles((prev) => [...prev, ...particles]);
+
+    const animateParticles = (time: number) => {
+      const elapsed = time - now;
+      if (elapsed >= 300) {
+        setExplosionParticles((prev) => prev.filter((p) => p.startTime !== now));
+        return;
+      }
+      requestAnimationFrame(animateParticles);
+    };
+    requestAnimationFrame(animateParticles);
   }, []);
 
   const triggerCardAnimation = useCallback((playerIndex: number, cardId: string, card: Card) => {
@@ -137,14 +223,37 @@ const GameBoard: React.FC<GameBoardProps> = ({ ws, roomId, playerId, players }) 
     };
 
     setFlyingCards((prev) => [...prev, flying]);
-    setGlowCards((prev) => new Set(prev).add(cardId));
+
+    let duration: number;
+    let color: string;
+    if (card.attack <= 2) {
+      duration = 200;
+      color = 'rgba(255, 255, 255, 0.7)';
+    } else if (card.attack <= 4) {
+      duration = 300;
+      color = 'rgba(255, 230, 150, 0.75)';
+    } else {
+      duration = 400;
+      color = 'rgba(255, 215, 0, 0.85)';
+    }
+
+    const glowStartTime = performance.now();
+    setGlowCards((prev) => {
+      const next = new Map(prev);
+      next.set(cardId, { attack: card.attack, startTime: glowStartTime, duration, color });
+      return next;
+    });
+
     setTimeout(() => {
       setGlowCards((prev) => {
-        const next = new Set(prev);
-        next.delete(cardId);
+        const next = new Map(prev);
+        const existing = next.get(cardId);
+        if (existing && existing.startTime === glowStartTime) {
+          next.delete(cardId);
+        }
         return next;
       });
-    }, 200);
+    }, duration);
 
     const animateFly = (time: number) => {
       const elapsed = time - flying.startTime;
@@ -156,13 +265,15 @@ const GameBoard: React.FC<GameBoardProps> = ({ ws, roomId, playerId, players }) 
         requestAnimationFrame(animateFly);
       } else {
         setFlyingCards((prev) => prev.filter((fc) => fc.id !== flying.id));
+        triggerExplosion(toX, toY);
       }
     };
     requestAnimationFrame(animateFly);
-  }, []);
+  }, [triggerExplosion]);
 
   const showTurnNotification = useCallback((turnNum: number, turnPlayer: number, gs: GameState) => {
     const name = gs.players[turnPlayer].name;
+    setTurnNotifKey((k) => k + 1);
     setTurnNotification(`第${turnNum}回合 - ${name}的回合`);
     setTimeout(() => setTurnNotification(null), 1500);
   }, []);
@@ -258,7 +369,7 @@ const GameBoard: React.FC<GameBoardProps> = ({ ws, roomId, playerId, players }) 
     const isCurrentTurn = gameState.currentTurn === playerIdx;
     const dHp = displayHp[playerIdx];
     const isHit = hitFlash[playerIdx];
-    const isMe = playerIdx === myPlayerIndex;
+    const isBouncing = hpBounce[playerIdx] !== undefined;
 
     return (
       <div style={{
@@ -285,7 +396,13 @@ const GameBoard: React.FC<GameBoardProps> = ({ ws, roomId, playerId, players }) 
             background: getHpBarGradient(dHp, player.maxHp),
             transition: 'width 0.3s ease',
           }} />
-          <span style={styles.hpText}>{dHp}/{player.maxHp}</span>
+          <span
+            style={styles.hpText}
+            className={isBouncing ? 'hp-bounce' : ''}
+            key={hpBounce[playerIdx] || 'static'}
+          >
+            {dHp}/{player.maxHp}
+          </span>
         </div>
         <div style={styles.deckInfo}>
           牌堆: {player.deck.length}
@@ -300,7 +417,8 @@ const GameBoard: React.FC<GameBoardProps> = ({ ws, roomId, playerId, players }) 
       <div style={styles.handContainer}>
         {myPlayer.hand.map((card, index) => {
           const offset = index * -30;
-          const isGlowing = glowCards.has(card.id);
+          const glowInfo = glowCards.get(card.id);
+          const isGlowing = glowInfo !== undefined;
           return (
             <div
               key={card.id}
@@ -308,7 +426,9 @@ const GameBoard: React.FC<GameBoardProps> = ({ ws, roomId, playerId, players }) 
                 ...styles.card,
                 marginLeft: index === 0 ? 0 : offset,
                 zIndex: index,
-                ...(isGlowing ? styles.cardGlow : {}),
+                ...(isGlowing && glowInfo ? {
+                  boxShadow: `0 0 ${12 + glowInfo.attack * 3}px ${glowInfo.color}, 0 2px 8px rgba(0,0,0,0.3)`,
+                } : {}),
                 ...(isMyTurn && !gameState.gameOver ? styles.cardPlayable : {}),
               }}
               onClick={() => isMyTurn && !gameState.gameOver && handlePlayCard(card.id)}
@@ -379,10 +499,37 @@ const GameBoard: React.FC<GameBoardProps> = ({ ws, roomId, playerId, players }) 
       })}
 
       {turnNotification && (
-        <div style={styles.turnNotification} className="turn-notification">
+        <div style={styles.turnNotification} className="turn-notification" key={`notif-${turnNotifKey}`}>
           {turnNotification}
         </div>
       )}
+
+      {explosionParticles.map((p) => {
+        const elapsed = performance.now() - p.startTime;
+        const t = Math.min(elapsed / 300, 1);
+        const dist = p.distance * t;
+        const opacity = 1 - t;
+        const size = 6 - t * 4;
+
+        return (
+          <div
+            key={p.id}
+            style={{
+              position: 'absolute',
+              left: p.x + Math.cos(p.angle) * dist,
+              top: p.y + Math.sin(p.angle) * dist,
+              width: size,
+              height: size,
+              borderRadius: '50%',
+              background: p.color,
+              boxShadow: `0 0 ${12 * (1 - t)}px ${p.color}`,
+              opacity,
+              pointerEvents: 'none',
+              zIndex: 1500,
+            }}
+          />
+        );
+      })}
 
       {showVictory && (
         <div style={styles.victoryOverlay} className="victory-overlay">
@@ -407,27 +554,35 @@ const GameBoard: React.FC<GameBoardProps> = ({ ws, roomId, playerId, players }) 
           0%, 100% { box-shadow: none; }
           50% { box-shadow: 0 0 30px rgba(255, 0, 0, 0.8), inset 0 0 20px rgba(255, 0, 0, 0.3); }
         }
-        @keyframes fadeInOut {
-          0% { opacity: 0; transform: translate(-50%, -20px); }
-          15% { opacity: 1; transform: translate(-50%, 0); }
-          85% { opacity: 1; transform: translate(-50%, 0); }
-          100% { opacity: 0; transform: translate(-50%, -20px); }
+        @keyframes fadeInOutScale {
+          0% { opacity: 0; transform: translate(-50%, -20px) scale(0.8); }
+          20% { opacity: 1; transform: translate(-50%, 0) scale(1); }
+          80% { opacity: 1; transform: translate(-50%, 0) scale(1); }
+          100% { opacity: 0; transform: translate(-50%, -20px) scale(0.9); }
         }
         @keyframes victoryAppear {
           from { transform: scale(0.3); opacity: 0; }
           to { transform: scale(1); opacity: 1; }
         }
+        @keyframes hpBounce {
+          0% { transform: translate(-50%, -50%) scale(1); }
+          50% { transform: translate(-50%, -50%) scale(1.4); }
+          100% { transform: translate(-50%, -50%) scale(1); }
+        }
         .rotating-glow {
           animation: rotateGlow 0.5s linear infinite;
         }
         .turn-notification {
-          animation: fadeInOut 1.5s ease forwards;
+          animation: fadeInOutScale 1.5s ease forwards;
         }
         .victory-overlay {
           animation: fadeIn 0.3s ease;
         }
         .victory-card {
           animation: victoryAppear 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+        }
+        .hp-bounce {
+          animation: hpBounce 0.2s ease;
         }
         @keyframes fadeIn {
           from { opacity: 0; }
