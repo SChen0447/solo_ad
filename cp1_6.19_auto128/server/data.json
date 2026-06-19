@@ -1,0 +1,68 @@
+{
+  "users": [
+    {
+      "id": "1",
+      "username": "demo",
+      "password": "123456"
+    }
+  ],
+  "locations": [
+    {
+      "id": "loc1",
+      "userId": "1",
+      "city": "东京",
+      "country": "日本",
+      "lat": 35.6762,
+      "lng": 139.6503,
+      "arrivalDate": "2024-03-15",
+      "daysStayed": 5,
+      "flagColor": "#BC002D"
+    },
+    {
+      "id": "loc2",
+      "userId": "1",
+      "city": "京都",
+      "country": "日本",
+      "lat": 35.0116,
+      "lng": 135.7681,
+      "arrivalDate": "2024-03-20",
+      "daysStayed": 3,
+      "flagColor": "#BC002D"
+    },
+    {
+      "id": "loc3",
+      "userId": "1",
+      "city": "大阪",
+      "country": "日本",
+      "lat": 34.6937,
+      "lng": 135.5023,
+      "arrivalDate": "2024-03-23",
+      "daysStayed": 2,
+      "flagColor": "#BC002D"
+    }
+  ],
+  "journals": [
+    {
+      "id": "j1",
+      "locationId": "loc1",
+      "userId": "1",
+      "title": "东京初印象",
+      "content": "第一次来到东京，这座城市的繁华和秩序让我印象深刻。从成田机场乘坐快线到新宿，沿途的风景从田园逐渐变成高楼大厦。涩谷十字路口人潮涌动，霓虹灯闪烁，真的是一座不夜城。",
+      "weather": "☀️ 晴",
+      "mood": "😊",
+      "photos": [],
+      "createdAt": "2024-03-16T10:00:00Z"
+    },
+    {
+      "id": "j2",
+      "locationId": "loc2",
+      "userId": "1",
+      "title": "千年古都的韵味",
+      "content": "京都真的太美了！漫步在祗园的石板路上，两旁是传统的町家建筑，偶尔还能看到艺伎匆匆走过。清水寺的樱花虽然还没完全开放，但已经能感受到那种古典的美。岚山的竹林小道更是让人沉醉。",
+      "weather": "⛅ 多云",
+      "mood": "🥰",
+      "photos": [],
+      "createdAt": "2024-03-21T09:30:00Z"
+    }
+  ]
+}
