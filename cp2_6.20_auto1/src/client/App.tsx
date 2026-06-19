@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import ResumeUploader from './components/ResumeUploader';
 import SkillMatchingChart from './components/SkillMatchingChart';
+import ReportView from './components/ReportView';
 import { ParsedResume, MatchResult, JobRequirement, SkillMatch } from './types';
 import { getSkillMatch, getJobs } from './api';
 
@@ -226,7 +227,13 @@ const App: React.FC = () => {
               <ResumeUploader onParseComplete={handleParseComplete} />
             </div>
 
-            {parsedResume && parsedResume.education.length > 0 && (
+            {parsedResume && matchResult && (
+              <div style={{ animation: 'fadeIn 0.5s ease' }}>
+                <ReportView resume={parsedResume} matchResult={matchResult} />
+              </div>
+            )}
+
+            {parsedResume && !matchResult && !isLoading && (
               <div className="panel-card" style={{ animation: 'fadeIn 0.4s ease' }}>
                 <h2 className="panel-title">
                   <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
@@ -301,49 +308,6 @@ const App: React.FC = () => {
               width: isMobile ? '100%' : `${100 - leftWidth - 2}%`,
             }}
           >
-            {parsedResume && parsedResume.skills.length > 0 && (
-              <div className="panel-card" style={{ animation: 'fadeIn 0.4s ease' }}>
-                <h2 className="panel-title">
-                  <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-                    <path
-                      d="M10 18C14.4183 18 18 14.4183 18 10C18 5.58172 14.4183 2 10 2C5.58172 2 2 5.58172 2 10C2 14.4183 5.58172 18 10 18Z"
-                      stroke="#1E3A5F"
-                      strokeWidth="2"
-                    />
-                    <path
-                      d="M7 10L9 12L13 8"
-                      stroke="#10B981"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                  </svg>
-                  提取的技能
-                  <span className="skill-count">{parsedResume.skills.length} 项</span>
-                </h2>
-                <div className="extracted-skills">
-                  {parsedResume.skills.map((skill, index) => {
-                    const score = getSkillMatchScore(skill.name);
-                    return (
-                      <span
-                        key={skill.name}
-                        className="extracted-skill-tag"
-                        style={{
-                          animation: `fadeIn 0.3s ease ${index * 0.03}s both`,
-                          backgroundColor: `${getSkillColor(score)}15`,
-                          borderColor: `${getSkillColor(score)}40`,
-                          color: getSkillColor(score),
-                        }}
-                      >
-                        {skill.name}
-                        <span className="skill-badge">{skill.count}</span>
-                      </span>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-
             {isLoading && (
               <div className="loading-state">
                 <div className="loading-spinner" />

@@ -290,6 +290,58 @@ const SkillMatchingChart: React.FC<SkillMatchingChartProps> = ({ skills, jobName
         </div>
       </div>
 
+      <div className="skill-score-table-wrapper">
+        <h4 className="list-title">技能分数明细</h4>
+        <div className="score-table-container">
+          <table className="score-table">
+            <thead>
+              <tr>
+                <th style={{ width: '40%' }}>技能名称</th>
+                <th style={{ width: '15%' }}>匹配度</th>
+                <th style={{ width: '30%' }}>分数进度</th>
+                <th style={{ width: '15%' }}>出现次数</th>
+              </tr>
+            </thead>
+            <tbody>
+              {[...skills].sort((a, b) => b.score - a.score).map((skill, index) => (
+                <tr
+                  key={skill.skill}
+                  className={selectedSkill?.skill === skill.skill ? 'selected-row' : ''}
+                  style={{ animation: `fadeIn 0.3s ease ${index * 0.02}s both` }}
+                  onClick={() => setSelectedSkill(selectedSkill?.skill === skill.skill ? null : skill)}
+                >
+                  <td className="table-skill-name">
+                    <span
+                      className="skill-indicator"
+                      style={{ backgroundColor: getSkillColor(skill.score) }}
+                    />
+                    {skill.skill}
+                  </td>
+                  <td className="table-score" style={{ color: getSkillColor(skill.score) }}>
+                    <strong>{skill.score}</strong>
+                    <span className="score-unit-sm">分</span>
+                  </td>
+                  <td>
+                    <div className="table-progress-bar">
+                      <div
+                        className="table-progress-fill"
+                        style={{
+                          width: `${skill.score}%`,
+                          background: `linear-gradient(90deg, ${getSkillColor(skill.score)}80, ${getSkillColor(skill.score)})`,
+                        }}
+                      />
+                    </div>
+                  </td>
+                  <td className="table-count">
+                    <span className="count-badge-sm">{skill.count}</span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
       {selectedSkill && (
         <div className="skill-detail-panel" style={{ animation: 'expandHeight 0.3s ease forwards' }}>
           <div className="detail-header">
@@ -593,6 +645,132 @@ const SkillMatchingChart: React.FC<SkillMatchingChartProps> = ({ skills, jobName
           font-weight: 500;
           box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
           z-index: 1000;
+        }
+
+        .skill-score-table-wrapper {
+          background: #fff;
+          border-radius: 16px;
+          padding: 20px;
+          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+          transition: all 0.2s ease;
+        }
+
+        .skill-score-table-wrapper:hover {
+          box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+          transform: translateY(-2px);
+        }
+
+        .score-table-container {
+          overflow-x: auto;
+          border-radius: 12px;
+          border: 1px solid #E2E8F0;
+        }
+
+        .score-table {
+          width: 100%;
+          border-collapse: collapse;
+          font-size: 13px;
+        }
+
+        .score-table thead {
+          background: linear-gradient(135deg, #F1F5F9 0%, #E8F0FE 100%);
+        }
+
+        .score-table th {
+          padding: 12px 16px;
+          text-align: left;
+          font-weight: 600;
+          color: #1E3A5F;
+          font-size: 12px;
+          white-space: nowrap;
+        }
+
+        .score-table td {
+          padding: 10px 16px;
+          border-top: 1px solid #F1F5F9;
+          color: #4A5568;
+          transition: background-color 0.2s ease;
+        }
+
+        .score-table tbody tr {
+          cursor: pointer;
+          transition: all 0.2s ease;
+        }
+
+        .score-table tbody tr:hover {
+          background: #F8FAFC;
+        }
+
+        .score-table tbody tr.selected-row {
+          background: #E8F0FE;
+        }
+
+        .table-skill-name {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          font-weight: 500;
+          color: #1A1A2E;
+        }
+
+        .skill-indicator {
+          width: 10px;
+          height: 10px;
+          border-radius: 50%;
+          flex-shrink: 0;
+          box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.5);
+        }
+
+        .table-score {
+          font-size: 16px;
+          display: flex;
+          align-items: baseline;
+          gap: 2px;
+        }
+
+        .table-score strong {
+          font-weight: 700;
+        }
+
+        .score-unit-sm {
+          font-size: 11px;
+          font-weight: 500;
+          opacity: 0.7;
+        }
+
+        .table-progress-bar {
+          position: relative;
+          height: 16px;
+          background: #F1F5F9;
+          border-radius: 8px;
+          overflow: hidden;
+        }
+
+        .table-progress-fill {
+          position: absolute;
+          left: 0;
+          top: 0;
+          bottom: 0;
+          border-radius: 8px;
+          transition: width 0.4s ease;
+        }
+
+        .table-count {
+          text-align: center;
+        }
+
+        .count-badge-sm {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          min-width: 24px;
+          height: 22px;
+          padding: 0 8px;
+          background: #F1F5F9;
+          color: #4A5568;
+          border-radius: 11px;
+          font-weight: 600;
+          font-size: 11px;
         }
 
         @keyframes slideInLeft {
