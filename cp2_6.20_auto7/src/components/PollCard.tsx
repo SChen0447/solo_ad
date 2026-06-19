@@ -24,11 +24,13 @@ export function PollCard({ poll }: PollCardProps) {
       className="poll-card"
       onClick={() => navigate(`/poll/${poll.id}`)}
     >
-      <span
-        className={`poll-card-status-dot ${isActive ? 'status-dot-active' : 'status-dot-expired'}`}
-        title={isActive ? '进行中' : '已截止'}
-      />
-      <div className="poll-card-title">{poll.title}</div>
+      <div className="poll-card-title-row">
+        <span
+          className={`poll-card-status-dot ${isActive ? 'status-dot-active' : 'status-dot-expired'}`}
+          title={isActive ? '进行中' : '已截止'}
+        />
+        <div className="poll-card-title">{poll.title}</div>
+      </div>
       <div className="poll-card-meta">
         <div className="poll-card-row">
           <span>创建时间</span>
