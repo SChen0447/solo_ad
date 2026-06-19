@@ -1,0 +1,105 @@
+.control-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 20px;
+  background-color: #ffffff;
+  border-bottom: 1px solid #e0e0e0;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  z-index: 10;
+}
+
+.control-bar-left {
+  display: flex;
+  align-items: center;
+}
+
+.control-bar-title {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #333333;
+}
+
+.control-bar-right {
+  display: flex;
+  gap: 10px;
+}
+
+.control-button {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  background-color: #f5f5f5;
+  color: #333333;
+  border: 1px solid #dddddd;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.control-button:hover {
+  background-color: #e8e8e8;
+  border-color: #cccccc;
+  transform: translateY(-1px);
+}
+
+.control-button:active {
+  transform: scale(0.97);
+}
+
+.control-button.primary {
+  background-color: #4a90d9;
+  color: white;
+  border-color: #4a90d9;
+}
+
+.control-button.primary:hover {
+  background-color: #357abd;
+  border-color: #357abd;
+}
+
+.control-button.danger {
+  background-color: #fff1f0;
+  color: #ff4d4f;
+  border-color: #ffccc7;
+}
+
+.control-button.danger:hover {
+  background-color: #ffccc7;
+  color: #ff4d4f;
+}
+
+.button-icon {
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.button-text {
+  white-space: nowrap;
+}
+
+@media (max-width: 768px) {
+  .control-bar {
+    padding: 10px 16px;
+  }
+
+  .control-bar-title {
+    font-size: 0.95rem;
+  }
+
+  .control-button {
+    padding: 6px 12px;
+    font-size: 0.8rem;
+  }
+
+  .button-text {
+    display: none;
+  }
+
+  .button-icon {
+    font-size: 1.1rem;
+  }
+}
