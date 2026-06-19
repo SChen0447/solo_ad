@@ -9,6 +9,8 @@ interface PlacedBuilding {
   x: number;
   y: number;
   selected: boolean;
+  cacheDay: HTMLCanvasElement | null;
+  cacheNight: HTMLCanvasElement | null;
 }
 
 const GRID_SIZE = 80;
@@ -74,10 +76,6 @@ export class SkylineScene {
     this.animCtrl.updateSize(this.canvasWidth, this.canvasHeight);
   }
 
-  setNightMode(night: boolean): void {
-    this.isNight = night;
-  }
-
   getZoom(): number {
     return this.zoom;
   }
@@ -107,10 +105,12 @@ export class SkylineScene {
       x: snapX,
       y: snapY,
       selected: false,
+      cacheDay: null,
+      cacheNight: null,
     };
     this.buildings.push(building);
 
-    const fromY = snapY - 80;
+    const fromY = -config.height * 2;
     this.animCtrl.addSpringAnim(id, fromY, snapY);
     this.animCtrl.initWindowsForBuilding(id, config.windowRows, config.windowCols);
   }
@@ -193,12 +193,27 @@ export class SkylineScene {
       return;
     }
 
+    const hit = this.findBuildingAt(mx, my);
+
     if (this.placingConfig && e.button === 0) {
+      if (hit) {
+        this.deselectAll();
+        hit.selected = true;
+        this.selectedBuildingId = hit.id;
+        this.isDraggingBuilding = true;
+        this.dragBuilding = hit;
+        const wx = this.screenToWorldX(mx);
+        const wy = this.screenToWorldY(my);
+        this.dragOffsetX = wx - hit.x;
+        this.dragOffsetY = wy - hit.y;
+        this.setPlacingConfig(null);
+        this.canvas.style.cursor = 'move';
+        return;
+      }
       this.addBuilding(this.placingConfig, mx, my);
       return;
     }
 
-    const hit = this.findBuildingAt(mx, my);
     if (hit) {
       this.deselectAll();
       hit.selected = true;
@@ -346,6 +361,17 @@ export class SkylineScene {
       ctx.stroke();
     }
 
+    const horizontalLines = 14;
+    for (let i = 1; i <= horizontalLines; i++) {
+      const t = 1 - Math.pow(1 - i / horizontalLines, 2);
+      const y = vpy + (groundY - vpy) * t;
+      const vSpread = (groundY - vpy) * t * 0.6;
+      ctx.beginPath();
+      ctx.moveTo(vpx - vSpread - (viewRight - vpx) * 0.3, y);
+      ctx.lineTo(vpx + vSpread - (vpx - viewLeft) * 0.3, y);
+      ctx.stroke();
+    }
+
     const depthLines = 10;
     for (let i = 0; i <= depthLines; i++) {
       const t = i / depthLines;
@@ -380,85 +406,71 @@ export class SkylineScene {
     ctx.stroke();
   }
 
-  private drawBuildings(ctx: CanvasRenderingContext2D): void {
-    const sorted = [...this.buildings].sort((a, b) => a.x - b.x);
+  private getOrCreateCache(b: PlacedBuilding): HTMLCanvasElement {
+    const cacheKey = this.isNight ? 'cacheNight' : 'cacheDay';
+    if (b[cacheKey]) return b[cacheKey]!;
 
-    for (const b of sorted) {
-      this.drawSingleBuilding(ctx, b);
-    }
-  }
-
-  private drawSingleBuilding(ctx: CanvasRenderingContext2D, b: PlacedBuilding): void {
     const cfg = b.config;
-    const springOffset = this.animCtrl.getSpringOffset(b.id);
-    const bx = b.x;
-    const by = b.y - cfg.height + springOffset;
+    const pad = 35;
+    const w = cfg.width + pad * 2;
+    const h = cfg.height + pad * 2;
+    const off = document.createElement('canvas');
+    off.width = w;
+    off.height = h;
+    const octx = off.getContext('2d')!;
+
+    const bx = pad;
+    const by = pad;
     const bw = cfg.width;
     const bh = cfg.height;
 
     if (this.isNight) {
-      const shadowGrad = ctx.createLinearGradient(bx, by, bx + bw + 30, by);
+      const shadowGrad = octx.createLinearGradient(bx, by, bx + bw + 30, by);
       shadowGrad.addColorStop(0, 'rgba(0, 0, 0, 0.3)');
       shadowGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
-      ctx.fillStyle = shadowGrad;
-      ctx.fillRect(bx + bw, by + bh * 0.1, 30, bh * 0.9);
+      octx.fillStyle = shadowGrad;
+      octx.fillRect(bx + bw, by + bh * 0.1, 30, bh * 0.9);
     }
 
-    ctx.fillStyle = cfg.bodyColor;
-    ctx.fillRect(bx, by, bw, bh);
+    octx.fillStyle = cfg.bodyColor;
+    octx.fillRect(bx, by, bw, bh);
 
     if (!this.isNight) {
-      const lightGrad = ctx.createLinearGradient(bx, by, bx + bw, by + bh);
+      const lightGrad = octx.createLinearGradient(bx, by, bx + bw, by + bh);
       lightGrad.addColorStop(0, 'rgba(255, 255, 255, 0.12)');
       lightGrad.addColorStop(0.5, 'rgba(255, 255, 255, 0)');
       lightGrad.addColorStop(1, 'rgba(0, 0, 0, 0.1)');
-      ctx.fillStyle = lightGrad;
-      ctx.fillRect(bx, by, bw, bh);
+      octx.fillStyle = lightGrad;
+      octx.fillRect(bx, by, bw, bh);
     }
 
-    this.drawRoof(ctx, cfg, bx, by, bw, bh);
+    this.drawRoofOnContext(octx, cfg, bx, by, bw, bh);
 
-    if (this.isNight) {
-      this.animCtrl.drawWindows(
-        ctx,
-        b.id,
-        bx,
-        by,
-        bw,
-        bh,
-        cfg.windowRows,
-        cfg.windowCols,
-      );
-    } else {
-      this.drawDayWindows(ctx, cfg, bx, by, bw, bh);
+    if (!this.isNight) {
+      this.drawDayWindowsOnContext(octx, cfg, bx, by, bw, bh);
     }
 
-    if (cfg.height >= cfg.heightThreshold) {
-      const lightX = bx + bw / 2;
-      let lightY: number;
-      if (cfg.roofType === 'pointed') {
-        lightY = by - bh * 0.15;
-      } else if (cfg.roofType === 'antenna') {
-        lightY = by - bh * 0.12;
-      } else {
-        lightY = by;
-      }
-      this.animCtrl.drawWarningLight(ctx, lightX, lightY, cfg.height);
-    }
+    b[cacheKey] = off;
+    return off;
+  }
 
-    if (b.selected) {
-      ctx.strokeStyle = '#00d2ff';
-      ctx.lineWidth = 2;
-      ctx.setLineDash([6, 3]);
-      ctx.strokeRect(bx - 3, by - 3, bw + 6, bh + 6);
-      ctx.setLineDash([]);
+  private invalidateCache(b: PlacedBuilding): void {
+    b.cacheDay = null;
+    b.cacheNight = null;
+  }
 
-      ctx.fillStyle = 'rgba(0, 210, 255, 0.05)';
-      ctx.fillRect(bx - 3, by - 3, bw + 6, bh + 6);
+  invalidateAllCaches(): void {
+    for (const b of this.buildings) this.invalidateCache(b);
+  }
+
+  setNightMode(night: boolean): void {
+    if (this.isNight !== night) {
+      this.isNight = night;
+      this.invalidateAllCaches();
     }
   }
 
-  private drawRoof(
+  private drawRoofOnContext(
     ctx: CanvasRenderingContext2D,
     cfg: BuildingConfig,
     bx: number,
@@ -492,7 +504,7 @@ export class SkylineScene {
     }
   }
 
-  private drawDayWindows(
+  private drawDayWindowsOnContext(
     ctx: CanvasRenderingContext2D,
     cfg: BuildingConfig,
     bx: number,
@@ -525,6 +537,78 @@ export class SkylineScene {
         ctx.lineWidth = 0.5;
         ctx.strokeRect(wx, wy, winW, winH);
       }
+    }
+  }
+
+  private drawBuildings(ctx: CanvasRenderingContext2D): void {
+    const sorted = [...this.buildings].sort((a, b) => a.x - b.x);
+
+    const viewLeft = this.screenToWorldX(0);
+    const viewRight = this.screenToWorldX(this.canvasWidth);
+    const viewTop = this.screenToWorldY(0);
+    const viewBottom = this.screenToWorldY(this.canvasHeight);
+
+    for (const b of sorted) {
+      const cfg = b.config;
+      const bx = b.x;
+      const by = b.y - cfg.height - 60;
+      const bw = cfg.width + 50;
+      const bh = cfg.height + 80;
+      if (bx + bw < viewLeft || bx > viewRight || by + bh < viewTop || by > viewBottom) continue;
+      this.drawSingleBuilding(ctx, b);
+    }
+  }
+
+  private drawSingleBuilding(ctx: CanvasRenderingContext2D, b: PlacedBuilding): void {
+    const cfg = b.config;
+    const springOffset = this.animCtrl.getSpringOffset(b.id);
+    const pad = 35;
+    const bx = b.x - pad;
+    const by = b.y - cfg.height - pad + springOffset;
+
+    const cache = this.getOrCreateCache(b);
+    ctx.drawImage(cache, bx, by);
+
+    const shiftedBx = b.x;
+    const shiftedBy = b.y - cfg.height + springOffset;
+    const bw = cfg.width;
+    const bh = cfg.height;
+
+    if (this.isNight) {
+      this.animCtrl.drawWindows(
+        ctx,
+        b.id,
+        shiftedBx,
+        shiftedBy,
+        bw,
+        bh,
+        cfg.windowRows,
+        cfg.windowCols,
+      );
+    }
+
+    if (cfg.height >= cfg.heightThreshold) {
+      const lightX = shiftedBx + bw / 2;
+      let lightY: number;
+      if (cfg.roofType === 'pointed') {
+        lightY = shiftedBy - bh * 0.15;
+      } else if (cfg.roofType === 'antenna') {
+        lightY = shiftedBy - bh * 0.12;
+      } else {
+        lightY = shiftedBy;
+      }
+      this.animCtrl.drawWarningLight(ctx, lightX, lightY, cfg.height);
+    }
+
+    if (b.selected) {
+      ctx.strokeStyle = '#00d2ff';
+      ctx.lineWidth = 2;
+      ctx.setLineDash([6, 3]);
+      ctx.strokeRect(shiftedBx - 3, shiftedBy - 3, bw + 6, bh + 6);
+      ctx.setLineDash([]);
+
+      ctx.fillStyle = 'rgba(0, 210, 255, 0.05)';
+      ctx.fillRect(shiftedBx - 3, shiftedBy - 3, bw + 6, bh + 6);
     }
   }
 }

@@ -150,13 +150,12 @@ export class AnimationController {
       if (star.y > this.canvasHeight * 0.55) star.y = 0;
     }
 
-    for (const [id, windows] of this.windowStates) {
+    for (const [_id, windows] of this.windowStates) {
       for (const w of windows) {
         if (w.lit && Math.random() < 0.001) {
-          w.lit = !w.lit;
+          w.lit = false;
         } else if (!w.lit && Math.random() < 0.0005) {
-          w.lit = !w.lit;
-          w.color = Math.random() < 0.3 ? '#7ec8e3' : '#f5a623';
+          w.lit = true;
         }
       }
     }
