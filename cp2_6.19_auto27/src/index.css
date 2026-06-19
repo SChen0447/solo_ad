@@ -296,7 +296,7 @@ body {
   grid-template-columns: 60px repeat(7, 1fr);
   gap: 1px;
   padding: 1px;
-  background: transparent;
+  background: white;
   border-radius: var(--border-radius);
 }
 

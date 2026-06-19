@@ -27,6 +27,7 @@ function getCatmullRomControlPoints(points: { x: number; y: number }[]): {
   cp2x: number;
   cp2y: number;
 }[] {
+  if (points.length < 2) return [];
   const result: { cp1x: number; cp1y: number; cp2x: number; cp2y: number }[] = [];
   const tension = 0.4;
 

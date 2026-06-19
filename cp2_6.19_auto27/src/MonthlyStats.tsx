@@ -12,6 +12,8 @@ interface HeatmapCell {
   dayOfMonth: number | null;
   avgValue: number;
   count: number;
+  color: string;
+  textColor: string;
 }
 
 function getColorForValue(value: number): string {
@@ -38,7 +40,7 @@ export default function MonthlyStats({ records }: MonthlyStatsProps) {
     let currentWeek: HeatmapCell[] = [];
 
     for (let i = 0; i < firstDayOfWeek; i++) {
-      currentWeek.push({ date: null, dayOfMonth: null, avgValue: 0, count: 0 });
+      currentWeek.push({ date: null, dayOfMonth: null, avgValue: 0, count: 0, color: '#fafafa', textColor: '#ccc' });
     }
 
     for (let day = 1; day <= daysInMonth; day++) {
@@ -48,12 +50,16 @@ export default function MonthlyStats({ records }: MonthlyStatsProps) {
       const avgValue = dayRecords.length > 0 
         ? getAverageMoodValue(dayRecords, MOOD_CONFIGS) 
         : 0;
+      const color = dayRecords.length > 0 ? getColorForValue(avgValue) : '#fafafa';
+      const textColor = avgValue > 0 && avgValue < 3 ? 'white' : (dayRecords.length > 0 ? '#333' : '#ccc');
 
       currentWeek.push({
         date: dateStr,
         dayOfMonth: day,
         avgValue,
-        count: dayRecords.length
+        count: dayRecords.length,
+        color,
+        textColor
       });
 
       if (currentWeek.length === 7) {
@@ -64,7 +70,7 @@ export default function MonthlyStats({ records }: MonthlyStatsProps) {
 
     if (currentWeek.length > 0) {
       while (currentWeek.length < 7) {
-        currentWeek.push({ date: null, dayOfMonth: null, avgValue: 0, count: 0 });
+        currentWeek.push({ date: null, dayOfMonth: null, avgValue: 0, count: 0, color: '#fafafa', textColor: '#ccc' });
       }
       weeks.push(currentWeek);
     }
@@ -127,8 +133,8 @@ export default function MonthlyStats({ records }: MonthlyStatsProps) {
                   key={dayIndex}
                   className={`heatmap-cell ${cell.date ? '' : 'heatmap-cell-empty'}`}
                   style={{
-                    backgroundColor: cell.date ? getColorForValue(cell.avgValue) : undefined,
-                    color: cell.avgValue < 3 ? 'white' : (cell.date ? '#333' : '#ccc')
+                    backgroundColor: cell.color,
+                    color: cell.textColor
                   }}
                 >
                   {cell.dayOfMonth}
@@ -150,7 +156,7 @@ export default function MonthlyStats({ records }: MonthlyStatsProps) {
           width: 150,
           height: 12,
           borderRadius: 6,
-          background: 'linear-gradient(to right, #64b5f6, #90caf9, #bbdefb, #ffcdd2, #ef9a9a, #e57373, #ef5350)'
+          background: 'linear-gradient(to right, #ef5350, #e57373, #ef9a9a, #ffcdd2, #bbdefb, #90caf9, #64b5f6)'
         }} />
         <span style={{ fontSize: 12, color: '#666' }}>正面 😊</span>
       </div>
