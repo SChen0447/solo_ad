@@ -3,7 +3,7 @@ import {
   getCell,
   fillCellRandom,
   refillCellRandom,
-  getEmptyCellsByBfsLayers,
+  getEmptyCellsInBfsOrder,
   generateRowByRowFillData,
   countFilledCells,
   setCell,
@@ -135,41 +135,38 @@ function handleFillClick(row: number, col: number): void {
     return;
   }
 
-  const layers = getEmptyCellsByBfsLayers(grid, row, col);
-  if (layers.length === 0) return;
+  const connectedCells = getEmptyCellsInBfsOrder(grid, row, col);
+  if (connectedCells.length === 0) return;
 
   const emoji = getRandomEmoji();
+  const totalCells = connectedCells.length;
 
-  let totalCells = 0;
-  layers.forEach(layer => {
-    layer.forEach(({ row: r, col: c }) => {
-      setCell(grid, r, c, emoji);
-      totalCells++;
-    });
+  connectedCells.forEach(({ row: r, col: c }) => {
+    setCell(grid, r, c, emoji);
   });
 
-  console.log(`[填充模式] 开始填充: ${totalCells} 个格子, ${layers.length} 层`);
+  console.log(`[填充模式] 开始填充: ${totalCells} 个格子`);
   
   isAnimating = true;
   const fillStartTime = performance.now();
   
-  renderer.animateFloodFill(layers, emoji, 60).then((perf) => {
+  renderer.animateFloodFill(connectedCells, emoji, 60).then((perf) => {
     isAnimating = false;
     updateInfo();
     
     const totalDuration = performance.now() - fillStartTime;
     const actualRate = (totalCells / totalDuration) * 1000;
     
-    console.log(`[填充模式] 完成: ${perf.cellCount} 个格子`);
+    console.log(`[填充模式] 完成: ${totalCells} 个格子`);
     console.log(`  - 总耗时: ${totalDuration.toFixed(2)}ms`);
-    console.log(`  - 填充速率: ${actualRate.toFixed(2)} 格/秒`);
+    console.log(`  - 填充速率: ${actualRate.toFixed(2)} 格/秒 (目标: ≥${MIN_FILL_RATE} 格/秒)`);
     
     if (actualRate < MIN_FILL_RATE) {
-      console.warn(`⚠️ 填充速率低于 ${MIN_FILL_RATE} 格/秒的最低要求! 当前: ${actualRate.toFixed(2)} 格/秒`);
+      console.warn(`⚠️ [填充模式] 填充速率不达标! 实际: ${actualRate.toFixed(2)} 格/秒, 最低要求: ${MIN_FILL_RATE} 格/秒`);
     }
     
-    if (totalDuration > MAX_FRAME_TIME && totalCells > 50) {
-      console.warn(`⚠️ 单次填充耗时超过 ${MAX_FRAME_TIME}ms! 当前: ${totalDuration.toFixed(2)}ms`);
+    if (totalDuration > MAX_FRAME_TIME) {
+      console.warn(`⚠️ [填充模式] 单次填充耗时过长! 实际: ${totalDuration.toFixed(2)}ms, 最大允许: ${MAX_FRAME_TIME}ms`);
     }
   });
 }
@@ -202,15 +199,15 @@ function handleFillAll(): void {
     
     console.log(`[全随机填充] 完成: ${totalCells} 个格子`);
     console.log(`  - 总耗时: ${totalDuration.toFixed(2)}ms`);
-    console.log(`  - 填充速率: ${actualRate.toFixed(2)} 格/秒`);
+    console.log(`  - 填充速率: ${actualRate.toFixed(2)} 格/秒 (目标: ≥${MIN_FILL_RATE} 格/秒)`);
     console.log(`  - 行数: ${rows.length}`);
     
     if (actualRate < MIN_FILL_RATE) {
-      console.warn(`⚠️ 填充速率低于 ${MIN_FILL_RATE} 格/秒的最低要求! 当前: ${actualRate.toFixed(2)} 格/秒`);
+      console.warn(`⚠️ [全随机填充] 填充速率不达标! 实际: ${actualRate.toFixed(2)} 格/秒, 最低要求: ${MIN_FILL_RATE} 格/秒`);
     }
     
-    if (totalDuration > MAX_FRAME_TIME && totalCells > 50) {
-      console.warn(`⚠️ 单次填充耗时超过 ${MAX_FRAME_TIME}ms! 当前: ${totalDuration.toFixed(2)}ms`);
+    if (totalDuration > MAX_FRAME_TIME) {
+      console.warn(`⚠️ [全随机填充] 单次填充耗时过长! 实际: ${totalDuration.toFixed(2)}ms, 最大允许: ${MAX_FRAME_TIME}ms`);
     }
   });
 }

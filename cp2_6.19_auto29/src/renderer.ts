@@ -145,6 +145,13 @@ export class Renderer {
       for (let col = 0; col < this.gridSize; col++) {
         const cell = this.cellElements[row][col];
         cell.style.transition = 'background-color 0.5s ease, box-shadow 0.5s ease, transform 0.1s ease';
+        
+        if (cell.querySelector('.emoji-content')?.textContent) {
+          cell.style.boxShadow = 'inset 0 0 0 2px var(--emoji-border-color)';
+          if (theme.emojiShadowColor) {
+            cell.style.boxShadow += ', 0 0 8px var(--emoji-shadow-color)';
+          }
+        }
       }
     }
   }
@@ -251,36 +258,44 @@ export class Renderer {
   }
 
   async animateFloodFill(
-    layers: CellPosition[][],
+    cells: CellPosition[],
     emoji: string,
     cellsPerSecond: number = 60
   ): Promise<{ duration: number; cellCount: number; rate: number }> {
-    if (layers.length === 0) {
+    if (cells.length === 0) {
       return { duration: 0, cellCount: 0, rate: 0 };
     }
 
     const startTime = performance.now();
-    let totalCells = 0;
-    const layerDelay = 1000 / cellsPerSecond;
+    const cellDelay = Math.max(10, Math.min(20, 1000 / cellsPerSecond));
+    const cellsPerBatch = Math.max(1, Math.floor(cellDelay / 16));
+    let currentIndex = 0;
 
-    for (let layerIdx = 0; layerIdx < layers.length; layerIdx++) {
-      const layer = layers[layerIdx];
-      totalCells += layer.length;
-
-      for (const { row, col } of layer) {
+    const fillNextCells = () => {
+      const end = Math.min(currentIndex + cellsPerBatch, cells.length);
+      
+      for (let i = currentIndex; i < end; i++) {
+        const { row, col } = cells[i];
         this.animateFill(row, col, emoji);
       }
-
-      if (layerIdx < layers.length - 1) {
-        await new Promise(resolve => setTimeout(resolve, layerDelay));
+      
+      currentIndex = end;
+      
+      if (currentIndex < cells.length) {
+        setTimeout(fillNextCells, cellDelay);
       }
-    }
+    };
+
+    fillNextCells();
+
+    const totalExpectedTime = cells.length * cellDelay + 300;
+    await new Promise(resolve => setTimeout(resolve, totalExpectedTime));
 
     const endTime = performance.now();
     const duration = endTime - startTime;
-    const rate = totalCells > 0 ? (totalCells / duration) * 1000 : 0;
+    const rate = cells.length > 0 ? (cells.length / duration) * 1000 : 0;
 
-    return { duration, cellCount: totalCells, rate };
+    return { duration, cellCount: cells.length, rate };
   }
 
   async animateRowByRowFill(
@@ -326,19 +341,15 @@ export class Renderer {
     const rowElements = this.cellElements[rowIndex];
     if (!rowElements) return;
 
-    rowElements.forEach((cell, colIndex) => {
-      const delay = colIndex * 15;
+    rowElements.forEach((cell) => {
+      cell.classList.add('wave-effect');
       
-      setTimeout(() => {
-        cell.classList.add('wave-effect');
-        
-        const handleAnimationEnd = () => {
-          cell.classList.remove('wave-effect');
-          cell.removeEventListener('animationend', handleAnimationEnd);
-        };
-        
-        cell.addEventListener('animationend', handleAnimationEnd);
-      }, delay);
+      const handleAnimationEnd = () => {
+        cell.classList.remove('wave-effect');
+        cell.removeEventListener('animationend', handleAnimationEnd);
+      };
+      
+      cell.addEventListener('animationend', handleAnimationEnd);
     });
   }
 

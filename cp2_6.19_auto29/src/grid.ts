@@ -142,14 +142,14 @@ export function getEmptyCellsInBfsOrder(grid: Grid, startRow: number, startCol: 
   const cols = grid[0].length;
   const result: CellPosition[] = [];
   const visited: boolean[][] = Array.from({ length: rows }, () => Array(cols).fill(false));
-  const queue: { pos: CellPosition; distance: number }[] = [];
+  const queue: CellPosition[] = [];
   
   const startCell = getCell(grid, startRow, startCol);
   if (!startCell || startCell.emoji !== null) {
     return result;
   }
   
-  queue.push({ pos: { row: startRow, col: startCol }, distance: 0 });
+  queue.push({ row: startRow, col: startCol });
   visited[startRow][startCol] = true;
   
   const directions = [
@@ -159,19 +159,13 @@ export function getEmptyCellsInBfsOrder(grid: Grid, startRow: number, startCol: 
     { row: 0, col: 1 }
   ];
   
-  const byDistance: Map<number, CellPosition[]> = new Map();
-  
   while (queue.length > 0) {
-    const { pos, distance } = queue.shift()!;
-    
-    if (!byDistance.has(distance)) {
-      byDistance.set(distance, []);
-    }
-    byDistance.get(distance)!.push(pos);
+    const current = queue.shift()!;
+    result.push(current);
     
     for (const dir of directions) {
-      const newRow = pos.row + dir.row;
-      const newCol = pos.col + dir.col;
+      const newRow = current.row + dir.row;
+      const newCol = current.col + dir.col;
       
       if (
         newRow >= 0 && newRow < rows &&
@@ -181,18 +175,8 @@ export function getEmptyCellsInBfsOrder(grid: Grid, startRow: number, startCol: 
         const cell = grid[newRow][newCol];
         if (cell.emoji === null) {
           visited[newRow][newCol] = true;
-          queue.push({ pos: { row: newRow, col: newCol }, distance: distance + 1 });
+          queue.push({ row: newRow, col: newCol });
         }
-      }
-    }
-  }
-  
-  const maxDistance = Math.max(...byDistance.keys());
-  for (let d = 0; d <= maxDistance; d++) {
-    const cells = byDistance.get(d);
-    if (cells) {
-      for (const cell of cells) {
-        result.push(cell);
       }
     }
   }

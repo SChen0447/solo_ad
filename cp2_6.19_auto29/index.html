@@ -50,6 +50,7 @@
       -webkit-text-fill-color: transparent;
       background-clip: text;
       margin-bottom: 10px;
+      transition: background 0.5s ease;
     }
 
     .theme-selector-wrapper {
@@ -62,6 +63,7 @@
       -webkit-backdrop-filter: blur(8px);
       border: 1px solid var(--glass-border);
       border-radius: 16px;
+      transition: background-color 0.5s ease, border-color 0.5s ease;
     }
 
     #theme-selector {
@@ -124,6 +126,7 @@
       border: 1px solid var(--glass-border);
       border-radius: 16px;
       min-width: 140px;
+      transition: background-color 0.5s ease, border-color 0.5s ease;
     }
 
     .toolbar-title {
@@ -143,7 +146,7 @@
       cursor: pointer;
       font-size: 0.9rem;
       font-weight: 500;
-      transition: transform 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+      transition: transform 0.2s ease, box-shadow 0.2s ease, background-color 0.5s ease, border-color 0.5s ease, color 0.5s ease;
     }
 
     .tool-btn:hover {
@@ -155,6 +158,7 @@
       background: var(--border-color);
       color: var(--bg-color);
       box-shadow: 0 0 20px var(--border-color);
+      transition: transform 0.2s ease, box-shadow 0.5s ease, background-color 0.5s ease, border-color 0.5s ease, color 0.5s ease;
     }
 
     .tool-btn.primary {
@@ -162,6 +166,7 @@
       border: none;
       color: white;
       font-weight: 600;
+      transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.5s ease;
     }
 
     .tool-btn.danger {
@@ -177,6 +182,7 @@
       height: 1px;
       background: var(--glass-border);
       margin: 8px 0;
+      transition: background-color 0.5s ease;
     }
 
     #grid-container {
@@ -189,6 +195,7 @@
 
     .emoji-grid {
       box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+      transition: box-shadow 0.5s ease;
     }
 
     .info-bar {
@@ -203,12 +210,14 @@
       align-items: center;
       flex-wrap: wrap;
       gap: 12px;
+      transition: background-color 0.5s ease, border-color 0.5s ease;
     }
 
     .info-item {
       display: flex;
       flex-direction: column;
       gap: 4px;
+      transition: color 0.5s ease;
     }
 
     .info-label {
@@ -216,11 +225,13 @@
       opacity: 0.7;
       text-transform: uppercase;
       letter-spacing: 0.5px;
+      transition: opacity 0.5s ease;
     }
 
     .info-value {
       font-size: 1rem;
       font-weight: 600;
+      transition: color 0.5s ease;
     }
 
     .progress-bar {
@@ -230,6 +241,7 @@
       background: rgba(255, 255, 255, 0.1);
       border-radius: 4px;
       overflow: hidden;
+      transition: background-color 0.5s ease;
     }
 
     .progress-fill {
@@ -257,15 +269,29 @@
 
       .toolbar {
         flex-direction: row;
-        overflow-x: auto;
+        overflow-x: scroll;
+        overflow-y: hidden;
         min-width: auto;
         width: 100%;
+        max-height: 70px;
         padding: 12px;
         -webkit-overflow-scrolling: touch;
         scrollbar-width: none;
+        -ms-overflow-style: none;
       }
 
       .toolbar::-webkit-scrollbar {
+        display: none;
+        width: 0;
+        height: 0;
+        background: transparent;
+      }
+
+      .toolbar::-webkit-scrollbar-track {
+        display: none;
+      }
+
+      .toolbar::-webkit-scrollbar-thumb {
         display: none;
       }
 
