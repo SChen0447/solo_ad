@@ -113,13 +113,6 @@ class DNAExplorerApp {
     input.addEventListener('input', () => {
       this.updateValidationState(input.value);
     });
-
-    input.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') {
-        e.preventDefault();
-        this.handleSequenceUpdateClick();
-      }
-    });
   }
 
   private updateValidationState(value: string): void {
@@ -127,31 +120,10 @@ class DNAExplorerApp {
     if (this.validationIcon) {
       if (hasInvalid) {
         this.validationIcon.classList.add('visible');
-        const invalidChars = SequenceParser.getInvalidCharacters(value);
-        const tooltip = this.validationIcon.querySelector('.validation-tooltip');
-        if (tooltip && invalidChars) {
-          tooltip.textContent = `仅允许A、T、C、G四种碱基字符。无效字符: ${invalidChars}`;
-        }
       } else {
         this.validationIcon.classList.remove('visible');
       }
     }
-  }
-
-  private handleSequenceUpdateClick(): void {
-    if (!this.sequenceInput) return;
-
-    const seq = this.sequenceInput.value.toUpperCase().replace(/[^ATCG]/g, '');
-    const finalSeq = seq.length > 64 ? seq.substring(0, 64) : seq;
-    this.sequenceInput.value = finalSeq;
-
-    this.guiController.updateSequenceDisplay(finalSeq);
-    this.sceneManager.updateSequence(finalSeq);
-    this.guiController.updateHighlightRange(Math.max(0, finalSeq.length - 1));
-    this.closeInfoPanel();
-
-    this.updateValidationState(finalSeq);
-    this.showStatusIndicator();
   }
 
   private showStatusIndicator(): void {

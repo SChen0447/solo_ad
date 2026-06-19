@@ -38,10 +38,10 @@ export class GuiController {
   private highlightFolder: dat.GUI;
   private appearanceFolder: dat.GUI;
   private animationFolder: dat.GUI;
-  private sequenceController: dat.controllers.StringController | null = null;
-  private updateButtonController: dat.GUI | dat.controllers.Controller | null = null;
-  private highlightStartController: dat.controllers.NumberController | null = null;
-  private highlightEndController: dat.controllers.NumberController | null = null;
+  private sequenceController: dat.GUIController | null = null;
+  private updateButtonController: dat.GUIController | null = null;
+  private highlightStartController: dat.GUIController | null = null;
+  private highlightEndController: dat.GUIController | null = null;
 
   constructor(callbacks: GuiCallbacks) {
     this.callbacks = callbacks;
@@ -124,7 +124,7 @@ export class GuiController {
     const folder = this.sequenceFolder;
     this.sequenceController = folder
       .add(this.params, 'sequence')
-      .name('序列(≤64)') as dat.controllers.StringController;
+      .name('序列(≤64)');
 
     this.updateButtonController = folder.add({
       updateSequence: () => {
@@ -142,10 +142,10 @@ export class GuiController {
     const folder = this.highlightFolder;
 
     this.highlightStartController = folder.add(this.params, 'highlightStart', 0, 63, 1)
-      .name('起始索引') as dat.controllers.NumberController;
+      .name('起始索引');
 
     this.highlightEndController = folder.add(this.params, 'highlightEnd', 0, 63, 1)
-      .name('结束索引') as dat.controllers.NumberController;
+      .name('结束索引');
 
     folder.add({
       applyHighlight: () => {

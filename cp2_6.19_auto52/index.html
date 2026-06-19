@@ -186,7 +186,8 @@
       transform: scale(0.97);
     }
 
-    .dg.main .c input[type="text"] {
+    .dg.main .c input[type="text"],
+    .dg li.string input[type="text"] {
       border: 1px solid rgba(79, 195, 247, 0.3) !important;
       background: rgba(0, 0, 0, 0.3) !important;
       color: white !important;
@@ -196,21 +197,30 @@
       transition: border-color 0.2s ease, box-shadow 0.2s ease !important;
       font-family: 'Courier New', monospace !important;
       letter-spacing: 1px !important;
+      box-sizing: border-box !important;
     }
 
-    .dg.main .c input[type="text"]:focus {
+    .dg.main .c input[type="text"]:focus,
+    .dg li.string input[type="text"]:focus {
       border-color: #4fc3f7 !important;
       box-shadow: 0 0 8px rgba(79, 195, 247, 0.5) !important;
+      outline: none !important;
+    }
+
+    .dg .folder .dg li {
+      position: relative !important;
     }
 
     .sequence-input-wrapper {
       position: relative;
       display: flex;
       align-items: center;
+      width: 100%;
     }
 
     .sequence-input-wrapper input[type="text"] {
       flex: 1;
+      width: 100%;
     }
 
     .validation-icon {

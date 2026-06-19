@@ -23,7 +23,7 @@ interface BaseMeshGroup {
 }
 
 interface TweenAnimation {
-  target: THREE.Object3D | THREE.Material;
+  target: any;
   property: string;
   startValue: number | THREE.Color | THREE.Vector3;
   endValue: number | THREE.Color | THREE.Vector3;
