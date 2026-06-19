@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <title>深空防线 - 空间站防御射击</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: linear-gradient(180deg, #0a0a1a 0%, #1a1a3a 50%, #0f0f2f 100%);
+      font-family: 'Courier New', monospace;
+      color: #e0e0ff;
+      user-select: none;
+    }
+    #game-container {
+      position: relative;
+      width: 100vw;
+      height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    #game-canvas {
+      display: block;
+      image-rendering: pixelated;
+      image-rendering: crisp-edges;
+      box-shadow: 0 0 60px rgba(0, 150, 255, 0.3);
+      border: 1px solid #2a4a7a;
+    }
+    #shop-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(5, 10, 30, 0.92);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 10;
+      backdrop-filter: blur(4px);
+    }
+    #shop-overlay.active {
+      display: flex;
+    }
+    .shop-panel {
+      background: linear-gradient(135deg, #1a1f3a 0%, #0d1025 100%);
+      border: 2px solid #3a6aaa;
+      border-radius: 12px;
+      padding: 30px;
+      max-width: 560px;
+      width: 90%;
+      box-shadow: 0 0 40px rgba(0, 120, 255, 0.4);
+    }
+    .shop-title {
+      text-align: center;
+      font-size: 28px;
+      color: #7ec8ff;
+      text-shadow: 0 0 10px #0088ff;
+      margin-bottom: 8px;
+      letter-spacing: 4px;
+    }
+    .shop-subtitle {
+      text-align: center;
+      color: #8888aa;
+      margin-bottom: 20px;
+      font-size: 14px;
+    }
+    .shop-coins {
+      text-align: center;
+      font-size: 20px;
+      color: #ffd700;
+      margin-bottom: 24px;
+      text-shadow: 0 0 8px #ffaa00;
+    }
+    .shop-items {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      margin-bottom: 24px;
+    }
+    .shop-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 18px;
+      background: rgba(30, 50, 90, 0.5);
+      border: 1px solid #3a6aaa;
+      border-radius: 8px;
+      transition: all 0.2s;
+    }
+    .shop-item:hover {
+      background: rgba(40, 70, 120, 0.7);
+      border-color: #5a9aff;
+    }
+    .shop-item-info {
+      flex: 1;
+    }
+    .shop-item-name {
+      font-size: 16px;
+      color: #aaddff;
+      margin-bottom: 4px;
+    }
+    .shop-item-desc {
+      font-size: 12px;
+      color: #7788aa;
+    }
+    .shop-item-level {
+      display: flex;
+      gap: 4px;
+      margin-top: 6px;
+    }
+    .level-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      border: 1px solid #3a6aaa;
+      background: transparent;
+    }
+    .level-dot.active {
+      background: #00ddff;
+      box-shadow: 0 0 6px #00ddff;
+    }
+    .shop-item-buy {
+      padding: 10px 20px;
+      background: linear-gradient(180deg, #2a6aaa 0%, #1a4a8a 100%);
+      border: 1px solid #5a9aff;
+      border-radius: 6px;
+      color: #fff;
+      cursor: pointer;
+      font-family: inherit;
+      font-size: 14px;
+      transition: all 0.2s;
+      min-width: 100px;
+    }
+    .shop-item-buy:hover:not(:disabled) {
+      background: linear-gradient(180deg, #3a8acc 0%, #2a6aaa 100%);
+      box-shadow: 0 0 12px rgba(0, 150, 255, 0.5);
+    }
+    .shop-item-buy:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+    .shop-item-buy.maxed {
+      background: linear-gradient(180deg, #4a3a6a 0%, #2a1a4a 100%);
+      border-color: #7a5aaa;
+    }
+    .shop-continue {
+      width: 100%;
+      padding: 14px;
+      background: linear-gradient(180deg, #2aaa6a 0%, #1a8a4a 100%);
+      border: 1px solid #5aff9a;
+      border-radius: 8px;
+      color: #fff;
+      cursor: pointer;
+      font-family: inherit;
+      font-size: 16px;
+      letter-spacing: 2px;
+      transition: all 0.2s;
+    }
+    .shop-continue:hover {
+      background: linear-gradient(180deg, #3acc8a 0%, #2aaa6a 100%);
+      box-shadow: 0 0 16px rgba(0, 255, 150, 0.5);
+    }
+    #start-screen {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 20;
+      background: radial-gradient(ellipse at center, #0a1a3a 0%, #050815 100%);
+    }
+    #start-screen.hidden {
+      display: none;
+    }
+    .game-title {
+      font-size: 48px;
+      color: #7ec8ff;
+      text-shadow: 0 0 20px #0088ff, 0 0 40px #0066cc;
+      letter-spacing: 8px;
+      margin-bottom: 12px;
+    }
+    .game-subtitle {
+      font-size: 18px;
+      color: #8899cc;
+      margin-bottom: 40px;
+      letter-spacing: 3px;
+    }
+    .start-btn {
+      padding: 16px 48px;
+      background: linear-gradient(180deg, #2a6aaa 0%, #1a4a8a 100%);
+      border: 2px solid #5a9aff;
+      border-radius: 8px;
+      color: #fff;
+      cursor: pointer;
+      font-family: inherit;
+      font-size: 20px;
+      letter-spacing: 4px;
+      transition: all 0.3s;
+    }
+    .start-btn:hover {
+      background: linear-gradient(180deg, #3a8acc 0%, #2a6aaa 100%);
+      box-shadow: 0 0 30px rgba(0, 150, 255, 0.6);
+      transform: scale(1.05);
+    }
+    .controls-info {
+      margin-top: 40px;
+      text-align: center;
+      color: #667799;
+      font-size: 13px;
+      line-height: 2;
+    }
+    .controls-info span {
+      color: #aaccff;
+      background: rgba(60, 100, 160, 0.3);
+      padding: 2px 8px;
+      border-radius: 4px;
+      margin: 0 4px;
+    }
+    #game-over-screen {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 20;
+      background: rgba(5, 5, 20, 0.9);
+    }
+    #game-over-screen.active {
+      display: flex;
+    }
+    .game-over-title {
+      font-size: 42px;
+      color: #ff5566;
+      text-shadow: 0 0 20px #ff2244;
+      letter-spacing: 6px;
+      margin-bottom: 20px;
+    }
+    .game-over-stats {
+      color: #aabbdd;
+      font-size: 18px;
+      margin-bottom: 30px;
+      text-align: center;
+      line-height: 1.8;
+    }
+    .game-over-stats span {
+      color: #ffd700;
+    }
+    #screen-flash {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      background: rgba(255, 30, 30, 0);
+      z-index: 5;
+      transition: background 0.08s ease-out;
+    }
+    #screen-flash.hit {
+      background: rgba(255, 30, 30, 0.25);
+    }
+  </style>
+</head>
+<body>
+  <div id="game-container">
+    <canvas id="game-canvas"></canvas>
+    <div id="screen-flash"></div>
+    
+    <div id="start-screen">
+      <h1 class="game-title">深空防线</h1>
+      <p class="game-subtitle">DEEP SPACE DEFENSE</p>
+      <button class="start-btn" id="start-btn">开始游戏</button>
+      <div class="controls-info">
+        <p><span>WASD</span> 移动飞船</p>
+        <p><span>鼠标</span> 瞄准方向</p>
+        <p><span>左键</span> 射击 <span>1/2</span> 切换武器</p>
+        <p><span>空格</span> 暂停</p>
+      </div>
+    </div>
+    
+    <div id="shop-overlay">
+      <div class="shop-panel">
+        <h2 class="shop-title">补给站</h2>
+        <p class="shop-subtitle">第 <span id="shop-wave">0</span> 波已清除</p>
+        <div class="shop-coins">
+          <span id="shop-coins">0</span> 星币
+        </div>
+        <div class="shop-items" id="shop-items"></div>
+        <button class="shop-continue" id="continue-btn">继续战斗</button>
+      </div>
+    </div>
+    
+    <div id="game-over-screen">
+      <h2 class="game-over-title">战舰损毁</h2>
+      <div class="game-over-stats">
+        <p>最终波次: <span id="final-wave">0</span></p>
+        <p>击毁敌机: <span id="final-kills">0</span></p>
+        <p>获得星币: <span id="final-coins">0</span></p>
+      </div>
+      <button class="start-btn" id="restart-btn">重新开始</button>
+    </div>
+  </div>
+  <script type="module" src="/src/game.ts"></script>
+</body>
+</html>
