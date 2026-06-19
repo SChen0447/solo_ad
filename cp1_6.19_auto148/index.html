@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>星轨防御 - Star Orbit Defense</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #0a0a2e;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      color: #fff;
+      user-select: none;
+    }
+    #game-container {
+      position: relative;
+      width: 100vw;
+      height: 100vh;
+    }
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+    #ui-layer {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+    }
+    #ui-layer > * {
+      pointer-events: auto;
+    }
+    .hud-top-left {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .wave-info {
+      background: rgba(10, 10, 46, 0.75);
+      border: 1px solid #8866ff;
+      border-radius: 8px;
+      padding: 10px 16px;
+      backdrop-filter: blur(6px);
+    }
+    .wave-info .label {
+      font-size: 12px;
+      color: #aaa;
+      letter-spacing: 1px;
+    }
+    .wave-info .value {
+      font-size: 22px;
+      font-weight: bold;
+      color: #8866ff;
+    }
+    .life-bar {
+      background: rgba(10, 10, 46, 0.75);
+      border: 1px solid #8866ff;
+      border-radius: 8px;
+      padding: 10px 16px;
+      backdrop-filter: blur(6px);
+    }
+    .life-hearts {
+      display: flex;
+      gap: 4px;
+      font-size: 22px;
+    }
+    .life-hearts .heart {
+      color: #ff4466;
+      filter: drop-shadow(0 0 4px #ff4466);
+      transition: transform 0.2s;
+    }
+    .life-hearts .heart.lost {
+      color: #442233;
+      filter: none;
+    }
+    .life-hearts .heart.flash {
+      animation: flashRed 0.5s ease;
+    }
+    @keyframes flashRed {
+      0%, 100% { filter: drop-shadow(0 0 4px #ff4466); }
+      50% { filter: drop-shadow(0 0 16px #ff0000); transform: scale(1.3); }
+    }
+    .hud-top-right {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: rgba(10, 10, 46, 0.75);
+      border: 1px solid #ffcc00;
+      border-radius: 8px;
+      padding: 10px 16px;
+      backdrop-filter: blur(6px);
+    }
+    .coin-icon {
+      font-size: 28px;
+      animation: spin 4s linear infinite;
+      filter: drop-shadow(0 0 6px #ffcc00);
+    }
+    @keyframes spin {
+      from { transform: rotateY(0deg); }
+      to { transform: rotateY(360deg); }
+    }
+    .coin-value {
+      font-size: 24px;
+      font-weight: bold;
+      color: #ffcc00;
+      min-width: 60px;
+      text-align: left;
+    }
+    .coin-value.bounce {
+      animation: bounce 0.4s ease;
+    }
+    @keyframes bounce {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-8px) scale(1.15); }
+    }
+    .hud-bottom-right {
+      position: absolute;
+      bottom: 20px;
+      right: 20px;
+    }
+    .speed-btn {
+      position: relative;
+      width: 64px;
+      height: 64px;
+      border-radius: 50%;
+      background: rgba(10, 10, 46, 0.85);
+      border: 2px solid #00ffcc;
+      color: #00ffcc;
+      font-size: 16px;
+      font-weight: bold;
+      cursor: pointer;
+      overflow: hidden;
+      backdrop-filter: blur(6px);
+      transition: all 0.2s;
+    }
+    .speed-btn:hover {
+      box-shadow: 0 0 16px #00ffcc;
+    }
+    .speed-btn.active {
+      background: rgba(0, 255, 204, 0.2);
+      color: #fff;
+    }
+    .speed-btn::before {
+      content: '';
+      position: absolute;
+      top: -4px;
+      left: -4px;
+      right: -4px;
+      bottom: -4px;
+      border-radius: 50%;
+      border: 2px solid transparent;
+      border-top-color: #00ffcc;
+      opacity: 0;
+    }
+    .speed-btn.active::before {
+      opacity: 1;
+      animation: haloSpin 1.2s linear infinite;
+    }
+    @keyframes haloSpin {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+    #build-menu {
+      position: absolute;
+      display: none;
+      background: rgba(10, 10, 46, 0.92);
+      border: 1px solid #8866ff;
+      border-radius: 10px;
+      padding: 12px;
+      backdrop-filter: blur(8px);
+      box-shadow: 0 0 20px rgba(136, 102, 255, 0.4);
+      transform: translate(-50%, -50%);
+      z-index: 100;
+    }
+    #build-menu::before {
+      content: '';
+      position: absolute;
+      inset: -6px;
+      border-radius: 14px;
+      border: 1px solid rgba(136, 102, 255, 0.4);
+      animation: menuPulse 2s ease-in-out infinite;
+      pointer-events: none;
+    }
+    @keyframes menuPulse {
+      0%, 100% { opacity: 0.3; transform: scale(1); }
+      50% { opacity: 0.8; transform: scale(1.03); }
+    }
+    .menu-title {
+      text-align: center;
+      color: #fff;
+      font-size: 13px;
+      margin-bottom: 10px;
+      letter-spacing: 2px;
+      color: #8866ff;
+    }
+    .tower-options {
+      display: flex;
+      gap: 8px;
+    }
+    .tower-option {
+      width: 80px;
+      height: 92px;
+      background: rgba(136, 102, 255, 0.15);
+      border: 1px solid #5544aa;
+      border-radius: 8px;
+      padding: 6px;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+    }
+    .tower-option:hover {
+      background: rgba(136, 102, 255, 0.35);
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(136, 102, 255, 0.5);
+    }
+    .tower-option.disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+      transform: none;
+    }
+    .tower-preview {
+      width: 36px;
+      height: 36px;
+      border-radius: 4px;
+    }
+    .tower-preview.laser {
+      background: linear-gradient(180deg, #00ddff, #0066aa);
+      box-shadow: 0 0 10px #00ddff;
+      clip-path: polygon(50% 0%, 65% 30%, 65% 100%, 35% 100%, 35% 30%);
+    }
+    .tower-preview.missile {
+      background: linear-gradient(180deg, #ff4444, #aa2222);
+      box-shadow: 0 0 10px #ff4444;
+      border-radius: 6px;
+    }
+    .tower-preview.electromagnetic {
+      background: linear-gradient(180deg, #cc66ff, #6622aa);
+      box-shadow: 0 0 10px #cc66ff;
+      clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%);
+    }
+    .tower-name {
+      font-size: 11px;
+      color: #fff;
+    }
+    .tower-cost {
+      font-size: 12px;
+      color: #ffcc00;
+      font-weight: bold;
+    }
+    .particle-burst {
+      position: absolute;
+      pointer-events: none;
+      z-index: 99;
+    }
+  </style>
+</head>
+<body>
+  <div id="game-container">
+    <div id="ui-layer">
+      <div class="hud-top-left">
+        <div class="wave-info">
+          <div class="label">波次 WAVE</div>
+          <div class="value" id="wave-value">1 / 10</div>
+        </div>
+        <div class="life-bar">
+          <div class="life-hearts" id="life-hearts"></div>
+        </div>
+      </div>
+      <div class="hud-top-right">
+        <div class="coin-icon">🪙</div>
+        <div class="coin-value" id="coin-value">100</div>
+      </div>
+      <div class="hud-bottom-right">
+        <button class="speed-btn" id="speed-btn">1×</button>
+      </div>
+      <div id="build-menu">
+        <div class="menu-title">建造防御塔</div>
+        <div class="tower-options">
+          <div class="tower-option" data-tower="laser">
+            <div class="tower-preview laser"></div>
+            <div class="tower-name">激光塔</div>
+            <div class="tower-cost">50💰</div>
+          </div>
+          <div class="tower-option" data-tower="missile">
+            <div class="tower-preview missile"></div>
+            <div class="tower-name">导弹塔</div>
+            <div class="tower-cost">80💰</div>
+          </div>
+          <div class="tower-option" data-tower="electromagnetic">
+            <div class="tower-preview electromagnetic"></div>
+            <div class="tower-name">电磁炮塔</div>
+            <div class="tower-cost">120💰</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
