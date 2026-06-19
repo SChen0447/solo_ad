@@ -19,6 +19,8 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({
   isMobile
 }) => {
   const [fadeKey, setFadeKey] = useState(0);
+  const [buttonHovered, setButtonHovered] = useState(false);
+  const [compareButtonHovered, setCompareButtonHovered] = useState<string | null>(null);
 
   React.useEffect(() => {
     setFadeKey(prev => prev + 1);
@@ -26,20 +28,38 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({
 
   const compareSchemes = schemes.slice(0, 4);
 
-  const renderButtonPreview = (scheme: ColorScheme) => (
-    <div className="preview-item button-preview" style={{ backgroundColor: scheme.background }}>
-      <div className="preview-item-label">按钮</div>
-      <button
-        className="preview-button"
-        style={{
-          backgroundColor: scheme.primary,
-          color: scheme.text
-        }}
-      >
-        主要按钮
-      </button>
-    </div>
-  );
+  const renderButtonPreview = (scheme: ColorScheme, isCompare: boolean = false, schemeId?: string) => {
+    const isHovered = isCompare ? compareButtonHovered === schemeId : buttonHovered;
+    return (
+      <div className="preview-item button-preview" style={{ backgroundColor: scheme.background }}>
+        <div className="preview-item-label">按钮</div>
+        <button
+          className="preview-button"
+          style={{
+            backgroundColor: isHovered ? darkenColor(scheme.primary, 10) : scheme.primary,
+            color: scheme.text,
+            transform: isHovered ? 'scale(1.02)' : 'scale(1)'
+          }}
+          onMouseEnter={() => {
+            if (isCompare && schemeId) {
+              setCompareButtonHovered(schemeId);
+            } else {
+              setButtonHovered(true);
+            }
+          }}
+          onMouseLeave={() => {
+            if (isCompare) {
+              setCompareButtonHovered(null);
+            } else {
+              setButtonHovered(false);
+            }
+          }}
+        >
+          主要按钮
+        </button>
+      </div>
+    );
+  };
 
   const renderCardPreview = (scheme: ColorScheme) => (
     <div className="preview-item card-preview" style={{ backgroundColor: scheme.background }}>
@@ -114,9 +134,22 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({
     </div>
   );
 
-  if (isCompareMode) {
-    return (
-      <div className="preview-panel compare-mode">
+  return (
+    <div className="preview-panel" key={fadeKey}>
+      <div className={`preview-view ${isCompareMode ? '' : 'active'}`}>
+        <div className="preview-header">
+          <h3>实时预览</h3>
+          {currentScheme && <span className="current-scheme-name">{currentScheme.name}</span>}
+        </div>
+        <div className="preview-grid">
+          {currentScheme && renderButtonPreview(currentScheme)}
+          {currentScheme && renderCardPreview(currentScheme)}
+          {currentScheme && renderInputPreview(currentScheme)}
+          {currentScheme && renderAlertPreview(currentScheme)}
+        </div>
+      </div>
+
+      <div className={`preview-view compare-view ${isCompareMode ? 'active' : ''}`}>
         <div className="compare-header">
           <h3>对比模式 - 2×2 网格</h3>
           <span className="compare-hint">点击任意方案设为当前方案并退出对比</span>
@@ -130,26 +163,11 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({
             >
               <div className="compare-card-label">{scheme.name}</div>
               <div className="compare-card-content">
-                {renderButtonPreview(scheme)}
+                {renderButtonPreview(scheme, true, scheme.id)}
               </div>
             </div>
           ))}
         </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="preview-panel" key={fadeKey}>
-      <div className="preview-header">
-        <h3>实时预览</h3>
-        {currentScheme && <span className="current-scheme-name">{currentScheme.name}</span>}
-      </div>
-      <div className="preview-grid">
-        {currentScheme && renderButtonPreview(currentScheme)}
-        {currentScheme && renderCardPreview(currentScheme)}
-        {currentScheme && renderInputPreview(currentScheme)}
-        {currentScheme && renderAlertPreview(currentScheme)}
       </div>
     </div>
   );

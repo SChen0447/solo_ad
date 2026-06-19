@@ -23,6 +23,12 @@ const ColorPicker: React.FC<ColorPickerProps> = ({ color, onChange, label }) => 
   }, [color]);
 
   useEffect(() => {
+    if (isOpen) {
+      setHsl(hexToHsl(color));
+    }
+  }, [isOpen, color]);
+
+  useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (pickerRef.current && !pickerRef.current.contains(e.target as Node)) {
         setIsOpen(false);

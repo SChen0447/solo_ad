@@ -216,6 +216,7 @@ body {
 
 .copy-btn.copied {
   background: #10B981;
+  transition: background-color 0.3s ease;
 }
 
 .copy-btn.copied:hover {
@@ -225,6 +226,30 @@ body {
 .copy-icon,
 .check-icon {
   font-size: 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.check-icon {
+  color: white;
+  font-weight: bold;
+  animation: checkPop 0.3s ease;
+}
+
+@keyframes checkPop {
+  0% {
+    transform: scale(0);
+    opacity: 0;
+  }
+  60% {
+    transform: scale(1.2);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
 }
 
 @media (max-width: 768px) {

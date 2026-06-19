@@ -3,10 +3,27 @@
   height: 100%;
   padding: 24px;
   box-sizing: border-box;
+  position: relative;
+  overflow-y: auto;
+}
+
+.preview-view {
+  position: absolute;
+  inset: 24px;
   display: flex;
   flex-direction: column;
   gap: 20px;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.3s ease, visibility 0.3s ease;
+  pointer-events: none;
   overflow-y: auto;
+}
+
+.preview-view.active {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
 }
 
 .preview-header {
@@ -64,17 +81,12 @@
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: background-color 0.3s ease, transform 0.15s ease;
   align-self: flex-start;
 }
 
-.preview-button:hover {
-  transform: scale(1.03);
-  filter: brightness(0.9);
-}
-
 .preview-button:active {
-  transform: scale(0.98);
+  transform: scale(0.98) !important;
 }
 
 .preview-card {
@@ -181,7 +193,6 @@
 
 .compare-grid.mobile {
   grid-template-columns: 1fr;
-  overflow-y: auto;
 }
 
 @keyframes fadeIn {
