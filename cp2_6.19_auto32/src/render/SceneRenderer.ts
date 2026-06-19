@@ -9,6 +9,7 @@ export interface SceneRendererOptions {
 interface CatRenderData {
   mesh: THREE.Mesh;
   glowMesh: THREE.Mesh;
+  outlineMesh: THREE.Mesh;
   currentDisguise: DisguiseType | null;
   disguiseMesh: THREE.Group | null;
   particles: THREE.Points | null;
@@ -63,8 +64,9 @@ export class SceneRenderer {
       0.1,
       1000
     );
-    this.catCamera.position.set(0, 35, 20);
+    this.catCamera.position.set(0, 28, 16);
     this.catCamera.lookAt(0, 0, 0);
+    this.catCamera.rotation.x = -Math.PI / 3;
 
     this.ghostCameraRig = new THREE.Object3D();
     this.ghostCameraRig.add(this.ghostCamera);
@@ -185,83 +187,253 @@ export class SceneRenderer {
 
   private createDisguiseMesh(type: DisguiseType): THREE.Group {
     const group = new THREE.Group();
-    let mesh: THREE.Mesh;
-    const color = 0x444444;
 
     switch (type) {
       case 'box': {
         const boxGeo = new THREE.BoxGeometry(1.2, 1.2, 1.2);
-        const boxMat = new THREE.MeshStandardMaterial({ color, roughness: 0.7, metalness: 0.3 });
-        mesh = new THREE.Mesh(boxGeo, boxMat);
-        mesh.position.y = 0.6;
+        const boxMat = new THREE.MeshStandardMaterial({
+          color: 0x555566,
+          roughness: 0.7,
+          metalness: 0.3
+        });
+        const box = new THREE.Mesh(boxGeo, boxMat);
+        box.position.y = 0.6;
+        box.castShadow = true;
+        box.receiveShadow = true;
+        group.add(box);
+
+        const lidGeo = new THREE.BoxGeometry(1.25, 0.08, 1.25);
+        const lidMat = new THREE.MeshStandardMaterial({
+          color: 0x667766,
+          roughness: 0.5,
+          metalness: 0.4
+        });
+        const lid = new THREE.Mesh(lidGeo, lidMat);
+        lid.position.y = 1.24;
+        lid.castShadow = true;
+        group.add(lid);
+
+        const edgeGeo = new THREE.EdgesGeometry(boxGeo);
+        const edgeMat = new THREE.LineBasicMaterial({ color: 0x00ff41, transparent: true, opacity: 0.3 });
+        const edges = new THREE.LineSegments(edgeGeo, edgeMat);
+        edges.position.y = 0.6;
+        group.add(edges);
         break;
       }
       case 'chair': {
+        const chairMat = new THREE.MeshStandardMaterial({
+          color: 0x443322,
+          roughness: 0.6,
+          metalness: 0.2
+        });
         const seatGeo = new THREE.BoxGeometry(1, 0.1, 1);
-        const seatMat = new THREE.MeshStandardMaterial({ color: 0x333333, roughness: 0.6, metalness: 0.4 });
-        const seat = new THREE.Mesh(seatGeo, seatMat);
+        const seat = new THREE.Mesh(seatGeo, chairMat);
         seat.position.y = 0.6;
+        seat.castShadow = true;
         group.add(seat);
 
-        const backGeo = new THREE.BoxGeometry(1, 0.8, 0.1);
-        const back = new THREE.Mesh(backGeo, seatMat);
-        back.position.set(0, 1.05, -0.45);
+        const backGeo = new THREE.BoxGeometry(1, 0.9, 0.1);
+        const back = new THREE.Mesh(backGeo, chairMat);
+        back.position.set(0, 1.1, -0.45);
+        back.castShadow = true;
         group.add(back);
 
-        for (let i = 0; i < 4; i++) {
-          const legGeo = new THREE.BoxGeometry(0.08, 0.6, 0.08);
-          const leg = new THREE.Mesh(legGeo, seatMat);
-          leg.position.set(
-            (i % 2 === 0 ? -0.4 : 0.4),
-            0.3,
-            (i < 2 ? -0.4 : 0.4)
-          );
+        const legGeo = new THREE.CylinderGeometry(0.04, 0.04, 0.6, 8);
+        const legPositions = [
+          [-0.4, 0.3, -0.4], [0.4, 0.3, -0.4],
+          [-0.4, 0.3, 0.4], [0.4, 0.3, 0.4]
+        ];
+        for (const pos of legPositions) {
+          const leg = new THREE.Mesh(legGeo, chairMat);
+          leg.position.set(pos[0], pos[1], pos[2]);
+          leg.castShadow = true;
           group.add(leg);
         }
-        return group;
+
+        const supportGeo = new THREE.BoxGeometry(0.06, 0.06, 0.8);
+        const support1 = new THREE.Mesh(supportGeo, chairMat);
+        support1.position.set(0, 0.45, 0);
+        group.add(support1);
+        break;
       }
       case 'trashcan': {
-        const canGeo = new THREE.CylinderGeometry(0.5, 0.45, 1.2, 16);
-        const canMat = new THREE.MeshStandardMaterial({ color: 0x333344, roughness: 0.5, metalness: 0.6 });
-        mesh = new THREE.Mesh(canGeo, canMat);
-        mesh.position.y = 0.6;
+        const canGeo = new THREE.CylinderGeometry(0.5, 0.42, 1.3, 16);
+        const canMat = new THREE.MeshStandardMaterial({
+          color: 0x334455,
+          roughness: 0.4,
+          metalness: 0.7
+        });
+        const can = new THREE.Mesh(canGeo, canMat);
+        can.position.y = 0.65;
+        can.castShadow = true;
+        can.receiveShadow = true;
+        group.add(can);
+
+        const rimGeo = new THREE.TorusGeometry(0.52, 0.04, 8, 16);
+        const rimMat = new THREE.MeshStandardMaterial({
+          color: 0x667788,
+          roughness: 0.3,
+          metalness: 0.8
+        });
+        const rim = new THREE.Mesh(rimGeo, rimMat);
+        rim.position.y = 1.3;
+        rim.rotation.x = Math.PI / 2;
+        group.add(rim);
+
+        const bandGeo = new THREE.TorusGeometry(0.48, 0.02, 8, 16);
+        const band = new THREE.Mesh(bandGeo, rimMat);
+        band.position.y = 0.5;
+        band.rotation.x = Math.PI / 2;
+        group.add(band);
         break;
       }
       case 'plant': {
-        const potGeo = new THREE.CylinderGeometry(0.4, 0.3, 0.6, 12);
-        const potMat = new THREE.MeshStandardMaterial({ color: 0x663322, roughness: 0.9 });
+        const potGeo = new THREE.CylinderGeometry(0.4, 0.28, 0.55, 12);
+        const potMat = new THREE.MeshStandardMaterial({
+          color: 0x993322,
+          roughness: 0.9,
+          metalness: 0.1
+        });
         const pot = new THREE.Mesh(potGeo, potMat);
-        pot.position.y = 0.3;
+        pot.position.y = 0.275;
+        pot.castShadow = true;
         group.add(pot);
 
-        const plantGeo = new THREE.SphereGeometry(0.5, 8, 8);
-        const plantMat = new THREE.MeshStandardMaterial({ color: 0x226622, roughness: 1 });
-        const plant = new THREE.Mesh(plantGeo, plantMat);
-        plant.position.y = 0.9;
-        plant.scale.y = 1.2;
-        group.add(plant);
-        return group;
+        const rimGeo = new THREE.TorusGeometry(0.42, 0.03, 8, 12);
+        const rimMat = new THREE.MeshStandardMaterial({
+          color: 0xaa4433,
+          roughness: 0.8
+        });
+        const rim = new THREE.Mesh(rimGeo, rimMat);
+        rim.position.y = 0.55;
+        rim.rotation.x = Math.PI / 2;
+        group.add(rim);
+
+        const soilGeo = new THREE.CylinderGeometry(0.38, 0.38, 0.05, 12);
+        const soilMat = new THREE.MeshStandardMaterial({ color: 0x332211, roughness: 1 });
+        const soil = new THREE.Mesh(soilGeo, soilMat);
+        soil.position.y = 0.55;
+        group.add(soil);
+
+        const leafMat = new THREE.MeshStandardMaterial({
+          color: 0x228833,
+          roughness: 0.9,
+          metalness: 0.1
+        });
+
+        const trunkGeo = new THREE.CylinderGeometry(0.05, 0.07, 0.5, 6);
+        const trunkMat = new THREE.MeshStandardMaterial({ color: 0x553311, roughness: 1 });
+        const trunk = new THREE.Mesh(trunkGeo, trunkMat);
+        trunk.position.y = 0.8;
+        group.add(trunk);
+
+        const crownGeo = new THREE.SphereGeometry(0.45, 10, 10);
+        const crown = new THREE.Mesh(crownGeo, leafMat);
+        crown.position.y = 1.2;
+        crown.scale.set(1, 1.3, 1);
+        crown.castShadow = true;
+        group.add(crown);
+
+        for (let i = 0; i < 5; i++) {
+          const leafGeo = new THREE.SphereGeometry(0.2, 6, 6);
+          const leaf = new THREE.Mesh(leafGeo, leafMat);
+          const angle = (i / 5) * Math.PI * 2;
+          leaf.position.set(
+            Math.cos(angle) * 0.35,
+            1.1,
+            Math.sin(angle) * 0.35
+          );
+          leaf.scale.set(1, 0.6, 1);
+          group.add(leaf);
+        }
+        break;
       }
       case 'barrel': {
-        const barrelGeo = new THREE.CylinderGeometry(0.45, 0.45, 1.3, 16);
-        const barrelMat = new THREE.MeshStandardMaterial({ color: 0x553311, roughness: 0.7, metalness: 0.2 });
-        mesh = new THREE.Mesh(barrelGeo, barrelMat);
-        mesh.position.y = 0.65;
+        const barrelGeo = new THREE.CylinderGeometry(0.45, 0.45, 1.4, 20);
+        const barrelMat = new THREE.MeshStandardMaterial({
+          color: 0x664422,
+          roughness: 0.7,
+          metalness: 0.2
+        });
+        const barrel = new THREE.Mesh(barrelGeo, barrelMat);
+        barrel.position.y = 0.7;
+        barrel.castShadow = true;
+        barrel.receiveShadow = true;
+        group.add(barrel);
+
+        const bandMat = new THREE.MeshStandardMaterial({
+          color: 0x444444,
+          roughness: 0.3,
+          metalness: 0.9
+        });
+
+        for (const bandY of [0.2, 0.7, 1.2]) {
+          const bandGeo = new THREE.TorusGeometry(0.47, 0.025, 8, 20);
+          const band = new THREE.Mesh(bandGeo, bandMat);
+          band.position.y = bandY;
+          band.rotation.x = Math.PI / 2;
+          group.add(band);
+        }
+
+        const topGeo = new THREE.CylinderGeometry(0.43, 0.43, 0.04, 20);
+        const top = new THREE.Mesh(topGeo, barrelMat);
+        top.position.y = 1.4;
+        group.add(top);
         break;
       }
       case 'crate':
       default: {
         const crateGeo = new THREE.BoxGeometry(1.1, 1.1, 1.1);
-        const crateMat = new THREE.MeshStandardMaterial({ color: 0x553311, roughness: 0.9 });
-        mesh = new THREE.Mesh(crateGeo, crateMat);
-        mesh.position.y = 0.55;
+        const crateMat = new THREE.MeshStandardMaterial({
+          color: 0x665533,
+          roughness: 0.9,
+          metalness: 0.1
+        });
+        const crate = new THREE.Mesh(crateGeo, crateMat);
+        crate.position.y = 0.55;
+        crate.castShadow = true;
+        crate.receiveShadow = true;
+        group.add(crate);
+
+        const slatGeo = new THREE.BoxGeometry(1.14, 0.06, 0.06);
+        for (const y of [0.3, 0.55, 0.8]) {
+          const slat1 = new THREE.Mesh(slatGeo, crateMat);
+          slat1.position.set(0, y, 0.55);
+          group.add(slat1);
+          const slat2 = new THREE.Mesh(slatGeo, crateMat);
+          slat2.position.set(0, y, -0.55);
+          group.add(slat2);
+        }
+
+        const crossGeo = new THREE.BoxGeometry(0.06, 1.14, 0.06);
+        const crossMat = new THREE.MeshStandardMaterial({
+          color: 0x554422,
+          roughness: 0.8,
+          metalness: 0.2
+        });
+        const cross1 = new THREE.Mesh(crossGeo, crossMat);
+        cross1.position.set(0.3, 0.55, 0);
+        group.add(cross1);
+        const cross2 = new THREE.Mesh(crossGeo, crossMat);
+        cross2.position.set(-0.3, 0.55, 0);
+        group.add(cross2);
+
+        const edgeGeo = new THREE.EdgesGeometry(crateGeo);
+        const edgeMat = new THREE.LineBasicMaterial({ color: 0x00ff41, transparent: true, opacity: 0.2 });
+        const edges = new THREE.LineSegments(edgeGeo, edgeMat);
+        edges.position.y = 0.55;
+        group.add(edges);
         break;
       }
     }
 
-    mesh.castShadow = true;
-    mesh.receiveShadow = true;
-    group.add(mesh);
+    group.traverse((child) => {
+      if (child instanceof THREE.Mesh) {
+        child.castShadow = true;
+        child.receiveShadow = true;
+      }
+    });
+
     return group;
   }
 
@@ -314,10 +486,16 @@ export class SceneRenderer {
     this.currentView = view;
   }
 
+  updateCatCamera(catPosition: THREE.Vector3): void {
+    this.catCamera.position.set(catPosition.x, catPosition.y + 28, catPosition.z + 16);
+    this.catCamera.lookAt(catPosition.x, catPosition.y, catPosition.z);
+  }
+
   initCats(cats: CatState[]): void {
     for (const catData of this.catRenderers.values()) {
       this.scene.remove(catData.mesh);
       this.scene.remove(catData.glowMesh);
+      this.scene.remove(catData.outlineMesh);
       if (catData.disguiseMesh) {
         this.scene.remove(catData.disguiseMesh);
       }
@@ -334,7 +512,9 @@ export class SceneRenderer {
         color: 0xff00ff,
         emissive: 0x440044,
         roughness: 0.3,
-        metalness: 0.7
+        metalness: 0.7,
+        transparent: true,
+        opacity: 1
       });
       const mesh = new THREE.Mesh(catGeo, catMat);
       mesh.castShadow = true;
@@ -344,19 +524,32 @@ export class SceneRenderer {
       const glowMat = new THREE.MeshBasicMaterial({
         color: 0x00ff41,
         transparent: true,
-        opacity: 0.4,
+        opacity: 0.0,
         side: THREE.BackSide
       });
       const glowMesh = new THREE.Mesh(glowGeo, glowMat);
       glowMesh.position.copy(cat.position);
       glowMesh.visible = false;
 
+      const outlineGeo = new THREE.SphereGeometry(0.55, 16, 16);
+      const outlineMat = new THREE.MeshBasicMaterial({
+        color: 0x00ff41,
+        transparent: true,
+        opacity: 0.0,
+        wireframe: true
+      });
+      const outlineMesh = new THREE.Mesh(outlineGeo, outlineMat);
+      outlineMesh.position.copy(cat.position);
+      outlineMesh.visible = false;
+
       this.scene.add(mesh);
       this.scene.add(glowMesh);
+      this.scene.add(outlineMesh);
 
       this.catRenderers.set(cat.id, {
         mesh,
         glowMesh,
+        outlineMesh,
         currentDisguise: null,
         disguiseMesh: null,
         particles: null,
@@ -385,6 +578,7 @@ export class SceneRenderer {
       if (this.caughtCats.has(cat.id)) {
         renderData.mesh.visible = false;
         renderData.glowMesh.visible = false;
+        renderData.outlineMesh.visible = false;
         if (renderData.disguiseMesh) {
           renderData.disguiseMesh.visible = false;
         }
@@ -424,6 +618,7 @@ export class SceneRenderer {
 
       renderData.mesh.position.copy(cat.position);
       renderData.glowMesh.position.copy(cat.position);
+      renderData.outlineMesh.position.copy(cat.position);
 
       if (renderData.disguiseMesh) {
         renderData.disguiseMesh.position.copy(cat.position);
@@ -431,22 +626,52 @@ export class SceneRenderer {
       }
 
       if (this.isPerspectiveMode && !cat.isDisguised) {
+        const pulse = 0.5 + Math.sin(Date.now() * 0.005) * 0.2;
+        const transition = this.perspectiveTransition;
+
+        const catMat = renderData.mesh.material as THREE.MeshStandardMaterial;
+        catMat.opacity = 0.3 + pulse * 0.2 * transition;
+        catMat.emissive.setHex(0x00ff41);
+        catMat.emissiveIntensity = 0.8 * transition;
+
         renderData.glowMesh.visible = true;
-        const pulse = 0.4 + Math.sin(Date.now() * 0.005) * 0.2;
-        (renderData.glowMesh.material as THREE.MeshBasicMaterial).opacity = pulse * this.perspectiveTransition;
+        const glowMat = renderData.glowMesh.material as THREE.MeshBasicMaterial;
+        glowMat.opacity = pulse * 0.6 * transition;
+
+        renderData.outlineMesh.visible = true;
+        const outlineMat = renderData.outlineMesh.material as THREE.MeshBasicMaterial;
+        outlineMat.opacity = (0.6 + pulse * 0.3) * transition;
+        renderData.outlineMesh.scale.setScalar(1 + Math.sin(Date.now() * 0.003) * 0.1);
       } else if (this.isPerspectiveMode && cat.isDisguised && renderData.disguiseMesh) {
+        const transition = this.perspectiveTransition;
+
+        const catMat = renderData.mesh.material as THREE.MeshStandardMaterial;
+        catMat.opacity = 1;
+        catMat.emissiveIntensity = 0;
+
         renderData.glowMesh.visible = false;
+        renderData.outlineMesh.visible = false;
+
         renderData.disguiseMesh.traverse((child) => {
           if (child instanceof THREE.Mesh) {
             const mat = child.material as THREE.MeshStandardMaterial;
             if (mat.emissive) {
               mat.emissive.setHex(0x00ff41);
-              mat.emissiveIntensity = 0.5 * this.perspectiveTransition;
+              mat.emissiveIntensity = 0.6 * transition;
             }
+            mat.transparent = true;
+            mat.opacity = 0.5 + 0.3 * transition;
           }
         });
       } else {
+        const catMat = renderData.mesh.material as THREE.MeshStandardMaterial;
+        catMat.opacity = 1;
+        catMat.emissive.setHex(0x440044);
+        catMat.emissiveIntensity = 1;
+
         renderData.glowMesh.visible = false;
+        renderData.outlineMesh.visible = false;
+
         if (renderData.disguiseMesh) {
           renderData.disguiseMesh.traverse((child) => {
             if (child instanceof THREE.Mesh) {
@@ -454,6 +679,8 @@ export class SceneRenderer {
               if (mat.emissive) {
                 mat.emissiveIntensity = 0;
               }
+              mat.transparent = true;
+              mat.opacity = 1;
             }
           });
         }
@@ -570,6 +797,7 @@ export class SceneRenderer {
         if (renderData) {
           renderData.mesh.visible = false;
           renderData.glowMesh.visible = false;
+          renderData.outlineMesh.visible = false;
           if (renderData.disguiseMesh) {
             renderData.disguiseMesh.visible = false;
           }

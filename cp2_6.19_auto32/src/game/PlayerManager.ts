@@ -117,6 +117,11 @@ export class PlayerManager {
     this.clampPosition(this.ghost.position);
   }
 
+  isCatDisguised(id: string): boolean {
+    const cat = this.cats.get(id);
+    return cat ? cat.isDisguised : false;
+  }
+
   moveCat(id: string, direction: THREE.Vector3, deltaTime: number): void {
     const cat = this.cats.get(id);
     if (!cat || cat.isCaught || cat.isDisguised) return;

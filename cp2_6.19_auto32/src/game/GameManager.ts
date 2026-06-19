@@ -25,8 +25,6 @@ export class GameManager {
   private lastTime: number = 0;
   private animationFrameId: number = 0;
   private catCount: number = 3;
-  private collisionAccumulator: number = 0;
-  private collisionFixedDelta: number = 1 / 60;
   private onStateChange?: (state: GameState) => void;
   private onUpdate?: (delta: number) => void;
   private onCollision?: (events: CollisionEvent[]) => void;
@@ -38,6 +36,7 @@ export class GameManager {
     this.playerManager = new PlayerManager();
     this.collisionSystem = new CollisionSystem();
     this.collisionSystem.setCollisionRadius(1.0);
+    this.collisionSystem.setFieldOfView(Math.PI / 2);
   }
 
   getPlayerManager(): PlayerManager {
@@ -169,13 +168,9 @@ export class GameManager {
     this.playerManager.update(delta);
     this.syncPositions();
 
-    this.collisionAccumulator += delta;
-    while (this.collisionAccumulator >= this.collisionFixedDelta) {
-      const events = this.collisionSystem.update();
-      if (events.length > 0) {
-        this.handleCollisions(events);
-      }
-      this.collisionAccumulator -= this.collisionFixedDelta;
+    const events = this.collisionSystem.updateWithFixedStep(delta);
+    if (events.length > 0) {
+      this.handleCollisions(events);
     }
 
     const activeCats = this.playerManager.getActiveCats().filter(c => !c.isCaught);
@@ -191,7 +186,9 @@ export class GameManager {
 
   private syncPositions(): void {
     const ghostPos = this.playerManager.getGhostPosition();
+    const ghostState = this.playerManager.getGhost();
     this.collisionSystem.setGhostPosition('ghost-1', ghostPos);
+    this.collisionSystem.setGhostRotation('ghost-1', ghostState.rotation);
 
     const cats = this.playerManager.getActiveCats();
     cats.forEach(cat => {

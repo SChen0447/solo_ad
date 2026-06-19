@@ -9,7 +9,9 @@ class Game {
   private uiOverlay: UIOverlay;
   private container: HTMLElement;
   private keys: Set<string> = new Set();
-  private isPointerLocked: boolean = false;
+  private isDragging: boolean = false;
+  private lastMouseX: number = 0;
+  private lastMouseY: number = 0;
   private currentView: 'ghost' | 'cat' = 'ghost';
   private animationFrameId: number = 0;
   private lastTime: number = 0;
@@ -85,10 +87,6 @@ class Game {
         e.preventDefault();
         this.toggleView();
       }
-
-      if (e.code === 'Escape') {
-        document.exitPointerLock();
-      }
     });
 
     document.addEventListener('keyup', (e) => {
@@ -99,32 +97,45 @@ class Game {
       }
     });
 
+    this.setupDragRotation();
+  }
+
+  private setupDragRotation(): void {
     const canvas = this.sceneRenderer.getDomElement();
 
-    canvas.addEventListener('click', () => {
+    canvas.addEventListener('mousedown', (e) => {
       if (this.currentView === 'ghost' && this.gameManager.getState() === 'playing') {
-        canvas.requestPointerLock();
+        this.isDragging = true;
+        this.lastMouseX = e.clientX;
+        this.lastMouseY = e.clientY;
+        canvas.style.cursor = 'grabbing';
       }
     });
 
-    document.addEventListener('pointerlockchange', () => {
-      this.isPointerLocked = document.pointerLockElement === canvas;
-    });
-
     document.addEventListener('mousemove', (e) => {
-      if (this.isPointerLocked && this.currentView === 'ghost') {
+      if (this.isDragging && this.currentView === 'ghost') {
+        const deltaX = e.clientX - this.lastMouseX;
+        const deltaY = e.clientY - this.lastMouseY;
+        this.lastMouseX = e.clientX;
+        this.lastMouseY = e.clientY;
+
         const ghostState = this.gameManager.getGhostState();
         const euler = new THREE.Euler().copy(ghostState.rotation);
-        euler.y -= e.movementX * 0.002;
-        euler.x -= e.movementY * 0.002;
+        euler.y -= deltaX * 0.005;
+        euler.x -= deltaY * 0.005;
         euler.x = Math.max(-Math.PI / 2 + 0.1, Math.min(Math.PI / 2 - 0.1, euler.x));
         this.gameManager.setGhostRotation(euler);
       }
     });
 
-    window.addEventListener('resize', () => {
-      // handled by SceneRenderer
+    document.addEventListener('mouseup', () => {
+      if (this.isDragging) {
+        this.isDragging = false;
+        canvas.style.cursor = 'grab';
+      }
     });
+
+    canvas.style.cursor = 'grab';
   }
 
   private handleGhostMovement(delta: number): void {
@@ -143,17 +154,20 @@ class Game {
   private handleCatMovement(delta: number): void {
     this.catMoveDir.set(0, 0, 0);
 
+    const cats = this.gameManager.getCatStates();
+    const activeCats = cats.filter(c => !c.isCaught);
+    if (activeCats.length === 0) return;
+
+    const leadCat = activeCats[0];
+    if (leadCat.isDisguised) return;
+
     if (this.keys.has('ArrowUp') || this.keys.has('KeyW')) this.catMoveDir.z -= 1;
     if (this.keys.has('ArrowDown') || this.keys.has('KeyS')) this.catMoveDir.z += 1;
     if (this.keys.has('ArrowLeft') || this.keys.has('KeyA')) this.catMoveDir.x -= 1;
     if (this.keys.has('ArrowRight') || this.keys.has('KeyD')) this.catMoveDir.x += 1;
 
     if (this.catMoveDir.length() > 0) {
-      const cats = this.gameManager.getCatStates();
-      const activeCats = cats.filter(c => !c.isCaught);
-      if (activeCats.length > 0) {
-        this.gameManager.moveCat(activeCats[0].id, this.catMoveDir, delta);
-      }
+      this.gameManager.moveCat(leadCat.id, this.catMoveDir, delta);
     }
   }
 
@@ -164,14 +178,24 @@ class Game {
     const catStates = this.gameManager.getCatStates();
     this.sceneRenderer.updateCats(catStates, delta);
 
+    const activeCats = catStates.filter(c => !c.isCaught);
+
     if (this.currentView === 'ghost') {
       this.uiOverlay.updateGhostStatus(ghostState);
+    } else {
+      if (activeCats.length > 0) {
+        this.sceneRenderer.updateCatCamera(activeCats[0].position);
+      }
     }
 
     this.uiOverlay.updateTimer(this.gameManager.getRemainingTime());
 
-    const activeCats = this.gameManager.getCatStates().filter(c => !c.isCaught);
     this.uiOverlay.updateCatCount(activeCats.length);
+
+    if (activeCats.length > 0) {
+      const leadCat = activeCats[0];
+      this.uiOverlay.updateDisguiseStatus(leadCat.isDisguised, leadCat.disguiseType || undefined);
+    }
 
     this.uiOverlay.updateTips(delta);
 
@@ -208,7 +232,6 @@ class Game {
   private handleGameEnd(stats: GameStats): void {
     this.uiOverlay.showScreen('result');
     this.uiOverlay.showResult(stats, this.bestCatchImage || undefined);
-    document.exitPointerLock();
   }
 
   private restartGame(): void {
@@ -229,7 +252,6 @@ class Game {
   private toggleView(): void {
     this.currentView = this.currentView === 'ghost' ? 'cat' : 'ghost';
     this.sceneRenderer.setCurrentView(this.currentView);
-    document.exitPointerLock();
   }
 
   destroy(): void {

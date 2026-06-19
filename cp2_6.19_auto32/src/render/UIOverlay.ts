@@ -33,6 +33,7 @@ export class UIOverlay {
   private catCountDisplay: HTMLDivElement;
   private perspectiveCooldownEl: HTMLDivElement;
   private bestCatchCanvas: HTMLCanvasElement;
+  private disguiseStatusEl: HTMLDivElement;
   private onStartGame?: () => void;
   private onRestartGame?: () => void;
   private onBackToMenu?: () => void;
@@ -65,6 +66,7 @@ export class UIOverlay {
     this.tipsElement = document.createElement('div');
     this.perspectiveCooldownEl = document.createElement('div');
     this.bestCatchCanvas = document.createElement('canvas');
+    this.disguiseStatusEl = document.createElement('div');
 
     this.uiContainer.appendChild(this.menuScreen);
     this.uiContainer.appendChild(this.gameUI);
@@ -353,6 +355,22 @@ export class UIOverlay {
 
     tipsPanel.appendChild(this.tipsElement);
 
+    this.disguiseStatusEl = document.createElement('div');
+    this.disguiseStatusEl.textContent = '';
+    this.disguiseStatusEl.style.cssText = `
+      position: absolute;
+      bottom: 80px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 18px;
+      color: #ff00ff;
+      text-shadow: 0 0 10px #ff00ff;
+      letter-spacing: 2px;
+      transition: opacity 0.3s ease;
+      opacity: 0;
+      pointer-events: none;
+    `;
+
     const crosshair = document.createElement('div');
     crosshair.style.cssText = `
       position: absolute;
@@ -371,6 +389,7 @@ export class UIOverlay {
     ui.appendChild(statusPanel);
     ui.appendChild(timerPanel);
     ui.appendChild(tipsPanel);
+    ui.appendChild(this.disguiseStatusEl);
     ui.appendChild(crosshair);
 
     return ui;
@@ -472,6 +491,7 @@ export class UIOverlay {
     this.bestCatchCanvas.style.cssText = `
       max-width: 100%;
       max-height: 100%;
+      display: none;
     `;
 
     const noReplayText = document.createElement('span');
@@ -480,8 +500,10 @@ export class UIOverlay {
     noReplayText.style.cssText = `
       color: #444;
       font-size: 14px;
+      position: absolute;
     `;
 
+    canvasContainer.appendChild(this.bestCatchCanvas);
     canvasContainer.appendChild(noReplayText);
 
     const buttonContainer = document.createElement('div');
@@ -582,6 +604,15 @@ export class UIOverlay {
     this.catCountDisplay.textContent = `剩余猫咪: ${count}`;
   }
 
+  updateDisguiseStatus(isDisguised: boolean, disguiseType?: string): void {
+    if (isDisguised) {
+      this.disguiseStatusEl.textContent = `伪装中 [${disguiseType || '???'}] - 无法移动 | 按Q解除伪装`;
+      this.disguiseStatusEl.style.opacity = '1';
+    } else {
+      this.disguiseStatusEl.style.opacity = '0';
+    }
+  }
+
   updateTips(deltaTime: number): void {
     this.tipsTimer += deltaTime;
     if (this.tipsTimer >= 5) {
@@ -621,10 +652,22 @@ export class UIOverlay {
     catsCaughtEl.textContent = `抓到 ${stats.catsCaught}/${stats.totalCats} 只猫`;
     disguiseCountEl.textContent = `伪装 ${stats.totalDisguises} 次`;
 
+    const ctx = this.bestCatchCanvas.getContext('2d');
+    if (!ctx) return;
+
+    ctx.clearRect(0, 0, this.bestCatchCanvas.width, this.bestCatchCanvas.height);
+
     if (bestCatchImage) {
       noReplayEl.style.display = 'none';
-      const ctx = this.bestCatchCanvas.getContext('2d');
-      if (ctx) {
+      this.bestCatchCanvas.style.display = 'block';
+
+      const tempCanvas = document.createElement('canvas');
+      tempCanvas.width = bestCatchImage.width;
+      tempCanvas.height = bestCatchImage.height;
+      const tempCtx = tempCanvas.getContext('2d');
+      if (tempCtx) {
+        tempCtx.putImageData(bestCatchImage, 0, 0);
+
         const scale = Math.min(
           this.bestCatchCanvas.width / bestCatchImage.width,
           this.bestCatchCanvas.height / bestCatchImage.height
@@ -634,19 +677,46 @@ export class UIOverlay {
         const offsetX = (this.bestCatchCanvas.width - drawWidth) / 2;
         const offsetY = (this.bestCatchCanvas.height - drawHeight) / 2;
 
-        const tempCanvas = document.createElement('canvas');
-        tempCanvas.width = bestCatchImage.width;
-        tempCanvas.height = bestCatchImage.height;
-        const tempCtx = tempCanvas.getContext('2d');
-        if (tempCtx) {
-          tempCtx.putImageData(bestCatchImage, 0, 0);
-          ctx.drawImage(tempCanvas, offsetX, offsetY, drawWidth, drawHeight);
-        }
+        ctx.fillStyle = '#0a0a0a';
+        ctx.fillRect(0, 0, this.bestCatchCanvas.width, this.bestCatchCanvas.height);
+
+        ctx.drawImage(tempCanvas, offsetX, offsetY, drawWidth, drawHeight);
+
+        ctx.strokeStyle = '#00ff41';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(offsetX + 2, offsetY + 2, drawWidth - 4, drawHeight - 4);
+
+        ctx.strokeStyle = '#ff00ff';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(offsetX + 5, offsetY + 5, drawWidth - 10, drawHeight - 10);
+
+        ctx.font = '14px "Courier New", monospace';
+        ctx.fillStyle = '#00ff41';
+        ctx.shadowColor = '#00ff41';
+        ctx.shadowBlur = 10;
+        ctx.fillText('CATCH REPLAY', offsetX + 10, offsetY + 20);
+        ctx.shadowBlur = 0;
+
+        ctx.fillStyle = '#ff00ff';
+        ctx.font = '11px "Courier New", monospace';
+        ctx.fillText(`${stats.catsCaught} CAUGHT`, offsetX + drawWidth - 90, offsetY + 20);
       }
-      this.bestCatchCanvas.style.display = 'block';
     } else {
       noReplayEl.style.display = 'block';
       this.bestCatchCanvas.style.display = 'none';
+
+      ctx.fillStyle = '#0a0a0a';
+      ctx.fillRect(0, 0, this.bestCatchCanvas.width, this.bestCatchCanvas.height);
+
+      ctx.strokeStyle = '#333';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(10, 10, this.bestCatchCanvas.width - 20, this.bestCatchCanvas.height - 20);
+
+      ctx.font = '16px "Courier New", monospace';
+      ctx.fillStyle = '#333';
+      ctx.textAlign = 'center';
+      ctx.fillText('NO CATCH RECORD', this.bestCatchCanvas.width / 2, this.bestCatchCanvas.height / 2);
+      ctx.textAlign = 'start';
     }
   }
 

@@ -8,16 +8,28 @@ export interface CollisionEvent {
 
 export class CollisionSystem {
   private ghostPositions: Map<string, THREE.Vector3> = new Map();
+  private ghostRotations: Map<string, THREE.Euler> = new Map();
   private catPositions: Map<string, THREE.Vector3> = new Map();
   private collisionRadius: number = 1.0;
+  private fieldOfViewAngle: number = Math.PI / 2;
   private lastCollisionEvents: CollisionEvent[] = [];
+  private accumulator: number = 0;
+  private fixedDelta: number = 1 / 60;
 
   setCollisionRadius(radius: number): void {
     this.collisionRadius = radius;
   }
 
+  setFieldOfView(angle: number): void {
+    this.fieldOfViewAngle = angle;
+  }
+
   setGhostPosition(id: string, position: THREE.Vector3): void {
     this.ghostPositions.set(id, position.clone());
+  }
+
+  setGhostRotation(id: string, rotation: THREE.Euler): void {
+    this.ghostRotations.set(id, rotation.clone());
   }
 
   setCatPosition(id: string, position: THREE.Vector3): void {
@@ -28,23 +40,63 @@ export class CollisionSystem {
     this.catPositions.delete(id);
   }
 
+  updateWithFixedStep(deltaTime: number): CollisionEvent[] {
+    this.accumulator += deltaTime;
+    let allEvents: CollisionEvent[] = [];
+
+    while (this.accumulator >= this.fixedDelta) {
+      const stepEvents = this.checkCollisions();
+      if (stepEvents.length > 0) {
+        allEvents = allEvents.concat(stepEvents);
+      }
+      this.accumulator -= this.fixedDelta;
+    }
+
+    this.lastCollisionEvents = allEvents;
+    return allEvents;
+  }
+
   update(): CollisionEvent[] {
+    const events = this.checkCollisions();
+    this.lastCollisionEvents = events;
+    return events;
+  }
+
+  private checkCollisions(): CollisionEvent[] {
     const events: CollisionEvent[] = [];
 
     for (const [ghostId, ghostPos] of this.ghostPositions) {
+      const ghostRotation = this.ghostRotations.get(ghostId);
+      if (!ghostRotation) continue;
+
+      const ghostForward = new THREE.Vector3(
+        -Math.sin(ghostRotation.y),
+        0,
+        -Math.cos(ghostRotation.y)
+      ).normalize();
+
       for (const [catId, catPos] of this.catPositions) {
         const distance = ghostPos.distanceTo(catPos);
         if (distance < this.collisionRadius) {
-          events.push({
-            ghostId,
-            catId,
-            distance
-          });
+          const toCat = new THREE.Vector3().subVectors(catPos, ghostPos).normalize();
+          toCat.y = 0;
+          if (toCat.length() > 0) {
+            toCat.normalize();
+          }
+
+          const angle = ghostForward.angleTo(toCat);
+
+          if (angle < this.fieldOfViewAngle / 2) {
+            events.push({
+              ghostId,
+              catId,
+              distance
+            });
+          }
         }
       }
     }
 
-    this.lastCollisionEvents = events;
     return events;
   }
 
@@ -58,7 +110,9 @@ export class CollisionSystem {
 
   clear(): void {
     this.ghostPositions.clear();
+    this.ghostRotations.clear();
     this.catPositions.clear();
     this.lastCollisionEvents = [];
+    this.accumulator = 0;
   }
 }
