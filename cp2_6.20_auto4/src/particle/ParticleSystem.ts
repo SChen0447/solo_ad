@@ -28,6 +28,7 @@ export class ParticleSystem {
 
   private positionsBuffer: Float32Array;
   private colorsBuffer: Float32Array;
+  private sizesBuffer: Float32Array;
 
   private terrainHeights: Float32Array | null = null;
   private terrainSize: number = 80;
@@ -35,6 +36,11 @@ export class ParticleSystem {
   private lowAreaParticles: Set<number> = new Set();
   private lowAreaBoostFactor: number = 1.3;
   private colorTransitionSpeed: number = 0.05;
+  private sizeTransitionSpeed: number = 0.08;
+
+  private readonly BASE_PARTICLE_SIZE: number = 3;
+  private readonly MIN_SIZE_FACTOR: number = 0.5;
+  private readonly MAX_SIZE_FACTOR: number = 1.5;
 
   private time: number = 0;
 
@@ -66,6 +72,7 @@ export class ParticleSystem {
 
     this.positionsBuffer = new Float32Array(this.MAX_PARTICLES * 3);
     this.colorsBuffer = new Float32Array(this.MAX_PARTICLES * 3);
+    this.sizesBuffer = new Float32Array(this.MAX_PARTICLES);
 
     this.generateTerrainHeights();
     this.initializeParticles(this.DEFAULT_PARTICLES);
@@ -207,6 +214,7 @@ export class ParticleSystem {
 
     this.positionsBuffer.set(this.positions.subarray(0, this.particleCount * 3));
     this.colorsBuffer.set(this.colors.subarray(0, this.particleCount * 3));
+    this.sizesBuffer.set(this.sizes.subarray(0, this.particleCount));
   }
 
   private manageLowAreaDensity(): void {
@@ -308,7 +316,9 @@ export class ParticleSystem {
     this.positions[i3 + 1] = y;
     this.positions[i3 + 2] = z;
 
-    this.updateParticleColor(index, isDeposition, isStrongWind, y, terrainHeight);
+    const particleSpeed = Math.sqrt(velX * velX + velY * velY + velZ * velZ);
+    this.updateParticleColor(index, isDeposition, isStrongWind, y, terrainHeight, particleSpeed);
+    this.updateParticleSize(index, particleSpeed);
   }
 
   private updateParticleColor(
@@ -316,28 +326,66 @@ export class ParticleSystem {
     isDeposition: boolean,
     isStrongWind: boolean,
     y: number,
-    terrainHeight: number
+    terrainHeight: number,
+    particleSpeed: number
   ): void {
     const i3 = index * 3;
     const targetColor = new THREE.Color();
 
+    const heightAboveTerrain = y - terrainHeight;
+    const normalizedHeight = Math.min(1, Math.max(0, heightAboveTerrain / 20));
+
+    const maxSpeed = Math.max(1, this.params.windSpeed * 0.5);
+    const normalizedSpeed = Math.min(1, particleSpeed / maxSpeed);
+
     if (isStrongWind) {
-      const t = Math.min(1, (this.params.windSpeed - 15) / 5);
-      const easeT = this.easeOutQuad(t);
-      const baseColor = new THREE.Color(0xffa500);
+      const windIntensity = Math.min(1, (this.params.windSpeed - 15) / 5);
+      const easeWind = this.easeOutQuad(windIntensity);
+
+      const lowAltitudeColor = new THREE.Color(0xd4a574);
+      const highAltitudeColor = new THREE.Color(0xf5e6d0);
       const whiteColor = new THREE.Color(0xffffff);
-      targetColor.copy(baseColor).lerp(whiteColor, easeT);
-    } else if (isDeposition && (y - terrainHeight) < 3 && terrainHeight < 1) {
-      const heightFactor = Math.min(1, (3 - (y - terrainHeight)) / 3);
+
+      const heightBlend = this.easeInOutQuad(normalizedHeight);
+      const speedBlend = this.easeOutQuad(normalizedSpeed);
+
+      targetColor.copy(lowAltitudeColor).lerp(highAltitudeColor, heightBlend);
+      targetColor.lerp(whiteColor, easeWind * (0.4 + speedBlend * 0.6));
+    } else if (isDeposition && heightAboveTerrain < 3 && terrainHeight < 1) {
+      const heightFactor = Math.min(1, (3 - heightAboveTerrain) / 3);
       const isLowAreaParticle = this.lowAreaParticles.has(index);
-      const depositFactor = isLowAreaParticle ? 0.8 : 0.5;
+      const depositFactor = isLowAreaParticle ? 0.85 : 0.55;
       const t = heightFactor * depositFactor;
-      const baseColor = new THREE.Color(0xdaa520);
+
+      const darkBrown = new THREE.Color(0x8b4513);
+      const goldenBrown = new THREE.Color(0xdaa520);
       const depositColor = new THREE.Color(0xcd853f);
-      targetColor.copy(baseColor).lerp(depositColor, t);
+
+      targetColor.copy(goldenBrown).lerp(darkBrown, normalizedHeight * 0.3);
+      targetColor.lerp(depositColor, t);
+
+      const speedBrightness = 0.9 + normalizedSpeed * 0.2;
+      targetColor.multiplyScalar(speedBrightness);
     } else {
-      const heightT = y / 20;
-      targetColor.setHSL(0.08 + heightT * 0.03, 0.8, 0.5 + heightT * 0.15);
+      const lowColor = new THREE.Color(0x996633);
+      const midColor = new THREE.Color(0xdaa520);
+      const highColor = new THREE.Color(0xf0e68c);
+
+      if (normalizedHeight < 0.5) {
+        const t = normalizedHeight * 2;
+        targetColor.copy(lowColor).lerp(midColor, this.easeInOutQuad(t));
+      } else {
+        const t = (normalizedHeight - 0.5) * 2;
+        targetColor.copy(midColor).lerp(highColor, this.easeInOutQuad(t));
+      }
+
+      const brightnessBoost = 1 + normalizedSpeed * 0.35;
+      targetColor.multiplyScalar(Math.min(1.3, brightnessBoost));
+
+      const saturationFactor = 1 - normalizedHeight * 0.25;
+      const hsl = { h: 0, s: 0, l: 0 };
+      targetColor.getHSL(hsl);
+      targetColor.setHSL(hsl.h, hsl.s * saturationFactor, hsl.l);
     }
 
     const currentColor = new THREE.Color(
@@ -351,6 +399,31 @@ export class ParticleSystem {
     this.colors[i3] = currentColor.r;
     this.colors[i3 + 1] = currentColor.g;
     this.colors[i3 + 2] = currentColor.b;
+  }
+
+  private updateParticleSize(
+    index: number,
+    particleSpeed: number
+  ): void {
+    const windSpeed = this.params.windSpeed;
+    const normalizedWindSpeed = Math.min(1, windSpeed / 20);
+
+    const windFactor = this.MAX_SIZE_FACTOR - normalizedWindSpeed * (this.MAX_SIZE_FACTOR - this.MIN_SIZE_FACTOR);
+
+    const maxSpeed = Math.max(1, windSpeed * 0.5);
+    const normalizedSpeed = Math.min(1, particleSpeed / maxSpeed);
+    const speedFactor = 1 - normalizedSpeed * 0.25;
+
+    const turbulenceFactor = 1 + (1 - this.params.turbulence) * 0.2;
+
+    const baseRandom = this.sizes[index] / this.BASE_PARTICLE_SIZE;
+
+    const targetSize = this.BASE_PARTICLE_SIZE * baseRandom * windFactor * speedFactor * turbulenceFactor;
+
+    const currentSize = this.sizes[index];
+    const newSize = currentSize + (targetSize - currentSize) * this.sizeTransitionSpeed;
+
+    this.sizes[index] = Math.max(1, Math.min(8, newSize));
   }
 
   private easeOutQuad(t: number): number {
@@ -367,6 +440,10 @@ export class ParticleSystem {
 
   public getColors(): Float32Array {
     return this.colorsBuffer.subarray(0, this.particleCount * 3);
+  }
+
+  public getSizes(): Float32Array {
+    return this.sizesBuffer.subarray(0, this.particleCount);
   }
 
   public getParticleCount(): number {

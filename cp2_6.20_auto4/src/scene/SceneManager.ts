@@ -20,7 +20,7 @@ export class SceneManager {
   private gridHelper: GridHelper;
   private particleSystem: THREE.Points | null = null;
   private particleGeometry: THREE.BufferGeometry | null = null;
-  private particleMaterial: THREE.PointsMaterial | null = null;
+  private particleMaterial: THREE.Material | null = null;
   private terrain: THREE.Mesh | null = null;
   private markers: THREE.Mesh[] = [];
   private markerData: MarkerData[] = [];
@@ -338,17 +338,37 @@ export class SceneManager {
     this.particleGeometry.setAttribute('size', new THREE.BufferAttribute(sizes, 1));
     this.particleGeometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
 
-    this.particleMaterial = new THREE.PointsMaterial({
-      size: 3,
-      sizeAttenuation: true,
-      vertexColors: true,
+    this.particleMaterial = new THREE.ShaderMaterial({
+      uniforms: {
+        uTime: { value: 0 }
+      },
+      vertexShader: `
+        attribute float size;
+        attribute vec3 color;
+        varying vec3 vColor;
+        void main() {
+          vColor = color;
+          vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+          gl_PointSize = size * (300.0 / -mvPosition.z);
+          gl_Position = projectionMatrix * mvPosition;
+        }
+      `,
+      fragmentShader: `
+        varying vec3 vColor;
+        void main() {
+          float dist = length(gl_PointCoord - vec2(0.5));
+          if (dist > 0.5) discard;
+          float alpha = 1.0 - smoothstep(0.0, 0.5, dist);
+          gl_FragColor = vec4(vColor, alpha * 0.7);
+        }
+      `,
       transparent: true,
-      opacity: 0.7,
       blending: THREE.AdditiveBlending,
-      depthWrite: false
+      depthWrite: false,
+      vertexColors: true
     });
 
-    this.particleSystem = new THREE.Points(this.particleGeometry, this.particleMaterial);
+    this.particleSystem = new THREE.Points(this.particleGeometry!, this.particleMaterial!);
     this.scene.add(this.particleSystem);
   }
 
@@ -376,6 +396,21 @@ export class SceneManager {
     }
     
     colorAttr.needsUpdate = true;
+  }
+
+  public updateParticleSizes(sizes: Float32Array): void {
+    if (!this.particleGeometry) return;
+
+    const sizeAttr = this.particleGeometry.attributes.size;
+    if (!sizeAttr) return;
+
+    const sizeArray = sizeAttr.array as Float32Array;
+    
+    for (let i = 0; i < sizes.length; i++) {
+      sizeArray[i] = sizes[i];
+    }
+    
+    sizeAttr.needsUpdate = true;
   }
 
   public setOnFrameCallback(callback: (delta: number) => void): void {

@@ -94,6 +94,7 @@ class App {
       this.particleSystem.update(delta);
       this.sceneManager.updateParticlePositions(this.particleSystem.getPositions());
       this.sceneManager.updateParticleColors(this.particleSystem.getColors());
+      this.sceneManager.updateParticleSizes(this.particleSystem.getSizes());
     }
   }
 
