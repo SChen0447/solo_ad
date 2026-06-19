@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>宇宙星图探索</title>
+  <link rel="stylesheet" href="/src/styles/main.css">
+</head>
+<body>
+  <div id="app">
+    <canvas id="canvas3d"></canvas>
+
+    <header class="title-bar">
+      <h1>宇宙星图探索</h1>
+      <p class="subtitle">Cosmic Star Map Explorer</p>
+    </header>
+
+    <div id="minimap" class="minimap">
+      <canvas id="minimapCanvas"></canvas>
+      <div class="minimap-label">星空导航</div>
+    </div>
+
+    <div id="speedControl" class="speed-control">
+      <div class="speed-title">公转速度</div>
+      <div class="speed-buttons">
+        <button class="speed-btn active" data-speed="1">1x</button>
+        <button class="speed-btn" data-speed="2">2x</button>
+        <button class="speed-btn" data-speed="5">5x</button>
+      </div>
+    </div>
+
+    <div id="infoPanel" class="info-panel">
+      <button class="close-btn" id="closePanel">&times;</button>
+      <div class="panel-content">
+        <h2 class="celestial-name" id="celestialName"></h2>
+        <div class="celestial-type" id="celestialType"></div>
+        <div class="celestial-stats">
+          <div class="stat-item">
+            <span class="stat-label">直径</span>
+            <span class="stat-value" id="statDiameter"></span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-label">质量</span>
+            <span class="stat-value" id="statMass"></span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-label">公转周期</span>
+            <span class="stat-value" id="statOrbit"></span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-label">距恒星距离</span>
+            <span class="stat-value" id="statDistance"></span>
+          </div>
+        </div>
+        <p class="celestial-desc" id="celestialDesc"></p>
+      </div>
+    </div>
+
+    <div class="controls-hint">
+      <p>鼠标拖拽旋转视角 · 滚轮缩放 · R键重置 · 点击行星查看详情</p>
+    </div>
+  </div>
+
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
