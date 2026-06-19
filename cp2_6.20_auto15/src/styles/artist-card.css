@@ -31,6 +31,17 @@
   gap: 4px;
   flex-wrap: wrap;
   max-width: calc(100% - 24px);
+  transition: all 0.3s ease-out;
+  z-index: 10;
+}
+
+.card-style-tags.expanded {
+  background-color: rgba(42, 42, 62, 0.95);
+  backdrop-filter: blur(8px);
+  padding: 10px;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  max-width: calc(100% - 24px);
 }
 
 .style-tag {
@@ -41,6 +52,42 @@
   color: white;
   text-transform: uppercase;
   letter-spacing: 0.3px;
+  transition: transform 0.2s ease-out;
+}
+
+.more-tags-badge {
+  padding: 3px 8px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 700;
+  background-color: var(--bg-tertiary);
+  color: var(--accent);
+  cursor: pointer;
+  transition: all 0.2s ease-out;
+  border: 1px solid rgba(108, 99, 255, 0.3);
+}
+
+.more-tags-badge:hover {
+  background-color: var(--accent);
+  color: white;
+  transform: scale(1.1);
+}
+
+.collapse-tags-badge {
+  padding: 3px 8px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 600;
+  background-color: var(--bg-primary);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.2s ease-out;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.collapse-tags-badge:hover {
+  color: var(--text-primary);
+  border-color: rgba(255, 255, 255, 0.2);
 }
 
 .card-avatar {
@@ -92,13 +139,34 @@
   border-top: 1px solid rgba(255, 255, 255, 0.05);
 }
 
-.latest-release {
+.latest-release,
+.no-works {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  text-align: left;
+  justify-content: flex-start;
+}
+
+.calendar-icon {
+  font-size: 12px;
+  flex-shrink: 0;
+  opacity: 0.9;
+}
+
+.latest-release .calendar-icon {
+  filter: brightness(1.2);
+}
+
+.release-text {
   font-size: 11px;
-  color: var(--success);
   font-weight: 500;
 }
 
-.no-works {
-  font-size: 11px;
+.latest-release .release-text {
+  color: var(--success);
+}
+
+.no-works .release-text {
   color: var(--text-secondary);
 }

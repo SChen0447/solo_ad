@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { Artist } from '../types';
 import '../styles/artist-card.css';
@@ -23,6 +23,7 @@ const styleTagColors = [
 
 const ArtistCard: React.FC<ArtistCardProps> = ({ artist, isNew }) => {
   const navigate = useNavigate();
+  const [tagsExpanded, setTagsExpanded] = useState(false);
 
   const latestWork = artist.works.length > 0
     ? artist.works.reduce((latest, work) =>
@@ -30,17 +31,26 @@ const ArtistCard: React.FC<ArtistCardProps> = ({ artist, isNew }) => {
       )
     : null;
 
-  const handleClick = () => {
+  const handleCardClick = () => {
     navigate(`/artists/${artist.id}`);
   };
+
+  const handleMoreTagsClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setTagsExpanded(!tagsExpanded);
+  };
+
+  const displayTags = tagsExpanded ? artist.styleTags : artist.styleTags.slice(0, 3);
+  const hiddenTagCount = artist.styleTags.length - 3;
+  const hasMoreTags = hiddenTagCount > 0;
 
   return (
     <div
       className={`artist-card ${isNew ? 'card-pop-in' : ''}`}
-      onClick={handleClick}
+      onClick={handleCardClick}
     >
-      <div className="card-style-tags">
-        {artist.styleTags.slice(0, 3).map((tag, idx) => (
+      <div className={`card-style-tags ${tagsExpanded ? 'expanded' : ''}`}>
+        {displayTags.map((tag, idx) => (
           <span
             key={tag}
             className="style-tag"
@@ -49,6 +59,22 @@ const ArtistCard: React.FC<ArtistCardProps> = ({ artist, isNew }) => {
             {tag}
           </span>
         ))}
+        {!tagsExpanded && hasMoreTags && (
+          <span
+            className="more-tags-badge"
+            onClick={handleMoreTagsClick}
+          >
+            +{hiddenTagCount}
+          </span>
+        )}
+        {tagsExpanded && (
+          <span
+            className="collapse-tags-badge"
+            onClick={handleMoreTagsClick}
+          >
+            收起 ↑
+          </span>
+        )}
       </div>
       <div className="card-avatar">
         {artist.avatarUrl ? (
@@ -61,11 +87,17 @@ const ArtistCard: React.FC<ArtistCardProps> = ({ artist, isNew }) => {
       <div className="card-bio">{artist.bio || '暂无简介'}</div>
       <div className="card-footer">
         {latestWork ? (
-          <span className="latest-release">
-            最新作品: {latestWork.releaseDate}
-          </span>
+          <div className="latest-release" title={`最新作品: ${latestWork.name}`}>
+            <span className="calendar-icon">📅</span>
+            <span className="release-text">
+              {latestWork.releaseDate}
+            </span>
+          </div>
         ) : (
-          <span className="no-works">暂无作品</span>
+          <div className="no-works">
+            <span className="calendar-icon">📅</span>
+            <span className="release-text">暂无作品</span>
+          </div>
         )}
       </div>
     </div>
