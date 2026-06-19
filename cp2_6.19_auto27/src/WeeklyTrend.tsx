@@ -14,9 +14,44 @@ interface TooltipData {
   value: number;
 }
 
+interface ChartPoint {
+  x: number;
+  y: number | null;
+  value: number;
+  date: string;
+}
+
+function getCatmullRomControlPoints(points: { x: number; y: number }[]): {
+  cp1x: number;
+  cp1y: number;
+  cp2x: number;
+  cp2y: number;
+}[] {
+  const result: { cp1x: number; cp1y: number; cp2x: number; cp2y: number }[] = [];
+  const tension = 0.4;
+
+  for (let i = 0; i < points.length - 1; i++) {
+    const p0 = points[i - 1] || points[i];
+    const p1 = points[i];
+    const p2 = points[i + 1];
+    const p3 = points[i + 2] || p2;
+
+    const cp1x = p1.x + (p2.x - p0.x) * tension / 6;
+    const cp1y = p1.y + (p2.y - p0.y) * tension / 6;
+    const cp2x = p2.x - (p3.x - p1.x) * tension / 6;
+    const cp2y = p2.y - (p3.y - p1.y) * tension / 6;
+
+    result.push({ cp1x, cp1y, cp2x, cp2y });
+  }
+  return result;
+}
+
 export default function WeeklyTrend({ records }: WeeklyTrendProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const rafRef = useRef<number | null>(null);
+  const resizeTimerRef = useRef<number | null>(null);
+  const tooltipCacheRef = useRef<ChartPoint[]>([]);
   const [tooltip, setTooltip] = useState<TooltipData | null>(null);
 
   const weekDates = useMemo(() => getWeekDates(), []);
@@ -26,13 +61,15 @@ export default function WeeklyTrend({ records }: WeeklyTrendProps) {
       const dateStr = formatDate(date);
       const dayRecords = records.filter((r) => r.date === dateStr);
       const dominantMood = getDominantMood(dayRecords);
-      const avgValue = getAverageMoodValue(dayRecords, MOOD_CONFIGS);
+      const avgValue = dayRecords.length > 0 
+        ? getAverageMoodValue(dayRecords, MOOD_CONFIGS)
+        : 0;
       return {
         date: dateStr,
         dayLabel: `${date.getMonth() + 1}/${date.getDate()}`,
-        records: dayRecords,
+        recordsCount: dayRecords.length,
         dominantMood,
-        avgValue: dayRecords.length > 0 ? avgValue : 0
+        avgValue
       };
     });
   }, [weekDates, records]);
@@ -62,7 +99,7 @@ export default function WeeklyTrend({ records }: WeeklyTrendProps) {
     const chartWidth = width - padding.left - padding.right;
     const chartHeight = height - padding.top - padding.bottom;
 
-    ctx.strokeStyle = '#e0e0e0';
+    ctx.strokeStyle = '#e8e8e8';
     ctx.lineWidth = 1;
     for (let i = 0; i <= 5; i++) {
       const y = padding.top + (chartHeight / 5) * i;
@@ -72,82 +109,76 @@ export default function WeeklyTrend({ records }: WeeklyTrendProps) {
       ctx.stroke();
       
       ctx.fillStyle = '#999';
-      ctx.font = '11px sans-serif';
+      ctx.font = '11px -apple-system, BlinkMacSystemFont, sans-serif';
       ctx.textAlign = 'right';
       ctx.textBaseline = 'middle';
-      ctx.fillText(String(5 - i), padding.left - 8, y);
+      const value = 5 - i;
+      ctx.fillText(String(value), padding.left - 8, y);
     }
 
-    const dataPoints = dailyData.map((d, i) => ({
+    const dataPoints: ChartPoint[] = dailyData.map((d, i) => ({
       x: padding.left + (chartWidth / 6) * i,
       y: d.avgValue > 0 ? padding.top + chartHeight - (chartHeight / 5) * d.avgValue : null,
       value: d.avgValue,
       date: d.date
     }));
 
-    const validPoints = dataPoints.filter((p) => p.y !== null);
+    tooltipCacheRef.current = dataPoints;
+
+    const validPoints = dataPoints.filter((p) => p.y !== null) as { x: number; y: number }[];
+    
     if (validPoints.length >= 2) {
-      ctx.beginPath();
-      ctx.strokeStyle = '#9c27b0';
-      ctx.lineWidth = 2;
-      ctx.lineCap = 'round';
-      ctx.lineJoin = 'round';
-
-      for (let i = 0; i < validPoints.length - 1; i++) {
-        const p1 = validPoints[i];
-        const p2 = validPoints[i + 1];
-        const midX = (p1.x + p2.x) / 2;
-        const cpx1 = midX;
-        const cpx2 = midX;
-
-        if (i === 0) {
-          ctx.moveTo(p1.x, p1.y as number);
-        }
-        ctx.bezierCurveTo(cpx1, p1.y as number, cpx2, p2.y as number, p2.x, p2.y as number);
-      }
-      ctx.stroke();
+      const controlPoints = getCatmullRomControlPoints(validPoints);
 
       const gradient = ctx.createLinearGradient(0, padding.top, 0, height - padding.bottom);
-      gradient.addColorStop(0, 'rgba(156, 39, 176, 0.3)');
+      gradient.addColorStop(0, 'rgba(156, 39, 176, 0.25)');
       gradient.addColorStop(1, 'rgba(156, 39, 176, 0)');
 
       ctx.beginPath();
       ctx.fillStyle = gradient;
-      const firstPoint = validPoints[0];
-      const lastPoint = validPoints[validPoints.length - 1];
-      ctx.moveTo(firstPoint.x, height - padding.bottom);
-      ctx.lineTo(firstPoint.x, firstPoint.y as number);
-      for (let i = 0; i < validPoints.length - 1; i++) {
-        const p1 = validPoints[i];
-        const p2 = validPoints[i + 1];
-        const midX = (p1.x + p2.x) / 2;
-        const cpx1 = midX;
-        const cpx2 = midX;
-        ctx.bezierCurveTo(cpx1, p1.y as number, cpx2, p2.y as number, p2.x, p2.y as number);
+      ctx.moveTo(validPoints[0].x, height - padding.bottom);
+      ctx.lineTo(validPoints[0].x, validPoints[0].y);
+      for (let i = 0; i < controlPoints.length; i++) {
+        const cp = controlPoints[i];
+        const next = validPoints[i + 1];
+        ctx.bezierCurveTo(cp.cp1x, cp.cp1y, cp.cp2x, cp.cp2y, next.x, next.y);
       }
-      ctx.lineTo(lastPoint.x, height - padding.bottom);
+      ctx.lineTo(validPoints[validPoints.length - 1].x, height - padding.bottom);
       ctx.closePath();
       ctx.fill();
+
+      ctx.beginPath();
+      ctx.strokeStyle = '#9c27b0';
+      ctx.lineWidth = 2.5;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.moveTo(validPoints[0].x, validPoints[0].y);
+      for (let i = 0; i < controlPoints.length; i++) {
+        const cp = controlPoints[i];
+        const next = validPoints[i + 1];
+        ctx.bezierCurveTo(cp.cp1x, cp.cp1y, cp.cp2x, cp.cp2y, next.x, next.y);
+      }
+      ctx.stroke();
     }
 
     dataPoints.forEach((p) => {
       if (p.y !== null) {
         ctx.beginPath();
-        ctx.arc(p.x, p.y, 6, 0, Math.PI * 2);
+        ctx.arc(p.x, p.y, 7, 0, Math.PI * 2);
         ctx.fillStyle = 'white';
         ctx.fill();
-        ctx.lineWidth = 2;
+        ctx.lineWidth = 2.5;
         ctx.strokeStyle = '#9c27b0';
         ctx.stroke();
 
         ctx.beginPath();
-        ctx.arc(p.x, p.y, 3, 0, Math.PI * 2);
+        ctx.arc(p.x, p.y, 3.5, 0, Math.PI * 2);
         ctx.fillStyle = '#9c27b0';
         ctx.fill();
       }
 
       ctx.fillStyle = '#666';
-      ctx.font = '11px sans-serif';
+      ctx.font = '11px -apple-system, BlinkMacSystemFont, sans-serif';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'top';
       const dayIndex = weekDates.findIndex((d) => formatDate(d) === p.date);
@@ -156,39 +187,70 @@ export default function WeeklyTrend({ records }: WeeklyTrendProps) {
       ctx.fillText(weekLabels[weekDay], p.x, height - padding.bottom + 8);
       ctx.fillText(dailyData[dayIndex].dayLabel, p.x, height - padding.bottom + 22);
     });
-
-    canvas.onmousemove = (e) => {
-      const rect = canvas.getBoundingClientRect();
-      const mouseX = e.clientX - rect.left;
-      const mouseY = e.clientY - rect.top;
-
-      let foundPoint: TooltipData | null = null;
-      for (const p of dataPoints) {
-        if (p.y !== null && Math.abs(mouseX - p.x) < 20) {
-          const dayIndex = weekDates.findIndex((d) => formatDate(d) === p.date);
-          foundPoint = {
-            x: p.x,
-            y: p.y,
-            date: dailyData[dayIndex].date,
-            value: Math.round(p.value * 10) / 10
-          };
-          break;
-        }
-      }
-      setTooltip(foundPoint);
-    };
-
-    canvas.onmouseleave = () => {
-      setTooltip(null);
-    };
   }, [dailyData, weekDates]);
 
-  useEffect(() => {
-    drawChart();
-    const handleResize = () => drawChart();
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
+  const debouncedDraw = useCallback(() => {
+    if (rafRef.current !== null) {
+      cancelAnimationFrame(rafRef.current);
+    }
+    rafRef.current = requestAnimationFrame(() => {
+      drawChart();
+      rafRef.current = null;
+    });
   }, [drawChart]);
+
+  const handleMouseMove = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+    const mouseX = e.clientX - rect.left;
+
+    const dataPoints = tooltipCacheRef.current;
+    let foundPoint: TooltipData | null = null;
+    for (const p of dataPoints) {
+      if (p.y !== null && Math.abs(mouseX - p.x) < 25) {
+        const dayIndex = weekDates.findIndex((d) => formatDate(d) === p.date);
+        foundPoint = {
+          x: p.x,
+          y: p.y,
+          date: dailyData[dayIndex].date,
+          value: Math.round(p.value * 10) / 10
+        };
+        break;
+      }
+    }
+    setTooltip(foundPoint);
+  }, [weekDates, dailyData]);
+
+  const handleMouseLeave = useCallback(() => {
+    setTooltip(null);
+  }, []);
+
+  useEffect(() => {
+    debouncedDraw();
+  }, [debouncedDraw]);
+
+  useEffect(() => {
+    const handleResize = () => {
+      if (resizeTimerRef.current !== null) {
+        window.clearTimeout(resizeTimerRef.current);
+      }
+      resizeTimerRef.current = window.setTimeout(() => {
+        debouncedDraw();
+        resizeTimerRef.current = null;
+      }, 80);
+    };
+    window.addEventListener('resize', handleResize);
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      if (resizeTimerRef.current !== null) {
+        window.clearTimeout(resizeTimerRef.current);
+      }
+      if (rafRef.current !== null) {
+        cancelAnimationFrame(rafRef.current);
+      }
+    };
+  }, [debouncedDraw]);
 
   return (
     <div className="section">
@@ -207,8 +269,8 @@ export default function WeeklyTrend({ records }: WeeklyTrendProps) {
                   {day.dominantMood ? MOOD_CONFIGS[day.dominantMood].emoji : '❓'}
                 </div>
                 <div className="mood-card-date">{day.dayLabel}</div>
-                {day.records.length > 0 && (
-                  <div className="mood-card-count">{day.records.length}条</div>
+                {day.recordsCount > 0 && (
+                  <div className="mood-card-count">{day.recordsCount}条</div>
                 )}
               </div>
             ))}
@@ -216,7 +278,12 @@ export default function WeeklyTrend({ records }: WeeklyTrendProps) {
         </div>
 
         <div className="chart-container" ref={containerRef}>
-          <canvas ref={canvasRef} className="chart-canvas" />
+          <canvas
+            ref={canvasRef}
+            className="chart-canvas"
+            onMouseMove={handleMouseMove}
+            onMouseLeave={handleMouseLeave}
+          />
           {tooltip && (
             <div
               className="chart-tooltip"

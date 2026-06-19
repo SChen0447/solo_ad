@@ -1,4 +1,4 @@
-import { useReducer, useEffect, useState, useCallback } from 'react';
+import { useReducer, useEffect, useState, useCallback, useRef } from 'react';
 import MoodRecorder from './MoodRecorder';
 import WeeklyTrend from './WeeklyTrend';
 import MonthlyStats from './MonthlyStats';
@@ -32,18 +32,33 @@ function initState(): AppState {
 function App() {
   const [state, dispatch] = useReducer(reducer, undefined, initState);
   const [showToast, setShowToast] = useState(false);
+  const toastTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
     saveRecords(state.records);
   }, [state.records]);
+
+  useEffect(() => {
+    return () => {
+      if (toastTimerRef.current !== null) {
+        window.clearTimeout(toastTimerRef.current);
+      }
+    };
+  }, []);
 
   const handleAddRecord = useCallback((record: MoodRecord) => {
     dispatch({ type: 'ADD_RECORD', payload: record });
   }, []);
 
   const handleShowToast = useCallback(() => {
+    if (toastTimerRef.current !== null) {
+      window.clearTimeout(toastTimerRef.current);
+    }
     setShowToast(true);
-    setTimeout(() => setShowToast(false), 2000);
+    toastTimerRef.current = window.setTimeout(() => {
+      setShowToast(false);
+      toastTimerRef.current = null;
+    }, 2000);
   }, []);
 
   const handleViewModeChange = useCallback((mode: ViewMode) => {

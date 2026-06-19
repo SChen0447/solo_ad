@@ -17,10 +17,10 @@ interface HeatmapCell {
 function getColorForValue(value: number): string {
   if (value === 0) return '#fafafa';
   const ratio = (value - 1) / 4;
-  const r = Math.round(230 - ratio * 180);
-  const g = Math.round(230 - ratio * 130);
-  const b = Math.round(242 - ratio * 192);
-  return `rgb(${Math.max(r, 239 - ratio * 189)}, ${Math.max(g, 83 - ratio * 33)}, ${Math.max(b, 80 - ratio * 80)})`;
+  const r = Math.round(239 + (100 - 239) * ratio);
+  const g = Math.round(83 + (194 - 83) * ratio);
+  const b = Math.round(80 + (255 - 80) * ratio);
+  return `rgb(${r}, ${g}, ${b})`;
 }
 
 export default function MonthlyStats({ records }: MonthlyStatsProps) {
@@ -128,7 +128,7 @@ export default function MonthlyStats({ records }: MonthlyStatsProps) {
                   className={`heatmap-cell ${cell.date ? '' : 'heatmap-cell-empty'}`}
                   style={{
                     backgroundColor: cell.date ? getColorForValue(cell.avgValue) : undefined,
-                    color: cell.avgValue > 3 ? 'white' : (cell.date ? '#333' : '#ccc')
+                    color: cell.avgValue < 3 ? 'white' : (cell.date ? '#333' : '#ccc')
                   }}
                 >
                   {cell.dayOfMonth}

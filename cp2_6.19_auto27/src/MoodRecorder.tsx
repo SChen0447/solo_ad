@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import type { MoodType, MoodRecord } from './types';
 import { MOOD_CONFIGS } from './types';
@@ -8,6 +8,8 @@ interface MoodRecorderProps {
   onAddRecord: (record: MoodRecord) => void;
   onShowToast: () => void;
 }
+
+const MOOD_TYPES: MoodType[] = ['happy', 'calm', 'anxious', 'sad', 'angry'];
 
 export default function MoodRecorder({ onAddRecord, onShowToast }: MoodRecorderProps) {
   const [selectedMood, setSelectedMood] = useState<MoodType | null>(null);
@@ -42,15 +44,16 @@ export default function MoodRecorder({ onAddRecord, onShowToast }: MoodRecorderP
     setDescription('');
   }, [selectedMood, description, onAddRecord, onShowToast]);
 
-  const moodTypes: MoodType[] = ['happy', 'calm', 'anxious', 'sad', 'angry'];
+  const moodConfigs = useMemo(() => 
+    MOOD_TYPES.map((mood) => ({ mood, config: MOOD_CONFIGS[mood] })),
+  []);
 
   return (
     <div className="section">
       <h2 className="section-title">记录今天的心情</h2>
       
       <div className="mood-tags">
-        {moodTypes.map((mood) => {
-          const config = MOOD_CONFIGS[mood];
+        {moodConfigs.map(({ mood, config }) => {
           return (
             <div
               key={mood}
