@@ -1,0 +1,281 @@
+[
+  {
+    "id": "egypt-pyramids",
+    "name": "古埃及金字塔建造",
+    "year": -2560,
+    "civilization": "埃及",
+    "category": "建筑",
+    "description": "吉萨大金字塔完工，作为法老胡夫的陵墓，高约146.6米，是古代世界七大奇迹中唯一至今仍存的建筑，由约230万块石灰岩砌成，展现了古埃及人卓越的工程技术和天文知识。",
+    "image": "https://images.unsplash.com/photo-1503177119275-0aa32b3a9368?w=800&q=80"
+  },
+  {
+    "id": "mesopotamia-cuneiform",
+    "name": "楔形文字发明",
+    "year": -3000,
+    "civilization": "埃及",
+    "category": "文化",
+    "description": "苏美尔人在美索不达米亚平原发明了楔形文字，用削尖的芦苇杆在湿泥板上刻写符号，是人类最早的文字系统之一，记录了法律、诗歌和商业交易。",
+    "image": "https://images.unsplash.com/photo-1590069261209-f8e9b8642343?w=800&q=80"
+  },
+  {
+    "id": "indus-valley",
+    "name": "印度河流域文明兴起",
+    "year": -2600,
+    "civilization": "埃及",
+    "category": "文明",
+    "description": "摩亨佐-达罗和哈拉帕等城市兴起，发展出精密的城市规划、排水系统和标准化度量衡，是古代南亚最大的文明中心，人口估计超过5万。",
+    "image": "https://images.unsplash.com/photo-1524492412937-b28074a5d7da?w=800&q=80"
+  },
+  {
+    "id": "shang-dynasty",
+    "name": "商朝建立",
+    "year": -1600,
+    "civilization": "中国",
+    "category": "政治",
+    "description": "商汤灭夏建立商朝，定都于亳，是中国第一个有直接文字记载的王朝，甲骨文和青铜器达到极高水平，宗教祭祀和礼乐制度完备。",
+    "image": "https://images.unsplash.com/photo-1547981609-4b6bfe67ca0b?w=800&q=80"
+  },
+  {
+    "id": "egypt-tutankhamun",
+    "name": "图坦卡蒙统治",
+    "year": -1332,
+    "civilization": "埃及",
+    "category": "人物",
+    "description": "年轻法老图坦卡蒙登基，虽然年仅9岁继位且18岁去世，但其保存完好的陵墓于1922年被发现，出土了黄金面具等数千件珍贵文物，震惊世界。",
+    "image": "https://images.unsplash.com/photo-1539650116574-75c0c6d73a63?w=800&q=80"
+  },
+  {
+    "id": "zhou-dynasty",
+    "name": "西周建立",
+    "year": -1046,
+    "civilization": "中国",
+    "category": "政治",
+    "description": "周武王姬发率诸侯联军牧野之战击败商朝，建立周朝，推行分封制和宗法制，奠定了中华文明礼乐传统的基础，享国近800年。",
+    "image": "https://images.unsplash.com/photo-1508804185872-d7badad00f7d?w=800&q=80"
+  },
+  {
+    "id": "greece-olympics",
+    "name": "第一届古代奥林匹克运动会",
+    "year": -776,
+    "civilization": "希腊",
+    "category": "文化",
+    "description": "在希腊奥林匹亚举办第一届古代奥运会，以祭祀众神之王宙斯，每四年一届，包含赛跑、摔跤、战车比赛等项目，持续了近12个世纪。",
+    "image": "https://images.unsplash.com/photo-1555993539-1732b0258235?w=800&q=80"
+  },
+  {
+    "id": "rome-founded",
+    "name": "罗马建城",
+    "year": -753,
+    "civilization": "罗马",
+    "category": "政治",
+    "description": "传说中罗慕路斯在帕拉蒂尼山建立罗马城，开启了罗马从小城邦到横跨三大洲帝国的传奇历史，最初实行王政，后发展为共和国。",
+    "image": "https://images.unsplash.com/photo-1552832230-c0197dd311b5?w=800&q=80"
+  },
+  {
+    "id": "confucius-born",
+    "name": "孔子诞生",
+    "year": -551,
+    "civilization": "中国",
+    "category": "人物",
+    "description": "伟大思想家孔子诞生于鲁国陬邑，创立儒家学派，倡导仁、义、礼、智、信，其思想深刻影响了东亚文化两千余年，被尊为至圣先师。",
+    "image": "https://images.unsplash.com/photo-1583417319070-4a69db38a482?w=800&q=80"
+  },
+  {
+    "id": "greece-democracy",
+    "name": "雅典民主制确立",
+    "year": -508,
+    "civilization": "希腊",
+    "category": "政治",
+    "description": "克里斯提尼改革确立雅典民主制度，公民大会成为最高权力机构，成年男性公民可直接参与政治决策，开创了西方民主政治的先河。",
+    "image": "https://images.unsplash.com/photo-1603565816030-6b389eeb23cb?w=800&q=80"
+  },
+  {
+    "id": "persia-wars",
+    "name": "希波战争",
+    "year": -480,
+    "civilization": "希腊",
+    "category": "军事",
+    "description": "波斯帝国大军入侵希腊，斯巴达300勇士血战温泉关，雅典海军在萨拉米斯海战大败波斯舰队，希腊城邦联军最终取得胜利，保卫了民主制度。",
+    "image": "https://images.unsplash.com/photo-1541370976299-4d24ebbc9077?w=800&q=80"
+  },
+  {
+    "id": "socrates-executed",
+    "name": "苏格拉底被处死",
+    "year": -399,
+    "civilization": "希腊",
+    "category": "人物",
+    "description": "哲学家苏格拉底因「不敬神」和「腐蚀青年」罪名被雅典公民大会判处死刑，饮鸩而亡，其思想由学生柏拉图传承，奠定了西方哲学的基础。",
+    "image": "https://images.unsplash.com/photo-1497215842964-222b430dc094?w=800&q=80"
+  },
+  {
+    "id": "alexander-conquest",
+    "name": "亚历山大大帝东征",
+    "year": -334,
+    "civilization": "希腊",
+    "category": "军事",
+    "description": "马其顿国王亚历山大率大军东征，十年间征服波斯、埃及、中亚，建立起横跨欧亚非的庞大帝国，传播了希腊文化，开创了希腊化时代。",
+    "image": "https://images.unsplash.com/photo-1568322445389-f64ac2515020?w=800&q=80"
+  },
+  {
+    "id": "qin-unification",
+    "name": "秦始皇统一中国",
+    "year": -221,
+    "civilization": "中国",
+    "category": "政治",
+    "description": "秦王嬴政扫灭六国，建立中国历史上第一个大一统王朝，自称始皇帝，推行郡县制、书同文、车同轨、统一度量衡，修筑万里长城。",
+    "image": "https://images.unsplash.com/photo-1508804052814-cd3ba865a116?w=800&q=80"
+  },
+  {
+    "id": "rome-republic-end",
+    "name": "罗马帝国建立",
+    "year": -27,
+    "civilization": "罗马",
+    "category": "政治",
+    "description": "屋大维被元老院授予「奥古斯都」尊号，成为罗马第一位皇帝，结束了近500年的共和制，开启罗马帝国的黄金时代，即「罗马和平」时期。",
+    "image": "https://images.unsplash.com/photo-1529260830199-42c24126f198?w=800&q=80"
+  },
+  {
+    "id": "jesus-crucified",
+    "name": "耶稣受难",
+    "year": 33,
+    "civilization": "欧洲",
+    "category": "宗教",
+    "description": "拿撒勒人耶稣在耶路撒冷被罗马总督彼拉多判处钉十字架，其门徒宣扬他的复活，由此诞生了基督教，后成为世界三大宗教之一。",
+    "image": "https://images.unsplash.com/photo-1507692049790-de58290a4334?w=800&q=80"
+  },
+  {
+    "id": "han-wudi",
+    "name": "汉武帝开辟丝绸之路",
+    "year": -138,
+    "civilization": "中国",
+    "category": "经济",
+    "description": "张骞奉汉武帝之命出使西域，开辟了连接东西方的丝绸之路，促进了中国与中亚、欧洲的贸易往来和文化交流，丝绸、瓷器、茶叶远销海外。",
+    "image": "https://images.unsplash.com/photo-1589828994270-d719e2d8d4a2?w=800&q=80"
+  },
+  {
+    "id": "rome-colosseum",
+    "name": "罗马斗兽场建成",
+    "year": 80,
+    "civilization": "罗马",
+    "category": "建筑",
+    "description": "弗拉维圆形剧场（斗兽场）在罗马落成，可容纳5至8万名观众，用于角斗士比赛、动物狩猎和公众庆典，是古罗马建筑工程的巅峰之作。",
+    "image": "https://images.unsplash.com/photo-1558636508-e0db3814bd1d?w=800&q=80"
+  },
+  {
+    "id": "rome-fall-west",
+    "name": "西罗马帝国灭亡",
+    "year": 476,
+    "civilization": "罗马",
+    "category": "政治",
+    "description": "日耳曼雇佣军首领奥多亚克废黜最后一位西罗马皇帝罗慕路斯·奥古斯都，标志着西罗马帝国的终结和欧洲中世纪的开始。",
+    "image": "https://images.unsplash.com/photo-1531572753322-ad063cecc140?w=800&q=80"
+  },
+  {
+    "id": "sui-dynasty",
+    "name": "隋朝统一南北",
+    "year": 589,
+    "civilization": "中国",
+    "category": "政治",
+    "description": "隋文帝杨坚灭陈朝，结束了近三百年的南北朝分裂局面，重新统一中国，推行科举制度，开凿大运河，为唐朝盛世奠定基础。",
+    "image": "https://images.unsplash.com/photo-1508804185872-d7badad00f7d?w=800&q=80"
+  },
+  {
+    "id": "islam-rise",
+    "name": "伊斯兰教兴起",
+    "year": 622,
+    "civilization": "伊斯兰",
+    "category": "宗教",
+    "description": "先知穆罕默德从麦加迁徙至麦地那（希吉拉），标志着伊斯兰历的开始，伊斯兰教迅速传播，建立了横跨三大洲的阿拉伯帝国。",
+    "image": "https://images.unsplash.com/photo-1591604129939-f1efa4d9f7fa?w=800&q=80"
+  },
+  {
+    "id": "tang-dynasty-peak",
+    "name": "唐朝贞观之治",
+    "year": 627,
+    "civilization": "中国",
+    "category": "政治",
+    "description": "唐太宗李世民开启贞观之治，政治清明、经济繁荣、文化昌盛，长安成为世界上最大的城市，丝绸之路贸易达到顶峰，万国来朝。",
+    "image": "https://images.unsplash.com/photo-1544551763-46a013bb70d5?w=800&q=80"
+  },
+  {
+    "id": "islam-golden-age",
+    "name": "伊斯兰黄金时代",
+    "year": 750,
+    "civilization": "伊斯兰",
+    "category": "文化",
+    "description": "阿拔斯王朝迁都巴格达，开启伊斯兰文明的黄金时代，学者们翻译保存了大量希腊、波斯、印度典籍，在数学、医学、天文学领域取得重大突破。",
+    "image": "https://images.unsplash.com/photo-1564769625905-50e93615e769?w=800&q=80"
+  },
+  {
+    "id": "charlemagne-crowned",
+    "name": "查理曼加冕为皇帝",
+    "year": 800,
+    "civilization": "欧洲",
+    "category": "政治",
+    "description": "法兰克国王查理曼在罗马被教皇利奥三世加冕为「罗马人的皇帝」，建立了神圣罗马帝国的雏形，推动了加洛林文艺复兴。",
+    "image": "https://images.unsplash.com/photo-1520681279154-51b3fb4ea0f6?w=800&q=80"
+  },
+  {
+    "id": "song-dynasty",
+    "name": "北宋建立",
+    "year": 960,
+    "civilization": "中国",
+    "category": "政治",
+    "description": "赵匡胤陈桥兵变黄袍加身，建立宋朝，经济文化达到中国古代巅峰，发明了活字印刷术、指南针、火药，商业繁荣，城市生活丰富多彩。",
+    "image": "https://images.unsplash.com/photo-1584646098378-0874589d76b1?w=800&q=80"
+  },
+  {
+    "id": "crusades-begin",
+    "name": "第一次十字军东征",
+    "year": 1096,
+    "civilization": "欧洲",
+    "category": "军事",
+    "description": "教皇乌尔班二世号召基督教国家收复圣地耶路撒冷，开启了持续近两个世纪的十字军东征，深刻改变了欧洲与伊斯兰世界的关系。",
+    "image": "https://images.unsplash.com/photo-1548013146-72479768bada?w=800&q=80"
+  },
+  {
+    "id": "mongol-empire",
+    "name": "蒙古帝国崛起",
+    "year": 1206,
+    "civilization": "中国",
+    "category": "军事",
+    "description": "铁木真统一蒙古各部，被尊为成吉思汗，蒙古铁骑横扫欧亚大陆，建立了人类历史上领土面积最大的帝国，促进了东西方交流。",
+    "image": "https://images.unsplash.com/photo-1596422846543-75c6fc197f07?w=800&q=80"
+  },
+  {
+    "id": "renaissance-begin",
+    "name": "文艺复兴开始",
+    "year": 1350,
+    "civilization": "欧洲",
+    "category": "文化",
+    "description": "文艺复兴在意大利佛罗伦萨兴起，以复兴古希腊罗马文化为名，人文主义精神觉醒，诞生了达芬奇、米开朗基罗、拉斐尔等艺术巨匠。",
+    "image": "https://images.unsplash.com/photo-1534351590666-13e3e96c5017?w=800&q=80"
+  },
+  {
+    "id": "ming-zhenghe",
+    "name": "郑和下西洋",
+    "year": 1405,
+    "civilization": "中国",
+    "category": "探险",
+    "description": "明朝航海家郑和率庞大舰队七次下西洋，访问了东南亚、印度、波斯湾、东非等地，最远到达肯尼亚，比哥伦布发现美洲早近90年。",
+    "image": "https://images.unsplash.com/photo-1500930287596-c1ecaa373bb2?w=800&q=80"
+  },
+  {
+    "id": "columbus-america",
+    "name": "哥伦布发现新大陆",
+    "year": 1492,
+    "civilization": "欧洲",
+    "category": "探险",
+    "description": "意大利航海家克里斯托弗·哥伦布在西班牙王室资助下横渡大西洋，到达美洲巴哈马群岛，开启了大航海时代和欧洲对美洲的殖民历史。",
+    "image": "https://images.unsplash.com/photo-1534447677768-be436bb09401?w=800&q=80"
+  },
+  {
+    "id": "printing-press",
+    "name": "古腾堡活字印刷术",
+    "year": 1440,
+    "civilization": "欧洲",
+    "category": "科技",
+    "description": "德国人约翰内斯·古腾堡改良活字印刷术，发明了金属活字印刷机，使书籍生产成本大幅降低，推动了知识的传播和宗教改革的发展。",
+    "image": "https://images.unsplash.com/photo-1457369804613-52c61a468e7d?w=800&q=80"
+  }
+]
