@@ -27,6 +27,10 @@ export class Renderer {
 
     this.drawWaveGrid(ctx);
 
+    this.drawRippleLayer(ctx);
+
+    this.drawSwellLayer(ctx);
+
     for (const ship of sm.playerShips) {
       this.drawTrail(ctx, ship.trail);
     }
@@ -107,6 +111,67 @@ export class Renderer {
         const offset = Math.sin(this.time * 0.6 + x * 0.02 + y * 0.01) * 3;
         if (x === 0) ctx.moveTo(x, y + offset);
         else ctx.lineTo(x, y + offset);
+      }
+      ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  private getWaveDirection(): { dx: number; dy: number } {
+    const cycle = 30;
+    const phase = ((this.time % cycle) / cycle) * Math.PI * 2;
+    const angle = Math.sin(phase) * Math.PI * 0.75 + Math.cos(phase * 0.5) * Math.PI * 0.25;
+    return { dx: Math.cos(angle), dy: Math.sin(angle) };
+  }
+
+  private drawRippleLayer(ctx: CanvasRenderingContext2D): void {
+    const dir = this.getWaveDirection();
+    ctx.globalAlpha = 0.3;
+    ctx.strokeStyle = '#1a3a5a';
+    ctx.lineWidth = 0.8;
+    const spacing = 18;
+    const freq = 0.06;
+    const amp = 4;
+    const speed = 1.8;
+    const lineCount = Math.ceil(this.height / spacing) + 4;
+    for (let i = -2; i < lineCount; i++) {
+      ctx.beginPath();
+      const baseY = i * spacing;
+      for (let x = 0; x <= this.width; x += 4) {
+        const projected = x * dir.dx + baseY * dir.dy;
+        const wave = Math.sin(projected * freq + this.time * speed + i * 0.8) * amp;
+        const wave2 = Math.sin(projected * freq * 1.7 + this.time * speed * 0.6 + i * 1.2) * amp * 0.5;
+        const py = baseY + wave + wave2 + dir.dy * Math.sin(this.time * 0.3 + i) * 8;
+        const px = x + dir.dx * Math.sin(this.time * 0.3 + i) * 4;
+        if (x === 0) ctx.moveTo(px, py);
+        else ctx.lineTo(px, py);
+      }
+      ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  private drawSwellLayer(ctx: CanvasRenderingContext2D): void {
+    const dir = this.getWaveDirection();
+    ctx.globalAlpha = 0.2;
+    ctx.strokeStyle = '#0d2a4a';
+    ctx.lineWidth = 1.5;
+    const spacing = 35;
+    const freq = 0.018;
+    const amp = 10;
+    const speed = 0.7;
+    const lineCount = Math.ceil(this.height / spacing) + 4;
+    for (let i = -2; i < lineCount; i++) {
+      ctx.beginPath();
+      const baseY = i * spacing;
+      for (let x = 0; x <= this.width; x += 5) {
+        const projected = x * dir.dx + baseY * dir.dy;
+        const wave = Math.sin(projected * freq + this.time * speed + i * 1.5) * amp;
+        const wave2 = Math.sin(projected * freq * 0.6 + this.time * speed * 0.4 + i * 0.9) * amp * 0.6;
+        const py = baseY + wave + wave2 + dir.dy * Math.sin(this.time * 0.2 + i * 0.7) * 15;
+        const px = x + dir.dx * Math.sin(this.time * 0.15 + i * 0.5) * 10;
+        if (x === 0) ctx.moveTo(px, py);
+        else ctx.lineTo(px, py);
       }
       ctx.stroke();
     }
