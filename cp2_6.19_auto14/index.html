@@ -237,45 +237,6 @@
 <body>
   <div id="app">
     <div id="canvas-container"></div>
-
-    <button id="reset-btn" title="复位视角">
-      <svg viewBox="0 0 24 24"><path d="M16 12V4h1V2H7v2h1v8l-2 2v2h5.2v6h1.6v-6H18v-2l-2-2z"/></svg>
-    </button>
-
-    <div id="side-panel">
-      <h2>地质断层可视化</h2>
-      <div class="subtitle">GEOLOGICAL FAULT VISUALIZER</div>
-
-      <div class="section">
-        <div class="section-label">
-          <span>深度截面查询</span>
-          <span class="depth-value"><span id="depth-display">0</span> m</span>
-        </div>
-        <input type="range" id="depth-slider" min="0" max="0" step="1" value="0" />
-      </div>
-
-      <div class="section" id="layer-info">
-        <div class="info-title">深度岩层构成</div>
-        <div id="layer-list">
-          <div style="font-size:12px; color:#666; padding:10px 0;">拖动滑块查询深度截面</div>
-        </div>
-      </div>
-    </div>
-
-    <div id="popup-card">
-      <button id="popup-close">&times;</button>
-      <div class="popup-title">
-        <span class="color-dot" id="popup-color"></span>
-        <span id="popup-name">岩层名称</span>
-      </div>
-      <div class="popup-row"><span class="popup-label">深度范围</span><span class="popup-value" id="popup-depth">-</span></div>
-      <div class="popup-row"><span class="popup-label">密&emsp;&emsp;度</span><span class="popup-value" id="popup-density">-</span></div>
-      <div class="popup-row"><span class="popup-label">估算年代</span><span class="popup-value" id="popup-era">-</span></div>
-    </div>
-
-    <div id="instructions">
-      <span>左键拖拽</span> 旋转 &nbsp;|&nbsp; <span>滚轮</span> 缩放 &nbsp;|&nbsp; <span>点击岩层</span> 查看详情
-    </div>
   </div>
   <script type="module" src="/src/main.ts"></script>
 </body>

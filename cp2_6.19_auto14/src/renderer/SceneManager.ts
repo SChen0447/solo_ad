@@ -4,17 +4,19 @@ import { GeologyData, GeologyLayer, GeologyFault } from '../data/GeologyInterfac
 
 const DEPTH_SCALE = 0.35;
 const LAYER_GAP = 0.25;
-const FAULT_COLOR = 0xFF4444;
+const FAULT_COLOR = 0xff4444;
 const FAULT_OPACITY = 0.5;
 const LAYER_OPACITY = 0.75;
-const HIGHLIGHT_COLOR = 0xFFEB3B;
+const HIGHLIGHT_COLOR = 0xffeb3b;
 const HIGHLIGHT_INTERVAL = 0.6;
 
 interface LayerMeshInfo {
   layer: GeologyLayer;
   mesh: THREE.Mesh;
-  edges: THREE.LineSegments;
+  edgeStartIndex: number;
+  edgeCount: number;
   originalEdgeColor: THREE.Color;
+  highlightEdges: THREE.LineSegments | null;
 }
 
 export class SceneManager {
@@ -26,19 +28,23 @@ export class SceneManager {
   private raycaster: THREE.Raycaster;
   private pointer: THREE.Vector2;
   private layerMeshes: LayerMeshInfo[] = [];
+  private mergedEdges: THREE.LineSegments | null = null;
+  private mergedEdgeGeom: THREE.BufferGeometry | null = null;
   private highlightedInfo: LayerMeshInfo | null = null;
   private highlightTimer = 0;
   private highlightState = false;
   private clock: THREE.Clock;
   private animationFrameId: number | null = null;
-  private onLayerClickCallback: ((layer: GeologyLayer, screenPos: { x: number; y: number }) => void) | null = null;
+  private onLayerClickCallback:
+    | ((layer: GeologyLayer, screenPos: { x: number; y: number }) => void)
+    | null = null;
   private data: GeologyData | null = null;
 
   constructor(container: HTMLElement) {
     this.container = container;
     this.scene = new THREE.Scene();
-    this.scene.background = new THREE.Color(0x1A1A2E);
-    this.scene.fog = new THREE.Fog(0x1A1A2E, 25, 70);
+    this.scene.background = new THREE.Color(0x1a1a2e);
+    this.scene.fog = new THREE.Fog(0x1a1a2e, 25, 70);
 
     const width = container.clientWidth;
     const height = container.clientHeight;
@@ -84,7 +90,7 @@ export class SceneManager {
     );
   }
 
-  resetCamera(onComplete?: () => void): {
+  resetCamera(): {
     startPos: THREE.Vector3;
     startTarget: THREE.Vector3;
     endPos: THREE.Vector3;
@@ -103,10 +109,6 @@ export class SceneManager {
     );
     const endTarget = new THREE.Vector3(0, -6, 0);
 
-    if (onComplete) {
-      setTimeout(onComplete, 1000);
-    }
-
     return { startPos, startTarget, endPos, endTarget };
   }
 
@@ -124,7 +126,7 @@ export class SceneManager {
     dir1.position.set(10, 20, 8);
     this.scene.add(dir1);
 
-    const dir2 = new THREE.DirectionalLight(0x8899FF, 0.3);
+    const dir2 = new THREE.DirectionalLight(0x8899ff, 0.3);
     dir2.position.set(-8, 12, -10);
     this.scene.add(dir2);
   }
@@ -135,14 +137,29 @@ export class SceneManager {
     const points: THREE.Vector3[] = [];
     for (let i = 0; i <= segments; i++) {
       const theta = (i / segments) * Math.PI * 2;
-      points.push(new THREE.Vector3(Math.cos(theta) * radius, 0.02, Math.sin(theta) * radius));
+      points.push(
+        new THREE.Vector3(
+          Math.cos(theta) * radius,
+          0.02,
+          Math.sin(theta) * radius
+        )
+      );
     }
     const ringGeom = new THREE.BufferGeometry().setFromPoints(points);
-    const ringMat = new THREE.LineBasicMaterial({ color: 0x4A5068, transparent: true, opacity: 0.5 });
+    const ringMat = new THREE.LineBasicMaterial({
+      color: 0x4a5068,
+      transparent: true,
+      opacity: 0.5
+    });
     this.scene.add(new THREE.Line(ringGeom, ringMat));
 
     const innerRing = new THREE.RingGeometry(8, 8.05, 64);
-    const innerMat = new THREE.MeshBasicMaterial({ color: 0x4A5068, transparent: true, opacity: 0.4, side: THREE.DoubleSide });
+    const innerMat = new THREE.MeshBasicMaterial({
+      color: 0x4a5068,
+      transparent: true,
+      opacity: 0.4,
+      side: THREE.DoubleSide
+    });
     const innerMesh = new THREE.Mesh(innerRing, innerMat);
     innerMesh.rotation.x = -Math.PI / 2;
     innerMesh.position.y = 0.01;
@@ -156,9 +173,17 @@ export class SceneManager {
       new THREE.Vector3(0, 0.02, -radius),
       new THREE.Vector3(0, 0.02, radius)
     ];
-    const crossMat = new THREE.LineBasicMaterial({ color: 0x4A5068, transparent: true, opacity: 0.35 });
-    this.scene.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(crossPts1), crossMat));
-    this.scene.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(crossPts2), crossMat));
+    const crossMat = new THREE.LineBasicMaterial({
+      color: 0x4a5068,
+      transparent: true,
+      opacity: 0.35
+    });
+    this.scene.add(
+      new THREE.Line(new THREE.BufferGeometry().setFromPoints(crossPts1), crossMat)
+    );
+    this.scene.add(
+      new THREE.Line(new THREE.BufferGeometry().setFromPoints(crossPts2), crossMat)
+    );
   }
 
   private setupEvents(): void {
@@ -210,22 +235,71 @@ export class SceneManager {
     }
   };
 
-  setOnLayerClick(cb: (layer: GeologyLayer, screenPos: { x: number; y: number }) => void): void {
+  setOnLayerClick(
+    cb: (layer: GeologyLayer, screenPos: { x: number; y: number }) => void
+  ): void {
     this.onLayerClickCallback = cb;
+  }
+
+  private clearHighlightState(info: LayerMeshInfo): void {
+    if (info.highlightEdges) {
+      this.scene.remove(info.highlightEdges);
+      info.highlightEdges.geometry.dispose();
+      (info.highlightEdges.material as THREE.Material).dispose();
+      info.highlightEdges = null;
+    }
   }
 
   private setHighlighted(info: LayerMeshInfo | null): void {
     if (this.highlightedInfo && this.highlightedInfo !== info) {
-      (this.highlightedInfo.edges.material as THREE.LineBasicMaterial).color.copy(this.highlightedInfo.originalEdgeColor);
-      (this.highlightedInfo.edges.material as THREE.LineBasicMaterial).opacity = 0.9;
+      this.clearHighlightState(this.highlightedInfo);
     }
+
     this.highlightedInfo = info;
     this.highlightTimer = 0;
     this.highlightState = false;
+
+    if (info) {
+      this.createHighlightEdges(info);
+    }
+  }
+
+  private createHighlightEdges(info: LayerMeshInfo): void {
+    const layer = info.layer;
+    const size = this.data ? this.data.groundSize : 12;
+    const topY = -layer.topDepth * DEPTH_SCALE;
+    const bottomY = -layer.bottomDepth * DEPTH_SCALE;
+    const height = Math.abs(bottomY - topY) - LAYER_GAP;
+    const centerY = (topY + bottomY) / 2 + LAYER_GAP / 2;
+
+    const boxGeom = new THREE.BoxGeometry(
+      size,
+      Math.max(height, 0.1),
+      size,
+      1,
+      1,
+      1
+    );
+    const edgeGeom = new THREE.EdgesGeometry(boxGeom);
+    boxGeom.dispose();
+
+    const edgeMat = new THREE.LineBasicMaterial({
+      color: HIGHLIGHT_COLOR,
+      transparent: true,
+      opacity: 1.0
+    });
+    const edges = new THREE.LineSegments(edgeGeom, edgeMat);
+    edges.position.set(0, centerY, 0);
+    this.scene.add(edges);
+
+    info.highlightEdges = edges;
   }
 
   clearHighlight(): void {
-    this.setHighlighted(null);
+    if (this.highlightedInfo) {
+      this.clearHighlightState(this.highlightedInfo);
+      this.highlightedInfo = null;
+    }
   }
 
   buildFromData(data: GeologyData): void {
@@ -234,26 +308,102 @@ export class SceneManager {
 
     const size = data.groundSize;
 
-    data.layers.forEach((layer) => {
-      this.createLayerMesh(layer, size);
+    const edgeGeoms: THREE.BufferGeometry[] = [];
+    let currentIndex = 0;
+
+    data.layers.forEach(layer => {
+      const { mesh, edgeGeom, color } = this.createLayerMesh(layer, size);
+      const edgeCount = edgeGeom.attributes.position.count;
+      this.layerMeshes.push({
+        layer,
+        mesh,
+        edgeStartIndex: currentIndex,
+        edgeCount,
+        originalEdgeColor: color.clone(),
+        highlightEdges: null
+      });
+      currentIndex += edgeCount;
+      edgeGeoms.push(edgeGeom);
     });
 
-    data.faults.forEach((fault) => {
-      this.createFaultMesh(fault, size);
+    this.buildMergedEdges(edgeGeoms);
+
+    data.faults.forEach(fault => {
+      this.createFaultMesh(fault);
     });
+  }
+
+  private buildMergedEdges(edgeGeoms: THREE.BufferGeometry[]): void {
+    if (this.mergedEdges) {
+      this.scene.remove(this.mergedEdges);
+      if (this.mergedEdgeGeom) this.mergedEdgeGeom.dispose();
+      (this.mergedEdges.material as THREE.Material).dispose();
+      this.mergedEdges = null;
+      this.mergedEdgeGeom = null;
+    }
+
+    if (edgeGeoms.length === 0) return;
+
+    const merged = this.mergeBufferGeometries(edgeGeoms);
+    this.mergedEdgeGeom = merged;
+
+    const mat = new THREE.LineBasicMaterial({
+      vertexColors: true,
+      transparent: true,
+      opacity: 0.95
+    });
+
+    const lineSegments = new THREE.LineSegments(merged, mat);
+    this.scene.add(lineSegments);
+    this.mergedEdges = lineSegments;
+
+    edgeGeoms.forEach(g => g.dispose());
+  }
+
+  private mergeBufferGeometries(geometries: THREE.BufferGeometry[]): THREE.BufferGeometry {
+    const positions: number[] = [];
+    const colors: number[] = [];
+
+    geometries.forEach((geom, layerIdx) => {
+      const posAttr = geom.attributes.position;
+      const color = this.layerMeshes[layerIdx]?.originalEdgeColor || new THREE.Color(0xffffff);
+      for (let i = 0; i < posAttr.count; i++) {
+        positions.push(posAttr.getX(i), posAttr.getY(i), posAttr.getZ(i));
+        colors.push(color.r, color.g, color.b);
+      }
+    });
+
+    const result = new THREE.BufferGeometry();
+    result.setAttribute(
+      'position',
+      new THREE.Float32BufferAttribute(positions, 3)
+    );
+    result.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+
+    return result;
   }
 
   private clearGeology(): void {
     this.layerMeshes.forEach(lm => {
       this.scene.remove(lm.mesh);
-      this.scene.remove(lm.edges);
       lm.mesh.geometry.dispose();
       (lm.mesh.material as THREE.Material).dispose();
-      lm.edges.geometry.dispose();
-      (lm.edges.material as THREE.Material).dispose();
+      if (lm.highlightEdges) {
+        this.scene.remove(lm.highlightEdges);
+        lm.highlightEdges.geometry.dispose();
+        (lm.highlightEdges.material as THREE.Material).dispose();
+      }
     });
     this.layerMeshes = [];
     this.highlightedInfo = null;
+
+    if (this.mergedEdges) {
+      this.scene.remove(this.mergedEdges);
+      if (this.mergedEdgeGeom) this.mergedEdgeGeom.dispose();
+      (this.mergedEdges.material as THREE.Material).dispose();
+      this.mergedEdges = null;
+      this.mergedEdgeGeom = null;
+    }
 
     const toRemove: THREE.Object3D[] = [];
     this.scene.traverse(obj => {
@@ -263,20 +413,25 @@ export class SceneManager {
     });
     toRemove.forEach(obj => {
       this.scene.remove(obj);
-      if ((obj as THREE.Mesh).geometry) (obj as THREE.Mesh).geometry.dispose();
-      const mat = (obj as THREE.Mesh).material as THREE.Material | THREE.Material[];
+      const mesh = obj as THREE.Mesh;
+      if (mesh.geometry) mesh.geometry.dispose();
+      const mat = mesh.material as THREE.Material | THREE.Material[];
       if (Array.isArray(mat)) mat.forEach(m => m.dispose());
       else if (mat) mat.dispose();
     });
   }
 
-  private createLayerMesh(layer: GeologyLayer, size: number): void {
+  private createLayerMesh(
+    layer: GeologyLayer,
+    size: number
+  ): { mesh: THREE.Mesh; edgeGeom: THREE.BufferGeometry; color: THREE.Color } {
     const topY = -layer.topDepth * DEPTH_SCALE;
     const bottomY = -layer.bottomDepth * DEPTH_SCALE;
     const height = Math.abs(bottomY - topY) - LAYER_GAP;
     const centerY = (topY + bottomY) / 2 + LAYER_GAP / 2;
+    const h = Math.max(height, 0.1);
 
-    const geom = new THREE.BoxGeometry(size, Math.max(height, 0.1), size, 1, 1, 1);
+    const geom = new THREE.BoxGeometry(size, h, size, 1, 1, 1);
     const color = new THREE.Color(layer.color);
     const mat = new THREE.MeshPhongMaterial({
       color,
@@ -292,80 +447,97 @@ export class SceneManager {
     mesh.userData.layerId = layer.id;
     this.scene.add(mesh);
 
-    const edgeGeom = new THREE.EdgesGeometry(geom);
     const edgeColor = color.clone().multiplyScalar(0.55);
-    const edgeMat = new THREE.LineBasicMaterial({
-      color: edgeColor,
-      transparent: true,
-      opacity: 0.9
-    });
-    const edges = new THREE.LineSegments(edgeGeom, edgeMat);
-    edges.position.copy(mesh.position);
-    this.scene.add(edges);
+    const edgeGeom = new THREE.EdgesGeometry(geom);
+    const posAttr = edgeGeom.attributes.position as THREE.BufferAttribute;
+    const positions = posAttr.array as Float32Array;
+    for (let i = 0; i < positions.length; i += 3) {
+      positions[i + 1] += centerY;
+    }
+    posAttr.needsUpdate = true;
 
-    this.layerMeshes.push({
-      layer,
-      mesh,
-      edges,
-      originalEdgeColor: edgeColor.clone()
-    });
+    return { mesh, edgeGeom, color: edgeColor };
   }
 
-  private createFaultMesh(fault: GeologyFault, _size: number): void {
+  private createFaultMesh(fault: GeologyFault): void {
     const pts = fault.strikePoints;
     if (pts.length < 2) return;
 
     const topY = -fault.topDepth * DEPTH_SCALE;
     const bottomY = -fault.bottomDepth * DEPTH_SCALE;
-    const midY = (topY + bottomY) / 2;
-    const planeHeight = Math.abs(bottomY - topY) * 0.92;
-
-    const dirX = pts[pts.length - 1].x - pts[0].x;
-    const dirZ = pts[pts.length - 1].z - pts[0].z;
-    const strikeLen = Math.sqrt(dirX * dirX + dirZ * dirZ);
-    if (strikeLen < 0.001) return;
-
-    const strikeAngle = Math.atan2(dirZ, dirX);
     const dipRad = (fault.dip * Math.PI) / 180;
 
-    const planeWidth = strikeLen * 1.15;
-    const planeGeom = new THREE.PlaneGeometry(planeWidth, planeHeight, Math.max(4, Math.floor(planeWidth)), 4);
-    const planeMat = new THREE.MeshPhongMaterial({
+    const positions: number[] = [];
+    const indices: number[] = [];
+
+    const steps = pts.length - 1;
+    const depthSegments = 8;
+
+    for (let i = 0; i < pts.length; i++) {
+      const sp = pts[i];
+      const nextSp = pts[Math.min(i + 1, pts.length - 1)];
+      const prevSp = pts[Math.max(i - 1, 0)];
+
+      const segDx = nextSp.x - prevSp.x;
+      const segDz = nextSp.z - prevSp.z;
+      const segLen = Math.sqrt(segDx * segDx + segDz * segDz) || 1;
+      const strikeNormalX = -segDz / segLen;
+      const strikeNormalZ = segDx / segLen;
+
+      const dipHorizontal = Math.cos(dipRad);
+      const dipVertical = Math.sin(dipRad);
+      const dipOffsetX = strikeNormalX * dipHorizontal;
+      const dipOffsetZ = strikeNormalZ * dipHorizontal;
+
+      for (let j = 0; j <= depthSegments; j++) {
+        const t = j / depthSegments;
+        const y = topY + (bottomY - topY) * t;
+        const depthAmt = t * (fault.bottomDepth - fault.topDepth) * DEPTH_SCALE;
+        const x = sp.x + dipOffsetX * depthAmt;
+        const z = sp.z + dipOffsetZ * depthAmt;
+
+        positions.push(x, y, z);
+      }
+    }
+
+    for (let i = 0; i < steps; i++) {
+      for (let j = 0; j < depthSegments; j++) {
+        const a = i * (depthSegments + 1) + j;
+        const b = a + 1;
+        const c = a + (depthSegments + 1);
+        const d = c + 1;
+
+        indices.push(a, c, b);
+        indices.push(b, c, d);
+      }
+    }
+
+    const geom = new THREE.BufferGeometry();
+    geom.setAttribute(
+      'position',
+      new THREE.Float32BufferAttribute(positions, 3)
+    );
+    geom.setIndex(indices);
+    geom.computeVertexNormals();
+
+    const mat = new THREE.MeshPhongMaterial({
       color: FAULT_COLOR,
       transparent: true,
       opacity: FAULT_OPACITY,
       side: THREE.DoubleSide,
       shininess: 20
     });
-    const mesh = new THREE.Mesh(planeGeom, planeMat);
+    const mesh = new THREE.Mesh(geom, mat);
     mesh.userData.isFault = true;
-
-    mesh.position.set(
-      (pts[0].x + pts[pts.length - 1].x) / 2,
-      midY,
-      (pts[0].z + pts[pts.length - 1].z) / 2
-    );
-
-    const mx = new THREE.Matrix4().makeRotationY(-strikeAngle);
-    const mz = new THREE.Matrix4().makeRotationZ(-dipRad);
-    const mBack = new THREE.Matrix4().makeRotationY(strikeAngle);
-    mesh.applyMatrix4(mx);
-    mesh.applyMatrix4(mz);
-    mesh.applyMatrix4(mBack);
-
     this.scene.add(mesh);
 
-    const edgeGeom = new THREE.EdgesGeometry(planeGeom);
+    const edgeGeom = new THREE.EdgesGeometry(geom);
     const edgeMat = new THREE.LineBasicMaterial({
-      color: 0xFF7777,
+      color: 0xff7777,
       transparent: true,
       opacity: 0.7
     });
     const edges = new THREE.LineSegments(edgeGeom, edgeMat);
-    edges.position.copy(mesh.position);
-    edges.applyMatrix4(mx);
-    edges.applyMatrix4(mz);
-    edges.applyMatrix4(mBack);
     edges.userData.isFault = true;
     this.scene.add(edges);
   }
@@ -378,7 +550,7 @@ export class SceneManager {
     const y = -depth * DEPTH_SCALE;
     const geom = new THREE.PlaneGeometry(size, size, 1, 1);
     const mat = new THREE.MeshPhongMaterial({
-      color: 0xD0D0D8,
+      color: 0xd0d0d8,
       transparent: true,
       opacity: 0.4,
       side: THREE.DoubleSide,
@@ -392,7 +564,7 @@ export class SceneManager {
 
     const frameGeom = new THREE.EdgesGeometry(geom);
     const frameMat = new THREE.LineBasicMaterial({
-      color: 0x4A90D9,
+      color: 0x4a90d9,
       transparent: true,
       opacity: 0.85
     });
@@ -412,8 +584,9 @@ export class SceneManager {
     });
     toRemove.forEach(obj => {
       this.scene.remove(obj);
-      if ((obj as THREE.Mesh).geometry) (obj as THREE.Mesh).geometry.dispose();
-      const mat = (obj as THREE.Mesh).material as THREE.Material | THREE.Material[];
+      const mesh = obj as THREE.Mesh;
+      if (mesh.geometry) mesh.geometry.dispose();
+      const mat = mesh.material as THREE.Material | THREE.Material[];
       if (Array.isArray(mat)) mat.forEach(m => m.dispose());
       else if (mat) mat.dispose();
     });
@@ -454,14 +627,14 @@ export class SceneManager {
   }
 
   private updateHighlight(dt: number): void {
-    if (!this.highlightedInfo) return;
+    if (!this.highlightedInfo || !this.highlightedInfo.highlightEdges) return;
+
     this.highlightTimer += dt;
     if (this.highlightTimer >= HIGHLIGHT_INTERVAL) {
       this.highlightTimer = 0;
       this.highlightState = !this.highlightState;
-      const mat = this.highlightedInfo.edges.material as THREE.LineBasicMaterial;
-      const color = new THREE.Color(HIGHLIGHT_COLOR);
-      mat.color.copy(color);
+      const mat = this.highlightedInfo.highlightEdges
+        .material as THREE.LineBasicMaterial;
       mat.opacity = this.highlightState ? 1.0 : 0.3;
       mat.needsUpdate = true;
     }
@@ -470,8 +643,14 @@ export class SceneManager {
   dispose(): void {
     this.stop();
     window.removeEventListener('resize', this.handleResize);
-    this.renderer.domElement.removeEventListener('pointerdown', this.handlePointerDown);
-    this.renderer.domElement.removeEventListener('pointerup', this.handlePointerUp);
+    this.renderer.domElement.removeEventListener(
+      'pointerdown',
+      this.handlePointerDown
+    );
+    this.renderer.domElement.removeEventListener(
+      'pointerup',
+      this.handlePointerUp
+    );
     this.clearGeology();
     this.removeCrossSectionPlane();
     this.renderer.dispose();
