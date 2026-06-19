@@ -17,9 +17,12 @@ export class SceneManager {
   private selectedBuildingId: string | null = null;
   private pendingBuildingType: BuildingType | null = null;
   private isDragging: boolean = false;
+  private previewBuilding: { mesh: THREE.Group; type: BuildingType; highlight: THREE.LineSegments } | null = null;
+  private isPlacingMode: boolean = false;
   
   private onBuildingChange?: () => void;
   private onSelectionChange?: (buildingId: string | null) => void;
+  private onPlacingModeChange?: (isPlacing: boolean) => void;
 
   constructor(canvasId: string) {
     this.canvas = document.getElementById(canvasId) as HTMLCanvasElement;
@@ -77,8 +80,23 @@ export class SceneManager {
     window.addEventListener('resize', () => this.onResize());
     this.canvas.addEventListener('click', (e) => this.onCanvasClick(e));
     this.canvas.addEventListener('mousemove', (e) => this.onCanvasMouseMove(e));
-    this.canvas.addEventListener('mousedown', () => { this.isDragging = false; });
+    this.canvas.addEventListener('mousedown', (e) => {
+      this.isDragging = false;
+      if (this.isPlacingMode && e.button === 2) {
+        this.cancelPlacing();
+      }
+    });
     this.canvas.addEventListener('mousemove', () => { this.isDragging = true; });
+    this.canvas.addEventListener('contextmenu', (e) => {
+      if (this.isPlacingMode) {
+        e.preventDefault();
+      }
+    });
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && this.isPlacingMode) {
+        this.cancelPlacing();
+      }
+    });
   }
 
   private onResize(): void {
@@ -95,7 +113,16 @@ export class SceneManager {
     
     this.raycaster.setFromCamera(this.mouse, this.camera);
     
-    if (this.pendingBuildingType) {
+    if (this.isPlacingMode && this.previewBuilding) {
+      const groundIntersect = this.raycaster.intersectObject(this.environment.getGround());
+      if (groundIntersect.length > 0 && this.buildings.size < MAX_BUILDINGS) {
+        const point = groundIntersect[0].point;
+        this.confirmPlacing(point.x, point.z);
+        return;
+      }
+    }
+    
+    if (this.pendingBuildingType && !this.isPlacingMode) {
       const groundIntersect = this.raycaster.intersectObject(this.environment.getGround());
       if (groundIntersect.length > 0 && this.buildings.size < MAX_BUILDINGS) {
         const point = groundIntersect[0].point;
@@ -124,10 +151,25 @@ export class SceneManager {
   }
 
   private onCanvasMouseMove(event: MouseEvent): void {
-    if (!this.pendingBuildingType) return;
-    
     this.mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
     this.mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+    
+    if (this.isPlacingMode && this.previewBuilding) {
+      this.raycaster.setFromCamera(this.mouse, this.camera);
+      const groundIntersect = this.raycaster.intersectObject(this.environment.getGround());
+      
+      if (groundIntersect.length > 0) {
+        const point = groundIntersect[0].point;
+        this.previewBuilding.mesh.position.set(point.x, 0, point.z);
+        this.previewBuilding.highlight.visible = true;
+        this.canvas.style.cursor = 'crosshair';
+      } else {
+        this.canvas.style.cursor = 'not-allowed';
+      }
+      return;
+    }
+    
+    if (!this.pendingBuildingType) return;
     
     this.raycaster.setFromCamera(this.mouse, this.camera);
     const groundIntersect = this.raycaster.intersectObject(this.environment.getGround());
@@ -458,9 +500,118 @@ export class SceneManager {
   }
 
   public setPendingBuildingType(type: BuildingType | null): void {
-    this.pendingBuildingType = type;
-    this.canvas.style.cursor = type ? 'crosshair' : 'default';
+    if (type === null) {
+      this.cancelPlacing();
+      this.pendingBuildingType = null;
+      this.canvas.style.cursor = 'default';
+    } else {
+      this.pendingBuildingType = type;
+      this.startPlacingMode(type);
+    }
     this.updateBuildingButtons();
+  }
+
+  private startPlacingMode(type: BuildingType): void {
+    if (this.buildings.size >= MAX_BUILDINGS) {
+      return;
+    }
+    
+    this.cancelPlacing();
+    
+    const preset = BUILDING_PRESETS[type];
+    const mesh = this.createBuildingMesh(type, preset.defaultHeight);
+    
+    mesh.traverse((child) => {
+      if (child instanceof THREE.Mesh) {
+        child.material.transparent = true;
+        child.material.opacity = 0.6;
+      }
+    });
+    
+    const highlight = this.createHighlight(preset.width, preset.depth, preset.defaultHeight);
+    highlight.visible = false;
+    mesh.add(highlight);
+    
+    const direction = new THREE.Vector3();
+    this.camera.getWorldDirection(direction);
+    direction.y = 0;
+    direction.normalize();
+    const defaultPos = this.camera.position.clone().add(direction.multiplyScalar(100));
+    
+    mesh.position.set(defaultPos.x, 0, defaultPos.z);
+    
+    this.scene.add(mesh);
+    this.previewBuilding = { mesh, type, highlight };
+    this.isPlacingMode = true;
+    this.canvas.style.cursor = 'crosshair';
+    this.controls.enabled = false;
+    
+    if (this.onPlacingModeChange) {
+      this.onPlacingModeChange(true);
+    }
+  }
+
+  private confirmPlacing(x: number, z: number): void {
+    if (!this.previewBuilding || !this.pendingBuildingType) return;
+    
+    const type = this.previewBuilding.type;
+    this.scene.remove(this.previewBuilding.mesh);
+    this.previewBuilding.mesh.traverse((child) => {
+      if (child instanceof THREE.Mesh) {
+        child.geometry.dispose();
+        if (Array.isArray(child.material)) {
+          child.material.forEach(m => m.dispose());
+        } else {
+          child.material.dispose();
+        }
+      }
+    });
+    this.previewBuilding = null;
+    
+    const addedId = this.addBuilding(type, x, z);
+    
+    this.isPlacingMode = false;
+    this.pendingBuildingType = null;
+    this.canvas.style.cursor = 'default';
+    this.controls.enabled = true;
+    
+    if (this.onPlacingModeChange) {
+      this.onPlacingModeChange(false);
+    }
+    this.updateBuildingButtons();
+  }
+
+  public cancelPlacing(): void {
+    if (this.previewBuilding) {
+      this.scene.remove(this.previewBuilding.mesh);
+      this.previewBuilding.mesh.traverse((child) => {
+        if (child instanceof THREE.Mesh) {
+          child.geometry.dispose();
+          if (Array.isArray(child.material)) {
+            child.material.forEach(m => m.dispose());
+          } else {
+            child.material.dispose();
+          }
+        }
+      });
+      this.previewBuilding = null;
+    }
+    
+    this.isPlacingMode = false;
+    this.canvas.style.cursor = 'default';
+    this.controls.enabled = true;
+    
+    if (this.onPlacingModeChange) {
+      this.onPlacingModeChange(false);
+    }
+  }
+
+  public setOnPlacingModeChange(callback: (isPlacing: boolean) => void): void {
+    this.onPlacingModeChange = callback;
+  }
+
+  public getIsPlacingMode(): boolean {
+    return this.isPlacingMode;
   }
 
   private updateBuildingButtons(): void {

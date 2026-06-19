@@ -58,10 +58,10 @@ export class ShadowAnalyzer {
 
   private calculateShadowRate(
     targetBuilding: BuildingData,
-    allBuildings: BuildingData[],
+    _allBuildings: BuildingData[],
     allMeshes: THREE.Group[],
     sunDir: THREE.Vector3,
-    targetIndex: number
+    _targetIndex: number
   ): number {
     const preset = BUILDING_PRESETS[targetBuilding.type];
     const gridSize = 10;
@@ -72,7 +72,6 @@ export class ShadowAnalyzer {
     const stepW = (halfW * 2) / (gridSize - 1);
     const stepD = (halfD * 2) / (gridSize - 1);
 
-    const buildingMesh = allMeshes[targetIndex];
     const rotationY = targetBuilding.rotation * Math.PI / 180;
     const cosR = Math.cos(rotationY);
     const sinR = Math.sin(rotationY);
@@ -152,7 +151,7 @@ export class ShadowAnalyzer {
   }
 
   private generateShadowContour(
-    mesh: THREE.Group,
+    _mesh: THREE.Group,
     sunDir: THREE.Vector3,
     building: BuildingData
   ): THREE.Vector3[] {

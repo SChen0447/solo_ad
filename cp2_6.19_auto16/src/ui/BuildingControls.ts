@@ -46,6 +46,11 @@ export class BuildingControls {
         this.sceneManager.updateBuildingHeight(selectedId, value);
       }
     });
+    
+    heightSlider.addEventListener('change', (e) => {
+      const value = parseInt((e.target as HTMLInputElement).value);
+      heightValue.textContent = value.toString();
+    });
 
     const rotationSlider = document.getElementById('rotation-slider') as HTMLInputElement;
     const rotationValue = document.getElementById('rotation-value') as HTMLElement;
@@ -59,6 +64,11 @@ export class BuildingControls {
         this.sceneManager.updateBuildingRotation(selectedId, value);
       }
     });
+    
+    rotationSlider.addEventListener('change', (e) => {
+      const value = parseInt((e.target as HTMLInputElement).value);
+      rotationValue.textContent = value.toString();
+    });
 
     const deleteBtn = document.getElementById('delete-building') as HTMLButtonElement;
     deleteBtn.addEventListener('click', () => {
@@ -71,25 +81,47 @@ export class BuildingControls {
     document.querySelectorAll('.panel-toggle').forEach(btn => {
       btn.addEventListener('click', (e) => {
         const panelSide = (e.currentTarget as HTMLElement).getAttribute('data-panel');
-        const panel = document.querySelector(`.panel-${panelSide}`);
-        if (panel) {
-          panel.classList.toggle('collapsed');
+        const container = document.getElementById(`${panelSide}-container`);
+        if (container) {
+          container.classList.toggle(`collapsed-${panelSide}`);
         }
       });
     });
+    
+    document.getElementById('panel-tab-left')?.addEventListener('click', () => {
+      const container = document.getElementById('building-container');
+      container?.classList.remove('collapsed-left');
+    });
+    
+    document.getElementById('panel-tab-right')?.addEventListener('click', () => {
+      const container = document.getElementById('analysis-container');
+      container?.classList.remove('collapsed-right');
+    });
 
     document.getElementById('mobile-toggle-left')?.addEventListener('click', () => {
-      const panel = document.getElementById('building-panel');
-      const rightPanel = document.getElementById('analysis-panel');
-      rightPanel?.classList.remove('mobile-open');
-      panel?.classList.toggle('mobile-open');
+      const container = document.getElementById('building-container');
+      const rightContainer = document.getElementById('analysis-container');
+      rightContainer?.classList.remove('mobile-open');
+      container?.classList.toggle('mobile-open');
     });
 
     document.getElementById('mobile-toggle-right')?.addEventListener('click', () => {
-      const panel = document.getElementById('analysis-panel');
-      const leftPanel = document.getElementById('building-panel');
-      leftPanel?.classList.remove('mobile-open');
-      panel?.classList.toggle('mobile-open');
+      const container = document.getElementById('analysis-container');
+      const leftContainer = document.getElementById('building-container');
+      leftContainer?.classList.remove('mobile-open');
+      container?.classList.toggle('mobile-open');
+    });
+    
+    document.getElementById('placing-cancel-btn')?.addEventListener('click', () => {
+      this.sceneManager.cancelPlacing();
+      this.sceneManager.setPendingBuildingType(null);
+    });
+    
+    this.sceneManager.setOnPlacingModeChange((isPlacing) => {
+      const banner = document.getElementById('placing-banner');
+      if (banner) {
+        banner.style.display = isPlacing ? 'flex' : 'none';
+      }
     });
 
     this.handleResponsiveLayout();
@@ -100,6 +132,8 @@ export class BuildingControls {
     const width = window.innerWidth;
     const leftToggle = document.getElementById('mobile-toggle-left');
     const rightToggle = document.getElementById('mobile-toggle-right');
+    const leftContainer = document.getElementById('building-container');
+    const rightContainer = document.getElementById('analysis-container');
     const leftPanel = document.getElementById('building-panel');
     const rightPanel = document.getElementById('analysis-panel');
     
@@ -108,11 +142,13 @@ export class BuildingControls {
       rightToggle?.style.setProperty('display', 'flex');
       leftPanel?.classList.remove('mobile-open');
       rightPanel?.classList.remove('mobile-open');
+      leftContainer?.classList.remove('collapsed-left');
+      rightContainer?.classList.remove('collapsed-right');
     } else {
       leftToggle?.style.setProperty('display', 'none');
       rightToggle?.style.setProperty('display', 'none');
-      leftPanel?.classList.remove('collapsed');
-      rightPanel?.classList.remove('collapsed');
+      leftContainer?.classList.remove('collapsed-left');
+      rightContainer?.classList.remove('collapsed-right');
     }
   }
 
@@ -151,13 +187,37 @@ export class BuildingControls {
     
     buildings.forEach((building, index) => {
       const item = document.createElement('div');
-      item.className = `building-item ${building.id === selectedId ? 'selected' : ''}`;
+      item.className = `building-item-detail ${building.id === selectedId ? 'selected' : ''}`;
       item.dataset.id = building.id;
       
       const typeName = BUILDING_PRESETS[building.type].name;
+      const typeColors: Record<string, string> = {
+        office: '#4a90d9',
+        residential: '#6bbf59',
+        tower: '#d9774a'
+      };
+      
       item.innerHTML = `
-        <span class="type">${this.buildingCounter + index}. ${typeName}</span>
-        <span class="height">${building.height}m</span>
+        <div class="building-item-header">
+          <span class="building-item-name">
+            <span class="building-item-dot" style="background: ${typeColors[building.type]}"></span>
+            ${this.buildingCounter + index}. ${typeName}
+          </span>
+        </div>
+        <div class="building-item-info">
+          <div class="info-col">
+            <span class="info-label">高度</span>
+            <span class="info-value">${building.height}m</span>
+          </div>
+          <div class="info-col">
+            <span class="info-label">旋转</span>
+            <span class="info-value">${building.rotation}°</span>
+          </div>
+          <div class="info-col">
+            <span class="info-label">位置</span>
+            <span class="info-value">${building.position.x.toFixed(0)}, ${building.position.z.toFixed(0)}</span>
+          </div>
+        </div>
       `;
       
       item.addEventListener('click', () => {

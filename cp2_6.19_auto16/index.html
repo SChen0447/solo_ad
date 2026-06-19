@@ -10,10 +10,15 @@
   <div id="app"></div>
   <canvas id="scene-canvas"></canvas>
   
-  <div class="panel panel-left" id="building-panel">
-    <div class="panel-header">
+  <div class="panel-container panel-container-left" id="building-container">
+    <div class="panel panel-left" id="building-panel">
+      <div class="panel-header">
       <h3>建筑操作</h3>
-      <button class="panel-toggle" data-panel="left">×</button>
+      <button class="panel-toggle" data-panel="left">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M15 18l-6-6 6-6" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </button>
     </div>
     <div class="panel-content">
       <div class="section">
@@ -32,7 +37,13 @@
             <span>锥形塔楼</span>
           </button>
         </div>
-        <p class="hint">点击选择建筑类型，然后点击地面放置</p>
+        <p class="hint" id="placing-hint">点击选择建筑类型，移动鼠标调整位置，点击确认放置（ESC取消）</p>
+        
+        <div class="placing-banner" id="placing-banner" style="display: none;">
+          <span class="placing-banner-icon">📍</span>
+          <span class="placing-banner-text">放置模式：移动鼠标调整位置，点击确认放置</span>
+          <button class="placing-banner-cancel" id="placing-cancel-btn">取消 (ESC)</button>
+        </div>
       </div>
       
       <div class="section" id="selected-section" style="display: none;">
@@ -54,12 +65,21 @@
         <p class="counter">最多8栋建筑，已添加: <span id="building-count">0</span>/8</p>
       </div>
     </div>
+    </div>
+    <div class="panel-tab panel-tab-left" id="panel-tab-left">
+      <span class="panel-tab-text">建筑</span>
+    </div>
   </div>
   
-  <div class="panel panel-right" id="analysis-panel">
-    <div class="panel-header">
+  <div class="panel-container panel-container-right" id="analysis-container">
+    <div class="panel panel-right" id="analysis-panel">
+      <div class="panel-header">
       <h3>阴影分析</h3>
-      <button class="panel-toggle" data-panel="right">×</button>
+      <button class="panel-toggle" data-panel="right">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M9 18l6-6-6-6" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </button>
     </div>
     <div class="panel-content">
       <div class="section">
@@ -104,6 +124,10 @@
           </div>
         </div>
       </div>
+    </div>
+    </div>
+    <div class="panel-tab panel-tab-right" id="panel-tab-right">
+      <span class="panel-tab-text">分析</span>
     </div>
   </div>
   
