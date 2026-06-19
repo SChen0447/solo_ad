@@ -17,6 +17,7 @@ export class SceneManager {
   private selectedBuildingId: string | null = null;
   private pendingBuildingType: BuildingType | null = null;
   private isDragging: boolean = false;
+  private pointerDownPos: { x: number; y: number } | null = null;
   private previewBuilding: { mesh: THREE.Group; type: BuildingType; highlight: THREE.LineSegments } | null = null;
   private isPlacingMode: boolean = false;
   
@@ -78,15 +79,31 @@ export class SceneManager {
 
   private setupEventListeners(): void {
     window.addEventListener('resize', () => this.onResize());
-    this.canvas.addEventListener('click', (e) => this.onCanvasClick(e));
-    this.canvas.addEventListener('mousemove', (e) => this.onCanvasMouseMove(e));
-    this.canvas.addEventListener('mousedown', (e) => {
+    this.canvas.addEventListener('pointerdown', (e) => {
       this.isDragging = false;
+      this.pointerDownPos = { x: e.clientX, y: e.clientY };
       if (this.isPlacingMode && e.button === 2) {
+        e.preventDefault();
         this.cancelPlacing();
       }
     });
-    this.canvas.addEventListener('mousemove', () => { this.isDragging = true; });
+    this.canvas.addEventListener('pointermove', (e) => {
+      if (this.pointerDownPos) {
+        const dx = e.clientX - this.pointerDownPos.x;
+        const dy = e.clientY - this.pointerDownPos.y;
+        if (Math.abs(dx) > 3 || Math.abs(dy) > 3) {
+          this.isDragging = true;
+        }
+      }
+      this.onCanvasMouseMove(e);
+    });
+    this.canvas.addEventListener('pointerup', (e) => {
+      if (e.button === 0 && !this.isDragging) {
+        this.onCanvasClick(e);
+      }
+      this.isDragging = false;
+      this.pointerDownPos = null;
+    });
     this.canvas.addEventListener('contextmenu', (e) => {
       if (this.isPlacingMode) {
         e.preventDefault();
@@ -95,6 +112,8 @@ export class SceneManager {
     window.addEventListener('keydown', (e) => {
       if (e.key === 'Escape' && this.isPlacingMode) {
         this.cancelPlacing();
+        this.pendingBuildingType = null;
+        this.updateBuildingButtons();
       }
     });
   }
@@ -105,9 +124,7 @@ export class SceneManager {
     this.renderer.setSize(window.innerWidth, window.innerHeight);
   }
 
-  private onCanvasClick(event: MouseEvent): void {
-    if (this.isDragging) return;
-    
+  private onCanvasClick(event: MouseEvent | PointerEvent): void {
     this.mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
     this.mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
     
@@ -118,19 +135,8 @@ export class SceneManager {
       if (groundIntersect.length > 0 && this.buildings.size < MAX_BUILDINGS) {
         const point = groundIntersect[0].point;
         this.confirmPlacing(point.x, point.z);
-        return;
       }
-    }
-    
-    if (this.pendingBuildingType && !this.isPlacingMode) {
-      const groundIntersect = this.raycaster.intersectObject(this.environment.getGround());
-      if (groundIntersect.length > 0 && this.buildings.size < MAX_BUILDINGS) {
-        const point = groundIntersect[0].point;
-        this.addBuilding(this.pendingBuildingType, point.x, point.z);
-        this.pendingBuildingType = null;
-        this.updateBuildingButtons();
-        return;
-      }
+      return;
     }
     
     const buildingMeshes = Array.from(this.buildings.values()).map(b => b.mesh);
@@ -150,7 +156,7 @@ export class SceneManager {
     this.deselectBuilding();
   }
 
-  private onCanvasMouseMove(event: MouseEvent): void {
+  private onCanvasMouseMove(event: MouseEvent | PointerEvent): void {
     this.mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
     this.mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
     
@@ -164,21 +170,13 @@ export class SceneManager {
         this.previewBuilding.highlight.visible = true;
         this.canvas.style.cursor = 'crosshair';
       } else {
+        this.previewBuilding.highlight.visible = false;
         this.canvas.style.cursor = 'not-allowed';
       }
       return;
     }
     
-    if (!this.pendingBuildingType) return;
-    
-    this.raycaster.setFromCamera(this.mouse, this.camera);
-    const groundIntersect = this.raycaster.intersectObject(this.environment.getGround());
-    
-    if (groundIntersect.length > 0) {
-      this.canvas.style.cursor = 'crosshair';
-    } else {
-      this.canvas.style.cursor = 'default';
-    }
+    this.canvas.style.cursor = 'default';
   }
 
   private createBuildingMesh(type: BuildingType, height: number): THREE.Group {
@@ -568,7 +566,7 @@ export class SceneManager {
     });
     this.previewBuilding = null;
     
-    const addedId = this.addBuilding(type, x, z);
+    this.addBuilding(type, x, z);
     
     this.isPlacingMode = false;
     this.pendingBuildingType = null;

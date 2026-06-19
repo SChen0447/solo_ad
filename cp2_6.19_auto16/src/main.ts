@@ -1,4 +1,5 @@
 import './style.css';
+import * as THREE from 'three';
 import { SceneManager } from './scene/SceneManager';
 import { TimeSlider } from './analysis/TimeSlider';
 import { ShadowAnalyzer } from './analysis/ShadowAnalyzer';
@@ -18,7 +19,7 @@ class App {
 
   constructor() {
     this.sceneManager = new SceneManager('scene-canvas');
-    this.timeSlider = new TimeSlider(this.sceneManager.getEnvironment(), 'gui-container');
+    this.timeSlider = new TimeSlider(this.sceneManager.getEnvironment());
     this.shadowAnalyzer = new ShadowAnalyzer(this.sceneManager.getScene());
     this.buildingControls = new BuildingControls(this.sceneManager);
     this.analysisPanel = new AnalysisPanel(this.sceneManager);
@@ -26,8 +27,6 @@ class App {
     this.setupEventListeners();
     this.setupTimeControls();
     this.triggerShadowAnalysis();
-    
-    console.log('建筑日照与阴影分析工具已启动');
   }
 
   private setupEventListeners(): void {
@@ -109,7 +108,7 @@ class App {
     
     const endTime = performance.now();
     if (endTime - startTime > 500) {
-      console.warn(`阴影计算耗时: ${(endTime - startTime).toFixed(0)}ms，超过500ms限制`);
+      console.warn(`阴影计算耗时: ${(endTime - startTime).toFixed(0)}ms`);
     }
   }
 
@@ -135,19 +134,12 @@ class App {
     const existing = markedTimes.find(m => m.id === id);
     
     if (existing) {
-      this.timeSlider.setOnClearMark?.(id);
       this.shadowAnalyzer.clearComparisonOverlay(id);
       
       const labelEl = document.getElementById(`marker-label-${id}`);
       const btnEl = document.getElementById(`mark-time-${id}`);
       if (labelEl) labelEl.textContent = `标记时段${id}`;
       if (btnEl) btnEl.classList.remove('marked');
-      
-      const filtered = markedTimes.filter(m => m.id !== id);
-      Object.defineProperty(this.timeSlider, 'markedTimes', {
-        value: filtered,
-        writable: true
-      });
     } else {
       const markedTime: MarkedTime = { id, date, hour, color };
       
@@ -176,12 +168,6 @@ class App {
         labelEl.textContent = `${dateStr} ${timeStr} (点击清除)`;
       }
       if (btnEl) btnEl.classList.add('marked');
-      
-      const updated = [...markedTimes, markedTime];
-      Object.defineProperty(this.timeSlider, 'markedTimes', {
-        value: updated,
-        writable: true
-      });
     }
   }
 

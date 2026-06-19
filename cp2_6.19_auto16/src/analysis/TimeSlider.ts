@@ -15,12 +15,10 @@ export class TimeSlider {
   private onMarkTime?: (markedTime: MarkedTime) => void;
   private onClearMark?: (id: number) => void;
 
-  constructor(environment: Environment, containerId?: string) {
+  constructor(environment: Environment, _containerId?: string) {
     this.environment = environment;
     
-    const container = containerId ? document.getElementById(containerId) : undefined;
     this.gui = new dat.GUI({ 
-      container: container || undefined,
       closed: true,
       width: 300
     });
@@ -136,16 +134,6 @@ export class TimeSlider {
     this.currentDate = date;
     this.currentHour = Math.max(6, Math.min(19, hour));
     this.updateSun();
-    
-    const controller = this.gui.controllersRecursive().find(c => c.property === '日期');
-    if (controller) {
-      controller.setValue(this.currentDate);
-    }
-    
-    const hourController = this.gui.controllersRecursive().find(c => c.property === '小时');
-    if (hourController) {
-      hourController.setValue(this.currentHour);
-    }
   }
 
   public getTime(): { date: string; hour: number } {
