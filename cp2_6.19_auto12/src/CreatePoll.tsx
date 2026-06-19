@@ -14,7 +14,11 @@ function CreatePoll({ onSuccess }: CreatePollProps) {
   const [deadlineMinutes, setDeadlineMinutes] = useState<number>(30);
   const [customDeadline, setCustomDeadline] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [errors, setErrors] = useState<{ title?: string; options?: string; deadline?: string }>({});
+  const [errors, setErrors] = useState<{ title?: string; options?: string; deadline?: string }>({
+    title: undefined,
+    options: undefined,
+    deadline: undefined
+  });
   const [createdPollId, setCreatedPollId] = useState<string | null>(null);
   const [linkCopied, setLinkCopied] = useState(false);
 
@@ -45,7 +49,11 @@ function CreatePoll({ onSuccess }: CreatePollProps) {
   };
 
   const validateForm = (): { title?: string; options?: string; deadline?: string } => {
-    const newErrors: { title?: string; options?: string; deadline?: string } = {};
+    const newErrors: { title?: string; options?: string; deadline?: string } = {
+      title: undefined,
+      options: undefined,
+      deadline: undefined
+    };
 
     if (!title.trim()) {
       newErrors.title = '请输入投票标题';
@@ -64,10 +72,8 @@ function CreatePoll({ onSuccess }: CreatePollProps) {
       } else {
         newErrors.options = '选项内容不能为空，请填写完整';
       }
-    } else if (options.length < 2) {
-      newErrors.options = '至少需要2个选项';
-    } else if (options.length > 8) {
-      newErrors.options = '最多只能有8个选项';
+    } else if (validOptions.length > 8) {
+      newErrors.options = '最多只能有8个有效选项';
     }
 
     const deadline = getDeadline();

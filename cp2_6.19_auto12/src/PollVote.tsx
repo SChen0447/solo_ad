@@ -87,7 +87,7 @@ function PollVote({ pollId, onBack }: PollVoteProps) {
       }
       const data: PollData = await response.json();
       setPoll(data);
-      deadlineRef.current = data.deadline;
+      deadlineRef.current = Number(data.deadline);
 
       const votedKey = `voted_${data.id}`;
       const votedVal = localStorage.getItem(votedKey);
@@ -96,7 +96,7 @@ function PollVote({ pollId, onBack }: PollVoteProps) {
         setVotedOptionId(votedVal);
       }
 
-      const remaining = Math.max(0, data.deadline - Date.now());
+      const remaining = Math.max(0, Number(data.deadline) - Date.now());
       setTimeRemaining(remaining);
 
       if (data.isExpired || remaining <= 0) {
@@ -116,7 +116,7 @@ function PollVote({ pollId, onBack }: PollVoteProps) {
   useEffect(() => {
     if (!poll) return;
 
-    deadlineRef.current = poll.deadline;
+    deadlineRef.current = Number(poll.deadline);
 
     const tick = () => {
       const remaining = Math.max(0, deadlineRef.current - Date.now());
@@ -367,7 +367,7 @@ function PollVote({ pollId, onBack }: PollVoteProps) {
                 >
                   <XAxis
                     dataKey="name"
-                    angle={windowWidth < 640 ? -45 : -30}
+                    angle={-30}
                     textAnchor="end"
                     interval={0}
                     height={windowWidth < 640 ? 60 : 80}
@@ -397,7 +397,6 @@ function PollVote({ pollId, onBack }: PollVoteProps) {
                     dataKey="votes"
                     animationBegin={0}
                     animationDuration={800}
-                    animationEasing="ease-out"
                     radius={[6, 6, 0, 0]}
                   >
                     {getChartData().map((entry, index) => (
@@ -429,7 +428,6 @@ function PollVote({ pollId, onBack }: PollVoteProps) {
                     dataKey="votes"
                     animationBegin={0}
                     animationDuration={800}
-                    animationEasing="ease-out"
                   >
                     {getChartData().map((entry, index) => (
                       <Cell key={`cell-${index}`} fill={entry.fill} />

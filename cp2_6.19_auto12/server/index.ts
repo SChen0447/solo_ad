@@ -4,8 +4,16 @@ import { v4 as uuidv4 } from 'uuid';
 const app = express();
 const PORT = 3001;
 
-app.set('trust proxy', 1);
+app.set('trust proxy', true);
 app.use(express.json());
+
+function normalizeClientIp(ip: string | undefined, socketAddr: string | undefined): string {
+  let clientIp = ip || socketAddr || 'unknown';
+  if (clientIp === '::1' || clientIp === '::ffff:127.0.0.1') {
+    clientIp = '127.0.0.1';
+  }
+  return clientIp;
+}
 
 interface PollOption {
   id: string;
@@ -105,7 +113,7 @@ app.post('/api/polls/:id/vote', (req: Request, res: Response) => {
   }
 
   const { optionId }: VoteRequest = req.body;
-  const clientIp = req.ip || req.socket.remoteAddress || 'unknown';
+  const clientIp = normalizeClientIp(req.ip, req.socket.remoteAddress);
 
   if (poll.votedIps.has(clientIp)) {
     return res.status(400).json({ error: '您已投过票' });
