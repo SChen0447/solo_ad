@@ -26,6 +26,7 @@ export class GameLoop {
   private lastTime = 0;
   private accumulator = 0;
   private readonly FIXED_DT = 1000 / 60;
+  private readonly MIN_REWIND_DT = 1000 / 30;
 
   private camX = 0;
   private camY = 0;
@@ -36,6 +37,17 @@ export class GameLoop {
 
   private now = 0;
 
+  private fps = 0;
+  private fpsFrameCount = 0;
+  private fpsTimer = 0;
+  private rewindFPS = 0;
+  private rewindFrameCount = 0;
+  private rewindTimer = 0;
+  private frameCountSinceRewind = 0;
+
+  private readonly MAX_HISTORY_MEMORY = 50 * 1024 * 1024;
+  private showFPS = true;
+
   constructor(canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D) {
     this.canvas = canvas;
     this.ctx = ctx;
@@ -43,12 +55,15 @@ export class GameLoop {
     this.input = new InputManager();
     this.level = new Level();
 
+    const playerHeight = 20;
     const spawnX = 2 * this.level.tile + 6;
-    const spawnY = 20 * this.level.tile - this.player.height;
+    const spawnY = 20 * this.level.tile - playerHeight;
     this.player = new Player(spawnX, spawnY);
 
-    this.timeRecorder = new TimeRecorder(this.player);
+    this.timeRecorder = new TimeRecorder(this.player, this.level);
     this.hud = new HUD();
+
+    this.hud.totalCollectibles = this.level.getTotalCollectibles();
 
     this.initStars();
   }
@@ -79,16 +94,65 @@ export class GameLoop {
     this.lastTime = timestamp;
     this.now = timestamp;
 
-    this.accumulator += Math.min(delta, 100);
+    this.updateFPS(delta);
 
-    while (this.accumulator >= this.FIXED_DT) {
+    const effectiveDt = this.timeRecorder.isRewinding
+      ? Math.max(delta, this.MIN_REWIND_DT)
+      : Math.min(delta, 100);
+
+    this.accumulator += effectiveDt;
+
+    const maxSteps = this.timeRecorder.isRewinding ? 1 : 3;
+    let steps = 0;
+
+    while (this.accumulator >= this.FIXED_DT && steps < maxSteps) {
       this.fixedUpdate();
       this.accumulator -= this.FIXED_DT;
+      steps++;
+    }
+
+    if (steps >= maxSteps) {
+      this.accumulator = 0;
     }
 
     this.render();
     requestAnimationFrame(this.loop);
   };
+
+  private updateFPS(delta: number): void {
+    this.fpsFrameCount++;
+    this.fpsTimer += delta;
+    if (this.fpsTimer >= 1000) {
+      this.fps = Math.round(this.fpsFrameCount * 1000 / this.fpsTimer);
+      this.fpsFrameCount = 0;
+      this.fpsTimer = 0;
+    }
+
+    if (this.timeRecorder.isRewinding) {
+      this.rewindFrameCount++;
+      this.rewindTimer += delta;
+    } else if (this.rewindTimer > 0) {
+      if (this.frameCountSinceRewind === 0) {
+        this.rewindFPS = Math.round(this.rewindFrameCount * 1000 / this.rewindTimer);
+        this.rewindFrameCount = 0;
+        this.rewindTimer = 0;
+      }
+      this.frameCountSinceRewind++;
+      if (this.frameCountSinceRewind > 120) {
+        this.frameCountSinceRewind = 0;
+      }
+    }
+  }
+
+  private checkMemoryLimits(): void {
+    const memoryUsage = this.player.getHistoryMemoryBytes();
+    if (memoryUsage > this.MAX_HISTORY_MEMORY * 0.9) {
+      const framesToRemove = Math.floor(this.player.history.length * 0.1);
+      for (let i = 0; i < framesToRemove; i++) {
+        this.player.history.shift();
+      }
+    }
+  }
 
   private fixedUpdate(): void {
     if (this.victory) {
@@ -99,11 +163,13 @@ export class GameLoop {
     this.input.update();
     this.hud.update();
     this.level.update(this.now);
+    this.checkMemoryLimits();
 
     if (this.player.dying) {
       this.player.update(false, false, false, false, false, this.now);
       if (this.player.deathTimer >= 60) {
         this.player.respawn(() => this.level.resetCollectibles());
+        this.hud.collectibleCount = 0;
       }
       return;
     }
@@ -216,6 +282,10 @@ export class GameLoop {
 
     this.hud.draw(ctx, w, h);
 
+    if (this.showFPS) {
+      this.drawPerformanceInfo(ctx, w);
+    }
+
     if (this.victory) {
       this.hud.drawVictory(ctx, w, h, this.victoryTimer);
     }
@@ -223,6 +293,20 @@ export class GameLoop {
     if (this.player.dying) {
       this.drawDeathOverlay(ctx, w, h);
     }
+  }
+
+  private drawPerformanceInfo(ctx: CanvasRenderingContext2D, w: number): void {
+    ctx.save();
+    ctx.font = '12px monospace';
+    ctx.fillStyle = '#00ff88';
+    ctx.textBaseline = 'top';
+    ctx.textAlign = 'right';
+
+    const memMB = (this.player.getHistoryMemoryBytes() / (1024 * 1024)).toFixed(2);
+    ctx.fillText(`FPS: ${this.fps}`, w - 16, 16);
+    ctx.fillText(`Rewind FPS: ${this.rewindFPS || '--'}`, w - 16, 32);
+    ctx.fillText(`History Mem: ${memMB}MB / 50MB`, w - 16, 48);
+    ctx.restore();
   }
 
   private drawBackground(ctx: CanvasRenderingContext2D, w: number, h: number): void {

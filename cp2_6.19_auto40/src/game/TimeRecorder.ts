@@ -1,4 +1,5 @@
 import { Player, PlayerSnapshot } from './Player';
+import { Level } from './Level';
 
 interface RewindParticle {
   x: number;
@@ -12,6 +13,7 @@ interface RewindParticle {
 
 export class TimeRecorder {
   private player: Player;
+  private level: Level;
   maxEnergy = 180;
   energy = 180;
   private energyRechargeRate = 0.5;
@@ -20,22 +22,32 @@ export class TimeRecorder {
   private readonly MAX_REWIND_FRAMES = 180;
 
   particles: RewindParticle[] = [];
-  spiralAngle = 0;
+  rewindPhase = 0;
+  private distortionCanvas: HTMLCanvasElement | null = null;
+  private distortionCtx: CanvasRenderingContext2D | null = null;
 
-  noiseCanvas: HTMLCanvasElement | null = null;
-
-  constructor(player: Player) {
+  constructor(player: Player, level: Level) {
     this.player = player;
+    this.level = level;
+  }
+
+  private ensureDistortionCanvas(w: number, h: number): void {
+    if (!this.distortionCanvas || this.distortionCanvas.width !== w || this.distortionCanvas.height !== h) {
+      this.distortionCanvas = document.createElement('canvas');
+      this.distortionCanvas.width = w;
+      this.distortionCanvas.height = h;
+      this.distortionCtx = this.distortionCanvas.getContext('2d');
+    }
   }
 
   update(rewindPressed: boolean, rewindReleased: boolean): void {
-    if (rewindPressed && this.energy > 10 && this.player.history.length > 10) {
+    if (rewindPressed && this.energy > 10 && this.player.history.length > 10 && !this.isRewinding) {
       this.isRewinding = true;
       this.rewindFrameCount = 0;
     }
 
-    if (rewindReleased) {
-      this.isRewinding = false;
+    if (rewindReleased && this.isRewinding) {
+      this.endRewind();
     }
 
     if (this.isRewinding) {
@@ -46,7 +58,7 @@ export class TimeRecorder {
       this.particles = this.particles.filter((p) => p.life > 0);
     }
 
-    this.spiralAngle += this.isRewinding ? 0.1 : 0.02;
+    this.rewindPhase += this.isRewinding ? 0.15 : 0.02;
 
     for (let i = this.particles.length - 1; i >= 0; i--) {
       const p = this.particles[i];
@@ -59,25 +71,43 @@ export class TimeRecorder {
 
   private performRewind(): void {
     if (this.player.history.length > 0 && this.energy > 0 && this.rewindFrameCount < this.MAX_REWIND_FRAMES) {
-      const snap = this.player.history.pop()!;
-      this.player.applySnapshot(snap);
+      const snap = this.player.history[this.player.history.length - 1];
 
-      this.energy -= 1;
-      this.rewindFrameCount++;
+      const testX = snap.x;
+      const testY = snap.y;
 
-      for (let i = 0; i < 2; i++) {
-        this.particles.push({
-          x: this.player.x + this.player.width / 2,
-          y: this.player.y + this.player.height / 2,
-          vx: (Math.random() - 0.5) * 4,
-          vy: (Math.random() - 0.5) * 4,
-          life: 20 + Math.random() * 20,
-          maxLife: 40,
-          size: 2 + Math.random() * 3,
-        });
+      if (!this.level.isSolidAt(testX, testY, this.player.width, this.player.height)) {
+        this.player.history.pop();
+        this.player.applySnapshot(snap);
+
+        this.energy -= 1;
+        this.rewindFrameCount++;
+
+        for (let i = 0; i < 2; i++) {
+          this.particles.push({
+            x: this.player.x + this.player.width / 2,
+            y: this.player.y + this.player.height / 2,
+            vx: (Math.random() - 0.5) * 4,
+            vy: (Math.random() - 0.5) * 4,
+            life: 20 + Math.random() * 20,
+            maxLife: 40,
+            size: 2 + Math.random() * 3,
+          });
+        }
+      } else {
+        this.endRewind();
+        return;
       }
     } else {
+      this.endRewind();
+    }
+  }
+
+  private endRewind(): void {
+    if (this.isRewinding) {
       this.isRewinding = false;
+      this.player.vx = 0;
+      this.player.vy = 0;
     }
   }
 
@@ -96,95 +126,107 @@ export class TimeRecorder {
 
   drawRewindOverlay(ctx: CanvasRenderingContext2D, w: number, h: number, now: number): void {
     if (!this.isRewinding) return;
+    if (w === 0 || h === 0) return;
 
-    this.drawVHSEffect(ctx, w, h, now);
-    this.drawSpiralBorder(ctx, w, h, now);
-  }
+    this.ensureDistortionCanvas(w, h);
+    if (!this.distortionCtx) return;
 
-  private drawVHSEffect(ctx: CanvasRenderingContext2D, w: number, h: number, now: number): void {
-    const imageData = ctx.getImageData(0, 0, w, h);
-    const data = imageData.data;
+    this.distortionCtx.drawImage(ctx.canvas, 0, 0);
+    const imageData = this.distortionCtx.getImageData(0, 0, w, h);
+    const srcData = imageData.data;
+    const dstData = new Uint8ClampedArray(srcData.length);
 
-    const noiseStrength = 0.03;
-    for (let i = 0; i < data.length; i += 16) {
-      if (Math.random() < noiseStrength) {
-        const noise = (Math.random() - 0.5) * 60;
-        data[i] += noise;
-        data[i + 1] += noise;
-        data[i + 2] += noise;
-      }
-    }
+    const amplitude = 8 + Math.sin(now * 0.01) * 3;
+    const frequency = 0.02;
+    const scanLineOffset = Math.floor(now * 0.08) % h;
 
-    const scanLineOffset = Math.floor(now * 0.05) % h;
-    for (let y = scanLineOffset; y < h; y += 4) {
-      const shift = Math.floor((Math.random() - 0.5) * 6);
-      if (shift !== 0 && y * w * 4 < data.length) {
-        const rowStart = y * w * 4;
-        const copyLen = Math.min(w * 4, data.length - rowStart);
-        if (shift > 0 && rowStart + shift * 4 + copyLen < data.length) {
-          for (let i = copyLen - 4; i >= 0; i -= 4) {
-            if (rowStart + i + shift * 4 < data.length) {
-              data[rowStart + i + shift * 4] = data[rowStart + i];
-              data[rowStart + i + shift * 4 + 1] = data[rowStart + i + 1];
-              data[rowStart + i + shift * 4 + 2] = data[rowStart + i + 2];
-            }
-          }
+    for (let y = 0; y < h; y++) {
+      const waveX = Math.sin(y * frequency + now * 0.003) * amplitude;
+      const waveY = Math.cos(y * frequency * 0.7 + now * 0.002) * amplitude * 0.3;
+
+      for (let x = 0; x < w; x++) {
+        const srcX = Math.floor(x + waveX + Math.sin(x * 0.01 + now * 0.004) * 2);
+        const srcY = Math.floor(y + waveY);
+
+        const clampedX = Math.max(0, Math.min(w - 1, srcX));
+        const clampedY = Math.max(0, Math.min(h - 1, srcY));
+
+        const srcIdx = (clampedY * w + clampedX) * 4;
+        const dstIdx = (y * w + x) * 4;
+
+        let r = srcData[srcIdx];
+        let g = srcData[srcIdx + 1];
+        let b = srcData[srcIdx + 2];
+
+        const yDiff = y - scanLineOffset;
+        if (yDiff >= 0 && yDiff < 3) {
+          const shift = Math.sin(now * 0.05) * 4;
+          const shiftedX = Math.floor(x + shift);
+          const clampedShiftX = Math.max(0, Math.min(w - 1, shiftedX));
+          const shiftIdx = (y * w + clampedShiftX) * 4;
+          r = srcData[shiftIdx];
+          g = srcData[shiftIdx + 1];
+          b = srcData[shiftIdx + 2];
         }
+
+        const chromaOffset = Math.floor(Math.sin(now * 0.01 + y * 0.02) * 2);
+        const rX = Math.max(0, Math.min(w - 1, clampedX + chromaOffset));
+        const bX = Math.max(0, Math.min(w - 1, clampedX - chromaOffset));
+        const rIdx = (clampedY * w + rX) * 4;
+        const bIdx = (clampedY * w + bX) * 4;
+        r = srcData[rIdx];
+        b = srcData[bIdx + 2];
+
+        const noise = (Math.random() - 0.5) * 40;
+        r = Math.max(0, Math.min(255, r + noise));
+        g = Math.max(0, Math.min(255, g + noise));
+        b = Math.max(0, Math.min(255, b + noise));
+
+        const rewindTint = 1 - this.rewindFrameCount / this.MAX_REWIND_FRAMES;
+        r = Math.max(0, Math.min(255, r - 20 * (1 - rewindTint)));
+        g = Math.max(0, Math.min(255, g + 10 * (1 - rewindTint)));
+        b = Math.max(0, Math.min(255, b + 30 * (1 - rewindTint)));
+
+        dstData[dstIdx] = r;
+        dstData[dstIdx + 1] = g;
+        dstData[dstIdx + 2] = b;
+        dstData[dstIdx + 3] = srcData[srcIdx + 3];
       }
     }
 
-    ctx.putImageData(imageData, 0, 0);
+    imageData.data.set(dstData);
+    this.distortionCtx.putImageData(imageData, 0, 0);
+    if (this.distortionCanvas) {
+      ctx.drawImage(this.distortionCanvas, 0, 0);
+    }
 
     ctx.save();
-    ctx.globalAlpha = 0.05;
-    ctx.fillStyle = '#a855f7';
+    ctx.globalAlpha = 0.1;
+    for (let y = 0; y < h; y += 4) {
+      ctx.fillStyle = '#000';
+      ctx.fillRect(0, y, w, 2);
+    }
+    ctx.restore();
+
+    ctx.save();
+    ctx.globalAlpha = 0.05 + Math.sin(now * 0.01) * 0.03;
+    const vignetteGradient = ctx.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, Math.max(w, h) * 0.7);
+    vignetteGradient.addColorStop(0, 'transparent');
+    vignetteGradient.addColorStop(1, '#7c3aed');
+    ctx.fillStyle = vignetteGradient;
     ctx.fillRect(0, 0, w, h);
     ctx.restore();
-  }
 
-  private drawSpiralBorder(ctx: CanvasRenderingContext2D, w: number, h: number, _now: number): void {
     ctx.save();
-    ctx.globalAlpha = 0.25;
-
-    const spiralCount = 8;
-    for (let i = 0; i < spiralCount; i++) {
-      const angle = this.spiralAngle + (i * Math.PI * 2) / spiralCount;
-      const cx = w / 2;
-      const cy = h / 2;
-      const maxR = Math.sqrt(cx * cx + cy * cy);
-
-      ctx.beginPath();
-      ctx.strokeStyle = '#a855f7';
-      ctx.lineWidth = 8;
-      for (let t = 0; t < 1; t += 0.01) {
-        const r = t * maxR * 0.15;
-        const a = angle + t * Math.PI * 3;
-        const x = cx + Math.cos(a) * (r + maxR * 0.35);
-        const y = cy + Math.sin(a) * (r + maxR * 0.35);
-        if (t === 0) ctx.moveTo(x, y);
-        else ctx.lineTo(x, y);
-      }
-      ctx.stroke();
-    }
-
-    const borderSize = 40;
-    ctx.fillStyle = '#7c3aed';
-    ctx.globalAlpha = 0.15;
-
-    for (let x = 0; x < w; x += 6) {
-      const topH = borderSize + Math.sin(x * 0.05 + this.spiralAngle * 3) * 10;
-      const botH = borderSize + Math.sin(x * 0.05 + this.spiralAngle * 3 + 2) * 10;
-      ctx.fillRect(x, 0, 6, topH);
-      ctx.fillRect(x, h - botH, 6, botH);
-    }
-
-    for (let y = 0; y < h; y += 6) {
-      const leftW = borderSize + Math.sin(y * 0.05 + this.spiralAngle * 3) * 10;
-      const rightW = borderSize + Math.sin(y * 0.05 + this.spiralAngle * 3 + 2) * 10;
-      ctx.fillRect(0, y, leftW, 6);
-      ctx.fillRect(w - rightW, y, rightW, 6);
-    }
-
+    ctx.font = 'bold 48px monospace';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    const textAlpha = 0.15 + Math.sin(now * 0.02) * 0.1;
+    ctx.globalAlpha = textAlpha;
+    ctx.fillStyle = '#c084fc';
+    ctx.scale(1.2, 1);
+    ctx.rotate(Math.sin(now * 0.003) * 0.05);
+    ctx.fillText('REWIND', w / 2, h / 2);
     ctx.restore();
   }
 

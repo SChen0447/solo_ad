@@ -57,18 +57,23 @@ const LEVEL_MAP: number[][] = [
 ];
 
 export class Level {
-  tileMap: number[][];
-  tileCols: number;
-  tileRows: number;
+  tileMap: number[][] = [];
+  tileCols = 0;
+  tileRows = 0;
   tile = TILE;
   collectibles: Collectible[] = [];
-  goal: GoalFlag;
+  goal: GoalFlag = {
+    x: 0,
+    y: 0,
+    activated: false,
+    particles: [],
+  };
   spikeRects: Rect[] = [];
   platformRects: Rect[] = [];
-  worldWidth: number;
-  worldHeight: number;
+  worldWidth = 0;
+  worldHeight = 0;
   spikeFlashTimer = 0;
-  private originalTileMap: number[][];
+  private originalTileMap: number[][] = [];
 
   constructor() {
     this.tileMap = LEVEL_MAP.map((row) => [...row]);
