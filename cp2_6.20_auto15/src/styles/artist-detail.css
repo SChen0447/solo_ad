@@ -1,0 +1,317 @@
+.artist-detail {
+  width: 100%;
+}
+
+.back-btn {
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 14px;
+  cursor: pointer;
+  margin-bottom: 16px;
+  padding: 0;
+  transition: var(--transition);
+}
+
+.back-btn:hover {
+  color: var(--accent);
+}
+
+.artist-header {
+  display: flex;
+  gap: 24px;
+  padding: 24px;
+  background-color: var(--bg-secondary);
+  border-radius: var(--border-radius);
+  margin-bottom: 20px;
+}
+
+.artist-avatar-large {
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  overflow: hidden;
+  background-color: var(--bg-tertiary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 48px;
+  flex-shrink: 0;
+}
+
+.artist-avatar-large img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.artist-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.artist-name {
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 12px;
+}
+
+.artist-tags {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.style-tag-large {
+  padding: 5px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: white;
+}
+
+.artist-bio-text {
+  font-size: 14px;
+  color: var(--text-secondary);
+  line-height: 1.6;
+  margin-bottom: 12px;
+}
+
+.artist-stats {
+  display: flex;
+  gap: 24px;
+}
+
+.artist-stats .stat {
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.artist-stats .stat strong {
+  color: var(--accent);
+  font-size: 18px;
+  margin-right: 4px;
+}
+
+.detail-tabs {
+  display: flex;
+  gap: 0;
+  margin-bottom: 20px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.tab-btn {
+  background: none;
+  border: none;
+  padding: 12px 20px;
+  font-size: 14px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: var(--transition);
+  margin-bottom: -1px;
+}
+
+.tab-btn:hover {
+  color: var(--text-primary);
+}
+
+.tab-btn.active {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+
+.detail-content {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+
+.content-left {
+  min-width: 0;
+}
+
+.content-right {
+  min-width: 0;
+}
+
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.section-header h2 {
+  font-size: 18px;
+  color: var(--text-primary);
+}
+
+.works-section,
+.performances-section,
+.graph-section {
+  background-color: var(--bg-secondary);
+  border-radius: var(--border-radius);
+  padding: 20px;
+}
+
+.works-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.work-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  background-color: var(--bg-primary);
+  border-radius: var(--border-radius);
+  transition: var(--transition);
+}
+
+.work-item:hover {
+  background-color: var(--bg-tertiary);
+}
+
+.work-icon {
+  font-size: 24px;
+}
+
+.work-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.work-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 4px;
+}
+
+.work-meta {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.work-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.btn-secondary.small,
+.btn-danger.small {
+  padding: 6px 12px;
+  font-size: 12px;
+}
+
+.performances-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.performance-item {
+  display: flex;
+  gap: 16px;
+  padding: 12px;
+  background-color: var(--bg-primary);
+  border-radius: var(--border-radius);
+  transition: var(--transition);
+  border-left: 3px solid var(--accent);
+}
+
+.performance-item:hover {
+  background-color: var(--bg-tertiary);
+}
+
+.perf-date-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 48px;
+}
+
+.perf-day {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.perf-month {
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.perf-details {
+  flex: 1;
+  min-width: 0;
+}
+
+.perf-time {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 4px;
+}
+
+.perf-venue-name {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin-bottom: 4px;
+}
+
+.perf-notes {
+  font-size: 12px;
+  color: var(--text-secondary);
+  opacity: 0.8;
+}
+
+.graph-section h3 {
+  font-size: 16px;
+  color: var(--text-primary);
+  margin-bottom: 4px;
+}
+
+.graph-desc {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-bottom: 12px;
+}
+
+.not-found {
+  text-align: center;
+  padding: 60px 20px;
+  color: var(--text-secondary);
+  font-size: 16px;
+}
+
+@media (max-width: 1024px) {
+  .detail-content {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 768px) {
+  .artist-header {
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+  }
+
+  .artist-tags {
+    justify-content: center;
+  }
+
+  .artist-stats {
+    justify-content: center;
+  }
+
+  .work-actions {
+    flex-direction: column;
+  }
+}

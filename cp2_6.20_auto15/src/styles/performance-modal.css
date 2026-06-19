@@ -1,0 +1,12 @@
+.performance-modal {
+  /* Modal styles are in layout.css and calendar.css */
+}
+
+.form-row {
+  display: flex;
+  gap: 12px;
+}
+
+.form-row .form-group {
+  flex: 1;
+}
