@@ -24,6 +24,8 @@ export interface GameState {
   volume: number;
   volumeHover: boolean;
   lowQuality: boolean;
+  isFadingOut: boolean;
+  fadeOutAlpha: number;
 }
 
 export class Renderer {
@@ -80,11 +82,15 @@ export class Renderer {
     this.drawScorePopups(scorePopups, now);
     this.drawUI(state, now);
 
-    if (!state.isStarted) {
-      this.drawStartScreen(width, height);
+    if (!state.isStarted && !state.isFadingOut) {
+      this.drawStartScreen(width, height, now);
     }
     if (state.isGameOver) {
       this.drawGameOverScreen(state, width, height, now);
+    }
+
+    if (state.isFadingOut) {
+      this.drawFadeOverlay(width, height, state.fadeOutAlpha);
     }
 
     this.drawVolumeControl(state, width, height);
@@ -408,55 +414,81 @@ export class Renderer {
     ctx.restore();
   }
 
-  private drawStartScreen(w: number, h: number): void {
+  private drawStartScreen(w: number, h: number, now: number): void {
     const ctx = this.ctx;
     ctx.save();
-    ctx.fillStyle = 'rgba(0,0,0,0.55)';
+    ctx.fillStyle = 'rgba(0,0,0,0.6)';
     ctx.fillRect(0, 0, w, h);
 
     ctx.textAlign = 'center';
-    ctx.font = 'bold 64px Arial, sans-serif';
-    ctx.fillStyle = '#ff5566';
-    ctx.shadowColor = 'rgba(255,100,100,0.7)';
-    ctx.shadowBlur = 20;
-    ctx.fillText('RHYTHM RUNNER', w / 2, h / 2 - 80);
+    ctx.textBaseline = 'middle';
 
-    ctx.font = '24px Arial, sans-serif';
+    ctx.font = 'bold 72px Arial, sans-serif';
     ctx.fillStyle = '#ffffff';
-    ctx.shadowBlur = 4;
+    ctx.shadowColor = 'rgba(255, 200, 50, 0.8)';
+    ctx.shadowBlur = 25;
+    ctx.fillText('节奏跑酷', w / 2, h / 2 - 80);
+    ctx.shadowBlur = 0;
+
+    ctx.font = '22px Arial, sans-serif';
+    ctx.fillStyle = 'rgba(200,200,255,0.8)';
     ctx.fillText('空格键 跳跃   |   ↓ 键 滑铲', w / 2, h / 2);
 
-    ctx.font = 'bold 28px Arial, sans-serif';
-    ctx.fillStyle = '#ffee66';
-    ctx.fillText('点击屏幕或按空格键开始', w / 2, h / 2 + 60);
+    const breathe = Math.sin(now * 3) * 0.4 + 0.6;
+    ctx.globalAlpha = breathe;
+    ctx.font = 'bold 30px Arial, sans-serif';
+    ctx.fillStyle = '#ffee88';
+    ctx.shadowColor = 'rgba(255, 220, 100, 0.5)';
+    ctx.shadowBlur = 10;
+    ctx.fillText('按空格键开始', w / 2, h / 2 + 70);
+
     ctx.restore();
   }
 
-  private drawGameOverScreen(state: GameState, w: number, h: number, _now: number): void {
+  private drawGameOverScreen(state: GameState, w: number, h: number, now: number): void {
     const ctx = this.ctx;
     ctx.save();
     ctx.fillStyle = 'rgba(0,0,0,0.65)';
     ctx.fillRect(0, 0, w, h);
 
     ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+
     ctx.font = 'bold 56px Arial, sans-serif';
     ctx.fillStyle = '#ff5566';
     ctx.shadowColor = 'rgba(255,100,100,0.7)';
     ctx.shadowBlur = 20;
-    ctx.fillText('GAME OVER', w / 2, h / 2 - 100);
+    ctx.fillText('游戏结束', w / 2, h / 2 - 100);
+    ctx.shadowBlur = 0;
 
     ctx.font = 'bold 36px Arial, sans-serif';
     ctx.fillStyle = '#ffffff';
+    ctx.shadowColor = 'rgba(255,255,255,0.3)';
     ctx.shadowBlur = 4;
     ctx.fillText(`本局得分: ${state.score}`, w / 2, h / 2 - 20);
 
     ctx.font = 'bold 30px Arial, sans-serif';
     ctx.fillStyle = '#ffcc44';
+    ctx.shadowColor = 'rgba(255,200,50,0.5)';
+    ctx.shadowBlur = 6;
     ctx.fillText(`最高纪录: ${state.bestScoreTypewriter}`, w / 2, h / 2 + 40);
 
-    ctx.font = '22px Arial, sans-serif';
+    const breathe = Math.sin(now * 3) * 0.4 + 0.6;
+    ctx.globalAlpha = breathe;
+    ctx.font = 'bold 26px Arial, sans-serif';
     ctx.fillStyle = '#aaccff';
-    ctx.fillText('点击屏幕或按空格键重新开始', w / 2, h / 2 + 110);
+    ctx.shadowColor = 'rgba(100, 150, 255, 0.5)';
+    ctx.shadowBlur = 8;
+    ctx.fillText('按空格键重新开始', w / 2, h / 2 + 120);
+
+    ctx.restore();
+  }
+
+  private drawFadeOverlay(w: number, h: number, alpha: number): void {
+    const ctx = this.ctx;
+    ctx.save();
+    ctx.fillStyle = `rgba(0,0,0,${alpha})`;
+    ctx.fillRect(0, 0, w, h);
     ctx.restore();
   }
 

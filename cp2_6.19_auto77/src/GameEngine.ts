@@ -40,6 +40,10 @@ class GameEngine {
 
   private distance = 0;
 
+  private fadeOutAlpha = 0;
+  private isFadingOut = false;
+  private fadeOutSpeed = 2.5;
+
   private keysDown: Set<string> = new Set();
 
   constructor() {
@@ -205,8 +209,11 @@ class GameEngine {
   }
 
   private async startGame(): Promise<void> {
-    this.isStarted = true;
-    this.isGameOver = false;
+    if (this.isFadingOut) return;
+
+    this.isFadingOut = true;
+    this.fadeOutAlpha = 0;
+
     this.score = 0;
     this.combo = 0;
     this.distance = 0;
@@ -264,6 +271,17 @@ class GameEngine {
       this.beatSync.update();
     }
 
+    if (this.isFadingOut) {
+      this.fadeOutAlpha += this.fadeOutSpeed * dt;
+      if (this.fadeOutAlpha >= 1) {
+        this.fadeOutAlpha = 0;
+        this.isFadingOut = false;
+        this.isStarted = true;
+        this.isGameOver = false;
+      }
+      return;
+    }
+
     if (!this.isStarted || this.isGameOver) {
       if (this.isGameOver) {
         this.updateTypewriter(dt);
@@ -311,6 +329,8 @@ class GameEngine {
 
   private onGameOver(): void {
     this.isGameOver = true;
+    this.isFadingOut = false;
+    this.fadeOutAlpha = 0;
     if (this.score > this.bestScore) {
       this.bestScore = this.score;
       localStorage.setItem('rhythm-runner-best', String(this.bestScore));
@@ -344,7 +364,9 @@ class GameEngine {
       bestScoreTypewriterProgress: this.bestScoreTypewriterTime,
       volume: this.beatSync.getVolume(),
       volumeHover: this.volumeHover,
-      lowQuality: this.lowQuality
+      lowQuality: this.lowQuality,
+      isFadingOut: this.isFadingOut,
+      fadeOutAlpha: this.fadeOutAlpha
     };
 
     this.renderer.render(
