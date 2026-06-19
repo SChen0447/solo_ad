@@ -3,26 +3,25 @@ import { Song } from './types';
 
 interface PlayerBarProps {
   currentSong: Song | null;
-  isPlaying: boolean;
-  progress: number;
-  duration: number;
-  onPlayPause: () => void;
+  isPlaying?: boolean;
+  progress?: number;
+  duration?: number;
+  onPlayPause?: () => void;
   onNext: () => void;
-  onSeek: (percent: number) => void;
+  onSeek?: (percent: number) => void;
 }
 
-const PlayerBar: React.FC<PlayerBarProps> = ({
-  currentSong,
-  isPlaying,
-  progress,
-  duration,
-  onPlayPause,
-  onNext,
-  onSeek,
-}) => {
+const FIXED_DURATION = 210;
+
+const PlayerBar: React.FC<PlayerBarProps> = ({ currentSong, onNext }) => {
   const progressRef = useRef<HTMLDivElement>(null);
+  const animationRef = useRef<number | null>(null);
+  const lastTimeRef = useRef<number>(0);
+
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [progress, setProgress] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
-  const [dragProgress, setDragProgress] = useState(progress);
+  const [dragProgress, setDragProgress] = useState(0);
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -38,12 +37,56 @@ const PlayerBar: React.FC<PlayerBarProps> = ({
     return percent;
   }, []);
 
+  useEffect(() => {
+    if (!isPlaying) {
+      if (animationRef.current) {
+        cancelAnimationFrame(animationRef.current);
+        animationRef.current = null;
+      }
+      return;
+    }
+
+    lastTimeRef.current = performance.now();
+
+    const animate = (now: number) => {
+      const delta = now - lastTimeRef.current;
+      lastTimeRef.current = now;
+
+      setProgress((prev) => {
+        const next = prev + delta / (FIXED_DURATION * 1000);
+        if (next >= 1) {
+          setIsPlaying(false);
+          return 0;
+        }
+        return next;
+      });
+
+      animationRef.current = requestAnimationFrame(animate);
+    };
+
+    animationRef.current = requestAnimationFrame(animate);
+
+    return () => {
+      if (animationRef.current) {
+        cancelAnimationFrame(animationRef.current);
+      }
+    };
+  }, [isPlaying]);
+
+  const handlePlayPause = () => {
+    setIsPlaying((prev) => !prev);
+  };
+
   const handleMouseDown = (e: React.MouseEvent) => {
     e.preventDefault();
     setIsDragging(true);
     const percent = calculateProgress(e.clientX);
     setDragProgress(percent);
   };
+
+  const handleSeek = useCallback((percent: number) => {
+    setProgress(percent);
+  }, []);
 
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
@@ -56,7 +99,7 @@ const PlayerBar: React.FC<PlayerBarProps> = ({
       if (!isDragging) return;
       const percent = calculateProgress(e.clientX);
       setIsDragging(false);
-      onSeek(percent);
+      handleSeek(percent);
     };
 
     if (isDragging) {
@@ -68,10 +111,10 @@ const PlayerBar: React.FC<PlayerBarProps> = ({
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
     };
-  }, [isDragging, calculateProgress, onSeek]);
+  }, [isDragging, calculateProgress, handleSeek]);
 
   const displayProgress = isDragging ? dragProgress : progress;
-  const currentTime = displayProgress * duration;
+  const currentTime = displayProgress * FIXED_DURATION;
 
   return (
     <footer className="player-bar">
@@ -98,7 +141,7 @@ const PlayerBar: React.FC<PlayerBarProps> = ({
 
       <div className="player-controls">
         <div className="control-buttons">
-          <button className="control-btn play-btn" onClick={onPlayPause}>
+          <button className="control-btn play-btn" onClick={handlePlayPause}>
             {isPlaying ? '⏸' : '▶'}
           </button>
           <button className="control-btn next-btn" onClick={onNext}>
@@ -121,7 +164,7 @@ const PlayerBar: React.FC<PlayerBarProps> = ({
               style={{ left: `${displayProgress * 100}%` }}
             />
           </div>
-          <span className="time-text">{formatTime(duration)}</span>
+          <span className="time-text">{formatTime(FIXED_DURATION)}</span>
         </div>
       </div>
 
