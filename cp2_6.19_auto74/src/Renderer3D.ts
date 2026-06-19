@@ -34,7 +34,7 @@ export class Renderer3D {
   private container: HTMLElement;
 
   private starMesh: THREE.Mesh | null = null;
-  private starGlow: THREE.Sprite | null = null;
+  private starGlow: THREE.Mesh | null = null;
   private starGlowMaterial: THREE.ShaderMaterial | null = null;
   private starPulseTime: number = 0;
   private readonly STAR_PULSE_PERIOD = 2.0;
@@ -259,39 +259,35 @@ export class Renderer3D {
     this.starGlowMaterial = new THREE.ShaderMaterial({
       uniforms: {
         glowColor: { value: new THREE.Color(starData.color) },
-        viewVector: { value: this.camera.position },
         pulseScale: { value: 1.0 },
       },
       vertexShader: `
-        uniform vec3 viewVector;
-        uniform float pulseScale;
-        varying float intensity;
+        varying vec2 vUv;
         void main() {
-          vec3 vNormal = normalize(normalMatrix * normal);
-          vec3 vNormel = normalize(normalMatrix * viewVector);
-          intensity = pow(0.7 - dot(vNormal, vNormel), 2.0);
-          vec3 scaledPosition = position * pulseScale;
-          gl_Position = projectionMatrix * modelViewMatrix * vec4(scaledPosition, 1.0);
+          vUv = uv;
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
         }
       `,
       fragmentShader: `
         uniform vec3 glowColor;
-        varying float intensity;
+        uniform float pulseScale;
+        varying vec2 vUv;
         void main() {
-          vec3 glow = glowColor * intensity;
-          gl_FragColor = vec4(glow, intensity * 0.6);
+          float dist = length(vUv - vec2(0.5));
+          float intensity = 1.0 - smoothstep(0.0, 0.5, dist);
+          intensity = pow(intensity, 1.5) * pulseScale;
+          gl_FragColor = vec4(glowColor, intensity * 0.6);
         }
       `,
-      side: THREE.BackSide,
+      side: THREE.DoubleSide,
       blending: THREE.AdditiveBlending,
       transparent: true,
       depthWrite: false,
     });
 
-    const glowGeometry = new THREE.PlaneGeometry(starData.radius * 3.5, starData.radius * 3.5);
-    this.starGlow = new THREE.Sprite(this.starGlowMaterial);
+    const glowGeometry = new THREE.PlaneGeometry(starData.radius * 7, starData.radius * 7);
+    this.starGlow = new THREE.Mesh(glowGeometry, this.starGlowMaterial);
     this.starGlow.position.copy(this.starMesh.position);
-    this.starGlow.scale.setScalar(starData.radius * 3.5);
     this.scene.add(this.starGlow);
   }
 
@@ -461,8 +457,15 @@ export class Renderer3D {
       group.mesh.rotation.y += 0.01;
 
       if (group.selectionRing && group.selectionRing.visible) {
-        group.selectionRing.rotation.z += 0.02;
-        (group.selectionRing.material as THREE.MeshBasicMaterial).opacity = 0.5 + 0.2 * Math.sin(Date.now() * 0.003);
+        const breathT = Date.now() * 0.001;
+        const breathCycle = 0.5 + 0.5 * Math.sin(breathT * Math.PI * 2 / 1.8);
+        group.selectionRing.rotation.z += 0.015 + 0.01 * breathCycle;
+        const breathScale = 1.0 + 0.08 * breathCycle;
+        group.selectionRing.scale.set(breathScale, breathScale, 1.0);
+        (group.selectionRing.material as THREE.MeshBasicMaterial).opacity = 0.25 + 0.45 * breathCycle;
+        const brightness = 0.5 + 0.5 * breathCycle;
+        const ringColor = (group.selectionRing.material as THREE.MeshBasicMaterial).color;
+        ringColor.copy(group.colorRgb).multiplyScalar(brightness);
       }
 
       this.updateTrail(group, planet.trail);
@@ -554,7 +557,7 @@ export class Renderer3D {
       this.starGlowMaterial.uniforms.pulseScale.value = pulse;
     }
     if (this.starGlow) {
-      this.starGlow.scale.setScalar(3.5 * 3 * pulse);
+      this.starGlow.lookAt(this.camera.position);
     }
 
     if (this.starField) {

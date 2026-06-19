@@ -132,8 +132,8 @@ export class UIControls {
     dom.style.backdropFilter = 'blur(8px)';
     (dom.style as any).webkitBackdropFilter = 'blur(8px)';
     dom.style.borderRadius = '12px';
-    dom.style.border = '1px solid rgba(255, 255, 255, 0.15)';
-    dom.style.boxShadow = '0 8px 32px rgba(0, 0, 0, 0.3)';
+    dom.style.border = '1px solid rgba(80, 120, 255, 0.6)';
+    dom.style.boxShadow = '0 8px 32px rgba(0, 0, 0, 0.3), 0 0 8px rgba(80, 120, 255, 0.3), inset 0 0 8px rgba(80, 120, 255, 0.05)';
     dom.style.overflow = 'hidden';
     dom.style.position = 'absolute';
     dom.style.top = '20px';
@@ -141,9 +141,56 @@ export class UIControls {
     dom.style.fontFamily = "'Courier New', Consolas, Monaco, monospace";
     dom.style.transition = 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)';
     dom.style.zIndex = '100';
+    dom.style.animation = 'gui-shield-border-cycle 6s linear infinite, gui-shield-glow-pulse 3s ease-in-out infinite';
 
     const style = document.createElement('style');
     style.textContent = `
+      @keyframes gui-shield-border-cycle {
+        0% {
+          border-color: rgba(80, 120, 255, 0.6);
+          box-shadow:
+            0 8px 32px rgba(0, 0, 0, 0.3),
+            0 0 8px rgba(80, 120, 255, 0.3),
+            inset 0 0 8px rgba(80, 120, 255, 0.05);
+        }
+        33% {
+          border-color: rgba(140, 80, 255, 0.6);
+          box-shadow:
+            0 8px 32px rgba(0, 0, 0, 0.3),
+            0 0 8px rgba(140, 80, 255, 0.3),
+            inset 0 0 8px rgba(140, 80, 255, 0.05);
+        }
+        66% {
+          border-color: rgba(180, 100, 255, 0.6);
+          box-shadow:
+            0 8px 32px rgba(0, 0, 0, 0.3),
+            0 0 8px rgba(180, 100, 255, 0.3),
+            inset 0 0 8px rgba(180, 100, 255, 0.05);
+        }
+        100% {
+          border-color: rgba(80, 120, 255, 0.6);
+          box-shadow:
+            0 8px 32px rgba(0, 0, 0, 0.3),
+            0 0 8px rgba(80, 120, 255, 0.3),
+            inset 0 0 8px rgba(80, 120, 255, 0.05);
+        }
+      }
+
+      @keyframes gui-shield-glow-pulse {
+        0%, 100% {
+          box-shadow:
+            0 8px 32px rgba(0, 0, 0, 0.3),
+            0 0 6px rgba(80, 120, 255, 0.2),
+            inset 0 0 6px rgba(80, 120, 255, 0.03);
+        }
+        50% {
+          box-shadow:
+            0 8px 32px rgba(0, 0, 0, 0.3),
+            0 0 14px rgba(140, 80, 255, 0.4),
+            inset 0 0 14px rgba(140, 80, 255, 0.06);
+        }
+      }
+
       .dg.ac {
         z-index: 100 !important;
       }
@@ -196,23 +243,63 @@ export class UIControls {
         position: relative;
       }
       .dg .c .slider {
-        background: rgba(255, 255, 255, 0.06) !important;
-        border-radius: 4px;
-        height: 18px;
-        margin-top: 4px;
+        background: linear-gradient(90deg, rgba(20, 20, 60, 0.8), rgba(30, 30, 80, 0.6)) !important;
+        border-radius: 8px;
+        height: 6px;
+        margin-top: 8px;
+        margin-bottom: 8px;
+        border: 1px solid rgba(80, 120, 255, 0.15);
         transition: all 0.2s ease;
+        overflow: visible !important;
       }
       .dg .c .slider:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+        border-color: rgba(80, 120, 255, 0.3);
+        box-shadow: 0 0 8px rgba(80, 120, 255, 0.2);
       }
       .dg .c .slider-fg {
-        background: linear-gradient(90deg, #4a4aff, #8080ff) !important;
-        border-radius: 4px;
+        background: linear-gradient(90deg, rgba(80, 120, 255, 0.7), rgba(140, 80, 255, 0.7)) !important;
+        border-radius: 8px;
+        height: 6px;
       }
       .dg .slider::-webkit-slider-thumb {
-        background: #ffd700;
-        box-shadow: 0 0 6px rgba(255, 215, 0, 0.5);
+        -webkit-appearance: none;
+        appearance: none;
+        width: 16px;
+        height: 16px;
+        border-radius: 50%;
+        background: radial-gradient(circle at 40% 35%, #e0e8ff, #8090ff 40%, #5070ff 70%, #3050ee);
+        border: none;
+        cursor: pointer;
+        box-shadow: 0 0 8px rgba(100, 140, 255, 0.5), 0 0 16px rgba(100, 140, 255, 0.25), 0 0 2px rgba(255, 255, 255, 0.4) inset;
+        transition: box-shadow 0.2s ease, transform 0.1s ease;
+        margin-top: -5px;
+      }
+      .dg .slider::-webkit-slider-thumb:hover {
+        box-shadow: 0 0 12px rgba(100, 140, 255, 0.7), 0 0 24px rgba(100, 140, 255, 0.4), 0 0 2px rgba(255, 255, 255, 0.5) inset;
+        transform: scale(1.1);
+      }
+      .dg .slider:active::-webkit-slider-thumb {
+        box-shadow: 0 0 16px rgba(140, 180, 255, 0.9), 0 0 32px rgba(140, 180, 255, 0.5), 0 0 3px rgba(255, 255, 255, 0.6) inset;
+        transform: scale(1.15);
+      }
+      .dg .slider::-moz-range-thumb {
+        width: 16px;
+        height: 16px;
+        border-radius: 50%;
+        background: radial-gradient(circle at 40% 35%, #e0e8ff, #8090ff 40%, #5070ff 70%, #3050ee);
+        border: none;
+        cursor: pointer;
+        box-shadow: 0 0 8px rgba(100, 140, 255, 0.5), 0 0 16px rgba(100, 140, 255, 0.25);
+        transition: box-shadow 0.2s ease;
+      }
+      .dg .slider::-moz-range-thumb:hover {
+        box-shadow: 0 0 12px rgba(100, 140, 255, 0.7), 0 0 24px rgba(100, 140, 255, 0.4);
+      }
+      .dg .slider::-moz-range-track {
+        background: linear-gradient(90deg, rgba(20, 20, 60, 0.8), rgba(30, 30, 80, 0.6));
+        border-radius: 8px;
+        height: 6px;
+        border: 1px solid rgba(80, 120, 255, 0.15);
       }
       .dg .property-name {
         color: #c0c0e0 !important;
@@ -285,7 +372,7 @@ export class UIControls {
           overflow-y: auto !important;
           overflow-x: hidden !important;
           border-radius: 16px 16px 0 0 !important;
-          border-top: 2px solid rgba(255, 215, 0, 0.3) !important;
+          border-top: 2px solid rgba(80, 120, 255, 0.3) !important;
           transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), max-height 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
           touch-action: none;
         }
@@ -324,7 +411,7 @@ export class UIControls {
 
   private setupResponsiveDrawer(): void {
     window.addEventListener('resize', () => {
-      this.checkResponsiveState();
+      this.updateDrawerState();
     });
 
     let pointerStartY = 0;
