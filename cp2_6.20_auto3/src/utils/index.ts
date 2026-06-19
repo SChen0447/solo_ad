@@ -50,10 +50,15 @@ export const formatRelativeTime = (timestamp: number): string => {
 }
 
 export const getProgressColor = (current: number, max: number): string => {
-  const ratio = current / max
-  if (ratio < 0.5) return 'linear-gradient(90deg, #4CAF50 0%, #8BC34A 100%)'
-  if (ratio < 0.8) return 'linear-gradient(90deg, #FFC107 0%, #FF9800 100%)'
-  return 'linear-gradient(90deg, #FF5722 0%, #F44336 100%)'
+  if (max === 0) return 'linear-gradient(90deg, #4CAF50 0%, #4CAF50 100%)'
+  const ratio = Math.min(current / max, 1)
+  const r = Math.round(76 + (244 - 76) * ratio)
+  const g = Math.round(175 + (67 - 175) * ratio)
+  const b = Math.round(80 + (54 - 80) * ratio)
+  const rEnd = Math.round(139 + (255 - 139) * ratio)
+  const gEnd = Math.round(195 + (152 - 195) * ratio)
+  const bEnd = Math.round(74 + (0 - 74) * ratio)
+  return `linear-gradient(90deg, rgb(${r}, ${g}, ${b}) 0%, rgb(${rEnd}, ${gEnd}, ${bEnd}) 100%)`
 }
 
 export const getTypeEmoji = (type: string): string => {
@@ -93,12 +98,19 @@ export const saveUserName = (name: string) => {
 export const debounce = <T extends (...args: any[]) => any>(
   func: T,
   wait: number
-): ((...args: Parameters<T>) => void) => {
+): ((...args: Parameters<T>) => void) & { cancel: () => void } => {
   let timeout: ReturnType<typeof setTimeout> | null = null
-  return (...args: Parameters<T>) => {
+  const debounced = (...args: Parameters<T>) => {
     if (timeout) clearTimeout(timeout)
     timeout = setTimeout(() => func(...args), wait)
   }
+  debounced.cancel = () => {
+    if (timeout) {
+      clearTimeout(timeout)
+      timeout = null
+    }
+  }
+  return debounced
 }
 
 export const validateForm = (data: {
@@ -114,7 +126,9 @@ export const validateForm = (data: {
     errors.title = '活动标题不能为空'
   }
   
-  if (data.time < Date.now()) {
+  if (isNaN(data.time)) {
+    errors.time = '请输入有效的日期时间'
+  } else if (data.time < Date.now()) {
     errors.time = '活动时间不能早于当前时间'
   }
   

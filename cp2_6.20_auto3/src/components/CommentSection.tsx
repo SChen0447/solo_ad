@@ -18,7 +18,8 @@ const CommentSection = ({ activityId, comments }: CommentSectionProps) => {
   const [commentsList, setCommentsList] = useState<Comment[]>(comments)
 
   useEffect(() => {
-    setCommentsList(comments)
+    const sorted = [...comments].sort((a, b) => b.createdAt - a.createdAt)
+    setCommentsList(sorted)
   }, [comments])
 
   const handleSubmit = async (e: React.FormEvent) => {

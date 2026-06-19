@@ -23,8 +23,7 @@ const ActivityCard = ({ activity, isNew }: ActivityCardProps) => {
   const isFull = activity.participants.length >= activity.maxParticipants
   const progressPercent = (activity.participants.length / activity.maxParticipants) * 100
 
-  const handleCardClick = (e: React.MouseEvent) => {
-    if ((e.target as HTMLElement).closest('.card-footer')) return
+  const handleCardClick = () => {
     navigate(`/activity/${activity.id}`)
   }
 

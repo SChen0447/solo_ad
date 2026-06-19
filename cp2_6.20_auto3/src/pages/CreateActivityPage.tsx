@@ -45,9 +45,10 @@ const CreateActivityPage = ({ onSuccess }: CreateActivityPageProps) => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     
+    const parsedTime = new Date(formData.time).getTime()
     const data = {
       ...formData,
-      time: new Date(formData.time).getTime()
+      time: parsedTime
     }
 
     const validation = validateForm(data)

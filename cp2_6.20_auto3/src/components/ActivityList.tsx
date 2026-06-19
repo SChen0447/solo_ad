@@ -23,6 +23,9 @@ const ActivityList = ({ activities, searchQuery = '', newActivityId = null }: Ac
 
   useEffect(() => {
     debouncedFilter(searchQuery)
+    return () => {
+      debouncedFilter.cancel()
+    }
   }, [searchQuery, debouncedFilter])
 
   const filteredActivities = useMemo(() => {
