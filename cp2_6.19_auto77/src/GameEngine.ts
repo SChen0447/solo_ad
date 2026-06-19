@@ -291,7 +291,8 @@ class GameEngine {
     if (result.collectedCoin) {
       const coin = result.collectedCoin;
       const value = coin.type === 'beat' ? 50 : 10;
-      if (coin.beatIndex - this.lastCoinBeatIndex <= 2) {
+      const beatDiff = coin.beatIndex - this.lastCoinBeatIndex;
+      if (beatDiff >= 0 && beatDiff <= 4) {
         this.combo++;
       } else {
         this.combo = 1;
@@ -300,6 +301,11 @@ class GameEngine {
 
       const comboBonus = this.combo > 5 ? 1.5 : 1;
       this.score += Math.floor(value * comboBonus);
+    } else if (!result.gameOver) {
+      const currentBeat = this.beatSync.getBeatIndex();
+      if (currentBeat - this.lastCoinBeatIndex > 6) {
+        this.combo = 0;
+      }
     }
   }
 

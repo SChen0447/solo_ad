@@ -28,6 +28,8 @@ export class Player {
   private jumpHeight = 140;
   private jumpElapsed = 0;
   private jumpStartY = 0;
+  private jumpTargetRotation = Math.PI * 2;
+  private lastJumpProgress = 0;
 
   private slideDuration = 0.4;
   private slideElapsed = 0;
@@ -104,6 +106,7 @@ export class Player {
     this.jumpElapsed = 0;
     this.jumpStartY = this.baseY;
     this.rotation = 0;
+    this.lastJumpProgress = 0;
     return true;
   }
 
@@ -124,12 +127,16 @@ export class Player {
 
     if (this.state === 'jumping') {
       this.jumpElapsed += dt;
-      const t = this.jumpElapsed / this.jumpDuration;
-      this.rotation = easeInOutQuad(t) * Math.PI * 2;
+      const t = Math.min(1, this.jumpElapsed / this.jumpDuration);
+      const easedTotal = easeInOutQuad(t) * this.jumpTargetRotation;
+      const deltaRotation = easedTotal - this.lastJumpProgress;
+      this.rotation += deltaRotation;
+      this.lastJumpProgress = easedTotal;
       if (this.jumpElapsed >= this.jumpDuration) {
         this.state = 'running';
         this.rotation = 0;
         this.jumpElapsed = 0;
+        this.lastJumpProgress = 0;
       }
     } else if (this.state === 'sliding') {
       this.slideElapsed += dt;

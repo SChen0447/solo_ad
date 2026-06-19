@@ -127,10 +127,10 @@ export class ObstacleManager {
     const difficulty = Math.min(1, beatIndex / 60);
 
     const obstacleChance = 0.55 + difficulty * 0.2;
-    const beatCoinChance = 0.15;
-    const normalCoinChance = 0.3;
+    const beatCoinChance = 0.18;
+    const normalCoinChance = 0.35;
 
-    const coinYPositions: { type: ObstacleType; weight: number }[] = [
+    const obstacleTypes: { type: ObstacleType; weight: number }[] = [
       { type: 'spike', weight: 0.4 },
       { type: 'wall', weight: 0.35 },
       { type: 'bar', weight: 0.25 }
@@ -142,7 +142,7 @@ export class ObstacleManager {
       const rand = Math.random();
       let cumulative = 0;
       let selectedType: ObstacleType = 'spike';
-      for (const entry of coinYPositions) {
+      for (const entry of obstacleTypes) {
         cumulative += entry.weight;
         if (rand < cumulative) {
           selectedType = entry.type;
@@ -152,24 +152,25 @@ export class ObstacleManager {
       this.spawnObstacle(selectedType, spawnX);
       this.spawnWarningCircle(spawnX, selectedType);
     } else if (r < obstacleChance + beatCoinChance) {
-      this.spawnCoin('beat', spawnX, beatIndex);
-      this.spawnWarningCircle(spawnX, 'coin');
+      this.spawnBeatCoin(spawnX, beatIndex);
     } else if (r < obstacleChance + beatCoinChance + normalCoinChance) {
-      this.spawnCoin('normal', spawnX, beatIndex);
-      this.spawnWarningCircle(spawnX, 'coin');
+      this.spawnNormalCoin(spawnX, beatIndex);
     }
 
-    if (Math.random() < 0.2) {
-      this.spawnCoin('normal', spawnX + 100, beatIndex);
+    if (Math.random() < 0.25) {
+      this.spawnNormalCoin(spawnX + 120, beatIndex);
     }
   }
 
-  private spawnWarningCircle(x: number, kind: 'spike' | 'wall' | 'bar' | 'coin'): void {
+  private spawnWarningCircle(x: number, kind: 'spike' | 'wall' | 'bar' | 'coin' | 'beatCoin'): void {
     let y = this.groundY - 30;
     let color = '#ff3333';
     if (kind === 'coin') {
       y = this.groundY - 60;
       color = '#ffaa00';
+    } else if (kind === 'beatCoin') {
+      y = this.groundY - 70;
+      color = '#aa55ff';
     } else if (kind === 'bar') {
       y = this.groundY - 90;
     } else if (kind === 'wall') {
@@ -223,19 +224,36 @@ export class ObstacleManager {
     });
   }
 
-  private spawnCoin(type: CoinType, x: number, beatIndex: number): void {
+  private spawnBeatCoin(x: number, beatIndex: number): void {
     const y = this.groundY - 70;
     this.coins.push({
       id: getNextId(),
-      type,
+      type: 'beat',
       x,
       y,
-      radius: type === 'beat' ? 18 : 14,
+      radius: 18,
       spawnTime: performance.now() / 1000,
       collected: false,
-      beatCoin: type === 'beat',
+      beatCoin: true,
       beatIndex
     });
+    this.spawnWarningCircle(x, 'beatCoin');
+  }
+
+  private spawnNormalCoin(x: number, beatIndex: number): void {
+    const y = this.groundY - 60;
+    this.coins.push({
+      id: getNextId(),
+      type: 'normal',
+      x,
+      y,
+      radius: 14,
+      spawnTime: performance.now() / 1000,
+      collected: false,
+      beatCoin: false,
+      beatIndex
+    });
+    this.spawnWarningCircle(x, 'coin');
   }
 
   public spawnScorePopup(value: number, x: number, y: number): void {

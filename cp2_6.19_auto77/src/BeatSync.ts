@@ -3,15 +3,24 @@ export type BeatCallback = (beatIndex: number, time: number) => void;
 export class BeatSync {
   private audioContext: AudioContext | null = null;
   private beatInterval = 0.5;
-  private nextBeatTime = 0;
-  private beatIndex = 0;
   private startTime = 0;
+  private nextNoteTime = 0;
+  private currentBeatIndex = 0;
+  private lastScheduledBeat = -1;
+  private lastDetectedBeat = -1;
+
   private onBeatCallbacks: BeatCallback[] = [];
   private onPreBeatCallbacks: BeatCallback[] = [];
+
   private running = false;
   private volume = 0.5;
   private gainNode: GainNode | null = null;
-  private scheduledBeats: Set<number> = new Set();
+
+  private schedulerTimer: number | null = null;
+  private lookahead = 0.1;
+  private scheduleAheadTime = 0.3;
+
+  private preBeatNotified: Set<number> = new Set();
 
   public getBeatInterval(): number {
     return this.beatInterval;
@@ -46,15 +55,23 @@ export class BeatSync {
     this.gainNode.gain.value = this.volume;
     this.gainNode.connect(this.audioContext.destination);
 
-    this.startTime = this.audioContext.currentTime;
-    this.nextBeatTime = this.startTime + this.beatInterval;
-    this.beatIndex = 0;
-    this.scheduledBeats.clear();
+    this.startTime = this.audioContext.currentTime + 0.05;
+    this.nextNoteTime = this.startTime;
+    this.currentBeatIndex = 0;
+    this.lastScheduledBeat = -1;
+    this.lastDetectedBeat = -1;
+    this.preBeatNotified.clear();
     this.running = true;
+
+    this.schedulerTimer = window.setInterval(() => this.scheduler(), this.lookahead * 1000);
   }
 
   public stop(): void {
     this.running = false;
+    if (this.schedulerTimer) {
+      clearInterval(this.schedulerTimer);
+      this.schedulerTimer = null;
+    }
     if (this.audioContext) {
       this.audioContext.close();
       this.audioContext = null;
@@ -67,60 +84,63 @@ export class BeatSync {
   }
 
   public getBeatProgress(): number {
-    if (!this.running) return 0;
-    const elapsed = this.getCurrentTime() - this.startTime;
+    if (!this.running || !this.audioContext) return 0;
+    const elapsed = this.audioContext.currentTime - this.startTime;
+    if (elapsed < 0) return 0;
     return (elapsed % this.beatInterval) / this.beatInterval;
   }
 
   public getBeatIndex(): number {
-    return this.beatIndex;
+    if (!this.running || !this.audioContext) return 0;
+    const elapsed = this.audioContext.currentTime - this.startTime;
+    if (elapsed < 0) return -1;
+    return Math.floor(elapsed / this.beatInterval);
   }
 
   public isRunning(): boolean {
     return this.running;
   }
 
-  public update(): void {
+  private scheduler(): void {
     if (!this.running || !this.audioContext) return;
     const now = this.audioContext.currentTime;
 
-    while (this.nextBeatTime - now < 0.3) {
-      const beatIdx = this.beatIndex;
-      const beatTime = this.nextBeatTime;
-
-      if (!this.scheduledBeats.has(beatIdx)) {
-        this.scheduledBeats.add(beatIdx);
-        this.scheduleKick(beatTime);
-        this.scheduleHat(beatTime + this.beatInterval * 0.5);
-
-        const preBeatDelay = 0.1;
-        const preBeatTime = beatTime - preBeatDelay;
-        if (preBeatTime > now) {
-          setTimeout(() => {
-            if (this.running) {
-              for (const cb of this.onPreBeatCallbacks) cb(beatIdx, preBeatTime);
-            }
-          }, Math.max(0, (preBeatTime - now) * 1000));
-        }
-
-        const beatDelay = Math.max(0, (beatTime - now) * 1000);
-        setTimeout(() => {
-          if (this.running) {
-            for (const cb of this.onBeatCallbacks) cb(beatIdx, beatTime);
-          }
-        }, beatDelay);
-      }
-
-      this.beatIndex++;
-      this.nextBeatTime += this.beatInterval;
+    while (this.nextNoteTime < now + this.scheduleAheadTime) {
+      const beatIndex = this.lastScheduledBeat + 1;
+      this.scheduleKick(this.nextNoteTime);
+      this.scheduleHat(this.nextNoteTime + this.beatInterval * 0.5);
+      this.lastScheduledBeat = beatIndex;
+      this.nextNoteTime += this.beatInterval;
     }
+  }
 
+  public update(): void {
+    if (!this.running || !this.audioContext) return;
+
+    const now = this.audioContext.currentTime;
     const elapsed = now - this.startTime;
-    const expectedIndex = Math.floor(elapsed / this.beatInterval);
-    if (expectedIndex > this.beatIndex) {
-      this.beatIndex = expectedIndex;
-      this.nextBeatTime = this.startTime + (this.beatIndex + 1) * this.beatInterval;
+    if (elapsed < 0) return;
+
+    const beatIndex = Math.floor(elapsed / this.beatInterval);
+    const beatProgress = (elapsed % this.beatInterval) / this.beatInterval;
+
+    if (beatIndex > this.lastDetectedBeat) {
+      for (let i = this.lastDetectedBeat + 1; i <= beatIndex; i++) {
+        const beatTime = this.startTime + i * this.beatInterval;
+        for (const cb of this.onBeatCallbacks) cb(i, beatTime);
+      }
+      this.lastDetectedBeat = beatIndex;
+      this.preBeatNotified.clear();
     }
+
+    const preBeatThreshold = 0.8;
+    if (beatProgress >= preBeatThreshold && !this.preBeatNotified.has(beatIndex + 1)) {
+      this.preBeatNotified.add(beatIndex + 1);
+      const preBeatTime = this.startTime + (beatIndex + 1) * this.beatInterval - 0.1;
+      for (const cb of this.onPreBeatCallbacks) cb(beatIndex + 1, preBeatTime);
+    }
+
+    this.currentBeatIndex = beatIndex;
   }
 
   private scheduleKick(time: number): void {

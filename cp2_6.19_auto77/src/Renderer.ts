@@ -68,15 +68,15 @@ export class Renderer {
 
     const pulseT = Math.min(1, (now - beatPulseTime) / 0.2);
     if (pulseT < 1) {
-      this.drawPulseGlow(width, height, pulseT);
+      this.drawPulseGlow(width, height, pulseT, state.lowQuality);
     }
 
     this.drawTrack(width, height, groundY, state.speed, state.lowQuality);
     this.drawWarningCircles(warningCircles, now);
     this.drawObstacles(obstacles);
-    this.drawCoins(coins, now);
+    this.drawCoins(coins, now, state.lowQuality);
     this.drawPlayer(player);
-    this.drawParticles(particles);
+    this.drawParticles(particles, state.lowQuality);
     this.drawScorePopups(scorePopups, now);
     this.drawUI(state, now);
 
@@ -100,14 +100,18 @@ export class Renderer {
     ctx.fillRect(0, 0, w, h);
   }
 
-  private drawPulseGlow(w: number, h: number, t: number): void {
+  private drawPulseGlow(w: number, h: number, t: number, lowQuality: boolean): void {
     const ctx = this.ctx;
     const alpha = (1 - t) * 0.4;
-    const thickness = 40 + t * 80;
+    const thickness = (lowQuality ? 30 : 40) + t * (lowQuality ? 60 : 80);
     ctx.save();
     ctx.strokeStyle = `rgba(255, 220, 120, ${alpha})`;
     ctx.lineWidth = thickness;
-    ctx.strokeRect(thickness / 2, thickness / 2, w - thickness, h - thickness);
+    if (lowQuality) {
+      ctx.strokeRect(0, 0, w, h);
+    } else {
+      ctx.strokeRect(thickness / 2, thickness / 2, w - thickness, h - thickness);
+    }
     ctx.restore();
   }
 
@@ -199,7 +203,7 @@ export class Renderer {
     }
   }
 
-  private drawCoins(coins: Coin[], now: number): void {
+  private drawCoins(coins: Coin[], now: number, lowQuality: boolean): void {
     const ctx = this.ctx;
     for (const c of coins) {
       if (c.collected) continue;
@@ -209,11 +213,13 @@ export class Renderer {
       if (c.type === 'beat') {
         const blink = Math.sin(now * 20) * 0.3 + 0.7;
         ctx.globalAlpha = blink;
-        const glow = ctx.createRadialGradient(c.x, c.y, 0, c.x, c.y, c.radius * 2.5);
-        glow.addColorStop(0, 'rgba(170, 85, 255, 0.6)');
-        glow.addColorStop(1, 'rgba(170, 85, 255, 0)');
-        ctx.fillStyle = glow;
-        ctx.fillRect(c.x - c.radius * 2.5, c.y - c.radius * 2.5, c.radius * 5, c.radius * 5);
+        if (!lowQuality) {
+          const glow = ctx.createRadialGradient(c.x, c.y, 0, c.x, c.y, c.radius * 2.5);
+          glow.addColorStop(0, 'rgba(170, 85, 255, 0.6)');
+          glow.addColorStop(1, 'rgba(170, 85, 255, 0)');
+          ctx.fillStyle = glow;
+          ctx.fillRect(c.x - c.radius * 2.5, c.y - c.radius * 2.5, c.radius * 5, c.radius * 5);
+        }
 
         ctx.globalAlpha = 1;
         ctx.fillStyle = '#aa55ff';
@@ -227,11 +233,13 @@ export class Renderer {
         const scaleX = Math.abs(Math.cos(rot));
         ctx.translate(c.x, c.y);
         ctx.scale(scaleX, 1);
-        const glow = ctx.createRadialGradient(0, 0, 0, 0, 0, c.radius * 2);
-        glow.addColorStop(0, 'rgba(255, 220, 0, 0.5)');
-        glow.addColorStop(1, 'rgba(255, 220, 0, 0)');
-        ctx.fillStyle = glow;
-        ctx.fillRect(-c.radius * 2, -c.radius * 2, c.radius * 4, c.radius * 4);
+        if (!lowQuality) {
+          const glow = ctx.createRadialGradient(0, 0, 0, 0, 0, c.radius * 2);
+          glow.addColorStop(0, 'rgba(255, 220, 0, 0.5)');
+          glow.addColorStop(1, 'rgba(255, 220, 0, 0)');
+          ctx.fillStyle = glow;
+          ctx.fillRect(-c.radius * 2, -c.radius * 2, c.radius * 4, c.radius * 4);
+        }
 
         ctx.fillStyle = '#ffdd00';
         ctx.strokeStyle = '#ffee66';
@@ -240,10 +248,12 @@ export class Renderer {
         ctx.arc(0, 0, c.radius, 0, Math.PI * 2);
         ctx.fill();
         ctx.stroke();
-        ctx.fillStyle = '#ffee88';
-        ctx.beginPath();
-        ctx.arc(-c.radius * 0.3, -c.radius * 0.3, c.radius * 0.3, 0, Math.PI * 2);
-        ctx.fill();
+        if (!lowQuality) {
+          ctx.fillStyle = '#ffee88';
+          ctx.beginPath();
+          ctx.arc(-c.radius * 0.3, -c.radius * 0.3, c.radius * 0.3, 0, Math.PI * 2);
+          ctx.fill();
+        }
       }
       ctx.restore();
     }
@@ -317,9 +327,11 @@ export class Renderer {
     }
   }
 
-  private drawParticles(particles: Particle[]): void {
+  private drawParticles(particles: Particle[], lowQuality: boolean): void {
     const ctx = this.ctx;
-    for (const p of particles) {
+    for (let i = 0; i < particles.length; i++) {
+      if (lowQuality && i % 2 === 1) continue;
+      const p = particles[i];
       const alpha = Math.max(0, p.life / p.maxLife);
       ctx.save();
       ctx.globalAlpha = alpha;
@@ -354,33 +366,44 @@ export class Renderer {
   private drawUI(state: GameState, _now: number): void {
     const ctx = this.ctx;
     ctx.save();
-    ctx.font = 'bold 40px Arial, sans-serif';
     ctx.textAlign = 'left';
     ctx.textBaseline = 'top';
 
+    const hasComboBoost = state.combo > 5;
     let scoreColor = '#ffffff';
-    let scale = 1;
-    if (state.combo > 5) {
-      scoreColor = '#ff9933';
-      const pulse = Math.sin(_now * 6) * 0.08 + 1;
-      scale = pulse;
+    let scoreScale = 1;
+    let glowColor = 'rgba(255, 215, 0, 0.5)';
+    let glowBlur = 8;
+
+    if (hasComboBoost) {
+      scoreColor = '#ffaa33';
+      const pulse = Math.sin(_now * 8) * 0.15 + 1.1;
+      scoreScale = pulse;
+      glowColor = 'rgba(255, 150, 50, 0.7)';
+      glowBlur = 15;
     }
 
     ctx.save();
     ctx.translate(30, 30);
-    ctx.scale(scale, scale);
-    ctx.shadowColor = 'rgba(255, 215, 0, 0.5)';
-    ctx.shadowBlur = 8;
+    ctx.scale(scoreScale, scoreScale);
+    ctx.shadowColor = glowColor;
+    ctx.shadowBlur = glowBlur;
+    ctx.font = 'bold 40px Arial, sans-serif';
     ctx.fillStyle = scoreColor;
     ctx.fillText(`${state.score}`, 0, 0);
     ctx.restore();
 
     if (state.combo > 0) {
-      ctx.font = 'bold 22px Arial, sans-serif';
-      ctx.fillStyle = state.combo > 5 ? '#ff9933' : '#aaccff';
-      ctx.shadowColor = 'rgba(100, 150, 255, 0.5)';
-      ctx.shadowBlur = 6;
-      ctx.fillText(`COMBO x${state.combo}`, 30, 80);
+      ctx.save();
+      const comboScale = hasComboBoost ? Math.sin(_now * 8) * 0.1 + 1.05 : 1;
+      ctx.translate(30, 80);
+      ctx.scale(comboScale, comboScale);
+      ctx.font = hasComboBoost ? 'bold 26px Arial, sans-serif' : 'bold 22px Arial, sans-serif';
+      ctx.fillStyle = hasComboBoost ? '#ff9933' : '#aaccff';
+      ctx.shadowColor = hasComboBoost ? 'rgba(255, 150, 50, 0.6)' : 'rgba(100, 150, 255, 0.5)';
+      ctx.shadowBlur = hasComboBoost ? 10 : 6;
+      ctx.fillText(`COMBO x${state.combo}`, 0, 0);
+      ctx.restore();
     }
     ctx.restore();
   }
