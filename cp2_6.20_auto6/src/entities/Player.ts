@@ -265,6 +265,7 @@ export class Player extends Phaser.Events.EventEmitter {
   public get isMoving(): boolean { return this._isMoving; }
   public get currentTool(): ToolType | null { return this._currentTool; }
   public get currentToolSlot(): number { return this._currentToolSlot; }
+  public get currentTerrainType(): TileType { return this._currentTerrainType; }
   public getAnimationFrame(): number { return this.animFrame; }
   public getToolSlots(): (ToolType | null)[] { return [...this.toolSlots]; }
 }

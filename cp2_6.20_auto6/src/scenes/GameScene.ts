@@ -43,6 +43,12 @@ export class GameScene extends Phaser.Scene {
 
   private tileImages: Map<string, Phaser.GameObjects.Image> = new Map();
   private craftingStationGlow?: Phaser.GameObjects.Graphics;
+  private craftingStationImage?: Phaser.GameObjects.Image;
+  private craftingRotation: number = 0;
+  private craftingRotationSpeed: number = 0;
+  private craftingTargetRotationSpeed: number = 0;
+  private craftingIdleParticles: Phaser.GameObjects.Graphics[] = [];
+  private nextCraftingParticleTime: number = 0;
   private craftingAnimationTimer: number = 0;
   private isCrafting: boolean = false;
 
@@ -221,12 +227,18 @@ export class GameScene extends Phaser.Scene {
     }
 
     const craftPos = this.world.getCraftingStationPosition();
+    const cx = (craftPos.x + 0.5) * ts;
+    const cy = (craftPos.y + 0.5) * ts;
+
     this.craftingStationGlow = this.add.graphics();
-    this.craftingStationGlow.setPosition(
-      (craftPos.x + 0.5) * ts,
-      (craftPos.y + 0.5) * ts
-    );
+    this.craftingStationGlow.setPosition(cx, cy);
+
+    this.craftingStationImage = this.add.image(cx, cy, 'tile_crafting');
+    this.craftingStationImage.setOrigin(0.5, 0.75);
+    this.craftingStationImage.setDepth(5);
+
     this.children.bringToTop(this.craftingStationGlow);
+    this.children.bringToTop(this.craftingStationImage);
   }
 
   private renderTile(tile: Tile): void {
@@ -1083,12 +1095,40 @@ export class GameScene extends Phaser.Scene {
     text.setOrigin(0.5);
     this.successToast.add(text);
 
+    let flickerState = true;
+    let flickerTimer: Phaser.Time.TimerEvent | null = null;
+
+    const startFlicker = () => {
+      flickerTimer = this.time.addEvent({
+        delay: 500,
+        loop: true,
+        callback: () => {
+          flickerState = !flickerState;
+          const targetAlpha = flickerState ? 1.0 : 0.8;
+          this.tweens.add({
+            targets: text,
+            alpha: targetAlpha,
+            duration: 80,
+            ease: 'Linear'
+          });
+        }
+      });
+    };
+
+    const stopFlicker = () => {
+      if (flickerTimer) {
+        flickerTimer.remove();
+        flickerTimer = null;
+      }
+    };
+
     this.tweens.add({
       targets: this.successToast,
       y: vh - 120,
       duration: 400,
       ease: 'Back.easeOut',
       onComplete: () => {
+        startFlicker();
         this.tweens.add({
           targets: this.successToast,
           delay: 1600,
@@ -1096,6 +1136,9 @@ export class GameScene extends Phaser.Scene {
           y: vh + 60,
           duration: 300,
           ease: 'Back.easeIn',
+          onStart: () => {
+            stopFlicker();
+          },
           onComplete: () => {
             this.successToast?.destroy();
             this.successToast = undefined;
@@ -1590,6 +1633,7 @@ export class GameScene extends Phaser.Scene {
     this.checkEnemyPlayerCollision(delta);
 
     if (this.craftingStationGlow) {
+      this.updateCraftingIdleEffect(time, delta);
       this.updateCraftingGlow(delta);
     }
 
@@ -1670,6 +1714,108 @@ export class GameScene extends Phaser.Scene {
         }
       }
     }
+  }
+
+  private updateCraftingIdleEffect(time: number, delta: number): void {
+    const craftPos = this.world.getCraftingStationPosition();
+    const ts = WorldManager.TILE_SIZE;
+    const cx = (craftPos.x + 0.5) * ts;
+    const cy = (craftPos.y + 0.5) * ts;
+
+    const px = this.player.x;
+    const py = this.player.y;
+    const distInTiles = Math.sqrt(
+      ((px - cx) / ts) ** 2 + ((py - cy) / ts) ** 2
+    );
+
+    const degreesPerSecond = 15;
+    this.craftingTargetRotationSpeed = distInTiles <= 3 ? (degreesPerSecond * Math.PI) / 180 : 0;
+
+    const accelerationTime = 500;
+    const maxAccel = (degreesPerSecond * Math.PI) / 180 / (accelerationTime / 1000);
+    const speedDiff = this.craftingTargetRotationSpeed - this.craftingRotationSpeed;
+    const accel = Math.sign(speedDiff) * Math.min(Math.abs(speedDiff), maxAccel * (delta / 1000));
+    this.craftingRotationSpeed += accel;
+
+    if (Math.abs(this.craftingRotationSpeed) < 0.001) {
+      this.craftingRotationSpeed = 0;
+    }
+
+    this.craftingRotation += this.craftingRotationSpeed * (delta / 1000);
+
+    if (this.craftingStationImage) {
+      this.craftingStationImage.setRotation(this.craftingRotation);
+      this.craftingStationImage.setPosition(cx, cy);
+    }
+
+    const shouldSpawnParticles = distInTiles <= 3 || this.craftingRotationSpeed > 0.001;
+
+    if (shouldSpawnParticles && time >= this.nextCraftingParticleTime && !this.performanceMode) {
+      this.spawnCraftingIdleParticle(cx, cy);
+      this.nextCraftingParticleTime = time + 150;
+    }
+
+    for (let i = this.craftingIdleParticles.length - 1; i >= 0; i--) {
+      const particle = this.craftingIdleParticles[i];
+      const data = particle.getData('particleData') as {
+        vy: number;
+        life: number;
+        maxLife: number;
+        baseAlpha: number;
+      };
+
+      if (!data) continue;
+
+      data.life -= delta;
+      const progress = 1 - data.life / data.maxLife;
+
+      const currentY = particle.y + data.vy * (delta / 1000);
+      particle.setY(currentY);
+
+      if (distInTiles > 3) {
+        data.baseAlpha = Math.max(0, data.baseAlpha - (delta / 300));
+      }
+
+      const alpha = data.baseAlpha * (1 - progress * 0.6);
+      particle.setAlpha(alpha);
+
+      const newScale = 1 - progress * 0.3;
+      particle.setScale(newScale);
+
+      if (data.life <= 0 || data.baseAlpha <= 0) {
+        particle.destroy();
+        this.craftingIdleParticles.splice(i, 1);
+      }
+    }
+  }
+
+  private spawnCraftingIdleParticle(cx: number, cy: number): void {
+    const ts = WorldManager.TILE_SIZE;
+    const g = this.add.graphics();
+    const size = 2 + Math.random() * 3;
+    const offsetX = (Math.random() - 0.5) * ts * 0.4;
+    const startY = cy + ts * 0.3;
+
+    g.fillStyle(0xffd700, 1);
+    g.fillRect(-size / 2, -size / 2, size, size);
+    g.fillStyle(0xffffaa, 1);
+    g.fillRect(-size / 2, -size / 2, size / 2, size / 2);
+
+    g.setPosition(cx + offsetX, startY);
+    g.setDepth(6);
+    g.setAlpha(0.6);
+
+    const vy = -20 - Math.random() * 25;
+    const life = 500 + Math.random() * 200;
+
+    g.setData('particleData', {
+      vy,
+      life,
+      maxLife: life,
+      baseAlpha: 0.6
+    });
+
+    this.craftingIdleParticles.push(g);
   }
 
   private updateCraftingGlow(_delta: number): void {
