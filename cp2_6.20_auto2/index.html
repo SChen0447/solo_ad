@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>细胞3D可视化</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background-color: #1a1a2e;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      color: #fff;
+    }
+    #app {
+      width: 100%;
+      height: 100%;
+      position: relative;
+    }
+    #canvas-container {
+      width: 100%;
+      height: 100%;
+    }
+    #sidebar {
+      position: absolute;
+      left: 16px;
+      top: 16px;
+      width: 260px;
+      height: calc(100% - 32px);
+      background: rgba(255, 255, 255, 0.08);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 16px;
+      overflow: hidden;
+      transition: transform 0.3s ease;
+      z-index: 10;
+    }
+    #sidebar.mobile {
+      left: 0;
+      top: auto;
+      bottom: 0;
+      width: 100%;
+      height: 60px;
+      border-radius: 16px 16px 0 0;
+    }
+    .sidebar-tabs {
+      display: flex;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      background: rgba(0, 0, 0, 0.2);
+    }
+    .sidebar-tab {
+      flex: 1;
+      padding: 12px 8px;
+      text-align: center;
+      cursor: pointer;
+      font-size: 13px;
+      color: rgba(255, 255, 255, 0.6);
+      transition: all 0.3s ease;
+      border-bottom: 2px solid transparent;
+    }
+    .sidebar-tab.active {
+      color: #fff;
+      border-bottom-color: #7c3aed;
+    }
+    .sidebar-tab:hover {
+      color: #fff;
+      background: rgba(255, 255, 255, 0.05);
+    }
+    .sidebar-content {
+      height: calc(100% - 45px);
+      overflow: hidden;
+      position: relative;
+    }
+    .sidebar-panel {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      padding: 16px;
+      overflow-y: auto;
+      transition: transform 0.3s ease;
+    }
+    .sidebar-panel.hidden-left {
+      transform: translateX(-100%);
+    }
+    .sidebar-panel.hidden-right {
+      transform: translateX(100%);
+    }
+    .panel-title {
+      font-size: 14px;
+      font-weight: 600;
+      margin-bottom: 12px;
+      color: #a78bfa;
+    }
+    .info-item {
+      margin-bottom: 10px;
+      padding: 10px;
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 8px;
+    }
+    .info-label {
+      font-size: 11px;
+      color: rgba(255, 255, 255, 0.5);
+      margin-bottom: 4px;
+    }
+    .info-value {
+      font-size: 13px;
+      color: #fff;
+      line-height: 1.5;
+    }
+    .mark-btn {
+      margin-top: 12px;
+      width: 100%;
+      padding: 10px;
+      background: linear-gradient(135deg, #7c3aed, #2563eb);
+      border: none;
+      border-radius: 8px;
+      color: white;
+      font-size: 13px;
+      cursor: pointer;
+      transition: transform 0.2s ease;
+    }
+    .mark-btn:hover {
+      transform: scale(1.02);
+    }
+    .mark-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    .mark-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .mark-item {
+      padding: 10px;
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background 0.2s ease;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .mark-item:hover {
+      background: rgba(255, 255, 255, 0.1);
+    }
+    .mark-color-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .mark-name {
+      font-size: 13px;
+      flex: 1;
+    }
+    .mark-delete {
+      padding: 2px 6px;
+      font-size: 11px;
+      background: rgba(239, 68, 68, 0.3);
+      border: none;
+      border-radius: 4px;
+      color: #fca5a5;
+      cursor: pointer;
+    }
+    .transport-toggle {
+      width: 100%;
+      padding: 12px;
+      background: linear-gradient(135deg, #10b981, #059669);
+      border: none;
+      border-radius: 8px;
+      color: white;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      margin-bottom: 16px;
+      transition: all 0.2s ease;
+    }
+    .transport-toggle.active {
+      background: linear-gradient(135deg, #dc2626, #b91c1c);
+    }
+    .transport-toggle:hover {
+      transform: scale(1.02);
+    }
+    .instruction-item {
+      padding: 10px 0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    }
+    .instruction-item:last-child {
+      border-bottom: none;
+    }
+    .instruction-key {
+      display: inline-block;
+      padding: 2px 8px;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 4px;
+      font-size: 11px;
+      font-family: monospace;
+      margin-right: 6px;
+    }
+    .instruction-text {
+      font-size: 12px;
+      color: rgba(255, 255, 255, 0.7);
+    }
+    #compass {
+      position: absolute;
+      top: 16px;
+      right: 16px;
+      width: 80px;
+      height: 80px;
+      border-radius: 50%;
+      background: rgba(0, 0, 0, 0.4);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      z-index: 10;
+      overflow: hidden;
+    }
+    #particle-label {
+      position: absolute;
+      padding: 8px 12px;
+      background: rgba(255, 255, 255, 0.9);
+      color: #1a1a2e;
+      border-radius: 8px;
+      font-size: 12px;
+      pointer-events: none;
+      z-index: 20;
+      display: none;
+      white-space: nowrap;
+    }
+    #floating-btn {
+      position: absolute;
+      right: 24px;
+      bottom: 24px;
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #7c3aed, #2563eb);
+      border: none;
+      color: white;
+      font-size: 20px;
+      cursor: pointer;
+      z-index: 15;
+      box-shadow: 0 4px 12px rgba(124, 58, 237, 0.4);
+      transition: all 0.3s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    #floating-btn:hover {
+      transform: scale(1.1);
+      box-shadow: 0 6px 20px rgba(124, 58, 237, 0.6);
+    }
+    #floating-btn .ripple {
+      position: absolute;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.4);
+      transform: scale(0);
+      animation: ripple 0.6s ease-out;
+      pointer-events: none;
+    }
+    @keyframes ripple {
+      to {
+        transform: scale(4);
+        opacity: 0;
+      }
+    }
+    .submenu {
+      position: absolute;
+      right: 24px;
+      bottom: 84px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      z-index: 14;
+      transform-origin: bottom right;
+      transform: scale(0);
+      opacity: 0;
+      transition: all 0.3s ease;
+    }
+    .submenu.open {
+      transform: scale(1);
+      opacity: 1;
+    }
+    .submenu-btn {
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      background: rgba(30, 30, 60, 0.9);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      color: white;
+      font-size: 16px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s ease;
+      position: relative;
+    }
+    .submenu-btn:hover {
+      background: rgba(50, 50, 90, 0.9);
+      transform: scale(1.05);
+    }
+    .submenu-btn .tooltip {
+      position: absolute;
+      right: 54px;
+      padding: 6px 10px;
+      background: rgba(0, 0, 0, 0.8);
+      border-radius: 4px;
+      font-size: 12px;
+      white-space: nowrap;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s ease;
+    }
+    .submenu-btn:hover .tooltip {
+      opacity: 1;
+    }
+    #marks-panel {
+      position: absolute;
+      right: 16px;
+      top: 112px;
+      width: 200px;
+      max-height: calc(100% - 140px);
+      background: rgba(255, 255, 255, 0.08);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 16px;
+      padding: 14px;
+      overflow-y: auto;
+      z-index: 10;
+    }
+    #marks-panel .panel-title {
+      font-size: 13px;
+      font-weight: 600;
+      margin-bottom: 10px;
+      color: #a78bfa;
+    }
+    #marks-panel.mobile {
+      display: none;
+    }
+    @media (max-width: 768px) {
+      #sidebar {
+        left: 0;
+        top: auto;
+        bottom: 0;
+        width: 100%;
+        height: 60px;
+        border-radius: 16px 16px 0 0;
+      }
+      .sidebar-content {
+        display: none;
+      }
+      .sidebar-content.mobile-open {
+        display: block;
+        position: fixed;
+        bottom: 60px;
+        left: 0;
+        width: 100%;
+        height: 60%;
+        background: rgba(20, 20, 40, 0.95);
+        backdrop-filter: blur(20px);
+      }
+      #marks-panel {
+        display: none;
+      }
+      #compass {
+        width: 60px;
+        height: 60px;
+        top: 8px;
+        right: 8px;
+      }
+      #floating-btn {
+        right: 16px;
+        bottom: 76px;
+      }
+      .submenu {
+        right: 16px;
+        bottom: 136px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <div id="canvas-container"></div>
+    <div id="sidebar">
+      <div class="sidebar-tabs">
+        <div class="sidebar-tab active" data-tab="info">细胞信息</div>
+        <div class="sidebar-tab" data-tab="marks">标记列表</div>
+        <div class="sidebar-tab" data-tab="help">操作说明</div>
+      </div>
+      <div class="sidebar-content">
+        <div class="sidebar-panel" data-panel="info">
+          <button class="transport-toggle" id="transport-toggle">▶ 物质运输</button>
+          <div class="panel-title">细胞器信息</div>
+          <div id="organelle-info">
+            <div class="info-item">
+              <div class="info-label">提示</div>
+              <div class="info-value">双击任意细胞器查看详细信息</div>
+            </div>
+          </div>
+        </div>
+        <div class="sidebar-panel hidden-right" data-panel="marks">
+          <div class="panel-title">已标记细胞器</div>
+          <div class="mark-list" id="sidebar-mark-list">
+            <div class="info-item">
+              <div class="info-value" style="color: rgba(255,255,255,0.5); font-size: 12px;">暂无标记</div>
+            </div>
+          </div>
+        </div>
+        <div class="sidebar-panel hidden-right" data-panel="help">
+          <div class="panel-title">操作说明</div>
+          <div class="instruction-item">
+            <span class="instruction-key">左键拖拽</span>
+            <span class="instruction-text">旋转视角</span>
+          </div>
+          <div class="instruction-item">
+            <span class="instruction-key">滚轮</span>
+            <span class="instruction-text">缩放场景</span>
+          </div>
+          <div class="instruction-item">
+            <span class="instruction-key">右键拖拽</span>
+            <span class="instruction-text">平移视角</span>
+          </div>
+          <div class="instruction-item">
+            <span class="instruction-key">左键双击</span>
+            <span class="instruction-text">聚焦细胞器</span>
+          </div>
+          <div class="instruction-item">
+            <span class="instruction-key">点击粒子</span>
+            <span class="instruction-text">暂停并查看粒子信息</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div id="marks-panel">
+      <div class="panel-title">标记列表</div>
+      <div class="mark-list" id="right-mark-list">
+        <div class="info-item" style="background: transparent; padding: 0;">
+          <div class="info-value" style="color: rgba(255,255,255,0.5); font-size: 12px;">暂无标记</div>
+        </div>
+      </div>
+    </div>
+    <canvas id="compass"></canvas>
+    <div id="particle-label"></div>
+    <div class="submenu" id="submenu">
+      <button class="submenu-btn" data-action="reset" title="重置视角">
+        <span class="tooltip">重置视角</span>⟳
+      </button>
+      <button class="submenu-btn" data-action="clearMarks" title="清除所有标记">
+        <span class="tooltip">清除标记</span>✕
+      </button>
+      <button class="submenu-btn" data-action="toggleMode" title="切换显示模式">
+        <span class="tooltip">切换模式</span>◉
+      </button>
+      <button class="submenu-btn" data-action="screenshot" title="截图保存">
+        <span class="tooltip">截图保存</span>📷
+      </button>
+    </div>
+    <button id="floating-btn">+</button>
+  </div>
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
