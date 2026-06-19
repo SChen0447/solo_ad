@@ -39,15 +39,6 @@ type ChartType = 'bar' | 'pie';
 
 const CHART_COLORS = ['#2B6CB0', '#3182CE', '#4299E1', '#63B3ED', '#90CDF4', '#BEE3F8', '#2C5282', '#2A4365'];
 
-function getOrCreateVoterId(): string {
-  let voterId = localStorage.getItem('vote_voter_id');
-  if (!voterId) {
-    voterId = `voter_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
-    localStorage.setItem('vote_voter_id', voterId);
-  }
-  return voterId;
-}
-
 function formatTimeRemaining(ms: number): string {
   if (ms <= 0) return '已结束';
   const seconds = Math.floor(ms / 1000);
@@ -77,9 +68,11 @@ function PollVote({ pollId, onBack }: PollVoteProps) {
   const [showResults, setShowResults] = useState(false);
   const [chartType, setChartType] = useState<ChartType>('bar');
   const [isVoting, setIsVoting] = useState(false);
+  const [windowWidth, setWindowWidth] = useState<number>(typeof window !== 'undefined' ? window.innerWidth : 1024);
   const pollRef = useRef<PollData | null>(null);
-
-  const voterId = useRef<string>(getOrCreateVoterId());
+  const deadlineRef = useRef<number>(0);
+  const countdownTimerRef = useRef<number | null>(null);
+  const refreshTimerRef = useRef<number | null>(null);
 
   pollRef.current = poll;
 
@@ -94,6 +87,7 @@ function PollVote({ pollId, onBack }: PollVoteProps) {
       }
       const data: PollData = await response.json();
       setPoll(data);
+      deadlineRef.current = data.deadline;
 
       const votedKey = `voted_${data.id}`;
       const votedVal = localStorage.getItem(votedKey);
@@ -122,29 +116,56 @@ function PollVote({ pollId, onBack }: PollVoteProps) {
   useEffect(() => {
     if (!poll) return;
 
-    const timer = setInterval(() => {
-      const remaining = Math.max(0, poll.deadline - Date.now());
+    deadlineRef.current = poll.deadline;
+
+    const tick = () => {
+      const remaining = Math.max(0, deadlineRef.current - Date.now());
       setTimeRemaining(remaining);
 
       if (remaining <= 0 && !pollRef.current?.isExpired) {
-        setPoll((prev) => prev ? { ...prev, isExpired: true } : prev);
+        setPoll((prev) => (prev ? { ...prev, isExpired: true } : prev));
         setShowResults(true);
-        clearInterval(timer);
+        if (countdownTimerRef.current !== null) {
+          clearInterval(countdownTimerRef.current);
+          countdownTimerRef.current = null;
+        }
       }
-    }, 1000);
+    };
 
-    return () => clearInterval(timer);
+    tick();
+    countdownTimerRef.current = window.setInterval(tick, 1000);
+
+    return () => {
+      if (countdownTimerRef.current !== null) {
+        clearInterval(countdownTimerRef.current);
+        countdownTimerRef.current = null;
+      }
+    };
   }, [poll]);
 
   useEffect(() => {
     if (!poll || hasVoted || poll.isExpired) return;
 
-    const refreshInterval = setInterval(() => {
+    refreshTimerRef.current = window.setInterval(() => {
       fetchPoll();
     }, 3000);
 
-    return () => clearInterval(refreshInterval);
+    return () => {
+      if (refreshTimerRef.current !== null) {
+        clearInterval(refreshTimerRef.current);
+        refreshTimerRef.current = null;
+      }
+    };
   }, [poll, hasVoted, fetchPoll]);
+
+  useEffect(() => {
+    const handleResize = () => {
+      setWindowWidth(window.innerWidth);
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   const handleVote = async (optionId: string) => {
     if (!poll || hasVoted || poll.isExpired || isVoting) return;
@@ -159,8 +180,7 @@ function PollVote({ pollId, onBack }: PollVoteProps) {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          optionId,
-          voterId: voterId.current
+          optionId
         })
       });
 
@@ -333,27 +353,38 @@ function PollVote({ pollId, onBack }: PollVoteProps) {
             </button>
           </div>
 
-          <div style={{ width: '100%', height: 360 }}>
+          <div style={{ width: '100%', height: windowWidth < 640 ? 300 : 360 }}>
             <ResponsiveContainer width="100%" height="100%">
               {chartType === 'bar' ? (
                 <BarChart
                   data={getChartData()}
-                  margin={{ top: 20, right: 30, left: 20, bottom: 60 }}
+                  margin={{
+                    top: windowWidth < 640 ? 16 : 20,
+                    right: windowWidth < 640 ? 16 : 30,
+                    left: windowWidth < 640 ? 10 : 20,
+                    bottom: windowWidth < 640 ? 50 : 60
+                  }}
                 >
                   <XAxis
                     dataKey="name"
-                    angle={-30}
+                    angle={windowWidth < 640 ? -45 : -30}
                     textAnchor="end"
                     interval={0}
-                    height={80}
-                    tick={{ fontSize: 12, fill: '#4A5568' }}
+                    height={windowWidth < 640 ? 60 : 80}
+                    tick={{ fontSize: windowWidth < 640 ? 10 : 12, fill: '#4A5568' }}
                     axisLine={{ stroke: '#E2E8F0' }}
                   />
                   <YAxis
                     allowDecimals={false}
-                    tick={{ fontSize: 12, fill: '#4A5568' }}
+                    tick={{ fontSize: windowWidth < 640 ? 10 : 12, fill: '#4A5568' }}
                     axisLine={{ stroke: '#E2E8F0' }}
-                    label={{ value: '票数', angle: -90, position: 'insideLeft', fill: '#718096', fontSize: 12 }}
+                    label={{
+                      value: '票数',
+                      angle: -90,
+                      position: 'insideLeft',
+                      fill: '#718096',
+                      fontSize: windowWidth < 640 ? 10 : 12
+                    }}
                   />
                   <Tooltip
                     formatter={(value: number, _name: string, props: any) => [
@@ -364,6 +395,7 @@ function PollVote({ pollId, onBack }: PollVoteProps) {
                   />
                   <Bar
                     dataKey="votes"
+                    animationBegin={0}
                     animationDuration={800}
                     animationEasing="ease-out"
                     radius={[6, 6, 0, 0]}
@@ -375,7 +407,7 @@ function PollVote({ pollId, onBack }: PollVoteProps) {
                       dataKey="votes"
                       position="top"
                       fill="#2D3748"
-                      fontSize={12}
+                      fontSize={windowWidth < 640 ? 10 : 12}
                       fontWeight={600}
                     />
                   </Bar>
@@ -387,10 +419,15 @@ function PollVote({ pollId, onBack }: PollVoteProps) {
                     cx="50%"
                     cy="50%"
                     labelLine={false}
-                    label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                    outerRadius={120}
+                    label={({ name, percent }) =>
+                      windowWidth < 640
+                        ? `${(percent * 100).toFixed(0)}%`
+                        : `${name} ${(percent * 100).toFixed(0)}%`
+                    }
+                    outerRadius={windowWidth < 640 ? 80 : 120}
                     fill="#8884d8"
                     dataKey="votes"
+                    animationBegin={0}
                     animationDuration={800}
                     animationEasing="ease-out"
                   >
@@ -405,7 +442,9 @@ function PollVote({ pollId, onBack }: PollVoteProps) {
                     ]}
                     contentStyle={{ borderRadius: '8px', border: '1px solid #E2E8F0' }}
                   />
-                  <Legend />
+                  <Legend
+                    wrapperStyle={{ fontSize: windowWidth < 640 ? 11 : 12 }}
+                  />
                 </PieChart>
               )}
             </ResponsiveContainer>

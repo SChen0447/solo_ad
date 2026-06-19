@@ -4,6 +4,7 @@ import { v4 as uuidv4 } from 'uuid';
 const app = express();
 const PORT = 3001;
 
+app.set('trust proxy', 1);
 app.use(express.json());
 
 interface PollOption {
@@ -19,7 +20,7 @@ interface Poll {
   deadline: number;
   createdAt: number;
   totalVotes: number;
-  voters: Set<string>;
+  votedIps: Set<string>;
 }
 
 const polls = new Map<string, Poll>();
@@ -53,7 +54,7 @@ app.post('/api/polls', (req: Request, res: Response) => {
     deadline,
     createdAt: Date.now(),
     totalVotes: 0,
-    voters: new Set<string>()
+    votedIps: new Set<string>()
   };
 
   polls.set(pollId, poll);
@@ -90,7 +91,6 @@ app.get('/api/polls/:id', (req: Request, res: Response) => {
 
 interface VoteRequest {
   optionId: string;
-  voterId: string;
 }
 
 app.post('/api/polls/:id/vote', (req: Request, res: Response) => {
@@ -104,13 +104,10 @@ app.post('/api/polls/:id/vote', (req: Request, res: Response) => {
     return res.status(400).json({ error: '投票已结束' });
   }
 
-  const { optionId, voterId }: VoteRequest = req.body;
+  const { optionId }: VoteRequest = req.body;
+  const clientIp = req.ip || req.socket.remoteAddress || 'unknown';
 
-  if (!voterId) {
-    return res.status(400).json({ error: '缺少投票者标识' });
-  }
-
-  if (poll.voters.has(voterId)) {
+  if (poll.votedIps.has(clientIp)) {
     return res.status(400).json({ error: '您已投过票' });
   }
 
@@ -121,7 +118,7 @@ app.post('/api/polls/:id/vote', (req: Request, res: Response) => {
 
   option.votes += 1;
   poll.totalVotes += 1;
-  poll.voters.add(voterId);
+  poll.votedIps.add(clientIp);
 
   res.json({
     id: poll.id,

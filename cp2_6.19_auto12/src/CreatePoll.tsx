@@ -14,7 +14,7 @@ function CreatePoll({ onSuccess }: CreatePollProps) {
   const [deadlineMinutes, setDeadlineMinutes] = useState<number>(30);
   const [customDeadline, setCustomDeadline] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [errors, setErrors] = useState<{ title?: string; options?: string; deadline?: string }>({});
   const [createdPollId, setCreatedPollId] = useState<string | null>(null);
   const [linkCopied, setLinkCopied] = useState(false);
 
@@ -44,31 +44,55 @@ function CreatePoll({ onSuccess }: CreatePollProps) {
     return Date.now() + deadlineMinutes * 60 * 1000;
   };
 
-  const validateForm = (): string | null => {
+  const validateForm = (): { title?: string; options?: string; deadline?: string } => {
+    const newErrors: { title?: string; options?: string; deadline?: string } = {};
+
     if (!title.trim()) {
-      return '请输入投票标题';
+      newErrors.title = '请输入投票标题';
+    } else if (title.trim().length < 2) {
+      newErrors.title = '标题至少需要2个字符';
+    } else if (title.trim().length > 200) {
+      newErrors.title = '标题不能超过200个字符';
     }
+
     const validOptions = options.filter((o) => o.trim());
+    const emptyOptions = options.filter((o) => !o.trim());
+
     if (validOptions.length < 2) {
-      return '请至少填写2个选项';
+      if (emptyOptions.length === options.length) {
+        newErrors.options = '请至少填写2个选项内容';
+      } else {
+        newErrors.options = '选项内容不能为空，请填写完整';
+      }
+    } else if (options.length < 2) {
+      newErrors.options = '至少需要2个选项';
+    } else if (options.length > 8) {
+      newErrors.options = '最多只能有8个选项';
     }
+
     const deadline = getDeadline();
-    if (customDeadline && isNaN(deadline)) {
-      return '请选择有效的截止时间';
+    if (customDeadline) {
+      if (isNaN(deadline) || deadline <= 0) {
+        newErrors.deadline = '请选择有效的截止时间';
+      } else if (deadline <= Date.now()) {
+        newErrors.deadline = '截止时间必须晚于当前时间';
+      }
+    } else {
+      if (deadline <= Date.now()) {
+        newErrors.deadline = '截止时间必须晚于当前时间';
+      }
     }
-    if (deadline <= Date.now()) {
-      return '截止时间必须大于当前时间';
-    }
-    return null;
+
+    return newErrors;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError(null);
 
-    const validationError = validateForm();
-    if (validationError) {
-      setError(validationError);
+    const validationErrors = validateForm();
+    setErrors(validationErrors);
+
+    if (Object.keys(validationErrors).length > 0) {
       return;
     }
 
@@ -96,7 +120,7 @@ function CreatePoll({ onSuccess }: CreatePollProps) {
       const data: CreatePollResponse = await response.json();
       setCreatedPollId(data.id);
     } catch (err) {
-      setError(err instanceof Error ? err.message : '创建投票失败');
+      setErrors({ title: err instanceof Error ? err.message : '创建投票失败' });
     } finally {
       setIsSubmitting(false);
     }
@@ -173,33 +197,59 @@ function CreatePoll({ onSuccess }: CreatePollProps) {
     <div className="card">
       <h2 className="card-title">创建新投票</h2>
 
-      {error && <div className="error-message">{error}</div>}
+      {errors.title && <div className="error-message">{errors.title}</div>}
 
       <form onSubmit={handleSubmit}>
         <div className="form-group">
           <label className="form-label">投票标题</label>
           <input
             type="text"
-            className="form-input"
+            className={`form-input ${errors.title ? 'input-error' : ''}`}
             placeholder="请输入投票问题或议题..."
             value={title}
-            onChange={(e) => setTitle(e.target.value)}
+            onChange={(e) => {
+              setTitle(e.target.value);
+              if (errors.title) {
+                setErrors((prev) => {
+                  const { title: _, ...rest } = prev;
+                  return rest;
+                });
+              }
+            }}
             maxLength={200}
           />
+          {errors.title && (
+            <div style={{ color: '#C53030', fontSize: '13px', marginTop: '6px' }}>
+              {errors.title}
+            </div>
+          )}
         </div>
 
         <div className="form-group">
           <label className="form-label">
             选项 ({options.length}/8)
           </label>
+          {errors.options && (
+            <div style={{ color: '#C53030', fontSize: '13px', marginBottom: '8px' }}>
+              {errors.options}
+            </div>
+          )}
           {options.map((option, index) => (
             <div key={index} className="option-input-row">
               <input
                 type="text"
-                className="form-input"
+                className={`form-input ${errors.options ? 'input-error' : ''}`}
                 placeholder={`选项 ${index + 1}`}
                 value={option}
-                onChange={(e) => updateOption(index, e.target.value)}
+                onChange={(e) => {
+                  updateOption(index, e.target.value);
+                  if (errors.options) {
+                    setErrors((prev) => {
+                      const { options: _, ...rest } = prev;
+                      return rest;
+                    });
+                  }
+                }}
                 maxLength={100}
               />
               {options.length > 2 && (
@@ -222,13 +272,24 @@ function CreatePoll({ onSuccess }: CreatePollProps) {
 
         <div className="form-group">
           <label className="form-label">截止时间</label>
+          {errors.deadline && (
+            <div style={{ color: '#C53030', fontSize: '13px', marginBottom: '8px' }}>
+              {errors.deadline}
+            </div>
+          )}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
             <select
-              className="form-input"
+              className={`form-input ${errors.deadline ? 'input-error' : ''}`}
               value={deadlineMinutes}
               onChange={(e) => {
                 setDeadlineMinutes(Number(e.target.value));
                 setCustomDeadline('');
+                if (errors.deadline) {
+                  setErrors((prev) => {
+                    const { deadline: _, ...rest } = prev;
+                    return rest;
+                  });
+                }
               }}
               disabled={!!customDeadline}
             >
@@ -243,9 +304,17 @@ function CreatePoll({ onSuccess }: CreatePollProps) {
             </div>
             <input
               type="datetime-local"
-              className="form-input"
+              className={`form-input ${errors.deadline ? 'input-error' : ''}`}
               value={customDeadline}
-              onChange={(e) => setCustomDeadline(e.target.value)}
+              onChange={(e) => {
+                setCustomDeadline(e.target.value);
+                if (errors.deadline) {
+                  setErrors((prev) => {
+                    const { deadline: _, ...rest } = prev;
+                    return rest;
+                  });
+                }
+              }}
             />
           </div>
         </div>

@@ -88,6 +88,17 @@ body {
   box-shadow: 0 0 0 3px rgba(43, 108, 176, 0.1);
 }
 
+.form-input.input-error,
+.form-textarea.input-error {
+  border-color: #FC8181;
+  background-color: #FFF5F5;
+}
+
+.form-input.input-error:focus,
+.form-textarea.input-error:focus {
+  box-shadow: 0 0 0 3px rgba(252, 129, 129, 0.2);
+}
+
 .option-input-row {
   display: flex;
   align-items: center;
