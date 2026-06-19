@@ -4,7 +4,7 @@ export interface Card {
   id: string;
   type: CardType;
   name: string;
-  cost: number;
+  energyCost: number;
   value: number;
   color: string;
   borderColor: string;
@@ -74,6 +74,7 @@ export interface GameState {
   playerFlashEndTime?: number;
   restartBtnRect?: { x: number; y: number; w: number; h: number };
   endTurnBtnRect?: { x: number; y: number; w: number; h: number };
+  gameOver: boolean;
 }
 
 export interface CardRect {

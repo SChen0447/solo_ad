@@ -1,6 +1,5 @@
 import type { GameLogic } from '../game/GameLogic';
 import type { Renderer } from './Renderer';
-import type { GameState } from '../types/game';
 
 export class InputHandler {
   private logic: GameLogic;
@@ -46,12 +45,18 @@ export class InputHandler {
 
   private onMouseMove(e: MouseEvent): void {
     const { x, y } = this.getCanvasCoords(e);
+    const state = this.logic.state;
+    if (state.gameOver) {
+      const overRestart = this.renderer.getRestartBtnAt(x, y, state);
+      this.canvas.style.cursor = overRestart ? 'pointer' : 'default';
+      this.renderer.setHoveredCard(null);
+      return;
+    }
     const card = this.renderer.getCardAtPoint(x, y);
     if (card) {
       this.canvas.style.cursor = 'pointer';
       this.renderer.setHoveredCard(card.id);
     } else {
-      const state: GameState = (window as unknown as { __lastState?: GameState }).__lastState || this.logic.state;
       const overBtn = this.renderer.getEndTurnBtnAt(x, y, state);
       const overRestart = this.renderer.getRestartBtnAt(x, y, state);
       this.canvas.style.cursor = overBtn || overRestart ? 'pointer' : 'default';
@@ -60,6 +65,10 @@ export class InputHandler {
   }
 
   private onMouseDown(e: MouseEvent): void {
+    if (this.logic.state.gameOver) {
+      this.pendingCardId = null;
+      return;
+    }
     const { x, y } = this.getCanvasCoords(e);
     const card = this.renderer.getCardAtPoint(x, y);
     if (card) {
@@ -78,7 +87,7 @@ export class InputHandler {
     const { x, y } = this.getCanvasCoords(e);
     const state = this.logic.state;
 
-    if (state.phase !== 'playing') {
+    if (state.gameOver || state.phase !== 'playing') {
       if (this.renderer.getRestartBtnAt(x, y, state)) {
         this.logic.restart();
       }
@@ -87,7 +96,7 @@ export class InputHandler {
 
     if (this.pendingCardId) {
       const card = state.player.hand.find((c) => c.id === this.pendingCardId);
-      if (card && card.cost <= state.player.energy && state.turnPhase === 'player_action') {
+      if (card && card.energyCost <= state.player.energy && state.turnPhase === 'player_action') {
         this.logic.playCard(this.pendingCardId);
       }
       this.pendingCardId = null;

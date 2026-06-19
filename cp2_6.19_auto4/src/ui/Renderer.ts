@@ -54,15 +54,19 @@ export class Renderer {
   private updateViewport(): void {
     const vw = window.innerWidth;
     const vh = window.innerHeight;
-    this.canvas.width = vw * window.devicePixelRatio;
-    this.canvas.height = vh * window.devicePixelRatio;
+    const dpr = window.devicePixelRatio;
+    this.canvas.width = vw * dpr;
+    this.canvas.height = vh * dpr;
     this.canvas.style.width = vw + 'px';
     this.canvas.style.height = vh + 'px';
 
-    const scale = Math.min(vw / BASE_W, vh / BASE_H);
-    this.scale = scale * window.devicePixelRatio;
-    this.offsetX = ((vw - BASE_W * scale) / 2) * window.devicePixelRatio;
-    this.offsetY = ((vh - BASE_H * scale) / 2) * window.devicePixelRatio;
+    let scale = Math.min(vw / BASE_W, vh / BASE_H);
+    const minScale = Math.min(1024 / BASE_W, 768 / BASE_H);
+    scale = Math.max(scale, minScale * 0.9);
+
+    this.scale = scale * dpr;
+    this.offsetX = ((vw - BASE_W * scale) / 2) * dpr;
+    this.offsetY = ((vh - BASE_H * scale) / 2) * dpr;
   }
 
   private applyTransform(): void {
@@ -512,7 +516,7 @@ export class Renderer {
       const card = hand[i];
       const isHovered = this.hoveredCardId === card.id;
       const isPressed = this.pressedCardId === card.id;
-      const disabled = card.cost > state.player.energy || state.turnPhase !== 'player_action';
+      const disabled = card.energyCost > state.player.energy || state.turnPhase !== 'player_action';
       let dx = startX + i * (cardW + gap);
       let dy = baseY;
       let scale = cardW / CARD_W;
@@ -601,7 +605,7 @@ export class Renderer {
     ctx.fillStyle = '#3d2a00';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText(String(card.cost), x + 16 * scale, y + 16 * scale + 1);
+    ctx.fillText(String(card.energyCost), x + 16 * scale, y + 16 * scale + 1);
     ctx.restore();
 
     ctx.font = Math.floor(38 * scale) + 'px "Segoe UI Emoji", sans-serif';

@@ -4,7 +4,7 @@ export class AIPlayer {
   static getAction(state: GameState): string | 'end_turn' {
     const ai = state.ai;
     const player = state.player;
-    const playable: Card[] = ai.hand.filter((c) => c.cost <= ai.energy);
+    const playable: Card[] = ai.hand.filter((c) => c.energyCost <= ai.energy);
 
     if (playable.length === 0) return 'end_turn';
 
@@ -40,7 +40,7 @@ export class AIPlayer {
       if (playerHp <= 10) {
         score += 30;
       }
-      if (aiHp <= 10 && card.cost >= 2) {
+      if (aiHp <= 10 && card.energyCost >= 2) {
         score -= 15;
       }
     } else if (card.type === 'defense') {
@@ -68,7 +68,7 @@ export class AIPlayer {
       }
     }
 
-    if (card.cost === 2) {
+    if (card.energyCost === 2) {
       score += 3;
     }
 

@@ -49,6 +49,7 @@ export class GameLogic {
       ai,
       animations: [],
       floatingTexts: [],
+      gameOver: false,
     };
   }
 
@@ -64,14 +65,15 @@ export class GameLogic {
   }
 
   playCard(cardId: string): boolean {
+    if (this.state.gameOver) return false;
     if (this.state.phase !== 'playing') return false;
     if (this.state.turnPhase !== 'player_action') return false;
 
     const card = this.state.player.hand.find((c) => c.id === cardId);
     if (!card) return false;
-    if (card.cost > this.state.player.energy) return false;
+    if (card.energyCost > this.state.player.energy) return false;
 
-    this.state.player.energy -= card.cost;
+    this.state.player.energy -= card.energyCost;
     CardDeck.discardCard(this.state.player, cardId);
     this.applyCardEffect(card, 'player', 'ai');
 
@@ -93,11 +95,13 @@ export class GameLogic {
   }
 
   endTurn(): void {
+    if (this.state.gameOver) return;
     if (this.state.phase !== 'playing') return;
     if (this.state.turnPhase !== 'player_action') return;
 
     this.state.turnPhase = 'player_end';
     this.state.battlefieldCard = undefined;
+    this.state.player.armor = 0;
 
     setTimeout(() => {
       this.beginAITurn();
@@ -106,6 +110,8 @@ export class GameLogic {
 
   update(_dt: number): void {
     const now = performance.now();
+
+    if (this.state.gameOver) return;
 
     this.state.animations = this.state.animations.filter(
       (a) => now - a.startTime < a.duration
@@ -143,6 +149,7 @@ export class GameLogic {
   }
 
   private beginPlayerTurn(first: boolean = false): void {
+    if (this.state.gameOver) return;
     this.state.currentPlayer = 'player';
     this.state.turnPhase = 'player_draw';
 
@@ -169,6 +176,7 @@ export class GameLogic {
   }
 
   private beginAITurn(): void {
+    if (this.state.gameOver) return;
     this.state.currentPlayer = 'ai';
     this.state.turnPhase = 'ai_draw';
     this.state.ai.energy = INITIAL_ENERGY;
@@ -200,6 +208,7 @@ export class GameLogic {
   private processAIStep(): void {
     this.pendingAiAction = false;
 
+    if (this.state.gameOver) return;
     if (this.state.phase !== 'playing') return;
     if (this.state.turnPhase !== 'ai_action') return;
 
@@ -207,7 +216,6 @@ export class GameLogic {
     if (action === 'end_turn') {
       this.state.turnPhase = 'ai_end';
       this.state.battlefieldCard = undefined;
-      this.state.player.armor = 0;
       setTimeout(() => {
         this.beginPlayerTurn();
       }, 400);
@@ -221,7 +229,7 @@ export class GameLogic {
       return;
     }
 
-    this.state.ai.energy -= card.cost;
+    this.state.ai.energy -= card.energyCost;
     CardDeck.discardCard(this.state.ai, card.id);
     this.applyCardEffect(card, 'ai', 'player');
 
@@ -329,8 +337,14 @@ export class GameLogic {
   }
 
   private checkVictory(): GamePhase {
-    if (this.state.player.hp <= 0) return 'defeat';
-    if (this.state.ai.hp <= 0) return 'victory';
+    if (this.state.player.hp <= 0) {
+      this.state.gameOver = true;
+      return 'defeat';
+    }
+    if (this.state.ai.hp <= 0) {
+      this.state.gameOver = true;
+      return 'victory';
+    }
     return 'playing';
   }
 

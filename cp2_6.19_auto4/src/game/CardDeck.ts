@@ -14,7 +14,7 @@ function randInt(min: number, max: number): number {
 
 function pickCardConfig(type: CardType): Omit<Card, 'id'> {
   let name: string;
-  let cost: number;
+  let energyCost: number;
   let value: number;
   let color: string;
   let borderColor: string;
@@ -24,7 +24,7 @@ function pickCardConfig(type: CardType): Omit<Card, 'id'> {
   if (type === 'attack') {
     name = ATTACK_NAMES[randInt(0, ATTACK_NAMES.length - 1)];
     value = randInt(5, 8);
-    cost = value >= 7 ? 2 : 1;
+    energyCost = 2;
     color = '#e94560';
     borderColor = '#ff6b6b';
     icon = '\u2694';
@@ -32,7 +32,7 @@ function pickCardConfig(type: CardType): Omit<Card, 'id'> {
   } else if (type === 'defense') {
     name = DEFENSE_NAMES[randInt(0, DEFENSE_NAMES.length - 1)];
     value = randInt(3, 5);
-    cost = value === 5 ? 2 : 1;
+    energyCost = 1;
     color = '#0f3460';
     borderColor = '#4a9eff';
     icon = '\u{1F6E1}';
@@ -40,14 +40,14 @@ function pickCardConfig(type: CardType): Omit<Card, 'id'> {
   } else {
     name = HEAL_NAMES[randInt(0, HEAL_NAMES.length - 1)];
     value = randInt(3, 5);
-    cost = value === 5 ? 2 : 1;
+    energyCost = 1;
     color = '#2d6a4f';
     borderColor = '#52b788';
     icon = '\u2764';
     description = `恢复 ${value} 点生命`;
   }
 
-  return { type, name, cost, value, color, borderColor, icon, description };
+  return { type, name, energyCost, value, color, borderColor, icon, description };
 }
 
 export class CardDeck {
