@@ -5,6 +5,8 @@ export interface PlayerSnapshot {
   vy: number;
   facingRight: boolean;
   onGround: boolean;
+  isJumping: boolean;
+  jumpHoldFrames: number;
 }
 
 interface GhostTrail {
@@ -31,22 +33,29 @@ export class Player {
   private spawnY = 0;
   private safeX = 0;
   private safeY = 0;
+  private lastSafeGroundX = 0;
+  private lastSafeGroundY = 0;
+  private safeGroundCooldown = 0;
 
-  private readonly GRAVITY = 0.6;
+  private readonly GRAVITY = 0.55;
+  private readonly REDUCED_GRAVITY = 0.28;
   private readonly MAX_FALL = 12;
   private readonly MOVE_ACCEL = 0.8;
   private readonly MOVE_DECEL = 0.5;
   private readonly MAX_SPEED = 5;
-  private readonly JUMP_MIN_VY = -7;
-  private readonly JUMP_MAX_VY = -14;
+  private readonly JUMP_INITIAL_VY = -6;
+  private readonly JUMP_HOLD_FORCE = -0.85;
+  private readonly JUMP_HOLD_MAX_FRAMES = 22;
   private readonly FRICTION = 0.85;
+  private readonly SAFE_GROUND_COOLDOWN = 30;
 
-  private jumpHeld = false;
-  private jumpHoldTime = 0;
-  private readonly JUMP_HOLD_MAX = 12;
+  private isJumping = false;
+  private jumpHoldFrames = 0;
+  private jumpPressedThisFrame = false;
 
   readonly history: PlayerSnapshot[] = [];
   private readonly HISTORY_DURATION = 300;
+  private readonly MAX_HISTORY_BYTES = 50 * 1024 * 1024;
 
   ghostTrails: GhostTrail[] = [];
   private ghostInterval = 0;
@@ -60,6 +69,8 @@ export class Player {
     this.y = spawnY;
     this.safeX = spawnX;
     this.safeY = spawnY;
+    this.lastSafeGroundX = spawnX;
+    this.lastSafeGroundY = spawnY;
   }
 
   getSnapshot(): PlayerSnapshot {
@@ -70,6 +81,8 @@ export class Player {
       vy: this.vy,
       facingRight: this.facingRight,
       onGround: this.onGround,
+      isJumping: this.isJumping,
+      jumpHoldFrames: this.jumpHoldFrames,
     };
   }
 
@@ -80,13 +93,28 @@ export class Player {
     this.vy = snap.vy;
     this.facingRight = snap.facingRight;
     this.onGround = snap.onGround;
+    this.isJumping = snap.isJumping;
+    this.jumpHoldFrames = snap.jumpHoldFrames;
   }
 
-  recordFrame(): void {
+  recordFrame(): boolean {
+    const snapSize = 8 * 8;
+    if ((this.history.length + 1) * snapSize > this.MAX_HISTORY_BYTES) {
+      return false;
+    }
     this.history.push(this.getSnapshot());
     if (this.history.length > this.HISTORY_DURATION) {
       this.history.shift();
     }
+    return true;
+  }
+
+  clearHistory(): void {
+    this.history.length = 0;
+  }
+
+  getHistoryMemoryBytes(): number {
+    return this.history.length * 8 * 8;
   }
 
   update(left: boolean, right: boolean, jump: boolean, jumpPressed: boolean, jumpReleased: boolean, now: number): void {
@@ -94,6 +122,8 @@ export class Player {
       this.deathTimer++;
       return;
     }
+
+    this.jumpPressedThisFrame = jumpPressed;
 
     if (left) {
       this.vx -= this.MOVE_ACCEL;
@@ -117,27 +147,29 @@ export class Player {
     if (this.vx < -this.MAX_SPEED) this.vx = -this.MAX_SPEED;
 
     if (jumpPressed && this.onGround) {
-      this.vy = this.JUMP_MIN_VY;
-      this.jumpHeld = true;
-      this.jumpHoldTime = 0;
+      this.vy = this.JUMP_INITIAL_VY;
+      this.isJumping = true;
+      this.jumpHoldFrames = 0;
       this.onGround = false;
     }
 
-    if (this.jumpHeld && jump) {
-      this.jumpHoldTime++;
-      if (this.jumpHoldTime < this.JUMP_HOLD_MAX) {
-        const t = this.jumpHoldTime / this.JUMP_HOLD_MAX;
-        const extraVy = this.JUMP_MIN_VY + (this.JUMP_MAX_VY - this.JUMP_MIN_VY) * t;
-        this.vy = Math.min(this.vy, extraVy);
-      }
+    if (this.isJumping && jump && this.jumpHoldFrames < this.JUMP_HOLD_MAX_FRAMES) {
+      this.vy += this.JUMP_HOLD_FORCE;
+      this.jumpHoldFrames++;
+      this.vy = Math.min(this.vy, this.JUMP_INITIAL_VY + this.JUMP_HOLD_FORCE * this.JUMP_HOLD_MAX_FRAMES);
     }
 
-    if (jumpReleased || !jump) {
-      this.jumpHeld = false;
+    if (jumpReleased) {
+      this.isJumping = false;
     }
 
-    this.vy += this.GRAVITY;
+    const effectiveGravity = (this.isJumping && jump && this.vy < 0) ? this.REDUCED_GRAVITY : this.GRAVITY;
+    this.vy += effectiveGravity;
     if (this.vy > this.MAX_FALL) this.vy = this.MAX_FALL;
+
+    if (this.safeGroundCooldown > 0) {
+      this.safeGroundCooldown--;
+    }
 
     this.ghostInterval++;
     if (this.ghostInterval >= 2 && (Math.abs(this.vx) > 0.5 || Math.abs(this.vy) > 0.5)) {
@@ -156,9 +188,12 @@ export class Player {
   }
 
   recordSafePosition(): void {
-    if (this.onGround) {
+    if (this.onGround && this.safeGroundCooldown === 0) {
+      this.lastSafeGroundX = this.x;
+      this.lastSafeGroundY = this.y;
       this.safeX = this.x;
       this.safeY = this.y;
+      this.safeGroundCooldown = this.SAFE_GROUND_COOLDOWN;
     }
   }
 
@@ -167,17 +202,20 @@ export class Player {
     this.dying = true;
     this.deathTimer = 0;
     this.alive = false;
+    this.isJumping = false;
+    this.jumpHoldFrames = 0;
   }
 
   respawn(resetCollectibles: () => void): void {
-    this.x = this.safeX;
-    this.y = this.safeY;
+    this.x = this.lastSafeGroundX;
+    this.y = this.lastSafeGroundY;
     this.vx = 0;
     this.vy = 0;
     this.dying = false;
     this.alive = true;
     this.deathTimer = 0;
-    this.jumpHeld = false;
+    this.isJumping = false;
+    this.jumpHoldFrames = 0;
     this.onGround = false;
     this.ghostTrails = [];
     this.history.length = 0;
@@ -186,6 +224,6 @@ export class Player {
 
   getSpawnX(): number { return this.spawnX; }
   getSpawnY(): number { return this.spawnY; }
-  getSafeX(): number { return this.safeX; }
-  getSafeY(): number { return this.safeY; }
+  getSafeX(): number { return this.lastSafeGroundX; }
+  getSafeY(): number { return this.lastSafeGroundY; }
 }

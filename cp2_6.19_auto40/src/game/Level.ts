@@ -23,6 +23,12 @@ export interface Rect {
 
 const TILE = 32;
 
+const TILE_EMPTY = 0;
+const TILE_PLATFORM = 1;
+const TILE_SPIKE = 2;
+const TILE_COLLECTIBLE = 3;
+const TILE_GOAL = 4;
+
 const LEVEL_MAP: number[][] = [
   [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
   [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
@@ -39,12 +45,12 @@ const LEVEL_MAP: number[][] = [
   [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
   [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
   [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
-  [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,0,0,0,0,0,0],
+  [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,4,1,1,1,1,1,0,0,0,0,0,0],
   [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
-  [0,0,0,0,0,0,0,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
-  [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,0,0,0],
+  [0,0,0,0,0,0,0,3,1,1,1,1,3,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+  [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,3,0,1,1,1,1,1,0,0,0,0],
   [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
-  [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+  [0,3,0,0,0,0,0,0,0,0,0,0,0,0,2,0,0,0,0,0,0,0,2,0,3,0,0,0,0,0],
   [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
   [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
   [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
@@ -62,59 +68,67 @@ export class Level {
   worldWidth: number;
   worldHeight: number;
   spikeFlashTimer = 0;
+  private originalTileMap: number[][];
 
   constructor() {
-    this.tileMap = LEVEL_MAP;
+    this.tileMap = LEVEL_MAP.map((row) => [...row]);
+    this.originalTileMap = LEVEL_MAP.map((row) => [...row]);
     this.tileRows = this.tileMap.length;
     this.tileCols = this.tileMap[0].length;
     this.worldWidth = this.tileCols * TILE;
     this.worldHeight = this.tileRows * TILE;
 
+    this.parseLevel();
+  }
+
+  private parseLevel(): void {
+    this.platformRects = [];
+    this.spikeRects = [];
+    this.collectibles = [];
+    let goalX = 0;
+    let goalY = 0;
+
     for (let r = 0; r < this.tileRows; r++) {
       for (let c = 0; c < this.tileCols; c++) {
-        const t = this.tileMap[r][c];
-        if (t === 1) {
-          this.platformRects.push({ x: c * TILE, y: r * TILE, w: TILE, h: TILE });
+        const t = this.originalTileMap[r][c];
+        const px = c * TILE;
+        const py = r * TILE;
+
+        switch (t) {
+          case TILE_PLATFORM:
+            this.platformRects.push({ x: px, y: py, w: TILE, h: TILE });
+            this.tileMap[r][c] = TILE_PLATFORM;
+            break;
+          case TILE_SPIKE:
+            this.spikeRects.push({ x: px, y: py + TILE - 16, w: TILE, h: 16 });
+            this.tileMap[r][c] = TILE_SPIKE;
+            break;
+          case TILE_COLLECTIBLE:
+            this.collectibles.push({
+              x: px + 8,
+              y: py + 8,
+              collected: false,
+              animTimer: 0,
+              originalX: px + 8,
+              originalY: py + 8,
+            });
+            this.tileMap[r][c] = TILE_EMPTY;
+            break;
+          case TILE_GOAL:
+            goalX = px;
+            goalY = py - TILE - 16;
+            this.tileMap[r][c] = TILE_EMPTY;
+            break;
         }
       }
     }
 
     this.goal = {
-      x: 21 * TILE,
-      y: 15 * TILE - 48,
+      x: goalX,
+      y: goalY,
       activated: false,
       particles: [],
     };
-
-    this.initCollectibles();
-    this.initSpikes();
-  }
-
-  private initCollectibles(): void {
-    const positions = [
-      { x: 3 * TILE, y: 19 * TILE - 20 },
-      { x: 10 * TILE, y: 16 * TILE - 20 },
-      { x: 14 * TILE, y: 19 * TILE - 20 },
-      { x: 20 * TILE, y: 17 * TILE - 20 },
-      { x: 25 * TILE, y: 19 * TILE - 20 },
-    ];
-    this.collectibles = positions.map((p) => ({
-      x: p.x,
-      y: p.y,
-      collected: false,
-      animTimer: 0,
-      originalX: p.x,
-      originalY: p.y,
-    }));
-  }
-
-  private initSpikes(): void {
-    this.spikeRects = [
-      { x: 15 * TILE, y: 20 * TILE - 16, w: TILE, h: 16 },
-      { x: 23 * TILE, y: 20 * TILE - 16, w: TILE, h: 16 },
-    ];
-    this.tileMap[20][15] = 2;
-    this.tileMap[20][23] = 2;
   }
 
   resetCollectibles(): void {
@@ -178,6 +192,10 @@ export class Level {
     return this.collectibles.every((c) => c.collected);
   }
 
+  getTotalCollectibles(): number {
+    return this.collectibles.length;
+  }
+
   checkGoal(px: number, py: number, pw: number, ph: number): boolean {
     return this.aabb(px, py, pw, ph, this.goal.x, this.goal.y, 16, 48);
   }
@@ -214,6 +232,13 @@ export class Level {
       }
     }
     return { y: newY, onGround, hitCeiling };
+  }
+
+  isSolidAt(px: number, py: number, pw: number, ph: number): boolean {
+    for (const rect of this.platformRects) {
+      if (this.aabb(px, py, pw, ph, rect.x, rect.y, rect.w, rect.h)) return true;
+    }
+    return false;
   }
 
   isOutOfBounds(px: number, py: number): boolean {
