@@ -20,6 +20,11 @@ class Application {
   private currentToolEl: HTMLElement;
   private sidebar: HTMLElement;
   private sidebarToggle: HTMLButtonElement;
+  private mazeSizeInfoEl: HTMLElement;
+  private totalCellsInfoEl: HTMLElement;
+  private pathCellsInfoEl: HTMLElement;
+  private wallCellsInfoEl: HTMLElement;
+  private pathRatioInfoEl: HTMLElement;
 
   private currentTool: ToolType = null;
 
@@ -38,6 +43,11 @@ class Application {
     this.currentToolEl = document.getElementById('current-tool') as HTMLElement;
     this.sidebar = document.getElementById('sidebar') as HTMLElement;
     this.sidebarToggle = document.getElementById('sidebar-toggle') as HTMLButtonElement;
+    this.mazeSizeInfoEl = document.getElementById('maze-size-info') as HTMLElement;
+    this.totalCellsInfoEl = document.getElementById('total-cells-info') as HTMLElement;
+    this.pathCellsInfoEl = document.getElementById('path-cells-info') as HTMLElement;
+    this.wallCellsInfoEl = document.getElementById('wall-cells-info') as HTMLElement;
+    this.pathRatioInfoEl = document.getElementById('path-ratio-info') as HTMLElement;
 
     new Renderer(
       this.eventBus,
@@ -161,6 +171,8 @@ class Application {
     const result = this.mazeGenerator.generate(size, size);
     console.log(`迷宫生成算法耗时: ${(performance.now() - generateTime).toFixed(2)}ms`);
 
+    this.updateMazeInfo(result.grid, result.width, result.height);
+
     this.eventBus.emit(AppEvent.MAZE_GENERATED, {
       grid: result.grid,
       width: result.width,
@@ -173,6 +185,30 @@ class Application {
       text: `已生成 ${result.width}x${result.height} 迷宫`,
       type: 'info'
     });
+  }
+
+  private updateMazeInfo(grid: number[][], width: number, height: number): void {
+    const totalCells = width * height;
+    let pathCells = 0;
+    let wallCells = 0;
+
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        if (grid[y][x] === 0) {
+          pathCells++;
+        } else {
+          wallCells++;
+        }
+      }
+    }
+
+    const pathRatio = ((pathCells / totalCells) * 100).toFixed(1);
+
+    this.mazeSizeInfoEl.textContent = `${width} × ${height}`;
+    this.totalCellsInfoEl.textContent = totalCells.toLocaleString();
+    this.pathCellsInfoEl.textContent = pathCells.toLocaleString();
+    this.wallCellsInfoEl.textContent = wallCells.toLocaleString();
+    this.pathRatioInfoEl.textContent = `${pathRatio}%`;
   }
 
   private generateInitialMaze(): void {
