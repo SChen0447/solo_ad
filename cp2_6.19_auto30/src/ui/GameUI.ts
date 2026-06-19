@@ -43,6 +43,12 @@ export class GameUI {
 
   private particles: Particle[] = [];
 
+  private screenShakeIntensity: number = 0;
+  private screenShakeDuration: number = 0;
+  private screenShakeTime: number = 0;
+
+  private comboStreaks: [number, number] = [0, 0];
+
   private gameState: GameState;
 
   private placingCue: boolean = false;
@@ -252,6 +258,7 @@ export class GameUI {
         size: 2 + Math.random() * 3
       });
     }
+    this.triggerScreenShake(8, 0.15);
   }
 
   private spawnPocketFlash(x: number, y: number): void {
@@ -300,6 +307,7 @@ export class GameUI {
 
   rerackGame(): void {
     this.gameState.phase = 'aiming';
+    this.comboStreaks = [0, 0];
     this.particles = [];
     this.isDragging = false;
   }
@@ -308,6 +316,7 @@ export class GameUI {
     let anyPotted = false;
     let cuePotted = false;
     let blackPotted = false;
+    let coloredPotted = false;
 
     for (const event of events) {
       anyPotted = true;
@@ -322,7 +331,15 @@ export class GameUI {
         if (event.ball.number >= 1 && event.ball.number <= 7) points = 1;
         else if (event.ball.number >= 9 && event.ball.number <= 15) points = 2;
         this.gameState.scores[this.gameState.currentPlayer - 1] += points;
+        coloredPotted = true;
       }
+    }
+
+    if (coloredPotted) {
+      this.comboStreaks[this.gameState.currentPlayer - 1]++;
+    }
+    if (cuePotted || blackPotted) {
+      this.comboStreaks[this.gameState.currentPlayer - 1] = 0;
     }
 
     if (blackPotted) {
@@ -341,7 +358,7 @@ export class GameUI {
     } else if (cuePotted) {
       this.placingCue = true;
       this.gameState.phase = 'placing';
-      this.switchPlayer();
+      this.switchPlayer(true);
     }
 
     return anyPotted;
@@ -355,8 +372,19 @@ export class GameUI {
     this.gameState.phase = this.placingCue ? 'placing' : 'aiming';
   }
 
-  switchPlayer(): void {
+  switchPlayer(resetCurrentCombo: boolean = false): void {
+    if (resetCurrentCombo) {
+      this.comboStreaks[this.gameState.currentPlayer - 1] = 0;
+    }
     this.gameState.currentPlayer = this.gameState.currentPlayer === 1 ? 2 : 1;
+  }
+
+  setNoPotThisTurn(): void {
+    this.comboStreaks[this.gameState.currentPlayer - 1] = 0;
+  }
+
+  public notifyNoPotThisTurnAndSwitch(): void {
+    this.switchPlayer(true);
   }
 
   resetGame(): void {
@@ -367,6 +395,7 @@ export class GameUI {
       winner: null,
       phase: 'aiming'
     };
+    this.comboStreaks = [0, 0];
     this.placingCue = false;
     this.particles = [];
     this.isDragging = false;
@@ -383,6 +412,92 @@ export class GameUI {
     this.particles = this.particles.filter(p => p.life > 0);
   }
 
+  private triggerScreenShake(intensity: number, duration: number): void {
+    this.screenShakeIntensity = intensity;
+    this.screenShakeDuration = duration;
+    this.screenShakeTime = 0;
+  }
+
+  private updateScreenShake(dt: number): void {
+    if (this.screenShakeTime < this.screenShakeDuration) {
+      this.screenShakeTime += dt;
+    } else {
+      this.screenShakeIntensity *= 0.9;
+      if (this.screenShakeIntensity < 0.01) {
+        this.screenShakeIntensity = 0;
+      }
+    }
+  }
+
+  private drawCueAimRing(ctx: CanvasRenderingContext2D): void {
+    if (this.gameState.phase !== 'aiming') return;
+    const cue = this.ballManager.getCueBall();
+    if (!cue) return;
+
+    const dx = this.mouseX - cue.x;
+    const dy = this.mouseY - cue.y;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+
+    if (dist >= cue.radius + 120) return;
+
+    const alpha = Math.max(0.15, Math.min(0.6, 1 - (dist - cue.radius) / 120));
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(cue.x, cue.y, cue.radius + 12, 0, Math.PI * 2);
+    ctx.strokeStyle = `rgba(100,200,255, ${alpha * 0.5})`;
+    ctx.setLineDash([6, 6]);
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.restore();
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(cue.x, cue.y, cue.radius + 4, 0, Math.PI * 2);
+    ctx.strokeStyle = `rgba(255,255,255, ${alpha * 0.8})`;
+    ctx.setLineDash([]);
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  private drawPocketGlow(ctx: CanvasRenderingContext2D): void {
+    const balls = this.ballManager.getBalls();
+    const pockets = this.geometry.pockets;
+
+    for (const p of pockets) {
+      let minDist = Infinity;
+      for (const ball of balls) {
+        if (ball.isPocketed) continue;
+        const bdx = ball.x - p.x;
+        const bdy = ball.y - p.y;
+        const bdist = Math.sqrt(bdx * bdx + bdy * bdy);
+        if (bdist < minDist) {
+          minDist = bdist;
+        }
+      }
+
+      let glowAlpha: number;
+      if (minDist < p.radius * 3) {
+        glowAlpha = Math.max(0.1, Math.min(0.7, 1 - (minDist - p.radius) / (p.radius * 2)));
+      } else {
+        glowAlpha = 0.12;
+      }
+
+      const grad = ctx.createRadialGradient(p.x, p.y, p.radius * 0.5, p.x, p.y, p.radius * 2.5);
+      grad.addColorStop(0, `rgba(120,200,255, ${glowAlpha})`);
+      grad.addColorStop(0.5, `rgba(80,150,255, ${glowAlpha * 0.5})`);
+      grad.addColorStop(1, 'rgba(0,0,0,0)');
+
+      ctx.save();
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.radius * 2.5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+  }
+
   getGameState(): GameState {
     return this.gameState;
   }
@@ -390,15 +505,22 @@ export class GameUI {
   render(dt: number): void {
     const ctx = this.ctx;
     this.updateParticles(dt);
+    this.updateScreenShake(dt);
 
     const rect = this.canvas.getBoundingClientRect();
     ctx.clearRect(0, 0, rect.width, rect.height);
 
     ctx.save();
+    const shakeProgress = this.screenShakeDuration > 0 ? this.screenShakeTime / this.screenShakeDuration : 1;
+    const currentIntensity = this.screenShakeIntensity * (1 - shakeProgress);
+    const shakeX = (Math.random() - 0.5) * 2 * currentIntensity;
+    const shakeY = (Math.random() - 0.5) * 2 * currentIntensity;
+    ctx.translate(shakeX, shakeY);
     ctx.translate(this.offsetX, this.offsetY);
     ctx.scale(this.scale, this.scale);
 
     this.drawTable(ctx);
+    this.drawPocketGlow(ctx);
     this.drawPockets(ctx);
 
     if (this.isDragging || (this.gameState.phase === 'aiming' && this.ballManager.getCueBall())) {
@@ -406,6 +528,7 @@ export class GameUI {
     }
 
     this.drawTrails(ctx);
+    this.drawCueAimRing(ctx);
     this.drawBalls(ctx);
     this.drawParticles(ctx);
     this.drawBreakArea(ctx);
@@ -460,6 +583,32 @@ export class GameUI {
     ctx.fillRect(0, h - bw, w, bw);
     ctx.fillRect(0, 0, bw, h);
     ctx.fillRect(w - bw, 0, bw, h);
+
+    const corners = [
+      { cx: bw, cy: bw },
+      { cx: w - bw, cy: bw },
+      { cx: w - bw, cy: h - bw },
+      { cx: bw, cy: h - bw }
+    ];
+
+    for (const corner of corners) {
+      let size = bw * 0.85;
+      const layers = [
+        { color: '#B8860B', lineWidth: 3 },
+        { color: '#6B4423', lineWidth: 2 },
+        { color: '#DAA520', lineWidth: 1.5 }
+      ];
+      for (const layer of layers) {
+        ctx.save();
+        ctx.translate(corner.cx, corner.cy);
+        ctx.rotate(Math.PI / 4);
+        ctx.strokeStyle = layer.color;
+        ctx.lineWidth = layer.lineWidth;
+        ctx.strokeRect(-size / 2, -size / 2, size, size);
+        ctx.restore();
+        size = size * (1 - 0.3);
+      }
+    }
 
     ctx.fillStyle = '#0A5C36';
     ctx.fillRect(bw, bw, w - bw * 2, h - bw * 2);
@@ -684,8 +833,21 @@ export class GameUI {
     ctx.fillStyle = player1Active ? '#FFD700' : '#AAAAAA';
     ctx.fillText(`玩家 1: ${this.gameState.scores[0]} 分`, w * 0.25, 20);
 
+    if (this.comboStreaks[0] > 1) {
+      ctx.font = 'bold 22px Segoe UI, Arial';
+      ctx.fillStyle = player1Active ? '#FF6B35' : '#888888';
+      ctx.fillText(`🔥 连击 x${this.comboStreaks[0]}`, w * 0.25, 60);
+    }
+
+    ctx.font = 'bold 32px Segoe UI, Arial';
     ctx.fillStyle = player2Active ? '#FFD700' : '#AAAAAA';
     ctx.fillText(`玩家 2: ${this.gameState.scores[1]} 分`, w * 0.75, 20);
+
+    if (this.comboStreaks[1] > 1) {
+      ctx.font = 'bold 22px Segoe UI, Arial';
+      ctx.fillStyle = player2Active ? '#FF6B35' : '#888888';
+      ctx.fillText(`🔥 连击 x${this.comboStreaks[1]}`, w * 0.75, 60);
+    }
 
     ctx.font = 'bold 36px Segoe UI, Arial';
     ctx.fillStyle = '#FFFFFF';

@@ -99,7 +99,7 @@ class Game {
         if (this.strikeThisTurn) {
           this.strikeThisTurn = false;
           if (!this.ballPottedThisTurn && !this.ui.getGameState().gameOver) {
-            this.ui.switchPlayer();
+            this.ui.switchPlayer(true);
           }
           this.ballPottedThisTurn = false;
         }
