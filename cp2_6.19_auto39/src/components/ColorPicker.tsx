@@ -13,6 +13,9 @@ const ColorPicker: React.FC<ColorPickerProps> = ({ color, onChange, label }) => 
   const [isOpen, setIsOpen] = useState(false);
   const [hsl, setHsl] = useState<HSL>(hexToHsl(color));
   const [showFlash, setShowFlash] = useState(false);
+  const [isWheelDragging, setIsWheelDragging] = useState(false);
+  const [isBrightnessDragging, setIsBrightnessDragging] = useState(false);
+  const [selectorPulse, setSelectorPulse] = useState(false);
   const pickerRef = useRef<HTMLDivElement>(null);
   const wheelRef = useRef<HTMLDivElement>(null);
   const isDragging = useRef(false);
@@ -59,6 +62,7 @@ const ColorPicker: React.FC<ColorPickerProps> = ({ color, onChange, label }) => 
   const handleWheelMouseDown = (e: React.MouseEvent) => {
     e.preventDefault();
     isDragging.current = true;
+    setIsWheelDragging(true);
     updateColor(e.clientX, e.clientY);
   };
 
@@ -79,7 +83,8 @@ const ColorPicker: React.FC<ColorPickerProps> = ({ color, onChange, label }) => 
     const handleMouseUp = () => {
       if (isDragging.current) {
         isDragging.current = false;
-        triggerFlash();
+        setIsWheelDragging(false);
+        triggerPulse();
       }
     };
     document.addEventListener('mousemove', handleMouseMove);
@@ -95,9 +100,15 @@ const ColorPicker: React.FC<ColorPickerProps> = ({ color, onChange, label }) => 
     setTimeout(() => setShowFlash(false), 300);
   };
 
+  const triggerPulse = () => {
+    setSelectorPulse(true);
+    setTimeout(() => setSelectorPulse(false), 400);
+  };
+
   const handleBrightnessMouseDown = (e: React.MouseEvent) => {
     e.preventDefault();
     isDraggingBrightness.current = true;
+    setIsBrightnessDragging(true);
     updateBrightness(e);
   };
 
@@ -122,7 +133,8 @@ const ColorPicker: React.FC<ColorPickerProps> = ({ color, onChange, label }) => 
     const handleMouseUp = () => {
       if (isDraggingBrightness.current) {
         isDraggingBrightness.current = false;
-        triggerFlash();
+        setIsBrightnessDragging(false);
+        triggerPulse();
       }
     };
     document.addEventListener('mousemove', handleMouseMove);
@@ -159,14 +171,14 @@ const ColorPicker: React.FC<ColorPickerProps> = ({ color, onChange, label }) => 
         <div className="color-picker-popup">
           <div
             ref={wheelRef}
-            className="color-wheel"
+            className={`color-wheel ${isWheelDragging ? 'dragging' : ''}`}
             style={{ width: wheelSize, height: wheelSize }}
             onMouseDown={handleWheelMouseDown}
           >
             <div className="color-wheel-gradient" />
             <div className="color-wheel-center-white" />
             <div
-              className={`color-selector ${showFlash ? 'flash' : ''}`}
+              className={`color-selector ${isWheelDragging ? 'dragging' : ''} ${selectorPulse ? 'pulse' : ''}`}
               style={{
                 left: selectorX - 8,
                 top: selectorY - 8,
@@ -175,7 +187,7 @@ const ColorPicker: React.FC<ColorPickerProps> = ({ color, onChange, label }) => 
             />
           </div>
           <div
-            className="brightness-bar"
+            className={`brightness-bar ${isBrightnessDragging ? 'dragging' : ''}`}
             onMouseDown={handleBrightnessMouseDown}
           >
             <div
@@ -185,7 +197,7 @@ const ColorPicker: React.FC<ColorPickerProps> = ({ color, onChange, label }) => 
               }}
             />
             <div
-              className="brightness-thumb"
+              className={`brightness-thumb ${isBrightnessDragging ? 'glow' : ''}`}
               style={{ left: `calc(${hsl.l}% - 6px)` }}
             />
           </div>
