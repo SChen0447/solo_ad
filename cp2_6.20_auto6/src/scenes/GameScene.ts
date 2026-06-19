@@ -41,7 +41,7 @@ export class GameScene extends Phaser.Scene {
   private enemies!: EnemyManager;
   private inventory!: InventoryManager;
 
-  private tileGraphics: Map<string, Phaser.GameObjects.Graphics> = new Map();
+  private tileImages: Map<string, Phaser.GameObjects.Image> = new Map();
   private craftingStationGlow?: Phaser.GameObjects.Graphics;
   private craftingAnimationTimer: number = 0;
   private isCrafting: boolean = false;
@@ -80,7 +80,6 @@ export class GameScene extends Phaser.Scene {
 
   private levelUpFlash?: Phaser.GameObjects.Rectangle;
   private successToast?: Phaser.GameObjects.Container;
-  private toastTimer: number = 0;
 
   private floatingTexts: FloatingText[] = [];
   private nextFloatingId: number = 1;
@@ -188,9 +187,12 @@ export class GameScene extends Phaser.Scene {
       } else if (type === TileType.WATER) {
         g.lineStyle(2, 0x7fbfff, 0.5);
         for (let i = 0; i < 3; i++) {
+          const y = 10 + i * 14;
           g.beginPath();
-          g.moveTo(0, 10 + i * 14);
-          g.bezierCurveTo(ts / 3, 6 + i * 14, (ts * 2) / 3, 14 + i * 14, ts, 10 + i * 14);
+          g.moveTo(0, y);
+          g.lineTo(ts / 3, y - 4);
+          g.lineTo((ts * 2) / 3, y + 4);
+          g.lineTo(ts, y);
           g.strokePath();
         }
       } else if (type === TileType.CRAFTING) {
@@ -229,30 +231,33 @@ export class GameScene extends Phaser.Scene {
 
   private renderTile(tile: Tile): void {
     const key = `${tile.gridX}_${tile.gridY}`;
-    let g = this.tileGraphics.get(key);
+    let img = this.tileImages.get(key);
     const ts = WorldManager.TILE_SIZE;
 
-    if (!g) {
-      g = this.add.graphics();
-      this.tileGraphics.set(key, g);
+    if (!img) {
+      const texKey = `tile_${tile.type}`;
+      img = this.add.image(tile.gridX * ts, tile.gridY * ts, texKey);
+      img.setOrigin(0, 0);
+      img.setInteractive(
+        new Phaser.Geom.Rectangle(0, 0, ts, ts),
+        Phaser.Geom.Rectangle.Contains
+      );
+      img.on('pointerdown', () => this.onTileClick(tile));
+      this.tileImages.set(key, img);
+    } else {
+      img.setTexture(`tile_${tile.type}`);
     }
-    g.clear();
-    const texKey = `tile_${tile.type}`;
-    const img = this.add.image(tile.gridX * ts, tile.gridY * ts, texKey);
-    img.setOrigin(0, 0);
-    g.copyFrom(img);
-    img.destroy();
-
-    g.setInteractive(
-      new Phaser.Geom.Rectangle(tile.gridX * ts, tile.gridY * ts, ts, ts),
-      Phaser.Geom.Rectangle.Contains
-    );
-    g.on('pointerdown', () => this.onTileClick(tile));
   }
 
   public refreshTile(gridX: number, gridY: number): void {
     const tile = this.world.getTile(gridX, gridY);
-    if (tile) this.renderTile(tile);
+    if (tile) {
+      const key = `${tile.gridX}_${tile.gridY}`;
+      const img = this.tileImages.get(key);
+      if (img) {
+        img.setTexture(`tile_${tile.type}`);
+      }
+    }
   }
 
   private createPlayerSprite(): void {
@@ -541,26 +546,36 @@ export class GameScene extends Phaser.Scene {
     const startAngle = Math.atan2(this.currentAttackDir.y, this.currentAttackDir.x) - Math.PI / 3;
     const endAngle = startAngle + (Math.PI * 2) / 3;
 
-    this.attackArc = this.add.arc(
+    const g = this.add.graphics();
+    g.setPosition(
       this.player.x + this.currentAttackDir.x * r * 0.4,
-      this.player.y + this.currentAttackDir.y * r * 0.4,
-      r,
-      (startAngle * 180) / Math.PI,
-      (endAngle * 180) / Math.PI,
-      false,
-      0xffffff,
-      0.7
+      this.player.y + this.currentAttackDir.y * r * 0.4
     );
-    this.attackArc.setLineStyle(4, 0xffff00, 0.9);
-    this.attackArc.setDepth(200);
+    g.setDepth(200);
+    g.lineStyle(4, 0xffff00, 0.9);
+    g.fillStyle(0xffffff, 0.4);
+
+    const steps = 16;
+    g.beginPath();
+    for (let i = 0; i <= steps; i++) {
+      const t = i / steps;
+      const angle = startAngle + (endAngle - startAngle) * t;
+      const px = Math.cos(angle) * r;
+      const py = Math.sin(angle) * r;
+      if (i === 0) g.moveTo(px, py);
+      else g.lineTo(px, py);
+    }
+    g.strokePath();
+
+    this.attackArc = g as unknown as Phaser.GameObjects.Arc;
 
     this.tweens.add({
-      targets: this.attackArc,
+      targets: g,
       alpha: 0,
       duration: 200,
       onComplete: () => {
-        if (this.attackArc) {
-          this.attackArc.destroy();
+        g.destroy();
+        if (this.attackArc === (g as unknown as Phaser.GameObjects.Arc)) {
           this.attackArc = undefined;
         }
       }
@@ -644,7 +659,6 @@ export class GameScene extends Phaser.Scene {
   }
 
   private createHealthAndExpBars(): void {
-    const vw = this.scale.width;
     const vh = this.scale.height;
     const x = 20;
     const y = vh - 100 * this.uiScale;
@@ -1049,8 +1063,6 @@ export class GameScene extends Phaser.Scene {
     this.successToast.setDepth(1600);
     this.successToast.setScrollFactor(0);
 
-    const tw = this.tweens.createTimeline();
-
     const g = this.add.graphics();
     const w = 200 * this.uiScale;
     const h = 50 * this.uiScale;
@@ -1071,29 +1083,26 @@ export class GameScene extends Phaser.Scene {
     text.setOrigin(0.5);
     this.successToast.add(text);
 
-    tw.add({
+    this.tweens.add({
       targets: this.successToast,
       y: vh - 120,
       duration: 400,
-      ease: 'Back.easeOut'
-    });
-    tw.add({
-      targets: this.successToast,
-      y: vh - 120,
-      duration: 1600
-    });
-    tw.add({
-      targets: this.successToast,
-      alpha: 0,
-      y: vh + 60,
-      duration: 300,
-      ease: 'Back.easeIn',
+      ease: 'Back.easeOut',
       onComplete: () => {
-        this.successToast?.destroy();
-        this.successToast = undefined;
+        this.tweens.add({
+          targets: this.successToast,
+          delay: 1600,
+          alpha: 0,
+          y: vh + 60,
+          duration: 300,
+          ease: 'Back.easeIn',
+          onComplete: () => {
+            this.successToast?.destroy();
+            this.successToast = undefined;
+          }
+        });
       }
     });
-    tw.play();
   }
 
   private toggleInventory(): void {
@@ -1172,7 +1181,6 @@ export class GameScene extends Phaser.Scene {
     this.inventoryItems.clear();
 
     const items = this.inventory.getInventoryList();
-    const pw = 320 * this.uiScale;
     const ph = Math.min(this.scale.height * 0.8, 480 * this.uiScale);
     const cols = 3;
     const cellSize = 80 * this.uiScale;
@@ -1297,7 +1305,6 @@ export class GameScene extends Phaser.Scene {
   private closeInventory(): void {
     if (!this.isInventoryOpen || !this.inventoryPanel || !this.inventoryBg) return;
     const pw = 320 * this.uiScale;
-    const vh = this.scale.height;
     this.tweens.add({
       targets: this.inventoryPanel,
       x: -pw,
@@ -1358,4 +1365,343 @@ export class GameScene extends Phaser.Scene {
     }).setOrigin(1, 0);
     closeBtn.setInteractive({ useHandCursor: true });
     closeBtn.on('pointerdown', () => this.closeCraftingPanel());
-    this.craftingPanel.add(close
+    this.craftingPanel.add(closeBtn);
+
+    this.craftingDimBg!.setInteractive(
+      new Phaser.Geom.Rectangle(0, 0, vw, vh),
+      Phaser.Geom.Rectangle.Contains
+    );
+    this.craftingDimBg!.on('pointerdown', (p: any) => {
+      if (p.target === this.craftingDimBg) this.closeCraftingPanel();
+    });
+
+    const recipeY0 = -ph / 2 + 80 * this.uiScale;
+    const recipeH = 100 * this.uiScale;
+    const recipeGap = 12 * this.uiScale;
+
+    for (let i = 0; i < RECIPES.length; i++) {
+      const recipe = RECIPES[i];
+      const y = recipeY0 + i * (recipeH + recipeGap);
+      this.createRecipeCard(recipe, y, pw);
+    }
+
+    this.tweens.add({
+      targets: this.craftingPanel,
+      scale: 1,
+      alpha: 1,
+      duration: 300,
+      ease: 'Back.easeOut'
+    });
+  }
+
+  private createRecipeCard(recipe: any, y: number, pw: number): void {
+    const card = this.add.container(0, y);
+    this.craftingPanel!.add(card);
+
+    const cardW = pw - 60 * this.uiScale;
+    const cardH = 90 * this.uiScale;
+
+    const bg = this.add.graphics();
+    bg.fillStyle(0x3c2418, 1);
+    bg.lineStyle(2, 0x8b5a2b, 0.8);
+    bg.fillRoundedRect(-cardW / 2, -cardH / 2, cardW, cardH, 8);
+    bg.strokeRoundedRect(-cardW / 2, -cardH / 2, cardW, cardH, 8);
+    card.add(bg);
+
+    const nameText = this.add.text(-cardW / 2 + 16 * this.uiScale, -cardH / 2 + 12 * this.uiScale, recipe.name, {
+      fontFamily: 'Courier New',
+      fontSize: `${16 * this.uiScale}px`,
+      color: '#ffd700',
+      fontStyle: 'bold'
+    }).setOrigin(0, 0);
+    card.add(nameText);
+
+    const canCraft = this.inventory.canCraft(recipe);
+    const textColor = canCraft ? '#66ff66' : '#ff6666';
+
+    let inputText = '';
+    for (let j = 0; j < recipe.inputs.length; j++) {
+      const input = recipe.inputs[j];
+      const names: Record<string, string> = { wood: '木材', stone: '石头', iron: '铁锭', gold: '金币' };
+      const have = this.inventory.getItemCount(input.itemId);
+      const need = input.count;
+      inputText += `${names[input.itemId] || input.itemId} ${have}/${need}  `;
+    }
+    const inputLabel = this.add.text(-cardW / 2 + 16 * this.uiScale, 0, inputText, {
+      fontFamily: 'Courier New',
+      fontSize: `${12 * this.uiScale}px`,
+      color: textColor
+    }).setOrigin(0, 0.5);
+    card.add(inputLabel);
+
+    const btnW = 80 * this.uiScale;
+    const btnH = 36 * this.uiScale;
+    const btnX = cardW / 2 - 20 * this.uiScale - btnW / 2;
+    const btnY = cardH / 2 - 20 * this.uiScale - btnH / 2;
+
+    const btnBg = this.add.graphics();
+    btnBg.fillStyle(canCraft ? 0x66aa33 : 0x555555, 1);
+    btnBg.lineStyle(2, canCraft ? 0x99dd66 : 0x777777, 1);
+    btnBg.fillRoundedRect(-btnW / 2, -btnH / 2, btnW, btnH, 6);
+    btnBg.strokeRoundedRect(-btnW / 2, -btnH / 2, btnW, btnH, 6);
+    btnBg.setPosition(btnX + btnW / 2, btnY + btnH / 2);
+    card.add(btnBg);
+
+    const btnText = this.add.text(btnX + btnW / 2, btnY + btnH / 2, '合成', {
+      fontFamily: 'Courier New',
+      fontSize: `${14 * this.uiScale}px`,
+      color: '#ffffff',
+      fontStyle: 'bold'
+    }).setOrigin(0.5);
+    card.add(btnText);
+
+    if (canCraft) {
+      btnBg.setInteractive(
+        new Phaser.Geom.Rectangle(-btnW / 2, -btnH / 2, btnW, btnH),
+        Phaser.Geom.Rectangle.Contains
+      );
+      btnBg.on('pointerover', () => btnBg.setAlpha(0.85));
+      btnBg.on('pointerout', () => btnBg.setAlpha(1));
+      btnBg.on('pointerdown', () => {
+        if (this.inventory.craft(recipe)) {
+          this.triggerCraftingAnimation();
+          this.closeCraftingPanel();
+        }
+      });
+    }
+  }
+
+  private triggerCraftingAnimation(): void {
+    this.isCrafting = true;
+    this.craftingAnimationTimer = 1000;
+  }
+
+  private closeCraftingPanel(): void {
+    if (!this.craftingOpen || !this.craftingPanel || !this.craftingDimBg) return;
+    this.tweens.add({
+      targets: this.craftingPanel,
+      scale: 0.8,
+      alpha: 0,
+      duration: 200,
+      ease: 'Back.easeIn',
+      onComplete: () => {
+        this.craftingPanel?.destroy();
+        this.craftingPanel = undefined;
+      }
+    });
+    this.craftingDimBg.destroy();
+    this.craftingDimBg = undefined;
+    this.craftingOpen = false;
+  }
+
+  private createEnemySprite(enemy: SlimeEnemy): void {
+    if (this.enemySprites.has(enemy.id)) return;
+
+    const container = this.add.container(enemy.x, enemy.y);
+    container.setDepth(60);
+
+    const body = this.add.graphics();
+    const w = 32;
+    const h = 24;
+    body.fillStyle(0x66cc66, 1);
+    body.fillEllipse(0, 0, w, h);
+    body.fillStyle(0x99ff99, 0.5);
+    body.fillEllipse(-4, -4, 10, 6);
+    body.fillStyle(0x000000, 1);
+    body.fillCircle(-6, -2, 3);
+    body.fillCircle(6, -2, 3);
+    body.fillStyle(0xffffff, 1);
+    body.fillCircle(-5, -3, 1);
+    body.fillCircle(7, -3, 1);
+    container.add(body);
+
+    const hitFlash = this.add.graphics();
+    hitFlash.fillStyle(0xff3333, 0);
+    hitFlash.fillEllipse(0, 0, w, h);
+    hitFlash.setName('hitFlash');
+    container.add(hitFlash);
+
+    this.enemySprites.set(enemy.id, container);
+  }
+
+  public update(time: number, delta: number): void {
+    super.update(time, delta);
+
+    this.frameCount++;
+    if (time - this.lastFpsCheck >= 1000) {
+      const instantFps = this.frameCount / ((time - this.lastFpsCheck) / 1000);
+      this.fpsSmoothed = this.fpsSmoothed * 0.7 + instantFps * 0.3;
+      this.frameCount = 0;
+      this.lastFpsCheck = time;
+
+      if (this.fpsText) {
+        const color = this.fpsSmoothed >= 30 ? '#00ff00' : this.fpsSmoothed >= 25 ? '#ffff00' : '#ff0000';
+        this.fpsText.setText(`FPS: ${Math.round(this.fpsSmoothed)}`);
+        this.fpsText.setColor(color);
+      }
+
+      if (this.fpsSmoothed < 25 && !this.performanceMode) {
+        this.performanceMode = true;
+      } else if (this.fpsSmoothed > 35 && this.performanceMode) {
+        this.performanceMode = false;
+      }
+    }
+
+    const input = {
+      up: this.keys['W']?.isDown || false,
+      down: this.keys['S']?.isDown || false,
+      left: this.keys['A']?.isDown || false,
+      right: this.keys['D']?.isDown || false
+    };
+
+    if (this.virtualJoystick && this.virtualJoystick.active) {
+      if (this.virtualJoystick.dy < -0.2) input.up = true;
+      if (this.virtualJoystick.dy > 0.2) input.down = true;
+      if (this.virtualJoystick.dx < -0.2) input.left = true;
+      if (this.virtualJoystick.dx > 0.2) input.right = true;
+    }
+
+    if (!this.isInventoryOpen && !this.craftingOpen) {
+      this.player.update(delta, input, this.performanceMode);
+    }
+
+    if (this.playerSprite) {
+      this.playerSprite.setPosition(this.player.x, this.player.y);
+      this.drawPlayerBody();
+    }
+
+    if (this.attackSwingTimer > 0) {
+      this.attackSwingTimer -= delta;
+      this.drawCurrentTool();
+      if (this.attackSwingTimer <= 0) {
+        this.attackSwingTimer = 0;
+      }
+    }
+
+    if (this.exclaimTimer > 0) {
+      this.exclaimTimer -= delta;
+      if (this.exclaimTimer <= 0 && this.exclaimMark) {
+        this.exclaimMark.setVisible(false);
+      }
+    }
+
+    this.enemies.update(delta, this.player.x, this.player.y);
+    this.syncEnemySprites();
+    this.checkEnemyPlayerCollision(delta);
+
+    if (this.craftingStationGlow) {
+      this.updateCraftingGlow(delta);
+    }
+
+    if (this.isCrafting) {
+      this.craftingAnimationTimer -= delta;
+      if (this.craftingAnimationTimer <= 0) {
+        this.isCrafting = false;
+      }
+    }
+
+    this.cameras.main.centerOn(this.player.x, this.player.y);
+  }
+
+  private syncEnemySprites(): void {
+    const enemies = this.enemies.getEnemies();
+    const activeIds = new Set<number>();
+
+    for (const enemy of enemies) {
+      activeIds.add(enemy.id);
+      let sprite = this.enemySprites.get(enemy.id);
+      if (!sprite) {
+        this.createEnemySprite(enemy);
+        sprite = this.enemySprites.get(enemy.id);
+      }
+      if (sprite) {
+        sprite.setPosition(enemy.x, enemy.y);
+        const jumpOffset = enemy.jumpPhase * 8;
+        sprite.y = enemy.y - jumpOffset;
+
+        if (!this.performanceMode) {
+          const squash = 1 - enemy.jumpPhase * 0.2;
+          const stretch = 1 + enemy.jumpPhase * 0.15;
+          sprite.setScale(stretch, squash);
+        } else {
+          sprite.setScale(1);
+        }
+
+        const flash = sprite.getByName('hitFlash') as Phaser.GameObjects.Graphics;
+        if (flash) {
+          if (enemy.hitFlashTimer > 0) {
+            flash.setAlpha(0.7);
+          } else {
+            flash.setAlpha(0);
+          }
+        }
+      }
+    }
+
+    for (const [id, sprite] of this.enemySprites) {
+      if (!activeIds.has(id)) {
+        sprite.destroy();
+        this.enemySprites.delete(id);
+      }
+    }
+  }
+
+  private checkEnemyPlayerCollision(_delta: number): void {
+    const enemies = this.enemies.getEnemies();
+    const playerRadius = 16;
+    const enemyRadius = 14;
+
+    for (const enemy of enemies) {
+      if (enemy.isDying) continue;
+      const dx = enemy.x - this.player.x;
+      const dy = enemy.y - this.player.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+
+      if (dist < playerRadius + enemyRadius) {
+        if (Math.random() < 0.02) {
+          this.player.takeDamage(5);
+          const pushDist = 20;
+          const nx = dx / dist;
+          const ny = dy / dist;
+          enemy.x += nx * pushDist;
+          enemy.y += ny * pushDist;
+          enemy.gridX = enemy.x / WorldManager.TILE_SIZE;
+          enemy.gridY = enemy.y / WorldManager.TILE_SIZE;
+        }
+      }
+    }
+  }
+
+  private updateCraftingGlow(_delta: number): void {
+    const craftPos = this.world.getCraftingStationPosition();
+    const ts = WorldManager.TILE_SIZE;
+    const cx = (craftPos.x + 0.5) * ts;
+    const cy = (craftPos.y + 0.5) * ts;
+
+    this.craftingStationGlow!.clear();
+
+    if (this.isCrafting) {
+      const progress = 1 - this.craftingAnimationTimer / 1000;
+      const glowSize = ts * (0.6 + Math.sin(progress * Math.PI * 4) * 0.15);
+      this.craftingStationGlow!.fillStyle(0xffd700, 0.4 + progress * 0.3);
+      this.craftingStationGlow!.fillCircle(0, 0, glowSize);
+      this.craftingStationGlow!.lineStyle(3, 0xffff00, 0.8);
+      this.craftingStationGlow!.strokeCircle(0, 0, glowSize * 0.8);
+
+      for (let i = 0; i < 3; i++) {
+        const angle = progress * Math.PI * 2 + (i * Math.PI * 2) / 3;
+        const r = glowSize * 0.7;
+        const px = Math.cos(angle) * r;
+        const py = Math.sin(angle) * r;
+        this.craftingStationGlow!.fillStyle(0xffff00, 0.9);
+        this.craftingStationGlow!.fillCircle(px, py, 4);
+      }
+    } else {
+      const pulse = 0.5 + Math.sin(this.time.now / 500) * 0.2;
+      this.craftingStationGlow!.fillStyle(0xffd700, 0.15 * pulse);
+      this.craftingStationGlow!.fillCircle(0, 0, ts * 0.5);
+    }
+
+    this.craftingStationGlow!.setPosition(cx, cy);
+  }
+}

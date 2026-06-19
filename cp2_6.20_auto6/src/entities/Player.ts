@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { WorldManager } from '../map/WorldManager';
+import { TileType } from '../map/Tile';
 import { InventoryManager, ToolType, TOOL_SLOTS } from './InventoryManager';
 
 export interface PlayerState {
@@ -41,6 +42,7 @@ export class Player extends Phaser.Events.EventEmitter {
   private _currentTool: ToolType | null = ToolType.HAMMER;
   private _currentToolSlot: number = 0;
   private _baseSpeed: number = 140;
+  private _currentTerrainType: TileType = TileType.GRASS;
 
   private animFrame: number = 0;
   private animTimer: number = 0;
@@ -86,11 +88,10 @@ export class Player extends Phaser.Events.EventEmitter {
       }
 
       let speed = this._baseSpeed;
-      const gridX = Math.floor(this._x / WorldManager.TILE_SIZE);
-      const gridY = Math.floor(this._y / WorldManager.TILE_SIZE);
-      if (this.world.isSlow(gridX, gridY)) {
-        speed *= 0.5;
-      }
+      const movementInfo = this.world.getMovementInfo(this._x, this._y, WorldManager.TILE_SIZE * 0.3);
+      speed *= movementInfo.speedMultiplier;
+
+      this._currentTerrainType = movementInfo.dominantType;
 
       const dt = deltaMs / 1000;
       const newX = this._x + dx * speed * dt;

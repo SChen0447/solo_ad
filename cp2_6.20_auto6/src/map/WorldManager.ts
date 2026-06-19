@@ -126,6 +126,71 @@ export class WorldManager {
     return tile.isSlow();
   }
 
+  public getTileInfo(gridX: number, gridY: number): {
+    type: TileType;
+    walkable: boolean;
+    harvestable: boolean;
+    slow: boolean;
+    speedMultiplier: number;
+    harvestItem?: string;
+  } | null {
+    const tile = this.getTile(gridX, gridY);
+    if (!tile) return null;
+    const slow = tile.isSlow();
+    return {
+      type: tile.type,
+      walkable: tile.walkable,
+      harvestable: tile.harvestable,
+      slow,
+      speedMultiplier: slow ? 0.5 : 1.0,
+      harvestItem: tile.harvestItem
+    };
+  }
+
+  public getMovementInfo(x: number, y: number, radius: number = 1): {
+    walkable: boolean;
+    slow: boolean;
+    speedMultiplier: number;
+    dominantType: TileType;
+  } {
+    let walkable = true;
+    let slowTiles = 0;
+    let totalTiles = 0;
+    const typeCounts: Partial<Record<TileType, number>> = {};
+
+    const minGX = Math.floor((x - radius) / WorldManager.TILE_SIZE);
+    const maxGX = Math.floor((x + radius) / WorldManager.TILE_SIZE);
+    const minGY = Math.floor((y - radius) / WorldManager.TILE_SIZE);
+    const maxGY = Math.floor((y + radius) / WorldManager.TILE_SIZE);
+
+    for (let gy = minGY; gy <= maxGY; gy++) {
+      for (let gx = minGX; gx <= maxGX; gx++) {
+        const tile = this.getTile(gx, gy);
+        if (!tile || !tile.walkable) {
+          walkable = false;
+          continue;
+        }
+        totalTiles++;
+        if (tile.isSlow()) slowTiles++;
+        typeCounts[tile.type] = (typeCounts[tile.type] || 0) + 1;
+      }
+    }
+
+    let dominantType: TileType = TileType.GRASS;
+    let maxCount = 0;
+    for (const [type, count] of Object.entries(typeCounts)) {
+      if ((count as number) > maxCount) {
+        maxCount = count as number;
+        dominantType = type as TileType;
+      }
+    }
+
+    const slowRatio = totalTiles > 0 ? slowTiles / totalTiles : 0;
+    const speedMultiplier = 1 - slowRatio * 0.5;
+
+    return { walkable, slow: slowRatio > 0.3, speedMultiplier, dominantType };
+  }
+
   public getCraftingStationPosition(): { x: number; y: number } {
     return { x: this.craftingStationX, y: this.craftingStationY };
   }
