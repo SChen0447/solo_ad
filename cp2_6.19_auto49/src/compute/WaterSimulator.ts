@@ -43,7 +43,7 @@ export class WaterSimulator {
   }
 
   setDrainEfficiency(value: number): void {
-    this.drainEfficiency = value;
+    this.drainEfficiency = Math.max(0.5, Math.min(2.0, value));
   }
 
   getDrainEfficiency(): number {
@@ -79,10 +79,11 @@ export class WaterSimulator {
   }
 
   private applyDrainage(): void {
+    const efficiency = this.drainEfficiency;
     for (const outlet of this.drainOutlets) {
       const cx = outlet.x;
       const cz = outlet.z;
-      const rate = outlet.drainRate * this.drainEfficiency;
+      const rate = outlet.drainRate * efficiency;
       const radius = 2;
 
       for (let dz = -radius; dz <= radius; dz++) {
@@ -97,7 +98,7 @@ export class WaterSimulator {
           if (dist > radius) continue;
           if (waterH > terrainH) {
             const falloff = 1 - dist / (radius + 1);
-            const drainAmount = rate * 0.002 * falloff;
+            const drainAmount = rate * 0.006 * falloff;
             this.waterLevel[idx] = Math.max(0, this.waterLevel[idx] - drainAmount);
           }
         }

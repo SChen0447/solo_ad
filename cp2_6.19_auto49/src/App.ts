@@ -47,7 +47,16 @@ class App {
     this.clock = new THREE.Clock();
     this.raycaster = new THREE.Raycaster();
     this.mouse = new THREE.Vector2();
+    this.cleanupStrayPopups();
     this.init();
+  }
+
+  private cleanupStrayPopups(): void {
+    if (typeof document === 'undefined') return;
+    const popups = document.querySelectorAll('.monitor-popup');
+    popups.forEach((el) => {
+      if (el.parentNode) el.parentNode.removeChild(el);
+    });
   }
 
   private init(): void {

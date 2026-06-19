@@ -34,6 +34,10 @@ export class TerrainRenderer {
   private prevAvgWater: number = 0;
   private smoothedColorT: number = 0;
   private targetColorT: number = 0;
+  private trendHistory: number[] = [];
+  private readonly TREND_WINDOW: number = 20;
+  private accumulatedTrend: number = 0;
+  private trendEma: number = 0;
 
   constructor(scene: THREE.Scene, heightmap: Float32Array, buildings: BuildingData[], drainOutlets: DrainOutletData[]) {
     this.scene = scene;
@@ -189,15 +193,26 @@ export class TerrainRenderer {
     positions.needsUpdate = true;
     this.waterGeometry.computeVertexNormals();
 
-    const trend = avgWater - this.prevAvgWater;
+    const rawTrend = avgWater - this.prevAvgWater;
     this.prevAvgWater = avgWater;
+
+    this.trendHistory.push(rawTrend);
+    this.accumulatedTrend += rawTrend;
+    if (this.trendHistory.length > this.TREND_WINDOW) {
+      const oldest = this.trendHistory.shift() as number;
+      this.accumulatedTrend -= oldest;
+    }
+    const windowAvg = this.accumulatedTrend / Math.max(1, this.trendHistory.length);
+    this.trendEma += (windowAvg - this.trendEma) * 0.15;
+    const trend = this.trendEma;
 
     if (hasWater) {
       const absT = Math.min(1, maxWater / (3 * HEIGHT_SCALE));
-      const trendBias = Math.max(-0.3, Math.min(0.3, trend * 2000));
+      const trendGain = 15000;
+      const trendBias = Math.max(-0.35, Math.min(0.35, trend * trendGain));
       this.targetColorT = Math.max(0, Math.min(1, absT + trendBias));
 
-      const smoothSpeed = 0.08;
+      const smoothSpeed = 0.1;
       this.smoothedColorT += (this.targetColorT - this.smoothedColorT) * smoothSpeed;
 
       const t = this.smoothedColorT;
@@ -210,6 +225,9 @@ export class TerrainRenderer {
       this.prevAvgWater = 0;
       this.targetColorT = 0;
       this.smoothedColorT = 0;
+      this.trendHistory.length = 0;
+      this.accumulatedTrend = 0;
+      this.trendEma = 0;
       this.waterMaterial.opacity = 0;
     }
   }
