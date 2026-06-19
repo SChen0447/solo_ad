@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <title>深海探险 - 2D水下探索模拟</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #0A2A3A;
+      font-family: 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+    }
+
+    #game-container {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+    }
+
+    #game-canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      cursor: pointer;
+    }
+
+    .hud {
+      position: absolute;
+      top: 16px;
+      left: 16px;
+      right: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 14px 20px;
+      background: rgba(10, 42, 58, 0.55);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border-radius: 16px;
+      border: 1px solid rgba(26, 107, 122, 0.4);
+      z-index: 10;
+    }
+
+    .hud-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      color: #ffffff;
+      font-size: 14px;
+      font-weight: 600;
+    }
+
+    .hud-label {
+      color: #1A6B7A;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .hud-value {
+      color: #00FF88;
+      font-size: 18px;
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+      min-width: 40px;
+      text-align: left;
+      transition: transform 0.15s ease;
+    }
+
+    .hud-value.bump {
+      transform: scale(1.25);
+    }
+
+    .oxygen-bar-container {
+      flex: 1;
+      max-width: 280px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .oxygen-bar-wrapper {
+      position: relative;
+      width: 100%;
+      height: 14px;
+      background: rgba(26, 107, 122, 0.3);
+      border-radius: 7px;
+      overflow: hidden;
+      border: 1px solid rgba(26, 107, 122, 0.5);
+    }
+
+    .oxygen-bar {
+      position: absolute;
+      left: 0;
+      top: 0;
+      height: 100%;
+      background: linear-gradient(90deg, #00FF88 0%, #1A6B7A 100%);
+      border-radius: 7px;
+      transition: width 0.25s ease;
+      box-shadow: 0 0 12px rgba(0, 255, 136, 0.5);
+    }
+
+    .oxygen-bar.low {
+      background: linear-gradient(90deg, #FF6B6B 0%, #FF3366 100%);
+      box-shadow: 0 0 12px rgba(255, 107, 107, 0.6);
+      animation: pulse 0.8s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.6; }
+    }
+
+    .coin-icon {
+      display: inline-block;
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 30% 30%, #FFD700, #FFA500);
+      box-shadow: 0 0 8px rgba(255, 215, 0, 0.6);
+    }
+
+    .game-over-panel {
+      position: absolute;
+      left: 50%;
+      bottom: 0;
+      transform: translate(-50%, 100%);
+      width: min(420px, 90%);
+      padding: 32px;
+      background: rgba(10, 42, 58, 0.92);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border-radius: 24px 24px 0 0;
+      border: 1px solid rgba(26, 107, 122, 0.5);
+      border-bottom: none;
+      z-index: 100;
+      text-align: center;
+      transition: transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+
+    .game-over-panel.show {
+      transform: translate(-50%, 0);
+    }
+
+    .game-over-title {
+      color: #FF6B6B;
+      font-size: 28px;
+      font-weight: 700;
+      margin-bottom: 8px;
+      letter-spacing: 2px;
+    }
+
+    .game-over-subtitle {
+      color: #1A6B7A;
+      font-size: 14px;
+      margin-bottom: 28px;
+      text-transform: uppercase;
+      letter-spacing: 3px;
+    }
+
+    .stat-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 14px 20px;
+      margin-bottom: 12px;
+      background: rgba(26, 107, 122, 0.2);
+      border-radius: 12px;
+      border: 1px solid rgba(26, 107, 122, 0.3);
+    }
+
+    .stat-label {
+      color: #1A6B7A;
+      font-size: 13px;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+    }
+
+    .stat-value {
+      color: #00FF88;
+      font-size: 22px;
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .restart-btn {
+      margin-top: 20px;
+      width: 100%;
+      padding: 16px 32px;
+      font-size: 16px;
+      font-weight: 700;
+      color: #0A2A3A;
+      background: linear-gradient(135deg, #00FF88 0%, #1A6B7A 100%);
+      border: none;
+      border-radius: 14px;
+      cursor: pointer;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      transition: all 0.2s ease;
+      box-shadow: 0 4px 20px rgba(0, 255, 136, 0.3);
+    }
+
+    .restart-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 28px rgba(0, 255, 136, 0.45);
+    }
+
+    .restart-btn:active {
+      transform: translateY(0);
+    }
+
+    .mobile-controls {
+      display: none;
+      position: absolute;
+      bottom: 24px;
+      left: 0;
+      right: 0;
+      padding: 0 24px;
+      z-index: 20;
+      pointer-events: none;
+    }
+
+    .mobile-controls.show {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+    }
+
+    .joystick-wrapper {
+      position: relative;
+      width: 140px;
+      height: 140px;
+      pointer-events: auto;
+    }
+
+    .joystick-base {
+      position: absolute;
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 100%;
+      border-radius: 50%;
+      background: rgba(26, 107, 122, 0.3);
+      border: 2px solid rgba(26, 107, 122, 0.6);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+    }
+
+    .joystick-knob {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: 60px;
+      height: 60px;
+      margin-left: -30px;
+      margin-top: -30px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #00FF88 0%, #1A6B7A 100%);
+      box-shadow: 0 0 20px rgba(0, 255, 136, 0.5);
+      transition: left 0.05s ease, top 0.05s ease;
+    }
+
+    .action-btn {
+      width: 80px;
+      height: 80px;
+      border-radius: 50%;
+      background: rgba(26, 107, 122, 0.4);
+      border: 2px solid #00FF88;
+      color: #00FF88;
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      pointer-events: auto;
+      transition: all 0.15s ease;
+    }
+
+    .action-btn:active {
+      background: rgba(0, 255, 136, 0.3);
+      transform: scale(0.92);
+    }
+
+    @media (max-width: 900px), (orientation: portrait) {
+      .hud {
+        top: 10px;
+        left: 10px;
+        right: 10px;
+        padding: 10px 14px;
+        gap: 10px;
+      }
+      .hud-value { font-size: 15px; }
+      .oxygen-bar-container { max-width: 160px; }
+    }
+
+    @media (hover: none) and (pointer: coarse) {
+      .mobile-controls {
+        display: flex;
+      }
+    }
+
+    .hint {
+      position: absolute;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      color: rgba(0, 255, 136, 0.6);
+      font-size: 12px;
+      letter-spacing: 1px;
+      z-index: 5;
+      pointer-events: none;
+    }
+  </style>
+</head>
+<body>
+  <div id="game-container">
+    <canvas id="game-canvas"></canvas>
+    
+    <div class="hud">
+      <div class="oxygen-bar-container">
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <span class="hud-label">氧气</span>
+          <span class="hud-value" id="oxygen-text">100%</span>
+        </div>
+        <div class="oxygen-bar-wrapper">
+          <div class="oxygen-bar" id="oxygen-bar" style="width:100%"></div>
+        </div>
+      </div>
+      <div class="hud-item">
+        <span class="coin-icon"></span>
+        <span class="hud-value" id="coin-count">0</span>
+      </div>
+      <div class="hud-item">
+        <span class="hud-label">探索</span>
+        <span class="hud-value" id="explore-percent">0%</span>
+      </div>
+    </div>
+
+    <div class="hint" id="key-hint">WASD 移动 &nbsp;|&nbsp; E 开启宝箱</div>
+
+    <div class="mobile-controls" id="mobile-controls">
+      <div class="joystick-wrapper" id="joystick-wrapper">
+        <div class="joystick-base"></div>
+        <div class="joystick-knob" id="joystick-knob"></div>
+      </div>
+      <button class="action-btn" id="action-btn">E</button>
+    </div>
+
+    <div class="game-over-panel" id="game-over-panel">
+      <div class="game-over-title">氧气耗尽</div>
+      <div class="game-over-subtitle">探险结束</div>
+      <div class="stat-row">
+        <span class="stat-label">探索时间</span>
+        <span class="stat-value" id="final-time">0s</span>
+      </div>
+      <div class="stat-row">
+        <span class="stat-label">收集金币</span>
+        <span class="stat-value" id="final-coins">0</span>
+      </div>
+      <button class="restart-btn" id="restart-btn">重新开始</button>
+    </div>
+  </div>
+
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
