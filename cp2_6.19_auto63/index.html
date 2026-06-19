@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>海战策略游戏</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background-color: #0a1628;
+      font-family: 'Roboto', sans-serif;
+    }
+
+    #game-container {
+      position: relative;
+      width: 100vw;
+      height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      background: linear-gradient(180deg, #0a1628 0%, #0d1f38 50%, #0a1628 100%);
+    }
+
+    #game-canvas {
+      display: block;
+      border: 2px solid #1a3a5a;
+      border-radius: 4px;
+      box-shadow: 0 0 40px rgba(74, 138, 170, 0.3), inset 0 0 60px rgba(10, 22, 40, 0.5);
+    }
+
+    .top-bar {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 24px;
+      background: linear-gradient(180deg, rgba(26, 42, 74, 0.9) 0%, rgba(26, 42, 74, 0.7) 100%);
+      backdrop-filter: blur(10px);
+      z-index: 100;
+      padding: 3px 20px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      border-bottom: 1px solid rgba(74, 138, 170, 0.3);
+    }
+
+    .health-bar-container {
+      flex: 1;
+      height: 16px;
+      background: rgba(10, 22, 40, 0.8);
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid rgba(74, 138, 170, 0.4);
+      position: relative;
+    }
+
+    .health-bar-fill {
+      height: 100%;
+      transition: width 0.3s ease, background-color 0.5s ease;
+      border-radius: 8px;
+      position: relative;
+    }
+
+    .health-bar-fill::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 50%;
+      background: linear-gradient(180deg, rgba(255,255,255,0.3) 0%, transparent 100%);
+      border-radius: 8px 8px 0 0;
+    }
+
+    .health-bar-text {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-family: 'Orbitron', sans-serif;
+      font-size: 11px;
+      font-weight: 700;
+      color: #fff;
+      text-shadow: 1px 1px 2px rgba(0,0,0,0.8);
+      z-index: 2;
+    }
+
+    .ship-list-panel {
+      position: fixed;
+      top: 36px;
+      left: 20px;
+      width: 180px;
+      background: rgba(26, 42, 74, 0.7);
+      backdrop-filter: blur(10px);
+      border-radius: 8px;
+      padding: 12px;
+      z-index: 100;
+      border: 1px solid rgba(74, 138, 170, 0.3);
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+    }
+
+    .ship-list-title {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 12px;
+      font-weight: 700;
+      color: #4a8aaa;
+      margin-bottom: 10px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .ship-list-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 8px;
+      margin-bottom: 6px;
+      background: rgba(10, 22, 40, 0.5);
+      border-radius: 4px;
+      transition: all 0.2s ease;
+    }
+
+    .ship-list-item:last-child {
+      margin-bottom: 0;
+    }
+
+    .ship-list-item.sunk {
+      opacity: 0.5;
+    }
+
+    .ship-icon {
+      width: 24px;
+      height: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+    }
+
+    .ship-icon.sunk::after {
+      content: '✕';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      color: #dc143c;
+      font-size: 20px;
+      font-weight: 900;
+      text-shadow: 0 0 4px rgba(220, 20, 60, 0.8);
+    }
+
+    .ship-mini-health {
+      flex: 1;
+      height: 6px;
+      background: rgba(10, 22, 40, 0.8);
+      border-radius: 3px;
+      overflow: hidden;
+    }
+
+    .ship-mini-health-fill {
+      height: 100%;
+      transition: width 0.3s ease;
+      border-radius: 3px;
+    }
+
+    .status-panel {
+      position: fixed;
+      bottom: 20px;
+      left: 20px;
+      width: 200px;
+      background: rgba(26, 42, 74, 0.7);
+      backdrop-filter: blur(10px);
+      border-radius: 8px;
+      padding: 14px;
+      z-index: 100;
+      border: 1px solid rgba(74, 138, 170, 0.3);
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+    }
+
+    .status-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+
+    .status-item:last-child {
+      margin-bottom: 0;
+    }
+
+    .status-label {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 11px;
+      color: #8ab4d4;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .status-value {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 12px;
+      font-weight: 700;
+      color: #fff;
+    }
+
+    .status-value.formation {
+      color: #ffd700;
+    }
+
+    .status-value.focus-active {
+      color: #ff4444;
+      animation: pulse 1s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.6; }
+    }
+
+    .stats-panel {
+      position: fixed;
+      top: 36px;
+      right: 20px;
+      width: 180px;
+      background: rgba(26, 42, 74, 0.7);
+      backdrop-filter: blur(10px);
+      border-radius: 8px;
+      padding: 14px;
+      z-index: 100;
+      border: 1px solid rgba(74, 138, 170, 0.3);
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+    }
+
+    .stats-title {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 12px;
+      font-weight: 700;
+      color: #4a8aaa;
+      margin-bottom: 12px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      text-align: center;
+    }
+
+    .stat-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 0;
+      border-bottom: 1px solid rgba(74, 138, 170, 0.2);
+    }
+
+    .stat-row:last-child {
+      border-bottom: none;
+    }
+
+    .stat-label {
+      font-size: 12px;
+      color: #8ab4d4;
+    }
+
+    .stat-value {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 16px;
+      font-weight: 700;
+      color: #ffd700;
+    }
+
+    .controls-hint {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      background: rgba(26, 42, 74, 0.7);
+      backdrop-filter: blur(10px);
+      border-radius: 8px;
+      padding: 12px 16px;
+      z-index: 100;
+      border: 1px solid rgba(74, 138, 170, 0.3);
+      font-size: 11px;
+      color: #8ab4d4;
+      line-height: 1.8;
+    }
+
+    .controls-hint kbd {
+      background: rgba(74, 138, 170, 0.3);
+      padding: 2px 6px;
+      border-radius: 3px;
+      font-family: 'Orbitron', monospace;
+      font-size: 10px;
+      color: #fff;
+      border: 1px solid rgba(74, 138, 170, 0.5);
+    }
+
+    .shatter-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      pointer-events: none;
+      z-index: 1000;
+      display: none;
+    }
+
+    .shatter-overlay.active {
+      display: block;
+    }
+
+    .shatter-line {
+      position: absolute;
+      background: linear-gradient(90deg, transparent, #dc143c, transparent);
+      transform-origin: center;
+      animation: shatterAnim 0.4s ease-out forwards;
+    }
+
+    @keyframes shatterAnim {
+      0% {
+        opacity: 0;
+        transform: scale(0);
+      }
+      50% {
+        opacity: 1;
+      }
+      100% {
+        opacity: 0;
+        transform: scale(2);
+      }
+    }
+
+    @media (max-width: 1280px) {
+      .ship-list-panel, .stats-panel {
+        width: 140px;
+        padding: 10px;
+      }
+
+      .status-panel {
+        width: 160px;
+        padding: 10px;
+      }
+
+      .controls-hint {
+        font-size: 10px;
+        padding: 8px 12px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div id="game-container">
+    <canvas id="game-canvas" width="800" height="600"></canvas>
+    
+    <div class="top-bar">
+      <div class="health-bar-container">
+        <div class="health-bar-fill" id="fleet-health-bar" style="width: 100%; background-color: #22c55e;"></div>
+        <div class="health-bar-text" id="fleet-health-text">编队生命值: 100%</div>
+      </div>
+    </div>
+
+    <div class="ship-list-panel">
+      <div class="ship-list-title">我方舰队</div>
+      <div id="ship-list"></div>
+    </div>
+
+    <div class="stats-panel">
+      <div class="stats-title">战况统计</div>
+      <div class="stat-row">
+        <span class="stat-label">击沉敌舰</span>
+        <span class="stat-value" id="sink-count">0</span>
+      </div>
+      <div class="stat-row">
+        <span class="stat-label">战斗耗时</span>
+        <span class="stat-value" id="game-time">00:00</span>
+      </div>
+    </div>
+
+    <div class="status-panel">
+      <div class="status-item">
+        <span class="status-label">当前阵型</span>
+        <span class="status-value formation" id="formation-name">箭形</span>
+      </div>
+      <div class="status-item">
+        <span class="status-label">集火状态</span>
+        <span class="status-value" id="focus-status">未激活</span>
+      </div>
+    </div>
+
+    <div class="controls-hint">
+      <div><kbd>点击</kbd> 海面移动编队</div>
+      <div><kbd>1</kbd> 箭形 <kbd>2</kbd> 线形 <kbd>3</kbd> 圆形</div>
+      <div><kbd>空格</kbd> 集火攻击</div>
+    </div>
+
+    <div class="shatter-overlay" id="shatter-overlay"></div>
+  </div>
+
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
