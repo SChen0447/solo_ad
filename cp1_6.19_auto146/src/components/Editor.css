@@ -1,0 +1,58 @@
+.editor-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background-color: #1a1a2e;
+}
+
+.editor-tabs {
+  display: flex;
+  background-color: #1a1a2e;
+  border-bottom: 1px solid #2d2d44;
+}
+
+.tab-btn {
+  padding: 12px 24px;
+  background: transparent;
+  border: none;
+  color: #888;
+  font-family: 'Fira Code', monospace;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border-bottom: 2px solid transparent;
+}
+
+.tab-btn:hover {
+  color: #fff;
+  background-color: rgba(102, 126, 234, 0.1);
+}
+
+.tab-btn.active {
+  color: #667eea;
+  border-bottom-color: #667eea;
+  background-color: rgba(102, 126, 234, 0.1);
+}
+
+.editor-wrapper {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+}
+
+.code-editor {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+}
+
+.editor-wrapper.show-html .code-editor:first-child,
+.editor-wrapper.show-css .code-editor:last-child {
+  opacity: 1;
+  pointer-events: auto;
+}

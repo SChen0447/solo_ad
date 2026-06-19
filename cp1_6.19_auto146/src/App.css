@@ -1,0 +1,55 @@
+.app-container {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  background-color: #1e1e2e;
+  overflow: hidden;
+}
+
+.app-container.dragging {
+  cursor: col-resize;
+  user-select: none;
+}
+
+.editor-section {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.preview-section {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  position: relative;
+}
+
+.divider {
+  width: 4px;
+  background-color: #2d2d44;
+  cursor: col-resize;
+  transition: background-color 0.2s ease;
+  flex-shrink: 0;
+}
+
+.divider:hover {
+  background-color: #667eea;
+}
+
+@media (max-width: 768px) {
+  .app-container {
+    flex-direction: column;
+  }
+
+  .divider {
+    width: 100%;
+    height: 4px;
+    cursor: row-resize;
+  }
+
+  .divider:hover {
+    background-color: #667eea;
+  }
+}
