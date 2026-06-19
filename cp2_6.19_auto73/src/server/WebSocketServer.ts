@@ -1,6 +1,6 @@
 import { WebSocketServer as WSServer, WebSocket } from 'ws';
 import type { Server } from 'http';
-import type { WSMessage, Stroke, Note } from '../src/types.js';
+import type { WSMessage, Stroke, Shape, Note } from '../src/types.js';
 
 interface ClientWS extends WebSocket {
   isAlive?: boolean;
@@ -9,6 +9,7 @@ interface ClientWS extends WebSocket {
 export class WhiteboardWebSocketServer {
   private wss: WSServer;
   private strokes: Stroke[] = [];
+  private shapes: Shape[] = [];
   private notes: Note[] = [];
 
   constructor(server: Server) {
@@ -23,7 +24,7 @@ export class WhiteboardWebSocketServer {
 
       this.sendToClient(ws, {
         type: 'snapshot',
-        payload: { strokes: this.strokes, notes: this.notes },
+        payload: { strokes: this.strokes, shapes: this.shapes, notes: this.notes },
       });
 
       this.broadcastUserCount();
@@ -58,6 +59,9 @@ export class WhiteboardWebSocketServer {
       case 'stroke-add':
         this.strokes.push(message.payload as Stroke);
         break;
+      case 'shape-add':
+        this.shapes.push(message.payload as Shape);
+        break;
       case 'note-add':
         this.notes.push(message.payload as Note);
         break;
@@ -86,6 +90,7 @@ export class WhiteboardWebSocketServer {
       }
       case 'clear':
         this.strokes = [];
+        this.shapes = [];
         this.notes = [];
         break;
     }

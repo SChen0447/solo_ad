@@ -1,15 +1,18 @@
 import { create } from 'zustand';
-import type { Stroke, Note, NoteColor, WSMessage } from '@/types';
+import type { Stroke, Shape, Note, NoteColor, WSMessage, DrawingMode } from '@/types';
 import { v4 as uuidv4 } from 'uuid';
 
 interface CanvasState {
   strokes: Stroke[];
+  shapes: Shape[];
   notes: Note[];
 }
 
 interface WhiteboardState {
   strokes: Stroke[];
+  shapes: Shape[];
   notes: Note[];
+  drawingMode: DrawingMode;
   penColor: string;
   penWidth: number;
   noteColor: NoteColor;
@@ -23,11 +26,13 @@ interface WhiteboardState {
   sendMessage: (msg: WSMessage) => void;
   connect: () => void;
 
+  setDrawingMode: (mode: DrawingMode) => void;
   setPenColor: (c: string) => void;
   setPenWidth: (w: number) => void;
   setNoteColor: (c: NoteColor) => void;
 
   addStroke: (stroke: Stroke) => void;
+  addShape: (shape: Shape) => void;
   addNote: () => void;
   moveNote: (id: string, x: number, y: number) => void;
   editNote: (id: string, text: string) => void;
@@ -38,7 +43,7 @@ interface WhiteboardState {
   redo: () => void;
   clear: () => void;
 
-  loadSnapshot: (strokes: Stroke[], notes: Note[]) => void;
+  loadSnapshot: (strokes: Stroke[], shapes: Shape[], notes: Note[]) => void;
   setUserCount: (count: number) => void;
   pushHistory: () => void;
 }
@@ -47,7 +52,9 @@ const MAX_HISTORY = 50;
 
 export const useWhiteboardStore = create<WhiteboardState>((set, get) => ({
   strokes: [],
+  shapes: [],
   notes: [],
+  drawingMode: 'pen',
   penColor: '#000000',
   penWidth: 3,
   noteColor: 'yellow',
@@ -72,10 +79,17 @@ export const useWhiteboardStore = create<WhiteboardState>((set, get) => ({
         const msg: WSMessage = JSON.parse(event.data);
         switch (msg.type) {
           case 'snapshot':
-            get().loadSnapshot(msg.payload.strokes, msg.payload.notes);
+            get().loadSnapshot(
+              msg.payload.strokes || [],
+              msg.payload.shapes || [],
+              msg.payload.notes || [],
+            );
             break;
           case 'stroke-add':
             set(s => ({ strokes: [...s.strokes, msg.payload as Stroke] }));
+            break;
+          case 'shape-add':
+            set(s => ({ shapes: [...s.shapes, msg.payload as Shape] }));
             break;
           case 'note-add':
             set(s => ({ notes: [...s.notes, msg.payload as Note] }));
@@ -107,7 +121,7 @@ export const useWhiteboardStore = create<WhiteboardState>((set, get) => ({
             break;
           }
           case 'clear':
-            set({ strokes: [], notes: [] });
+            set({ strokes: [], shapes: [], notes: [] });
             break;
           case 'user-count':
             set({ userCount: msg.payload as number });
@@ -128,6 +142,7 @@ export const useWhiteboardStore = create<WhiteboardState>((set, get) => ({
     }
   },
 
+  setDrawingMode: (mode) => set({ drawingMode: mode }),
   setPenColor: (c) => set({ penColor: c }),
   setPenWidth: (w) => set({ penWidth: w }),
   setNoteColor: (c) => set({ noteColor: c }),
@@ -136,6 +151,12 @@ export const useWhiteboardStore = create<WhiteboardState>((set, get) => ({
     get().pushHistory();
     set(s => ({ strokes: [...s.strokes, stroke] }));
     get().sendMessage({ type: 'stroke-add', payload: stroke });
+  },
+
+  addShape: (shape: Shape) => {
+    get().pushHistory();
+    set(s => ({ shapes: [...s.shapes, shape] }));
+    get().sendMessage({ type: 'shape-add', payload: shape });
   },
 
   addNote: () => {
@@ -183,10 +204,11 @@ export const useWhiteboardStore = create<WhiteboardState>((set, get) => ({
   },
 
   pushHistory: () => {
-    const { strokes, notes, history, historyIndex } = get();
+    const { strokes, shapes, notes, history, historyIndex } = get();
     const newHistory = history.slice(0, historyIndex + 1);
     newHistory.push({
       strokes: JSON.parse(JSON.stringify(strokes)),
+      shapes: JSON.parse(JSON.stringify(shapes)),
       notes: JSON.parse(JSON.stringify(notes)),
     });
     if (newHistory.length > MAX_HISTORY) newHistory.shift();
@@ -202,12 +224,14 @@ export const useWhiteboardStore = create<WhiteboardState>((set, get) => ({
       if (entry) {
         set({
           strokes: JSON.parse(JSON.stringify(entry.strokes)),
+          shapes: JSON.parse(JSON.stringify(entry.shapes)),
           notes: JSON.parse(JSON.stringify(entry.notes)),
           historyIndex: historyIndex - 1,
           fading: false,
         });
         get().sendMessage({ type: 'clear', payload: null });
         entry.strokes.forEach(s => get().sendMessage({ type: 'stroke-add', payload: s }));
+        entry.shapes.forEach(sh => get().sendMessage({ type: 'shape-add', payload: sh }));
         entry.notes.forEach(n => get().sendMessage({ type: 'note-add', payload: n }));
       } else {
         set({ fading: false });
@@ -225,12 +249,14 @@ export const useWhiteboardStore = create<WhiteboardState>((set, get) => ({
       if (entry) {
         set({
           strokes: JSON.parse(JSON.stringify(entry.strokes)),
+          shapes: JSON.parse(JSON.stringify(entry.shapes)),
           notes: JSON.parse(JSON.stringify(entry.notes)),
           historyIndex: newIndex,
           fading: false,
         });
         get().sendMessage({ type: 'clear', payload: null });
         entry.strokes.forEach(s => get().sendMessage({ type: 'stroke-add', payload: s }));
+        entry.shapes.forEach(sh => get().sendMessage({ type: 'shape-add', payload: sh }));
         entry.notes.forEach(n => get().sendMessage({ type: 'note-add', payload: n }));
       } else {
         set({ fading: false });
@@ -240,12 +266,12 @@ export const useWhiteboardStore = create<WhiteboardState>((set, get) => ({
 
   clear: () => {
     get().pushHistory();
-    set({ strokes: [], notes: [] });
+    set({ strokes: [], shapes: [], notes: [] });
     get().sendMessage({ type: 'clear', payload: null });
   },
 
-  loadSnapshot: (strokes, notes) => {
-    set({ strokes, notes });
+  loadSnapshot: (strokes, shapes, notes) => {
+    set({ strokes, shapes, notes });
   },
 
   setUserCount: (count) => set({ userCount: count }),

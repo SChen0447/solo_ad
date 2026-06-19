@@ -3,7 +3,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { useWhiteboardStore } from '@/store/useWhiteboardStore';
 import { Toolbar } from '@/client/Toolbar';
 import { StickyNote } from '@/client/StickyNote';
-import type { Point, Stroke } from '@/types';
+import type { Point, Stroke, Shape, ShapeType } from '@/types';
 
 function buildPathD(points: Point[]): string {
   if (points.length < 2) return '';
@@ -25,16 +25,111 @@ function buildPathD(points: Point[]): string {
   return d;
 }
 
+function shapeRect(shape: Shape): { x: number; y: number; w: number; h: number } {
+  return {
+    x: Math.min(shape.startX, shape.endX),
+    y: Math.min(shape.startY, shape.endY),
+    w: Math.abs(shape.endX - shape.startX),
+    h: Math.abs(shape.endY - shape.startY),
+  };
+}
+
+function ShapeRenderer({ shape }: { shape: Shape }) {
+  const r = shapeRect(shape);
+  if (r.w <= 0 || r.h <= 0) return null;
+
+  if (shape.type === 'rect') {
+    return (
+      <rect
+        key={shape.id}
+        x={r.x}
+        y={r.y}
+        width={r.w}
+        height={r.h}
+        fill={shape.color}
+        fillOpacity={0.3}
+        stroke={shape.color}
+        strokeWidth={shape.width}
+      />
+    );
+  }
+
+  return (
+    <ellipse
+      key={shape.id}
+      cx={r.x + r.w / 2}
+      cy={r.y + r.h / 2}
+      rx={r.w / 2}
+      ry={r.h / 2}
+      fill={shape.color}
+      fillOpacity={0.3}
+      stroke={shape.color}
+      strokeWidth={shape.width}
+    />
+  );
+}
+
+function ShapePreview({
+  shapeType, startX, startY, endX, endY, color, width,
+}: {
+  shapeType: ShapeType;
+  startX: number;
+  startY: number;
+  endX: number;
+  endY: number;
+  color: string;
+  width: number;
+}) {
+  const x = Math.min(startX, endX);
+  const y = Math.min(startY, endY);
+  const w = Math.abs(endX - startX);
+  const h = Math.abs(endY - startY);
+  if (w <= 0 || h <= 0) return null;
+
+  if (shapeType === 'rect') {
+    return (
+      <rect
+        x={x}
+        y={y}
+        width={w}
+        height={h}
+        fill="none"
+        stroke={color}
+        strokeWidth={Math.max(width, 2)}
+        strokeDasharray="6 4"
+      />
+    );
+  }
+
+  return (
+    <ellipse
+      cx={x + w / 2}
+      cy={y + h / 2}
+      rx={w / 2}
+      ry={h / 2}
+      fill="none"
+      stroke={color}
+      strokeWidth={Math.max(width, 2)}
+      strokeDasharray="6 4"
+    />
+  );
+}
+
 export function Whiteboard() {
   const {
-    strokes, notes, penColor, penWidth, connected, userCount, fading,
-    addStroke, connect,
+    strokes, shapes, notes, penColor, penWidth, drawingMode,
+    connected, userCount, fading,
+    addStroke, addShape, connect,
   } = useWhiteboardStore();
 
   const svgRef = useRef<SVGSVGElement>(null);
   const [drawing, setDrawing] = useState(false);
+
   const currentPoints = useRef<Point[]>([]);
   const [currentPath, setCurrentPath] = useState('');
+
+  const shapeStart = useRef<Point>({ x: 0, y: 0 });
+  const [shapeEnd, setShapeEnd] = useState<Point | null>(null);
 
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
@@ -63,10 +158,17 @@ export function Whiteboard() {
     }
     if (e.button !== 0) return;
     const pt = screenToCanvas(e.clientX, e.clientY);
-    currentPoints.current = [pt];
-    setDrawing(true);
-    setCurrentPath(`M ${pt.x} ${pt.y}`);
-  }, [screenToCanvas, pan]);
+
+    if (drawingMode === 'pen') {
+      currentPoints.current = [pt];
+      setCurrentPath(`M ${pt.x} ${pt.y}`);
+      setDrawing(true);
+    } else {
+      shapeStart.current = pt;
+      setShapeEnd(pt);
+      setDrawing(true);
+    }
+  }, [screenToCanvas, pan, drawingMode]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
     if (panning.current) {
@@ -80,9 +182,14 @@ export function Whiteboard() {
     }
     if (!drawing) return;
     const pt = screenToCanvas(e.clientX, e.clientY);
-    currentPoints.current.push(pt);
-    setCurrentPath(buildPathD(currentPoints.current));
-  }, [drawing, screenToCanvas]);
+
+    if (drawingMode === 'pen') {
+      currentPoints.current.push(pt);
+      setCurrentPath(buildPathD(currentPoints.current));
+    } else {
+      setShapeEnd(pt);
+    }
+  }, [drawing, screenToCanvas, drawingMode]);
 
   const handleMouseUp = useCallback(() => {
     if (panning.current) {
@@ -91,18 +198,41 @@ export function Whiteboard() {
     }
     if (!drawing) return;
     setDrawing(false);
-    if (currentPoints.current.length >= 2) {
-      const stroke: Stroke = {
-        id: uuidv4(),
-        points: [...currentPoints.current],
-        color: penColor,
-        width: penWidth,
-      };
-      addStroke(stroke);
+
+    if (drawingMode === 'pen') {
+      if (currentPoints.current.length >= 2) {
+        const stroke: Stroke = {
+          id: uuidv4(),
+          points: [...currentPoints.current],
+          color: penColor,
+          width: penWidth,
+        };
+        addStroke(stroke);
+      }
+      currentPoints.current = [];
+      setCurrentPath('');
+    } else {
+      const end = shapeEnd;
+      if (end) {
+        const dx = Math.abs(end.x - shapeStart.current.x);
+        const dy = Math.abs(end.y - shapeStart.current.y);
+        if (dx >= 2 || dy >= 2) {
+          const shape: Shape = {
+            id: uuidv4(),
+            type: drawingMode as ShapeType,
+            startX: shapeStart.current.x,
+            startY: shapeStart.current.y,
+            endX: end.x,
+            endY: end.y,
+            color: penColor,
+            width: penWidth,
+          };
+          addShape(shape);
+        }
+      }
+      setShapeEnd(null);
     }
-    currentPoints.current = [];
-    setCurrentPath('');
-  }, [drawing, penColor, penWidth, addStroke]);
+  }, [drawing, drawingMode, penColor, penWidth, addStroke, addShape]);
 
   const handleWheel = useCallback((e: React.WheelEvent) => {
     e.preventDefault();
@@ -120,6 +250,8 @@ export function Whiteboard() {
     }));
     setZoom(newZoom);
   }, [zoom]);
+
+  const showPreview = drawing && (drawingMode === 'rect' || drawingMode === 'circle') && shapeEnd;
 
   return (
     <div className="whiteboard-layout">
@@ -166,7 +298,10 @@ export function Whiteboard() {
                 fill="none"
               />
             ))}
-            {drawing && currentPath && (
+            {shapes.map(shape => (
+              <ShapeRenderer key={shape.id} shape={shape} />
+            ))}
+            {drawing && drawingMode === 'pen' && currentPath && (
               <path
                 d={currentPath}
                 stroke={penColor}
@@ -175,6 +310,17 @@ export function Whiteboard() {
                 strokeLinejoin="round"
                 fill="none"
                 opacity={0.7}
+              />
+            )}
+            {showPreview && (
+              <ShapePreview
+                shapeType={drawingMode as ShapeType}
+                startX={shapeStart.current.x}
+                startY={shapeStart.current.y}
+                endX={shapeEnd!.x}
+                endY={shapeEnd!.y}
+                color={penColor}
+                width={penWidth}
               />
             )}
           </svg>

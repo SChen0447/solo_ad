@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { useWhiteboardStore } from '@/store/useWhiteboardStore';
-import type { NoteColor } from '@/types';
+import type { NoteColor, DrawingMode } from '@/types';
 import {
-  Pencil, Palette, StickyNote, Undo2, Redo2, Trash2,
+  Pencil, Square, Circle, Palette, StickyNote, Undo2, Redo2, Trash2,
   ChevronDown,
 } from 'lucide-react';
 
@@ -21,6 +21,12 @@ const WIDTHS = [
   { value: 8, label: '特粗' },
 ];
 
+const DRAWING_MODES: { value: DrawingMode; label: string; icon: typeof Pencil }[] = [
+  { value: 'pen', label: '画笔', icon: Pencil },
+  { value: 'rect', label: '矩形', icon: Square },
+  { value: 'circle', label: '圆形', icon: Circle },
+];
+
 const NOTE_COLORS: { value: NoteColor; label: string; hex: string }[] = [
   { value: 'yellow', label: '黄色', hex: '#FEF08A' },
   { value: 'pink', label: '粉色', hex: '#FBCFE8' },
@@ -29,8 +35,8 @@ const NOTE_COLORS: { value: NoteColor; label: string; hex: string }[] = [
 
 export function Toolbar() {
   const {
-    penColor, penWidth, noteColor,
-    setPenColor, setPenWidth, setNoteColor,
+    penColor, penWidth, noteColor, drawingMode,
+    setPenColor, setPenWidth, setNoteColor, setDrawingMode,
     addNote, undo, redo, clear,
     history, historyIndex,
   } = useWhiteboardStore();
@@ -43,7 +49,26 @@ export function Toolbar() {
   return (
     <aside className="toolbar">
       <div className="toolbar-section">
-        <div className="toolbar-label">画笔</div>
+        <div className="toolbar-label">工具</div>
+        <div className="tool-grid">
+          {DRAWING_MODES.map(mode => {
+            const Icon = mode.icon;
+            return (
+              <button
+                key={mode.value}
+                className={`tool-btn action-btn ${drawingMode === mode.value ? 'active' : ''}`}
+                onClick={() => setDrawingMode(mode.value)}
+                title={mode.label}
+              >
+                <Icon size={18} />
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      <div className="toolbar-section">
+        <div className="toolbar-label">颜色</div>
         <div className="color-grid">
           {COLORS.map(c => (
             <button
