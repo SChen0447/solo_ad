@@ -1,0 +1,121 @@
+.preview-card {
+  width: 300px;
+  background: #ffffff;
+  border: 0.5px solid #e8e8e8;
+  border-radius: 4px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  position: relative;
+}
+
+.preview-card--exiting {
+  animation: shrinkFade 0.3s ease forwards;
+}
+
+@keyframes shrinkFade {
+  from {
+    opacity: 1;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: scale(0.8);
+  }
+}
+
+.preview-card--entering {
+  animation: slideIn 0.3s ease forwards;
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.preview-card__delete {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 22px;
+  height: 22px;
+  border: none;
+  background: rgba(0, 0, 0, 0.06);
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 14px;
+  color: #999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  z-index: 2;
+  line-height: 1;
+  opacity: 0;
+}
+
+.preview-card:hover .preview-card__delete {
+  opacity: 1;
+}
+
+.preview-card__delete:hover {
+  background: #ff4d4f;
+  color: #fff;
+}
+
+.preview-card__content {
+  flex: 1;
+  padding: 24px 20px;
+  overflow-wrap: break-word;
+  word-break: break-word;
+  white-space: pre-wrap;
+  transition: transform 0.2s ease;
+}
+
+.preview-card__content--flash {
+  animation: bgFlash 0.2s ease;
+}
+
+@keyframes bgFlash {
+  0% {
+    background-color: #f0f0f0;
+  }
+  100% {
+    background-color: #ffffff;
+  }
+}
+
+.preview-card__text {
+  transition: opacity 0.15s ease;
+}
+
+.preview-card__text--fading {
+  opacity: 0;
+}
+
+.preview-card__footer {
+  padding: 10px 16px;
+  border-top: 1px solid #f0f0f0;
+  display: flex;
+  justify-content: space-between;
+  background: #fafafa;
+}
+
+.preview-card__footer-item {
+  font-size: 11px;
+  color: #999;
+  font-weight: 500;
+}
+
+.preview-card__footer-item strong {
+  color: #1a73e8;
+  font-weight: 600;
+  margin-left: 4px;
+}
