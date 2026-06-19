@@ -9,10 +9,16 @@ export interface GridCell {
   targetHeight: number;
   baseColor: THREE.Color;
   targetColor: THREE.Color;
+  colorTransitionProgress: number;
+  colorTransitionDuration: number;
   isHovered: boolean;
   isSelected: boolean;
   hoverOffset: number;
   targetHoverOffset: number;
+  hoverTransitionProgress: number;
+  hoverTransitionStartValue: number;
+  hoverTransitionTargetValue: number;
+  hoverTransitionDuration: number;
 }
 
 export interface CityGridOptions {
@@ -159,10 +165,16 @@ export class CityGrid {
           targetHeight: 0.05,
           baseColor: new THREE.Color(0x3a7bd5),
           targetColor: new THREE.Color(0x3a7bd5),
+          colorTransitionProgress: 1,
+          colorTransitionDuration: 0.5,
           isHovered: false,
           isSelected: false,
           hoverOffset: 0,
-          targetHoverOffset: 0
+          targetHoverOffset: 0,
+          hoverTransitionProgress: 1,
+          hoverTransitionStartValue: 0,
+          hoverTransitionTargetValue: 0,
+          hoverTransitionDuration: 0.2
         };
       }
     }
@@ -247,7 +259,7 @@ export class CityGrid {
 
     canvas.addEventListener('mouseleave', () => {
       if (this.hoveredCell) {
-        this.hoveredCell.targetHoverOffset = 0;
+        this.startHoverTransition(this.hoveredCell, 0);
         this.hoveredCell.isHovered = false;
         this.hoveredCell = null;
       }
@@ -274,10 +286,10 @@ export class CityGrid {
 
       if (this.hoveredCell !== cell) {
         if (this.hoveredCell) {
-          this.hoveredCell.targetHoverOffset = 0;
+          this.startHoverTransition(this.hoveredCell, 0);
           this.hoveredCell.isHovered = false;
         }
-        cell.targetHoverOffset = 0.1;
+        this.startHoverTransition(cell, 0.1);
         cell.isHovered = true;
         this.hoveredCell = cell;
       }
@@ -287,7 +299,7 @@ export class CityGrid {
       }
     } else {
       if (this.hoveredCell) {
-        this.hoveredCell.targetHoverOffset = 0;
+        this.startHoverTransition(this.hoveredCell, 0);
         this.hoveredCell.isHovered = false;
         this.hoveredCell = null;
       }
@@ -295,6 +307,16 @@ export class CityGrid {
         this.onCellHoverCallback(null, event);
       }
     }
+  }
+
+  private startHoverTransition(cell: GridCell, targetValue: number): void {
+    if (cell.hoverTransitionTargetValue === targetValue && cell.hoverTransitionProgress >= 1) {
+      return;
+    }
+    cell.hoverTransitionStartValue = cell.hoverOffset;
+    cell.hoverTransitionTargetValue = targetValue;
+    cell.hoverTransitionProgress = 0;
+    cell.targetHoverOffset = targetValue;
   }
 
   private handleClick(event: MouseEvent): void {
@@ -339,7 +361,18 @@ export class CityGrid {
         const cell = this.gridCells[row][col];
 
         cell.baseHeight += (cell.targetHeight - cell.baseHeight) * delta * 2;
-        cell.hoverOffset += (cell.targetHoverOffset - cell.hoverOffset) * delta * 5;
+
+        if (cell.hoverTransitionProgress < 1) {
+          cell.hoverTransitionProgress = Math.min(1, cell.hoverTransitionProgress + delta / cell.hoverTransitionDuration);
+          let easedProgress: number;
+          if (cell.hoverTransitionTargetValue > cell.hoverTransitionStartValue) {
+            easedProgress = this.easeOutBack(cell.hoverTransitionProgress);
+          } else {
+            easedProgress = this.easeInCubic(cell.hoverTransitionProgress);
+          }
+          cell.hoverOffset = cell.hoverTransitionStartValue +
+            (cell.hoverTransitionTargetValue - cell.hoverTransitionStartValue) * easedProgress;
+        }
 
         const totalHeight = cell.baseHeight + cell.hoverOffset;
         cell.mesh.position.y = totalHeight;
@@ -347,8 +380,13 @@ export class CityGrid {
         cell.edge.position.y = totalHeight;
         cell.edge.scale.y = totalHeight / 0.05;
 
-        const material = cell.mesh.material as THREE.MeshStandardMaterial;
-        material.color.lerpColors(cell.baseColor, cell.targetColor, 1);
+        if (cell.colorTransitionProgress < 1) {
+          cell.colorTransitionProgress = Math.min(1, cell.colorTransitionProgress + delta / cell.colorTransitionDuration);
+          const easedProgress = this.easeInOutCubic(cell.colorTransitionProgress);
+
+          const material = cell.mesh.material as THREE.MeshStandardMaterial;
+          material.color.lerpColors(cell.baseColor, cell.targetColor, easedProgress);
+        }
 
         const edgeMaterial = cell.edge.material as THREE.LineBasicMaterial;
         if (cell.isSelected) {
@@ -364,10 +402,33 @@ export class CityGrid {
     this.renderer.render(this.scene, this.camera);
   };
 
+  private easeOutCubic(t: number): number {
+    return 1 - Math.pow(1 - t, 3);
+  }
+
+  private easeOutBack(t: number): number {
+    const c1 = 1.70158;
+    const c3 = c1 + 1;
+    return 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2);
+  }
+
+  private easeInCubic(t: number): number {
+    return t * t * t;
+  }
+
+  private easeInOutCubic(t: number): number {
+    return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+  }
+
   public setCellData(row: number, col: number, color: THREE.Color, height: number): void {
     if (row >= 0 && row < this.gridSize && col >= 0 && col < this.gridSize) {
       const cell = this.gridCells[row][col];
+
+      const currentColor = (cell.mesh.material as THREE.MeshStandardMaterial).color;
+      cell.baseColor.copy(currentColor);
       cell.targetColor = color.clone();
+      cell.colorTransitionProgress = 0;
+
       cell.targetHeight = 0.05 + height;
     }
   }
@@ -375,8 +436,12 @@ export class CityGrid {
   public setCellDataSmooth(row: number, col: number, color: THREE.Color, height: number): void {
     if (row >= 0 && row < this.gridSize && col >= 0 && col < this.gridSize) {
       const cell = this.gridCells[row][col];
-      cell.baseColor.copy(cell.targetColor);
+
+      const currentColor = (cell.mesh.material as THREE.MeshStandardMaterial).color;
+      cell.baseColor.copy(currentColor);
       cell.targetColor = color.clone();
+      cell.colorTransitionProgress = 0;
+
       cell.baseHeight = cell.targetHeight;
       cell.targetHeight = 0.05 + height;
     }

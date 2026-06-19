@@ -26,10 +26,11 @@ export class HeatmapManager {
   private noonData: number[][] = [];
   private eveningData: number[][] = [];
 
-  private colorScale: d3.ScaleLinear<string, string>;
+  private colorScale: d3.ScaleSequential<string>;
   private minTemp = 20;
   private maxTemp = 45;
   private maxHeight = 0.3;
+  private terrainHeight: number[][] = [];
 
   private isTransitioning = false;
   private transitionDuration = 1000;
@@ -44,12 +45,11 @@ export class HeatmapManager {
     this.cityGrid = cityGrid;
     this.gridSize = cityGrid.getGridSize();
 
-    this.colorScale = d3.scaleLinear<string>()
-      .domain([this.minTemp, (this.minTemp + this.maxTemp) / 2, this.maxTemp])
-      .range(['#0D47A1', '#4FC3F7', '#D32F2F'])
-      .clamp(true);
+    this.colorScale = d3.scaleSequential<string>(d3.interpolateRdYlBu)
+      .domain([this.maxTemp, this.minTemp]);
 
     this.generateRegionLabels();
+    this.generateTerrainHeight();
     this.generateHeatmapData();
     this.initializeHeatmap();
   }
@@ -63,6 +63,65 @@ export class HeatmapManager {
         const num = (col + 1).toString().padStart(2, '0');
         this.regionLabels[row][col] = `${letter}-${num}`;
       }
+    }
+  }
+
+  private generateTerrainHeight(): void {
+    for (let row = 0; row < this.gridSize; row++) {
+      this.terrainHeight[row] = [];
+      for (let col = 0; col < this.gridSize; col++) {
+        const nx = col / this.gridSize;
+        const ny = row / this.gridSize;
+
+        let height = 0;
+        let amplitude = 1;
+        let frequency = 1;
+        let maxValue = 0;
+
+        for (let octave = 0; octave < 4; octave++) {
+          const wave1 = Math.sin(nx * frequency * 2.5 + 0.3) * Math.cos(ny * frequency * 2.8 + 0.7);
+          const wave2 = Math.sin(nx * frequency * 4.2 - ny * frequency * 3.1 + 1.5) * 0.6;
+          const wave3 = Math.cos(nx * frequency * 1.8 + 2.1) * Math.sin(ny * frequency * 2.2 - 0.4) * 0.4;
+
+          height += (wave1 + wave2 + wave3) * amplitude;
+          maxValue += amplitude * 2.0;
+          amplitude *= 0.5;
+          frequency *= 2.0;
+        }
+
+        const normalizedHeight = (height / maxValue + 1) * 0.5;
+        this.terrainHeight[row][col] = normalizedHeight;
+      }
+    }
+
+    this.smoothTerrain();
+  }
+
+  private smoothTerrain(): void {
+    const iterations = 2;
+    for (let iter = 0; iter < iterations; iter++) {
+      const smoothed: number[][] = [];
+      for (let row = 0; row < this.gridSize; row++) {
+        smoothed[row] = [];
+        for (let col = 0; col < this.gridSize; col++) {
+          let sum = 0;
+          let count = 0;
+
+          for (let dr = -1; dr <= 1; dr++) {
+            for (let dc = -1; dc <= 1; dc++) {
+              const nr = row + dr;
+              const nc = col + dc;
+              if (nr >= 0 && nr < this.gridSize && nc >= 0 && nc < this.gridSize) {
+                const weight = (dr === 0 && dc === 0) ? 4 : 1;
+                sum += this.terrainHeight[nr][nc] * weight;
+                count += weight;
+              }
+            }
+          }
+          smoothed[row][col] = sum / count;
+        }
+      }
+      this.terrainHeight = smoothed;
     }
   }
 
@@ -84,8 +143,9 @@ export class HeatmapManager {
         const noise2 = this.noise(row * noiseScale * 0.5, col * noiseScale * 0.5, 3);
         const combinedNoise = (noise1 + noise2 * 0.5) / 1.5;
 
+        const terrainBias = this.terrainHeight[row][col] * 0.25;
         const centerHeat = (1 - distFromCenter) * 0.4;
-        const heatFactor = centerHeat + combinedNoise * 0.6;
+        const heatFactor = centerHeat + combinedNoise * 0.6 + terrainBias;
 
         const morningBase = 20 + heatFactor * 10;
         this.morningData[row][col] = morningBase + (Math.random() - 0.5) * 2;
@@ -130,9 +190,11 @@ export class HeatmapManager {
     return new THREE.Color(colorStr);
   }
 
-  private getHeight(temperature: number): number {
-    const normalized = (temperature - this.minTemp) / (this.maxTemp - this.minTemp);
-    return normalized * this.maxHeight;
+  private getHeight(temperature: number, row: number, col: number): number {
+    const tempNormalized = (temperature - this.minTemp) / (this.maxTemp - this.minTemp);
+    const terrainBase = this.terrainHeight[row][col] * this.maxHeight * 0.7;
+    const tempHeight = tempNormalized * this.maxHeight * 0.3;
+    return terrainBase + tempHeight;
   }
 
   private initializeHeatmap(): void {
@@ -142,7 +204,7 @@ export class HeatmapManager {
       for (let col = 0; col < this.gridSize; col++) {
         const temp = data[row][col];
         const color = this.getColor(temp);
-        const height = this.getHeight(temp);
+        const height = this.getHeight(temp, row, col);
         this.cityGrid.setCellData(row, col, color, height);
       }
     }
@@ -170,7 +232,7 @@ export class HeatmapManager {
           const currentTemp = oldTemp + (newTemp - oldTemp) * easedProgress;
 
           const color = this.getColor(currentTemp);
-          const height = this.getHeight(currentTemp);
+          const height = this.getHeight(currentTemp, row, col);
 
           this.cityGrid.setCellData(row, col, color, height);
         }
