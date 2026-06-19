@@ -179,21 +179,36 @@ export class SceneManager {
   }
 
   private onClick(event: MouseEvent): void {
+    if (event.button !== 0) return;
+
     this.mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
     this.mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
 
     this.raycaster.setFromCamera(this.mouse, this.camera);
-    const intersects = this.raycaster.intersectObjects(this.markers);
+
+    const intersects = this.raycaster.intersectObjects(this.markers, true);
 
     if (intersects.length > 0) {
-      const marker = intersects[0].object as THREE.Mesh;
-      this.selectMarker(marker.userData.id);
-    } else {
-      this.deselectAllMarkers();
+      let clickedObject = intersects[0].object as THREE.Mesh;
+      while (clickedObject.parent && !clickedObject.userData.hasOwnProperty('id')) {
+        clickedObject = clickedObject.parent as THREE.Mesh;
+      }
+
+      if (clickedObject.userData.hasOwnProperty('id')) {
+        const markerId = clickedObject.userData.id;
+        event.preventDefault();
+        event.stopPropagation();
+        this.selectMarker(markerId);
+        return;
+      }
     }
+
+    this.deselectAllMarkers();
   }
 
   private selectMarker(id: number): void {
+    if (id < 0 || id >= this.markers.length) return;
+
     this.deselectAllMarkers();
     this.selectedMarker = id;
 
@@ -217,6 +232,7 @@ export class SceneManager {
   private animateMarkerFlash(marker: THREE.Mesh, times: number): void {
     const material = marker.material as THREE.MeshBasicMaterial;
     const flashDuration = 0.2;
+    const totalDuration = flashDuration * times * 2;
     let elapsed = 0;
     const startTime = this.clock.getElapsedTime();
 
@@ -224,10 +240,12 @@ export class SceneManager {
       const now = this.clock.getElapsedTime();
       elapsed = now - startTime;
 
-      const phase = Math.floor(elapsed / flashDuration) % 2;
-      material.opacity = phase === 0 ? 0.3 : 0.9;
+      if (elapsed < totalDuration) {
+        const cycleTime = elapsed % (flashDuration * 2);
+        const t = cycleTime / flashDuration;
+        const easeT = t < 1 ? this.easeOutQuad(t) : this.easeOutQuad(2 - t);
+        material.opacity = 0.3 + easeT * 0.6;
 
-      if (elapsed < flashDuration * times * 2) {
         requestAnimationFrame(flash);
       } else {
         material.opacity = 0.9;
@@ -235,6 +253,10 @@ export class SceneManager {
     };
 
     flash();
+  }
+
+  private easeOutQuad(t: number): number {
+    return 1 - (1 - t) * (1 - t);
   }
 
   private showInfoLabel(markerId: number): void {

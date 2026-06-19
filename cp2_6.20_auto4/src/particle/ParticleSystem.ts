@@ -32,6 +32,9 @@ export class ParticleSystem {
   private terrainHeights: Float32Array | null = null;
   private terrainSize: number = 80;
   private terrainSegments: number = 20;
+  private lowAreaParticles: Set<number> = new Set();
+  private lowAreaBoostFactor: number = 1.3;
+  private colorTransitionSpeed: number = 0.05;
 
   private time: number = 0;
 
@@ -192,12 +195,47 @@ export class ParticleSystem {
     const isDeposition = windSpeed < 3;
     const isStrongWind = windSpeed > 15;
 
+    if (isDeposition) {
+      this.manageLowAreaDensity();
+    } else {
+      this.lowAreaParticles.clear();
+    }
+
     for (let i = 0; i < this.particleCount; i++) {
       this.updateParticle(i, delta, isDeposition, isStrongWind);
     }
 
     this.positionsBuffer.set(this.positions.subarray(0, this.particleCount * 3));
     this.colorsBuffer.set(this.colors.subarray(0, this.particleCount * 3));
+  }
+
+  private manageLowAreaDensity(): void {
+    const lowAreaCount = this.lowAreaParticles.size;
+    const targetLowAreaCount = Math.floor(this.particleCount * 0.3 * this.lowAreaBoostFactor);
+
+    if (lowAreaCount < targetLowAreaCount) {
+      const toAdd = Math.min(50, targetLowAreaCount - lowAreaCount);
+      let added = 0;
+      let attempts = 0;
+
+      while (added < toAdd && attempts < 1000) {
+        const idx = Math.floor(Math.random() * this.particleCount);
+        attempts++;
+
+        if (!this.lowAreaParticles.has(idx)) {
+          const i3 = idx * 3;
+          const x = this.positions[i3];
+          const z = this.positions[i3 + 2];
+          const terrainHeight = this.getTerrainHeight(x, z);
+
+          if (terrainHeight < 1) {
+            this.lowAreaParticles.add(idx);
+            this.initSingleParticle(idx, true);
+            added++;
+          }
+        }
+      }
+    }
   }
 
   private updateParticle(
@@ -211,6 +249,7 @@ export class ParticleSystem {
     let y = this.positions[i3 + 1];
     let z = this.positions[i3 + 2];
 
+    const terrainHeight = this.getTerrainHeight(x, z);
     const windVel = this.windField.getWindVelocity(x, y, z);
 
     const floatAmplitude = 0.5 + (this.floatSpeeds[index] - 0.5) * 2;
@@ -229,9 +268,14 @@ export class ParticleSystem {
     }
 
     if (isDeposition) {
-      const terrainHeight = this.getTerrainHeight(x, z);
       if (terrainHeight < 1) {
-        velY -= 0.5 * delta;
+        velY -= 0.8 * delta;
+        velX *= 0.7;
+        velZ *= 0.7;
+
+        if (this.lowAreaParticles.has(index)) {
+          velY -= 0.5 * delta;
+        }
       }
     }
 
@@ -239,7 +283,6 @@ export class ParticleSystem {
     y += velY * delta;
     z += velZ * delta;
 
-    const terrainHeight = this.getTerrainHeight(x, z);
     const minY = terrainHeight;
     const maxY = 20;
 
@@ -276,26 +319,42 @@ export class ParticleSystem {
     terrainHeight: number
   ): void {
     const i3 = index * 3;
-    let color = new THREE.Color();
+    const targetColor = new THREE.Color();
 
     if (isStrongWind) {
       const t = Math.min(1, (this.params.windSpeed - 15) / 5);
+      const easeT = this.easeOutQuad(t);
       const baseColor = new THREE.Color(0xffa500);
       const whiteColor = new THREE.Color(0xffffff);
-      color = baseColor.clone().lerp(whiteColor, t);
+      targetColor.copy(baseColor).lerp(whiteColor, easeT);
     } else if (isDeposition && (y - terrainHeight) < 3 && terrainHeight < 1) {
-      const t = Math.min(1, (3 - (y - terrainHeight)) / 3);
+      const heightFactor = Math.min(1, (3 - (y - terrainHeight)) / 3);
+      const isLowAreaParticle = this.lowAreaParticles.has(index);
+      const depositFactor = isLowAreaParticle ? 0.8 : 0.5;
+      const t = heightFactor * depositFactor;
       const baseColor = new THREE.Color(0xdaa520);
       const depositColor = new THREE.Color(0xcd853f);
-      color = baseColor.clone().lerp(depositColor, t * 0.5);
+      targetColor.copy(baseColor).lerp(depositColor, t);
     } else {
       const heightT = y / 20;
-      color.setHSL(0.08 + heightT * 0.03, 0.8, 0.5 + heightT * 0.15);
+      targetColor.setHSL(0.08 + heightT * 0.03, 0.8, 0.5 + heightT * 0.15);
     }
 
-    this.colors[i3] = color.r;
-    this.colors[i3 + 1] = color.g;
-    this.colors[i3 + 2] = color.b;
+    const currentColor = new THREE.Color(
+      this.colors[i3],
+      this.colors[i3 + 1],
+      this.colors[i3 + 2]
+    );
+
+    currentColor.lerp(targetColor, this.colorTransitionSpeed);
+
+    this.colors[i3] = currentColor.r;
+    this.colors[i3 + 1] = currentColor.g;
+    this.colors[i3 + 2] = currentColor.b;
+  }
+
+  private easeOutQuad(t: number): number {
+    return 1 - (1 - t) * (1 - t);
   }
 
   private easeInOutQuad(t: number): number {

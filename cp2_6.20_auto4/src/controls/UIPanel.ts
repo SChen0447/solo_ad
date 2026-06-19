@@ -62,8 +62,10 @@ export class UIPanel {
     button.innerHTML = '⚙️';
     button.title = '控制面板';
     button.style.display = this.isMobile ? 'block' : 'none';
+    button.setAttribute('aria-label', '打开控制面板');
 
-    button.addEventListener('click', () => {
+    button.addEventListener('click', (e) => {
+      e.stopPropagation();
       this.togglePanel();
     });
 
@@ -74,18 +76,55 @@ export class UIPanel {
   private togglePanel(): void {
     this.isPanelVisible = !this.isPanelVisible;
     
-    if (this.isPanelVisible) {
-      this.gui.domElement.style.display = 'block';
-      this.gui.domElement.classList.add('panel-visible');
-      this.gui.domElement.classList.remove('panel-hidden');
+    const dom = this.gui.domElement;
+    
+    if (this.isMobile) {
+      if (this.isPanelVisible) {
+        dom.style.display = 'flex';
+        dom.style.flexDirection = 'column';
+        dom.style.alignItems = 'stretch';
+        dom.style.justifyContent = 'flex-start';
+        
+        requestAnimationFrame(() => {
+          dom.classList.add('panel-visible');
+          dom.classList.remove('panel-hidden');
+          dom.style.opacity = '1';
+          dom.style.transform = 'translateY(0)';
+        });
+        
+        document.body.style.overflow = 'hidden';
+        this.mobileToggle.innerHTML = '✕';
+        this.mobileToggle.setAttribute('aria-label', '关闭控制面板');
+      } else {
+        dom.classList.add('panel-hidden');
+        dom.classList.remove('panel-visible');
+        dom.style.opacity = '0';
+        dom.style.transform = 'translateY(-20px)';
+        
+        setTimeout(() => {
+          if (!this.isPanelVisible) {
+            dom.style.display = 'none';
+            document.body.style.overflow = '';
+          }
+        }, 300);
+        
+        this.mobileToggle.innerHTML = '⚙️';
+        this.mobileToggle.setAttribute('aria-label', '打开控制面板');
+      }
     } else {
-      this.gui.domElement.classList.add('panel-hidden');
-      this.gui.domElement.classList.remove('panel-visible');
-      setTimeout(() => {
-        if (!this.isPanelVisible) {
-          this.gui.domElement.style.display = 'none';
-        }
-      }, 300);
+      if (this.isPanelVisible) {
+        dom.style.display = 'block';
+        dom.classList.add('panel-visible');
+        dom.classList.remove('panel-hidden');
+      } else {
+        dom.classList.add('panel-hidden');
+        dom.classList.remove('panel-visible');
+        setTimeout(() => {
+          if (!this.isPanelVisible) {
+            dom.style.display = 'none';
+          }
+        }, 300);
+      }
     }
   }
 
@@ -101,7 +140,8 @@ export class UIPanel {
       .onChange((value: number) => {
         this.params.density = value;
         this.callbacks.onDensityChange(value);
-      });
+      })
+      .listen();
 
     dustFolder
       .add(paramsRecord, 'windSpeed', 0, 20, 0.5)
@@ -109,7 +149,8 @@ export class UIPanel {
       .onChange((value: number) => {
         this.params.windSpeed = value;
         this.callbacks.onWindSpeedChange(value);
-      });
+      })
+      .listen();
 
     dustFolder
       .add(paramsRecord, 'windDirection', 0, 360, 1)
@@ -117,7 +158,8 @@ export class UIPanel {
       .onChange((value: number) => {
         this.params.windDirection = value;
         this.callbacks.onWindDirectionChange(value);
-      });
+      })
+      .listen();
 
     dustFolder
       .add(paramsRecord, 'turbulence', 0, 1, 0.1)
@@ -125,7 +167,8 @@ export class UIPanel {
       .onChange((value: number) => {
         this.params.turbulence = value;
         this.callbacks.onTurbulenceChange(value);
-      });
+      })
+      .listen();
 
     const controlFolder = this.gui.addFolder('视图控制');
     controlFolder.open();
@@ -140,7 +183,46 @@ export class UIPanel {
       .onChange((value: boolean) => {
         this.params.isPaused = value;
         this.callbacks.onPauseToggle(value);
+      })
+      .listen();
+
+    this.setupSliderInteraction();
+  }
+
+  private setupSliderInteraction(): void {
+    const sliders = this.gui.domElement.querySelectorAll('.slider');
+    
+    sliders.forEach((slider) => {
+      slider.addEventListener('mouseenter', () => {
+        slider.classList.add('slider-hover');
       });
+
+      slider.addEventListener('mouseleave', () => {
+        slider.classList.remove('slider-hover');
+      });
+
+      slider.addEventListener('mousedown', () => {
+        slider.classList.add('slider-active');
+        slider.classList.remove('slider-hover');
+
+        const handleMouseUp = () => {
+          slider.classList.remove('slider-active');
+          document.removeEventListener('mouseup', handleMouseUp);
+        };
+
+        document.addEventListener('mouseup', handleMouseUp);
+      });
+
+      slider.addEventListener('touchstart', () => {
+        slider.classList.add('slider-active');
+      }, { passive: true });
+
+      slider.addEventListener('touchend', () => {
+        setTimeout(() => {
+          slider.classList.remove('slider-active');
+        }, 100);
+      });
+    });
   }
 
   private styleGUI(): void {
@@ -156,6 +238,7 @@ export class UIPanel {
     dom.style.borderRadius = '12px';
     dom.style.overflow = 'hidden';
     dom.style.transition = 'opacity 0.3s ease, transform 0.3s ease';
+    dom.style.boxShadow = '0 8px 32px rgba(0, 0, 0, 0.3)';
 
     if (this.isMobile) {
       dom.style.top = '0';
@@ -165,6 +248,14 @@ export class UIPanel {
       dom.style.borderRadius = '0';
       dom.style.border = 'none';
       dom.style.overflowY = 'auto';
+      dom.style.overflowX = 'hidden';
+      dom.style.padding = '60px 20px 20px';
+      dom.style.boxSizing = 'border-box';
+      dom.style.background = 'rgba(20, 20, 20, 0.95)';
+      dom.style.backdropFilter = 'blur(12px)';
+      (dom.style as CSSStyleDeclaration & { webkitBackdropFilter: string }).webkitBackdropFilter = 'blur(12px)';
+      dom.style.opacity = this.isPanelVisible ? '1' : '0';
+      dom.style.transform = this.isPanelVisible ? 'translateY(0)' : 'translateY(-20px)';
     }
 
     this.addCustomStyles();
@@ -194,19 +285,22 @@ export class UIPanel {
       .dg .slider {
         background: rgba(255, 255, 255, 0.1) !important;
         border-radius: 4px;
+        transition: all 0.2s ease;
       }
       
       .dg .slider-fg {
         background: #FFA500 !important;
         border-radius: 4px;
-        transition: background 0.2s ease;
+        transition: background 0.2s ease, transform 0.1s ease;
       }
       
-      .dg .slider:hover .slider-fg {
+      .dg .slider:hover .slider-fg,
+      .dg .slider.slider-hover .slider-fg {
         background: #FFB733 !important;
       }
       
-      .dg .slider:active .slider-fg {
+      .dg .slider:active .slider-fg,
+      .dg .slider.slider-active .slider-fg {
         background: #FFFFFF !important;
         transition: background 0.1s ease;
       }
@@ -331,6 +425,52 @@ export class UIPanel {
         .mobile-toggle {
           display: block;
         }
+        
+        .dg.ac {
+          position: fixed !important;
+          top: 0 !important;
+          left: 0 !important;
+          right: 0 !important;
+          bottom: 0 !important;
+          width: 100% !important;
+          height: 100% !important;
+          z-index: 1000 !important;
+        }
+        
+        .dg.main {
+          width: 100% !important;
+          max-width: 100% !important;
+          padding: 20px !important;
+          box-sizing: border-box !important;
+        }
+        
+        .dg .cr {
+          padding: 6px 4px !important;
+        }
+        
+        .dg .property-name {
+          font-size: 14px !important;
+          width: 45% !important;
+        }
+        
+        .dg .c {
+          width: 55% !important;
+        }
+        
+        .dg .slider {
+          height: 20px !important;
+        }
+        
+        .dg .title {
+          font-size: 16px !important;
+          padding: 12px 16px !important;
+        }
+        
+        .dg .button {
+          padding: 12px !important;
+          font-size: 16px !important;
+          margin-top: 8px !important;
+        }
       }
       
       .info-label {
@@ -393,6 +533,8 @@ export class UIPanel {
         if (this.isMobile) {
           this.isPanelVisible = false;
           this.gui.domElement.style.display = 'none';
+          document.body.style.overflow = '';
+          this.mobileToggle.innerHTML = '⚙️';
         } else {
           this.isPanelVisible = true;
           this.gui.domElement.style.display = 'block';
@@ -400,9 +542,31 @@ export class UIPanel {
           this.gui.domElement.style.left = '20px';
           this.gui.domElement.style.width = '280px';
           this.gui.domElement.style.height = 'auto';
+          this.gui.domElement.style.padding = '0';
+          document.body.style.overflow = '';
         }
         
         this.styleGUI();
+      }
+    });
+
+    if (this.isMobile) {
+      this.setupMobileCloseHandler();
+    }
+  }
+
+  private setupMobileCloseHandler(): void {
+    const dom = this.gui.domElement;
+    
+    dom.addEventListener('click', (e) => {
+      if (e.target === dom && this.isPanelVisible) {
+        this.togglePanel();
+      }
+    });
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && this.isPanelVisible && this.isMobile) {
+        this.togglePanel();
       }
     });
   }
