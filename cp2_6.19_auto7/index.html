@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>分子结构3D查看器</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: linear-gradient(180deg, #0b0f1a 0%, #1a2332 100%);
+      color: #ffffff;
+    }
+
+    #app {
+      width: 100%;
+      height: 100%;
+      position: relative;
+    }
+
+    #canvas-container {
+      width: 100%;
+      height: 100%;
+      position: absolute;
+      top: 0;
+      left: 0;
+    }
+
+    .control-panel {
+      position: fixed;
+      left: 20px;
+      top: 20px;
+      width: 260px;
+      background: rgba(30, 41, 59, 0.55);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border-radius: 16px;
+      padding: 20px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+      z-index: 10;
+    }
+
+    .control-panel h2 {
+      font-size: 16px;
+      font-weight: 600;
+      margin-bottom: 16px;
+      color: #e2e8f0;
+    }
+
+    .panel-section {
+      margin-bottom: 18px;
+    }
+
+    .panel-section:last-child {
+      margin-bottom: 0;
+    }
+
+    .panel-label {
+      font-size: 12px;
+      color: #94a3b8;
+      margin-bottom: 8px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .btn-group {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .btn-group-row {
+      display: flex;
+      gap: 8px;
+    }
+
+    .btn {
+      padding: 10px 14px;
+      border: none;
+      border-radius: 10px;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      background: rgba(71, 85, 105, 0.6);
+      color: #e2e8f0;
+      flex: 1;
+    }
+
+    .btn:hover {
+      background: rgba(100, 116, 139, 0.7);
+      filter: brightness(1.1);
+    }
+
+    .btn.active {
+      background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+      color: #ffffff;
+      box-shadow: 0 0 12px rgba(59, 130, 246, 0.4);
+    }
+
+    .molecule-info {
+      position: fixed;
+      left: 20px;
+      top: 20px;
+      margin-left: 300px;
+      background: rgba(30, 41, 59, 0.55);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border-radius: 12px;
+      padding: 12px 18px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      z-index: 10;
+    }
+
+    .molecule-name {
+      font-size: 18px;
+      font-weight: 600;
+      color: #f1f5f9;
+    }
+
+    .molecule-formula {
+      font-size: 13px;
+      color: #94a3b8;
+      margin-top: 2px;
+    }
+
+    .atom-tooltip {
+      position: fixed;
+      pointer-events: none;
+      background: rgba(15, 23, 42, 0.92);
+      color: #f1f5f9;
+      padding: 8px 12px;
+      border-radius: 8px;
+      font-size: 12px;
+      line-height: 1.6;
+      opacity: 0;
+      transform: translateY(4px);
+      transition: opacity 200ms ease, transform 200ms ease;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      z-index: 20;
+      white-space: nowrap;
+    }
+
+    .atom-tooltip.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    .atom-detail-panel {
+      position: fixed;
+      right: -320px;
+      top: 20px;
+      width: 300px;
+      background: rgba(15, 23, 42, 0.85);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border-radius: 16px;
+      padding: 20px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+      z-index: 10;
+      transition: right 300ms ease-out;
+    }
+
+    .atom-detail-panel.visible {
+      right: 20px;
+    }
+
+    .atom-detail-panel h3 {
+      font-size: 15px;
+      font-weight: 600;
+      color: #f1f5f9;
+      margin-bottom: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .close-btn {
+      background: none;
+      border: none;
+      color: #94a3b8;
+      font-size: 20px;
+      cursor: pointer;
+      padding: 0;
+      width: 24px;
+      height: 24px;
+      line-height: 1;
+      border-radius: 6px;
+      transition: all 0.2s;
+    }
+
+    .close-btn:hover {
+      background: rgba(255, 255, 255, 0.1);
+      color: #f1f5f9;
+    }
+
+    .detail-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 8px 0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+      font-size: 13px;
+    }
+
+    .detail-row:last-child {
+      border-bottom: none;
+    }
+
+    .detail-label {
+      color: #94a3b8;
+    }
+
+    .detail-value {
+      color: #e2e8f0;
+      font-family: 'SF Mono', 'Fira Code', monospace;
+    }
+
+    .reset-btn {
+      position: fixed;
+      right: 20px;
+      bottom: 20px;
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      background: rgba(30, 41, 59, 0.75);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      color: #e2e8f0;
+      font-size: 20px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s ease;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+      z-index: 10;
+    }
+
+    .reset-btn:hover {
+      background: rgba(71, 85, 105, 0.85);
+      filter: brightness(1.1);
+      transform: scale(1.05);
+    }
+
+    .mobile-toggle {
+      display: none;
+      position: fixed;
+      left: 20px;
+      bottom: 20px;
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      background: rgba(30, 41, 59, 0.75);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      color: #e2e8f0;
+      font-size: 18px;
+      cursor: pointer;
+      align-items: center;
+      justify-content: center;
+      z-index: 15;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+    }
+
+    @media (max-width: 768px) {
+      .mobile-toggle {
+        display: flex;
+      }
+
+      .control-panel {
+        left: 0;
+        right: 0;
+        bottom: -100%;
+        top: auto;
+        width: 100%;
+        border-radius: 20px 20px 0 0;
+        transition: bottom 300ms ease-out;
+      }
+
+      .control-panel.open {
+        bottom: 0;
+      }
+
+      .molecule-info {
+        margin-left: 0;
+        left: 20px;
+        top: 20px;
+      }
+
+      .atom-detail-panel {
+        width: calc(100% - 40px);
+      }
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <div id="canvas-container"></div>
+
+    <div class="molecule-info">
+      <div class="molecule-name" id="molecule-name">苯</div>
+      <div class="molecule-formula" id="molecule-formula">C₆H₆</div>
+    </div>
+
+    <div class="control-panel" id="control-panel">
+      <h2>分子查看器</h2>
+      <div class="panel-section">
+        <div class="panel-label">选择分子</div>
+        <div class="btn-group" id="molecule-buttons">
+          <button class="btn" data-molecule="methane">甲烷 (CH₄)</button>
+          <button class="btn active" data-molecule="benzene">苯 (C₆H₆)</button>
+          <button class="btn" data-molecule="glucose">葡萄糖 (C₆H₁₂O₆)</button>
+        </div>
+      </div>
+      <div class="panel-section">
+        <div class="panel-label">显示模式</div>
+        <div class="btn-group-row">
+          <button class="btn active" data-mode="ballstick">球棍模型</button>
+          <button class="btn" data-mode="wireframe">线框模型</button>
+        </div>
+      </div>
+    </div>
+
+    <button class="mobile-toggle" id="mobile-toggle">☰</button>
+
+    <div class="atom-detail-panel" id="atom-detail">
+      <h3>
+        <span>原子详情</span>
+        <button class="close-btn" id="close-detail">×</button>
+      </h3>
+      <div class="detail-row">
+        <span class="detail-label">元素类型</span>
+        <span class="detail-value" id="detail-element">-</span>
+      </div>
+      <div class="detail-row">
+        <span class="detail-label">坐标 X</span>
+        <span class="detail-value" id="detail-x">-</span>
+      </div>
+      <div class="detail-row">
+        <span class="detail-label">坐标 Y</span>
+        <span class="detail-value" id="detail-y">-</span>
+      </div>
+      <div class="detail-row">
+        <span class="detail-label">坐标 Z</span>
+        <span class="detail-value" id="detail-z">-</span>
+      </div>
+      <div class="detail-row">
+        <span class="detail-label">相邻原子数</span>
+        <span class="detail-value" id="detail-neighbors">-</span>
+      </div>
+    </div>
+
+    <div class="atom-tooltip" id="atom-tooltip"></div>
+
+    <button class="reset-btn" id="reset-view" title="重置视角">↺</button>
+  </div>
+
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
