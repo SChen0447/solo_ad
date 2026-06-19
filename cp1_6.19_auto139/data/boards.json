@@ -1,0 +1,82 @@
+{
+  "boards": [
+    {
+      "id": "board-abstract-001",
+      "name": "抽象探索",
+      "themeColor": "#9b59b6",
+      "cards": [
+        {
+          "id": "card-abs-001",
+          "type": "text",
+          "content": {
+            "title": "创作灵感",
+            "body": "## 今日思考\n\n抽象艺术的核心在于**情感的表达**而非具象的描绘。\n\n### 要点\n- 色彩的韵律感\n- 线条的流动感\n- 空间的呼吸感"
+          },
+          "x": 100,
+          "y": 80,
+          "createdAt": 1710000000000,
+          "updatedAt": 1710000000000
+        },
+        {
+          "id": "card-abs-002",
+          "type": "image",
+          "content": {
+            "url": "https://images.unsplash.com/photo-1541701494587-cb58502866ab?w=400",
+            "caption": "参考图：色彩流动"
+          },
+          "x": 350,
+          "y": 80,
+          "createdAt": 1710000100000,
+          "updatedAt": 1710000100000
+        },
+        {
+          "id": "card-abs-003",
+          "type": "color",
+          "content": {
+            "name": "紫罗兰梦境",
+            "color": "#8e44ad"
+          },
+          "x": 220,
+          "y": 280,
+          "createdAt": 1710000200000,
+          "updatedAt": 1710000200000
+        }
+      ],
+      "createdAt": 1710000000000,
+      "updatedAt": 1710000200000
+    },
+    {
+      "id": "board-color-002",
+      "name": "色彩实验",
+      "themeColor": "#e74c3c",
+      "cards": [
+        {
+          "id": "card-color-001",
+          "type": "color",
+          "content": {
+            "name": "日落橙",
+            "color": "#e67e22"
+          },
+          "x": 120,
+          "y": 100,
+          "createdAt": 1710001000000,
+          "updatedAt": 1710001000000
+        },
+        {
+          "id": "card-color-002",
+          "type": "text",
+          "content": {
+            "title": "色彩搭配笔记",
+            "body": "**互补色搭配**\n\n橙色 + 蓝色 = 活力四射\n红色 + 青色 = 强烈对比\n\n**类似色搭配**\n红色 → 橙色 → 黄色"
+          },
+          "x": 380,
+          "y": 100,
+          "createdAt": 1710001100000,
+          "updatedAt": 1710001100000
+        }
+      ],
+      "createdAt": 1710001000000,
+      "updatedAt": 1710001100000
+    }
+  ]
+}
