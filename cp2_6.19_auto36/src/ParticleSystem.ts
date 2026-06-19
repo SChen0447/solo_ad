@@ -30,6 +30,7 @@ export interface ParticleSystemConfig {
   attractionRadius?: number
   attractionStrength?: number
   swirlStrength?: number
+  glowIntensity?: number
 }
 
 export class ParticleSystem {
@@ -49,6 +50,7 @@ export class ParticleSystem {
   private attractionRadius: number
   private attractionStrength: number
   private swirlStrength: number
+  private glowIntensity: number
   private time: number = 0
   private colorTransitionProgress: number = 1
   private fistRadius: number = 80
@@ -59,6 +61,7 @@ export class ParticleSystem {
     this.attractionRadius = config.attractionRadius ?? 100
     this.attractionStrength = config.attractionStrength ?? 0.05
     this.swirlStrength = config.swirlStrength ?? 0.8
+    this.glowIntensity = config.glowIntensity ?? 1.0
 
     this.positions = new Float32Array(count * 3)
     this.velocities = new Float32Array(count * 3)
@@ -77,47 +80,38 @@ export class ParticleSystem {
 
     const material = new THREE.ShaderMaterial({
       uniforms: {
-        time: { value: 0 }
+        glowIntensity: { value: this.glowIntensity }
       },
       vertexShader: `
         attribute float size;
         varying vec3 vColor;
-        varying float vSize;
-        varying vec3 vWorldPosition;
+        varying float vDistance;
         void main() {
           vColor = color;
-          vSize = size;
           vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
-          vWorldPosition = position;
+          vDistance = -mvPosition.z;
           gl_PointSize = size * (300.0 / -mvPosition.z);
           gl_Position = projectionMatrix * mvPosition;
         }
       `,
       fragmentShader: `
+        uniform float glowIntensity;
         varying vec3 vColor;
-        varying float vSize;
-        varying vec3 vWorldPosition;
+        varying float vDistance;
         void main() {
           vec2 center = gl_PointCoord - vec2(0.5);
           float dist = length(center);
           if (dist > 0.5) discard;
 
-          float core = 1.0 - smoothstep(0.0, 0.2, dist);
-          float innerGlow = 1.0 - smoothstep(0.0, 0.4, dist);
-          float outerGlow = 1.0 - smoothstep(0.15, 0.5, dist);
+          float alpha = 1.0 - smoothstep(0.0, 0.5, dist);
 
-          float alpha = innerGlow * 0.95 + outerGlow * 0.35;
+          float distanceFactor = 300.0 / max(vDistance, 1.0);
+          float intensity = glowIntensity * distanceFactor;
+          intensity = clamp(intensity, 0.3, 2.5);
 
-          vec3 coreColor = vColor * 2.0;
-          vec3 glowColor = vColor * 1.3;
-          vec3 haloColor = vColor * 0.7;
+          vec3 finalColor = vColor * intensity;
 
-          vec3 finalColor = coreColor * core + glowColor * innerGlow + haloColor * outerGlow * 0.5;
-
-          float flare = pow(1.0 - dist, 4.0);
-          finalColor += vColor * flare * 0.5;
-
-          gl_FragColor = vec4(finalColor, clamp(alpha, 0.0, 1.0));
+          gl_FragColor = vec4(finalColor, alpha);
         }
       `,
       transparent: true,
@@ -373,6 +367,14 @@ export class ParticleSystem {
 
   setSwirlStrength(strength: number): void {
     this.swirlStrength = strength
+  }
+
+  setGlowIntensity(intensity: number): void {
+    this.glowIntensity = intensity
+    const material = this.particles.material as THREE.ShaderMaterial
+    if (material.uniforms && material.uniforms.glowIntensity) {
+      material.uniforms.glowIntensity.value = intensity
+    }
   }
 
   dispose(): void {

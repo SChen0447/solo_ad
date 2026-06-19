@@ -2,6 +2,14 @@ import * as THREE from 'three'
 import { HandTracker, HandData } from './HandTracker'
 import { ParticleSystem, ThemeType } from './ParticleSystem'
 
+interface CaptureConfig {
+  showWatermark?: boolean
+  watermarkOffsetX?: number
+  watermarkOffsetY?: number
+  watermarkText?: string
+  showTimestamp?: boolean
+}
+
 class App {
   private scene: THREE.Scene
   private camera: THREE.PerspectiveCamera
@@ -17,6 +25,13 @@ class App {
   private frameCount: number = 0
   private lastFpsUpdate: number = 0
   private currentHandData: HandData | null = null
+  private captureConfig: Required<CaptureConfig> = {
+    showWatermark: true,
+    watermarkOffsetX: 24,
+    watermarkOffsetY: 28,
+    watermarkText: 'Gesture Particle Canvas',
+    showTimestamp: true
+  }
 
   constructor() {
     this.videoElement = document.getElementById('video') as HTMLVideoElement
@@ -163,6 +178,10 @@ class App {
     }
   }
 
+  setCaptureConfig(config: CaptureConfig): void {
+    this.captureConfig = { ...this.captureConfig, ...config }
+  }
+
   private captureImage(): void {
     const compositeCanvas = document.createElement('canvas')
     const width = window.innerWidth
@@ -179,21 +198,24 @@ class App {
     ctx.fillStyle = gradient
     ctx.fillRect(0, 0, width, height)
 
-    if (this.videoElement.readyState >= 2) {
-      const videoRatio = this.videoElement.videoWidth / this.videoElement.videoHeight
+    if (this.videoElement.readyState >= 2 && this.videoElement.videoWidth > 0) {
+      const videoW = this.videoElement.videoWidth
+      const videoH = this.videoElement.videoHeight
+      const videoRatio = videoW / videoH
       const canvasRatio = width / height
-      let drawWidth: number, drawHeight: number, offsetX: number, offsetY: number
+
+      let sx: number, sy: number, sWidth: number, sHeight: number
 
       if (videoRatio > canvasRatio) {
-        drawHeight = height
-        drawWidth = height * videoRatio
-        offsetX = (width - drawWidth) / 2
-        offsetY = 0
+        sHeight = videoH
+        sWidth = videoH * canvasRatio
+        sx = (videoW - sWidth) / 2
+        sy = 0
       } else {
-        drawWidth = width
-        drawHeight = width / videoRatio
-        offsetX = 0
-        offsetY = (height - drawHeight) / 2
+        sWidth = videoW
+        sHeight = videoW / canvasRatio
+        sx = 0
+        sy = (videoH - sHeight) / 2
       }
 
       ctx.save()
@@ -203,10 +225,8 @@ class App {
       try {
         ctx.drawImage(
           this.videoElement,
-          -offsetX - (width - drawWidth),
-          offsetY,
-          drawWidth,
-          drawHeight
+          sx, sy, sWidth, sHeight,
+          0, 0, width, height
         )
       } catch (e) {
         console.warn('Video frame capture failed:', e)
@@ -222,19 +242,23 @@ class App {
 
     ctx.drawImage(this.threeCanvas, 0, 0, width, height)
 
-    const watermarkCanvas = document.createElement('canvas')
-    watermarkCanvas.width = width
-    watermarkCanvas.height = height
-    const wctx = watermarkCanvas.getContext('2d')!
-    wctx.font = '14px monospace'
-    wctx.fillStyle = 'rgba(0, 255, 255, 0.4)'
-    wctx.textAlign = 'left'
-    wctx.fillText('Gesture Particle Canvas', 24, height - 28)
-    wctx.font = '12px monospace'
-    wctx.fillStyle = 'rgba(255, 255, 255, 0.25)'
-    const now = new Date()
-    wctx.fillText(now.toLocaleString(), 24, height - 10)
-    ctx.drawImage(watermarkCanvas, 0, 0)
+    if (this.captureConfig.showWatermark) {
+      const offsetX = this.captureConfig.watermarkOffsetX
+      const offsetY = this.captureConfig.watermarkOffsetY
+      let yPos = height - offsetY
+
+      ctx.font = '14px monospace'
+      ctx.fillStyle = 'rgba(0, 255, 255, 0.4)'
+      ctx.textAlign = 'left'
+      ctx.fillText(this.captureConfig.watermarkText, offsetX, yPos)
+
+      if (this.captureConfig.showTimestamp) {
+        yPos += 18
+        ctx.font = '12px monospace'
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.25)'
+        ctx.fillText(new Date().toLocaleString(), offsetX, yPos)
+      }
+    }
 
     try {
       const link = document.createElement('a')

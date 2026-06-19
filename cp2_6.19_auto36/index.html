@@ -75,9 +75,9 @@
       display: flex;
       gap: 16px;
       padding: 16px 24px;
-      background: rgba(30, 30, 80, 0.85);
-      backdrop-filter: blur(20px) saturate(1.5);
+      background: rgba(30, 30, 80, 0.6);
       -webkit-backdrop-filter: blur(20px) saturate(1.5);
+      backdrop-filter: blur(20px) saturate(1.5);
       border: 1px solid rgba(255, 255, 255, 0.2);
       border-radius: 50px;
       z-index: 10;
@@ -87,31 +87,20 @@
         inset 0 1px 0 rgba(255, 255, 255, 0.1);
     }
 
-    @supports not ((backdrop-filter: blur(20px)) or (-webkit-backdrop-filter: blur(20px))) {
+    @supports not ((-webkit-backdrop-filter: blur(20px)) or (backdrop-filter: blur(20px))) {
       #toolbar {
         background: rgba(20, 20, 55, 0.95);
       }
     }
 
     .toolbar-btn {
-      --btn-glow: 0;
-      --btn-shadow-x: 0;
-      --btn-shadow-y: 0;
-      --btn-shadow-blur: 8px;
-      --btn-shadow-spread: 0px;
-      --btn-shadow-color: rgba(0, 255, 255, 0);
-      --btn-scale: 1;
-      --btn-translate-y: 0;
-      --btn-border-color: rgba(255, 255, 255, 0.3);
-      --btn-bg-color: rgba(255, 255, 255, 0.1);
-
       width: 52px;
       height: 52px;
       border-radius: 50%;
-      border: 1px solid var(--btn-border-color);
-      background: var(--btn-bg-color);
-      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 255, 255, 0.3);
+      background: rgba(255, 255, 255, 0.08);
       -webkit-backdrop-filter: blur(10px);
+      backdrop-filter: blur(10px);
       cursor: pointer;
       display: flex;
       align-items: center;
@@ -124,31 +113,15 @@
       position: relative;
       overflow: hidden;
       box-shadow:
-        0 var(--btn-shadow-y) var(--btn-shadow-blur) var(--btn-shadow-spread) var(--btn-shadow-color),
+        0 2px 8px rgba(0, 0, 0, 0.2),
         inset 0 1px 0 rgba(255, 255, 255, 0.1);
-      transform: translateY(var(--btn-translate-y)) scale(var(--btn-scale));
       flex-shrink: 0;
     }
 
-    @supports not ((backdrop-filter: blur(10px)) or (-webkit-backdrop-filter: blur(10px))) {
+    @supports not ((-webkit-backdrop-filter: blur(10px)) or (backdrop-filter: blur(10px))) {
       .toolbar-btn {
         background: rgba(40, 40, 90, 0.9);
       }
-    }
-
-    .toolbar-btn::before {
-      content: '';
-      position: absolute;
-      inset: -2px;
-      border-radius: 50%;
-      background: radial-gradient(
-        circle at center,
-        rgba(0, 255, 255, calc(var(--btn-glow) * 0.3)) 0%,
-        transparent 70%
-      );
-      pointer-events: none;
-      transition: opacity 0.35s ease;
-      opacity: var(--btn-glow);
     }
 
     .toolbar-btn::after {
@@ -165,17 +138,17 @@
         transparent
       );
       transition: left 0.6s ease;
+      pointer-events: none;
     }
 
     .toolbar-btn:hover {
-      --btn-translate-y: -6px;
-      --btn-scale: 1.08;
-      --btn-border-color: rgba(0, 255, 255, 0.7);
-      --btn-bg-color: rgba(0, 255, 255, 0.12);
-      --btn-shadow-color: rgba(0, 255, 255, 0.4);
-      --btn-shadow-blur: 28px;
-      --btn-shadow-spread: 2px;
-      --btn-glow: 1;
+      transform: translateY(-6px) scale(1.08);
+      border-color: rgba(0, 255, 255, 0.7);
+      background: rgba(0, 255, 255, 0.12);
+      box-shadow:
+        0 8px 28px rgba(0, 255, 255, 0.4),
+        0 0 16px rgba(0, 255, 255, 0.2),
+        inset 0 1px 0 rgba(255, 255, 255, 0.15);
     }
 
     .toolbar-btn:hover::after {
@@ -183,30 +156,32 @@
     }
 
     .toolbar-btn:active {
-      --btn-translate-y: -2px;
-      --btn-scale: 1.02;
-      --btn-shadow-blur: 16px;
+      transform: translateY(-2px) scale(1.02);
       transition-duration: 0.1s;
     }
 
     .toolbar-btn.active {
-      --btn-border-color: rgba(0, 255, 255, 1);
-      --btn-shadow-color: rgba(0, 255, 255, 0.55);
-      --btn-shadow-blur: 24px;
-      --btn-shadow-spread: 1px;
-      --btn-bg-color: rgba(0, 255, 255, 0.18);
-      --btn-glow: 1;
+      border-color: rgba(0, 255, 255, 1);
+      background: rgba(0, 255, 255, 0.18);
+      box-shadow:
+        0 4px 24px rgba(0, 255, 255, 0.55),
+        0 0 12px rgba(0, 255, 255, 0.35),
+        inset 0 1px 0 rgba(255, 255, 255, 0.2);
       animation: activePulse 2.5s ease-in-out infinite;
     }
 
     @keyframes activePulse {
       0%, 100% {
-        --btn-shadow-color: rgba(0, 255, 255, 0.55);
-        --btn-shadow-blur: 24px;
+        box-shadow:
+          0 4px 24px rgba(0, 255, 255, 0.55),
+          0 0 12px rgba(0, 255, 255, 0.35),
+          inset 0 1px 0 rgba(255, 255, 255, 0.2);
       }
       50% {
-        --btn-shadow-color: rgba(255, 0, 200, 0.45);
-        --btn-shadow-blur: 32px;
+        box-shadow:
+          0 4px 32px rgba(255, 0, 200, 0.45),
+          0 0 20px rgba(255, 0, 200, 0.25),
+          inset 0 1px 0 rgba(255, 255, 255, 0.2);
       }
     }
 
