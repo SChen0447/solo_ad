@@ -46,6 +46,10 @@ export class WaterSimulator {
     this.drainEfficiency = value;
   }
 
+  getDrainEfficiency(): number {
+    return this.drainEfficiency;
+  }
+
   reset(): void {
     this.waterLevel.fill(0);
     this.prevWaterLevel.fill(0);

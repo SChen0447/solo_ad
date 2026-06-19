@@ -31,6 +31,9 @@ export class TerrainRenderer {
   private buildings: BuildingData[];
   private drainOutlets: DrainOutletData[];
   private clock: THREE.Clock;
+  private prevAvgWater: number = 0;
+  private smoothedColorT: number = 0;
+  private targetColorT: number = 0;
 
   constructor(scene: THREE.Scene, heightmap: Float32Array, buildings: BuildingData[], drainOutlets: DrainOutletData[]) {
     this.scene = scene;
@@ -154,7 +157,9 @@ export class TerrainRenderer {
   updateWaterSurface(waterGrid: Float32Array, time: number): void {
     const positions = this.waterGeometry.attributes.position;
     let maxWater = 0;
+    let avgWater = 0;
     let hasWater = false;
+    let waterCount = 0;
 
     for (let i = 0; i < positions.count; i++) {
       const ix = i % GRID;
@@ -168,23 +173,43 @@ export class TerrainRenderer {
 
       if (waterH > 0.01) {
         hasWater = true;
+        waterCount++;
+        avgWater += waterH;
         if (waterH > maxWater) maxWater = waterH;
-        const waveOffset = Math.sin(time * 2 + ix * 0.3 + iz * 0.4) * 0.02 * Math.min(waterH, 1);
-        positions.setY(i, surfaceY + waveOffset);
+
+        const wave1 = Math.sin(time * 2.2 + ix * 0.35 + iz * 0.42) * 0.03 * Math.min(waterH, 1);
+        const wave2 = Math.sin(time * 3.7 - ix * 0.22 + iz * 0.18) * 0.02 * Math.min(waterH, 1);
+        const wave3 = Math.cos(time * 1.5 + ix * 0.5 - iz * 0.28 + Math.sin(ix * 0.1 + iz * 0.07) * 2.0) * 0.015 * Math.min(waterH, 1);
+        positions.setY(i, surfaceY + wave1 + wave2 + wave3);
       }
     }
+
+    if (waterCount > 0) avgWater /= waterCount;
 
     positions.needsUpdate = true;
     this.waterGeometry.computeVertexNormals();
 
+    const trend = avgWater - this.prevAvgWater;
+    this.prevAvgWater = avgWater;
+
     if (hasWater) {
-      const t = Math.min(1, maxWater / (3 * HEIGHT_SCALE));
+      const absT = Math.min(1, maxWater / (3 * HEIGHT_SCALE));
+      const trendBias = Math.max(-0.3, Math.min(0.3, trend * 2000));
+      this.targetColorT = Math.max(0, Math.min(1, absT + trendBias));
+
+      const smoothSpeed = 0.08;
+      this.smoothedColorT += (this.targetColorT - this.smoothedColorT) * smoothSpeed;
+
+      const t = this.smoothedColorT;
       const hue = 210 + t * 30;
       const lightness = 80 - t * 40;
       const color = new THREE.Color(`hsl(${hue}, 70%, ${lightness}%)`);
       this.waterMaterial.color.copy(color);
-      this.waterMaterial.opacity = 0.35 + t * 0.35;
+      this.waterMaterial.opacity = 0.3 + t * 0.45;
     } else {
+      this.prevAvgWater = 0;
+      this.targetColorT = 0;
+      this.smoothedColorT = 0;
       this.waterMaterial.opacity = 0;
     }
   }

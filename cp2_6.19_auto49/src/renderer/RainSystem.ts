@@ -9,8 +9,12 @@ export class RainSystem {
   private velocities: Float32Array;
   private sizes: Float32Array;
   private rainIntensity: number = 0;
+  private targetIntensityFactor: number = 0;
+  private currentIntensityFactor: number = 0;
   private areaSize: number = 50;
   private heightRange: number = 30;
+  private currentActiveCount: number = 0;
+  private lastActiveCount: number = 0;
 
   constructor(scene: THREE.Scene) {
     this.scene = scene;
@@ -25,6 +29,9 @@ export class RainSystem {
   private initParticles(): void {
     for (let i = 0; i < MAX_PARTICLES; i++) {
       this.resetParticle(i);
+      this.positions[i * 3 + 1] = -1000;
+    }
+    for (let i = 0; i < 100; i++) {
       this.positions[i * 3 + 1] = Math.random() * this.heightRange;
     }
   }
@@ -56,22 +63,32 @@ export class RainSystem {
   }
 
   setRainIntensity(value: number): void {
-    this.rainIntensity = value;
+    const clampedValue = Math.max(0, Math.min(200, value));
+    this.rainIntensity = clampedValue;
+    this.targetIntensityFactor = clampedValue / 200;
   }
 
   update(delta: number): void {
-    const intensityFactor = this.rainIntensity / 200;
-    const activeCount = Math.floor(MAX_PARTICLES * intensityFactor);
-    const speedMultiplier = 0.5 + intensityFactor * 1.5;
+    const responseSpeed = 0.15;
+    this.currentIntensityFactor += (this.targetIntensityFactor - this.currentIntensityFactor) * responseSpeed;
 
+    const factor = this.currentIntensityFactor;
+    const activeCount = Math.max(0, Math.min(MAX_PARTICLES, Math.floor(MAX_PARTICLES * factor)));
+    const speedMultiplier = 0.5 + factor * 1.5;
     const posAttr = this.particleSystem.geometry.attributes.position as THREE.BufferAttribute;
 
-    for (let i = 0; i < MAX_PARTICLES; i++) {
-      if (i >= activeCount) {
-        this.positions[i * 3 + 1] = -1000;
-        continue;
-      }
+    for (let i = this.lastActiveCount; i < activeCount; i++) {
+      const pi = Math.max(0, Math.min(MAX_PARTICLES - 1, i));
+      this.positions[pi * 3] = (Math.random() - 0.5) * this.areaSize;
+      this.positions[pi * 3 + 1] = Math.random() * this.heightRange;
+      this.positions[pi * 3 + 2] = (Math.random() - 0.5) * this.areaSize;
+    }
+    this.lastActiveCount = activeCount;
+    this.currentActiveCount = activeCount;
 
+    const safeActive = Math.min(activeCount, MAX_PARTICLES);
+
+    for (let i = 0; i < safeActive; i++) {
       this.positions[i * 3 + 1] -= this.velocities[i] * speedMultiplier * delta * 60;
 
       if (this.positions[i * 3 + 1] < -1) {
@@ -79,10 +96,18 @@ export class RainSystem {
       }
     }
 
+    for (let i = safeActive; i < MAX_PARTICLES; i++) {
+      if (this.positions[i * 3 + 1] > -999) {
+        this.positions[i * 3 + 1] = -1000;
+      }
+    }
+
     posAttr.needsUpdate = true;
 
     const mat = this.particleSystem.material as THREE.PointsMaterial;
-    mat.opacity = 0.3 + intensityFactor * 0.5;
-    mat.size = 0.08 + intensityFactor * 0.12;
+    const targetOpacity = 0.25 + factor * 0.55;
+    const targetSize = 0.08 + factor * 0.14;
+    mat.opacity += (targetOpacity - mat.opacity) * 0.2;
+    mat.size += (targetSize - mat.size) * 0.2;
   }
 }

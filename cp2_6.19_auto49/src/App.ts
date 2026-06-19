@@ -12,6 +12,16 @@ interface MonitorPoint {
   blinkPhase: number;
 }
 
+interface PooledPopup {
+  element: HTMLElement;
+  titleEl: HTMLElement;
+  waterEl: HTMLElement;
+  trendEl: HTMLElement;
+  inUse: boolean;
+  hideTimer: number | null;
+  fadeTimer: number | null;
+}
+
 const GRID = 50;
 
 class App {
@@ -30,7 +40,8 @@ class App {
   private frameCount: number = 0;
   private fpsTime: number = 0;
   private currentFps: number = 0;
-  private activePopup: HTMLElement | null = null;
+  private activePopup: PooledPopup | null = null;
+  private popupPool: PooledPopup[] = [];
 
   constructor() {
     this.clock = new THREE.Clock();
@@ -235,8 +246,37 @@ class App {
     }
   }
 
+  private acquirePopup(): PooledPopup {
+    let available = this.popupPool.find(p => !p.inUse);
+    if (available) {
+      available.element.classList.remove('fade-out');
+      return available;
+    }
+
+    const element = document.createElement('div');
+    element.className = 'monitor-popup';
+    const titleEl = document.createElement('div');
+    titleEl.style.cssText = 'font-weight:bold;margin-bottom:4px;';
+    const waterEl = document.createElement('div');
+    const trendEl = document.createElement('div');
+    element.appendChild(titleEl);
+    element.appendChild(waterEl);
+    element.appendChild(trendEl);
+    document.body.appendChild(element);
+
+    const popup: PooledPopup = {
+      element, titleEl, waterEl, trendEl,
+      inUse: false, hideTimer: null, fadeTimer: null,
+    };
+    this.popupPool.push(popup);
+    return popup;
+  }
+
   private showMonitorPopup(mp: MonitorPoint, screenX: number, screenY: number): void {
     this.removePopup();
+
+    const popup = this.acquirePopup();
+    popup.inUse = true;
 
     const waterLevel = this.waterSimulator.getWaterLevelAt(mp.gx, mp.gz);
     const trend = this.waterSimulator.getWaterTrendAt(mp.gx, mp.gz);
@@ -252,29 +292,47 @@ class App {
       trendText = '下降';
     }
 
-    const popup = document.createElement('div');
-    popup.className = 'monitor-popup';
-    popup.innerHTML = `
-      <div style="font-weight:bold;margin-bottom:4px;">监测点 (${mp.gx}, ${mp.gz})</div>
-      <div>水位: ${waterLevelCm} cm</div>
-      <div>趋势: ${trendIcon} ${trendText}</div>
-    `;
-    popup.style.left = `${screenX + 10}px`;
-    popup.style.top = `${screenY - 60}px`;
-    document.body.appendChild(popup);
+    popup.titleEl.textContent = `监测点 (${mp.gx}, ${mp.gz})`;
+    popup.waterEl.textContent = `水位: ${waterLevelCm} cm`;
+    popup.trendEl.textContent = `趋势: ${trendIcon} ${trendText}`;
+
+    popup.element.classList.remove('fade-out');
+    popup.element.style.display = 'block';
+    popup.element.style.left = `${screenX + 10}px`;
+    popup.element.style.top = `${screenY - 60}px`;
+    popup.element.style.opacity = '0';
+    popup.element.style.transform = 'translateY(10px)';
+    requestAnimationFrame(() => {
+      popup.element.style.transition = 'opacity 0.25s ease-out, transform 0.25s ease-out';
+      popup.element.style.opacity = '1';
+      popup.element.style.transform = 'translateY(0)';
+    });
+
     this.activePopup = popup;
 
-    setTimeout(() => {
-      popup.classList.add('fade-out');
-      setTimeout(() => {
+    if (popup.hideTimer) { window.clearTimeout(popup.hideTimer); popup.hideTimer = null; }
+    if (popup.fadeTimer) { window.clearTimeout(popup.fadeTimer); popup.fadeTimer = null; }
+
+    popup.hideTimer = window.setTimeout(() => {
+      popup.element.style.transition = 'opacity 0.25s ease-in, transform 0.25s ease-in';
+      popup.element.style.opacity = '0';
+      popup.element.style.transform = 'translateY(-10px)';
+      popup.fadeTimer = window.setTimeout(() => {
         this.removePopup();
-      }, 300);
-    }, 2700);
+      }, 280);
+    }, 2720);
   }
 
   private removePopup(): void {
-    if (this.activePopup && this.activePopup.parentNode) {
-      this.activePopup.parentNode.removeChild(this.activePopup);
+    if (this.activePopup) {
+      const popup = this.activePopup;
+      if (popup.hideTimer) { window.clearTimeout(popup.hideTimer); popup.hideTimer = null; }
+      if (popup.fadeTimer) { window.clearTimeout(popup.fadeTimer); popup.fadeTimer = null; }
+      popup.element.style.display = 'none';
+      popup.element.style.transition = '';
+      popup.element.style.opacity = '';
+      popup.element.style.transform = '';
+      popup.inUse = false;
       this.activePopup = null;
     }
   }
