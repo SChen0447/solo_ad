@@ -1,0 +1,52 @@
+[
+  {
+    "id": "s1",
+    "requesterId": "u3",
+    "bookOfferedId": "b5",
+    "bookRequestedId": "b4",
+    "ownerId": "u2",
+    "status": "completed",
+    "createdAt": "2025-06-05T10:00:00.000Z",
+    "updatedAt": "2025-06-05T10:05:00.000Z"
+  },
+  {
+    "id": "s2",
+    "requesterId": "u1",
+    "bookOfferedId": "b2",
+    "bookRequestedId": "b8",
+    "ownerId": "u4",
+    "status": "completed",
+    "createdAt": "2025-06-08T11:00:00.000Z",
+    "updatedAt": "2025-06-08T11:05:00.000Z"
+  },
+  {
+    "id": "s3",
+    "requesterId": "u5",
+    "bookOfferedId": "b9",
+    "bookRequestedId": "b7",
+    "ownerId": "u4",
+    "status": "pending",
+    "createdAt": "2025-06-10T14:00:00.000Z",
+    "updatedAt": "2025-06-10T14:00:00.000Z"
+  },
+  {
+    "id": "s4",
+    "requesterId": "u2",
+    "bookOfferedId": "b11",
+    "bookRequestedId": "b1",
+    "ownerId": "u1",
+    "status": "accepted",
+    "createdAt": "2025-06-12T09:00:00.000Z",
+    "updatedAt": "2025-06-12T09:01:00.000Z"
+  },
+  {
+    "id": "s5",
+    "requesterId": "u3",
+    "bookOfferedId": "b6",
+    "bookRequestedId": "b12",
+    "ownerId": "u4",
+    "status": "rejected",
+    "createdAt": "2025-06-11T16:00:00.000Z",
+    "updatedAt": "2025-06-11T16:30:00.000Z"
+  }
+]

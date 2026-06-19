@@ -1,0 +1,7 @@
+[
+  {"id":"u1","name":"林小书","avatar":"https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=avatar%20of%20a%20young%20chinese%20woman%20reading%20book%20warm%20tone&image_size=square","points":30},
+  {"id":"u2","name":"张阅微","avatar":"https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=avatar%20of%20a%20middle%20aged%20chinese%20man%20with%20glasses%20warm%20tone&image_size=square","points":20},
+  {"id":"u3","name":"王墨香","avatar":"https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=avatar%20of%20a%20young%20chinese%20man%20scholar%20warm%20tone&image_size=square","points":10},
+  {"id":"u4","name":"陈卷舒","avatar":"https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=avatar%20of%20a%20chinese%20woman%20librarian%20warm%20tone&image_size=square","points":50},
+  {"id":"u5","name":"赵书吟","avatar":"https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=avatar%20of%20a%20chinese%20man%20writer%20warm%20tone&image_size=square","points":0}
+]

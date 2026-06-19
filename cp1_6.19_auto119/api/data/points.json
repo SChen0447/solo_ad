@@ -1,0 +1,34 @@
+[
+  {
+    "id": "p1",
+    "userId": "u3",
+    "swapId": "s1",
+    "counterpartyId": "u2",
+    "points": 10,
+    "createdAt": "2025-06-05T10:05:00.000Z"
+  },
+  {
+    "id": "p2",
+    "userId": "u2",
+    "swapId": "s1",
+    "counterpartyId": "u3",
+    "points": 10,
+    "createdAt": "2025-06-05T10:05:00.000Z"
+  },
+  {
+    "id": "p3",
+    "userId": "u1",
+    "swapId": "s2",
+    "counterpartyId": "u4",
+    "points": 10,
+    "createdAt": "2025-06-08T11:05:00.000Z"
+  },
+  {
+    "id": "p4",
+    "userId": "u4",
+    "swapId": "s2",
+    "counterpartyId": "u1",
+    "points": 10,
+    "createdAt": "2025-06-08T11:05:00.000Z"
+  }
+]
