@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useRef } from 'react'
 import type { Recipe } from './types'
 
 interface Props {
@@ -7,13 +7,15 @@ interface Props {
 }
 
 export default function RecipeModal({ recipe, onClose }: Props) {
-  const [visible, setVisible] = useState(false)
-  const [closing, setClosing] = useState(false)
-  const modalRef = useRef<HTMLDivElement>(null)
+  const overlayRef = useRef<HTMLDivElement>(null)
+  const contentRef = useRef<HTMLDivElement>(null)
+  const closingRef = useRef(false)
 
   useEffect(() => {
+    if (!overlayRef.current) return
     requestAnimationFrame(() => {
-      setVisible(true)
+      overlayRef.current?.classList.add('modal-overlay-visible')
+      contentRef.current?.classList.add('modal-content-visible')
     })
   }, [])
 
@@ -30,21 +32,37 @@ export default function RecipeModal({ recipe, onClose }: Props) {
   }, [])
 
   const handleClose = () => {
-    setClosing(true)
-    setVisible(false)
-    setTimeout(() => {
+    if (closingRef.current) return
+    closingRef.current = true
+    const overlay = overlayRef.current
+    const content = contentRef.current
+    if (!overlay || !content) {
       onClose()
-    }, 300)
+      return
+    }
+    overlay.classList.remove('modal-overlay-visible')
+    content.classList.remove('modal-content-visible')
+
+    const handleEnd = () => {
+      content.removeEventListener('transitionend', handleEnd)
+      onClose()
+    }
+    content.addEventListener('transitionend', handleEnd)
+    setTimeout(() => {
+      content.removeEventListener('transitionend', handleEnd)
+      if (closingRef.current) onClose()
+    }, 350)
   }
 
   return (
     <div
-      className={`modal-overlay ${visible && !closing ? 'modal-overlay-visible' : ''}`}
+      ref={overlayRef}
+      className="modal-overlay"
       onClick={handleClose}
     >
       <div
-        className={`modal-content ${visible && !closing ? 'modal-content-visible' : ''}`}
-        ref={modalRef}
+        ref={contentRef}
+        className="modal-content"
         onClick={e => e.stopPropagation()}
       >
         <button className="modal-close" onClick={handleClose} aria-label="关闭">

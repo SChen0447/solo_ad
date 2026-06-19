@@ -129,8 +129,6 @@ export default function IngredientInput({ ingredients, setIngredients }: Props) 
       e.preventDefault()
       if (activeIndex >= 0 && activeIndex < suggestions.length) {
         addIngredient(suggestions[activeIndex])
-      } else if (suggestions.length > 0) {
-        addIngredient(suggestions[0])
       } else if (value.trim()) {
         addIngredient(value)
       }

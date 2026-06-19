@@ -299,16 +299,47 @@ app.post('/api/recommend', (req, res) => {
   try {
     let body = req.body
     if (!body || typeof body === 'string') {
-      try {
-        body = typeof body === 'string' ? JSON.parse(body) : {}
-      } catch {
-        body = {}
+      if (typeof body === 'string' && body.trim()) {
+        try {
+          body = JSON.parse(body)
+        } catch (parseErr) {
+          console.error('JSON parse error:', parseErr)
+          res.status(400).json({ error: '请求体格式错误，必须是有效的JSON对象' })
+          return
+        }
+      } else {
+        res.status(400).json({ error: '请求体不能为空，必须包含 ingredients 字段' })
+        return
       }
     }
-    const userIngredients: string[] = Array.isArray(body.ingredients)
-      ? body.ingredients.filter((i: unknown) => typeof i === 'string')
-      : []
-    console.log('Recommend request - body:', JSON.stringify(body))
+
+    if (typeof body !== 'object' || body === null || Array.isArray(body)) {
+      res.status(400).json({ error: '请求体必须是JSON对象' })
+      return
+    }
+
+    if (!('ingredients' in body)) {
+      res.status(400).json({ error: '请求体缺少必填字段 ingredients' })
+      return
+    }
+
+    if (!Array.isArray(body.ingredients)) {
+      res.status(400).json({ error: 'ingredients 字段必须是字符串数组' })
+      return
+    }
+
+    const invalidItems = body.ingredients.filter((i: unknown) => typeof i !== 'string')
+    if (invalidItems.length > 0) {
+      res.status(400).json({ error: 'ingredients 数组中的每个元素必须是字符串' })
+      return
+    }
+
+    const userIngredients: string[] = body.ingredients as string[]
+    if (userIngredients.length === 0) {
+      res.status(400).json({ error: 'ingredients 数组不能为空，请至少提供一种食材' })
+      return
+    }
+
     console.log('Recommend request - ingredients:', userIngredients)
     const userIngredientsLower = userIngredients.map((i: string) => i.toLowerCase().trim())
 
@@ -339,7 +370,7 @@ app.post('/api/recommend', (req, res) => {
     res.json(result)
   } catch (error) {
     console.error('Recommend error:', error)
-    res.status(500).json({ error: 'Internal server error' })
+    res.status(500).json({ error: '服务器内部错误', detail: String(error) })
   }
 })
 

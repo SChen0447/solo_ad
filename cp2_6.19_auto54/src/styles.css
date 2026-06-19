@@ -157,23 +157,27 @@ ol {
 .sidebar {
   width: 320px;
   flex-shrink: 0;
+  display: grid;
+  grid-template-rows: auto 0fr;
+  transition: grid-template-rows 0.35s ease;
+}
+
+.sidebar.open {
+  grid-template-rows: auto 1fr;
 }
 
 .sidebar.collapsed .sidebar-content {
-  max-height: 0;
-  overflow: hidden;
   opacity: 0;
-  padding: 0;
-  margin: 0;
 }
 
 .sidebar-content {
   display: flex;
   flex-direction: column;
   gap: 20px;
-  max-height: 2000px;
+  overflow: hidden;
   opacity: 1;
-  transition: max-height 0.35s ease, opacity 0.25s ease;
+  min-height: 0;
+  transition: opacity 0.25s ease;
 }
 
 .sidebar-toggle {
@@ -1125,18 +1129,6 @@ ol {
   .sidebar-toggle {
     margin-bottom: 12px;
     border-radius: 8px;
-  }
-
-  .sidebar.collapsed .sidebar-content {
-    max-height: 0;
-    opacity: 0;
-    margin: 0;
-  }
-
-  .sidebar-content {
-    max-height: 2000px;
-    opacity: 1;
-    transition: max-height 0.35s ease, opacity 0.25s ease, margin 0.35s ease;
   }
 
   .recipe-grid {
