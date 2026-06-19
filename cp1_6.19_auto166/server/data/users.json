@@ -1,0 +1,17 @@
+[
+  {
+    "id": "u1",
+    "name": "大厨小王",
+    "avatar": "https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=chef%20avatar%20cartoon%20warm%20smile%20asian%20male&image_size=square_hd"
+  },
+  {
+    "id": "u2",
+    "name": "美食达人小李",
+    "avatar": "https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=foodie%20avatar%20cartoon%20happy%20asian%20female&image_size=square_hd"
+  },
+  {
+    "id": "u3",
+    "name": "家常菜高手老张",
+    "avatar": "https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=home%20cook%20avatar%20cartoon%20friendly%20asian&image_size=square_hd"
+  }
+]

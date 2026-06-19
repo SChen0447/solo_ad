@@ -1,0 +1,16 @@
+[
+  { "userId": "u2", "recipeId": "r1" },
+  { "userId": "u3", "recipeId": "r1" },
+  { "userId": "u1", "recipeId": "r2" },
+  { "userId": "u1", "recipeId": "r3" },
+  { "userId": "u2", "recipeId": "r3" },
+  { "userId": "u3", "recipeId": "r3" },
+  { "userId": "u2", "recipeId": "r4" },
+  { "userId": "u1", "recipeId": "r5" },
+  { "userId": "u1", "recipeId": "r6" },
+  { "userId": "u2", "recipeId": "r7" },
+  { "userId": "u3", "recipeId": "r7" },
+  { "userId": "u1", "recipeId": "r9" },
+  { "userId": "u2", "recipeId": "r9" },
+  { "userId": "u1", "recipeId": "r10" }
+]

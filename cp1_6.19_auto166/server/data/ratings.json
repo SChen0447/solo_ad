@@ -1,0 +1,21 @@
+[
+  { "id": "rt1", "recipeId": "r1", "userId": "u2", "score": 5 },
+  { "id": "rt2", "recipeId": "r1", "userId": "u3", "score": 4 },
+  { "id": "rt3", "recipeId": "r2", "userId": "u1", "score": 4 },
+  { "id": "rt4", "recipeId": "r2", "userId": "u3", "score": 5 },
+  { "id": "rt5", "recipeId": "r3", "userId": "u2", "score": 5 },
+  { "id": "rt6", "recipeId": "r3", "userId": "u3", "score": 5 },
+  { "id": "rt7", "recipeId": "r4", "userId": "u1", "score": 4 },
+  { "id": "rt8", "recipeId": "r4", "userId": "u2", "score": 5 },
+  { "id": "rt9", "recipeId": "r5", "userId": "u1", "score": 4 },
+  { "id": "rt10", "recipeId": "r6", "userId": "u1", "score": 4 },
+  { "id": "rt11", "recipeId": "r6", "userId": "u2", "score": 4 },
+  { "id": "rt12", "recipeId": "r7", "userId": "u2", "score": 5 },
+  { "id": "rt13", "recipeId": "r7", "userId": "u3", "score": 4 },
+  { "id": "rt14", "recipeId": "r8", "userId": "u1", "score": 4 },
+  { "id": "rt15", "recipeId": "r8", "userId": "u3", "score": 4 },
+  { "id": "rt16", "recipeId": "r9", "userId": "u1", "score": 5 },
+  { "id": "rt17", "recipeId": "r9", "userId": "u2", "score": 5 },
+  { "id": "rt18", "recipeId": "r10", "userId": "u2", "score": 5 },
+  { "id": "rt19", "recipeId": "r10", "userId": "u3", "score": 4 }
+]

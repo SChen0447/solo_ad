@@ -1,0 +1,102 @@
+[
+  {
+    "id": "r1",
+    "title": "红烧肉",
+    "authorId": "u1",
+    "image": "https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=braised%20pork%20belly%20chinese%20dish%20close%20up%20warm%20lighting&image_size=square",
+    "rating": 4.5,
+    "likes": 12,
+    "ingredients": ["五花肉 500g", "生抽 2勺", "老抽 1勺", "冰糖 30g", "料酒 2勺", "葱姜适量", "八角 2颗", "桂皮 1小块"],
+    "steps": ["五花肉切成3cm见方的块，冷水下锅焯水去血沫，捞出沥干", "锅中放少许油，小火炒冰糖至焦糖色", "放入肉块翻炒均匀，使每块肉都裹上糖色", "加入料酒、生抽、老抽翻炒出酱香", "加入开水没过肉块，放入葱姜、八角、桂皮", "大火烧开后转小火炖1小时至肉酥烂", "最后大火收汁至汤汁浓稠即可出锅"]
+  },
+  {
+    "id": "r2",
+    "title": "麻婆豆腐",
+    "authorId": "u2",
+    "image": "https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=mapo%20tofu%20sichuan%20dish%20red%20chili%20oil%20close%20up&image_size=square",
+    "rating": 4.2,
+    "likes": 8,
+    "ingredients": ["嫩豆腐 1盒", "猪肉末 100g", "豆瓣酱 2勺", "花椒粉 1勺", "蒜末 适量", "葱花 适量", "淀粉水 适量", "辣椒面 1勺"],
+    "steps": ["豆腐切成2cm小块，放入加盐的开水中焯烫2分钟，沥干备用", "锅中放油，下肉末煸炒至变色出油", "加入豆瓣酱、蒜末炒出红油和香味", "加入适量清水煮开，放入豆腐块", "小火煮5分钟让豆腐入味", "加入淀粉水勾芡，轻轻推动避免碎裂", "出锅撒花椒粉、辣椒面和葱花"]
+  },
+  {
+    "id": "r3",
+    "title": "糖醋里脊",
+    "authorId": "u1",
+    "image": "https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=sweet%20sour%20pork%20tenderloin%20glazed%20chinese%20dish&image_size=square",
+    "rating": 4.7,
+    "likes": 15,
+    "ingredients": ["猪里脊 300g", "番茄酱 3勺", "白糖 2勺", "醋 2勺", "淀粉 适量", "鸡蛋 1个", "料酒 1勺", "盐 少许"],
+    "steps": ["里脊肉切成条状，加料酒、盐腌制15分钟", "鸡蛋打散加淀粉调成糊，将肉条裹上面糊", "油温六成热时下肉条炸至金黄捞出", "升高油温至八成，复炸一次使外皮更酥脆", "锅中留少许油，加番茄酱、白糖、醋调成糖醋汁", "汁冒泡后倒入炸好的肉条快速翻炒均匀", "出锅装盘，可撒少许白芝麻点缀"]
+  },
+  {
+    "id": "r4",
+    "title": "宫保鸡丁",
+    "authorId": "u3",
+    "image": "https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=kung%20pao%20chicken%20peanuts%20chili%20chinese%20cuisine&image_size=square",
+    "rating": 4.3,
+    "likes": 10,
+    "ingredients": ["鸡胸肉 300g", "花生米 50g", "干辣椒 8个", "花椒 1勺", "葱段 适量", "蒜末 适量", "生抽 2勺", "醋 1勺", "糖 1勺", "淀粉 适量"],
+    "steps": ["鸡胸肉切丁，加生抽、料酒、淀粉腌制20分钟", "花生米小火炒至酥脆盛出备用", "调碗汁：生抽、醋、糖、淀粉加水拌匀", "锅中热油，先炒干辣椒和花椒出香味", "下鸡丁滑炒至变色", "加入葱段和蒜末翻炒", "倒入碗汁快速翻炒至浓稠，最后加入花生米拌匀"]
+  },
+  {
+    "id": "r5",
+    "title": "蒜蓉西兰花",
+    "authorId": "u2",
+    "image": "https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=garlic%20broccoli%20green%20vegetables%20chinese%20style&image_size=square",
+    "rating": 3.8,
+    "likes": 5,
+    "ingredients": ["西兰花 1颗", "蒜末 4瓣", "蚝油 1勺", "盐 适量", "食用油 适量", "水淀粉 少许"],
+    "steps": ["西兰花掰成小朵，清水浸泡10分钟后洗净", "锅中烧开水，加少许盐和油，焯烫西兰花1分钟捞出", "锅中放油，小火爆香蒜末至微黄", "加入蚝油和少许水煮开", "放入西兰花翻炒均匀", "加水淀粉勾薄芡即可出锅"]
+  },
+  {
+    "id": "r6",
+    "title": "酸辣土豆丝",
+    "authorId": "u3",
+    "image": "https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=sour%20spicy%20shredded%20potato%20chinese%20home%20cooking&image_size=square",
+    "rating": 4.0,
+    "likes": 7,
+    "ingredients": ["土豆 2个", "干辣椒 4个", "花椒 少许", "醋 2勺", "盐 适量", "葱花 适量", "蒜片 适量"],
+    "steps": ["土豆去皮切细丝，放入清水中浸泡去淀粉", "沥干水分备用", "锅中放油，下花椒和干辣椒爆香", "捞出花椒，放入土豆丝大火快炒", "加入醋和盐调味，继续翻炒2分钟", "出锅前撒葱花和蒜片翻匀"]
+  },
+  {
+    "id": "r7",
+    "title": "鱼香肉丝",
+    "authorId": "u1",
+    "image": "https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=yuxiang%20shredded%20pork%20fish%20flavor%20chinese%20dish&image_size=square",
+    "rating": 4.6,
+    "likes": 11,
+    "ingredients": ["猪里脊 250g", "木耳 适量", "胡萝卜 1根", "青椒 1个", "豆瓣酱 1勺", "泡椒 3个", "蒜末 适量", "姜末 适量", "醋 2勺", "糖 1.5勺", "生抽 1勺", "淀粉 适量"],
+    "steps": ["里脊肉切丝，加盐、料酒、淀粉腌制15分钟", "木耳泡发切丝，胡萝卜和青椒切丝", "调鱼香汁：醋、糖、生抽、淀粉加水拌匀", "锅中热油，下肉丝滑散盛出", "锅中留油，爆香豆瓣酱、泡椒、姜蒜末", "下胡萝卜丝和木耳丝翻炒", "倒入肉丝和青椒丝，淋入鱼香汁快速翻炒均匀"]
+  },
+  {
+    "id": "r8",
+    "title": "蛋炒饭",
+    "authorId": "u2",
+    "image": "https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=egg%20fried%20rice%20golden%20color%20chinese%20food&image_size=square",
+    "rating": 3.9,
+    "likes": 6,
+    "ingredients": ["隔夜米饭 2碗", "鸡蛋 2个", "火腿丁 适量", "葱花 适量", "盐 适量", "生抽 1勺", "胡椒粉 少许"],
+    "steps": ["隔夜米饭用手打散，鸡蛋打散备用", "锅中放油，倒入蛋液快速翻炒至半凝固", "加入米饭大火翻炒，使每粒米都裹上蛋液", "加入火腿丁继续翻炒2分钟", "调入盐、生抽和胡椒粉", "最后撒葱花翻匀出锅"]
+  },
+  {
+    "id": "r9",
+    "title": "清蒸鲈鱼",
+    "authorId": "u3",
+    "image": "https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=steamed%20sea%20bass%20fish%20chinese%20cuisine%20elegant&image_size=square",
+    "rating": 4.8,
+    "likes": 18,
+    "ingredients": ["鲈鱼 1条", "葱丝 适量", "姜丝 适量", "蒸鱼豉油 2勺", "料酒 1勺", "食用油 适量", "红椒丝 少许"],
+    "steps": ["鲈鱼处理干净，在鱼身两侧划几刀便于入味", "鱼身抹少许料酒和盐，放上姜片腌制10分钟", "盘中铺葱姜，将鱼放上，再铺一层葱姜", "大火蒸8-10分钟至鱼肉刚好熟", "倒掉蒸出的汤汁，去掉葱姜", "重新铺上葱丝、姜丝和红椒丝", "淋上蒸鱼豉油，浇上热油激发香气"]
+  },
+  {
+    "id": "r10",
+    "title": "番茄牛腩",
+    "authorId": "u1",
+    "image": "https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=tomato%20beef%20brisket%20stew%20chinese%20warm%20comfort%20food&image_size=square",
+    "rating": 4.4,
+    "likes": 13,
+    "ingredients": ["牛腩 500g", "番茄 3个", "番茄酱 2勺", "洋葱 半个", "姜片 适量", "料酒 2勺", "盐 适量", "糖 1勺", "八角 1颗"],
+    "steps": ["牛腩切块冷水下锅焯水，捞出洗净", "番茄顶部划十字，开水烫后去皮切块", "锅中放油，炒香洋葱和姜片", "加入番茄块炒出汁，再加番茄酱增色", "放入牛腩翻炒，加料酒去腥", "加入开水没过食材，放八角", "大火烧开后转小火炖1.5小时至牛腩软烂", "最后加盐和糖调味即可"]
+  }
+]

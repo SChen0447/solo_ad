@@ -1,0 +1,12 @@
+[
+  { "id": "c1", "recipeId": "r1", "userId": "u2", "content": "红烧肉做得太棒了！肥而不腻，入口即化！", "rating": 5, "createdAt": "2026-06-15T10:30:00Z" },
+  { "id": "c2", "recipeId": "r1", "userId": "u3", "content": "糖色炒得刚刚好，颜色漂亮味道也好。", "rating": 4, "createdAt": "2026-06-16T14:20:00Z" },
+  { "id": "c3", "recipeId": "r2", "userId": "u1", "content": "麻辣鲜香，很正宗的川菜味道！", "rating": 4, "createdAt": "2026-06-14T09:15:00Z" },
+  { "id": "c4", "recipeId": "r3", "userId": "u2", "content": "外酥里嫩，酸甜可口，家里小朋友特别喜欢！", "rating": 5, "createdAt": "2026-06-17T18:45:00Z" },
+  { "id": "c5", "recipeId": "r3", "userId": "u3", "content": "复炸的技巧很关键，确实更加酥脆了。", "rating": 5, "createdAt": "2026-06-18T11:00:00Z" },
+  { "id": "c6", "recipeId": "r4", "userId": "u2", "content": "花生米酥脆，鸡丁嫩滑，完美搭配！", "rating": 5, "createdAt": "2026-06-16T20:30:00Z" },
+  { "id": "c7", "recipeId": "r7", "userId": "u2", "content": "鱼香汁的比例太重要了，这个配方很赞！", "rating": 5, "createdAt": "2026-06-17T12:00:00Z" },
+  { "id": "c8", "recipeId": "r9", "userId": "u1", "content": "蒸的时间掌握得很好，鱼肉很嫩。", "rating": 5, "createdAt": "2026-06-18T16:30:00Z" },
+  { "id": "c9", "recipeId": "r9", "userId": "u2", "content": "清蒸做法保留了鱼的鲜美，点赞！", "rating": 5, "createdAt": "2026-06-18T19:00:00Z" },
+  { "id": "c10", "recipeId": "r10", "userId": "u2", "content": "牛腩炖得很软烂，番茄味浓郁，冬天吃特别暖。", "rating": 5, "createdAt": "2026-06-17T08:00:00Z" }
+]
