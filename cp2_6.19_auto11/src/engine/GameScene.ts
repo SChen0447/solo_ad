@@ -72,6 +72,35 @@ export class GameScene extends Phaser.Scene {
     super({ key: 'GameScene' });
   }
 
+  preload(): void {
+    const g = this.add.graphics();
+    g.fillStyle(0xFFFFFF, 1);
+    g.fillCircle(8, 8, 7);
+    g.generateTexture('particle_spark', 16, 16);
+    g.destroy();
+
+    const g2 = this.add.graphics();
+    const colors = [0xFFD54F, 0xFFA000, 0xFF6F00];
+    for (let i = 0; i < 3; i++) {
+      g2.fillStyle(colors[i], 1);
+      g2.fillCircle(8 + i * 16, 8, 7);
+    }
+    g2.generateTexture('particle_gold', 48, 16);
+    g2.destroy();
+
+    const g3 = this.add.graphics();
+    g3.fillStyle(0xFFFFFF, 1);
+    for (let i = 0; i < 4; i++) {
+      const angle = (Math.PI * 2 * i) / 4;
+      const x = 8 + Math.cos(angle) * 5;
+      const y = 8 + Math.sin(angle) * 5;
+      g3.fillCircle(x, y, 2);
+    }
+    g3.fillCircle(8, 8, 3);
+    g3.generateTexture('particle_star', 16, 16);
+    g3.destroy();
+  }
+
   create(): void {
     this.towerFactory = new TowerFactory(this);
     this.waveManager = new WaveManager(this);
@@ -85,6 +114,37 @@ export class GameScene extends Phaser.Scene {
 
     this.scale.on('resize', this.handleResize, this);
     this.handleResize();
+
+    this.updateHUD();
+  }
+
+  shutdown(): void {
+    this.scale.off('resize', this.handleResize, this);
+
+    for (const bc of this.breathingCells) {
+      if (bc.tween) {
+        bc.tween.stop();
+        bc.tween.remove();
+      }
+    }
+    this.breathingCells = [];
+
+    if (this.livesPulseTween) {
+      this.livesPulseTween.stop();
+      this.livesPulseTween.remove();
+      this.livesPulseTween = null;
+    }
+
+    this.cleanupTimers();
+
+    for (const tower of this.towers) {
+      if (tower.barrelTween) {
+        tower.barrelTween.stop();
+        tower.barrelTween.remove();
+      }
+    }
+
+    this.tweens.killAll();
   }
 
   private drawBackground(): void {
@@ -661,12 +721,27 @@ export class GameScene extends Phaser.Scene {
   }
 
   private enforceProjectileLimit(): void {
-    while (this.projectiles.length > this.MAX_PROJECTILES) {
-      const activeProjectiles = this.projectiles.filter((p) => p.isActive);
-      if (activeProjectiles.length === 0) break;
+    const overLimit = this.projectiles.length - this.MAX_PROJECTILES;
+    if (overLimit <= 0) return;
 
-      activeProjectiles.sort((a, b) => b.distToBase - a.distToBase);
-      const toRemove = activeProjectiles[0];
+    const activeProjectiles = this.projectiles.filter((p) => p.isActive);
+    if (activeProjectiles.length === 0) return;
+
+    for (let i = 0; i < overLimit && activeProjectiles.length > 0; i++) {
+      let maxDist = -Infinity;
+      let maxIdx = -1;
+
+      for (let j = 0; j < activeProjectiles.length; j++) {
+        if (activeProjectiles[j].distToBase > maxDist) {
+          maxDist = activeProjectiles[j].distToBase;
+          maxIdx = j;
+        }
+      }
+
+      if (maxIdx === -1) break;
+
+      const toRemove = activeProjectiles[maxIdx];
+      activeProjectiles.splice(maxIdx, 1);
       toRemove.isActive = false;
       toRemove.graphics.destroy();
       this.projectiles = this.projectiles.filter((p) => p !== toRemove);
@@ -833,6 +908,8 @@ export class GameScene extends Phaser.Scene {
     const cx = this.scale.width / 2;
     const cy = this.scale.height / 2;
 
+    const textureKeys = ['particle_spark', 'particle_gold', 'particle_star'];
+
     for (let wave = 0; wave < 3; wave++) {
       this.time.delayedCall(wave * 400, () => {
         if (!this.isVictory) return;
@@ -840,28 +917,68 @@ export class GameScene extends Phaser.Scene {
         for (let i = 0; i < particleCount; i++) {
           const angle = (Math.PI * 2 * i) / particleCount + wave * 0.3;
           const startDist = Phaser.Math.Between(0, 20);
-          const endDist = Phaser.Math.Between(120, 350);
+          const speed = Phaser.Math.Between(180, 400);
+          const vx = Math.cos(angle) * speed;
+          const vy = Math.sin(angle) * speed;
+          const drag = Phaser.Math.FloatBetween(1.5, 3);
+          const gravity = Phaser.Math.FloatBetween(50, 150);
+
           const colors = [0xFFD54F, 0xFFA000, 0xFF6F00, 0xFFEB3B, 0xFFFFFF, 0xFF8F00];
-          const p = this.add.circle(
+          const tintColor = Phaser.Utils.Array.GetRandom(colors);
+          const textureKey = Phaser.Utils.Array.GetRandom(textureKeys);
+
+          const p = this.add.image(
             cx + Math.cos(angle) * startDist,
             cy + Math.sin(angle) * startDist,
-            Phaser.Math.Between(3, 8),
-            Phaser.Utils.Array.GetRandom(colors),
-            1
+            textureKey
           );
+          p.setTint(tintColor);
           p.setDepth(100);
+          p.setScale(Phaser.Math.FloatBetween(0.4, 1.1));
+          p.setRotation(Phaser.Math.FloatBetween(0, Math.PI * 2));
 
-          const tx = cx + Math.cos(angle) * endDist;
-          const ty = cy + Math.sin(angle) * endDist;
+          const particleData: {
+            vx: number;
+            vy: number;
+            drag: number;
+            gravity: number;
+            rotSpeed: number;
+            life: number;
+            maxLife: number;
+            img: Phaser.GameObjects.Image;
+          } = {
+            vx,
+            vy,
+            drag,
+            gravity,
+            rotSpeed: Phaser.Math.FloatBetween(-6, 6),
+            life: 0,
+            maxLife: Phaser.Math.FloatBetween(0.8, 1.6),
+            img: p
+          };
 
-          this.tweens.add({
-            targets: p,
-            x: tx,
-            y: ty,
-            alpha: 0,
-            scale: { from: 1.5, to: 0.1 },
-            duration: Phaser.Math.Between(800, 1600),
-            ease: 'Cubic.easeOut',
+          const startX = p.x;
+          const startY = p.y;
+          const startScale = p.scale;
+          const startRot = p.rotation;
+
+          this.tweens.addCounter({
+            from: 0,
+            to: 1,
+            duration: particleData.maxLife * 1000,
+            ease: 'Linear',
+            onUpdate: (tween) => {
+              const t = tween.getValue();
+              if (t === null) return;
+              const dragFactor = Math.pow(1 - particleData.drag * 0.016, t * 60);
+              particleData.vy += particleData.gravity * 0.016;
+
+              particleData.img.x = startX + particleData.vx * t * (1 - t * 0.3);
+              particleData.img.y = startY + particleData.vy * t * (1 - t * 0.3) + 0.5 * particleData.gravity * t * t * 100;
+              particleData.img.rotation = startRot + particleData.rotSpeed * t;
+              particleData.img.alpha = 1 - t;
+              particleData.img.scale = startScale * (1 - t * 0.7);
+            },
             onComplete: () => p.destroy()
           });
         }

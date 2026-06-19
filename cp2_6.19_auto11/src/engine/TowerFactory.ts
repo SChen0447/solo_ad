@@ -164,7 +164,12 @@ export class TowerFactory {
     tower.targetBarrelAngle = targetAngle;
 
     if (tower.barrelTween) {
+      if (tower.barrelTween.isPlaying()) {
+        tower.barrelAngle = tower.barrel.rotation;
+      }
       tower.barrelTween.stop();
+      tower.barrelTween.removeListener('onUpdate');
+      tower.barrelTween.removeListener('onComplete');
       tower.barrelTween = null;
     }
 
@@ -177,12 +182,16 @@ export class TowerFactory {
       rotation: endAngle,
       duration: duration,
       ease: 'Quad.easeOut',
-      onUpdate: () => {
-        tower.barrelAngle = tower.barrel.rotation;
+      onUpdate: (tween) => {
+        if (tween.isPlaying()) {
+          tower.barrelAngle = tower.barrel.rotation;
+        }
       },
-      onComplete: () => {
+      onComplete: (tween) => {
         tower.barrelAngle = endAngle;
-        tower.barrelTween = null;
+        if (tower.barrelTween === tween) {
+          tower.barrelTween = null;
+        }
       }
     });
   }
