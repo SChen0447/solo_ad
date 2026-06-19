@@ -15,6 +15,22 @@ function easeOutBack(t: number): number {
   return 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2);
 }
 
+function easeOutElasticSmall(t: number): number {
+  if (t === 0) return 0;
+  if (t === 1) return 1;
+  const c4 = (2 * Math.PI) / 2.5;
+  return Math.pow(2, -8 * t) * Math.sin((t * 8 - 0.75) * c4) + 1;
+}
+
+function easeOutProgress(t: number): number {
+  if (t < 0.3) {
+    return (t / 0.3) * 0.7;
+  } else {
+    const rem = (t - 0.3) / 0.7;
+    return 0.7 + 0.3 * (1 - Math.pow(1 - rem, 3));
+  }
+}
+
 function easeOutCubic(t: number): number {
   return 1 - Math.pow(1 - t, 3);
 }
@@ -169,20 +185,24 @@ export class Renderer {
     });
   }
 
-  private drawBuilding(b: Building, currentTime: number, overrideX?: number, overrideY?: number, alpha?: number): void {
+  private drawBuilding(b: Building, currentTime: number, overrideX?: number, overrideY?: number, alpha?: number, scaleOverride?: number): void {
     const ctx = this.ctx;
     const elapsed = currentTime - b.placeAnimStartTime;
-    const animDuration = 200;
+    const animDuration = 300;
     let scale = 1;
     let shakeX = 0;
     let shakeY = 0;
 
     if (elapsed < animDuration) {
       const progress = elapsed / animDuration;
-      scale = 1 + 0.2 * (1 - easeOutBack(Math.min(progress, 1)));
-      const shakeIntensity = (1 - progress) * 1.5;
-      shakeX = Math.sin(progress * Math.PI * 6) * shakeIntensity;
-      shakeY = Math.cos(progress * Math.PI * 8) * shakeIntensity * 0.5;
+      scale = 1 + 0.2 * (1 - easeOutElasticSmall(Math.min(progress, 1)));
+      const shakeIntensity = (1 - Math.min(progress * 1.5, 1)) * 2;
+      shakeX = Math.sin(progress * Math.PI * 8) * shakeIntensity;
+      shakeY = Math.cos(progress * Math.PI * 10) * shakeIntensity * 0.5;
+    }
+
+    if (scaleOverride !== undefined) {
+      scale = scaleOverride;
     }
 
     const cx = overrideX !== undefined ? overrideX : this.gridOffsetX + b.gridX * this.cellSize + this.cellSize / 2;
@@ -333,7 +353,8 @@ export class Renderer {
       ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
       ctx.fillRect(barX, barY, barW, barH);
       ctx.fillStyle = '#44FF44';
-      ctx.fillRect(barX, barY, barW * b.upgradeProgress, barH);
+      const visualProgress = easeOutProgress(b.upgradeProgress);
+      ctx.fillRect(barX, barY, barW * visualProgress, barH);
       ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
       ctx.lineWidth = 0.5;
       ctx.strokeRect(barX, barY, barW, barH);
@@ -378,22 +399,24 @@ export class Renderer {
     for (const t of this.engine.tourists) {
       if (!t.coinBubble) continue;
       const elapsed = currentTime - t.coinBubble.startTime;
-      const progress = Math.min(elapsed / 300, 1);
+      const progress = Math.min(elapsed / 250, 1);
 
       let scale: number;
-      if (progress < 0.5) {
-        scale = 0.5 + 1.2 * progress;
+      if (progress < 0.4) {
+        const p = progress / 0.4;
+        scale = 0.3 + 0.9 * easeOutCubic(p);
       } else {
-        scale = 1.1 - 0.2 * ((progress - 0.5) / 0.5);
+        const p = (progress - 0.4) / 0.6;
+        scale = 1.2 - 0.2 * easeOutBack(p);
       }
 
       const px = this.gridOffsetX + t.x * this.cellSize;
-      const py = this.gridOffsetY + t.y * this.cellSize - this.cellSize * 0.4;
+      const py = this.gridOffsetY + t.y * this.cellSize - this.cellSize * 0.45;
 
       ctx.save();
       ctx.translate(px, py);
       ctx.scale(scale, scale);
-      ctx.globalAlpha = progress < 0.8 ? 1 : 1 - (progress - 0.8) / 0.2;
+      ctx.globalAlpha = progress < 0.75 ? 1 : 1 - (progress - 0.75) / 0.25;
 
       ctx.fillStyle = '#FFD700';
       ctx.beginPath();
