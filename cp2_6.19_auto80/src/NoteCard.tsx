@@ -233,6 +233,18 @@ export const NoteCard: React.FC<NoteCardProps> = ({
             opacity: 1;
           }
         }
+        @keyframes glowFadeOut {
+          0% {
+            opacity: 0.8;
+            filter: blur(8px);
+            transform: scale(1);
+          }
+          100% {
+            opacity: 0;
+            filter: blur(20px);
+            transform: scale(1.15);
+          }
+        }
         @keyframes breathing {
           0%, 100% {
             box-shadow: 0 8px 32px rgba(74, 144, 217, 0.25), 0 2px 8px rgba(0, 0, 0, 0.08);
@@ -251,6 +263,22 @@ export const NoteCard: React.FC<NoteCardProps> = ({
             border: '2px solid #4A90D9',
             animation: 'breathing 2s ease-in-out infinite',
             pointerEvents: 'none',
+          }}
+        />
+      )}
+
+      {isNew && (
+        <div
+          style={{
+            position: 'absolute',
+            inset: 0,
+            borderRadius: 12,
+            backgroundColor: card.color,
+            opacity: 0.8,
+            filter: 'blur(8px)',
+            pointerEvents: 'none',
+            zIndex: -1,
+            animation: 'glowFadeOut 0.3s ease-out forwards',
           }}
         />
       )}

@@ -196,6 +196,7 @@ const App: React.FC = () => {
     alignItems: 'center',
     gap: 6,
     fontFamily: 'inherit',
+    boxShadow: '0 1px 3px rgba(0, 0, 0, 0.15)',
   };
 
   return (
@@ -254,12 +255,12 @@ const App: React.FC = () => {
           onMouseEnter={(e) => {
             (e.currentTarget as HTMLElement).style.transform = 'scale(1.05)';
             (e.currentTarget as HTMLElement).style.background = 'rgba(255, 255, 255, 0.25)';
-            (e.currentTarget as HTMLElement).style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.2)';
+            (e.currentTarget as HTMLElement).style.boxShadow = '0 4px 16px rgba(0, 0, 0, 0.3)';
           }}
           onMouseLeave={(e) => {
             (e.currentTarget as HTMLElement).style.transform = 'scale(1)';
             (e.currentTarget as HTMLElement).style.background = 'rgba(255, 255, 255, 0.15)';
-            (e.currentTarget as HTMLElement).style.boxShadow = 'none';
+            (e.currentTarget as HTMLElement).style.boxShadow = '0 1px 3px rgba(0, 0, 0, 0.15)';
           }}
         >
           <span style={{ fontSize: 14 }}>➕</span>
@@ -272,12 +273,12 @@ const App: React.FC = () => {
           onMouseEnter={(e) => {
             (e.currentTarget as HTMLElement).style.transform = 'scale(1.05)';
             (e.currentTarget as HTMLElement).style.background = 'rgba(255, 255, 255, 0.25)';
-            (e.currentTarget as HTMLElement).style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.2)';
+            (e.currentTarget as HTMLElement).style.boxShadow = '0 4px 16px rgba(0, 0, 0, 0.3)';
           }}
           onMouseLeave={(e) => {
             (e.currentTarget as HTMLElement).style.transform = 'scale(1)';
             (e.currentTarget as HTMLElement).style.background = 'rgba(255, 255, 255, 0.15)';
-            (e.currentTarget as HTMLElement).style.boxShadow = 'none';
+            (e.currentTarget as HTMLElement).style.boxShadow = '0 1px 3px rgba(0, 0, 0, 0.15)';
           }}
         >
           <span style={{ fontSize: 14 }}>💾</span>
@@ -357,13 +358,15 @@ const App: React.FC = () => {
               to { opacity: 1; }
             }
             @keyframes modalPopIn {
-              from {
+              0% {
                 transform: translate(-50%, -50%) scale(0.5);
                 opacity: 0;
+                box-shadow: 0 0 0 rgba(0, 0, 0, 0), 0 0 0 rgba(0, 0, 0, 0);
               }
-              to {
+              100% {
                 transform: translate(-50%, -50%) scale(1);
                 opacity: 1;
+                box-shadow: 0 24px 64px rgba(0, 0, 0, 0.2), 0 8px 24px rgba(0, 0, 0, 0.12);
               }
             }
             @keyframes inputFocus {
@@ -384,7 +387,6 @@ const App: React.FC = () => {
               WebkitBackdropFilter: 'blur(20px)',
               borderRadius: 12,
               border: '1px solid rgba(255, 255, 255, 0.8)',
-              boxShadow: '0 24px 64px rgba(0, 0, 0, 0.2), 0 8px 24px rgba(0, 0, 0, 0.12)',
               padding: 24,
               zIndex: 2001,
               animation: 'modalPopIn 0.2s cubic-bezier(0.34, 1.56, 0.64, 1) forwards',
