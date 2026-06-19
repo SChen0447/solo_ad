@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>地质断层3D可视化系统</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { width: 100%; height: 100%; overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif; background: #1A1A2E; color: #E0E0E0; }
+    #app { width: 100%; height: 100%; position: relative; }
+    #canvas-container { width: 100%; height: 100%; display: block; }
+
+    #reset-btn {
+      position: absolute;
+      top: 24px;
+      left: 24px;
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background: #4A90D9;
+      border: none;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: box-shadow 0.2s ease, transform 0.2s ease;
+      box-shadow: 0 2px 8px rgba(74, 144, 217, 0.3);
+      z-index: 100;
+    }
+    #reset-btn:hover {
+      box-shadow: 0 4px 16px rgba(74, 144, 217, 0.7);
+      transform: scale(1.05);
+    }
+    #reset-btn svg { width: 20px; height: 20px; fill: white; }
+
+    #side-panel {
+      position: absolute;
+      top: 0;
+      right: 0;
+      width: 300px;
+      height: 100%;
+      background: rgba(22, 33, 62, 0.95);
+      backdrop-filter: blur(10px);
+      padding: 24px 20px;
+      border-left: 1px solid rgba(74, 144, 217, 0.3);
+      z-index: 90;
+      display: flex;
+      flex-direction: column;
+    }
+    #side-panel h2 {
+      font-size: 16px;
+      font-weight: 600;
+      margin-bottom: 6px;
+      color: #4A90D9;
+      letter-spacing: 1px;
+    }
+    #side-panel .subtitle {
+      font-size: 12px;
+      color: #8892B0;
+      margin-bottom: 28px;
+    }
+
+    .section { margin-bottom: 24px; }
+    .section-label {
+      font-size: 13px;
+      color: #A0AEC0;
+      margin-bottom: 12px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .depth-value {
+      font-size: 14px;
+      font-weight: 600;
+      color: #4A90D9;
+      background: rgba(74, 144, 217, 0.15);
+      padding: 2px 10px;
+      border-radius: 10px;
+    }
+
+    #depth-slider {
+      width: 100%;
+      height: 6px;
+      -webkit-appearance: none;
+      appearance: none;
+      background: linear-gradient(to right, #2D3A5A, #4A90D9);
+      border-radius: 3px;
+      outline: none;
+      cursor: pointer;
+      transition: box-shadow 0.2s ease;
+    }
+    #depth-slider:hover { box-shadow: 0 0 10px rgba(74, 144, 217, 0.5); }
+    #depth-slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: #FFFFFF;
+      border: 3px solid #4A90D9;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+    }
+    #depth-slider::-webkit-slider-thumb:hover {
+      box-shadow: 0 0 12px rgba(74, 144, 217, 0.8);
+      transform: scale(1.1);
+    }
+
+    #layer-info {
+      flex: 1;
+      overflow-y: auto;
+      padding-right: 8px;
+    }
+    #layer-info::-webkit-scrollbar { width: 4px; }
+    #layer-info::-webkit-scrollbar-track { background: transparent; }
+    #layer-info::-webkit-scrollbar-thumb { background: #4A90D9; border-radius: 2px; }
+
+    .info-title {
+      font-size: 12px;
+      color: #8892B0;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      margin-bottom: 12px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid rgba(74, 144, 217, 0.2);
+    }
+    .layer-item {
+      background: rgba(74, 144, 217, 0.08);
+      border-radius: 8px;
+      padding: 10px 12px;
+      margin-bottom: 8px;
+      transition: all 0.2s ease;
+      border-left: 3px solid transparent;
+    }
+    .layer-item:hover {
+      background: rgba(74, 144, 217, 0.15);
+      border-left-color: #4A90D9;
+      box-shadow: 0 2px 8px rgba(74, 144, 217, 0.3);
+    }
+    .layer-item .row1 {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 4px;
+    }
+    .layer-item .name {
+      font-size: 13px;
+      font-weight: 500;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .color-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 3px;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+    .layer-item .thickness {
+      font-size: 12px;
+      color: #4A90D9;
+      font-weight: 600;
+    }
+    .layer-item .hex {
+      font-size: 11px;
+      color: #A0AEC0;
+      font-family: 'Courier New', monospace;
+    }
+
+    #popup-card {
+      position: absolute;
+      background: rgba(22, 33, 62, 0.95);
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(74, 144, 217, 0.4);
+      border-radius: 12px;
+      padding: 16px 20px;
+      min-width: 240px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+      z-index: 200;
+      display: none;
+      pointer-events: auto;
+      transition: box-shadow 0.2s ease;
+    }
+    #popup-card:hover { box-shadow: 0 8px 32px rgba(74, 144, 217, 0.4); }
+    #popup-card .popup-title {
+      font-size: 15px;
+      font-weight: 600;
+      color: #FFFFFF;
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid rgba(74, 144, 217, 0.3);
+    }
+    #popup-card .popup-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 5px 0;
+      font-size: 13px;
+    }
+    #popup-card .popup-label { color: #8892B0; }
+    #popup-card .popup-value { color: #E0E0E0; font-weight: 500; }
+    #popup-close {
+      position: absolute;
+      top: 8px;
+      right: 10px;
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: transparent;
+      border: none;
+      color: #8892B0;
+      cursor: pointer;
+      font-size: 16px;
+      line-height: 1;
+      transition: all 0.2s ease;
+    }
+    #popup-close:hover { color: #FF6B6B; background: rgba(255, 107, 107, 0.1); }
+
+    #instructions {
+      position: absolute;
+      bottom: 20px;
+      left: 24px;
+      background: rgba(22, 33, 62, 0.9);
+      padding: 10px 16px;
+      border-radius: 8px;
+      font-size: 12px;
+      color: #8892B0;
+      border: 1px solid rgba(74, 144, 217, 0.2);
+      z-index: 90;
+    }
+    #instructions span { color: #4A90D9; font-weight: 500; }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <div id="canvas-container"></div>
+
+    <button id="reset-btn" title="复位视角">
+      <svg viewBox="0 0 24 24"><path d="M16 12V4h1V2H7v2h1v8l-2 2v2h5.2v6h1.6v-6H18v-2l-2-2z"/></svg>
+    </button>
+
+    <div id="side-panel">
+      <h2>地质断层可视化</h2>
+      <div class="subtitle">GEOLOGICAL FAULT VISUALIZER</div>
+
+      <div class="section">
+        <div class="section-label">
+          <span>深度截面查询</span>
+          <span class="depth-value"><span id="depth-display">0</span> m</span>
+        </div>
+        <input type="range" id="depth-slider" min="0" max="0" step="1" value="0" />
+      </div>
+
+      <div class="section" id="layer-info">
+        <div class="info-title">深度岩层构成</div>
+        <div id="layer-list">
+          <div style="font-size:12px; color:#666; padding:10px 0;">拖动滑块查询深度截面</div>
+        </div>
+      </div>
+    </div>
+
+    <div id="popup-card">
+      <button id="popup-close">&times;</button>
+      <div class="popup-title">
+        <span class="color-dot" id="popup-color"></span>
+        <span id="popup-name">岩层名称</span>
+      </div>
+      <div class="popup-row"><span class="popup-label">深度范围</span><span class="popup-value" id="popup-depth">-</span></div>
+      <div class="popup-row"><span class="popup-label">密&emsp;&emsp;度</span><span class="popup-value" id="popup-density">-</span></div>
+      <div class="popup-row"><span class="popup-label">估算年代</span><span class="popup-value" id="popup-era">-</span></div>
+    </div>
+
+    <div id="instructions">
+      <span>左键拖拽</span> 旋转 &nbsp;|&nbsp; <span>滚轮</span> 缩放 &nbsp;|&nbsp; <span>点击岩层</span> 查看详情
+    </div>
+  </div>
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
