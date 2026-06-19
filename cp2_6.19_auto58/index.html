@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>三维重力场行星模拟器</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      font-family: 'Courier New', 'Consolas', 'Monaco', monospace;
+      background: linear-gradient(135deg, #0a0a2e 0%, #1a1a3e 100%);
+    }
+
+    #app {
+      width: 100%;
+      height: 100%;
+      position: relative;
+    }
+
+    #canvas-container {
+      width: 100%;
+      height: 100%;
+      position: absolute;
+      top: 0;
+      left: 0;
+    }
+
+    .glass-panel {
+      background: rgba(255, 255, 255, 0.08);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 12px;
+      box-shadow: 0 4px 30px rgba(0, 0, 0, 0.3);
+    }
+
+    #info-panel {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      width: 280px;
+      padding: 20px;
+      color: #e0e0ff;
+      z-index: 100;
+      transition: transform 0.3s ease, box-shadow 0.3s ease;
+    }
+
+    #info-panel h2 {
+      font-size: 16px;
+      margin-bottom: 16px;
+      color: #ffcc00;
+      text-shadow: 0 0 10px rgba(255, 204, 0, 0.5);
+      letter-spacing: 1px;
+    }
+
+    .info-item {
+      display: flex;
+      justify-content: space-between;
+      padding: 10px 0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      font-size: 13px;
+    }
+
+    .info-item:last-child {
+      border-bottom: none;
+    }
+
+    .info-label {
+      color: #8888aa;
+    }
+
+    .info-value {
+      color: #ffffff;
+      font-weight: bold;
+    }
+
+    #info-panel.empty .info-content {
+      display: none;
+    }
+
+    #info-panel.empty::after {
+      content: '点击行星或按数字键 1-4 选择行星';
+      display: block;
+      text-align: center;
+      color: #6666aa;
+      padding: 20px 0;
+      font-size: 12px;
+    }
+
+    .slider-float-label {
+      position: absolute;
+      right: 10px;
+      top: 50%;
+      transform: translateY(-50%);
+      background: rgba(255, 204, 0, 0.9);
+      color: #000;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: bold;
+      pointer-events: none;
+      white-space: nowrap;
+    }
+
+    .dg.main .c {
+      position: relative !important;
+    }
+
+    @media (max-width: 768px) {
+      #info-panel {
+        top: auto;
+        bottom: 100px;
+        right: 10px;
+        left: 10px;
+        width: auto;
+      }
+
+      .dg.ac {
+        top: auto !important;
+        bottom: 0 !important;
+        left: 0 !important;
+        right: 0 !important;
+        width: 100% !important;
+        max-height: 40vh;
+      }
+    }
+
+    .dg.main .button {
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .dg.main .button:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+    }
+
+    .dg.main .slider {
+      transition: transform 0.2s ease;
+    }
+
+    .dg.main .slider:hover {
+      transform: translateY(-1px);
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <div id="canvas-container"></div>
+    <div id="info-panel" class="glass-panel empty">
+      <h2>行星信息面板</h2>
+      <div class="info-content">
+        <div class="info-item">
+          <span class="info-label">行星名称</span>
+          <span class="info-value" id="info-name">-</span>
+        </div>
+        <div class="info-item">
+          <span class="info-label">质量 (kg)</span>
+          <span class="info-value" id="info-mass">-</span>
+        </div>
+        <div class="info-item">
+          <span class="info-label">速度 (单位/s)</span>
+          <span class="info-value" id="info-speed">-</span>
+        </div>
+        <div class="info-item">
+          <span class="info-label">轨道半径 (单位)</span>
+          <span class="info-value" id="info-radius">-</span>
+        </div>
+        <div class="info-item">
+          <span class="info-label">公转周期 (s)</span>
+          <span class="info-value" id="info-period">-</span>
+        </div>
+      </div>
+    </div>
+  </div>
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
