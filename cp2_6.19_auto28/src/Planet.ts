@@ -53,9 +53,11 @@ export class Planet {
         color: 0xd4c4a8,
         side: THREE.DoubleSide,
         transparent: true,
-        opacity: 0.6
+        opacity: 0.6,
+        depthWrite: false
       });
       this.ring = new THREE.Mesh(ringGeometry, ringMaterial);
+      this.ring.renderOrder = 1;
       this.ring.rotation.x = -Math.PI / 2.5;
       this.mesh.add(this.ring);
     }

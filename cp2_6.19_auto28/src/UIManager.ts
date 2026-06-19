@@ -139,10 +139,11 @@ export class UIManager {
         z-index: 200;
         pointer-events: none;
         border: 1px solid rgba(255, 255, 255, 0.2);
-        animation: fadeIn 0.2s ease-out forwards;
+        transform: translateX(-50%) translateY(-100%);
+        animation: popupFadeIn 0.2s ease-out forwards;
       }
       .info-popup.fading {
-        animation: fadeOut 0.5s ease-out forwards;
+        animation: popupFadeOut 0.5s ease-out forwards;
       }
       .info-popup .popup-title {
         font-size: 16px;
@@ -154,6 +155,14 @@ export class UIManager {
         color: #aaa;
         line-height: 1.5;
       }
+      @keyframes popupFadeIn {
+        from { opacity: 0; }
+        to { opacity: 1; }
+      }
+      @keyframes popupFadeOut {
+        from { opacity: 1; }
+        to { opacity: 0; }
+      }
       @media (max-width: 1024px) {
         #controlPanel {
           left: 0 !important;
@@ -164,8 +173,12 @@ export class UIManager {
           border-radius: 0;
           display: flex;
           align-items: center;
-          gap: 10px;
-          padding: 0 10px !important;
+          gap: 8px;
+          padding: 0 12px !important;
+          overflow-x: auto;
+          overflow-y: hidden;
+          flex-wrap: nowrap;
+          animation: none;
         }
         #controlPanel h3 {
           display: none;
@@ -174,13 +187,42 @@ export class UIManager {
           display: none;
         }
         #controlPanel .value-display {
-          display: none;
+          font-size: 10px;
+          margin: 0;
+          white-space: nowrap;
+          padding: 0 4px;
+          flex-shrink: 0;
         }
-        #controlPanel select, #controlPanel input[type="range"], #controlPanel button {
+        #controlPanel select,
+        #controlPanel input[type="range"],
+        #controlPanel button {
           width: auto;
           margin: 0;
-          flex: 1;
+          flex-shrink: 0;
+          min-width: 50px;
+          height: 32px;
+          padding: 4px 8px;
+          font-size: 11px;
+        }
+        #controlPanel select {
+          min-width: 70px;
+        }
+        #controlPanel input[type="range"] {
+          width: 80px;
           min-width: 60px;
+        }
+        #controlPanel .button-group {
+          display: flex;
+          gap: 4px;
+          margin: 0;
+          flex-shrink: 0;
+        }
+        #controlPanel .button-group button {
+          flex: none;
+          margin: 0;
+          padding: 4px 10px;
+          font-size: 11px;
+          white-space: nowrap;
         }
       }
     `;
@@ -265,7 +307,7 @@ export class UIManager {
     const screenPos = worldPos.clone().project(this.camera);
 
     const x = (screenPos.x * 0.5 + 0.5) * window.innerWidth;
-    const y = (-screenPos.y * 0.5 + 0.5) * window.innerHeight - 20;
+    const y = (-screenPos.y * 0.5 + 0.5) * window.innerHeight;
 
     this.infoPopup = document.createElement('div');
     this.infoPopup.className = 'info-popup';
@@ -276,8 +318,8 @@ export class UIManager {
         公转速度: ${planet.orbitSpeed.toFixed(2)}
       </div>
     `;
-    this.infoPopup.style.left = `${Math.max(10, Math.min(window.innerWidth - 210, x - 100))}px`;
-    this.infoPopup.style.top = `${Math.max(10, y - 80)}px`;
+    this.infoPopup.style.left = `${Math.max(110, Math.min(window.innerWidth - 110, x))}px`;
+    this.infoPopup.style.top = `${Math.max(10, y - 20)}px`;
 
     this.container.appendChild(this.infoPopup);
 
@@ -313,10 +355,10 @@ export class UIManager {
     const screenPos = worldPos.clone().project(this.camera);
 
     const x = (screenPos.x * 0.5 + 0.5) * window.innerWidth;
-    const y = (-screenPos.y * 0.5 + 0.5) * window.innerHeight - 20;
+    const y = (-screenPos.y * 0.5 + 0.5) * window.innerHeight;
 
-    this.infoPopup.style.left = `${Math.max(10, Math.min(window.innerWidth - 210, x - 100))}px`;
-    this.infoPopup.style.top = `${Math.max(10, y - 80)}px`;
+    this.infoPopup.style.left = `${Math.max(110, Math.min(window.innerWidth - 110, x))}px`;
+    this.infoPopup.style.top = `${Math.max(10, y - 20)}px`;
   }
 
   public getSelectedPlanetIndex(): number {

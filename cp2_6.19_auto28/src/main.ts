@@ -139,6 +139,17 @@ class CameraController {
       const t = Math.min(1, this.transitionProgress);
       const easedT = easeInOutCubic(t);
 
+      if (this.transitionMode === 'follow' && this.followPlanet) {
+        const planetPos = this.followPlanet.getPosition();
+        this.transitionTargetPos = new THREE.Vector3(planetPos.x, planetPos.y + 1, planetPos.z);
+        const forwardAngle = this.followPlanet.angle + Math.PI / 2;
+        this.transitionTargetLook = new THREE.Vector3(
+          planetPos.x + Math.cos(forwardAngle) * 3,
+          planetPos.y,
+          planetPos.z + Math.sin(forwardAngle) * 3
+        );
+      }
+
       if (this.transitionStart && this.transitionTargetPos && this.transitionTargetLook) {
         const currentPos = new THREE.Vector3().lerpVectors(
           this.transitionStart,
@@ -171,8 +182,7 @@ class CameraController {
       }
     } else if (this.mode === 'follow' && this.followPlanet) {
       const planetPos = this.followPlanet.getPosition();
-      const cameraOffset = new THREE.Vector3(0, 1, 0);
-      this.camera.position.copy(planetPos).add(cameraOffset);
+      this.camera.position.set(planetPos.x, planetPos.y + 1, planetPos.z);
 
       const forwardAngle = this.followPlanet.angle + Math.PI / 2;
       const lookTarget = new THREE.Vector3(
@@ -317,9 +327,9 @@ class App {
   }
 
   private handleGlobalView(): void {
-    this.cameraController.animateToGlobalView();
     this.cameraController.setFollowPlanet(null);
     this.cameraController.setOrbitTarget(new THREE.Vector3(0, 0, 0));
+    this.cameraController.animateToGlobalView();
   }
 
   private handleFollowPlanet(): void {
