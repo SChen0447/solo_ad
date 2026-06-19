@@ -7,27 +7,34 @@ interface HistoryTimelineProps {
   onClear: (snapshot: HistorySnapshot) => void;
 }
 
-function formatTime(timestamp: number): string {
+function getTimeAgo(timestamp: number): string {
+  const now = Date.now();
+  const diff = Math.max(0, now - timestamp);
+  const sec = Math.floor(diff / 1000);
+  const min = Math.floor(sec / 60);
+  const hr = Math.floor(min / 60);
+  const day = Math.floor(hr / 24);
+
+  if (sec < 5) return '刚刚';
+  if (sec < 60) return `${sec} 秒前`;
+  if (min < 60) return `${min} 分钟前`;
+  if (hr < 24) return `${hr} 小时前`;
+  if (day < 7) return `${day} 天前`;
+
+  const d = new Date(timestamp);
+  const mm = (d.getMonth() + 1).toString().padStart(2, '0');
+  const dd = d.getDate().toString().padStart(2, '0');
+  const hh = d.getHours().toString().padStart(2, '0');
+  const mi = d.getMinutes().toString().padStart(2, '0');
+  return `${mm}-${dd} ${hh}:${mi}`;
+}
+
+function formatExactTime(timestamp: number): string {
   const d = new Date(timestamp);
   const hh = d.getHours().toString().padStart(2, '0');
   const mm = d.getMinutes().toString().padStart(2, '0');
   const ss = d.getSeconds().toString().padStart(2, '0');
   return `${hh}:${mm}:${ss}`;
-}
-
-function formatDate(timestamp: number): string {
-  const d = new Date(timestamp);
-  const now = new Date();
-  const isToday =
-    d.getFullYear() === now.getFullYear() &&
-    d.getMonth() === now.getMonth() &&
-    d.getDate() === now.getDate();
-  if (isToday) {
-    return `今天 ${formatTime(timestamp)}`;
-  }
-  const mm = (d.getMonth() + 1).toString().padStart(2, '0');
-  const dd = d.getDate().toString().padStart(2, '0');
-  return `${mm}-${dd} ${formatTime(timestamp)}`;
 }
 
 export default function HistoryTimeline({
@@ -81,8 +88,23 @@ export default function HistoryTimeline({
               className={`timeline-item ${activeId === snap.id ? 'active' : ''}`}
               onClick={() => onRestore(snap)}
               style={{ animationDelay: `${index * 0.03}s` }}
+              title={`保存于 ${formatExactTime(snap.timestamp)}`}
             >
-              <div className="timeline-time">{formatDate(snap.timestamp)}</div>
+              <div className="timeline-time">
+                <span
+                  style={{
+                    fontWeight: 700,
+                    display: 'block',
+                    fontSize: 12,
+                    marginBottom: 2,
+                  }}
+                >
+                  {getTimeAgo(snap.timestamp)}
+                </span>
+                <span style={{ fontSize: 10, opacity: 0.6 }}>
+                  {formatExactTime(snap.timestamp)}
+                </span>
+              </div>
               <div
                 style={{
                   fontSize: 11,

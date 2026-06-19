@@ -372,7 +372,7 @@ export default function App() {
               <div className="hue-slider-container">
                 <input
                   type="range"
-                  className="hue-slider"
+                  className="hue-slider secondary"
                   min={0}
                   max={360}
                   value={secondaryHue}
