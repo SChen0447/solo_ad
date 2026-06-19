@@ -50,7 +50,11 @@ const App: React.FC = () => {
     anim.target = targetPct;
     const startValue = anim.current;
     const start = performance.now();
-    const duration = 900;
+
+    const delta = Math.abs(targetPct - startValue);
+    const maxDuration = 900;
+    const minDuration = 150;
+    const duration = Math.max(minDuration, Math.min(maxDuration, (delta / 100) * maxDuration));
 
     if (anim.rafId !== null) {
       cancelAnimationFrame(anim.rafId);

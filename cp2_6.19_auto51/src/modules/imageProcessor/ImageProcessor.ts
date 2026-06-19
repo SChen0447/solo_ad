@@ -33,20 +33,65 @@ function rgbToLab(r: number, g: number, b: number): [number, number, number] {
   return [116 * fy - 16, 500 * (fx - fy), 200 * (fy - fz)];
 }
 
-function applyMorandiTone(rgb: [number, number, number]): [number, number, number] {
-  const [L, a, b] = rgbToLab(rgb[0], rgb[1], rgb[2]);
-  const satFactor = 0.55;
-  const lightShift = 12;
-  const newA = a * satFactor;
-  const newB = b * satFactor;
-  const newL = Math.min(92, L + lightShift * (1 - L / 100));
-  const fy = (newL + 16) / 116;
-  const fx = newA / 500 + fy;
-  const fz = fy - newB / 200;
+function rgbToHue(r: number, g: number, b: number): number {
+  const rr = r / 255;
+  const gg = g / 255;
+  const bb = b / 255;
+  const max = Math.max(rr, gg, bb);
+  const min = Math.min(rr, gg, bb);
+  const delta = max - min;
+  if (delta === 0) return 0;
+  let h = 0;
+  if (max === rr) {
+    h = ((gg - bb) / delta) % 6;
+  } else if (max === gg) {
+    h = (bb - rr) / delta + 2;
+  } else {
+    h = (rr - gg) / delta + 4;
+  }
+  h = (h * 60 + 360) % 360;
+  return h;
+}
+
+function getHueSatFactor(hue: number): number {
+  const h = hue;
+  const keyPoints: Array<[number, number]> = [
+    [0, 0.62],
+    [30, 0.58],
+    [55, 0.52],
+    [85, 0.50],
+    [120, 0.52],
+    [160, 0.55],
+    [190, 0.58],
+    [225, 0.64],
+    [260, 0.60],
+    [295, 0.56],
+    [330, 0.60],
+    [360, 0.62]
+  ];
+
+  if (h <= keyPoints[0][0]) return keyPoints[0][1];
+  if (h >= keyPoints[keyPoints.length - 1][0]) return keyPoints[keyPoints.length - 1][1];
+
+  for (let i = 0; i < keyPoints.length - 1; i++) {
+    const [h1, f1] = keyPoints[i];
+    const [h2, f2] = keyPoints[i + 1];
+    if (h >= h1 && h <= h2) {
+      const t = (h - h1) / (h2 - h1);
+      return f1 + (f2 - f1) * t;
+    }
+  }
+  return 0.55;
+}
+
+function labToRgb(L: number, a: number, b: number): [number, number, number] {
+  const fy = (L + 16) / 116;
+  const fx = a / 500 + fy;
+  const fz = fy - b / 200;
   const e = 0.008856;
   const k = 903.3;
   const xr = fx * fx * fx > e ? fx * fx * fx : (116 * fx - 16) / k;
-  const yr = newL > k * e ? Math.pow((newL + 16) / 116, 3) : newL / k;
+  const yr = L > k * e ? Math.pow((L + 16) / 116, 3) : L / k;
   const zr = fz * fz * fz > e ? fz * fz * fz : (116 * fz - 16) / k;
   const x = xr * 0.95047;
   const y = yr * 1.00000;
@@ -60,6 +105,29 @@ function applyMorandiTone(rgb: [number, number, number]): [number, number, numbe
   gg = Math.max(0, Math.min(255, Math.round(srgb(gg) * 255)));
   bb = Math.max(0, Math.min(255, Math.round(srgb(bb) * 255)));
   return [rr, gg, bb];
+}
+
+function applyMorandiTone(rgb: [number, number, number]): [number, number, number] {
+  const [L, a, b] = rgbToLab(rgb[0], rgb[1], rgb[2]);
+
+  const hue = rgbToHue(rgb[0], rgb[1], rgb[2]);
+  const satFactor = getHueSatFactor(hue);
+
+  const chroma = Math.sqrt(a * a + b * b);
+  const newChroma = chroma * satFactor;
+
+  let newA = a;
+  let newB = b;
+  if (chroma > 0.001) {
+    const scale = newChroma / chroma;
+    newA = a * scale;
+    newB = b * scale;
+  }
+
+  const lightShift = 10 + (satFactor - 0.5) * 20;
+  const newL = Math.min(92, Math.max(8, L + lightShift * (1 - L / 100)));
+
+  return labToRgb(newL, newA, newB);
 }
 
 interface ColorBucket {

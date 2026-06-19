@@ -28,12 +28,14 @@ export class CanvasEngine {
   private displaySize: { width: number; height: number } = { width: 0, height: 0 };
   private numberFadePlayed: Set<string> = new Set();
   private hoveredRegionId: string | null = null;
+  private dpr: number = 1;
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
     const ctx = canvas.getContext('2d');
     if (!ctx) throw new Error('Canvas 2D context not available');
     this.ctx = ctx;
+    this.dpr = Math.min(window?.devicePixelRatio || 1, 3);
     this.animationManager = new AnimationManager();
     this.state = {
       fillProgress: new Map(),
@@ -107,8 +109,11 @@ export class CanvasEngine {
 
   setDisplaySize(width: number, height: number): void {
     this.displaySize = { width, height };
-    this.canvas.width = width;
-    this.canvas.height = height;
+    this.canvas.width = Math.round(width * this.dpr);
+    this.canvas.height = Math.round(height * this.dpr);
+    this.canvas.style.width = `${width}px`;
+    this.canvas.style.height = `${height}px`;
+    this.ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
     this.adjustDisplaySize();
     this.render();
   }
@@ -368,6 +373,7 @@ export class CanvasEngine {
     const n = boundary.length;
     if (n < 3) return false;
 
+    const EPS = 1e-9;
     let inside = false;
     let j = n - 1;
 
@@ -377,17 +383,40 @@ export class CanvasEngine {
       const xj = boundary[j].x;
       const yj = boundary[j].y;
 
-      const yiAbove = yi > py;
-      const yjAbove = yj > py;
+      const dy = yj - yi;
+      if (Math.abs(dy) < EPS) continue;
 
-      if (yiAbove === yjAbove) continue;
+      const yiAbove = yi > py + EPS;
+      const yjAbove = yj > py + EPS;
+      const yiBelow = yi < py - EPS;
+      const yjBelow = yj < py - EPS;
+
+      if (yiAbove === yjAbove && yiBelow === yjBelow) continue;
+
+      const yiOn = !yiAbove && !yiBelow;
+      const yjOn = !yjAbove && !yjBelow;
+
+      if (yiOn && yjOn) continue;
+
+      if (yiOn) {
+        const prevIdx = (i - 1 + n) % n;
+        const yPrev = boundary[prevIdx].y;
+        const yPrevAbove = yPrev > py + EPS;
+        if (yPrevAbove === yjAbove) continue;
+      }
+
+      if (yjOn) {
+        const nextIdx = (j + 1) % n;
+        const yNext = boundary[nextIdx].y;
+        const yNextAbove = yNext > py + EPS;
+        if (yNextAbove === yiAbove) continue;
+      }
 
       const dx = xj - xi;
-      const dy = yj - yi;
       const t = (py - yi) / dy;
       const xIntersect = xi + t * dx;
 
-      if (px < xIntersect) {
+      if (px < xIntersect - EPS) {
         inside = !inside;
       }
     }
