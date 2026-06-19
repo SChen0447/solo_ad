@@ -1,0 +1,596 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>文物数字展柜</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      background: #1a2332;
+      color: #ffffff;
+    }
+    
+    #app {
+      position: relative;
+      width: 100%;
+      height: 100%;
+    }
+    
+    #canvas-container {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+    }
+    
+    #canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+    
+    #ui-container {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 10;
+    }
+    
+    .loading-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(26, 35, 50, 0.95);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+      transition: opacity 0.5s ease;
+    }
+    
+    .loading-overlay.hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
+    
+    .loading-title {
+      font-size: 32px;
+      color: #cba86a;
+      margin-bottom: 30px;
+      letter-spacing: 4px;
+    }
+    
+    .loading-bar {
+      width: 300px;
+      height: 4px;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 2px;
+      overflow: hidden;
+    }
+    
+    .loading-progress {
+      height: 100%;
+      background: linear-gradient(90deg, #cba86a, #b39ddb);
+      width: 0%;
+      transition: width 0.3s ease;
+    }
+    
+    .loading-text {
+      margin-top: 15px;
+      font-size: 14px;
+      color: rgba(255, 255, 255, 0.6);
+    }
+    
+    .guide-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(26, 35, 50, 0.85);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 90;
+      opacity: 1;
+      transition: opacity 0.5s ease;
+      backdrop-filter: blur(8px);
+    }
+    
+    .guide-overlay.hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
+    
+    .guide-content {
+      text-align: center;
+      max-width: 600px;
+      padding: 40px;
+    }
+    
+    .guide-title {
+      font-size: 28px;
+      color: #cba86a;
+      margin-bottom: 40px;
+      letter-spacing: 2px;
+    }
+    
+    .guide-items {
+      display: flex;
+      gap: 40px;
+      justify-content: center;
+    }
+    
+    .guide-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 15px;
+      opacity: 0;
+      transform: translateY(20px);
+      animation: guideItemIn 0.6s ease forwards;
+    }
+    
+    .guide-item:nth-child(1) { animation-delay: 0.2s; }
+    .guide-item:nth-child(2) { animation-delay: 0.4s; }
+    .guide-item:nth-child(3) { animation-delay: 0.6s; }
+    
+    @keyframes guideItemIn {
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+    
+    .guide-icon {
+      width: 60px;
+      height: 60px;
+      border-radius: 50%;
+      background: rgba(203, 168, 106, 0.2);
+      border: 2px solid #cba86a;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      animation: guidePulse 2s ease-in-out infinite;
+    }
+    
+    @keyframes guidePulse {
+      0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(203, 168, 106, 0.4); }
+      50% { transform: scale(1.1); box-shadow: 0 0 20px 10px rgba(203, 168, 106, 0); }
+    }
+    
+    .guide-text {
+      font-size: 14px;
+      color: rgba(255, 255, 255, 0.8);
+    }
+    
+    .relic-list {
+      position: absolute;
+      left: 20px;
+      top: 50%;
+      transform: translateY(-50%);
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 12px;
+      pointer-events: auto;
+      z-index: 20;
+    }
+    
+    .relic-card {
+      width: 120px;
+      height: 160px;
+      border-radius: 12px;
+      background: rgba(26, 35, 50, 0.6);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(203, 168, 106, 0.3);
+      cursor: pointer;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 12px;
+      overflow: hidden;
+      position: relative;
+    }
+    
+    .relic-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(135deg, rgba(203, 168, 106, 0.1), transparent);
+      opacity: 0;
+      transition: opacity 0.3s ease;
+      pointer-events: none;
+    }
+    
+    .relic-card:hover {
+      transform: translateY(-4px) scale(1.05);
+      border-color: rgba(203, 168, 106, 0.6);
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    }
+    
+    .relic-card:hover::before {
+      opacity: 1;
+    }
+    
+    .relic-card.active {
+      border-color: #cba86a;
+      box-shadow: 0 0 20px rgba(203, 168, 106, 0.4);
+    }
+    
+    .relic-card.active::after {
+      content: '';
+      position: absolute;
+      top: -50%;
+      left: -50%;
+      width: 200%;
+      height: 200%;
+      background: radial-gradient(circle, rgba(203, 168, 106, 0.15) 0%, transparent 70%);
+      animation: relicGlow 3s ease-in-out infinite;
+      pointer-events: none;
+    }
+    
+    @keyframes relicGlow {
+      0%, 100% { opacity: 0.5; transform: scale(1); }
+      50% { opacity: 1; transform: scale(1.1); }
+    }
+    
+    .relic-preview {
+      width: 60px;
+      height: 60px;
+      border-radius: 8px;
+      background: linear-gradient(135deg, rgba(203, 168, 106, 0.3), rgba(179, 157, 219, 0.3));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 8px;
+      font-size: 24px;
+    }
+    
+    .relic-name {
+      font-size: 12px;
+      color: #ffffff;
+      text-align: center;
+      line-height: 1.4;
+    }
+    
+    .relic-dynasty {
+      font-size: 10px;
+      color: rgba(255, 255, 255, 0.5);
+      margin-top: 4px;
+    }
+    
+    .view-mode-controls {
+      position: absolute;
+      right: 20px;
+      bottom: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      pointer-events: auto;
+      z-index: 20;
+    }
+    
+    .view-mode-btn {
+      width: 50px;
+      height: 50px;
+      border-radius: 50%;
+      background: rgba(26, 35, 50, 0.6);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(203, 168, 106, 0.3);
+      color: rgba(255, 255, 255, 0.8);
+      cursor: pointer;
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 11px;
+      font-weight: 500;
+    }
+    
+    .view-mode-btn:hover {
+      background: rgba(203, 168, 106, 0.2);
+      border-color: rgba(203, 168, 106, 0.6);
+      transform: scale(1.05);
+    }
+    
+    .view-mode-btn.active {
+      background: rgba(203, 168, 106, 0.3);
+      border-color: #cba86a;
+      color: #cba86a;
+      animation: btnBounce 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+    }
+    
+    @keyframes btnBounce {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.2); }
+      100% { transform: scale(1); }
+    }
+    
+    .info-panel {
+      position: absolute;
+      right: 20px;
+      top: 50%;
+      transform: translateY(-50%) translateX(100%);
+      width: 320px;
+      max-height: 80vh;
+      background: rgba(26, 35, 50, 0.7);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(203, 168, 106, 0.3);
+      border-radius: 16px;
+      padding: 24px;
+      pointer-events: auto;
+      z-index: 30;
+      opacity: 0;
+      transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+      overflow-y: auto;
+    }
+    
+    .info-panel.visible {
+      transform: translateY(-50%) translateX(0);
+      opacity: 1;
+    }
+    
+    .info-panel::-webkit-scrollbar {
+      width: 4px;
+    }
+    
+    .info-panel::-webkit-scrollbar-track {
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 2px;
+    }
+    
+    .info-panel::-webkit-scrollbar-thumb {
+      background: rgba(203, 168, 106, 0.5);
+      border-radius: 2px;
+    }
+    
+    .info-title {
+      font-size: 24px;
+      color: #cba86a;
+      margin-bottom: 8px;
+      font-weight: 600;
+    }
+    
+    .info-dynasty {
+      font-size: 14px;
+      color: #b39ddb;
+      margin-bottom: 20px;
+    }
+    
+    .info-section {
+      margin-bottom: 20px;
+    }
+    
+    .info-label {
+      font-size: 12px;
+      color: rgba(255, 255, 255, 0.5);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 8px;
+    }
+    
+    .info-value {
+      font-size: 14px;
+      color: rgba(255, 255, 255, 0.9);
+      line-height: 1.6;
+    }
+    
+    .info-dimensions {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+      margin-top: 8px;
+    }
+    
+    .dimension-item {
+      text-align: center;
+      padding: 12px;
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 8px;
+    }
+    
+    .dimension-value {
+      font-size: 16px;
+      color: #cba86a;
+      font-weight: 600;
+      font-family: 'SF Mono', Monaco, 'Courier New', monospace;
+    }
+    
+    .dimension-unit {
+      font-size: 11px;
+      color: rgba(255, 255, 255, 0.5);
+      margin-top: 4px;
+    }
+    
+    .annotation-list {
+      margin-top: 16px;
+    }
+    
+    .annotation-item {
+      padding: 12px;
+      background: rgba(255, 255, 255, 0.03);
+      border-radius: 8px;
+      margin-bottom: 8px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      border-left: 3px solid transparent;
+    }
+    
+    .annotation-item:hover {
+      background: rgba(203, 168, 106, 0.1);
+      border-left-color: #cba86a;
+    }
+    
+    .annotation-title {
+      font-size: 13px;
+      color: #cba86a;
+      margin-bottom: 4px;
+    }
+    
+    .annotation-content {
+      font-size: 12px;
+      color: rgba(255, 255, 255, 0.7);
+      line-height: 1.5;
+    }
+    
+    .detail-card {
+      position: absolute;
+      background: rgba(26, 35, 50, 0.9);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(203, 168, 106, 0.4);
+      border-radius: 12px;
+      padding: 20px;
+      min-width: 240px;
+      max-width: 320px;
+      pointer-events: auto;
+      z-index: 40;
+      opacity: 0;
+      transform: translateY(10px);
+      transition: all 0.3s ease;
+    }
+    
+    .detail-card.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+    
+    .detail-title {
+      font-size: 18px;
+      color: #cba86a;
+      margin-bottom: 12px;
+    }
+    
+    .detail-content {
+      font-size: 14px;
+      color: rgba(255, 255, 255, 0.85);
+      line-height: 1.7;
+    }
+    
+    .detail-close {
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.1);
+      border: none;
+      color: rgba(255, 255, 255, 0.6);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+      transition: all 0.2s ease;
+    }
+    
+    .detail-close:hover {
+      background: rgba(255, 255, 255, 0.2);
+      color: #ffffff;
+    }
+    
+    @media (max-width: 1024px) {
+      .relic-list {
+        grid-template-columns: repeat(2, 1fr);
+        left: 10px;
+        gap: 8px;
+      }
+      
+      .relic-card {
+        width: 90px;
+        height: 120px;
+        padding: 8px;
+      }
+      
+      .relic-preview {
+        width: 40px;
+        height: 40px;
+        font-size: 18px;
+      }
+      
+      .relic-name {
+        font-size: 11px;
+      }
+      
+      .info-panel {
+        width: 260px;
+        right: 10px;
+        padding: 16px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <div id="canvas-container">
+      <canvas id="canvas"></canvas>
+    </div>
+    <div id="ui-container">
+      <div class="loading-overlay" id="loading-overlay">
+      <div class="loading-title">文物数字展柜</div>
+      <div class="loading-bar">
+        <div class="loading-progress" id="loading-progress"></div>
+      </div>
+      <div class="loading-text" id="loading-text">0%</div>
+    </div>
+    
+    <div class="guide-overlay hidden" id="guide-overlay">
+      <div class="guide-content">
+        <div class="guide-title">欢迎来到文物数字展柜</div>
+        <div class="guide-items">
+          <div class="guide-item">
+            <div class="guide-icon">🖱️</div>
+            <div class="guide-text">拖拽旋转</div>
+          </div>
+          <div class="guide-item">
+            <div class="guide-icon">🔍</div>
+            <div class="guide-text">滚轮缩放</div>
+          </div>
+          <div class="guide-item">
+            <div class="guide-icon">👆</div>
+            <div class="guide-text">点击选择文物</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <div class="relic-list" id="relic-list"></div>
+    
+    <div class="view-mode-controls" id="view-mode-controls">
+      <button class="view-mode-btn active" data-mode="free">自由</button>
+      <button class="view-mode-btn" data-mode="focus">聚焦</button>
+      <button class="view-mode-btn" data-mode="explosion">分解</button>
+    </div>
+    
+    <div class="info-panel" id="info-panel"></div>
+  </div>
+  </div>
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
