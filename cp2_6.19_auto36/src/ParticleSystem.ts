@@ -26,6 +26,12 @@ const THEMES: Record<ThemeType, ThemeColors> = {
   }
 }
 
+export interface ParticleSystemConfig {
+  attractionRadius?: number
+  attractionStrength?: number
+  swirlStrength?: number
+}
+
 export class ParticleSystem {
   private scene: THREE.Scene
   private particles: THREE.Points
@@ -35,18 +41,24 @@ export class ParticleSystem {
   private targetColors: Float32Array
   private sizes: Float32Array
   private originalPositions: Float32Array
+  private particleAngles: Float32Array
   private particleCount: number
   private currentTheme: ThemeType = 'rainbow'
   private attractPosition: THREE.Vector3 | null = null
   private isFist: boolean = false
-  private attractionRadius: number = 100
-  private attractionStrength: number = 0.05
+  private attractionRadius: number
+  private attractionStrength: number
+  private swirlStrength: number
   private time: number = 0
   private colorTransitionProgress: number = 1
+  private fistRadius: number = 80
 
-  constructor(scene: THREE.Scene, count: number = 5000) {
+  constructor(scene: THREE.Scene, count: number = 5000, config: ParticleSystemConfig = {}) {
     this.scene = scene
     this.particleCount = count
+    this.attractionRadius = config.attractionRadius ?? 100
+    this.attractionStrength = config.attractionStrength ?? 0.05
+    this.swirlStrength = config.swirlStrength ?? 0.8
 
     this.positions = new Float32Array(count * 3)
     this.velocities = new Float32Array(count * 3)
@@ -54,6 +66,7 @@ export class ParticleSystem {
     this.targetColors = new Float32Array(count * 3)
     this.sizes = new Float32Array(count)
     this.originalPositions = new Float32Array(count * 3)
+    this.particleAngles = new Float32Array(count)
 
     this.initParticles()
 
@@ -70,22 +83,41 @@ export class ParticleSystem {
         attribute float size;
         varying vec3 vColor;
         varying float vSize;
+        varying vec3 vWorldPosition;
         void main() {
           vColor = color;
           vSize = size;
           vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+          vWorldPosition = position;
           gl_PointSize = size * (300.0 / -mvPosition.z);
           gl_Position = projectionMatrix * mvPosition;
         }
       `,
       fragmentShader: `
         varying vec3 vColor;
+        varying float vSize;
+        varying vec3 vWorldPosition;
         void main() {
-          float dist = length(gl_PointCoord - vec2(0.5));
+          vec2 center = gl_PointCoord - vec2(0.5);
+          float dist = length(center);
           if (dist > 0.5) discard;
-          float alpha = 1.0 - smoothstep(0.0, 0.5, dist);
-          vec3 glow = vColor * 1.5;
-          gl_FragColor = vec4(glow, alpha * 0.9);
+
+          float core = 1.0 - smoothstep(0.0, 0.2, dist);
+          float innerGlow = 1.0 - smoothstep(0.0, 0.4, dist);
+          float outerGlow = 1.0 - smoothstep(0.15, 0.5, dist);
+
+          float alpha = innerGlow * 0.95 + outerGlow * 0.35;
+
+          vec3 coreColor = vColor * 2.0;
+          vec3 glowColor = vColor * 1.3;
+          vec3 haloColor = vColor * 0.7;
+
+          vec3 finalColor = coreColor * core + glowColor * innerGlow + haloColor * outerGlow * 0.5;
+
+          float flare = pow(1.0 - dist, 4.0);
+          finalColor += vColor * flare * 0.5;
+
+          gl_FragColor = vec4(finalColor, clamp(alpha, 0.0, 1.0));
         }
       `,
       transparent: true,
@@ -135,6 +167,7 @@ export class ParticleSystem {
       this.targetColors[i3 + 2] = color.b
 
       this.sizes[i] = 1 + Math.random() * 3
+      this.particleAngles[i] = Math.random() * Math.PI * 2
     }
   }
 
@@ -204,26 +237,60 @@ export class ParticleSystem {
         const dz = this.attractPosition.z - this.positions[i3 + 2]
         const dist = Math.sqrt(dx * dx + dy * dy + dz * dz)
 
-        if (dist < this.attractionRadius && dist > 0) {
-          const force = this.attractionStrength * (1 - dist / this.attractionRadius)
-          this.velocities[i3] += (dx / dist) * force
-          this.velocities[i3 + 1] += (dy / dist) * force
-          this.velocities[i3 + 2] += (dz / dist) * force
+        if (dist < this.attractionRadius && dist > 0.1) {
+          const t = 1 - dist / this.attractionRadius
+          const force = this.attractionStrength * t
+          const normDx = dx / dist
+          const normDy = dy / dist
+          const normDz = dz / dist
 
-          const tangentX = -dy / dist
-          const tangentY = dx / dist
-          const tangentZ = (Math.random() - 0.5) * 0.1
-          const swirlForce = force * 0.3
-          this.velocities[i3] += tangentX * swirlForce
-          this.velocities[i3 + 1] += tangentY * swirlForce
-          this.velocities[i3 + 2] += tangentZ * swirlForce
+          this.velocities[i3] += normDx * force
+          this.velocities[i3 + 1] += normDy * force
+          this.velocities[i3 + 2] += normDz * force
+
+          this.particleAngles[i] += deltaTime * (2 + t * 6) * this.swirlStrength
+          const angle = this.particleAngles[i]
+          const cosA = Math.cos(angle)
+          const sinA = Math.sin(angle)
+
+          const upX = 0, upY = 1, upZ = 0
+          let tanX = upY * normDz - upZ * normDy
+          let tanY = upZ * normDx - upX * normDz
+          let tanZ = upX * normDy - upY * normDx
+          const tanLen = Math.sqrt(tanX * tanX + tanY * tanY + tanZ * tanZ)
+          if (tanLen > 0.001) {
+            tanX /= tanLen
+            tanY /= tanLen
+            tanZ /= tanLen
+          } else {
+            tanX = 1; tanY = 0; tanZ = 0
+          }
+
+          let biX = normDy * tanZ - normDz * tanY
+          let biY = normDz * tanX - normDx * tanZ
+          let biZ = normDx * tanY - normDy * tanX
+
+          const swirlForce = this.swirlStrength * force * (0.5 + t * 0.8)
+          const swirlX = (tanX * cosA + biX * sinA) * swirlForce
+          const swirlY = (tanY * cosA + biY * sinA) * swirlForce
+          const swirlZ = (tanZ * cosA + biZ * sinA) * swirlForce
+
+          this.velocities[i3] += swirlX
+          this.velocities[i3 + 1] += swirlY
+          this.velocities[i3 + 2] += swirlZ
+
+          const verticalForce = (Math.sin(this.time * 1.5 + i * 0.01) * 0.5) * force * 0.3
+          this.velocities[i3 + 1] += verticalForce
         }
 
-        if (this.isFist && dist < 50) {
-          const attractForce = 0.1
+        if (this.isFist && dist < this.fistRadius && dist > 0.1) {
+          const t = 1 - dist / this.fistRadius
+          const attractForce = this.attractionStrength * 3 * t
           this.velocities[i3] += (dx / dist) * attractForce
           this.velocities[i3 + 1] += (dy / dist) * attractForce
           this.velocities[i3 + 2] += (dz / dist) * attractForce
+
+          this.particleAngles[i] += deltaTime * 12
         }
       } else {
         const ox = this.originalPositions[i3]
@@ -233,6 +300,8 @@ export class ParticleSystem {
         this.velocities[i3] += (ox - this.positions[i3]) * returnForce
         this.velocities[i3 + 1] += (oy - this.positions[i3 + 1]) * returnForce
         this.velocities[i3 + 2] += (oz - this.positions[i3 + 2]) * returnForce
+
+        this.particleAngles[i] += deltaTime * 0.5
       }
 
       const damping = 0.98
@@ -240,7 +309,7 @@ export class ParticleSystem {
       this.velocities[i3 + 1] *= damping
       this.velocities[i3 + 2] *= damping
 
-      const maxSpeed = this.isFist ? 2 : 5
+      const maxSpeed = this.isFist ? 3 : 6
       const speed = Math.sqrt(
         this.velocities[i3] ** 2 +
         this.velocities[i3 + 1] ** 2 +
@@ -254,18 +323,18 @@ export class ParticleSystem {
     }
 
     if (this.isFist && this.attractPosition) {
-      const pulseIntensity = 0.3 + Math.sin(this.time * 8) * 0.2
+      const pulseIntensity = 0.4 + Math.sin(this.time * 10) * 0.25
       for (let i = 0; i < this.particleCount; i++) {
         const i3 = i * 3
         const dx = this.attractPosition!.x - this.positions[i3]
         const dy = this.attractPosition!.y - this.positions[i3 + 1]
         const dz = this.attractPosition!.z - this.positions[i3 + 2]
         const dist = Math.sqrt(dx * dx + dy * dy + dz * dz)
-        if (dist < 30) {
-          const brightness = pulseIntensity * (1 - dist / 30)
-          this.colors[i3] = Math.min(1, this.targetColors[i3] * (1 + brightness))
-          this.colors[i3 + 1] = Math.min(1, this.targetColors[i3 + 1] * (1 + brightness))
-          this.colors[i3 + 2] = Math.min(1, this.targetColors[i3 + 2] * (1 + brightness))
+        if (dist < 40) {
+          const brightness = pulseIntensity * (1 - dist / 40)
+          this.colors[i3] = Math.min(1, this.targetColors[i3] * (1 + brightness * 1.5))
+          this.colors[i3 + 1] = Math.min(1, this.targetColors[i3 + 1] * (1 + brightness * 1.5))
+          this.colors[i3 + 2] = Math.min(1, this.targetColors[i3 + 2] * (1 + brightness * 1.5))
         }
       }
     }
@@ -300,6 +369,10 @@ export class ParticleSystem {
 
   setAttractionStrength(strength: number): void {
     this.attractionStrength = strength
+  }
+
+  setSwirlStrength(strength: number): void {
+    this.swirlStrength = strength
   }
 
   dispose(): void {

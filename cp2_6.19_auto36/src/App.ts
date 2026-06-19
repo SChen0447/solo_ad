@@ -38,7 +38,8 @@ class App {
     this.renderer = new THREE.WebGLRenderer({
       canvas: this.threeCanvas,
       alpha: true,
-      antialias: true
+      antialias: true,
+      preserveDrawingBuffer: true
     })
     this.renderer.setSize(window.innerWidth, window.innerHeight)
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
@@ -164,35 +165,90 @@ class App {
 
   private captureImage(): void {
     const compositeCanvas = document.createElement('canvas')
-    compositeCanvas.width = window.innerWidth
-    compositeCanvas.height = window.innerHeight
+    const width = window.innerWidth
+    const height = window.innerHeight
+    compositeCanvas.width = width
+    compositeCanvas.height = height
     const ctx = compositeCanvas.getContext('2d')!
+    ctx.imageSmoothingEnabled = true
+    ctx.imageSmoothingQuality = 'high'
 
-    const gradient = ctx.createLinearGradient(0, 0, compositeCanvas.width, compositeCanvas.height)
+    const gradient = ctx.createLinearGradient(0, 0, width, height)
     gradient.addColorStop(0, '#0a0a2e')
     gradient.addColorStop(1, '#1a1a3e')
     ctx.fillStyle = gradient
-    ctx.fillRect(0, 0, compositeCanvas.width, compositeCanvas.height)
+    ctx.fillRect(0, 0, width, height)
+
+    if (this.videoElement.readyState >= 2) {
+      const videoRatio = this.videoElement.videoWidth / this.videoElement.videoHeight
+      const canvasRatio = width / height
+      let drawWidth: number, drawHeight: number, offsetX: number, offsetY: number
+
+      if (videoRatio > canvasRatio) {
+        drawHeight = height
+        drawWidth = height * videoRatio
+        offsetX = (width - drawWidth) / 2
+        offsetY = 0
+      } else {
+        drawWidth = width
+        drawHeight = width / videoRatio
+        offsetX = 0
+        offsetY = (height - drawHeight) / 2
+      }
+
+      ctx.save()
+      ctx.globalAlpha = 0.3
+      ctx.translate(width, 0)
+      ctx.scale(-1, 1)
+      try {
+        ctx.drawImage(
+          this.videoElement,
+          -offsetX - (width - drawWidth),
+          offsetY,
+          drawWidth,
+          drawHeight
+        )
+      } catch (e) {
+        console.warn('Video frame capture failed:', e)
+      }
+      ctx.restore()
+    }
 
     ctx.save()
-    ctx.translate(compositeCanvas.width, 0)
+    ctx.translate(width, 0)
     ctx.scale(-1, 1)
-    ctx.globalAlpha = 0.3
-    ctx.drawImage(this.videoElement, 0, 0, compositeCanvas.width, compositeCanvas.height)
+    ctx.drawImage(this.handCanvas, 0, 0, width, height)
     ctx.restore()
 
-    ctx.save()
-    ctx.translate(compositeCanvas.width, 0)
-    ctx.scale(-1, 1)
-    ctx.drawImage(this.handCanvas, 0, 0, compositeCanvas.width, compositeCanvas.height)
-    ctx.restore()
+    ctx.drawImage(this.threeCanvas, 0, 0, width, height)
 
-    ctx.drawImage(this.threeCanvas, 0, 0, compositeCanvas.width, compositeCanvas.height)
+    const watermarkCanvas = document.createElement('canvas')
+    watermarkCanvas.width = width
+    watermarkCanvas.height = height
+    const wctx = watermarkCanvas.getContext('2d')!
+    wctx.font = '14px monospace'
+    wctx.fillStyle = 'rgba(0, 255, 255, 0.4)'
+    wctx.textAlign = 'left'
+    wctx.fillText('Gesture Particle Canvas', 24, height - 28)
+    wctx.font = '12px monospace'
+    wctx.fillStyle = 'rgba(255, 255, 255, 0.25)'
+    const now = new Date()
+    wctx.fillText(now.toLocaleString(), 24, height - 10)
+    ctx.drawImage(watermarkCanvas, 0, 0)
 
-    const link = document.createElement('a')
-    link.download = `gesture-particles-${Date.now()}.png`
-    link.href = compositeCanvas.toDataURL('image/png')
-    link.click()
+    try {
+      const link = document.createElement('a')
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-')
+      link.download = `gesture-particles-${timestamp}.png`
+      const dataUrl = compositeCanvas.toDataURL('image/png', 0.95)
+      link.href = dataUrl
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+    } catch (e) {
+      console.error('Failed to save image:', e)
+      alert('保存图片失败，请重试')
+    }
   }
 }
 

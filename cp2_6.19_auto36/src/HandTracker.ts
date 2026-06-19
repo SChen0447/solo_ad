@@ -19,6 +19,23 @@ const HAND_CONNECTIONS: Array<[number, number]> = [
   [0, 17]
 ]
 
+const FINGER_COLORS: Record<number, string> = {
+  0: 'rgba(0, 255, 140, 0.9)',
+  1: 'rgba(0, 255, 160, 0.9)',
+  2: 'rgba(50, 255, 180, 0.9)',
+  3: 'rgba(80, 255, 200, 0.9)',
+  4: 'rgba(100, 255, 220, 0.9)'
+}
+
+const CONNECTION_TO_FINGER: Map<string, number> = new Map([
+  ['0-1', 0], ['1-2', 0], ['2-3', 0], ['3-4', 0],
+  ['0-5', 1], ['5-6', 1], ['6-7', 1], ['7-8', 1],
+  ['5-9', 2], ['9-10', 2], ['10-11', 2], ['11-12', 2],
+  ['9-13', 3], ['13-14', 3], ['14-15', 3], ['15-16', 3],
+  ['13-17', 4], ['17-18', 4], ['18-19', 4], ['19-20', 4],
+  ['0-17', 0]
+])
+
 export class HandTracker {
   private hands: Hands | null = null
   private camera: Camera | null = null
@@ -175,52 +192,128 @@ export class HandTracker {
   private drawHand(landmarks: Array<{ x: number; y: number; z: number }>, gesture: GestureType): void {
     const ctx = this.canvasCtx
 
-    ctx.strokeStyle = 'rgba(0, 255, 128, 0.8)'
-    ctx.lineWidth = 3
-    ctx.shadowColor = 'rgba(0, 255, 128, 0.8)'
-    ctx.shadowBlur = 10
+    ctx.lineCap = 'round'
+    ctx.lineJoin = 'round'
 
     for (const [startIdx, endIdx] of HAND_CONNECTIONS) {
       const start = landmarks[startIdx]
       const end = landmarks[endIdx]
+      const key = `${startIdx}-${endIdx}`
+      const fingerIdx = CONNECTION_TO_FINGER.get(key) ?? 0
+      const color = FINGER_COLORS[fingerIdx]
+
+      const gradient = ctx.createLinearGradient(start.x, start.y, end.x, end.y)
+      gradient.addColorStop(0, color)
+      gradient.addColorStop(1, FINGER_COLORS[(fingerIdx + 1) % 5])
+
+      ctx.strokeStyle = gradient
+      ctx.lineWidth = 4
+      ctx.shadowColor = 'rgba(0, 255, 128, 0.9)'
+      ctx.shadowBlur = 15
+
       ctx.beginPath()
       ctx.moveTo(start.x, start.y)
       ctx.lineTo(end.x, end.y)
       ctx.stroke()
     }
 
-    ctx.fillStyle = 'rgba(0, 255, 200, 0.9)'
-    ctx.shadowColor = 'rgba(0, 255, 200, 0.8)'
-    ctx.shadowBlur = 8
+    ctx.shadowBlur = 10
 
-    for (const lm of landmarks) {
+    for (let i = 0; i < landmarks.length; i++) {
+      const lm = landmarks[i]
+      const isFingerTip = [4, 8, 12, 16, 20].includes(i)
+      const isWrist = i === 0
+      const isJoint = [2, 3, 6, 7, 10, 11, 14, 15, 18, 19].includes(i)
+
+      let radius = 4
+      let fillColor = 'rgba(0, 255, 180, 0.95)'
+      let shadowColor = 'rgba(0, 255, 180, 0.8)'
+
+      if (isFingerTip) {
+        radius = 7
+        fillColor = 'rgba(120, 255, 220, 1)'
+        shadowColor = 'rgba(120, 255, 220, 1)'
+      } else if (isWrist) {
+        radius = 8
+        fillColor = 'rgba(0, 200, 255, 0.95)'
+        shadowColor = 'rgba(0, 200, 255, 0.9)'
+      } else if (isJoint) {
+        radius = 5
+        fillColor = 'rgba(50, 255, 160, 0.9)'
+        shadowColor = 'rgba(50, 255, 160, 0.8)'
+      }
+
+      ctx.fillStyle = fillColor
+      ctx.shadowColor = shadowColor
+
       ctx.beginPath()
-      ctx.arc(lm.x, lm.y, 4, 0, Math.PI * 2)
+      ctx.arc(lm.x, lm.y, radius, 0, Math.PI * 2)
       ctx.fill()
+
+      if (isFingerTip || isWrist) {
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)'
+        ctx.lineWidth = 1.5
+        ctx.shadowBlur = 5
+        ctx.stroke()
+      }
     }
 
     const palmPos = this.calculatePalmPosition(landmarks)
-    const handSize = this.distance2D(landmarks[0], landmarks[9])
-    const ringRadius = gesture === 'fist' ? handSize * 0.6 : handSize * 1.2
+    const wristToMiddleMcp = this.distance2D(landmarks[0], landmarks[9])
+    const handSize = wristToMiddleMcp * 1.8
+    const ringRadius = gesture === 'fist' ? handSize * 0.55 : handSize * 1.3
+    const innerRadius = gesture === 'fist' ? handSize * 0.25 : handSize * 0.35
 
     let ringColor: string
+    let ringColorRgb: { r: number; g: number; b: number }
+    let fillColor: string
+
     if (gesture === 'fist') {
-      ringColor = 'rgba(255, 80, 80, 0.4)'
+      ringColor = 'rgba(255, 70, 70, 0.55)'
+      ringColorRgb = { r: 255, g: 70, b: 70 }
+      fillColor = 'rgba(255, 70, 70, 0.18)'
     } else {
-      ringColor = 'rgba(0, 200, 255, 0.3)'
+      ringColor = 'rgba(0, 190, 255, 0.45)'
+      ringColorRgb = { r: 0, g: 190, b: 255 }
+      fillColor = 'rgba(0, 190, 255, 0.12)'
     }
 
+    ctx.shadowColor = `rgba(${ringColorRgb.r}, ${ringColorRgb.g}, ${ringColorRgb.b}, 0.9)`
+    ctx.shadowBlur = 30
+
     ctx.strokeStyle = ringColor
-    ctx.lineWidth = 4
-    ctx.shadowColor = gesture === 'fist' ? 'rgba(255, 80, 80, 0.8)' : 'rgba(0, 200, 255, 0.8)'
-    ctx.shadowBlur = 20
+    ctx.lineWidth = 5
     ctx.beginPath()
     ctx.arc(palmPos.x, palmPos.y, ringRadius, 0, Math.PI * 2)
     ctx.stroke()
 
-    ctx.fillStyle = ringColor
+    ctx.strokeStyle = `rgba(${ringColorRgb.r}, ${ringColorRgb.g}, ${ringColorRgb.b}, 0.25)`
+    ctx.lineWidth = 10
     ctx.beginPath()
-    ctx.arc(palmPos.x, palmPos.y, ringRadius * 0.3, 0, Math.PI * 2)
+    ctx.arc(palmPos.x, palmPos.y, ringRadius + 5, 0, Math.PI * 2)
+    ctx.stroke()
+
+    ctx.fillStyle = fillColor
+    ctx.beginPath()
+    ctx.arc(palmPos.x, palmPos.y, innerRadius, 0, Math.PI * 2)
+    ctx.fill()
+
+    ctx.strokeStyle = `rgba(${ringColorRgb.r}, ${ringColorRgb.g}, ${ringColorRgb.b}, 0.7)`
+    ctx.lineWidth = 2
+    ctx.shadowBlur = 15
+    for (let i = 0; i < 4; i++) {
+      const angle = (i / 4) * Math.PI * 2 + (Date.now() / 1500)
+      const startAngle = angle - 0.25
+      const endAngle = angle + 0.25
+      ctx.beginPath()
+      ctx.arc(palmPos.x, palmPos.y, ringRadius * 0.75, startAngle, endAngle)
+      ctx.stroke()
+    }
+
+    ctx.fillStyle = `rgba(${ringColorRgb.r}, ${ringColorRgb.g}, ${ringColorRgb.b}, 0.95)`
+    ctx.shadowBlur = 20
+    ctx.beginPath()
+    ctx.arc(palmPos.x, palmPos.y, 6, 0, Math.PI * 2)
     ctx.fill()
 
     ctx.shadowBlur = 0
