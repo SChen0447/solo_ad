@@ -1,0 +1,130 @@
+.jtp-container {
+  width: 280px;
+  height: 100%;
+  background: #1E293B;
+  color: #e2e8f0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.jtp-header {
+  padding: 16px 16px 12px;
+  border-bottom: 1px solid #334155;
+  flex-shrink: 0;
+}
+
+.jtp-title {
+  font-size: 16px;
+  font-weight: 600;
+  margin: 0 0 12px 0;
+  color: #f1f5f9;
+  letter-spacing: 0.3px;
+}
+
+.jtp-toolbar {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.jtp-btn {
+  padding: 6px 12px;
+  font-size: 12px;
+  border-radius: 6px;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-family: inherit;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.jtp-btn-primary {
+  background: #4A90D9;
+  color: #ffffff;
+}
+
+.jtp-btn-primary:hover {
+  background: #3a7bc8;
+  transform: translateY(-1px);
+}
+
+.jtp-btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.jtp-btn-danger {
+  background: #dc2626;
+  color: #ffffff;
+}
+
+.jtp-btn-danger:hover {
+  background: #b91c1c;
+}
+
+.jtp-btn-danger:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.jtp-add-menu {
+  position: absolute;
+  background: #334155;
+  border: 1px solid #475569;
+  border-radius: 8px;
+  padding: 6px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+  z-index: 1000;
+  min-width: 140px;
+}
+
+.jtp-add-menu-item {
+  padding: 8px 12px;
+  font-size: 13px;
+  color: #e2e8f0;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.jtp-add-menu-item:hover {
+  background: #4A90D9;
+  color: #ffffff;
+}
+
+.jtp-tree-wrapper {
+  flex: 1;
+  overflow: auto;
+  padding: 8px 0 16px 4px;
+}
+
+.jtp-tree-wrapper::-webkit-scrollbar {
+  width: 6px;
+}
+
+.jtp-tree-wrapper::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.jtp-tree-wrapper::-webkit-scrollbar-thumb {
+  background: #475569;
+  border-radius: 3px;
+}
+
+.jtp-tree-node {
+  transition: background-color 0.2s ease;
+  border-radius: 4px;
+}
+
+.jtp-selected-key path {
+  background: #4A90D9 !important;
+}
+
+.jtp-tree-wrapper > div > ul {
+  padding-left: 0 !important;
+}
