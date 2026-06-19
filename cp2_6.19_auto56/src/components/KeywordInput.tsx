@@ -8,8 +8,12 @@ interface Particle {
   vx: number
   vy: number
   size: number
+  initialSize: number
   alpha: number
   color: string
+  fadeColor: string
+  born: number
+  maxLife: number
 }
 
 const SendIcon: React.FC = () => (
@@ -28,31 +32,129 @@ const RocketIcon: React.FC<{ style?: React.CSSProperties }> = ({ style }) => (
   </svg>
 )
 
+function hexToRgb(hex: string): { r: number; g: number; b: number } {
+  const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex)
+  return result
+    ? { r: parseInt(result[1], 16), g: parseInt(result[2], 16), b: parseInt(result[3], 16) }
+    : { r: 0, g: 0, b: 0 }
+}
+
+function lerpColor(c1: string, c2: string, t: number): string {
+  const a = hexToRgb(c1)
+  const b = hexToRgb(c2)
+  const r = Math.round(a.r + (b.r - a.r) * t)
+  const g = Math.round(a.g + (b.g - a.g) * t)
+  const bl = Math.round(a.b + (b.b - a.b) * t)
+  return `rgb(${r},${g},${bl})`
+}
+
+const PARTICLE_LIFE = 400
+
 const KeywordInput: React.FC<KeywordInputProps> = ({ onSubmit, disabled }) => {
   const [keyword, setKeyword] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
-  const [rocket, setRocket] = useState<{ visible: boolean; x: number; y: number; targetX: number; targetY: number } | null>(null)
+  const [rocket, setRocket] = useState<{ x: number; y: number } | null>(null)
   const [particles, setParticles] = useState<Particle[]>([])
   const particleIdRef = useRef(0)
   const animationFrameRef = useRef<number | null>(null)
+  const particleLoopRef = useRef<number | null>(null)
 
-  const spawnParticles = useCallback((x: number, y: number, color: string, count: number = 5) => {
+  const spawnTrailParticles = useCallback((x: number, y: number, color: string, count: number) => {
+    const now = performance.now()
     const newParticles: Particle[] = []
     for (let i = 0; i < count; i++) {
       particleIdRef.current += 1
+      const angle = Math.PI / 2 + (Math.random() - 0.5) * 1.2
+      const speed = 1.5 + Math.random() * 2.5
+      const size = 3 + Math.random() * 5
+      newParticles.push({
+        id: particleIdRef.current,
+        x: x + (Math.random() - 0.5) * 6,
+        y: y + (Math.random() - 0.5) * 4,
+        vx: Math.cos(angle) * speed * (Math.random() > 0.5 ? 1 : -1) * 0.6,
+        vy: Math.sin(angle) * speed * 0.8,
+        size,
+        initialSize: size,
+        alpha: 1,
+        color,
+        fadeColor: '#ffffff',
+        born: now,
+        maxLife: PARTICLE_LIFE + Math.random() * 150
+      })
+    }
+    setParticles((prev) => [...prev, ...newParticles])
+  }, [])
+
+  const spawnBurstParticles = useCallback((x: number, y: number, color: string) => {
+    const now = performance.now()
+    const newParticles: Particle[] = []
+    for (let i = 0; i < 24; i++) {
+      particleIdRef.current += 1
+      const angle = (i / 24) * Math.PI * 2 + Math.random() * 0.3
+      const speed = 2 + Math.random() * 4
+      const size = 4 + Math.random() * 5
       newParticles.push({
         id: particleIdRef.current,
         x,
         y,
-        vx: (Math.random() - 0.5) * 4,
-        vy: (Math.random() - 0.5) * 4 - 1,
-        size: 2 + Math.random() * 4,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed,
+        size,
+        initialSize: size,
         alpha: 1,
-        color
+        color,
+        fadeColor: '#ffffff',
+        born: now,
+        maxLife: PARTICLE_LIFE + Math.random() * 200
       })
     }
     setParticles((prev) => [...prev, ...newParticles])
+  }, [])
+
+  useEffect(() => {
+    if (particles.length === 0) return
+
+    const tick = () => {
+      const now = performance.now()
+      setParticles((prev) => {
+        const alive = prev
+          .map((p) => {
+            const age = now - p.born
+            const lifeRatio = Math.max(0, 1 - age / p.maxLife)
+            return {
+              ...p,
+              x: p.x + p.vx,
+              y: p.y + p.vy,
+              vy: p.vy + 0.05,
+              vx: p.vx * 0.98,
+              size: p.initialSize * (0.2 + 0.8 * lifeRatio),
+              alpha: lifeRatio * lifeRatio
+            }
+          })
+          .filter((p) => p.alpha > 0.01)
+        return alive
+      })
+      particleLoopRef.current = requestAnimationFrame(tick)
+    }
+    particleLoopRef.current = requestAnimationFrame(tick)
+
+    return () => {
+      if (particleLoopRef.current) {
+        cancelAnimationFrame(particleLoopRef.current)
+      }
+    }
+  }, [particles.length > 0])
+
+  useEffect(() => {
+    return () => {
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current)
+      }
+      if (particleLoopRef.current) {
+        cancelAnimationFrame(particleLoopRef.current)
+      }
+    }
   }, [])
 
   const animateRocket = useCallback((
@@ -64,67 +166,33 @@ const KeywordInput: React.FC<KeywordInputProps> = ({ onSubmit, disabled }) => {
   ) => {
     const startTime = performance.now()
     const duration = 500
-    let lastSpawnTime = startTime
+    let lastTrailTime = 0
 
-    const animate = () => {
-      const elapsed = performance.now() - startTime
+    const animate = (now: number) => {
+      const elapsed = now - startTime
       const t = Math.min(elapsed / duration, 1)
       const easeT = 1 - Math.pow(1 - t, 3)
 
       const currentX = startX + (targetX - startX) * easeT
       const currentY = startY + (targetY - startY) * easeT
 
-      setRocket({ visible: true, x: currentX, y: currentY, targetX, targetY })
+      setRocket({ x: currentX, y: currentY })
 
-      if (performance.now() - lastSpawnTime > 16) {
-        spawnParticles(currentX, currentY + 8, color, 4)
-        lastSpawnTime = performance.now()
+      if (now - lastTrailTime > 20) {
+        spawnTrailParticles(currentX, currentY + 12, color, 3)
+        lastTrailTime = now
       }
 
       if (t < 1) {
         animationFrameRef.current = requestAnimationFrame(animate)
       } else {
-        spawnParticles(targetX, targetY, color, 20)
-        setTimeout(() => {
-          setRocket(null)
-        }, 100)
+        spawnBurstParticles(targetX, targetY, color)
+        setTimeout(() => setRocket(null), 80)
       }
     }
 
     animationFrameRef.current = requestAnimationFrame(animate)
-  }, [spawnParticles])
-
-  useEffect(() => {
-    if (particles.length === 0) return
-
-    let frameId: number
-    const animate = () => {
-      setParticles((prev) =>
-        prev
-          .map((p) => ({
-            ...p,
-            x: p.x + p.vx,
-            y: p.y + p.vy,
-            vy: p.vy + 0.08,
-            alpha: p.alpha * 0.92,
-            size: p.size * 0.97
-          }))
-          .filter((p) => p.alpha > 0.02)
-      )
-      frameId = requestAnimationFrame(animate)
-    }
-    frameId = requestAnimationFrame(animate)
-
-    return () => cancelAnimationFrame(frameId)
-  }, [particles.length > 0])
-
-  useEffect(() => {
-    return () => {
-      if (animationFrameRef.current) {
-        cancelAnimationFrame(animationFrameRef.current)
-      }
-    }
-  }, [])
+  }, [spawnTrailParticles, spawnBurstParticles])
 
   const handleSubmit = useCallback(() => {
     const trimmed = keyword.trim().slice(0, 10)
@@ -137,9 +205,11 @@ const KeywordInput: React.FC<KeywordInputProps> = ({ onSubmit, disabled }) => {
     const startX = inputRect.left + inputRect.width / 2 - containerRect.left
     const startY = inputRect.top - containerRect.top
     const targetX = containerRect.width / 2
-    const targetY = -containerRect.height / 2 + 80
+    const targetY = 20
 
-    animateRocket(startX, startY, targetX, targetY, getComputedStyle(document.documentElement).getPropertyValue('--primary').trim() || '#0ea5e9')
+    const primaryColor = getComputedStyle(document.documentElement).getPropertyValue('--primary').trim() || '#0ea5e9'
+
+    animateRocket(startX, startY, targetX, targetY, primaryColor)
 
     onSubmit(trimmed)
     setKeyword('')
@@ -178,7 +248,7 @@ const KeywordInput: React.FC<KeywordInputProps> = ({ onSubmit, disabled }) => {
         发送
       </button>
 
-      {rocket && rocket.visible && (
+      {rocket && (
         <div
           style={{
             position: 'absolute',
@@ -187,31 +257,36 @@ const KeywordInput: React.FC<KeywordInputProps> = ({ onSubmit, disabled }) => {
             color: 'var(--primary)',
             pointerEvents: 'none',
             zIndex: 20,
-            filter: 'drop-shadow(0 2px 8px var(--primary-light))'
+            filter: 'drop-shadow(0 2px 8px var(--primary-light))',
+            transition: 'none'
           }}
         >
           <RocketIcon />
         </div>
       )}
 
-      {particles.map((p) => (
-        <div
-          key={p.id}
-          style={{
-            position: 'absolute',
-            left: p.x - p.size / 2,
-            top: p.y - p.size / 2,
-            width: p.size,
-            height: p.size,
-            borderRadius: '50%',
-            backgroundColor: p.color,
-            opacity: p.alpha,
-            pointerEvents: 'none',
-            zIndex: 15,
-            boxShadow: `0 0 ${p.size * 2}px ${p.color}`
-          }}
-        />
-      ))}
+      {particles.map((p) => {
+        const displayColor = lerpColor(p.fadeColor, p.color, p.alpha)
+        return (
+          <div
+            key={p.id}
+            style={{
+              position: 'absolute',
+              left: p.x - p.size / 2,
+              top: p.y - p.size / 2,
+              width: p.size,
+              height: p.size,
+              borderRadius: '50%',
+              backgroundColor: displayColor,
+              opacity: p.alpha,
+              pointerEvents: 'none',
+              zIndex: 15,
+              boxShadow: `0 0 ${p.size * 1.5}px ${displayColor}`,
+              willChange: 'transform, opacity'
+            }}
+          />
+        )
+      })}
     </div>
   )
 }

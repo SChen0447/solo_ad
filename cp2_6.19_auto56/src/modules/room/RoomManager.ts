@@ -8,13 +8,10 @@ import type {
   RoomEventMap
 } from '../../types'
 
-type BroadcastMessage =
-  | { type: 'keyword'; roomId: string; message: KeywordMessage }
-  | { type: 'clear'; roomId: string }
-  | { type: 'sync-request'; roomId: string; requesterId: string }
-  | { type: 'sync-response'; roomId: string; keywords: KeywordWeight[]; onlineCount: number }
-  | { type: 'user-join'; roomId: string; user: User }
-  | { type: 'user-leave'; roomId: string; userId: string }
+interface ServerMessage {
+  type: string
+  [key: string]: unknown
+}
 
 const generateRoomCode = (): string => {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
@@ -25,96 +22,154 @@ const generateRoomCode = (): string => {
   return code
 }
 
-const STORAGE_PREFIX = 'wordcloud-room:'
+class WebSocketClient {
+  private sharedWorker: SharedWorker | null = null
+  private broadcastChannel: BroadcastChannel | null = null
+  private messageHandler: ((msg: ServerMessage) => void) | null = null
+  private useFallback: boolean = false
+
+  connect(onMessage: (msg: ServerMessage) => void): void {
+    this.messageHandler = onMessage
+
+    try {
+      this.sharedWorker = new SharedWorker(
+        new URL('./SignalingServer.worker.ts', import.meta.url),
+        { type: 'module', name: 'wordcloud-signaling' }
+      )
+      this.sharedWorker.port.onmessage = (e: MessageEvent<ServerMessage>) => {
+        if (this.messageHandler) {
+          this.messageHandler(e.data)
+        }
+      }
+      this.sharedWorker.port.start()
+      this.useFallback = false
+    } catch {
+      console.warn('SharedWorker unavailable, falling back to BroadcastChannel')
+      this.initBroadcastFallback()
+    }
+  }
+
+  private initBroadcastFallback(): void {
+    this.useFallback = true
+    try {
+      this.broadcastChannel = new BroadcastChannel('wordcloud-signaling')
+      this.broadcastChannel.onmessage = (e: MessageEvent<ServerMessage>) => {
+        if (this.messageHandler) {
+          this.messageHandler(e.data)
+        }
+      }
+    } catch {
+      console.warn('BroadcastChannel also unavailable, running in standalone mode')
+    }
+  }
+
+  send(msg: object): void {
+    if (this.sharedWorker && this.sharedWorker.port) {
+      this.sharedWorker.port.postMessage(msg)
+    } else if (this.broadcastChannel) {
+      this.broadcastChannel.postMessage(msg)
+    }
+  }
+
+  disconnect(): void {
+    if (this.sharedWorker) {
+      this.sharedWorker.port.close()
+      this.sharedWorker = null
+    }
+    if (this.broadcastChannel) {
+      this.broadcastChannel.close()
+      this.broadcastChannel = null
+    }
+    this.messageHandler = null
+  }
+
+  isUsingFallback(): boolean {
+    return this.useFallback
+  }
+}
 
 class RoomManager extends EventEmitter<RoomEventMap> {
   private rooms: Map<string, Room> = new Map()
   private currentUser: User | null = null
   private currentRoom: Room | null = null
-  private broadcastChannel: BroadcastChannel | null = null
-  private clientId: string = uuidv4()
+  private wsClient: WebSocketClient = new WebSocketClient()
+  private pendingWsMessages: object[] = []
+  private wsConnected: boolean = false
 
   constructor() {
     super()
-    this.initBroadcastChannel()
-  }
-
-  private initBroadcastChannel(): void {
-    try {
-      this.broadcastChannel = new BroadcastChannel('wordcloud-realtime')
-      this.broadcastChannel.onmessage = (event: MessageEvent<BroadcastMessage>) => {
-        this.handleBroadcastMessage(event.data)
-      }
-    } catch (e) {
-      console.warn('BroadcastChannel not supported, using localStorage fallback')
-      this.initLocalStorageFallback()
+    this.wsClient.connect((msg) => this.handleServerMessage(msg))
+    this.wsConnected = true
+    for (const m of this.pendingWsMessages) {
+      this.wsClient.send(m)
     }
+    this.pendingWsMessages = []
   }
 
-  private initLocalStorageFallback(): void {
-    window.addEventListener('storage', (e: StorageEvent) => {
-      if (e.key && e.key.startsWith(STORAGE_PREFIX) && e.newValue) {
-        try {
-          const message: BroadcastMessage = JSON.parse(e.newValue)
-          this.handleBroadcastMessage(message)
-        } catch {
-          // ignore parse errors
-        }
-      }
-    })
-  }
-
-  private postMessage(message: BroadcastMessage): void {
-    if (this.broadcastChannel) {
-      this.broadcastChannel.postMessage(message)
+  private sendToServer(msg: object): void {
+    if (this.wsConnected) {
+      this.wsClient.send(msg)
     } else {
-      const key = STORAGE_PREFIX + message.type + '-' + Date.now() + '-' + Math.random()
-      localStorage.setItem(key, JSON.stringify(message))
-      setTimeout(() => localStorage.removeItem(key), 1000)
+      this.pendingWsMessages.push(msg)
     }
   }
 
-  private handleBroadcastMessage(message: BroadcastMessage): void {
-    if (!this.currentRoom || message.roomId !== this.currentRoom.id) return
+  private handleServerMessage(msg: ServerMessage): void {
+    switch (msg.type) {
+      case 'keyword-update':
+        if (this.currentRoom) {
+          this.currentRoom.keywords = (msg.keywords as KeywordWeight[]).map(kw => ({ ...kw }))
+          this.currentRoom.keywords.sort((a, b) => b.weight - a.weight)
+          this.emit('keyword:broadcast', this.getKeywords())
+        }
+        break
 
-    switch (message.type) {
-      case 'keyword':
-        if (message.message.userId !== this.currentUser?.id) {
-          this.processKeyword(message.message, false)
+      case 'keywords-cleared':
+        if (this.currentRoom) {
+          this.currentRoom.keywords = []
+          this.emit('room:clear', undefined)
+          this.emit('keyword:broadcast', [])
         }
         break
-      case 'clear':
-        this.currentRoom.keywords = []
-        this.emit('room:clear', undefined)
-        this.emit('keyword:broadcast', [])
-        break
-      case 'sync-request':
-        if (this.currentUser?.role === 'teacher' && message.requesterId !== this.clientId) {
-          this.postMessage({
-            type: 'sync-response',
-            roomId: this.currentRoom.id,
-            keywords: this.getKeywords(),
-            onlineCount: this.getOnlineUsers().length
-          })
+
+      case 'user-joined':
+        if (this.currentRoom && (msg.userId as string) !== this.currentUser?.id) {
+          const joinedUser: User = {
+            id: msg.userId as string,
+            nickname: msg.nickname as string,
+            role: 'student',
+            roomId: this.currentRoom.id
+          }
+          this.currentRoom.users.set(joinedUser.id, joinedUser)
+          this.emit('user:join', joinedUser)
         }
         break
+
+      case 'user-left':
+        if (this.currentRoom) {
+          this.currentRoom.users.delete(msg.userId as string)
+          this.emit('user:leave', { id: msg.userId as string } as User)
+        }
+        break
+
+      case 'join-success':
+        if (this.currentRoom) {
+          this.currentRoom.keywords = (msg.keywords as KeywordWeight[]).map(kw => ({ ...kw }))
+          this.emit('keyword:broadcast', this.getKeywords())
+        }
+        break
+
+      case 'join-failed':
+        break
+
       case 'sync-response':
-        if (this.currentUser?.role === 'student') {
-          this.currentRoom.keywords = message.keywords
-          this.emit('keyword:broadcast', message.keywords)
+        if (this.currentRoom) {
+          this.currentRoom.keywords = (msg.keywords as KeywordWeight[]).map(kw => ({ ...kw }))
+          this.emit('keyword:broadcast', this.getKeywords())
         }
         break
-      case 'user-join':
-        if (message.user.id !== this.currentUser?.id) {
-          this.currentRoom.users.set(message.user.id, message.user)
-          this.emit('user:join', message.user)
-        }
-        break
-      case 'user-leave':
-        if (message.userId !== this.currentUser?.id) {
-          this.currentRoom.users.delete(message.userId)
-          this.emit('user:leave', { id: message.userId } as User)
-        }
+
+      case 'room-created':
         break
     }
   }
@@ -146,39 +201,21 @@ class RoomManager extends EventEmitter<RoomEventMap> {
     this.currentUser = teacher
     this.currentRoom = room
 
-    sessionStorage.setItem(STORAGE_PREFIX + roomId, JSON.stringify({
-      id: roomId,
-      name: roomName,
-      teacherId: userId,
-      createdAt: room.createdAt
-    }))
+    this.sendToServer({
+      type: 'create-room',
+      roomId,
+      roomName,
+      userId,
+      nickname: teacherNickname
+    })
 
     return { roomId, user: teacher }
   }
 
   joinRoom(roomId: string, nickname: string): { room: Room; user: User } | null {
     const normalizedId = roomId.toUpperCase()
-
-    let room = this.rooms.get(normalizedId)
-    if (!room) {
-      const stored = sessionStorage.getItem(STORAGE_PREFIX + normalizedId)
-      if (!stored) {
-        return null
-      }
-      try {
-        const storedRoom = JSON.parse(stored)
-        room = {
-          ...storedRoom,
-          users: new Map<string, User>(),
-          keywords: []
-        }
-        this.rooms.set(normalizedId, room)
-      } catch {
-        return null
-      }
-    }
-
     const userId = uuidv4()
+
     const student: User = {
       id: userId,
       nickname,
@@ -186,20 +223,27 @@ class RoomManager extends EventEmitter<RoomEventMap> {
       roomId: normalizedId
     }
 
-    room.users.set(userId, student)
+    const users = new Map<string, User>()
+    users.set(userId, student)
+
+    const room: Room = {
+      id: normalizedId,
+      name: '',
+      teacherId: '',
+      users,
+      keywords: [],
+      createdAt: Date.now()
+    }
+
+    this.rooms.set(normalizedId, room)
     this.currentUser = student
     this.currentRoom = room
 
-    this.postMessage({
-      type: 'user-join',
+    this.sendToServer({
+      type: 'join-room',
       roomId: normalizedId,
-      user: student
-    })
-
-    this.postMessage({
-      type: 'sync-request',
-      roomId: normalizedId,
-      requesterId: this.clientId
+      userId,
+      nickname
     })
 
     this.emit('user:join', student)
@@ -209,8 +253,8 @@ class RoomManager extends EventEmitter<RoomEventMap> {
 
   leaveRoom(): void {
     if (this.currentRoom && this.currentUser) {
-      this.postMessage({
-        type: 'user-leave',
+      this.sendToServer({
+        type: 'leave-room',
         roomId: this.currentRoom.id,
         userId: this.currentUser.id
       })
@@ -219,7 +263,6 @@ class RoomManager extends EventEmitter<RoomEventMap> {
 
       if (this.currentRoom.users.size === 0) {
         this.rooms.delete(this.currentRoom.id)
-        sessionStorage.removeItem(STORAGE_PREFIX + this.currentRoom.id)
       }
     }
     this.currentUser = null
@@ -246,37 +289,15 @@ class RoomManager extends EventEmitter<RoomEventMap> {
     }
 
     this.emit('keyword:submit', message)
-    this.processKeyword(message, true)
-    this.postMessage({
-      type: 'keyword',
+
+    this.sendToServer({
+      type: 'submit-keyword',
       roomId: this.currentRoom.id,
-      message
+      keyword: trimmed,
+      userId: this.currentUser.id
     })
 
     return message
-  }
-
-  private processKeyword(message: KeywordMessage, isLocal: boolean): void {
-    if (!this.currentRoom) return
-    void isLocal
-
-    const existing = this.currentRoom.keywords.find(
-      (kw) => kw.word.toLowerCase() === message.keyword.toLowerCase()
-    )
-
-    if (existing) {
-      existing.weight += 1
-      existing.lastUpdated = Date.now()
-    } else {
-      this.currentRoom.keywords.push({
-        word: message.keyword,
-        weight: 1,
-        lastUpdated: Date.now()
-      })
-    }
-
-    this.currentRoom.keywords.sort((a, b) => b.weight - a.weight)
-    this.emit('keyword:broadcast', this.getKeywords())
   }
 
   clearKeywords(): void {
@@ -284,8 +305,9 @@ class RoomManager extends EventEmitter<RoomEventMap> {
     this.currentRoom.keywords = []
     this.emit('room:clear', undefined)
     this.emit('keyword:broadcast', [])
-    this.postMessage({
-      type: 'clear',
+
+    this.sendToServer({
+      type: 'clear-keywords',
       roomId: this.currentRoom.id
     })
   }
@@ -312,10 +334,7 @@ class RoomManager extends EventEmitter<RoomEventMap> {
 
   destroy(): void {
     this.leaveRoom()
-    if (this.broadcastChannel) {
-      this.broadcastChannel.close()
-      this.broadcastChannel = null
-    }
+    this.wsClient.disconnect()
     this.removeAllListeners()
   }
 }

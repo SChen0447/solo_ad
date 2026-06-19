@@ -7,24 +7,18 @@ import type {
   WordCloudEventMap
 } from '../../types'
 
-interface PlacedWord {
-  word: string
-  weight: number
-  x: number
-  y: number
-  width: number
-  height: number
-  fontSize: number
-  color: string
-  rotate: number
-  radius: number
+interface Rect {
+  left: number
+  right: number
+  top: number
+  bottom: number
 }
 
 class WordCloudEngine extends EventEmitter<WordCloudEventMap> {
   private canvasWidth: number = 800
   private canvasHeight: number = 600
   private currentTheme: Theme | null = null
-  private placedWords: PlacedWord[] = []
+  private placedRects: Rect[] = []
   private measureCanvas: HTMLCanvasElement | null = null
 
   setCanvasSize(width: number, height: number): void {
@@ -47,100 +41,114 @@ class WordCloudEngine extends EventEmitter<WordCloudEventMap> {
     return this.measureCanvas.getContext('2d')
   }
 
-  private measureText(word: string, fontSize: number, rotate: number): { width: number; height: number } {
+  private measureTextBBox(word: string, fontSize: number, rotate: number): { halfW: number; halfH: number } {
     const ctx = this.getMeasureContext()
+    let textW: number
+    let textH: number
     if (!ctx) {
-      return { width: word.length * fontSize * 0.6, height: fontSize * 1.2 }
+      textW = word.length * fontSize * 0.6
+      textH = fontSize * 1.2
+    } else {
+      ctx.font = `bold ${fontSize}px sans-serif`
+      const metrics = ctx.measureText(word)
+      textW = metrics.width
+      textH = fontSize * 1.2
     }
-    ctx.font = `bold ${fontSize}px sans-serif`
-    const metrics = ctx.measureText(word)
-    const w = metrics.width
-    const h = fontSize * 1.2
     if (rotate === 0) {
-      return { width: w, height: h }
+      return { halfW: textW / 2, halfH: textH / 2 }
     }
     const rad = (rotate * Math.PI) / 180
     const absCos = Math.abs(Math.cos(rad))
     const absSin = Math.abs(Math.sin(rad))
     return {
-      width: w * absCos + h * absSin,
-      height: w * absSin + h * absCos
+      halfW: (textW * absCos + textH * absSin) / 2,
+      halfH: (textW * absSin + textH * absCos) / 2
     }
   }
 
-  private rectsCollide(
-    a: { x: number; y: number; width: number; height: number },
-    b: { x: number; y: number; width: number; height: number },
-    padding: number = 4
-  ): boolean {
-    return !(
-      a.x + a.width / 2 + padding < b.x - b.width / 2 ||
-      a.x - a.width / 2 - padding > b.x + b.width / 2 ||
-      a.y + a.height / 2 + padding < b.y - b.height / 2 ||
-      a.y - a.height / 2 - padding > b.y + b.height / 2
-    )
+  private toRect(cx: number, cy: number, halfW: number, halfH: number, pad: number): Rect {
+    return {
+      left: cx - halfW - pad,
+      right: cx + halfW + pad,
+      top: cy - halfH - pad,
+      bottom: cy + halfH + pad
+    }
   }
 
-  private collidesWithAny(candidate: { x: number; y: number; width: number; height: number }): boolean {
-    for (const placed of this.placedWords) {
-      if (this.rectsCollide(candidate, placed, 6)) {
+  private rectsOverlap(a: Rect, b: Rect): boolean {
+    return a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top
+  }
+
+  private collidesWithAny(candidate: Rect): boolean {
+    for (let i = this.placedRects.length - 1; i >= 0; i--) {
+      if (this.rectsOverlap(candidate, this.placedRects[i])) {
         return true
       }
     }
     return false
   }
 
-  private inBounds(pos: { x: number; y: number; width: number; height: number }): boolean {
-    const margin = 20
+  private inBounds(cx: number, cy: number, halfW: number, halfH: number): boolean {
+    const margin = 16
     return (
-      pos.x - pos.width / 2 >= margin &&
-      pos.x + pos.width / 2 <= this.canvasWidth - margin &&
-      pos.y - pos.height / 2 >= margin &&
-      pos.y + pos.height / 2 <= this.canvasHeight - margin
+      cx - halfW >= margin &&
+      cx + halfW <= this.canvasWidth - margin &&
+      cy - halfH >= margin &&
+      cy + halfH <= this.canvasHeight - margin
     )
   }
 
-  private findArchimedeanSpiralPosition(
-    size: { width: number; height: number },
+  private findPosition(
+    halfW: number,
+    halfH: number,
     weightRatio: number
-  ): { x: number; y: number; radius: number } | null {
+  ): { x: number; y: number } | null {
     const centerX = this.canvasWidth / 2
     const centerY = this.canvasHeight / 2
-    const maxRadius = Math.min(this.canvasWidth, this.canvasHeight) / 2 - 20
+    const maxRadius = Math.sqrt(centerX * centerX + centerY * centerY)
+    const pad = 5
 
-    const startRadius = maxRadius * (1 - weightRatio) * 0.6
-    const angleStep = 0.15
-    const radiusGrowth = 0.8
+    const tightPad = 2
+    const idealStartRadius = maxRadius * (1 - weightRatio) * 0.5
 
-    let angle = Math.random() * Math.PI * 2
-    let radius = startRadius
+    let angle = 0
+    let radius = Math.max(0, idealStartRadius)
+    const angleStep = 0.2 + Math.random() * 0.1
+    const radiusStepPerRevolution = Math.max(halfW, halfH) * 0.5 + 8
 
-    for (let i = 0; i < 4000; i++) {
-      const x = centerX + Math.cos(angle) * radius
-      const y = centerY + Math.sin(angle) * radius
+    for (let i = 0; i < 6000; i++) {
+      const cx = centerX + Math.cos(angle) * radius
+      const cy = centerY + Math.sin(angle) * radius
 
-      const candidate = { x, y, width: size.width, height: size.height }
-      if (this.inBounds(candidate) && !this.collidesWithAny(candidate)) {
-        return { x, y, radius }
+      if (this.inBounds(cx, cy, halfW, halfH)) {
+        const candidate = this.toRect(cx, cy, halfW, halfH, pad)
+        if (!this.collidesWithAny(candidate)) {
+          const verifyRect = this.toRect(cx, cy, halfW, halfH, tightPad)
+          if (!this.collidesWithAny(verifyRect)) {
+            return { x: cx, y: cy }
+          }
+        }
       }
 
       angle += angleStep
-      radius = startRadius + radiusGrowth * (angle / (2 * Math.PI))
+      radius = idealStartRadius + radiusStepPerRevolution * (angle / (2 * Math.PI))
 
       if (radius > maxRadius) {
         break
       }
     }
 
-    for (let i = 0; i < 2000; i++) {
-      const angle2 = Math.random() * Math.PI * 2
-      const radius2 = startRadius + Math.random() * (maxRadius - startRadius)
-      const x = centerX + Math.cos(angle2) * radius2
-      const y = centerY + Math.sin(angle2) * radius2
+    for (let attempt = 0; attempt < 3000; attempt++) {
+      const r = idealStartRadius + Math.random() * (maxRadius * 0.8 - idealStartRadius)
+      const a = Math.random() * Math.PI * 2
+      const cx = centerX + Math.cos(a) * r
+      const cy = centerY + Math.sin(a) * r
 
-      const candidate = { x, y, width: size.width, height: size.height }
-      if (this.inBounds(candidate) && !this.collidesWithAny(candidate)) {
-        return { x, y, radius: radius2 }
+      if (this.inBounds(cx, cy, halfW, halfH)) {
+        const candidate = this.toRect(cx, cy, halfW, halfH, pad)
+        if (!this.collidesWithAny(candidate)) {
+          return { x: cx, y: cy }
+        }
       }
     }
 
@@ -162,31 +170,28 @@ class WordCloudEngine extends EventEmitter<WordCloudEventMap> {
     return Math.round(minFontSize + Math.pow(combinedRatio, 1.5) * (maxFontSize - minFontSize))
   }
 
-  private getColorForWord(weightRatio: number, rank: number): string {
+  private getColorForWord(weightRatio: number): string {
     if (this.currentTheme && this.currentTheme.textColors.length > 0) {
       const colors = this.currentTheme.textColors
       const idx = Math.min(Math.floor(weightRatio * colors.length), colors.length - 1)
       return colors[idx]
     }
     const colors = ['#2563eb', '#7c3aed', '#db2777', '#ea580c', '#059669']
-    return colors[rank % colors.length]
+    return colors[Math.floor(Math.random() * colors.length)]
   }
 
-  private getRotation(weight: number, maxWeight: number, rank: number): number {
-    if (rank < 3) {
+  private getRotation(rank: number, weight: number, maxWeight: number): number {
+    if (rank < 3 || weight >= maxWeight * 0.5) {
       return 0
     }
-    if (weight < maxWeight * 0.5) {
-      return Math.random() > 0.75 ? (Math.random() > 0.5 ? 90 : -90) : 0
-    }
-    return 0
+    return Math.random() > 0.7 ? (Math.random() > 0.5 ? 90 : -90) : 0
   }
 
   compute(keywords: KeywordWeight[]): RenderData {
     const startTime = performance.now()
 
     if (keywords.length === 0) {
-      this.placedWords = []
+      this.placedRects = []
       const result: RenderData = { positions: [], width: this.canvasWidth, height: this.canvasHeight }
       this.emit('data:update', result)
       return result
@@ -197,38 +202,29 @@ class WordCloudEngine extends EventEmitter<WordCloudEventMap> {
     const minWeight = sorted[sorted.length - 1].weight
     const limit = Math.min(sorted.length, 100)
 
-    this.placedWords = []
+    this.placedRects = []
     const positions: WordPosition[] = []
 
     for (let i = 0; i < limit; i++) {
       const kw = sorted[i]
-      const weightRatio = maxWeight === minWeight ? (1 - i / Math.max(limit - 1, 1)) : (kw.weight - minWeight) / (maxWeight - minWeight)
+      const weightRatio = maxWeight === minWeight
+        ? (1 - i / Math.max(limit - 1, 1))
+        : (kw.weight - minWeight) / (maxWeight - minWeight)
       const fontSize = this.calculateFontSize(kw.weight, maxWeight, minWeight, i, limit)
-      const rotate = this.getRotation(kw.weight, maxWeight, i)
-      const textSize = this.measureText(kw.word, fontSize, rotate)
-      const color = this.getColorForWord(weightRatio, i)
+      const rotate = this.getRotation(i, kw.weight, maxWeight)
+      const bbox = this.measureTextBBox(kw.word, fontSize, rotate)
+      const color = this.getColorForWord(weightRatio)
 
-      const posResult = this.findArchimedeanSpiralPosition(textSize, weightRatio)
+      const pos = this.findPosition(bbox.halfW, bbox.halfH, weightRatio)
 
-      if (posResult) {
-        const placed: PlacedWord = {
-          word: kw.word,
-          weight: kw.weight,
-          x: posResult.x,
-          y: posResult.y,
-          width: textSize.width,
-          height: textSize.height,
-          fontSize,
-          color,
-          rotate,
-          radius: posResult.radius
-        }
-        this.placedWords.push(placed)
+      if (pos) {
+        const placedRect = this.toRect(pos.x, pos.y, bbox.halfW, bbox.halfH, 5)
+        this.placedRects.push(placedRect)
         positions.push({
           word: kw.word,
           weight: kw.weight,
-          x: posResult.x,
-          y: posResult.y,
+          x: pos.x,
+          y: pos.y,
           fontSize,
           color,
           rotate
@@ -236,16 +232,8 @@ class WordCloudEngine extends EventEmitter<WordCloudEventMap> {
       }
     }
 
-    this.placedWords.sort((a, b) => a.radius - b.radius)
-
-    const sortedPositions = [...positions].sort((a, b) => {
-      const ra = Math.sqrt(Math.pow(a.x - this.canvasWidth / 2, 2) + Math.pow(a.y - this.canvasHeight / 2, 2))
-      const rb = Math.sqrt(Math.pow(b.x - this.canvasWidth / 2, 2) + Math.pow(b.y - this.canvasHeight / 2, 2))
-      return ra - rb
-    })
-
     const result: RenderData = {
-      positions: sortedPositions,
+      positions,
       width: this.canvasWidth,
       height: this.canvasHeight
     }
@@ -262,15 +250,19 @@ class WordCloudEngine extends EventEmitter<WordCloudEventMap> {
 
   getCurrentRenderData(): RenderData {
     return {
-      positions: this.placedWords.map((p) => ({
-        word: p.word,
-        weight: p.weight,
-        x: p.x,
-        y: p.y,
-        fontSize: p.fontSize,
-        color: p.color,
-        rotate: p.rotate
-      })),
+      positions: this.placedRects.map((rect, i) => {
+        const cx = (rect.left + rect.right) / 2
+        const cy = (rect.top + rect.bottom) / 2
+        return {
+          word: `word-${i}`,
+          weight: 1,
+          x: cx,
+          y: cy,
+          fontSize: 20,
+          color: '#333',
+          rotate: 0
+        }
+      }),
       width: this.canvasWidth,
       height: this.canvasHeight
     }

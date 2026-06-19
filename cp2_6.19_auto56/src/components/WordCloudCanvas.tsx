@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useImperativeHandle, forwardRef } from 'react'
+import { useEffect, useRef, useImperativeHandle, forwardRef } from 'react'
 import { wordCloudRenderer } from '../modules/wordcloud/WordCloudRenderer'
 import type { WordCloudCanvasHandle, WordCloudCanvasProps } from '../types'
 
