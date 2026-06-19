@@ -1,17 +1,6 @@
 import React, { useState } from 'react'
 import ThemeSelector from './ThemeSelector'
-import type { Theme, ThemeId } from '../types'
-
-interface ControlPanelProps {
-  roomId: string
-  onlineCount: number
-  isTeacher: boolean
-  themes: Theme[]
-  selectedThemeId: ThemeId
-  onThemeChange: (themeId: ThemeId) => void
-  onClear: () => void
-  onExport: () => void
-}
+import type { ControlPanelProps } from '../types'
 
 const CopyIcon: React.FC = () => (
   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

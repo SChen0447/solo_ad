@@ -1,13 +1,13 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
 import AuthScreen from './components/AuthScreen'
 import ControlPanel from './components/ControlPanel'
-import WordCloudCanvas, { WordCloudCanvasHandle } from './components/WordCloudCanvas'
+import WordCloudCanvas from './components/WordCloudCanvas'
 import KeywordInput from './components/KeywordInput'
 import { roomManager } from './modules/room/RoomManager'
 import { wordCloudEngine } from './modules/wordcloud/WordCloudEngine'
 import { wordCloudRenderer } from './modules/wordcloud/WordCloudRenderer'
 import { themeList, getTheme } from './theme/themes'
-import type { User, KeywordWeight, ThemeId, KeywordMessage } from './types'
+import type { User, KeywordWeight, ThemeId, KeywordMessage, WordCloudCanvasHandle } from './types'
 
 const App: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<User | null>(null)

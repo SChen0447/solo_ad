@@ -18,11 +18,43 @@ interface AnimatedWord extends WordPosition {
   currentX: number
   currentY: number
   currentFontSize: number
+  targetColor: string
+  currentColor: string
   alpha: number
   scale: number
   pulseScale: number
+  targetRotate: number
+  currentRotate: number
   isNew: boolean
+  fadeInStartTime: number
+  pulseStartTime: number
 }
+
+function hexToRgb(hex: string): { r: number; g: number; b: number } {
+  const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex)
+  return result
+    ? {
+        r: parseInt(result[1], 16),
+        g: parseInt(result[2], 16),
+        b: parseInt(result[3], 16)
+      }
+    : { r: 0, g: 0, b: 0 }
+}
+
+function rgbToHex(r: number, g: number, b: number): string {
+  return '#' + [r, g, b].map((x) => Math.round(x).toString(16).padStart(2, '0')).join('')
+}
+
+function lerpColor(color1: string, color2: string, t: number): string {
+  const c1 = hexToRgb(color1)
+  const c2 = hexToRgb(color2)
+  return rgbToHex(c1.r + (c2.r - c1.r) * t, c1.g + (c2.g - c1.g) * t, c1.b + (c2.b - c1.b) * t)
+}
+
+const FADE_DURATION = 600
+const PULSE_DURATION = 200
+const THEME_TRANSITION_DURATION = 400
+const CLEAR_DURATION = 500
 
 class WordCloudRenderer {
   private canvas: HTMLCanvasElement | null = null
@@ -31,8 +63,11 @@ class WordCloudRenderer {
   private particles: Particle[] = []
   private animationFrameId: number | null = null
   private currentTheme: Theme | null = null
+  private targetTheme: Theme | null = null
+  private themeTransitionStart: number = 0
+  private isThemeTransitioning: boolean = false
   private isClearing: boolean = false
-  private clearProgress: number = 0
+  private clearStartTime: number = 0
   private dpr: number = 1
 
   attach(canvas: HTMLCanvasElement): void {
@@ -55,12 +90,22 @@ class WordCloudRenderer {
     this.canvas.width = rect.width * this.dpr
     this.canvas.height = rect.height * this.dpr
     if (this.ctx) {
+      this.ctx.setTransform(1, 0, 0, 1, 0, 0)
       this.ctx.scale(this.dpr, this.dpr)
     }
   }
 
   setTheme(theme: Theme): void {
-    this.currentTheme = theme
+    if (!this.currentTheme) {
+      this.currentTheme = theme
+      this.targetTheme = theme
+      return
+    }
+    if (this.currentTheme.id !== theme.id) {
+      this.targetTheme = theme
+      this.themeTransitionStart = performance.now()
+      this.isThemeTransitioning = true
+    }
   }
 
   getCanvas(): HTMLCanvasElement | null {
@@ -75,26 +120,17 @@ class WordCloudRenderer {
   triggerClearAnimation(): Promise<void> {
     return new Promise((resolve) => {
       this.isClearing = true
-      this.clearProgress = 0
+      this.clearStartTime = performance.now()
       this.spawnClearParticles()
 
-      const startTime = performance.now()
-      const duration = 500
-
-      const animate = () => {
-        const elapsed = performance.now() - startTime
-        this.clearProgress = Math.min(elapsed / duration, 1)
-
-        if (this.clearProgress >= 1) {
-          this.isClearing = false
-          this.animatedWords.clear()
-          this.particles = []
+      const checkDone = () => {
+        if (!this.isClearing) {
           resolve()
         } else {
-          requestAnimationFrame(animate)
+          requestAnimationFrame(checkDone)
         }
       }
-      requestAnimationFrame(animate)
+      requestAnimationFrame(checkDone)
     })
   }
 
@@ -103,17 +139,17 @@ class WordCloudRenderer {
     const rect = this.canvas.getBoundingClientRect()
     const colors = this.currentTheme?.textColors || ['#3b82f6', '#8b5cf6', '#ec4899']
 
-    for (let i = 0; i < 80; i++) {
+    for (let i = 0; i < 120; i++) {
       const angle = Math.random() * Math.PI * 2
-      const speed = 1 + Math.random() * 3
+      const speed = 2 + Math.random() * 5
       this.particles.push({
-        x: rect.width / 2 + (Math.random() - 0.5) * rect.width * 0.6,
-        y: rect.height / 2 + (Math.random() - 0.5) * rect.height * 0.6,
+        x: rect.width / 2 + (Math.random() - 0.5) * rect.width * 0.7,
+        y: rect.height / 2 + (Math.random() - 0.5) * rect.height * 0.7,
         vx: Math.cos(angle) * speed,
-        vy: Math.sin(angle) * speed - 1,
+        vy: Math.sin(angle) * speed - 2,
         alpha: 1,
         color: colors[Math.floor(Math.random() * colors.length)],
-        size: 2 + Math.random() * 4,
+        size: 2 + Math.random() * 5,
         life: 1
       })
     }
@@ -122,7 +158,8 @@ class WordCloudRenderer {
   triggerRocketAnimation(fromX: number, fromY: number, toX: number, toY: number, color: string): void {
     const startTime = performance.now()
     const duration = 500
-    const particles: Particle[] = []
+    let lastX = fromX
+    let lastY = fromY
 
     const animate = () => {
       const elapsed = performance.now() - startTime
@@ -132,43 +169,54 @@ class WordCloudRenderer {
       const x = fromX + (toX - fromX) * easeT
       const y = fromY + (toY - fromY) * easeT
 
-      for (let i = 0; i < 3; i++) {
-        particles.push({
-          x,
-          y,
-          vx: (Math.random() - 0.5) * 2,
-          vy: (Math.random() - 0.5) * 2,
-          alpha: 1,
+      const dx = x - lastX
+      const dy = y - lastY
+      const dist = Math.sqrt(dx * dx + dy * dy)
+      const particleCount = Math.max(2, Math.floor(dist / 4))
+
+      for (let i = 0; i < particleCount; i++) {
+        const pt = i / particleCount
+        const px = lastX + dx * pt
+        const py = lastY + dy * pt
+        this.particles.push({
+          x: px,
+          y: py,
+          vx: (Math.random() - 0.5) * 1.5,
+          vy: (Math.random() - 0.5) * 1.5 - 0.5,
+          alpha: 0.9,
           color,
           size: 2 + Math.random() * 3,
           life: 1
         })
       }
 
-      particles.forEach((p) => {
-        p.x += p.vx
-        p.y += p.vy
-        p.alpha *= 0.92
-        p.life *= 0.92
-      })
+      lastX = x
+      lastY = y
 
-      for (let i = particles.length - 1; i >= 0; i--) {
-        if (particles[i].life < 0.05) {
-          particles.splice(i, 1)
-        }
-      }
-
-      this.particles.push(...particles.splice(0))
-
-      if (t < 1 || particles.length > 0) {
+      if (t < 1) {
         requestAnimationFrame(animate)
+      } else {
+        for (let i = 0; i < 15; i++) {
+          const angle = Math.random() * Math.PI * 2
+          const speed = 1 + Math.random() * 3
+          this.particles.push({
+            x: toX,
+            y: toY,
+            vx: Math.cos(angle) * speed,
+            vy: Math.sin(angle) * speed,
+            alpha: 1,
+            color,
+            size: 3 + Math.random() * 3,
+            life: 1
+          })
+        }
       }
     }
     requestAnimationFrame(animate)
   }
 
   update(data: RenderData, previousWeights?: Map<string, number>): void {
-    const newWords = new Set<string>()
+    const now = performance.now()
     const pulseWords = new Set<string>()
 
     data.positions.forEach((pos) => {
@@ -183,11 +231,10 @@ class WordCloudRenderer {
         existing.targetX = pos.x
         existing.targetY = pos.y
         existing.targetFontSize = pos.fontSize
-        existing.color = pos.color
+        existing.targetColor = pos.color
+        existing.targetRotate = pos.rotate
         existing.weight = pos.weight
-        existing.rotate = pos.rotate
       } else {
-        newWords.add(pos.word)
         this.animatedWords.set(pos.word, {
           ...pos,
           targetX: pos.x,
@@ -195,11 +242,17 @@ class WordCloudRenderer {
           targetFontSize: pos.fontSize,
           currentX: pos.x,
           currentY: pos.y,
-          currentFontSize: pos.fontSize * 0.5,
+          currentFontSize: pos.fontSize * 0.3,
+          targetColor: pos.color,
+          currentColor: pos.color,
           alpha: 0,
-          scale: 0.5,
+          scale: 0.3,
           pulseScale: 1,
-          isNew: true
+          targetRotate: pos.rotate,
+          currentRotate: pos.rotate,
+          isNew: true,
+          fadeInStartTime: now,
+          pulseStartTime: 0
         })
       }
     })
@@ -214,7 +267,8 @@ class WordCloudRenderer {
     pulseWords.forEach((word) => {
       const w = this.animatedWords.get(word)
       if (w) {
-        w.pulseScale = 1.3
+        w.pulseScale = 1.4
+        w.pulseStartTime = now
       }
     })
   }
@@ -235,15 +289,51 @@ class WordCloudRenderer {
     }
   }
 
+  private getInterpolatedTheme(now: number): Theme | null {
+    if (!this.currentTheme) return null
+    if (!this.isThemeTransitioning || !this.targetTheme) return this.currentTheme
+
+    const t = Math.min((now - this.themeTransitionStart) / THEME_TRANSITION_DURATION, 1)
+    const easeT = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2
+
+    if (t >= 1) {
+      this.currentTheme = this.targetTheme
+      this.isThemeTransitioning = false
+      return this.currentTheme
+    }
+
+    const interpolatedTextColors = this.currentTheme.textColors.map((c, i) => {
+      const target = this.targetTheme?.textColors[i] || c
+      return lerpColor(c, target, easeT)
+    })
+
+    return {
+      id: this.targetTheme.id,
+      name: this.targetTheme.name,
+      primary: lerpColor(this.currentTheme.primary, this.targetTheme.primary, easeT),
+      background: lerpColor(this.currentTheme.background, this.targetTheme.background, easeT),
+      canvasBackground: lerpColor(
+        this.currentTheme.canvasBackground,
+        this.targetTheme.canvasBackground,
+        easeT
+      ),
+      textColors: interpolatedTextColors,
+      accent: lerpColor(this.currentTheme.accent, this.targetTheme.accent, easeT)
+    }
+  }
+
   private renderFrame(): void {
     if (!this.ctx || !this.canvas) return
     const rect = this.canvas.getBoundingClientRect()
     const ctx = this.ctx
+    const now = performance.now()
+
+    const theme = this.getInterpolatedTheme(now)
 
     ctx.clearRect(0, 0, rect.width, rect.height)
 
-    if (this.currentTheme) {
-      ctx.fillStyle = this.currentTheme.canvasBackground
+    if (theme) {
+      ctx.fillStyle = theme.canvasBackground
       ctx.fillRect(0, 0, rect.width, rect.height)
     } else {
       ctx.fillStyle = '#ffffff'
@@ -251,70 +341,105 @@ class WordCloudRenderer {
     }
 
     if (this.isClearing) {
-      this.renderClearEffect(ctx, rect)
+      const elapsed = now - this.clearStartTime
+      const progress = Math.min(elapsed / CLEAR_DURATION, 1)
+      if (progress >= 1) {
+        this.isClearing = false
+        this.animatedWords.clear()
+      } else {
+        this.renderClearEffect(ctx, progress)
+      }
     } else {
-      this.renderWords(ctx)
+      this.renderWords(ctx, now)
     }
 
     this.renderParticles(ctx)
   }
 
-  private renderWords(ctx: CanvasRenderingContext2D): void {
-    for (const [, word] of this.animatedWords) {
-      const fadeSpeed = 1 / (60 * 0.6)
-      const moveSpeed = 0.12
-      const scaleSpeed = 0.1
-      const pulseSpeed = 0.15
+  private renderWords(ctx: CanvasRenderingContext2D, now: number): void {
+    const moveSpeed = 0.15
+    const scaleSpeed = 0.12
+    const colorSpeed = 0.15
+    const rotateSpeed = 0.15
 
-      if (word.alpha < 1) {
-        word.alpha = Math.min(1, word.alpha + fadeSpeed)
+    for (const [, word] of this.animatedWords) {
+      if (word.isNew) {
+        const fadeElapsed = now - word.fadeInStartTime
+        const fadeProgress = Math.min(fadeElapsed / FADE_DURATION, 1)
+        const easeFade = fadeProgress < 0.5
+          ? 2 * fadeProgress * fadeProgress
+          : 1 - Math.pow(-2 * fadeProgress + 2, 2) / 2
+
+        word.alpha = easeFade
+        word.scale = 0.3 + 0.7 * easeFade
+
+        if (fadeProgress >= 1) {
+          word.isNew = false
+          word.alpha = 1
+          word.scale = 1
+        }
+      } else {
+        if (word.scale < 1) {
+          word.scale = Math.min(1, word.scale + scaleSpeed)
+        }
+        if (word.alpha < 1) {
+          word.alpha = Math.min(1, word.alpha + 0.05)
+        }
       }
-      if (word.scale < 1) {
-        word.scale = Math.min(1, word.scale + scaleSpeed)
-      }
-      if (word.pulseScale > 1) {
-        word.pulseScale = Math.max(1, word.pulseScale - pulseSpeed)
+
+      if (word.pulseStartTime > 0) {
+        const pulseElapsed = now - word.pulseStartTime
+        const pulseProgress = Math.min(pulseElapsed / PULSE_DURATION, 1)
+        word.pulseScale = 1 + 0.4 * (1 - pulseProgress) * (1 - pulseProgress)
+        if (pulseProgress >= 1) {
+          word.pulseStartTime = 0
+          word.pulseScale = 1
+        }
       }
 
       word.currentX += (word.targetX - word.currentX) * moveSpeed
       word.currentY += (word.targetY - word.currentY) * moveSpeed
       word.currentFontSize += (word.targetFontSize - word.currentFontSize) * moveSpeed
+      word.currentRotate += (word.targetRotate - word.currentRotate) * rotateSpeed
+      word.currentColor = lerpColor(word.currentColor, word.targetColor, colorSpeed)
 
       ctx.save()
       ctx.globalAlpha = word.alpha
       ctx.translate(word.currentX, word.currentY)
-      ctx.rotate((word.rotate * Math.PI) / 180)
+      ctx.rotate((word.currentRotate * Math.PI) / 180)
       ctx.scale(word.scale * word.pulseScale, word.scale * word.pulseScale)
 
       ctx.font = `bold ${word.currentFontSize}px sans-serif`
       ctx.textAlign = 'center'
       ctx.textBaseline = 'middle'
-      ctx.fillStyle = word.color
+      ctx.fillStyle = word.currentColor
       ctx.fillText(word.word, 0, 0)
 
       ctx.restore()
     }
   }
 
-  private renderClearEffect(ctx: CanvasRenderingContext2D, rect: { width: number; height: number }): void {
+  private renderClearEffect(ctx: CanvasRenderingContext2D, progress: number): void {
     for (const [, word] of this.animatedWords) {
       ctx.save()
-      ctx.globalAlpha = 1 - this.clearProgress
-      const dx = (Math.random() - 0.5) * this.clearProgress * 100
-      const dy = -this.clearProgress * 80 + (Math.random() - 0.5) * 30
+      ctx.globalAlpha = 1 - progress
+      const easeProgress = progress * progress
+      const dx = (Math.sin(word.currentX * 0.01 + progress * 10) * 80) * easeProgress
+      const dy = -easeProgress * 120 + (Math.random() - 0.5) * 20 * easeProgress
       ctx.translate(word.currentX + dx, word.currentY + dy)
-      ctx.rotate((word.rotate * Math.PI) / 180 + (Math.random() - 0.5) * this.clearProgress * 0.5)
-      ctx.scale(1 - this.clearProgress * 0.5, 1 - this.clearProgress * 0.5)
+      ctx.rotate(
+        (word.currentRotate * Math.PI) / 180 + (Math.random() - 0.5) * progress * 0.8
+      )
+      ctx.scale(1 - progress * 0.6, 1 - progress * 0.6)
 
       ctx.font = `bold ${word.currentFontSize}px sans-serif`
       ctx.textAlign = 'center'
       ctx.textBaseline = 'middle'
-      ctx.fillStyle = word.color
+      ctx.fillStyle = word.currentColor
       ctx.fillText(word.word, 0, 0)
 
       ctx.restore()
     }
-    void rect
   }
 
   private renderParticles(ctx: CanvasRenderingContext2D): void {
@@ -322,9 +447,9 @@ class WordCloudRenderer {
       const p = this.particles[i]
       p.x += p.vx
       p.y += p.vy
-      p.vy += 0.05
-      p.alpha *= 0.96
-      p.life *= 0.96
+      p.vy += 0.08
+      p.alpha *= 0.94
+      p.life *= 0.94
 
       if (p.life < 0.02) {
         this.particles.splice(i, 1)
@@ -335,7 +460,7 @@ class WordCloudRenderer {
       ctx.globalAlpha = p.alpha
       ctx.fillStyle = p.color
       ctx.beginPath()
-      ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2)
+      ctx.arc(p.x, p.y, p.size * p.life, 0, Math.PI * 2)
       ctx.fill()
       ctx.restore()
     }

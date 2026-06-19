@@ -68,3 +68,41 @@ export type RoomEventMap = {
 export type WordCloudEventMap = {
   'data:update': RenderData
 }
+
+export interface AuthScreenProps {
+  onCreateRoom: (roomName: string, teacherName: string) => void
+  onJoinRoom: (roomId: string, studentName: string) => void
+  error?: string
+}
+
+export interface ThemeSelectorProps {
+  themes: Theme[]
+  selectedThemeId: ThemeId
+  onSelect: (themeId: ThemeId) => void
+}
+
+export interface ControlPanelProps {
+  roomId: string
+  onlineCount: number
+  isTeacher: boolean
+  themes: Theme[]
+  selectedThemeId: ThemeId
+  onThemeChange: (themeId: ThemeId) => void
+  onClear: () => void
+  onExport: () => void
+}
+
+export interface WordCloudCanvasHandle {
+  getCanvas: () => HTMLCanvasElement | null
+  triggerRocket: (fromX: number, fromY: number, toX: number, toY: number, color: string) => void
+  triggerClear: () => Promise<void>
+}
+
+export interface WordCloudCanvasProps {
+  theme: Theme
+}
+
+export interface KeywordInputProps {
+  onSubmit: (keyword: string) => void
+  disabled?: boolean
+}

@@ -1,10 +1,5 @@
 import React, { useState } from 'react'
-
-interface AuthScreenProps {
-  onCreateRoom: (roomName: string, teacherName: string) => void
-  onJoinRoom: (roomId: string, studentName: string) => void
-  error?: string
-}
+import type { AuthScreenProps } from '../types'
 
 const AuthScreen: React.FC<AuthScreenProps> = ({ onCreateRoom, onJoinRoom, error }) => {
   const [activeTab, setActiveTab] = useState<'teacher' | 'student'>('teacher')

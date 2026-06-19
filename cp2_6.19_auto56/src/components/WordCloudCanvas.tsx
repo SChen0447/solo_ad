@@ -1,16 +1,6 @@
 import React, { useEffect, useRef, useImperativeHandle, forwardRef } from 'react'
 import { wordCloudRenderer } from '../modules/wordcloud/WordCloudRenderer'
-import type { Theme } from '../types'
-
-export interface WordCloudCanvasHandle {
-  getCanvas: () => HTMLCanvasElement | null
-  triggerRocket: (fromX: number, fromY: number, toX: number, toY: number, color: string) => void
-  triggerClear: () => Promise<void>
-}
-
-interface WordCloudCanvasProps {
-  theme: Theme
-}
+import type { WordCloudCanvasHandle, WordCloudCanvasProps } from '../types'
 
 const WordCloudCanvas = forwardRef<WordCloudCanvasHandle, WordCloudCanvasProps>(({ theme }, ref) => {
   const canvasRef = useRef<HTMLCanvasElement>(null)

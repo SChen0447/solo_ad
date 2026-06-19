@@ -1,11 +1,5 @@
 import React from 'react'
-import type { Theme, ThemeId } from '../types'
-
-interface ThemeSelectorProps {
-  themes: Theme[]
-  selectedThemeId: ThemeId
-  onSelect: (themeId: ThemeId) => void
-}
+import type { ThemeSelectorProps } from '../types'
 
 const ThemeSelector: React.FC<ThemeSelectorProps> = ({ themes, selectedThemeId, onSelect }) => {
   return (

@@ -17,6 +17,7 @@ interface PlacedWord {
   fontSize: number
   color: string
   rotate: number
+  radius: number
 }
 
 class WordCloudEngine extends EventEmitter<WordCloudEventMap> {
@@ -67,18 +68,22 @@ class WordCloudEngine extends EventEmitter<WordCloudEventMap> {
     }
   }
 
-  private rectsCollide(a: { x: number; y: number; width: number; height: number }, b: { x: number; y: number; width: number; height: number }): boolean {
+  private rectsCollide(
+    a: { x: number; y: number; width: number; height: number },
+    b: { x: number; y: number; width: number; height: number },
+    padding: number = 4
+  ): boolean {
     return !(
-      a.x + a.width / 2 < b.x - b.width / 2 ||
-      a.x - a.width / 2 > b.x + b.width / 2 ||
-      a.y + a.height / 2 < b.y - b.height / 2 ||
-      a.y - a.height / 2 > b.y + b.height / 2
+      a.x + a.width / 2 + padding < b.x - b.width / 2 ||
+      a.x - a.width / 2 - padding > b.x + b.width / 2 ||
+      a.y + a.height / 2 + padding < b.y - b.height / 2 ||
+      a.y - a.height / 2 - padding > b.y + b.height / 2
     )
   }
 
   private collidesWithAny(candidate: { x: number; y: number; width: number; height: number }): boolean {
     for (const placed of this.placedWords) {
-      if (this.rectsCollide(candidate, placed)) {
+      if (this.rectsCollide(candidate, placed, 6)) {
         return true
       }
     }
@@ -86,72 +91,93 @@ class WordCloudEngine extends EventEmitter<WordCloudEventMap> {
   }
 
   private inBounds(pos: { x: number; y: number; width: number; height: number }): boolean {
+    const margin = 20
     return (
-      pos.x - pos.width / 2 >= -10 &&
-      pos.x + pos.width / 2 <= this.canvasWidth + 10 &&
-      pos.y - pos.height / 2 >= -10 &&
-      pos.y + pos.height / 2 <= this.canvasHeight + 10
+      pos.x - pos.width / 2 >= margin &&
+      pos.x + pos.width / 2 <= this.canvasWidth - margin &&
+      pos.y - pos.height / 2 >= margin &&
+      pos.y + pos.height / 2 <= this.canvasHeight - margin
     )
   }
 
-  private findSpiralPosition(
+  private findArchimedeanSpiralPosition(
     size: { width: number; height: number },
-    startX: number,
-    startY: number
-  ): { x: number; y: number } | null {
+    weightRatio: number
+  ): { x: number; y: number; radius: number } | null {
     const centerX = this.canvasWidth / 2
     const centerY = this.canvasHeight / 2
-    const maxRadius = Math.min(this.canvasWidth, this.canvasHeight) / 2
-    let angle = 0
-    let radius = 0
-    const angleStep = 0.25
-    const radiusStep = 0.5
+    const maxRadius = Math.min(this.canvasWidth, this.canvasHeight) / 2 - 20
 
-    for (let i = 0; i < 3000; i++) {
+    const startRadius = maxRadius * (1 - weightRatio) * 0.6
+    const angleStep = 0.15
+    const radiusGrowth = 0.8
+
+    let angle = Math.random() * Math.PI * 2
+    let radius = startRadius
+
+    for (let i = 0; i < 4000; i++) {
       const x = centerX + Math.cos(angle) * radius
       const y = centerY + Math.sin(angle) * radius
 
       const candidate = { x, y, width: size.width, height: size.height }
       if (this.inBounds(candidate) && !this.collidesWithAny(candidate)) {
-        return { x, y }
+        return { x, y, radius }
       }
 
       angle += angleStep
-      radius += radiusStep * (angleStep / (2 * Math.PI))
+      radius = startRadius + radiusGrowth * (angle / (2 * Math.PI))
 
       if (radius > maxRadius) {
         break
       }
     }
 
-    const fallback = { x: startX, y: startY, width: size.width, height: size.height }
-    if (this.inBounds(fallback) && !this.collidesWithAny(fallback)) {
-      return { x: startX, y: startY }
+    for (let i = 0; i < 2000; i++) {
+      const angle2 = Math.random() * Math.PI * 2
+      const radius2 = startRadius + Math.random() * (maxRadius - startRadius)
+      const x = centerX + Math.cos(angle2) * radius2
+      const y = centerY + Math.sin(angle2) * radius2
+
+      const candidate = { x, y, width: size.width, height: size.height }
+      if (this.inBounds(candidate) && !this.collidesWithAny(candidate)) {
+        return { x, y, radius: radius2 }
+      }
     }
+
     return null
   }
 
-  private calculateFontSize(weight: number, maxWeight: number, minWeight: number): number {
+  private calculateFontSize(weight: number, maxWeight: number, minWeight: number, rank: number, total: number): number {
     const minFontSize = 14
     const maxFontSize = 72
+
     if (maxWeight === minWeight) {
-      return (minFontSize + maxFontSize) / 2
+      return Math.round(minFontSize + (maxFontSize - minFontSize) * (1 - rank / Math.max(total - 1, 1)))
     }
-    const ratio = (weight - minWeight) / (maxWeight - minWeight)
-    return minFontSize + ratio * ratio * (maxFontSize - minFontSize)
+
+    const weightRatio = (weight - minWeight) / (maxWeight - minWeight)
+    const rankRatio = 1 - rank / Math.max(total - 1, 1)
+    const combinedRatio = weightRatio * 0.7 + rankRatio * 0.3
+
+    return Math.round(minFontSize + Math.pow(combinedRatio, 1.5) * (maxFontSize - minFontSize))
   }
 
-  private getColorForWord(index: number): string {
+  private getColorForWord(weightRatio: number, rank: number): string {
     if (this.currentTheme && this.currentTheme.textColors.length > 0) {
-      return this.currentTheme.textColors[index % this.currentTheme.textColors.length]
+      const colors = this.currentTheme.textColors
+      const idx = Math.min(Math.floor(weightRatio * colors.length), colors.length - 1)
+      return colors[idx]
     }
     const colors = ['#2563eb', '#7c3aed', '#db2777', '#ea580c', '#059669']
-    return colors[index % colors.length]
+    return colors[rank % colors.length]
   }
 
-  private getRotation(weight: number, maxWeight: number): number {
-    if (weight < maxWeight * 0.3) {
-      return Math.random() > 0.7 ? 90 : 0
+  private getRotation(weight: number, maxWeight: number, rank: number): number {
+    if (rank < 3) {
+      return 0
+    }
+    if (weight < maxWeight * 0.5) {
+      return Math.random() > 0.75 ? (Math.random() > 0.5 ? 90 : -90) : 0
     }
     return 0
   }
@@ -169,38 +195,40 @@ class WordCloudEngine extends EventEmitter<WordCloudEventMap> {
     const sorted = [...keywords].sort((a, b) => b.weight - a.weight)
     const maxWeight = sorted[0].weight
     const minWeight = sorted[sorted.length - 1].weight
+    const limit = Math.min(sorted.length, 100)
 
     this.placedWords = []
     const positions: WordPosition[] = []
-    const limit = Math.min(sorted.length, 100)
 
     for (let i = 0; i < limit; i++) {
       const kw = sorted[i]
-      const fontSize = this.calculateFontSize(kw.weight, maxWeight, minWeight)
-      const rotate = this.getRotation(kw.weight, maxWeight)
+      const weightRatio = maxWeight === minWeight ? (1 - i / Math.max(limit - 1, 1)) : (kw.weight - minWeight) / (maxWeight - minWeight)
+      const fontSize = this.calculateFontSize(kw.weight, maxWeight, minWeight, i, limit)
+      const rotate = this.getRotation(kw.weight, maxWeight, i)
       const textSize = this.measureText(kw.word, fontSize, rotate)
-      const color = this.getColorForWord(i)
+      const color = this.getColorForWord(weightRatio, i)
 
-      const pos = this.findSpiralPosition(textSize, this.canvasWidth / 2, this.canvasHeight / 2)
+      const posResult = this.findArchimedeanSpiralPosition(textSize, weightRatio)
 
-      if (pos) {
+      if (posResult) {
         const placed: PlacedWord = {
           word: kw.word,
           weight: kw.weight,
-          x: pos.x,
-          y: pos.y,
+          x: posResult.x,
+          y: posResult.y,
           width: textSize.width,
           height: textSize.height,
           fontSize,
           color,
-          rotate
+          rotate,
+          radius: posResult.radius
         }
         this.placedWords.push(placed)
         positions.push({
           word: kw.word,
           weight: kw.weight,
-          x: pos.x,
-          y: pos.y,
+          x: posResult.x,
+          y: posResult.y,
           fontSize,
           color,
           rotate
@@ -208,8 +236,16 @@ class WordCloudEngine extends EventEmitter<WordCloudEventMap> {
       }
     }
 
+    this.placedWords.sort((a, b) => a.radius - b.radius)
+
+    const sortedPositions = [...positions].sort((a, b) => {
+      const ra = Math.sqrt(Math.pow(a.x - this.canvasWidth / 2, 2) + Math.pow(a.y - this.canvasHeight / 2, 2))
+      const rb = Math.sqrt(Math.pow(b.x - this.canvasWidth / 2, 2) + Math.pow(b.y - this.canvasHeight / 2, 2))
+      return ra - rb
+    })
+
     const result: RenderData = {
-      positions,
+      positions: sortedPositions,
       width: this.canvasWidth,
       height: this.canvasHeight
     }

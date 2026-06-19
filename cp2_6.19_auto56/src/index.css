@@ -113,6 +113,7 @@ html, body, #root {
   gap: 6px;
   font-size: 14px;
   color: var(--text-secondary);
+  transition: color 0.4s ease;
 }
 
 .online-number {
@@ -228,6 +229,7 @@ html, body, #root {
   color: var(--text-secondary);
   text-transform: uppercase;
   letter-spacing: 0.5px;
+  transition: color 0.4s ease;
 }
 
 .theme-grid {
@@ -473,6 +475,7 @@ html, body, #root {
   border-radius: 20px;
   font-size: 13px;
   font-weight: 600;
+  transition: background-color 0.4s ease, color 0.4s ease;
 }
 
 .error-message {
