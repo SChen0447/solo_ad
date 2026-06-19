@@ -1,0 +1,94 @@
+{
+  "meetings": [
+    {
+      "id": "meeting-001",
+      "title": "Sprint 12 复盘会议",
+      "date": "2026-06-15",
+      "members": ["张三", "李四", "王五", "赵六"],
+      "items": {
+        "good": [
+          {
+            "id": "good-001",
+            "content": "用户登录模块提前2天完成",
+            "order": 0
+          },
+          {
+            "id": "good-002",
+            "content": "每日站会沟通效率提升",
+            "order": 1
+          }
+        ],
+        "improve": [
+          {
+            "id": "improve-001",
+            "content": "接口文档更新不及时",
+            "order": 0
+          },
+          {
+            "id": "improve-002",
+            "content": "测试用例覆盖率需要提高",
+            "order": 1
+          }
+        ],
+        "action": [
+          {
+            "id": "action-001",
+            "content": "完善接口文档模板并纳入Definition of Done",
+            "assignee": "李四",
+            "dueDate": "2026-06-25",
+            "completed": false,
+            "order": 0
+          },
+          {
+            "id": "action-002",
+            "content": "组织一次单元测试培训分享会",
+            "assignee": "王五",
+            "dueDate": "2026-06-20",
+            "completed": true,
+            "order": 1
+          },
+          {
+            "id": "action-003",
+            "content": "优化CI/CD流水线，减少部署时间",
+            "assignee": "赵六",
+            "dueDate": "2026-06-10",
+            "completed": false,
+            "order": 2
+          }
+        ]
+      }
+    },
+    {
+      "id": "meeting-002",
+      "title": "Sprint 11 复盘会议",
+      "date": "2026-06-01",
+      "members": ["张三", "李四", "钱七"],
+      "items": {
+        "good": [
+          {
+            "id": "good-101",
+            "content": "需求评审环节流程规范了很多",
+            "order": 0
+          }
+        ],
+        "improve": [
+          {
+            "id": "improve-101",
+            "content": "任务拆分粒度不够细",
+            "order": 0
+          }
+        ],
+        "action": [
+          {
+            "id": "action-101",
+            "content": "制定任务拆分规范checklist",
+            "assignee": "张三",
+            "dueDate": "2026-06-08",
+            "completed": true,
+            "order": 0
+          }
+        ]
+      }
+    }
+  ]
+}
