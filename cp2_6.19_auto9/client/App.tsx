@@ -13,11 +13,12 @@ const App: React.FC = () => {
   const [selectedPost, setSelectedPost] = useState<Post | null>(null);
   const [loading, setLoading] = useState(true);
   const [isAdmin] = useState(true);
+  const [sortMode, setSortMode] = useState<'latest' | 'hot'>('latest');
 
   useEffect(() => {
     fetchTags();
     fetchPosts();
-  }, [selectedTag]);
+  }, [selectedTag, sortMode]);
 
   const fetchTags = async () => {
     try {
@@ -32,9 +33,11 @@ const App: React.FC = () => {
   const fetchPosts = async () => {
     setLoading(true);
     try {
-      const url = selectedTag 
-        ? `/api/posts?tag=${selectedTag}` 
-        : '/api/posts';
+      const params = new URLSearchParams();
+      if (selectedTag) params.set('tag', selectedTag);
+      if (sortMode === 'hot') params.set('sort', 'hot');
+      const query = params.toString();
+      const url = query ? `/api/posts?${query}` : '/api/posts';
       const response = await fetch(url);
       const data = await response.json();
       setPosts(data);
@@ -123,6 +126,11 @@ const App: React.FC = () => {
     setSelectedPost(null);
   };
 
+  const handleSortChange = (mode: 'latest' | 'hot') => {
+    setSortMode(mode);
+    setSelectedPost(null);
+  };
+
   const handleSelectPost = (post: Post) => {
     setSelectedPost(post);
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -163,7 +171,9 @@ const App: React.FC = () => {
                 <TagNav 
                   tags={tags} 
                   selectedTag={selectedTag} 
-                  onSelectTag={handleSelectTag} 
+                  onSelectTag={handleSelectTag}
+                  sortMode={sortMode}
+                  onSortChange={handleSortChange}
                 />
                 {loading ? (
                   <div className="loading">加载中...</div>

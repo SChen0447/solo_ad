@@ -217,13 +217,22 @@ initMockData();
 
 export const getTags = (): Tag[] => TAGS;
 
-export const getPosts = (tag?: string): Post[] => {
+export const getPosts = (tag?: string, sort?: string): Post[] => {
   let result = tag ? posts.filter(p => p.tag === tag) : [...posts];
   result.sort((a, b) => {
     if (a.isTop !== b.isTop) return b.isTop ? 1 : -1;
+    if (sort === 'hot') {
+      const aCount = comments.filter(c => c.postId === a.id).length;
+      const bCount = comments.filter(c => c.postId === b.id).length;
+      return bCount - aCount;
+    }
     return b.createdAt - a.createdAt;
   });
   return result;
+};
+
+export const getCommentCount = (postId: string): number => {
+  return comments.filter(c => c.postId === postId).length;
 };
 
 export const getPost = (id: string): Post | undefined => {

@@ -10,6 +10,7 @@ import {
   toggleFeatured,
   getTags,
   getStats,
+  getCommentCount,
   generateMorePosts
 } from './data';
 
@@ -36,8 +37,13 @@ app.get('/api/tags', (req: Request, res: Response) => {
 
 app.get('/api/posts', (req: Request, res: Response) => {
   const tag = typeof req.query.tag === 'string' ? req.query.tag : undefined;
-  const posts = getPosts(tag);
-  res.json(posts);
+  const sort = typeof req.query.sort === 'string' ? req.query.sort : undefined;
+  const posts = getPosts(tag, sort);
+  const postsWithCount = posts.map(p => ({
+    ...p,
+    commentCount: getCommentCount(p.id)
+  }));
+  res.json(postsWithCount);
 });
 
 app.get('/api/posts/:id', (req: Request, res: Response) => {

@@ -8,6 +8,7 @@ export interface Post {
   createdAt: number;
   isTop: boolean;
   isFeatured: boolean;
+  commentCount?: number;
 }
 
 export interface Comment {
