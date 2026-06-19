@@ -44,6 +44,7 @@ export class ThemeManager {
   private readonly transitionDuration: number = 1500;
   private transitionStartTime: number = 0;
   private onThemeChangeCallback: ((colors: ThemeColors) => void) | null = null;
+  private fromColors: ThemeColors | null = null;
 
   constructor() {}
 
@@ -56,13 +57,13 @@ export class ThemeManager {
   }
 
   getCurrentColors(): ThemeColors {
-    if (this.transitionProgress >= 1) {
+    if (this.transitionProgress >= 1 || !this.fromColors) {
       return THEMES[this.currentTheme];
     }
 
-    const fromColors = THEMES[this.currentTheme];
+    const fromColors = this.fromColors;
     const toColors = THEMES[this.targetTheme];
-    const t = this.transitionProgress;
+    const t = this.easeInOutCubic(this.transitionProgress);
 
     return {
       background: this.lerpColor(fromColors.background, toColors.background, t),
@@ -76,10 +77,18 @@ export class ThemeManager {
   }
 
   switchTheme(theme: ThemeType): void {
-    if (theme === this.currentTheme && this.transitionProgress >= 1) {
+    if (theme === this.targetTheme && this.transitionProgress >= 1) {
       return;
     }
 
+    this.fromColors = { ...THEMES[this.currentTheme] };
+    this.fromColors.particleColors = [...THEMES[this.currentTheme].particleColors];
+
+    if (this.transitionProgress < 1 && this.fromColors) {
+      this.fromColors = this.getCurrentColors();
+    }
+
+    this.currentTheme = this.targetTheme;
     this.targetTheme = theme;
     this.transitionProgress = 0;
     this.transitionStartTime = performance.now();
@@ -87,9 +96,6 @@ export class ThemeManager {
 
   update(_deltaTime: number): void {
     if (this.transitionProgress >= 1) {
-      if (this.currentTheme !== this.targetTheme) {
-        this.currentTheme = this.targetTheme;
-      }
       return;
     }
 
@@ -99,11 +105,16 @@ export class ThemeManager {
     if (this.transitionProgress >= 1) {
       this.currentTheme = this.targetTheme;
       this.transitionProgress = 1;
+      this.fromColors = null;
     }
 
     if (this.onThemeChangeCallback) {
       this.onThemeChangeCallback(this.getCurrentColors());
     }
+  }
+
+  private easeInOutCubic(t: number): number {
+    return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
   }
 
   private lerpColor(color1: number, color2: number, t: number): number {

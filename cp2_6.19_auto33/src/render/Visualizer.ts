@@ -13,8 +13,8 @@ export class Visualizer {
   private particleSizes: Float32Array | null = null;
   private particleBaseSizes: Float32Array | null = null;
   private particleColors: Float32Array | null = null;
-  private particleFreqIndices: number[] = [];
-  
+  private currentOpacity: number = 0.8;
+
   private waveformLine: THREE.Line | null = null;
   private waveformGeometry: THREE.BufferGeometry | null = null;
   private waveformPositions: Float32Array | null = null;
@@ -78,8 +78,6 @@ export class Visualizer {
       const size = 0.05 + Math.random() * 0.15;
       this.particleSizes[i] = size;
       this.particleBaseSizes[i] = size;
-      
-      this.particleFreqIndices[i] = Math.floor(Math.random() * 32) + 16;
     }
     
     geometry.setAttribute('position', new THREE.BufferAttribute(this.particlePositions, 3));
@@ -226,67 +224,80 @@ export class Visualizer {
   private updateParticles(
     spectrum: number[],
     lowFreqEnergy: number,
-    midHighFreqEnergy: number
+    _midHighFreqEnergy: number
   ): void {
     if (!this.particleSystem || !this.particlePositions || !this.particleBasePositions ||
         !this.particleSizes || !this.particleBaseSizes) return;
-    
+
+    let midHighAvg = 0;
+    for (let i = 16; i <= 48; i++) {
+      midHighAvg += spectrum[i] || 0;
+    }
+    midHighAvg /= 33;
+
     const maxOffset = 2;
+    const radialOffset = midHighAvg * maxOffset;
     const sizeMultiplier = 1 + lowFreqEnergy * 1.5;
-    const opacityMultiplier = 0.5 + lowFreqEnergy * 0.5;
-    
+    const targetOpacity = 0.4 + lowFreqEnergy * 0.6;
+    this.currentOpacity += (targetOpacity - this.currentOpacity) * 0.1;
+
     for (let i = 0; i < this.particleCount; i++) {
-      const freqIndex = this.particleFreqIndices[i];
-      const freqEnergy = spectrum[freqIndex] || 0;
-      
       const bx = this.particleBasePositions[i * 3];
       const by = this.particleBasePositions[i * 3 + 1];
       const bz = this.particleBasePositions[i * 3 + 2];
-      
+
       const length = Math.sqrt(bx * bx + by * by + bz * bz);
       if (length > 0) {
         const nx = bx / length;
         const ny = by / length;
         const nz = bz / length;
-        
-        const offset = freqEnergy * midHighFreqEnergy * maxOffset;
-        
-        this.particlePositions[i * 3] = bx + nx * offset;
-        this.particlePositions[i * 3 + 1] = by + ny * offset;
-        this.particlePositions[i * 3 + 2] = bz + nz * offset;
+
+        this.particlePositions[i * 3] = bx + nx * radialOffset;
+        this.particlePositions[i * 3 + 1] = by + ny * radialOffset;
+        this.particlePositions[i * 3 + 2] = bz + nz * radialOffset;
       }
-      
+
       this.particleSizes[i] = this.particleBaseSizes[i] * sizeMultiplier;
     }
-    
+
     const positionAttribute = this.particleSystem.geometry.getAttribute('position') as THREE.BufferAttribute;
     positionAttribute.needsUpdate = true;
-    
+
     const sizeAttribute = this.particleSystem.geometry.getAttribute('size') as THREE.BufferAttribute;
     sizeAttribute.needsUpdate = true;
-    
+
     const material = this.particleSystem.material as THREE.PointsMaterial;
-    material.opacity = opacityMultiplier;
+    material.opacity = this.currentOpacity;
   }
 
-  private updateWaveform(_spectrum: number[], lowFreqEnergy: number): void {
+  private updateWaveform(spectrum: number[], _lowFreqEnergy: number): void {
     if (!this.waveformLine || !this.waveformPositions || !this.waveformGeometry) return;
-    
+
+    let lowFreqWeighted = 0;
+    const weights = [1.0, 0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3];
+    let totalWeight = 0;
+    for (let i = 0; i < 8; i++) {
+      lowFreqWeighted += (spectrum[i] || 0) * weights[i];
+      totalWeight += weights[i];
+    }
+    lowFreqWeighted /= totalWeight;
+
+    const amplitude = 1.5 * lowFreqWeighted;
+
     let waveformData: number[] = [];
     if (this.spectrumAnalyzer) {
       waveformData = this.spectrumAnalyzer.getWaveform();
     }
-    
+
     for (let i = 0; i < this.wavePoints; i++) {
       const waveIndex = Math.floor((i / this.wavePoints) * waveformData.length);
       const waveValue = waveformData[waveIndex] || 0;
-      
-      const amplitude = 1.5 * lowFreqEnergy;
+
       const y = waveValue * amplitude;
-      
+
       this.waveformPositions[i * 3 + 1] = y;
     }
-    
+
     const positionAttribute = this.waveformGeometry.getAttribute('position') as THREE.BufferAttribute;
     positionAttribute.needsUpdate = true;
   }

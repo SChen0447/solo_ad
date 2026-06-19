@@ -5,7 +5,13 @@ import { ThemeType } from './render/ThemeManager';
 class App {
   private audioLoader: AudioLoader;
   private renderer: Renderer;
-  
+
+  private source: AudioBufferSourceNode | null = null;
+  private isPlaying: boolean = false;
+  private startTime: number = 0;
+  private pausedAt: number = 0;
+  private audioUpdateFrameId: number | null = null;
+
   private uploadZone: HTMLElement;
   private fileInput: HTMLInputElement;
   private audioInfo: HTMLElement;
@@ -22,10 +28,10 @@ class App {
 
   constructor() {
     this.audioLoader = new AudioLoader();
-    
+
     const container = document.getElementById('canvas-container')!;
     this.renderer = new Renderer(container);
-    
+
     this.uploadZone = document.getElementById('upload-zone')!;
     this.fileInput = document.getElementById('file-input') as HTMLInputElement;
     this.audioInfo = document.getElementById('audio-info')!;
@@ -39,7 +45,7 @@ class App {
     this.progressBar = document.getElementById('progress-bar')!;
     this.progress = document.getElementById('progress')!;
     this.timeDisplay = document.getElementById('time-display')!;
-    
+
     this.setupAudioCallbacks();
     this.setupEventListeners();
     this.renderer.start();
@@ -49,37 +55,54 @@ class App {
     this.audioLoader.setSpectrumCallback((spectrum) => {
       this.renderer.setSpectrumData(spectrum);
     });
-    
-    this.audioLoader.setAudioInfoCallback((info) => {
-      this.updateAudioInfo(info);
-    });
   }
 
   private setupEventListeners(): void {
     this.uploadZone.addEventListener('click', () => {
       this.fileInput.click();
     });
-    
+
     this.fileInput.addEventListener('change', (e) => {
       const target = e.target as HTMLInputElement;
       if (target.files && target.files.length > 0) {
         this.handleFile(target.files[0]);
       }
     });
-    
+
+    document.addEventListener('dragover', (e) => {
+      e.preventDefault();
+    });
+
+    document.addEventListener('drop', (e) => {
+      e.preventDefault();
+    });
+
+    let dragCounter = 0;
+
+    this.uploadZone.addEventListener('dragenter', (e) => {
+      e.preventDefault();
+      dragCounter++;
+      this.uploadZone.classList.add('drag-over');
+    });
+
     this.uploadZone.addEventListener('dragover', (e) => {
       e.preventDefault();
       this.uploadZone.classList.add('drag-over');
     });
-    
+
     this.uploadZone.addEventListener('dragleave', () => {
-      this.uploadZone.classList.remove('drag-over');
+      dragCounter--;
+      if (dragCounter <= 0) {
+        dragCounter = 0;
+        this.uploadZone.classList.remove('drag-over');
+      }
     });
-    
+
     this.uploadZone.addEventListener('drop', (e) => {
       e.preventDefault();
+      dragCounter = 0;
       this.uploadZone.classList.remove('drag-over');
-      
+
       if (e.dataTransfer && e.dataTransfer.files.length > 0) {
         const file = e.dataTransfer.files[0];
         if (this.isValidAudioFile(file)) {
@@ -87,15 +110,15 @@ class App {
         }
       }
     });
-    
+
     this.playStatus.addEventListener('click', () => {
       this.togglePlayPause();
     });
-    
+
     this.playPauseBtn.addEventListener('click', () => {
       this.togglePlayPause();
     });
-    
+
     this.themeButtons.forEach(btn => {
       btn.addEventListener('click', () => {
         const theme = btn.dataset.theme as ThemeType;
@@ -104,24 +127,24 @@ class App {
         }
       });
     });
-    
+
     this.progressBar.addEventListener('click', (e) => {
       const rect = this.progressBar.getBoundingClientRect();
       const x = e.clientX - rect.left;
       const percent = x / rect.width;
       const duration = this.audioLoader.getDuration();
       if (duration > 0) {
-        this.audioLoader.seek(percent * duration);
+        this.seek(percent * duration);
       }
     });
-    
+
     document.addEventListener('keydown', (e) => {
       if (e.code === 'Space' && this.audioLoader.getDuration() > 0) {
         e.preventDefault();
         this.togglePlayPause();
       }
     });
-    
+
     window.addEventListener('beforeunload', () => {
       this.dispose();
     });
@@ -130,11 +153,11 @@ class App {
   private isValidAudioFile(file: File): boolean {
     const validTypes = ['audio/mpeg', 'audio/wav', 'audio/x-wav', 'audio/mp3'];
     const validExtensions = ['.mp3', '.wav'];
-    
+
     if (validTypes.includes(file.type)) {
       return true;
     }
-    
+
     const extension = file.name.toLowerCase().slice(file.name.lastIndexOf('.'));
     return validExtensions.includes(extension);
   }
@@ -144,10 +167,12 @@ class App {
       alert('请上传 MP3 或 WAV 格式的音频文件');
       return;
     }
-    
+
     try {
+      this.stopPlayback();
       await this.audioLoader.loadFile(file);
       this.renderer.setSpectrumAnalyzer(this.audioLoader.getSpectrumAnalyzer());
+      this.startPlayback();
       this.showControls();
     } catch (error) {
       console.error('Failed to load audio file:', error);
@@ -155,19 +180,135 @@ class App {
     }
   }
 
+  private startPlayback(offset?: number): void {
+    const audioContext = this.audioLoader.getAudioContext();
+    const audioBuffer = this.audioLoader.getAudioBuffer();
+    const analyzer = this.audioLoader.getSpectrumAnalyzer();
+    const gainNode = this.audioLoader.getGainNode();
+
+    if (!audioContext || !audioBuffer || !analyzer || !gainNode) return;
+
+    this.stopSource();
+
+    this.source = audioContext.createBufferSource();
+    this.source.buffer = audioBuffer;
+    this.source.connect(analyzer.getAnalyserNode());
+    analyzer.getAnalyserNode().connect(gainNode);
+
+    this.source.onended = () => {
+      if (this.isPlaying) {
+        this.isPlaying = false;
+        this.pausedAt = 0;
+        this.updatePlayUI();
+      }
+    };
+
+    const startOffset = offset !== undefined ? offset : this.pausedAt;
+    this.startTime = audioContext.currentTime - startOffset;
+    this.source.start(0, startOffset);
+    this.isPlaying = true;
+    this.updatePlayUI();
+    this.startUIUpdateLoop();
+  }
+
+  private stopSource(): void {
+    if (this.source) {
+      try {
+        this.source.stop();
+        this.source.disconnect();
+      } catch (e) {}
+      this.source = null;
+    }
+  }
+
+  private pausePlayback(): void {
+    const audioContext = this.audioLoader.getAudioContext();
+    if (this.isPlaying && audioContext) {
+      this.pausedAt = audioContext.currentTime - this.startTime;
+      this.stopSource();
+      this.isPlaying = false;
+      this.updatePlayUI();
+    }
+  }
+
+  private stopPlayback(): void {
+    this.stopSource();
+    this.isPlaying = false;
+    this.pausedAt = 0;
+    if (this.audioUpdateFrameId) {
+      cancelAnimationFrame(this.audioUpdateFrameId);
+      this.audioUpdateFrameId = null;
+    }
+  }
+
+  private seek(time: number): void {
+    const duration = this.audioLoader.getDuration();
+    if (duration <= 0) return;
+
+    this.pausedAt = Math.max(0, Math.min(time, duration));
+
+    if (this.isPlaying) {
+      this.startPlayback(this.pausedAt);
+    } else {
+      this.updateTimeDisplay();
+    }
+  }
+
+  private togglePlayPause(): void {
+    if (this.isPlaying) {
+      this.pausePlayback();
+    } else {
+      this.startPlayback();
+    }
+  }
+
+  private startUIUpdateLoop(): void {
+    const updateUI = () => {
+      if (!this.isPlaying) {
+        this.audioUpdateFrameId = null;
+        return;
+      }
+      this.updateTimeDisplay();
+      this.audioUpdateFrameId = requestAnimationFrame(updateUI);
+    };
+    if (!this.audioUpdateFrameId) {
+      updateUI();
+    }
+  }
+
+  private updatePlayUI(): void {
+    this.playStatusIcon.textContent = this.isPlaying ? '⏸' : '▶';
+    this.playPauseBtn.textContent = this.isPlaying ? '⏸' : '▶';
+
+    if (!this.isPlaying && this.audioUpdateFrameId) {
+      cancelAnimationFrame(this.audioUpdateFrameId);
+      this.audioUpdateFrameId = null;
+    }
+  }
+
+  private updateTimeDisplay(): void {
+    const audioContext = this.audioLoader.getAudioContext();
+    const duration = this.audioLoader.getDuration();
+    const currentTime = this.isPlaying && audioContext
+      ? audioContext.currentTime - this.startTime
+      : this.pausedAt;
+
+    if (duration > 0) {
+      const percent = (currentTime / duration) * 100;
+      this.progress.style.width = `${percent}%`;
+    }
+
+    this.timeDisplay.textContent = `${this.formatTime(currentTime)} / ${this.formatTime(duration)}`;
+  }
+
   private showControls(): void {
     this.uploadZone.classList.add('hidden');
     this.audioInfo.classList.add('visible');
     this.playStatus.classList.add('visible');
     this.controls.classList.add('visible');
-  }
 
-  private togglePlayPause(): void {
-    if (this.audioLoader.getIsPlaying()) {
-      this.audioLoader.pause();
-    } else {
-      this.audioLoader.play();
-    }
+    this.audioName.textContent = this.audioLoader.getFileName();
+    this.audioDuration.textContent = `时长: ${this.formatTime(this.audioLoader.getDuration())}`;
   }
 
   private switchTheme(theme: ThemeType): void {
@@ -177,41 +318,22 @@ class App {
         btn.classList.add('active');
       }
     });
-    
-    this.renderer.switchTheme(theme);
-  }
 
-  private updateAudioInfo(info: {
-    name: string;
-    duration: number;
-    currentTime: number;
-    isPlaying: boolean;
-  }): void {
-    this.audioName.textContent = info.name;
-    this.audioDuration.textContent = `时长: ${this.formatTime(info.duration)}`;
-    
-    this.playStatusIcon.textContent = info.isPlaying ? '⏸' : '▶';
-    this.playPauseBtn.textContent = info.isPlaying ? '⏸' : '▶';
-    
-    if (info.duration > 0) {
-      const percent = (info.currentTime / info.duration) * 100;
-      this.progress.style.width = `${percent}%`;
-    }
-    
-    this.timeDisplay.textContent = `${this.formatTime(info.currentTime)} / ${this.formatTime(info.duration)}`;
+    this.renderer.switchTheme(theme);
   }
 
   private formatTime(seconds: number): string {
     if (!isFinite(seconds) || seconds < 0) {
       return '0:00';
     }
-    
+
     const mins = Math.floor(seconds / 60);
     const secs = Math.floor(seconds % 60);
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   }
 
   private dispose(): void {
+    this.stopPlayback();
     this.audioLoader.dispose();
     this.renderer.dispose();
   }
