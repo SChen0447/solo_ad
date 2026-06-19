@@ -123,6 +123,9 @@ export class Renderer {
   applyTheme(theme: Theme): void {
     this.currentTheme = theme;
     const root = document.documentElement;
+    const body = document.body;
+
+    body.style.transition = 'background-color 0.5s ease, color 0.5s ease';
     
     root.style.setProperty('--bg-color', theme.backgroundColor);
     root.style.setProperty('--border-color', theme.borderColor);
@@ -135,14 +138,13 @@ export class Renderer {
     }
 
     if (this.gridElement) {
-      this.gridElement.style.transition = 'border-color 0.5s ease, background-color 0.5s ease';
+      this.gridElement.style.transition = 'border-color 0.5s ease, background-color 0.5s ease, box-shadow 0.5s ease';
     }
 
     for (let row = 0; row < this.gridSize; row++) {
       for (let col = 0; col < this.gridSize; col++) {
         const cell = this.cellElements[row][col];
-        cell.style.transition = 'background-color 0.5s ease, box-shadow 0.5s ease';
-        cell.style.backgroundColor = 'var(--bg-color)';
+        cell.style.transition = 'background-color 0.5s ease, box-shadow 0.5s ease, transform 0.1s ease';
       }
     }
   }
@@ -249,45 +251,52 @@ export class Renderer {
   }
 
   async animateFloodFill(
-    cells: CellPosition[],
+    layers: CellPosition[][],
     emoji: string,
-    speed: number = 50
-  ): Promise<void> {
-    if (cells.length === 0) return;
+    cellsPerSecond: number = 60
+  ): Promise<{ duration: number; cellCount: number; rate: number }> {
+    if (layers.length === 0) {
+      return { duration: 0, cellCount: 0, rate: 0 };
+    }
 
-    const delay = 1000 / speed;
-    let index = 0;
+    const startTime = performance.now();
+    let totalCells = 0;
+    const layerDelay = 1000 / cellsPerSecond;
 
-    const fillBatch = () => {
-      const batchSize = Math.max(1, Math.floor(speed / 60));
-      const end = Math.min(index + batchSize, cells.length);
-      
-      for (let i = index; i < end; i++) {
-        const { row, col } = cells[i];
+    for (let layerIdx = 0; layerIdx < layers.length; layerIdx++) {
+      const layer = layers[layerIdx];
+      totalCells += layer.length;
+
+      for (const { row, col } of layer) {
         this.animateFill(row, col, emoji);
       }
-      
-      index = end;
-      
-      if (index < cells.length) {
-        requestAnimationFrame(fillBatch);
+
+      if (layerIdx < layers.length - 1) {
+        await new Promise(resolve => setTimeout(resolve, layerDelay));
       }
-    };
+    }
 
-    fillBatch();
+    const endTime = performance.now();
+    const duration = endTime - startTime;
+    const rate = totalCells > 0 ? (totalCells / duration) * 1000 : 0;
 
-    const totalTime = (cells.length / speed) * 1000 + 500;
-    return new Promise(resolve => setTimeout(resolve, totalTime));
+    return { duration, cellCount: totalCells, rate };
   }
 
   async animateRowByRowFill(
     rows: CellWithEmoji[][],
     speed: number = 100
-  ): Promise<void> {
-    if (rows.length === 0) return;
+  ): Promise<{ duration: number; cellCount: number; rate: number }> {
+    if (rows.length === 0) {
+      return { duration: 0, cellCount: 0, rate: 0 };
+    }
+
+    const startTime = performance.now();
+    let totalCells = 0;
 
     for (let rowIdx = 0; rowIdx < rows.length; rowIdx++) {
       const rowCells = rows[rowIdx];
+      totalCells += rowCells.length;
       
       for (let i = 0; i < rowCells.length; i++) {
         const { row, col, emoji } = rowCells[i];
@@ -299,12 +308,18 @@ export class Renderer {
 
       const maxDelay = rowCells.length * (1000 / speed);
       
-      await new Promise(resolve => setTimeout(resolve, maxDelay + 100));
+      await new Promise(resolve => setTimeout(resolve, maxDelay + 50));
       
-      this.applyRowWaveEffect(rowIdx);
+      this.applyRowWaveEffect(rows[rowIdx][0].row);
       
-      await new Promise(resolve => setTimeout(resolve, 200));
+      await new Promise(resolve => setTimeout(resolve, 250));
     }
+
+    const endTime = performance.now();
+    const duration = endTime - startTime;
+    const rate = totalCells > 0 ? (totalCells / duration) * 1000 : 0;
+
+    return { duration, cellCount: totalCells, rate };
   }
 
   private applyRowWaveEffect(rowIndex: number): void {
@@ -312,12 +327,17 @@ export class Renderer {
     if (!rowElements) return;
 
     rowElements.forEach((cell, colIndex) => {
-      const delay = colIndex * 20;
+      const delay = colIndex * 15;
+      
       setTimeout(() => {
-        cell.style.transform = 'translateY(-3px)';
-        setTimeout(() => {
-          cell.style.transform = 'translateY(0)';
-        }, 150);
+        cell.classList.add('wave-effect');
+        
+        const handleAnimationEnd = () => {
+          cell.classList.remove('wave-effect');
+          cell.removeEventListener('animationend', handleAnimationEnd);
+        };
+        
+        cell.addEventListener('animationend', handleAnimationEnd);
       }, delay);
     });
   }

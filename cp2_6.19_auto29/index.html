@@ -323,11 +323,39 @@
 
     @keyframes waveBounce {
       0%, 100% {
-        transform: translateY(0);
+        transform: translateY(0) rotate(0deg);
+      }
+      25% {
+        transform: translateY(-4px) rotate(-2deg);
       }
       50% {
-        transform: translateY(-3px);
+        transform: translateY(-2px) rotate(0deg);
       }
+      75% {
+        transform: translateY(-4px) rotate(2deg);
+      }
+    }
+
+    @keyframes waveShake {
+      0%, 100% {
+        transform: translateX(0) translateY(0);
+      }
+      20% {
+        transform: translateX(-2px) translateY(-3px);
+      }
+      40% {
+        transform: translateX(2px) translateY(-2px);
+      }
+      60% {
+        transform: translateX(-1px) translateY(-4px);
+      }
+      80% {
+        transform: translateX(1px) translateY(-2px);
+      }
+    }
+
+    .grid-cell.wave-effect {
+      animation: waveShake 0.3s ease-in-out;
     }
 
     .grid-cell {

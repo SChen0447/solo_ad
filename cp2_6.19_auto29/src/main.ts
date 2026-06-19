@@ -3,7 +3,7 @@ import {
   getCell,
   fillCellRandom,
   refillCellRandom,
-  getEmptyCellsInBfsOrder,
+  getEmptyCellsByBfsLayers,
   generateRowByRowFillData,
   countFilledCells,
   setCell,
@@ -14,6 +14,8 @@ import {
 import { Renderer, THEMES, type Theme, type ToolMode } from './renderer';
 
 const GRID_SIZE = 20;
+const MIN_FILL_RATE = 50;
+const MAX_FRAME_TIME = 100;
 
 let grid = createGrid(GRID_SIZE);
 let currentMode: ToolMode = 'brush';
@@ -133,19 +135,42 @@ function handleFillClick(row: number, col: number): void {
     return;
   }
 
-  const connectedCells = getEmptyCellsInBfsOrder(grid, row, col);
-  if (connectedCells.length === 0) return;
+  const layers = getEmptyCellsByBfsLayers(grid, row, col);
+  if (layers.length === 0) return;
 
   const emoji = getRandomEmoji();
 
-  connectedCells.forEach(({ row: r, col: c }) => {
-    setCell(grid, r, c, emoji);
+  let totalCells = 0;
+  layers.forEach(layer => {
+    layer.forEach(({ row: r, col: c }) => {
+      setCell(grid, r, c, emoji);
+      totalCells++;
+    });
   });
 
+  console.log(`[填充模式] 开始填充: ${totalCells} 个格子, ${layers.length} 层`);
+  
   isAnimating = true;
-  renderer.animateFloodFill(connectedCells, emoji, 60).then(() => {
+  const fillStartTime = performance.now();
+  
+  renderer.animateFloodFill(layers, emoji, 60).then((perf) => {
     isAnimating = false;
     updateInfo();
+    
+    const totalDuration = performance.now() - fillStartTime;
+    const actualRate = (totalCells / totalDuration) * 1000;
+    
+    console.log(`[填充模式] 完成: ${perf.cellCount} 个格子`);
+    console.log(`  - 总耗时: ${totalDuration.toFixed(2)}ms`);
+    console.log(`  - 填充速率: ${actualRate.toFixed(2)} 格/秒`);
+    
+    if (actualRate < MIN_FILL_RATE) {
+      console.warn(`⚠️ 填充速率低于 ${MIN_FILL_RATE} 格/秒的最低要求! 当前: ${actualRate.toFixed(2)} 格/秒`);
+    }
+    
+    if (totalDuration > MAX_FRAME_TIME && totalCells > 50) {
+      console.warn(`⚠️ 单次填充耗时超过 ${MAX_FRAME_TIME}ms! 当前: ${totalDuration.toFixed(2)}ms`);
+    }
   });
 }
 
@@ -155,16 +180,38 @@ function handleFillAll(): void {
   const rows = generateRowByRowFillData(grid);
   if (rows.length === 0) return;
 
+  let totalCells = 0;
   rows.forEach(row => {
     row.forEach(({ row: r, col: c, emoji }) => {
       setCell(grid, r, c, emoji);
+      totalCells++;
     });
   });
 
+  console.log(`[全随机填充] 开始填充: ${totalCells} 个格子, ${rows.length} 行`);
+
   isAnimating = true;
-  renderer.animateRowByRowFill(rows, 80).then(() => {
+  const fillStartTime = performance.now();
+  
+  renderer.animateRowByRowFill(rows, 80).then((perf) => {
     isAnimating = false;
     updateInfo();
+    
+    const totalDuration = performance.now() - fillStartTime;
+    const actualRate = (totalCells / totalDuration) * 1000;
+    
+    console.log(`[全随机填充] 完成: ${totalCells} 个格子`);
+    console.log(`  - 总耗时: ${totalDuration.toFixed(2)}ms`);
+    console.log(`  - 填充速率: ${actualRate.toFixed(2)} 格/秒`);
+    console.log(`  - 行数: ${rows.length}`);
+    
+    if (actualRate < MIN_FILL_RATE) {
+      console.warn(`⚠️ 填充速率低于 ${MIN_FILL_RATE} 格/秒的最低要求! 当前: ${actualRate.toFixed(2)} 格/秒`);
+    }
+    
+    if (totalDuration > MAX_FRAME_TIME && totalCells > 50) {
+      console.warn(`⚠️ 单次填充耗时超过 ${MAX_FRAME_TIME}ms! 当前: ${totalDuration.toFixed(2)}ms`);
+    }
   });
 }
 

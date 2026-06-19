@@ -200,6 +200,57 @@ export function getEmptyCellsInBfsOrder(grid: Grid, startRow: number, startCol: 
   return result;
 }
 
+export function getEmptyCellsByBfsLayers(grid: Grid, startRow: number, startCol: number): CellPosition[][] {
+  const rows = grid.length;
+  const cols = grid[0].length;
+  const layers: CellPosition[][] = [];
+  const visited: boolean[][] = Array.from({ length: rows }, () => Array(cols).fill(false));
+  const queue: { pos: CellPosition; distance: number }[] = [];
+  
+  const startCell = getCell(grid, startRow, startCol);
+  if (!startCell || startCell.emoji !== null) {
+    return layers;
+  }
+  
+  queue.push({ pos: { row: startRow, col: startCol }, distance: 0 });
+  visited[startRow][startCol] = true;
+  
+  const directions = [
+    { row: -1, col: 0 },
+    { row: 1, col: 0 },
+    { row: 0, col: -1 },
+    { row: 0, col: 1 }
+  ];
+  
+  while (queue.length > 0) {
+    const { pos, distance } = queue.shift()!;
+    
+    if (distance >= layers.length) {
+      layers.push([]);
+    }
+    layers[distance].push(pos);
+    
+    for (const dir of directions) {
+      const newRow = pos.row + dir.row;
+      const newCol = pos.col + dir.col;
+      
+      if (
+        newRow >= 0 && newRow < rows &&
+        newCol >= 0 && newCol < cols &&
+        !visited[newRow][newCol]
+      ) {
+        const cell = grid[newRow][newCol];
+        if (cell.emoji === null) {
+          visited[newRow][newCol] = true;
+          queue.push({ pos: { row: newRow, col: newCol }, distance: distance + 1 });
+        }
+      }
+    }
+  }
+  
+  return layers;
+}
+
 export function getAllEmptyCells(grid: Grid): CellPosition[] {
   const result: CellPosition[] = [];
   for (let row = 0; row < grid.length; row++) {
