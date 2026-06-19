@@ -1,0 +1,54 @@
+{
+  "tips": [
+    {
+      "id": "t1",
+      "type": "positive",
+      "content": "本周蔬菜摄入量充足，继续保持！"
+    },
+    {
+      "id": "t2",
+      "type": "warning",
+      "content": "建议减少油炸食品的摄入，多选择蒸、煮、烤的烹饪方式。"
+    },
+    {
+      "id": "t3",
+      "type": "positive",
+      "content": "蛋白质摄入达标，有助于肌肉修复和免疫力提升。"
+    },
+    {
+      "id": "t4",
+      "type": "warning",
+      "content": "早餐营养不均衡，建议搭配富含蛋白质的食物。"
+    },
+    {
+      "id": "t5",
+      "type": "positive",
+      "content": "水果摄入充足，维生素摄取良好。"
+    },
+    {
+      "id": "t6",
+      "type": "warning",
+      "content": "晚餐热量偏高，建议适量减少碳水化合物摄入。"
+    },
+    {
+      "id": "t7",
+      "type": "positive",
+      "content": "水分摄入充足，新陈代谢状态良好。"
+    },
+    {
+      "id": "t8",
+      "type": "warning",
+      "content": "膳食纤维摄入不足，建议增加全谷物和蔬菜摄入。"
+    },
+    {
+      "id": "t9",
+      "type": "positive",
+      "content": "三餐规律，饮食习惯良好！"
+    },
+    {
+      "id": "t10",
+      "type": "warning",
+      "content": "加餐选择不够健康，建议用坚果或水果替代加工食品。"
+    }
+  ]
+}

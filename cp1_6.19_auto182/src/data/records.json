@@ -1,0 +1,156 @@
+{
+  "records": [
+    {
+      "id": "1",
+      "date": "2026-06-15",
+      "mealType": "breakfast",
+      "photos": [
+        {
+          "id": "p1",
+          "url": "https://images.unsplash.com/photo-1525351484163-7529414344d8?w=200&h=200&fit=crop",
+          "order": 0
+        }
+      ],
+      "comment": "今天的早餐很丰盛，吃了燕麦粥配蓝莓和坚果，还有一杯牛奶。",
+      "nutrition": {
+        "calories": 420,
+        "protein": 18,
+        "carbs": 55,
+        "fat": 15,
+        "balanceScore": 85
+      },
+      "createdAt": "2026-06-15T08:30:00Z"
+    },
+    {
+      "id": "2",
+      "date": "2026-06-15",
+      "mealType": "lunch",
+      "photos": [
+        {
+          "id": "p2",
+          "url": "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=200&h=200&fit=crop",
+          "order": 0
+        }
+      ],
+      "comment": "午餐吃了鸡胸肉沙拉，搭配了很多新鲜蔬菜。",
+      "nutrition": {
+        "calories": 550,
+        "protein": 45,
+        "carbs": 30,
+        "fat": 22,
+        "balanceScore": 78
+      },
+      "createdAt": "2026-06-15T12:30:00Z"
+    },
+    {
+      "id": "3",
+      "date": "2026-06-16",
+      "mealType": "breakfast",
+      "photos": [
+        {
+          "id": "p3",
+          "url": "https://images.unsplash.com/photo-1551183053-bf91a1d81141?w=200&h=200&fit=crop",
+          "order": 0
+        }
+      ],
+      "comment": "今天起晚了，只吃了两个面包和一杯咖啡。",
+      "nutrition": {
+        "calories": 320,
+        "protein": 8,
+        "carbs": 58,
+        "fat": 8,
+        "balanceScore": 45
+      },
+      "createdAt": "2026-06-16T09:00:00Z"
+    },
+    {
+      "id": "4",
+      "date": "2026-06-16",
+      "mealType": "dinner",
+      "photos": [
+        {
+          "id": "p4",
+          "url": "https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=200&h=200&fit=crop",
+          "order": 0
+        },
+        {
+          "id": "p5",
+          "url": "https://images.unsplash.com/photo-1567620905732-2d1ec7ab7445?w=200&h=200&fit=crop",
+          "order": 1
+        }
+      ],
+      "comment": "晚上吃了披萨，虽然有点油腻但是很好吃。",
+      "nutrition": {
+        "calories": 780,
+        "protein": 28,
+        "carbs": 85,
+        "fat": 35,
+        "balanceScore": 52
+      },
+      "createdAt": "2026-06-16T19:30:00Z"
+    },
+    {
+      "id": "5",
+      "date": "2026-06-17",
+      "mealType": "lunch",
+      "photos": [
+        {
+          "id": "p6",
+          "url": "https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=200&h=200&fit=crop",
+          "order": 0
+        }
+      ],
+      "comment": "健康午餐，烤三文鱼配西兰花和糙米。",
+      "nutrition": {
+        "calories": 620,
+        "protein": 42,
+        "carbs": 48,
+        "fat": 28,
+        "balanceScore": 92
+      },
+      "createdAt": "2026-06-17T12:15:00Z"
+    },
+    {
+      "id": "6",
+      "date": "2026-06-18",
+      "mealType": "snack",
+      "photos": [
+        {
+          "id": "p7",
+          "url": "https://images.unsplash.com/photo-1490474418585-ba9bad8fd0ea?w=200&h=200&fit=crop",
+          "order": 0
+        }
+      ],
+      "comment": "下午茶吃了水果和酸奶，很健康！",
+      "nutrition": {
+        "calories": 180,
+        "protein": 10,
+        "carbs": 25,
+        "fat": 5,
+        "balanceScore": 95
+      },
+      "createdAt": "2026-06-18T15:00:00Z"
+    },
+    {
+      "id": "7",
+      "date": "2026-06-19",
+      "mealType": "breakfast",
+      "photos": [
+        {
+          "id": "p8",
+          "url": "https://images.unsplash.com/photo-1638176066666-ffb2f013c7dd?w=200&h=200&fit=crop",
+          "order": 0
+        }
+      ],
+      "comment": "今天早餐吃了牛油果吐司配水煮蛋。",
+      "nutrition": {
+        "calories": 480,
+        "protein": 22,
+        "carbs": 38,
+        "fat": 26,
+        "balanceScore": 88
+      },
+      "createdAt": "2026-06-19T08:00:00Z"
+    }
+  ]
+}

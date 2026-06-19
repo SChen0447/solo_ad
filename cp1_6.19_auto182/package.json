@@ -1,0 +1,36 @@
+{
+  "name": "food-diary",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-router-dom": "^6.26.0",
+    "uuid": "^9.0.1",
+    "recharts": "^2.12.7",
+    "express": "^4.19.2",
+    "cors": "^2.8.5",
+    "body-parser": "^1.20.2",
+    "lucide-react": "^0.400.0"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.3",
+    "@types/react-dom": "^18.3.0",
+    "@types/uuid": "^9.0.8",
+    "@vitejs/plugin-react": "^4.3.1",
+    "typescript": "^5.5.3",
+    "vite": "^5.3.3",
+    "tailwindcss": "^3.4.6",
+    "postcss": "^8.4.39",
+    "autoprefixer": "^10.4.19",
+    "@types/cors": "^2.8.17",
+    "@types/body-parser": "^1.19.5",
+    "@types/node": "^20.14.10"
+  }
+}
