@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>像素迷宫地图编辑器</title>
+  <link rel="stylesheet" href="/src/style.css" />
+</head>
+<body>
+  <div id="app">
+    <header id="toolbar">
+      <h1 class="title">像素迷宫编辑器</h1>
+      <div class="toolbar-group">
+        <label class="toolbar-label">
+          尺寸:
+          <select id="maze-size" class="pixel-select">
+            <option value="20">20 x 20</option>
+            <option value="25">25 x 25</option>
+            <option value="30" selected>30 x 30</option>
+            <option value="35">35 x 35</option>
+            <option value="40">40 x 40</option>
+            <option value="45">45 x 45</option>
+            <option value="50">50 x 50</option>
+          </select>
+        </label>
+        <button id="generate-btn" class="pixel-btn">生成迷宫</button>
+        <button id="export-btn" class="pixel-btn">导出JSON</button>
+      </div>
+    </header>
+
+    <main id="main-container">
+      <section id="maze-area">
+        <div id="maze-wrapper">
+          <canvas id="maze-canvas"></canvas>
+        </div>
+        <div id="thumbnail-container">
+          <div class="thumbnail-label">地图概览</div>
+          <canvas id="thumbnail-canvas"></canvas>
+        </div>
+      </section>
+
+      <aside id="sidebar">
+        <button id="sidebar-toggle" class="sidebar-toggle" title="切换面板">≡</button>
+        <div class="sidebar-content">
+          <div class="panel-section">
+            <h2 class="panel-title">编辑工具</h2>
+            <div id="tool-buttons">
+              <button class="tool-btn" data-tool="start" title="起点">
+                <span class="tool-icon start-icon"></span>
+              </button>
+              <button class="tool-btn" data-tool="end" title="终点">
+                <span class="tool-icon end-icon"></span>
+              </button>
+              <button class="tool-btn" data-tool="monster" title="怪物刷新点">
+                <span class="tool-icon monster-icon"></span>
+              </button>
+              <button class="tool-btn tool-clear" data-tool="erase" title="擦除">
+                <span class="tool-icon erase-icon">×</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="panel-section">
+            <h2 class="panel-title">当前状态</h2>
+            <div id="status-panel">
+              <div class="status-row">
+                <span class="status-dot start-dot"></span>
+                <span class="status-label">起点:</span>
+                <span id="start-count" class="status-count">0</span>
+                <span class="status-max">/5</span>
+              </div>
+              <div class="status-row">
+                <span class="status-dot end-dot"></span>
+                <span class="status-label">终点:</span>
+                <span id="end-count" class="status-count">0</span>
+                <span class="status-max">/5</span>
+              </div>
+              <div class="status-row">
+                <span class="status-dot monster-dot"></span>
+                <span class="status-label">怪物点:</span>
+                <span id="monster-count" class="status-count">0</span>
+                <span class="status-max">/5</span>
+              </div>
+              <div class="status-row current-tool-row">
+                <span class="status-label">当前工具:</span>
+                <span id="current-tool" class="current-tool">未选择</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="panel-section tips-section">
+            <h2 class="panel-title">操作提示</h2>
+            <ul class="tips-list">
+              <li>选择工具后点击迷宫放置元素</li>
+              <li>再次点击同位置可删除该元素</li>
+              <li>怪物不能放在起终点相邻格子</li>
+              <li>使用擦除工具清除已有元素</li>
+            </ul>
+          </div>
+        </div>
+      </aside>
+    </main>
+  </div>
+
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
