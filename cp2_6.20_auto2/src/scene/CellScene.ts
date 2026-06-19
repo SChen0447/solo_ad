@@ -208,10 +208,8 @@ export class CellScene {
     const geometry = new THREE.SphereGeometry(7.8, 32, 32);
     const material = new THREE.MeshBasicMaterial({
       color: 0x2a2a5e,
-      transparent: true,
-      opacity: 0.15,
       side: THREE.BackSide,
-      depthWrite: false
+      depthWrite: true
     });
     this.cytoplasm = new THREE.Mesh(geometry, material);
     this.cytoplasm.renderOrder = -5;
@@ -312,6 +310,33 @@ export class CellScene {
     return group;
   }
 
+  private cloneMitochondrionGroup(source: THREE.Group, childColor: number): THREE.Group {
+    const clonedGroup = new THREE.Group();
+    source.traverse((child) => {
+      if (child instanceof THREE.Mesh) {
+        const clonedGeo = child.geometry.clone();
+        let clonedMat: THREE.Material;
+        if (child.material instanceof THREE.MeshStandardMaterial) {
+          clonedMat = child.material.clone() as THREE.MeshStandardMaterial;
+          if ((child.material as THREE.MeshStandardMaterial).color.getHex() === 0xcc3333 ||
+              (child.material as THREE.MeshStandardMaterial).color.getHex() === 0xff6633) {
+            (clonedMat as THREE.MeshStandardMaterial).color.setHex(childColor);
+            (clonedMat as THREE.MeshStandardMaterial).emissive.setHex(0x331100);
+            (clonedMat as THREE.MeshStandardMaterial).emissiveIntensity = 0.5;
+          }
+        } else {
+          clonedMat = (child.material as THREE.Material).clone();
+        }
+        const clonedMesh = new THREE.Mesh(clonedGeo, clonedMat);
+        clonedMesh.position.copy(child.position);
+        clonedMesh.rotation.copy(child.rotation);
+        clonedMesh.scale.copy(child.scale);
+        clonedGroup.add(clonedMesh);
+      }
+    });
+    return clonedGroup;
+  }
+
   private createMitochondria(): void {
     const positions = [
       { x: 4.5, y: 1.5, z: 2, highlight: true },
@@ -337,7 +362,7 @@ export class CellScene {
 
       if (pos.highlight) {
         const childColor = 0xff8844;
-        const childGroup = this.createSingleMitochondrion(childColor, true);
+        const childGroup = this.cloneMitochondrionGroup(group, childColor);
         childGroup.visible = false;
         childGroup.scale.copy(group.scale);
         childGroup.position.copy(group.position);
@@ -714,7 +739,7 @@ export class CellScene {
     const ringMat = new THREE.MeshBasicMaterial({
       color: color,
       transparent: true,
-      opacity: 1.0,
+      opacity: 0.8,
       side: THREE.DoubleSide,
       blending: THREE.AdditiveBlending,
       depthWrite: false
@@ -740,7 +765,7 @@ export class CellScene {
       const scale = 1 + t * 4;
       glow.mesh.scale.setScalar(scale);
       const mat = glow.mesh.material as THREE.MeshBasicMaterial;
-      mat.opacity = 1 - t;
+      mat.opacity = 0.8 * (1 - t);
 
       glow.mesh.lookAt(this.camera.position);
 

@@ -12,7 +12,13 @@ function init(): void {
   cellScene = new CellScene(container);
   cellController = new CellController(cellScene, container);
 
-  cellController.setOnMarksChange(updateMarkLists);
+  cellController.setOnMarksChange(() => {
+    updateMarkLists();
+    const focused = cellController.getFocusedOrganelle();
+    if (focused) {
+      updateOrganelleInfo(focused);
+    }
+  });
   cellController.setOnFocusChange(updateOrganelleInfo);
 
   bindSidebarEvents();

@@ -525,11 +525,35 @@ export class CellController {
     ctx.lineWidth = 1;
     ctx.stroke();
 
-    const theta = this.cameraState.spherical.theta;
-    const phi = this.cameraState.spherical.phi;
+    const camera = this.scene.camera;
+    camera.updateMatrixWorld(true);
 
-    const dirX = -Math.sin(theta) * Math.sin(phi);
-    const dirY = Math.cos(phi);
+    const viewDir = new THREE.Vector3();
+    camera.getWorldDirection(viewDir);
+    viewDir.negate();
+
+    const cameraPos = new THREE.Vector3().setFromMatrixPosition(camera.matrixWorld);
+    const lookTarget = this.cameraState.target.clone();
+    const toTarget = new THREE.Vector3().subVectors(lookTarget, cameraPos).normalize();
+
+    const up = new THREE.Vector3(0, 1, 0);
+    const right = new THREE.Vector3();
+    right.crossVectors(toTarget, up).normalize();
+    const actualUp = new THREE.Vector3();
+    actualUp.crossVectors(right, toTarget).normalize();
+
+    const forward2D = new THREE.Vector2(
+      -toTarget.dot(right),
+      -toTarget.dot(actualUp)
+    );
+
+    if (forward2D.lengthSq() < 0.0001) {
+      forward2D.set(0, -1);
+    }
+    forward2D.normalize();
+
+    const dirX = forward2D.x;
+    const dirY = forward2D.y;
     const dirLen = Math.sqrt(dirX * dirX + dirY * dirY);
     const arrowLen = radius * 0.7;
 
