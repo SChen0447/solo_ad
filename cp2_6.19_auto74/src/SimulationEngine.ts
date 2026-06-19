@@ -20,6 +20,8 @@ export interface CollisionEvent {
   position: { x: number; y: number; z: number };
   color1: string;
   color2: string;
+  mass1: number;
+  mass2: number;
 }
 
 export interface SimulationParams {
@@ -53,10 +55,18 @@ function rgbToHex(r: number, g: number, b: number): string {
   );
 }
 
-function mixColors(color1: string, color2: string): string {
+function mixColorsWeighted(
+  color1: string,
+  mass1: number,
+  color2: string,
+  mass2: number
+): string {
   const c1 = hexToRgb(color1);
   const c2 = hexToRgb(color2);
-  return rgbToHex((c1.r + c2.r) / 2, (c1.g + c2.g) / 2, (c1.b + c2.b) / 2);
+  const totalMass = mass1 + mass2;
+  const w1 = mass1 / totalMass;
+  const w2 = mass2 / totalMass;
+  return rgbToHex(c1.r * w1 + c2.r * w2, c1.g * w1 + c2.g * w2, c1.b * w1 + c2.b * w2);
 }
 
 function generateId(): string {
@@ -424,7 +434,7 @@ export class SimulationEngine {
       z: (planet1.position.z * planet2.mass + planet2.position.z * planet1.mass) / totalMass,
     };
 
-    const newColor = mixColors(planet1.color, planet2.color);
+    const newColor = mixColorsWeighted(planet1.color, planet1.mass, planet2.color, planet2.mass);
     const newRadius = Math.cbrt(planet1.radius ** 3 + planet2.radius ** 3);
 
     const merged: PlanetData = {
@@ -459,6 +469,8 @@ export class SimulationEngine {
       position: { ...collisionPoint },
       color1: planet1.color,
       color2: planet2.color,
+      mass1: planet1.mass,
+      mass2: planet2.mass,
     });
 
     this.lastOrbitUpdateTime.delete(planet1.id);

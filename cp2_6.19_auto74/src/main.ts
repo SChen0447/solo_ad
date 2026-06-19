@@ -62,6 +62,8 @@ class GravitySimulatorApp {
     const allBodies = this.engine.getAllBodies();
     this.renderer.render(deltaTime, allBodies);
 
+    this.controls.update(this.clock.elapsed);
+
     this.rafId = requestAnimationFrame(this.animate);
   };
 

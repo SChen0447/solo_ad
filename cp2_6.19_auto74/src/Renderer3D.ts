@@ -2,16 +2,21 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import type { PlanetData, CollisionEvent } from './SimulationEngine';
 
+const MAX_TRAIL_POINTS = 200;
+const PARTICLE_LIFETIME = 0.5;
+const PARTICLE_MIN_SPEED = 0.5;
+const PARTICLE_MAX_SPEED = 2.0;
+
 interface PlanetMeshGroup {
   id: string;
   mesh: THREE.Mesh;
-  glow: THREE.Mesh;
   selectionRing: THREE.Mesh;
   trail: THREE.Line;
   trailGeometry: THREE.BufferGeometry;
-  trailMaterial: THREE.LineBasicMaterial;
+  trailMaterial: THREE.ShaderMaterial;
+  trailPositions: Float32Array;
   color: string;
-  visibleTrailPoints: number;
+  colorRgb: THREE.Color;
 }
 
 interface Particle {
@@ -29,24 +34,28 @@ export class Renderer3D {
   private container: HTMLElement;
 
   private starMesh: THREE.Mesh | null = null;
-  private starGlow: THREE.Mesh | null = null;
+  private starGlow: THREE.Sprite | null = null;
+  private starGlowMaterial: THREE.ShaderMaterial | null = null;
   private starPulseTime: number = 0;
+  private readonly STAR_PULSE_PERIOD = 2.0;
+  private readonly STAR_PULSE_MIN = 1.0;
+  private readonly STAR_PULSE_MAX = 1.1;
 
   private planetMeshes: Map<string, PlanetMeshGroup> = new Map();
   private particles: Particle[] = [];
 
   private selectedPlanetId: string | null = null;
-  private infoUpdateTimer: number = 0;
 
   private raycaster: THREE.Raycaster = new THREE.Raycaster();
   private mouse: THREE.Vector2 = new THREE.Vector2();
   private clickableMeshes: THREE.Mesh[] = [];
 
   private onPlanetClickCallbacks: ((planetId: string) => void)[] = [];
+  private onSelectedPlanetDataCallbacks: ((planet: PlanetData | null) => void)[] = [];
 
   private trailFadeActive: boolean = false;
   private trailFadeTime: number = 0;
-  private trailFadeDuration: number = 0.3;
+  private readonly TRAIL_FADE_DURATION = 0.3;
 
   private starField: THREE.Points | null = null;
 
@@ -122,7 +131,6 @@ export class Renderer3D {
     const starCount = 3000;
     const positions = new Float32Array(starCount * 3);
     const colors = new Float32Array(starCount * 3);
-    const sizes = new Float32Array(starCount);
 
     for (let i = 0; i < starCount; i++) {
       const radius = 200 + Math.random() * 800;
@@ -138,14 +146,11 @@ export class Renderer3D {
       colors[i * 3] = brightness * (colorShift > 0.7 ? 1 : 0.9);
       colors[i * 3 + 1] = brightness * (colorShift > 0.3 ? 1 : 0.85);
       colors[i * 3 + 2] = brightness;
-
-      sizes[i] = Math.random() * 2 + 0.5;
     }
 
     const geometry = new THREE.BufferGeometry();
     geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
     geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-    geometry.setAttribute('size', new THREE.BufferAttribute(sizes, 1));
 
     const material = new THREE.PointsMaterial({
       size: 1.5,
@@ -214,12 +219,27 @@ export class Renderer3D {
     this.onPlanetClickCallbacks.push(callback);
   }
 
+  onSelectedPlanetData(callback: (planet: PlanetData | null) => void): void {
+    this.onSelectedPlanetDataCallbacks.push(callback);
+  }
+
+  private emitSelectedPlanetData(planet: PlanetData | null): void {
+    this.onSelectedPlanetDataCallbacks.forEach((cb) => cb(planet));
+  }
+
   setSelectedPlanet(planetId: string | null): void {
+    const oldSelected = this.selectedPlanetId;
     this.selectedPlanetId = planetId;
 
     for (const [id, group] of this.planetMeshes.entries()) {
       if (group.selectionRing) {
         group.selectionRing.visible = id === planetId;
+      }
+    }
+
+    if (oldSelected !== planetId) {
+      if (planetId === null) {
+        this.emitSelectedPlanetData(null);
       }
     }
   }
@@ -236,22 +256,22 @@ export class Renderer3D {
     this.scene.add(this.starMesh);
     this.clickableMeshes.push(this.starMesh);
 
-    const glowGeometry = new THREE.SphereGeometry(starData.radius * 1.4, 32, 32);
-    const glowMaterial = new THREE.ShaderMaterial({
+    this.starGlowMaterial = new THREE.ShaderMaterial({
       uniforms: {
-        c: { value: 0.4 },
-        p: { value: 4.5 },
         glowColor: { value: new THREE.Color(starData.color) },
         viewVector: { value: this.camera.position },
+        pulseScale: { value: 1.0 },
       },
       vertexShader: `
         uniform vec3 viewVector;
+        uniform float pulseScale;
         varying float intensity;
         void main() {
           vec3 vNormal = normalize(normalMatrix * normal);
           vec3 vNormel = normalize(normalMatrix * viewVector);
           intensity = pow(0.7 - dot(vNormal, vNormel), 2.0);
-          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+          vec3 scaledPosition = position * pulseScale;
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(scaledPosition, 1.0);
         }
       `,
       fragmentShader: `
@@ -267,9 +287,11 @@ export class Renderer3D {
       transparent: true,
       depthWrite: false,
     });
-    this.starGlow = new THREE.Mesh(glowGeometry, glowMaterial);
+
+    const glowGeometry = new THREE.PlaneGeometry(starData.radius * 3.5, starData.radius * 3.5);
+    this.starGlow = new THREE.Sprite(this.starGlowMaterial);
     this.starGlow.position.copy(this.starMesh.position);
-    this.starGlow.scale.setScalar(1.05);
+    this.starGlow.scale.setScalar(starData.radius * 3.5);
     this.scene.add(this.starGlow);
   }
 
@@ -288,6 +310,7 @@ export class Renderer3D {
       (this.starGlow.material as THREE.Material).dispose();
       this.starGlow = null;
     }
+    this.starGlowMaterial = null;
   }
 
   createPlanet(planetData: PlanetData): void {
@@ -325,15 +348,46 @@ export class Renderer3D {
     selectionRing.visible = false;
     mesh.add(selectionRing);
 
+    const trailPositions = new Float32Array(MAX_TRAIL_POINTS * 3);
+    const trailAlphas = new Float32Array(MAX_TRAIL_POINTS);
+
+    for (let i = 0; i < MAX_TRAIL_POINTS; i++) {
+      const t = i / Math.max(1, MAX_TRAIL_POINTS - 1);
+      trailAlphas[i] = 0.8 * (1 - t * 0.75);
+    }
+
     const trailGeometry = new THREE.BufferGeometry();
-    const trailPositions = new Float32Array(200 * 3);
     trailGeometry.setAttribute('position', new THREE.BufferAttribute(trailPositions, 3));
-    const trailMaterial = new THREE.LineBasicMaterial({
-      color: planetData.color,
+    trailGeometry.setAttribute('alpha', new THREE.BufferAttribute(trailAlphas, 1));
+    trailGeometry.setDrawRange(0, 0);
+
+    const planetColor = new THREE.Color(planetData.color);
+    const trailMaterial = new THREE.ShaderMaterial({
+      uniforms: {
+        baseColor: { value: planetColor },
+        fadeProgress: { value: 0.0 },
+      },
+      vertexShader: `
+        attribute float alpha;
+        varying float vAlpha;
+        uniform float fadeProgress;
+        void main() {
+          vAlpha = alpha * (1.0 - fadeProgress);
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        }
+      `,
+      fragmentShader: `
+        uniform vec3 baseColor;
+        varying float vAlpha;
+        void main() {
+          gl_FragColor = vec4(baseColor, vAlpha);
+        }
+      `,
       transparent: true,
-      opacity: 0.8,
+      depthWrite: false,
       linewidth: 1.5,
     });
+
     const trail = new THREE.Line(trailGeometry, trailMaterial);
     trail.frustumCulled = false;
     this.scene.add(trail);
@@ -341,13 +395,13 @@ export class Renderer3D {
     this.planetMeshes.set(planetData.id, {
       id: planetData.id,
       mesh,
-      glow: new THREE.Mesh(),
       selectionRing,
       trail,
       trailGeometry,
       trailMaterial,
+      trailPositions,
       color: planetData.color,
-      visibleTrailPoints: 0,
+      colorRgb: planetColor,
     });
   }
 
@@ -416,10 +470,13 @@ export class Renderer3D {
   }
 
   private updateTrail(group: PlanetMeshGroup, trailPoints: { x: number; y: number; z: number }[]): void {
-    const posAttr = group.trailGeometry.getAttribute('position') as THREE.BufferAttribute;
-    const positions = posAttr.array as Float32Array;
     const pointCount = trailPoints.length;
+    if (pointCount === 0) {
+      group.trailGeometry.setDrawRange(0, 0);
+      return;
+    }
 
+    const positions = group.trailPositions;
     for (let i = 0; i < pointCount; i++) {
       positions[i * 3] = trailPoints[i].x;
       positions[i * 3 + 1] = trailPoints[i].y;
@@ -427,27 +484,9 @@ export class Renderer3D {
     }
 
     group.trailGeometry.setDrawRange(0, pointCount);
+    const posAttr = group.trailGeometry.getAttribute('position') as THREE.BufferAttribute;
     posAttr.needsUpdate = true;
     group.trailGeometry.computeBoundingSphere();
-    group.visibleTrailPoints = pointCount;
-
-    if (pointCount > 1) {
-      const color = new THREE.Color(group.color);
-      const colorsAttr = group.trailGeometry.getAttribute('color');
-      if (!colorsAttr) {
-        const colors = new Float32Array(200 * 3);
-        const alphas = new Float32Array(200);
-        for (let i = 0; i < 200; i++) {
-          const t = i / Math.max(1, 199);
-          const alpha = 0.8 * (1 - t * 0.75);
-          colors[i * 3] = color.r;
-          colors[i * 3 + 1] = color.g;
-          colors[i * 3 + 2] = color.b;
-          alphas[i] = alpha;
-        }
-        group.trailGeometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-      }
-    }
   }
 
   startTrailFade(): void {
@@ -457,14 +496,30 @@ export class Renderer3D {
 
   createCollisionParticles(event: CollisionEvent): void {
     const particleCount = 50;
-    const mixedColor = new THREE.Color()
-      .lerpColors(new THREE.Color(event.color1), new THREE.Color(event.color2), 0.5);
+    const totalMass = event.mass1 + event.mass2;
+    const w1 = event.mass1 / totalMass;
+    const w2 = event.mass2 / totalMass;
+
+    const c1 = new THREE.Color(event.color1);
+    const c2 = new THREE.Color(event.color2);
+    const mixedColor = new THREE.Color(
+      c1.r * w1 + c2.r * w2,
+      c1.g * w1 + c2.g * w2,
+      c1.b * w1 + c2.b * w2
+    );
 
     for (let i = 0; i < particleCount; i++) {
       const size = 0.1 + Math.random() * 0.25;
       const geometry = new THREE.SphereGeometry(size, 8, 8);
+
+      const particleColor = mixedColor.clone().offsetHSL(
+        (Math.random() - 0.5) * 0.1,
+        0,
+        (Math.random() - 0.5) * 0.2
+      );
+
       const material = new THREE.MeshBasicMaterial({
-        color: mixedColor.clone().offsetHSL((Math.random() - 0.5) * 0.1, 0, (Math.random() - 0.5) * 0.2),
+        color: particleColor,
         transparent: true,
         opacity: 1.0,
       });
@@ -473,7 +528,7 @@ export class Renderer3D {
 
       const theta = Math.random() * Math.PI * 2;
       const phi = Math.acos(2 * Math.random() - 1);
-      const speed = 2 + Math.random() * 4;
+      const speed = PARTICLE_MIN_SPEED + Math.random() * (PARTICLE_MAX_SPEED - PARTICLE_MIN_SPEED);
       const velocity = new THREE.Vector3(
         Math.sin(phi) * Math.cos(theta) * speed,
         Math.sin(phi) * Math.sin(theta) * speed,
@@ -484,53 +539,22 @@ export class Renderer3D {
       this.particles.push({
         mesh,
         velocity,
-        life: 0.5,
-        maxLife: 0.5,
+        life: PARTICLE_LIFETIME,
+        maxLife: PARTICLE_LIFETIME,
       });
-    }
-  }
-
-  updateInfoPanel(planet: PlanetData | null): void {
-    const panel = document.getElementById('info-panel');
-    if (!panel) return;
-
-    if (!planet) {
-      panel.classList.remove('visible');
-      return;
-    }
-
-    panel.classList.add('visible');
-
-    const nameEl = document.getElementById('planet-name');
-    const massEl = document.getElementById('info-mass');
-    const velEl = document.getElementById('info-velocity');
-    const orbitEl = document.getElementById('info-orbit');
-    const periodEl = document.getElementById('info-period');
-
-    if (nameEl) nameEl.textContent = planet.name;
-    if (massEl) massEl.textContent = planet.mass.toFixed(3);
-    if (velEl) {
-      const speed = Math.sqrt(
-        planet.velocity.x ** 2 + planet.velocity.y ** 2 + planet.velocity.z ** 2
-      );
-      velEl.textContent = speed.toFixed(3);
-    }
-    if (orbitEl) orbitEl.textContent = planet.orbitRadius.toFixed(3);
-    if (periodEl) {
-      if (planet.orbitalPeriod > 0 && planet.orbitalPeriod < 10000) {
-        periodEl.textContent = planet.orbitalPeriod.toFixed(2);
-      } else {
-        periodEl.textContent = '计算中...';
-      }
     }
   }
 
   render(deltaTime: number, allPlanets: PlanetData[]): void {
     this.starPulseTime += deltaTime;
-    const pulse = 1.0 + 0.05 * Math.sin(this.starPulseTime * Math.PI);
+    const pulseT = (this.starPulseTime % this.STAR_PULSE_PERIOD) / this.STAR_PULSE_PERIOD;
+    const pulse = this.STAR_PULSE_MIN + (this.STAR_PULSE_MAX - this.STAR_PULSE_MIN) * (0.5 + 0.5 * Math.sin(pulseT * Math.PI * 2));
 
+    if (this.starGlowMaterial) {
+      this.starGlowMaterial.uniforms.pulseScale.value = pulse;
+    }
     if (this.starGlow) {
-      this.starGlow.scale.setScalar(pulse);
+      this.starGlow.scale.setScalar(3.5 * 3 * pulse);
     }
 
     if (this.starField) {
@@ -541,16 +565,16 @@ export class Renderer3D {
 
     if (this.trailFadeActive) {
       this.trailFadeTime += deltaTime;
-      const progress = Math.min(1.0, this.trailFadeTime / this.trailFadeDuration);
+      const progress = Math.min(1.0, this.trailFadeTime / this.TRAIL_FADE_DURATION);
 
       this.planetMeshes.forEach((group) => {
-        group.trailMaterial.opacity = 0.8 * (1 - progress);
+        group.trailMaterial.uniforms.fadeProgress.value = progress;
       });
 
       if (progress >= 1.0) {
         this.trailFadeActive = false;
         this.planetMeshes.forEach((group) => {
-          group.trailMaterial.opacity = 0.8;
+          group.trailMaterial.uniforms.fadeProgress.value = 0;
         });
       }
     }
@@ -570,17 +594,12 @@ export class Renderer3D {
       return true;
     });
 
-    this.infoUpdateTimer += deltaTime;
-    if (this.infoUpdateTimer >= 1.0) {
-      this.infoUpdateTimer = 0;
-      if (this.selectedPlanetId) {
-        const selected = allPlanets.find((p) => p.id === this.selectedPlanetId);
-        if (selected) {
-          this.updateInfoPanel(selected);
-        } else {
-          this.setSelectedPlanet(null);
-          this.updateInfoPanel(null);
-        }
+    if (this.selectedPlanetId) {
+      const selected = allPlanets.find((p) => p.id === this.selectedPlanetId);
+      if (selected) {
+        this.emitSelectedPlanetData(selected);
+      } else {
+        this.setSelectedPlanet(null);
       }
     }
 

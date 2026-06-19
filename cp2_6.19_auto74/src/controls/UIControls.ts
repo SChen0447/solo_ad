@@ -1,5 +1,5 @@
 import * as dat from 'dat.gui';
-import type { SimulationEngine, SimulationParams } from '../SimulationEngine';
+import type { SimulationEngine, SimulationParams, PlanetData } from '../SimulationEngine';
 import type { Renderer3D } from '../Renderer3D';
 
 export interface UIControlParams {
@@ -8,12 +8,51 @@ export interface UIControlParams {
   timeScale: number;
 }
 
+interface DrawerState {
+  isExpanded: boolean;
+  isDragging: boolean;
+  currentHeight: number;
+  startY: number;
+  startHeight: number;
+}
+
 export class UIControls {
   private gui: dat.GUI;
   private engine: SimulationEngine;
   private renderer: Renderer3D;
   private params: UIControlParams;
   private onClearTrailsCallbacks: (() => void)[] = [];
+
+  private selectedPlanetId: string | null = null;
+  private lastInfoUpdateTime: number = 0;
+  private readonly INFO_UPDATE_INTERVAL = 1.0;
+
+  private drawer: DrawerState = {
+    isExpanded: false,
+    isDragging: false,
+    currentHeight: 0,
+    startY: 0,
+    startHeight: 0,
+  };
+
+  private readonly DRAWER_HANDLE_HEIGHT = 40;
+  private readonly DRAWER_MAX_HEIGHT_RATIO = 0.4;
+  private readonly MOBILE_BREAKPOINT = 768;
+
+  private infoPanelElement: HTMLElement | null = null;
+  private infoElements: {
+    name: HTMLElement | null;
+    mass: HTMLElement | null;
+    velocity: HTMLElement | null;
+    orbit: HTMLElement | null;
+    period: HTMLElement | null;
+  } = {
+    name: null,
+    mass: null,
+    velocity: null,
+    orbit: null,
+    period: null,
+  };
 
   constructor(engine: SimulationEngine, renderer: Renderer3D) {
     this.engine = engine;
@@ -30,7 +69,61 @@ export class UIControls {
     this.applyGlassStyle();
     this.buildControls();
     this.setupKeyboardEvents();
-    this.setupPlanetClick();
+    this.setupPlanetSelectionEvents();
+    this.setupInfoPanelElements();
+    this.setupResponsiveDrawer();
+    this.checkInitialResponsiveState();
+  }
+
+  private setupInfoPanelElements(): void {
+    this.infoPanelElement = document.getElementById('info-panel');
+    this.infoElements.name = document.getElementById('planet-name');
+    this.infoElements.mass = document.getElementById('info-mass');
+    this.infoElements.velocity = document.getElementById('info-velocity');
+    this.infoElements.orbit = document.getElementById('info-orbit');
+    this.infoElements.period = document.getElementById('info-period');
+  }
+
+  private setupPlanetSelectionEvents(): void {
+    this.renderer.onPlanetClick((planetId) => {
+      this.selectPlanet(planetId);
+    });
+
+    this.renderer.onSelectedPlanetData((planet) => {
+      this.updateInfoPanelInternal(planet);
+    });
+  }
+
+  private updateInfoPanelInternal(planet: PlanetData | null): void {
+    if (!this.infoPanelElement) return;
+
+    if (!planet) {
+      this.infoPanelElement.classList.remove('visible');
+      return;
+    }
+
+    this.infoPanelElement.classList.add('visible');
+
+    if (this.infoElements.name) this.infoElements.name.textContent = planet.name;
+    if (this.infoElements.mass) this.infoElements.mass.textContent = planet.mass.toFixed(3);
+    if (this.infoElements.velocity) {
+      const speed = Math.sqrt(
+        planet.velocity.x ** 2 + planet.velocity.y ** 2 + planet.velocity.z ** 2
+      );
+      this.infoElements.velocity.textContent = speed.toFixed(3);
+    }
+    if (this.infoElements.orbit) this.infoElements.orbit.textContent = planet.orbitRadius.toFixed(3);
+    if (this.infoElements.period) {
+      if (planet.orbitalPeriod > 0 && planet.orbitalPeriod < 10000) {
+        this.infoElements.period.textContent = planet.orbitalPeriod.toFixed(2);
+      } else {
+        this.infoElements.period.textContent = '计算中...';
+      }
+    }
+  }
+
+  updateInfoPanel(planet: PlanetData | null): void {
+    this.updateInfoPanelInternal(planet);
   }
 
   private applyGlassStyle(): void {
@@ -46,6 +139,8 @@ export class UIControls {
     dom.style.top = '20px';
     dom.style.left = '20px';
     dom.style.fontFamily = "'Courier New', Consolas, Monaco, monospace";
+    dom.style.transition = 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)';
+    dom.style.zIndex = '100';
 
     const style = document.createElement('style');
     style.textContent = `
@@ -186,10 +281,13 @@ export class UIControls {
           left: 0 !important;
           right: 0 !important;
           width: 100% !important;
-          max-height: 45vh !important;
+          max-height: 40vh !important;
           overflow-y: auto !important;
+          overflow-x: hidden !important;
           border-radius: 16px 16px 0 0 !important;
           border-top: 2px solid rgba(255, 215, 0, 0.3) !important;
+          transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), max-height 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+          touch-action: none;
         }
         .dg.ac::before {
           content: '≡≡≡';
@@ -200,10 +298,161 @@ export class UIControls {
           padding: 8px 0;
           letter-spacing: 8px;
           cursor: grab;
+          height: 40px;
+          box-sizing: border-box;
+          line-height: 24px;
+          user-select: none;
+          -webkit-user-select: none;
+          background: linear-gradient(180deg, rgba(255, 215, 0, 0.1), transparent);
+        }
+        .dg.ac:active::before {
+          cursor: grabbing;
+        }
+        .dg.ac.drawer-collapsed {
+          transform: translateY(calc(100% - 40px)) !important;
+        }
+        .dg.ac.drawer-expanded {
+          transform: translateY(0) !important;
+        }
+        .dg.ac.drawer-dragging {
+          transition: none !important;
         }
       }
     `;
     document.head.appendChild(style);
+  }
+
+  private setupResponsiveDrawer(): void {
+    window.addEventListener('resize', () => {
+      this.checkResponsiveState();
+    });
+
+    let pointerStartY = 0;
+    let pointerStartHeight = 0;
+    let isDragging = false;
+
+    const getPanelElement = (): HTMLElement | null => {
+      return document.querySelector('.dg.ac');
+    };
+
+    const getMaxHeight = (): number => {
+      return window.innerHeight * this.DRAWER_MAX_HEIGHT_RATIO;
+    };
+
+    const handlePointerDown = (e: PointerEvent) => {
+      if (window.innerWidth > this.MOBILE_BREAKPOINT) return;
+
+      const panel = getPanelElement();
+      if (!panel) return;
+
+      const target = e.target as HTMLElement;
+      const isHandle = target.tagName === 'LI' && target.classList.contains('title') && target.parentElement?.classList.contains('ac');
+
+      if (!isHandle && !target.closest('.dg.ac::before')) {
+        const handleArea = document.querySelector('.dg.ac');
+        if (handleArea) {
+          const rect = handleArea.getBoundingClientRect();
+          if (e.clientY - rect.top > this.DRAWER_HANDLE_HEIGHT) {
+            return;
+          }
+        }
+      }
+
+      isDragging = true;
+      pointerStartY = e.clientY;
+      const rect = panel.getBoundingClientRect();
+      pointerStartHeight = window.innerHeight - rect.top;
+
+      panel.classList.add('drawer-dragging');
+      e.preventDefault();
+    };
+
+    const handlePointerMove = (e: PointerEvent) => {
+      if (!isDragging) return;
+
+      const panel = getPanelElement();
+      if (!panel) return;
+
+      const deltaY = pointerStartY - e.clientY;
+      let newHeight = pointerStartHeight + deltaY;
+      const maxHeight = getMaxHeight();
+
+      newHeight = Math.max(this.DRAWER_HANDLE_HEIGHT, Math.min(maxHeight, newHeight));
+
+      panel.style.maxHeight = newHeight + 'px';
+      panel.style.height = newHeight + 'px';
+      this.drawer.currentHeight = newHeight;
+    };
+
+    const handlePointerUp = () => {
+      if (!isDragging) return;
+      isDragging = false;
+
+      const panel = getPanelElement();
+      if (!panel) return;
+
+      panel.classList.remove('drawer-dragging');
+      panel.style.height = '';
+
+      const maxHeight = getMaxHeight();
+      const midPoint = (this.DRAWER_HANDLE_HEIGHT + maxHeight) / 2;
+      const shouldExpand = this.drawer.currentHeight > midPoint;
+
+      if (shouldExpand) {
+        this.expandDrawer();
+      } else {
+        this.collapseDrawer();
+      }
+    };
+
+    window.addEventListener('pointerdown', handlePointerDown);
+    window.addEventListener('pointermove', handlePointerMove);
+    window.addEventListener('pointerup', handlePointerUp);
+    window.addEventListener('pointercancel', handlePointerUp);
+  }
+
+  private checkInitialResponsiveState(): void {
+    setTimeout(() => {
+      this.updateDrawerState();
+    }, 100);
+  }
+
+  private updateDrawerState(): void {
+    const panel = document.querySelector('.dg.ac') as HTMLElement | null;
+    if (!panel) return;
+
+    if (window.innerWidth <= this.MOBILE_BREAKPOINT) {
+      if (this.drawer.isExpanded) {
+        this.expandDrawer();
+      } else {
+        this.collapseDrawer();
+      }
+    } else {
+      panel.classList.remove('drawer-collapsed', 'drawer-expanded', 'drawer-dragging');
+      panel.style.maxHeight = '';
+      panel.style.height = '';
+    }
+  }
+
+  private expandDrawer(): void {
+    const panel = document.querySelector('.dg.ac') as HTMLElement | null;
+    if (!panel) return;
+
+    this.drawer.isExpanded = true;
+    const maxHeight = window.innerHeight * this.DRAWER_MAX_HEIGHT_RATIO;
+    panel.style.maxHeight = maxHeight + 'px';
+    panel.classList.remove('drawer-collapsed');
+    panel.classList.add('drawer-expanded');
+  }
+
+  private collapseDrawer(): void {
+    const panel = document.querySelector('.dg.ac') as HTMLElement | null;
+    if (!panel) return;
+
+    this.drawer.isExpanded = false;
+    panel.style.maxHeight = this.DRAWER_HANDLE_HEIGHT + 'px';
+    panel.classList.remove('drawer-expanded');
+    panel.classList.add('drawer-collapsed');
   }
 
   private buildControls(): void {
@@ -266,7 +515,8 @@ export class UIControls {
     const resetSelectionObj = {
       '取消选择 (Esc)': () => {
         this.renderer.setSelectedPlanet(null);
-        this.renderer.updateInfoPanel(null);
+        this.selectedPlanetId = null;
+        this.updateInfoPanelInternal(null);
       },
     };
     const resetBtn = actionsFolder.add(resetSelectionObj, '取消选择 (Esc)');
@@ -344,7 +594,8 @@ export class UIControls {
 
       if (e.key === 'Escape') {
         this.renderer.setSelectedPlanet(null);
-        this.renderer.updateInfoPanel(null);
+        this.selectedPlanetId = null;
+        this.updateInfoPanelInternal(null);
         return;
       }
 
@@ -358,17 +609,12 @@ export class UIControls {
     });
   }
 
-  private setupPlanetClick(): void {
-    this.renderer.onPlanetClick((planetId) => {
-      this.selectPlanet(planetId);
-    });
-  }
-
   private selectPlanet(planetId: string): void {
     this.renderer.setSelectedPlanet(planetId);
+    this.selectedPlanetId = planetId;
     const planet = this.engine.getPlanetById(planetId);
     if (planet) {
-      this.renderer.updateInfoPanel(planet);
+      this.updateInfoPanelInternal(planet);
     }
   }
 
@@ -382,17 +628,20 @@ export class UIControls {
     this.onClearTrailsCallbacks.push(callback);
   }
 
-  update(): void {
+  update(currentTime: number): void {
     if (this.selectedPlanetId) {
-      const planet = this.engine.getPlanetById(this.selectedPlanetId);
-      if (planet) {
-        this.renderer.updateInfoPanel(planet);
+      const timeSinceLastUpdate = currentTime - this.lastInfoUpdateTime;
+      if (timeSinceLastUpdate >= this.INFO_UPDATE_INTERVAL) {
+        this.lastInfoUpdateTime = currentTime;
+        const planet = this.engine.getPlanetById(this.selectedPlanetId);
+        if (planet) {
+          this.updateInfoPanelInternal(planet);
+        } else {
+          this.selectedPlanetId = null;
+          this.updateInfoPanelInternal(null);
+        }
       }
     }
-  }
-
-  get selectedPlanetId(): string | null {
-    return null;
   }
 
   dispose(): void {
