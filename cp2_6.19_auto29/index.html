@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Emoji 像素画生成器</title>
+  <style>
+    :root {
+      --bg-color: #0f0f23;
+      --border-color: #00fff5;
+      --emoji-border-color: #ff00ff;
+      --emoji-shadow-color: #ff00ff;
+      --glass-bg: rgba(255, 255, 255, 0.1);
+      --glass-border: rgba(255, 255, 255, 0.2);
+      --text-color: #ffffff;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background-color: var(--bg-color);
+      color: var(--text-color);
+      min-height: 100vh;
+      transition: background-color 0.5s ease, color 0.5s ease;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 20px;
+    }
+
+    .app-container {
+      width: 100%;
+      max-width: 800px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .app-title {
+      text-align: center;
+      font-size: 1.8rem;
+      font-weight: 700;
+      background: linear-gradient(135deg, var(--border-color), var(--emoji-border-color));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      margin-bottom: 10px;
+    }
+
+    .theme-selector-wrapper {
+      display: flex;
+      justify-content: center;
+      gap: 12px;
+      padding: 12px 20px;
+      background: var(--glass-bg);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      border: 1px solid var(--glass-border);
+      border-radius: 16px;
+    }
+
+    #theme-selector {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+    }
+
+    .theme-btn {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      border: 3px solid transparent;
+      cursor: pointer;
+      padding: 0;
+      background: none;
+      transition: transform 0.2s ease, border-color 0.3s ease, box-shadow 0.3s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .theme-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    }
+
+    .theme-btn.active {
+      border-color: var(--border-color);
+      box-shadow: 0 0 15px var(--border-color);
+    }
+
+    .theme-preview {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+    }
+
+    .theme-label {
+      font-size: 0.85rem;
+      opacity: 0.8;
+      margin-left: 8px;
+    }
+
+    .main-content {
+      display: flex;
+      gap: 20px;
+      justify-content: center;
+      align-items: flex-start;
+    }
+
+    .toolbar {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      padding: 20px;
+      background: var(--glass-bg);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      border: 1px solid var(--glass-border);
+      border-radius: 16px;
+      min-width: 140px;
+    }
+
+    .toolbar-title {
+      font-size: 0.9rem;
+      font-weight: 600;
+      margin-bottom: 8px;
+      opacity: 0.9;
+      text-align: center;
+    }
+
+    .tool-btn {
+      padding: 12px 16px;
+      border: 2px solid var(--border-color);
+      border-radius: 10px;
+      background: transparent;
+      color: var(--text-color);
+      cursor: pointer;
+      font-size: 0.9rem;
+      font-weight: 500;
+      transition: transform 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+    }
+
+    .tool-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+    }
+
+    .tool-btn.active {
+      background: var(--border-color);
+      color: var(--bg-color);
+      box-shadow: 0 0 20px var(--border-color);
+    }
+
+    .tool-btn.primary {
+      background: linear-gradient(135deg, var(--border-color), var(--emoji-border-color));
+      border: none;
+      color: white;
+      font-weight: 600;
+    }
+
+    .tool-btn.danger {
+      border-color: #ff4757;
+      color: #ff4757;
+    }
+
+    .tool-btn.danger:hover {
+      background: rgba(255, 71, 87, 0.1);
+    }
+
+    .tool-divider {
+      height: 1px;
+      background: var(--glass-border);
+      margin: 8px 0;
+    }
+
+    #grid-container {
+      flex: 1;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      max-width: 520px;
+    }
+
+    .emoji-grid {
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    }
+
+    .info-bar {
+      padding: 16px 24px;
+      background: var(--glass-bg);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      border: 1px solid var(--glass-border);
+      border-radius: 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+
+    .info-item {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .info-label {
+      font-size: 0.75rem;
+      opacity: 0.7;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .info-value {
+      font-size: 1rem;
+      font-weight: 600;
+    }
+
+    .progress-bar {
+      flex: 1;
+      min-width: 150px;
+      height: 8px;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 4px;
+      overflow: hidden;
+    }
+
+    .progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--border-color), var(--emoji-border-color));
+      border-radius: 4px;
+      transition: width 0.3s ease;
+      width: 0%;
+    }
+
+    @media (max-width: 420px) {
+      body {
+        padding: 12px;
+      }
+
+      .app-title {
+        font-size: 1.4rem;
+        margin-bottom: 8px;
+      }
+
+      .main-content {
+        flex-direction: column;
+        align-items: center;
+      }
+
+      .toolbar {
+        flex-direction: row;
+        overflow-x: auto;
+        min-width: auto;
+        width: 100%;
+        padding: 12px;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
+      }
+
+      .toolbar::-webkit-scrollbar {
+        display: none;
+      }
+
+      .toolbar-title {
+        display: none;
+      }
+
+      .tool-divider {
+        width: 1px;
+        height: auto;
+        margin: 0 8px;
+      }
+
+      .tool-btn {
+        white-space: nowrap;
+        flex-shrink: 0;
+        padding: 10px 14px;
+        font-size: 0.85rem;
+      }
+
+      #grid-container {
+        width: 100%;
+        max-width: none;
+      }
+
+      .info-bar {
+        padding: 12px 16px;
+      }
+
+      .info-value {
+        font-size: 0.9rem;
+      }
+    }
+
+    @keyframes cellPopIn {
+      0% {
+        transform: scale(0);
+      }
+      70% {
+        transform: scale(1.15);
+      }
+      100% {
+        transform: scale(1);
+      }
+    }
+
+    @keyframes cellRotate {
+      from {
+        transform: rotate(0deg);
+      }
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    @keyframes waveBounce {
+      0%, 100% {
+        transform: translateY(0);
+      }
+      50% {
+        transform: translateY(-3px);
+      }
+    }
+
+    .grid-cell {
+      will-change: transform;
+    }
+
+    .emoji-content {
+      will-change: transform;
+      pointer-events: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="app-container">
+    <h1 class="app-title">🎨 Emoji 像素画生成器</h1>
+    
+    <div class="theme-selector-wrapper">
+      <span class="theme-label">主题:</span>
+      <div id="theme-selector"></div>
+    </div>
+
+    <div class="main-content">
+      <aside id="toolbar" class="toolbar">
+        <div class="toolbar-title">工具</div>
+        <button id="brush-btn" class="tool-btn">🖌️ 画笔</button>
+        <button id="fill-btn" class="tool-btn">🪣 填充</button>
+        <div class="tool-divider"></div>
+        <button id="fill-all-btn" class="tool-btn primary">✨ 全随机填充</button>
+        <div class="tool-divider"></div>
+        <button id="clear-btn" class="tool-btn danger">🗑️ 清空画布</button>
+      </aside>
+
+      <main id="grid-container"></main>
+    </div>
+
+    <footer id="info-bar" class="info-bar">
+      <div class="info-item">
+        <span class="info-label">当前模式</span>
+        <span id="mode-indicator" class="info-value">画笔模式</span>
+      </div>
+      <div class="info-item" style="flex: 1; min-width: 150px;">
+        <span class="info-label">填充进度</span>
+        <div class="progress-bar">
+          <div id="progress-fill" class="progress-fill"></div>
+        </div>
+      </div>
+      <div class="info-item">
+        <span class="info-label">已填充</span>
+        <span id="filled-count" class="info-value">0 / 400 (0%)</span>
+      </div>
+    </footer>
+  </div>
+
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
