@@ -110,13 +110,15 @@ export class SkylineScene {
     };
     this.buildings.push(building);
 
-    const fromY = -config.height * 2;
+    const fromY = -this.canvasHeight;
     this.animCtrl.addSpringAnim(id, fromY, snapY);
     this.animCtrl.initWindowsForBuilding(id, config.windowRows, config.windowCols);
   }
 
   deleteSelected(): void {
     if (!this.selectedBuildingId) return;
+    const target = this.buildings.find((b) => b.id === this.selectedBuildingId);
+    if (target) this.releaseBuildingCanvases(target);
     this.animCtrl.removeWindowsForBuilding(this.selectedBuildingId);
     this.buildings = this.buildings.filter((b) => b.id !== this.selectedBuildingId);
     this.selectedBuildingId = null;
@@ -124,6 +126,7 @@ export class SkylineScene {
 
   clearAll(): void {
     for (const b of this.buildings) {
+      this.releaseBuildingCanvases(b);
       this.animCtrl.removeWindowsForBuilding(b.id);
     }
     this.buildings = [];
@@ -275,6 +278,7 @@ export class SkylineScene {
     const my = e.clientY - rect.top;
     const hit = this.findBuildingAt(mx, my);
     if (hit) {
+      this.releaseBuildingCanvases(hit);
       this.animCtrl.removeWindowsForBuilding(hit.id);
       this.buildings = this.buildings.filter((b) => b.id !== hit.id);
       if (this.selectedBuildingId === hit.id) this.selectedBuildingId = null;
@@ -365,10 +369,9 @@ export class SkylineScene {
     for (let i = 1; i <= horizontalLines; i++) {
       const t = 1 - Math.pow(1 - i / horizontalLines, 2);
       const y = vpy + (groundY - vpy) * t;
-      const vSpread = (groundY - vpy) * t * 0.6;
       ctx.beginPath();
-      ctx.moveTo(vpx - vSpread - (viewRight - vpx) * 0.3, y);
-      ctx.lineTo(vpx + vSpread - (vpx - viewLeft) * 0.3, y);
+      ctx.moveTo(viewLeft - GRID_SIZE, y);
+      ctx.lineTo(viewRight + GRID_SIZE, y);
       ctx.stroke();
     }
 
@@ -455,12 +458,24 @@ export class SkylineScene {
   }
 
   private invalidateCache(b: PlacedBuilding): void {
-    b.cacheDay = null;
-    b.cacheNight = null;
+    this.releaseBuildingCanvases(b);
+  }
+
+  private releaseBuildingCanvases(b: PlacedBuilding): void {
+    if (b.cacheDay) {
+      b.cacheDay.width = 0;
+      b.cacheDay.height = 0;
+      b.cacheDay = null;
+    }
+    if (b.cacheNight) {
+      b.cacheNight.width = 0;
+      b.cacheNight.height = 0;
+      b.cacheNight = null;
+    }
   }
 
   invalidateAllCaches(): void {
-    for (const b of this.buildings) this.invalidateCache(b);
+    for (const b of this.buildings) this.releaseBuildingCanvases(b);
   }
 
   setNightMode(night: boolean): void {
@@ -550,11 +565,15 @@ export class SkylineScene {
 
     for (const b of sorted) {
       const cfg = b.config;
-      const bx = b.x;
-      const by = b.y - cfg.height - 60;
-      const bw = cfg.width + 50;
-      const bh = cfg.height + 80;
-      if (bx + bw < viewLeft || bx > viewRight || by + bh < viewTop || by > viewBottom) continue;
+      const roofOverhead = cfg.height * 0.2 + 20;
+      const shadowOverhead = 50;
+      const bBoxMinX = b.x - 10;
+      const bBoxMaxX = b.x + cfg.width + shadowOverhead;
+      const bBoxMinY = b.y - cfg.height - roofOverhead;
+      const bBoxMaxY = b.y + 10;
+
+      if (bBoxMaxX < viewLeft || bBoxMinX > viewRight ||
+          bBoxMaxY < viewTop || bBoxMinY > viewBottom) continue;
       this.drawSingleBuilding(ctx, b);
     }
   }

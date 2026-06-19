@@ -101,12 +101,12 @@ export class AnimationController {
     for (let r = 0; r < rows; r++) {
       for (let c = 0; c < cols; c++) {
         const isLit = Math.random() < 0.55;
-        const isBlue = Math.random() < 0.3;
+        const pickBlue = Math.random() < 0.5;
         windows.push({
           row: r,
           col: c,
           lit: isLit,
-          color: isBlue ? '#7ec8e3' : '#f5a623',
+          color: pickBlue ? '#7ec8e3' : '#f5a623',
           flickerPhase: Math.random() * Math.PI * 2,
           flickerSpeed: 0.2 + Math.random() * 0.8,
         });
