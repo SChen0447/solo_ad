@@ -28,8 +28,11 @@ interface Projectile {
   size: number;
   graphics: Phaser.GameObjects.Arc;
   isActive: boolean;
-  distanceToCamera: number;
+  distToBase: number;
 }
+
+const BASE_X = MAP_OFFSET_X + GRID_COLS * CELL_SIZE;
+const BASE_Y = MAP_OFFSET_Y + GRID_ROWS * CELL_SIZE;
 
 export class GameScene extends Phaser.Scene {
   private towerFactory!: TowerFactory;
@@ -54,11 +57,14 @@ export class GameScene extends Phaser.Scene {
   private hudGoldText!: Phaser.GameObjects.Text;
   private hudStartWaveBtn!: Phaser.GameObjects.Container;
   private livesPulseTween: Phaser.Tweens.Tween | null = null;
+  private hudLivesBg!: Phaser.GameObjects.Graphics;
 
   private towerPanel: Phaser.GameObjects.Container | null = null;
   private selectedBuildCell: { gridX: number; gridY: number; x: number; y: number } | null = null;
 
   private resultPanel: Phaser.GameObjects.Container | null = null;
+  private glowTimer: Phaser.Time.TimerEvent | null = null;
+  private shakeTimer: Phaser.Time.TimerEvent | null = null;
 
   private readonly MAX_PROJECTILES = 50;
 
@@ -138,13 +144,14 @@ export class GameScene extends Phaser.Scene {
             const buildable: { gridX: number; gridY: number; x: number; y: number; built: boolean; graphics: Phaser.GameObjects.Rectangle | null | undefined } = { gridX: x, gridY: y, x: cx, y: cy, built: false, graphics: null };
             this.buildableCells.push(buildable);
 
-            const breathingRect = this.add.rectangle(cx, cy, CELL_SIZE - 14, CELL_SIZE - 14, 0xFFD54F, 0.0);
-            breathingRect.setStrokeStyle(2, 0xFFD54F, 0.5);
+            const breathingRect = this.add.rectangle(cx, cy, CELL_SIZE - 14, CELL_SIZE - 14, 0xFFD54F, 0.08);
+            breathingRect.setStrokeStyle(3, 0xFFD54F, 0.6);
+            breathingRect.setDepth(2);
             buildable.graphics = breathingRect;
 
             const tween = this.tweens.add({
               targets: breathingRect,
-              alpha: { from: 0.2, to: 0.8 },
+              alpha: { from: 0.15, to: 0.75 },
               duration: 1400,
               yoyo: true,
               repeat: -1,
@@ -190,6 +197,12 @@ export class GameScene extends Phaser.Scene {
 
   private createHUD(): void {
     const hudY = 65;
+
+    this.hudLivesBg = this.add.graphics();
+    this.hudLivesBg.fillStyle(0x0D47A1, 1);
+    this.hudLivesBg.fillRoundedRect(520 - 85, hudY - 24, 170, 48, 10);
+    this.hudLivesBg.lineStyle(3, 0xFFD54F, 1);
+    this.hudLivesBg.strokeRoundedRect(520 - 85, hudY - 24, 170, 48, 10);
 
     this.hudWaveText = this.createHudItem(280, hudY, '波次', `${this.waveManager.currentWave}/${this.waveManager.totalWaves}`, 'waves');
 
@@ -562,6 +575,7 @@ export class GameScene extends Phaser.Scene {
     }
 
     this.updateProjectiles(delta);
+    this.enforceProjectileLimit();
 
     const aliveCount = this.enemies.length;
     this.waveManager.notifyEnemyKilled(aliveCount);
@@ -592,23 +606,19 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
-  private fireProjectile(tower: Tower, enemy: Enemy): void {
-    if (this.projectiles.length >= this.MAX_PROJECTILES) {
-      const minProj = this.projectiles
-        .filter((p) => p.isActive)
-        .sort((a, b) => a.distanceToCamera - b.distanceToCamera)[0];
-      if (minProj) {
-        minProj.graphics.destroy();
-        this.projectiles = this.projectiles.filter((p) => p !== minProj);
-      }
-    }
+  private calcDistToBase(x: number, y: number): number {
+    const dx = x - BASE_X;
+    const dy = y - BASE_Y;
+    return Math.sqrt(dx * dx + dy * dy);
+  }
 
+  private fireProjectile(tower: Tower, enemy: Enemy): void {
     const angle = Math.atan2(
       enemy.y - tower.y,
       enemy.x - tower.x
     );
-    const startX = tower.x + Math.cos(angle) * 30;
-    const startY = tower.y + Math.sin(angle) * 30;
+    const startX = tower.x + Math.cos(tower.barrelAngle) * 35;
+    const startY = tower.y + Math.sin(tower.barrelAngle) * 35;
 
     const graphics = this.add.circle(
       startX,
@@ -636,7 +646,7 @@ export class GameScene extends Phaser.Scene {
       size: tower.config.projectileSize,
       graphics,
       isActive: true,
-      distanceToCamera: 0
+      distToBase: this.calcDistToBase(startX, startY)
     };
 
     this.projectiles.push(projectile);
@@ -648,6 +658,19 @@ export class GameScene extends Phaser.Scene {
       duration: 80,
       ease: 'Quad.easeOut'
     });
+  }
+
+  private enforceProjectileLimit(): void {
+    while (this.projectiles.length > this.MAX_PROJECTILES) {
+      const activeProjectiles = this.projectiles.filter((p) => p.isActive);
+      if (activeProjectiles.length === 0) break;
+
+      activeProjectiles.sort((a, b) => b.distToBase - a.distToBase);
+      const toRemove = activeProjectiles[0];
+      toRemove.isActive = false;
+      toRemove.graphics.destroy();
+      this.projectiles = this.projectiles.filter((p) => p !== toRemove);
+    }
   }
 
   private updateProjectiles(delta: number): void {
@@ -667,7 +690,7 @@ export class GameScene extends Phaser.Scene {
       const dx = target.x - proj.x;
       const dy = target.y - proj.y;
       const dist = Math.sqrt(dx * dx + dy * dy);
-      proj.distanceToCamera = dist;
+      proj.distToBase = this.calcDistToBase(proj.x, proj.y);
 
       if (dist < 12) {
         this.onProjectileHit(proj, target);
@@ -764,11 +787,20 @@ export class GameScene extends Phaser.Scene {
     const ratio = this.lives / INITIAL_LIVES;
     if (ratio <= 0.3 && this.lives > 0) {
       this.hudLivesText.setColor('#F44336');
+
+      if (this.hudLivesBg) {
+        this.hudLivesBg.clear();
+        this.hudLivesBg.fillStyle(0x7F0000, 0.9);
+        this.hudLivesBg.fillRoundedRect(520 - 85, 65 - 24, 170, 48, 10);
+        this.hudLivesBg.lineStyle(3, 0xF44336, 1);
+        this.hudLivesBg.strokeRoundedRect(520 - 85, 65 - 24, 170, 48, 10);
+      }
+
       if (!this.livesPulseTween) {
         this.livesPulseTween = this.tweens.add({
           targets: this.hudLivesText,
-          scale: { from: 1, to: 1.25 },
-          duration: 500,
+          scale: { from: 1, to: 1.3 },
+          duration: 400,
           yoyo: true,
           repeat: -1,
           ease: 'Sine.easeInOut'
@@ -776,6 +808,15 @@ export class GameScene extends Phaser.Scene {
       }
     } else {
       this.hudLivesText.setColor('#FFFFFF');
+
+      if (this.hudLivesBg) {
+        this.hudLivesBg.clear();
+        this.hudLivesBg.fillStyle(0x0D47A1, 1);
+        this.hudLivesBg.fillRoundedRect(520 - 85, 65 - 24, 170, 48, 10);
+        this.hudLivesBg.lineStyle(3, 0xFFD54F, 1);
+        this.hudLivesBg.strokeRoundedRect(520 - 85, 65 - 24, 170, 48, 10);
+      }
+
       if (this.livesPulseTween) {
         this.livesPulseTween.stop();
         this.livesPulseTween = null;
@@ -788,36 +829,49 @@ export class GameScene extends Phaser.Scene {
 
   private showVictory(): void {
     this.isVictory = true;
-    this.createVictoryPanel();
 
-    for (let i = 0; i < 60; i++) {
-      const angle = (Math.PI * 2 * i) / 60;
-      const dist = Phaser.Math.Between(100, 350);
-      const colors = [0xFFD54F, 0xFFA000, 0xFF6F00, 0xFFEB3B, 0xFFFFFF];
-      const p = this.add.circle(
-        this.scale.width / 2,
-        this.scale.height / 2,
-        Phaser.Math.Between(4, 9),
-        Phaser.Utils.Array.GetRandom(colors),
-        1
-      );
-      p.setDepth(100);
+    const cx = this.scale.width / 2;
+    const cy = this.scale.height / 2;
 
-      const tx = this.scale.width / 2 + Math.cos(angle) * dist;
-      const ty = this.scale.height / 2 + Math.sin(angle) * dist;
+    for (let wave = 0; wave < 3; wave++) {
+      this.time.delayedCall(wave * 400, () => {
+        if (!this.isVictory) return;
+        const particleCount = 30;
+        for (let i = 0; i < particleCount; i++) {
+          const angle = (Math.PI * 2 * i) / particleCount + wave * 0.3;
+          const startDist = Phaser.Math.Between(0, 20);
+          const endDist = Phaser.Math.Between(120, 350);
+          const colors = [0xFFD54F, 0xFFA000, 0xFF6F00, 0xFFEB3B, 0xFFFFFF, 0xFF8F00];
+          const p = this.add.circle(
+            cx + Math.cos(angle) * startDist,
+            cy + Math.sin(angle) * startDist,
+            Phaser.Math.Between(3, 8),
+            Phaser.Utils.Array.GetRandom(colors),
+            1
+          );
+          p.setDepth(100);
 
-      this.tweens.add({
-        targets: p,
-        x: tx,
-        y: ty,
-        alpha: 0,
-        scale: 0.2,
-        duration: Phaser.Math.Between(700, 1400),
-        ease: 'Cubic.easeOut',
-        delay: Phaser.Math.Between(0, 300),
-        onComplete: () => p.destroy()
+          const tx = cx + Math.cos(angle) * endDist;
+          const ty = cy + Math.sin(angle) * endDist;
+
+          this.tweens.add({
+            targets: p,
+            x: tx,
+            y: ty,
+            alpha: 0,
+            scale: { from: 1.5, to: 0.1 },
+            duration: Phaser.Math.Between(800, 1600),
+            ease: 'Cubic.easeOut',
+            onComplete: () => p.destroy()
+          });
+        }
       });
     }
+
+    this.time.delayedCall(500, () => {
+      if (!this.isVictory) return;
+      this.createVictoryPanel();
+    });
   }
 
   private createVictoryPanel(): void {
@@ -826,6 +880,7 @@ export class GameScene extends Phaser.Scene {
 
     this.resultPanel = this.add.container(cx, cy);
     this.resultPanel.setDepth(200);
+    this.resultPanel.setAlpha(0);
 
     const overlay = this.add.graphics();
     overlay.fillStyle(0x000000, 0.65);
@@ -838,6 +893,14 @@ export class GameScene extends Phaser.Scene {
     panel.lineStyle(6, 0xFFD54F, 1);
     panel.strokeRoundedRect(-260, -180, 520, 360, 20);
     this.resultPanel.add(panel);
+
+    const cornerGlow = this.add.graphics();
+    cornerGlow.fillStyle(0xFFD54F, 0.4);
+    cornerGlow.fillCircle(-260, -180, 30);
+    cornerGlow.fillCircle(260, -180, 30);
+    cornerGlow.fillCircle(-260, 180, 30);
+    cornerGlow.fillCircle(260, 180, 30);
+    this.resultPanel.add(cornerGlow);
 
     const stars = this.add.graphics();
     for (let i = 0; i < 8; i++) {
@@ -855,16 +918,32 @@ export class GameScene extends Phaser.Scene {
       color: '#FFD54F'
     }).setOrigin(0.5);
     victoryText.setShadow(6, 6, '#8D6E00', 1);
+    victoryText.setScale(0.01);
+    victoryText.setAlpha(0);
     this.resultPanel.add(victoryText);
 
-    victoryText.setScale(0.1);
+    this.tweens.add({
+      targets: this.resultPanel,
+      alpha: 1,
+      duration: 300,
+      ease: 'Linear'
+    });
+
     this.tweens.add({
       targets: victoryText,
-      scale: { from: 0.1, to: 1 },
+      scale: { from: 0.01, to: 1.2 },
       alpha: { from: 0, to: 1 },
-      duration: 1200,
+      duration: 800,
       ease: 'Back.easeOut',
-      delay: 200
+      delay: 300,
+      onComplete: () => {
+        this.tweens.add({
+          targets: victoryText,
+          scale: 1,
+          duration: 200,
+          ease: 'Quad.easeOut'
+        });
+      }
     });
 
     const subText = this.add.text(0, 50, '你成功守住了王国！', {
@@ -877,8 +956,10 @@ export class GameScene extends Phaser.Scene {
     this.tweens.add({
       targets: subText,
       alpha: 1,
-      duration: 500,
-      delay: 1000
+      y: 55,
+      duration: 600,
+      delay: 1200,
+      ease: 'Cubic.easeOut'
     });
     this.resultPanel.add(subText);
 
@@ -893,7 +974,7 @@ export class GameScene extends Phaser.Scene {
       targets: statsText,
       alpha: 1,
       duration: 500,
-      delay: 1200
+      delay: 1500
     });
     this.resultPanel.add(statsText);
 
@@ -905,7 +986,33 @@ export class GameScene extends Phaser.Scene {
 
   private showGameOver(): void {
     this.isGameOver = true;
-    this.createGameOverPanel();
+
+    const cx = this.scale.width / 2;
+    const cy = this.scale.height / 2;
+
+    for (let i = 0; i < 20; i++) {
+      const p = this.add.circle(
+        cx + Phaser.Math.Between(-100, 100),
+        cy + Phaser.Math.Between(-50, 50),
+        Phaser.Math.Between(2, 5),
+        0xF44336,
+        0.8
+      );
+      p.setDepth(100);
+      this.tweens.add({
+        targets: p,
+        y: p.y - 80,
+        alpha: 0,
+        duration: Phaser.Math.Between(600, 1200),
+        ease: 'Cubic.easeOut',
+        onComplete: () => p.destroy()
+      });
+    }
+
+    this.time.delayedCall(300, () => {
+      if (!this.isGameOver) return;
+      this.createGameOverPanel();
+    });
   }
 
   private createGameOverPanel(): void {
@@ -914,30 +1021,36 @@ export class GameScene extends Phaser.Scene {
 
     this.resultPanel = this.add.container(cx, cy);
     this.resultPanel.setDepth(200);
+    this.resultPanel.setAlpha(0);
 
     const overlay = this.add.graphics();
     overlay.fillStyle(0x000000, 0.7);
     overlay.fillRect(-this.scale.width, -this.scale.height, this.scale.width * 2, this.scale.height * 2);
     this.resultPanel.add(overlay);
 
-    const glow = this.add.graphics();
-    this.resultPanel.add(glow);
-
     const panel = this.add.graphics();
     panel.fillStyle(0x263238, 0.98);
     panel.fillRoundedRect(-260, -180, 520, 360, 20);
     this.resultPanel.add(panel);
 
-    const animateGlow = () => {
-      if (!this.resultPanel) return;
-      glow.clear();
-      const t = this.time.now * 0.004;
-      const pulse = 3 + Math.sin(t) * 3;
-      glow.lineStyle(pulse + 4, 0xF44336, 0.9);
-      glow.strokeRoundedRect(-262, -182, 524, 364, 20);
-      this.time.delayedCall(30, animateGlow);
-    };
-    animateGlow();
+    const glow = this.add.graphics();
+    this.resultPanel.add(glow);
+
+    this.glowTimer = this.time.addEvent({
+      delay: 33,
+      callback: () => {
+        if (!this.resultPanel || !glow.active) return;
+        glow.clear();
+        const t = this.time.now * 0.005;
+        const pulse = 4 + Math.sin(t) * 4;
+        const alpha = 0.6 + Math.sin(t) * 0.35;
+        glow.lineStyle(pulse, 0xF44336, alpha);
+        glow.strokeRoundedRect(-264, -184, 528, 368, 22);
+        glow.lineStyle(pulse * 0.5, 0xFF5252, alpha * 0.5);
+        glow.strokeRoundedRect(-268, -188, 536, 376, 24);
+      },
+      loop: true
+    });
 
     const failText = this.add.text(0, -40, '失败...', {
       fontFamily: 'Georgia, serif',
@@ -948,21 +1061,22 @@ export class GameScene extends Phaser.Scene {
     failText.setShadow(4, 4, '#7F0000', 1);
     this.resultPanel.add(failText);
 
-    const shake = () => {
-      if (!this.resultPanel || !failText.active) return;
-      this.tweens.add({
-        targets: failText,
-        x: Phaser.Math.Between(-8, 8),
-        y: -40 + Phaser.Math.Between(-6, 6),
-        duration: 70,
-        ease: 'Linear',
-        onComplete: () => {
-          failText.setPosition(0, -40);
-          this.time.delayedCall(Phaser.Math.Between(600, 1200), shake);
-        }
-      });
-    };
-    shake();
+    this.shakeTimer = this.time.addEvent({
+      delay: 800,
+      callback: () => {
+        if (!this.resultPanel || !failText.active) return;
+        this.tweens.add({
+          targets: failText,
+          x: { from: 0, to: Phaser.Math.Between(-10, 10) },
+          y: { from: -40, to: -40 + Phaser.Math.Between(-8, 8) },
+          duration: 50,
+          yoyo: true,
+          repeat: 3,
+          ease: 'Linear'
+        });
+      },
+      loop: true
+    });
 
     const subText = this.add.text(0, 50, '王国已沦陷...', {
       fontFamily: 'Georgia, serif',
@@ -980,10 +1094,29 @@ export class GameScene extends Phaser.Scene {
     }).setOrigin(0.5);
     this.resultPanel.add(reachedText);
 
+    this.tweens.add({
+      targets: this.resultPanel,
+      alpha: 1,
+      duration: 400,
+      ease: 'Linear'
+    });
+
     const restartBtn = this.createResultButton(0, 160, '重新开始', () => {
+      this.cleanupTimers();
       this.scene.restart();
     });
     this.resultPanel.add(restartBtn);
+  }
+
+  private cleanupTimers(): void {
+    if (this.glowTimer) {
+      this.glowTimer.destroy();
+      this.glowTimer = null;
+    }
+    if (this.shakeTimer) {
+      this.shakeTimer.destroy();
+      this.shakeTimer = null;
+    }
   }
 
   private createResultButton(x: number, y: number, label: string, onClick: () => void): Phaser.GameObjects.Container {

@@ -19,6 +19,8 @@ export interface Tower {
   base: Phaser.GameObjects.Graphics;
   barrel: Phaser.GameObjects.Graphics;
   barrelAngle: number;
+  targetBarrelAngle: number;
+  barrelTween: Phaser.Tweens.Tween | null;
   targetEnemyId: number | null;
   rangeCircle: Phaser.GameObjects.Arc | null;
 }
@@ -42,11 +44,12 @@ export class TowerFactory {
     const container = this.scene.add.container(x, y);
 
     const base = this.scene.add.graphics();
-    this.drawTowerBase(base, config.color);
+    this.drawTowerBase(base, config.color, type);
     container.add(base);
 
     const barrel = this.scene.add.graphics();
-    this.drawTowerBarrel(barrel, config.barrelColor, type);
+    this.drawBarrel(barrel, type);
+    barrel.rotation = -Math.PI / 2;
     container.add(barrel);
 
     this.scene.tweens.add({
@@ -72,74 +75,116 @@ export class TowerFactory {
       base,
       barrel,
       barrelAngle: -Math.PI / 2,
+      targetBarrelAngle: -Math.PI / 2,
+      barrelTween: null,
       targetEnemyId: null,
       rangeCircle: null
     };
   }
 
-  private drawTowerBase(graphics: Phaser.GameObjects.Graphics, color: number): void {
+  private drawTowerBase(graphics: Phaser.GameObjects.Graphics, color: number, type: TowerType): void {
     graphics.clear();
     graphics.fillStyle(color, 1);
     graphics.fillRoundedRect(-26, -22, 52, 48, 6);
     graphics.lineStyle(3, 0x0D47A1, 1);
     graphics.strokeRoundedRect(-26, -22, 52, 48, 6);
+
     graphics.fillStyle(0xFFD54F, 0.85);
     graphics.fillCircle(0, -18, 6);
+
+    if (type === 'magic') {
+      graphics.fillStyle(0xCE93D8, 0.5);
+      graphics.fillCircle(0, 0, 12);
+    }
   }
 
-  private drawTowerBarrel(
-    graphics: Phaser.GameObjects.Graphics,
-    color: number,
-    type: TowerType
-  ): void {
+  private drawBarrel(graphics: Phaser.GameObjects.Graphics, type: TowerType): void {
     graphics.clear();
-    this.drawBarrelAtAngle(graphics, color, type, -Math.PI / 2);
-  }
-
-  private drawBarrelAtAngle(
-    graphics: Phaser.GameObjects.Graphics,
-    color: number,
-    type: TowerType,
-    angle: number
-  ): void {
-    const cos = Math.cos(angle);
-    const sin = Math.sin(angle);
-    const rx = (x: number, y: number) => x * cos - y * sin;
-    const ry = (x: number, y: number) => x * sin + y * cos;
-    const fillRotatedRect = (x1: number, y1: number, x2: number, y2: number, x3: number, y3: number, x4: number, y4: number) => {
-      graphics.fillTriangle(rx(x1,y1), ry(x1,y1), rx(x2,y2), ry(x2,y2), rx(x3,y3), ry(x3,y3));
-      graphics.fillTriangle(rx(x3,y3), ry(x3,y3), rx(x4,y4), ry(x4,y4), rx(x1,y1), ry(x1,y1));
-    };
-
-    graphics.fillStyle(color, 1);
 
     switch (type) {
       case 'arrow':
-        fillRotatedRect(-4, -4, 26, -4, 26, 4, -4, 4);
+        graphics.fillStyle(0x4A2511, 1);
+        graphics.fillRect(-3, -3, 32, 6);
+        graphics.lineStyle(1, 0x6D3A1A, 1);
+        graphics.strokeRect(-3, -3, 32, 6);
+        graphics.fillStyle(0xA0A0A0, 1);
+        graphics.fillRect(29, -5, 6, 10);
         graphics.fillStyle(0xC0C0C0, 1);
-        graphics.fillTriangle(rx(26,-6), ry(26,-6), rx(34,0), ry(34,0), rx(26,6), ry(26,6));
+        graphics.fillTriangle(35, -4, 41, 0, 35, 4);
+        graphics.lineStyle(1, 0x808080, 0.6);
+        graphics.strokeTriangle(35, -4, 41, 0, 35, 4);
+        graphics.fillStyle(0xD0D0D0, 1);
+        graphics.fillRect(6, -4, 2, 8);
+        graphics.fillRect(18, -4, 2, 8);
         break;
+
       case 'cannon':
-        fillRotatedRect(-6, -8, 26, -8, 26, 8, -6, 8);
+        graphics.fillStyle(0x3E2723, 1);
+        graphics.fillRect(-5, -7, 34, 14);
+        graphics.lineStyle(1, 0x5D4037, 0.8);
+        graphics.strokeRect(-5, -7, 34, 14);
+        graphics.fillStyle(0x4E342E, 1);
+        graphics.fillRect(-5, -9, 8, 18);
         graphics.fillStyle(0x212121, 1);
-        graphics.fillCircle(rx(30, 0), ry(30, 0), 6);
+        graphics.fillCircle(33, 0, 8);
+        graphics.fillStyle(0x424242, 1);
+        graphics.fillCircle(33, 0, 5);
+        graphics.fillStyle(0x1A1A1A, 1);
+        graphics.fillCircle(33, 0, 2);
+        graphics.lineStyle(2, 0x616161, 0.5);
+        graphics.strokeCircle(33, 0, 8);
         break;
+
       case 'magic':
-        fillRotatedRect(-4, -5, 20, -5, 20, 5, -4, 5);
+        graphics.fillStyle(0x7B1FA2, 1);
+        graphics.fillRect(-3, -4, 26, 8);
+        graphics.lineStyle(1, 0x9C27B0, 0.7);
+        graphics.strokeRect(-3, -4, 26, 8);
         graphics.fillStyle(0xCE93D8, 1);
-        graphics.fillCircle(rx(24, 0), ry(24, 0), 8);
+        graphics.fillCircle(28, 0, 10);
         graphics.fillStyle(0xE040FB, 1);
-        graphics.fillCircle(rx(24, 0), ry(24, 0), 4);
+        graphics.fillCircle(28, 0, 7);
+        graphics.fillStyle(0xF48FB1, 1);
+        graphics.fillCircle(28, 0, 3);
+        graphics.lineStyle(2, 0xAB47BC, 0.8);
+        graphics.strokeCircle(28, 0, 10);
         break;
     }
   }
 
   rotateBarrelTo(tower: Tower, targetX: number, targetY: number): void {
-    const angle = Math.atan2(targetY - tower.y, targetX - tower.x);
-    tower.barrelAngle = angle;
+    const targetAngle = Math.atan2(targetY - tower.y, targetX - tower.x);
 
-    tower.barrel.clear();
-    this.drawBarrelAtAngle(tower.barrel, tower.config.barrelColor, tower.type, angle);
+    let angleDiff = targetAngle - tower.barrelAngle;
+    while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
+    while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
+
+    if (Math.abs(angleDiff) < 0.02) return;
+
+    tower.targetBarrelAngle = targetAngle;
+
+    if (tower.barrelTween) {
+      tower.barrelTween.stop();
+      tower.barrelTween = null;
+    }
+
+    const startAngle = tower.barrelAngle;
+    const endAngle = startAngle + angleDiff;
+    const duration = Math.min(200, Math.max(60, Math.abs(angleDiff) * 100));
+
+    tower.barrelTween = this.scene.tweens.add({
+      targets: tower.barrel,
+      rotation: endAngle,
+      duration: duration,
+      ease: 'Quad.easeOut',
+      onUpdate: () => {
+        tower.barrelAngle = tower.barrel.rotation;
+      },
+      onComplete: () => {
+        tower.barrelAngle = endAngle;
+        tower.barrelTween = null;
+      }
+    });
   }
 
   showRange(tower: Tower): void {
@@ -168,6 +213,10 @@ export class TowerFactory {
   }
 
   destroyTower(tower: Tower): void {
+    if (tower.barrelTween) {
+      tower.barrelTween.stop();
+      tower.barrelTween = null;
+    }
     this.hideRange(tower);
     this.scene.tweens.add({
       targets: tower.container,
