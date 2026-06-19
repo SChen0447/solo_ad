@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>三维重力场与行星运动模拟器</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      font-family: 'Courier New', Consolas, Monaco, monospace;
+      background: linear-gradient(180deg, #0a0a2e 0%, #1a1a3e 100%);
+      color: #e0e0ff;
+    }
+
+    #app {
+      position: relative;
+      width: 100%;
+      height: 100%;
+    }
+
+    #canvas-container {
+      position: absolute;
+      inset: 0;
+    }
+
+    #info-panel {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      width: 280px;
+      padding: 20px;
+      background: rgba(255, 255, 255, 0.08);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      border-radius: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+      display: none;
+      transition: all 0.2s ease;
+    }
+
+    #info-panel.visible {
+      display: block;
+    }
+
+    #info-panel h3 {
+      font-size: 16px;
+      margin-bottom: 16px;
+      color: #ffd700;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      border-bottom: 1px solid rgba(255, 215, 0, 0.3);
+      padding-bottom: 8px;
+    }
+
+    .info-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+      font-size: 13px;
+      line-height: 1.6;
+    }
+
+    .info-label {
+      color: #a0a0c0;
+    }
+
+    .info-value {
+      color: #80ff80;
+      font-weight: bold;
+    }
+
+    #controls-hint {
+      position: absolute;
+      bottom: 20px;
+      left: 20px;
+      padding: 12px 16px;
+      background: rgba(255, 255, 255, 0.08);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      border-radius: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      font-size: 12px;
+      line-height: 1.8;
+      color: #b0b0d0;
+      max-width: 280px;
+    }
+
+    #controls-hint strong {
+      color: #ffd700;
+    }
+
+    .dg.ac {
+      z-index: 100 !important;
+    }
+
+    .dg.main .close-button {
+      background-color: rgba(255, 215, 0, 0.2) !important;
+    }
+
+    .dg .c .slider-fg {
+      background: linear-gradient(90deg, #4a4aff, #8080ff) !important;
+    }
+
+    @media (max-width: 768px) {
+      #info-panel {
+        width: calc(100% - 40px);
+        top: auto;
+        bottom: 120px;
+        right: 20px;
+      }
+
+      #controls-hint {
+        bottom: auto;
+        top: 20px;
+        left: 20px;
+        max-width: calc(100% - 40px);
+      }
+
+      .dg.ac {
+        position: fixed !important;
+        bottom: 0 !important;
+        top: auto !important;
+        left: 0 !important;
+        right: 0 !important;
+        width: 100% !important;
+        max-height: 40vh !important;
+        overflow-y: auto !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <div id="canvas-container"></div>
+
+    <div id="info-panel">
+      <h3 id="planet-name">行星信息</h3>
+      <div class="info-item">
+        <span class="info-label">质量 (kg)</span>
+        <span class="info-value" id="info-mass">--</span>
+      </div>
+      <div class="info-item">
+        <span class="info-label">速度 (m/s)</span>
+        <span class="info-value" id="info-velocity">--</span>
+      </div>
+      <div class="info-item">
+        <span class="info-label">轨道半径 (m)</span>
+        <span class="info-value" id="info-orbit">--</span>
+      </div>
+      <div class="info-item">
+        <span class="info-label">公转周期 (s)</span>
+        <span class="info-value" id="info-period">--</span>
+      </div>
+    </div>
+
+    <div id="controls-hint">
+      <strong>操作提示：</strong><br>
+      • 鼠标拖拽：旋转视角<br>
+      • 滚轮：缩放视图<br>
+      • 数字键 <strong>1-4</strong>：切换选中行星<br>
+      • 鼠标点击行星：选中查看信息<br>
+      • <strong>空格键</strong>：清除所有轨迹线
+    </div>
+  </div>
+
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
