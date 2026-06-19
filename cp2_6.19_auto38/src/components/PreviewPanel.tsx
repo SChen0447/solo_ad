@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Theme } from '../theme/ThemeEngine';
-import { hexWithOpacity } from '../theme/colorUtils';
+import { hexWithOpacity, getRelativeLuminance, hexToRgb } from '../theme/colorUtils';
 
 interface PreviewPanelProps {
   theme: Theme;
@@ -11,18 +11,48 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ theme }) => {
   const [inputFocused, setInputFocused] = useState(false);
   const [activeNav, setActiveNav] = useState(0);
 
-  const transitionStyle = 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)';
+  const isDarkBg = useMemo(() => {
+    return getRelativeLuminance(hexToRgb(theme.background)) < 0.5;
+  }, [theme.background]);
+
+  const isDarkPrimary = useMemo(() => {
+    return getRelativeLuminance(hexToRgb(theme.primary)) < 0.5;
+  }, [theme.primary]);
+
+  const colorTransition = 'background-color 0.25s cubic-bezier(0.4, 0, 0.6, 1), box-shadow 0.25s cubic-bezier(0.4, 0, 0.6, 1), border-color 0.25s cubic-bezier(0.4, 0, 0.6, 1), color 0.25s cubic-bezier(0.4, 0, 0.6, 1)';
+  const transformTransition = 'transform 0.15s cubic-bezier(0.2, 0, 0, 1)';
+  const allTransition = `${colorTransition}, ${transformTransition}`;
+
   const navItems = ['首页', '产品', '关于我们', '联系'];
 
-  const cardShadow = `0 1px 2px ${hexWithOpacity(theme.primary, 0.06)}, 0 4px 12px ${hexWithOpacity(theme.primary, 0.08)}`;
-  const cardHoverShadow = `0 4px 8px ${hexWithOpacity(theme.primary, 0.1)}, 0 12px 28px ${hexWithOpacity(theme.primary, 0.12)}`;
-  const btnPrimaryShadow = `0 2px 4px ${hexWithOpacity(theme.primary, 0.18)}, 0 1px 3px ${hexWithOpacity(theme.primary, 0.12)}`;
-  const btnPrimaryHoverShadow = `0 6px 12px ${hexWithOpacity(theme.primary, 0.24)}, 0 2px 6px ${hexWithOpacity(theme.primary, 0.16)}`;
-  const btnPrimaryActiveShadow = `0 1px 2px ${hexWithOpacity(theme.primary, 0.2)}, 0 0 0 3px ${hexWithOpacity(theme.primary, 0.15)}`;
-  const btnSecondaryShadow = `0 2px 4px ${hexWithOpacity(theme.secondary, 0.18)}, 0 1px 3px ${hexWithOpacity(theme.secondary, 0.12)}`;
-  const btnSecondaryHoverShadow = `0 6px 12px ${hexWithOpacity(theme.secondary, 0.24)}, 0 2px 6px ${hexWithOpacity(theme.secondary, 0.16)}`;
-  const btnSecondaryActiveShadow = `0 1px 2px ${hexWithOpacity(theme.secondary, 0.2)}, 0 0 0 3px ${hexWithOpacity(theme.secondary, 0.15)}`;
-  const navInnerShadow = `inset 0 -1px 0 ${hexWithOpacity(theme.textOnPrimary, 0.12)}`;
+  const neutralShadow = 'rgba(0, 0, 0, 0.06)';
+  const neutralShadowHover = 'rgba(0, 0, 0, 0.1)';
+  const neutralShadowStrong = 'rgba(0, 0, 0, 0.12)';
+
+  const cardShadow = `0 1px 2px ${neutralShadow}, 0 4px 12px ${hexWithOpacity(theme.primary, isDarkPrimary ? 0.25 : 0.08)}`;
+  const cardHoverShadow = `0 4px 8px ${neutralShadowHover}, 0 12px 28px ${hexWithOpacity(theme.primary, isDarkPrimary ? 0.35 : 0.12)}`;
+
+  const btnPrimaryShadow = `0 2px 4px ${hexWithOpacity(theme.primary, 0.25)}, 0 1px 3px ${neutralShadow}`;
+  const btnPrimaryHoverShadow = `0 6px 14px ${hexWithOpacity(theme.primary, 0.32)}, 0 2px 6px ${neutralShadowHover}`;
+  const btnPrimaryActiveShadow = `0 1px 2px ${neutralShadowStrong}, 0 0 0 3px ${hexWithOpacity(theme.primaryDark, 0.3)}`;
+
+  const btnSecondaryShadow = `0 2px 4px ${hexWithOpacity(theme.secondary, 0.25)}, 0 1px 3px ${neutralShadow}`;
+  const btnSecondaryHoverShadow = `0 6px 14px ${hexWithOpacity(theme.secondary, 0.32)}, 0 2px 6px ${neutralShadowHover}`;
+  const btnSecondaryActiveShadow = `0 1px 2px ${neutralShadowStrong}, 0 0 0 3px ${hexWithOpacity(theme.secondaryDark, 0.3)}`;
+
+  const navBottomBorder = hexWithOpacity('#000000', 0.15);
+  const navOuterShadow = `0 4px 14px ${hexWithOpacity(theme.primary, isDarkPrimary ? 0.4 : 0.22)}`;
+
+  const cardBg = isDarkBg ? hexWithOpacity('#ffffff', 0.04) : '#ffffff';
+  const cardBorder = isDarkBg
+    ? hexWithOpacity('#ffffff', 0.08)
+    : hexWithOpacity(theme.primary, 0.06);
+  const cardHoverBorder = isDarkBg
+    ? hexWithOpacity('#ffffff', 0.14)
+    : hexWithOpacity(theme.primary, 0.12);
+
+  const inputBg = isDarkBg ? hexWithOpacity('#ffffff', 0.04) : theme.background;
+  const inputFocusBg = isDarkBg ? hexWithOpacity('#ffffff', 0.08) : '#ffffff';
 
   return (
     <div
@@ -32,7 +62,7 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ theme }) => {
         height: '100%',
         overflowY: 'auto',
         boxSizing: 'border-box',
-        transition: transitionStyle,
+        transition: colorTransition,
       }}
     >
       <h2
@@ -41,7 +71,7 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ theme }) => {
           fontWeight: 700,
           marginBottom: '32px',
           color: theme.textPrimary,
-          transition: transitionStyle,
+          transition: colorTransition,
         }}
       >
         实时预览
@@ -65,9 +95,9 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ theme }) => {
             height: '56px',
             alignItems: 'center',
             justifyContent: 'space-between',
-            boxShadow: `${navInnerShadow}, 0 4px 14px ${hexWithOpacity(theme.primary, 0.22)}`,
-            borderBottom: `2px solid ${hexWithOpacity(theme.primaryDark, 0.4)}`,
-            transition: transitionStyle,
+            boxShadow: navOuterShadow,
+            borderBottom: `2px solid ${navBottomBorder}`,
+            transition: colorTransition,
           }}
         >
           <div
@@ -76,8 +106,8 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ theme }) => {
               fontWeight: 700,
               fontSize: '16px',
               letterSpacing: '0.3px',
-              transition: transitionStyle,
-              textShadow: `0 1px 2px ${hexWithOpacity(theme.primaryDark, 0.3)}`,
+              transition: colorTransition,
+              textShadow: `0 1px 2px ${hexWithOpacity('#000000', 0.2)}`,
             }}
           >
             Logo
@@ -100,7 +130,7 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ theme }) => {
                     fontSize: '14px',
                     fontWeight: isActive ? 600 : 400,
                     cursor: 'pointer',
-                    transition: transitionStyle,
+                    transition: allTransition,
                     opacity: isActive ? 1 : 0.85,
                     position: 'relative',
                   }}
@@ -132,22 +162,22 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ theme }) => {
 
         <div
           style={{
-            background: '#ffffff',
+            background: cardBg,
             borderRadius: theme.borderRadius,
             padding: '24px',
             boxShadow: cardShadow,
-            border: `1px solid ${hexWithOpacity(theme.primary, 0.06)}`,
-            transition: transitionStyle,
+            border: `1px solid ${cardBorder}`,
+            transition: allTransition,
           }}
           onMouseEnter={(e) => {
             e.currentTarget.style.boxShadow = cardHoverShadow;
             e.currentTarget.style.transform = 'translateY(-2px)';
-            e.currentTarget.style.borderColor = hexWithOpacity(theme.primary, 0.12);
+            e.currentTarget.style.borderColor = cardHoverBorder;
           }}
           onMouseLeave={(e) => {
             e.currentTarget.style.boxShadow = cardShadow;
             e.currentTarget.style.transform = 'translateY(0)';
-            e.currentTarget.style.borderColor = hexWithOpacity(theme.primary, 0.06);
+            e.currentTarget.style.borderColor = cardBorder;
           }}
         >
           <h3
@@ -156,7 +186,7 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ theme }) => {
               fontWeight: 600,
               marginBottom: '8px',
               color: theme.textPrimary,
-              transition: transitionStyle,
+              transition: colorTransition,
               letterSpacing: '-0.2px',
             }}
           >
@@ -168,7 +198,7 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ theme }) => {
               lineHeight: '1.7',
               color: theme.textSecondary,
               marginBottom: '16px',
-              transition: transitionStyle,
+              transition: colorTransition,
             }}
           >
             这是一个卡片组件示例。调整左侧的配色方案，可以实时看到卡片的背景色、文字颜色、边框和阴影效果的变化。
@@ -183,7 +213,7 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ theme }) => {
                 borderRadius: '999px',
                 fontSize: '12px',
                 fontWeight: 600,
-                transition: transitionStyle,
+                transition: colorTransition,
                 border: `1px solid ${hexWithOpacity(theme.primary, 0.2)}`,
               }}
             >
@@ -198,7 +228,7 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ theme }) => {
                 borderRadius: '999px',
                 fontSize: '12px',
                 fontWeight: 600,
-                transition: transitionStyle,
+                transition: colorTransition,
                 border: `1px solid ${hexWithOpacity(theme.secondary, 0.2)}`,
               }}
             >
@@ -209,12 +239,12 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ theme }) => {
 
         <div
           style={{
-            background: '#ffffff',
+            background: cardBg,
             borderRadius: theme.borderRadius,
             padding: '24px',
             boxShadow: cardShadow,
-            border: `1px solid ${hexWithOpacity(theme.primary, 0.06)}`,
-            transition: transitionStyle,
+            border: `1px solid ${cardBorder}`,
+            transition: allTransition,
           }}
         >
           <label
@@ -224,7 +254,7 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ theme }) => {
               fontWeight: 500,
               marginBottom: '10px',
               color: theme.textPrimary,
-              transition: transitionStyle,
+              transition: colorTransition,
             }}
           >
             输入框示例
@@ -243,10 +273,10 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ theme }) => {
               borderRadius: theme.borderRadius,
               fontSize: '14px',
               color: theme.textPrimary,
-              background: inputFocused ? '#ffffff' : theme.background,
+              background: inputFocused ? inputFocusBg : inputBg,
               outline: 'none',
               boxSizing: 'border-box',
-              transition: transitionStyle,
+              transition: allTransition,
               boxShadow: inputFocused
                 ? `0 0 0 4px ${hexWithOpacity(theme.primary, 0.12)}`
                 : 'none',
@@ -266,7 +296,7 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ theme }) => {
               fontWeight: 600,
               cursor: 'pointer',
               boxShadow: btnPrimaryShadow,
-              transition: transitionStyle,
+              transition: allTransition,
             }}
             onMouseEnter={(e) => {
               e.currentTarget.style.background = theme.primaryDark;
@@ -303,7 +333,7 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ theme }) => {
               fontWeight: 600,
               cursor: 'pointer',
               boxShadow: btnSecondaryShadow,
-              transition: transitionStyle,
+              transition: allTransition,
             }}
             onMouseEnter={(e) => {
               e.currentTarget.style.background = theme.secondaryDark;
@@ -339,7 +369,7 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ theme }) => {
               fontSize: '14px',
               fontWeight: 600,
               cursor: 'pointer',
-              transition: transitionStyle,
+              transition: allTransition,
             }}
             onMouseEnter={(e) => {
               e.currentTarget.style.background = hexWithOpacity(theme.primary, 0.06);
