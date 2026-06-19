@@ -9,6 +9,11 @@ class DNAExplorerApp {
   private infoPanel!: HTMLElement;
   private closePanelBtn!: HTMLElement;
 
+  private sequenceInput: HTMLInputElement | null = null;
+  private validationIcon: HTMLElement | null = null;
+  private statusIndicator: HTMLElement | null = null;
+  private statusHideTimer: number | null = null;
+
   constructor() {
     this.init();
   }
@@ -46,7 +51,125 @@ class DNAExplorerApp {
     this.sceneManager.updateSequence(defaultSequence);
     this.guiController.updateHighlightRange(defaultSequence.length - 1);
 
+    this.setupSequenceUIEnhancements();
+
     this.sceneManager.start();
+  }
+
+  private setupSequenceUIEnhancements(): void {
+    const setup = () => {
+      this.sequenceInput = this.guiController.getSequenceInputElement();
+      const sequenceRow = this.guiController.getSequenceRowElement();
+      const updateButton = this.guiController.getUpdateButtonElement();
+
+      if (!this.sequenceInput || !sequenceRow) {
+        setTimeout(setup, 50);
+        return;
+      }
+
+      this.injectValidationIcon(this.sequenceInput);
+      this.injectStatusIndicator(sequenceRow, updateButton);
+      this.attachInputListeners(this.sequenceInput);
+
+      this.updateValidationState(this.sequenceInput.value);
+    };
+
+    setTimeout(setup, 100);
+  }
+
+  private injectValidationIcon(input: HTMLInputElement): void {
+    const parent = input.parentElement;
+    if (!parent) return;
+
+    parent.style.position = 'relative';
+    parent.classList.add('sequence-input-wrapper');
+
+    const icon = document.createElement('div');
+    icon.className = 'validation-icon';
+    icon.textContent = '!';
+    icon.setAttribute('role', 'alert');
+
+    const tooltip = document.createElement('span');
+    tooltip.className = 'validation-tooltip';
+    tooltip.textContent = '仅允许A、T、C、G四种碱基字符';
+    icon.appendChild(tooltip);
+
+    parent.appendChild(icon);
+    this.validationIcon = icon;
+  }
+
+  private injectStatusIndicator(sequenceRow: HTMLElement, _updateButton: HTMLElement | null): void {
+    const status = document.createElement('div');
+    status.className = 'sequence-status';
+    status.textContent = '✓ 序列已更新';
+
+    if (sequenceRow.parentNode) {
+      sequenceRow.parentNode.insertBefore(status, sequenceRow.nextSibling);
+    }
+    this.statusIndicator = status;
+  }
+
+  private attachInputListeners(input: HTMLInputElement): void {
+    input.addEventListener('input', () => {
+      this.updateValidationState(input.value);
+    });
+
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        this.handleSequenceUpdateClick();
+      }
+    });
+  }
+
+  private updateValidationState(value: string): void {
+    const hasInvalid = SequenceParser.hasInvalidCharacters(value);
+    if (this.validationIcon) {
+      if (hasInvalid) {
+        this.validationIcon.classList.add('visible');
+        const invalidChars = SequenceParser.getInvalidCharacters(value);
+        const tooltip = this.validationIcon.querySelector('.validation-tooltip');
+        if (tooltip && invalidChars) {
+          tooltip.textContent = `仅允许A、T、C、G四种碱基字符。无效字符: ${invalidChars}`;
+        }
+      } else {
+        this.validationIcon.classList.remove('visible');
+      }
+    }
+  }
+
+  private handleSequenceUpdateClick(): void {
+    if (!this.sequenceInput) return;
+
+    const seq = this.sequenceInput.value.toUpperCase().replace(/[^ATCG]/g, '');
+    const finalSeq = seq.length > 64 ? seq.substring(0, 64) : seq;
+    this.sequenceInput.value = finalSeq;
+
+    this.guiController.updateSequenceDisplay(finalSeq);
+    this.sceneManager.updateSequence(finalSeq);
+    this.guiController.updateHighlightRange(Math.max(0, finalSeq.length - 1));
+    this.closeInfoPanel();
+
+    this.updateValidationState(finalSeq);
+    this.showStatusIndicator();
+  }
+
+  private showStatusIndicator(): void {
+    if (!this.statusIndicator) return;
+
+    if (this.statusHideTimer !== null) {
+      window.clearTimeout(this.statusHideTimer);
+      this.statusHideTimer = null;
+      this.statusIndicator.classList.remove('visible');
+      void this.statusIndicator.offsetWidth;
+    }
+
+    this.statusIndicator.classList.add('visible');
+
+    this.statusHideTimer = window.setTimeout(() => {
+      this.statusIndicator?.classList.remove('visible');
+      this.statusHideTimer = null;
+    }, 2000);
   }
 
   private getGuiCallbacks() {
@@ -84,6 +207,9 @@ class DNAExplorerApp {
         this.sceneManager.updateSequence(sanitized);
         this.guiController.updateHighlightRange(Math.max(0, sanitized.length - 1));
         this.closeInfoPanel();
+
+        this.updateValidationState(sanitized);
+        this.showStatusIndicator();
       },
       onHighlight: (start: number, end: number) => {
         this.sceneManager.applyHighlight(start, end);

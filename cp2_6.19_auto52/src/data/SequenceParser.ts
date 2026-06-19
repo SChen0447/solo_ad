@@ -115,6 +115,22 @@ export class SequenceParser {
       sanitized
     };
   }
+
+  public static hasInvalidCharacters(input: string): boolean {
+    if (!input) return false;
+    return /[^ATCGatcg]/.test(input);
+  }
+
+  public static getInvalidCharacters(input: string): string {
+    if (!input) return '';
+    const invalidSet = new Set<string>();
+    for (const char of input.toUpperCase()) {
+      if (!isBaseType(char)) {
+        invalidSet.add(char);
+      }
+    }
+    return Array.from(invalidSet).join(', ');
+  }
 }
 
 export default SequenceParser;

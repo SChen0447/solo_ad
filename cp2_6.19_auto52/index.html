@@ -186,6 +186,115 @@
       transform: scale(0.97);
     }
 
+    .dg.main .c input[type="text"] {
+      border: 1px solid rgba(79, 195, 247, 0.3) !important;
+      background: rgba(0, 0, 0, 0.3) !important;
+      color: white !important;
+      border-radius: 4px !important;
+      padding: 3px 6px !important;
+      outline: none !important;
+      transition: border-color 0.2s ease, box-shadow 0.2s ease !important;
+      font-family: 'Courier New', monospace !important;
+      letter-spacing: 1px !important;
+    }
+
+    .dg.main .c input[type="text"]:focus {
+      border-color: #4fc3f7 !important;
+      box-shadow: 0 0 8px rgba(79, 195, 247, 0.5) !important;
+    }
+
+    .sequence-input-wrapper {
+      position: relative;
+      display: flex;
+      align-items: center;
+    }
+
+    .sequence-input-wrapper input[type="text"] {
+      flex: 1;
+    }
+
+    .validation-icon {
+      position: absolute;
+      right: 8px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: #ef5350;
+      color: white;
+      font-size: 11px;
+      font-weight: bold;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      cursor: help;
+      z-index: 5;
+      box-shadow: 0 0 6px rgba(239, 83, 80, 0.6);
+      font-family: Arial, sans-serif;
+      line-height: 1;
+    }
+
+    .validation-icon.visible {
+      display: flex;
+    }
+
+    .validation-icon:hover .validation-tooltip {
+      opacity: 1;
+      visibility: visible;
+      transform: translateX(-50%) translateY(-4px);
+    }
+
+    .validation-tooltip {
+      position: absolute;
+      bottom: calc(100% + 8px);
+      left: 50%;
+      transform: translateX(-50%) translateY(0);
+      background: rgba(0, 0, 0, 0.85);
+      color: #ffcdd2;
+      padding: 6px 10px;
+      border-radius: 4px;
+      font-size: 11px;
+      white-space: nowrap;
+      opacity: 0;
+      visibility: hidden;
+      transition: all 0.15s ease;
+      pointer-events: none;
+      border: 1px solid rgba(239, 83, 80, 0.3);
+      font-weight: normal;
+      letter-spacing: normal;
+    }
+
+    .validation-tooltip::after {
+      content: '';
+      position: absolute;
+      top: 100%;
+      left: 50%;
+      transform: translateX(-50%);
+      border: 4px solid transparent;
+      border-top-color: rgba(0, 0, 0, 0.85);
+    }
+
+    .sequence-status {
+      font-size: 12px !important;
+      color: #4fc3f7 !important;
+      margin-top: 2px !important;
+      padding-left: 2px !important;
+      opacity: 0;
+      transition: opacity 0.3s ease;
+      pointer-events: none;
+      text-shadow: 0 0 6px rgba(79, 195, 247, 0.4);
+      letter-spacing: 0.5px;
+      height: 0;
+      overflow: hidden;
+      display: block;
+    }
+
+    .sequence-status.visible {
+      opacity: 1;
+      height: 18px;
+    }
+
     @media (max-width: 768px) {
       #title-bar h1 {
         font-size: 14px;

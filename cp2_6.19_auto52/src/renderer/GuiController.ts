@@ -39,6 +39,7 @@ export class GuiController {
   private appearanceFolder: dat.GUI;
   private animationFolder: dat.GUI;
   private sequenceController: dat.controllers.StringController | null = null;
+  private updateButtonController: dat.GUI | dat.controllers.Controller | null = null;
   private highlightStartController: dat.controllers.NumberController | null = null;
   private highlightEndController: dat.controllers.NumberController | null = null;
 
@@ -125,7 +126,7 @@ export class GuiController {
       .add(this.params, 'sequence')
       .name('序列(≤64)') as dat.controllers.StringController;
 
-    folder.add({
+    this.updateButtonController = folder.add({
       updateSequence: () => {
         const seq = this.params.sequence.toUpperCase().replace(/[^ATCG]/g, '');
         this.params.sequence = seq.length > 64 ? seq.substring(0, 64) : seq;
@@ -169,6 +170,27 @@ export class GuiController {
   public updateHighlightRange(maxIndex: number): void {
     this.highlightStartController?.max(maxIndex).updateDisplay();
     this.highlightEndController?.max(maxIndex).updateDisplay();
+  }
+
+  public getSequenceInputElement(): HTMLInputElement | null {
+    if (!this.sequenceController) return null;
+    const dom = (this.sequenceController as any).domElement as HTMLElement | undefined;
+    if (!dom) return null;
+    return dom.querySelector('input[type="text"]');
+  }
+
+  public getSequenceRowElement(): HTMLElement | null {
+    if (!this.sequenceController) return null;
+    const dom = (this.sequenceController as any).domElement as HTMLElement | undefined;
+    if (!dom) return null;
+    return dom;
+  }
+
+  public getUpdateButtonElement(): HTMLElement | null {
+    if (!this.updateButtonController) return null;
+    const dom = (this.updateButtonController as any).domElement as HTMLElement | undefined;
+    if (!dom) return null;
+    return dom;
   }
 
   public destroy(): void {
