@@ -465,6 +465,8 @@ export class CellController {
   }
 
   public update(): void {
+    this.updateCompass();
+
     if (this.focusAnimation?.active) {
       const elapsed = performance.now() - this.focusAnimation.startTime;
       const t = Math.min(elapsed / this.focusAnimation.duration, 1);

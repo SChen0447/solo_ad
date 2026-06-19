@@ -1,5 +1,12 @@
 import * as THREE from 'three';
 
+export interface MitochondrionState {
+  stage: 'idle' | 'stretching' | 'pinching' | 'separating' | 'recovering';
+  timer: number;
+  childGroup: THREE.Group | null;
+  originalChildPosition: THREE.Vector3;
+}
+
 export interface Organelle {
   name: string;
   description: string;
@@ -8,6 +15,7 @@ export interface Organelle {
   rotationSpeed: number;
   originalPosition: THREE.Vector3;
   originalScale: THREE.Vector3;
+  mitochondrionState?: MitochondrionState;
 }
 
 export interface MRNA {
@@ -36,6 +44,12 @@ export interface Mark {
   name: string;
 }
 
+export interface PulseGlow {
+  mesh: THREE.Mesh;
+  life: number;
+  maxLife: number;
+}
+
 export type DisplayMode = 'solid' | 'wireframe' | 'transparent';
 
 export class CellScene {
@@ -46,6 +60,7 @@ export class CellScene {
   public mRNAParticles: MRNA[] = [];
   public ribosomes: Ribosome[] = [];
   public marks: Mark[] = [];
+  public pulseGlows: PulseGlow[] = [];
   public cellMembrane: THREE.Mesh | null = null;
   public starField: THREE.Points | null = null;
   public cytoplasm: THREE.Mesh | null = null;
@@ -181,9 +196,11 @@ export class CellScene {
       roughness: 0.1,
       metalness: 0.1,
       transmission: 0.9,
-      thickness: 0.5
+      thickness: 0.5,
+      depthWrite: false
     });
     this.cellMembrane = new THREE.Mesh(geometry, material);
+    this.cellMembrane.renderOrder = -10;
     this.scene.add(this.cellMembrane);
   }
 
@@ -193,9 +210,11 @@ export class CellScene {
       color: 0x2a2a5e,
       transparent: true,
       opacity: 0.15,
-      side: THREE.BackSide
+      side: THREE.BackSide,
+      depthWrite: false
     });
     this.cytoplasm = new THREE.Mesh(geometry, material);
+    this.cytoplasm.renderOrder = -5;
     this.scene.add(this.cytoplasm);
   }
 
@@ -249,6 +268,50 @@ export class CellScene {
     });
   }
 
+  private createSingleMitochondrion(color: number, highlight: boolean): THREE.Group {
+    const group = new THREE.Group();
+
+    const outerGeo = new THREE.SphereGeometry(1, 32, 16);
+    const scaleMatrix = new THREE.Matrix4().makeScale(0.6, 1.2, 0.5);
+    outerGeo.applyMatrix4(scaleMatrix);
+
+    const outerMat = new THREE.MeshStandardMaterial({
+      color: color,
+      roughness: 0.5,
+      metalness: 0.2,
+      emissive: highlight ? 0x331100 : 0x000000,
+      emissiveIntensity: highlight ? 0.5 : 0
+    });
+    const outer = new THREE.Mesh(outerGeo, outerMat);
+    group.add(outer);
+
+    const innerGeo = new THREE.SphereGeometry(1, 24, 12);
+    innerGeo.applyMatrix4(new THREE.Matrix4().makeScale(0.45, 0.95, 0.35));
+    const innerMat = new THREE.MeshStandardMaterial({
+      color: 0xffaa00,
+      roughness: 0.6,
+      transparent: true,
+      opacity: 0.6
+    });
+    const inner = new THREE.Mesh(innerGeo, innerMat);
+    group.add(inner);
+
+    for (let i = 0; i < 4; i++) {
+      const cristaeGeo = new THREE.TorusGeometry(0.35, 0.03, 8, 16);
+      const cristaeMat = new THREE.MeshStandardMaterial({
+        color: 0xff4400,
+        roughness: 0.4
+      });
+      const cristae = new THREE.Mesh(cristaeGeo, cristaeMat);
+      cristae.rotation.x = Math.PI / 2;
+      cristae.position.y = -0.6 + i * 0.35;
+      cristae.scale.set(1, 0.8, 0.5);
+      group.add(cristae);
+    }
+
+    return group;
+  }
+
   private createMitochondria(): void {
     const positions = [
       { x: 4.5, y: 1.5, z: 2, highlight: true },
@@ -260,46 +323,8 @@ export class CellScene {
     ];
 
     positions.forEach((pos, index) => {
-      const group = new THREE.Group();
-
-      const outerGeo = new THREE.SphereGeometry(1, 32, 16);
-      const scaleMatrix = new THREE.Matrix4().makeScale(0.6, 1.2, 0.5);
-      outerGeo.applyMatrix4(scaleMatrix);
-
       const color = pos.highlight ? 0xff6633 : 0xcc3333;
-      const outerMat = new THREE.MeshStandardMaterial({
-        color: color,
-        roughness: 0.5,
-        metalness: 0.2,
-        emissive: pos.highlight ? 0x331100 : 0x000000,
-        emissiveIntensity: pos.highlight ? 0.5 : 0
-      });
-      const outer = new THREE.Mesh(outerGeo, outerMat);
-      group.add(outer);
-
-      const innerGeo = new THREE.SphereGeometry(1, 24, 12);
-      innerGeo.applyMatrix4(new THREE.Matrix4().makeScale(0.45, 0.95, 0.35));
-      const innerMat = new THREE.MeshStandardMaterial({
-        color: 0xffaa00,
-        roughness: 0.6,
-        transparent: true,
-        opacity: 0.6
-      });
-      const inner = new THREE.Mesh(innerGeo, innerMat);
-      group.add(inner);
-
-      for (let i = 0; i < 4; i++) {
-        const cristaeGeo = new THREE.TorusGeometry(0.35, 0.03, 8, 16);
-        const cristaeMat = new THREE.MeshStandardMaterial({
-          color: 0xff4400,
-          roughness: 0.4
-        });
-        const cristae = new THREE.Mesh(cristaeGeo, cristaeMat);
-        cristae.rotation.x = Math.PI / 2;
-        cristae.position.y = -0.6 + i * 0.35;
-        cristae.scale.set(1, 0.8, 0.5);
-        group.add(cristae);
-      }
+      const group = this.createSingleMitochondrion(color, pos.highlight);
 
       group.position.set(pos.x, pos.y, pos.z);
       group.rotation.set(
@@ -308,9 +333,26 @@ export class CellScene {
         Math.random() * Math.PI
       );
 
+      let mitoState: MitochondrionState | undefined;
+
       if (pos.highlight) {
-        group.userData.isDividing = true;
-        group.userData.divisionPhase = Math.random() * Math.PI * 2;
+        const childColor = 0xff8844;
+        const childGroup = this.createSingleMitochondrion(childColor, true);
+        childGroup.visible = false;
+        childGroup.scale.copy(group.scale);
+        childGroup.position.copy(group.position);
+        childGroup.rotation.copy(group.rotation);
+        this.scene.add(childGroup);
+
+        const childOffset = new THREE.Vector3(0, 1.5, 0);
+        childOffset.applyQuaternion(group.quaternion);
+
+        mitoState = {
+          stage: 'stretching',
+          timer: Math.random() * 1.0,
+          childGroup: childGroup,
+          originalChildPosition: group.position.clone().add(childOffset)
+        };
       }
 
       this.scene.add(group);
@@ -324,7 +366,8 @@ export class CellScene {
         type: 'mitochondrion',
         rotationSpeed: 0.3,
         originalPosition: group.position.clone(),
-        originalScale: group.scale.clone()
+        originalScale: group.scale.clone(),
+        mitochondrionState: mitoState
       });
     });
   }
@@ -601,7 +644,7 @@ export class CellScene {
     const existing = this.marks.find(m => m.organelle === organelle);
     if (existing) return null;
 
-    const colorIndex = this.marks.length % this.MARK_COLORS.length;
+    const colorIndex = Math.floor(Math.random() * this.MARK_COLORS.length);
     const color = new THREE.Color(this.MARK_COLORS[colorIndex]);
 
     const markerGeo = new THREE.SphereGeometry(0.5, 16, 16);
@@ -662,6 +705,205 @@ export class CellScene {
     return '#' + mark.color.getHexString();
   }
 
+  private easeInOut(t: number): number {
+    return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+  }
+
+  private createPulseGlow(position: THREE.Vector3, color: number): void {
+    const ringGeo = new THREE.RingGeometry(0.1, 0.3, 32);
+    const ringMat = new THREE.MeshBasicMaterial({
+      color: color,
+      transparent: true,
+      opacity: 1.0,
+      side: THREE.DoubleSide,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false
+    });
+    const ring = new THREE.Mesh(ringGeo, ringMat);
+    ring.position.copy(position);
+    ring.lookAt(this.camera.position);
+    this.scene.add(ring);
+
+    this.pulseGlows.push({
+      mesh: ring,
+      life: 0.5,
+      maxLife: 0.5
+    });
+  }
+
+  private updatePulseGlows(delta: number): void {
+    for (let i = this.pulseGlows.length - 1; i >= 0; i--) {
+      const glow = this.pulseGlows[i];
+      glow.life -= delta;
+
+      const t = 1 - glow.life / glow.maxLife;
+      const scale = 1 + t * 4;
+      glow.mesh.scale.setScalar(scale);
+      const mat = glow.mesh.material as THREE.MeshBasicMaterial;
+      mat.opacity = 1 - t;
+
+      glow.mesh.lookAt(this.camera.position);
+
+      if (glow.life <= 0) {
+        this.scene.remove(glow.mesh);
+        glow.mesh.geometry.dispose();
+        (glow.mesh.material as THREE.Material).dispose();
+        this.pulseGlows.splice(i, 1);
+      }
+    }
+  }
+
+  private updateMitochondrionDivision(organelle: Organelle, delta: number): void {
+    const state = organelle.mitochondrionState!;
+    state.timer += delta;
+
+    const parent = organelle.mesh;
+    const child = state.childGroup;
+    const origPos = organelle.originalPosition;
+    const origScale = organelle.originalScale;
+
+    const longAxis = new THREE.Vector3(0, 1, 0);
+    longAxis.applyQuaternion(parent.quaternion);
+
+    switch (state.stage) {
+      case 'stretching': {
+        const dur = 0.8;
+        const t = Math.min(state.timer / dur, 1);
+        const eased = this.easeInOut(t);
+
+        const stretchY = 1 + eased * 0.8;
+        const shrinkXZ = 1 - eased * 0.2;
+        parent.scale.set(
+          origScale.x * shrinkXZ,
+          origScale.y * stretchY,
+          origScale.z * shrinkXZ
+        );
+
+        if (t >= 1) {
+          state.stage = 'pinching';
+          state.timer = 0;
+        }
+        break;
+      }
+
+      case 'pinching': {
+        const dur = 0.6;
+        const t = Math.min(state.timer / dur, 1);
+        const eased = this.easeInOut(t);
+
+        parent.scale.y = origScale.y * (1.8 - eased * 0.3);
+        parent.scale.x = origScale.x * (0.8 - eased * 0.15);
+        parent.scale.z = origScale.z * (0.8 - eased * 0.15);
+
+        if (child) {
+          child.visible = true;
+          child.scale.copy(parent.scale);
+          child.position.copy(parent.position);
+          child.rotation.copy(parent.rotation);
+          child.traverse(c => {
+            if (c instanceof THREE.Mesh) {
+              const mat = c.material as THREE.MeshStandardMaterial;
+              mat.transparent = true;
+              mat.opacity = eased * 0.8;
+            }
+          });
+        }
+
+        if (t >= 1) {
+          state.stage = 'separating';
+          state.timer = 0;
+        }
+        break;
+      }
+
+      case 'separating': {
+        const dur = 0.9;
+        const t = Math.min(state.timer / dur, 1);
+        const eased = this.easeInOut(t);
+
+        const separateDist = eased * 2.5;
+        const parentOffset = longAxis.clone().multiplyScalar(-separateDist * 0.5);
+        parent.position.copy(origPos).add(parentOffset);
+
+        if (child) {
+          const childOffset = longAxis.clone().multiplyScalar(separateDist * 0.5);
+          child.position.copy(origPos).add(childOffset);
+          child.rotation.copy(parent.rotation);
+          child.traverse(c => {
+            if (c instanceof THREE.Mesh) {
+              const mat = c.material as THREE.MeshStandardMaterial;
+              mat.opacity = 0.8;
+            }
+          });
+        }
+
+        parent.scale.y = origScale.y * (1.5 - eased * 0.5);
+        parent.scale.x = origScale.x * (0.65 + eased * 0.35);
+        parent.scale.z = origScale.z * (0.65 + eased * 0.35);
+
+        if (child) {
+          child.scale.copy(parent.scale);
+        }
+
+        if (t >= 1) {
+          state.stage = 'recovering';
+          state.timer = 0;
+        }
+        break;
+      }
+
+      case 'recovering': {
+        const dur = 0.6;
+        const t = Math.min(state.timer / dur, 1);
+        const eased = this.easeInOut(t);
+
+        const finalDist = 2.5;
+        const parentOffset = longAxis.clone().multiplyScalar(-finalDist * 0.5 + (1 - eased) * 0.3);
+        parent.position.copy(origPos).add(parentOffset);
+
+        if (child) {
+          const childOffset = longAxis.clone().multiplyScalar(finalDist * 0.5 - (1 - eased) * 0.3);
+          child.position.copy(origPos).add(childOffset);
+          child.rotation.copy(parent.rotation);
+        }
+
+        parent.scale.lerp(origScale, eased);
+        if (child) {
+          child.scale.lerp(origScale, eased);
+          child.traverse(c => {
+            if (c instanceof THREE.Mesh) {
+              const mat = c.material as THREE.MeshStandardMaterial;
+              mat.opacity = 0.8 + eased * 0.2;
+              if (t >= 1) mat.transparent = false;
+            }
+          });
+        }
+
+        if (t >= 1) {
+          state.stage = 'idle';
+          state.timer = 0;
+        }
+        break;
+      }
+
+      case 'idle': {
+        const dur = 0.8;
+        if (state.timer >= dur) {
+          state.stage = 'stretching';
+          state.timer = 0;
+
+          if (child) {
+            child.visible = false;
+            child.position.copy(parent.position);
+          }
+          parent.position.copy(origPos);
+          parent.scale.copy(origScale);
+        }
+        break;
+      }
+    }
+  }
+
   private updateMRNA(delta: number): void {
     if (this.transportActive) {
       this.particleTimer += delta;
@@ -709,6 +951,7 @@ export class CellScene {
             mat.color.setHex(0x55dd88);
             mat.emissive.setHex(0x22aa44);
             (mrna.glowMesh.material as THREE.MeshBasicMaterial).color.setHex(0x55dd88);
+            this.createPulseGlow(mrna.mesh.position.clone(), 0x55ff88);
             break;
           }
         }
@@ -744,18 +987,13 @@ export class CellScene {
         organelle.mesh.rotation.x += organelle.rotationSpeed * 0.5 * delta;
       }
 
-      if (organelle.mesh.userData.isDividing) {
-        organelle.mesh.userData.divisionPhase += delta * 1.5;
-        const phase = organelle.mesh.userData.divisionPhase;
-        const pinch = 0.5 + 0.5 * Math.sin(phase);
-        organelle.mesh.scale.y = organelle.originalScale.y * (1 + pinch * 0.3);
-        organelle.mesh.scale.x = organelle.originalScale.x * (1 - pinch * 0.15);
-        organelle.mesh.scale.z = organelle.originalScale.z * (1 - pinch * 0.15);
-        organelle.mesh.position.y = organelle.originalPosition.y + Math.sin(phase * 0.5) * 0.2;
+      if (organelle.type === 'mitochondrion' && organelle.mitochondrionState) {
+        this.updateMitochondrionDivision(organelle, delta);
       }
     });
 
     this.updateMRNA(delta);
+    this.updatePulseGlows(delta);
 
     this.marks.forEach(mark => {
       const organellePos = mark.organelle.mesh.position;
