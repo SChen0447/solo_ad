@@ -77,6 +77,11 @@ export class Unit {
   public formationAnimStartPos: Position | null;
   public formationAnimProgress: number;
   public formationAnimDuration: number;
+  public isBouncing: boolean;
+  public bounceAnimTime: number;
+  public bounceDuration: number;
+  public bounceAmplitude: number;
+  public bounceOffset: number;
 
   constructor(type: UnitType, team: Team, position: Position) {
     this.id = `unit_${++unitIdCounter}`;
@@ -109,6 +114,12 @@ export class Unit {
     this.formationAnimStartPos = null;
     this.formationAnimProgress = 0;
     this.formationAnimDuration = 0.5;
+
+    this.isBouncing = false;
+    this.bounceAnimTime = 0;
+    this.bounceDuration = 0.2;
+    this.bounceAmplitude = 3;
+    this.bounceOffset = 0;
 
     const nameList = UNIT_NAMES[type];
     const index = (unitIdCounter - 1) % nameList.length;
@@ -157,6 +168,17 @@ export class Unit {
   public update(deltaTime: number): void {
     if (this.hp <= 0) return;
 
+    if (this.isBouncing) {
+      this.bounceAnimTime += deltaTime;
+      if (this.bounceAnimTime >= this.bounceDuration) {
+        this.isBouncing = false;
+        this.bounceOffset = 0;
+      } else {
+        const t = this.bounceAnimTime / this.bounceDuration;
+        this.bounceOffset = this.bounceAmplitude * easeOutBounce(t);
+      }
+    }
+
     if (this.animatingFormation && this.formationAnimStartPos && this.targetPosition) {
       const startPos = this.formationAnimStartPos;
       const targetPos = this.targetPosition;
@@ -165,6 +187,8 @@ export class Unit {
         this.formationAnimProgress = 1;
         this.animatingFormation = false;
         this.formationAnimStartPos = null;
+        this.isBouncing = true;
+        this.bounceAnimTime = 0;
       }
       const t = easeOutCubic(this.formationAnimProgress);
       this.position.x = startPos.x + (targetPos.x - startPos.x) * t;
@@ -222,4 +246,21 @@ export class Unit {
 
 function easeOutCubic(t: number): number {
   return 1 - Math.pow(1 - t, 3);
+}
+
+function easeOutBounce(t: number): number {
+  const n1 = 7.5625;
+  const d1 = 2.75;
+  if (t < 1 / d1) {
+    return n1 * t * t;
+  } else if (t < 2 / d1) {
+    const t2 = t - 1.5 / d1;
+    return n1 * t2 * t2 + 0.75;
+  } else if (t < 2.5 / d1) {
+    const t2 = t - 2.25 / d1;
+    return n1 * t2 * t2 + 0.9375;
+  } else {
+    const t2 = t - 2.625 / d1;
+    return n1 * t2 * t2 + 0.984375;
+  }
 }

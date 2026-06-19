@@ -192,10 +192,33 @@ export class Renderer {
     this.ctx.restore();
   }
 
+  private drawMoveArrow(unit: Unit): void {
+    if (!unit.isMoving) return;
+
+    const { x, y } = unit.position;
+    const arrowSize = 8;
+
+    this.ctx.save();
+    this.ctx.translate(x, y);
+    this.ctx.rotate(unit.facingAngle);
+
+    this.ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
+    this.ctx.beginPath();
+    this.ctx.moveTo(unit.radius + 4 + arrowSize, 0);
+    this.ctx.lineTo(unit.radius + 4, -arrowSize / 2);
+    this.ctx.lineTo(unit.radius + 4, arrowSize / 2);
+    this.ctx.closePath();
+    this.ctx.fill();
+
+    this.ctx.restore();
+  }
+
   private drawUnit(unit: Unit): void {
     if (unit.isDead()) return;
 
+    const bounceY = unit.isBouncing ? -unit.bounceOffset : 0;
     const { x, y } = unit.position;
+    const drawY = y + bounceY;
     const radius = unit.radius;
 
     let bodyColor = '';
@@ -215,18 +238,20 @@ export class Renderer {
       bodyColor = '#e74c3c';
     }
 
+    this.drawMoveArrow(unit);
+
     this.ctx.save();
 
     this.ctx.fillStyle = bodyColor;
     this.ctx.beginPath();
-    this.ctx.arc(x, y, radius, 0, Math.PI * 2);
+    this.ctx.arc(x, drawY, radius, 0, Math.PI * 2);
     this.ctx.fill();
 
     this.ctx.strokeStyle = 'rgba(0, 0, 0, 0.5)';
     this.ctx.lineWidth = 2;
     this.ctx.stroke();
 
-    this.ctx.translate(x, y);
+    this.ctx.translate(x, drawY);
     this.ctx.rotate(unit.facingAngle);
 
     this.ctx.fillStyle = unit.team === 'player' ? '#ffffff' : '#ffcccc';
@@ -239,14 +264,14 @@ export class Renderer {
 
     this.ctx.restore();
 
-    this.drawHealthBar(unit);
+    this.drawHealthBar(unit, bounceY);
   }
 
-  private drawHealthBar(unit: Unit): void {
+  private drawHealthBar(unit: Unit, bounceY: number = 0): void {
     const barWidth = unit.radius * 2;
     const barHeight = 4;
     const x = unit.position.x - barWidth / 2;
-    const y = unit.position.y - unit.radius - 10;
+    const y = unit.position.y + bounceY - unit.radius - 10;
 
     this.ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
     this.ctx.fillRect(x, y, barWidth, barHeight);
@@ -433,19 +458,31 @@ export class Renderer {
       this.ctx.fillText(typeName, x + iconSize + spacing, currentY + padding + 16);
 
       const hpBarWidth = 60;
-      const hpBarHeight = 4;
+      const hpBarHeight = 6;
       const hpBarX = x + iconSize + spacing;
-      const hpBarY = currentY + padding + iconSize - 6;
+      const hpBarY = currentY + padding + iconSize - 8;
 
-      this.ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
-      this.ctx.fillRect(hpBarX, hpBarY, hpBarWidth, hpBarHeight);
+      this.ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+      this.roundRectPath(hpBarX, hpBarY, hpBarWidth, hpBarHeight, 3);
+      this.ctx.fill();
 
       const hpRatio = unit.hp / unit.maxHp;
-      let hpColor = '#4caf50';
-      if (hpRatio < 0.3) hpColor = '#f44336';
-      else if (hpRatio < 0.6) hpColor = '#ff9800';
-      this.ctx.fillStyle = hpColor;
-      this.ctx.fillRect(hpBarX, hpBarY, hpBarWidth * hpRatio, hpBarHeight);
+      if (hpRatio > 0) {
+        const gradient = this.ctx.createLinearGradient(hpBarX, 0, hpBarX + hpBarWidth * hpRatio, 0);
+        if (hpRatio < 0.3) {
+          gradient.addColorStop(0, '#f44336');
+          gradient.addColorStop(1, '#ff7043');
+        } else if (hpRatio < 0.6) {
+          gradient.addColorStop(0, '#ff9800');
+          gradient.addColorStop(1, '#ffb74d');
+        } else {
+          gradient.addColorStop(0, '#66bb6a');
+          gradient.addColorStop(1, '#a5d6a7');
+        }
+        this.ctx.fillStyle = gradient;
+        this.roundRectPath(hpBarX, hpBarY, hpBarWidth * hpRatio, hpBarHeight, 3);
+        this.ctx.fill();
+      }
 
       currentY += rowHeight;
     }
