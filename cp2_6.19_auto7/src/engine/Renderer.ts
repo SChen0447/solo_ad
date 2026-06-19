@@ -56,6 +56,13 @@ export class Renderer {
   private animationId: number;
   private atomNeighborMap: Map<number, number>;
 
+  private isTransitioning: boolean;
+  private transitioningOutModel: THREE.Group | null;
+  private transitionTime: number;
+  private transitionDuration: number;
+  private nextNeighborMap: Map<number, number> | null;
+  private onTransitionComplete: (() => void) | null;
+
   constructor(container: HTMLElement) {
     this.container = container;
     this.modelManager = new ModelManager();
@@ -84,6 +91,13 @@ export class Renderer {
     this.clickCallback = null;
     this.animationId = 0;
     this.atomNeighborMap = new Map();
+
+    this.isTransitioning = false;
+    this.transitioningOutModel = null;
+    this.transitionTime = 0;
+    this.transitionDuration = 500;
+    this.nextNeighborMap = null;
+    this.onTransitionComplete = null;
 
     this.raycaster = new THREE.Raycaster();
     this.mouse = new THREE.Vector2();
@@ -146,6 +160,7 @@ export class Renderer {
   }
 
   private onMouseDown = (e: MouseEvent): void => {
+    if (this.isTransitioning) return;
     this.isDragging = true;
     this.previousMouse = { x: e.clientX, y: e.clientY };
     this.targetCameraState = null;
@@ -154,7 +169,7 @@ export class Renderer {
   private onMouseMove = (e: MouseEvent): void => {
     this.updateMouse(e.clientX, e.clientY);
 
-    if (this.isDragging) {
+    if (this.isDragging && !this.isTransitioning) {
       const dx = e.clientX - this.previousMouse.x;
       const dy = e.clientY - this.previousMouse.y;
 
@@ -166,7 +181,9 @@ export class Renderer {
       this.updateInitialCameraState();
     }
 
-    this.checkHover(e.clientX, e.clientY);
+    if (!this.isTransitioning) {
+      this.checkHover(e.clientX, e.clientY);
+    }
   };
 
   private onMouseUp = (): void => {
@@ -180,6 +197,7 @@ export class Renderer {
 
   private onWheel = (e: WheelEvent): void => {
     e.preventDefault();
+    if (this.isTransitioning) return;
     const delta = e.deltaY * 0.01;
     this.spherical.radius = Math.max(2, Math.min(50, this.spherical.radius + delta));
     this.updateCameraPosition();
@@ -188,6 +206,7 @@ export class Renderer {
   };
 
   private handleCanvasClick = (e: MouseEvent): void => {
+    if (this.isTransitioning) return;
     this.updateMouse(e.clientX, e.clientY);
     const atom = this.pickAtom();
     if (atom && this.clickCallback) {
@@ -202,6 +221,7 @@ export class Renderer {
   };
 
   private onTouchStart = (e: TouchEvent): void => {
+    if (this.isTransitioning) return;
     if (e.touches.length === 1) {
       this.isDragging = true;
       this.previousMouse = { x: e.touches[0].clientX, y: e.touches[0].clientY };
@@ -210,6 +230,7 @@ export class Renderer {
   };
 
   private onTouchMove = (e: TouchEvent): void => {
+    if (this.isTransitioning) return;
     if (e.touches.length === 1 && this.isDragging) {
       e.preventDefault();
       const touch = e.touches[0];
@@ -321,23 +342,21 @@ export class Renderer {
     atomNeighborMap: Map<number, number>,
     animate: boolean = true
   ): void {
+    const hasExistingModel = this.currentModel !== null;
+
+    if (hasExistingModel && animate) {
+      this.startTransition(group, atomNeighborMap);
+      return;
+    }
+
     if (this.currentModel) {
-      this.scene.remove(this.currentModel);
-      this.currentModel.traverse((obj) => {
-        if (obj instanceof THREE.Mesh) {
-          if (Array.isArray(obj.material)) {
-            obj.material.forEach((m) => m.dispose());
-          } else {
-            obj.material.dispose();
-          }
-        }
-      });
+      this.disposeModel(this.currentModel);
     }
 
     this.currentModel = group;
     this.atomNeighborMap = atomNeighborMap;
 
-    if (animate) {
+    if (animate && !hasExistingModel) {
       this.scaleStart = 0.3;
       this.scaleTarget = 1;
       this.scaleAnimationTime = 0;
@@ -350,6 +369,68 @@ export class Renderer {
     this.scene.add(group);
 
     this.fitCameraToModel();
+  }
+
+  private startTransition(
+    newGroup: THREE.Group,
+    newNeighborMap: Map<number, number>
+  ): void {
+    if (this.isTransitioning && this.transitioningOutModel) {
+      this.disposeModel(this.transitioningOutModel);
+      this.transitioningOutModel = null;
+    }
+
+    if (this.currentModel) {
+      this.transitioningOutModel = this.currentModel;
+    }
+
+    this.currentModel = newGroup;
+    this.nextNeighborMap = newNeighborMap;
+    this.scene.add(newGroup);
+
+    this.modelManager.setModelScale(newGroup, 0.001);
+
+    this.isTransitioning = true;
+    this.transitionTime = 0;
+    this.transitionDuration = 500;
+
+    this.clearHover();
+
+    this.fitCameraToModel();
+  }
+
+  private disposeModel(group: THREE.Group): void {
+    this.scene.remove(group);
+    group.traverse((obj) => {
+      if (obj instanceof THREE.Mesh) {
+        obj.geometry.dispose();
+        if (Array.isArray(obj.material)) {
+          obj.material.forEach((m) => m.dispose());
+        } else {
+          obj.material.dispose();
+        }
+      }
+    });
+  }
+
+  private completeTransition(): void {
+    if (this.transitioningOutModel) {
+      this.disposeModel(this.transitioningOutModel);
+      this.transitioningOutModel = null;
+    }
+
+    if (this.nextNeighborMap) {
+      this.atomNeighborMap = this.nextNeighborMap;
+      this.nextNeighborMap = null;
+    }
+
+    this.isTransitioning = false;
+    this.transitionTime = 0;
+
+    if (this.onTransitionComplete) {
+      this.onTransitionComplete();
+      this.onTransitionComplete = null;
+    }
   }
 
   private fitCameraToModel(): void {
@@ -407,7 +488,20 @@ export class Renderer {
 
     const delta = 16;
 
-    if (this.scaleAnimationTime < this.scaleAnimationDuration && this.currentModel) {
+    if (this.isTransitioning && this.currentModel) {
+      this.transitionTime += delta;
+      const t = Math.min(1, this.transitionTime / this.transitionDuration);
+      this.modelManager.transition(
+        this.transitioningOutModel,
+        this.currentModel,
+        t
+      );
+      if (t >= 1) {
+        this.completeTransition();
+      }
+    }
+
+    if (!this.isTransitioning && this.scaleAnimationTime < this.scaleAnimationDuration && this.currentModel) {
       this.scaleAnimationTime += delta;
       const t = Math.min(1, this.scaleAnimationTime / this.scaleAnimationDuration);
       const eased = this.easeOutCubic(t);

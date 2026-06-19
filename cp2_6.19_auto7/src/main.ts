@@ -17,7 +17,7 @@ class App {
   private loader: MoleculeLoader;
   private currentMolecule: ParsedMolecule | null;
   private currentMode: DisplayMode;
-  private currentMoleculeKey: string;
+  private justClickedAtom: boolean;
 
   private moleculeNameEl: HTMLElement;
   private moleculeFormulaEl: HTMLElement;
@@ -41,7 +41,7 @@ class App {
     this.loader = new MoleculeLoader();
     this.currentMolecule = null;
     this.currentMode = 'ballstick';
-    this.currentMoleculeKey = 'benzene';
+    this.justClickedAtom = false;
 
     this.moleculeNameEl = document.getElementById('molecule-name')!;
     this.moleculeFormulaEl = document.getElementById('molecule-formula')!;
@@ -94,6 +94,24 @@ class App {
     this.mobileToggleBtn.addEventListener('click', () => {
       this.controlPanelEl.classList.toggle('open');
     });
+
+    document.addEventListener('click', (e) => {
+      if (this.justClickedAtom) {
+        this.justClickedAtom = false;
+        return;
+      }
+
+      const target = e.target as HTMLElement;
+      const isPanelClick = this.detailPanelEl.contains(target);
+      const isControlPanelClick = this.controlPanelEl.contains(target);
+      const isMoleculeInfoClick = target.closest('.molecule-info');
+      const isMobileToggle = this.mobileToggleBtn.contains(target);
+      const isResetBtn = target.closest('#reset-view');
+
+      if (!isPanelClick && !isControlPanelClick && !isMoleculeInfoClick && !isMobileToggle && !isResetBtn) {
+        this.detailPanelEl.classList.remove('visible');
+      }
+    });
   }
 
   private setupCallbacks(): void {
@@ -129,7 +147,6 @@ class App {
   }
 
   private loadMolecule(key: string): void {
-    this.currentMoleculeKey = key;
     const parsed = this.loader.loadMolecule(key, this.currentMode);
     if (!parsed) return;
 
@@ -195,6 +212,7 @@ class App {
   }
 
   private handleClick(data: ClickCallbackData): void {
+    this.justClickedAtom = true;
     const name = ELEMENT_NAMES[data.element] || data.element;
     this.detailElementEl.textContent = `${name} (${data.element})`;
     this.detailXEl.textContent = data.position.x.toFixed(4);

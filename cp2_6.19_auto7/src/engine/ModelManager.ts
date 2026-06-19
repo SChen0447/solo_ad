@@ -244,4 +244,56 @@ export class ModelManager {
         : new THREE.Color(0x000000);
     }
   }
+
+  public setModelScale(group: THREE.Group, scale: number): void {
+    group.scale.setScalar(scale);
+  }
+
+  public transition(
+    oldGroup: THREE.Group | null,
+    newGroup: THREE.Group,
+    progress: number
+  ): void {
+    const easedOut = this.easeOutCubic(progress);
+    const easedIn = this.easeInCubic(progress);
+
+    if (oldGroup) {
+      const oldScale = 1 - easedIn;
+      this.setModelScale(oldGroup, Math.max(0.001, oldScale));
+      this.setGroupOpacity(oldGroup, 1 - easedIn);
+    }
+
+    const newScale = easedOut;
+    this.setModelScale(newGroup, newScale);
+    this.setGroupOpacity(newGroup, easedOut);
+  }
+
+  private setGroupOpacity(group: THREE.Group, opacity: number): void {
+    group.traverse((obj) => {
+      if (obj instanceof THREE.Mesh) {
+        if (Array.isArray(obj.material)) {
+          obj.material.forEach((m) => {
+            if (m instanceof THREE.MeshPhongMaterial || m instanceof THREE.MeshBasicMaterial) {
+              m.opacity = opacity;
+              m.transparent = true;
+            }
+          });
+        } else if (
+          obj.material instanceof THREE.MeshPhongMaterial ||
+          obj.material instanceof THREE.MeshBasicMaterial
+        ) {
+          obj.material.opacity = opacity;
+          obj.material.transparent = true;
+        }
+      }
+    });
+  }
+
+  private easeOutCubic(t: number): number {
+    return 1 - Math.pow(1 - t, 3);
+  }
+
+  private easeInCubic(t: number): number {
+    return t * t * t;
+  }
 }
