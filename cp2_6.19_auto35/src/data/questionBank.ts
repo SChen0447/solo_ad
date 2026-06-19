@@ -33,6 +33,8 @@ export interface ExamResult {
   maxScore: number;
   correctCount: number;
   totalCount: number;
+  answeredCount: number;
+  timeUsed: number;
   typeStats: {
     single: { correct: number; total: number; accuracy: number };
     multiple: { correct: number; total: number; accuracy: number };
@@ -455,7 +457,8 @@ export function addQuestion(question: Omit<Question, 'id'>): Question {
 
 export function calculateScore(
   questions: Question[],
-  userAnswers: Record<string, string | string[]>
+  userAnswers: Record<string, string | string[]>,
+  extra?: { answeredCount: number; timeUsed: number }
 ): ExamResult {
   const answers: UserAnswer[] = questions.map((q) => {
     const ua = userAnswers[q.id];
@@ -475,6 +478,7 @@ export function calculateScore(
   let totalScore = 0;
   let maxScore = 0;
   let correctCount = 0;
+  let answeredCount = 0;
   const typeStats = {
     single: { correct: 0, total: 0, accuracy: 0 },
     multiple: { correct: 0, total: 0, accuracy: 0 },
@@ -485,6 +489,9 @@ export function calculateScore(
     maxScore += q.score;
     const a = answers[idx];
     typeStats[q.type].total += 1;
+    if (a.answer && (Array.isArray(a.answer) ? a.answer.length > 0 : true)) {
+      answeredCount += 1;
+    }
     if (a.isCorrect) {
       totalScore += q.score;
       correctCount += 1;
@@ -502,6 +509,8 @@ export function calculateScore(
     maxScore,
     correctCount,
     totalCount: questions.length,
+    answeredCount: extra?.answeredCount ?? answeredCount,
+    timeUsed: extra?.timeUsed ?? 0,
     typeStats,
     answers,
     questions,

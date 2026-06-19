@@ -81,7 +81,10 @@ export default function ExamPage() {
     }
     setSubmitted(true);
 
-    const result: ExamResult = calculateScore(questions, answers);
+    const result: ExamResult = calculateScore(questions, answers, {
+      answeredCount,
+      timeUsed: EXAM_DURATION - timeLeft,
+    });
     setExamResult(result);
     setTimeout(() => navigate('/report'), 300);
   };
