@@ -52,7 +52,7 @@ export default function CollectionPanel({ isMobile = false }: CollectionPanelPro
                     </div>
                     <button
                       onClick={() => toggleCollection(p.id)}
-                      className="p-1 text-gallery-accent hover:bg-gallery-accent/10 rounded"
+                      className="p-1 text-gallery-accent bg-transparent hover:bg-gallery-accent/20 rounded transition-all duration-200 ease-out hover:scale-105 active:scale-90"
                     >
                       <Heart size={14} className="fill-gallery-accent" />
                     </button>
@@ -105,7 +105,7 @@ export default function CollectionPanel({ isMobile = false }: CollectionPanelPro
               </div>
               <button
                 onClick={() => toggleCollection(p.id)}
-                className="p-1.5 text-gallery-accent hover:bg-gallery-accent/10 rounded transition-colors"
+                className="p-1.5 text-gallery-accent bg-transparent hover:bg-gallery-accent/20 rounded-lg transition-all duration-200 ease-out hover:scale-105 active:scale-90"
                 aria-label="取消收藏"
               >
                 <Heart size={14} className="fill-gallery-accent" />

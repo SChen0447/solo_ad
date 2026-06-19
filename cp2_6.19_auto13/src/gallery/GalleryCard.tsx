@@ -58,13 +58,14 @@ export default function GalleryCard({ painting, onClick }: GalleryCardProps) {
 
           <button
             onClick={handleHeartClick}
-            className="p-1.5 rounded-full transition-colors duration-200
-              hover:bg-gallery-accent/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-gallery-accent"
+            className="p-1.5 rounded-full transition-all duration-200 ease-out
+              hover:bg-gallery-accent/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-gallery-accent
+              active:scale-80"
             aria-label={collected ? '取消收藏' : '收藏'}
           >
             <Heart
               size={20}
-              className={`transition-colors duration-200 ${
+              className={`transition-all duration-200 ${
                 collected
                   ? 'fill-gallery-accent text-gallery-accent'
                   : 'text-gallery-muted hover:text-gallery-accent'
