@@ -113,18 +113,44 @@ export class TerrainEditor {
 
   private setupUI(): void {
     const colorPanel = document.getElementById('color-panel')!;
-    PRESET_COLORS.forEach((color, i) => {
+    colorPanel.innerHTML = '';
+
+    const recentLabel = document.createElement('div');
+    recentLabel.className = 'recent-label';
+    recentLabel.textContent = '最近';
+    recentLabel.id = 'recent-label';
+    colorPanel.appendChild(recentLabel);
+
+    const recentContainer = document.createElement('div');
+    recentContainer.id = 'recent-colors';
+    recentContainer.style.display = 'flex';
+    recentContainer.style.gap = '6px';
+    colorPanel.appendChild(recentContainer);
+
+    const divider = document.createElement('div');
+    divider.className = 'color-panel-divider';
+    colorPanel.appendChild(divider);
+
+    const presetsContainer = document.createElement('div');
+    presetsContainer.id = 'preset-colors';
+    presetsContainer.style.display = 'flex';
+    presetsContainer.style.gap = '8px';
+    presetsContainer.style.flexWrap = 'wrap';
+    presetsContainer.style.justifyContent = 'center';
+    colorPanel.appendChild(presetsContainer);
+
+    PRESET_COLORS.forEach((color) => {
       const swatch = document.createElement('div');
-      swatch.className = 'color-swatch' + (i === 0 ? ' active' : '');
+      swatch.className = 'color-swatch';
       swatch.style.backgroundColor = color;
       swatch.dataset.color = color;
-      swatch.addEventListener('click', () => {
-        this.dataManager.setColor(color);
-        document.querySelectorAll('.color-swatch').forEach(s => s.classList.remove('active'));
-        swatch.classList.add('active');
-      });
-      colorPanel.appendChild(swatch);
+      swatch.dataset.type = 'preset';
+      swatch.addEventListener('click', () => this.applyColor(color, swatch));
+      presetsContainer.appendChild(swatch);
     });
+
+    this.setActiveSwatchInitial();
+    this.updateRecentColors();
 
     document.querySelectorAll('.mode-btn').forEach(btn => {
       btn.addEventListener('click', () => {
@@ -149,6 +175,81 @@ export class TerrainEditor {
     });
 
     this.updateHistoryUI();
+  }
+
+  private setActiveSwatchInitial(): void {
+    const currentColor = this.dataManager.getColor();
+    const swatches = document.querySelectorAll<HTMLElement>('.color-swatch[data-type="preset"]');
+    swatches.forEach(s => {
+      if (s.dataset.color === currentColor) {
+        s.classList.add('active');
+      }
+    });
+  }
+
+  private applyColor(color: string, sourceSwatch?: HTMLElement): void {
+    this.dataManager.setColor(color);
+    this.updateActiveSwatch(color, sourceSwatch);
+    this.updateRecentColors();
+  }
+
+  private updateActiveSwatch(color: string, sourceSwatch?: HTMLElement): void {
+    const allSwatches = document.querySelectorAll<HTMLElement>('.color-swatch');
+    allSwatches.forEach(s => {
+      if (s.classList.contains('active')) {
+        s.classList.remove('active');
+      }
+    });
+
+    if (sourceSwatch) {
+      requestAnimationFrame(() => {
+        sourceSwatch.classList.add('active');
+      });
+    } else {
+      let matched: HTMLElement | null = null;
+      allSwatches.forEach(s => {
+        if (s.dataset.color && s.dataset.color.toLowerCase() === color.toLowerCase()) {
+          matched = s;
+        }
+      });
+      if (matched) {
+        requestAnimationFrame(() => {
+          matched!.classList.add('active');
+        });
+      }
+    }
+  }
+
+  private updateRecentColors(): void {
+    const container = document.getElementById('recent-colors');
+    if (!container) return;
+    container.innerHTML = '';
+
+    const recent = this.dataManager.getRecentColors();
+    for (let i = 0; i < 3; i++) {
+      const swatch = document.createElement('div');
+      swatch.className = 'color-swatch';
+      swatch.style.opacity = recent[i] ? '1' : '0.25';
+      swatch.style.backgroundColor = recent[i] || 'transparent';
+      swatch.style.backgroundImage = recent[i] ? 'none'
+        : 'repeating-linear-gradient(45deg, rgba(255,255,255,0.08), rgba(255,255,255,0.08) 2px, transparent 2px, transparent 5px)';
+      if (recent[i]) {
+        swatch.dataset.color = recent[i];
+        swatch.dataset.type = 'recent';
+        swatch.addEventListener('click', () => this.applyColor(recent[i], swatch));
+      }
+      container.appendChild(swatch);
+    }
+
+    const currentColor = this.dataManager.getColor();
+    requestAnimationFrame(() => {
+      const swatches = container.querySelectorAll<HTMLElement>('.color-swatch');
+      swatches.forEach(s => {
+        if (s.dataset.color && s.dataset.color.toLowerCase() === currentColor.toLowerCase()) {
+          s.classList.add('active');
+        }
+      });
+    });
   }
 
   private setMode(mode: ToolMode): void {
@@ -399,11 +500,7 @@ export class TerrainEditor {
       const allVoxels = this.dataManager.getAllVoxels();
       if (hits[0].instanceId < allVoxels.length) {
         const v = allVoxels[hits[0].instanceId];
-        this.dataManager.setColor(v.color);
-        document.querySelectorAll('.color-swatch').forEach(s => {
-          const swatch = s as HTMLElement;
-          swatch.classList.toggle('active', swatch.dataset.color === v.color);
-        });
+        this.applyColor(v.color);
         this.showToast(`已选取颜色: ${v.color}`);
       }
     }

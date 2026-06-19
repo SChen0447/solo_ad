@@ -39,6 +39,8 @@ export class UIDataManager {
   private currentMode: ToolMode = 'add';
   private changeCallbacks: ChangeCallback[] = [];
   private suppressNotify: boolean = false;
+  private recentColors: string[] = [];
+  private readonly MAX_RECENT = 3;
 
   private static key(x: number, y: number, z: number): string {
     return `${x},${y},${z}`;
@@ -71,6 +73,17 @@ export class UIDataManager {
 
   setColor(color: string): void {
     this.currentColor = color;
+    this.addRecentColor(color);
+  }
+
+  getRecentColors(): string[] {
+    return [...this.recentColors];
+  }
+
+  private addRecentColor(color: string): void {
+    const filtered = this.recentColors.filter(c => c.toLowerCase() !== color.toLowerCase());
+    filtered.unshift(color);
+    this.recentColors = filtered.slice(0, this.MAX_RECENT);
   }
 
   getMode(): ToolMode {

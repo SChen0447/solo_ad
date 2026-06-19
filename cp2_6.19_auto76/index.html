@@ -152,7 +152,8 @@
       left: 50%;
       transform: translateX(-50%);
       display: flex;
-      gap: 6px;
+      align-items: center;
+      gap: 8px;
       padding: 10px 16px;
       background: rgba(0, 0, 0, 0.5);
       border-radius: 12px;
@@ -160,21 +161,42 @@
       box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
       flex-wrap: wrap;
       justify-content: center;
-      max-width: 90vw;
+      max-width: 92vw;
+    }
+
+    .color-panel-divider {
+      width: 1px;
+      height: 28px;
+      background: rgba(255, 255, 255, 0.12);
+      margin: 0 2px;
+      flex-shrink: 0;
+    }
+
+    .recent-label {
+      font-size: 10px;
+      color: rgba(255, 255, 255, 0.5);
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      margin-right: -2px;
+      flex-shrink: 0;
     }
 
     .color-swatch {
-      width: 28px;
-      height: 28px;
-      border-radius: 6px;
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
       cursor: pointer;
-      border: 2px solid transparent;
-      transition: transform 0.15s ease, border-color 0.2s ease;
+      border-width: 2px;
+      border-style: solid;
+      border-color: transparent;
+      transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
       position: relative;
+      flex-shrink: 0;
+      box-sizing: border-box;
     }
 
     .color-swatch:hover {
-      transform: translateY(-2px) scale(1.1);
+      transform: translateY(-2px) scale(1.08);
     }
 
     .color-swatch:active {
@@ -183,12 +205,23 @@
 
     .color-swatch.active {
       border-color: white;
-      animation: pulse-border 1.5s ease-in-out infinite;
+      animation: pulse-swatch 1.5s ease-in-out infinite;
+      z-index: 1;
     }
 
-    @keyframes pulse-border {
-      0%, 100% { border-color: rgba(255, 255, 255, 0.8); box-shadow: 0 0 4px rgba(255, 255, 255, 0.3); }
-      50% { border-color: rgba(255, 255, 255, 0.3); box-shadow: 0 0 8px rgba(255, 255, 255, 0.5); }
+    @keyframes pulse-swatch {
+      0%, 100% {
+        border-width: 1px;
+        border-color: rgba(255, 255, 255, 0.95);
+        box-shadow: 0 0 4px rgba(255, 255, 255, 0.4), 0 0 1px rgba(255, 255, 255, 0.8) inset;
+        transform: scale(1.0);
+      }
+      50% {
+        border-width: 3px;
+        border-color: rgba(255, 255, 255, 0.5);
+        box-shadow: 0 0 12px rgba(255, 255, 255, 0.7), 0 0 2px rgba(255, 255, 255, 0.6) inset;
+        transform: scale(1.05);
+      }
     }
 
     .export-panel {
