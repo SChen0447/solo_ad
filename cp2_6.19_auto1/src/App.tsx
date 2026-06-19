@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from 'react';
-import ColorPicker, { HSV, hsvToHex, hexToRgb, rgbToHsv } from './ColorPicker';
+import ColorPicker, { HSV, hsvToHex } from './ColorPicker';
 import ColorPalette, { ColorScheme } from './ColorPalette';
 import {
   SavedPalette,
@@ -49,6 +49,7 @@ const appStyles: Record<string, React.CSSProperties> = {
   leftPanel: {
     width: '300px',
     minWidth: '300px',
+    maxWidth: '300px',
     borderRight: '1px solid rgba(255,255,255,0.06)',
     background: 'rgba(255,255,255,0.02)',
     overflowY: 'auto',
@@ -64,6 +65,7 @@ const appStyles: Record<string, React.CSSProperties> = {
   rightPanel: {
     width: '280px',
     minWidth: '280px',
+    maxWidth: '280px',
     borderLeft: '1px solid rgba(255,255,255,0.06)',
     background: 'rgba(255,255,255,0.02)',
     overflowY: 'auto',
@@ -182,6 +184,11 @@ const App: React.FC = () => {
         id: generateId(),
         name: scheme.name,
         baseColor: hsvToHex(hsv),
+        hsv: {
+          h: Math.round(hsv.h * 10) / 10,
+          s: Math.round(hsv.s * 1000) / 1000,
+          v: Math.round(hsv.v * 1000) / 1000,
+        },
         colors: scheme.colors.map((c) => hsvToHex(c)),
         schemeType: scheme.nameEn,
         savedAt: Date.now(),
@@ -205,15 +212,11 @@ const App: React.FC = () => {
   }, []);
 
   const handleFavClick = useCallback((fav: SavedPalette) => {
-    const rgb = hexToRgb(fav.baseColor);
-    if (rgb) {
-      const newHsv = rgbToHsv(rgb);
-      setHsv({
-        h: Math.round(newHsv.h * 10) / 10,
-        s: Math.round(newHsv.s * 1000) / 1000,
-        v: Math.round(newHsv.v * 1000) / 1000,
-      });
-    }
+    setHsv({
+      h: fav.hsv.h,
+      s: fav.hsv.s,
+      v: fav.hsv.v,
+    });
   }, []);
 
   return (
@@ -354,6 +357,9 @@ const App: React.FC = () => {
             max-width: 100% !important;
             border-left: none !important;
             border-top: 1px solid rgba(255,255,255,0.06) !important;
+          }
+          .right-panel > div {
+            max-width: 100%;
           }
         }
         .scheme-card:hover {

@@ -1,7 +1,14 @@
+export interface HSV {
+  h: number;
+  s: number;
+  v: number;
+}
+
 export interface SavedPalette {
   id: string;
   name: string;
   baseColor: string;
+  hsv: HSV;
   colors: string[];
   schemeType: string;
   savedAt: number;
@@ -13,11 +20,23 @@ interface StorageData {
 }
 
 const STORAGE_KEY = 'color-palette-favorites';
-const CURRENT_VERSION = 1;
+const CURRENT_VERSION = 2;
 
 function isValidHexColor(val: unknown): val is string {
   if (typeof val !== 'string') return false;
   return /^#[0-9a-f]{6}$/i.test(val);
+}
+
+function isValidHSV(val: unknown): val is HSV {
+  if (!val || typeof val !== 'object') return false;
+  const obj = val as Record<string, unknown>;
+  if (typeof obj.h !== 'number') return false;
+  if (typeof obj.s !== 'number') return false;
+  if (typeof obj.v !== 'number') return false;
+  if (obj.h < 0 || obj.h > 360) return false;
+  if (obj.s < 0 || obj.s > 1) return false;
+  if (obj.v < 0 || obj.v > 1) return false;
+  return true;
 }
 
 function isValidSavedPalette(val: unknown): val is SavedPalette {
@@ -26,6 +45,7 @@ function isValidSavedPalette(val: unknown): val is SavedPalette {
   if (typeof obj.id !== 'string' || obj.id.length === 0) return false;
   if (typeof obj.name !== 'string') return false;
   if (!isValidHexColor(obj.baseColor)) return false;
+  if (!isValidHSV(obj.hsv)) return false;
   if (!Array.isArray(obj.colors) || obj.colors.length === 0) return false;
   if (!obj.colors.every((c: unknown) => isValidHexColor(c))) return false;
   if (typeof obj.schemeType !== 'string') return false;

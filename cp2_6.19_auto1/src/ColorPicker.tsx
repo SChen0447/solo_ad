@@ -96,8 +96,9 @@ interface ColorPickerProps {
 
 const HUE_RING_SIZE = 220;
 const HUE_RING_THICKNESS = 22;
-const HUE_RING_MIDDLE_RADIUS = HUE_RING_SIZE / 2 - HUE_RING_THICKNESS / 2;
-const HUE_INNER_RADIUS = HUE_RING_SIZE / 2 - HUE_RING_THICKNESS;
+const HUE_RING_OUTER_RADIUS = HUE_RING_SIZE / 2;
+const HUE_RING_INNER_RADIUS = HUE_RING_OUTER_RADIUS - HUE_RING_THICKNESS;
+const HUE_RING_MIDDLE_RADIUS = (HUE_RING_INNER_RADIUS + HUE_RING_OUTER_RADIUS) / 2;
 const SV_PANEL_SIZE = 220;
 
 const pickerStyles: Record<string, React.CSSProperties> = {
@@ -209,7 +210,7 @@ const pickerStyles: Record<string, React.CSSProperties> = {
   },
 };
 
-function getHueFromEvent(e: React.MouseEvent | MouseEvent, wrapper: HTMLDivElement): number | null {
+function getHueFromEvent(e: React.MouseEvent | MouseEvent, wrapper: HTMLDivElement): { h: number; onRing: boolean } {
   const rect = wrapper.getBoundingClientRect();
   const cx = rect.left + rect.width / 2;
   const cy = rect.top + rect.height / 2;
@@ -218,10 +219,10 @@ function getHueFromEvent(e: React.MouseEvent | MouseEvent, wrapper: HTMLDivEleme
   const dist = Math.sqrt(dx * dx + dy * dy);
   const outerR = rect.width / 2;
   const innerR = outerR - HUE_RING_THICKNESS;
-  if (dist < innerR || dist > outerR) return null;
   let angle = Math.atan2(dy, dx) * (180 / Math.PI);
   if (angle < 0) angle += 360;
-  return angle;
+  const onRing = dist >= innerR && dist <= outerR;
+  return { h: angle, onRing };
 }
 
 function getHueThumbPos(hue: number): { x: number; y: number } {
@@ -262,9 +263,9 @@ const ColorPicker: React.FC<ColorPickerProps> = ({ hsv, onChange }) => {
     (e: React.MouseEvent) => {
       e.preventDefault();
       if (!hueRef.current) return;
-      const h = getHueFromEvent(e, hueRef.current);
-      if (h === null) return;
-      onChange({ ...hsv, h });
+      const result = getHueFromEvent(e, hueRef.current);
+      if (!result.onRing) return;
+      onChange({ ...hsv, h: result.h });
       setDraggingHue(true);
     },
     [hsv, onChange]
@@ -286,10 +287,8 @@ const ColorPicker: React.FC<ColorPickerProps> = ({ hsv, onChange }) => {
 
     const handleMove = (e: MouseEvent) => {
       if (draggingHue && hueRef.current) {
-        const h = getHueFromEvent(e, hueRef.current);
-        if (h !== null) {
-          onChangeRef.current({ ...hsvRef.current, h });
-        }
+        const result = getHueFromEvent(e, hueRef.current);
+        onChangeRef.current({ ...hsvRef.current, h: result.h });
       }
       if (draggingSV && svRef.current) {
         const { s, v } = getSVFromEvent(e, svRef.current);

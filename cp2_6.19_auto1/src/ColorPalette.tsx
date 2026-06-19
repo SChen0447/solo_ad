@@ -15,30 +15,43 @@ function wrapHue(h: number): number {
   return ((h % 360) + 360) % 360;
 }
 
-function adjustSV(s: number, v: number, sDelta: number, vDelta: number): { s: number; v: number } {
-  return {
-    s: clamp(s + sDelta, 0.05, 1),
-    v: clamp(v + vDelta, 0.08, 1),
-  };
+function adjustSV(
+  s: number,
+  v: number,
+  sReduce: number,
+  sBoost: number,
+  vReduce: number,
+  vBoost: number
+): { s: number; v: number } {
+  const newS = clamp(s * (1 - sReduce) + (1 - s) * sBoost, 0.05, 1);
+  const newV = clamp(v * (1 - vReduce) + (1 - v) * vBoost, 0.08, 1);
+  return { s: newS, v: newV };
 }
 
 function tint(h: number, s: number, v: number, amount: number): HSV {
-  const adj = adjustSV(s, v, -s * amount * 0.6, (1 - v) * amount * 0.8);
+  const adj = adjustSV(s, v, amount * 0.6, 0, 0, amount * 0.85);
   return { h, s: adj.s, v: adj.v };
 }
 
 function shade(h: number, s: number, v: number, amount: number): HSV {
-  const adj = adjustSV(s, v, s * amount * 0.3, -v * amount * 0.5);
-  return { h, s: clamp(adj.s, 0.05, 1), v: clamp(adj.v, 0.08, 1) };
+  const adj = adjustSV(s, v, 0, amount * 0.25, amount * 0.6, 0);
+  return { h, s: adj.s, v: adj.v };
 }
 
 function tone(h: number, s: number, v: number, amount: number): HSV {
-  const adj = adjustSV(s, v, -s * amount * 0.4, -v * amount * 0.2);
-  return { h, s: clamp(adj.s, 0.05, 1), v: clamp(adj.v, 0.15, 1) };
+  const adj = adjustSV(s, v, amount * 0.5, 0, amount * 0.25, amount * 0.1);
+  return { h, s: adj.s, v: adj.v };
 }
 
 function generateSchemes(hsv: HSV): ColorScheme[] {
   const { h, s, v } = hsv;
+
+  function harmonyOffset(hue: number, hOffset: number, sReduce = 0, sBoost = 0, vReduce = 0, vBoost = 0): HSV {
+    return {
+      h: wrapHue(hue + hOffset),
+      ...adjustSV(s, v, sReduce, sBoost, vReduce, vBoost),
+    };
+  }
 
   const complementary: ColorScheme = {
     name: '互补色',
@@ -46,9 +59,9 @@ function generateSchemes(hsv: HSV): ColorScheme[] {
     colors: [
       { h, s, v },
       tint(h, s, v, 0.45),
-      { h: wrapHue(h + 180), s: clamp(s * 0.85, 0.1, 1), v: clamp(v * 1.05, 0.1, 1) },
+      harmonyOffset(h, 180, 0.15, 0, 0, 0.08),
       shade(h, s, v, 0.5),
-      { h: wrapHue(h + 180), s: clamp(s * 0.5, 0.08, 0.8), v: clamp(v * 1.15, 0.2, 1) },
+      harmonyOffset(h, 180, 0.5, 0, 0, 0.18),
     ],
   };
 
@@ -56,11 +69,11 @@ function generateSchemes(hsv: HSV): ColorScheme[] {
     name: '类似色',
     nameEn: 'Analogous',
     colors: [
-      { h: wrapHue(h - 30), s: clamp(s * 0.9, 0.08, 1), v: clamp(v * 1.05, 0.1, 1) },
-      { h: wrapHue(h - 15), s: clamp(s * 0.95, 0.08, 1), v },
+      harmonyOffset(h, -30, 0.1, 0, 0, 0.06),
+      harmonyOffset(h, -15, 0.05, 0, 0, 0),
       { h, s, v },
-      { h: wrapHue(h + 15), s: clamp(s * 0.95, 0.08, 1), v },
-      { h: wrapHue(h + 30), s: clamp(s * 0.9, 0.08, 1), v: clamp(v * 1.05, 0.1, 1) },
+      harmonyOffset(h, 15, 0.05, 0, 0, 0),
+      harmonyOffset(h, 30, 0.1, 0, 0, 0.06),
     ],
   };
 
@@ -69,8 +82,8 @@ function generateSchemes(hsv: HSV): ColorScheme[] {
     nameEn: 'Triadic',
     colors: [
       { h, s, v },
-      { h: wrapHue(h + 120), s: clamp(s * 0.9, 0.1, 1), v: clamp(v * 1.05, 0.1, 1) },
-      { h: wrapHue(h + 240), s: clamp(s * 0.9, 0.1, 1), v: clamp(v * 1.05, 0.1, 1) },
+      harmonyOffset(h, 120, 0.1, 0, 0, 0.06),
+      harmonyOffset(h, 240, 0.1, 0, 0, 0.06),
       tint(h, s, v, 0.4),
       tone(wrapHue(h + 120), s, v, 0.35),
     ],
@@ -81,10 +94,10 @@ function generateSchemes(hsv: HSV): ColorScheme[] {
     nameEn: 'Split-Complementary',
     colors: [
       { h, s, v },
-      { h: wrapHue(h + 150), s: clamp(s * 0.85, 0.1, 1), v: clamp(v * 1.08, 0.1, 1) },
-      { h: wrapHue(h + 210), s: clamp(s * 0.85, 0.1, 1), v: clamp(v * 1.08, 0.1, 1) },
+      harmonyOffset(h, 150, 0.15, 0, 0, 0.08),
+      harmonyOffset(h, 210, 0.15, 0, 0, 0.08),
       shade(h, s, v, 0.4),
-      tint(wrapHue(h + 180), s * 0.7, v, 0.3),
+      tint(wrapHue(h + 180), clamp(s * 0.7, 0.05, 1), v, 0.3),
     ],
   };
 
@@ -93,9 +106,9 @@ function generateSchemes(hsv: HSV): ColorScheme[] {
     nameEn: 'Tetradic',
     colors: [
       { h, s, v },
-      { h: wrapHue(h + 90), s: clamp(s * 0.85, 0.1, 1), v: clamp(v * 1.05, 0.1, 1) },
-      { h: wrapHue(h + 180), s: clamp(s * 0.9, 0.1, 1), v: clamp(v * 1.05, 0.1, 1) },
-      { h: wrapHue(h + 270), s: clamp(s * 0.85, 0.1, 1), v: clamp(v * 1.05, 0.1, 1) },
+      harmonyOffset(h, 90, 0.15, 0, 0, 0.06),
+      harmonyOffset(h, 180, 0.1, 0, 0, 0.06),
+      harmonyOffset(h, 270, 0.15, 0, 0, 0.06),
       tone(h, s, v, 0.4),
     ],
   };
