@@ -60,6 +60,7 @@ const sidePanel = new SidePanel(appContainer || document.body, {
   }
 });
 
+sidePanel.setLayers(geologyData.layers);
 sidePanel.setMaxDepth(crossSection.getMaxDepth());
 
 const initialDepth = Math.round(crossSection.getMaxDepth() * 0.4);

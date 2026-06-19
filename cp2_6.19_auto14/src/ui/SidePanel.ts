@@ -1,4 +1,8 @@
-import { CrossSectionResult, LayerSample } from '../data/GeologyInterfaces';
+import {
+  CrossSectionResult,
+  GeologyLayer,
+  LayerSample
+} from '../data/GeologyInterfaces';
 
 export interface SidePanelHandlers {
   onDepthChange: (depth: number) => void;
@@ -23,21 +27,26 @@ const PANEL_CSS = `
   box-sizing: border-box;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
   color: #E0E0E0;
+  overflow-y: auto;
 }
+.geology-side-panel::-webkit-scrollbar { width: 4px; }
+.geology-side-panel::-webkit-scrollbar-track { background: transparent; }
+.geology-side-panel::-webkit-scrollbar-thumb { background: #4A90D9; border-radius: 2px; }
 .geology-side-panel h2 {
-  font-size: 16px;
-  font-weight: 600;
-  margin: 0 0 6px 0;
+  font-size: 20px;
+  font-weight: 700;
+  margin: 0 0 4px 0;
   color: #4A90D9;
-  letter-spacing: 1px;
+  letter-spacing: 1.5px;
 }
 .geology-side-panel .subtitle {
-  font-size: 12px;
+  font-size: 13px;
   color: #8892B0;
-  margin-bottom: 28px;
+  margin-bottom: 24px;
+  letter-spacing: 0.5px;
 }
 .geology-side-panel .section {
-  margin-bottom: 24px;
+  margin-bottom: 22px;
 }
 .geology-side-panel .section-label {
   font-size: 13px;
@@ -54,6 +63,48 @@ const PANEL_CSS = `
   background: rgba(74, 144, 217, 0.15);
   padding: 2px 10px;
   border-radius: 10px;
+}
+.geology-side-panel .profile-bar-wrapper {
+  position: relative;
+  width: 100%;
+  margin-bottom: 14px;
+}
+.geology-side-panel .profile-bar {
+  position: relative;
+  width: 100%;
+  height: 20px;
+  border-radius: 4px;
+  overflow: hidden;
+  display: flex;
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.08);
+}
+.geology-side-panel .profile-segment {
+  height: 100%;
+  transition: opacity 0.2s ease;
+  position: relative;
+}
+.geology-side-panel .profile-segment:hover {
+  opacity: 0.85;
+}
+.geology-side-panel .profile-indicator {
+  position: absolute;
+  top: -3px;
+  bottom: -3px;
+  width: 2px;
+  background: #FFFFFF;
+  box-shadow: 0 0 6px rgba(74, 144, 217, 0.9), 0 0 3px rgba(255,255,255,0.8);
+  transform: translateX(-50%);
+  pointer-events: none;
+  transition: left 0.05s linear;
+  z-index: 2;
+}
+.geology-side-panel .profile-labels {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 5px;
+  font-size: 10px;
+  color: #6B7A99;
+  font-family: 'Courier New', monospace;
 }
 .geology-side-panel .depth-slider {
   width: 100%;
@@ -97,8 +148,10 @@ const PANEL_CSS = `
 }
 .geology-side-panel .layer-info {
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
   padding-right: 8px;
+  margin-bottom: 16px;
 }
 .geology-side-panel .layer-info::-webkit-scrollbar { width: 4px; }
 .geology-side-panel .layer-info::-webkit-scrollbar-track { background: transparent; }
@@ -144,6 +197,7 @@ const PANEL_CSS = `
   border-radius: 3px;
   border: 1px solid rgba(255, 255, 255, 0.2);
   display: inline-block;
+  flex-shrink: 0;
 }
 .geology-side-panel .layer-item .thickness {
   font-size: 12px;
@@ -165,6 +219,43 @@ const PANEL_CSS = `
   color: #4A90D9;
   font-weight: 500;
   margin-bottom: 10px;
+}
+.geology-side-panel .legend-section {
+  margin-top: auto;
+  padding-top: 12px;
+  border-top: 1px solid rgba(74, 144, 217, 0.15);
+}
+.geology-side-panel .legend-title {
+  font-size: 11px;
+  color: #8892B0;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  margin-bottom: 10px;
+}
+.geology-side-panel .legend-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.geology-side-panel .legend-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: #A0AEC0;
+  padding: 3px 4px;
+  border-radius: 4px;
+  transition: background 0.2s ease;
+}
+.geology-side-panel .legend-item:hover {
+  background: rgba(74, 144, 217, 0.08);
+  color: #E0E0E0;
+}
+.geology-side-panel .legend-item .legend-depth {
+  margin-left: auto;
+  font-size: 10px;
+  color: #6B7A99;
+  font-family: 'Courier New', monospace;
 }
 `;
 
@@ -277,15 +368,24 @@ const INSTRUCTIONS_CSS = `
 .geology-instructions span { color: #4A90D9; font-weight: 500; }
 `;
 
+interface LegendLayer {
+  name: string;
+  color: string;
+  topDepth: number;
+  bottomDepth: number;
+}
+
 export class SidePanel {
   private container: HTMLElement;
   private handlers: SidePanelHandlers;
+  private layers: LegendLayer[] = [];
   private panelEl: HTMLElement | null = null;
   private sliderEl: HTMLInputElement | null = null;
   private depthDisplayEl: HTMLElement | null = null;
   private layerListEl: HTMLElement | null = null;
   private resetBtnEl: HTMLButtonElement | null = null;
   private popupEl: HTMLElement | null = null;
+  private profileIndicatorEl: HTMLElement | null = null;
   private maxDepth = 0;
   private styleEl: HTMLStyleElement | null = null;
 
@@ -297,6 +397,17 @@ export class SidePanel {
     this.createPanel();
     this.createPopup();
     this.createInstructions();
+  }
+
+  setLayers(layers: GeologyLayer[]): void {
+    this.layers = layers.map(l => ({
+      name: l.name,
+      color: l.color,
+      topDepth: l.topDepth,
+      bottomDepth: l.bottomDepth
+    }));
+    this.rebuildProfileBar();
+    this.rebuildLegend();
   }
 
   private injectStyles(): void {
@@ -328,6 +439,14 @@ export class SidePanel {
           <span>深度截面查询</span>
           <span class="depth-value"><span class="depth-display">0</span> m</span>
         </div>
+        <div class="profile-bar-wrapper">
+          <div class="profile-bar"></div>
+          <div class="profile-indicator" style="left:0%"></div>
+          <div class="profile-labels">
+            <span>0m</span>
+            <span class="max-depth-label">0m</span>
+          </div>
+        </div>
         <input type="range" class="depth-slider" min="0" max="0" step="1" value="0" />
       </div>
       <div class="section layer-info">
@@ -335,6 +454,10 @@ export class SidePanel {
         <div class="layer-list">
           <div class="empty-hint">拖动滑块查询深度截面</div>
         </div>
+      </div>
+      <div class="legend-section">
+        <div class="legend-title">岩层图例</div>
+        <div class="legend-list"></div>
       </div>
     `;
 
@@ -344,18 +467,87 @@ export class SidePanel {
     this.sliderEl = panel.querySelector('.depth-slider') as HTMLInputElement;
     this.depthDisplayEl = panel.querySelector('.depth-display') as HTMLElement;
     this.layerListEl = panel.querySelector('.layer-list') as HTMLElement;
+    this.profileIndicatorEl = panel.querySelector(
+      '.profile-indicator'
+    ) as HTMLElement;
 
     this.sliderEl.addEventListener('input', () => {
       const val = parseFloat(this.sliderEl!.value);
       this.updateDepthDisplay(val);
+      this.updateProfileIndicator(val);
       this.handlers.onDepthInput(val);
     });
 
     this.sliderEl.addEventListener('change', () => {
       const val = parseFloat(this.sliderEl!.value);
       this.updateDepthDisplay(val);
+      this.updateProfileIndicator(val);
       this.handlers.onDepthChange(val);
     });
+  }
+
+  private rebuildProfileBar(): void {
+    if (!this.panelEl || this.maxDepth === 0) return;
+
+    const bar = this.panelEl.querySelector(
+      '.profile-bar'
+    ) as HTMLElement | null;
+    if (!bar) return;
+    bar.innerHTML = '';
+
+    const maxLabel = this.panelEl.querySelector(
+      '.max-depth-label'
+    ) as HTMLElement | null;
+    if (maxLabel) maxLabel.textContent = `${this.maxDepth}m`;
+
+    const sorted = [...this.layers].sort(
+      (a, b) => a.topDepth - b.topDepth
+    );
+
+    for (const layer of sorted) {
+      const seg = document.createElement('div');
+      seg.className = 'profile-segment';
+      seg.title = `${layer.name} (${layer.topDepth}m ~ ${layer.bottomDepth}m)`;
+
+      const topPct = (layer.topDepth / this.maxDepth) * 100;
+      const botPct = (layer.bottomDepth / this.maxDepth) * 100;
+      const widthPct = botPct - topPct;
+
+      seg.style.flex = `0 0 ${widthPct}%`;
+      seg.style.background = layer.color;
+      seg.style.width = `${widthPct}%`;
+
+      if (this.layers.indexOf(layer) > 0) {
+        seg.style.borderLeft = '1px solid rgba(0,0,0,0.25)';
+      }
+
+      bar.appendChild(seg);
+    }
+  }
+
+  private rebuildLegend(): void {
+    if (!this.panelEl) return;
+
+    const list = this.panelEl.querySelector(
+      '.legend-list'
+    ) as HTMLElement | null;
+    if (!list) return;
+    list.innerHTML = '';
+
+    const sorted = [...this.layers].sort(
+      (a, b) => a.topDepth - b.topDepth
+    );
+
+    for (const layer of sorted) {
+      const item = document.createElement('div');
+      item.className = 'legend-item';
+      item.innerHTML = `
+        <span class="color-dot" style="background:${layer.color}"></span>
+        <span>${layer.name}</span>
+        <span class="legend-depth">${layer.topDepth}-${layer.bottomDepth}m</span>
+      `;
+      list.appendChild(item);
+    }
   }
 
   private createPopup(): void {
@@ -374,7 +566,9 @@ export class SidePanel {
     this.container.appendChild(popup);
     this.popupEl = popup;
 
-    const closeBtn = popup.querySelector('.geology-popup-close') as HTMLButtonElement;
+    const closeBtn = popup.querySelector(
+      '.geology-popup-close'
+    ) as HTMLButtonElement;
     closeBtn.addEventListener('click', () => this.hidePopup());
   }
 
@@ -390,6 +584,7 @@ export class SidePanel {
     if (this.sliderEl) {
       this.sliderEl.max = String(maxDepth);
     }
+    this.rebuildProfileBar();
   }
 
   setInitialDepth(depth: number): void {
@@ -397,12 +592,19 @@ export class SidePanel {
       this.sliderEl.value = String(Math.round(depth));
     }
     this.updateDepthDisplay(depth);
+    this.updateProfileIndicator(depth);
   }
 
   private updateDepthDisplay(depth: number): void {
     if (this.depthDisplayEl) {
       this.depthDisplayEl.textContent = String(Math.round(depth));
     }
+  }
+
+  private updateProfileIndicator(depth: number): void {
+    if (!this.profileIndicatorEl || this.maxDepth === 0) return;
+    const pct = Math.max(0, Math.min(100, (depth / this.maxDepth) * 100));
+    this.profileIndicatorEl.style.left = `${pct}%`;
   }
 
   updateLayerList(result: CrossSectionResult): void {
@@ -413,7 +615,9 @@ export class SidePanel {
       return;
     }
 
-    const sorted: LayerSample[] = [...result.samples].sort((a, b) => b.thickness - a.thickness);
+    const sorted: LayerSample[] = [...result.samples].sort(
+      (a, b) => b.thickness - a.thickness
+    );
     const d = Math.round(result.depth);
     const header = `<div class="depth-header">深度 ${d}m &middot; 共 ${sorted.length} 个岩层</div>`;
     const items = sorted
