@@ -1,0 +1,252 @@
+.preview-panel {
+  width: 100%;
+  height: 100%;
+  padding: 24px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  overflow-y: auto;
+}
+
+.preview-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.preview-header h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: #F3F4F6;
+}
+
+.current-scheme-name {
+  padding: 6px 12px;
+  background: #374151;
+  border-radius: 6px;
+  color: #E5E7EB;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.preview-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 20px;
+  flex: 1;
+}
+
+.preview-item {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 20px;
+  border-radius: 8px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+  transition: all 0.3s ease;
+  min-height: 160px;
+}
+
+.preview-item-label {
+  font-size: 12px;
+  font-weight: 500;
+  color: #9CA3AF;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.preview-button {
+  padding: 12px 24px;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  align-self: flex-start;
+}
+
+.preview-button:hover {
+  transform: scale(1.03);
+  filter: brightness(0.9);
+}
+
+.preview-button:active {
+  transform: scale(0.98);
+}
+
+.preview-card {
+  padding: 16px;
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.preview-card-title {
+  font-size: 16px;
+  font-weight: 600;
+  margin: 0;
+}
+
+.preview-card-text {
+  font-size: 13px;
+  line-height: 1.5;
+  margin: 0;
+  opacity: 0.8;
+}
+
+.preview-card-accent {
+  width: 40px;
+  height: 4px;
+  border-radius: 2px;
+  margin-top: 4px;
+}
+
+.preview-input-wrapper {
+  display: flex;
+  gap: 8px;
+}
+
+.preview-input {
+  flex: 1;
+  padding: 12px 14px;
+  border: 2px solid;
+  border-radius: 8px;
+  font-size: 14px;
+  outline: none;
+  transition: border-color 0.15s ease;
+}
+
+.preview-input::placeholder {
+  opacity: 0.5;
+}
+
+.preview-input:focus {
+  filter: brightness(1.1);
+}
+
+.preview-input-btn {
+  padding: 12px 20px;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.preview-input-btn:hover {
+  filter: brightness(1.1);
+  transform: translateY(-1px);
+}
+
+.preview-alert {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 16px;
+  border-radius: 8px;
+  border-left: 4px solid;
+  font-size: 14px;
+}
+
+.compare-mode .compare-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.compare-header h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: #F3F4F6;
+}
+
+.compare-hint {
+  font-size: 13px;
+  color: #9CA3AF;
+}
+
+.compare-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+  flex: 1;
+  animation: fadeIn 0.3s ease;
+}
+
+.compare-grid.mobile {
+  grid-template-columns: 1fr;
+  overflow-y: auto;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.compare-card {
+  position: relative;
+  padding: 16px;
+  background: #2A2A3E;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+}
+
+.compare-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.3);
+}
+
+.compare-card-label {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 2;
+  padding: 4px 10px;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(4px);
+  border-radius: 6px;
+  color: white;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.compare-card-content {
+  margin-top: 20px;
+}
+
+.compare-card-content .preview-item {
+  min-height: 120px;
+  padding: 12px;
+}
+
+@media (max-width: 768px) {
+  .preview-panel {
+    padding: 16px;
+  }
+
+  .preview-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .preview-item {
+    min-height: auto;
+  }
+
+  .compare-grid {
+    grid-template-columns: 1fr;
+  }
+}
