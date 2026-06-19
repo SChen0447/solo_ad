@@ -13,18 +13,181 @@ export class FileManager {
   private dragStart: Point | null = null;
   private imageStartPos: Point | null = null;
   private imageStartSize: { width: number; height: number } | null = null;
+  private imageStartRatio: number = 1;
   private listeners: Map<string, Set<EventHandler>> = new Map();
   private editingImageId: string | null = null;
+  private canvas: HTMLCanvasElement;
+  private eventHandlersBound: boolean = false;
 
   constructor(canvasCore: CanvasCore, userId: string) {
     this.canvasCore = canvasCore;
     this.userId = userId;
+    this.canvas = (canvasCore as any).canvas as HTMLCanvasElement;
+    this.bindInterceptingEvents();
     this.bindCanvasEvents();
   }
 
+  private bindInterceptingEvents(): void {
+    this.canvas.addEventListener('mousedown', this.interceptMouseDown, true);
+    this.canvas.addEventListener('mousemove', this.interceptMouseMove, true);
+    this.canvas.addEventListener('mouseup', this.interceptMouseUp, true);
+    this.canvas.addEventListener('mouseleave', this.interceptMouseUp, true);
+    this.eventHandlersBound = true;
+  }
+
+  private interceptMouseDown = (e: MouseEvent): void => {
+    const point = this.canvasCore.screenToWorld(e.clientX, e.clientY);
+
+    const resizeHit = this.canvasCore.getResizeHandleAtPoint(point);
+    if (resizeHit) {
+      e.stopImmediatePropagation();
+      this.isResizing = true;
+      this.resizeHandle = resizeHit.handle;
+      this.selectedImageId = resizeHit.imageId;
+      this.dragStart = point;
+      const img = this.canvasCore.getImages().find(i => i.id === resizeHit.imageId);
+      if (img) {
+        this.imageStartPos = { x: img.x, y: img.y };
+        this.imageStartSize = { width: img.width, height: img.height };
+        this.imageStartRatio = img.width / img.height;
+      }
+      this.updateCursor();
+      return;
+    }
+
+    const image = this.canvasCore.getImageAtPoint(point);
+    if (image) {
+      e.stopImmediatePropagation();
+      this.isDragging = true;
+      this.selectedImageId = image.id;
+      this.dragStart = point;
+      this.imageStartPos = { x: image.x, y: image.y };
+      this.canvas.style.cursor = 'move';
+      return;
+    }
+
+    this.selectedImageId = null;
+    this.canvas.style.cursor = this.canvasCore.getTool() === 'brush' ? 'crosshair' : 'default';
+  };
+
+  private interceptMouseMove = (e: MouseEvent): void => {
+    const point = this.canvasCore.screenToWorld(e.clientX, e.clientY);
+
+    if (this.isResizing && this.selectedImageId && this.resizeHandle && this.imageStartPos && this.imageStartSize && this.dragStart) {
+      e.stopImmediatePropagation();
+      const dx = point.x - this.dragStart.x;
+      const dy = point.y - this.dragStart.y;
+      const ratio = this.imageStartRatio;
+
+      let newWidth = this.imageStartSize.width;
+      let newHeight = this.imageStartSize.height;
+      let newX = this.imageStartPos.x;
+      let newY = this.imageStartPos.y;
+
+      const absDx = Math.abs(dx);
+      const absDy = Math.abs(dy);
+      let scaleFactor = 1;
+
+      switch (this.resizeHandle) {
+        case 'se':
+          scaleFactor = absDx > absDy ? 1 + dx / this.imageStartSize.width : 1 + dy / this.imageStartSize.height;
+          break;
+        case 'ne':
+          scaleFactor = absDx > absDy ? 1 + dx / this.imageStartSize.width : 1 - dy / this.imageStartSize.height;
+          break;
+        case 'sw':
+          scaleFactor = absDx > absDy ? 1 - dx / this.imageStartSize.width : 1 + dy / this.imageStartSize.height;
+          break;
+        case 'nw':
+          scaleFactor = absDx > absDy ? 1 - dx / this.imageStartSize.width : 1 - dy / this.imageStartSize.height;
+          break;
+      }
+
+      scaleFactor = Math.max(0.2, scaleFactor);
+      newWidth = Math.max(50, this.imageStartSize.width * scaleFactor);
+      newHeight = newWidth / ratio;
+
+      switch (this.resizeHandle) {
+        case 'se':
+          newX = this.imageStartPos.x;
+          newY = this.imageStartPos.y;
+          break;
+        case 'ne':
+          newX = this.imageStartPos.x;
+          newY = this.imageStartPos.y + (this.imageStartSize.height - newHeight);
+          break;
+        case 'sw':
+          newX = this.imageStartPos.x + (this.imageStartSize.width - newWidth);
+          newY = this.imageStartPos.y;
+          break;
+        case 'nw':
+          newX = this.imageStartPos.x + (this.imageStartSize.width - newWidth);
+          newY = this.imageStartPos.y + (this.imageStartSize.height - newHeight);
+          break;
+      }
+
+      this.canvasCore.updateImage(this.selectedImageId, {
+        x: newX,
+        y: newY,
+        width: newWidth,
+        height: newHeight,
+      });
+      return;
+    }
+
+    if (this.isDragging && this.selectedImageId && this.dragStart && this.imageStartPos) {
+      e.stopImmediatePropagation();
+      const dx = point.x - this.dragStart.x;
+      const dy = point.y - this.dragStart.y;
+      this.canvasCore.updateImage(this.selectedImageId, {
+        x: this.imageStartPos.x + dx,
+        y: this.imageStartPos.y + dy,
+      });
+      return;
+    }
+
+    if (!this.isDragging && !this.isResizing) {
+      const handleHit = this.canvasCore.getResizeHandleAtPoint(point);
+      if (handleHit) {
+        const cursors: Record<string, string> = {
+          nw: 'nwse-resize',
+          ne: 'nesw-resize',
+          sw: 'nesw-resize',
+          se: 'nwse-resize',
+        };
+        this.canvas.style.cursor = cursors[handleHit.handle] || 'pointer';
+      } else if (this.canvasCore.getImageAtPoint(point)) {
+        this.canvas.style.cursor = 'move';
+      } else {
+        this.updateCursor();
+      }
+    }
+  };
+
+  private interceptMouseUp = (e: MouseEvent): void => {
+    if (this.isDragging || this.isResizing) {
+      e.stopImmediatePropagation();
+      this.isDragging = false;
+      this.isResizing = false;
+      this.resizeHandle = null;
+      this.dragStart = null;
+      this.imageStartPos = null;
+      this.imageStartSize = null;
+      this.updateCursor();
+    }
+  };
+
+  private updateCursor(): void {
+    const tool = this.canvasCore.getTool();
+    if ((this.canvasCore as any).isSpacePressed) {
+      this.canvas.style.cursor = 'grab';
+    } else {
+      this.canvas.style.cursor = tool === 'brush' ? 'crosshair' : tool === 'pan' ? 'grab' : 'default';
+    }
+  }
+
   private bindCanvasEvents(): void {
-    const canvas = (this.canvasCore as any).canvas as HTMLCanvasElement;
-    canvas.addEventListener('dblclick', this.handleDoubleClick);
+    this.canvas.addEventListener('dblclick', this.handleDoubleClick);
   }
 
   private handleDoubleClick = (e: MouseEvent): void => {
@@ -98,110 +261,15 @@ export class FileManager {
 
   public handleDragOver(e: DragEvent): void {
     e.preventDefault();
-    e.dataTransfer!.dropEffect = 'copy';
-  }
-
-  public handleMouseDown(e: MouseEvent): boolean {
-    const point = this.canvasCore.screenToWorld(e.clientX, e.clientY);
-
-    const resizeHit = this.canvasCore.getResizeHandleAtPoint(point);
-    if (resizeHit) {
-      this.isResizing = true;
-      this.resizeHandle = resizeHit.handle;
-      this.selectedImageId = resizeHit.imageId;
-      this.dragStart = point;
-      const img = this.canvasCore.getImages().find(i => i.id === resizeHit.imageId);
-      if (img) {
-        this.imageStartPos = { x: img.x, y: img.y };
-        this.imageStartSize = { width: img.width, height: img.height };
-      }
-      return true;
+    if (e.dataTransfer) {
+      e.dataTransfer.dropEffect = 'copy';
     }
-
-    const image = this.canvasCore.getImageAtPoint(point);
-    if (image) {
-      this.isDragging = true;
-      this.selectedImageId = image.id;
-      this.dragStart = point;
-      this.imageStartPos = { x: image.x, y: image.y };
-      return true;
-    }
-
-    this.selectedImageId = null;
-    return false;
-  }
-
-  public handleMouseMove(e: MouseEvent): boolean {
-    if (!this.selectedImageId) return false;
-
-    const point = this.canvasCore.screenToWorld(e.clientX, e.clientY);
-
-    if (this.isDragging && this.dragStart && this.imageStartPos) {
-      const dx = point.x - this.dragStart.x;
-      const dy = point.y - this.dragStart.y;
-      this.canvasCore.updateImage(this.selectedImageId, {
-        x: this.imageStartPos.x + dx,
-        y: this.imageStartPos.y + dy,
-      });
-      return true;
-    }
-
-    if (this.isResizing && this.resizeHandle && this.imageStartPos && this.imageStartSize && this.dragStart) {
-      const dx = point.x - this.dragStart.x;
-      const dy = point.y - this.dragStart.y;
-      const aspectRatio = this.imageStartSize.width / this.imageStartSize.height;
-
-      let newWidth = this.imageStartSize.width;
-      let newHeight = this.imageStartSize.height;
-      let newX = this.imageStartPos.x;
-      let newY = this.imageStartPos.y;
-
-      if (this.resizeHandle.includes('e')) {
-        newWidth = Math.max(50, this.imageStartSize.width + dx);
-        newHeight = newWidth / aspectRatio;
-      } else if (this.resizeHandle.includes('w')) {
-        newWidth = Math.max(50, this.imageStartSize.width - dx);
-        newHeight = newWidth / aspectRatio;
-        newX = this.imageStartPos.x + (this.imageStartSize.width - newWidth);
-      }
-
-      if (this.resizeHandle.includes('s')) {
-        newHeight = Math.max(50, this.imageStartSize.height + dy);
-        newWidth = newHeight * aspectRatio;
-      } else if (this.resizeHandle.includes('n')) {
-        newHeight = Math.max(50, this.imageStartSize.height - dy);
-        newWidth = newHeight * aspectRatio;
-        newY = this.imageStartPos.y + (this.imageStartSize.height - newHeight);
-      }
-
-      this.canvasCore.updateImage(this.selectedImageId, {
-        x: newX,
-        y: newY,
-        width: newWidth,
-        height: newHeight,
-      });
-      return true;
-    }
-
-    return false;
-  }
-
-  public handleMouseUp(): boolean {
-    if (this.isDragging || this.isResizing) {
-      this.isDragging = false;
-      this.isResizing = false;
-      this.resizeHandle = null;
-      this.dragStart = null;
-      this.imageStartPos = null;
-      this.imageStartSize = null;
-      return true;
-    }
-    return false;
   }
 
   public updateImageLabel(imageId: string, label: string): void {
     this.canvasCore.updateImage(imageId, { label });
-    this.emit('image-updated', this.canvasCore.getImages().find(i => i.id === imageId));
+    const updated = this.canvasCore.getImages().find(i => i.id === imageId);
+    this.emit('image-updated', updated);
   }
 
   public getSelectedImageId(): string | null {
@@ -236,8 +304,13 @@ export class FileManager {
   }
 
   public destroy(): void {
-    const canvas = (this.canvasCore as any).canvas as HTMLCanvasElement;
-    canvas.removeEventListener('dblclick', this.handleDoubleClick);
+    if (this.eventHandlersBound) {
+      this.canvas.removeEventListener('mousedown', this.interceptMouseDown, true);
+      this.canvas.removeEventListener('mousemove', this.interceptMouseMove, true);
+      this.canvas.removeEventListener('mouseup', this.interceptMouseUp, true);
+      this.canvas.removeEventListener('mouseleave', this.interceptMouseUp, true);
+    }
+    this.canvas.removeEventListener('dblclick', this.handleDoubleClick);
     this.listeners.clear();
   }
 }

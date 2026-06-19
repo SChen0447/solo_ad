@@ -42,6 +42,9 @@ export class CanvasCore {
   private offsetX: number = 0;
   private offsetY: number = 0;
   private scale: number = 1;
+  private targetScale: number = 1;
+  private targetOffsetX: number = 0;
+  private targetOffsetY: number = 0;
   private minScale: number = 0.25;
   private maxScale: number = 4;
 
@@ -82,7 +85,6 @@ export class CanvasCore {
     this.canvas.width = rect.width * dpr;
     this.canvas.height = rect.height * dpr;
     this.ctx.scale(dpr, dpr);
-    this.requestRender();
   }
 
   private bindEvents(): void {
@@ -168,8 +170,9 @@ export class CanvasCore {
       const dy = e.clientY - this.lastPanPoint.y;
       this.offsetX += dx;
       this.offsetY += dy;
+      this.targetOffsetX = this.offsetX;
+      this.targetOffsetY = this.offsetY;
       this.lastPanPoint = { x: e.clientX, y: e.clientY };
-      this.requestRender();
       return;
     }
 
@@ -208,20 +211,25 @@ export class CanvasCore {
     const mouseX = e.clientX - rect.left;
     const mouseY = e.clientY - rect.top;
 
-    const delta = e.deltaY > 0 ? 0.9 : 1.1;
-    const newScale = Math.max(this.minScale, Math.min(this.maxScale, this.scale * delta));
+    const worldX = (mouseX - this.offsetX) / this.scale;
+    const worldY = (mouseY - this.offsetY) / this.scale;
 
-    const scaleRatio = newScale / this.scale;
-    this.offsetX = mouseX - (mouseX - this.offsetX) * scaleRatio;
-    this.offsetY = mouseY - (mouseY - this.offsetY) * scaleRatio;
-    this.scale = newScale;
+    const zoomFactor = e.deltaY > 0 ? 0.9 : 1.1;
+    const newScale = Math.max(this.minScale, Math.min(this.maxScale, this.scale * zoomFactor));
 
-    this.requestRender();
+    const newOffsetX = mouseX - worldX * newScale;
+    const newOffsetY = mouseY - worldY * newScale;
+
+    this.targetScale = newScale;
+    this.targetOffsetX = newOffsetX;
+    this.targetOffsetY = newOffsetY;
+
     this.notifyListeners();
   };
 
   private startRenderLoop(): void {
     const render = () => {
+      this.updateViewTransform();
       this.updateAnimations();
       this.render();
       this.animationFrameId = requestAnimationFrame(render);
@@ -229,14 +237,42 @@ export class CanvasCore {
     this.animationFrameId = requestAnimationFrame(render);
   }
 
+  private updateViewTransform(): void {
+    const scaleLerp = 0.25;
+    const offsetLerp = 0.25;
+
+    const scaleDiff = this.targetScale - this.scale;
+    if (Math.abs(scaleDiff) > 0.001) {
+      this.scale += scaleDiff * scaleLerp;
+    } else {
+      this.scale = this.targetScale;
+    }
+
+    const offsetXDiff = this.targetOffsetX - this.offsetX;
+    if (Math.abs(offsetXDiff) > 0.1) {
+      this.offsetX += offsetXDiff * offsetLerp;
+    } else {
+      this.offsetX = this.targetOffsetX;
+    }
+
+    const offsetYDiff = this.targetOffsetY - this.offsetY;
+    if (Math.abs(offsetYDiff) > 0.1) {
+      this.offsetY += offsetYDiff * offsetLerp;
+    } else {
+      this.offsetY = this.targetOffsetY;
+    }
+  }
+
   private updateAnimations(): void {
     let needsUpdate = false;
+    const glowFrames = 12;
 
     for (const pathId of this.activePaths) {
       const path = this.paths.get(pathId);
       if (path && path.isComplete) {
-        path.glowProgress += 1 / 12;
+        path.glowProgress += 1 / glowFrames;
         if (path.glowProgress >= 1) {
+          path.glowProgress = 1;
           this.activePaths.delete(pathId);
         }
         needsUpdate = true;
@@ -248,17 +284,14 @@ export class CanvasCore {
     }
   }
 
-  private requestRender(): void {
-    // Render is handled by the animation loop
-  }
-
   private render(): void {
     const ctx = this.ctx;
-    const width = this.canvas.width / (window.devicePixelRatio || 1);
-    const height = this.canvas.height / (window.devicePixelRatio || 1);
+    const dpr = window.devicePixelRatio || 1;
+    const width = this.canvas.width / dpr;
+    const height = this.canvas.height / dpr;
 
     ctx.clearRect(0, 0, width, height);
-    this.drawGrid();
+    this.drawGrid(width, height);
 
     ctx.save();
     ctx.translate(this.offsetX, this.offsetY);
@@ -270,14 +303,12 @@ export class CanvasCore {
     ctx.restore();
   }
 
-  private drawGrid(): void {
+  private drawGrid(width: number, height: number): void {
     const ctx = this.ctx;
-    const width = this.canvas.width / (window.devicePixelRatio || 1);
-    const height = this.canvas.height / (window.devicePixelRatio || 1);
 
     const gridSize = 50 * this.scale;
-    const offsetX = this.offsetX % gridSize;
-    const offsetY = this.offsetY % gridSize;
+    const offsetX = ((this.offsetX % gridSize) + gridSize) % gridSize;
+    const offsetY = ((this.offsetY % gridSize) + gridSize) % gridSize;
 
     ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
     ctx.lineWidth = 1;
@@ -322,47 +353,131 @@ export class CanvasCore {
       ctx.stroke();
 
       if (path.isComplete && path.glowProgress < 1) {
-        const glowIntensity = 1 - path.glowProgress;
-        ctx.save();
-        ctx.globalAlpha = glowIntensity * 0.8;
-        ctx.shadowColor = path.color;
-        ctx.shadowBlur = 20 * glowIntensity;
-        ctx.strokeStyle = path.color;
-        ctx.lineWidth = path.width * 0.5;
+        const t = path.glowProgress;
 
         const totalLength = this.getPathLength(path.points);
-        const currentLength = totalLength * path.glowProgress;
+        const glowHeadLength = Math.min(totalLength * 0.2, 80);
+        const currentHead = totalLength * t;
+        const currentTail = Math.max(0, currentHead - glowHeadLength);
         let drawnLength = 0;
 
-        ctx.beginPath();
-        ctx.moveTo(path.points[0].x, path.points[0].y);
+        for (let layer = 0; layer < 3; layer++) {
+          ctx.save();
+          const layerIntensity = (1 - t) * (1 - layer * 0.25);
+          ctx.globalAlpha = layerIntensity * (0.9 - layer * 0.2);
+          ctx.shadowColor = path.color;
+          ctx.shadowBlur = (35 - layer * 8) * (1 - t * 0.5);
+          ctx.strokeStyle = path.color;
+          ctx.lineWidth = path.width * (1.0 - layer * 0.2);
+          ctx.lineCap = 'round';
+          ctx.lineJoin = 'round';
 
-        for (let i = 1; i < path.points.length; i++) {
-          const dx = path.points[i].x - path.points[i - 1].x;
-          const dy = path.points[i].y - path.points[i - 1].y;
-          const segLength = Math.sqrt(dx * dx + dy * dy);
+          let isDrawing = false;
+          let subStart: Point | null = null;
+          drawnLength = 0;
 
-          if (drawnLength + segLength <= currentLength) {
-            const xc = (path.points[i].x + path.points[i - 1].x) / 2;
-            const yc = (path.points[i].y + path.points[i - 1].y) / 2;
-            ctx.quadraticCurveTo(path.points[i - 1].x, path.points[i - 1].y, xc, yc);
+          ctx.beginPath();
+
+          for (let i = 1; i < path.points.length; i++) {
+            const prev = path.points[i - 1];
+            const curr = path.points[i];
+            const dx = curr.x - prev.x;
+            const dy = curr.y - prev.y;
+            const segLength = Math.sqrt(dx * dx + dy * dy);
+
+            const segStart = drawnLength;
+            const segEnd = drawnLength + segLength;
+
+            if (segEnd < currentTail || segStart > currentHead) {
+              drawnLength += segLength;
+              continue;
+            }
+
+            const localTail = Math.max(0, currentTail - segStart);
+            const localHead = Math.min(segLength, currentHead - segStart);
+
+            const tailRatio = localTail / segLength;
+            const headRatio = localHead / segLength;
+
+            const tailX = prev.x + dx * tailRatio;
+            const tailY = prev.y + dy * tailRatio;
+            const headX = prev.x + dx * headRatio;
+            const headY = prev.y + dy * headRatio;
+
+            if (!isDrawing) {
+              subStart = { x: tailX, y: tailY };
+              ctx.moveTo(tailX, tailY);
+              isDrawing = true;
+            }
+
+            const xc = (headX + tailX) / 2;
+            const yc = (headY + tailY) / 2;
+            ctx.quadraticCurveTo(tailX, tailY, xc, yc);
+            ctx.lineTo(headX, headY);
+
             drawnLength += segLength;
-          } else {
-            const remaining = currentLength - drawnLength;
-            const ratio = remaining / segLength;
-            const endX = path.points[i - 1].x + dx * ratio;
-            const endY = path.points[i - 1].y + dy * ratio;
-            ctx.lineTo(endX, endY);
-            break;
           }
-        }
 
-        ctx.stroke();
-        ctx.restore();
+          ctx.stroke();
+
+          if (layer === 0 && subStart) {
+            const endPoint = this.getPointAtLength(path.points, currentHead);
+            if (endPoint) {
+              ctx.beginPath();
+              const particleSize = path.width * 2.2 * (1 - t * 0.4);
+              const gradient = ctx.createRadialGradient(
+                endPoint.x, endPoint.y, 0,
+                endPoint.x, endPoint.y, particleSize * 2.5
+              );
+              gradient.addColorStop(0, path.color);
+              gradient.addColorStop(0.4, path.color + '99');
+              gradient.addColorStop(1, path.color + '00');
+              ctx.fillStyle = gradient;
+              ctx.globalAlpha = (1 - t);
+              ctx.shadowColor = path.color;
+              ctx.shadowBlur = 30;
+              ctx.arc(endPoint.x, endPoint.y, particleSize * 2.5, 0, Math.PI * 2);
+              ctx.fill();
+
+              ctx.beginPath();
+              ctx.fillStyle = '#ffffff';
+              ctx.globalAlpha = (1 - t) * 0.95;
+              ctx.shadowBlur = 20;
+              ctx.arc(endPoint.x, endPoint.y, particleSize * 0.5, 0, Math.PI * 2);
+              ctx.fill();
+            }
+          }
+
+          ctx.restore();
+        }
       }
 
       ctx.restore();
     }
+  }
+
+  private getPointAtLength(points: Point[], targetLength: number): Point | null {
+    if (points.length < 2) return points[0] || null;
+    let accumulated = 0;
+
+    for (let i = 1; i < points.length; i++) {
+      const prev = points[i - 1];
+      const curr = points[i];
+      const dx = curr.x - prev.x;
+      const dy = curr.y - prev.y;
+      const segLen = Math.sqrt(dx * dx + dy * dy);
+
+      if (accumulated + segLen >= targetLength) {
+        const remaining = targetLength - accumulated;
+        const ratio = segLen > 0 ? remaining / segLen : 0;
+        return {
+          x: prev.x + dx * ratio,
+          y: prev.y + dy * ratio,
+        };
+      }
+      accumulated += segLen;
+    }
+    return points[points.length - 1];
   }
 
   private getPathLength(points: Point[]): number {
@@ -395,12 +510,56 @@ export class CanvasCore {
         ctx.fill();
 
         ctx.fillStyle = '#1a1a2e';
-        ctx.font = '12px -apple-system, sans-serif';
+        ctx.font = '12px -apple-system, BlinkMacSystemFont, sans-serif';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.fillText(img.label, img.x + img.width / 2, labelY + labelHeight / 2);
         ctx.restore();
       }
+
+      this.drawImageHandles(img, ctx);
+    }
+  }
+
+  private drawImageHandles(img: ImageItem, ctx: CanvasRenderingContext2D): void {
+    const handleSize = 10;
+    const handleRadius = handleSize / 2;
+    const border = 2;
+
+    ctx.save();
+    ctx.strokeStyle = '#0ea5e9';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([4, 4]);
+    ctx.strokeRect(img.x - border, img.y - border, img.width + border * 2, img.height + border * 2);
+    ctx.restore();
+
+    const corners = [
+      { x: img.x, y: img.y, cursor: 'nw' },
+      { x: img.x + img.width, y: img.y, cursor: 'ne' },
+      { x: img.x, y: img.y + img.height, cursor: 'sw' },
+      { x: img.x + img.width, y: img.y + img.height, cursor: 'se' },
+    ];
+
+    for (const corner of corners) {
+      ctx.save();
+
+      ctx.beginPath();
+      ctx.shadowColor = '#0ea5e9';
+      ctx.shadowBlur = 8;
+      ctx.fillStyle = '#16213e';
+      ctx.strokeStyle = '#0ea5e9';
+      ctx.lineWidth = 1.5;
+      ctx.arc(corner.x, corner.y, handleRadius, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.fillStyle = '#0ea5e9';
+      ctx.shadowBlur = 0;
+      ctx.arc(corner.x, corner.y, handleRadius * 0.45, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.restore();
     }
   }
 
@@ -441,7 +600,7 @@ export class CanvasCore {
   }
 
   public getScale(): number {
-    return this.scale;
+    return this.targetScale;
   }
 
   public getOffset(): Point {
@@ -468,10 +627,10 @@ export class CanvasCore {
   public getImageAtPoint(point: Point): ImageItem | null {
     for (const img of this.images.values()) {
       if (
-        point.x >= img.x &&
-        point.x <= img.x + img.width &&
-        point.y >= img.y &&
-        point.y <= img.y + img.height
+        point.x >= img.x - 4 &&
+        point.x <= img.x + img.width + 4 &&
+        point.y >= img.y - 4 &&
+        point.y <= img.y + img.height + 4
       ) {
         return img;
       }
@@ -480,20 +639,21 @@ export class CanvasCore {
   }
 
   public getResizeHandleAtPoint(point: Point): { imageId: string; handle: string } | null {
-    const handleSize = 10;
+    const handleSize = 14;
+    const half = handleSize / 2;
     for (const img of this.images.values()) {
       const handles = [
-        { name: 'nw', x: img.x - handleSize / 2, y: img.y - handleSize / 2 },
-        { name: 'ne', x: img.x + img.width - handleSize / 2, y: img.y - handleSize / 2 },
-        { name: 'sw', x: img.x - handleSize / 2, y: img.y + img.height - handleSize / 2 },
-        { name: 'se', x: img.x + img.width - handleSize / 2, y: img.y + img.height - handleSize / 2 },
+        { name: 'nw', cx: img.x, cy: img.y },
+        { name: 'ne', cx: img.x + img.width, cy: img.y },
+        { name: 'sw', cx: img.x, cy: img.y + img.height },
+        { name: 'se', cx: img.x + img.width, cy: img.y + img.height },
       ];
       for (const handle of handles) {
         if (
-          point.x >= handle.x &&
-          point.x <= handle.x + handleSize &&
-          point.y >= handle.y &&
-          point.y <= handle.y + handleSize
+          point.x >= handle.cx - half &&
+          point.x <= handle.cx + half &&
+          point.y >= handle.cy - half &&
+          point.y <= handle.cy + half
         ) {
           return { imageId: img.id, handle: handle.name };
         }
