@@ -87,26 +87,26 @@ body {
   padding: 7px 14px;
   border: none;
   border-radius: 8px;
-  background: #f0f2f5;
-  color: #3c4043;
+  background-color: #6b7280;
+  color: #ffffff;
   font-size: 12px;
   font-weight: 700;
   font-family: 'DM Sans', sans-serif;
   cursor: pointer;
-  transition: background 0.3s ease, color 0.3s ease;
+  transition: background-color 0.3s ease-in-out, color 0.3s ease-in-out;
 }
 
 .unified-toggle:hover {
-  background: #e3e6ea;
+  background-color: #5a6270;
 }
 
 .unified-toggle-active {
-  background: #1a73e8;
-  color: #fff;
+  background-color: #3b82f6;
+  color: #ffffff;
 }
 
 .unified-toggle-active:hover {
-  background: #1557b0;
+  background-color: #2563eb;
 }
 
 .app-body {
@@ -375,7 +375,14 @@ body {
   }
 }
 
+.preview-text {
+  transform-origin: top left;
+  will-change: transform, opacity;
+}
+
 .preview-text-scale {
+  transform-origin: top left;
+  will-change: transform, opacity;
   animation: textScale 0.2s ease-out;
 }
 

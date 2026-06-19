@@ -13,24 +13,34 @@ interface EditorPanelProps {
 const FONT_WEIGHTS = Array.from({ length: 9 }, (_, i) => (i + 1) * 100);
 
 export default function EditorPanel({ sample, index, onChange, onRemove, canDelete }: EditorPanelProps) {
-  const debouncedChangeRef = useRef(
-    debounce((updatedSample: TypographySample) => {
-      onChange(updatedSample);
-    }, 30)
-  ).current;
+  const latestOnChangeRef = useRef(onChange);
+  useEffect(() => {
+    latestOnChangeRef.current = onChange;
+  }, [onChange]);
+
+  const debouncedFnRef = useRef(
+    debounce(
+      (updatedSample: TypographySample) => {
+        latestOnChangeRef.current(updatedSample);
+      },
+      30,
+      { leading: false, trailing: true }
+    )
+  );
 
   useEffect(() => {
+    const fn = debouncedFnRef.current;
     return () => {
-      debouncedChangeRef.cancel();
+      fn.flush();
     };
-  }, [debouncedChangeRef]);
+  }, []);
 
   const handleChange = useCallback(
     (updates: Partial<TypographySample>) => {
       const updatedSample = { ...sample, ...updates };
-      debouncedChangeRef(updatedSample);
+      debouncedFnRef.current(updatedSample);
     },
-    [debouncedChangeRef, sample]
+    [sample]
   );
 
   const handleTextChange = useCallback(

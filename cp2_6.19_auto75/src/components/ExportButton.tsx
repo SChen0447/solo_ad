@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { TypographySample } from '@/types';
 
 interface ExportButtonProps {
@@ -8,13 +8,32 @@ interface ExportButtonProps {
 export default function ExportButton({ samples }: ExportButtonProps) {
   const [exporting, setExporting] = useState(false);
   const [exported, setExported] = useState(false);
+  const scaleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const flashTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const samplesRef = useRef(samples);
+
+  useEffect(() => {
+    samplesRef.current = samples;
+  }, [samples]);
+
+  useEffect(() => {
+    return () => {
+      if (scaleTimerRef.current) clearTimeout(scaleTimerRef.current);
+      if (flashTimerRef.current) clearTimeout(flashTimerRef.current);
+    };
+  }, []);
 
   const handleExport = useCallback(() => {
     if (exporting) return;
-    setExporting(true);
 
-    setTimeout(() => {
-      const data = JSON.stringify(samples, null, 2);
+    if (scaleTimerRef.current) clearTimeout(scaleTimerRef.current);
+    if (flashTimerRef.current) clearTimeout(flashTimerRef.current);
+
+    setExporting(true);
+    setExported(false);
+
+    scaleTimerRef.current = setTimeout(() => {
+      const data = JSON.stringify(samplesRef.current, null, 2);
       const blob = new Blob([data], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -27,9 +46,12 @@ export default function ExportButton({ samples }: ExportButtonProps) {
 
       setExporting(false);
       setExported(true);
-      setTimeout(() => setExported(false), 500);
+
+      flashTimerRef.current = setTimeout(() => {
+        setExported(false);
+      }, 500);
     }, 300);
-  }, [samples, exporting]);
+  }, [exporting]);
 
   return (
     <button

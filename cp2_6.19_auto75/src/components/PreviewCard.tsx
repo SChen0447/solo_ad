@@ -65,10 +65,6 @@ export default function PreviewCard({ sample, index, staggerDelay = 0 }: Preview
   const fontTransitionStyle =
     fontTransition !== 'idle' ? 'opacity 0.15s ease-in-out' : 'opacity 0s';
 
-  const scaleStyle = scaleAnim
-    ? 'transform 0.2s ease-out'
-    : 'transform 0s';
-
   return (
     <div
       className={`preview-card ${entering ? 'preview-card-entering' : ''}`}
@@ -86,7 +82,7 @@ export default function PreviewCard({ sample, index, staggerDelay = 0 }: Preview
         className={`preview-card-body ${bgFlash ? 'preview-card-flash' : ''}`}
       >
         <p
-          className={`${scaleAnim ? 'preview-text-scale' : ''}`}
+          className={`${scaleAnim ? 'preview-text-scale' : 'preview-text'}`}
           style={{
             fontFamily: `'${displayFont}', sans-serif`,
             fontSize: `${sample.fontSize}px`,
@@ -94,10 +90,9 @@ export default function PreviewCard({ sample, index, staggerDelay = 0 }: Preview
             fontWeight: sample.fontWeight,
             color: sample.color,
             opacity: fontOpacity,
-            transition: `${fontTransitionStyle}, ${scaleStyle}`,
+            transition: fontTransitionStyle,
             wordBreak: 'break-word',
             whiteSpace: 'pre-wrap',
-            transformOrigin: 'center left',
           }}
         >
           {sample.text}
