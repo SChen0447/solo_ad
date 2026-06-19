@@ -19,9 +19,10 @@ const PostCard: React.FC<PostCardProps> = ({
   isAdmin = true
 }) => {
   const tag = tags.find(t => t.id === post.tag);
-  const summary = post.content.length > 100 
-    ? post.content.substring(0, 100) + '...' 
-    : post.content;
+  const plainContent = post.content.replace(/\n/g, ' ').replace(/\s+/g, ' ').trim();
+  const summary = plainContent.length > 100 
+    ? plainContent.substring(0, 100) + '...' 
+    : plainContent;
 
   const formatDate = (timestamp: number): string => {
     const date = new Date(timestamp);

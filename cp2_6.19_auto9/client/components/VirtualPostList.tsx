@@ -1,4 +1,5 @@
-import React, { useState, useRef, useCallback, useEffect } from 'react';
+import React, { useRef, useEffect } from 'react';
+import { FixedSizeList as List, ListChildComponentProps } from 'react-window';
 import { Post, Tag } from '../types';
 import PostCard from './PostCard';
 
@@ -25,32 +26,51 @@ const VirtualPostList: React.FC<VirtualPostListProps> = ({
   overscan = 5,
   threshold = 30
 }) => {
+  const listRef = useRef<List>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const [scrollTop, setScrollTop] = useState(0);
-  const [containerHeight, setContainerHeight] = useState(0);
-
+  const [containerHeight, setContainerHeight] = React.useState(600);
   const useVirtualScroll = posts.length > threshold;
 
   useEffect(() => {
-    const container = containerRef.current;
-    if (!container || !useVirtualScroll) return;
-
     const updateHeight = () => {
-      setContainerHeight(container.clientHeight);
+      if (containerRef.current) {
+        const vh = window.innerHeight;
+        const topOffset = containerRef.current.getBoundingClientRect().top;
+        const maxHeight = vh - topOffset - 40;
+        setContainerHeight(Math.max(400, Math.min(maxHeight, 700)));
+      }
     };
 
     updateHeight();
     window.addEventListener('resize', updateHeight);
-    return () => window.removeEventListener('resize', updateHeight);
-  }, [useVirtualScroll]);
-
-  const handleScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
-    setScrollTop(e.currentTarget.scrollTop);
+    
+    const timeout = setTimeout(updateHeight, 100);
+    
+    return () => {
+      window.removeEventListener('resize', updateHeight);
+      clearTimeout(timeout);
+    };
   }, []);
 
-  const renderPosts = () => {
-    if (!useVirtualScroll) {
-      return posts.map(post => (
+  const Row = ({ index, style }: ListChildComponentProps) => {
+    const post = posts[index];
+    return (
+      <div style={style} className="virtual-list__item">
+        <PostCard
+          post={post}
+          tags={tags}
+          onSelect={onSelectPost}
+          onToggleTop={onToggleTop}
+          onToggleFeatured={onToggleFeatured}
+          isAdmin={isAdmin}
+        />
+      </div>
+    );
+  };
+
+  const renderPlainList = () => (
+    <div className="post-list post-list--plain">
+      {posts.map(post => (
         <PostCard
           key={post.id}
           post={post}
@@ -60,69 +80,39 @@ const VirtualPostList: React.FC<VirtualPostListProps> = ({
           onToggleFeatured={onToggleFeatured}
           isAdmin={isAdmin}
         />
-      ));
-    }
-
-    const startIndex = Math.max(0, Math.floor(scrollTop / itemHeight) - overscan);
-    const endIndex = Math.min(
-      posts.length,
-      Math.ceil((scrollTop + containerHeight) / itemHeight) + overscan
-    );
-
-    const visiblePosts = posts.slice(startIndex, endIndex);
-    const totalHeight = posts.length * itemHeight;
-    const offsetY = startIndex * itemHeight;
-
-    return (
-      <div style={{ height: totalHeight, position: 'relative' }}>
-        <div style={{ transform: `translateY(${offsetY}px)` }}>
-          {visiblePosts.map((post, index) => (
-            <div
-              key={post.id}
-              style={{
-                height: itemHeight,
-                position: 'absolute',
-                top: index * itemHeight,
-                left: 0,
-                right: 0
-              }}
-            >
-              <PostCard
-                post={post}
-                tags={tags}
-                onSelect={onSelectPost}
-                onToggleTop={onToggleTop}
-                onToggleFeatured={onToggleFeatured}
-                isAdmin={isAdmin}
-              />
-            </div>
-          ))}
-        </div>
-      </div>
-    );
-  };
-
-  return (
-    <div
-      ref={containerRef}
-      className="post-list"
-      onScroll={handleScroll}
-    >
-      {posts.length === 0 ? (
-        <div className="post-list__empty">
-          暂无帖子，快来发布第一篇吧～
-        </div>
-      ) : (
-        renderPosts()
-      )}
-      
-      {useVirtualScroll && (
-        <div className="post-list__hint">
-          共 {posts.length} 条帖子（虚拟滚动已启用）
-        </div>
-      )}
+      ))}
     </div>
   );
+
+  const renderVirtualList = () => (
+    <div ref={containerRef} className="post-list post-list--virtual">
+      <List
+        ref={listRef}
+        height={containerHeight}
+        itemCount={posts.length}
+        itemSize={itemHeight}
+        width="100%"
+        overscanCount={overscan}
+        className="virtual-list"
+        itemData={posts}
+      >
+        {Row}
+      </List>
+      <div className="post-list__hint">
+        共 {posts.length} 条帖子（虚拟滚动已启用）
+      </div>
+    </div>
+  );
+
+  if (posts.length === 0) {
+    return (
+      <div className="post-list__empty">
+        暂无帖子，快来发布第一篇吧～
+      </div>
+    );
+  }
+
+  return useVirtualScroll ? renderVirtualList() : renderPlainList();
 };
 
 export default VirtualPostList;

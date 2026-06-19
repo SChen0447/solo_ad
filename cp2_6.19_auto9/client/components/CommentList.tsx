@@ -12,26 +12,34 @@ const CommentList: React.FC<CommentListProps> = ({ postId }) => {
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const listRef = useRef<HTMLDivElement>(null);
+  const lastCommentRef = useRef<HTMLDivElement>(null);
   const [newCommentId, setNewCommentId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     fetchComments();
   }, [postId]);
 
   useEffect(() => {
-    if (newCommentId && listRef.current) {
-      listRef.current.scrollTop = listRef.current.scrollHeight;
+    if (newCommentId && lastCommentRef.current) {
+      lastCommentRef.current.scrollIntoView({
+        behavior: 'smooth',
+        block: 'end'
+      });
     }
   }, [comments, newCommentId]);
 
   const fetchComments = async () => {
     setLoading(true);
+    setError(null);
     try {
       const response = await fetch(`/api/posts/${postId}/comments`);
+      if (!response.ok) throw new Error('获取评论失败');
       const data = await response.json();
       setComments(data);
     } catch (error) {
       console.error('获取评论失败:', error);
+      setError('加载评论失败，请稍后重试');
     } finally {
       setLoading(false);
     }
@@ -100,15 +108,18 @@ const CommentList: React.FC<CommentListProps> = ({ postId }) => {
       <div className="comment-list__container" ref={listRef}>
         {loading ? (
           <div className="comment-list__loading">加载中...</div>
+        ) : error ? (
+          <div className="comment-list__error">{error}</div>
         ) : comments.length === 0 ? (
           <div className="comment-list__empty">
             暂无评论，快来发表第一条评论吧～
           </div>
         ) : (
           <div className="comment-list__items">
-            {comments.map(comment => (
+            {comments.map((comment, index) => (
               <div
                 key={comment.id}
+                ref={index === comments.length - 1 ? lastCommentRef : null}
                 className={`comment-item ${newCommentId === comment.id ? 'comment-item--new' : ''}`}
               >
                 <div 

@@ -1,4 +1,5 @@
 import express, { Request, Response } from 'express';
+import net from 'net';
 import {
   getPosts,
   getPost,
@@ -13,7 +14,8 @@ import {
 } from './data';
 
 const app = express();
-const PORT = 3001;
+const START_PORT = 3001;
+const MAX_PORT_TRIES = 10;
 
 app.use(express.json());
 
@@ -105,8 +107,44 @@ app.post('/api/generate-more', (req: Request, res: Response) => {
   res.json({ success: true, count: count || 20 });
 });
 
-app.listen(PORT, () => {
-  console.log(`Server is running on http://localhost:${PORT}`);
-});
+const checkPortAvailable = (port: number): Promise<boolean> => {
+  return new Promise(resolve => {
+    const server = net.createServer();
+    server.once('error', () => resolve(false));
+    server.once('listening', () => {
+      server.close();
+      resolve(true);
+    });
+    server.listen(port);
+  });
+};
+
+const startServer = async () => {
+  let port = START_PORT;
+  let found = false;
+  
+  for (let i = 0; i < MAX_PORT_TRIES; i++) {
+    const available = await checkPortAvailable(port);
+    if (available) {
+      found = true;
+      break;
+    }
+    console.log(`端口 ${port} 被占用，尝试下一个端口...`);
+    port++;
+  }
+  
+  if (!found) {
+    console.error(`错误：无法找到可用端口（已尝试 ${MAX_PORT_TRIES} 个端口）`);
+    process.exit(1);
+  }
+  
+  app.listen(port, () => {
+    console.log(`Server is running on http://localhost:${port}`);
+  });
+  
+  return port;
+};
+
+startServer();
 
 export default app;
