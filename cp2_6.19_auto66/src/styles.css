@@ -1,0 +1,188 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  font-family: 'Courier New', Courier, monospace;
+  background: linear-gradient(180deg, #0a0a2e 0%, #1a1a3e 100%);
+}
+
+#app {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+}
+
+#app canvas {
+  display: block;
+}
+
+#info-panel {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  width: 220px;
+  background: rgba(30, 30, 60, 0.6);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  padding: 16px;
+  color: #fff;
+  font-family: 'Courier New', Courier, monospace;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+  z-index: 100;
+  transition: all 0.3s ease;
+}
+
+#info-panel.hidden {
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(20px);
+}
+
+.panel-header {
+  font-size: 14px;
+  font-weight: bold;
+  color: #6496ff;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  letter-spacing: 1px;
+}
+
+.panel-content {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.info-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+}
+
+.info-row .label {
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.info-row span:last-child {
+  color: #fff;
+  font-weight: bold;
+}
+
+#mobile-handle {
+  position: fixed;
+  bottom: 280px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 60px;
+  height: 20px;
+  background: rgba(30, 30, 60, 0.8);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border-radius: 12px 12px 0 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 99;
+  cursor: grab;
+  touch-action: none;
+}
+
+#mobile-handle.hidden {
+  display: none;
+}
+
+#mobile-handle:active {
+  cursor: grabbing;
+}
+
+.handle-bar {
+  width: 30px;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.4);
+  border-radius: 2px;
+}
+
+.dg.main .c {
+  background: transparent !important;
+}
+
+.dg.main .folder {
+  background: transparent !important;
+}
+
+.dg .cr {
+  border-left: 3px solid transparent !important;
+  transition: all 0.2s ease;
+}
+
+.dg .cr:hover {
+  transform: translateY(-2px);
+  background: rgba(255, 255, 255, 0.05) !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.dg .property-name {
+  color: rgba(255, 255, 255, 0.8) !important;
+  font-family: 'Courier New', Courier, monospace !important;
+  font-size: 12px !important;
+}
+
+.dg .c input[type="text"] {
+  color: #fff !important;
+  background: rgba(255, 255, 255, 0.1) !important;
+  border: none !important;
+  font-family: 'Courier New', Courier, monospace !important;
+  font-size: 12px !important;
+}
+
+.dg .slider {
+  background: rgba(255, 255, 255, 0.1) !important;
+}
+
+.dg .slider-fg {
+  background: linear-gradient(90deg, #6496ff, #a0c0ff) !important;
+}
+
+.dg .title {
+  background: rgba(100, 150, 255, 0.3) !important;
+  color: #fff !important;
+  font-family: 'Courier New', Courier, monospace !important;
+  font-size: 13px !important;
+  font-weight: bold !important;
+  letter-spacing: 1px;
+}
+
+.dg li:not(.folder) {
+  background: transparent !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05) !important;
+}
+
+.dg.close-button {
+  background: rgba(100, 150, 255, 0.3) !important;
+}
+
+@media (max-width: 768px) {
+  #info-panel {
+    top: auto;
+    bottom: 310px;
+    right: 10px;
+    left: 10px;
+    width: auto;
+  }
+
+  #info-panel.hidden {
+    transform: translateY(20px);
+  }
+}

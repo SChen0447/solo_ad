@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>三维重力场与行星运动模拟</title>
+  <link rel="stylesheet" href="/src/styles.css">
+</head>
+<body>
+  <div id="app"></div>
+  <div id="info-panel" class="hidden">
+    <div class="panel-header">行星信息</div>
+    <div class="panel-content">
+      <div class="info-row"><span class="label">名称:</span><span id="info-name">-</span></div>
+      <div class="info-row"><span class="label">质量:</span><span id="info-mass">-</span></div>
+      <div class="info-row"><span class="label">速度:</span><span id="info-velocity">-</span></div>
+      <div class="info-row"><span class="label">轨道半径:</span><span id="info-radius">-</span></div>
+      <div class="info-row"><span class="label">公转周期:</span><span id="info-period">-</span></div>
+    </div>
+  </div>
+  <div id="mobile-handle" class="hidden">
+    <div class="handle-bar"></div>
+  </div>
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
