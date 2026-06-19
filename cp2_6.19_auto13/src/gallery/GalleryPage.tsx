@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { X, Heart } from 'lucide-react';
 import GalleryCard from './GalleryCard';
 import { useGalleryStore } from '@/store/galleryStore';
@@ -11,9 +12,16 @@ export default function GalleryPage() {
   const selectPainting = useGalleryStore((s) => s.selectPainting);
   const toggleCollection = useGalleryStore((s) => s.toggleCollection);
   const isCollected = useGalleryStore((s) => s.isCollected);
+  const [heartAnimating, setHeartAnimating] = useState(false);
 
   const selectedPainting = paintings.find((p) => p.id === selectedPaintingId) ?? null;
   const panelOpen = selectedPaintingId !== null;
+
+  const handleToggleCollect = (paintingId: string) => {
+    setHeartAnimating(true);
+    window.setTimeout(() => setHeartAnimating(false), 200);
+    toggleCollection(paintingId);
+  };
 
   return (
     <div className="min-h-screen bg-gallery-bg font-body">
@@ -89,19 +97,20 @@ export default function GalleryPage() {
                 </div>
 
                 <button
-                  onClick={() => toggleCollection(selectedPainting.id)}
-                  className={`mt-4 w-full py-2.5 rounded-card font-medium text-sm transition-colors duration-200 flex items-center justify-center gap-2
+                  onClick={() => handleToggleCollect(selectedPainting.id)}
+                  className={`mt-4 w-full py-2.5 rounded-card font-medium text-sm transition-all duration-200 ease-out flex items-center justify-center gap-2 scale-100
+                    ${heartAnimating ? 'animate-heart-pop' : ''}
                     ${
                       isCollected(selectedPainting.id)
-                        ? 'bg-gallery-accent/20 text-gallery-accent border border-gallery-accent/40'
-                        : 'bg-gallery-card text-gallery-muted border border-gallery-deep/40 hover:border-gallery-accent/40 hover:text-gallery-accent'
+                        ? 'bg-[#e94560]/20 text-[#e94560] border border-[#e94560]/40'
+                        : 'bg-gallery-card text-gallery-muted border border-gallery-deep/40 hover:border-[#e94560]/40 hover:text-[#e94560]'
                     }`}
                 >
                   <Heart
                     size={16}
                     className={
                       isCollected(selectedPainting.id)
-                        ? 'fill-gallery-accent text-gallery-accent'
+                        ? 'fill-[#e94560] text-[#e94560]'
                         : ''
                     }
                   />

@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Heart, MessageCircle, Eye } from 'lucide-react';
 import type { Painting } from '@/data/mockData';
 import { useGalleryStore } from '@/store/galleryStore';
@@ -10,11 +11,14 @@ interface GalleryCardProps {
 export default function GalleryCard({ painting, onClick }: GalleryCardProps) {
   const toggleCollection = useGalleryStore((s) => s.toggleCollection);
   const isCollected = useGalleryStore((s) => s.isCollected(painting.id));
+  const [animating, setAnimating] = useState(false);
 
   const collected = isCollected;
 
   const handleHeartClick = (e: React.MouseEvent) => {
     e.stopPropagation();
+    setAnimating(true);
+    window.setTimeout(() => setAnimating(false), 200);
     toggleCollection(painting.id);
   };
 
@@ -58,9 +62,9 @@ export default function GalleryCard({ painting, onClick }: GalleryCardProps) {
 
           <button
             onClick={handleHeartClick}
-            className="p-1.5 rounded-full transition-all duration-200 ease-out
+            className={`p-1.5 rounded-full transition-all duration-200 ease-out scale-100
               hover:bg-gallery-accent/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-gallery-accent
-              active:scale-80"
+              ${animating ? 'animate-heart-pop' : ''}`}
             aria-label={collected ? '取消收藏' : '收藏'}
           >
             <Heart
