@@ -17,6 +17,10 @@ export interface FleetData {
   ships: PlacedShip[];
 }
 
+interface GridParticle {
+  x: number; y: number; size: number; phase: number; period: number;
+}
+
 export class FleetManager {
   private ships: PlacedShip[] = [];
   private container: HTMLElement | null = null;
@@ -25,6 +29,15 @@ export class FleetManager {
   private dragOffset = { x: 0, y: 0 };
   private onChange: ((fleet: FleetData) => void) | null = null;
   private idCounter = 0;
+  private gridParticles: GridParticle[] = [];
+  private gridAnimFrame: number | null = null;
+  private gridTime = 0;
+  private dragPending = false;
+  private dragMouseX = 0;
+  private dragMouseY = 0;
+  private dragRafId: number | null = null;
+  private dragLayer: HTMLElement | null = null;
+  private dragGrid: HTMLCanvasElement | null = null;
 
   constructor() {
     this.loadFleet();
@@ -135,6 +148,7 @@ export class FleetManager {
   }
 
   render(root: HTMLElement, onStartBattle: () => void): void {
+    this.stopGridAnimation();
     this.container = root;
     root.innerHTML = '';
 
@@ -385,17 +399,58 @@ export class FleetManager {
     });
   }
 
-  private renderShips(layer: HTMLElement, gridCanvas: HTMLCanvasElement): void {
+  private renderShips(layer: HTMLElement, gridCanvas: HTMLCanvasElement, rebind: boolean = true): void {
+    const existingGhost = document.getElementById('drag-ghost');
     layer.innerHTML = '';
+    if (existingGhost) layer.appendChild(existingGhost);
+
+    if (this.draggingShip && !existingGhost) {
+      const ghost = document.createElement('div');
+      ghost.id = 'drag-ghost';
+      const preset = SHIP_PRESETS[this.draggingShip.type];
+      const rect = layer.getBoundingClientRect();
+      const px = this.dragMouseX - rect.left - this.dragOffset.x;
+      const py = this.dragMouseY - rect.top - this.dragOffset.y;
+      ghost.style.cssText = `
+        position:absolute;left:${px}px;top:${py}px;
+        width:${CELL_SIZE}px;height:${CELL_SIZE}px;
+        display:flex;align-items:center;justify-content:center;
+        opacity:0.65;pointer-events:none;z-index:1000;
+        transition:opacity 0.1s;
+      `;
+      const gInner = document.createElement('div');
+      gInner.style.cssText = `
+        width:38px;height:38px;display:flex;align-items:center;justify-content:center;
+        background:radial-gradient(circle, ${preset.stats.color}60 0%, transparent 70%);
+        border:2px solid rgba(0,212,255,0.9);
+        border-radius:6px;
+        box-shadow:0 0 20px rgba(0,212,255,0.8);
+        transform: rotate(${this.draggingShip.facing}deg);
+      `;
+      const sz = preset.stats.size;
+      const gBody = document.createElement('div');
+      gBody.style.cssText = `
+        width:${sz + 6}px;height:${Math.max(8, sz * 0.6)}px;
+        background:linear-gradient(90deg, ${preset.stats.color}aa, ${preset.stats.accentColor});
+        clip-path:polygon(0 50%, 40% 0, 85% 25%, 100% 50%, 85% 75%, 40% 100%);
+        box-shadow:0 0 8px ${preset.stats.color};
+      `;
+      gInner.appendChild(gBody);
+      ghost.appendChild(gInner);
+      layer.appendChild(ghost);
+    }
+
     this.ships.forEach(s => {
       const preset = SHIP_PRESETS[s.type];
       const el = document.createElement('div');
       const isSel = this.selectedId === s.id;
+      const isDragging = this.draggingShip?.id === s.id;
       el.style.cssText = `
         position:absolute;left:${s.gridX * CELL_SIZE}px;top:${s.gridY * CELL_SIZE}px;
         width:${CELL_SIZE}px;height:${CELL_SIZE}px;
         display:flex;align-items:center;justify-content:center;
         cursor:grab;z-index:${isSel ? 10 : 1};
+        ${isDragging ? 'opacity:0.3;' : ''}
       `;
 
       const inner = document.createElement('div');
@@ -419,32 +474,54 @@ export class FleetManager {
       inner.appendChild(body);
       el.appendChild(inner);
 
-      el.addEventListener('mousedown', (ev) => {
-        ev.preventDefault();
-        this.draggingShip = s;
-        const rect = el.getBoundingClientRect();
-        this.dragOffset = { x: ev.clientX - rect.left, y: ev.clientY - rect.top };
-        el.style.zIndex = '100';
-        el.style.pointerEvents = 'none';
-      });
+      if (rebind) {
+        el.addEventListener('mousedown', (ev) => {
+          ev.preventDefault();
+          this.draggingShip = s;
+          const rect = el.getBoundingClientRect();
+          this.dragOffset = { x: ev.clientX - rect.left, y: ev.clientY - rect.top };
+          el.style.zIndex = '100';
+          el.style.pointerEvents = 'none';
+          this.dragLayer = layer;
+          this.dragGrid = gridCanvas;
+        });
 
-      el.addEventListener('dblclick', () => {
-        s.facing = (s.facing + 90) % 360;
-        this.saveFleet();
-        this.selectedId = s.id;
-        this.renderShips(layer, gridCanvas);
-      });
+        el.addEventListener('dblclick', () => {
+          s.facing = (s.facing + 90) % 360;
+          this.saveFleet();
+          this.selectedId = s.id;
+          this.renderShips(layer, gridCanvas);
+        });
+      }
 
       layer.appendChild(el);
     });
 
-    const globalMouseMove = (ev: MouseEvent) => {
-      if (!this.draggingShip || !layer.parentElement) return;
+    if (!rebind) return;
+
+    const updateDrag = () => {
+      if (!this.draggingShip || !this.dragLayer?.parentElement) {
+        this.dragRafId = null;
+        this.dragPending = false;
+        return;
+      }
+      this.dragPending = false;
+      const layer = this.dragLayer;
+      const grid = this.dragGrid;
       const rect = layer.getBoundingClientRect();
-      const nx = ev.clientX - rect.left - this.dragOffset.x + CELL_SIZE / 2;
-      const ny = ev.clientY - rect.top - this.dragOffset.y + CELL_SIZE / 2;
+      const nx = this.dragMouseX - rect.left - this.dragOffset.x + CELL_SIZE / 2;
+      const ny = this.dragMouseY - rect.top - this.dragOffset.y + CELL_SIZE / 2;
       const gx = Math.max(0, Math.min(GRID_COLS - 1, Math.floor(nx / CELL_SIZE)));
       const gy = Math.max(0, Math.min(GRID_ROWS - 1, Math.floor(ny / CELL_SIZE)));
+
+      const ghost = document.getElementById('drag-ghost');
+      if (layer && ghost) {
+        const px = this.dragMouseX - rect.left - this.dragOffset.x;
+        const py = this.dragMouseY - rect.top - this.dragOffset.y;
+        ghost.style.left = px + 'px';
+        ghost.style.top = py + 'px';
+      }
+
       if (gx !== this.draggingShip.gridX || gy !== this.draggingShip.gridY) {
         const occupant = this.getShipAt(gx, gy);
         if (occupant && occupant.id !== this.draggingShip.id) {
@@ -456,13 +533,40 @@ export class FleetManager {
         this.draggingShip.gridX = gx;
         this.draggingShip.gridY = gy;
         this.saveFleet();
-        this.renderShips(layer, gridCanvas);
+        if (layer && grid) this.renderShips(layer, grid, false);
+      }
+
+      if (this.dragRafId !== null) cancelAnimationFrame(this.dragRafId);
+      this.dragRafId = requestAnimationFrame(updateDrag);
+    };
+
+    const globalMouseMove = (ev: MouseEvent) => {
+      if (!this.draggingShip) return;
+      this.dragMouseX = ev.clientX;
+      this.dragMouseY = ev.clientY;
+      if (!this.dragPending) {
+        this.dragPending = true;
+        if (this.dragRafId === null) {
+          this.dragRafId = requestAnimationFrame(updateDrag);
+        }
       }
     };
 
     const globalMouseUp = () => {
       if (this.draggingShip) {
         this.draggingShip = null;
+        if (this.dragRafId !== null) {
+          cancelAnimationFrame(this.dragRafId);
+          this.dragRafId = null;
+        }
+        this.dragPending = false;
+        const ghost = document.getElementById('drag-ghost');
+        if (ghost) ghost.remove();
+        if (this.dragLayer && this.dragGrid) {
+          this.renderShips(this.dragLayer, this.dragGrid, false);
+        }
+        this.dragLayer = null;
+        this.dragGrid = null;
         document.removeEventListener('mousemove', globalMouseMove);
         document.removeEventListener('mouseup', globalMouseUp);
       }
@@ -472,16 +576,65 @@ export class FleetManager {
     document.addEventListener('mouseup', globalMouseUp);
   }
 
-  private drawGrid(canvas: HTMLCanvasElement, w: number, h: number): void {
+  private initGridParticles(w: number, h: number): void {
+    this.gridParticles = [];
+    const count = 50 + Math.floor(Math.random() * 31);
+    const candidatePositions: { x: number; y: number }[] = [];
+    for (let x = 0; x <= GRID_COLS; x++) {
+      for (let y = 0; y <= GRID_ROWS; y++) {
+        candidatePositions.push({ x: x * CELL_SIZE, y: y * CELL_SIZE });
+      }
+    }
+    const shuffled = candidatePositions.sort(() => Math.random() - 0.5);
+    for (let i = 0; i < Math.min(count, shuffled.length); i++) {
+      const pos = shuffled[i];
+      this.gridParticles.push({
+        x: pos.x + (Math.random() - 0.5) * 4,
+        y: pos.y + (Math.random() - 0.5) * 4,
+        size: 1 + Math.random() * 2,
+        phase: Math.random() * Math.PI * 2,
+        period: 2 + Math.random() * 2
+      });
+    }
+  }
+
+  private startGridAnimation(canvas: HTMLCanvasElement, w: number, h: number): void {
+    if (this.gridAnimFrame !== null) cancelAnimationFrame(this.gridAnimFrame);
+    this.gridTime = 0;
+    let last = performance.now();
     const ctx = canvas.getContext('2d')!;
+    const loop = (now: number) => {
+      const dt = Math.min(0.05, (now - last) / 1000);
+      last = now;
+      this.gridTime += dt;
+      this.drawGridFrame(ctx, w, h);
+      this.gridAnimFrame = requestAnimationFrame(loop);
+    };
+    this.gridAnimFrame = requestAnimationFrame(loop);
+  }
+
+  private stopGridAnimation(): void {
+    if (this.gridAnimFrame !== null) {
+      cancelAnimationFrame(this.gridAnimFrame);
+      this.gridAnimFrame = null;
+    }
+  }
+
+  private drawGridFrame(ctx: CanvasRenderingContext2D, w: number, h: number): void {
+    const driftPhase = (this.gridTime / 30) * Math.PI * 2;
+    const drift = Math.sin(driftPhase) * 2.5;
+
+    ctx.clearRect(0, 0, w, h);
     ctx.fillStyle = 'rgba(0,20,60,0.4)';
     ctx.fillRect(0, 0, w, h);
+
     ctx.strokeStyle = 'rgba(0,212,255,0.15)';
     ctx.lineWidth = 1;
     for (let x = 0; x <= GRID_COLS; x++) {
+      const xPos = x * CELL_SIZE + 0.5 + drift;
       ctx.beginPath();
-      ctx.moveTo(x * CELL_SIZE + 0.5, 0);
-      ctx.lineTo(x * CELL_SIZE + 0.5, h);
+      ctx.moveTo(xPos, 0);
+      ctx.lineTo(xPos, h);
       ctx.stroke();
     }
     for (let y = 0; y <= GRID_ROWS; y++) {
@@ -490,12 +643,26 @@ export class FleetManager {
       ctx.lineTo(w, y * CELL_SIZE + 0.5);
       ctx.stroke();
     }
+
+    for (const p of this.gridParticles) {
+      const alpha = 0.3 + 0.5 * (0.5 + 0.5 * Math.sin(this.gridTime * (Math.PI * 2) / p.period + p.phase));
+      ctx.fillStyle = `rgba(140, 200, 255, ${alpha * 0.75})`;
+      ctx.beginPath();
+      ctx.arc(p.x + drift, p.y, p.size, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
     const grad = ctx.createLinearGradient(0, 0, w, 0);
     grad.addColorStop(0, 'rgba(122,255,154,0.12)');
     grad.addColorStop(0.6, 'rgba(0,212,255,0.05)');
     grad.addColorStop(1, 'rgba(255,100,100,0.1)');
     ctx.fillStyle = grad;
     ctx.fillRect(0, 0, w, h);
+  }
+
+  private drawGrid(canvas: HTMLCanvasElement, w: number, h: number): void {
+    this.initGridParticles(w, h);
+    this.startGridAnimation(canvas, w, h);
   }
 
   private drawStars(canvas: HTMLCanvasElement): void {

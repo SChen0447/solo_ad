@@ -133,7 +133,11 @@ export class BattleReport {
     const s2 = document.createElement('button'); s2.textContent = '2x';
     const s4 = document.createElement('button'); s4.textContent = '4x';
     const highlight = (v: number) => {
-      [[s1, 1], [s2, 2], [s4, 4]].forEach(([b, vv]: [HTMLButtonElement, number]) => {
+      ([
+        [s1, 1] as [HTMLButtonElement, number],
+        [s2, 2] as [HTMLButtonElement, number],
+        [s4, 4] as [HTMLButtonElement, number]
+      ]).forEach(([b, vv]) => {
         if (vv === v) {
           b.style.background = 'rgba(0,212,255,0.3)';
           b.style.borderColor = '#00d4ff';
