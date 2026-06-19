@@ -1,5 +1,45 @@
 export type CardType = 'attack' | 'defense' | 'heal';
 
+export interface CardConfig {
+  energyCost: number;
+  color: string;
+  borderColor: string;
+  icon: string;
+  valueRange: [number, number];
+  names: string[];
+  descriptionTemplate: (value: number) => string;
+}
+
+export const CARD_CONFIGS: Readonly<Record<CardType, CardConfig>> = {
+  attack: {
+    energyCost: 2,
+    color: '#e94560',
+    borderColor: '#ff6b6b',
+    icon: '\u2694',
+    valueRange: [5, 8],
+    names: ['烈焰斩', '暗影刺', '雷霆击', '冰霜箭', '烈焰风暴'],
+    descriptionTemplate: (v) => `造成 ${v} 点伤害`,
+  },
+  defense: {
+    energyCost: 1,
+    color: '#0f3460',
+    borderColor: '#4a9eff',
+    icon: '\u{1F6E1}',
+    valueRange: [3, 5],
+    names: ['铁壁', '圣光盾', '冰甲', '暗影屏障', '岩石护甲'],
+    descriptionTemplate: (v) => `获得 ${v} 点护甲`,
+  },
+  heal: {
+    energyCost: 1,
+    color: '#2d6a4f',
+    borderColor: '#52b788',
+    icon: '\u2764',
+    valueRange: [3, 5],
+    names: ['生命之泉', '圣光治愈', '自然恢复', '能量注入', '疗愈之光'],
+    descriptionTemplate: (v) => `恢复 ${v} 点生命`,
+  },
+};
+
 export interface Card {
   id: string;
   type: CardType;

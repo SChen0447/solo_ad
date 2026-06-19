@@ -101,11 +101,22 @@ export class GameLogic {
 
     this.state.turnPhase = 'player_end';
     this.state.battlefieldCard = undefined;
-    this.state.player.armor = 0;
 
     setTimeout(() => {
-      this.beginAITurn();
+      this.handleTurn('player_to_ai');
     }, 300);
+  }
+
+  handleTurn(direction: 'player_to_ai' | 'ai_to_player'): void {
+    if (this.state.gameOver) return;
+
+    if (direction === 'player_to_ai') {
+      this.state.player.armor = 0;
+      this.beginAITurn();
+    } else {
+      this.state.ai.armor = 0;
+      this.beginPlayerTurn();
+    }
   }
 
   update(_dt: number): void {
@@ -180,7 +191,6 @@ export class GameLogic {
     this.state.currentPlayer = 'ai';
     this.state.turnPhase = 'ai_draw';
     this.state.ai.energy = INITIAL_ENERGY;
-    this.state.ai.armor = 0;
     CardDeck.drawCards(this.state.ai, DRAW_PER_TURN);
 
     this.state.message = 'AI回合';
@@ -217,7 +227,7 @@ export class GameLogic {
       this.state.turnPhase = 'ai_end';
       this.state.battlefieldCard = undefined;
       setTimeout(() => {
-        this.beginPlayerTurn();
+        this.handleTurn('ai_to_player');
       }, 400);
       return;
     }
@@ -225,7 +235,9 @@ export class GameLogic {
     const card = this.state.ai.hand.find((c) => c.id === action);
     if (!card) {
       this.state.turnPhase = 'ai_end';
-      setTimeout(() => this.beginPlayerTurn(), 400);
+      setTimeout(() => {
+        this.handleTurn('ai_to_player');
+      }, 400);
       return;
     }
 

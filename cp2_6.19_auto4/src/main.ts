@@ -14,48 +14,39 @@ const input = new InputHandler(canvas, gameLogic, renderer);
 input.attach();
 gameLogic.init();
 
-const TARGET_FPS = 60;
 const MIN_FPS = 30;
-const FRAME_TIME_MAX = 1000 / MIN_FPS;
-const FRAME_TIME_TARGET = 1000 / TARGET_FPS;
+const MIN_FRAME_INTERVAL = 1000 / MIN_FPS;
+const MAX_FRAME_INTERVAL = 1000 / 20;
 
 let lastTime = performance.now();
-let accumulator = 0;
 let frameCount = 0;
 let fpsTimer = 0;
-let lastRenderTime = 0;
 
 function loop(now: number): void {
-  let frameTime = now - lastTime;
+  const frameInterval = now - lastTime;
   lastTime = now;
 
-  if (frameTime > FRAME_TIME_MAX) {
-    frameTime = FRAME_TIME_MAX;
+  const clampedInterval = Math.min(frameInterval, MAX_FRAME_INTERVAL);
+  fpsTimer += clampedInterval;
+
+  if (frameInterval < MIN_FRAME_INTERVAL * 0.5) {
+    requestAnimationFrame(loop);
+    return;
   }
 
-  accumulator += frameTime;
-  fpsTimer += frameTime;
+  gameLogic.update(clampedInterval);
 
-  while (accumulator >= FRAME_TIME_TARGET) {
-    gameLogic.update(FRAME_TIME_TARGET);
-    accumulator -= FRAME_TIME_TARGET;
+  const renderStart = performance.now();
+  renderer.draw(gameLogic.state);
+  const renderTime = performance.now() - renderStart;
+  if (renderTime > MIN_FRAME_INTERVAL * 0.5) {
+    console.warn(`Render time: ${renderTime.toFixed(2)}ms`);
   }
-
-  const timeSinceLastRender = now - lastRenderTime;
-  if (timeSinceLastRender >= FRAME_TIME_TARGET * 0.9) {
-    const renderStart = performance.now();
-    renderer.draw(gameLogic.state);
-    const renderTime = performance.now() - renderStart;
-    if (renderTime > 8) {
-      console.warn(`Render time: ${renderTime.toFixed(2)}ms`);
-    }
-    lastRenderTime = now;
-    frameCount++;
-  }
+  frameCount++;
 
   if (fpsTimer >= 2000) {
     const fps = (frameCount * 1000) / fpsTimer;
-    if (fps < 30) {
+    if (fps < MIN_FPS) {
       console.warn(`Low FPS: ${fps.toFixed(1)}`);
     }
     frameCount = 0;

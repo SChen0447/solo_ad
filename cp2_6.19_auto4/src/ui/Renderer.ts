@@ -20,6 +20,7 @@ export class Renderer {
   private scale: number = 1;
   private offsetX: number = 0;
   private offsetY: number = 0;
+  private uiScale: number = 1;
   private bgCanvas: HTMLCanvasElement;
   private bgCtx: CanvasRenderingContext2D;
   private stars: { x: number; y: number; r: number; a: number; s: number }[];
@@ -64,6 +65,8 @@ export class Renderer {
     const minScale = Math.min(1024 / BASE_W, 768 / BASE_H);
     scale = Math.max(scale, minScale * 0.9);
 
+    this.uiScale = Math.max(0.75, Math.min(1.25, scale));
+
     this.scale = scale * dpr;
     this.offsetX = ((vw - BASE_W * scale) / 2) * dpr;
     this.offsetY = ((vh - BASE_H * scale) / 2) * dpr;
@@ -73,6 +76,14 @@ export class Renderer {
     this.ctx.setTransform(1, 0, 0, 1, 0, 0);
     this.ctx.imageSmoothingEnabled = true;
     this.ctx.setTransform(this.scale, 0, 0, this.scale, this.offsetX, this.offsetY);
+  }
+
+  private fs(size: number): number {
+    return size * this.uiScale;
+  }
+
+  private sz(size: number): number {
+    return size * this.uiScale;
   }
 
   private renderStaticBackground(): void {
@@ -274,7 +285,7 @@ export class Renderer {
     this.drawArmorBadge(ctx, cx + 90, cy + 10, state.ai.armor);
     this.drawEnergyBadge(ctx, cx + 200, cy + 10, state.ai.energy, state.ai.maxEnergy, '#ffd700');
 
-    ctx.font = 'bold 22px "Segoe UI", sans-serif';
+    ctx.font = `bold ${this.fs(22)}px "Segoe UI", sans-serif`;
     ctx.fillStyle = '#ff6b6b';
     ctx.textAlign = 'left';
     ctx.textBaseline = 'middle';
@@ -291,7 +302,7 @@ export class Renderer {
     this.drawHpBar(ctx, cx + 90, cy - 30, 220, 24, state.player.hp, state.player.maxHp, '#52b788');
     this.drawArmorBadge(ctx, cx + 90, cy + 10, state.player.armor);
 
-    ctx.font = 'bold 22px "Segoe UI", sans-serif';
+    ctx.font = `bold ${this.fs(22)}px "Segoe UI", sans-serif`;
     ctx.fillStyle = '#00d9ff';
     ctx.textAlign = 'left';
     ctx.textBaseline = 'middle';
@@ -338,7 +349,7 @@ export class Renderer {
     ctx.restore();
 
     ctx.save();
-    ctx.font = 'bold 36px "Segoe UI Emoji", sans-serif';
+    ctx.font = `bold ${this.fs(36)}px "Segoe UI Emoji", sans-serif`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillStyle = '#fff';
@@ -382,7 +393,7 @@ export class Renderer {
       ctx.fill();
     }
 
-    ctx.font = 'bold 14px "Segoe UI", sans-serif';
+    ctx.font = `bold ${this.fs(14)}px "Segoe UI", sans-serif`;
     ctx.fillStyle = '#fff';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
@@ -394,18 +405,18 @@ export class Renderer {
 
   private drawArmorBadge(ctx: CanvasRenderingContext2D, x: number, y: number, armor: number): void {
     ctx.save();
-    const size = 36;
+    const size = this.sz(36);
     this.roundRect(ctx, x, y, size, size, 8);
     ctx.fillStyle = 'rgba(74, 158, 255, 0.25)';
     ctx.fill();
     ctx.strokeStyle = '#4a9eff';
     ctx.lineWidth = 2;
     ctx.stroke();
-    ctx.font = '18px "Segoe UI Emoji", sans-serif';
+    ctx.font = `${this.fs(18)}px "Segoe UI Emoji", sans-serif`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText('\u{1F6E1}', x + size / 2, y + size / 2 - 2);
-    ctx.font = 'bold 13px "Segoe UI", sans-serif';
+    ctx.font = `bold ${this.fs(13)}px "Segoe UI", sans-serif`;
     ctx.fillStyle = '#4a9eff';
     ctx.fillText(String(armor), x + size / 2, y + size / 2 + 14);
     ctx.restore();
@@ -421,8 +432,8 @@ export class Renderer {
   ): void {
     ctx.save();
     for (let i = 0; i < maxEnergy; i++) {
-      const sx = x + i * 26;
-      const size = 22;
+      const sx = x + i * this.sz(26);
+      const size = this.sz(22);
       this.roundRect(ctx, sx, y + 6, size, size, 6);
       if (i < energy) {
         const grad = ctx.createLinearGradient(sx, y + 6, sx, y + 6 + size);
@@ -441,7 +452,7 @@ export class Renderer {
       ctx.stroke();
 
       if (i < energy) {
-        ctx.font = 'bold 12px "Segoe UI", sans-serif';
+        ctx.font = `bold ${this.fs(12)}px "Segoe UI", sans-serif`;
         ctx.fillStyle = '#3d2a00';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
@@ -685,12 +696,12 @@ export class Renderer {
     ctx.stroke();
     ctx.shadowBlur = 0;
 
-    ctx.font = 'bold 16px "Segoe UI", sans-serif';
+    ctx.font = `bold ${this.fs(16)}px "Segoe UI", sans-serif`;
     ctx.fillStyle = 'rgba(255,255,255,0.6)';
     ctx.textAlign = 'left';
     ctx.textBaseline = 'middle';
     ctx.fillText('回合', bx + 20, by + 22);
-    ctx.font = 'bold 30px "Segoe UI", sans-serif';
+    ctx.font = `bold ${this.fs(30)}px "Segoe UI", sans-serif`;
     ctx.fillStyle = '#00d9ff';
     ctx.fillText(String(state.turn), bx + 80, by + 38);
 
@@ -708,13 +719,13 @@ export class Renderer {
     ctx.stroke();
     ctx.shadowBlur = 0;
 
-    ctx.font = 'bold 16px "Segoe UI", sans-serif';
+    ctx.font = `bold ${this.fs(16)}px "Segoe UI", sans-serif`;
     ctx.fillStyle = 'rgba(255,255,255,0.6)';
     ctx.fillText('能量', ex + 20, ey + 22);
     for (let i = 0; i < state.player.maxEnergy; i++) {
-      const sx = ex + 85 + i * 34;
+      const sx = ex + 85 + i * this.sz(34);
       const sy = ey + 16;
-      const size = 28;
+      const size = this.sz(28);
       this.roundRect(ctx, sx, sy, size, size, 8);
       if (i < state.player.energy) {
         const g = ctx.createLinearGradient(sx, sy, sx, sy + size);
@@ -732,7 +743,7 @@ export class Renderer {
       ctx.lineWidth = 1.5;
       ctx.stroke();
       if (i < state.player.energy) {
-        ctx.font = 'bold 14px "Segoe UI", sans-serif';
+        ctx.font = `bold ${this.fs(14)}px "Segoe UI", sans-serif`;
         ctx.fillStyle = '#3d2a00';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
@@ -747,8 +758,8 @@ export class Renderer {
   private drawEndTurnButton(ctx: CanvasRenderingContext2D, state: GameState, now: number): void {
     const bx = BASE_W - 200;
     const by = 580;
-    const bw = 140;
-    const bh = 50;
+    const bw = this.sz(140);
+    const bh = this.sz(50);
     state.endTurnBtnRect = { x: bx, y: by, w: bw, h: bh };
     const active = state.turnPhase === 'player_action' && state.phase === 'playing';
     const pulse = 0.5 + Math.sin(now * 0.004) * 0.5;
@@ -771,7 +782,7 @@ export class Renderer {
     ctx.lineWidth = 2;
     ctx.stroke();
 
-    ctx.font = 'bold 18px "Segoe UI", sans-serif';
+    ctx.font = `bold ${this.fs(18)}px "Segoe UI", sans-serif`;
     ctx.fillStyle = active ? '#fff' : 'rgba(255,255,255,0.4)';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
@@ -794,7 +805,7 @@ export class Renderer {
 
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.font = 'bold 72px "Segoe UI", sans-serif';
+    ctx.font = `bold ${this.fs(72)}px "Segoe UI", sans-serif`;
     ctx.fillStyle = who === 'player' ? '#00d9ff' : '#ff6b6b';
     ctx.shadowColor = ctx.fillStyle as string;
     ctx.shadowBlur = 40;
@@ -821,7 +832,7 @@ export class Renderer {
       const alpha = t < 0.7 ? 1 : 1 - (t - 0.7) / 0.3;
       const rise = -80 * t;
       ctx.globalAlpha = alpha;
-      ctx.font = 'bold 34px "Segoe UI", sans-serif';
+      ctx.font = `bold ${this.fs(34)}px "Segoe UI", sans-serif`;
       ctx.fillStyle = f.color;
       ctx.shadowColor = f.color;
       ctx.shadowBlur = 14;
@@ -905,10 +916,10 @@ export class Renderer {
     }
     ctx.globalAlpha = 1;
 
-    const mx = BASE_W / 2 - 280;
-    const my = BASE_H / 2 - 200;
-    const mw = 560;
-    const mh = 400;
+    const mx = BASE_W / 2 - this.sz(280);
+    const my = BASE_H / 2 - this.sz(200);
+    const mw = this.sz(560);
+    const mh = this.sz(400);
     const pulse = 0.5 + Math.sin(now * 0.004) * 0.5;
     this.roundRect(ctx, mx, my, mw, mh, 24);
     const g = ctx.createLinearGradient(mx, my, mx, my + mh);
@@ -925,26 +936,26 @@ export class Renderer {
 
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.font = 'bold 80px "Segoe UI", sans-serif';
+    ctx.font = `bold ${this.fs(80)}px "Segoe UI", sans-serif`;
     ctx.fillStyle = color;
     ctx.shadowColor = color;
     ctx.shadowBlur = 40;
-    ctx.fillText(title, BASE_W / 2, my + 110);
+    ctx.fillText(title, BASE_W / 2, my + this.sz(110));
     ctx.shadowBlur = 0;
 
-    ctx.font = 'bold 24px "Segoe UI", sans-serif';
+    ctx.font = `bold ${this.fs(24)}px "Segoe UI", sans-serif`;
     ctx.fillStyle = 'rgba(255,255,255,0.85)';
     const sub = win ? '你击败了AI对手！' : '再接再厉！';
-    ctx.fillText(sub, BASE_W / 2, my + 190);
+    ctx.fillText(sub, BASE_W / 2, my + this.sz(190));
 
-    ctx.font = '18px "Segoe UI", sans-serif';
+    ctx.font = `${this.fs(18)}px "Segoe UI", sans-serif`;
     ctx.fillStyle = 'rgba(255,255,255,0.6)';
-    ctx.fillText(`坚持了 ${state.turn} 回合`, BASE_W / 2, my + 230);
+    ctx.fillText(`坚持了 ${state.turn} 回合`, BASE_W / 2, my + this.sz(230));
 
-    const bx = BASE_W / 2 - 110;
-    const by = my + 280;
-    const bw = 220;
-    const bh = 60;
+    const bx = BASE_W / 2 - this.sz(110);
+    const by = my + this.sz(280);
+    const bw = this.sz(220);
+    const bh = this.sz(60);
     state.restartBtnRect = { x: bx, y: by, w: bw, h: bh };
 
     this.roundRect(ctx, bx, by, bw, bh, 14);
@@ -960,7 +971,7 @@ export class Renderer {
     ctx.lineWidth = 2;
     ctx.stroke();
 
-    ctx.font = 'bold 22px "Segoe UI", sans-serif';
+    ctx.font = `bold ${this.fs(22)}px "Segoe UI", sans-serif`;
     ctx.fillStyle = '#fff';
     ctx.fillText('重新开始', BASE_W / 2, by + bh / 2);
     ctx.restore();
