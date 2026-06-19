@@ -84,6 +84,20 @@ const CardDeck = ({ decks, onSelect }: CardDeckProps) => {
                   width: isHovered ? 4 : 0,
                   background: deck.color,
                   transition: 'width 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                  boxShadow: isHovered ? `2px 0 8px ${deck.color}66` : 'none',
+                  borderRadius: '0 2px 2px 0',
+                }}
+              />
+              <div
+                style={{
+                  position: 'absolute',
+                  left: 0,
+                  top: 0,
+                  bottom: 0,
+                  width: isHovered ? 24 : 0,
+                  background: `linear-gradient(90deg, ${deck.color}18, transparent)`,
+                  transition: 'width 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                  pointerEvents: 'none',
                 }}
               />
 

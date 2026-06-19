@@ -16,6 +16,7 @@ const ReviewSession = ({ deck, onReview }: ReviewSessionProps) => {
 
   const [currentIndex, setCurrentIndex] = useState(0)
   const [isFlipped, setIsFlipped] = useState(false)
+  const [isAnimating, setIsAnimating] = useState(false)
   const [feedback, setFeedback] = useState<FeedbackState>(null)
   const [feedbackScale, setFeedbackScale] = useState(false)
   const [showDone, setShowDone] = useState(dueCards.length === 0)
@@ -24,6 +25,8 @@ const ReviewSession = ({ deck, onReview }: ReviewSessionProps) => {
 
   const handleFlip = useCallback(() => {
     setIsFlipped((f) => !f)
+    setIsAnimating(true)
+    setTimeout(() => setIsAnimating(false), 600)
   }, [])
 
   const handleAnswer = useCallback(
@@ -201,6 +204,8 @@ const ReviewSession = ({ deck, onReview }: ReviewSessionProps) => {
                   padding: 24,
                   backfaceVisibility: 'hidden',
                   WebkitBackfaceVisibility: 'hidden',
+                  opacity: isFlipped ? (isAnimating ? 0 : 0) : (isAnimating ? 0.4 : 1),
+                  transition: isAnimating ? 'opacity 0.15s ease' : 'opacity 0.3s ease 0.3s',
                 } as React.CSSProperties}
               >
                 <div
@@ -254,6 +259,8 @@ const ReviewSession = ({ deck, onReview }: ReviewSessionProps) => {
                   flexDirection: 'column',
                   justifyContent: 'center',
                   border: '1px solid var(--border)',
+                  opacity: isFlipped ? (isAnimating ? 0.5 : 1) : 0,
+                  transition: isAnimating ? 'opacity 0.2s ease 0.2s' : 'opacity 0.15s ease',
                 } as React.CSSProperties}
               >
                 <div

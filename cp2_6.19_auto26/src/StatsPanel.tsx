@@ -14,12 +14,12 @@ const StatsPanel = ({ stats }: StatsPanelProps) => {
 
   useEffect(() => {
     let frame = 0
-    const duration = 1200
+    const duration = 600
     const start = performance.now()
     const animate = (now: number) => {
       const elapsed = now - start
       const t = Math.min(elapsed / duration, 1)
-      const eased = 1 - Math.pow(1 - t, 3)
+      const eased = 1 - Math.pow(1 - t, 2)
       setAnimatedProgress(masteryRate * eased)
       if (t < 1) frame = requestAnimationFrame(animate)
     }
@@ -204,7 +204,6 @@ const StatsPanel = ({ stats }: StatsPanelProps) => {
               strokeLinecap="round"
               strokeDasharray={circumference}
               strokeDashoffset={offset}
-              style={{ transition: 'stroke-dashoffset 0.05s linear' }}
             />
             <defs>
               <linearGradient id="masteryGradient" x1="0%" y1="0%" x2="100%" y2="100%">
@@ -404,7 +403,7 @@ const StatsPanel = ({ stats }: StatsPanelProps) => {
                       borderRadius: '6px 6px 2px 2px',
                       opacity: isLast ? 1 : 0.65,
                       transition: `height 0.7s cubic-bezier(0.34, 1.56, 0.64, 1)`,
-                      transitionDelay: `${i * 60}ms`,
+                      transitionDelay: `${i * 100}ms`,
                       boxShadow: isLast ? '0 4px 12px rgba(79,142,247,0.35)' : 'none',
                     }}
                   />
