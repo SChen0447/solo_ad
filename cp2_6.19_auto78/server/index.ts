@@ -115,6 +115,50 @@ const borrowRecords: BorrowRecord[] = [
   },
   {
     id: uuidv4(),
+    bookId: books[1].id,
+    bookTitle: '人类简史',
+    bookCover: books[1].coverUrl,
+    readerName: '李四',
+    borrowDate: new Date(Date.now() - 60 * 24 * 60 * 60 * 1000).toISOString(),
+    returnDate: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
+    status: 'completed',
+    progress: 100,
+  },
+  {
+    id: uuidv4(),
+    bookId: books[1].id,
+    bookTitle: '人类简史',
+    bookCover: books[1].coverUrl,
+    readerName: '王五',
+    borrowDate: new Date(Date.now() - 100 * 24 * 60 * 60 * 1000).toISOString(),
+    returnDate: new Date(Date.now() - 70 * 24 * 60 * 60 * 1000).toISOString(),
+    status: 'completed',
+    progress: 100,
+  },
+  {
+    id: uuidv4(),
+    bookId: books[0].id,
+    bookTitle: '百年孤独',
+    bookCover: books[0].coverUrl,
+    readerName: '赵六',
+    borrowDate: new Date(Date.now() - 45 * 24 * 60 * 60 * 1000).toISOString(),
+    returnDate: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000).toISOString(),
+    status: 'completed',
+    progress: 100,
+  },
+  {
+    id: uuidv4(),
+    bookId: books[0].id,
+    bookTitle: '百年孤独',
+    bookCover: books[0].coverUrl,
+    readerName: '钱七',
+    borrowDate: new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString(),
+    returnDate: new Date(Date.now() - 55 * 24 * 60 * 60 * 1000).toISOString(),
+    status: 'completed',
+    progress: 100,
+  },
+  {
+    id: uuidv4(),
     bookId: books[3].id,
     bookTitle: '艺术的故事',
     bookCover: books[3].coverUrl,
@@ -122,6 +166,17 @@ const borrowRecords: BorrowRecord[] = [
     borrowDate: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
     status: 'reading',
     progress: 30,
+  },
+  {
+    id: uuidv4(),
+    bookId: books[2].id,
+    bookTitle: '算法导论',
+    bookCover: books[2].coverUrl,
+    readerName: '孙八',
+    borrowDate: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
+    returnDate: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
+    status: 'completed',
+    progress: 100,
   },
 ];
 
@@ -306,6 +361,27 @@ app.put('/api/records/:id/progress', (req: Request, res: Response) => {
   }
 
   res.json(record);
+});
+
+app.get('/api/books/:id/records', (req: Request, res: Response) => {
+  const book = books.find((b) => b.id === req.params.id);
+  if (!book) {
+    return res.status(404).json({ error: '图书不存在' });
+  }
+
+  const records = borrowRecords
+    .filter((r) => r.bookId === req.params.id)
+    .sort((a, b) => new Date(b.borrowDate).getTime() - new Date(a.borrowDate).getTime())
+    .slice(0, 3)
+    .map((r) => ({
+      id: r.id,
+      readerName: r.readerName,
+      borrowDate: r.borrowDate,
+      returnDate: r.returnDate,
+      status: r.status,
+    }));
+
+  res.json(records);
 });
 
 app.get('/api/categories', (_req: Request, res: Response) => {

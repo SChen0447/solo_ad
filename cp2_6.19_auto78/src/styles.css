@@ -378,6 +378,128 @@ body {
   font-size: 12px;
 }
 
+.category-tag {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 16px;
+  font-size: 12px;
+  font-weight: 500;
+  color: white;
+}
+
+.category-文学 {
+  background-color: #43a047;
+}
+
+.category-科技 {
+  background-color: #1e88e5;
+}
+
+.category-历史 {
+  background-color: #8d6e63;
+}
+
+.category-艺术 {
+  background-color: #fb8c00;
+}
+
+.category-哲学 {
+  background-color: #8e24aa;
+}
+
+.category-经济 {
+  background-color: #00acc1;
+}
+
+.borrowed-corner-badge {
+  position: absolute;
+  bottom: 8px;
+  right: 8px;
+  background-color: var(--error-color);
+  color: white;
+  padding: 4px 10px;
+  border-radius: 14px;
+  font-size: 11px;
+  font-weight: 600;
+  box-shadow: 0 2px 6px rgba(231, 76, 60, 0.4);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  z-index: 2;
+}
+
+.borrow-history {
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border-color);
+}
+
+.borrow-history-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.borrow-history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.borrow-history-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  background-color: var(--bg-color);
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+}
+
+.borrow-history-reader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+.borrow-history-avatar {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background-color: var(--primary-color);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+}
+
+.borrow-history-dates {
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.borrow-history-empty {
+  color: var(--text-light);
+  font-size: 13px;
+  text-align: center;
+  padding: 16px;
+}
+
+.isbn-display {
+  font-family: 'Courier New', Courier, monospace;
+  background-color: var(--bg-color);
+  padding: 2px 8px;
+  border-radius: 4px;
+  letter-spacing: 0.5px;
+}
+
 .reserve-count {
   font-size: 12px;
   color: var(--text-light);

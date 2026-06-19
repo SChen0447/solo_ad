@@ -117,6 +117,11 @@ function BookList({
                 >
                   {book.status === 'available' ? '可借' : '已借出'}
                 </span>
+                {book.status === 'borrowed' && (
+                  <span className="borrowed-corner-badge">
+                    📖 已借出
+                  </span>
+                )}
               </div>
               <div className="book-info">
                 <div className="book-title" title={book.title}>
