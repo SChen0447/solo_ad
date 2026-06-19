@@ -1,0 +1,32 @@
+{
+  "votes": [
+    {
+      "id": "vote-001",
+      "ideaId": "idea-001",
+      "priority": 4,
+      "voterId": "voter-demo",
+      "createdAt": 1718864800000
+    },
+    {
+      "id": "vote-002",
+      "ideaId": "idea-002",
+      "priority": 3,
+      "voterId": "voter-demo",
+      "createdAt": 1718864800000
+    },
+    {
+      "id": "vote-003",
+      "ideaId": "idea-003",
+      "priority": 5,
+      "voterId": "voter-demo",
+      "createdAt": 1718864800000
+    },
+    {
+      "id": "vote-004",
+      "ideaId": "idea-004",
+      "priority": 4,
+      "voterId": "voter-demo",
+      "createdAt": 1718864800000
+    }
+  ]
+}

@@ -1,0 +1,90 @@
+{
+  "ideas": [
+    {
+      "id": "idea-001",
+      "title": "引入 AI 代码审查助手",
+      "description": "集成 AI 工具进行自动化代码审查，提高代码质量和审查效率，减少人工审查的工作量。可以实时分析代码风格、潜在 Bug 和安全漏洞。",
+      "author": "张伟",
+      "likes": 12,
+      "liked": false,
+      "comments": [
+        {
+          "id": "comment-001",
+          "author": "李娜",
+          "content": "这个想法很棒！可以考虑集成 GitHub Copilot 或类似工具。",
+          "createdAt": 1718764800000
+        }
+      ],
+      "order": 0,
+      "createdAt": 1718764800000
+    },
+    {
+      "id": "idea-002",
+      "title": "每周技术分享会",
+      "description": "建立每周五下午的技术分享机制，团队成员轮流分享新技术、项目经验或学习心得，促进知识共享和团队成长。",
+      "author": "王芳",
+      "likes": 8,
+      "liked": true,
+      "comments": [],
+      "order": 1,
+      "createdAt": 1718774800000
+    },
+    {
+      "id": "idea-003",
+      "title": "自动化测试覆盖率提升计划",
+      "description": "制定分阶段的自动化测试覆盖率提升目标，从核心模块开始逐步扩展到全项目，确保代码质量和回归测试效率。",
+      "author": "刘强",
+      "likes": 15,
+      "liked": false,
+      "comments": [
+        {
+          "id": "comment-002",
+          "author": "陈明",
+          "content": "建议优先覆盖支付和用户认证等关键模块。",
+          "createdAt": 1718784800000
+        },
+        {
+          "id": "comment-003",
+          "author": "赵丽",
+          "content": "可以引入 CI/CD 流水线来强制执行覆盖率检查。",
+          "createdAt": 1718794800000
+        }
+      ],
+      "order": 2,
+      "createdAt": 1718784800000
+    },
+    {
+      "id": "idea-004",
+      "title": "远程办公灵活制度",
+      "description": "实施混合办公模式，允许员工每周选择 1-2 天远程办公，提高工作生活平衡，同时保持团队协作效率。",
+      "author": "孙磊",
+      "likes": 20,
+      "liked": false,
+      "comments": [],
+      "order": 3,
+      "createdAt": 1718794800000
+    },
+    {
+      "id": "idea-005",
+      "title": "技术债务偿还 Sprint",
+      "description": "每季度安排一个专门的 Sprint 来集中处理技术债务，包括代码重构、性能优化和架构升级，避免技术债务累积。",
+      "author": "周杰",
+      "likes": 10,
+      "liked": false,
+      "comments": [],
+      "order": 4,
+      "createdAt": 1718804800000
+    },
+    {
+      "id": "idea-006",
+      "title": "产品用户反馈闭环系统",
+      "description": "建立从用户反馈收集、分类、处理到结果反馈的完整闭环系统，让用户看到自己的建议被采纳和实施。",
+      "author": "吴敏",
+      "likes": 6,
+      "liked": false,
+      "comments": [],
+      "order": 5,
+      "createdAt": 1718814800000
+    }
+  ]
+}
