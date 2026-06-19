@@ -629,7 +629,7 @@ export class UIOverlay {
     }
   }
 
-  showResult(stats: GameStats, bestCatchImage?: ImageData): void {
+  showResult(stats: GameStats, bestCatchCanvas?: HTMLCanvasElement): void {
     const titleEl = this.resultScreen.querySelector('#result-title') as HTMLHeadingElement;
     const ghostScoreEl = this.resultScreen.querySelector('#ghost-score') as HTMLParagraphElement;
     const catScoreEl = this.resultScreen.querySelector('#cat-score') as HTMLParagraphElement;
@@ -657,50 +657,42 @@ export class UIOverlay {
 
     ctx.clearRect(0, 0, this.bestCatchCanvas.width, this.bestCatchCanvas.height);
 
-    if (bestCatchImage) {
+    if (bestCatchCanvas) {
       noReplayEl.style.display = 'none';
       this.bestCatchCanvas.style.display = 'block';
 
-      const tempCanvas = document.createElement('canvas');
-      tempCanvas.width = bestCatchImage.width;
-      tempCanvas.height = bestCatchImage.height;
-      const tempCtx = tempCanvas.getContext('2d');
-      if (tempCtx) {
-        tempCtx.putImageData(bestCatchImage, 0, 0);
+      const scale = Math.min(
+        this.bestCatchCanvas.width / bestCatchCanvas.width,
+        this.bestCatchCanvas.height / bestCatchCanvas.height
+      );
+      const drawWidth = bestCatchCanvas.width * scale;
+      const drawHeight = bestCatchCanvas.height * scale;
+      const offsetX = (this.bestCatchCanvas.width - drawWidth) / 2;
+      const offsetY = (this.bestCatchCanvas.height - drawHeight) / 2;
 
-        const scale = Math.min(
-          this.bestCatchCanvas.width / bestCatchImage.width,
-          this.bestCatchCanvas.height / bestCatchImage.height
-        );
-        const drawWidth = bestCatchImage.width * scale;
-        const drawHeight = bestCatchImage.height * scale;
-        const offsetX = (this.bestCatchCanvas.width - drawWidth) / 2;
-        const offsetY = (this.bestCatchCanvas.height - drawHeight) / 2;
+      ctx.fillStyle = '#0a0a0a';
+      ctx.fillRect(0, 0, this.bestCatchCanvas.width, this.bestCatchCanvas.height);
 
-        ctx.fillStyle = '#0a0a0a';
-        ctx.fillRect(0, 0, this.bestCatchCanvas.width, this.bestCatchCanvas.height);
+      ctx.drawImage(bestCatchCanvas, offsetX, offsetY, drawWidth, drawHeight);
 
-        ctx.drawImage(tempCanvas, offsetX, offsetY, drawWidth, drawHeight);
+      ctx.strokeStyle = '#00ff41';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(offsetX + 2, offsetY + 2, drawWidth - 4, drawHeight - 4);
 
-        ctx.strokeStyle = '#00ff41';
-        ctx.lineWidth = 2;
-        ctx.strokeRect(offsetX + 2, offsetY + 2, drawWidth - 4, drawHeight - 4);
+      ctx.strokeStyle = '#ff00ff';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(offsetX + 5, offsetY + 5, drawWidth - 10, drawHeight - 10);
 
-        ctx.strokeStyle = '#ff00ff';
-        ctx.lineWidth = 1;
-        ctx.strokeRect(offsetX + 5, offsetY + 5, drawWidth - 10, drawHeight - 10);
+      ctx.font = '14px "Courier New", monospace';
+      ctx.fillStyle = '#00ff41';
+      ctx.shadowColor = '#00ff41';
+      ctx.shadowBlur = 10;
+      ctx.fillText('CATCH REPLAY', offsetX + 10, offsetY + 20);
+      ctx.shadowBlur = 0;
 
-        ctx.font = '14px "Courier New", monospace';
-        ctx.fillStyle = '#00ff41';
-        ctx.shadowColor = '#00ff41';
-        ctx.shadowBlur = 10;
-        ctx.fillText('CATCH REPLAY', offsetX + 10, offsetY + 20);
-        ctx.shadowBlur = 0;
-
-        ctx.fillStyle = '#ff00ff';
-        ctx.font = '11px "Courier New", monospace';
-        ctx.fillText(`${stats.catsCaught} CAUGHT`, offsetX + drawWidth - 90, offsetY + 20);
-      }
+      ctx.fillStyle = '#ff00ff';
+      ctx.font = '11px "Courier New", monospace';
+      ctx.fillText(`${stats.catsCaught} CAUGHT`, offsetX + drawWidth - 90, offsetY + 20);
     } else {
       noReplayEl.style.display = 'block';
       this.bestCatchCanvas.style.display = 'none';

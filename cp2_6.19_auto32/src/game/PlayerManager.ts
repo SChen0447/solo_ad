@@ -4,6 +4,10 @@ export type DisguiseType = 'box' | 'chair' | 'trashcan' | 'plant' | 'barrel' | '
 
 export const DISGUISE_TYPES: DisguiseType[] = ['box', 'chair', 'trashcan', 'plant', 'barrel', 'crate'];
 
+// 能量每秒消耗10%，基于3分钟游戏时长、透视模式使用频率的平衡性设计：
+// 满能量可连续使用透视10秒，配合15%/秒的恢复速度，鼓励间歇性使用而非常开
+export const ENERGY_DRAIN_RATE_PER_SECOND = 10;
+
 export interface GhostState {
   id: string;
   position: THREE.Vector3;
@@ -31,7 +35,7 @@ export class PlayerManager {
   private moveSpeed: number = 8;
   private catMoveSpeed: number = 6;
   private perspectiveCooldownTime: number = 2;
-  private energyDrainRate: number = 10;
+  private energyDrainRate: number = ENERGY_DRAIN_RATE_PER_SECOND;
   private energyRecoverRate: number = 15;
 
   constructor() {

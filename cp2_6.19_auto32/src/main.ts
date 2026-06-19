@@ -16,7 +16,7 @@ class Game {
   private animationFrameId: number = 0;
   private lastTime: number = 0;
   private catMoveDir: THREE.Vector3 = new THREE.Vector3();
-  private bestCatchImage: ImageData | null = null;
+  private bestCatchImage: HTMLCanvasElement | null = null;
 
   constructor(containerId: string) {
     const container = document.getElementById(containerId);

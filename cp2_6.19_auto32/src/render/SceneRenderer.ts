@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { BufferGeometryUtils } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { GhostState, CatState, DisguiseType, DISGUISE_TYPES } from '../game/PlayerManager';
 import { CollisionEvent } from '../game/CollisionSystem';
 
@@ -9,7 +10,9 @@ export interface SceneRendererOptions {
 interface CatRenderData {
   mesh: THREE.Mesh;
   glowMesh: THREE.Mesh;
+  glowMesh2: THREE.Mesh;
   outlineMesh: THREE.Mesh;
+  outlinePulseMesh: THREE.Mesh;
   currentDisguise: DisguiseType | null;
   disguiseMesh: THREE.Group | null;
   particles: THREE.Points | null;
@@ -495,7 +498,9 @@ export class SceneRenderer {
     for (const catData of this.catRenderers.values()) {
       this.scene.remove(catData.mesh);
       this.scene.remove(catData.glowMesh);
+      this.scene.remove(catData.glowMesh2);
       this.scene.remove(catData.outlineMesh);
+      this.scene.remove(catData.outlinePulseMesh);
       if (catData.disguiseMesh) {
         this.scene.remove(catData.disguiseMesh);
       }
@@ -511,6 +516,7 @@ export class SceneRenderer {
       const catMat = new THREE.MeshStandardMaterial({
         color: 0xff00ff,
         emissive: 0x440044,
+        emissiveIntensity: 1,
         roughness: 0.3,
         metalness: 0.7,
         transparent: true,
@@ -520,7 +526,7 @@ export class SceneRenderer {
       mesh.castShadow = true;
       mesh.position.copy(cat.position);
 
-      const glowGeo = new THREE.SphereGeometry(0.7, 16, 16);
+      const glowGeo = new THREE.SphereGeometry(0.65, 16, 16);
       const glowMat = new THREE.MeshBasicMaterial({
         color: 0x00ff41,
         transparent: true,
@@ -531,9 +537,20 @@ export class SceneRenderer {
       glowMesh.position.copy(cat.position);
       glowMesh.visible = false;
 
-      const outlineGeo = new THREE.SphereGeometry(0.55, 16, 16);
-      const outlineMat = new THREE.MeshBasicMaterial({
+      const glowGeo2 = new THREE.SphereGeometry(0.8, 16, 16);
+      const glowMat2 = new THREE.MeshBasicMaterial({
         color: 0x00ff41,
+        transparent: true,
+        opacity: 0.0,
+        side: THREE.BackSide
+      });
+      const glowMesh2 = new THREE.Mesh(glowGeo2, glowMat2);
+      glowMesh2.position.copy(cat.position);
+      glowMesh2.visible = false;
+
+      const outlineGeo = new THREE.SphereGeometry(0.58, 32, 32);
+      const outlineMat = new THREE.MeshBasicMaterial({
+        color: 0x00ffff,
         transparent: true,
         opacity: 0.0,
         wireframe: true
@@ -542,14 +559,29 @@ export class SceneRenderer {
       outlineMesh.position.copy(cat.position);
       outlineMesh.visible = false;
 
+      const outlinePulseGeo = new THREE.SphereGeometry(0.6, 16, 16);
+      const outlinePulseMat = new THREE.MeshBasicMaterial({
+        color: 0x00ff41,
+        transparent: true,
+        opacity: 0.0,
+        wireframe: true
+      });
+      const outlinePulseMesh = new THREE.Mesh(outlinePulseGeo, outlinePulseMat);
+      outlinePulseMesh.position.copy(cat.position);
+      outlinePulseMesh.visible = false;
+
       this.scene.add(mesh);
       this.scene.add(glowMesh);
+      this.scene.add(glowMesh2);
       this.scene.add(outlineMesh);
+      this.scene.add(outlinePulseMesh);
 
       this.catRenderers.set(cat.id, {
         mesh,
         glowMesh,
+        glowMesh2,
         outlineMesh,
+        outlinePulseMesh,
         currentDisguise: null,
         disguiseMesh: null,
         particles: null,
@@ -578,7 +610,9 @@ export class SceneRenderer {
       if (this.caughtCats.has(cat.id)) {
         renderData.mesh.visible = false;
         renderData.glowMesh.visible = false;
+        renderData.glowMesh2.visible = false;
         renderData.outlineMesh.visible = false;
+        renderData.outlinePulseMesh.visible = false;
         if (renderData.disguiseMesh) {
           renderData.disguiseMesh.visible = false;
         }
@@ -618,7 +652,9 @@ export class SceneRenderer {
 
       renderData.mesh.position.copy(cat.position);
       renderData.glowMesh.position.copy(cat.position);
+      renderData.glowMesh2.position.copy(cat.position);
       renderData.outlineMesh.position.copy(cat.position);
+      renderData.outlinePulseMesh.position.copy(cat.position);
 
       if (renderData.disguiseMesh) {
         renderData.disguiseMesh.position.copy(cat.position);
@@ -626,23 +662,36 @@ export class SceneRenderer {
       }
 
       if (this.isPerspectiveMode && !cat.isDisguised) {
-        const pulse = 0.5 + Math.sin(Date.now() * 0.005) * 0.2;
+        const time = Date.now() * 0.003;
+        const pulseFast = 0.5 + Math.sin(time * 3) * 0.3;
+        const pulseSlow = 0.5 + Math.sin(time) * 0.3;
         const transition = this.perspectiveTransition;
 
         const catMat = renderData.mesh.material as THREE.MeshStandardMaterial;
-        catMat.opacity = 0.3 + pulse * 0.2 * transition;
+        catMat.opacity = 0.25 + pulseSlow * 0.15 * transition;
         catMat.emissive.setHex(0x00ff41);
-        catMat.emissiveIntensity = 0.8 * transition;
+        catMat.emissiveIntensity = (0.6 + pulseFast * 0.4) * transition;
 
         renderData.glowMesh.visible = true;
         const glowMat = renderData.glowMesh.material as THREE.MeshBasicMaterial;
-        glowMat.opacity = pulse * 0.6 * transition;
+        glowMat.opacity = (0.3 + pulseFast * 0.2) * transition;
+
+        renderData.glowMesh2.visible = true;
+        const glowMat2 = renderData.glowMesh2.material as THREE.MeshBasicMaterial;
+        glowMat2.opacity = (0.15 + pulseSlow * 0.15) * transition;
+        renderData.glowMesh2.scale.setScalar(1 + Math.sin(time * 2) * 0.1);
 
         renderData.outlineMesh.visible = true;
         const outlineMat = renderData.outlineMesh.material as THREE.MeshBasicMaterial;
-        outlineMat.opacity = (0.6 + pulse * 0.3) * transition;
-        renderData.outlineMesh.scale.setScalar(1 + Math.sin(Date.now() * 0.003) * 0.1);
+        outlineMat.opacity = (0.7 + pulseFast * 0.3) * transition;
+
+        renderData.outlinePulseMesh.visible = true;
+        const outlinePulseMat = renderData.outlinePulseMesh.material as THREE.MeshBasicMaterial;
+        outlinePulseMat.opacity = (0.4 + pulseSlow * 0.3) * transition;
+        renderData.outlinePulseMesh.scale.setScalar(1 + Math.sin(time * 4) * 0.15);
       } else if (this.isPerspectiveMode && cat.isDisguised && renderData.disguiseMesh) {
+        const time = Date.now() * 0.003;
+        const pulseSlow = 0.5 + Math.sin(time) * 0.3;
         const transition = this.perspectiveTransition;
 
         const catMat = renderData.mesh.material as THREE.MeshStandardMaterial;
@@ -650,17 +699,19 @@ export class SceneRenderer {
         catMat.emissiveIntensity = 0;
 
         renderData.glowMesh.visible = false;
+        renderData.glowMesh2.visible = false;
         renderData.outlineMesh.visible = false;
+        renderData.outlinePulseMesh.visible = false;
 
         renderData.disguiseMesh.traverse((child) => {
           if (child instanceof THREE.Mesh) {
             const mat = child.material as THREE.MeshStandardMaterial;
-            if (mat.emissive) {
+            if (mat.emissive !== undefined) {
               mat.emissive.setHex(0x00ff41);
-              mat.emissiveIntensity = 0.6 * transition;
+              mat.emissiveIntensity = (0.5 + pulseSlow * 0.3) * transition;
             }
             mat.transparent = true;
-            mat.opacity = 0.5 + 0.3 * transition;
+            mat.opacity = 0.45 + 0.25 * transition;
           }
         });
       } else {
@@ -670,13 +721,15 @@ export class SceneRenderer {
         catMat.emissiveIntensity = 1;
 
         renderData.glowMesh.visible = false;
+        renderData.glowMesh2.visible = false;
         renderData.outlineMesh.visible = false;
+        renderData.outlinePulseMesh.visible = false;
 
         if (renderData.disguiseMesh) {
           renderData.disguiseMesh.traverse((child) => {
             if (child instanceof THREE.Mesh) {
               const mat = child.material as THREE.MeshStandardMaterial;
-              if (mat.emissive) {
+              if (mat.emissive !== undefined) {
                 mat.emissiveIntensity = 0;
               }
               mat.transparent = true;
@@ -797,7 +850,9 @@ export class SceneRenderer {
         if (renderData) {
           renderData.mesh.visible = false;
           renderData.glowMesh.visible = false;
+          renderData.glowMesh2.visible = false;
           renderData.outlineMesh.visible = false;
+          renderData.outlinePulseMesh.visible = false;
           if (renderData.disguiseMesh) {
             renderData.disguiseMesh.visible = false;
           }
@@ -884,34 +939,27 @@ export class SceneRenderer {
     return this.renderer.domElement;
   }
 
-  captureFrame(): ImageData | null {
+  captureFrame(): HTMLCanvasElement | null {
     const camera = this.currentView === 'ghost' ? this.ghostCamera : this.catCamera;
     this.renderer.render(this.scene, camera);
 
-    const gl = this.renderer.getContext();
-    const width = this.renderer.domElement.width;
-    const height = this.renderer.domElement.height;
-    const pixels = new Uint8Array(width * height * 4);
-    gl.readPixels(0, 0, width, height, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
+    const srcCanvas = this.renderer.domElement;
+    const width = srcCanvas.width;
+    const height = srcCanvas.height;
 
-    const flippedPixels = new Uint8Array(width * height * 4);
-    for (let y = 0; y < height; y++) {
-      for (let x = 0; x < width; x++) {
-        const srcIdx = (y * width + x) * 4;
-        const dstIdx = ((height - 1 - y) * width + x) * 4;
-        flippedPixels[dstIdx] = pixels[srcIdx];
-        flippedPixels[dstIdx + 1] = pixels[srcIdx + 1];
-        flippedPixels[dstIdx + 2] = pixels[srcIdx + 2];
-        flippedPixels[dstIdx + 3] = pixels[srcIdx + 3];
-      }
-    }
+    const targetCanvas = document.createElement('canvas');
+    targetCanvas.width = width;
+    targetCanvas.height = height;
+    const ctx = targetCanvas.getContext('2d');
+    if (!ctx) return null;
 
-    return {
-      data: new Uint8ClampedArray(flippedPixels),
-      width,
-      height,
-      colorSpace: 'srgb' as PredefinedColorSpace
-    };
+    ctx.save();
+    ctx.translate(0, height);
+    ctx.scale(1, -1);
+    ctx.drawImage(srcCanvas, 0, 0, width, height);
+    ctx.restore();
+
+    return targetCanvas;
   }
 
   update(_deltaTime: number): void {

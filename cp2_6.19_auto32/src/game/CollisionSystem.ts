@@ -6,15 +6,21 @@ export interface CollisionEvent {
   distance: number;
 }
 
+export const GHOST_FOV = Math.PI / 2;
+
 export class CollisionSystem {
   private ghostPositions: Map<string, THREE.Vector3> = new Map();
   private ghostRotations: Map<string, THREE.Euler> = new Map();
   private catPositions: Map<string, THREE.Vector3> = new Map();
   private collisionRadius: number = 1.0;
-  private fieldOfViewAngle: number = Math.PI / 2;
+  private fieldOfViewAngle: number = GHOST_FOV;
   private lastCollisionEvents: CollisionEvent[] = [];
   private accumulator: number = 0;
   private fixedDelta: number = 1 / 60;
+
+  constructor() {
+    this.fieldOfViewAngle = GHOST_FOV;
+  }
 
   setCollisionRadius(radius: number): void {
     this.collisionRadius = radius;
@@ -86,6 +92,7 @@ export class CollisionSystem {
 
           const angle = ghostForward.angleTo(toCat);
 
+          // 使用半角检测：GHOST_FOV / 2 确保总视野为90度
           if (angle < this.fieldOfViewAngle / 2) {
             events.push({
               ghostId,
