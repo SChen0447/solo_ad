@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
 import { Printer, ArrowLeft } from 'lucide-react';
@@ -13,6 +13,13 @@ const COLORS = {
   warning: '#FB8C00',
   danger: '#E53935',
   light: '#E3F2FD',
+};
+
+const GRADIENT_MAP: Record<string, { start: string; end: string }> = {
+  [COLORS.primary]: { start: '#90CAF9', end: '#1565C0' },
+  [COLORS.success]: { start: '#A5D6A7', end: '#2E7D32' },
+  [COLORS.warning]: { start: '#FFE082', end: '#F57C00' },
+  [COLORS.danger]: { start: '#EF9A9A', end: '#C62828' },
 };
 
 const typeLabel: Record<string, string> = {
@@ -51,6 +58,8 @@ function AnimatedNumber({ value, decimals = 0, suffix = '' }: { value: number; d
   return <span>{animated.toFixed(decimals)}{suffix}</span>;
 }
 
+let gradientIdCounter = 0;
+
 function ProgressRing({ value, size = 120, strokeWidth = 10, color = COLORS.primary }: {
   value: number;
   size?: number;
@@ -62,8 +71,29 @@ function ProgressRing({ value, size = 120, strokeWidth = 10, color = COLORS.prim
   const circumference = 2 * Math.PI * radius;
   const offset = circumference - (animatedValue / 100) * circumference;
 
+  const gradientIdRef = useRef(`progressGradient-${gradientIdCounter++}`);
+  const gradientId = gradientIdRef.current;
+
+  const gradient = GRADIENT_MAP[color] || GRADIENT_MAP[COLORS.primary];
+
+  const progress = Math.min(animatedValue / Math.max(value, 1), 1);
+  const scaleValue = 0.6 + 0.4 * progress;
+
   return (
     <svg width={size} height={size} style={{ transform: 'rotate(-90deg)' }}>
+      <defs>
+        <linearGradient id={gradientId} x1="0%" y1="0%" x2="100%" y2="0%">
+          <stop offset="0%" stopColor={gradient.start} />
+          <stop offset="100%" stopColor={gradient.end} />
+        </linearGradient>
+        <filter id={`${gradientId}-glow`}>
+          <feGaussianBlur stdDeviation="2" result="blur" />
+          <feMerge>
+            <feMergeNode in="blur" />
+            <feMergeNode in="SourceGraphic" />
+          </feMerge>
+        </filter>
+      </defs>
       <circle
         cx={size / 2}
         cy={size / 2}
@@ -77,11 +107,12 @@ function ProgressRing({ value, size = 120, strokeWidth = 10, color = COLORS.prim
         cy={size / 2}
         r={radius}
         fill="none"
-        stroke={color}
+        stroke={`url(#${gradientId})`}
         strokeWidth={strokeWidth}
         strokeDasharray={circumference}
         strokeDashoffset={offset}
         strokeLinecap="round"
+        filter={`url(#${gradientId}-glow)`}
         style={{ transition: 'stroke-dashoffset 600ms ease-out' }}
       />
       <text
@@ -90,11 +121,12 @@ function ProgressRing({ value, size = 120, strokeWidth = 10, color = COLORS.prim
         textAnchor="middle"
         dominantBaseline="middle"
         style={{
-          transform: 'rotate(90deg)',
+          transform: `rotate(90deg) scale(${scaleValue})`,
           transformOrigin: `${size / 2}px ${size / 2}px`,
-          fontSize: 24,
+          fontSize: size >= 110 ? 24 : 20,
           fontWeight: 700,
-          fill: color,
+          fill: `url(#${gradientId})`,
+          transition: 'transform 600ms cubic-bezier(0.34, 1.56, 0.64, 1)',
         }}
       >
         {animatedValue.toFixed(0)}%
@@ -189,4 +221,186 @@ export default function ReportPage() {
               <ProgressRing
                 value={typeStats.single.accuracy * 100}
                 size={100}
-                color
+                color={COLORS.primary}
+              />
+              <div style={{ marginTop: 12, fontSize: 14, color: 'var(--text-secondary)' }}>
+                {typeStats.single.correct} / {typeStats.single.total} 题
+              </div>
+            </>
+          ) : (
+            <div style={{ color: 'var(--text-light)', padding: 20 }}>无此题型</div>
+          )}
+        </div>
+        <div className="report-chart-card">
+          <div className="report-chart-title">多选题正确率</div>
+          {typeStats.multiple.total > 0 ? (
+            <>
+              <ProgressRing
+                value={typeStats.multiple.accuracy * 100}
+                size={100}
+                color={COLORS.warning}
+              />
+              <div style={{ marginTop: 12, fontSize: 14, color: 'var(--text-secondary)' }}>
+                {typeStats.multiple.correct} / {typeStats.multiple.total} 题
+              </div>
+            </>
+          ) : (
+            <div style={{ color: 'var(--text-light)', padding: 20 }}>无此题型</div>
+          )}
+        </div>
+        <div className="report-chart-card">
+          <div className="report-chart-title">判断题正确率</div>
+          {typeStats.judge.total > 0 ? (
+            <>
+              <ProgressRing
+                value={typeStats.judge.accuracy * 100}
+                size={100}
+                color={COLORS.success}
+              />
+              <div style={{ marginTop: 12, fontSize: 14, color: 'var(--text-secondary)' }}>
+                {typeStats.judge.correct} / {typeStats.judge.total} 题
+              </div>
+            </>
+          ) : (
+            <div style={{ color: 'var(--text-light)', padding: 20 }}>无此题型</div>
+          )}
+        </div>
+      </div>
+
+      <div className="card" style={{ marginBottom: 24 }}>
+        <div className="section-title">成绩分布</div>
+        <ResponsiveContainer width="100%" height={200}>
+          <PieChart>
+            <Pie
+              data={chartData}
+              cx="50%"
+              cy="50%"
+              innerRadius={50}
+              outerRadius={80}
+              paddingAngle={4}
+              dataKey="value"
+              animationBegin={0}
+              animationDuration={600}
+              animationEasing="ease-out"
+            >
+              <Cell fill={COLORS.success} />
+              <Cell fill={COLORS.danger} />
+            </Pie>
+          </PieChart>
+        </ResponsiveContainer>
+        <div style={{ display: 'flex', justifyContent: 'center', gap: 24, fontSize: 14 }}>
+          <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ display: 'inline-block', width: 12, height: 12, borderRadius: 3, background: COLORS.success }} />
+            正确 {correctCount} 题
+          </span>
+          <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ display: 'inline-block', width: 12, height: 12, borderRadius: 3, background: COLORS.danger }} />
+            错误 {totalCount - correctCount} 题
+          </span>
+        </div>
+      </div>
+
+      <div className="section-title">答题详情</div>
+      {questions.map((q, idx) => {
+        const answer = answers[idx];
+        const userAns = answer?.answer;
+        const isCorrect = answer?.isCorrect;
+
+        return (
+          <div
+            key={q.id}
+            className={`answer-detail-item ${isCorrect ? '' : 'wrong'}`}
+          >
+            <div className="answer-detail-header">
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span className={`tag tag-${q.type}`}>{typeLabel[q.type]}</span>
+                <span className={`tag tag-${q.difficulty}`}>
+                  {q.difficulty === 'easy' ? '简单' : q.difficulty === 'medium' ? '中等' : '困难'}
+                </span>
+                <span style={{ fontSize: 13, color: 'var(--text-secondary)' }}>第 {idx + 1} 题 ({q.score}分)</span>
+              </div>
+              <span className={`answer-status ${isCorrect ? 'correct' : 'wrong'}`}>
+                {isCorrect ? '正确' : '错误'}
+              </span>
+            </div>
+
+            <div className="question-content">{q.content}</div>
+
+            {q.options && (
+              <div className="question-options" style={{ marginTop: 8 }}>
+                {q.options.map((opt, i) => {
+                  const label = optionLabels[i];
+                  const isCorrectOpt = Array.isArray(q.answer)
+                    ? q.answer.includes(label)
+                    : q.answer === label;
+                  const isUserOpt = Array.isArray(userAns)
+                    ? userAns.includes(label)
+                    : userAns === label;
+
+                  return (
+                    <div
+                      key={i}
+                      style={{
+                        padding: '6px 8px',
+                        borderRadius: 4,
+                        fontSize: 14,
+                        background: isCorrectOpt
+                          ? '#E8F5E9'
+                          : isUserOpt && !isCorrectOpt
+                          ? '#FFEBEE'
+                          : 'transparent',
+                        color: isCorrectOpt
+                          ? '#2E7D32'
+                          : isUserOpt && !isCorrectOpt
+                          ? '#C62828'
+                          : 'var(--text-secondary)',
+                      }}
+                    >
+                      {label}. {opt}
+                      {isCorrectOpt && ' ✓'}
+                      {isUserOpt && !isCorrectOpt && ' ✗'}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {q.type === 'judge' && (
+              <div style={{ marginTop: 8, fontSize: 14 }}>
+                <span style={{ color: q.answer === '正确' ? '#2E7D32' : 'var(--text-secondary)', marginRight: 16 }}>
+                  正确 {q.answer === '正确' && '✓'}
+                </span>
+                <span style={{ color: q.answer === '错误' ? '#2E7D32' : 'var(--text-secondary)' }}>
+                  错误 {q.answer === '错误' && '✓'}
+                </span>
+              </div>
+            )}
+
+            <div className="answer-detail-section">
+              <strong>你的答案：</strong>
+              <span style={{ color: isCorrect ? 'var(--success-color)' : 'var(--danger-color)' }}>
+                {Array.isArray(userAns) ? userAns.join(', ') : (userAns || '未作答')}
+              </span>
+              {!isCorrect && (
+                <>
+                  <span style={{ margin: '0 8px', color: 'var(--text-light)' }}>|</span>
+                  <strong>正确答案：</strong>
+                  <span style={{ color: 'var(--success-color)' }}>
+                    {Array.isArray(q.answer) ? q.answer.join(', ') : q.answer}
+                  </span>
+                </>
+              )}
+            </div>
+
+            {q.analysis && (
+              <div className="answer-detail-section">
+                <strong>解析：</strong>
+                <div className="analysis-text">{q.analysis}</div>
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
