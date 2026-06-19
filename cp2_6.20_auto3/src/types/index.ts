@@ -22,8 +22,10 @@ export interface Activity {
   maxParticipants: number
   participants: User[]
   type: string
+  tags?: string[]
   likes: number
   likedBy: string[]
+  favorites: string[]
   comments: Comment[]
   createdAt: number
   coverColor: string

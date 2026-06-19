@@ -312,6 +312,44 @@ body {
   position: relative;
 }
 
+.favorite-btn {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(4px);
+  border: none;
+  cursor: pointer;
+  padding: 6px 10px;
+  border-radius: 20px;
+  font-size: 13px;
+  color: #666;
+  transition: all 0.2s ease;
+  z-index: 2;
+}
+
+.favorite-btn:hover {
+  background: rgba(255, 255, 255, 1);
+  transform: scale(1.05);
+}
+
+.favorite-btn.favorited {
+  color: #FF6B6B;
+  background: rgba(255, 255, 255, 1);
+}
+
+.favorite-icon {
+  font-size: 16px;
+  transition: transform 0.2s ease;
+}
+
+.favorite-icon.heart-animation {
+  animation: pulse 0.2s ease-in-out;
+}
+
 .card-type-tag {
   position: absolute;
   top: 12px;
@@ -361,6 +399,25 @@ body {
 
 .progress-container {
   margin-bottom: 12px;
+}
+
+.tags-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  background: #F0F2F5;
+  color: #4A4A4A;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.5;
 }
 
 .progress-bar {

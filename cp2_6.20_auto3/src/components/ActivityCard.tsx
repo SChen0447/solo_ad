@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import type { Activity } from '../types'
-import { registerActivity, likeActivity } from '../api'
+import { registerActivity, likeActivity, favoriteActivity } from '../api'
 import { useAppContext } from '../App'
 import { formatTime, getProgressColor, getTypeEmoji } from '../utils'
 
@@ -16,10 +16,13 @@ const ActivityCard = ({ activity, isNew }: ActivityCardProps) => {
   const [isRegistering, setIsRegistering] = useState(false)
   const [isLiking, setIsLiking] = useState(false)
   const [heartAnimating, setHeartAnimating] = useState(false)
+  const [isFavoriting, setIsFavoriting] = useState(false)
+  const [favAnimating, setFavAnimating] = useState(false)
 
   const currentUserId = state.currentUser.id
   const isRegistered = activity.participants.some(p => p.id === currentUserId)
   const isLiked = activity.likedBy.includes(currentUserId)
+  const isFavorited = activity.favorites.includes(currentUserId)
   const isFull = activity.participants.length >= activity.maxParticipants
   const progressPercent = (activity.participants.length / activity.maxParticipants) * 100
 
@@ -60,6 +63,24 @@ const ActivityCard = ({ activity, isNew }: ActivityCardProps) => {
     }
   }
 
+  const handleFavorite = async (e: React.MouseEvent) => {
+    e.stopPropagation()
+    if (isFavoriting) return
+
+    setIsFavoriting(true)
+    setFavAnimating(true)
+    setTimeout(() => setFavAnimating(false), 200)
+
+    try {
+      const result = await favoriteActivity(activity.id, currentUserId)
+      dispatch({ type: 'UPDATE_ACTIVITY', payload: result.activity })
+    } catch (error) {
+      console.error('收藏失败:', error)
+    } finally {
+      setIsFavoriting(false)
+    }
+  }
+
   const getButtonClass = () => {
     if (isFull && !isRegistered) return 'btn btn-disabled'
     if (isRegistered) return 'btn btn-success'
@@ -80,6 +101,16 @@ const ActivityCard = ({ activity, isNew }: ActivityCardProps) => {
     >
       <div className="card-cover" style={{ background: activity.coverColor }}>
         <span className="card-type-tag">{getTypeEmoji(activity.type)} {activity.type}</span>
+        <button
+          className={`favorite-btn ${isFavorited ? 'favorited' : ''}`}
+          onClick={handleFavorite}
+          disabled={isFavoriting}
+        >
+          <span className={`favorite-icon ${favAnimating ? 'heart-animation' : ''}`}>
+            {isFavorited ? '❤️' : '🤍'}
+          </span>
+          <span>{activity.favorites.length}</span>
+        </button>
         <span>{getTypeEmoji(activity.type)}</span>
       </div>
 
@@ -96,6 +127,14 @@ const ActivityCard = ({ activity, isNew }: ActivityCardProps) => {
             <span>{activity.location}</span>
           </div>
         </div>
+
+        {activity.tags && activity.tags.length > 0 && (
+          <div className="tags-container">
+            {activity.tags.map((tag, index) => (
+              <span key={index} className="tag">#{tag}</span>
+            ))}
+          </div>
+        )}
 
         <div className="progress-container">
           <div className="progress-bar">

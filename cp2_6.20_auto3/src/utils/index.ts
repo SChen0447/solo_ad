@@ -50,15 +50,11 @@ export const formatRelativeTime = (timestamp: number): string => {
 }
 
 export const getProgressColor = (current: number, max: number): string => {
-  if (max === 0) return 'linear-gradient(90deg, #4CAF50 0%, #4CAF50 100%)'
-  const ratio = Math.min(current / max, 1)
-  const r = Math.round(76 + (244 - 76) * ratio)
-  const g = Math.round(175 + (67 - 175) * ratio)
-  const b = Math.round(80 + (54 - 80) * ratio)
-  const rEnd = Math.round(139 + (255 - 139) * ratio)
-  const gEnd = Math.round(195 + (152 - 195) * ratio)
-  const bEnd = Math.round(74 + (0 - 74) * ratio)
-  return `linear-gradient(90deg, rgb(${r}, ${g}, ${b}) 0%, rgb(${rEnd}, ${gEnd}, ${bEnd}) 100%)`
+  if (max === 0) return 'linear-gradient(90deg, #4CAF50 0%, #8BC34A 100%)'
+  const ratio = current / max
+  if (ratio < 0.5) return 'linear-gradient(90deg, #4CAF50 0%, #8BC34A 100%)'
+  if (ratio < 0.8) return 'linear-gradient(90deg, #FF9800 0%, #FFB74D 100%)'
+  return 'linear-gradient(90deg, #F44336 0%, #FF5722 100%)'
 }
 
 export const getTypeEmoji = (type: string): string => {

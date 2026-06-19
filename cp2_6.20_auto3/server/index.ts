@@ -32,8 +32,10 @@ interface Activity {
   maxParticipants: number
   participants: User[]
   type: string
+  tags?: string[]
   likes: number
   likedBy: string[]
+  favorites: string[]
   comments: Comment[]
   createdAt: number
   coverColor: string
@@ -76,8 +78,10 @@ const sampleActivities: Activity[] = [
     maxParticipants: 12,
     participants: [sampleUsers[0], sampleUsers[1]],
     type: '运动',
+    tags: ['运动', '篮球', '友谊赛', '户外'],
     likes: 15,
     likedBy: ['user1', 'user3'],
+    favorites: ['user2', 'user4'],
     comments: [
       {
         id: uuidv4(),
@@ -108,8 +112,10 @@ const sampleActivities: Activity[] = [
     maxParticipants: 15,
     participants: [sampleUsers[1], sampleUsers[2], sampleUsers[3]],
     type: '音乐',
+    tags: ['音乐', '吉他', '民谣', '弹唱', '咖啡'],
     likes: 23,
     likedBy: ['user2', 'user4', 'user5'],
+    favorites: ['user1', 'user3', 'user5'],
     comments: [
       {
         id: uuidv4(),
@@ -132,8 +138,10 @@ const sampleActivities: Activity[] = [
     maxParticipants: 10,
     participants: [sampleUsers[0], sampleUsers[2], sampleUsers[4]],
     type: '读书',
+    tags: ['读书', '文学', '余华', '分享'],
     likes: 8,
     likedBy: ['user1', 'user3'],
+    favorites: ['user4'],
     comments: [],
     createdAt: now - 1 * dayMs,
     coverColor: coverColors[2]
@@ -147,8 +155,10 @@ const sampleActivities: Activity[] = [
     maxParticipants: 15,
     participants: [sampleUsers[0], sampleUsers[1], sampleUsers[2], sampleUsers[3], sampleUsers[4]],
     type: '桌游',
+    tags: ['桌游', '推理', '社交', '血染钟楼'],
     likes: 31,
     likedBy: ['user1', 'user2', 'user3', 'user4', 'user5'],
+    favorites: ['user1', 'user2', 'user3'],
     comments: [
       {
         id: uuidv4(),
@@ -179,8 +189,10 @@ const sampleActivities: Activity[] = [
     maxParticipants: 20,
     participants: [sampleUsers[3]],
     type: '户外',
+    tags: ['户外', '徒步', '赏秋', '拍照', '野餐'],
     likes: 42,
     likedBy: ['user1', 'user2', 'user3', 'user4', 'user5'],
+    favorites: ['user1', 'user2', 'user3', 'user4', 'user5'],
     comments: [
       {
         id: uuidv4(),
@@ -235,8 +247,10 @@ app.post('/api/activities', (req: Request, res: Response) => {
     maxParticipants,
     participants: [],
     type,
+    tags: [],
     likes: 0,
     likedBy: [],
+    favorites: [],
     comments: [],
     createdAt: Date.now(),
     coverColor: coverColors[Math.floor(Math.random() * coverColors.length)]
@@ -300,6 +314,25 @@ app.post('/api/activities/:id/like', (req: Request, res: Response) => {
 
   activities.set(activity.id, activity)
   res.json({ activity, isLiked: !isLiked })
+})
+
+app.post('/api/activities/:id/favorite', (req: Request, res: Response) => {
+  const activity = activities.get(req.params.id)
+  if (!activity) {
+    return res.status(404).json({ error: '活动不存在' })
+  }
+
+  const { userId } = req.body
+  const isFavorited = activity.favorites.includes(userId)
+
+  if (isFavorited) {
+    activity.favorites = activity.favorites.filter(id => id !== userId)
+  } else {
+    activity.favorites.push(userId)
+  }
+
+  activities.set(activity.id, activity)
+  res.json({ activity, isFavorited: !isFavorited })
 })
 
 app.post('/api/activities/:id/comments', (req: Request, res: Response) => {

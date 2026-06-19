@@ -63,6 +63,19 @@ export const likeActivity = async (
   return response.json()
 }
 
+export const favoriteActivity = async (
+  activityId: string,
+  userId: string
+): Promise<{ activity: Activity; isFavorited: boolean }> => {
+  const response = await fetch(`${API_BASE}/activities/${activityId}/favorite`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ userId })
+  })
+  if (!response.ok) throw new Error('收藏失败')
+  return response.json()
+}
+
 export const addComment = async (
   activityId: string,
   userId: string,
