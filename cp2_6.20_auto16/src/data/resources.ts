@@ -57,6 +57,14 @@ export function getResources(): Resource[] {
   return resources;
 }
 
+export function getResourcesAsync(delay: number = 500): Promise<Resource[]> {
+  return new Promise((resolve) => {
+    setTimeout(() => {
+      resolve(resources);
+    }, delay);
+  });
+}
+
 export function addResource(data: Omit<Resource, 'id' | 'createdAt'>): Resource {
   const resource: Resource = {
     ...data,

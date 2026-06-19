@@ -12,17 +12,25 @@ const ResourceForm: React.FC<ResourceFormProps> = ({ onSubmit, onClose }) => {
   const [title, setTitle] = useState('');
   const [type, setType] = useState<ResourceType>('笔记');
   const [description, setDescription] = useState('');
+  const [closing, setClosing] = useState(false);
+
+  const handleClose = () => {
+    setClosing(true);
+    setTimeout(() => {
+      onClose();
+    }, 200);
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim()) return;
     onSubmit({ title: title.trim(), type, description: description.trim() });
-    onClose();
+    handleClose();
   };
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+    <div className={`modal-overlay ${closing ? 'closing' : ''}`} onClick={handleClose}>
+      <div className={`modal-content ${closing ? 'closing' : ''}`} onClick={(e) => e.stopPropagation()}>
         <h2 className="modal-title">发布资源</h2>
         <form onSubmit={handleSubmit}>
           <div className="form-group">
@@ -60,7 +68,7 @@ const ResourceForm: React.FC<ResourceFormProps> = ({ onSubmit, onClose }) => {
             />
           </div>
           <div className="form-actions">
-            <button type="button" className="btn-cancel" onClick={onClose}>
+            <button type="button" className="btn-cancel" onClick={handleClose}>
               取消
             </button>
             <button type="submit" className="btn-submit">

@@ -95,6 +95,7 @@ body {
 .search-area {
   flex: 1;
   min-width: 200px;
+  position: relative;
 }
 
 .search-input {
@@ -106,6 +107,35 @@ body {
   background: #F7FAFC;
   outline: none;
   transition: border-color 0.2s;
+  padding-right: 36px;
+}
+
+.search-clear-btn {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: #E2E8F0;
+  border: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  font-size: 11px;
+  color: #718096;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s, transform 0.1s;
+}
+
+.search-clear-btn:hover {
+  background: #CBD5E0;
+  color: #1A365D;
+}
+
+.search-clear-btn:active {
+  transform: translateY(-50%) scale(0.95);
 }
 
 .search-input:focus {
@@ -351,6 +381,30 @@ body {
   to {
     opacity: 1;
     transform: scale(1);
+  }
+}
+
+.modal-overlay.closing {
+  animation: fadeOut 0.2s ease forwards;
+}
+
+.modal-content.closing {
+  animation: scaleOut 0.2s ease forwards;
+}
+
+@keyframes fadeOut {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+@keyframes scaleOut {
+  from {
+    opacity: 1;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: scale(0.7);
   }
 }
 
@@ -742,6 +796,108 @@ body {
   bottom: 0;
   background: rgba(0, 0, 0, 0.4);
   z-index: 40;
+}
+
+/* ===== Skeleton Loader ===== */
+.skeleton-card {
+  background: #fff;
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  position: relative;
+}
+
+.skeleton-card::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
+  animation: skeletonShimmer 1.2s infinite;
+}
+
+@keyframes skeletonShimmer {
+  100% { left: 100%; }
+}
+
+.skeleton-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 12px;
+  gap: 8px;
+}
+
+.skeleton-title {
+  flex: 1;
+  height: 19px;
+  background: #E2E8F0;
+  border-radius: 4px;
+}
+
+.skeleton-badge {
+  width: 40px;
+  height: 20px;
+  background: #E2E8F0;
+  border-radius: 12px;
+  flex-shrink: 0;
+}
+
+.skeleton-desc {
+  flex: 1;
+  margin-bottom: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.skeleton-line {
+  height: 14px;
+  background: #EDF2F7;
+  border-radius: 3px;
+}
+
+.skeleton-line.short {
+  width: 60%;
+}
+
+.skeleton-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-top: 1px solid #EDF2F7;
+  padding-top: 12px;
+}
+
+.skeleton-author {
+  width: 60px;
+  height: 14px;
+  background: #EDF2F7;
+  border-radius: 3px;
+}
+
+.skeleton-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.skeleton-btn {
+  width: 56px;
+  height: 28px;
+  background: #EDF2F7;
+  border-radius: 6px;
+}
+
+.skeleton-btn.small {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
 }
 
 /* ===== Empty ===== */

@@ -4,11 +4,11 @@ import {
   searchResources,
   addResource,
   toggleFavorite as toggleFav,
-  isFavorite,
   getFavoriteResources,
   createExchangeRequest,
   getExchangeRequests,
   updateExchangeRequest,
+  getResourcesAsync,
 } from './data/resources';
 import ResourceCard from './components/ResourceCard';
 import ResourceForm from './components/ResourceForm';
@@ -37,8 +37,15 @@ const App: React.FC = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [acceptAnimId, setAcceptAnimId] = useState<string | null>(null);
   const [rejectAnimId, setRejectAnimId] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
 
   const debounceTimer = useRef<ReturnType<typeof setTimeout>>();
+
+  useEffect(() => {
+    getResourcesAsync(600).then(() => {
+      setLoading(false);
+    });
+  }, []);
 
   useEffect(() => {
     if (debounceTimer.current) clearTimeout(debounceTimer.current);
@@ -178,6 +185,15 @@ const App: React.FC = () => {
               value={keyword}
               onChange={(e) => setKeyword(e.target.value)}
             />
+            {keyword && (
+              <button
+                className="search-clear-btn"
+                onClick={() => setKeyword('')}
+                title="清除搜索"
+              >
+                ✕
+              </button>
+            )}
           </div>
           <div className="filter-area">
             {RESOURCE_TYPES.map((t) => (
@@ -201,17 +217,42 @@ const App: React.FC = () => {
         </header>
 
         <div className="resource-grid">
-          {filteredResources.map((r) => (
-            <ResourceCard
-              key={r.id}
-              resource={r}
-              isFavorited={favoriteIds.has(r.id)}
-              onToggleFavorite={handleToggleFavorite}
-              onExchange={handleExchange}
-            />
-          ))}
-          {filteredResources.length === 0 && (
-            <p className="empty-text">没有找到匹配的资源</p>
+          {loading ? (
+            Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="skeleton-card">
+                <div className="skeleton-header">
+                  <div className="skeleton-title" />
+                  <div className="skeleton-badge" />
+                </div>
+                <div className="skeleton-desc">
+                  <div className="skeleton-line" />
+                  <div className="skeleton-line" />
+                  <div className="skeleton-line short" />
+                </div>
+                <div className="skeleton-footer">
+                  <div className="skeleton-author" />
+                  <div className="skeleton-actions">
+                    <div className="skeleton-btn small" />
+                    <div className="skeleton-btn" />
+                  </div>
+                </div>
+              </div>
+            ))
+          ) : (
+            <>
+              {filteredResources.map((r) => (
+                <ResourceCard
+                  key={r.id}
+                  resource={r}
+                  isFavorited={favoriteIds.has(r.id)}
+                  onToggleFavorite={handleToggleFavorite}
+                  onExchange={handleExchange}
+                />
+              ))}
+              {filteredResources.length === 0 && (
+                <p className="empty-text">没有找到匹配的资源</p>
+              )}
+            </>
           )}
         </div>
       </main>
