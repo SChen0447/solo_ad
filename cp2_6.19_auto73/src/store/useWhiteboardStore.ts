@@ -15,6 +15,7 @@ interface WhiteboardState {
   drawingMode: DrawingMode;
   penColor: string;
   penWidth: number;
+  shapeOpacity: number;
   noteColor: NoteColor;
   connected: boolean;
   userCount: number;
@@ -29,6 +30,7 @@ interface WhiteboardState {
   setDrawingMode: (mode: DrawingMode) => void;
   setPenColor: (c: string) => void;
   setPenWidth: (w: number) => void;
+  setShapeOpacity: (o: number) => void;
   setNoteColor: (c: NoteColor) => void;
 
   addStroke: (stroke: Stroke) => void;
@@ -57,6 +59,7 @@ export const useWhiteboardStore = create<WhiteboardState>((set, get) => ({
   drawingMode: 'pen',
   penColor: '#000000',
   penWidth: 3,
+  shapeOpacity: 0.3,
   noteColor: 'yellow',
   connected: false,
   userCount: 0,
@@ -88,9 +91,14 @@ export const useWhiteboardStore = create<WhiteboardState>((set, get) => ({
           case 'stroke-add':
             set(s => ({ strokes: [...s.strokes, msg.payload as Stroke] }));
             break;
-          case 'shape-add':
-            set(s => ({ shapes: [...s.shapes, msg.payload as Shape] }));
+          case 'shape-add': {
+            const incoming = msg.payload as Shape;
+            set(s => {
+              if (s.shapes.some(sh => sh.id === incoming.id)) return s;
+              return { shapes: [...s.shapes, incoming] };
+            });
             break;
+          }
           case 'note-add':
             set(s => ({ notes: [...s.notes, msg.payload as Note] }));
             break;
@@ -145,6 +153,7 @@ export const useWhiteboardStore = create<WhiteboardState>((set, get) => ({
   setDrawingMode: (mode) => set({ drawingMode: mode }),
   setPenColor: (c) => set({ penColor: c }),
   setPenWidth: (w) => set({ penWidth: w }),
+  setShapeOpacity: (o) => set({ shapeOpacity: Math.min(Math.max(o, 0), 1) }),
   setNoteColor: (c) => set({ noteColor: c }),
 
   addStroke: (stroke: Stroke) => {

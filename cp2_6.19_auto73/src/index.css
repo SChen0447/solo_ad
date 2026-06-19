@@ -214,6 +214,77 @@ html, body, #root {
   color: #EF4444;
 }
 
+.opacity-value {
+  position: absolute;
+  bottom: 1px;
+  right: 2px;
+  font-size: 8px;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.opacity-dropdown {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-items: stretch;
+  padding: 6px;
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+  margin-top: 4px;
+  width: 72px;
+}
+
+.opacity-option {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 4px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  cursor: pointer;
+  transition: background-color 0.15s ease, transform 0.15s ease;
+}
+
+.opacity-option:hover {
+  background: #f3f4f6;
+  transform: translateX(1px);
+}
+
+.opacity-option.selected {
+  background: #EFF6FF;
+  outline: 1px solid #3B82F6;
+}
+
+.opacity-bar {
+  position: relative;
+  width: 28px;
+  height: 10px;
+  background: repeating-linear-gradient(
+    45deg,
+    #e5e7eb,
+    #e5e7eb 2px,
+    #f9fafb 2px,
+    #f9fafb 4px
+  );
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.opacity-bar-fill {
+  position: absolute;
+  inset: 0;
+  background: #3B82F6;
+}
+
+.opacity-label {
+  font-size: 10px;
+  color: #6b7280;
+  line-height: 1;
+}
+
 .note-color-section {
   display: flex;
   gap: 2px;

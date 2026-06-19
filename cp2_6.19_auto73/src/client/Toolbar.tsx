@@ -3,7 +3,7 @@ import { useWhiteboardStore } from '@/store/useWhiteboardStore';
 import type { NoteColor, DrawingMode } from '@/types';
 import {
   Pencil, Square, Circle, Palette, StickyNote, Undo2, Redo2, Trash2,
-  ChevronDown,
+  ChevronDown, Layers,
 } from 'lucide-react';
 
 const COLORS = [
@@ -21,10 +21,24 @@ const WIDTHS = [
   { value: 8, label: '特粗' },
 ];
 
-const DRAWING_MODES: { value: DrawingMode; label: string; icon: typeof Pencil }[] = [
-  { value: 'pen', label: '画笔', icon: Pencil },
-  { value: 'rect', label: '矩形', icon: Square },
-  { value: 'circle', label: '圆形', icon: Circle },
+const DRAWING_MODES: {
+  value: DrawingMode;
+  label: string;
+  ariaLabel: string;
+  shortcut: string;
+  icon: typeof Pencil;
+}[] = [
+  { value: 'pen', label: '画笔', ariaLabel: '自由绘制画笔', shortcut: 'P', icon: Pencil },
+  { value: 'rect', label: '矩形', ariaLabel: '绘制矩形', shortcut: 'R', icon: Square },
+  { value: 'circle', label: '圆形', ariaLabel: '绘制圆形', shortcut: 'C', icon: Circle },
+];
+
+const OPACITY_PRESETS = [
+  { value: 0.1, label: '10%' },
+  { value: 0.3, label: '30%' },
+  { value: 0.5, label: '50%' },
+  { value: 0.7, label: '70%' },
+  { value: 0.9, label: '90%' },
 ];
 
 const NOTE_COLORS: { value: NoteColor; label: string; hex: string }[] = [
@@ -35,13 +49,14 @@ const NOTE_COLORS: { value: NoteColor; label: string; hex: string }[] = [
 
 export function Toolbar() {
   const {
-    penColor, penWidth, noteColor, drawingMode,
-    setPenColor, setPenWidth, setNoteColor, setDrawingMode,
+    penColor, penWidth, shapeOpacity, noteColor, drawingMode,
+    setPenColor, setPenWidth, setShapeOpacity, setNoteColor, setDrawingMode,
     addNote, undo, redo, clear,
     history, historyIndex,
   } = useWhiteboardStore();
 
   const [showNoteColors, setShowNoteColors] = useState(false);
+  const [showOpacity, setShowOpacity] = useState(false);
 
   const canUndo = historyIndex >= 0;
   const canRedo = historyIndex < history.length - 1;
@@ -53,12 +68,14 @@ export function Toolbar() {
         <div className="tool-grid">
           {DRAWING_MODES.map(mode => {
             const Icon = mode.icon;
+            const title = `${mode.ariaLabel}（快捷键 ${mode.shortcut}）`;
             return (
               <button
                 key={mode.value}
                 className={`tool-btn action-btn ${drawingMode === mode.value ? 'active' : ''}`}
                 onClick={() => setDrawingMode(mode.value)}
-                title={mode.label}
+                title={title}
+                aria-label={mode.ariaLabel}
               >
                 <Icon size={18} />
               </button>
@@ -76,7 +93,8 @@ export function Toolbar() {
               className={`tool-btn color-btn ${penColor === c.value ? 'active' : ''}`}
               style={{ backgroundColor: c.value }}
               onClick={() => setPenColor(c.value)}
-              title={c.label}
+              title={`颜色：${c.label}`}
+              aria-label={`选择${c.label}色`}
             />
           ))}
         </div>
@@ -90,7 +108,8 @@ export function Toolbar() {
               key={w.value}
               className={`tool-btn width-btn ${penWidth === w.value ? 'active' : ''}`}
               onClick={() => setPenWidth(w.value)}
-              title={w.label}
+              title={`线条粗细：${w.label}（${w.value}px）`}
+              aria-label={`设置线条粗细为${w.label}`}
             >
               <span
                 className="width-dot"
@@ -102,15 +121,52 @@ export function Toolbar() {
       </div>
 
       <div className="toolbar-section">
+        <div className="toolbar-label">透明度</div>
+        <button
+          className={`tool-btn action-btn ${showOpacity ? 'active' : ''}`}
+          onClick={() => setShowOpacity(!showOpacity)}
+          title={`形状填充透明度：${Math.round(shapeOpacity * 100)}%`}
+          aria-label="设置形状填充透明度"
+        >
+          <Layers size={18} />
+          <span className="opacity-value">{Math.round(shapeOpacity * 100)}</span>
+        </button>
+        {showOpacity && (
+          <div className="opacity-dropdown">
+            {OPACITY_PRESETS.map(o => (
+              <button
+                key={o.value}
+                className={`opacity-option ${Math.abs(shapeOpacity - o.value) < 0.01 ? 'selected' : ''}`}
+                onClick={() => { setShapeOpacity(o.value); setShowOpacity(false); }}
+                title={`${o.label} 透明度`}
+                aria-label={`设置透明度为${o.label}`}
+              >
+                <span className="opacity-bar">
+                  <span className="opacity-bar-fill" style={{ opacity: o.value }} />
+                </span>
+                <span className="opacity-label">{o.label}</span>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div className="toolbar-section">
         <div className="toolbar-label">便签</div>
         <div className="note-color-section">
-          <button className="tool-btn action-btn" onClick={addNote} title="添加便签">
+          <button
+            className="tool-btn action-btn"
+            onClick={addNote}
+            title="添加便签"
+            aria-label="添加便签"
+          >
             <StickyNote size={20} />
           </button>
           <button
             className={`tool-btn action-btn note-color-toggle ${showNoteColors ? 'active' : ''}`}
             onClick={() => setShowNoteColors(!showNoteColors)}
-            title="便签颜色"
+            title="选择便签颜色"
+            aria-label="选择便签颜色"
           >
             <Palette size={16} />
             <ChevronDown size={12} />
@@ -124,7 +180,8 @@ export function Toolbar() {
                 className={`note-color-option ${noteColor === nc.value ? 'selected' : ''}`}
                 style={{ backgroundColor: nc.hex }}
                 onClick={() => { setNoteColor(nc.value); setShowNoteColors(false); }}
-                title={nc.label}
+                title={`便签颜色：${nc.label}`}
+                aria-label={`设置便签颜色为${nc.label}`}
               />
             ))}
           </div>
@@ -137,7 +194,8 @@ export function Toolbar() {
           className={`tool-btn action-btn ${!canUndo ? 'disabled' : ''}`}
           onClick={undo}
           disabled={!canUndo}
-          title="撤销"
+          title="撤销（Ctrl+Z）"
+          aria-label="撤销"
         >
           <Undo2 size={20} />
         </button>
@@ -145,14 +203,20 @@ export function Toolbar() {
           className={`tool-btn action-btn ${!canRedo ? 'disabled' : ''}`}
           onClick={redo}
           disabled={!canRedo}
-          title="重做"
+          title="重做（Ctrl+Shift+Z）"
+          aria-label="重做"
         >
           <Redo2 size={20} />
         </button>
       </div>
 
       <div className="toolbar-section toolbar-bottom">
-        <button className="tool-btn action-btn danger" onClick={clear} title="清空画布">
+        <button
+          className="tool-btn action-btn danger"
+          onClick={clear}
+          title="清空画布"
+          aria-label="清空画布"
+        >
           <Trash2 size={20} />
         </button>
       </div>

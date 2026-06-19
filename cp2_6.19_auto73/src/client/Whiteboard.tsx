@@ -34,7 +34,7 @@ function shapeRect(shape: Shape): { x: number; y: number; w: number; h: number }
   };
 }
 
-function ShapeRenderer({ shape }: { shape: Shape }) {
+function ShapeRenderer({ shape, opacity }: { shape: Shape; opacity: number }) {
   const r = shapeRect(shape);
   if (r.w <= 0 || r.h <= 0) return null;
 
@@ -47,7 +47,7 @@ function ShapeRenderer({ shape }: { shape: Shape }) {
         width={r.w}
         height={r.h}
         fill={shape.color}
-        fillOpacity={0.3}
+        fillOpacity={opacity}
         stroke={shape.color}
         strokeWidth={shape.width}
       />
@@ -62,7 +62,7 @@ function ShapeRenderer({ shape }: { shape: Shape }) {
       rx={r.w / 2}
       ry={r.h / 2}
       fill={shape.color}
-      fillOpacity={0.3}
+      fillOpacity={opacity}
       stroke={shape.color}
       strokeWidth={shape.width}
     />
@@ -117,9 +117,9 @@ function ShapePreview({
 
 export function Whiteboard() {
   const {
-    strokes, shapes, notes, penColor, penWidth, drawingMode,
+    strokes, shapes, notes, penColor, penWidth, shapeOpacity, drawingMode,
     connected, userCount, fading,
-    addStroke, addShape, connect,
+    addStroke, addShape, connect, setDrawingMode,
   } = useWhiteboardStore();
 
   const svgRef = useRef<SVGSVGElement>(null);
@@ -138,6 +138,23 @@ export function Whiteboard() {
   const panOrigin = useRef({ x: 0, y: 0 });
 
   useEffect(() => { connect(); }, []);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement;
+      const isEditing = target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable);
+      if (isEditing) return;
+      if (e.key === 'p' || e.key === 'P') {
+        setDrawingMode('pen');
+      } else if (e.key === 'r' || e.key === 'R') {
+        setDrawingMode('rect');
+      } else if (e.key === 'c' || e.key === 'C') {
+        setDrawingMode('circle');
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [setDrawingMode]);
 
   const screenToCanvas = useCallback((clientX: number, clientY: number): Point => {
     const svg = svgRef.current;
@@ -299,7 +316,7 @@ export function Whiteboard() {
               />
             ))}
             {shapes.map(shape => (
-              <ShapeRenderer key={shape.id} shape={shape} />
+              <ShapeRenderer key={shape.id} shape={shape} opacity={shapeOpacity} />
             ))}
             {drawing && drawingMode === 'pen' && currentPath && (
               <path
