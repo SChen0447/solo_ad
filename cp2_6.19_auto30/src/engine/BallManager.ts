@@ -18,7 +18,7 @@ export interface Ball {
   number: number;
   isStripe: boolean;
   isCue: boolean;
-  isPotted: boolean;
+  isPocketed: boolean;
   trail: BallTrailPoint[];
 }
 
@@ -66,7 +66,7 @@ export class BallManager {
       number: 0,
       isStripe: false,
       isCue: true,
-      isPotted: false,
+      isPocketed: false,
       trail: []
     };
     this.balls.push(cueBall);
@@ -94,7 +94,7 @@ export class BallManager {
           number: num,
           isStripe: c.isStripe,
           isCue: false,
-          isPotted: false,
+          isPocketed: false,
           trail: []
         };
         this.balls.push(ball);
@@ -104,7 +104,7 @@ export class BallManager {
   }
 
   getBalls(): Ball[] {
-    return this.balls.filter(b => !b.isPotted);
+    return this.balls.filter(b => !b.isPocketed);
   }
 
   getAllBalls(): Ball[] {
@@ -112,7 +112,7 @@ export class BallManager {
   }
 
   getCueBall(): Ball | undefined {
-    return this.balls.find(b => b.isCue && !b.isPotted);
+    return this.balls.find(b => b.isCue && !b.isPocketed);
   }
 
   setCueBallPosition(x: number, y: number): void {
@@ -123,7 +123,7 @@ export class BallManager {
       cue.y = clamped.y;
       cue.vx = 0;
       cue.vy = 0;
-      cue.isPotted = false;
+      cue.isPocketed = false;
       cue.trail = [];
     }
   }
@@ -144,11 +144,11 @@ export class BallManager {
   }
 
   areAllBallsResting(speedThreshold: number = 0.1): boolean {
-    return this.balls.every(b => b.isPotted || Math.sqrt(b.vx * b.vx + b.vy * b.vy) < speedThreshold);
+    return this.balls.every(b => b.isPocketed || Math.sqrt(b.vx * b.vx + b.vy * b.vy) < speedThreshold);
   }
 
   potBall(ball: Ball): void {
-    ball.isPotted = true;
+    ball.isPocketed = true;
     ball.vx = 0;
     ball.vy = 0;
   }
@@ -156,7 +156,7 @@ export class BallManager {
   resetCueBall(): void {
     const cue = this.balls.find(b => b.isCue);
     if (cue) {
-      cue.isPotted = false;
+      cue.isPocketed = false;
       cue.x = this.geometry.bounds.left + (this.geometry.bounds.right - this.geometry.bounds.left) * 0.25;
       cue.y = this.geometry.height / 2;
       cue.vx = 0;
@@ -170,11 +170,121 @@ export class BallManager {
   }
 
   getRemainingColoredBalls(): Ball[] {
-    return this.balls.filter(b => !b.isCue && b.number !== 8 && !b.isPotted);
+    return this.balls.filter(b => !b.isCue && b.number !== 8 && !b.isPocketed);
   }
 
   is8BallPotted(): boolean {
     const ball8 = this.balls.find(b => b.number === 8);
-    return !!ball8?.isPotted;
+    return !!ball8?.isPocketed;
+  }
+
+  private getRackPositions(): Map<number, { x: number; y: number }> {
+    const map = new Map<number, { x: number; y: number }>();
+    const r = this.geometry.ballRadius;
+    const rackX = this.geometry.bounds.right - (this.geometry.bounds.right - this.geometry.bounds.left) * 0.25;
+    const rackY = this.geometry.height / 2;
+    const spacing = r * 2 + 1;
+
+    const rackOrder = [1, 11, 2, 10, 8, 3, 9, 4, 14, 5, 13, 6, 12, 7, 15];
+    let idx = 0;
+    for (let row = 0; row < 5; row++) {
+      for (let col = 0; col <= row; col++) {
+        if (idx >= rackOrder.length) break;
+        const num = rackOrder[idx];
+        const x = rackX + row * spacing * Math.cos(Math.PI / 6);
+        const y = rackY + (col - row / 2) * spacing;
+        map.set(num, { x, y });
+        idx++;
+      }
+    }
+    return map;
+  }
+
+  rerack(): void {
+    const rackPositions = this.getRackPositions();
+
+    for (const ball of this.balls) {
+      if (ball.isCue) {
+        if (!ball.isPocketed) {
+          ball.x = this.geometry.bounds.left + (this.geometry.bounds.right - this.geometry.bounds.left) * 0.25;
+          ball.y = this.geometry.height / 2;
+          ball.vx = 0;
+          ball.vy = 0;
+          ball.trail = [];
+        }
+      } else {
+        if (!ball.isPocketed) {
+          const pos = rackPositions.get(ball.number);
+          if (pos) {
+            ball.x = pos.x;
+            ball.y = pos.y;
+            ball.vx = 0;
+            ball.vy = 0;
+            ball.trail = [];
+          }
+        }
+      }
+    }
+  }
+
+  isStalemate(): boolean {
+    const remainingColored = this.getRemainingColoredBalls();
+    if (remainingColored.length < 3) return false;
+
+    const meanX = remainingColored.reduce((sum, b) => sum + b.x, 0) / remainingColored.length;
+    const varianceX = remainingColored.reduce((sum, b) => sum + (b.x - meanX) ** 2, 0) / remainingColored.length;
+    const stdDevX = Math.sqrt(varianceX);
+    if (stdDevX < 80) return true;
+
+    const corners = [
+      { x: this.geometry.bounds.left, y: this.geometry.bounds.top },
+      { x: this.geometry.bounds.right, y: this.geometry.bounds.top },
+      { x: this.geometry.bounds.left, y: this.geometry.bounds.bottom },
+      { x: this.geometry.bounds.right, y: this.geometry.bounds.bottom }
+    ];
+    const remainingBalls = this.balls.filter(b => !b.isPocketed);
+    for (const ball of remainingBalls) {
+      let minCornerDist = Infinity;
+      for (const corner of corners) {
+        const dist = Math.sqrt((ball.x - corner.x) ** 2 + (ball.y - corner.y) ** 2);
+        if (dist < minCornerDist) minCornerDist = dist;
+      }
+      if (minCornerDist >= 200) {
+        break;
+      }
+      if (ball === remainingBalls[remainingBalls.length - 1]) {
+        return true;
+      }
+    }
+    let allInCorner = true;
+    for (const ball of remainingBalls) {
+      let minCornerDist = Infinity;
+      for (const corner of corners) {
+        const dist = Math.sqrt((ball.x - corner.x) ** 2 + (ball.y - corner.y) ** 2);
+        if (dist < minCornerDist) minCornerDist = dist;
+      }
+      if (minCornerDist >= 200) {
+        allInCorner = false;
+        break;
+      }
+    }
+    if (allInCorner) return true;
+
+    const ball8 = this.balls.find(b => b.number === 8 && !b.isPocketed);
+    if (ball8) {
+      const dists: number[] = [];
+      for (const b of remainingColored) {
+        const d = Math.sqrt((b.x - ball8.x) ** 2 + (b.y - ball8.y) ** 2);
+        dists.push(d);
+      }
+      dists.sort((a, b) => a - b);
+      const nearest3 = dists.slice(0, Math.min(3, dists.length));
+      if (nearest3.length >= 3) {
+        const avgDist = nearest3.reduce((s, d) => s + d, 0) / nearest3.length;
+        if (avgDist < 50) return true;
+      }
+    }
+
+    return false;
   }
 }

@@ -13,14 +13,6 @@ interface Particle {
   size: number;
 }
 
-interface PocketFlash {
-  x: number;
-  y: number;
-  radius: number;
-  life: number;
-  maxLife: number;
-}
-
 export interface GameState {
   currentPlayer: number;
   scores: [number, number];
@@ -47,10 +39,9 @@ export class GameUI {
   private mouseX: number = 0;
   private mouseY: number = 0;
   private powerAnim: number = 0;
-  private powerDir: number = 1;
+  private readonly MAX_DRAG_DISTANCE = 300;
 
   private particles: Particle[] = [];
-  private pocketFlashes: PocketFlash[] = [];
 
   private gameState: GameState;
 
@@ -59,6 +50,7 @@ export class GameUI {
   private onStrikeCallback: ((dx: number, dy: number, power: number) => void) | null = null;
   private onResetCallback: (() => void) | null = null;
   private onRestartCallback: (() => void) | null = null;
+  private onRerackCallback: (() => void) | null = null;
 
   constructor(
     container: HTMLElement,
@@ -98,6 +90,46 @@ export class GameUI {
         this.isDragging = false;
       }
     });
+    this.canvas.addEventListener('click', (e) => this.handleCanvasClick(e));
+  }
+
+  private handleCanvasClick(e: MouseEvent): void {
+    const rect = this.canvas.getBoundingClientRect();
+    const cx = e.clientX - rect.left;
+    const cy = e.clientY - rect.top;
+    const w = rect.width;
+    const h = rect.height;
+
+    if (this.gameState.gameOver) {
+      const modalH = 250;
+      const my = (h - modalH) / 2;
+      const btnW = 160;
+      const btnH = 45;
+      const bx = w / 2 - btnW / 2;
+      const by = my + modalH - btnH - 25;
+      if (cx >= bx && cx <= bx + btnW && cy >= by && cy <= by + btnH) {
+        if (this.onRestartCallback) this.onRestartCallback();
+        return;
+      }
+    }
+
+    const rerackBtnW = 120;
+    const rerackBtnH = 40;
+    const rerackX = w - rerackBtnW - 20;
+    const rerackY = h - rerackBtnH - 20 - 50;
+    if (cx >= rerackX && cx <= rerackX + rerackBtnW && cy >= rerackY && cy <= rerackY + rerackBtnH) {
+      if (this.onRerackCallback) this.onRerackCallback();
+      return;
+    }
+
+    const resetBtnW = 120;
+    const resetBtnH = 40;
+    const resetX = w - resetBtnW - 20;
+    const resetY = h - resetBtnH - 20;
+    if (cx >= resetX && cx <= resetX + resetBtnW && cy >= resetY && cy <= resetY + resetBtnH) {
+      if (this.onResetCallback) this.onResetCallback();
+      return;
+    }
   }
 
   private handleResize(): void {
@@ -161,6 +193,13 @@ export class GameUI {
     const pos = this.screenToTable(e.clientX, e.clientY);
     this.mouseX = pos.x;
     this.mouseY = pos.y;
+
+    if (this.isDragging) {
+      const dx = this.dragStartX - this.mouseX;
+      const dy = this.dragStartY - this.mouseY;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      this.powerAnim = Math.min(dist / this.MAX_DRAG_DISTANCE * 100, 100);
+    }
   }
 
   private onMouseUp(e: MouseEvent): void {
@@ -216,25 +255,29 @@ export class GameUI {
   }
 
   private spawnPocketFlash(x: number, y: number): void {
-    this.pocketFlashes.push({
-      x,
-      y,
-      radius: this.geometry.pocketRadius,
-      life: 1,
-      maxLife: 1
-    });
-    for (let i = 0; i < 20; i++) {
+    const count = 35 + Math.floor(Math.random() * 6);
+    for (let i = 0; i < count; i++) {
       const angle = Math.random() * Math.PI * 2;
-      const speed = 1 + Math.random() * 4;
+      const speed = 2 + Math.random() * 5;
+      let color: string;
+      const rand = Math.random();
+      if (rand < 0.7) {
+        color = '#FFD700';
+      } else if (rand < 0.9) {
+        color = '#FFFFFF';
+      } else {
+        color = '#FF6B35';
+      }
+      const size = 2 + Math.random() * 4;
       this.particles.push({
         x,
         y,
         vx: Math.cos(angle) * speed,
         vy: Math.sin(angle) * speed,
-        life: 1,
-        maxLife: 1,
-        color: '#FFEB3B',
-        size: 2 + Math.random() * 4
+        life: 0.3,
+        maxLife: 0.3,
+        color,
+        size
       });
     }
   }
@@ -249,6 +292,16 @@ export class GameUI {
 
   setOnRestart(callback: () => void): void {
     this.onRestartCallback = callback;
+  }
+
+  setOnRerack(callback: () => void): void {
+    this.onRerackCallback = callback;
+  }
+
+  rerackGame(): void {
+    this.gameState.phase = 'aiming';
+    this.particles = [];
+    this.isDragging = false;
   }
 
   processPocketEvents(events: PocketEvent[]): boolean {
@@ -316,7 +369,6 @@ export class GameUI {
     };
     this.placingCue = false;
     this.particles = [];
-    this.pocketFlashes = [];
     this.isDragging = false;
   }
 
@@ -326,25 +378,9 @@ export class GameUI {
       p.y += p.vy;
       p.vx *= 0.96;
       p.vy *= 0.96;
-      p.life -= dt * 2;
+      p.life -= dt;
     }
     this.particles = this.particles.filter(p => p.life > 0);
-
-    for (const f of this.pocketFlashes) {
-      f.life -= dt * 2.5;
-    }
-    this.pocketFlashes = this.pocketFlashes.filter(f => f.life > 0);
-
-    if (this.isDragging) {
-      this.powerAnim += this.powerDir * 2.5;
-      if (this.powerAnim >= 100) {
-        this.powerAnim = 100;
-        this.powerDir = -1;
-      } else if (this.powerAnim <= 0) {
-        this.powerAnim = 0;
-        this.powerDir = 1;
-      }
-    }
   }
 
   getGameState(): GameState {
@@ -363,7 +399,6 @@ export class GameUI {
     ctx.scale(this.scale, this.scale);
 
     this.drawTable(ctx);
-    this.drawPocketFlashes(ctx);
     this.drawPockets(ctx);
 
     if (this.isDragging || (this.gameState.phase === 'aiming' && this.ballManager.getCueBall())) {
@@ -378,6 +413,28 @@ export class GameUI {
     ctx.restore();
 
     this.drawHUD(ctx, rect.width, rect.height);
+
+    if (this.ballManager.isStalemate() && this.gameState.phase === 'aiming') {
+      ctx.save();
+      const text = '⚠ 僵局预警 - 建议重新摆球';
+      ctx.font = 'bold 28px Segoe UI, Arial';
+      const metrics = ctx.measureText(text);
+      const textW = metrics.width;
+      const textH = 40;
+      const tx = (rect.width - textW) / 2 - 20;
+      const ty = rect.height / 2 - textH / 2;
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+      ctx.fillRect(tx, ty, textW + 40, textH);
+      ctx.strokeStyle = '#EF4444';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(tx, ty, textW + 40, textH);
+      ctx.fillStyle = '#EF4444';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(text, rect.width / 2, rect.height / 2);
+      ctx.restore();
+    }
+
     this.drawPowerBar(ctx, rect.width, rect.height);
     this.drawResetButton(ctx, rect.width, rect.height);
 
@@ -449,21 +506,6 @@ export class GameUI {
     }
   }
 
-  private drawPocketFlashes(ctx: CanvasRenderingContext2D): void {
-    for (const f of this.pocketFlashes) {
-      const alpha = f.life;
-      const r = f.radius * (1 + (1 - f.life) * 0.5);
-      const grad = ctx.createRadialGradient(f.x, f.y, 0, f.x, f.y, r);
-      grad.addColorStop(0, `rgba(255, 255, 200, ${alpha})`);
-      grad.addColorStop(0.5, `rgba(255, 200, 50, ${alpha * 0.7})`);
-      grad.addColorStop(1, `rgba(255, 150, 0, 0)`);
-      ctx.fillStyle = grad;
-      ctx.beginPath();
-      ctx.arc(f.x, f.y, r, 0, Math.PI * 2);
-      ctx.fill();
-    }
-  }
-
   private drawAimLine(ctx: CanvasRenderingContext2D): void {
     const cue = this.ballManager.getCueBall();
     if (!cue) return;
@@ -528,7 +570,7 @@ export class GameUI {
   private drawTrails(ctx: CanvasRenderingContext2D): void {
     const balls = this.ballManager.getAllBalls();
     for (const ball of balls) {
-      if (ball.isPotted || ball.trail.length < 2) continue;
+      if (ball.isPocketed || ball.trail.length < 2) continue;
 
       for (let i = 1; i < ball.trail.length; i++) {
         const t = ball.trail[i];
@@ -692,31 +734,39 @@ export class GameUI {
   private drawResetButton(ctx: CanvasRenderingContext2D, w: number, h: number): void {
     const btnW = 120;
     const btnH = 40;
-    const x = w - btnW - 20;
-    const y = h - btnH - 20;
+    const rerackY = h - btnH - 20 - 50;
+    const rerackX = w - btnW - 20;
 
     ctx.save();
-    ctx.fillStyle = '#4B5563';
-    ctx.fillRect(x, y, btnW, btnH);
-    ctx.strokeStyle = '#9CA3AF';
+    ctx.fillStyle = '#1D4ED8';
+    ctx.fillRect(rerackX, rerackY, btnW, btnH);
+    ctx.strokeStyle = '#3B82F6';
     ctx.lineWidth = 2;
-    ctx.strokeRect(x, y, btnW, btnH);
+    ctx.strokeRect(rerackX, rerackY, btnW, btnH);
 
     ctx.fillStyle = '#FFFFFF';
     ctx.font = 'bold 18px Segoe UI, Arial';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText('重置游戏', x + btnW / 2, y + btnH / 2);
+    ctx.fillText('重新摆球', rerackX + btnW / 2, rerackY + btnH / 2);
     ctx.restore();
 
-    this.canvas.onclick = (e) => {
-      const rect = this.canvas.getBoundingClientRect();
-      const cx = e.clientX - rect.left;
-      const cy = e.clientY - rect.top;
-      if (cx >= x && cx <= x + btnW && cy >= y && cy <= y + btnH) {
-        if (this.onResetCallback) this.onResetCallback();
-      }
-    };
+    const resetX = w - btnW - 20;
+    const resetY = h - btnH - 20;
+
+    ctx.save();
+    ctx.fillStyle = '#4B5563';
+    ctx.fillRect(resetX, resetY, btnW, btnH);
+    ctx.strokeStyle = '#9CA3AF';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(resetX, resetY, btnW, btnH);
+
+    ctx.fillStyle = '#FFFFFF';
+    ctx.font = 'bold 18px Segoe UI, Arial';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('重置游戏', resetX + btnW / 2, resetY + btnH / 2);
+    ctx.restore();
   }
 
   private drawGameOverModal(ctx: CanvasRenderingContext2D, w: number, h: number): void {
@@ -769,21 +819,6 @@ export class GameUI {
     ctx.textBaseline = 'middle';
     ctx.fillText('再来一局', w / 2, by + btnH / 2);
     ctx.restore();
-
-    this.canvas.onclick = (e) => {
-      const rect = this.canvas.getBoundingClientRect();
-      const cx = e.clientX - rect.left;
-      const cy = e.clientY - rect.top;
-      if (cx >= bx && cx <= bx + btnW && cy >= by && cy <= by + btnH) {
-        if (this.onRestartCallback) this.onRestartCallback();
-      }
-
-      const rbx = w - 140;
-      const rby = h - 60;
-      if (cx >= rbx && cx <= rbx + 120 && cy >= rby && cy <= rby + 40) {
-        if (this.onResetCallback) this.onResetCallback();
-      }
-    };
   }
 
   private lightenColor(hex: string, percent: number): string {

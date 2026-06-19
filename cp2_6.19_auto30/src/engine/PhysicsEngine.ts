@@ -6,6 +6,56 @@ export interface PocketEvent {
   pocket: Pocket;
 }
 
+class SpatialHashGrid {
+  private cellSize: number;
+  private cells: Map<string, Ball[]>;
+
+  constructor(cellSize: number) {
+    this.cellSize = cellSize;
+    this.cells = new Map();
+  }
+
+  clear(): void {
+    this.cells.clear();
+  }
+
+  private getKey(cx: number, cy: number): string {
+    return `${cx},${cy}`;
+  }
+
+  insert(ball: Ball): void {
+    const cx = Math.floor(ball.x / this.cellSize);
+    const cy = Math.floor(ball.y / this.cellSize);
+    const key = this.getKey(cx, cy);
+    let cell = this.cells.get(key);
+    if (!cell) {
+      cell = [];
+      this.cells.set(key, cell);
+    }
+    cell.push(ball);
+  }
+
+  query(ball: Ball): Ball[] {
+    const cx = Math.floor(ball.x / this.cellSize);
+    const cy = Math.floor(ball.y / this.cellSize);
+    const candidates: Ball[] = [];
+
+    for (let dx = -1; dx <= 1; dx++) {
+      for (let dy = -1; dy <= 1; dy++) {
+        const key = this.getKey(cx + dx, cy + dy);
+        const cell = this.cells.get(key);
+        if (cell) {
+          for (const other of cell) {
+            candidates.push(other);
+          }
+        }
+      }
+    }
+
+    return candidates;
+  }
+}
+
 export class PhysicsEngine {
   private ballManager: BallManager;
   private geometry: TableGeometry;
@@ -15,10 +65,12 @@ export class PhysicsEngine {
   private pocketEventsThisFrame: PocketEvent[] = [];
   private lastTime: number = 0;
   private readonly fpsInterval: number = 1000 / 60;
+  private spatialGrid: SpatialHashGrid;
 
   constructor(ballManager: BallManager, geometry: TableGeometry) {
     this.ballManager = ballManager;
     this.geometry = geometry;
+    this.spatialGrid = new SpatialHashGrid(geometry.ballRadius * 4);
   }
 
   step(currentTime: number): PocketEvent[] {
@@ -46,7 +98,7 @@ export class PhysicsEngine {
     const balls = this.ballManager.getBalls();
 
     for (const ball of balls) {
-      if (ball.isPotted) continue;
+      if (ball.isPocketed) continue;
       this.ballManager.updateBallPosition(ball, dt);
       this.applyFriction(ball);
       this.handleWallCollision(ball);
@@ -86,7 +138,7 @@ export class PhysicsEngine {
   }
 
   private checkPocketCollision(ball: Ball): void {
-    if (ball.isPotted) return;
+    if (ball.isPocketed) return;
 
     for (const pocket of this.geometry.pockets) {
       const dx = ball.x - pocket.x;
@@ -102,11 +154,19 @@ export class PhysicsEngine {
   }
 
   private handleBallCollisions(): void {
-    const balls = this.ballManager.getBalls().filter(b => !b.isPotted);
+    const balls = this.ballManager.getBalls().filter(b => !b.isPocketed);
 
-    for (let i = 0; i < balls.length; i++) {
-      for (let j = i + 1; j < balls.length; j++) {
-        this.resolveBallCollision(balls[i], balls[j]);
+    this.spatialGrid.clear();
+    for (const ball of balls) {
+      this.spatialGrid.insert(ball);
+    }
+
+    for (const ball of balls) {
+      const candidates = this.spatialGrid.query(ball);
+      for (const other of candidates) {
+        if (other.id > ball.id) {
+          this.resolveBallCollision(ball, other);
+        }
       }
     }
   }
@@ -165,44 +225,51 @@ export class PhysicsEngine {
     const len = Math.sqrt(dirX * dirX + dirY * dirY);
     if (len === 0) return points;
 
-    let x = startX;
-    let y = startY;
-    let vx = (dirX / len);
-    let vy = (dirY / len);
-    let remaining = maxLength;
+    const nx = dirX / len;
+    const ny = dirY / len;
     const r = this.geometry.ballRadius;
     const { left, right, top, bottom } = this.geometry.bounds;
+    const pockets = this.geometry.pockets;
 
+    let x = startX;
+    let y = startY;
+    let traveled = 0;
     const step = 2;
-    while (remaining > 0) {
-      const move = Math.min(step, remaining);
-      x += vx * move;
-      y += vy * move;
-      remaining -= move;
 
-      if (x - r < left || x + r > right) {
-        vx = -vx;
-        x = x - r < left ? left + r : right - r;
-      }
-      if (y - r < top || y + r > bottom) {
-        vy = -vy;
-        y = y - r < top ? top + r : bottom - r;
-      }
+    while (traveled < maxLength) {
+      const move = Math.min(step, maxLength - traveled);
+      x += nx * move;
+      y += ny * move;
+      traveled += move;
 
-      if (points.length < 2 ||
-        Math.abs(points[points.length - 1].x - x) > 3 ||
-        Math.abs(points[points.length - 1].y - y) > 3) {
+      const lastPoint = points[points.length - 1];
+      const dx = x - lastPoint.x;
+      const dy = y - lastPoint.y;
+      if (dx * dx + dy * dy > 9) {
         points.push({ x, y });
       }
 
-      const balls = this.ballManager.getBalls().filter(b => !b.isCue && !b.isPotted);
+      if (x - r < left || x + r > right || y - r < top || y + r > bottom) {
+        break;
+      }
+
+      let hitPocket = false;
+      for (const pocket of pockets) {
+        const pdx = x - pocket.x;
+        const pdy = y - pocket.y;
+        if (pdx * pdx + pdy * pdy < pocket.radius * pocket.radius) {
+          hitPocket = true;
+          break;
+        }
+      }
+      if (hitPocket) break;
+
+      const balls = this.ballManager.getBalls().filter(b => !b.isCue && !b.isPocketed);
       let hitBall = false;
       for (const ball of balls) {
         const bdx = x - ball.x;
         const bdy = y - ball.y;
-        const bdist = Math.sqrt(bdx * bdx + bdy * bdy);
-        if (bdist < r + ball.radius) {
-          points.push({ x, y });
+        if (bdx * bdx + bdy * bdy < 4 * r * r) {
           hitBall = true;
           break;
         }
@@ -210,7 +277,8 @@ export class PhysicsEngine {
       if (hitBall) break;
     }
 
-    if (points.length < 2 || points[points.length - 1].x !== x || points[points.length - 1].y !== y) {
+    const endPoint = points[points.length - 1];
+    if (endPoint.x !== x || endPoint.y !== y) {
       points.push({ x, y });
     }
 

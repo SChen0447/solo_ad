@@ -40,6 +40,17 @@ class Game {
     this.ui.setOnRestart(() => {
       this.resetGame();
     });
+
+    this.ui.setOnRerack(() => {
+      this.rerackGame();
+    });
+  }
+
+  private rerackGame(): void {
+    this.ballManager.rerack();
+    this.ui.rerackGame();
+    this.ballPottedThisTurn = false;
+    this.strikeThisTurn = false;
   }
 
   private handleStrike(dx: number, dy: number, power: number): void {
