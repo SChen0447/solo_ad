@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState } from 'react';
 import {
   DndContext,
   closestCenter,
@@ -9,7 +9,6 @@ import {
   DragOverlay,
   DragStartEvent,
 } from '@dnd-kit/core';
-
 import Board from './components/Board';
 import TaskDetail from './components/TaskDetail';
 import TaskCard from './components/TaskCard';
@@ -163,7 +162,6 @@ function App() {
   const [board, setBoard] = useLocalStorage<BoardType>('kanban-board', initialBoard);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [activeTask, setActiveTask] = useState<Task | null>(null);
-  const [newMemberEmail, setNewMemberEmail] = useState('');
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -172,21 +170,6 @@ function App() {
       },
     })
   );
-
-  const memberTaskCounts = useMemo(() => {
-    const counts: Record<string, number> = {};
-    board.members.forEach(member => {
-      counts[member.id] = 0;
-    });
-    board.lists.forEach(list => {
-      list.tasks.forEach(task => {
-        if (task.assigneeId && counts[task.assigneeId] !== undefined) {
-          counts[task.assigneeId]++;
-        }
-      });
-    });
-    return counts;
-  }, [board]);
 
   const handleDragStart = (event: DragStartEvent) => {
     const { active } = event;
@@ -261,7 +244,6 @@ function App() {
       ...prev,
       members: [...prev.members, newMember],
     }));
-    setNewMemberEmail('');
   };
 
   const addTask = (listId: string, title: string) => {
@@ -314,42 +296,6 @@ function App() {
 
   return (
     <div className="app-container">
-      <header className="app-header">
-        <h1 className="app-title">{board.title}</h1>
-        <div className="member-list">
-          {board.members.map(member => (
-            <div key={member.id} className="member-item">
-              <div
-                className="member-avatar"
-                style={{ background: member.avatarColor }}
-              >
-                {getInitials(member.name)}
-              </div>
-              <span>{member.name}</span>
-              <span className="member-task-count">{memberTaskCounts[member.id] || 0}</span>
-            </div>
-          ))}
-          <form
-            className="add-member-form"
-            onSubmit={e => {
-              e.preventDefault();
-              addMember(newMemberEmail);
-            }}
-          >
-            <input
-              type="email"
-              className="add-member-input"
-              placeholder="输入邮箱添加成员"
-              value={newMemberEmail}
-              onChange={e => setNewMemberEmail(e.target.value)}
-            />
-            <button type="submit" className="add-member-btn">
-              添加
-            </button>
-          </form>
-        </div>
-      </header>
-
       <DndContext
         sensors={sensors}
         collisionDetection={closestCenter}
@@ -357,11 +303,13 @@ function App() {
         onDragEnd={handleDragEnd}
       >
         <Board
+          title={board.title}
           lists={board.lists}
           members={board.members}
           onTaskClick={setSelectedTask}
           onAddTask={addTask}
           onAssignTask={assignTask}
+          onAddMember={addMember}
           getMemberById={getMemberById}
         />
         <DragOverlay>

@@ -93,17 +93,23 @@ function TaskCard({ task, member, members, onClick, onAssign, isDragging = false
             className="task-card-assignee"
             style={{ background: member.avatarColor }}
             onClick={handleAvatarClick}
+            title={`负责人: ${member.name}，点击切换`}
           >
             {getInitials(member.name)}
           </div>
         ) : (
           <div
             className="task-card-assignee"
-            style={{ background: '#ccc' }}
+            style={{
+              background: '#EBEDF0',
+              color: '#4A90D9',
+              border: '1px dashed #4A90D9',
+              boxShadow: 'none',
+            }}
             onClick={handleAvatarClick}
             title="点击分配负责人"
           >
-            ?
+            +
           </div>
         )}
         {showDropdown && (
@@ -112,8 +118,18 @@ function TaskCard({ task, member, members, onClick, onAssign, isDragging = false
               className="assignee-dropdown-item"
               onClick={() => handleAssign(null)}
             >
-              <div className="member-avatar" style={{ background: '#ccc', width: 20, height: 20, fontSize: 10 }}>
-                ?
+              <div
+                className="member-avatar"
+                style={{
+                  background: '#EBEDF0',
+                  color: '#4A90D9',
+                  border: '1px dashed #4A90D9',
+                  width: 20,
+                  height: 20,
+                  fontSize: 12,
+                }}
+              >
+                +
               </div>
               <span>未分配</span>
             </div>
