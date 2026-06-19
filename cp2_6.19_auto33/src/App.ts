@@ -184,21 +184,23 @@ class App {
     const audioContext = this.audioLoader.getAudioContext();
     const audioBuffer = this.audioLoader.getAudioBuffer();
     const analyzer = this.audioLoader.getSpectrumAnalyzer();
-    const gainNode = this.audioLoader.getGainNode();
 
-    if (!audioContext || !audioBuffer || !analyzer || !gainNode) return;
+    if (!audioContext || !audioBuffer || !analyzer) return;
 
     this.stopSource();
 
     this.source = audioContext.createBufferSource();
     this.source.buffer = audioBuffer;
     this.source.connect(analyzer.getAnalyserNode());
-    analyzer.getAnalyserNode().connect(gainNode);
 
     this.source.onended = () => {
-      if (this.isPlaying) {
+      if (this.isPlaying && this.source) {
         this.isPlaying = false;
         this.pausedAt = 0;
+        try {
+          this.source.disconnect();
+        } catch (e) {}
+        this.source = null;
         this.updatePlayUI();
       }
     };
@@ -214,7 +216,10 @@ class App {
   private stopSource(): void {
     if (this.source) {
       try {
+        this.source.onended = null;
         this.source.stop();
+      } catch (e) {}
+      try {
         this.source.disconnect();
       } catch (e) {}
       this.source = null;

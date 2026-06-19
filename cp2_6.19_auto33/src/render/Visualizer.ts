@@ -275,10 +275,9 @@ export class Visualizer {
 
     let lowFreqWeighted = 0;
     const weights = [1.0, 0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3];
-    let totalWeight = 0;
+    const totalWeight = 1.0 + 0.9 + 0.8 + 0.7 + 0.6 + 0.5 + 0.4 + 0.3;
     for (let i = 0; i < 8; i++) {
       lowFreqWeighted += (spectrum[i] || 0) * weights[i];
-      totalWeight += weights[i];
     }
     lowFreqWeighted /= totalWeight;
 

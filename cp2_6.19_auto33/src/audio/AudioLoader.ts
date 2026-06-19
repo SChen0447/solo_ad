@@ -36,6 +36,7 @@ export class AudioLoader {
     this.gainNode = this.audioContext.createGain();
     this.gainNode.gain.value = 0.7;
 
+    this.spectrumAnalyzer.getAnalyserNode().connect(this.gainNode);
     this.gainNode.connect(this.audioContext.destination);
 
     this.startAnalysisLoop();
