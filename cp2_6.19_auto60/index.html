@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>3D 像素沙盒地形编辑器</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background-color: #1a2332;
+      color: #fff;
+      user-select: none;
+    }
+
+    #app {
+      width: 100%;
+      height: 100%;
+      position: relative;
+    }
+
+    #canvas-container {
+      width: 100%;
+      height: 100%;
+    }
+
+    canvas {
+      display: block;
+    }
+
+    .mode-panel {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      display: flex;
+      gap: 12px;
+      background: rgba(255, 255, 255, 0.1);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      padding: 12px;
+      border-radius: 50px;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+      z-index: 100;
+    }
+
+    .mode-btn {
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      border: none;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+      font-weight: bold;
+      transition: all 0.2s ease;
+      background: rgba(255, 255, 255, 0.2);
+      color: #fff;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .mode-btn:hover {
+      transform: translateY(-2px);
+      background: rgba(255, 255, 255, 0.3);
+    }
+
+    .mode-btn:active {
+      transform: scale(0.95);
+    }
+
+    .mode-btn.active {
+      background: #4ade80;
+      box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.3);
+      animation: buttonPress 0.3s ease;
+    }
+
+    .mode-btn .icon {
+      transition: opacity 0.2s ease, transform 0.2s ease;
+    }
+
+    .mode-btn.active .icon {
+      transform: scale(1.1);
+    }
+
+    @keyframes buttonPress {
+      0% { transform: scale(1); }
+      50% { transform: scale(0.92); }
+      100% { transform: scale(1); }
+    }
+
+    .history-panel {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      display: flex;
+      gap: 10px;
+      z-index: 100;
+    }
+
+    .history-btn {
+      padding: 10px 16px;
+      border-radius: 8px;
+      border: none;
+      cursor: pointer;
+      background: #e5e7eb;
+      color: #1a2332;
+      font-size: 14px;
+      font-weight: 500;
+      transition: all 0.15s ease;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      min-width: 80px;
+      justify-content: center;
+    }
+
+    .history-btn:hover:not(:disabled) {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    }
+
+    .history-btn:active:not(:disabled) {
+      transform: scale(0.95);
+    }
+
+    .history-btn:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+
+    .history-btn .count {
+      background: #1a2332;
+      color: #e5e7eb;
+      padding: 2px 6px;
+      border-radius: 10px;
+      font-size: 11px;
+      font-weight: bold;
+    }
+
+    .color-palette-panel {
+      position: absolute;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(0, 0, 0, 0.5);
+      padding: 16px 24px;
+      border-radius: 12px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+      z-index: 100;
+      max-width: 95vw;
+    }
+
+    .color-palette {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    @media (max-width: 1200px) {
+      .color-palette {
+        max-width: 400px;
+      }
+    }
+
+    .color-swatch {
+      width: 36px;
+      height: 36px;
+      border-radius: 6px;
+      border: 3px solid transparent;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      position: relative;
+    }
+
+    .color-swatch:hover {
+      transform: translateY(-2px);
+    }
+
+    .color-swatch:active {
+      transform: scale(0.95);
+    }
+
+    .color-swatch.selected {
+      animation: pulseBorder 1.5s ease-in-out infinite;
+    }
+
+    @keyframes pulseBorder {
+      0%, 100% {
+        border-color: #fff;
+        box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.7);
+      }
+      50% {
+        border-color: #fff;
+        box-shadow: 0 0 0 6px rgba(255, 255, 255, 0);
+      }
+    }
+
+    .export-panel {
+      position: absolute;
+      bottom: 20px;
+      right: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      z-index: 100;
+    }
+
+    .export-btn, .import-btn {
+      padding: 12px 24px;
+      border-radius: 8px;
+      border: none;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 600;
+      transition: all 0.15s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      min-width: 120px;
+    }
+
+    .export-btn {
+      background: #4ade80;
+      color: #1a2332;
+    }
+
+    .import-btn {
+      background: #60a5fa;
+      color: #fff;
+    }
+
+    .export-btn:hover, .import-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    }
+
+    .export-btn:active, .import-btn:active {
+      transform: scale(0.95);
+    }
+
+    .export-btn.loading .btn-icon {
+      animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+
+    .export-btn.success {
+      background: #22c55e;
+    }
+
+    .btn-icon {
+      font-size: 16px;
+      transition: all 0.3s ease;
+    }
+
+    .toast-container {
+      position: fixed;
+      bottom: 100px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 1000;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      pointer-events: none;
+    }
+
+    .toast {
+      background: rgba(0, 0, 0, 0.8);
+      color: #fff;
+      padding: 12px 24px;
+      border-radius: 8px;
+      font-size: 14px;
+      animation: slideInUp 0.3s ease, slideOutDown 0.3s ease 1.7s forwards;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+    }
+
+    @keyframes slideInUp {
+      from {
+        opacity: 0;
+        transform: translateY(20px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    @keyframes slideOutDown {
+      from {
+        opacity: 1;
+        transform: translateY(0);
+      }
+      to {
+        opacity: 0;
+        transform: translateY(20px);
+      }
+    }
+
+    #file-input {
+      display: none;
+    }
+
+    .info-text {
+      position: absolute;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(0, 0, 0, 0.5);
+      padding: 8px 16px;
+      border-radius: 6px;
+      font-size: 12px;
+      color: rgba(255, 255, 255, 0.7);
+      z-index: 100;
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <div id="canvas-container"></div>
+
+    <div class="info-text">
+      A: 添加模式 | D: 移除模式 | S: 选取模式 | 左键拖拽旋转 | 滚轮缩放 | 右键拖拽平移 | Ctrl+Z: 撤销 | Ctrl+Shift+Z: 重做
+    </div>
+
+    <div class="mode-panel">
+      <button class="mode-btn active" data-mode="add" title="添加模式 (A)">
+        <span class="icon">+</span>
+      </button>
+      <button class="mode-btn" data-mode="remove" title="移除模式 (D)">
+        <span class="icon">−</span>
+      </button>
+      <button class="mode-btn" data-mode="select" title="选取模式 (S)">
+        <span class="icon">◆</span>
+      </button>
+    </div>
+
+    <div class="history-panel">
+      <button class="history-btn" id="undo-btn" disabled>
+        <span>↶ 撤销</span>
+        <span class="count" id="undo-count">0</span>
+      </button>
+      <button class="history-btn" id="redo-btn" disabled>
+        <span>↷ 重做</span>
+        <span class="count" id="redo-count">0</span>
+      </button>
+    </div>
+
+    <div class="color-palette-panel">
+      <div class="color-palette" id="color-palette">
+      </div>
+    </div>
+
+    <div class="export-panel">
+      <button class="import-btn" id="import-btn">
+        <span class="btn-icon">📂</span>
+        <span>导入</span>
+      </button>
+      <button class="export-btn" id="export-btn">
+        <span class="btn-icon">⬇</span>
+        <span>导出 JSON</span>
+      </button>
+    </div>
+
+    <input type="file" id="file-input" accept=".json" />
+
+    <div class="toast-container" id="toast-container"></div>
+  </div>
+
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
