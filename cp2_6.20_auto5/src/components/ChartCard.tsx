@@ -36,19 +36,35 @@ const CustomTooltip = ({ active, payload, label }: any) => {
   if (active && payload && payload.length) {
     return (
       <div style={{
-        background: 'rgba(255, 255, 255, 0.95)',
+        background: 'rgba(255, 255, 255, 0.82)',
+        backdropFilter: 'blur(4px)',
+        WebkitBackdropFilter: 'blur(4px)',
         borderRadius: '8px',
-        padding: '8px 12px',
-        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)',
-        border: '1px solid #f0f0f0',
+        padding: '10px 14px',
+        boxShadow: '0 4px 16px rgba(0, 0, 0, 0.08)',
+        border: '1px solid rgba(255, 255, 255, 0.6)',
         fontSize: '12px',
         transition: 'opacity 0.1s ease',
+        pointerEvents: 'none',
       }}>
-        <p style={{ fontWeight: 600, color: '#333', marginBottom: '4px' }}>{label}</p>
+        <p style={{ fontWeight: 600, color: '#333', marginBottom: '6px', fontSize: '13px' }}>
+          {label !== undefined && label !== null ? String(label) : ''}
+        </p>
         {payload.map((entry: any, index: number) => (
-          <p key={index} style={{ color: entry.color, margin: '2px 0' }}>
-            {entry.name}: {typeof entry.value === 'number' ? entry.value.toLocaleString() : entry.value}
-          </p>
+          <div key={index} style={{ display: 'flex', alignItems: 'center', gap: '6px', margin: '3px 0' }}>
+            <span style={{
+              display: 'inline-block',
+              width: '8px',
+              height: '8px',
+              borderRadius: '50%',
+              background: entry.color,
+              flexShrink: 0,
+            }} />
+            <span style={{ color: '#555', flexShrink: 0 }}>{entry.name}:</span>
+            <span style={{ color: '#333', fontWeight: 500 }}>
+              {typeof entry.value === 'number' ? entry.value.toFixed(2) : String(entry.value)}
+            </span>
+          </div>
         ))}
       </div>
     )
@@ -85,6 +101,44 @@ export default function ChartCard({ chart, data, onDelete, onRefresh }: ChartCar
       return newSet
     })
   }, [])
+
+  const fullscreenRef = useRef<HTMLDivElement>(null)
+
+  const handleExportPNG = useCallback(() => {
+    const container = fullscreenRef.current
+    if (!container) return
+
+    const svgElement = container.querySelector('.recharts-wrapper svg')
+    if (!svgElement) return
+
+    const svgData = new XMLSerializer().serializeToString(svgElement)
+    const canvas = document.createElement('canvas')
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
+
+    const svgRect = svgElement.getBoundingClientRect()
+    const scale = 2
+    canvas.width = svgRect.width * scale
+    canvas.height = svgRect.height * scale
+    ctx.scale(scale, scale)
+
+    const img = new Image()
+    const svgBlob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' })
+    const url = URL.createObjectURL(svgBlob)
+
+    img.onload = () => {
+      ctx.fillStyle = '#ffffff'
+      ctx.fillRect(0, 0, canvas.width, canvas.height)
+      ctx.drawImage(img, 0, 0, svgRect.width, svgRect.height)
+      URL.revokeObjectURL(url)
+
+      const link = document.createElement('a')
+      link.download = `${chartLabels[chart.type]}_${chart.xAxis}_${chart.yAxes.join('_')}.png`
+      link.href = canvas.toDataURL('image/png')
+      link.click()
+    }
+    img.src = url
+  }, [chart.type, chart.xAxis, chart.yAxes])
 
   const handleDoubleClick = useCallback(() => {
     setIsFullscreen(true)
@@ -268,7 +322,7 @@ export default function ChartCard({ chart, data, onDelete, onRefresh }: ChartCar
         flexDirection: 'column',
         overflow: 'hidden',
         opacity: isVisible ? 1 : 0,
-        transform: isVisible ? 'translateY(0)' : 'translateY(20px)',
+        transform: isVisible ? 'translateY(0) scale(1)' : 'translateY(20px) scale(0.95)',
         transition: 'opacity 0.4s ease, transform 0.4s ease',
         animation: isShaking ? 'shake 0.5s ease-in-out' : 'none',
         cursor: 'pointer',
@@ -377,6 +431,7 @@ export default function ChartCard({ chart, data, onDelete, onRefresh }: ChartCar
           }}
         >
           <div
+            ref={fullscreenRef}
             onClick={(e) => e.stopPropagation()}
             style={{
               width: '90%',
@@ -401,7 +456,37 @@ export default function ChartCard({ chart, data, onDelete, onRefresh }: ChartCar
                   {chartLabels[chart.type]}
                 </h2>
               </div>
-              <button
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                <button
+                  onClick={(e) => { e.stopPropagation(); handleExportPNG() }}
+                  style={{
+                    padding: '6px 14px',
+                    border: '1px solid #d9d9d9',
+                    background: '#fff',
+                    cursor: 'pointer',
+                    borderRadius: '8px',
+                    fontSize: '13px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px',
+                    color: '#555',
+                    transition: 'all 0.2s',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = '#f0f7ff'
+                    e.currentTarget.style.borderColor = '#4a90d9'
+                    e.currentTarget.style.color = '#4a90d9'
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = '#fff'
+                    e.currentTarget.style.borderColor = '#d9d9d9'
+                    e.currentTarget.style.color = '#555'
+                  }}
+                >
+                  📥 导出为图片
+                </button>
+                <button
                 onClick={closeFullscreen}
                 style={{
                   width: '32px',
@@ -424,9 +509,10 @@ export default function ChartCard({ chart, data, onDelete, onRefresh }: ChartCar
                   e.currentTarget.style.background = '#f5f5f5'
                   e.currentTarget.style.color = '#333'
                 }}
-              >
-                ✕
-              </button>
+                >
+                  ✕
+                </button>
+              </div>
             </div>
             <div style={{ flex: 1 }}>
               {renderChart(500)}
