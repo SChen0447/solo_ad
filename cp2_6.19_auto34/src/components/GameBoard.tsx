@@ -36,6 +36,7 @@ function GameBoard({ wordData, onCorrect, disabled = false }: GameBoardProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [dragPart, setDragPart] = useState<DraggablePart | null>(null);
   const [hoveringSlot, setHoveringSlot] = useState(false);
+  const [showHint, setShowHint] = useState(false);
 
   const slotRef = useRef<HTMLDivElement>(null);
   const ghostRef = useRef<HTMLDivElement | null>(null);
@@ -49,6 +50,7 @@ function GameBoard({ wordData, onCorrect, disabled = false }: GameBoardProps) {
     setAvailableParts(shuffleArray(parts));
     setPlacedParts([]);
     setSlotStatus('empty');
+    setShowHint(false);
   }, [wordData]);
 
   const checkAnswer = useCallback(
@@ -345,10 +347,83 @@ function GameBoard({ wordData, onCorrect, disabled = false }: GameBoardProps) {
               color: '#888',
               marginBottom: '12px',
               fontWeight: '500',
-              paddingLeft: '4px'
+              paddingLeft: '4px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px'
             }}
           >
-            拼词槽位 ({placedParts.length}/{wordData.word.length})
+            <span>拼词槽位 ({placedParts.length}/{wordData.word.length})</span>
+            <div style={{ position: 'relative' }}>
+              <button
+                onClick={() => setShowHint(!showHint)}
+                style={{
+                  width: '20px',
+                  height: '20px',
+                  borderRadius: '50%',
+                  backgroundColor: showHint ? '#F5A623' : 'rgba(245, 166, 35, 0.15)',
+                  color: showHint ? '#fff' : '#F5A623',
+                  border: 'none',
+                  fontSize: '12px',
+                  fontWeight: 'bold',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  transition: 'all 0.2s ease',
+                  padding: 0
+                }}
+                onMouseEnter={(e) => {
+                  if (!showHint) {
+                    e.currentTarget.style.backgroundColor = 'rgba(245, 166, 35, 0.3)';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!showHint) {
+                    e.currentTarget.style.backgroundColor = 'rgba(245, 166, 35, 0.15)';
+                  }
+                }}
+                title="点击查看提示"
+              >
+                ?
+              </button>
+              {showHint && (
+                <div
+                  className="hint-tooltip"
+                  style={{
+                    position: 'absolute',
+                    top: '28px',
+                    left: '50%',
+                    transform: 'translateX(-50%)',
+                    backgroundColor: '#333',
+                    color: '#fff',
+                    padding: '10px 14px',
+                    borderRadius: '8px',
+                    fontSize: '13px',
+                    lineHeight: '1.5',
+                    whiteSpace: 'nowrap',
+                    zIndex: 100,
+                    boxShadow: '0 4px 12px rgba(0,0,0,0.2)'
+                  }}
+                >
+                  <div style={{ fontWeight: 'bold', marginBottom: '4px' }}>💡 提示</div>
+                  <div>{wordData.hint}</div>
+                  <div
+                    style={{
+                      position: 'absolute',
+                      top: '-6px',
+                      left: '50%',
+                      transform: 'translateX(-50%)',
+                      width: 0,
+                      height: 0,
+                      borderLeft: '6px solid transparent',
+                      borderRight: '6px solid transparent',
+                      borderBottom: '6px solid #333'
+                    }}
+                  />
+                </div>
+              )}
+            </div>
           </div>
           <div
             ref={slotRef}

@@ -2,6 +2,7 @@ export interface WordData {
   id: string;
   word: string;
   parts: string[];
+  hint: string;
 }
 
 export interface DraggablePart {

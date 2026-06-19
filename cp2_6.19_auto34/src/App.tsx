@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import GameBoard from './components/GameBoard';
 import ScorePanel from './components/ScorePanel';
 import type { WordData, GameResult } from './types';
-import { getRandomWords, ROUND_SIZE, POINTS_PER_WORD } from './data/words';
+import { getRandomWords, getWordLibrary, shuffleArray, ROUND_SIZE, POINTS_PER_WORD } from './data/words';
 
 /**
  * App 主组件 — 游戏全局状态管理与布局
@@ -63,8 +63,10 @@ function App() {
   const [scoreAnimating, setScoreAnimating] = useState(false);
   const [startTime, setStartTime] = useState<number>(0);
   const [loadingNext, setLoadingNext] = useState(false);
+  const [isTransitioning, setIsTransitioning] = useState(false);
 
   const nextQuestionTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const transitionTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const initGame = useCallback(() => {
     const words = getRandomWords(ROUND_SIZE);
@@ -128,6 +130,45 @@ function App() {
     initGame();
   }, [initGame]);
 
+  const handleRefreshWords = useCallback(() => {
+    if (isTransitioning || loadingNext) return;
+
+    if (nextQuestionTimer.current) {
+      clearTimeout(nextQuestionTimer.current);
+    }
+    if (transitionTimer.current) {
+      clearTimeout(transitionTimer.current);
+    }
+
+    setIsTransitioning(true);
+
+    transitionTimer.current = setTimeout(() => {
+      const allWords = getWordLibrary();
+      const shuffled = shuffleArray(allWords);
+      const newRoundWords = shuffled.slice(0, ROUND_SIZE);
+
+      setRoundWords(newRoundWords);
+      setCurrentIndex(0);
+      setScore(0);
+      setCorrectCount(0);
+      setRoundProgress(new Array(ROUND_SIZE).fill(false));
+      setGamePhase('playing');
+      setShowResult(false);
+      setGameResult(null);
+      setStartTime(Date.now());
+      setLoadingNext(false);
+      setIsTransitioning(false);
+    }, 500);
+  }, [isTransitioning, loadingNext]);
+
+  useEffect(() => {
+    return () => {
+      if (transitionTimer.current) {
+        clearTimeout(transitionTimer.current);
+      }
+    };
+  }, []);
+
   const currentWord = roundWords[currentIndex];
 
   return (
@@ -159,10 +200,40 @@ function App() {
             fontSize: '20px',
             fontWeight: 'bold',
             color: '#fff',
-            letterSpacing: '2px'
+            letterSpacing: '2px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '12px'
           }}
         >
           汉字拼拼乐
+          <button
+            onClick={handleRefreshWords}
+            disabled={isTransitioning || loadingNext}
+            style={{
+              padding: '6px 12px',
+              fontSize: '12px',
+              fontWeight: 'normal',
+              backgroundColor: 'rgba(255,255,255,0.25)',
+              color: '#fff',
+              border: '1px solid rgba(255,255,255,0.4)',
+              borderRadius: '16px',
+              cursor: isTransitioning || loadingNext ? 'not-allowed' : 'pointer',
+              transition: 'all 0.2s ease',
+              letterSpacing: '0',
+              opacity: isTransitioning ? 0.7 : 1
+            }}
+            onMouseEnter={(e) => {
+              if (!isTransitioning && !loadingNext) {
+                e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.35)';
+              }
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.25)';
+            }}
+          >
+            {isTransitioning ? '加载中...' : '🔄 换一批'}
+          </button>
         </h1>
         <div
           style={{
@@ -219,14 +290,23 @@ function App() {
           boxSizing: 'border-box'
         }}
       >
-        {currentWord && gamePhase === 'playing' && (
-          <GameBoard
-            key={currentWord.id}
-            wordData={currentWord}
-            onCorrect={handleCorrect}
-            disabled={loadingNext}
-          />
-        )}
+        <div
+          className={isTransitioning ? 'board-fade-out' : 'board-fade-in'}
+          style={{
+            width: '100%',
+            display: 'flex',
+            justifyContent: 'center'
+          }}
+        >
+          {currentWord && gamePhase === 'playing' && (
+            <GameBoard
+              key={currentWord.id}
+              wordData={currentWord}
+              onCorrect={handleCorrect}
+              disabled={loadingNext || isTransitioning}
+            />
+          )}
+        </div>
       </main>
 
       <ScorePanel
