@@ -86,6 +86,7 @@ export class Obstacle {
 export class ObstacleManager {
   public obstacles: Obstacle[] = [];
   public onCollision: ObstacleCollisionCallback | null = null;
+  private _speedMultiplier: number = 1;
 
   public generate(maze: { gridSize: number; cellSize: number; offsetX: number; offsetY: number; grid: { walls: { top: boolean; right: boolean; bottom: boolean; left: boolean } }[][] }, config: ObstacleConfig): void {
     this.obstacles = [];
@@ -136,9 +137,17 @@ export class ObstacleManager {
     }
   }
 
+  get speedMultiplier(): number {
+    return this._speedMultiplier;
+  }
+
+  set speedMultiplier(value: number) {
+    this._speedMultiplier = Math.max(0, value);
+  }
+
   public update(dt: number): void {
     for (const obs of this.obstacles) {
-      obs.update(dt);
+      obs.update(dt * this._speedMultiplier);
     }
   }
 

@@ -23,7 +23,9 @@ export interface VictoryParticle {
 export class UIManager {
   private canvas: HTMLCanvasElement;
   private ctx: CanvasRenderingContext2D;
-  private buttons: { id: string; x: number; y: number; w: number; h: number; hover: boolean; pressed: boolean; scale: number; pressTime: number }[] = [];
+  private blurCanvas: HTMLCanvasElement;
+  private blurCtx: CanvasRenderingContext2D;
+  private buttons: { id: string; x: number; y: number; w: number; h: number; hover: boolean; pressed: boolean; scale: number; pressTime: number; clickAnim: boolean; clickAnimTime: number }[] = [];
   public onButtonClick: ((buttonId: string) => void) | null = null;
   public victoryParticles: VictoryParticle[] = [];
   public levelFlash: number = 0;
@@ -32,7 +34,26 @@ export class UIManager {
   constructor(canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D) {
     this.canvas = canvas;
     this.ctx = ctx;
+    this.blurCanvas = document.createElement('canvas');
+    const blurCtx = this.blurCanvas.getContext('2d');
+    if (!blurCtx) throw new Error('Failed to get blur canvas context');
+    this.blurCtx = blurCtx;
     this.setupInput();
+  }
+
+  private drawBlurredBackground(blurAmount: number): void {
+    const w = this.canvas.width;
+    const h = this.canvas.height;
+    if (this.blurCanvas.width !== w || this.blurCanvas.height !== h) {
+      this.blurCanvas.width = w;
+      this.blurCanvas.height = h;
+    }
+    this.blurCtx.clearRect(0, 0, w, h);
+    this.blurCtx.drawImage(this.canvas, 0, 0);
+    this.ctx.save();
+    this.ctx.filter = `blur(${blurAmount}px)`;
+    this.ctx.drawImage(this.blurCanvas, 0, 0);
+    this.ctx.restore();
   }
 
   private setupInput(): void {
@@ -65,6 +86,8 @@ export class UIManager {
       const pos = getPos(e);
       for (const btn of this.buttons) {
         if (btn.pressed && pos.x >= btn.x && pos.x <= btn.x + btn.w && pos.y >= btn.y && pos.y <= btn.y + btn.h) {
+          btn.clickAnim = true;
+          btn.clickAnimTime = 0;
           if (this.onButtonClick) this.onButtonClick(btn.id);
         }
         btn.pressed = false;
@@ -90,6 +113,8 @@ export class UIManager {
         const pos = getPos(e.changedTouches[0]);
         for (const btn of this.buttons) {
           if (btn.pressed && pos.x >= btn.x && pos.x <= btn.x + btn.w && pos.y >= btn.y && pos.y <= btn.y + btn.h) {
+            btn.clickAnim = true;
+            btn.clickAnimTime = 0;
             if (this.onButtonClick) this.onButtonClick(btn.id);
           }
           btn.pressed = false;
@@ -141,6 +166,21 @@ export class UIManager {
         const bounce = pressT < 0.5 ? pressT * 2 : 2 - pressT * 2;
         const pressScale = 0.85 + bounce * 0.25;
         btn.scale += (pressScale - btn.scale) * Math.min(1, dt * 25);
+      } else if (btn.clickAnim) {
+        btn.clickAnimTime += dt;
+        const animT = Math.min(1, btn.clickAnimTime / 0.15);
+        let clickScale: number;
+        if (animT < 0.4) {
+          clickScale = 1.0 + (animT / 0.4) * 0.2;
+        } else {
+          const t = (animT - 0.4) / 0.6;
+          clickScale = 1.2 - t * 0.2;
+        }
+        btn.scale = clickScale;
+        if (animT >= 1) {
+          btn.clickAnim = false;
+          btn.scale = targetScale;
+        }
       } else {
         btn.scale += (targetScale - btn.scale) * Math.min(1, dt * 12);
       }
@@ -219,7 +259,7 @@ export class UIManager {
     const btnH = Math.min(70, h * 0.1);
     const btnX = (w - btnW) / 2;
     const btnY = h * 0.62;
-    this.buttons.push({ id: 'start', x: btnX, y: btnY, w: btnW, h: btnH, hover: false, pressed: false, scale: 1.0, pressTime: 0 });
+    this.buttons.push({ id: 'start', x: btnX, y: btnY, w: btnW, h: btnH, hover: false, pressed: false, scale: 1.0, pressTime: 0, clickAnim: false, clickAnimTime: 0 });
 
     const btn = this.buttons[0];
     const cx = btnX + btnW / 2;
@@ -317,12 +357,8 @@ export class UIManager {
     const ctx = this.ctx;
     const pulse = 0.5 + Math.sin(time * Math.PI * 2) * 0.5;
 
-    ctx.save();
-    ctx.filter = 'blur(8px)';
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.1)';
-    ctx.fillRect(0, 0, w, h);
-    ctx.restore();
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.65)';
+    this.drawBlurredBackground(10);
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.55)';
     ctx.fillRect(0, 0, w, h);
 
     const pw = Math.min(380, w * 0.85);
@@ -371,7 +407,7 @@ export class UIManager {
     const btnH = Math.min(60, h * 0.09);
     const btnX = (w - btnW) / 2;
     const btnY = py + ph * 0.72;
-    this.buttons.push({ id: 'restart', x: btnX, y: btnY, w: btnW, h: btnH, hover: false, pressed: false, scale: 1.0, pressTime: 0 });
+    this.buttons.push({ id: 'restart', x: btnX, y: btnY, w: btnW, h: btnH, hover: false, pressed: false, scale: 1.0, pressTime: 0, clickAnim: false, clickAnimTime: 0 });
 
     const btn = this.buttons[this.buttons.length - 1];
     const bcx = btnX + btnW / 2;
@@ -426,7 +462,8 @@ export class UIManager {
     const ctx = this.ctx;
     const pulse = 0.5 + Math.sin(time * Math.PI) * 0.5;
 
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.55)';
+    this.drawBlurredBackground(8);
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.45)';
     ctx.fillRect(0, 0, w, h);
 
     const pw = Math.min(380, w * 0.85);
@@ -479,7 +516,7 @@ export class UIManager {
     const btnH = Math.min(60, h * 0.09);
     const btnX = (w - btnW) / 2;
     const btnY = py + ph * 0.78;
-    this.buttons.push({ id: 'next', x: btnX, y: btnY, w: btnW, h: btnH, hover: false, pressed: false, scale: 1.0, pressTime: 0 });
+    this.buttons.push({ id: 'next', x: btnX, y: btnY, w: btnW, h: btnH, hover: false, pressed: false, scale: 1.0, pressTime: 0, clickAnim: false, clickAnimTime: 0 });
 
     const btn = this.buttons[this.buttons.length - 1];
     const bcx = btnX + btnW / 2;

@@ -3,6 +3,9 @@ export interface TrailParticle {
   y: number;
   life: number;
   maxLife: number;
+  r: number;
+  g: number;
+  b: number;
 }
 
 export interface BallInput {
@@ -118,12 +121,11 @@ export class Ball {
     this.rotation += (Math.abs(this.vx) + Math.abs(this.vy)) * dt * 0.01;
 
     if (this.squishTime > 0) {
-      this.squishTime -= dt;
-      if (this.squishTime <= 0) {
+      const recoverRate = 1 / 0.1;
+      this.squish -= recoverRate * dt;
+      if (this.squish <= 0) {
         this.squish = 0;
-      } else {
-        const t = 1 - this.squishTime / 0.1;
-        this.squish = 1 - t;
+        this.squishTime = 0;
       }
     }
 
@@ -138,14 +140,23 @@ export class Ball {
           x: this.x,
           y: this.y,
           life: 0.3,
-          maxLife: 0.3
+          maxLife: 0.3,
+          r: 255,
+          g: 215,
+          b: 0
         });
       }
     }
 
+    const endR = 255, endG = 140, endB = 0;
     for (let i = this.trail.length - 1; i >= 0; i--) {
-      this.trail[i].life -= dt;
-      if (this.trail[i].life <= 0) {
+      const p = this.trail[i];
+      p.life -= dt;
+      const t = 1 - p.life / p.maxLife;
+      p.r = 255 + (endR - 255) * t;
+      p.g = 215 + (endG - 215) * t;
+      p.b = 0 + (endB - 0) * t;
+      if (p.life <= 0) {
         this.trail.splice(i, 1);
       }
     }
@@ -176,14 +187,9 @@ export class Ball {
     for (const p of this.trail) {
       const t = p.life / p.maxLife;
       const r = this.radius * (0.3 + t * 0.7);
-      const startR = 255, startG = 215, startB = 0;
-      const endR = 255, endG = 140, endB = 0;
-      const pr = Math.floor(startR + (endR - startR) * (1 - t));
-      const pg = Math.floor(startG + (endG - startG) * (1 - t));
-      const pb = Math.floor(startB + (endB - startB) * (1 - t));
       ctx.beginPath();
       ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
-      ctx.fillStyle = `rgba(${pr}, ${pg}, ${pb}, ${t * 0.6})`;
+      ctx.fillStyle = `rgba(${Math.floor(p.r)}, ${Math.floor(p.g)}, ${Math.floor(p.b)}, ${t * 0.6})`;
       ctx.fill();
     }
 
