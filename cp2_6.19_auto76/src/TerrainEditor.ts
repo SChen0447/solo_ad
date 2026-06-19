@@ -22,6 +22,7 @@ export class TerrainEditor {
   private lastPlaceKey: string = '';
   private isDragging: boolean = false;
   private animFrameId: number = 0;
+  private isModeAnimating: boolean = false;
 
   constructor(container: HTMLElement) {
     this.container = container;
@@ -253,22 +254,52 @@ export class TerrainEditor {
   }
 
   private setMode(mode: ToolMode): void {
-    this.dataManager.setMode(mode);
-    document.querySelectorAll('.mode-btn').forEach(btn => {
-      btn.classList.toggle('active', (btn as HTMLElement).dataset.mode === mode);
-    });
+    const oldMode = this.dataManager.getMode();
+    if (oldMode === mode || this.isModeAnimating) return;
 
-    const canvas = this.renderer.domElement;
-    switch (mode) {
-      case 'add':
-        canvas.style.cursor = 'crosshair';
-        break;
-      case 'remove':
-        canvas.style.cursor = 'crosshair';
-        break;
-      case 'select':
-        canvas.style.cursor = 'pointer';
-        break;
+    this.isModeAnimating = true;
+
+    const oldBtn = document.querySelector<HTMLElement>(`.mode-btn[data-mode="${oldMode}"]`);
+    const newBtn = document.querySelector<HTMLElement>(`.mode-btn[data-mode="${mode}"]`);
+
+    const oldIcon = oldBtn?.querySelector<HTMLElement>('.icon-wrapper');
+    const newIcon = newBtn?.querySelector<HTMLElement>('.icon-wrapper');
+
+    const doSwitch = () => {
+      this.dataManager.setMode(mode);
+      document.querySelectorAll('.mode-btn').forEach(btn => {
+        btn.classList.toggle('active', (btn as HTMLElement).dataset.mode === mode);
+      });
+
+      if (newIcon) {
+        newIcon.classList.remove('fade-out');
+        newIcon.classList.add('fade-in');
+        setTimeout(() => newIcon.classList.remove('fade-in'), 400);
+      }
+
+      const canvas = this.renderer.domElement;
+      switch (mode) {
+        case 'add':
+          canvas.style.cursor = 'crosshair';
+          break;
+        case 'remove':
+          canvas.style.cursor = 'crosshair';
+          break;
+        case 'select':
+          canvas.style.cursor = 'pointer';
+          break;
+      }
+
+      setTimeout(() => {
+        this.isModeAnimating = false;
+      }, 350);
+    };
+
+    if (oldIcon && oldIcon !== newIcon) {
+      oldIcon.classList.add('fade-out');
+      setTimeout(doSwitch, 180);
+    } else {
+      doSwitch();
     }
   }
 
