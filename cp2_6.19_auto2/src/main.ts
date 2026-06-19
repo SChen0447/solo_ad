@@ -22,9 +22,10 @@ class App {
   private iconPlay: HTMLElement | null;
   private iconPause: HTMLElement | null;
 
-  private frameCount = 0;
-  private fpsTime = 0;
+  private frameTimestamps: number[] = [];
+  private readonly FPS_WINDOW = 60;
   private currentFps = 0;
+  private lastMonitorUpdate = 0;
 
   constructor() {
     const container = document.getElementById('app');
@@ -92,12 +93,17 @@ class App {
     this.interactionManager.update();
     this.renderer.render(this.scene, this.camera);
 
-    this.frameCount++;
-    this.fpsTime += delta;
-    if (this.fpsTime >= 0.5) {
-      this.currentFps = Math.round(this.frameCount / this.fpsTime);
-      this.frameCount = 0;
-      this.fpsTime = 0;
+    this.frameTimestamps.push(performance.now());
+    if (this.frameTimestamps.length > this.FPS_WINDOW) {
+      this.frameTimestamps.shift();
+    }
+    if (this.frameTimestamps.length >= 2) {
+      const elapsed = this.frameTimestamps[this.frameTimestamps.length - 1] - this.frameTimestamps[0];
+      this.currentFps = Math.round(((this.frameTimestamps.length - 1) / elapsed) * 1000);
+    }
+    const now = performance.now();
+    if (now - this.lastMonitorUpdate > 200) {
+      this.lastMonitorUpdate = now;
       this.updateMonitorPanel();
     }
   };

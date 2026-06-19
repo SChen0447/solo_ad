@@ -2,11 +2,13 @@ import * as THREE from 'three';
 import type { FlowData } from './DataSimulator';
 
 const PARTICLE_COUNT = 2500;
-const CURVE_COUNT = 6;
+const CURVE_COUNT = 5;
 const COLOR_BLUE = new THREE.Color(0x00d4ff);
 const COLOR_RED = new THREE.Color(0xff0055);
-const FADE_IN_RANGE = 0.05;
-const FADE_OUT_RANGE = 0.95;
+const FADE_IN_END = 0.10;
+const FADE_OUT_START = 0.90;
+
+const _tempColor = new THREE.Color();
 
 interface ParticleState {
   curveIndex: number;
@@ -14,6 +16,7 @@ interface ParticleState {
   speed: number;
   baseSpeed: number;
   offset: THREE.Vector3;
+  localMagnitude: number;
 }
 
 export class ParticleFlow {
@@ -57,10 +60,6 @@ export class ParticleFlow {
     this.initializePositions();
   }
 
-  getPathLines(): THREE.Line[] {
-    return this.pathLines;
-  }
-
   addToScene(scene: THREE.Scene): void {
     scene.add(this.points);
     for (const line of this.pathLines) {
@@ -83,6 +82,7 @@ export class ParticleFlow {
       const state = this.states[i];
       const curve = this.curves[state.curveIndex];
 
+      state.localMagnitude += (this.currentMagnitude - state.localMagnitude) * 0.08;
       state.speed = state.baseSpeed * speedMultiplier;
       state.t += state.speed * delta;
 
@@ -90,32 +90,33 @@ export class ParticleFlow {
         state.t -= 1;
         state.curveIndex = Math.floor(Math.random() * CURVE_COUNT);
         state.offset.set(
-          (Math.random() - 0.5) * 0.8,
-          (Math.random() - 0.5) * 0.8,
-          (Math.random() - 0.5) * 0.8,
+          (Math.random() - 0.5) * 0.6,
+          (Math.random() - 0.5) * 0.6,
+          (Math.random() - 0.5) * 0.6,
         );
       }
 
-      const point = curve.getPointAt(state.t);
+      const clampedT = Math.min(Math.max(state.t, 0), 0.999);
+      const point = curve.getPointAt(clampedT);
       const i3 = i * 3;
 
       this.positions[i3] = point.x + state.offset.x;
       this.positions[i3 + 1] = point.y + state.offset.y;
       this.positions[i3 + 2] = point.z + state.offset.z;
 
-      const magnitude = this.currentMagnitude;
-      const tempColor = COLOR_BLUE.clone().lerp(COLOR_RED, magnitude);
-      this.colors[i3] = tempColor.r;
-      this.colors[i3 + 1] = tempColor.g;
-      this.colors[i3 + 2] = tempColor.b;
+      const mag = state.localMagnitude;
+      _tempColor.copy(COLOR_BLUE).lerp(COLOR_RED, mag);
+      this.colors[i3] = _tempColor.r;
+      this.colors[i3 + 1] = _tempColor.g;
+      this.colors[i3 + 2] = _tempColor.b;
 
       let alpha = 1.0;
-      if (state.t < FADE_IN_RANGE) {
-        alpha = state.t / FADE_IN_RANGE;
-      } else if (state.t > FADE_OUT_RANGE) {
-        alpha = (1 - state.t) / (1 - FADE_OUT_RANGE);
+      if (state.t < FADE_IN_END) {
+        alpha = state.t / FADE_IN_END;
+      } else if (state.t > FADE_OUT_START) {
+        alpha = (1 - state.t) / (1 - FADE_OUT_START);
       }
-      const particleSize = 0.1 + magnitude * 0.9;
+      const particleSize = 0.1 + mag * 0.9;
       this.sizes[i] = particleSize * alpha;
     }
 
@@ -142,48 +143,54 @@ export class ParticleFlow {
 
   private createCurves(): THREE.CatmullRomCurve3[] {
     const curves: THREE.CatmullRomCurve3[] = [];
-    const range = 12;
+    const R = 12;
 
-    const configs = [
-      { axis: 'x', sign: 1, yOff: 0, zOff: 0 },
-      { axis: 'x', sign: -1, yOff: 3, zOff: 2 },
-      { axis: 'z', sign: 1, yOff: -2, zOff: 0 },
-      { axis: 'z', sign: -1, yOff: 1, zOff: -3 },
-      { axis: 'diag1', sign: 1, yOff: 0, zOff: 0 },
-      { axis: 'diag2', sign: 1, yOff: -1, zOff: 1 },
-    ];
+    curves.push(new THREE.CatmullRomCurve3([
+      new THREE.Vector3(-R, 0, 0),
+      new THREE.Vector3(-R * 0.5, 4, 3),
+      new THREE.Vector3(0, -1, -2),
+      new THREE.Vector3(R * 0.5, 3, 4),
+      new THREE.Vector3(R, 1, -1),
+      new THREE.Vector3(R * 0.8, -2, -5),
+      new THREE.Vector3(R * 0.3, 5, 2),
+    ], false, 'catmullrom', 0.5));
 
-    for (const cfg of configs) {
-      const points: THREE.Vector3[] = [];
-      const numPoints = 5 + Math.floor(Math.random() * 3);
+    curves.push(new THREE.CatmullRomCurve3([
+      new THREE.Vector3(0, -R * 0.5, -R),
+      new THREE.Vector3(3, -R * 0.3, -R * 0.4),
+      new THREE.Vector3(-2, 0, 0),
+      new THREE.Vector3(4, R * 0.2, R * 0.4),
+      new THREE.Vector3(-1, R * 0.5, R),
+      new THREE.Vector3(2, R * 0.3, R * 0.7),
+    ], false, 'catmullrom', 0.5));
 
-      for (let j = 0; j < numPoints; j++) {
-        const frac = j / (numPoints - 1);
-        let x = 0, y = 0, z = 0;
+    curves.push(new THREE.CatmullRomCurve3([
+      new THREE.Vector3(-R, -R * 0.4, R * 0.5),
+      new THREE.Vector3(-R * 0.6, 2, R * 0.2),
+      new THREE.Vector3(-R * 0.2, -3, 0),
+      new THREE.Vector3(R * 0.2, 1, -R * 0.3),
+      new THREE.Vector3(R * 0.6, -2, -R * 0.5),
+      new THREE.Vector3(R, R * 0.4, -R * 0.2),
+    ], false, 'catmullrom', 0.5));
 
-        if (cfg.axis === 'x') {
-          x = (frac * 2 - 1) * range * cfg.sign;
-          y = cfg.yOff + Math.sin(frac * Math.PI * 2) * 2 + (Math.random() - 0.5) * 1.5;
-          z = cfg.zOff + Math.cos(frac * Math.PI * 1.5) * 3 + (Math.random() - 0.5) * 1.5;
-        } else if (cfg.axis === 'z') {
-          x = cfg.zOff + Math.cos(frac * Math.PI * 1.5) * 3 + (Math.random() - 0.5) * 1.5;
-          y = cfg.yOff + Math.sin(frac * Math.PI * 2) * 2 + (Math.random() - 0.5) * 1.5;
-          z = (frac * 2 - 1) * range * cfg.sign;
-        } else if (cfg.axis === 'diag1') {
-          x = (frac * 2 - 1) * range;
-          y = cfg.yOff + Math.sin(frac * Math.PI * 2.5) * 3;
-          z = (frac * 2 - 1) * range * 0.6;
-        } else {
-          x = -(frac * 2 - 1) * range * 0.7;
-          y = cfg.yOff + Math.cos(frac * Math.PI * 2) * 2.5;
-          z = (frac * 2 - 1) * range;
-        }
+    curves.push(new THREE.CatmullRomCurve3([
+      new THREE.Vector3(R * 0.3, R * 0.6, -R),
+      new THREE.Vector3(-R * 0.2, R * 0.3, -R * 0.5),
+      new THREE.Vector3(-R * 0.5, 0, 0),
+      new THREE.Vector3(0, -R * 0.2, R * 0.5),
+      new THREE.Vector3(R * 0.4, -R * 0.4, R),
+      new THREE.Vector3(R * 0.1, R * 0.1, R * 0.6),
+    ], false, 'catmullrom', 0.5));
 
-        points.push(new THREE.Vector3(x, y, z));
-      }
-
-      curves.push(new THREE.CatmullRomCurve3(points, false, 'catmullrom', 0.5));
-    }
+    curves.push(new THREE.CatmullRomCurve3([
+      new THREE.Vector3(R * 0.5, -R, -R * 0.3),
+      new THREE.Vector3(R * 0.2, -R * 0.5, R * 0.2),
+      new THREE.Vector3(-R * 0.3, -R * 0.2, -R * 0.1),
+      new THREE.Vector3(-R * 0.6, R * 0.1, R * 0.4),
+      new THREE.Vector3(-R * 0.1, R * 0.5, R * 0.1),
+      new THREE.Vector3(R * 0.4, R, -R * 0.5),
+      new THREE.Vector3(R * 0.2, R * 0.3, -R * 0.2),
+    ], false, 'catmullrom', 0.5));
 
     return curves;
   }
@@ -198,10 +205,11 @@ export class ParticleFlow {
         speed: baseSpeed,
         baseSpeed,
         offset: new THREE.Vector3(
-          (Math.random() - 0.5) * 0.8,
-          (Math.random() - 0.5) * 0.8,
-          (Math.random() - 0.5) * 0.8,
+          (Math.random() - 0.5) * 0.6,
+          (Math.random() - 0.5) * 0.6,
+          (Math.random() - 0.5) * 0.6,
         ),
+        localMagnitude: 0,
       });
     }
     return states;
@@ -211,7 +219,8 @@ export class ParticleFlow {
     for (let i = 0; i < PARTICLE_COUNT; i++) {
       const state = this.states[i];
       const curve = this.curves[state.curveIndex];
-      const point = curve.getPointAt(state.t);
+      const clampedT = Math.min(Math.max(state.t, 0), 0.999);
+      const point = curve.getPointAt(clampedT);
       const i3 = i * 3;
       this.positions[i3] = point.x + state.offset.x;
       this.positions[i3 + 1] = point.y + state.offset.y;
