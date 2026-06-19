@@ -26,6 +26,7 @@ export class SolarSystem {
   public sun: THREE.Mesh;
   public sunLight: THREE.PointLight;
   public sunHaloParticles: THREE.Points;
+  public sunGlowSprites: THREE.Sprite[] = [];
   public group: THREE.Group;
   private scene: THREE.Scene;
 
@@ -39,6 +40,11 @@ export class SolarSystem {
     this.sun.add(this.sunLight);
     this.group.add(this.sun);
 
+    this.sunGlowSprites = this.createSunGlow();
+    for (const sprite of this.sunGlowSprites) {
+      this.sun.add(sprite);
+    }
+
     this.sunHaloParticles = this.createSunHalo();
     this.group.add(this.sunHaloParticles);
 
@@ -48,8 +54,33 @@ export class SolarSystem {
 
   private createSun(): THREE.Mesh {
     const geometry = new THREE.SphereGeometry(0.8, 32, 32);
+    const canvas = document.createElement('canvas');
+    canvas.width = 256;
+    canvas.height = 256;
+    const ctx = canvas.getContext('2d')!;
+    const grad = ctx.createRadialGradient(128, 128, 20, 128, 128, 128);
+    grad.addColorStop(0, '#ffffff');
+    grad.addColorStop(0.3, '#fff27a');
+    grad.addColorStop(0.6, '#ffdd00');
+    grad.addColorStop(1, '#ff8800');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, 256, 256);
+    for (let i = 0; i < 3000; i++) {
+      const nx = Math.random() * 256;
+      const ny = Math.random() * 256;
+      const dx = nx - 128;
+      const dy = ny - 128;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      if (dist < 100) {
+        const alpha = Math.random() * 0.15;
+        ctx.fillStyle = `rgba(255, 180, 80, ${alpha})`;
+        ctx.fillRect(nx, ny, 2, 2);
+      }
+    }
+    const texture = new THREE.CanvasTexture(canvas);
     const material = new THREE.MeshBasicMaterial({
-      color: 0xffdd00
+      color: 0xffffff,
+      map: texture
     });
     const sun = new THREE.Mesh(geometry, material);
     sun.position.set(0, 0, 0);
@@ -61,6 +92,46 @@ export class SolarSystem {
     light.position.set(0, 0, 0);
     light.castShadow = true;
     return light;
+  }
+
+  private createSunGlow(): THREE.Sprite[] {
+    const sprites: THREE.Sprite[] = [];
+    const glowLayers = [
+      { size: 2.5, color: 0xffaa00, opacity: 0.45 },
+      { size: 3.5, color: 0xff8800, opacity: 0.30 },
+      { size: 5.0, color: 0xff6600, opacity: 0.18 }
+    ];
+
+    for (const layer of glowLayers) {
+      const canvas = document.createElement('canvas');
+      canvas.width = 256;
+      canvas.height = 256;
+      const ctx = canvas.getContext('2d')!;
+      const grad = ctx.createRadialGradient(128, 128, 0, 128, 128, 128);
+      const colorObj = new THREE.Color(layer.color);
+      const r = Math.floor(colorObj.r * 255);
+      const g = Math.floor(colorObj.g * 255);
+      const b = Math.floor(colorObj.b * 255);
+      grad.addColorStop(0, `rgba(${r},${g},${b},${layer.opacity})`);
+      grad.addColorStop(0.4, `rgba(${r},${g},${b},${layer.opacity * 0.6})`);
+      grad.addColorStop(0.7, `rgba(${r},${g},${b},${layer.opacity * 0.2})`);
+      grad.addColorStop(1, `rgba(${r},${g},${b},0)`);
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, 256, 256);
+
+      const texture = new THREE.CanvasTexture(canvas);
+      const material = new THREE.SpriteMaterial({
+        map: texture,
+        transparent: true,
+        opacity: 1,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false
+      });
+      const sprite = new THREE.Sprite(material);
+      sprite.scale.set(layer.size, layer.size, 1);
+      sprites.push(sprite);
+    }
+    return sprites;
   }
 
   private createSunHalo(): THREE.Points {
