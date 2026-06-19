@@ -50,6 +50,13 @@ body {
   opacity: 1;
 }
 
+.react-grid-placeholder {
+  background: transparent;
+  border: 2px dashed #4a90d9;
+  border-radius: 12px;
+  opacity: 1;
+}
+
 .react-grid-item > .react-resizable-handle::after {
   width: 8px;
   height: 8px;

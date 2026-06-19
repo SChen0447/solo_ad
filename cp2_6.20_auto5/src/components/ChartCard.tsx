@@ -32,46 +32,6 @@ const chartLabels: Record<ChartConfig['type'], string> = {
   scatter: '散点图',
 }
 
-const CustomTooltip = ({ active, payload, label }: any) => {
-  if (active && payload && payload.length) {
-    return (
-      <div style={{
-        background: 'rgba(255, 255, 255, 0.82)',
-        backdropFilter: 'blur(4px)',
-        WebkitBackdropFilter: 'blur(4px)',
-        borderRadius: '8px',
-        padding: '10px 14px',
-        boxShadow: '0 4px 16px rgba(0, 0, 0, 0.08)',
-        border: '1px solid rgba(255, 255, 255, 0.6)',
-        fontSize: '12px',
-        transition: 'opacity 0.1s ease',
-        pointerEvents: 'none',
-      }}>
-        <p style={{ fontWeight: 600, color: '#333', marginBottom: '6px', fontSize: '13px' }}>
-          {label !== undefined && label !== null ? String(label) : ''}
-        </p>
-        {payload.map((entry: any, index: number) => (
-          <div key={index} style={{ display: 'flex', alignItems: 'center', gap: '6px', margin: '3px 0' }}>
-            <span style={{
-              display: 'inline-block',
-              width: '8px',
-              height: '8px',
-              borderRadius: '50%',
-              background: entry.color,
-              flexShrink: 0,
-            }} />
-            <span style={{ color: '#555', flexShrink: 0 }}>{entry.name}:</span>
-            <span style={{ color: '#333', fontWeight: 500 }}>
-              {typeof entry.value === 'number' ? entry.value.toFixed(2) : String(entry.value)}
-            </span>
-          </div>
-        ))}
-      </div>
-    )
-  }
-  return null
-}
-
 export default function ChartCard({ chart, data, onDelete, onRefresh }: ChartCardProps) {
   const [hiddenSeries, setHiddenSeries] = useState<Set<string>>(new Set())
   const [isFullscreen, setIsFullscreen] = useState(false)
@@ -83,6 +43,49 @@ export default function ChartCard({ chart, data, onDelete, onRefresh }: ChartCar
     const timer = setTimeout(() => setIsVisible(true), 50)
     return () => clearTimeout(timer)
   }, [])
+
+  const CustomTooltip = useCallback(({ active, payload, label }: any) => {
+    if (active && payload && payload.length) {
+      const isPie = chart.type === 'pie'
+      return (
+        <div style={{
+          background: 'rgba(255, 255, 255, 0.82)',
+          backdropFilter: 'blur(4px)',
+          WebkitBackdropFilter: 'blur(4px)',
+          borderRadius: '8px',
+          padding: '10px 14px',
+          boxShadow: '0 4px 16px rgba(0, 0, 0, 0.08)',
+          border: '1px solid rgba(255, 255, 255, 0.6)',
+          fontSize: '12px',
+          transition: 'opacity 0.1s ease',
+          pointerEvents: 'none',
+        }}>
+          {!isPie && label !== undefined && label !== null && (
+            <p style={{ fontWeight: 600, color: '#333', marginBottom: '6px', fontSize: '13px' }}>
+              {String(label)}
+            </p>
+          )}
+          {payload.map((entry: any, index: number) => (
+            <div key={index} style={{ display: 'flex', alignItems: 'center', gap: '6px', margin: '3px 0' }}>
+              <span style={{
+                display: 'inline-block',
+                width: '8px',
+                height: '8px',
+                borderRadius: '50%',
+                background: entry.color,
+                flexShrink: 0,
+              }} />
+              <span style={{ color: '#555', flexShrink: 0 }}>{entry.name}:</span>
+              <span style={{ color: '#333', fontWeight: 500 }}>
+                {typeof entry.value === 'number' ? entry.value.toFixed(2) : String(entry.value)}
+              </span>
+            </div>
+          ))}
+        </div>
+      )
+    }
+    return null
+  }, [chart.type])
 
   const handleRefresh = useCallback(() => {
     setIsShaking(true)
@@ -105,39 +108,66 @@ export default function ChartCard({ chart, data, onDelete, onRefresh }: ChartCar
   const fullscreenRef = useRef<HTMLDivElement>(null)
 
   const handleExportPNG = useCallback(() => {
-    const container = fullscreenRef.current
-    if (!container) return
+    try {
+      const container = fullscreenRef.current
+      if (!container) {
+        alert('导出失败：找不到图表容器')
+        return
+      }
 
-    const svgElement = container.querySelector('.recharts-wrapper svg')
-    if (!svgElement) return
+      const svgElement = container.querySelector('.recharts-wrapper svg') as SVGElement | null
+      if (!svgElement) {
+        alert('导出失败：找不到图表SVG元素')
+        return
+      }
 
-    const svgData = new XMLSerializer().serializeToString(svgElement)
-    const canvas = document.createElement('canvas')
-    const ctx = canvas.getContext('2d')
-    if (!ctx) return
+      const svgData = new XMLSerializer().serializeToString(svgElement)
+      const canvas = document.createElement('canvas')
+      const ctx = canvas.getContext('2d')
+      if (!ctx) {
+        alert('导出失败：浏览器不支持Canvas')
+        return
+      }
 
-    const svgRect = svgElement.getBoundingClientRect()
-    const scale = 2
-    canvas.width = svgRect.width * scale
-    canvas.height = svgRect.height * scale
-    ctx.scale(scale, scale)
+      const svgRect = svgElement.getBoundingClientRect()
+      const scale = 2
+      canvas.width = svgRect.width * scale
+      canvas.height = svgRect.height * scale
+      ctx.scale(scale, scale)
 
-    const img = new Image()
-    const svgBlob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' })
-    const url = URL.createObjectURL(svgBlob)
+      const img = new Image()
+      img.crossOrigin = 'anonymous'
+      const svgBlob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' })
+      const url = URL.createObjectURL(svgBlob)
 
-    img.onload = () => {
-      ctx.fillStyle = '#ffffff'
-      ctx.fillRect(0, 0, canvas.width, canvas.height)
-      ctx.drawImage(img, 0, 0, svgRect.width, svgRect.height)
-      URL.revokeObjectURL(url)
+      img.onload = () => {
+        try {
+          ctx.fillStyle = '#ffffff'
+          ctx.fillRect(0, 0, canvas.width, canvas.height)
+          ctx.drawImage(img, 0, 0, svgRect.width, svgRect.height)
+          URL.revokeObjectURL(url)
 
-      const link = document.createElement('a')
-      link.download = `${chartLabels[chart.type]}_${chart.xAxis}_${chart.yAxes.join('_')}.png`
-      link.href = canvas.toDataURL('image/png')
-      link.click()
+          const link = document.createElement('a')
+          link.download = `${chartLabels[chart.type]}_${chart.xAxis}_${chart.yAxes.join('_')}.png`
+          link.href = canvas.toDataURL('image/png')
+          link.click()
+        } catch (err) {
+          URL.revokeObjectURL(url)
+          console.error('导出图片失败:', err)
+          alert('导出失败：可能由于跨域资源限制导致。\n\n建议使用截图工具（如Windows: Win+Shift+S，Mac: Cmd+Shift+4）手动截取。')
+        }
+      }
+
+      img.onerror = () => {
+        URL.revokeObjectURL(url)
+        alert('导出失败：图片资源加载错误。\n\n建议使用截图工具（如Windows: Win+Shift+S，Mac: Cmd+Shift+4）手动截取。')
+      }
+
+      img.src = url
+    } catch (err) {
+      console.error('导出图片失败:', err)
+      alert('导出失败：发生未知错误。\n\n建议使用截图工具（如Windows: Win+Shift+S，Mac: Cmd+Shift+4）手动截取。')
     }
-    img.src = url
   }, [chart.type, chart.xAxis, chart.yAxes])
 
   const handleDoubleClick = useCallback(() => {
@@ -167,7 +197,7 @@ export default function ChartCard({ chart, data, onDelete, onRefresh }: ChartCar
               <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
               <XAxis dataKey={chart.xAxis} tick={{ fontSize: 11, fill: '#888' }} />
               <YAxis tick={{ fontSize: 11, fill: '#888' }} />
-              <Tooltip content={<CustomTooltip />} cursor={{ stroke: '#e8e8e8' }} />
+              <Tooltip content={CustomTooltip} cursor={{ stroke: '#e8e8e8' }} />
               <Legend
                 onClick={(e) => {
                   if (e.dataKey) toggleSeries(String(e.dataKey))
@@ -208,7 +238,7 @@ export default function ChartCard({ chart, data, onDelete, onRefresh }: ChartCar
               <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
               <XAxis dataKey={chart.xAxis} tick={{ fontSize: 11, fill: '#888' }} />
               <YAxis tick={{ fontSize: 11, fill: '#888' }} />
-              <Tooltip content={<CustomTooltip />} cursor={{ fill: '#f5f5f5' }} />
+              <Tooltip content={CustomTooltip} cursor={{ fill: '#f5f5f5' }} />
               <Legend
                 onClick={(e) => {
                   if (e.dataKey) toggleSeries(String(e.dataKey))
@@ -258,7 +288,7 @@ export default function ChartCard({ chart, data, onDelete, onRefresh }: ChartCar
                   <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                 ))}
               </Pie>
-              <Tooltip content={<CustomTooltip />} />
+              <Tooltip content={CustomTooltip} />
               <Legend
                 formatter={(value) => (
                   <span style={{ fontSize: '11px', color: '#666' }}>{value}</span>
@@ -276,7 +306,7 @@ export default function ChartCard({ chart, data, onDelete, onRefresh }: ChartCar
               <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
               <XAxis dataKey={chart.xAxis} name={chart.xAxis} tick={{ fontSize: 11, fill: '#888' }} />
               <YAxis dataKey={chart.yAxes[0]} name={chart.yAxes[0]} tick={{ fontSize: 11, fill: '#888' }} />
-              <Tooltip content={<CustomTooltip />} cursor={{ strokeDasharray: '3 3' }} />
+              <Tooltip content={CustomTooltip} cursor={{ strokeDasharray: '3 3' }} />
               <Legend
                 onClick={(e) => {
                   if (e.dataKey) toggleSeries(String(e.dataKey))
@@ -323,7 +353,9 @@ export default function ChartCard({ chart, data, onDelete, onRefresh }: ChartCar
         overflow: 'hidden',
         opacity: isVisible ? 1 : 0,
         transform: isVisible ? 'translateY(0) scale(1)' : 'translateY(20px) scale(0.95)',
-        transition: 'opacity 0.4s ease, transform 0.4s ease',
+        transformOrigin: 'center bottom',
+        transition: 'opacity 0.4s cubic-bezier(0.34, 1.56, 0.64, 1), transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)',
+        willChange: 'opacity, transform',
         animation: isShaking ? 'shake 0.5s ease-in-out' : 'none',
         cursor: 'pointer',
       }}
@@ -427,7 +459,7 @@ export default function ChartCard({ chart, data, onDelete, onRefresh }: ChartCar
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            animation: 'fadeIn 0.3s ease',
+            animation: 'fadeIn 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)',
           }}
         >
           <div
@@ -441,7 +473,7 @@ export default function ChartCard({ chart, data, onDelete, onRefresh }: ChartCar
               padding: '24px',
               display: 'flex',
               flexDirection: 'column',
-              animation: 'scaleIn 0.3s ease',
+              animation: 'scaleIn 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)',
             }}
           >
             <div style={{
@@ -527,7 +559,7 @@ export default function ChartCard({ chart, data, onDelete, onRefresh }: ChartCar
           to { opacity: 1; }
         }
         @keyframes scaleIn {
-          from { opacity: 0; transform: scale(0.9); }
+          from { opacity: 0; transform: scale(0.95); }
           to { opacity: 1; transform: scale(1); }
         }
       `}</style>
