@@ -106,19 +106,32 @@ const CardDeck = ({ decks, onSelect }: CardDeckProps) => {
                   📖
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <h3
-                    style={{
-                      margin: 0,
-                      fontSize: 16,
-                      fontWeight: 600,
-                      color: 'var(--text-primary)',
-                      whiteSpace: 'nowrap',
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                    }}
-                  >
-                    {deck.name}
-                  </h3>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
+                    <h3
+                      style={{
+                        margin: 0,
+                        fontSize: 16,
+                        fontWeight: 600,
+                        color: 'var(--text-primary)',
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                      }}
+                    >
+                      {deck.name}
+                    </h3>
+                    <span
+                      style={{
+                        fontSize: 12,
+                        fontWeight: 400,
+                        color: isHovered ? deck.color : 'var(--text-secondary)',
+                        transition: 'color 0.3s ease',
+                        flexShrink: 0,
+                      }}
+                    >
+                      ({totalCards}张)
+                    </span>
+                  </div>
                   <p
                     style={{
                       margin: '2px 0 0 0',

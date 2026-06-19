@@ -9,6 +9,7 @@ const StatsPanel = ({ stats }: StatsPanelProps) => {
   const masteryRate = stats.totalCards > 0 ? stats.totalMastered / stats.totalCards : 0
   const [animatedProgress, setAnimatedProgress] = useState(0)
   const [barsAnimated, setBarsAnimated] = useState(false)
+  const [lineAnimated, setLineAnimated] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -31,12 +32,46 @@ const StatsPanel = ({ stats }: StatsPanelProps) => {
     return () => clearTimeout(timer)
   }, [])
 
+  useEffect(() => {
+    const timer = setTimeout(() => setLineAnimated(true), 500)
+    return () => clearTimeout(timer)
+  }, [])
+
   const radius = 70
   const stroke = 10
   const circumference = 2 * Math.PI * radius
   const offset = circumference - animatedProgress * circumference
 
   const maxHistory = Math.max(...stats.history.map((h) => h.count), 1)
+
+  const weekData = stats.history.slice(-7)
+  const chartWidth = 260
+  const chartHeight = 90
+  const chartPadding = { top: 10, right: 10, bottom: 20, left: 10 }
+  const innerWidth = chartWidth - chartPadding.left - chartPadding.right
+  const innerHeight = chartHeight - chartPadding.top - chartPadding.bottom
+  const maxWeek = Math.max(...weekData.map((h) => h.count), 1)
+
+  const points = weekData.map((d, i) => ({
+    x: chartPadding.left + (i / (weekData.length - 1)) * innerWidth,
+    y: chartPadding.top + innerHeight - (d.count / maxWeek) * innerHeight,
+    value: d.count,
+    label: d.date,
+  }))
+
+  const smoothPath = points
+    .map((p, i, arr) => {
+      if (i === 0) return `M ${p.x} ${p.y}`
+      const prev = arr[i - 1]
+      const cpx1 = prev.x + (p.x - prev.x) / 2
+      const cpy1 = prev.y
+      const cpx2 = prev.x + (p.x - prev.x) / 2
+      const cpy2 = p.y
+      return `C ${cpx1} ${cpy1}, ${cpx2} ${cpy2}, ${p.x} ${p.y}`
+    })
+    .join(' ')
+
+  const lineLength = 500
 
   const statCards = [
     {
@@ -200,6 +235,101 @@ const StatsPanel = ({ stats }: StatsPanelProps) => {
             <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 4 }}>
               总进度
             </div>
+          </div>
+
+          <div
+            style={{
+              width: '100%',
+              marginTop: 20,
+              paddingTop: 16,
+              borderTop: '1px solid var(--border)',
+            }}
+          >
+            <div
+              style={{
+                fontSize: 13,
+                color: 'var(--text-secondary)',
+                fontWeight: 500,
+                marginBottom: 12,
+                textAlign: 'center',
+              }}
+            >
+              本周学习趋势
+            </div>
+            <svg
+              width={chartWidth}
+              height={chartHeight}
+              style={{ display: 'block', margin: '0 auto' }}
+            >
+              <defs>
+                <linearGradient id="lineGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                  <stop offset="0%" stopColor="#79a9ff" />
+                  <stop offset="100%" stopColor="#4f8ef7" />
+                </linearGradient>
+                <linearGradient id="areaGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                  <stop offset="0%" stopColor="rgba(79,142,247,0.25)" />
+                  <stop offset="100%" stopColor="rgba(79,142,247,0)" />
+                </linearGradient>
+              </defs>
+
+              <path
+                d={`${smoothPath} L ${points[points.length - 1].x} ${chartHeight - chartPadding.bottom} L ${points[0].x} ${chartHeight - chartPadding.bottom} Z`}
+                fill="url(#areaGradient)"
+                opacity={lineAnimated ? 1 : 0}
+                style={{ transition: 'opacity 0.8s ease' }}
+              />
+
+              <path
+                d={smoothPath}
+                fill="none"
+                stroke="url(#lineGradient)"
+                strokeWidth={2.5}
+                strokeLinecap="round"
+                strokeDasharray={lineLength}
+                strokeDashoffset={lineAnimated ? 0 : lineLength}
+                style={{ transition: 'stroke-dashoffset 1.2s cubic-bezier(0.4, 0, 0.2, 1)' }}
+              />
+
+              {points.map((p, i) => (
+                <g key={i}>
+                  <circle
+                    cx={p.x}
+                    cy={p.y}
+                    r={4}
+                    fill="var(--bg-card)"
+                    stroke="url(#lineGradient)"
+                    strokeWidth={2}
+                    opacity={lineAnimated ? 1 : 0}
+                    style={{
+                      transition: `opacity 0.3s ease ${0.3 + i * 0.1}s`,
+                    }}
+                  />
+                  <circle
+                    cx={p.x}
+                    cy={p.y}
+                    r={1.5}
+                    fill="url(#lineGradient)"
+                    opacity={lineAnimated ? 1 : 0}
+                    style={{
+                      transition: `opacity 0.3s ease ${0.35 + i * 0.1}s`,
+                    }}
+                  />
+                  <text
+                    x={p.x}
+                    y={chartHeight - 5}
+                    textAnchor="middle"
+                    fontSize={9}
+                    fill="var(--text-secondary)"
+                    opacity={lineAnimated ? 1 : 0}
+                    style={{
+                      transition: `opacity 0.3s ease ${0.4 + i * 0.1}s`,
+                    }}
+                  >
+                    {p.label}
+                  </text>
+                </g>
+              ))}
+            </svg>
           </div>
         </div>
 
