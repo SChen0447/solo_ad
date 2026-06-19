@@ -132,6 +132,12 @@ body {
   border-bottom: 2px dashed #ddd;
   padding-bottom: 12px;
   margin-bottom: 12px;
+  transition: transform 0.3s ease, opacity 0.3s ease;
+}
+
+.editor-panel-wrapper.removing {
+  transform: scale(0.8);
+  opacity: 0;
 }
 
 .editor-panel-card {
@@ -354,11 +360,35 @@ body {
 }
 
 .preview-card-flash {
-  background: linear-gradient(to bottom, #f8f9ff, #ffffff);
+  animation: bgFlash 0.2s ease-out;
 }
 
-.preview-card-size-anim {
-  transition: background 0.2s ease;
+@keyframes bgFlash {
+  0% {
+    background: linear-gradient(to bottom, #f0f2f5, #ffffff);
+  }
+  50% {
+    background: linear-gradient(to bottom, #f8f9ff, #ffffff);
+  }
+  100% {
+    background: #ffffff;
+  }
+}
+
+.preview-text-scale {
+  animation: textScale 0.2s ease-out;
+}
+
+@keyframes textScale {
+  0% {
+    transform: scale(0.96);
+  }
+  50% {
+    transform: scale(1.02);
+  }
+  100% {
+    transform: scale(1);
+  }
 }
 
 .preview-card-footer {
@@ -391,14 +421,14 @@ body {
 
 @keyframes scaleExport {
   0% { transform: scale(1); }
-  50% { transform: scale(0.92); }
+  50% { transform: scale(0.9); }
   100% { transform: scale(1); }
 }
 
 @keyframes flashGreen {
   0% { background: #34a853; }
-  50% { background: #4caf50; }
-  75% { background: #34a853; }
+  30% { background: #66bb6a; }
+  60% { background: #34a853; }
   100% { background: #34a853; }
 }
 

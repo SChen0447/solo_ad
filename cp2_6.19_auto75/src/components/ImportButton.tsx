@@ -1,9 +1,11 @@
 import { useCallback, useRef, useState } from 'react';
 import { TypographySample } from '@/types';
-import { useTypographyStore } from '@/store/typographyStore';
 
-export default function ImportButton() {
-  const importSamples = useTypographyStore((s) => s.importSamples);
+interface ImportButtonProps {
+  onImport: (samples: TypographySample[]) => void;
+}
+
+export default function ImportButton({ onImport }: ImportButtonProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [importing, setImporting] = useState(false);
 
@@ -33,7 +35,7 @@ export default function ImportButton() {
                 color: item.color || '#333333',
               })
             );
-            importSamples(validSamples);
+            onImport(validSamples);
           }
         } catch {
           console.error('Invalid JSON file');
@@ -46,7 +48,7 @@ export default function ImportButton() {
       };
       reader.readAsText(file);
     },
-    [importSamples]
+    [onImport]
   );
 
   return (

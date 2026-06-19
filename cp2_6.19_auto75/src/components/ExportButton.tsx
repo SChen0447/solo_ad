@@ -1,8 +1,11 @@
 import { useState, useCallback } from 'react';
-import { useTypographyStore } from '@/store/typographyStore';
+import { TypographySample } from '@/types';
 
-export default function ExportButton() {
-  const samples = useTypographyStore((s) => s.samples);
+interface ExportButtonProps {
+  samples: TypographySample[];
+}
+
+export default function ExportButton({ samples }: ExportButtonProps) {
   const [exporting, setExporting] = useState(false);
   const [exported, setExported] = useState(false);
 

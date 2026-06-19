@@ -1,45 +1,44 @@
 import { useCallback, useEffect, useRef } from 'react';
 import debounce from 'lodash.debounce';
 import { TypographySample, FONT_FAMILIES } from '@/types';
-import { useTypographyStore } from '@/store/typographyStore';
 
 interface EditorPanelProps {
   sample: TypographySample;
   index: number;
+  onChange: (sample: TypographySample) => void;
   onRemove: (id: string) => void;
+  canDelete: boolean;
 }
 
 const FONT_WEIGHTS = Array.from({ length: 9 }, (_, i) => (i + 1) * 100);
 
-export default function EditorPanel({ sample, index, onRemove }: EditorPanelProps) {
-  const updateSample = useTypographyStore((s) => s.updateSample);
-  const samples = useTypographyStore((s) => s.samples);
-
-  const debouncedUpdate = useRef(
-    debounce((id: string, updates: Partial<TypographySample>) => {
-      updateSample(id, updates);
+export default function EditorPanel({ sample, index, onChange, onRemove, canDelete }: EditorPanelProps) {
+  const debouncedChangeRef = useRef(
+    debounce((updatedSample: TypographySample) => {
+      onChange(updatedSample);
     }, 30)
   ).current;
 
   useEffect(() => {
     return () => {
-      debouncedUpdate.cancel();
+      debouncedChangeRef.cancel();
     };
-  }, [debouncedUpdate]);
+  }, [debouncedChangeRef]);
 
   const handleChange = useCallback(
     (updates: Partial<TypographySample>) => {
-      debouncedUpdate(sample.id, updates);
+      const updatedSample = { ...sample, ...updates };
+      debouncedChangeRef(updatedSample);
     },
-    [debouncedUpdate, sample.id]
+    [debouncedChangeRef, sample]
   );
 
   const handleTextChange = useCallback(
     (e: React.ChangeEvent<HTMLTextAreaElement>) => {
       const value = e.target.value.slice(0, 200);
-      updateSample(sample.id, { text: value });
+      onChange({ ...sample, text: value });
     },
-    [updateSample, sample.id]
+    [onChange, sample]
   );
 
   return (
@@ -48,7 +47,7 @@ export default function EditorPanel({ sample, index, onRemove }: EditorPanelProp
         <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">
           Sample {index + 1}
         </span>
-        {samples.length > 1 && (
+        {canDelete && (
           <button
             onClick={() => onRemove(sample.id)}
             className="delete-btn"

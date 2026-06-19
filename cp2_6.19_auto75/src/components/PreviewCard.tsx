@@ -14,8 +14,8 @@ export default function PreviewCard({ sample, index, staggerDelay = 0 }: Preview
   const prevSizeRef = useRef(sample.fontSize);
   const prevLineHeightRef = useRef(sample.lineHeight);
   const [displayFont, setDisplayFont] = useState(sample.fontFamily);
-  const [animatingSize, setAnimatingSize] = useState(false);
   const [entering, setEntering] = useState(true);
+  const [scaleAnim, setScaleAnim] = useState(false);
 
   useEffect(() => {
     const timer = setTimeout(() => setEntering(false), 50 + staggerDelay);
@@ -39,14 +39,21 @@ export default function PreviewCard({ sample, index, staggerDelay = 0 }: Preview
   useEffect(() => {
     if (prevSizeRef.current !== sample.fontSize || prevLineHeightRef.current !== sample.lineHeight) {
       setBgFlash(true);
-      setAnimatingSize(true);
+      let scaleTimer: ReturnType<typeof setTimeout> | null = null;
+      if (prevSizeRef.current !== sample.fontSize) {
+        setScaleAnim(true);
+        scaleTimer = setTimeout(() => setScaleAnim(false), 200);
+      }
       prevSizeRef.current = sample.fontSize;
       prevLineHeightRef.current = sample.lineHeight;
       const timer = setTimeout(() => {
         setBgFlash(false);
-        setAnimatingSize(false);
+        setScaleAnim(false);
       }, 200);
-      return () => clearTimeout(timer);
+      return () => {
+        clearTimeout(timer);
+        if (scaleTimer) clearTimeout(scaleTimer);
+      };
     }
   }, [sample.fontSize, sample.lineHeight]);
 
@@ -56,7 +63,11 @@ export default function PreviewCard({ sample, index, staggerDelay = 0 }: Preview
     1;
 
   const fontTransitionStyle =
-    fontTransition !== 'idle' ? 'opacity 0.15s ease' : 'none';
+    fontTransition !== 'idle' ? 'opacity 0.15s ease-in-out' : 'opacity 0s';
+
+  const scaleStyle = scaleAnim
+    ? 'transform 0.2s ease-out'
+    : 'transform 0s';
 
   return (
     <div
@@ -72,9 +83,10 @@ export default function PreviewCard({ sample, index, staggerDelay = 0 }: Preview
         </span>
       </div>
       <div
-        className={`preview-card-body ${bgFlash ? 'preview-card-flash' : ''} ${animatingSize ? 'preview-card-size-anim' : ''}`}
+        className={`preview-card-body ${bgFlash ? 'preview-card-flash' : ''}`}
       >
         <p
+          className={`${scaleAnim ? 'preview-text-scale' : ''}`}
           style={{
             fontFamily: `'${displayFont}', sans-serif`,
             fontSize: `${sample.fontSize}px`,
@@ -82,9 +94,10 @@ export default function PreviewCard({ sample, index, staggerDelay = 0 }: Preview
             fontWeight: sample.fontWeight,
             color: sample.color,
             opacity: fontOpacity,
-            transition: fontTransitionStyle,
+            transition: `${fontTransitionStyle}, ${scaleStyle}`,
             wordBreak: 'break-word',
             whiteSpace: 'pre-wrap',
+            transformOrigin: 'center left',
           }}
         >
           {sample.text}
