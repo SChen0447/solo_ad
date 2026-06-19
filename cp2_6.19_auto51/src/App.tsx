@@ -38,6 +38,54 @@ const App: React.FC = () => {
     translateY: number;
   }>({ isDragging: false, startX: 0, startY: 0, translateX: 0, translateY: 0 });
   const [previewScale, setPreviewScale] = useState(1);
+  const [animatedProgress, setAnimatedProgress] = useState(0);
+  const progressAnimRef = useRef<{ rafId: number | null; target: number; current: number }>({
+    rafId: null,
+    target: 0,
+    current: 0
+  });
+
+  const runProgressAnimation = useCallback((targetPct: number) => {
+    const anim = progressAnimRef.current;
+    anim.target = targetPct;
+    const startValue = anim.current;
+    const start = performance.now();
+    const duration = 900;
+
+    if (anim.rafId !== null) {
+      cancelAnimationFrame(anim.rafId);
+      anim.rafId = null;
+    }
+
+    const tick = (now: number) => {
+      const elapsed = now - start;
+      const rawT = Math.min(1, elapsed / duration);
+      const easeT = 1 - Math.pow(1 - rawT, 3);
+      anim.current = startValue + (targetPct - startValue) * easeT;
+      setAnimatedProgress(anim.current);
+
+      if (rawT < 1) {
+        anim.rafId = requestAnimationFrame(tick);
+      } else {
+        anim.current = targetPct;
+        setAnimatedProgress(targetPct);
+        anim.rafId = null;
+      }
+    };
+    anim.rafId = requestAnimationFrame(tick);
+  }, []);
+
+  useEffect(() => {
+    runProgressAnimation(progress.percentage);
+  }, [progress.percentage, runProgressAnimation]);
+
+  useEffect(() => {
+    return () => {
+      if (progressAnimRef.current.rafId !== null) {
+        cancelAnimationFrame(progressAnimRef.current.rafId);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     if (!processorRef.current) {
@@ -266,7 +314,8 @@ const App: React.FC = () => {
     const stroke = 7;
     const radius = (size - stroke) / 2;
     const circumference = 2 * Math.PI * radius;
-    const offset = circumference - (progress.percentage / 100) * circumference;
+    const displayPct = animatedProgress;
+    const offset = circumference - (displayPct / 100) * circumference;
 
     return (
       <div style={styles.progressContainer}>
@@ -289,7 +338,6 @@ const App: React.FC = () => {
             strokeDasharray={circumference}
             strokeDashoffset={offset}
             strokeLinecap="round"
-            style={{ transition: 'stroke-dashoffset 0.5s ease' }}
             transform={`rotate(-90 ${size / 2} ${size / 2})`}
           />
           <defs>
@@ -300,7 +348,7 @@ const App: React.FC = () => {
           </defs>
         </svg>
         <div style={styles.progressTextWrap}>
-          <div style={styles.progressPercent}>{progress.percentage.toFixed(0)}%</div>
+          <div style={styles.progressPercent}>{displayPct.toFixed(0)}%</div>
           <div style={styles.progressCount}>
             {progress.filled} / {progress.total}
           </div>

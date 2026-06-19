@@ -203,42 +203,61 @@ export class CanvasEngine {
 
     const { width: dataW, height: dataH, regions, colorPalette } = this.processedData;
     const aspect = dataW / dataH;
+
+    const TARGET_MAX = EXPORT_SIZE;
     let ew: number, eh: number;
     if (aspect >= 1) {
-      ew = EXPORT_SIZE;
-      eh = Math.round(EXPORT_SIZE / aspect);
+      ew = TARGET_MAX;
+      eh = Math.round(TARGET_MAX / aspect);
     } else {
-      eh = EXPORT_SIZE;
-      ew = Math.round(EXPORT_SIZE * aspect);
+      eh = TARGET_MAX;
+      ew = Math.round(TARGET_MAX * aspect);
     }
 
-    const scale = ew / dataW;
-    const exportCanvas = document.createElement('canvas');
-    exportCanvas.width = ew;
-    exportCanvas.height = eh;
-    const ectx = exportCanvas.getContext('2d')!;
+    const SSAA = 2;
+    const hiW = ew * SSAA;
+    const hiH = eh * SSAA;
+    const scale = hiW / dataW;
 
-    ectx.fillStyle = '#FAF8F5';
-    ectx.fillRect(0, 0, ew, eh);
+    const hiCanvas = document.createElement('canvas');
+    hiCanvas.width = hiW;
+    hiCanvas.height = hiH;
+    const hiCtx = hiCanvas.getContext('2d', { alpha: false })!;
+    hiCtx.imageSmoothingEnabled = true;
+    (hiCtx as any).imageSmoothingQuality = 'high';
 
+    hiCtx.fillStyle = '#FAF8F5';
+    hiCtx.fillRect(0, 0, hiW, hiH);
+
+    hiCtx.fillStyle = '#FAF8F5';
     for (const region of regions) {
       const colorIdx = this.filledRegions.get(region.id);
       if (colorIdx !== undefined) {
         const color = colorPalette[colorIdx];
         if (color) {
-          ectx.fillStyle = `rgb(${color.rgb[0]},${color.rgb[1]},${color.rgb[2]})`;
-          this.drawRegionPath(ectx, region, scale, 0, 0);
-          ectx.fill();
+          hiCtx.fillStyle = `rgb(${color.rgb[0]},${color.rgb[1]},${color.rgb[2]})`;
+          this.drawSmoothRegion(hiCtx, region, scale, 0, 0);
+          hiCtx.fill();
         }
       }
     }
 
-    ectx.strokeStyle = 'rgba(60,60,70,0.6)';
-    ectx.lineWidth = Math.max(1, scale * 0.6);
+    hiCtx.strokeStyle = 'rgba(60,60,70,0.55)';
+    hiCtx.lineWidth = Math.max(1.5, scale * 0.7);
+    hiCtx.lineJoin = 'round';
+    hiCtx.lineCap = 'round';
     for (const region of regions) {
-      this.drawRegionPath(ectx, region, scale, 0, 0);
-      ectx.stroke();
+      this.drawSmoothRegion(hiCtx, region, scale, 0, 0);
+      hiCtx.stroke();
     }
+
+    const exportCanvas = document.createElement('canvas');
+    exportCanvas.width = ew;
+    exportCanvas.height = eh;
+    const ectx = exportCanvas.getContext('2d', { alpha: false })!;
+    ectx.imageSmoothingEnabled = true;
+    (ectx as any).imageSmoothingQuality = 'high';
+    ectx.drawImage(hiCanvas, 0, 0, hiW, hiH, 0, 0, ew, eh);
 
     return new Promise((resolve, reject) => {
       exportCanvas.toBlob(
@@ -250,6 +269,37 @@ export class CanvasEngine {
         1.0
       );
     });
+  }
+
+  private drawSmoothRegion(ctx: CanvasRenderingContext2D, region: Region, scale: number, offX: number, offY: number): void {
+    const pts = region.boundary;
+    if (pts.length < 3) return;
+
+    ctx.beginPath();
+    const p0 = pts[0];
+    ctx.moveTo(offX + p0.x * scale, offY + p0.y * scale);
+
+    if (pts.length < 6) {
+      for (let i = 1; i < pts.length; i++) {
+        ctx.lineTo(offX + pts[i].x * scale, offY + pts[i].y * scale);
+      }
+    } else {
+      const step = Math.max(1, Math.floor(pts.length / 40));
+      for (let i = 1; i < pts.length - 2; i += step) {
+        const p1 = pts[i];
+        const p2 = pts[Math.min(i + 1, pts.length - 1)];
+        const midX = offX + (p1.x + p2.x) * 0.5 * scale;
+        const midY = offY + (p1.y + p2.y) * 0.5 * scale;
+        ctx.quadraticCurveTo(
+          offX + p1.x * scale, offY + p1.y * scale,
+          midX, midY
+        );
+      }
+      const last = pts[pts.length - 1];
+      ctx.lineTo(offX + last.x * scale, offY + last.y * scale);
+    }
+
+    ctx.closePath();
   }
 
   private drawRegionPath(ctx: CanvasRenderingContext2D, region: Region, scale: number, offX: number, offY: number): void {
@@ -314,23 +364,106 @@ export class CanvasEngine {
     }
   };
 
+  private isPointInPolygonRayCast(px: number, py: number, boundary: Array<{ x: number; y: number }>): boolean {
+    const n = boundary.length;
+    if (n < 3) return false;
+
+    let inside = false;
+    let j = n - 1;
+
+    for (let i = 0; i < n; j = i++) {
+      const xi = boundary[i].x;
+      const yi = boundary[i].y;
+      const xj = boundary[j].x;
+      const yj = boundary[j].y;
+
+      const yiAbove = yi > py;
+      const yjAbove = yj > py;
+
+      if (yiAbove === yjAbove) continue;
+
+      const dx = xj - xi;
+      const dy = yj - yi;
+      const t = (py - yi) / dy;
+      const xIntersect = xi + t * dx;
+
+      if (px < xIntersect) {
+        inside = !inside;
+      }
+    }
+
+    return inside;
+  }
+
+  private pointOnSegment(px: number, py: number, ax: number, ay: number, bx: number, by: number): boolean {
+    const EPS = 0.8;
+    const dx = bx - ax;
+    const dy = by - ay;
+    const lenSq = dx * dx + dy * dy;
+    if (lenSq === 0) {
+      const ddx = px - ax;
+      const ddy = py - ay;
+      return ddx * ddx + ddy * ddy <= EPS * EPS;
+    }
+    let t = ((px - ax) * dx + (py - ay) * dy) / lenSq;
+    t = Math.max(0, Math.min(1, t));
+    const projX = ax + t * dx;
+    const projY = ay + t * dy;
+    const ddx = px - projX;
+    const ddy = py - projY;
+    return ddx * ddx + ddy * ddy <= EPS * EPS;
+  }
+
+  private pointOnPolygonEdge(px: number, py: number, boundary: Array<{ x: number; y: number }>): boolean {
+    const n = boundary.length;
+    if (n < 2) return false;
+    for (let i = 0; i < n; i++) {
+      const a = boundary[i];
+      const b = boundary[(i + 1) % n];
+      if (this.pointOnSegment(px, py, a.x, a.y, b.x, b.y)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   private hitTest(x: number, y: number): string | null {
     if (!this.processedData) return null;
     const { width, height, regionMap, regions } = this.processedData;
-    
+
+    if (x < 0 || x >= width || y < 0 || y >= height) return null;
+
     const px = Math.floor(x);
     const py = Math.floor(y);
-    
-    if (px < 0 || px >= width || py < 0 || py >= height) return null;
-    
     const idx = py * width + px;
     const regionIdx = regionMap[idx];
-    
+
     if (regionIdx >= 0 && regionIdx < regions.length) {
-      return regions[regionIdx].id;
+      const candidate = regions[regionIdx];
+      if (this.isPointInPolygonRayCast(x, y, candidate.boundary) ||
+          this.pointOnPolygonEdge(x, y, candidate.boundary)) {
+        return candidate.id;
+      }
     }
-    
-    return null;
+
+    let bestRegion: Region | null = null;
+    let bestDist = Infinity;
+
+    for (const region of regions) {
+      const c = region.centroid;
+      const dx = x - c.x;
+      const dy = y - c.y;
+      const dist = dx * dx + dy * dy;
+      if (dist < bestDist) {
+        if (this.isPointInPolygonRayCast(x, y, region.boundary) ||
+            this.pointOnPolygonEdge(x, y, region.boundary)) {
+          bestDist = dist;
+          bestRegion = region;
+        }
+      }
+    }
+
+    return bestRegion ? bestRegion.id : null;
   }
 
   private colorToRgb(c: ColorInfo): string {
