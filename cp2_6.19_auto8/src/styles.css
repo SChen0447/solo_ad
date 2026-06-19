@@ -34,7 +34,7 @@ body {
 .board-header {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-start;
   margin-bottom: 24px;
   flex-wrap: wrap;
   gap: 16px;
@@ -51,6 +51,8 @@ body {
   align-items: center;
   gap: 12px;
   flex-wrap: wrap;
+  max-width: 100%;
+  overflow: hidden;
 }
 
 .member-item {
@@ -62,6 +64,7 @@ body {
   border-radius: 20px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
   font-size: 14px;
+  flex-shrink: 0;
 }
 
 .member-avatar {
@@ -90,6 +93,7 @@ body {
 .add-member-form {
   display: flex;
   gap: 8px;
+  flex-shrink: 0;
 }
 
 .add-member-input {
@@ -119,6 +123,17 @@ body {
 
 .add-member-btn:hover {
   background: #357ABD;
+}
+
+.email-error {
+  width: 100%;
+  color: #E74C3C;
+  font-size: 12px;
+  margin-top: 4px;
+}
+
+.add-member-input.input-error {
+  border-color: #E74C3C;
 }
 
 .board-container {

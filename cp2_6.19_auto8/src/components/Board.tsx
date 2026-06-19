@@ -39,6 +39,7 @@ function Board({
   const [addingToList, setAddingToList] = useState<string | null>(null);
   const [newTaskTitle, setNewTaskTitle] = useState('');
   const [newMemberEmail, setNewMemberEmail] = useState('');
+  const [emailError, setEmailError] = useState('');
 
   const memberTaskCounts = useMemo(() => {
     const counts: Record<string, number> = {};
@@ -65,10 +66,22 @@ function Board({
 
   const handleAddMember = (e: React.FormEvent) => {
     e.preventDefault();
-    if (newMemberEmail.trim()) {
-      onAddMember(newMemberEmail);
-      setNewMemberEmail('');
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!newMemberEmail.trim()) {
+      setEmailError('请输入邮箱地址');
+      return;
     }
+    if (!emailRegex.test(newMemberEmail.trim())) {
+      setEmailError('请输入有效的邮箱格式');
+      return;
+    }
+    if (members.some(m => m.email === newMemberEmail.trim())) {
+      setEmailError('该成员已存在');
+      return;
+    }
+    setEmailError('');
+    onAddMember(newMemberEmail);
+    setNewMemberEmail('');
   };
 
   return (
@@ -91,15 +104,19 @@ function Board({
           <form className="add-member-form" onSubmit={handleAddMember}>
             <input
               type="email"
-              className="add-member-input"
+              className={`add-member-input${emailError ? ' input-error' : ''}`}
               placeholder="输入邮箱添加成员"
               value={newMemberEmail}
-              onChange={e => setNewMemberEmail(e.target.value)}
+              onChange={e => {
+                setNewMemberEmail(e.target.value);
+                if (emailError) setEmailError('');
+              }}
             />
             <button type="submit" className="add-member-btn">
               添加
             </button>
           </form>
+          {emailError && <div className="email-error">{emailError}</div>}
         </div>
       </div>
 

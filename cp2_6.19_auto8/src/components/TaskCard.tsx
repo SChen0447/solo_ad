@@ -75,6 +75,12 @@ function TaskCard({ task, member, members, onClick, onAssign, isDragging = false
     setShowDropdown(false);
   };
 
+  const handleDropdownItemClick = (e: React.MouseEvent, memberId: string | null) => {
+    e.preventDefault();
+    e.stopPropagation();
+    handleAssign(memberId);
+  };
+
   const dueDateClass = isOverdue(task.dueDate) ? 'task-card-due overdue' : 'task-card-due';
 
   return (
@@ -113,10 +119,10 @@ function TaskCard({ task, member, members, onClick, onAssign, isDragging = false
           </div>
         )}
         {showDropdown && (
-          <div className="assignee-dropdown" onClick={e => e.stopPropagation()}>
+          <div className="assignee-dropdown">
             <div
               className="assignee-dropdown-item"
-              onClick={() => handleAssign(null)}
+              onClick={e => handleDropdownItemClick(e, null)}
             >
               <div
                 className="member-avatar"
@@ -137,7 +143,7 @@ function TaskCard({ task, member, members, onClick, onAssign, isDragging = false
               <div
                 key={m.id}
                 className="assignee-dropdown-item"
-                onClick={() => handleAssign(m.id)}
+                onClick={e => handleDropdownItemClick(e, m.id)}
               >
                 <div
                   className="member-avatar"

@@ -28,15 +28,6 @@ const avatarColors = [
   '#34495E',
 ];
 
-const getInitials = (name: string) => {
-  return name
-    .split(' ')
-    .map(n => n[0])
-    .join('')
-    .toUpperCase()
-    .slice(0, 2);
-};
-
 const initialMembers: Member[] = [
   { id: 'member-1', name: '张三', email: 'zhangsan@example.com', avatarColor: '#4A90D9' },
   { id: 'member-2', name: '李四', email: 'lisi@example.com', avatarColor: '#2ECC71' },
