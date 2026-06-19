@@ -13,6 +13,7 @@ export default function RecipeDetail() {
   const [likeCount, setLikeCount] = useState(0);
   const [likeAnimating, setLikeAnimating] = useState(false);
   const stepsRef = useRef<HTMLDivElement>(null);
+  const stepElsRef = useRef<(HTMLDivElement | null)[]>([]);
 
   useEffect(() => {
     if (!id) return;
@@ -47,17 +48,41 @@ export default function RecipeDetail() {
 
   const handleDelete = async () => {
     if (!recipe) return;
-    if (!window.confirm('确定要删除这道食谱吗？')) return;
-    await removeRecipe(recipe.id);
-    navigate('/');
+    if (!window.confirm('确定要删除这道食谱吗？此操作不可撤销。')) return;
+    try {
+      await removeRecipe(recipe.id);
+      navigate('/');
+    } catch (err) {
+      console.error('删除失败', err);
+      alert('删除失败，请重试');
+    }
   };
 
   const scrollToStep = (idx: number) => {
     setCurrentStep(idx);
-    if (stepsRef.current) {
-      const stepEl = stepsRef.current.children[idx] as HTMLElement;
-      if (stepEl) {
-        stepEl.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+    const stepEl = stepElsRef.current[idx];
+    if (stepEl && stepsRef.current) {
+      const container = stepsRef.current;
+      const targetLeft = stepEl.offsetLeft - (container.clientWidth - stepEl.clientWidth) / 2;
+      container.scrollTo({ left: targetLeft, behavior: 'smooth' });
+    }
+  };
+
+  const handleScroll = () => {
+    if (!stepsRef.current) return;
+    const container = stepsRef.current;
+    const scrollLeft = container.scrollLeft;
+    const center = scrollLeft + container.clientWidth / 2;
+    const children = stepElsRef.current;
+    for (let i = 0; i < children.length; i++) {
+      const el = children[i];
+      if (!el) continue;
+      const elCenter = el.offsetLeft + el.clientWidth / 2;
+      if (Math.abs(elCenter - center) < el.clientWidth / 2) {
+        if (i !== currentStep) {
+          setCurrentStep(i);
+        }
+        break;
       }
     }
   };
@@ -81,7 +106,9 @@ export default function RecipeDetail() {
   return (
     <div className="detail-page">
       <div className="detail-cover">
-        <img src={recipe.coverImage} alt={recipe.title} />
+        <img src={recipe.coverImage} alt={recipe.title} onError={e => {
+          (e.target as HTMLImageElement).style.display = 'none';
+        }} />
         <div className="detail-cover-overlay" />
         <div className="detail-cover-info">
           <h1 className="detail-title">{recipe.title}</h1>
@@ -113,14 +140,23 @@ export default function RecipeDetail() {
                 key={i}
                 className={`step-dot ${i === currentStep ? 'active' : ''}`}
                 onClick={() => scrollToStep(i)}
+                aria-label={`第${i + 1}步`}
               >
                 {i + 1}
               </button>
             ))}
           </div>
-          <div className="steps-scroll" ref={stepsRef}>
+          <div
+            className="steps-scroll"
+            ref={stepsRef}
+            onScroll={handleScroll}
+          >
             {recipe.steps.map((step, i) => (
-              <div key={i} className="step-card">
+              <div
+                key={i}
+                ref={el => (stepElsRef.current[i] = el)}
+                className="step-card"
+              >
                 <div className="step-number">{i + 1}</div>
                 <p className="step-text">{step}</p>
               </div>

@@ -9,40 +9,64 @@ interface Props {
 export default function RecipeCard({ recipe }: Props) {
   const [loaded, setLoaded] = useState(false);
   const [imgError, setImgError] = useState(false);
-  const [isVisible, setIsVisible] = useState(false);
-  const imgRef = useRef<HTMLDivElement>(null);
+  const [shouldLoad, setShouldLoad] = useState(false);
+  const containerRef = useRef<HTMLAnchorElement>(null);
+  const observerRef = useRef<IntersectionObserver | null>(null);
 
   useEffect(() => {
-    const el = imgRef.current;
+    const el = containerRef.current;
     if (!el) return;
-    const observer = new IntersectionObserver(
+
+    if (observerRef.current) {
+      observerRef.current.disconnect();
+    }
+
+    observerRef.current = new IntersectionObserver(
       ([entry]) => {
         if (entry.isIntersecting) {
-          setIsVisible(true);
-          observer.disconnect();
+          setShouldLoad(true);
+          observerRef.current?.disconnect();
         }
       },
-      { rootMargin: '200px' }
+      { rootMargin: '300px 200px', threshold: 0.01 }
     );
-    observer.observe(el);
-    return () => observer.disconnect();
+
+    observerRef.current.observe(el);
+
+    return () => {
+      observerRef.current?.disconnect();
+    };
   }, []);
 
+  const handleError = () => {
+    setImgError(true);
+    setLoaded(false);
+  };
+
   return (
-    <Link to={`/recipe/${recipe.id}`} className="recipe-card">
-      <div className="card-cover" ref={imgRef}>
+    <Link to={`/recipe/${recipe.id}`} className="recipe-card" ref={containerRef}>
+      <div className="card-cover">
         {!loaded && !imgError && <div className="card-skeleton" />}
-        {isVisible && !imgError ? (
+
+        {shouldLoad && !imgError && (
           <img
+            data-src={recipe.coverImage}
             src={recipe.coverImage}
             alt={recipe.title}
-            loading="lazy"
-            className={loaded ? 'loaded' : ''}
+            className={loaded ? 'loaded' : 'loading'}
             onLoad={() => setLoaded(true)}
-            onError={() => setImgError(true)}
+            onError={handleError}
+            draggable={false}
           />
-        ) : null}
-        {imgError && <div className="card-cover-fallback">🍽️</div>}
+        )}
+
+        {imgError && (
+          <div className="card-cover-fallback">
+            <span className="fallback-icon">🍽️</span>
+            <span className="fallback-text">图片加载失败</span>
+          </div>
+        )}
+
         <div className="card-like-badge">
           <span>❤️</span>
           <span>{recipe.likes}</span>

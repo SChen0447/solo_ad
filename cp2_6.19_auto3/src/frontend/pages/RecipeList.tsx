@@ -11,6 +11,7 @@ export default function RecipeList() {
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const loaderRef = useRef<HTMLDivElement>(null);
+  const initializedRef = useRef(false);
 
   const loadRecipes = useCallback(async (pageNum: number) => {
     if (pageNum === 1) {
@@ -31,6 +32,8 @@ export default function RecipeList() {
   }, []);
 
   useEffect(() => {
+    if (initializedRef.current) return;
+    initializedRef.current = true;
     loadRecipes(1);
   }, [loadRecipes]);
 
@@ -39,17 +42,17 @@ export default function RecipeList() {
     if (!el) return;
     const observer = new IntersectionObserver(
       ([entry]) => {
-        if (entry.isIntersecting && !loadingMore && recipes.length < total) {
+        if (entry.isIntersecting && !loadingMore && recipes.length < total && !loading) {
           const nextPage = page + 1;
           setPage(nextPage);
           loadRecipes(nextPage);
         }
       },
-      { rootMargin: '400px' }
+      { rootMargin: '400px 0px' }
     );
     observer.observe(el);
     return () => observer.disconnect();
-  }, [loadingMore, recipes.length, total, page, loadRecipes]);
+  }, [loadingMore, recipes.length, total, page, loadRecipes, loading]);
 
   return (
     <div className="recipe-list-page">
