@@ -190,7 +190,7 @@ export class Renderer {
 
   private drawShip(ctx: CanvasRenderingContext2D, ship: Ship): void {
     ctx.save();
-    ctx.translate(ship.x, ship.y);
+    ctx.translate(ship.x + (ship.renderOffsetX || 0), ship.y + (ship.renderOffsetY || 0));
     ctx.rotate(ship.angle);
 
     let scale = 1;
@@ -243,8 +243,10 @@ export class Renderer {
   private drawHealthBar(ctx: CanvasRenderingContext2D, ship: Ship): void {
     const barWidth = 30;
     const barHeight = 4;
-    const x = ship.x - barWidth / 2;
-    const y = ship.y - (ship.type === ShipType.Battleship ? 30 : ship.type === ShipType.Cruiser ? 24 : 20);
+    const ox = ship.renderOffsetX || 0;
+    const oy = ship.renderOffsetY || 0;
+    const x = ship.x + ox - barWidth / 2;
+    const y = ship.y + oy - (ship.type === ShipType.Battleship ? 30 : ship.type === ShipType.Cruiser ? 24 : 20);
 
     ctx.fillStyle = '#333';
     ctx.fillRect(x - 1, y - 1, barWidth + 2, barHeight + 2);

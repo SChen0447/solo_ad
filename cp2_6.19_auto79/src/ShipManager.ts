@@ -61,6 +61,12 @@ export interface Ship {
   prevOffsetAngle: number;
   trail: Particle[];
   speed: number;
+  renderOffsetX: number;
+  renderOffsetY: number;
+  dockSwayTimer: number;
+  trailSpawnAccumulator: number;
+  decelerationFactor: number;
+  animPhase: number;
 }
 
 const SHIP_CONFIGS: Record<ShipType, { health: number; speed: number; size: number }> = {
@@ -176,7 +182,13 @@ export class ShipManager {
         prevOffsetY: offsets[i].offsetY,
         prevOffsetAngle: offsets[i].angle,
         trail: [],
-        speed: cfg.speed
+        speed: cfg.speed,
+        renderOffsetX: 0,
+        renderOffsetY: 0,
+        dockSwayTimer: 0,
+        trailSpawnAccumulator: 0,
+        decelerationFactor: 1.0,
+        animPhase: 0
       };
       this.playerShips.push(ship);
     }
@@ -220,7 +232,13 @@ export class ShipManager {
         prevOffsetY: 0,
         prevOffsetAngle: 0,
         trail: [],
-        speed: cfg.speed * 0.6
+        speed: cfg.speed * 0.6,
+        renderOffsetX: 0,
+        renderOffsetY: 0,
+        dockSwayTimer: 0,
+        trailSpawnAccumulator: 0,
+        decelerationFactor: 1.0,
+        animPhase: 0
       });
     }
   }
@@ -272,12 +290,38 @@ export class ShipManager {
   private updateShipMovement(ship: Ship, dt: number): void {
     if (ship.isDead || ship.isSinking) return;
 
+    ship.animPhase += dt;
+
     const dx = ship.targetX - ship.x;
     const dy = ship.targetY - ship.y;
     const dist = Math.hypot(dx, dy);
 
+    const inFormationTransition = ship.transitionProgress < 1;
+
+    let speedFactor = 1.0;
+    let decelFactor = 1.0;
+
+    if (!inFormationTransition && dist <= 50 && dist > 2) {
+      decelFactor = 0.3 + 0.7 * (dist / 50);
+      speedFactor = decelFactor;
+      ship.dockSwayTimer = 0;
+    } else if (!inFormationTransition && dist <= 2) {
+      decelFactor = 0.3;
+      speedFactor = 0;
+      if (ship.dockSwayTimer < 1.0) {
+        ship.dockSwayTimer += dt;
+      }
+    } else {
+      decelFactor = 1.0;
+      speedFactor = 1.0;
+      ship.dockSwayTimer = 0;
+    }
+
+    ship.decelerationFactor = decelFactor;
+
     if (dist > 2) {
-      const moveSpeed = ship.speed * 60 * dt;
+      const baseMoveSpeed = ship.speed * 60 * dt;
+      const moveSpeed = baseMoveSpeed * speedFactor;
       const moveDist = Math.min(moveSpeed, dist);
       ship.x += (dx / dist) * moveDist;
       ship.y += (dy / dist) * moveDist;
@@ -289,17 +333,42 @@ export class ShipManager {
     while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
     ship.angle += angleDiff * Math.min(1, 5 * dt);
 
+    if (!inFormationTransition && dist <= 50 && dist > 2) {
+      const pitchAmp = 3 + (ship.type === ShipType.Battleship ? 2 : 1);
+      ship.renderOffsetY = Math.sin(ship.animPhase * (Math.PI * 2 / 0.3)) * pitchAmp;
+      ship.renderOffsetX = 0;
+    } else if (!inFormationTransition && dist <= 2 && ship.dockSwayTimer < 1.0) {
+      const swayT = Math.min(1, ship.dockSwayTimer / 1.0);
+      const swayAmp = 2 * (1 - swayT * 0.5);
+      ship.renderOffsetX = Math.sin(ship.animPhase * (Math.PI * 2 / 0.5)) * swayAmp;
+      ship.renderOffsetY = Math.sin(ship.animPhase * (Math.PI * 2 / 0.5) + 0.5) * (swayAmp * 0.3);
+    } else {
+      ship.renderOffsetX *= Math.min(1, 1 - dt * 5);
+      ship.renderOffsetY *= Math.min(1, 1 - dt * 5);
+    }
+
     if (dist > 2 && !ship.isSinking) {
-      ship.trail.push({
-        x: ship.x - Math.sin(ship.angle) * (ship.type === ShipType.Battleship ? 12 : 8),
-        y: ship.y + Math.cos(ship.angle) * (ship.type === ShipType.Battleship ? 12 : 8),
-        vx: 0,
-        vy: 0,
-        life: 1.0,
-        maxLife: 1.0,
-        color: 'rgba(255,255,255,',
-        size: 3
-      });
+      const slowT = 1 - decelFactor;
+      const spawnInterval = 0.05 + slowT * 0.15;
+      const particleSize = 3 - slowT * 2;
+      const particleLife = 1.0 - slowT * 0.7;
+
+      ship.trailSpawnAccumulator += dt;
+      while (ship.trailSpawnAccumulator >= spawnInterval) {
+        ship.trailSpawnAccumulator -= spawnInterval;
+        ship.trail.push({
+          x: ship.x - Math.sin(ship.angle) * (ship.type === ShipType.Battleship ? 12 : 8),
+          y: ship.y + Math.cos(ship.angle) * (ship.type === ShipType.Battleship ? 12 : 8),
+          vx: 0,
+          vy: 0,
+          life: particleLife,
+          maxLife: particleLife,
+          color: 'rgba(255,255,255,',
+          size: particleSize
+        });
+      }
+    } else {
+      ship.trailSpawnAccumulator = 0;
     }
   }
 
