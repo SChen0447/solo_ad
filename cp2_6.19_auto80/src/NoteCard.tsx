@@ -235,14 +235,14 @@ export const NoteCard: React.FC<NoteCardProps> = ({
         }
         @keyframes glowFadeOut {
           0% {
-            opacity: 0.8;
-            filter: blur(8px);
-            transform: scale(1);
+            opacity: 0.9;
+            filter: blur(3px);
+            transform: scale(0.98);
           }
           100% {
             opacity: 0;
-            filter: blur(20px);
-            transform: scale(1.15);
+            filter: blur(18px);
+            transform: scale(1.2);
           }
         }
         @keyframes breathing {
@@ -274,8 +274,8 @@ export const NoteCard: React.FC<NoteCardProps> = ({
             inset: 0,
             borderRadius: 12,
             backgroundColor: card.color,
-            opacity: 0.8,
-            filter: 'blur(8px)',
+            opacity: 0.9,
+            filter: 'blur(3px)',
             pointerEvents: 'none',
             zIndex: -1,
             animation: 'glowFadeOut 0.3s ease-out forwards',

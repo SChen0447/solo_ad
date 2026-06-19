@@ -361,7 +361,11 @@ const App: React.FC = () => {
               0% {
                 transform: translate(-50%, -50%) scale(0.5);
                 opacity: 0;
-                box-shadow: 0 0 0 rgba(0, 0, 0, 0), 0 0 0 rgba(0, 0, 0, 0);
+                box-shadow: 0 4px 10px rgba(0, 0, 0, 0), 0 2px 4px rgba(0, 0, 0, 0);
+              }
+              40% {
+                opacity: 0.8;
+                box-shadow: 0 12px 32px rgba(0, 0, 0, 0.12), 0 4px 12px rgba(0, 0, 0, 0.08);
               }
               100% {
                 transform: translate(-50%, -50%) scale(1);
@@ -387,6 +391,7 @@ const App: React.FC = () => {
               WebkitBackdropFilter: 'blur(20px)',
               borderRadius: 12,
               border: '1px solid rgba(255, 255, 255, 0.8)',
+              boxShadow: '0 24px 64px rgba(0, 0, 0, 0.2), 0 8px 24px rgba(0, 0, 0, 0.12)',
               padding: 24,
               zIndex: 2001,
               animation: 'modalPopIn 0.2s cubic-bezier(0.34, 1.56, 0.64, 1) forwards',
