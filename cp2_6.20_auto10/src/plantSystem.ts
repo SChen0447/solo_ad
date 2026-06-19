@@ -383,7 +383,7 @@ export class PlantSystem {
       .normalize();
 
     const targetLen = this.maxHeight * (0.45 + Math.random() * 0.25) * (1 - parent.branchLevel * 0.25);
-    const targetThick = Math.min(0.18, parent.targetThickness * 0.55);
+    const targetThicknessValue = Math.min(0.18, parent.targetThickness * 0.55);
 
     const branch: PlantNodeData = {
       id,
@@ -395,7 +395,7 @@ export class PlantSystem {
       currentLength: 0,
       targetLength: targetLen,
       thickness: 0.01,
-      targetThickness,
+      targetThickness: targetThicknessValue,
       growthProgress: 0,
       leafUnfoldProgress: 0,
       branchLevel: parent.branchLevel + 1,
