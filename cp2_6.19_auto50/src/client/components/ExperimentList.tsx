@@ -145,7 +145,8 @@ export default function ExperimentList({
               borderLeft: selectedId === exp.id ? '3px solid var(--color-secondary)' : '3px solid transparent',
               boxShadow: selectedId === exp.id ? '0 0 15px rgba(255, 179, 0, 0.3)' : 'none',
               transition: 'background-color 0.15s, box-shadow 0.15s, transform 0.2s',
-              transform: draggedIndex === index ? 'scale(0.98); opacity: 0.5;' : dragOverIndex === index ? 'translateY(4px)' : 'none',
+              transform: draggedIndex === index ? 'scale(0.98)' : dragOverIndex === index ? 'translateY(4px)' : 'none',
+              opacity: draggedIndex === index ? 0.5 : 1,
               animation: highlightedId === exp.id ? 'highlightFlash 1s ease-in-out' : undefined
             }}
             onMouseEnter={(e) => {

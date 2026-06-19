@@ -475,7 +475,7 @@ app.post('/api/experiments/:id/report', (req: Request, res: Response) => {
 
     <section id="conclusion" class="conclusion-section">
       <h2 style="border-bottom:2px solid #FFB300;padding-bottom:8px;">结论</h2>
-      <p style="color:#E0E0E0;white-space:pre-wrap;">${conclusion || '（请在此处填写实验结论...'}</p>
+      <p style="color:#E0E0E0;white-space:pre-wrap;">${conclusion || '（请在此处填写实验结论...）'}</p>
     </section>
   </div>
 </body>

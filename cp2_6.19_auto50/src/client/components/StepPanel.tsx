@@ -105,22 +105,23 @@ export default function StepPanel({
   return (
     <div style={{ position: 'relative', paddingBottom: selectedStepIds.size > 0 ? '70px' : '0' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-      <h3 style={{ fontSize: '16px', color: 'var(--color-text)' }}>
-        实验步骤 ({steps.length})
-      </h3>
-      <button
-        onClick={onAddStep}
-        style={{
-          padding: '8px 16px',
-          background: 'var(--color-secondary)',
-          color: '#1A1535',
-          borderRadius: '8px',
-          fontSize: '13px',
-          fontWeight: '600'
-        }}>
-        + 添加步骤
-      </button>
-    </div>
+        <h3 style={{ fontSize: '16px', color: 'var(--color-text)' }}>
+          实验步骤 ({steps.length})
+        </h3>
+        <button
+          onClick={onAddStep}
+          style={{
+            padding: '8px 16px',
+            background: 'var(--color-secondary)',
+            color: '#1A1535',
+            borderRadius: '8px',
+            fontSize: '13px',
+            fontWeight: '600'
+          }}
+        >
+          + 添加步骤
+        </button>
+      </div>
 
       <input
         ref={fileInputRef}
@@ -161,8 +162,8 @@ export default function StepPanel({
                 border: selectedStepId === step.id ? '2px solid var(--color-secondary)' : '2px solid transparent',
                 transform: draggedId === step.id ? 'scale(0.95)' : 'none',
                 boxShadow: draggedId === step.id ? '-8px 0 20px rgba(255, 179, 0, 0.3)' : '0 2px 8px rgba(0, 0, 0, 0.2)',
-                animation: `slideUpIn 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                animationDelay: `${index * 0.05 + 's'
+                animation: `slideUpIn 0.3s cubic-bezier(0.4, 0, 0.2, 1)`,
+                animationDelay: `${index * 0.05}s`
               }}
               onMouseEnter={(e) => {
                 if (draggedId !== step.id) {
@@ -175,7 +176,7 @@ export default function StepPanel({
                 e.currentTarget.style.boxShadow = draggedId === step.id ? '-8px 0 20px rgba(255, 179, 0, 0.3)' : '0 2px 8px rgba(0, 0, 0, 0.2)';
               }}
             >
-              <div style={{ display: 'flex', gap: '12px', marginBottom: '16px' }}>
+              <div style={{ display: 'flex', gap: '12px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <input
                     type="checkbox"
@@ -200,7 +201,7 @@ export default function StepPanel({
                     {index + 1}
                   </div>
                 </div>
-                <div style={{ flex: '1' }}>
+                <div style={{ flex: '1', minWidth: 0 }}>
                   <input
                     type="text"
                     value={step.name}
@@ -223,148 +224,150 @@ export default function StepPanel({
                   <div style={{ display: 'flex', gap: '16px', marginTop: '6px', fontSize: '12px', color: 'var(--color-text-muted)' }}>
                     <span>开始: {step.startTime ? new Date(step.startTime).toLocaleString('zh-CN') : '-'}</span>
                     <span>结束: {step.endTime ? new Date(step.endTime).toLocaleString('zh-CN') : '-'}</span>
-                </div>
-                <div style={{ display: 'flex', gap: '12px', marginTop: '12px' }}>
-                  <div style={{ flex: '1' }}>
-                    <label style={{ fontSize: '11px', color: 'var(--color-text-muted)', display: 'block', marginBottom: '4px' }}>预期结果</label>
-                    <textarea
-                      value={step.expectedResult}
-                      onChange={(e) => onUpdateStep(step.id, { expectedResult: e.target.value })}
-                      onClick={(e) => e.stopPropagation()}
-                      placeholder="输入预期结果..."
-                      rows={2}
-                      style={{ width: '100%', fontSize: '13px' }}
-                    />
                   </div>
-                  <div style={{ flex: '1' }}>
-                    <label style={{ fontSize: '11px', color: 'var(--color-text-muted)', display: 'block', marginBottom: '4px' }}>实际结果</label>
-                    <textarea
-                      value={step.actualResult}
-                      onChange={(e) => onUpdateStep(step.id, { actualResult: e.target.value })}
-                      onClick={(e) => e.stopPropagation()}
-                      placeholder="输入实际结果..."
-                      rows={2}
-                      style={{ width: '100%', fontSize: '13px' }}
-                    />
-                  </div>
-                </div>
-                <div style={{ display: 'flex', gap: '8px', marginTop: '12px', alignItems: 'center' }}>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', cursor: 'pointer', color: 'var(--color-text-muted)' }}>
-                    <input
-                      type="checkbox"
-                      checked={step.completed}
-                      onChange={(e) => {
-                        e.stopPropagation();
-                        onUpdateStep(step.id, { completed: e.target.checked });
-                      }}
-                      onClick={(e) => e.stopPropagation()}
-                      style={{ accentColor: '#4CAF50' }}
-                    />
-                    标记为已完成
-                  </label>
-                </div>
-                <div style={{ marginTop: '12px', display: 'flex', gap: '8px', alignItems: 'center' }}>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      triggerUpload(step.id);
-                    }}
-                    disabled={uploadingStepId === step.id}
-                    style={{
-                      padding: '6px 14px',
-                      background: 'var(--color-card-light)',
-                      color: 'var(--color-text)',
-                      borderRadius: '6px',
-                      fontSize: '12px'
-                    }}>
-                    {uploadingStepId === step.id ? '上传中...' : '📎 上传附件'}
-                  </button>
-                  {uploadingStepId === step.id && uploadProgress[step.id] > 0 && (
-                    <div style={{
-                      flex: '1',
-                      height: '8px',
-                      background: 'var(--color-bg-start)',
-                      borderRadius: '4px',
-                      overflow: 'hidden',
-                      minWidth: '120px'
-                    }}>
-                      <div style={{
-                        height: '100%',
-                        background: 'var(--color-secondary)',
-                        transition: 'width 0.15s ease-out',
-                        width: `${uploadProgress[step.id]}%'
-                      }} />
+                  <div style={{ display: 'flex', gap: '12px', marginTop: '12px' }}>
+                    <div style={{ flex: '1' }}>
+                      <label style={{ fontSize: '11px', color: 'var(--color-text-muted)', display: 'block', marginBottom: '4px' }}>预期结果</label>
+                      <textarea
+                        value={step.expectedResult}
+                        onChange={(e) => onUpdateStep(step.id, { expectedResult: e.target.value })}
+                        onClick={(e) => e.stopPropagation()}
+                        placeholder="输入预期结果..."
+                        rows={2}
+                        style={{ width: '100%', fontSize: '13px' }}
+                      />
                     </div>
-                  )}
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      if (confirm('确定要删除这个步骤吗？')) {
-                        onDeleteStep(step.id);
-                      }
-                    }}
-                    style={{
-                      padding: '6px 14px',
-                      background: 'rgba(229, 57, 53, 0.1)',
-                      color: 'var(--color-danger)',
-                      borderRadius: '6px',
-                      fontSize: '12px'
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.background = 'var(--color-danger)';
-                      e.currentTarget.style.color = 'white';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.background = 'rgba(229, 57, 53, 0.1)';
-                      e.currentTarget.style.color = 'var(--color-danger)';
-                    }}
-                  >
-                    删除
-                  </button>
-                </div>
-                {step.attachments.length > 0 && (
-                  <div style={{
-                    marginTop: '16px',
-                    display: 'flex',
-                    gap: '8px',
-                    flexWrap: 'wrap'
-                  }}>
-                    {step.attachments.map(att => (
-                      <div key={att.id} style={{
-                        position: 'relative',
-                        animation: 'fadeIn 0.3s ease-out'
+                    <div style={{ flex: '1' }}>
+                      <label style={{ fontSize: '11px', color: 'var(--color-text-muted)', display: 'block', marginBottom: '4px' }}>实际结果</label>
+                      <textarea
+                        value={step.actualResult}
+                        onChange={(e) => onUpdateStep(step.id, { actualResult: e.target.value })}
+                        onClick={(e) => e.stopPropagation()}
+                        placeholder="输入实际结果..."
+                        rows={2}
+                        style={{ width: '100%', fontSize: '13px' }}
+                      />
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', gap: '8px', marginTop: '12px', alignItems: 'center' }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', cursor: 'pointer', color: 'var(--color-text-muted)' }}>
+                      <input
+                        type="checkbox"
+                        checked={step.completed}
+                        onChange={(e) => {
+                          e.stopPropagation();
+                          onUpdateStep(step.id, { completed: e.target.checked });
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                        style={{ accentColor: '#4CAF50' }}
+                      />
+                      标记为已完成
+                    </label>
+                  </div>
+                  <div style={{ marginTop: '12px', display: 'flex', gap: '8px', alignItems: 'center' }}>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        triggerUpload(step.id);
+                      }}
+                      disabled={uploadingStepId === step.id}
+                      style={{
+                        padding: '6px 14px',
+                        background: 'var(--color-card-light)',
+                        color: 'var(--color-text)',
+                        borderRadius: '6px',
+                        fontSize: '12px'
+                      }}
+                    >
+                      {uploadingStepId === step.id ? '上传中...' : '📎 上传附件'}
+                    </button>
+                    {uploadingStepId === step.id && uploadProgress[step.id] > 0 && (
+                      <div style={{
+                        flex: '1',
+                        height: '8px',
+                        background: 'var(--color-bg-start)',
+                        borderRadius: '4px',
+                        overflow: 'hidden',
+                        minWidth: '120px'
                       }}>
-                        {isImage(att.mimetype) ? (
-                          <img
-                            src={att.url}
-                            alt={att.originalName}
-                            style={{
+                        <div style={{
+                          height: '100%',
+                          background: 'var(--color-secondary)',
+                          transition: 'width 0.15s ease-out',
+                          width: `${uploadProgress[step.id]}%`
+                        }} />
+                      </div>
+                    )}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (confirm('确定要删除这个步骤吗？')) {
+                          onDeleteStep(step.id);
+                        }
+                      }}
+                      style={{
+                        padding: '6px 14px',
+                        background: 'rgba(229, 57, 53, 0.1)',
+                        color: 'var(--color-danger)',
+                        borderRadius: '6px',
+                        fontSize: '12px'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.background = 'var(--color-danger)';
+                        e.currentTarget.style.color = 'white';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background = 'rgba(229, 57, 53, 0.1)';
+                        e.currentTarget.style.color = 'var(--color-danger)';
+                      }}
+                    >
+                      删除
+                    </button>
+                  </div>
+                  {step.attachments.length > 0 && (
+                    <div style={{
+                      marginTop: '16px',
+                      display: 'flex',
+                      gap: '8px',
+                      flexWrap: 'wrap'
+                    }}>
+                      {step.attachments.map(att => (
+                        <div key={att.id} style={{
+                          position: 'relative',
+                          animation: 'fadeIn 0.3s ease-out'
+                        }}>
+                          {isImage(att.mimetype) ? (
+                            <img
+                              src={att.url}
+                              alt={att.originalName}
+                              style={{
+                                width: '80px',
+                                height: '80px',
+                                objectFit: 'cover',
+                                borderRadius: '8px',
+                                border: '1px solid var(--color-border)'
+                              }}
+                              title={att.originalName}
+                            />
+                          ) : (
+                            <div style={{
                               width: '80px',
                               height: '80px',
-                              objectFit: 'cover',
+                              background: 'var(--color-card-light)',
                               borderRadius: '8px',
-                              border: '1px solid var(--color-border)'
-                            }}
-                            title={att.originalName}
-                          />
-                        ) : (
-                          <div style={{
-                            width: '80px',
-                            height: '80px',
-                            background: 'var(--color-card-light)',
-                            borderRadius: '8px',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            fontSize: '24px'
-                          }}>
-                            📄
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )}
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              fontSize: '24px'
+                            }}>
+                              📄
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           ))}
@@ -399,7 +402,8 @@ export default function StepPanel({
                 color: 'var(--color-text)',
                 borderRadius: '8px',
                 fontSize: '13px'
-              }}>
+              }}
+            >
               取消选择
             </button>
             <button
