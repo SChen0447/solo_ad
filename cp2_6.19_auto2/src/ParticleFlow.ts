@@ -37,19 +37,19 @@ export class ParticleFlow {
     this.curves = this.createCurves();
     this.states = this.createStates();
     this.positions = new Float32Array(PARTICLE_COUNT * 3);
-    this.colors = new Float32Array(PARTICLE_COUNT * 3);
+    this.colors = new Float32Array(PARTICLE_COUNT * 4);
     this.sizes = new Float32Array(PARTICLE_COUNT);
 
     this.geometry = new THREE.BufferGeometry();
     this.geometry.setAttribute('position', new THREE.BufferAttribute(this.positions, 3));
-    this.geometry.setAttribute('color', new THREE.BufferAttribute(this.colors, 3));
+    this.geometry.setAttribute('color', new THREE.BufferAttribute(this.colors, 4));
     this.geometry.setAttribute('size', new THREE.BufferAttribute(this.sizes, 1));
 
     this.material = new THREE.PointsMaterial({
       size: 0.15,
       vertexColors: true,
       transparent: true,
-      opacity: 0.9,
+      opacity: 1.0,
       blending: THREE.AdditiveBlending,
       depthWrite: false,
       sizeAttenuation: true,
@@ -98,6 +98,7 @@ export class ParticleFlow {
 
       const clampedT = Math.min(Math.max(state.t, 0), 0.999);
       const point = curve.getPointAt(clampedT);
+      const i4 = i * 4;
       const i3 = i * 3;
 
       this.positions[i3] = point.x + state.offset.x;
@@ -106,9 +107,9 @@ export class ParticleFlow {
 
       const mag = state.localMagnitude;
       _tempColor.copy(COLOR_BLUE).lerp(COLOR_RED, mag);
-      this.colors[i3] = _tempColor.r;
-      this.colors[i3 + 1] = _tempColor.g;
-      this.colors[i3 + 2] = _tempColor.b;
+      this.colors[i4] = _tempColor.r;
+      this.colors[i4 + 1] = _tempColor.g;
+      this.colors[i4 + 2] = _tempColor.b;
 
       let alpha = 1.0;
       if (state.t < FADE_IN_END) {
@@ -116,8 +117,10 @@ export class ParticleFlow {
       } else if (state.t > FADE_OUT_START) {
         alpha = (1 - state.t) / (1 - FADE_OUT_START);
       }
+      this.colors[i4 + 3] = alpha;
+
       const particleSize = 0.1 + mag * 0.9;
-      this.sizes[i] = particleSize * alpha;
+      this.sizes[i] = particleSize;
     }
 
     posAttr.needsUpdate = true;
@@ -146,50 +149,53 @@ export class ParticleFlow {
     const R = 12;
 
     curves.push(new THREE.CatmullRomCurve3([
-      new THREE.Vector3(-R, 0, 0),
-      new THREE.Vector3(-R * 0.5, 4, 3),
-      new THREE.Vector3(0, -1, -2),
-      new THREE.Vector3(R * 0.5, 3, 4),
-      new THREE.Vector3(R, 1, -1),
-      new THREE.Vector3(R * 0.8, -2, -5),
-      new THREE.Vector3(R * 0.3, 5, 2),
+      new THREE.Vector3(-R, -R * 0.6, R * 0.8),
+      new THREE.Vector3(-R * 0.6, R * 0.4, R * 0.3),
+      new THREE.Vector3(-R * 0.2, -R * 0.8, -R * 0.2),
+      new THREE.Vector3(R * 0.3, R * 0.7, -R * 0.7),
+      new THREE.Vector3(R * 0.7, -R * 0.3, R * 0.5),
+      new THREE.Vector3(R, R * 0.5, -R * 0.4),
+      new THREE.Vector3(R * 0.4, -R * 0.5, -R * 0.6),
     ], false, 'catmullrom', 0.5));
 
     curves.push(new THREE.CatmullRomCurve3([
-      new THREE.Vector3(0, -R * 0.5, -R),
-      new THREE.Vector3(3, -R * 0.3, -R * 0.4),
-      new THREE.Vector3(-2, 0, 0),
-      new THREE.Vector3(4, R * 0.2, R * 0.4),
-      new THREE.Vector3(-1, R * 0.5, R),
-      new THREE.Vector3(2, R * 0.3, R * 0.7),
+      new THREE.Vector3(R * 0.8, -R, R * 0.7),
+      new THREE.Vector3(-R * 0.3, -R * 0.5, R * 0.2),
+      new THREE.Vector3(R * 0.5, 0, -R * 0.4),
+      new THREE.Vector3(-R * 0.7, R * 0.4, R * 0.6),
+      new THREE.Vector3(R * 0.2, R * 0.8, -R * 0.7),
+      new THREE.Vector3(-R * 0.5, -R * 0.3, R * 0.4),
+      new THREE.Vector3(R * 0.6, R * 0.6, -R * 0.2),
     ], false, 'catmullrom', 0.5));
 
     curves.push(new THREE.CatmullRomCurve3([
-      new THREE.Vector3(-R, -R * 0.4, R * 0.5),
-      new THREE.Vector3(-R * 0.6, 2, R * 0.2),
-      new THREE.Vector3(-R * 0.2, -3, 0),
-      new THREE.Vector3(R * 0.2, 1, -R * 0.3),
-      new THREE.Vector3(R * 0.6, -2, -R * 0.5),
-      new THREE.Vector3(R, R * 0.4, -R * 0.2),
+      new THREE.Vector3(-R * 0.9, R * 0.7, -R * 0.8),
+      new THREE.Vector3(R * 0.2, R * 0.2, -R * 0.3),
+      new THREE.Vector3(-R * 0.5, -R * 0.6, R * 0.5),
+      new THREE.Vector3(R * 0.8, -R * 0.2, -R * 0.6),
+      new THREE.Vector3(-R * 0.3, R * 0.5, R * 0.7),
+      new THREE.Vector3(R * 0.5, -R * 0.7, -R * 0.5),
+      new THREE.Vector3(-R * 0.7, R * 0.3, R * 0.3),
     ], false, 'catmullrom', 0.5));
 
     curves.push(new THREE.CatmullRomCurve3([
-      new THREE.Vector3(R * 0.3, R * 0.6, -R),
-      new THREE.Vector3(-R * 0.2, R * 0.3, -R * 0.5),
-      new THREE.Vector3(-R * 0.5, 0, 0),
-      new THREE.Vector3(0, -R * 0.2, R * 0.5),
-      new THREE.Vector3(R * 0.4, -R * 0.4, R),
-      new THREE.Vector3(R * 0.1, R * 0.1, R * 0.6),
+      new THREE.Vector3(R, R * 0.8, R * 0.6),
+      new THREE.Vector3(-R * 0.5, R * 0.1, -R * 0.7),
+      new THREE.Vector3(R * 0.3, -R * 0.8, R * 0.2),
+      new THREE.Vector3(-R * 0.8, -R * 0.4, -R * 0.8),
+      new THREE.Vector3(R * 0.6, R * 0.6, R * 0.4),
+      new THREE.Vector3(-R * 0.2, -R * 0.6, -R * 0.3),
+      new THREE.Vector3(R * 0.4, R * 0.4, -R * 0.5),
     ], false, 'catmullrom', 0.5));
 
     curves.push(new THREE.CatmullRomCurve3([
-      new THREE.Vector3(R * 0.5, -R, -R * 0.3),
-      new THREE.Vector3(R * 0.2, -R * 0.5, R * 0.2),
-      new THREE.Vector3(-R * 0.3, -R * 0.2, -R * 0.1),
-      new THREE.Vector3(-R * 0.6, R * 0.1, R * 0.4),
-      new THREE.Vector3(-R * 0.1, R * 0.5, R * 0.1),
-      new THREE.Vector3(R * 0.4, R, -R * 0.5),
-      new THREE.Vector3(R * 0.2, R * 0.3, -R * 0.2),
+      new THREE.Vector3(-R * 0.6, -R * 0.9, -R * 0.7),
+      new THREE.Vector3(R * 0.7, -R * 0.3, R * 0.8),
+      new THREE.Vector3(-R * 0.4, R * 0.5, -R * 0.5),
+      new THREE.Vector3(R * 0.5, R * 0.8, R * 0.3),
+      new THREE.Vector3(-R * 0.8, 0, -R * 0.8),
+      new THREE.Vector3(R * 0.3, -R * 0.5, R * 0.5),
+      new THREE.Vector3(-R * 0.5, R * 0.7, R * 0.4),
     ], false, 'catmullrom', 0.5));
 
     return curves;
@@ -221,14 +227,16 @@ export class ParticleFlow {
       const curve = this.curves[state.curveIndex];
       const clampedT = Math.min(Math.max(state.t, 0), 0.999);
       const point = curve.getPointAt(clampedT);
+      const i4 = i * 4;
       const i3 = i * 3;
       this.positions[i3] = point.x + state.offset.x;
       this.positions[i3 + 1] = point.y + state.offset.y;
       this.positions[i3 + 2] = point.z + state.offset.z;
 
-      this.colors[i3] = COLOR_BLUE.r;
-      this.colors[i3 + 1] = COLOR_BLUE.g;
-      this.colors[i3 + 2] = COLOR_BLUE.b;
+      this.colors[i4] = COLOR_BLUE.r;
+      this.colors[i4 + 1] = COLOR_BLUE.g;
+      this.colors[i4 + 2] = COLOR_BLUE.b;
+      this.colors[i4 + 3] = 1.0;
 
       this.sizes[i] = 0.1;
     }

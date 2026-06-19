@@ -24,6 +24,7 @@ class App {
 
   private frameTimestamps: number[] = [];
   private readonly FPS_WINDOW = 60;
+  private readonly MIN_FPS_FRAMES = 10;
   private currentFps = 0;
   private lastMonitorUpdate = 0;
 
@@ -97,9 +98,11 @@ class App {
     if (this.frameTimestamps.length > this.FPS_WINDOW) {
       this.frameTimestamps.shift();
     }
-    if (this.frameTimestamps.length >= 2) {
+    if (this.frameTimestamps.length >= this.MIN_FPS_FRAMES) {
       const elapsed = this.frameTimestamps[this.frameTimestamps.length - 1] - this.frameTimestamps[0];
-      this.currentFps = Math.round(((this.frameTimestamps.length - 1) / elapsed) * 1000);
+      if (elapsed > 1) {
+        this.currentFps = Math.round(((this.frameTimestamps.length - 1) / elapsed) * 1000);
+      }
     }
     const now = performance.now();
     if (now - this.lastMonitorUpdate > 200) {
