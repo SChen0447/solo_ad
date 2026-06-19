@@ -1,0 +1,28 @@
+.masonry-container {
+  display: flex;
+  width: 100%;
+}
+
+.masonry-column {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+
+@media (max-width: 1200px) {
+  .masonry-container {
+    gap: 16px !important;
+  }
+}
+
+@media (max-width: 992px) {
+  .masonry-container {
+    gap: 16px !important;
+  }
+}
+
+@media (max-width: 600px) {
+  .masonry-container {
+    gap: 12px !important;
+  }
+}
