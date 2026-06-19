@@ -3,7 +3,9 @@ import cors from 'cors'
 
 const app = express()
 app.use(cors())
-app.use(express.json())
+app.use(express.json({ limit: '1mb' }))
+app.use(express.urlencoded({ extended: true }))
+app.use(express.text({ type: 'text/plain' }))
 
 interface Ingredient {
   name: string
@@ -294,36 +296,54 @@ app.get('/api/ingredients', (_req, res) => {
 })
 
 app.post('/api/recommend', (req, res) => {
-  const userIngredients: string[] = req.body.ingredients || []
-  const userIngredientsLower = userIngredients.map(i => i.toLowerCase().trim())
-
-  const result = recipes.map(recipe => {
-    const totalIngredients = recipe.ingredients.length
-    const matchedCount = recipe.ingredients.filter(ing =>
-      userIngredientsLower.includes(ing.name.toLowerCase())
-    ).length
-    const matchPercentage = totalIngredients > 0
-      ? Math.round((matchedCount / totalIngredients) * 100)
-      : 0
-    const matchedIngredients = recipe.ingredients
-      .filter(ing => userIngredientsLower.includes(ing.name.toLowerCase()))
-      .map(ing => ing.name)
-
-    return {
-      ...recipe,
-      matchPercentage,
-      matchedCount,
-      totalIngredients,
-      matchedIngredients
+  try {
+    let body = req.body
+    if (!body || typeof body === 'string') {
+      try {
+        body = typeof body === 'string' ? JSON.parse(body) : {}
+      } catch {
+        body = {}
+      }
     }
-  })
-    .filter(r => r.matchPercentage > 0)
-    .sort((a, b) => b.matchPercentage - a.matchPercentage)
+    const userIngredients: string[] = Array.isArray(body.ingredients)
+      ? body.ingredients.filter((i: unknown) => typeof i === 'string')
+      : []
+    console.log('Recommend request - body:', JSON.stringify(body))
+    console.log('Recommend request - ingredients:', userIngredients)
+    const userIngredientsLower = userIngredients.map((i: string) => i.toLowerCase().trim())
 
-  res.json(result)
+    const result = recipes.map(recipe => {
+      const totalIngredients = recipe.ingredients.length
+      const matchedCount = recipe.ingredients.filter(ing =>
+        userIngredientsLower.includes(ing.name.toLowerCase())
+      ).length
+      const matchPercentage = totalIngredients > 0
+        ? Math.round((matchedCount / totalIngredients) * 100)
+        : 0
+      const matchedIngredients = recipe.ingredients
+        .filter(ing => userIngredientsLower.includes(ing.name.toLowerCase()))
+        .map(ing => ing.name)
+
+      return {
+        ...recipe,
+        matchPercentage,
+        matchedCount,
+        totalIngredients,
+        matchedIngredients
+      }
+    })
+      .filter(r => r.matchPercentage > 0)
+      .sort((a, b) => b.matchPercentage - a.matchPercentage)
+
+    console.log('Recommend result count:', result.length)
+    res.json(result)
+  } catch (error) {
+    console.error('Recommend error:', error)
+    res.status(500).json({ error: 'Internal server error' })
+  }
 })
 
-const PORT = 3001
+const PORT = Number(process.env.PORT) || 3002
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`)
 })

@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect } from 'react'
+import { useMemo, useState, useEffect, useRef } from 'react'
 import type { Recipe } from './types'
 
 interface Props {
@@ -22,6 +22,8 @@ export default function RecipeList({
 }: Props) {
   const [displayed, setDisplayed] = useState<Recipe[]>(recipes)
   const [animating, setAnimating] = useState(false)
+  const [tabSwitching, setTabSwitching] = useState(false)
+  const prevTabRef = useRef(activeTab)
 
   const filtered = useMemo(() => {
     if (!searchQuery.trim()) return recipes
@@ -33,6 +35,15 @@ export default function RecipeList({
         r.ingredients.some(i => i.name.toLowerCase().includes(q))
     )
   }, [recipes, searchQuery])
+
+  useEffect(() => {
+    if (prevTabRef.current !== activeTab) {
+      prevTabRef.current = activeTab
+      setTabSwitching(true)
+      const timer = setTimeout(() => setTabSwitching(false), 350)
+      return () => clearTimeout(timer)
+    }
+  }, [activeTab])
 
   useEffect(() => {
     setAnimating(true)
@@ -61,7 +72,7 @@ export default function RecipeList({
         </div>
       </div>
 
-      <div className={`recipe-grid ${animating ? 'fade-out' : 'fade-in'} ${activeTab === 'favorites' ? 'tab-slide' : ''}`}>
+      <div className={`recipe-grid ${animating ? 'fade-out' : 'fade-in'} ${tabSwitching ? 'tab-slide' : ''}`}>
         {displayed.length === 0 ? (
           <div className="empty-state">
             <div className="empty-emoji">🍽️</div>

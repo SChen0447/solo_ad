@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import type { Recipe } from './types'
 
 interface Props {
@@ -7,11 +7,19 @@ interface Props {
 }
 
 export default function RecipeModal({ recipe, onClose }: Props) {
+  const [visible, setVisible] = useState(false)
+  const [closing, setClosing] = useState(false)
   const modalRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
+    requestAnimationFrame(() => {
+      setVisible(true)
+    })
+  }, [])
+
+  useEffect(() => {
     const handleEsc = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose()
+      if (e.key === 'Escape') handleClose()
     }
     document.addEventListener('keydown', handleEsc)
     document.body.style.overflow = 'hidden'
@@ -19,16 +27,27 @@ export default function RecipeModal({ recipe, onClose }: Props) {
       document.removeEventListener('keydown', handleEsc)
       document.body.style.overflow = ''
     }
-  }, [onClose])
+  }, [])
+
+  const handleClose = () => {
+    setClosing(true)
+    setVisible(false)
+    setTimeout(() => {
+      onClose()
+    }, 300)
+  }
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
+    <div
+      className={`modal-overlay ${visible && !closing ? 'modal-overlay-visible' : ''}`}
+      onClick={handleClose}
+    >
       <div
-        className="modal-content"
+        className={`modal-content ${visible && !closing ? 'modal-content-visible' : ''}`}
         ref={modalRef}
         onClick={e => e.stopPropagation()}
       >
-        <button className="modal-close" onClick={onClose} aria-label="关闭">
+        <button className="modal-close" onClick={handleClose} aria-label="关闭">
           ×
         </button>
 

@@ -82,42 +82,40 @@ export default function App() {
       <div className="main-container">
         <aside className={`sidebar ${panelOpen ? 'open' : 'collapsed'}`}>
           <div className="sidebar-toggle" onClick={() => setPanelOpen(!panelOpen)}>
-            <span>{panelOpen ? '▼ 收起' : '▶ 展开食材面板'}</span>
+            <span>{panelOpen ? '▼ 收起食材面板' : '▶ 展开食材面板'}</span>
           </div>
-          {panelOpen && (
-            <div className="sidebar-content">
-              <div className="sidebar-section">
-                <h3>🥬 我的食材</h3>
-                <IngredientInput
-                  ingredients={ingredients}
-                  setIngredients={setIngredients}
-                />
-                <div className="ingredient-hint">
-                  已添加 {ingredients.length} 种食材
-                </div>
-              </div>
-
-              <div className="sidebar-section">
-                <h3>📂 菜谱分类</h3>
-                <div className="tabs">
-                  <button
-                    className={`tab ${activeTab === 'all' ? 'active' : ''}`}
-                    onClick={() => setActiveTab('all')}
-                  >
-                    全部菜谱
-                    <span className="tab-count">{recipes.length}</span>
-                  </button>
-                  <button
-                    className={`tab ${activeTab === 'favorites' ? 'active' : ''}`}
-                    onClick={() => setActiveTab('favorites')}
-                  >
-                    ⭐ 我的收藏
-                    <span className="tab-count">{favorites.size}</span>
-                  </button>
-                </div>
+          <div className="sidebar-content">
+            <div className="sidebar-section">
+              <h3>🥬 我的食材</h3>
+              <IngredientInput
+                ingredients={ingredients}
+                setIngredients={setIngredients}
+              />
+              <div className="ingredient-hint">
+                已添加 {ingredients.length} 种食材
               </div>
             </div>
-          )}
+
+            <div className="sidebar-section">
+              <h3>📂 菜谱分类</h3>
+              <div className="tabs">
+                <button
+                  className={`tab ${activeTab === 'all' ? 'active' : ''}`}
+                  onClick={() => setActiveTab('all')}
+                >
+                  全部菜谱
+                  <span className="tab-count">{recipes.length}</span>
+                </button>
+                <button
+                  className={`tab ${activeTab === 'favorites' ? 'active' : ''}`}
+                  onClick={() => setActiveTab('favorites')}
+                >
+                  ⭐ 我的收藏
+                  <span className="tab-count">{favorites.size}</span>
+                </button>
+              </div>
+            </div>
+          </div>
         </aside>
 
         <main className="content">
