@@ -1,0 +1,16 @@
+{
+  "id": "water",
+  "name": "水",
+  "formula": "H₂O",
+  "molecularWeight": 18.02,
+  "description": "水是生命之源，是地球上最常见且最重要的物质之一。",
+  "atoms": [
+    { "element": "O", "x": 0.000, "y": 0.000, "z": 0.000 },
+    { "element": "H", "x": 0.757, "y": 0.586, "z": 0.000 },
+    { "element": "H", "x": -0.757, "y": 0.586, "z": 0.000 }
+  ],
+  "bonds": [
+    { "atom1": 0, "atom2": 1, "order": 1 },
+    { "atom1": 0, "atom2": 2, "order": 1 }
+  ]
+}
