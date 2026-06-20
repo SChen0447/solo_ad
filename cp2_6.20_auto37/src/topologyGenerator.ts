@@ -146,17 +146,31 @@ function generateMesh(nodeCount: number, probability: number): TopologyData {
   const cols = Math.ceil(Math.sqrt(nodeCount));
   const rows = Math.ceil(nodeCount / cols);
   const spacing = 2;
+  const totalSlots = cols * rows;
 
   for (let i = 0; i < nodeCount; i++) {
     const col = i % cols;
     const row = Math.floor(i / cols);
-    const xOffset = rows * col >= nodeCount ? 0 : 0;
+
+    let xOffset = 0;
+    let zOffset = 0;
+
+    if (totalSlots > nodeCount) {
+      const emptySlots = totalSlots - nodeCount;
+      const emptyStartRow = rows - Math.ceil(emptySlots / cols);
+
+      if (row >= emptyStartRow) {
+        const slotsInThisRow = cols - (row === emptyStartRow ? emptySlots % cols || cols : 0);
+        xOffset = ((cols - slotsInThisRow) / 2) * spacing;
+      }
+    }
+
     nodes.push({
       id: i,
       position: {
         x: (col - (cols - 1) / 2) * spacing + xOffset,
         y: 0,
-        z: (row - (rows - 1) / 2) * spacing,
+        z: (row - (rows - 1) / 2) * spacing + zOffset,
       },
     });
   }

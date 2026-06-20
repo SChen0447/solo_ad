@@ -12,13 +12,11 @@ interface NodeObject {
   glow: THREE.Mesh;
   id: number;
   targetPosition: THREE.Vector3;
+  springTarget: THREE.Vector3;
+  velocity: THREE.Vector3;
   isDragging: boolean;
   scale: number;
   targetScale: number;
-  bounceTime: number;
-  bounceStartPos: THREE.Vector3;
-  bounceEndPos: THREE.Vector3;
-  isBouncing: boolean;
   baseOpacity: number;
 }
 
@@ -56,6 +54,7 @@ export class TopologyRenderer {
   private edgeObjects: EdgeObject[] = [];
   private particles: THREE.Points | null = null;
   private particleData: Particle[] = [];
+  private gridHelper: THREE.GridHelper | null = null;
 
   private dataRouter: DataRouter | null = null;
   private packetMesh: THREE.Mesh | null = null;
@@ -126,12 +125,12 @@ export class TopologyRenderer {
   }
 
   private setupGrid(): void {
-    const gridHelper = new THREE.GridHelper(20, 20, 0x334455, 0x223344);
-    gridHelper.position.y = -2;
-    const mat = gridHelper.material as THREE.Material;
+    this.gridHelper = new THREE.GridHelper(20, 20, 0x334455, 0x223344);
+    this.gridHelper.position.y = -2;
+    const mat = this.gridHelper.material as THREE.Material;
     mat.transparent = true;
-    mat.opacity = 0.25;
-    this.scene.add(gridHelper);
+    mat.opacity = 0;
+    this.scene.add(this.gridHelper);
   }
 
   private setupParticles(): void {
@@ -244,7 +243,6 @@ export class TopologyRenderer {
         this.isDragging = true;
         nodeObj.isDragging = true;
         nodeObj.targetScale = 1.3;
-        nodeObj.isBouncing = false;
         this.setSelectedNode(nodeObj.id);
 
         const intersectPoint = intersects[0].point.clone();
@@ -280,6 +278,7 @@ export class TopologyRenderer {
           const newPos = intersectPoint.clone().sub(this.dragOffset);
           nodeObj.mesh.position.copy(newPos);
           nodeObj.targetPosition.copy(newPos);
+          nodeObj.springTarget.copy(newPos);
           this.updateEdgesForNode(this.draggedNodeId);
 
           if (this.onNodePositionChange) {
@@ -306,10 +305,7 @@ export class TopologyRenderer {
       if (nodeObj) {
         nodeObj.isDragging = false;
         nodeObj.targetScale = 1.0;
-        nodeObj.isBouncing = true;
-        nodeObj.bounceTime = 0;
-        nodeObj.bounceStartPos = nodeObj.mesh.position.clone();
-        nodeObj.bounceEndPos = nodeObj.targetPosition.clone();
+        nodeObj.springTarget.copy(nodeObj.targetPosition);
       }
     }
     this.isDragging = false;
@@ -412,8 +408,9 @@ export class TopologyRenderer {
       const nodeObj = this.nodeObjects.get(node.id)!;
       nodeObj.targetPosition.set(node.position.x, node.position.y, node.position.z);
       nodeObj.mesh.position.set(node.position.x, node.position.y, node.position.z);
+      nodeObj.springTarget.set(node.position.x, node.position.y, node.position.z);
+      nodeObj.velocity.set(0, 0, 0);
       nodeObj.baseOpacity = 0;
-      nodeObj.isBouncing = false;
     }
 
     for (const edge of data.edges) {
@@ -460,13 +457,11 @@ export class TopologyRenderer {
       glow,
       id: node.id,
       targetPosition: new THREE.Vector3(node.position.x, node.position.y, node.position.z),
+      springTarget: new THREE.Vector3(node.position.x, node.position.y, node.position.z),
+      velocity: new THREE.Vector3(),
       isDragging: false,
       scale: 1,
       targetScale: 1,
-      bounceTime: 0,
-      bounceStartPos: new THREE.Vector3(),
-      bounceEndPos: new THREE.Vector3(node.position.x, node.position.y, node.position.z),
-      isBouncing: false,
       baseOpacity: 0,
     });
   }
@@ -653,9 +648,24 @@ export class TopologyRenderer {
         this.isFadingIn = false;
       }
     }
+
+    if (this.gridHelper) {
+      const gridMat = this.gridHelper.material as THREE.Material;
+      let targetOpacity = 0.25;
+      if (this.isFadingOut) {
+        targetOpacity = 0.25 * (1 - easeOutQuad(this.fadeProgress));
+      } else if (this.isFadingIn) {
+        targetOpacity = 0.25 * easeOutQuad(this.fadeProgress);
+      }
+      gridMat.opacity += (targetOpacity - gridMat.opacity) * Math.min(1, deltaTime * 5);
+    }
   }
 
   private updateNodeAnimations(deltaTime: number): void {
+    const springStiffness = 180;
+    const damping = 12;
+    const mass = 1;
+
     let fadeMultiplier = 1;
     if (this.isFadingOut) {
       fadeMultiplier = 1 - easeOutQuad(this.fadeProgress);
@@ -670,7 +680,7 @@ export class TopologyRenderer {
       if (nodeObj.isDragging) {
         const targetGlow = 0.6;
         glowMaterial.opacity += (targetGlow - glowMaterial.opacity) * Math.min(1, deltaTime * 15);
-      } else if (!nodeObj.isBouncing) {
+      } else {
         const targetGlow = 0.15;
         glowMaterial.opacity += (targetGlow - glowMaterial.opacity) * Math.min(1, deltaTime * 10);
       }
@@ -686,17 +696,20 @@ export class TopologyRenderer {
       material.opacity = nodeObj.baseOpacity * fadeMultiplier;
       glowMaterial.opacity = Math.min(glowMaterial.opacity, material.opacity + 0.1);
 
-      if (nodeObj.isBouncing && !nodeObj.isDragging) {
-        nodeObj.bounceTime += deltaTime;
-        const t = Math.min(1, nodeObj.bounceTime / BOUNCE_DURATION);
-        const eased = easeOutElastic(t);
+      if (!nodeObj.isDragging) {
+        const displacement = new THREE.Vector3().subVectors(nodeObj.springTarget, nodeObj.mesh.position);
+        const springForce = displacement.clone().multiplyScalar(springStiffness);
+        const dampingForce = nodeObj.velocity.clone().multiplyScalar(damping);
+        const acceleration = springForce.sub(dampingForce).divideScalar(mass);
 
-        nodeObj.mesh.position.lerpVectors(nodeObj.bounceStartPos, nodeObj.bounceEndPos, eased);
+        nodeObj.velocity.add(acceleration.multiplyScalar(deltaTime));
+        nodeObj.mesh.position.add(nodeObj.velocity.clone().multiplyScalar(deltaTime));
+
         this.updateEdgesForNode(nodeObj.id);
 
-        if (t >= 1) {
-          nodeObj.isBouncing = false;
-          nodeObj.mesh.position.copy(nodeObj.bounceEndPos);
+        if (nodeObj.velocity.length() < 0.01 && displacement.length() < 0.01) {
+          nodeObj.mesh.position.copy(nodeObj.springTarget);
+          nodeObj.velocity.set(0, 0, 0);
           this.updateEdgesForNode(nodeObj.id);
           if (this.onNodePositionChange) {
             this.onNodePositionChange(nodeObj.id, {
