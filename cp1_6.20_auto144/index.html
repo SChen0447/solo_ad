@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <title>节奏回廊 - Rhythm Corridor</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    html, body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      background: #0F0F23;
+      font-family: 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+      color: #ffffff;
+      user-select: none;
+      -webkit-user-select: none;
+      touch-action: none;
+    }
+    #app {
+      width: 100%;
+      height: 100%;
+      position: relative;
+    }
+    canvas {
+      display: block;
+    }
+    #hud {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 10;
+    }
+    #lives {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      display: flex;
+      gap: 8px;
+      font-size: 28px;
+      filter: drop-shadow(0 0 8px rgba(255, 100, 100, 0.8));
+    }
+    #score {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      text-align: right;
+      font-size: 18px;
+      line-height: 1.6;
+      text-shadow: 0 0 10px rgba(0, 212, 255, 0.6);
+    }
+    #score .label {
+      color: #00D4FF;
+      font-size: 14px;
+      letter-spacing: 2px;
+    }
+    #score .value {
+      color: #FFFFFF;
+      font-weight: bold;
+      font-size: 24px;
+    }
+    #progress-container {
+      position: absolute;
+      bottom: 30px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 60%;
+      max-width: 600px;
+    }
+    #progress-bar {
+      width: 100%;
+      height: 8px;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 4px;
+      overflow: hidden;
+      box-shadow: 0 0 20px rgba(0, 212, 255, 0.3);
+    }
+    #progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #00D4FF, #FFD700);
+      border-radius: 4px;
+      width: 0%;
+      transition: width 0.3s ease;
+      box-shadow: 0 0 15px rgba(255, 215, 0, 0.6);
+    }
+    #progress-text {
+      text-align: center;
+      margin-top: 8px;
+      font-size: 13px;
+      color: rgba(255, 255, 255, 0.7);
+      letter-spacing: 1px;
+    }
+    .overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(15, 15, 35, 0.92);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+      pointer-events: all;
+      backdrop-filter: blur(10px);
+    }
+    .overlay.hidden {
+      display: none;
+    }
+    .title {
+      font-size: 64px;
+      font-weight: bold;
+      letter-spacing: 8px;
+      background: linear-gradient(135deg, #00D4FF, #FFD700, #FF6B6B);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      margin-bottom: 16px;
+      text-shadow: 0 0 60px rgba(0, 212, 255, 0.4);
+      animation: titlePulse 2s ease-in-out infinite;
+    }
+    @keyframes titlePulse {
+      0%, 100% { filter: brightness(1); }
+      50% { filter: brightness(1.3); }
+    }
+    .subtitle {
+      font-size: 18px;
+      color: rgba(255, 255, 255, 0.6);
+      letter-spacing: 4px;
+      margin-bottom: 60px;
+    }
+    .btn {
+      padding: 16px 56px;
+      font-size: 18px;
+      letter-spacing: 4px;
+      background: linear-gradient(135deg, rgba(0, 212, 255, 0.2), rgba(255, 215, 0, 0.2));
+      border: 2px solid #00D4FF;
+      color: #FFFFFF;
+      cursor: pointer;
+      border-radius: 4px;
+      transition: all 0.3s ease;
+      font-family: inherit;
+      pointer-events: all;
+      text-transform: uppercase;
+    }
+    .btn:hover {
+      background: linear-gradient(135deg, rgba(0, 212, 255, 0.4), rgba(255, 215, 0, 0.4));
+      box-shadow: 0 0 30px rgba(0, 212, 255, 0.5);
+      transform: translateY(-2px);
+    }
+    .instructions {
+      margin-top: 50px;
+      text-align: center;
+      color: rgba(255, 255, 255, 0.5);
+      font-size: 14px;
+      line-height: 2;
+      letter-spacing: 1px;
+    }
+    .instructions span {
+      color: #00D4FF;
+      font-weight: bold;
+      padding: 2px 8px;
+      border: 1px solid rgba(0, 212, 255, 0.4);
+      border-radius: 3px;
+      margin: 0 4px;
+    }
+    .result-text {
+      font-size: 48px;
+      margin-bottom: 20px;
+      letter-spacing: 4px;
+    }
+    .result-text.win {
+      color: #FFD700;
+      text-shadow: 0 0 30px rgba(255, 215, 0, 0.6);
+    }
+    .result-text.lose {
+      color: #FF6B6B;
+      text-shadow: 0 0 30px rgba(255, 107, 107, 0.6);
+    }
+    .result-stats {
+      font-size: 18px;
+      color: rgba(255, 255, 255, 0.7);
+      margin-bottom: 40px;
+      letter-spacing: 2px;
+    }
+    #beat-indicator {
+      position: absolute;
+      bottom: 60px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(0, 212, 255, 0.8), transparent);
+      opacity: 0;
+      pointer-events: none;
+    }
+    #beat-indicator.pulse {
+      animation: beatPulse 0.3s ease-out;
+    }
+    @keyframes beatPulse {
+      0% { opacity: 1; transform: translateX(-50%) scale(0.5); }
+      100% { opacity: 0; transform: translateX(-50%) scale(2); }
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <div id="hud">
+      <div id="lives"></div>
+      <div id="score">
+        <div class="label">关卡 LEVEL</div>
+        <div class="value" id="level">1</div>
+        <div class="label" style="margin-top: 8px;">分数 SCORE</div>
+        <div class="value" id="score-value">0</div>
+      </div>
+      <div id="beat-indicator"></div>
+      <div id="progress-container">
+        <div id="progress-bar">
+          <div id="progress-fill"></div>
+        </div>
+        <div id="progress-text">能量核心: 0 / 0</div>
+      </div>
+    </div>
+
+    <div id="title-screen" class="overlay">
+      <div class="title">节奏回廊</div>
+      <div class="subtitle">RHYTHM CORRIDOR</div>
+      <button class="btn" id="start-btn">开始游戏</button>
+      <div class="instructions">
+        桌面端: <span>W</span><span>A</span><span>S</span><span>D</span> 控制光球移动 &nbsp;&nbsp; <span>ESC</span> 暂停<br/>
+        移动端: 手指滑动控制移动<br/>
+        收集所有 <span style="color:#FFD700;border-color:#FFD700;">能量核心</span> 解锁下一关<br/>
+        躲避随节拍移动的 <span style="color:#FF6B6B;border-color:#FF6B6B;">红色障碍物</span>
+      </div>
+    </div>
+
+    <div id="pause-screen" class="overlay hidden">
+      <div class="title" style="font-size: 48px;">游戏暂停</div>
+      <div class="subtitle">PAUSED</div>
+      <button class="btn" id="resume-btn">继续游戏</button>
+      <div style="margin-top: 20px;">
+        <button class="btn" id="restart-pause-btn" style="border-color: #FF6B6B; background: linear-gradient(135deg, rgba(255, 107, 107, 0.2), rgba(255, 107, 107, 0.1));">重新开始</button>
+      </div>
+    </div>
+
+    <div id="result-screen" class="overlay hidden">
+      <div class="result-text" id="result-title">关卡完成!</div>
+      <div class="result-stats" id="result-stats">得分: 0</div>
+      <button class="btn" id="next-btn">下一关</button>
+      <div style="margin-top: 20px;">
+        <button class="btn" id="restart-btn" style="border-color: #FF6B6B; background: linear-gradient(135deg, rgba(255, 107, 107, 0.2), rgba(255, 107, 107, 0.1));">重新开始</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="/src/gameLoop.ts"></script>
+</body>
+</html>
