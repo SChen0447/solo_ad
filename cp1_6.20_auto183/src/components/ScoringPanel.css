@@ -1,0 +1,284 @@
+.scoring-panel {
+  background: #ffffff;
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.scoring-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.scoring-header h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: #333;
+}
+
+.round-info {
+  font-size: 14px;
+  color: #909399;
+  background: #f5f7fa;
+  padding: 4px 10px;
+  border-radius: 12px;
+}
+
+.score-sections {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.pronunciation-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.section-title {
+  margin: 0;
+  font-size: 14px;
+  color: #606266;
+  font-weight: 500;
+}
+
+.circular-progress-container {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.circular-progress {
+  transform: rotate(-90deg);
+}
+
+.progress-bg {
+  fill: none;
+  stroke: #f0f0f0;
+}
+
+.progress-fg {
+  fill: none;
+  stroke-linecap: round;
+  transition: stroke-dashoffset 0.5s ease;
+}
+
+.progress-text {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.score-value {
+  font-size: 28px;
+  font-weight: 700;
+  color: #303133;
+  line-height: 1;
+}
+
+.score-unit {
+  font-size: 12px;
+  color: #909399;
+  margin-top: 2px;
+}
+
+.score-status {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.status-passed {
+  color: #00c853;
+}
+
+.status-failed {
+  color: #ff4444;
+}
+
+.status-waiting {
+  color: #909399;
+}
+
+.grammar-section {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.bar-progress-container {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.bar-progress-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.bar-label {
+  font-size: 14px;
+  color: #606266;
+  font-weight: 500;
+}
+
+.bar-value {
+  font-size: 13px;
+  color: #909399;
+}
+
+.bar-progress-bg {
+  height: 8px;
+  background: #f0f0f0;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.bar-progress-fg {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.8s ease;
+}
+
+.grammar-errors-list {
+  margin-top: 8px;
+}
+
+.grammar-title {
+  margin: 0 0 10px 0;
+  font-size: 14px;
+  font-weight: 500;
+  color: #303133;
+}
+
+.grammar-errors-list ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.grammar-error-item {
+  padding: 8px 12px;
+  background: #fef0f0;
+  border-radius: 6px;
+  border-left: 3px solid #ff4444;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.error-type {
+  font-size: 12px;
+  font-weight: 600;
+  color: #ff4444;
+}
+
+.error-message {
+  font-size: 12px;
+  color: #606266;
+}
+
+.grammar-no-errors {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  background: #f0f9eb;
+  border-radius: 6px;
+  font-size: 13px;
+  color: #00c853;
+}
+
+.check-icon {
+  font-weight: 700;
+}
+
+.text-comparison {
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid #f0f0f0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.comparison-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.comparison-label {
+  font-size: 12px;
+  color: #909399;
+  font-weight: 500;
+}
+
+.comparison-text {
+  font-size: 13px;
+  line-height: 1.5;
+  padding: 8px 10px;
+  border-radius: 6px;
+  word-break: break-word;
+}
+
+.comparison-text.recognized {
+  background: #ecf5ff;
+  color: #409eff;
+}
+
+.comparison-text.standard {
+  background: #f0f9eb;
+  color: #00c853;
+}
+
+.waiting-hint {
+  text-align: center;
+  padding: 30px 20px;
+  color: #909399;
+}
+
+.waiting-hint p {
+  margin: 0;
+  font-size: 14px;
+}
+
+.hint-small {
+  font-size: 12px !important;
+  margin-top: 8px !important;
+  color: #c0c4cc !important;
+}
+
+@media (max-width: 768px) {
+  .scoring-panel {
+    padding: 16px;
+  }
+
+  .score-sections {
+    flex-direction: row;
+    align-items: flex-start;
+  }
+
+  .pronunciation-section {
+    flex: 1;
+  }
+
+  .grammar-section {
+    flex: 1;
+  }
+}
