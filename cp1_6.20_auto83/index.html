@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>赛道编辑器与赛车对战</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      background-color: #1a1a2e;
+      color: #fff;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    #app {
+      width: 100%;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .game-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .title-bar {
+      width: 100%;
+      text-align: center;
+    }
+
+    .title-bar h1 {
+      font-size: 24px;
+      font-weight: bold;
+      color: #e94560;
+    }
+
+    .editor-toolbar {
+      display: flex;
+      gap: 12px;
+      justify-content: flex-end;
+      width: 600px;
+    }
+
+    .btn {
+      background-color: #0f3460;
+      color: #fff;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 14px;
+      transition: all 0.2s ease;
+    }
+
+    .btn:hover {
+      background-color: #16508a;
+      transform: scale(1.05);
+    }
+
+    .btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .btn-secondary {
+      background-color: #535c68;
+    }
+
+    .btn-secondary:hover {
+      background-color: #636e72;
+    }
+
+    .btn-start {
+      background-color: #27ae60;
+    }
+
+    .btn-start:hover {
+      background-color: #2ecc71;
+    }
+
+    canvas {
+      border-radius: 4px;
+      cursor: crosshair;
+    }
+
+    .track-data-container {
+      width: 600px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .track-data-container label {
+      font-size: 14px;
+      color: #aaa;
+    }
+
+    #trackData {
+      width: 100%;
+      height: 80px;
+      background-color: #16213e;
+      color: #00ff88;
+      border: 1px solid #0f3460;
+      border-radius: 4px;
+      padding: 8px;
+      font-family: monospace;
+      font-size: 12px;
+      resize: none;
+    }
+
+    .scoreboard {
+      display: flex;
+      justify-content: space-between;
+      width: 600px;
+      padding: 12px 20px;
+      background-color: #16213e;
+      border-radius: 8px;
+      font-size: 16px;
+    }
+
+    .score-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .score-label {
+      font-size: 12px;
+      color: #888;
+    }
+
+    .score-value {
+      font-size: 18px;
+      font-weight: bold;
+      color: #e94560;
+    }
+
+    .gap-text {
+      color: #f39c12;
+    }
+
+    .win-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      background: rgba(0, 0, 0, 0.7);
+      z-index: 100;
+      pointer-events: none;
+    }
+
+    .win-text {
+      font-size: 64px;
+      font-weight: bold;
+      color: gold;
+      text-shadow: 0 0 20px gold, 0 0 40px orange;
+      animation: pulse 0.5s ease-in-out infinite alternate;
+    }
+
+    @keyframes pulse {
+      from { transform: scale(1); }
+      to { transform: scale(1.1); }
+    }
+
+    .small-screen-warning {
+      display: none;
+      text-align: center;
+      padding: 40px;
+      color: #e94560;
+      font-size: 18px;
+    }
+
+    @media (max-width: 719px) {
+      .game-container {
+        display: none;
+      }
+      .small-screen-warning {
+        display: block;
+      }
+    }
+
+    .instructions {
+      width: 600px;
+      padding: 12px;
+      background-color: #16213e;
+      border-radius: 8px;
+      font-size: 13px;
+      color: #aaa;
+      line-height: 1.6;
+    }
+
+    .instructions strong {
+      color: #e94560;
+    }
+
+    .hidden {
+      display: none !important;
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <div class="small-screen-warning">
+      请使用更大屏幕（宽度720px以上）以获得最佳体验
+    </div>
+    <div class="game-container" id="gameContainer">
+      <!-- 编辑器模式 -->
+      <div id="editorMode">
+        <div class="title-bar">
+          <h1>赛道编辑器</h1>
+        </div>
+        <div class="editor-toolbar" style="margin-top: 12px; margin-bottom: 8px;">
+          <button class="btn btn-secondary" id="undoBtn">撤销</button>
+          <button class="btn btn-secondary" id="clearBtn">清空赛道</button>
+          <button class="btn" id="saveBtn">保存赛道</button>
+          <button class="btn btn-start" id="startBtn">开始比赛</button>
+        </div>
+        <canvas id="editorCanvas" width="600" height="400"></canvas>
+        <div class="track-data-container">
+          <label for="trackData">赛道数据（JSON格式）：</label>
+          <textarea id="trackData" readonly></textarea>
+        </div>
+        <div class="instructions">
+          <strong>操作说明：</strong>点击画布放置控制点（至少需要3个点），系统自动生成贝塞尔曲线赛道。
+          点击已有控制点可选中并拖动调整位置。使用"撤销"按钮删除上一个控制点。
+          点击"保存赛道"生成赛道数据，然后点击"开始比赛"进入对战模式。
+        </div>
+      </div>
+
+      <!-- 比赛模式 -->
+      <div id="racingMode" class="hidden">
+        <div class="title-bar">
+          <h1>赛车对战</h1>
+        </div>
+        <div class="scoreboard" style="margin-top: 12px; margin-bottom: 8px;">
+          <div class="score-item">
+            <span class="score-label">圈数</span>
+            <span class="score-value" id="lapDisplay">0 / 3</span>
+          </div>
+          <div class="score-item">
+            <span class="score-label">当前差距</span>
+            <span class="score-value gap-text" id="gapDisplay">领先：+0米</span>
+          </div>
+          <div class="score-item">
+            <span class="score-label">状态</span>
+            <span class="score-value" id="statusDisplay">准备中</span>
+          </div>
+        </div>
+        <canvas id="racingCanvas" width="600" height="400"></canvas>
+        <div class="editor-toolbar" style="justify-content: center;">
+          <button class="btn" id="backBtn">返回编辑器</button>
+        </div>
+        <div class="instructions">
+          <strong>操作说明：</strong>使用 <strong>← →</strong> 或 <strong>A D</strong> 键控制赛车左右偏移。
+          赛车自动向前行驶，保持在赛道内前进。完成 <strong>3圈</strong> 即可获胜！
+          红色赛车是你，蓝色赛车是AI对手。
+        </div>
+      </div>
+    </div>
+  </div>
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
