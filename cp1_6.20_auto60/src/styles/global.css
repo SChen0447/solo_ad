@@ -1,0 +1,118 @@
+@media (min-width: 769px) {
+  .sidebar-desktop {
+    transform: translateX(0) !important;
+  }
+
+  .main-content-desktop {
+    margin-left: 240px !important;
+  }
+
+  .mobile-header-desktop {
+    display: none !important;
+  }
+
+  .overlay-mobile {
+    display: none !important;
+  }
+}
+
+@media (max-width: 768px) {
+  .brainstorm-layout-mobile {
+    grid-template-columns: 1fr !important;
+  }
+
+  .vote-grid-mobile {
+    grid-template-columns: 1fr !important;
+  }
+
+  .members-panel-mobile {
+    position: static !important;
+  }
+
+  .page-container-mobile {
+    padding: 16px 16px 100px !important;
+  }
+
+  .floating-buttons-mobile {
+    right: 16px !important;
+    bottom: 16px !important;
+  }
+
+  .floating-buttons-mobile .fab-btn {
+    padding: 12px 16px !important;
+    font-size: 12px !important;
+  }
+
+  .report-modal-mobile {
+    margin: 12px !important;
+    max-height: calc(100vh - 24px) !important;
+  }
+}
+
+.fab-hover {
+  transition: all 0.2s ease !important;
+}
+
+.fab-hover:hover {
+  transform: scale(1.05) !important;
+  border-color: rgba(187, 134, 252, 0.6) !important;
+  box-shadow: 0 0 20px rgba(187, 134, 252, 0.3) !important;
+}
+
+.btn-hover {
+  transition: all 0.2s ease !important;
+}
+
+.btn-hover:hover:not(:disabled) {
+  transform: scale(1.05);
+  filter: brightness(1.1);
+}
+
+.btn-hover:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+.card-hover {
+  transition: all 0.3s ease;
+}
+
+.card-hover:hover {
+  transform: translateY(-2px);
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.7; transform: scale(1.1); }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes navFill {
+  from { transform: scaleY(0); }
+  to { transform: scaleY(1); }
+}
+
+.voted-highlight {
+  border-color: rgba(187, 134, 252, 0.5) !important;
+  box-shadow: 0 0 15px rgba(187, 134, 252, 0.2) !important;
+}
+
+.scrollbar-thin::-webkit-scrollbar {
+  width: 6px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
