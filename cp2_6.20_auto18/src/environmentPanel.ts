@@ -372,7 +372,10 @@ export class EnvironmentPanel {
     this.toggleBtn.className = 'panel-toggle-btn';
     this.toggleBtn.innerHTML = '⚙';
     this.toggleBtn.title = '显示控制面板';
+    this.toggleBtn.setAttribute('aria-label', '切换控制面板');
     this.container.appendChild(this.toggleBtn);
+
+    let isAnimating = false;
 
     const checkWidth = () => {
       const isNarrow = window.innerWidth < 768;
@@ -380,32 +383,65 @@ export class EnvironmentPanel {
         this.toggleBtn?.classList.add('visible');
         if (!this.isPanelVisible) {
           this.panel.classList.add('hidden');
-        } else {
-          this.isPanelVisible = false;
-          this.panel.classList.add('hidden');
+        } else if (this.panel.classList.contains('hidden')) {
+          this.panel.classList.remove('hidden');
         }
       } else {
         this.toggleBtn?.classList.remove('visible');
         this.panel.classList.remove('hidden');
+        this.panel.style.animation = '';
         this.isPanelVisible = true;
       }
     };
 
-    this.toggleBtn.addEventListener('click', () => {
-      this.isPanelVisible = !this.isPanelVisible;
-      if (this.isPanelVisible) {
+    const animatePanel = (show: boolean) => {
+      if (isAnimating) return;
+      isAnimating = true;
+
+      if (show) {
+        this.isPanelVisible = true;
         this.panel.classList.remove('hidden');
-        this.panel.style.animation = 'fadeSlideIn 0.3s ease forwards';
-      } else {
-        this.panel.style.animation = 'fadeSlideOut 0.3s ease forwards';
+        this.panel.style.animation = 'none';
+        void this.panel.offsetWidth;
+        this.panel.style.animation = 'fadeSlideIn 0.3s cubic-bezier(0.4, 0, 0.2, 1) forwards';
+        if (this.toggleBtn) this.toggleBtn.innerHTML = '✕';
         setTimeout(() => {
-          if (!this.isPanelVisible) this.panel.classList.add('hidden');
+          isAnimating = false;
+        }, 300);
+      } else {
+        this.isPanelVisible = false;
+        this.panel.style.animation = 'none';
+        void this.panel.offsetWidth;
+        this.panel.style.animation = 'fadeSlideOut 0.3s cubic-bezier(0.4, 0, 0.2, 1) forwards';
+        if (this.toggleBtn) this.toggleBtn.innerHTML = '⚙';
+        setTimeout(() => {
+          if (!this.isPanelVisible) {
+            this.panel.classList.add('hidden');
+          }
+          isAnimating = false;
         }, 300);
       }
+    };
+
+    this.toggleBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      animatePanel(!this.isPanelVisible);
+    });
+
+    document.addEventListener('click', (e) => {
+      const isNarrow = window.innerWidth < 768;
+      if (!isNarrow || !this.isPanelVisible) return;
+      const target = e.target as Node;
+      if (this.panel.contains(target) || (this.toggleBtn && this.toggleBtn.contains(target))) return;
+      animatePanel(false);
     });
 
     window.addEventListener('resize', checkWidth);
     checkWidth();
+    if (window.innerWidth < 768) {
+      this.isPanelVisible = false;
+      this.panel.classList.add('hidden');
+    }
   }
 
   public getParams(): EnvironmentParams {

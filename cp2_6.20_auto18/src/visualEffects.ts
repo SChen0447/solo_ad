@@ -129,6 +129,7 @@ export class VisualEffects {
   }
 
   private spawnPetalGroup(): void {
+    this.cleanupExpiredPetals();
     const count = 5 + Math.floor(Math.random() * 4);
     for (let i = 0; i < count; i++) {
       if (this.petals.length >= MAX_PETALS) {
@@ -181,11 +182,46 @@ export class VisualEffects {
     }
   }
 
+  private disposePetal(petal: PetalParticle): void {
+    if (!petal || !petal.mesh) return;
+    try {
+      if (this.group.children.includes(petal.mesh)) {
+        this.group.remove(petal.mesh);
+      }
+    } catch { /* ignore */ }
+    petal.mesh.geometry = null as unknown as THREE.BufferGeometry;
+    const mat = petal.mesh.material as THREE.Material | THREE.Material[];
+    if (Array.isArray(mat)) {
+      mat.forEach(m => { if (m) m.dispose(); });
+    } else if (mat) {
+      mat.dispose();
+    }
+    petal.mesh.material = null as unknown as THREE.Material;
+    (petal as Partial<PetalParticle>).mesh = undefined;
+    (petal as Partial<PetalParticle>).velocity = undefined;
+    (petal as Partial<PetalParticle>).rotationSpeed = undefined;
+  }
+
+  private cleanupExpiredPetals(): void {
+    for (let i = this.petals.length - 1; i >= 0; i--) {
+      const petal = this.petals[i];
+      if (!petal || !petal.mesh) {
+        this.petals.splice(i, 1);
+        continue;
+      }
+      if (petal.lifetime >= petal.maxLifetime) {
+        this.disposePetal(petal);
+        this.petals.splice(i, 1);
+      }
+    }
+  }
+
   private removeOldestPetal(): void {
     if (this.petals.length === 0) return;
-    const oldest = this.petals.shift()!;
-    this.group.remove(oldest.mesh);
-    (oldest.mesh.material as THREE.Material).dispose();
+    this.cleanupExpiredPetals();
+    if (this.petals.length === 0) return;
+    const oldest = this.petals.shift();
+    if (oldest) this.disposePetal(oldest);
   }
 
   public updateLightParams(params: EnvironmentParams): void {
@@ -215,6 +251,7 @@ export class VisualEffects {
 
   public update(delta: number, actualTime: number): void {
     this.updateLightTransition(delta);
+    this.cleanupExpiredPetals();
 
     if (this.backgroundMesh) {
       this.backgroundMesh.rotation.y += delta * 0.005;
@@ -227,11 +264,22 @@ export class VisualEffects {
 
     for (let i = this.petals.length - 1; i >= 0; i--) {
       const petal = this.petals[i];
+      if (!petal || !petal.mesh) {
+        this.petals.splice(i, 1);
+        continue;
+      }
+
       petal.lifetime += delta;
 
       if (petal.lifetime >= petal.maxLifetime) {
-        this.group.remove(petal.mesh);
-        (petal.mesh.material as THREE.Material).dispose();
+        this.disposePetal(petal);
+        this.petals.splice(i, 1);
+        continue;
+      }
+
+      const mat = petal.mesh.material as THREE.MeshStandardMaterial | undefined;
+      if (!mat) {
+        this.disposePetal(petal);
         this.petals.splice(i, 1);
         continue;
       }
@@ -247,7 +295,7 @@ export class VisualEffects {
       const fadeStart = 0.7;
       if (lifeRatio > fadeStart) {
         const opacity = 1 - ((lifeRatio - fadeStart) / (1 - fadeStart));
-        (petal.mesh.material as THREE.MeshStandardMaterial).opacity = opacity * 0.9;
+        mat.opacity = opacity * 0.9;
       }
 
       if (petal.mesh.position.y < -0.1) {

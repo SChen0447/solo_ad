@@ -107,9 +107,11 @@ export class CameraControls {
     style.id = styleId;
     style.textContent = `
       @keyframes pulseOnce {
-        0% { transform: scale(1); opacity: 1; }
-        50% { transform: scale(1.4); opacity: 0.8; }
-        100% { transform: scale(1.2); opacity: 1; }
+        0% { transform: scale(1); opacity: 1; filter: brightness(1); }
+        25% { transform: scale(1.5); opacity: 0.6; filter: brightness(1.5); }
+        50% { transform: scale(1.35); opacity: 0.9; filter: brightness(1.3); }
+        75% { transform: scale(1.25); opacity: 1; filter: brightness(1.15); }
+        100% { transform: scale(1.2); opacity: 1; filter: brightness(1); }
       }
       @keyframes elasticBounce {
         0% { transform: scale(1); }
@@ -524,7 +526,11 @@ export class CameraControls {
     if (index < 0 || index >= this.PRESETS.length) return;
 
     this.presetButtons.forEach((btn, i) => {
-      btn.classList.toggle('active', i === index);
+      btn.classList.remove('active');
+      if (i === index) {
+        void btn.offsetWidth;
+        btn.classList.add('active');
+      }
     });
     this.activePresetIndex = index;
 
@@ -601,21 +607,29 @@ export class CameraControls {
   }
 
   public update(delta: number): void {
-    if (this.transitionProgress < 1 &&
-        this.transitionFromSpherical && this.transitionToSpherical &&
-        this.transitionFromTarget && this.transitionToTarget) {
+    const fromS = this.transitionFromSpherical;
+    const toS = this.transitionToSpherical;
+    const fromT = this.transitionFromTarget;
+    const toT = this.transitionToTarget;
+    const inPresetTransition = this.transitionProgress < 1 && !!fromS && !!toS && !!fromT && !!toT;
+
+    if (inPresetTransition && fromS && toS && fromT && toT) {
       this.transitionProgress = Math.min(1, this.transitionProgress + delta * 2);
       const t = this.easeInOutCubic(this.transitionProgress);
 
-      this.targetSpherical.theta = this.lerp(this.transitionFromSpherical.theta, this.transitionToSpherical.theta, t);
-      this.targetSpherical.phi = this.lerp(this.transitionFromSpherical.phi, this.transitionToSpherical.phi, t);
-      this.targetSpherical.radius = this.lerp(this.transitionFromSpherical.radius, this.transitionToSpherical.radius, t);
-      this.target.lerpVectors(this.transitionFromTarget, this.transitionToTarget, t);
-    }
+      const theta = this.lerp(fromS.theta, toS.theta, t);
+      const phi = this.lerp(fromS.phi, toS.phi, t);
+      const radius = this.lerp(fromS.radius, toS.radius, t);
+      this.targetSpherical.set(radius, phi, theta);
 
-    this.spherical.theta += (this.targetSpherical.theta - this.spherical.theta) * this.ROTATION_DAMPING;
-    this.spherical.phi += (this.targetSpherical.phi - this.spherical.phi) * this.ROTATION_DAMPING;
-    this.spherical.radius += (this.targetSpherical.radius - this.spherical.radius) * this.ROTATION_DAMPING;
+      this.target.lerpVectors(fromT, toT, t);
+
+      this.spherical.copy(this.targetSpherical);
+    } else {
+      this.spherical.theta += (this.targetSpherical.theta - this.spherical.theta) * this.ROTATION_DAMPING;
+      this.spherical.phi += (this.targetSpherical.phi - this.spherical.phi) * this.ROTATION_DAMPING;
+      this.spherical.radius += (this.targetSpherical.radius - this.spherical.radius) * this.ROTATION_DAMPING;
+    }
 
     this.updateCamera();
   }

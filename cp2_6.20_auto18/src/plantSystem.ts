@@ -71,6 +71,10 @@ export class PlantSystem {
   private baseBranchCount = 0;
   private grownBranchesThisSegment = new Set<number>();
   private lastSegmentLevel = -1;
+  private leafColorFrom: THREE.Color = new THREE.Color(0x1B5E20);
+  private leafColorTo: THREE.Color = new THREE.Color(0x1B5E20);
+  private leafColorProgress: number = 1;
+  private readonly LEAF_COLOR_TRANSITION_DURATION: number = 0.8;
 
   constructor() {
     this.group = new THREE.Group();
@@ -166,15 +170,32 @@ export class PlantSystem {
 
   private shouldSpawnBranch(_segmentLevel: number): boolean {
     if (this.branches.length >= this.baseBranchCount) return false;
-    const waterBonus = (this.envParams.water / 100) * 0.3;
-    const probability = 0.55 + waterBonus;
+    const waterBonus = (this.envParams.water / 10) * 0.5;
+    const probability = Math.min(1, 0.55 + waterBonus);
     return Math.random() < probability;
   }
 
   public setEnvironmentParams(params: Partial<EnvironmentParams>): void {
+    const oldLight = this.targetEnvParams.light;
     this.targetEnvParams = { ...this.targetEnvParams, ...params };
     this.envTransitionProgress = 0;
     this.baseBranchCount = this.calculateTargetBranchCount();
+    if (params.light !== undefined && params.light !== oldLight) {
+      this.triggerLeafColorTransition();
+    }
+  }
+
+  private triggerLeafColorTransition(): void {
+    this.leafColorFrom.copy(this.getLeafColorByLight(this.envParams.light));
+    this.leafColorTo.copy(this.getLeafColorByLight(this.targetEnvParams.light));
+    this.leafColorProgress = 0;
+  }
+
+  private getLeafColorByLight(light: number): THREE.Color {
+    const t = light / 100;
+    const darkGreen = new THREE.Color(0x1B5E20);
+    const yellowGreen = new THREE.Color(0x9CCC65);
+    return darkGreen.clone().lerp(yellowGreen, t);
   }
 
   private lerpEnvParams(): void {
@@ -197,11 +218,26 @@ export class PlantSystem {
   }
 
   private updateLeafColors(): void {
-    const targetColor = this.getLeafColor();
+    if (this.leafColorProgress >= 1 && this.envTransitionProgress >= 1) return;
+    let t = 1;
+    if (this.leafColorProgress < 1) {
+      t = this.easeInOutCubic(this.leafColorProgress);
+    }
+    const currentColor = this.leafColorFrom.clone().lerp(this.leafColorTo, t);
     this.leaves.forEach(leaf => {
       const mat = leaf.mesh.material as THREE.MeshStandardMaterial;
-      mat.color.lerp(targetColor, 0.02);
+      mat.color.copy(currentColor);
     });
+  }
+
+  private updateLeafColorTransition(fixedDelta: number): void {
+    if (this.leafColorProgress < 1) {
+      this.leafColorProgress = Math.min(
+        1,
+        this.leafColorProgress + fixedDelta / this.LEAF_COLOR_TRANSITION_DURATION
+      );
+      this.updateLeafColors();
+    }
   }
 
   private spawnTrunkBranch(startY: number): void {
@@ -418,6 +454,7 @@ export class PlantSystem {
     this.elapsedTime = actualTime;
     this.lerpEnvParams();
     this.growthMultiplier = this.getGrowthMultiplier();
+    this.updateLeafColorTransition(fixedDelta);
 
     if (this.isReplaying) return;
 
