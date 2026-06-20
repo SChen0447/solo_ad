@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>幽暗密林生存</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #1a1a2e;
+      font-family: 'Courier New', monospace;
+    }
+    #game-container {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+    #progress-bar-container {
+      width: 60%;
+      height: 20px;
+      background: #2b2b2b;
+      border-radius: 8px;
+      margin-bottom: 8px;
+      box-shadow: inset 0 1px 3px rgba(0,0,0,0.5);
+      overflow: hidden;
+    }
+    #progress-bar-fill {
+      width: 0%;
+      height: 100%;
+      background: #e0a96d;
+      border-radius: 8px;
+      transition: width 0.3s ease;
+    }
+    #game-area {
+      display: flex;
+      width: 100%;
+      height: 70%;
+      justify-content: center;
+      align-items: center;
+    }
+    #side-panel {
+      width: 15%;
+      height: 70%;
+      background: #16213e;
+      color: #e0e0e0;
+      font-size: 16px;
+      text-align: center;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-start;
+      padding: 20px 10px;
+      border-radius: 8px;
+      margin-right: 12px;
+    }
+    #side-panel h3 {
+      margin-bottom: 16px;
+      font-size: 18px;
+      color: #e0a96d;
+    }
+    #side-panel .guide-item {
+      margin-bottom: 10px;
+      line-height: 1.6;
+    }
+    #side-panel .fragment-count {
+      margin-top: auto;
+      font-size: 48px;
+      font-weight: bold;
+      color: #ffd700;
+    }
+    #side-panel .fragment-hint {
+      font-size: 14px;
+      color: #a0a0a0;
+      margin-top: 4px;
+    }
+    #map-wrapper {
+      width: 80%;
+      height: 100%;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      position: relative;
+    }
+    canvas {
+      display: block;
+      image-rendering: pixelated;
+      max-width: 100%;
+      max-height: 100%;
+    }
+    #vignette {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      background: radial-gradient(ellipse at center, transparent 50%, rgba(0,0,0,0.4) 100%);
+    }
+  </style>
+</head>
+<body>
+  <div id="game-container">
+    <div id="progress-bar-container">
+      <div id="progress-bar-fill"></div>
+    </div>
+    <div id="game-area">
+      <div id="side-panel">
+        <h3>操作指南</h3>
+        <div class="guide-item">W - 向上移动</div>
+        <div class="guide-item">A - 向左移动</div>
+        <div class="guide-item">S - 向下移动</div>
+        <div class="guide-item">D - 向右移动</div>
+        <div class="guide-item" style="margin-top:12px;color:#e76f51;">躲避幽灵！</div>
+        <div class="guide-item" style="color:#ffd700;">收集灵魂碎片</div>
+        <div class="fragment-count" id="fragment-count">0</div>
+        <div class="fragment-hint" id="fragment-hint">碎片 0 / 20</div>
+      </div>
+      <div id="map-wrapper">
+        <canvas id="game-canvas"></canvas>
+        <div id="vignette"></div>
+      </div>
+    </div>
+  </div>
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
