@@ -6,8 +6,30 @@ export interface EnvironmentParams {
   temperature: number;
 }
 
+interface BranchBlueprint {
+  id: number;
+  parentIndex: number;
+  startY: number;
+  targetHeight: number;
+  thickness: number;
+  angle: number;
+  branchAngleRad: number;
+  growthStartTime: number;
+  color: number;
+}
+
+interface LeafBlueprint {
+  id: number;
+  branchIndex: number;
+  positionOnBranch: number;
+  side: number;
+  phase: number;
+  spawnTime: number;
+}
+
 interface BranchData {
   mesh: THREE.Mesh;
+  blueprint: BranchBlueprint;
   startY: number;
   targetHeight: number;
   currentHeight: number;
@@ -21,6 +43,7 @@ interface BranchData {
 
 interface LeafData {
   mesh: THREE.Mesh;
+  blueprint: LeafBlueprint;
   branchIndex: number;
   positionOnBranch: number;
   side: number;
@@ -63,24 +86,98 @@ export class PlantSystem {
   private envTransitionProgress = 1;
   private elapsedTime = 0;
   private readonly GROWTH_DURATION = 40;
-  private readonly BRANCH_GROWTH_RATE = 0.3;
   private readonly SEGMENT_HEIGHT = 1;
-  private growthMultiplier = 1;
   private snapshots: PlantSnapshot[] = [];
   private isReplaying = false;
   private baseBranchCount = 0;
-  private grownBranchesThisSegment = new Set<number>();
-  private lastSegmentLevel = -1;
   private leafColorFrom: THREE.Color = new THREE.Color(0x1B5E20);
   private leafColorTo: THREE.Color = new THREE.Color(0x1B5E20);
   private leafColorProgress: number = 1;
   private readonly LEAF_COLOR_TRANSITION_DURATION: number = 0.8;
+  private branchBlueprints: BranchBlueprint[] = [];
+  private leafBlueprints: LeafBlueprint[] = [];
+  private isPlaying = true;
+  private readonly RANDOM_SEED = 1337;
 
   constructor() {
     this.group = new THREE.Group();
     this.seed = this.createSeed();
     this.group.add(this.seed);
     this.baseBranchCount = this.calculateTargetBranchCount();
+    this.generateGrowthBlueprints();
+  }
+
+  private mulberry32(seed: number): () => number {
+    let a = seed;
+    return function () {
+      a |= 0;
+      a = (a + 0x6D2B79F5) | 0;
+      let t = Math.imul(a ^ (a >>> 15), 1 | a);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+
+  private generateGrowthBlueprints(): void {
+    const rand = this.mulberry32(this.RANDOM_SEED);
+    this.branchBlueprints = [];
+    this.leafBlueprints = [];
+    let branchId = 0;
+    let leafId = 0;
+
+    const trunk: BranchBlueprint = {
+      id: branchId++,
+      parentIndex: -1,
+      startY: 0,
+      targetHeight: 4,
+      thickness: 0.15,
+      angle: 0,
+      branchAngleRad: 0,
+      growthStartTime: 0.5,
+      color: 0x5D4037
+    };
+    this.branchBlueprints.push(trunk);
+
+    const maxSegments = 4;
+    for (let level = 1; level <= maxSegments; level++) {
+      const waterBonus = (this.targetEnvParams.water / 10) * 0.5;
+      const probability = Math.min(1, 0.55 + waterBonus);
+      if (rand() < probability && this.branchBlueprints.length - 1 < this.baseBranchCount) {
+        const angle = rand() * Math.PI * 2;
+        const branchAngle = THREE.MathUtils.degToRad(45 + rand() * 30);
+        const targetHeight = 0.8 + rand() * 1;
+        const thickness = 0.08 + rand() * 0.07;
+        const growthStart = 0.5 + level * 1.2 + rand() * 0.5;
+
+        const branch: BranchBlueprint = {
+          id: branchId++,
+          parentIndex: 0,
+          startY: level * this.SEGMENT_HEIGHT,
+          targetHeight,
+          thickness,
+          angle,
+          branchAngleRad: branchAngle,
+          growthStartTime: growthStart,
+          color: 0x6D4C41
+        };
+        this.branchBlueprints.push(branch);
+
+        const leafCount = 2 + Math.floor(rand() * 2);
+        for (let i = 0; i < leafCount; i++) {
+          const t = (i + 1) / (leafCount + 1);
+          const side = i % 2 === 0 ? 1 : -1;
+          const phase = rand() * Math.PI * 2;
+          this.leafBlueprints.push({
+            id: leafId++,
+            branchIndex: branch.id,
+            positionOnBranch: t,
+            side,
+            phase,
+            spawnTime: growthStart + 0.5
+          });
+        }
+      }
+    }
   }
 
   private createSeed(): THREE.Mesh {
@@ -163,18 +260,6 @@ export class PlantSystem {
     return factor;
   }
 
-  private getGrowthMultiplier(): number {
-    const lightFactor = 1 + ((this.envParams.light - 60) / 10) * 0.1;
-    return Math.max(0.3, Math.min(2, lightFactor));
-  }
-
-  private shouldSpawnBranch(_segmentLevel: number): boolean {
-    if (this.branches.length >= this.baseBranchCount) return false;
-    const waterBonus = (this.envParams.water / 10) * 0.5;
-    const probability = Math.min(1, 0.55 + waterBonus);
-    return Math.random() < probability;
-  }
-
   public setEnvironmentParams(params: Partial<EnvironmentParams>): void {
     const oldLight = this.targetEnvParams.light;
     this.targetEnvParams = { ...this.targetEnvParams, ...params };
@@ -240,74 +325,166 @@ export class PlantSystem {
     }
   }
 
-  private spawnTrunkBranch(startY: number): void {
-    const angle = Math.random() * Math.PI * 2;
-    const branchAngle = THREE.MathUtils.degToRad(THREE.MathUtils.randFloat(45, 75));
-    const direction = new THREE.Vector3(
-      Math.sin(angle) * Math.sin(branchAngle),
-      Math.cos(branchAngle),
-      Math.cos(angle) * Math.sin(branchAngle)
+  private getBranchDirection(bp: BranchBlueprint): THREE.Vector3 {
+    if (this.isTrunkBlueprint(bp)) {
+      return new THREE.Vector3(0, 1, 0);
+    }
+    return new THREE.Vector3(
+      Math.sin(bp.angle) * Math.sin(bp.branchAngleRad),
+      Math.cos(bp.branchAngleRad),
+      Math.cos(bp.angle) * Math.sin(bp.branchAngleRad)
     ).normalize();
-
-    const position = new THREE.Vector3(0, startY, 0);
-    const thickness = THREE.MathUtils.randFloat(0.08, 0.15);
-    const height = THREE.MathUtils.randFloat(0.8, 1.8);
-
-    const mesh = this.createBranch(position, direction, thickness, height, 0x6D4C41);
-    this.group.add(mesh);
-
-    this.branches.push({
-      mesh,
-      startY,
-      targetHeight: height,
-      currentHeight: 0,
-      growthStartTime: this.elapsedTime,
-      thickness,
-      parentIndex: 0,
-      angle,
-      direction,
-      position: position.clone()
-    });
   }
 
-  private spawnLeavesOnBranch(branch: BranchData, branchIdx: number): void {
-    const leafCount = 2 + Math.floor(Math.random() * 2);
+  private isTrunkBlueprint(bp: BranchBlueprint): boolean {
+    return bp.parentIndex === -1;
+  }
+
+  private instantiateBranch(bp: BranchBlueprint): BranchData {
+    const direction = this.getBranchDirection(bp);
+    const position = new THREE.Vector3(0, bp.startY, 0);
+    const mesh = this.createBranch(position, direction, bp.thickness, Math.max(0.01, bp.targetHeight), bp.color);
+    mesh.scale.set(1, 0.01 / Math.max(0.01, bp.targetHeight), 1);
+    this.group.add(mesh);
+    return {
+      mesh,
+      blueprint: bp,
+      startY: bp.startY,
+      targetHeight: bp.targetHeight,
+      currentHeight: 0,
+      growthStartTime: bp.growthStartTime,
+      thickness: bp.thickness,
+      parentIndex: bp.parentIndex,
+      angle: bp.angle,
+      direction,
+      position: position.clone()
+    };
+  }
+
+  private instantiateLeaf(lbp: LeafBlueprint, branchData: BranchData, currentTime: number): LeafData {
     const scaleFactor = this.getLeafScaleFactor();
     const baseSize = 0.3 * scaleFactor;
 
-    for (let i = 0; i < leafCount; i++) {
-      const t = (i + 1) / (leafCount + 1);
-      const side = i % 2 === 0 ? 1 : -1;
+    const perpX = new THREE.Vector3(-branchData.direction.z, 0, branchData.direction.x).normalize();
+    const leafDir = perpX.multiplyScalar(lbp.side);
+    const leafPos = branchData.position.clone().add(
+      branchData.direction.clone().multiplyScalar(branchData.currentHeight * lbp.positionOnBranch)
+    ).add(leafDir.clone().multiplyScalar(0.05));
 
-      const perpX = new THREE.Vector3(-branch.direction.z, 0, branch.direction.x).normalize();
-      const leafDir = perpX.multiplyScalar(side);
-      const leafPos = branch.position.clone().add(
-        branch.direction.clone().multiplyScalar(branch.currentHeight * t)
-      ).add(leafDir.clone().multiplyScalar(0.05));
+    const leaf = this.createLeaf();
+    leaf.position.copy(leafPos);
 
-      const leaf = this.createLeaf();
-      leaf.position.copy(leafPos);
+    const up = new THREE.Vector3(0, 1, 0);
+    const targetDir = branchData.direction.clone().lerp(leafDir, 0.4).add(new THREE.Vector3(0, 0.3, 0)).normalize();
+    const quat = new THREE.Quaternion().setFromUnitVectors(up, targetDir);
+    leaf.quaternion.copy(quat);
 
-      const up = new THREE.Vector3(0, 1, 0);
-      const targetDir = branch.direction.clone().lerp(leafDir, 0.4).add(new THREE.Vector3(0, 0.3, 0)).normalize();
-      const quat = new THREE.Quaternion().setFromUnitVectors(up, targetDir);
-      leaf.quaternion.copy(quat);
+    const curlProgress = Math.max(0, Math.min(1, (currentTime - lbp.spawnTime) / 0.4));
+    const curl = 1 - curlProgress;
+    leaf.scale.set(
+      baseSize * (0.3 + 0.7 * curlProgress),
+      baseSize * (0.3 + 0.7 * curlProgress),
+      baseSize * 0.1 * (0.2 + 0.8 * (1 - curl * 0.5))
+    );
+    this.group.add(leaf);
 
-      leaf.scale.set(baseSize, baseSize, baseSize * 0.1);
-      this.group.add(leaf);
+    return {
+      mesh: leaf,
+      blueprint: lbp,
+      branchIndex: lbp.branchIndex,
+      positionOnBranch: lbp.positionOnBranch,
+      side: lbp.side,
+      curlProgress,
+      targetCurl: 1,
+      phase: lbp.phase,
+      basePosition: leafPos.clone(),
+      baseScale: baseSize
+    };
+  }
 
-      this.leaves.push({
-        mesh: leaf,
-        branchIndex: branchIdx,
-        positionOnBranch: t,
-        side,
-        curlProgress: 0,
-        targetCurl: 1,
-        phase: Math.random() * Math.PI * 2,
-        basePosition: leafPos.clone(),
-        baseScale: baseSize
-      });
+  private clearPlantMeshes(): void {
+    while (this.branches.length > 0) {
+      const b = this.branches.pop()!;
+      if (b && b.mesh) {
+        this.group.remove(b.mesh);
+        b.mesh.geometry.dispose();
+        const mat = b.mesh.material as THREE.Material | THREE.Material[];
+        if (Array.isArray(mat)) mat.forEach(m => m.dispose());
+        else if (mat) mat.dispose();
+      }
     }
+    while (this.leaves.length > 0) {
+      const l = this.leaves.pop()!;
+      if (l && l.mesh) {
+        this.group.remove(l.mesh);
+        l.mesh.geometry.dispose();
+        const mat = l.mesh.material as THREE.Material | THREE.Material[];
+        if (Array.isArray(mat)) mat.forEach(m => m.dispose());
+        else if (mat) mat.dispose();
+      }
+    }
+  }
+
+  public seekToGrowthTime(targetTime: number): void {
+    const t = Math.max(0, Math.min(this.GROWTH_DURATION, targetTime));
+    this.elapsedTime = t;
+    this.clearPlantMeshes();
+
+    const seedScale = Math.max(0.01, 1 - Math.max(0, Math.min(1, (t - 0.5) / 1.5)));
+    this.seed.scale.setScalar(seedScale);
+    this.seed.visible = !(t > 2);
+
+    const growthProgress = Math.min(1, t / this.GROWTH_DURATION);
+    const targetTrunkHeight = 4 * growthProgress;
+
+    const branchById = new Map<number, BranchData>();
+
+    for (const bp of this.branchBlueprints) {
+      const isTrunk = this.isTrunkBlueprint(bp);
+      let height = 0;
+      if (t >= bp.growthStartTime) {
+        const growDuration = 3.5;
+        const elapsed = t - bp.growthStartTime;
+        if (isTrunk) {
+          height = Math.min(targetTrunkHeight, bp.targetHeight * Math.min(1, elapsed / growDuration));
+        } else {
+          height = Math.min(bp.targetHeight, bp.targetHeight * Math.min(1, elapsed / growDuration));
+        }
+      }
+      const branchData = this.instantiateBranch(bp);
+      branchData.currentHeight = Math.max(0.01, height);
+      this.updateBranchMesh(branchData);
+      this.branches.push(branchData);
+      branchById.set(bp.id, branchData);
+    }
+
+    for (const lbp of this.leafBlueprints) {
+      if (t < lbp.spawnTime) continue;
+      const branch = branchById.get(lbp.branchIndex);
+      if (!branch) continue;
+      if (branch.currentHeight / branch.targetHeight < 0.3) continue;
+      const leaf = this.instantiateLeaf(lbp, branch, t);
+      this.leaves.push(leaf);
+    }
+
+    this.updateLeafColors();
+  }
+
+  public togglePlay(): boolean {
+    this.isPlaying = !this.isPlaying;
+    return this.isPlaying;
+  }
+
+  public setPlaying(playing: boolean): void {
+    this.isPlaying = playing;
+  }
+
+  public getIsPlaying(): boolean {
+    return this.isPlaying;
+  }
+
+  public getGrowthDuration(): number {
+    return this.GROWTH_DURATION;
   }
 
   public startRecording(): void {
@@ -348,204 +525,24 @@ export class PlantSystem {
   }
 
   public seekToTime(time: number): void {
-    if (this.snapshots.length < 2) return;
-
-    let idx = 0;
-    for (let i = 0; i < this.snapshots.length - 1; i++) {
-      if (time >= this.snapshots[i].time && time <= this.snapshots[i + 1].time) {
-        idx = i;
-        break;
-      }
-    }
-
-    const s1 = this.snapshots[idx];
-    const s2 = this.snapshots[Math.min(idx + 1, this.snapshots.length - 1)];
-    const totalT = s2.time - s1.time;
-    const localT = totalT === 0 ? 0 : (time - s1.time) / totalT;
-
-    while (this.branches.length < s1.branches.length) {
-      const tempBranch = this.createBranch(
-        new THREE.Vector3(0, 0, 0),
-        new THREE.Vector3(0, 1, 0),
-        0.1, 1
-      );
-      this.group.add(tempBranch);
-      this.branches.push({
-        mesh: tempBranch,
-        startY: 0, targetHeight: 1, currentHeight: 0,
-        growthStartTime: 0, thickness: 0.1, parentIndex: 0,
-        angle: 0, direction: new THREE.Vector3(0, 1, 0),
-        position: new THREE.Vector3()
-      });
-    }
-    while (this.branches.length > s1.branches.length) {
-      const b = this.branches.pop()!;
-      this.group.remove(b.mesh);
-    }
-
-    s1.branches.forEach((sb, i) => {
-      const b = this.branches[i];
-      const next = s2.branches[i] || sb;
-      b.mesh.position.set(
-        this.lerp(sb.position[0], next.position[0], localT),
-        this.lerp(sb.position[1], next.position[1], localT),
-        this.lerp(sb.position[2], next.position[2], localT)
-      );
-      b.mesh.rotation.set(
-        this.lerp(sb.rotation[0], next.rotation[0], localT),
-        this.lerp(sb.rotation[1], next.rotation[1], localT),
-        this.lerp(sb.rotation[2], next.rotation[2], localT)
-      );
-      b.mesh.scale.set(
-        this.lerp(sb.scale[0], next.scale[0], localT),
-        this.lerp(sb.scale[1], next.scale[1], localT),
-        this.lerp(sb.scale[2], next.scale[2], localT)
-      );
-    });
-
-    while (this.leaves.length < s1.leaves.length) {
-      const leaf = this.createLeaf();
-      this.group.add(leaf);
-      this.leaves.push({
-        mesh: leaf,
-        branchIndex: 0, positionOnBranch: 0, side: 0,
-        curlProgress: 0, targetCurl: 1, phase: 0,
-        basePosition: new THREE.Vector3(), baseScale: 0.3
-      });
-    }
-    while (this.leaves.length > s1.leaves.length) {
-      const l = this.leaves.pop()!;
-      this.group.remove(l.mesh);
-    }
-
-    s1.leaves.forEach((sl, i) => {
-      const l = this.leaves[i];
-      const next = s2.leaves[i] || sl;
-      l.mesh.position.set(
-        this.lerp(sl.position[0], next.position[0], localT),
-        this.lerp(sl.position[1], next.position[1], localT),
-        this.lerp(sl.position[2], next.position[2], localT)
-      );
-      l.mesh.rotation.set(
-        this.lerp(sl.rotation[0], next.rotation[0], localT),
-        this.lerp(sl.rotation[1], next.rotation[1], localT),
-        this.lerp(sl.rotation[2], next.rotation[2], localT)
-      );
-      l.mesh.scale.set(
-        this.lerp(sl.scale[0], next.scale[0], localT),
-        this.lerp(sl.scale[1], next.scale[1], localT),
-        this.lerp(sl.scale[2], next.scale[2], localT)
-      );
-      const mat = l.mesh.material as THREE.MeshStandardMaterial;
-      mat.color.setStyle(sl.color);
-    });
-
-    this.seed.position.set(
-      this.lerp(s1.seed.position[0], s2.seed.position[0], localT),
-      this.lerp(s1.seed.position[1], s2.seed.position[1], localT),
-      this.lerp(s1.seed.position[2], s2.seed.position[2], localT)
-    );
-    const seedScale = this.lerp(s1.seed.scale, s2.seed.scale, localT);
-    this.seed.scale.set(seedScale, seedScale, seedScale);
-    this.seed.visible = s1.seed.visible;
+    this.seekToGrowthTime(time);
   }
 
-  public update(fixedDelta: number, actualTime: number): void {
-    this.elapsedTime = actualTime;
+  public update(fixedDelta: number, _actualTime: number): void {
+    if (this.isPlaying && !this.isReplaying) {
+      const newTime = Math.min(this.GROWTH_DURATION, this.elapsedTime + fixedDelta);
+      if (Math.abs(newTime - this.elapsedTime) > 1e-6) {
+        this.seekToGrowthTime(newTime);
+      }
+    }
     this.lerpEnvParams();
-    this.growthMultiplier = this.getGrowthMultiplier();
     this.updateLeafColorTransition(fixedDelta);
 
-    if (this.isReplaying) return;
-
-    const seedScale = Math.max(0.01, 1 - Math.max(0, Math.min(1, (actualTime - 0.5) / 1.5)));
-    this.seed.scale.setScalar(seedScale);
-    if (actualTime > 2) this.seed.visible = false;
-
-    const growthProgress = Math.min(1, actualTime / this.GROWTH_DURATION);
-    const targetTrunkHeight = 4 * growthProgress;
-    const segmentLevel = Math.floor(targetTrunkHeight / this.SEGMENT_HEIGHT);
-
-    if (segmentLevel !== this.lastSegmentLevel && segmentLevel > 0) {
-      this.lastSegmentLevel = segmentLevel;
-      this.grownBranchesThisSegment.clear();
-    }
-
-    if (this.branches.length === 0 || !this.isTrunk(this.branches[0])) {
-      const trunkDir = new THREE.Vector3(0, 1, 0);
-      const trunkPos = new THREE.Vector3(0, 0, 0);
-      const trunkMesh = this.createBranch(trunkPos, trunkDir, 0.15, 0.01, 0x5D4037);
-      this.group.add(trunkMesh);
-      this.branches.unshift({
-        mesh: trunkMesh,
-        startY: 0,
-        targetHeight: 4,
-        currentHeight: 0,
-        growthStartTime: 0.5,
-        thickness: 0.15,
-        parentIndex: -1,
-        angle: 0,
-        direction: trunkDir.clone(),
-        position: trunkPos.clone()
-      });
-    }
-
-    const trunk = this.branches[0];
-    if (actualTime >= trunk.growthStartTime && trunk.currentHeight < targetTrunkHeight) {
-      const growthAmount = this.BRANCH_GROWTH_RATE * this.growthMultiplier * fixedDelta;
-      trunk.currentHeight = Math.min(targetTrunkHeight, trunk.currentHeight + growthAmount);
-      this.updateBranchMesh(trunk);
-
-      const currentSegments = Math.floor(trunk.currentHeight / this.SEGMENT_HEIGHT);
-      for (let level = 1; level <= currentSegments; level++) {
-        if (!this.grownBranchesThisSegment.has(level)) {
-          if (this.shouldSpawnBranch(level)) {
-            this.spawnTrunkBranch(level * this.SEGMENT_HEIGHT);
-          }
-          this.grownBranchesThisSegment.add(level);
-        }
-      }
-    }
-
-    for (let i = 1; i < this.branches.length; i++) {
-      const branch = this.branches[i];
-      if (actualTime >= branch.growthStartTime && branch.currentHeight < branch.targetHeight) {
-        const growthAmount = this.BRANCH_GROWTH_RATE * 0.7 * this.growthMultiplier * fixedDelta;
-        const wasZero = branch.currentHeight === 0;
-        branch.currentHeight = Math.min(branch.targetHeight, branch.currentHeight + growthAmount);
-        this.updateBranchMesh(branch);
-        if (wasZero || Math.random() < 0.02) {
-          const hasLeaves = this.leaves.some(l => l.branchIndex === i);
-          if (!hasLeaves && branch.currentHeight / branch.targetHeight > 0.3) {
-            this.spawnLeavesOnBranch(branch, i);
-          }
-        }
-      }
-    }
-
-    this.leaves.forEach(leaf => {
-      if (leaf.curlProgress < leaf.targetCurl) {
-        leaf.curlProgress = Math.min(1, leaf.curlProgress + fixedDelta / 0.4);
-        const curl = 1 - leaf.curlProgress;
-        const s = leaf.baseScale;
-        leaf.mesh.scale.set(
-          s * (0.3 + 0.7 * leaf.curlProgress),
-          s * (0.3 + 0.7 * leaf.curlProgress),
-          s * 0.1 * (0.2 + 0.8 * (1 - curl * 0.5))
-        );
-      }
-
-      const float = Math.sin(actualTime * 0.5 * Math.PI * 2 + leaf.phase) * 0.01;
+    const t = this.elapsedTime;
+    for (const leaf of this.leaves) {
+      const float = Math.sin(t * 0.5 * Math.PI * 2 + leaf.phase) * 0.01;
       leaf.mesh.position.y = leaf.basePosition.y + float;
-    });
-
-    const scaleFactor = this.getLeafScaleFactor();
-    this.leaves.forEach(leaf => {
-      const targetScale = leaf.baseScale * (leaf.baseScale / 0.3) * scaleFactor * (0.3 + 0.7 * leaf.curlProgress) / (leaf.baseScale / 0.3);
-      const currentX = leaf.mesh.scale.x;
-      const newScale = currentX + (targetScale - currentX) * 0.05;
-      leaf.mesh.scale.set(newScale, newScale, newScale * 0.1);
-    });
+    }
   }
 
   private isTrunk(branch: BranchData): boolean {
@@ -559,7 +556,7 @@ export class PlantSystem {
       ? 0.15 * (0.5 + 0.5 * (h / 4))
       : branch.thickness;
 
-    branch.mesh.scale.set(1, h / Math.max(0.01, h > 0 ? h : 0.01), 1);
+    branch.mesh.scale.set(1, 1, 1);
 
     const up = new THREE.Vector3(0, 1, 0);
     const dirNorm = branch.direction.clone().normalize();

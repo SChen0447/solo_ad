@@ -1,6 +1,8 @@
 import type { EnvironmentParams } from './plantSystem';
 
 type ParamChangeCallback = (params: Partial<EnvironmentParams>) => void;
+type TimelineSeekCallback = (time: number) => void;
+type TimelinePlayPauseCallback = () => boolean;
 
 interface SliderConfig {
   key: keyof EnvironmentParams;
@@ -16,6 +18,10 @@ export class EnvironmentPanel {
   private container: HTMLElement;
   private panel: HTMLElement;
   private toggleBtn: HTMLElement | null = null;
+  private timelineProgress: HTMLElement | null = null;
+  private timelineFill: HTMLElement | null = null;
+  private playBtn: HTMLButtonElement | null = null;
+  private timeLabel: HTMLElement | null = null;
   private sliders: Map<keyof EnvironmentParams, {
     input: HTMLInputElement;
     fill: HTMLElement;
@@ -24,16 +30,27 @@ export class EnvironmentPanel {
     thumb: HTMLElement;
   }> = new Map();
   private onParamChange: ParamChangeCallback;
+  private onSeek: TimelineSeekCallback;
+  private onPlayPause: TimelinePlayPauseCallback;
   private isPanelVisible = true;
+  private currentTime = 0;
+  private readonly TOTAL_DURATION = 40;
   private readonly sliderConfigs: SliderConfig[] = [
     { key: 'light', label: '光照强度', unit: '%', min: 0, max: 100, default: 60, icon: '☀' },
     { key: 'water', label: '水分含量', unit: '%', min: 0, max: 100, default: 70, icon: '💧' },
     { key: 'temperature', label: '温度', unit: '°C', min: 10, max: 40, default: 25, icon: '🌡' }
   ];
 
-  constructor(appContainer: HTMLElement, callback: ParamChangeCallback) {
+  constructor(
+    appContainer: HTMLElement,
+    paramCallback: ParamChangeCallback,
+    seekCallback: TimelineSeekCallback,
+    playPauseCallback: TimelinePlayPauseCallback
+  ) {
     this.container = appContainer;
-    this.onParamChange = callback;
+    this.onParamChange = paramCallback;
+    this.onSeek = seekCallback;
+    this.onPlayPause = playPauseCallback;
     this.panel = this.createPanel();
     this.container.appendChild(this.panel);
     this.createStyles();
@@ -238,6 +255,116 @@ export class EnvironmentPanel {
       .panel-toggle-btn.visible {
         display: flex;
       }
+      .timeline-container {
+        margin-top: 24px;
+        padding-top: 20px;
+        border-top: 1px solid rgba(255, 255, 255, 0.12);
+      }
+      .timeline-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 12px;
+        font-size: 14px;
+        color: rgba(255, 255, 255, 0.9);
+      }
+      .timeline-title {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .timeline-time-label {
+        font-variant-numeric: tabular-nums;
+        font-weight: 600;
+        color: rgba(255, 255, 255, 0.95);
+        font-size: 13px;
+      }
+      .timeline-controls {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+      .timeline-play-btn {
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #4ade80 0%, #22c55e 100%);
+        border: none;
+        color: white;
+        font-size: 14px;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+        box-shadow: 0 2px 8px rgba(74, 222, 128, 0.4);
+        transition: transform 0.1s ease, box-shadow 0.1s ease;
+      }
+      .timeline-play-btn:hover {
+        transform: scale(1.08);
+        box-shadow: 0 3px 12px rgba(74, 222, 128, 0.5);
+      }
+      .timeline-play-btn:active {
+        animation: elasticBounce 0.15s ease;
+      }
+      .timeline-track-wrapper {
+        flex: 1;
+        position: relative;
+        height: 6px;
+        cursor: pointer;
+        padding: 6px 0;
+      }
+      .timeline-track {
+        position: absolute;
+        top: 50%;
+        left: 0;
+        right: 0;
+        height: 6px;
+        transform: translateY(-50%);
+        background: rgba(255, 255, 255, 0.15);
+        border-radius: 3px;
+        overflow: hidden;
+      }
+      .timeline-fill {
+        position: absolute;
+        top: 0;
+        left: 0;
+        height: 100%;
+        border-radius: 3px;
+        background: linear-gradient(90deg, #4ade80 0%, #22c55e 100%);
+        transition: width 0.05s linear;
+      }
+      .timeline-fill::after {
+        content: '';
+        position: absolute;
+        top: 0;
+        right: 0;
+        width: 12px;
+        height: 100%;
+        background: radial-gradient(circle at right center,
+          rgba(255, 255, 255, 0.6) 0%,
+          transparent 70%
+        );
+      }
+      .timeline-thumb {
+        position: absolute;
+        top: 50%;
+        width: 14px;
+        height: 14px;
+        background: white;
+        border-radius: 50%;
+        transform: translate(-50%, -50%);
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+        transition: transform 0.1s ease;
+        z-index: 2;
+        cursor: grab;
+      }
+      .timeline-track-wrapper:hover .timeline-thumb {
+        transform: translate(-50%, -50%) scale(1.15);
+      }
+      .timeline-thumb:active {
+        cursor: grabbing;
+      }
       @media (max-width: 768px) {
         .env-panel {
           left: 0;
@@ -257,7 +384,7 @@ export class EnvironmentPanel {
 
     const title = document.createElement('div');
     title.className = 'env-panel-title';
-    title.textContent = '环境参数控制';
+    title.textContent = '植物生长模拟器';
     panel.appendChild(title);
 
     this.sliderConfigs.forEach(config => {
@@ -265,7 +392,123 @@ export class EnvironmentPanel {
       panel.appendChild(group);
     });
 
+    const timeline = this.createTimeline();
+    panel.appendChild(timeline);
+
     return panel;
+  }
+
+  private formatTime(seconds: number): string {
+    const s = Math.max(0, Math.min(this.TOTAL_DURATION, seconds));
+    const fixed = s.toFixed(1);
+    return `${fixed}s / ${this.TOTAL_DURATION.toFixed(1)}s`;
+  }
+
+  private createTimeline(): HTMLElement {
+    const container = document.createElement('div');
+    container.className = 'timeline-container';
+
+    const header = document.createElement('div');
+    header.className = 'timeline-header';
+    const title = document.createElement('span');
+    title.className = 'timeline-title';
+    title.innerHTML = `<span>🌱</span><span>生长回放</span>`;
+    this.timeLabel = document.createElement('span');
+    this.timeLabel.className = 'timeline-time-label';
+    this.timeLabel.textContent = this.formatTime(0);
+    header.appendChild(title);
+    header.appendChild(this.timeLabel);
+    container.appendChild(header);
+
+    const controls = document.createElement('div');
+    controls.className = 'timeline-controls';
+
+    this.playBtn = document.createElement('button');
+    this.playBtn.className = 'timeline-play-btn';
+    this.playBtn.innerHTML = '❚❚';
+    this.playBtn.title = '暂停';
+    this.playBtn.addEventListener('click', () => {
+      const nowPlaying = this.onPlayPause();
+      if (this.playBtn) {
+        this.playBtn.innerHTML = nowPlaying ? '❚❚' : '▶';
+        this.playBtn.title = nowPlaying ? '暂停' : '播放';
+      }
+    });
+    controls.appendChild(this.playBtn);
+
+    const trackWrapper = document.createElement('div');
+    trackWrapper.className = 'timeline-track-wrapper';
+    this.timelineProgress = trackWrapper;
+
+    const track = document.createElement('div');
+    track.className = 'timeline-track';
+    this.timelineFill = document.createElement('div');
+    this.timelineFill.className = 'timeline-fill';
+    this.timelineFill.style.width = '0%';
+    track.appendChild(this.timelineFill);
+    trackWrapper.appendChild(track);
+
+    const thumb = document.createElement('div');
+    thumb.className = 'timeline-thumb';
+    thumb.style.left = '0%';
+    trackWrapper.appendChild(thumb);
+
+    let isDragging = false;
+    const getTimeFromEvent = (ev: MouseEvent | TouchEvent): number => {
+      const rect = trackWrapper.getBoundingClientRect();
+      const clientX = 'touches' in ev ? ev.touches[0].clientX : (ev as MouseEvent).clientX;
+      let ratio = (clientX - rect.left) / rect.width;
+      ratio = Math.max(0, Math.min(1, ratio));
+      return ratio * this.TOTAL_DURATION;
+    };
+    const applyTime = (t: number) => {
+      this.currentTime = t;
+      if (this.timelineFill) this.timelineFill.style.width = `${(t / this.TOTAL_DURATION) * 100}%`;
+      thumb.style.left = `${(t / this.TOTAL_DURATION) * 100}%`;
+      if (this.timeLabel) this.timeLabel.textContent = this.formatTime(t);
+      this.onSeek(t);
+    };
+    const onDown = (ev: MouseEvent | TouchEvent) => {
+      isDragging = true;
+      ev.preventDefault();
+      applyTime(getTimeFromEvent(ev));
+    };
+    const onMove = (ev: MouseEvent | TouchEvent) => {
+      if (!isDragging) return;
+      ev.preventDefault();
+      applyTime(getTimeFromEvent(ev));
+    };
+    const onUp = () => { isDragging = false; };
+    trackWrapper.addEventListener('mousedown', onDown);
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+    trackWrapper.addEventListener('touchstart', onDown, { passive: false });
+    window.addEventListener('touchmove', onMove, { passive: false });
+    window.addEventListener('touchend', onUp);
+
+    controls.appendChild(trackWrapper);
+    container.appendChild(controls);
+
+    return container;
+  }
+
+  public updateTimeline(time: number): void {
+    const t = Math.max(0, Math.min(this.TOTAL_DURATION, time));
+    if (Math.abs(t - this.currentTime) < 1e-3) return;
+    this.currentTime = t;
+    if (this.timelineFill) this.timelineFill.style.width = `${(t / this.TOTAL_DURATION) * 100}%`;
+    if (this.timelineProgress) {
+      const thumb = this.timelineProgress.querySelector('.timeline-thumb') as HTMLElement | null;
+      if (thumb) thumb.style.left = `${(t / this.TOTAL_DURATION) * 100}%`;
+    }
+    if (this.timeLabel) this.timeLabel.textContent = this.formatTime(t);
+  }
+
+  public updatePlayState(playing: boolean): void {
+    if (this.playBtn) {
+      this.playBtn.innerHTML = playing ? '❚❚' : '▶';
+      this.playBtn.title = playing ? '暂停' : '播放';
+    }
   }
 
   private createSliderGroup(config: SliderConfig): HTMLElement {

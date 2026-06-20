@@ -65,7 +65,9 @@ class App {
 
     this.environmentPanel = new EnvironmentPanel(
       this.appContainer,
-      (params) => this.onEnvironmentChange(params)
+      (params) => this.onEnvironmentChange(params),
+      (time) => this.onTimelineSeek(time),
+      () => this.onTimelinePlayPause()
     );
 
     this.cameraControls = new CameraControls(
@@ -109,6 +111,21 @@ class App {
     this.visualEffects.updateLightParams(currentParams);
   }
 
+  private onTimelineSeek(time: number): void {
+    this.actualTime = time;
+    this.accumulator = 0;
+    this.plantSystem.seekToGrowthTime(time);
+  }
+
+  private onTimelinePlayPause(): boolean {
+    const wasPlaying = this.plantSystem.getIsPlaying();
+    const nowPlaying = this.plantSystem.togglePlay();
+    if (wasPlaying && !nowPlaying) {
+      this.accumulator = 0;
+    }
+    return nowPlaying;
+  }
+
   private setupEvents(): void {
     window.addEventListener('resize', this.onResize);
   }
@@ -150,23 +167,28 @@ class App {
 
     const isReplayMode = this.cameraControls.isReplayMode();
     const isRecording = this.cameraControls.isRecording();
+    const isPlantPlaying = this.plantSystem.getIsPlaying();
 
-    if (!isReplayMode) {
+    if (!isReplayMode && isPlantPlaying) {
       this.accumulator += delta;
 
       while (this.accumulator >= FIXED_TIMESTEP) {
         this.plantSystem.update(FIXED_TIMESTEP, this.actualTime);
-        this.actualTime += FIXED_TIMESTEP;
+        this.actualTime = this.plantSystem.getElapsedTime();
         this.accumulator -= FIXED_TIMESTEP;
 
         if (isRecording) {
           this.plantSystem.recordSnapshot();
         }
       }
+    } else if (!isReplayMode && !isPlantPlaying) {
+      this.accumulator = 0;
     }
 
     this.visualEffects.update(delta, this.actualTime);
     this.cameraControls.update(delta);
+    this.environmentPanel.updateTimeline(this.plantSystem.getElapsedTime());
+    this.environmentPanel.updatePlayState(this.plantSystem.getIsPlaying());
 
     this.renderer.render(this.scene, this.camera);
   };
