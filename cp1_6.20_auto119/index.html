@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>暗黑地牢 - 迷宫探索</title>
+  <link rel="stylesheet" href="/src/style.css" />
+</head>
+<body>
+  <div id="app">
+    <div id="game-container">
+      <div id="top-bar">
+        <div id="mini-map-panel" class="panel">
+          <h3 class="panel-title">迷宫地图</h3>
+          <canvas id="mini-map"></canvas>
+        </div>
+        <div id="party-panel" class="panel">
+          <h3 class="panel-title">队伍状态</h3>
+          <div id="party-list"></div>
+        </div>
+      </div>
+      
+      <div id="main-area">
+        <div id="maze-view">
+          <canvas id="game-canvas"></canvas>
+          <div id="transition-overlay" class="transition-overlay"></div>
+        </div>
+      </div>
+      
+      <div id="bottom-bar">
+        <div id="log-panel" class="panel">
+          <h3 class="panel-title">行动日志</h3>
+          <div id="log-list"></div>
+        </div>
+      </div>
+    </div>
+    
+    <div id="event-modal" class="modal hidden">
+      <div class="modal-content">
+        <h2 id="event-title"></h2>
+        <p id="event-description"></p>
+        <div class="modal-buttons">
+          <button id="event-btn1" class="game-btn"></button>
+          <button id="event-btn2" class="game-btn"></button>
+        </div>
+      </div>
+    </div>
+    
+    <div id="battle-screen" class="hidden">
+      <div class="battle-arena">
+        <div class="enemy-side">
+          <div id="enemy-list"></div>
+        </div>
+        <div class="battle-center">
+          <div id="battle-log"></div>
+        </div>
+        <div class="player-side">
+          <div id="player-party"></div>
+        </div>
+      </div>
+      <div id="skill-panel" class="hidden">
+        <h3>选择技能</h3>
+        <div id="skill-list"></div>
+      </div>
+    </div>
+    
+    <div id="inventory-panel" class="panel hidden">
+      <h3 class="panel-title">背包</h3>
+      <div id="inventory-grid"></div>
+    </div>
+    
+    <div id="start-screen">
+      <div class="start-content">
+        <h1>暗黑地牢</h1>
+        <p class="subtitle">迷宫探索 · 回合制战斗</p>
+        <div class="party-setup">
+          <h3>组建你的队伍 (选择3-4人)</h3>
+          <div id="class-selection"></div>
+          <div id="selected-party"></div>
+        </div>
+        <button id="start-btn" class="game-btn primary-btn" disabled>开始冒险</button>
+      </div>
+    </div>
+  </div>
+  
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
