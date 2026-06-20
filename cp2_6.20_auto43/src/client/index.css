@@ -42,6 +42,15 @@ body {
   50% { opacity: 0.4; }
 }
 
+@keyframes dotPulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.8); }
+}
+
+.dot-pulse {
+  animation: dotPulse 0.8s ease-in-out infinite;
+}
+
 .fade-in {
   animation: fadeIn 0.2s ease-out;
 }

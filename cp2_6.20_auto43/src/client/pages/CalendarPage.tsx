@@ -22,6 +22,7 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ isMobile }) => {
   });
   const [newEventId, setNewEventId] = useState<string | null>(null);
   const [isAnimating, setIsAnimating] = useState(false);
+  const [highlightToday, setHighlightToday] = useState(false);
 
   useEffect(() => {
     fetchEvents();
@@ -53,6 +54,16 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ isMobile }) => {
     return events.filter(event => event.date === dateKey);
   };
 
+  const getTodayKey = () => {
+    const today = new Date();
+    return formatDateKey(today.getFullYear(), today.getMonth(), today.getDate());
+  };
+
+  const getCurrentHourTime = () => {
+    const now = new Date();
+    return `${String(now.getHours()).padStart(2, '0')}:00`;
+  };
+
   const handlePrevMonth = () => {
     setIsAnimating(true);
     setTimeout(() => {
@@ -69,12 +80,35 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ isMobile }) => {
     }, 150);
   };
 
+  const handleGoToday = () => {
+    const today = new Date();
+    const needSwitchMonth = today.getMonth() !== currentDate.getMonth() || today.getFullYear() !== currentDate.getFullYear();
+    
+    if (needSwitchMonth) {
+      setIsAnimating(true);
+      setTimeout(() => {
+        setCurrentDate(new Date(today.getFullYear(), today.getMonth(), 1));
+        setIsAnimating(false);
+        triggerHighlightToday();
+      }, 150);
+    } else {
+      triggerHighlightToday();
+    }
+  };
+
+  const triggerHighlightToday = () => {
+    setHighlightToday(true);
+    setTimeout(() => {
+      setHighlightToday(false);
+    }, 1500);
+  };
+
   const handleDateClick = (dateKey: string) => {
     setSelectedDate(dateKey);
     setNewEvent({
       city: '',
       venue: '',
-      startTime: '',
+      startTime: getCurrentHourTime(),
       expectedAttendance: 0,
       notes: ''
     });
@@ -102,13 +136,23 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ isMobile }) => {
     }
   };
 
+  const getDateStatus = (dateKey: string): 'past' | 'today' | 'future' => {
+    const today = new Date();
+    const todayOnly = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    const eventDate = new Date(dateKey);
+    const eventOnly = new Date(eventDate.getFullYear(), eventDate.getMonth(), eventDate.getDate());
+    
+    if (eventOnly.getTime() < todayOnly.getTime()) return 'past';
+    if (eventOnly.getTime() === todayOnly.getTime()) return 'today';
+    return 'future';
+  };
+
   const renderCalendarGrid = () => {
     const year = currentDate.getFullYear();
     const month = currentDate.getMonth();
     const daysInMonth = getDaysInMonth(year, month);
     const firstDay = getFirstDayOfMonth(year, month);
-    const today = new Date();
-    const todayKey = formatDateKey(today.getFullYear(), today.getMonth(), today.getDate());
+    const todayKey = getTodayKey();
 
     const days = [];
     
@@ -120,6 +164,7 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ isMobile }) => {
       const dateKey = formatDateKey(year, month, day);
       const dayEvents = getEventsForDate(dateKey);
       const isToday = dateKey === todayKey;
+      const shouldHighlightToday = isToday && highlightToday;
 
       days.push(
         <div
@@ -131,12 +176,17 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ isMobile }) => {
             backgroundColor: isToday ? 'rgba(83, 52, 131, 0.3)' : 'transparent',
             borderRadius: '8px',
             cursor: 'pointer',
-            transition: 'background-color 0.2s',
-            border: isToday ? '2px solid #533483' : '1px solid rgba(255,255,255,0.1)',
+            transition: 'background-color 0.2s, border 0.3s',
+            border: shouldHighlightToday 
+              ? '2px dashed #FFD700' 
+              : isToday ? '2px solid #533483' : '1px solid rgba(255,255,255,0.1)',
+            boxShadow: shouldHighlightToday ? '0 0 12px rgba(255, 215, 0, 0.6)' : 'none',
             position: 'relative'
           }}
           onMouseEnter={(e) => {
-            e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.1)';
+            if (!shouldHighlightToday) {
+              e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.1)';
+            }
           }}
           onMouseLeave={(e) => {
             e.currentTarget.style.backgroundColor = isToday ? 'rgba(83, 52, 131, 0.3)' : 'transparent';
@@ -151,28 +201,81 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ isMobile }) => {
             {day}
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-            {dayEvents.map(event => (
-              <div
-                key={event.id}
-                className={newEventId === event.id ? 'bounce-in' : ''}
-                style={{
-                  backgroundColor: event.color,
-                  color: '#1a1a2e',
-                  padding: '4px 8px',
-                  borderRadius: '6px',
-                  fontSize: isMobile ? '10px' : '12px',
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  whiteSpace: 'nowrap',
-                  fontWeight: '500',
-                  transform: newEventId === event.id ? 'scale(1)' : undefined,
-                  opacity: newEventId === event.id ? 1 : undefined
-                }}
-                title={`${event.city} - ${event.venue}`}
-              >
-                {isMobile ? event.city : `${event.city} · ${event.venue}`}
-              </div>
-            ))}
+            {dayEvents.map(event => {
+              const status = getDateStatus(event.date);
+              const opacity = status === 'past' ? 0.5 : 1;
+              const borderStyle = status === 'today' 
+                ? '2px solid #FFD700' 
+                : 'none';
+              const boxShadow = status === 'today' 
+                ? '0 0 10px rgba(255, 215, 0, 0.7)' 
+                : 'none';
+
+              return (
+                <div
+                  key={event.id}
+                  className={newEventId === event.id ? 'bounce-in' : ''}
+                  style={{
+                    backgroundColor: event.color,
+                    color: '#1a1a2e',
+                    padding: '4px 8px',
+                    borderRadius: '6px',
+                    fontSize: isMobile ? '10px' : '12px',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                    fontWeight: '500',
+                    transform: newEventId === event.id ? 'scale(1)' : undefined,
+                    opacity: newEventId === event.id ? 1 : opacity,
+                    border: borderStyle,
+                    boxShadow: boxShadow,
+                    position: 'relative',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between'
+                  }}
+                  title={`${event.city} - ${event.venue}${status === 'past' ? ' (已结束)' : status === 'today' ? ' (今日)' : ''}`}
+                >
+                  <span style={{ 
+                    overflow: 'hidden', 
+                    textOverflow: 'ellipsis', 
+                    whiteSpace: 'nowrap',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px'
+                  }}>
+                    {status === 'today' && !isMobile && (
+                      <span 
+                        className="dot-pulse"
+                        style={{
+                          display: 'inline-block',
+                          width: '6px',
+                          height: '6px',
+                          backgroundColor: '#FFD700',
+                          borderRadius: '50%',
+                          flexShrink: 0
+                        }}
+                      />
+                    )}
+                    {isMobile ? event.city : `${event.city} · ${event.venue}`}
+                  </span>
+                  {status === 'past' && (
+                    <span
+                      style={{
+                        display: 'inline-block',
+                        width: '6px',
+                        height: '6px',
+                        backgroundColor: '#888',
+                        borderRadius: '50%',
+                        flexShrink: 0,
+                        marginLeft: '4px'
+                      }}
+                      title="已结束"
+                    />
+                  )}
+                </div>
+              );
+            })}
           </div>
         </div>
       );
@@ -186,40 +289,144 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ isMobile }) => {
     
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-        {sortedEvents.map(event => (
-          <div
-            key={event.id}
-            style={{
-              backgroundColor: '#16213e',
-              borderRadius: '12px',
-              padding: '16px',
-              borderLeft: `6px solid ${event.color}`
-            }}
-          >
-            <div style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: '8px' }}>
-              {event.city} - {event.venue}
-            </div>
-            <div style={{ color: '#a0a0c0', fontSize: '14px' }}>
-              📅 {event.date} | ⏰ {event.startTime} | 👥 {event.expectedAttendance}人
-            </div>
-            {event.notes && (
-              <div style={{ marginTop: '8px', fontSize: '13px', color: '#888' }}>
-                备注: {event.notes}
+        {sortedEvents.map(event => {
+          const status = getDateStatus(event.date);
+          const opacity = status === 'past' ? 0.5 : 1;
+          const borderExtra = status === 'today' 
+            ? '2px solid #FFD700' 
+            : 'none';
+          const boxShadow = status === 'today' 
+            ? '0 0 12px rgba(255, 215, 0, 0.5)' 
+            : 'none';
+
+          return (
+            <div
+              key={event.id}
+              style={{
+                backgroundColor: '#16213e',
+                borderRadius: '12px',
+                padding: '16px',
+                borderLeft: `6px solid ${event.color}`,
+                border: status === 'today' ? `2px solid #FFD700` : undefined,
+                boxShadow: boxShadow,
+                opacity: opacity,
+                position: 'relative'
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ 
+                    fontSize: '18px', 
+                    fontWeight: 'bold', 
+                    marginBottom: '8px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px'
+                  }}>
+                    {status === 'today' && (
+                      <span 
+                        className="dot-pulse"
+                        style={{
+                          display: 'inline-block',
+                          width: '10px',
+                          height: '10px',
+                          backgroundColor: '#FFD700',
+                          borderRadius: '50%',
+                          boxShadow: '0 0 8px rgba(255, 215, 0, 0.8)'
+                        }}
+                      />
+                    )}
+                    {event.city} - {event.venue}
+                  </div>
+                  <div style={{ color: '#a0a0c0', fontSize: '14px' }}>
+                    📅 {event.date} | ⏰ {event.startTime} | 👥 {event.expectedAttendance}人
+                  </div>
+                  {event.notes && (
+                    <div style={{ marginTop: '8px', fontSize: '13px', color: '#888' }}>
+                      备注: {event.notes}
+                    </div>
+                  )}
+                </div>
+                {status === 'past' && (
+                  <div style={{ 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    gap: '6px',
+                    backgroundColor: 'rgba(136, 136, 136, 0.2)',
+                    padding: '4px 10px',
+                    borderRadius: '12px',
+                    fontSize: '12px',
+                    color: '#888'
+                  }}>
+                    <span
+                      style={{
+                        display: 'inline-block',
+                        width: '8px',
+                        height: '8px',
+                        backgroundColor: '#888',
+                        borderRadius: '50%'
+                      }}
+                    />
+                    已结束
+                  </div>
+                )}
+                {status === 'today' && (
+                  <div style={{ 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    gap: '6px',
+                    backgroundColor: 'rgba(255, 215, 0, 0.15)',
+                    padding: '4px 10px',
+                    borderRadius: '12px',
+                    fontSize: '12px',
+                    color: '#FFD700',
+                    fontWeight: 'bold'
+                  }}>
+                    今日演出
+                  </div>
+                )}
+                {status === 'future' && (
+                  <div style={{ 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    gap: '6px',
+                    backgroundColor: 'rgba(78, 205, 196, 0.15)',
+                    padding: '4px 10px',
+                    borderRadius: '12px',
+                    fontSize: '12px',
+                    color: '#4ECDC4',
+                    fontWeight: 'bold'
+                  }}>
+                    即将到来
+                  </div>
+                )}
               </div>
-            )}
-          </div>
-        ))}
+            </div>
+          );
+        })}
       </div>
     );
   };
 
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '10px' }}>
         <h2 style={{ fontSize: '24px', fontWeight: 'bold' }}>
           📅 {MONTHS[currentDate.getMonth()]} {currentDate.getFullYear()}
         </h2>
-        <div style={{ display: 'flex', gap: '10px' }}>
+        <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+          <button
+            onClick={handleGoToday}
+            style={{
+              padding: '8px 16px',
+              backgroundColor: '#FFD700',
+              color: '#1a1a2e',
+              fontSize: '14px',
+              fontWeight: 'bold'
+            }}
+          >
+            今天
+          </button>
           <button
             onClick={handlePrevMonth}
             style={{
@@ -320,9 +527,19 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ isMobile }) => {
             }}
           >
             <h3 style={{ fontSize: '20px', fontWeight: 'bold', marginBottom: '20px', color: '#1a1a2e' }}>
-              创建演出日程 - {selectedDate}
+              创建演出日程
             </h3>
             <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <div>
+                <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500', color: '#333' }}>日期 *</label>
+                <input
+                  type="date"
+                  value={selectedDate || getTodayKey()}
+                  onChange={(e) => setSelectedDate(e.target.value)}
+                  required
+                  style={{ width: '100%', backgroundColor: '#f5f5f5', color: '#1a1a2e', border: '1px solid #ddd' }}
+                />
+              </div>
               <div>
                 <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500', color: '#333' }}>城市 *</label>
                 <input
