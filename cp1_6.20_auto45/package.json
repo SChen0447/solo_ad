@@ -1,0 +1,14 @@
+{
+  "name": "pixel-fleet-command",
+  "version": "1.0.0",
+  "description": "像素风格宇宙舰队指挥沙盘",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.3",
+    "vite": "^5.0.10"
+  }
+}
