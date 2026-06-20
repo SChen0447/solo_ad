@@ -1,0 +1,192 @@
+.app-container {
+  min-height: 100vh;
+  background-color: #f8fafc;
+  padding: 24px 0;
+}
+
+.main-panel {
+  display: flex;
+  max-width: 1200px;
+  margin: 0 auto;
+  background-color: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  overflow: hidden;
+  min-height: calc(100vh - 48px);
+}
+
+.sidebar {
+  width: 280px;
+  flex-shrink: 0;
+  padding: 16px;
+  border-right: 1px solid #e5e7eb;
+  display: flex;
+  flex-direction: column;
+}
+
+.content {
+  flex: 1;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.button-primary {
+  padding: 8px 20px;
+  background-color: #3b82f6;
+  color: #ffffff;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: filter 0.1s, transform 0.1s;
+}
+
+.button-primary:hover:not(:disabled) {
+  filter: brightness(1.1);
+}
+
+.button-primary:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+.button-primary:disabled {
+  background-color: #93c5fd;
+  cursor: not-allowed;
+}
+
+.textarea:focus {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.select:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.color-picker:hover {
+  border-color: #3b82f6;
+}
+
+.align-button:hover {
+  border-color: #3b82f6;
+  color: #3b82f6;
+}
+
+.align-button-active:hover {
+  filter: brightness(1.05);
+}
+
+.delete-button:hover {
+  background-color: #fee2e2;
+  color: #ef4444;
+}
+
+.remove-column-button:hover {
+  background-color: #fee2e2;
+  color: #ef4444;
+}
+
+.add-column-button:hover:not(:disabled) {
+  background-color: #eff6ff;
+}
+
+.font-item:hover .delete-button {
+  opacity: 1;
+}
+
+.preview-content::-webkit-scrollbar {
+  width: 6px;
+}
+
+.preview-content::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+
+.preview-content::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 3px;
+}
+
+.preview-content::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+.font-list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.font-list::-webkit-scrollbar-track {
+  background: #f1f5f9;
+  border-radius: 3px;
+}
+
+.font-list::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 3px;
+}
+
+.code-block::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.code-block::-webkit-scrollbar-track {
+  background: #0f172a;
+}
+
+.code-block::-webkit-scrollbar-thumb {
+  background: #475569;
+  border-radius: 4px;
+}
+
+.close-button:hover {
+  background-color: #e5e7eb;
+  color: #374151;
+}
+
+@media (max-width: 768px) {
+  .app-container {
+    padding: 0;
+  }
+  
+  .main-panel {
+    flex-direction: column;
+    max-width: 100%;
+    min-height: 100vh;
+    border-radius: 0;
+  }
+  
+  .sidebar {
+    width: 100%;
+    border-right: none;
+    border-bottom: 1px solid #e5e7eb;
+    max-height: 300px;
+  }
+  
+  .content {
+    padding: 16px;
+  }
+  
+  .controls-section {
+    flex-direction: column;
+  }
+  
+  .preview-container {
+    flex-direction: column;
+  }
+  
+  .preview-column {
+    border-right: none !important;
+    border-bottom: 1px solid #e5e7eb;
+    min-height: 300px;
+  }
+  
+  .preview-column:last-child {
+    border-bottom: none;
+  }
+}
