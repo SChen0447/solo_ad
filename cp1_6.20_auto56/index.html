@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>城市实时人流热力可视化与交通信号模拟</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+    #app {
+      width: 100%;
+      height: 100%;
+      position: relative;
+    }
+    #canvas-container {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+    #control-panel {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      width: 280px;
+      padding: 20px;
+      background: rgba(255, 255, 255, 0.1);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 12px;
+      color: #fff;
+      z-index: 10;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+    }
+    #control-panel h3 {
+      margin-bottom: 16px;
+      font-size: 16px;
+      font-weight: 600;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+      padding-bottom: 10px;
+    }
+    .control-group {
+      margin-bottom: 16px;
+    }
+    .control-group label {
+      display: block;
+      margin-bottom: 6px;
+      font-size: 13px;
+      opacity: 0.9;
+    }
+    .control-group select,
+    .control-group input[type="range"] {
+      width: 100%;
+      padding: 6px 8px;
+      background: rgba(255, 255, 255, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 6px;
+      color: #fff;
+      font-size: 13px;
+      outline: none;
+    }
+    .control-group select option {
+      background: #2c3e50;
+      color: #fff;
+    }
+    .control-group input[type="range"] {
+      padding: 0;
+      height: 6px;
+      cursor: pointer;
+      -webkit-appearance: none;
+      appearance: none;
+      background: rgba(255, 255, 255, 0.2);
+      border-radius: 3px;
+    }
+    .control-group input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 16px;
+      height: 16px;
+      background: #3498db;
+      border-radius: 50%;
+      cursor: pointer;
+    }
+    .value-display {
+      display: inline-block;
+      margin-left: 8px;
+      font-weight: 600;
+      color: #3498db;
+    }
+    .apply-btn {
+      width: 100%;
+      padding: 10px;
+      background: linear-gradient(135deg, #3498db, #2980b9);
+      border: none;
+      border-radius: 8px;
+      color: #fff;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+    .apply-btn:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(52, 152, 219, 0.4);
+    }
+    .status-bar {
+      position: absolute;
+      bottom: 20px;
+      left: 20px;
+      padding: 10px 16px;
+      background: rgba(0, 0, 0, 0.5);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      border-radius: 8px;
+      color: #fff;
+      font-size: 12px;
+      z-index: 10;
+      display: flex;
+      gap: 20px;
+    }
+    .status-item span {
+      color: #3498db;
+      font-weight: 600;
+    }
+    .time-display {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      padding: 12px 20px;
+      background: rgba(0, 0, 0, 0.5);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      border-radius: 10px;
+      color: #fff;
+      z-index: 10;
+    }
+    .time-display .time {
+      font-size: 24px;
+      font-weight: 700;
+      color: #f39c12;
+    }
+    .time-display .label {
+      font-size: 11px;
+      opacity: 0.7;
+      margin-bottom: 2px;
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <canvas id="canvas-container"></canvas>
+    
+    <div class="time-display">
+      <div class="label">模拟时间</div>
+      <div class="time" id="sim-time">12:00</div>
+    </div>
+
+    <div id="control-panel">
+      <h3>交通信号控制</h3>
+      <div class="control-group">
+        <label for="road-select">选择道路</label>
+        <select id="road-select"></select>
+      </div>
+      <div class="control-group">
+        <label for="green-duration">
+          绿灯时长
+          <span class="value-display" id="green-value">30秒</span>
+        </label>
+        <input type="range" id="green-duration" min="10" max="60" step="5" value="30">
+      </div>
+      <button class="apply-btn" id="apply-btn">应用配时</button>
+    </div>
+
+    <div class="status-bar">
+      <div class="status-item">FPS: <span id="fps-display">60</span></div>
+      <div class="status-item">实例数: <span id="instance-count">0</span></div>
+      <div class="status-item">热力分辨率: <span id="heat-resolution">1x1</span></div>
+    </div>
+  </div>
+  <script type="module" src="/src/modules/city/index.ts"></script>
+</body>
+</html>
