@@ -1,0 +1,585 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>太空战舰 - Space Battle</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background-color: #000;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+
+    #game-container {
+      width: 100%;
+      height: 100%;
+      position: relative;
+    }
+
+    #game-canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+
+    #hud {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 10;
+    }
+
+    #hud-left {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .hud-item {
+      color: #e0e0e0;
+      font-size: 16px;
+      text-shadow: 0 0 10px rgba(0, 212, 255, 0.5);
+    }
+
+    .hud-item .label {
+      color: #00d4ff;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .hud-item .value {
+      font-size: 24px;
+      font-weight: bold;
+    }
+
+    .shield-bar {
+      width: 200px;
+      height: 12px;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 6px;
+      overflow: hidden;
+      border: 1px solid rgba(0, 212, 255, 0.3);
+    }
+
+    .shield-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #00d4ff, #00ff88);
+      border-radius: 6px;
+      transition: width 0.3s ease;
+    }
+
+    .shield-fill.low {
+      background: linear-gradient(90deg, #ff6b35, #ff3535);
+    }
+
+    #hud-right {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      align-items: flex-end;
+    }
+
+    .upgrade-icons {
+      display: flex;
+      gap: 8px;
+    }
+
+    .upgrade-icon {
+      width: 40px;
+      height: 40px;
+      border-radius: 8px;
+      background: rgba(0, 212, 255, 0.2);
+      border: 2px solid #00d4ff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+      opacity: 0.3;
+      transition: all 0.3s ease;
+    }
+
+    .upgrade-icon.unlocked {
+      opacity: 1;
+      box-shadow: 0 0 15px rgba(0, 212, 255, 0.6);
+    }
+
+    .upgrade-icon.level-2 {
+      border-color: #ff6b35;
+      box-shadow: 0 0 15px rgba(255, 107, 53, 0.6);
+    }
+
+    .upgrade-icon.level-3 {
+      border-color: #ffd700;
+      box-shadow: 0 0 20px rgba(255, 215, 0, 0.8);
+    }
+
+    #upgrade-btn {
+      position: absolute;
+      top: 50%;
+      right: 20px;
+      transform: translateY(-50%);
+      width: 50px;
+      height: 50px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #00d4ff, #0088ff);
+      border: none;
+      color: white;
+      font-size: 24px;
+      cursor: pointer;
+      pointer-events: auto;
+      box-shadow: 0 0 20px rgba(0, 212, 255, 0.5);
+      transition: all 0.3s ease;
+      z-index: 20;
+    }
+
+    #upgrade-btn:hover {
+      transform: translateY(-50%) scale(1.1);
+      box-shadow: 0 0 30px rgba(0, 212, 255, 0.8);
+    }
+
+    #upgrade-panel {
+      position: absolute;
+      top: 0;
+      right: -400px;
+      width: 350px;
+      height: 100%;
+      background: rgba(26, 10, 46, 0.85);
+      backdrop-filter: blur(10px);
+      border-left: 2px solid rgba(0, 212, 255, 0.3);
+      padding: 30px 20px;
+      transition: right 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+      pointer-events: auto;
+      z-index: 30;
+    }
+
+    #upgrade-panel.open {
+      right: 0;
+    }
+
+    #upgrade-panel h2 {
+      color: #00d4ff;
+      font-size: 24px;
+      margin-bottom: 20px;
+      text-align: center;
+      text-shadow: 0 0 10px rgba(0, 212, 255, 0.5);
+    }
+
+    #upgrade-panel .close-btn {
+      position: absolute;
+      top: 15px;
+      right: 15px;
+      background: none;
+      border: none;
+      color: #e0e0e0;
+      font-size: 24px;
+      cursor: pointer;
+      transition: color 0.3s;
+    }
+
+    #upgrade-panel .close-btn:hover {
+      color: #ff6b35;
+    }
+
+    .upgrade-item {
+      background: rgba(0, 212, 255, 0.1);
+      border: 1px solid rgba(0, 212, 255, 0.3);
+      border-radius: 12px;
+      padding: 15px;
+      margin-bottom: 15px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+
+    .upgrade-item:hover {
+      transform: scale(1.02);
+      border-color: #00d4ff;
+      box-shadow: 0 0 20px rgba(0, 212, 255, 0.3);
+    }
+
+    .upgrade-item.maxed {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .upgrade-item.locked {
+      opacity: 0.6;
+    }
+
+    .upgrade-item-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 8px;
+    }
+
+    .upgrade-item-icon {
+      width: 40px;
+      height: 40px;
+      border-radius: 8px;
+      background: linear-gradient(135deg, rgba(0, 212, 255, 0.3), rgba(0, 136, 255, 0.3));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 22px;
+    }
+
+    .upgrade-item-name {
+      color: #e0e0e0;
+      font-size: 16px;
+      font-weight: bold;
+      flex: 1;
+    }
+
+    .upgrade-item-level {
+      color: #ffd700;
+      font-size: 14px;
+    }
+
+    .upgrade-item-desc {
+      color: #aaa;
+      font-size: 13px;
+      margin-bottom: 10px;
+    }
+
+    .upgrade-item-cost {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .upgrade-item-cost span {
+      color: #ff6b35;
+      font-weight: bold;
+      font-size: 14px;
+    }
+
+    .upgrade-item-cost button {
+      background: linear-gradient(135deg, #00d4ff, #0088ff);
+      border: none;
+      color: white;
+      padding: 6px 16px;
+      border-radius: 20px;
+      cursor: pointer;
+      font-size: 12px;
+      transition: all 0.3s ease;
+    }
+
+    .upgrade-item-cost button:hover {
+      transform: scale(1.05);
+      box-shadow: 0 0 15px rgba(0, 212, 255, 0.5);
+    }
+
+    .upgrade-item-cost button:disabled {
+      background: #666;
+      cursor: not-allowed;
+      transform: none;
+      box-shadow: none;
+    }
+
+    #emergency-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 5;
+      opacity: 0;
+      transition: opacity 0.3s;
+    }
+
+    #emergency-overlay.active {
+      opacity: 1;
+      animation: emergencyFlash 0.5s ease-in-out infinite alternate;
+    }
+
+    @keyframes emergencyFlash {
+      from { box-shadow: inset 0 0 100px rgba(255, 0, 0, 0.3); }
+      to { box-shadow: inset 0 0 200px rgba(255, 0, 0, 0.6); }
+    }
+
+    #start-screen, #game-over-screen {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: rgba(26, 10, 46, 0.95);
+      backdrop-filter: blur(5px);
+      z-index: 100;
+      pointer-events: auto;
+    }
+
+    #game-over-screen {
+      display: none;
+    }
+
+    #start-screen h1, #game-over-screen h1 {
+      font-size: 48px;
+      color: #00d4ff;
+      text-shadow: 0 0 30px rgba(0, 212, 255, 0.8);
+      margin-bottom: 20px;
+    }
+
+    #start-screen p, #game-over-screen p {
+      color: #e0e0e0;
+      font-size: 18px;
+      margin-bottom: 30px;
+    }
+
+    .start-btn, .restart-btn {
+      background: linear-gradient(135deg, #00d4ff, #0088ff);
+      border: none;
+      color: white;
+      padding: 15px 50px;
+      font-size: 20px;
+      border-radius: 30px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      box-shadow: 0 0 30px rgba(0, 212, 255, 0.5);
+    }
+
+    .start-btn:hover, .restart-btn:hover {
+      transform: scale(1.05);
+      box-shadow: 0 0 40px rgba(0, 212, 255, 0.8);
+    }
+
+    .final-score {
+      font-size: 72px;
+      color: #ffd700;
+      font-weight: bold;
+      text-shadow: 0 0 30px rgba(255, 215, 0, 0.8);
+      margin: 20px 0;
+      animation: scoreBounce 0.6s ease-out;
+    }
+
+    @keyframes scoreBounce {
+      0% { transform: scale(0); opacity: 0; }
+      50% { transform: scale(1.2); }
+      100% { transform: scale(1); opacity: 1; }
+    }
+
+    .stats {
+      display: flex;
+      gap: 30px;
+      margin-bottom: 30px;
+    }
+
+    .stat-item {
+      text-align: center;
+    }
+
+    .stat-label {
+      color: #00d4ff;
+      font-size: 14px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .stat-value {
+      color: #e0e0e0;
+      font-size: 28px;
+      font-weight: bold;
+      margin-top: 5px;
+    }
+
+    #mobile-controls {
+      display: none;
+      position: absolute;
+      bottom: 20px;
+      left: 0;
+      width: 100%;
+      padding: 0 20px;
+      z-index: 15;
+      pointer-events: none;
+    }
+
+    .mobile-dpad {
+      position: absolute;
+      bottom: 20px;
+      left: 20px;
+      width: 140px;
+      height: 140px;
+      pointer-events: auto;
+    }
+
+    .mobile-dpad button {
+      position: absolute;
+      width: 50px;
+      height: 50px;
+      border-radius: 50%;
+      background: rgba(0, 212, 255, 0.3);
+      border: 2px solid rgba(0, 212, 255, 0.6);
+      color: white;
+      font-size: 20px;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+    }
+
+    .mobile-dpad button:active {
+      background: rgba(0, 212, 255, 0.6);
+      transform: scale(0.95);
+    }
+
+    .dpad-up { top: 0; left: 50%; transform: translateX(-50%); }
+    .dpad-down { bottom: 0; left: 50%; transform: translateX(-50%); }
+    .dpad-left { left: 0; top: 50%; transform: translateY(-50%); }
+    .dpad-right { right: 0; top: 50%; transform: translateY(-50%); }
+
+    .mobile-fire {
+      position: absolute;
+      bottom: 40px;
+      right: 30px;
+      width: 80px;
+      height: 80px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #ff6b35, #ff3535);
+      border: none;
+      color: white;
+      font-size: 24px;
+      pointer-events: auto;
+      cursor: pointer;
+      box-shadow: 0 0 20px rgba(255, 107, 53, 0.6);
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+    }
+
+    .mobile-fire:active {
+      transform: scale(0.95);
+      box-shadow: 0 0 30px rgba(255, 107, 53, 0.9);
+    }
+
+    @media (max-width: 768px) {
+      #mobile-controls {
+        display: block;
+      }
+
+      #upgrade-btn {
+        top: auto;
+        bottom: 120px;
+        right: 20px;
+        transform: none;
+      }
+
+      #upgrade-btn:hover {
+        transform: none;
+      }
+
+      .hud-item .value {
+        font-size: 18px;
+      }
+
+      .shield-bar {
+        width: 120px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div id="game-container">
+    <div id="hud">
+      <div id="hud-left">
+        <div class="hud-item">
+          <div class="label">分数</div>
+          <div class="value" id="score">0</div>
+        </div>
+        <div class="hud-item">
+          <div class="label">波次</div>
+          <div class="value" id="wave">1</div>
+        </div>
+        <div class="hud-item">
+          <div class="label">护盾</div>
+          <div class="shield-bar">
+            <div class="shield-fill" id="shield-fill" style="width: 100%"></div>
+          </div>
+        </div>
+        <div class="hud-item">
+          <div class="label">能量碎片</div>
+          <div class="value" id="energy" style="color: #ff6b35;">0</div>
+        </div>
+      </div>
+
+      <div id="hud-right">
+        <div class="upgrade-icons" id="upgrade-icons">
+          <div class="upgrade-icon" id="icon-shield" title="护盾强化">🛡️</div>
+          <div class="upgrade-icon" id="icon-weapon" title="主炮强化">⚔️</div>
+          <div class="upgrade-icon" id="icon-turret" title="自动炮塔">🔫</div>
+        </div>
+      </div>
+
+      <button id="upgrade-btn" title="升级面板">⬅️</button>
+
+      <div id="upgrade-panel">
+        <button class="close-btn" id="close-upgrade-btn">✕</button>
+        <h2>升级面板</h2>
+        <div id="upgrade-list"></div>
+      </div>
+
+      <div id="emergency-overlay"></div>
+
+      <div id="start-screen">
+        <h1>🚀 太空战舰</h1>
+        <p>使用 WASD 移动，鼠标点击发射激光<br>消灭敌人，收集能量，升级战舰！</p>
+        <button class="start-btn" id="start-btn">开始游戏</button>
+      </div>
+
+      <div id="game-over-screen">
+        <h1>💥 游戏结束</h1>
+        <p>最终得分</p>
+        <div class="final-score" id="final-score">0</div>
+        <div class="stats">
+          <div class="stat-item">
+            <div class="stat-label">击杀数</div>
+            <div class="stat-value" id="final-kills">0</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-label">波次</div>
+            <div class="stat-value" id="final-wave">0</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-label">升级项</div>
+            <div class="stat-value" id="final-upgrades">0</div>
+          </div>
+        </div>
+        <button class="restart-btn" id="restart-btn">重新开始</button>
+      </div>
+    </div>
+
+    <div id="mobile-controls">
+      <div class="mobile-dpad">
+        <button class="dpad-up" data-key="w">▲</button>
+        <button class="dpad-down" data-key="s">▼</button>
+        <button class="dpad-left" data-key="a">◀</button>
+        <button class="dpad-right" data-key="d">▶</button>
+      </div>
+      <button class="mobile-fire" id="mobile-fire">🔥</button>
+    </div>
+  </div>
+
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
