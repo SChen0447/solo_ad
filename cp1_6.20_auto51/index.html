@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Parametric Sculpture Generator</title>
+  <link rel="stylesheet" href="/src/style.css" />
+</head>
+<body>
+  <div id="app">
+    <canvas id="scene-canvas"></canvas>
+    
+    <div id="performance-warning" class="performance-warning hidden">
+      ⚠ 性能下降，已降低渲染质量
+    </div>
+    
+    <div id="left-panel" class="left-panel">
+      <div id="vertex-info" class="vertex-info hidden">
+        <div class="vertex-info-label">顶点索引</div>
+        <div id="vertex-index" class="vertex-info-value">-</div>
+        <div class="vertex-info-label">数据值</div>
+        <div id="vertex-value" class="vertex-info-value">-</div>
+      </div>
+    </div>
+    
+    <div id="control-panel" class="control-panel">
+      <div class="panel-header">
+        <h2>参数控制</h2>
+      </div>
+      <div id="controls-container"></div>
+    </div>
+    
+    <div id="bottom-info" class="bottom-info">
+      <span id="fps-display">FPS: --</span>
+      <span id="vertex-count">顶点: --</span>
+      <span id="data-source">数据源: 模拟</span>
+    </div>
+    
+    <div id="bottom-buttons" class="bottom-buttons">
+      <button id="reset-view-btn" class="action-btn">重置视角</button>
+      <button id="screenshot-btn" class="action-btn">截图</button>
+    </div>
+    
+    <button id="mobile-toggle" class="mobile-toggle hidden">
+      <span class="arrow-icon">▲</span>
+    </button>
+  </div>
+  
+  <input type="file" id="json-upload" accept=".json" style="display: none;" />
+  
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
