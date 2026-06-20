@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>三维地质勘探可视化系统</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background-color: #1a1a2e;
+      color: #a8d8ea;
+      overflow: hidden;
+      width: 100vw;
+      height: 100vh;
+    }
+
+    #app {
+      position: relative;
+      width: 100%;
+      height: 100%;
+    }
+
+    #scene-container {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 1;
+    }
+
+    #left-panel {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      width: 220px;
+      height: calc(100% - 40px);
+      background: rgba(0, 0, 0, 0.3);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border-radius: 12px;
+      z-index: 10;
+      padding: 16px;
+      transform: translateX(-260px);
+      transition: transform 0.5s ease;
+      overflow-y: auto;
+    }
+
+    #left-panel.show {
+      transform: translateX(0);
+    }
+
+    #right-panel {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      width: 280px;
+      height: calc(100% - 40px);
+      background: rgba(255, 255, 255, 0.08);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border-radius: 12px;
+      z-index: 10;
+      padding: 16px;
+      transform: translateX(320px);
+      transition: transform 0.5s ease;
+      overflow-y: auto;
+    }
+
+    #right-panel.show {
+      transform: translateX(0);
+    }
+
+    .panel-title {
+      font-size: 16px;
+      font-weight: 600;
+      color: #a8d8ea;
+      margin-bottom: 16px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid rgba(168, 216, 234, 0.2);
+    }
+
+    .drill-list {
+      list-style: none;
+    }
+
+    .drill-item {
+      padding: 10px 12px;
+      margin-bottom: 8px;
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      font-size: 14px;
+    }
+
+    .drill-item:hover {
+      background: rgba(231, 76, 60, 0.2);
+    }
+
+    .drill-item.active {
+      background: rgba(231, 76, 60, 0.3);
+      border-left: 3px solid #e74c3c;
+    }
+
+    .detail-section {
+      margin-bottom: 20px;
+    }
+
+    .detail-label {
+      font-size: 12px;
+      color: rgba(168, 216, 234, 0.6);
+      margin-bottom: 4px;
+    }
+
+    .detail-value {
+      font-size: 16px;
+      color: #a8d8ea;
+      margin-bottom: 12px;
+    }
+
+    .chart-container {
+      background: #2d2d44;
+      border-radius: 8px;
+      padding: 12px;
+      margin-top: 12px;
+    }
+
+    .chart-title {
+      font-size: 14px;
+      color: #a8d8ea;
+      margin-bottom: 12px;
+      text-align: center;
+    }
+
+    #lithology-chart {
+      width: 100%;
+      height: 200px;
+    }
+
+    .modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.7);
+      display: none;
+      justify-content: center;
+      align-items: center;
+      z-index: 100;
+      opacity: 0;
+      transition: opacity 0.2s ease;
+    }
+
+    .modal-overlay.show {
+      display: flex;
+      opacity: 1;
+    }
+
+    .modal {
+      background: #2d2d44;
+      border-radius: 12px;
+      padding: 24px;
+      min-width: 400px;
+      max-width: 90%;
+      max-height: 80vh;
+      overflow-y: auto;
+    }
+
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+    }
+
+    .modal-title {
+      font-size: 18px;
+      color: #a8d8ea;
+      font-weight: 600;
+    }
+
+    .modal-close {
+      background: none;
+      border: none;
+      color: #a8d8ea;
+      font-size: 24px;
+      cursor: pointer;
+      padding: 0;
+      line-height: 1;
+    }
+
+    .modal-close:hover {
+      color: #e74c3c;
+    }
+
+    #modal-chart {
+      width: 100%;
+      height: 300px;
+    }
+
+    .info-tooltip {
+      position: absolute;
+      background: rgba(0, 0, 0, 0.8);
+      color: #a8d8ea;
+      padding: 8px 12px;
+      border-radius: 6px;
+      font-size: 12px;
+      pointer-events: none;
+      z-index: 20;
+      display: none;
+      white-space: nowrap;
+    }
+
+    .drill-label {
+      position: absolute;
+      color: #a8d8ea;
+      font-size: 11px;
+      pointer-events: none;
+      z-index: 5;
+      text-shadow: 0 0 4px rgba(0, 0, 0, 0.8);
+      white-space: nowrap;
+    }
+
+    .layer-legend {
+      margin-top: 16px;
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      margin-bottom: 8px;
+      font-size: 12px;
+    }
+
+    .legend-color {
+      width: 16px;
+      height: 16px;
+      border-radius: 4px;
+      margin-right: 8px;
+    }
+
+    ::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 3px;
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: rgba(168, 216, 234, 0.3);
+      border-radius: 3px;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+      background: rgba(168, 216, 234, 0.5);
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <div id="scene-container"></div>
+    
+    <div id="left-panel">
+      <div class="panel-title">钻井列表</div>
+      <ul class="drill-list" id="drill-list"></ul>
+      <div class="layer-legend">
+        <div class="panel-title" style="font-size: 14px;">岩层图例</div>
+        <div id="layer-legend"></div>
+      </div>
+    </div>
+
+    <div id="right-panel">
+      <div class="panel-title">钻井详情</div>
+      <div id="drill-detail">
+        <p style="color: rgba(168, 216, 234, 0.5); font-size: 14px;">请选择一个钻井查看详情</p>
+      </div>
+    </div>
+
+    <div class="info-tooltip" id="info-tooltip"></div>
+
+    <div class="modal-overlay" id="modal-overlay">
+      <div class="modal">
+        <div class="modal-header">
+          <span class="modal-title" id="modal-title">岩性柱状图</span>
+          <button class="modal-close" id="modal-close">&times;</button>
+        </div>
+        <canvas id="modal-chart"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
