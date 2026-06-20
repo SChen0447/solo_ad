@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { fetchItemById, requestExchange, CURRENT_USER, type Item } from '../api';
+import ConfirmModal from '../components/ConfirmModal';
 
 export default function ItemDetail() {
   const { id } = useParams<{ id: string }>();
@@ -32,6 +33,8 @@ export default function ItemDetail() {
       setExchangeSuccess(true);
       setShowModal(false);
       setTimeout(() => setExchangeSuccess(false), 3000);
+      const updated = await fetchItemById(item.id);
+      setItem(updated);
     } catch (err) {
       console.error('Exchange request failed:', err);
     } finally {
@@ -88,25 +91,15 @@ export default function ItemDetail() {
         )}
       </div>
 
-      {showModal && (
-        <div className="modal-overlay" onClick={() => setShowModal(false)}>
-          <div className="modal-box" onClick={e => e.stopPropagation()}>
-            <div className="modal-title">确认交换请求</div>
-            <div className="modal-text">
-              确定向 <strong>{item.ownerName}</strong> 申请交换「{item.title}」吗？
-              <br />交换请求发送后，对方将会收到通知。
-            </div>
-            <div className="modal-actions">
-              <button className="btn-cancel" onClick={() => setShowModal(false)}>
-                取消
-              </button>
-              <button className="btn-confirm" onClick={handleExchange} disabled={exchanging}>
-                {exchanging ? '发送中...' : '确认交换'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ConfirmModal
+        open={showModal}
+        title="确认交换请求"
+        description={`确定向 <strong>${item.ownerName}</strong> 申请交换「${item.title}」吗？<br />交换请求发送后，对方将会收到通知。`}
+        confirmText="确认交换"
+        loading={exchanging}
+        onConfirm={handleExchange}
+        onCancel={() => setShowModal(false)}
+      />
     </div>
   );
 }

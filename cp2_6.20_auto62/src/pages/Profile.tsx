@@ -9,6 +9,7 @@ import {
   type Item,
   type Question,
 } from '../api';
+import TabBar from '../components/TabBar';
 
 export default function Profile() {
   const { userId } = useParams<{ userId: string }>();
@@ -79,20 +80,14 @@ export default function Profile() {
         <div className="profile-name">{CURRENT_USER.name}</div>
       </div>
 
-      <div className="profile-tabs">
-        <button
-          className={`profile-tab ${activeTab === 'items' ? 'active' : ''}`}
-          onClick={() => setActiveTab('items')}
-        >
-          我的物品
-        </button>
-        <button
-          className={`profile-tab ${activeTab === 'qa' ? 'active' : ''}`}
-          onClick={() => setActiveTab('qa')}
-        >
-          我的问答
-        </button>
-      </div>
+      <TabBar
+        tabs={[
+          { key: 'items', label: '我的物品' },
+          { key: 'qa', label: '我的问答' },
+        ]}
+        activeKey={activeTab}
+        onChange={(key) => setActiveTab(key as 'items' | 'qa')}
+      />
 
       {activeTab === 'items' && (
         <div>
