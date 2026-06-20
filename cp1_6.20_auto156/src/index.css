@@ -1,0 +1,265 @@
+:root {
+  --bg-color: #F8F9FA;
+  --nav-height: 60px;
+  --sidebar-width: 240px;
+  --analysis-panel-width: 280px;
+  --border-color: #E0E0E0;
+  --text-primary: #2c3e50;
+  --text-secondary: #7f8c8d;
+}
+
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+.app-container {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  width: 100vw;
+  overflow: hidden;
+}
+
+.navbar {
+  height: var(--nav-height);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 24px;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  background-color: rgba(255, 255, 255, 0.8);
+  border-bottom: 1px solid var(--border-color);
+  position: relative;
+  z-index: 100;
+}
+
+.navbar-left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.navbar-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.navbar-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.sidebar-toggle {
+  width: 36px;
+  height: 36px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s ease;
+}
+
+.sidebar-toggle:hover {
+  background: rgba(0, 0, 0, 0.05);
+}
+
+.main-content {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+.sidebar {
+  width: var(--sidebar-width);
+  background: #fff;
+  border-right: 1px solid var(--border-color);
+  transition: width 0.3s ease;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.sidebar.collapsed {
+  width: 60px;
+}
+
+.sidebar-nav {
+  display: flex;
+  flex-direction: column;
+  padding: 16px 8px;
+  gap: 4px;
+}
+
+.sidebar-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.2s ease;
+  color: var(--text-primary);
+  font-size: 14px;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.sidebar-item:hover {
+  background: rgba(0, 0, 0, 0.04);
+}
+
+.sidebar-item.active {
+  background: rgba(255, 166, 47, 0.1);
+  color: #FFA62F;
+  font-weight: 500;
+}
+
+.sidebar-icon {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+}
+
+.sidebar-label {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sidebar.collapsed .sidebar-label {
+  opacity: 0;
+  width: 0;
+}
+
+.content-area {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+}
+
+.wall-area {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+}
+
+.analysis-panel {
+  width: var(--analysis-panel-width);
+  background: #fff;
+  border-left: 1px solid var(--border-color);
+  flex-shrink: 0;
+  overflow-y: auto;
+  padding: 20px;
+}
+
+.analysis-title {
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 20px;
+  color: var(--text-primary);
+}
+
+.analysis-section {
+  margin-bottom: 32px;
+}
+
+.analysis-section-title {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  margin-bottom: 12px;
+}
+
+.chart-container {
+  position: relative;
+  height: 200px;
+}
+
+.line-chart-container {
+  position: relative;
+  height: 180px;
+}
+
+@media (max-width: 768px) {
+  .main-content {
+    flex-direction: column;
+  }
+
+  .sidebar {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    width: 100% !important;
+    height: 60px;
+    border-right: none;
+    border-top: 1px solid var(--border-color);
+    z-index: 100;
+  }
+
+  .sidebar.collapsed {
+    width: 100% !important;
+  }
+
+  .sidebar-nav {
+    flex-direction: row;
+    justify-content: space-around;
+    padding: 8px;
+    height: 100%;
+  }
+
+  .sidebar-item {
+    flex-direction: column;
+    gap: 4px;
+    font-size: 10px;
+    padding: 4px 8px;
+  }
+
+  .sidebar-label {
+    opacity: 1 !important;
+    width: auto !important;
+  }
+
+  .analysis-panel {
+    position: fixed;
+    right: 0;
+    top: var(--nav-height);
+    bottom: 60px;
+    width: 100%;
+    transform: translateX(100%);
+    transition: transform 0.3s ease;
+    z-index: 90;
+  }
+
+  .analysis-panel.open {
+    transform: translateX(0);
+  }
+
+  .content-area {
+    padding-bottom: 60px;
+  }
+
+  .wall-area {
+    width: 100%;
+  }
+}
+
+.recorder-page {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  flex: 1;
+  overflow: auto;
+}
+
+.wall-page {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
