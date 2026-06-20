@@ -1,0 +1,91 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  background-color: #1a1a2e;
+  color: #e0e0e0;
+  overflow-x: hidden;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes scaleIn {
+  from { transform: scale(0.5); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+
+@keyframes bounceIn {
+  0% { transform: scale(0.5); opacity: 0; }
+  70% { transform: scale(1.05); }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+@keyframes slideInRight {
+  from { transform: translateX(-100%); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+@keyframes lowStockBlink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+.fade-in {
+  animation: fadeIn 0.2s ease-out;
+}
+
+.scale-in {
+  animation: scaleIn 0.2s ease-out;
+}
+
+.bounce-in {
+  animation: bounceIn 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+}
+
+.slide-in {
+  animation: slideInRight 0.25s ease-out;
+}
+
+.low-stock-blink {
+  animation: lowStockBlink 1s ease-in-out infinite;
+}
+
+button {
+  cursor: pointer;
+  border: none;
+  outline: none;
+  border-radius: 6px;
+  transition: filter 0.2s ease;
+}
+
+button:hover {
+  filter: brightness(1.2);
+}
+
+input, select, textarea {
+  font-family: inherit;
+  font-size: 14px;
+  border-radius: 6px;
+  border: 1px solid #2a3a5c;
+  background-color: #1a1a2e;
+  color: #e0e0e0;
+  padding: 8px 12px;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+input:focus, select:focus, textarea:focus {
+  border-color: #533483;
+}
