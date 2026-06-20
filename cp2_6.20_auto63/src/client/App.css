@@ -56,6 +56,11 @@ body {
   }
 }
 
+.fade-in-up-item {
+  opacity: 0;
+  animation: fadeInUp 0.3s ease-out forwards;
+}
+
 @keyframes fadeIn {
   from {
     opacity: 0;
@@ -290,6 +295,18 @@ body {
   transition: all 0.3s ease;
 }
 
+.mobile-menu-overlay {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 1000;
+  animation: fadeIn 0.2s ease;
+}
+
 .mobile-menu {
   display: none;
   position: fixed;
@@ -513,7 +530,6 @@ body {
 .btn-success.pulse {
   animation: pulse 1s infinite;
 }
-
 .btn-disabled {
   background: #E5E7EB;
   color: #9CA3AF;
@@ -1307,7 +1323,7 @@ body {
   align-items: flex-start;
   justify-content: center;
   z-index: 2000;
-  padding-top: 100px;
+  padding-top: 0;
   animation: fadeIn 0.3s ease;
 }
 
@@ -1318,8 +1334,27 @@ body {
   text-align: center;
   max-width: 400px;
   width: 90%;
-  animation: slideInTop 0.3s ease;
+  margin-top: 80px;
+  transform: translateY(-100%);
+  opacity: 0;
+  transition: transform 0.3s ease, opacity 0.3s ease;
   box-shadow: var(--shadow-xl);
+}
+
+.badge-modal.animate-in {
+  transform: translateY(0);
+  opacity: 1;
+}
+
+@keyframes slideInBadge {
+  from {
+    transform: translateY(-100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
 }
 
 .badge-modal-icon {
@@ -1495,8 +1530,13 @@ body {
     display: flex;
   }
 
+  .mobile-menu-overlay {
+    display: block;
+  }
+
   .mobile-menu {
     display: block;
+    width: 80%;
   }
 
   .activity-list {

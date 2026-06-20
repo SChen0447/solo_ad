@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 
 interface BadgeModalProps {
   isOpen: boolean;
@@ -8,6 +8,20 @@ interface BadgeModalProps {
 }
 
 function BadgeModal({ isOpen, badgeType, hours, onClose }: BadgeModalProps) {
+  const [animateIn, setAnimateIn] = useState(false);
+
+  useEffect(() => {
+    if (isOpen) {
+      setAnimateIn(false);
+      const timer = setTimeout(() => {
+        setAnimateIn(true);
+      }, 10);
+      return () => clearTimeout(timer);
+    } else {
+      setAnimateIn(false);
+    }
+  }, [isOpen]);
+
   useEffect(() => {
     if (isOpen) {
       const timer = setTimeout(() => {
@@ -29,7 +43,10 @@ function BadgeModal({ isOpen, badgeType, hours, onClose }: BadgeModalProps) {
 
   return (
     <div className="badge-modal-overlay" onClick={onClose}>
-      <div className="badge-modal" onClick={(e) => e.stopPropagation()}>
+      <div 
+        className={`badge-modal ${animateIn ? 'animate-in' : ''}`} 
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="badge-modal-icon">{badge.icon}</div>
         <h2 className="badge-modal-title">恭喜解锁新徽章！</h2>
         <p className="badge-modal-desc">

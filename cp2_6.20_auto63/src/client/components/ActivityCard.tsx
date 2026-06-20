@@ -6,7 +6,7 @@ interface ActivityCardProps {
   index?: number;
 }
 
-function ActivityCard({ activity }: ActivityCardProps) {
+function ActivityCard({ activity, index }: ActivityCardProps) {
   const navigate = useNavigate();
 
   const formatDate = (dateString: string) => {
@@ -29,13 +29,31 @@ function ActivityCard({ activity }: ActivityCardProps) {
     }
   };
 
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'recruiting': return '#10B981';
+      case 'upcoming': return '#F59E0B';
+      case 'ended': return '#EF4444';
+      default: return '#9CA3AF';
+    }
+  };
+
   const handleClick = () => {
     navigate(`/activity/${activity.id}`);
   };
 
+  const animationDelay = index ? `${0.05 * index}s` : '0s';
+
   return (
-    <div className="activity-card" onClick={handleClick}>
-      <div className={`activity-card-bar ${activity.status}`}></div>
+    <div 
+      className="activity-card" 
+      onClick={handleClick}
+      style={{ animationDelay }}
+    >
+      <div 
+        className="activity-card-bar" 
+        style={{ backgroundColor: getStatusColor(activity.status) }}
+      ></div>
       <div className="activity-card-content">
         <h3 className="activity-card-title">{activity.name}</h3>
         <div className="activity-card-info">

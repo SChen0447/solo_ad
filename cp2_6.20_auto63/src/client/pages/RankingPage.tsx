@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { userApi } from '../api';
 import { RankUser } from '../types';
+import { getCertificationBorderColor } from '../utils/colors';
 
 function RankingPage() {
   const [rankings, setRankings] = useState<RankUser[]>([]);
@@ -70,7 +71,13 @@ function RankingPage() {
                 <div className={`podium-trophy ${getMedalClass(2)}`}>
                   {getTrophyEmoji(2)}
                 </div>
-                <div className={`podium-avatar level-${topThree[1].certificationLevel}`}>
+                <div 
+                  className="podium-avatar"
+                  style={{ 
+                    borderColor: getCertificationBorderColor(topThree[1].certificationLevel),
+                    background: `linear-gradient(135deg, #F59E0B, ${getCertificationBorderColor(topThree[1].certificationLevel)})`
+                  }}
+                >
                   {topThree[1].nickname.charAt(0)}
                 </div>
                 <div className="podium-name">{topThree[1].nickname}</div>
@@ -84,7 +91,13 @@ function RankingPage() {
                 <div className={`podium-trophy ${getMedalClass(1)}`}>
                   {getTrophyEmoji(1)}
                 </div>
-                <div className={`podium-avatar level-${topThree[0].certificationLevel}`}>
+                <div 
+                  className="podium-avatar"
+                  style={{ 
+                    borderColor: getCertificationBorderColor(topThree[0].certificationLevel),
+                    background: `linear-gradient(135deg, #F59E0B, ${getCertificationBorderColor(topThree[0].certificationLevel)})`
+                  }}
+                >
                   {topThree[0].nickname.charAt(0)}
                 </div>
                 <div className="podium-name">{topThree[0].nickname}</div>
@@ -98,7 +111,13 @@ function RankingPage() {
                 <div className={`podium-trophy ${getMedalClass(3)}`}>
                   {getTrophyEmoji(3)}
                 </div>
-                <div className={`podium-avatar level-${topThree[2].certificationLevel}`}>
+                <div 
+                  className="podium-avatar"
+                  style={{ 
+                    borderColor: getCertificationBorderColor(topThree[2].certificationLevel),
+                    background: `linear-gradient(135deg, #F59E0B, ${getCertificationBorderColor(topThree[2].certificationLevel)})`
+                  }}
+                >
                   {topThree[2].nickname.charAt(0)}
                 </div>
                 <div className="podium-name">{topThree[2].nickname}</div>
@@ -110,10 +129,20 @@ function RankingPage() {
 
           {rest.length > 0 && (
             <div className="ranking-list">
-              {rest.map((user) => (
-                <div key={user.id} className="ranking-list-item">
+              {rest.map((user, index) => (
+                <div 
+                  key={user.id} 
+                  className="ranking-list-item fade-in-up-item"
+                  style={{ animationDelay: `${0.05 * index}s` }}
+                >
                   <div className="ranking-list-rank">{user.rank}</div>
-                  <div className={`ranking-list-avatar level-${user.certificationLevel}`}>
+                  <div 
+                    className="ranking-list-avatar"
+                    style={{ 
+                      borderColor: getCertificationBorderColor(user.certificationLevel),
+                      background: `linear-gradient(135deg, #F59E0B, ${getCertificationBorderColor(user.certificationLevel)})`
+                    }}
+                  >
                     {user.nickname.charAt(0)}
                   </div>
                   <div className="ranking-list-info">

@@ -59,16 +59,29 @@ function ProfilePage() {
     return '已报名';
   };
 
+  const RADIUS = 64;
+  const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
+  const MAX_HOURS = 200;
+
   const getProgressOffset = (totalHours: number) => {
-    const maxHours = 200;
-    const circumference = 2 * Math.PI * 64;
-    const progress = Math.min(totalHours / maxHours, 1);
-    return circumference * (1 - progress);
+    if (typeof totalHours !== 'number' || isNaN(totalHours) || totalHours <= 0) {
+      return CIRCUMFERENCE;
+    }
+    if (MAX_HOURS <= 0) {
+      return CIRCUMFERENCE;
+    }
+    const progress = Math.min(totalHours / MAX_HOURS, 1);
+    return CIRCUMFERENCE * (1 - progress);
   };
 
   const getProgressPercentage = (totalHours: number) => {
-    const maxHours = 200;
-    return Math.min((totalHours / maxHours) * 100, 100);
+    if (typeof totalHours !== 'number' || isNaN(totalHours) || totalHours <= 0) {
+      return 0;
+    }
+    if (MAX_HOURS <= 0) {
+      return 0;
+    }
+    return Math.min((totalHours / MAX_HOURS) * 100, 100);
   };
 
   if (loading) {
@@ -93,8 +106,6 @@ function ProfilePage() {
     );
   }
 
-  const circumference = 2 * Math.PI * 64;
-
   return (
     <div className="profile-container">
       <div className="profile-header">
@@ -110,18 +121,18 @@ function ProfilePage() {
               className="progress-ring-bg"
               cx="70"
               cy="70"
-              r="64"
+              r={RADIUS}
               strokeWidth="6"
             />
             <circle
               className="progress-ring-fill"
               cx="70"
               cy="70"
-              r="64"
+              r={RADIUS}
               strokeWidth="6"
-              strokeDasharray={circumference}
+              strokeDasharray={CIRCUMFERENCE}
               style={{
-                strokeDashoffset: circumference,
+                strokeDashoffset: CIRCUMFERENCE,
                 animation: `fillProgress 0.5s ease forwards 0.1s`,
               }}
             />
@@ -140,7 +151,7 @@ function ProfilePage() {
           <style>{`
             @keyframes fillProgress {
               from {
-                stroke-dashoffset: ${circumference};
+                stroke-dashoffset: ${CIRCUMFERENCE};
               }
               to {
                 stroke-dashoffset: ${getProgressOffset(profileUser.totalHours)};
@@ -195,12 +206,12 @@ function ProfilePage() {
                   <p className="empty-state-text">暂无报名活动</p>
                 </div>
               ) : (
-                registrations.map((reg) => (
+                registrations.map((reg, index) => (
                   <div
                     key={reg.id}
-                    className="activity-item"
+                    className="activity-item fade-in-up-item"
                     onClick={() => navigate(`/activity/${reg.activityId}`)}
-                    style={{ cursor: 'pointer' }}
+                    style={{ cursor: 'pointer', animationDelay: `${0.05 * index}s` }}
                   >
                     <div className="activity-item-info">
                       <h4>{reg.activityName}</h4>
@@ -229,8 +240,12 @@ function ProfilePage() {
                   <p className="empty-state-text">暂无服务记录</p>
                 </div>
               ) : (
-                serviceRecords.map((record) => (
-                  <div key={record.id} className="service-record-item">
+                serviceRecords.map((record, index) => (
+                  <div 
+                    key={record.id} 
+                    className="service-record-item fade-in-up-item"
+                    style={{ animationDelay: `${0.05 * index}s` }}
+                  >
                     <div className="service-record-info">
                       <h4>{record.activityName}</h4>
                       <p>{record.date}</p>

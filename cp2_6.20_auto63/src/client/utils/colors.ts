@@ -36,8 +36,15 @@ export function interpolateColor(startHex: string, endHex: string, t: number): s
 export function getCertificationBorderColor(level: number): string {
   const green = '#10B981';
   const purple = '#8B5CF6';
+  const minLevel = 1;
   const maxLevel = 5;
-  const t = Math.max(0, Math.min(maxLevel, level - 1)) / Math.max(0, maxLevel - 1);
+
+  if (typeof level !== 'number' || isNaN(level) || level < minLevel) {
+    return green;
+  }
+
+  const clampedLevel = Math.min(level, maxLevel);
+  const t = (clampedLevel - minLevel) / (maxLevel - minLevel);
   return interpolateColor(green, purple, t);
 }
 
