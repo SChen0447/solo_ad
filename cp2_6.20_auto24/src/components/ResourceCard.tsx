@@ -1,4 +1,4 @@
-import { useState, memo } from 'react';
+import { useState, useEffect, useRef, memo } from 'react';
 import type { Resource } from '../types';
 import './ResourceCard.css';
 
@@ -9,6 +9,8 @@ interface ResourceCardProps {
   onExchange: (resource: Resource) => void;
 }
 
+const MAX_DESC_LENGTH = 60;
+
 const ResourceCard = memo(function ResourceCard({
   resource,
   isFavorite,
@@ -17,12 +19,34 @@ const ResourceCard = memo(function ResourceCard({
 }: ResourceCardProps) {
   const [isAnimating, setIsAnimating] = useState(false);
   const [showExchangeDialog, setShowExchangeDialog] = useState(false);
+  const [showFavoriteTip, setShowFavoriteTip] = useState(false);
+  const tipTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const truncatedDesc = resource.description.length > MAX_DESC_LENGTH
+    ? resource.description.slice(0, MAX_DESC_LENGTH) + '...'
+    : resource.description;
+  const needsTooltip = resource.description.length > MAX_DESC_LENGTH;
 
   const handleFavoriteClick = () => {
     setIsAnimating(true);
     onFavorite(resource.id);
+    setShowFavoriteTip(true);
+    if (tipTimerRef.current) {
+      clearTimeout(tipTimerRef.current);
+    }
+    tipTimerRef.current = setTimeout(() => {
+      setShowFavoriteTip(false);
+    }, 1500);
     setTimeout(() => setIsAnimating(false), 300);
   };
+
+  useEffect(() => {
+    return () => {
+      if (tipTimerRef.current) {
+        clearTimeout(tipTimerRef.current);
+      }
+    };
+  }, []);
 
   const handleExchangeClick = () => {
     setShowExchangeDialog(true);
@@ -52,7 +76,12 @@ const ResourceCard = memo(function ResourceCard({
           </span>
         </div>
         <h3 className="card-title">{resource.title}</h3>
-        <p className="card-description">{resource.description}</p>
+        <p
+          className="card-description"
+          title={needsTooltip ? resource.description : undefined}
+        >
+          {truncatedDesc}
+        </p>
         <div className="card-footer">
           <span className="owner-info">
             发布者：{resource.ownerName}
@@ -65,24 +94,31 @@ const ResourceCard = memo(function ResourceCard({
             >
               交换
             </button>
-            <button
-              className={`favorite-btn ${isFavorite ? 'favorited' : ''} ${isAnimating ? 'animate-spin' : ''}`}
-              onClick={handleFavoriteClick}
-              title={isFavorite ? '取消收藏' : '收藏'}
-            >
-              <svg
-                viewBox="0 0 24 24"
-                width="20"
-                height="20"
-                fill={isFavorite ? 'var(--color-accent-gold)' : 'none'}
-                stroke={isFavorite ? 'var(--color-accent-gold)' : 'currentColor'}
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
+            <div className="favorite-wrapper">
+              <button
+                className={`favorite-btn ${isFavorite ? 'favorited' : ''} ${isAnimating ? 'animate-spin' : ''}`}
+                onClick={handleFavoriteClick}
+                title={isFavorite ? '取消收藏' : '收藏'}
               >
-                <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
-              </svg>
-            </button>
+                <svg
+                  viewBox="0 0 24 24"
+                  width="20"
+                  height="20"
+                  fill={isFavorite ? 'var(--color-accent-gold)' : 'none'}
+                  stroke={isFavorite ? 'var(--color-accent-gold)' : 'currentColor'}
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+                </svg>
+              </button>
+              {showFavoriteTip && (
+                <span className="favorite-tip animate-fade-in">
+                  {isFavorite ? '已收藏' : '已取消'}
+                </span>
+              )}
+            </div>
           </div>
         </div>
       </div>

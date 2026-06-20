@@ -61,10 +61,7 @@
   color: #4A5568;
   line-height: 1.5;
   flex: 1;
-  display: -webkit-box;
-  -webkit-line-clamp: 3;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
+  cursor: default;
 }
 
 .card-footer {
@@ -117,6 +114,28 @@
 
 .favorite-btn.favorited {
   color: var(--color-accent-gold);
+}
+
+.favorite-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.favorite-tip {
+  position: absolute;
+  right: calc(100% + 6px);
+  top: 50%;
+  transform: translateY(-50%);
+  white-space: nowrap;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--color-accent-gold);
+  background-color: #FFFFF0;
+  padding: 4px 10px;
+  border-radius: 4px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  pointer-events: none;
 }
 
 .modal-overlay {
