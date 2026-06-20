@@ -1,19 +1,20 @@
 import React, { useState } from 'react';
 import { useAppContext } from '../context/AppContext';
 import ArtistCard from '../components/ArtistCard';
-import AddArtistModal from '../components/AddArtistModal';
+import AddArtistModal, { CreatedFromPoint } from '../components/AddArtistModal';
 import { ArtistsGridSkeleton } from '../components/Skeleton';
 import { Artist } from '../types';
 
 const ArtistsPage: React.FC = () => {
   const { artists, loading } = useAppContext();
   const [modalOpen, setModalOpen] = useState(false);
-  const [newArtistId, setNewArtistId] = useState<string | null>(null);
+  const [animState, setAnimState] = useState<{ id: string; from: CreatedFromPoint } | null>(null);
 
-  const handleCreated = (artist: Artist) => {
-    setNewArtistId(artist.id);
-    setTimeout(() => setNewArtistId(null), 1000);
+  const handleCreated = (artist: Artist, fromPoint: CreatedFromPoint) => {
+    setAnimState({ id: artist.id, from: fromPoint });
   };
+
+  const handleAnimDone = () => setAnimState(null);
 
   return (
     <>
@@ -38,7 +39,9 @@ const ArtistsPage: React.FC = () => {
             <ArtistCard
               key={artist.id}
               artist={artist}
-              isNew={artist.id === newArtistId}
+              isNew={animState?.id === artist.id}
+              fromPoint={animState?.id === artist.id ? animState.from : undefined}
+              onAnimDone={animState?.id === artist.id ? handleAnimDone : undefined}
             />
           ))}
           <button

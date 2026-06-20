@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Artist, Track } from '../types';
 import { useAppContext } from '../context/AppContext';
@@ -7,22 +7,56 @@ import { getLatestReleaseDate, formatDate } from '../utils/helpers';
 interface Props {
   artist: Artist;
   isNew?: boolean;
+  fromPoint?: { x: number; y: number } | null;
+  onAnimDone?: () => void;
 }
 
-const ArtistCard: React.FC<Props> = ({ artist, isNew }) => {
+const ArtistCard: React.FC<Props> = ({ artist, isNew, fromPoint, onAnimDone }) => {
   const navigate = useNavigate();
   const { tracks, styleColors } = useAppContext();
+  const cardRef = useRef<HTMLDivElement>(null);
+  const [animStyle, setAnimStyle] = useState<React.CSSProperties | null>(null);
 
   const artistTracks = tracks.filter(t => t.artistId === artist.id);
   const latest = getLatestReleaseDate(artistTracks);
 
   const colorForTag = (tag: string) => styleColors[tag] || '#6c63ff';
 
+  useEffect(() => {
+    if (!isNew || !fromPoint || !cardRef.current) return;
+    const rect = cardRef.current.getBoundingClientRect();
+    const targetX = rect.left + rect.width / 2;
+    const targetY = rect.top + rect.height / 2;
+    const dx = fromPoint.x - targetX;
+    const dy = fromPoint.y - targetY;
+
+    setAnimStyle({
+      transform: `translate(${dx}px, ${dy}px) scale(0.9)`,
+      opacity: 0,
+      animation: 'none',
+    });
+
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        setAnimStyle({
+          transform: 'translate(0, 0) scale(1)',
+          opacity: 1,
+          transition: 'transform 0.3s cubic-bezier(0.68, -0.6, 0.32, 1.6), opacity 0.3s ease-out',
+          animation: 'none',
+        });
+        setTimeout(() => {
+          onAnimDone?.();
+        }, 320);
+      });
+    });
+  }, [isNew, fromPoint, onAnimDone]);
+
   return (
     <div
+      ref={cardRef}
       className="artist-card"
       onClick={() => navigate(`/artists/${artist.id}`)}
-      style={isNew ? undefined : { animation: 'none' }}
+      style={animStyle ?? (isNew ? undefined : { animation: 'none' })}
     >
       {artist.styleTags.length > 0 && (
         <div className="artist-card-tags">

@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { Show, Artist } from '../types';
 import { getConflicts, getArtistColor } from '../utils/helpers';
@@ -9,16 +9,20 @@ interface Props {
 }
 
 const weekdays = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
+const COMPACT_BREAKPOINT = 768;
 
 const CalendarView: React.FC<Props> = ({ artistId, onSelectShow }) => {
   const { shows, artists, styleColors, addShow, updateShow, deleteShow } = useAppContext();
   const [current, setCurrent] = useState(new Date());
-  const [isCompact, setIsCompact] = useState(typeof window !== 'undefined' && window.innerWidth < 768);
+  const [isCompact, setIsCompact] = useState(
+    typeof window !== 'undefined' && window.innerWidth < COMPACT_BREAKPOINT
+  );
   const [editModal, setEditModal] = useState<{ show: Show; conflictIds: string[] } | null>(null);
   const [addModal, setAddModal] = useState<{ date: string } | null>(null);
+  const [expandedConflictId, setExpandedConflictId] = useState<string | null>(null);
 
   useEffect(() => {
-    const handle = () => setIsCompact(window.innerWidth < 768);
+    const handle = () => setIsCompact(window.innerWidth < COMPACT_BREAKPOINT);
     window.addEventListener('resize', handle);
     return () => window.removeEventListener('resize', handle);
   }, []);
@@ -42,9 +46,7 @@ const CalendarView: React.FC<Props> = ({ artistId, onSelectShow }) => {
     const year = current.getFullYear();
     const month = current.getMonth();
     const first = new Date(year, month, 1);
-    const last = new Date(year, month + 1, 0);
     const startDow = (first.getDay() + 6) % 7;
-
     const startDate = new Date(year, month, 1 - startDow);
     const daysArr: { date: Date; inMonth: boolean; key: string; iso: string }[] = [];
     for (let i = 0; i < 42; i++) {
@@ -54,7 +56,6 @@ const CalendarView: React.FC<Props> = ({ artistId, onSelectShow }) => {
       const iso = d.toISOString().split('T')[0];
       daysArr.push({ date: d, inMonth, key: `${i}-${iso}`, iso });
     }
-
     const label = `${year}年${month + 1}月`;
     return { days: daysArr, monthLabel: label };
   }, [current]);
@@ -79,8 +80,9 @@ const CalendarView: React.FC<Props> = ({ artistId, onSelectShow }) => {
   const nextMonth = () => setCurrent(d => new Date(d.getFullYear(), d.getMonth() + 1, 1));
   const goToday = () => setCurrent(new Date());
 
-  const handleConflictClick = (show: Show) => {
+  const openEditConflict = (show: Show) => {
     const conflictIds = Array.from(conflicts.get(show.id) || []);
+    setExpandedConflictId(null);
     setEditModal({ show, conflictIds });
   };
 
@@ -138,35 +140,63 @@ const CalendarView: React.FC<Props> = ({ artistId, onSelectShow }) => {
                       const art = getArtist(ev.artistId);
                       const hasConflict = conflicts.has(ev.id);
                       const color = art ? getArtistColor(art.styleTags, styleColors) : 'var(--accent)';
+                      const isExpanded = expandedConflictId === ev.id;
                       return (
                         <div
                           key={ev.id}
-                          className={`calendar-event ${hasConflict ? 'has-conflict conflict-banner' : ''}`}
-                          style={hasConflict ? undefined : { background: color }}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            if (hasConflict) {
-                              handleConflictClick(ev);
-                            } else {
-                              onSelectShow?.(ev);
-                            }
+                          style={{
+                            position: 'relative',
+                            marginBottom: 4,
                           }}
-                          title={`${art?.name || ''} ${ev.time} @ ${ev.venue}`}
                         >
-                          <strong>{ev.time}</strong> {art?.name || '未知'}
                           {hasConflict && (
-                            <div className="conflict-banner-detail" onClick={(e) => e.stopPropagation()}>
-                              {Array.from(conflicts.get(ev.id) || []).map(cid => {
-                                const cs = filteredShows.find(s => s.id === cid);
-                                if (!cs) return null;
-                                return (
-                                  <div key={cid}>
-                                    ⚠ {cs.time} @ {cs.venue}
-                                  </div>
-                                );
-                              })}
-                              <button onClick={(e) => { e.stopPropagation(); handleConflictClick(ev); }}>
-                                修改日程
+                            <div
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setExpandedConflictId(isExpanded ? null : ev.id);
+                              }}
+                              className="conflict-warning-bar"
+                            >
+                              <span>⚠ 档期冲突</span>
+                              <span style={{ marginLeft: 'auto', fontSize: 10 }}>
+                                {isExpanded ? '收起 ▲' : '修改 ▼'}
+                              </span>
+                            </div>
+                          )}
+                          <div
+                            className={`calendar-event ${hasConflict ? 'has-conflict' : ''}`}
+                            style={hasConflict ? undefined : { background: color }}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (hasConflict) {
+                                setExpandedConflictId(isExpanded ? null : ev.id);
+                              } else {
+                                onSelectShow?.(ev);
+                              }
+                            }}
+                            title={`${art?.name || ''} ${ev.time} @ ${ev.venue}`}
+                          >
+                            <strong>{ev.time}</strong> {art?.name || '未知'}
+                          </div>
+                          {hasConflict && isExpanded && (
+                            <div
+                              className="conflict-detail-panel"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <div className="conflict-detail-header">冲突详情对比：</div>
+                              <ConflictCompareRows
+                                primary={ev}
+                                others={Array.from(conflicts.get(ev.id) || [])
+                                  .map(id => filteredShows.find(s => s.id === id))
+                                  .filter((s): s is Show => !!s)}
+                                getArtist={getArtist}
+                              />
+                              <button
+                                className="btn btn-danger btn-sm"
+                                style={{ width: '100%', marginTop: 10, fontSize: 12 }}
+                                onClick={() => openEditConflict(ev)}
+                              >
+                                点击修改此日程 →
                               </button>
                             </div>
                           )}
@@ -185,47 +215,17 @@ const CalendarView: React.FC<Props> = ({ artistId, onSelectShow }) => {
           </div>
         </>
       ) : (
-        <div className="compact-list">
-          {sortedList.length === 0 ? (
-            <div className="empty-state" style={{ padding: 40 }}>
-              <div className="empty-icon" style={{ fontSize: 40 }}>📅</div>
-              <div className="empty-text">暂无演出安排</div>
-            </div>
-          ) : (
-            sortedList.map(ev => {
-              const art = getArtist(ev.artistId);
-              const hasConflict = conflicts.has(ev.id);
-              const color = art ? getArtistColor(art.styleTags, styleColors) : 'var(--accent)';
-              return (
-                <div
-                  key={ev.id}
-                  className={`compact-event ${hasConflict ? 'has-conflict' : ''}`}
-                  style={{ background: `linear-gradient(90deg, ${color}15, var(--bg-primary))` }}
-                  onClick={() => (hasConflict ? handleConflictClick(ev) : onSelectShow?.(ev))}
-                >
-                  <div
-                    className="compact-event-time"
-                    style={hasConflict ? undefined : { background: color }}
-                  >
-                    <div style={{ fontSize: 11, opacity: 0.85 }}>
-                      {ev.date.slice(5).replace('-', '/')}
-                    </div>
-                    <div>{ev.time}</div>
-                  </div>
-                  <div className="compact-event-artist">
-                    {art?.name || '未知艺术家'}
-                    <small>{hasConflict ? '⚠ 存在档期冲突' : ''}</small>
-                  </div>
-                  <div className="compact-event-venue">
-                    📍 {ev.venue}
-                    {ev.notes && <div style={{ fontSize: 12, marginTop: 4, color: 'var(--text-muted)' }}>{ev.notes}</div>}
-                  </div>
-                  <div style={{ fontSize: 20, opacity: 0.3 }}>›</div>
-                </div>
-              );
-            })
-          )}
-        </div>
+        <CompactList
+          sortedList={sortedList}
+          conflicts={conflicts}
+          getArtist={getArtist}
+          styleColors={styleColors}
+          filteredShows={filteredShows}
+          onSelect={(ev) => {
+            if (conflicts.has(ev.id)) openEditConflict(ev);
+            else onSelectShow?.(ev);
+          }}
+        />
       )}
 
       {editModal && (
@@ -254,6 +254,128 @@ const CalendarView: React.FC<Props> = ({ artistId, onSelectShow }) => {
       )}
     </div>
   );
+};
+
+const ConflictCompareRows: React.FC<{
+  primary: Show;
+  others: Show[];
+  getArtist: (id: string) => Artist | undefined;
+}> = ({ primary, others, getArtist }) => {
+  const all = [primary, ...others];
+  return (
+    <div className="conflict-compare">
+      {all.map((ev, i) => {
+        const art = getArtist(ev.artistId);
+        const isPrimary = ev.id === primary.id;
+        return (
+          <div key={ev.id} className={`conflict-compare-row ${isPrimary ? 'is-primary' : ''}`}>
+            <div className="conflict-compare-label">
+              {isPrimary ? '🎯 当前' : `⚠ 冲突${i}`}
+            </div>
+            <div className="conflict-compare-time">{ev.time}</div>
+            <div className="conflict-compare-venue">{ev.venue}</div>
+            <div className="conflict-compare-artist">{art?.name || '未知'}</div>
+          </div>
+        );
+      })}
+    </div>
+  );
+};
+
+const CompactList: React.FC<{
+  sortedList: Show[];
+  conflicts: Map<string, Set<string>>;
+  getArtist: (id: string) => Artist | undefined;
+  styleColors: Record<string, string>;
+  filteredShows: Show[];
+  onSelect: (ev: Show) => void;
+}> = ({ sortedList, conflicts, getArtist, styleColors, onSelect }) => {
+  if (sortedList.length === 0) {
+    return (
+      <div className="empty-state" style={{ padding: 40 }}>
+        <div className="empty-icon" style={{ fontSize: 40 }}>📅</div>
+        <div className="empty-text">暂无演出安排</div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="compact-event-list">
+      {sortedList.map((ev, idx) => {
+        const art = getArtist(ev.artistId);
+        const hasConflict = conflicts.has(ev.id);
+        const color = art ? getArtistColor(art.styleTags, styleColors) : '#6c63ff';
+        return (
+          <React.Fragment key={ev.id}>
+            {idx === 0 || sortedList[idx - 1].date !== ev.date ? (
+              <div className="compact-date-label">{formatDateLabel(ev.date)}</div>
+            ) : null}
+            <div
+              className="compact-event-bar"
+              onClick={() => onSelect(ev)}
+              style={{
+                background: hasConflict
+                  ? 'linear-gradient(90deg, #ff6b6b 0%, #ff8e8e 100%)'
+                  : `linear-gradient(135deg, ${color}dd 0%, ${adjustColor(color, -20)}dd 100%)`,
+              }}
+            >
+              <div className="compact-event-bar-time">
+                <div className="bar-hour">{ev.time}</div>
+              </div>
+              <div className="compact-event-bar-body">
+                <div className="compact-event-bar-artist">
+                  {art?.name || '未知艺术家'}
+                  {hasConflict && (
+                    <span className="compact-conflict-badge">
+                      ⚠ 档期冲突 · 点击修改
+                    </span>
+                  )}
+                </div>
+                <div className="compact-event-bar-venue">
+                  📍 {ev.venue}
+                </div>
+              </div>
+              <div className="compact-event-bar-arrow">›</div>
+            </div>
+            {hasConflict && (
+              <div className="compact-conflict-detail">
+                <div className="conflict-detail-header" style={{ padding: '0 4px 8px' }}>
+                  冲突场次对比：
+                </div>
+                <ConflictCompareRows
+                  primary={ev}
+                  others={Array.from(conflicts.get(ev.id) || [])
+                    .map(id => sortedList.find(s => s.id === id))
+                    .filter((s): s is Show => !!s)}
+                  getArtist={getArtist}
+                />
+              </div>
+            )}
+          </React.Fragment>
+        );
+      })}
+    </div>
+  );
+};
+
+const formatDateLabel = (iso: string) => {
+  const d = new Date(iso);
+  const today = new Date().toISOString().split('T')[0];
+  const wd = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'][d.getDay()];
+  const mark = iso === today ? ' · 今天' : '';
+  return `${d.getMonth() + 1}月${d.getDate()}日 ${wd}${mark}`;
+};
+
+const adjustColor = (hex: string, amount: number) => {
+  const h = hex.replace('#', '');
+  const num = parseInt(h.length === 3 ? h.split('').map(c => c + c).join('') : h, 16);
+  let r = (num >> 16) + amount;
+  let g = ((num >> 8) & 0x00FF) + amount;
+  let b = (num & 0x0000FF) + amount;
+  r = Math.max(Math.min(255, r), 0);
+  g = Math.max(Math.min(255, g), 0);
+  b = Math.max(Math.min(255, b), 0);
+  return '#' + ((r << 16) | (g << 8) | b).toString(16).padStart(6, '0');
 };
 
 const AddShowModal: React.FC<{

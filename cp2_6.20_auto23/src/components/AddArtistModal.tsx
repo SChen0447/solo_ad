@@ -2,10 +2,15 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { Artist } from '../types';
 
+export interface CreatedFromPoint {
+  x: number;
+  y: number;
+}
+
 interface Props {
   open: boolean;
   onClose: () => void;
-  onCreated?: (artist: Artist) => void;
+  onCreated?: (artist: Artist, fromPoint: CreatedFromPoint) => void;
 }
 
 const AddArtistModal: React.FC<Props> = ({ open, onClose, onCreated }) => {
@@ -16,6 +21,7 @@ const AddArtistModal: React.FC<Props> = ({ open, onClose, onCreated }) => {
   const [tags, setTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState('');
   const tagRef = useRef<HTMLInputElement>(null);
+  const modalRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (open) {
@@ -56,13 +62,21 @@ const AddArtistModal: React.FC<Props> = ({ open, onClose, onCreated }) => {
     e.preventDefault();
     if (!name.trim()) return;
     try {
+      let fromPoint: CreatedFromPoint = { x: window.innerWidth / 2, y: 100 };
+      if (modalRef.current) {
+        const rect = modalRef.current.getBoundingClientRect();
+        fromPoint = {
+          x: rect.left + rect.width / 2,
+          y: rect.top + rect.height / 2,
+        };
+      }
       const artist = await addArtist({
         name: name.trim(),
         avatarUrl: avatarUrl.trim(),
         styleTags: tags,
         bio: bio.trim(),
       });
-      onCreated?.(artist);
+      onCreated?.(artist, fromPoint);
       onClose();
     } catch (err) {
       console.error(err);
@@ -75,7 +89,7 @@ const AddArtistModal: React.FC<Props> = ({ open, onClose, onCreated }) => {
 
   return (
     <div className="modal-overlay modal-overlay-enter" onClick={onClose}>
-      <div className="modal" onClick={(e) => e.stopPropagation()}>
+      <div className="modal" ref={modalRef} onClick={(e) => e.stopPropagation()}>
         <h2>添加新艺术家</h2>
         <form onSubmit={handleSubmit}>
           <div className="form-group">

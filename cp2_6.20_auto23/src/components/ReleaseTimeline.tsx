@@ -29,19 +29,27 @@ const ReleaseTimeline: React.FC<Props> = ({ artistId }) => {
     return set;
   }, [shows, artistId]);
 
-  const { rangeStart, rangeEnd, totalDays, dateFromOffset } = useMemo(() => {
+  const { rangeStart, totalDays, dateFromOffset } = useMemo(() => {
     if (artistTracks.length === 0) {
       const today = new Date();
       const s = new Date(today);
       s.setDate(s.getDate() - 7);
       const e = new Date(today);
       e.setDate(e.getDate() + 60);
+      const total = Math.ceil((e.getTime() - s.getTime()) / (1000 * 60 * 60 * 24));
       return {
-        rangeStart: s, rangeEnd: e, totalDays: 67, dateFromOffset: null as any };
+        rangeStart: s,
+        totalDays: total,
+        dateFromOffset: (offsetDays: number) => {
+          const d = new Date(s);
+          d.setDate(d.getDate() + offsetDays);
+          return d;
+        },
+      };
     }
-    const dates = artistTracks.map(t => new Date(t.releaseDate).sort((a, b) => a.getTime() - b.getTime());
-    const first = dates[0];
-    const last = dates[dates.length - 1];
+    const dateObjects = artistTracks.map(t => new Date(t.releaseDate)).sort((a, b) => a.getTime() - b.getTime());
+    const first = dateObjects[0];
+    const last = dateObjects[dateObjects.length - 1];
     const s = new Date(first);
     s.setDate(s.getDate() - 14);
     const e = new Date(last);
@@ -52,7 +60,7 @@ const ReleaseTimeline: React.FC<Props> = ({ artistId }) => {
       d.setDate(d.getDate() + offsetDays);
       return d;
     };
-    return { rangeStart: s, rangeEnd: e, totalDays: Math.max(total, 30), dateFromOffset: fn };
+    return { rangeStart: s, totalDays: Math.max(total, 30), dateFromOffset: fn };
   }, [artistTracks]);
 
   const dayToPercent = (iso: string, offset = 0) => {
@@ -66,13 +74,13 @@ const ReleaseTimeline: React.FC<Props> = ({ artistId }) => {
     const arr: { date: Date; label: string; percent: number }[] = [];
     const step = Math.max(7, Math.floor(totalDays / 8));
     for (let i = 0; i <= totalDays; i += step) {
-      const d = dateFromOffset ? dateFromOffset(i) : (() => { const dt = new Date(rangeStart); dt.setDate(dt.getDate() + i); return dt; })();
-      const percent = i / totalDays * 100;
+      const d = dateFromOffset(i);
+      const percent = (i / totalDays) * 100;
       const label = `${d.getMonth() + 1}/${d.getDate()}`;
       arr.push({ date: d, label, percent });
     }
     return arr;
-  }, [totalDays, rangeStart, dateFromOffset]);
+  }, [totalDays, dateFromOffset]);
 
   const handleMouseDown = (e: React.MouseEvent, track: Track) => {
     e.preventDefault();
@@ -90,7 +98,7 @@ const ReleaseTimeline: React.FC<Props> = ({ artistId }) => {
       if (!containerRef.current || !dragging) return;
       const rect = containerRef.current.getBoundingClientRect();
       const dx = e.clientX - dragging.startX;
-      const days = Math.round((dx / rect.width) * totalDays;
+      const days = Math.round((dx / rect.width) * totalDays);
       setTempOffset(days);
     };
 
@@ -121,7 +129,7 @@ const ReleaseTimeline: React.FC<Props> = ({ artistId }) => {
 
   return (
     <div className="timeline-wrap">
-      <div className="timeline-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flexEnd }}>
+      <div className="timeline-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
         <div>
           <h3>作品发布计划</h3>
           <p>拖拽蓝色三角形可调整发行日期 · 点击查看详情</p>
@@ -135,7 +143,10 @@ const ReleaseTimeline: React.FC<Props> = ({ artistId }) => {
         <div className="timeline-marks">
           {marks.map((m, i) => (
             <div
-              key={i} className="timeline-mark" style={{ position: 'absolute', left: `${m.percent}%` }}>
+              key={i}
+              className="timeline-mark"
+              style={{ position: 'absolute', left: `${m.percent}%` }}
+            >
               {m.label}
             </div>
           ))}
@@ -147,7 +158,9 @@ const ReleaseTimeline: React.FC<Props> = ({ artistId }) => {
           {artistTracks.map(track => {
             const offset = dragging?.id === track.id ? tempOffset : 0;
             const percent = dayToPercent(track.releaseDate, offset) * 100;
-            const hasShowOverlap = showDates.has(new Date(new Date(track.releaseDate).getTime() + offset * 86400000).toISOString().split('T')[0]);
+            const actualDate = new Date(new Date(track.releaseDate).getTime() + offset * 86400000);
+            const actualISO = actualDate.toISOString().split('T')[0];
+            const hasShowOverlap = showDates.has(actualISO);
             const isHovered = hovered === track.id;
             const art = getArtist(track.artistId);
             const countdown = getCountdown(track.releaseDate);
@@ -160,19 +173,22 @@ const ReleaseTimeline: React.FC<Props> = ({ artistId }) => {
                   position: 'absolute',
                   left: `${percent}%`,
                   top: '50%',
-                  transform: `translate(-50%, -50%)`,
+                  transform: 'translate(-50%, -50%)',
                 }}
                 onMouseDown={(e) => handleMouseDown(e, track)}
                 onMouseEnter={() => setHovered(track.id)}
                 onMouseLeave={() => setHovered(null)}
-                onClick={() => { if (!dragging) setSelected(selected?.id === track.id ? null : track)}
+                onClick={() => {
+                  if (!dragging) setSelected(selected?.id === track.id ? null : track);
+                }}
               >
                 <div className="timeline-triangle" />
                 {hasShowOverlap && <div className="timeline-star">★</div>}
                 {isHovered && (
                   <div className="timeline-tooltip">
                     <div className="timeline-tooltip-title">
-                      {art ? `${art.name} · ' : ''}{track.name}
+                      {art ? `${art.name} · ` : ''}
+                      {track.name}
                     </div>
                     {!countdown.past && (
                       <div className="timeline-tooltip-countdown">
@@ -216,7 +232,10 @@ const ReleaseTimeline: React.FC<Props> = ({ artistId }) => {
           artists={artists}
           artistId={artistId}
           onClose={() => setShowAdd(false)}
-          onSave={async (d) => { await addTrack(d); setShowAdd(false); }}
+          onSave={async (d) => {
+            await addTrack(d);
+            setShowAdd(false);
+          }}
         />
       )}
     </div>
@@ -245,10 +264,13 @@ const ReleaseDetail: React.FC<{
             </div>
           ) : (
             <div style={{ fontSize: 14, color: 'var(--success)' }}>
-            ✅ 已于 {formatDateCN(track.releaseDate)} 发行
-          </div>
+              ✅ 已于 {formatDateCN(track.releaseDate)} 发行
+            </div>
+          )}
         </div>
-        <button className="btn btn-ghost btn-sm" onClick={onClose}>× 关闭</button>
+        <button className="btn btn-ghost btn-sm" onClick={onClose}>
+          × 关闭
+        </button>
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, fontSize: 13 }}>
         <div>
@@ -258,7 +280,9 @@ const ReleaseDetail: React.FC<{
         <div>
           <div style={{ color: 'var(--text-muted)', marginBottom: 4 }}>时长</div>
           <div style={{ fontWeight: 600 }}>
-            {track.duration ? `${Math.floor(track.duration / 60)}:{(track.duration % 60).toString().padStart(2, '0')} : '—'}
+            {track.duration
+              ? `${Math.floor(track.duration / 60)}:${(track.duration % 60).toString().padStart(2, '0')}`
+              : '—'}
           </div>
         </div>
         <div>
@@ -266,9 +290,11 @@ const ReleaseDetail: React.FC<{
           <div style={{ fontWeight: 600 }}>
             {track.playLink ? (
               <a href={track.playLink} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent)' }}>
-              点击播放 →
-            </a>
-          ) : '—'}
+                点击播放 →
+              </a>
+            ) : (
+              '—'
+            )}
           </div>
         </div>
       </div>
@@ -302,38 +328,62 @@ const AddTrackModal: React.FC<{
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal dark-theme" onClick={e => e.stopPropagation()}>
+      <div className="modal dark-theme" onClick={(e) => e.stopPropagation()}>
         <h2>新增作品</h2>
         <form onSubmit={handle}>
           {!artistId && (
             <div className="form-group">
               <label className="form-label">艺术家</label>
-              <select className="form-input" value={aid} onChange={e => setAid(e.target.value)}>
-                {artists.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+              <select className="form-input" value={aid} onChange={(e) => setAid(e.target.value)}>
+                {artists.map((a) => (
+                  <option key={a.id} value={a.id}>
+                    {a.name}
+                  </option>
+                ))}
               </select>
             </div>
           )}
           <div className="form-group">
             <label className="form-label">曲名</label>
-            <input className="form-input" value={name} onChange={e => setName(e.target.value)} />
+            <input className="form-input" value={name} onChange={(e) => setName(e.target.value)} />
           </div>
           <div className="form-row">
             <div className="form-group">
               <label className="form-label">发行日期</label>
-              <input type="date" className="form-input" value={releaseDate} onChange={e => setReleaseDate(e.target.value)} />
+              <input
+                type="date"
+                className="form-input"
+                value={releaseDate}
+                onChange={(e) => setReleaseDate(e.target.value)}
+              />
             </div>
             <div className="form-group">
               <label className="form-label">时长（秒）</label>
-              <input type="number" className="form-input" value={duration} onChange={e => setDuration(e.target.value)} placeholder="例如 240" />
+              <input
+                type="number"
+                className="form-input"
+                value={duration}
+                onChange={(e) => setDuration(e.target.value)}
+                placeholder="例如 240"
+              />
             </div>
           </div>
           <div className="form-group">
             <label className="form-label">播放链接</label>
-            <input className="form-input" value={playLink} onChange={e => setPlayLink(e.target.value)} placeholder="Spotify / Apple Music 链接" />
+            <input
+              className="form-input"
+              value={playLink}
+              onChange={(e) => setPlayLink(e.target.value)}
+              placeholder="Spotify / Apple Music 链接"
+            />
           </div>
           <div className="form-actions">
-            <button type="button" className="btn btn-ghost" onClick={onClose}>取消</button>
-            <button type="submit" className="btn btn-primary" disabled={!aid || !name}>保存</button>
+            <button type="button" className="btn btn-ghost" onClick={onClose}>
+              取消
+            </button>
+            <button type="submit" className="btn btn-primary" disabled={!aid || !name}>
+              保存
+            </button>
           </div>
         </form>
       </div>

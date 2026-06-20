@@ -1,7 +1,24 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAppContext } from '../context/AppContext';
 import { SearchResult } from '../types';
+
+const DEBOUNCE_MS = 150;
+
+function useDebouncedValue<T>(value: T, delay: number): T {
+  const [debounced, setDebounced] = useState<T>(value);
+  const timerRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    if (timerRef.current) clearTimeout(timerRef.current);
+    timerRef.current = window.setTimeout(() => setDebounced(value), delay);
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+    };
+  }, [value, delay]);
+
+  return debounced;
+}
 
 interface Props {
   pageTitle: string;
@@ -13,14 +30,10 @@ const SearchBar: React.FC<Props> = ({ pageTitle }) => {
   const [open, setOpen] = useState(false);
   const navigate = useNavigate();
   const { search } = useAppContext();
-  const timeoutRef = useRef<number | null>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
+  const reqIdRef = useRef(0);
 
-  useEffect(() => {
-    return () => {
-      if (timeoutRef.current) clearTimeout(timeoutRef.current);
-    };
-  }, []);
+  const debouncedQuery = useDebouncedValue(query, DEBOUNCE_MS);
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -32,26 +45,28 @@ const SearchBar: React.FC<Props> = ({ pageTitle }) => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const triggerSearch = useCallback(async (q: string) => {
-    if (!q.trim()) {
+  useEffect(() => {
+    const q = debouncedQuery.trim();
+    if (!q) {
       setResults([]);
       setOpen(false);
       return;
     }
-    try {
-      const res = await search(q);
-      setResults(res);
-      setOpen(true);
-    } catch (err) {
-      console.error(err);
-    }
-  }, [search]);
+    const myReqId = ++reqIdRef.current;
+    search(q)
+      .then(res => {
+        if (myReqId !== reqIdRef.current) return;
+        setResults(res);
+        setOpen(true);
+      })
+      .catch(err => {
+        if (myReqId !== reqIdRef.current) return;
+        console.error(err);
+      });
+  }, [debouncedQuery, search]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const val = e.target.value;
-    setQuery(val);
-    if (timeoutRef.current) clearTimeout(timeoutRef.current);
-    timeoutRef.current = window.setTimeout(() => triggerSearch(val), 180);
+    setQuery(e.target.value);
   };
 
   const handleResultClick = (item: SearchResult) => {
