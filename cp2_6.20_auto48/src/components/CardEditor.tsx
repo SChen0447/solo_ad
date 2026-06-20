@@ -1,13 +1,15 @@
 import { useRef, useEffect, useCallback, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useCardStore, generateId } from '@/store/cardStore';
 import { CanvasRenderer } from '@/core/CanvasRenderer';
 import { gradientPresets, fontOptions } from '@/data/templates';
 import type { TextElement, DecorationElement, DecorationShape, CardElementUnion } from '@/types';
-import { Type, Star, Heart, Flower2, Trash2, Image, Palette, ChevronDown, ChevronUp, RotateCw, ZoomIn, Minus, Plus } from 'lucide-react';
+import { Type, Star, Heart, Flower2, Trash2, Image, Palette, ChevronDown, ChevronUp, RotateCw, ZoomIn, Minus, Plus, Eye } from 'lucide-react';
 
 type ToolSection = 'text' | 'decoration' | 'background' | 'properties';
 
 export default function CardEditor() {
+  const navigate = useNavigate();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const rendererRef = useRef<CanvasRenderer | null>(null);
   const dragRef = useRef<{ elementId: string; offsetX: number; offsetY: number } | null>(null);
@@ -172,7 +174,11 @@ export default function CardEditor() {
 
   const updateSelectedProperty = (key: string, value: string | number) => {
     if (selectedElementId) {
-      updateElement(selectedElementId, { [key]: value } as Partial<CardElementUnion>);
+      let finalValue: string | number = value;
+      if (key === 'rotation' && typeof value === 'number') {
+        finalValue = Math.max(0, Math.min(360, Math.round(value / 15) * 15));
+      }
+      updateElement(selectedElementId, { [key]: finalValue } as Partial<CardElementUnion>);
     }
   };
 
@@ -484,6 +490,19 @@ export default function CardEditor() {
           >
             <Trash2 size={14} />
             清空画布
+          </button>
+          <button
+            onClick={() => navigate('/preview')}
+            className="btn-gradient px-5 py-2 text-sm flex items-center gap-1.5"
+          >
+            <Eye size={14} />
+            预览贺卡
+          </button>
+          <button
+            onClick={() => navigate('/')}
+            className="btn-gradient px-5 py-2 text-sm"
+          >
+            🏠 首页
           </button>
         </div>
       </div>

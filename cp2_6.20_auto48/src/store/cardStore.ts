@@ -43,7 +43,7 @@ export const useCardStore = create<CardState>((set) => ({
   updateElement: (id, updates) =>
     set((state) => ({
       elements: state.elements.map((el) =>
-        el.id === id ? { ...el, ...updates } : el
+        el.id === id ? ({ ...el, ...updates } as CardElementUnion) : el
       ),
     })),
 

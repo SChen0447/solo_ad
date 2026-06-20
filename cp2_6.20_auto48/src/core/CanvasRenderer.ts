@@ -45,25 +45,37 @@ export class CanvasRenderer {
   }
 
   private drawImageBackground(): void {
-    if (this.bgImage) {
-      const canvasRatio = this.width / this.height;
-      const imgRatio = this.bgImage.width / this.bgImage.height;
-      let drawW: number, drawH: number, drawX: number, drawY: number;
+    if (!this.bgImage) return;
+    const ctx = this.ctx;
+    const canvasW = this.width;
+    const canvasH = this.height;
+    const imgW = this.bgImage.width;
+    const imgH = this.bgImage.height;
+    const canvasRatio = canvasW / canvasH;
+    const imgRatio = imgW / imgH;
 
-      if (imgRatio > canvasRatio) {
-        drawH = this.height;
-        drawW = this.height * imgRatio;
-        drawX = (this.width - drawW) / 2;
-        drawY = 0;
-      } else {
-        drawW = this.width;
-        drawH = this.width / imgRatio;
-        drawX = 0;
-        drawY = (this.height - drawH) / 2;
-      }
+    let sx = 0, sy = 0, sw = imgW, sh = imgH;
+    let dx = 0, dy = 0, dw = canvasW, dh = canvasH;
 
-      this.ctx.drawImage(this.bgImage, drawX, drawY, drawW, drawH);
+    if (imgRatio > canvasRatio) {
+      sw = imgH * canvasRatio;
+      sx = (imgW - sw) / 2;
+    } else {
+      sh = imgW / canvasRatio;
+      sy = (imgH - sh) / 2;
     }
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(0, 0, canvasW, canvasH);
+    ctx.clip();
+
+    ctx.drawImage(
+      this.bgImage,
+      sx, sy, sw, sh,
+      dx, dy, dw, dh
+    );
+    ctx.restore();
   }
 
   drawBackground(background: string, backgroundType: BackgroundType): void {
@@ -90,8 +102,11 @@ export class CanvasRenderer {
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
 
+    const clampedShadowBlur = Math.max(3, Math.min(8, element.shadowBlur));
+    const clampedStrokeWidth = Math.max(1, Math.min(4, element.strokeWidth));
+
     if (element.shadowBlur > 0) {
-      ctx.shadowBlur = element.shadowBlur;
+      ctx.shadowBlur = clampedShadowBlur;
       ctx.shadowColor = element.shadowColor;
       ctx.shadowOffsetX = 2;
       ctx.shadowOffsetY = 2;
@@ -99,15 +114,19 @@ export class CanvasRenderer {
 
     if (element.strokeWidth > 0) {
       ctx.strokeStyle = element.strokeColor;
-      ctx.lineWidth = element.strokeWidth;
+      ctx.lineWidth = clampedStrokeWidth;
       ctx.lineJoin = 'round';
+      ctx.miterLimit = 2;
       ctx.strokeText(element.text, 0, 0);
     }
 
-    ctx.shadowBlur = 0;
-    ctx.shadowColor = 'transparent';
     ctx.fillStyle = element.color;
     ctx.fillText(element.text, 0, 0);
+
+    ctx.shadowBlur = 0;
+    ctx.shadowColor = 'transparent';
+    ctx.shadowOffsetX = 0;
+    ctx.shadowOffsetY = 0;
 
     ctx.restore();
   }

@@ -1,8 +1,8 @@
 import { useRef, useEffect, useState, useCallback } from 'react';
 import { useCardStore } from '@/store/cardStore';
 import { CanvasRenderer } from '@/core/CanvasRenderer';
-import { exportToPNG, generateShortLink, serializeCardState } from '@/utils/export';
-import { Download, Share2, ArrowLeft, Copy, Check } from 'lucide-react';
+import { exportToPNG, exportToGIF, generateShortLink, serializeCardState, captureAnimatedFrames } from '@/utils/export';
+import { Download, Share2, ArrowLeft, Copy, Check, Film } from 'lucide-react';
 
 interface Particle {
   id: number;
@@ -23,6 +23,7 @@ export default function CardPreview() {
   const [shortLink, setShortLink] = useState('');
   const [linkCopied, setLinkCopied] = useState(false);
   const [isGeneratingLink, setIsGeneratingLink] = useState(false);
+  const [isGeneratingGIF, setIsGeneratingGIF] = useState(false);
   const [animPhase, setAnimPhase] = useState(0);
 
   useEffect(() => {
@@ -69,6 +70,46 @@ export default function CardPreview() {
   const handleExportPNG = () => {
     if (!canvasRef.current) return;
     exportToPNG(canvasRef.current);
+  };
+
+  const handleExportGIF = async () => {
+    if (!canvasRef.current) return;
+    setIsGeneratingGIF(true);
+    try {
+      const width = 800;
+      const height = 600;
+      const tempCanvas = document.createElement('canvas');
+      tempCanvas.width = width;
+      tempCanvas.height = height;
+      const tempCtx = tempCanvas.getContext('2d')!;
+      const renderer = new CanvasRenderer(tempCanvas);
+      const originalElements = elements;
+
+      const frames: ImageData[] = [];
+      const totalFrames = 24;
+
+      for (let i = 0; i < totalFrames; i++) {
+        const progress = i / totalFrames;
+        const eased = 1 - Math.pow(1 - progress, 3);
+        const animatedElements = originalElements.map((el) => {
+          const copy = { ...el };
+          if (el.type === 'text') {
+            copy.scale = el.scale * (0.5 + eased * 0.5);
+          } else {
+            copy.scale = el.scale * (0.3 + Math.sin(progress * Math.PI) * 0.7 + 0.3);
+            copy.rotation = (el.rotation + eased * 360) % 360;
+          }
+          return copy;
+        });
+
+        renderer.render(animatedElements, background, backgroundType, null);
+        frames.push(tempCtx.getImageData(0, 0, width, height));
+      }
+
+      await exportToGIF(frames, width, height, { delayMs: 80 });
+    } finally {
+      setIsGeneratingGIF(false);
+    }
   };
 
   const handleGenerateLink = async () => {
@@ -168,6 +209,14 @@ export default function CardPreview() {
         >
           <Download size={16} />
           下载PNG
+        </button>
+        <button
+          onClick={handleExportGIF}
+          disabled={isGeneratingGIF}
+          className="btn-gradient px-6 py-2.5 text-sm flex items-center gap-2 disabled:opacity-50"
+        >
+          <Film size={16} />
+          {isGeneratingGIF ? '生成中...' : '下载GIF'}
         </button>
         <button
           onClick={handleGenerateLink}
