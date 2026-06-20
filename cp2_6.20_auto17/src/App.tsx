@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import ColorPalette from './components/ColorPalette';
 import PreviewPanel from './components/PreviewPanel';
 import HistoryTimeline from './components/HistoryTimeline';
+import HueCanvasPicker from './components/HueCanvasPicker';
 import {
   generateColorScale,
   isValidHex,
@@ -32,10 +33,10 @@ function App(): React.ReactElement {
   const [themeMode, setThemeMode] = useState<ThemeMode>('dark');
   const [isAnimating, setIsAnimating] = useState<boolean>(false);
   const [hueValue, setHueValue] = useState<number>(220);
-  const [displayHue, setDisplayHue] = useState<number>(220);
+  const [showCopied, setShowCopied] = useState<boolean>(false);
 
-  const hueAnimationRef = useRef<number | null>(null);
   const lastSaveTimeRef = useRef<number>(0);
+  const copiedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     const savedHistory = localStorage.getItem(STORAGE_KEY);
@@ -80,6 +81,9 @@ function App(): React.ReactElement {
     };
 
     setHistory((prev) => {
+      if (prev.length > 0 && prev[0].primaryColor === primaryColor && prev[0].secondaryColor === secondaryColor) {
+        return prev;
+      }
       const updated = [snapshot, ...prev].slice(0, MAX_HISTORY);
       localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
       return updated;
@@ -90,42 +94,12 @@ function App(): React.ReactElement {
     document.documentElement.setAttribute('data-theme', themeMode);
   }, [themeMode]);
 
-  const animateHue = useCallback((targetHue: number) => {
-    if (hueAnimationRef.current) {
-      cancelAnimationFrame(hueAnimationRef.current);
-    }
-
-    const startHue = displayHue;
-    const diff = targetHue - startHue;
-    const duration = 100;
-    const startTime = performance.now();
-
-    const animate = (currentTime: number) => {
-      const elapsed = currentTime - startTime;
-      const progress = Math.min(elapsed / duration, 1);
-
-      const easeProgress = 1 - Math.pow(1 - progress, 3);
-      const currentHue = Math.round(startHue + diff * easeProgress);
-
-      setDisplayHue(currentHue);
-
-      if (progress < 1) {
-        hueAnimationRef.current = requestAnimationFrame(animate);
-      }
-    };
-
-    hueAnimationRef.current = requestAnimationFrame(animate);
-  }, [displayHue]);
-
-  const handleHueChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const newHue = parseInt(e.target.value, 10);
+  const handleHueChange = useCallback((newHue: number) => {
     setHueValue(newHue);
-    animateHue(newHue);
-
     const hsl = hexToHsl(primaryColor);
     const newColor = hslToHex(newHue, hsl.s, 45);
     setPrimaryColor(newColor);
-  }, [primaryColor, animateHue]);
+  }, [primaryColor]);
 
   const handlePrimaryInput = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
@@ -134,7 +108,6 @@ function App(): React.ReactElement {
       setPrimaryColor(normalized);
       const hsl = hexToHsl(normalized);
       setHueValue(hsl.h);
-      setDisplayHue(hsl.h);
     }
   }, []);
 
@@ -165,12 +138,38 @@ function App(): React.ReactElement {
 
     const hsl = hexToHsl(snapshot.primaryColor);
     setHueValue(hsl.h);
-    setDisplayHue(hsl.h);
 
     setTimeout(() => {
       setIsAnimating(false);
-    }, 800);
+    }, 1000);
   }, []);
+
+  const handleShowCopied = useCallback(() => {
+    if (copiedTimerRef.current) {
+      clearTimeout(copiedTimerRef.current);
+    }
+    setShowCopied(false);
+
+    requestAnimationFrame(() => {
+      setShowCopied(true);
+    });
+
+    copiedTimerRef.current = setTimeout(() => {
+      setShowCopied(false);
+      copiedTimerRef.current = null;
+    }, 3000);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (copiedTimerRef.current) {
+        clearTimeout(copiedTimerRef.current);
+      }
+    };
+  }, []);
+
+  const primaryHsl = hexToHsl(primaryColor);
+  const secondaryHsl = hexToHsl(secondaryColor);
 
   return (
     <div
@@ -208,44 +207,25 @@ function App(): React.ReactElement {
                 </label>
 
                 <div className="hue-picker-container">
-                  <div className="hue-ring-wrapper">
-                    <div className="hue-ring" />
-                    <div
-                      className="hue-indicator"
-                      style={{
-                        transform: `rotate(${displayHue}deg) translateY(-110px)`
-                      }}
-                    >
-                      <div
-                        className="hue-indicator-dot"
-                        style={{ backgroundColor: `hsl(${displayHue}, 80%, 50%)` }}
-                      />
+                  <HueCanvasPicker
+                    hue={hueValue}
+                    saturation={primaryHsl.s}
+                    lightness={50}
+                    onChange={handleHueChange}
+                  />
+
+                  <div className="color-values-display">
+                    <div className="color-value-item">
+                      <span className="value-label">HEX</span>
+                      <span className="value-content">{primaryColor.toUpperCase()}</span>
                     </div>
-                    <div className="hue-center-display">
-                      <span className="hue-value">{displayHue}°</span>
-                      <span className="hue-label">HUE</span>
+                    <div className="color-value-item">
+                      <span className="value-label">HSL</span>
+                      <span className="value-content">
+                        {primaryHsl.h}°, {primaryHsl.s}%, {primaryHsl.l}%
+                      </span>
                     </div>
                   </div>
-
-                  <input
-                    type="range"
-                    className="hue-slider"
-                    min="0"
-                    max="360"
-                    value={hueValue}
-                    onChange={handleHueChange}
-                    style={{
-                      background: `linear-gradient(to right, 
-                        hsl(0, 80%, 50%), 
-                        hsl(60, 80%, 50%), 
-                        hsl(120, 80%, 50%), 
-                        hsl(180, 80%, 50%), 
-                        hsl(240, 80%, 50%), 
-                        hsl(300, 80%, 50%), 
-                        hsl(360, 80%, 50%)
-                      )`
-                    }}
-                  />
                 </div>
 
                 <div className="hex-input-wrapper">
@@ -279,6 +259,19 @@ function App(): React.ReactElement {
                   </div>
                 </div>
 
+                <div className="color-values-display">
+                  <div className="color-value-item">
+                    <span className="value-label">HEX</span>
+                    <span className="value-content">{secondaryColor.toUpperCase()}</span>
+                  </div>
+                  <div className="color-value-item">
+                    <span className="value-label">HSL</span>
+                    <span className="value-content">
+                      {secondaryHsl.h}°, {secondaryHsl.s}%, {secondaryHsl.l}%
+                    </span>
+                  </div>
+                </div>
+
                 <div className="hex-input-wrapper">
                   <span className="hex-prefix">#</span>
                   <input
@@ -302,6 +295,7 @@ function App(): React.ReactElement {
               onTokenNameChange={handleTokenNameChange}
               isAnimating={isAnimating}
               primaryColor={primaryColor}
+              onShowCopied={handleShowCopied}
             />
           </div>
 
@@ -326,6 +320,13 @@ function App(): React.ReactElement {
       <div className="app-footer">
         <p>拖动色相环选择主色 · 点击色块查看脉冲动画 · 支持一键导出多种格式</p>
       </div>
+
+      {showCopied && (
+        <div className="copy-toast show">
+          <span className="toast-icon">✓</span>
+          <span>已复制</span>
+        </div>
+      )}
     </div>
   );
 }

@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import type { ColorSwatch, ColorToken } from '../colorSystem/colorTypes';
 import { createColorTokens, exportCSSVariables, exportJSON, exportTailwindConfig } from '../colorSystem/colorEngine';
 
@@ -9,6 +9,7 @@ interface ColorPaletteProps {
   onTokenNameChange: (swatchName: string, newName: string) => void;
   isAnimating: boolean;
   primaryColor: string;
+  onShowCopied?: () => void;
 }
 
 const ColorPalette: React.FC<ColorPaletteProps> = ({
@@ -17,36 +18,43 @@ const ColorPalette: React.FC<ColorPaletteProps> = ({
   tokenNames,
   onTokenNameChange,
   isAnimating,
-  primaryColor
+  primaryColor,
+  onShowCopied
 }) => {
   const [pulsedIndex, setPulsedIndex] = useState<number | null>(null);
-  const [showToast, setShowToast] = useState(false);
-  const [toastMessage, setToastMessage] = useState('');
   const [editingToken, setEditingToken] = useState<string | null>(null);
   const [editValue, setEditValue] = useState('');
+  const [animationKey, setAnimationKey] = useState<number>(0);
+  const prevAnimatingRef = useRef<boolean>(false);
+
+  useEffect(() => {
+    if (isAnimating && !prevAnimatingRef.current) {
+      setAnimationKey((prev) => prev + 1);
+    }
+    prevAnimatingRef.current = isAnimating;
+  }, [isAnimating]);
 
   const primaryTokens = createColorTokens(primaryScale, 'primary', tokenNames);
   const secondaryTokens = createColorTokens(secondaryScale, 'secondary', tokenNames);
 
-  const showNotification = useCallback((message: string) => {
-    setToastMessage(message);
-    setShowToast(true);
-    setTimeout(() => setShowToast(false), 3000);
-  }, []);
-
   const handleSwatchClick = useCallback((index: number) => {
-    setPulsedIndex(index);
-    setTimeout(() => setPulsedIndex(null), 300);
+    setPulsedIndex(null);
+    requestAnimationFrame(() => {
+      setPulsedIndex(index);
+      setTimeout(() => setPulsedIndex(null), 300);
+    });
   }, []);
 
   const copyToClipboard = useCallback(async (text: string) => {
     try {
       await navigator.clipboard.writeText(text);
-      showNotification('已复制');
+      if (onShowCopied) {
+        onShowCopied();
+      }
     } catch (err) {
       console.error('复制失败:', err);
     }
-  }, [showNotification]);
+  }, [onShowCopied]);
 
   const handleCopyAllCSS = useCallback(() => {
     const css = `:root {\n${exportCSSVariables(primaryTokens, secondaryTokens)}\n}`;
@@ -83,7 +91,7 @@ const ColorPalette: React.FC<ColorPaletteProps> = ({
     }
   }, [handleTokenNameBlur]);
 
-  const getWCAGColor = (level: string) => {
+  const getWCAGColor = (level: string): string => {
     switch (level) {
       case 'AAA':
         return '#10b981';
@@ -96,16 +104,16 @@ const ColorPalette: React.FC<ColorPaletteProps> = ({
 
   const renderSwatch = (token: ColorToken, _index: number, totalIndex: number) => {
     const isPulsed = pulsedIndex === totalIndex;
-    const animationDelay = isAnimating ? `${totalIndex * 0.03}s` : '0s';
+    const staggerDelay = totalIndex * 0.05;
 
     return (
       <div
-        key={token.swatch.name}
-        className={`color-swatch ${isPulsed ? 'pulse-animation' : ''} ${isAnimating ? 'stagger-fly-in' : ''}`}
+        key={`${token.swatch.name}-${animationKey}`}
+        className={`color-swatch ${isPulsed ? 'pulse-animation' : ''}`}
         style={{
           '--swatch-color': token.swatch.hex,
-          '--delay': animationDelay,
-          '--text-color': token.swatch.wcagLevel !== 'Fail' ? '#ffffff' : '#000000'
+          '--stagger-delay': `${staggerDelay}s`,
+          '--text-color': token.swatch.l > 50 ? '#000000' : '#ffffff'
         } as React.CSSProperties}
         onClick={() => handleSwatchClick(totalIndex)}
         onKeyDown={(e) => {
@@ -116,12 +124,19 @@ const ColorPalette: React.FC<ColorPaletteProps> = ({
         }}
         tabIndex={0}
         role="button"
-        aria-label={`${token.swatch.name}, ${token.swatch.hex}, WCAG ${token.swatch.wcagLevel}`}
+        aria-label={`${token.swatch.name}, ${token.swatch.hex}, WCAG ${token.swatch.wcagLevel}, 对比度 ${token.swatch.contrast.toFixed(2)}:1`}
       >
-        <div className="swatch-color" style={{ backgroundColor: token.swatch.hex }}>
+        <div
+          className={`swatch-color ${isAnimating ? 'stagger-fly-in' : ''}`}
+          style={{
+            backgroundColor: token.swatch.hex,
+            animationDelay: `${staggerDelay}s`
+          }}
+        >
           <span className="swatch-level">{token.swatch.level}</span>
         </div>
-        <div className="swatch-info">
+        <div className={`swatch-info ${isAnimating ? 'stagger-fade-in' : ''}`}
+             style={{ animationDelay: `${staggerDelay + 0.1}s` }}>
           <div className="swatch-hex">{token.swatch.hex.toUpperCase()}</div>
           <div className="swatch-meta">
             <span
@@ -189,7 +204,7 @@ const ColorPalette: React.FC<ColorPaletteProps> = ({
 
       <div className="palette-section">
         <h3 className="section-title">主色板</h3>
-        <div className="swatch-grid">
+        <div className="swatch-grid" key={`primary-${animationKey}`}>
           {primaryTokens.map((token, index) =>
             renderSwatch(token, index, index)
           )}
@@ -198,19 +213,12 @@ const ColorPalette: React.FC<ColorPaletteProps> = ({
 
       <div className="palette-section">
         <h3 className="section-title">辅色板</h3>
-        <div className="swatch-grid">
+        <div className="swatch-grid" key={`secondary-${animationKey}`}>
           {secondaryTokens.map((token, index) =>
             renderSwatch(token, index, primaryTokens.length + index)
           )}
         </div>
       </div>
-
-      {showToast && (
-        <div className="toast-notification">
-          <span className="toast-icon">✓</span>
-          {toastMessage}
-        </div>
-      )}
     </div>
   );
 };
