@@ -1,0 +1,542 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>3D 沉浸式漫游录屏系统</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: #1a1a2e;
+      color: #e0e0e0;
+    }
+
+    #app {
+      width: 100%;
+      height: 100%;
+      display: flex;
+    }
+
+    #canvas-container {
+      flex: 1;
+      position: relative;
+      overflow: hidden;
+    }
+
+    #scene-canvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    #loading-logo {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 48px;
+      font-weight: bold;
+      color: #4a90d9;
+      opacity: 0;
+      animation: logoFadeIn 0.8s ease-out forwards;
+      z-index: 100;
+      text-shadow: 0 0 20px rgba(74, 144, 217, 0.5);
+    }
+
+    @keyframes logoFadeIn {
+      0% {
+        opacity: 0;
+        transform: translate(-50%, calc(-50% + 20px));
+      }
+      100% {
+        opacity: 1;
+        transform: translate(-50%, -50%);
+      }
+    }
+
+    #sidebar {
+      width: 240px;
+      background: #16213e;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      transition: transform 0.3s ease;
+    }
+
+    #sidebar h2 {
+      font-size: 18px;
+      color: #fff;
+      margin-bottom: 8px;
+      border-bottom: 1px solid #2a3a5c;
+      padding-bottom: 8px;
+    }
+
+    .sidebar-section {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .sidebar-label {
+      font-size: 13px;
+      color: #a0a0a0;
+    }
+
+    #camera-markers-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      max-height: 300px;
+      overflow-y: auto;
+    }
+
+    .camera-marker-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 10px;
+      background: #1e2d4d;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      user-select: none;
+    }
+
+    .camera-marker-item:hover {
+      background: #2a3d66;
+      transform: translateX(2px);
+    }
+
+    .camera-marker-item.dragging {
+      opacity: 0.5;
+      transform: scale(0.98);
+    }
+
+    .marker-drag-handle {
+      color: #666;
+      cursor: grab;
+      font-size: 14px;
+    }
+
+    .marker-index {
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: #4a90d9;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 11px;
+      color: #fff;
+    }
+
+    .marker-name {
+      flex: 1;
+      font-size: 13px;
+      color: #e0e0e0;
+    }
+
+    .marker-delete {
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: #e74c3c;
+      border: none;
+      color: #fff;
+      font-size: 10px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      transition: opacity 0.2s;
+    }
+
+    .camera-marker-item:hover .marker-delete {
+      opacity: 1;
+    }
+
+    #floating-controls {
+      position: absolute;
+      bottom: 24px;
+      right: 24px;
+      display: flex;
+      gap: 8px;
+      align-items: flex-end;
+      z-index: 50;
+    }
+
+    .floating-btn {
+      width: 56px;
+      height: 56px;
+      border-radius: 50%;
+      border: none;
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      font-size: 11px;
+      color: #fff;
+      transition: all 0.15s ease-out;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .floating-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+    }
+
+    .floating-btn:active {
+      transform: scale(0.9);
+      transition: transform 0.2s ease;
+    }
+
+    .floating-btn.primary {
+      background: linear-gradient(135deg, #4a90d9 0%, #357abd 100%);
+      box-shadow: 0 4px 15px rgba(74, 144, 217, 0.4);
+    }
+
+    .floating-btn.record {
+      background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
+      box-shadow: 0 4px 15px rgba(231, 76, 60, 0.4);
+      animation: recordPulse 1s ease-in-out infinite;
+    }
+
+    .floating-btn.record.stopped {
+      animation: none;
+    }
+
+    @keyframes recordPulse {
+      0%, 100% {
+        opacity: 0.8;
+        box-shadow: 0 4px 15px rgba(231, 76, 60, 0.4);
+      }
+      50% {
+        opacity: 1;
+        box-shadow: 0 4px 25px rgba(231, 76, 60, 0.7);
+      }
+    }
+
+    .floating-btn .btn-icon {
+      font-size: 20px;
+      margin-bottom: 2px;
+    }
+
+    .floating-btn .btn-label {
+      font-size: 10px;
+    }
+
+    #record-timer {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      background: rgba(0, 0, 0, 0.6);
+      color: #fff;
+      padding: 8px 16px;
+      border-radius: 8px;
+      font-family: 'Courier New', monospace;
+      font-size: 18px;
+      font-weight: bold;
+      z-index: 50;
+      display: none;
+    }
+
+    #record-timer.active {
+      display: block;
+    }
+
+    #recording-watermark {
+      position: absolute;
+      top: 16px;
+      left: 16px;
+      font-family: Arial, sans-serif;
+      font-size: 16px;
+      color: rgba(255, 255, 255, 0.5);
+      z-index: 40;
+      pointer-events: none;
+      display: none;
+    }
+
+    #recording-watermark.active {
+      display: block;
+    }
+
+    #export-dialog {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.7);
+      backdrop-filter: blur(0.5px);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 200;
+    }
+
+    #export-dialog.active {
+      display: flex;
+    }
+
+    .dialog-content {
+      background: #16213e;
+      border-radius: 12px;
+      padding: 24px;
+      width: 90%;
+      max-width: 600px;
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+    }
+
+    .dialog-title {
+      font-size: 20px;
+      color: #fff;
+      margin-bottom: 16px;
+    }
+
+    .dialog-video {
+      width: 100%;
+      border-radius: 8px;
+      background: #000;
+      margin-bottom: 16px;
+    }
+
+    .dialog-actions {
+      display: flex;
+      gap: 12px;
+      justify-content: flex-end;
+    }
+
+    .dialog-btn {
+      padding: 10px 20px;
+      border-radius: 6px;
+      border: none;
+      cursor: pointer;
+      font-size: 14px;
+      transition: all 0.2s ease;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .dialog-btn.primary {
+      background: linear-gradient(135deg, #4a90d9 0%, #357abd 100%);
+      color: #fff;
+    }
+
+    .dialog-btn.secondary {
+      background: #2a3a5c;
+      color: #e0e0e0;
+    }
+
+    .dialog-btn:hover {
+      transform: translateY(-1px);
+    }
+
+    .ripple {
+      position: absolute;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.4);
+      transform: scale(0);
+      animation: rippleEffect 0.3s ease-out;
+      pointer-events: none;
+    }
+
+    @keyframes rippleEffect {
+      to {
+        transform: scale(4);
+        opacity: 0;
+      }
+    }
+
+    #hamburger-btn {
+      display: none;
+      position: absolute;
+      top: 16px;
+      left: 16px;
+      width: 40px;
+      height: 40px;
+      border-radius: 8px;
+      background: rgba(22, 33, 62, 0.9);
+      border: none;
+      color: #fff;
+      font-size: 20px;
+      cursor: pointer;
+      z-index: 60;
+      align-items: center;
+      justify-content: center;
+    }
+
+    #sidebar-close-btn {
+      display: none;
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: transparent;
+      border: none;
+      color: #e0e0e0;
+      font-size: 18px;
+      cursor: pointer;
+    }
+
+    .exhibit-label {
+      position: absolute;
+      padding: 6px 12px;
+      background: rgba(44, 62, 80, 0.7);
+      color: #fff;
+      font-size: 14px;
+      border-radius: 8px;
+      pointer-events: none;
+      transform: translate(-50%, -100%);
+      white-space: nowrap;
+      transition: transform 0.2s ease;
+      z-index: 30;
+    }
+
+    .exhibit-label.hovered {
+      transform: translate(-50%, -100%) scale(1.2);
+    }
+
+    .exhibit-details {
+      display: none;
+      font-size: 12px;
+      margin-top: 4px;
+      color: #ccc;
+    }
+
+    .exhibit-label.hovered .exhibit-details {
+      display: block;
+    }
+
+    @media (max-width: 768px) {
+      #sidebar {
+        position: fixed;
+        top: 0;
+        right: 0;
+        height: 100%;
+        z-index: 150;
+        transform: translateX(100%);
+        box-shadow: -5px 0 20px rgba(0, 0, 0, 0.3);
+      }
+
+      #sidebar.open {
+        transform: translateX(0);
+      }
+
+      #hamburger-btn {
+        display: flex;
+      }
+
+      #sidebar-close-btn {
+        display: flex;
+      }
+
+      .floating-btn {
+        width: 48px;
+        height: 48px;
+      }
+
+      .floating-btn .btn-label {
+        display: none;
+      }
+
+      .floating-btn .btn-icon {
+        font-size: 18px;
+      }
+    }
+
+    .controls-hint {
+      position: absolute;
+      bottom: 24px;
+      left: 24px;
+      background: rgba(0, 0, 0, 0.6);
+      padding: 12px 16px;
+      border-radius: 8px;
+      font-size: 12px;
+      color: #a0a0a0;
+      z-index: 40;
+    }
+
+    .controls-hint div {
+      margin: 4px 0;
+    }
+
+    .controls-hint kbd {
+      background: #2a3a5c;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-family: monospace;
+      color: #fff;
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <div id="canvas-container">
+      <div id="loading-logo">3D TOUR</div>
+      <canvas id="scene-canvas"></canvas>
+      <button id="hamburger-btn">☰</button>
+      <div id="recording-watermark">Demo Recording</div>
+      <div id="record-timer">00:00</div>
+      
+      <div class="controls-hint">
+        <div><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> 移动</div>
+        <div><kbd>鼠标拖拽</kbd> 旋转视角</div>
+        <div><kbd>滚轮</kbd> 缩放</div>
+      </div>
+
+      <div id="floating-controls">
+        <button class="floating-btn primary" id="add-camera-btn">
+          <span class="btn-icon">📷</span>
+          <span class="btn-label">添加摄像机</span>
+        </button>
+        <button class="floating-btn record stopped" id="record-btn">
+          <span class="btn-icon">●</span>
+          <span class="btn-label">开始录制</span>
+        </button>
+      </div>
+    </div>
+
+    <aside id="sidebar">
+      <button id="sidebar-close-btn">×</button>
+      <h2>摄像机标记</h2>
+      <div class="sidebar-section">
+        <span class="sidebar-label">已保存视角 (最多6个)</span>
+        <div id="camera-markers-list"></div>
+      </div>
+      
+      <h2 style="margin-top: 20px;">展品信息</h2>
+      <div class="sidebar-section">
+        <span class="sidebar-label">鼠标悬停展品查看详情</span>
+      </div>
+    </aside>
+  </div>
+
+  <div id="export-dialog">
+    <div class="dialog-content">
+      <h3 class="dialog-title">录制预览</h3>
+      <video class="dialog-video" id="preview-video" controls></video>
+      <div class="dialog-actions">
+        <button class="dialog-btn secondary" id="close-dialog-btn">关闭</button>
+        <button class="dialog-btn primary" id="download-btn">下载视频</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
