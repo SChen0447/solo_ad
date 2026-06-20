@@ -4,15 +4,19 @@ import { HeatmapManager, GridCellData } from './heatmapManager';
 export interface CellInfo {
   row: number;
   col: number;
-  mesh: THREE.Mesh;
-  border: THREE.LineSegments;
   baseHeight: number;
   targetHeight: number;
+  currentHeight: number;
   baseColor: THREE.Color;
   targetColor: THREE.Color;
+  currentColor: THREE.Color;
   isHovered: boolean;
   isSelected: boolean;
   regionId: string;
+  x: number;
+  z: number;
+  heightAnimationTime: number;
+  colorAnimationTime: number;
 }
 
 export class CityGrid {
@@ -26,9 +30,8 @@ export class CityGrid {
   private heatmapManager: HeatmapManager;
   private raycaster: THREE.Raycaster;
   private mouse: THREE.Vector2;
-  private hoveredCell: CellInfo | null = null;
-  private selectedCell: CellInfo | null = null;
-  private tooltip: HTMLDivElement | null = null;
+  private hoveredCellIndex: number | null = null;
+  private selectedCellIndex: number | null = null;
   private animationId: number = 0;
   private clock: THREE.Clock;
   private isRotating: boolean = false;
@@ -40,15 +43,31 @@ export class CityGrid {
   private targetCameraAngleX: number = 0.5;
   private targetCameraAngleY: number = 0.8;
   private onCellClick: ((cellData: GridCellData, row: number, col: number) => void) | null = null;
-  private temperatureLabels: Map<string, HTMLDivElement> = new Map();
+  private temperatureLabel: HTMLDivElement | null = null;
+  private container: HTMLElement;
+  
+  private instancedMesh: THREE.InstancedMesh | null = null;
+  private instancedBorders: THREE.InstancedMesh | null = null;
+  private dummy: THREE.Object3D;
+  private borderDummy: THREE.Object3D;
+  private cellColors: THREE.Color[] = [];
+  
+  private readonly HEIGHT_ANIMATION_DURATION = 0.5;
+  private readonly COLOR_ANIMATION_DURATION = 1.0;
+  private readonly ROTATION_SPEED = 0.002;
+  private readonly ZOOM_SPEED = 0.0015;
+  private readonly CAMERA_RESPONSE_TIME = 0.5;
 
   constructor(container: HTMLElement, heatmapManager: HeatmapManager) {
+    this.container = container;
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color(0x1a1a2e);
     this.heatmapManager = heatmapManager;
     this.raycaster = new THREE.Raycaster();
     this.mouse = new THREE.Vector2();
     this.clock = new THREE.Clock();
+    this.dummy = new THREE.Object3D();
+    this.borderDummy = new THREE.Object3D();
 
     const width = container.clientWidth;
     const height = container.clientHeight;
@@ -65,7 +84,7 @@ export class CityGrid {
 
     this.setupLighting();
     this.createGrid();
-    this.createTooltip();
+    this.createTemperatureLabel();
     this.setupEventListeners(container);
     this.animate();
   }
@@ -95,34 +114,35 @@ export class CityGrid {
     const totalWidth = this.gridSize * this.cellSize + (this.gridSize - 1) * this.gap;
     const offset = totalWidth / 2 - this.cellSize / 2;
     const data = this.heatmapManager.getData();
+    const totalCells = this.gridSize * this.gridSize;
+
+    const geometry = new THREE.BoxGeometry(this.cellSize, 1, this.cellSize);
+    const material = new THREE.MeshStandardMaterial({
+      metalness: 0.1,
+      roughness: 0.8,
+      vertexColors: false
+    });
+
+    this.instancedMesh = new THREE.InstancedMesh(geometry, material, totalCells);
+    this.instancedMesh.castShadow = true;
+    this.instancedMesh.receiveShadow = true;
+    this.instancedMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+
+    const borderGeometry = new THREE.EdgesGeometry(geometry);
+    const borderMaterial = new THREE.LineBasicMaterial({
+      color: 0xffffff,
+      transparent: true,
+      opacity: 0
+    });
+    this.instancedBorders = new THREE.InstancedMesh(borderGeometry, borderMaterial, totalCells);
+    this.instancedBorders.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
 
     for (let row = 0; row < this.gridSize; row++) {
       this.cells[row] = [];
       for (let col = 0; col < this.gridSize; col++) {
         const x = col * (this.cellSize + this.gap) - offset;
         const z = row * (this.cellSize + this.gap) - offset;
-
-        const geometry = new THREE.BoxGeometry(this.cellSize, 0.1, this.cellSize);
-        const material = new THREE.MeshStandardMaterial({
-          color: 0x333366,
-          metalness: 0.1,
-          roughness: 0.8
-        });
-
-        const mesh = new THREE.Mesh(geometry, material);
-        mesh.position.set(x, 0, z);
-        mesh.castShadow = true;
-        mesh.receiveShadow = true;
-        mesh.userData = { row, col };
-
-        const edges = new THREE.EdgesGeometry(geometry);
-        const borderMaterial = new THREE.LineBasicMaterial({ 
-          color: 0xffffff, 
-          transparent: true, 
-          opacity: 0 
-        });
-        const border = new THREE.LineSegments(edges, borderMaterial);
-        border.position.copy(mesh.position);
+        const index = row * this.gridSize + col;
 
         const regionId = this.getRegionId(row, col);
         const cellData = data[row][col];
@@ -132,26 +152,87 @@ export class CityGrid {
         this.cells[row][col] = {
           row,
           col,
-          mesh,
-          border,
           baseHeight,
           targetHeight: baseHeight,
+          currentHeight: baseHeight,
           baseColor: baseColor.clone(),
           targetColor: baseColor.clone(),
+          currentColor: baseColor.clone(),
           isHovered: false,
           isSelected: false,
-          regionId
+          regionId,
+          x,
+          z,
+          heightAnimationTime: this.HEIGHT_ANIMATION_DURATION,
+          colorAnimationTime: this.COLOR_ANIMATION_DURATION
         };
 
-        mesh.scale.y = baseHeight / 0.1;
-        mesh.position.y = baseHeight / 2;
-        border.position.y = baseHeight / 2;
-        (material as THREE.MeshStandardMaterial).color.copy(baseColor);
-
-        this.scene.add(mesh);
-        this.scene.add(border);
+        this.cellColors[index] = baseColor.clone();
+        this.updateInstanceMatrix(index, row, col, baseHeight, false);
       }
     }
+
+    (this.instancedMesh.material as THREE.MeshStandardMaterial).color.set(0xffffff);
+    this.instancedMesh.instanceColor = new THREE.InstancedBufferAttribute(
+      new Float32Array(totalCells * 3), 3
+    );
+    this.instancedMesh.instanceColor.setUsage(THREE.DynamicDrawUsage);
+    this.updateInstanceColors();
+
+    this.instancedMesh.userData = { isGridMesh: true };
+    this.instancedBorders.userData = { isBorderMesh: true };
+
+    this.scene.add(this.instancedMesh);
+    this.scene.add(this.instancedBorders);
+  }
+
+  private updateInstanceMatrix(
+    index: number, 
+    row: number, 
+    col: number, 
+    height: number, 
+    isHovered: boolean
+  ): void {
+    if (!this.instancedMesh || !this.instancedBorders) return;
+
+    const cell = this.cells[row][col];
+    const hoverOffset = isHovered ? 0.1 : 0;
+    const actualHeight = Math.max(0.001, height);
+
+    this.dummy.position.set(cell.x, actualHeight / 2 + hoverOffset, cell.z);
+    this.dummy.scale.set(1, actualHeight, 1);
+    this.dummy.updateMatrix();
+    this.instancedMesh.setMatrixAt(index, this.dummy.matrix);
+    this.instancedMesh.instanceMatrix.needsUpdate = true;
+
+    this.borderDummy.position.set(cell.x, actualHeight / 2 + hoverOffset, cell.z);
+    this.borderDummy.scale.set(1, actualHeight, 1);
+    this.borderDummy.updateMatrix();
+    this.instancedBorders.setMatrixAt(index, this.borderDummy.matrix);
+    this.instancedBorders.instanceMatrix.needsUpdate = true;
+  }
+
+  private updateInstanceColors(): void {
+    if (!this.instancedMesh) return;
+    
+    const colors = this.instancedMesh.instanceColor;
+    if (!colors) return;
+
+    for (let row = 0; row < this.gridSize; row++) {
+      for (let col = 0; col < this.gridSize; col++) {
+        const index = row * this.gridSize + col;
+        const color = this.cells[row][col].currentColor;
+        colors.setXYZ(index, color.r, color.g, color.b);
+      }
+    }
+    colors.needsUpdate = true;
+  }
+
+  private updateBorderOpacity(index: number, opacity: number): void {
+    if (!this.instancedBorders) return;
+    const material = this.instancedBorders.material as THREE.LineBasicMaterial;
+    material.opacity = opacity;
+    this.instancedBorders.visible = opacity > 0;
   }
 
   private getRegionId(row: number, col: number): string {
@@ -163,12 +244,12 @@ export class CityGrid {
     const minTemp = 20;
     const maxTemp = 45;
     const normalized = Math.max(0, Math.min(1, (temp - minTemp) / (maxTemp - minTemp)));
-    return 0.1 + normalized * 0.3;
+    return normalized * 0.3;
   }
 
-  private createTooltip(): void {
-    this.tooltip = document.createElement('div');
-    this.tooltip.style.cssText = `
+  private createTemperatureLabel(): void {
+    this.temperatureLabel = document.createElement('div');
+    this.temperatureLabel.style.cssText = `
       position: fixed;
       padding: 6px 12px;
       background: rgba(0, 0, 0, 0.8);
@@ -180,8 +261,9 @@ export class CityGrid {
       opacity: 0;
       transition: opacity 0.2s ease;
       backdrop-filter: blur(4px);
+      white-space: nowrap;
     `;
-    document.body.appendChild(this.tooltip);
+    document.body.appendChild(this.temperatureLabel);
   }
 
   private setupEventListeners(container: HTMLElement): void {
@@ -190,6 +272,7 @@ export class CityGrid {
     container.addEventListener('contextmenu', (e) => e.preventDefault());
     container.addEventListener('mousedown', (e) => this.onMouseDown(e));
     container.addEventListener('mouseup', () => this.onMouseUp());
+    container.addEventListener('mouseleave', () => this.onMouseLeave());
     container.addEventListener('wheel', (e) => this.onWheel(e), { passive: false });
     window.addEventListener('resize', () => this.onResize(container));
   }
@@ -203,90 +286,91 @@ export class CityGrid {
       const deltaX = event.clientX - this.previousMousePosition.x;
       const deltaY = event.clientY - this.previousMousePosition.y;
       
-      this.targetCameraAngleX -= deltaX * 0.005 * 0.2;
+      this.targetCameraAngleX -= deltaX * this.ROTATION_SPEED * (this.CAMERA_RESPONSE_TIME / 0.5);
       this.targetCameraAngleY = Math.max(0.1, Math.min(Math.PI / 2 - 0.1, 
-        this.targetCameraAngleY + deltaY * 0.005 * 0.2));
+        this.targetCameraAngleY + deltaY * this.ROTATION_SPEED * (this.CAMERA_RESPONSE_TIME / 0.5)));
       
       this.previousMousePosition = { x: event.clientX, y: event.clientY };
     }
 
-    this.updateHover();
-    this.updateTooltipPosition(event);
+    this.updateHover(event);
   }
 
-  private updateHover(): void {
-    this.raycaster.setFromCamera(this.mouse, this.camera);
-    const meshes = this.cells.flat().map(c => c.mesh);
-    const intersects = this.raycaster.intersectObjects(meshes);
+  private updateHover(event: MouseEvent): void {
+    if (!this.instancedMesh) return;
 
-    if (this.hoveredCell && (!intersects.length || 
-        intersects[0].object.userData.row !== this.hoveredCell.row ||
-        intersects[0].object.userData.col !== this.hoveredCell.col)) {
-      this.hoveredCell.isHovered = false;
-      this.hideTooltip();
-      this.hoveredCell = null;
+    this.raycaster.setFromCamera(this.mouse, this.camera);
+    const intersects = this.raycaster.intersectObject(this.instancedMesh);
+
+    if (this.hoveredCellIndex !== null) {
+      const prevRow = Math.floor(this.hoveredCellIndex / this.gridSize);
+      const prevCol = this.hoveredCellIndex % this.gridSize;
+      this.cells[prevRow][prevCol].isHovered = false;
     }
 
     if (intersects.length > 0) {
-      const { row, col } = intersects[0].object.userData;
-      const cell = this.cells[row][col];
-      
-      if (!cell.isHovered) {
-        if (this.hoveredCell) {
-          this.hoveredCell.isHovered = false;
-        }
+      const instanceId = intersects[0].instanceId;
+      if (instanceId !== undefined) {
+        const row = Math.floor(instanceId / this.gridSize);
+        const col = instanceId % this.gridSize;
+        const cell = this.cells[row][col];
+        
         cell.isHovered = true;
-        this.hoveredCell = cell;
-        this.showTooltip(cell);
+        this.hoveredCellIndex = instanceId;
+        
+        this.showTemperatureLabel(cell, event);
+        return;
       }
     }
+
+    this.hoveredCellIndex = null;
+    this.hideTemperatureLabel();
   }
 
-  private showTooltip(cell: CellInfo): void {
-    if (!this.tooltip) return;
+  private showTemperatureLabel(cell: CellInfo, event: MouseEvent): void {
+    if (!this.temperatureLabel) return;
     const data = this.heatmapManager.getData()[cell.row][cell.col];
-    this.tooltip.textContent = `${cell.regionId}: ${data.temperature.toFixed(1)}°C`;
-    this.tooltip.style.opacity = '1';
+    this.temperatureLabel.textContent = `${cell.regionId}: ${data.temperature.toFixed(1)}°C`;
+    this.temperatureLabel.style.opacity = '1';
+    this.temperatureLabel.style.left = `${event.clientX + 15}px`;
+    this.temperatureLabel.style.top = `${event.clientY + 15}px`;
   }
 
-  private hideTooltip(): void {
-    if (this.tooltip) {
-      this.tooltip.style.opacity = '0';
+  private hideTemperatureLabel(): void {
+    if (this.temperatureLabel) {
+      this.temperatureLabel.style.opacity = '0';
     }
-  }
-
-  private updateTooltipPosition(event: MouseEvent): void {
-    if (!this.tooltip || this.tooltip.style.opacity === '0') return;
-    this.tooltip.style.left = `${event.clientX + 15}px`;
-    this.tooltip.style.top = `${event.clientY + 15}px`;
   }
 
   private onClick(event: MouseEvent, container: HTMLElement): void {
-    if (event.button !== 0) return;
+    if (event.button !== 0 || !this.instancedMesh) return;
     
     const rect = container.getBoundingClientRect();
     this.mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
     this.mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
 
     this.raycaster.setFromCamera(this.mouse, this.camera);
-    const meshes = this.cells.flat().map(c => c.mesh);
-    const intersects = this.raycaster.intersectObjects(meshes);
+    const intersects = this.raycaster.intersectObject(this.instancedMesh);
 
-    if (intersects.length > 0) {
-      const { row, col } = intersects[0].object.userData;
+    if (intersects.length > 0 && intersects[0].instanceId !== undefined) {
+      const instanceId = intersects[0].instanceId;
+      const row = Math.floor(instanceId / this.gridSize);
+      const col = instanceId % this.gridSize;
       this.selectCell(row, col);
     }
   }
 
   private selectCell(row: number, col: number): void {
-    if (this.selectedCell) {
-      this.selectedCell.isSelected = false;
-      (this.selectedCell.border.material as THREE.LineBasicMaterial).opacity = 0;
+    if (this.selectedCellIndex !== null) {
+      const prevRow = Math.floor(this.selectedCellIndex / this.gridSize);
+      const prevCol = this.selectedCellIndex % this.gridSize;
+      this.cells[prevRow][prevCol].isSelected = false;
     }
 
+    const index = row * this.gridSize + col;
     const cell = this.cells[row][col];
     cell.isSelected = true;
-    this.selectedCell = cell;
+    this.selectedCellIndex = index;
 
     const data = this.heatmapManager.getData()[row][col];
     if (this.onCellClick) {
@@ -305,11 +389,21 @@ export class CityGrid {
     this.isRotating = false;
   }
 
+  private onMouseLeave(): void {
+    this.isRotating = false;
+    if (this.hoveredCellIndex !== null) {
+      const row = Math.floor(this.hoveredCellIndex / this.gridSize);
+      const col = this.hoveredCellIndex % this.gridSize;
+      this.cells[row][col].isHovered = false;
+      this.hoveredCellIndex = null;
+    }
+    this.hideTemperatureLabel();
+  }
+
   private onWheel(event: WheelEvent): void {
     event.preventDefault();
-    const zoomSpeed = 0.001;
     this.targetCameraDistance = Math.max(5, Math.min(30, 
-      this.targetCameraDistance + event.deltaY * zoomSpeed * this.targetCameraDistance));
+      this.targetCameraDistance + event.deltaY * this.ZOOM_SPEED * this.targetCameraDistance));
   }
 
   private onResize(container: HTMLElement): void {
@@ -325,7 +419,7 @@ export class CityGrid {
     const y = this.cameraDistance * Math.sin(this.cameraAngleY);
     const z = this.cameraDistance * Math.cos(this.cameraAngleX) * Math.cos(this.cameraAngleY);
     this.camera.position.set(x, y, z);
-    this.camera.lookAt(0, 0.2, 0);
+    this.camera.lookAt(0, 0.15, 0);
   }
 
   public updateHeatmap(timePeriod: string): void {
@@ -336,11 +430,13 @@ export class CityGrid {
         const cell = this.cells[row][col];
         const cellData = data[row][col];
         
-        cell.baseColor = cell.targetColor.clone();
+        cell.baseColor = cell.currentColor.clone();
         cell.targetColor = this.heatmapManager.getColorForTemperature(cellData.temperature);
+        cell.colorAnimationTime = 0;
         
-        cell.baseHeight = cell.targetHeight;
+        cell.baseHeight = cell.currentHeight;
         cell.targetHeight = this.getHeightFromTemperature(cellData.temperature);
+        cell.heightAnimationTime = 0;
       }
     }
   }
@@ -355,43 +451,48 @@ export class CityGrid {
 
   private animate(): void {
     this.animationId = requestAnimationFrame(() => this.animate());
-    const delta = this.clock.getDelta();
+    const delta = Math.min(this.clock.getDelta(), 0.1);
     const time = this.clock.getElapsedTime();
 
-    const smoothFactor = 1 - Math.pow(0.001, delta / 0.3);
+    const smoothFactor = 1 - Math.pow(0.001, delta / this.CAMERA_RESPONSE_TIME);
     this.cameraDistance += (this.targetCameraDistance - this.cameraDistance) * smoothFactor;
     this.cameraAngleX += (this.targetCameraAngleX - this.cameraAngleX) * smoothFactor;
     this.cameraAngleY += (this.targetCameraAngleY - this.cameraAngleY) * smoothFactor;
     this.updateCameraPosition();
 
-    const animationProgress = Math.min(1, delta / 1);
-    
+    let needsColorUpdate = false;
+
     for (let row = 0; row < this.gridSize; row++) {
       for (let col = 0; col < this.gridSize; col++) {
         const cell = this.cells[row][col];
-        
-        const material = cell.mesh.material as THREE.MeshStandardMaterial;
-        const currentColor = material.color.clone();
-        currentColor.lerpColors(cell.baseColor, cell.targetColor, animationProgress);
-        material.color.copy(currentColor);
+        const index = row * this.gridSize + col;
 
-        const heightProgress = Math.min(1, delta / 0.5);
-        const currentHeight = cell.baseHeight + (cell.targetHeight - cell.baseHeight) * heightProgress;
-        cell.mesh.scale.y = Math.max(0.1, currentHeight / 0.1);
-        cell.mesh.position.y = currentHeight / 2;
-        cell.border.position.y = currentHeight / 2;
-
-        if (cell.isHovered && !cell.isSelected) {
-          const hoverHeight = cell.targetHeight + 0.1;
-          cell.mesh.position.y = hoverHeight / 2 + 0.05;
-          cell.border.position.y = hoverHeight / 2 + 0.05;
+        if (cell.colorAnimationTime < this.COLOR_ANIMATION_DURATION) {
+          cell.colorAnimationTime += delta;
+          const t = Math.min(1, cell.colorAnimationTime / this.COLOR_ANIMATION_DURATION);
+          cell.currentColor.lerpColors(cell.baseColor, cell.targetColor, t);
+          needsColorUpdate = true;
         }
 
-        if (cell.isSelected) {
-          const borderMaterial = cell.border.material as THREE.LineBasicMaterial;
+        if (cell.heightAnimationTime < this.HEIGHT_ANIMATION_DURATION) {
+          cell.heightAnimationTime += delta;
+          const t = Math.min(1, cell.heightAnimationTime / this.HEIGHT_ANIMATION_DURATION);
+          const easeT = 1 - Math.pow(1 - t, 3);
+          cell.currentHeight = cell.baseHeight + (cell.targetHeight - cell.baseHeight) * easeT;
+        }
+
+        this.updateInstanceMatrix(index, row, col, cell.currentHeight, cell.isHovered);
+
+        if (cell.isSelected && this.instancedBorders) {
+          const borderMaterial = this.instancedBorders.material as THREE.LineBasicMaterial;
           borderMaterial.opacity = 0.5 + 0.5 * Math.sin(time * Math.PI * 2 / 1.5);
+          this.instancedBorders.visible = true;
         }
       }
+    }
+
+    if (needsColorUpdate) {
+      this.updateInstanceColors();
     }
 
     this.renderer.render(this.scene, this.camera);
@@ -399,11 +500,17 @@ export class CityGrid {
 
   public dispose(): void {
     cancelAnimationFrame(this.animationId);
-    if (this.tooltip) {
-      this.tooltip.remove();
+    if (this.temperatureLabel) {
+      this.temperatureLabel.remove();
     }
-    this.temperatureLabels.forEach(label => label.remove());
-    this.temperatureLabels.clear();
+    if (this.instancedMesh) {
+      this.instancedMesh.geometry.dispose();
+      (this.instancedMesh.material as THREE.Material).dispose();
+    }
+    if (this.instancedBorders) {
+      this.instancedBorders.geometry.dispose();
+      (this.instancedBorders.material as THREE.Material).dispose();
+    }
     this.renderer.dispose();
   }
 }

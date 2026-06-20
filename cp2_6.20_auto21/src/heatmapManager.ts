@@ -181,6 +181,7 @@ export class HeatmapManager {
       </div>
     `;
 
+    void this.infoPanel.offsetWidth;
     this.infoPanel.classList.add('visible');
     
     this.drawTrendChart(cellData.history);
@@ -208,11 +209,11 @@ export class HeatmapManager {
       padding: 24px;
       color: white;
       z-index: 100;
-      transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease;
+      transition: transform 0.3s ease-out, opacity 0.3s ease-out;
       border: 1px solid rgba(255, 255, 255, 0.1);
       box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
       opacity: 0;
-      pointer-events: none;
+      pointer-events: auto;
     `;
 
     const style = document.createElement('style');
