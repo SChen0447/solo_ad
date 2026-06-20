@@ -1,0 +1,543 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>诗词画廊 — 唐宋诗词可视化</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;700;900&family=Playfair+Display:wght@400;700&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --ink-black: #1a1a2e;
+      --paper-white: #f5f0e8;
+      --vermilion: #c0392b;
+      --indigo: #2c3e50;
+      --bronze: #8b6914;
+      --card-bg: #faf6ee;
+      --card-border: #c0392b;
+      --skeleton-base: #e8e0d0;
+      --skeleton-shine: #f5f0e8;
+      --font-serif: 'Noto Serif SC', 'STKaiti', 'KaiTi', serif;
+      --font-display: 'Playfair Display', serif;
+    }
+
+    *, *::before, *::after {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    html {
+      font-size: 16px;
+      scroll-behavior: smooth;
+    }
+
+    body {
+      font-family: var(--font-serif);
+      background-color: var(--paper-white);
+      color: var(--ink-black);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.03'/%3E%3C/svg%3E");
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .daily-poem-section {
+      position: relative;
+      width: 100%;
+      min-height: 80vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+
+    .daily-poem-canvas {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 0;
+    }
+
+    .daily-poem-content {
+      position: relative;
+      z-index: 1;
+      text-align: center;
+      padding: 3rem 2rem;
+      max-width: 800px;
+      animation: fadeInUp 1.2s ease-out;
+    }
+
+    .daily-poem-label {
+      display: inline-block;
+      font-size: 0.85rem;
+      color: var(--vermilion);
+      border: 1px solid var(--vermilion);
+      padding: 0.25rem 1rem;
+      margin-bottom: 1.5rem;
+      letter-spacing: 0.3em;
+    }
+
+    .daily-poem-title {
+      font-size: clamp(2rem, 5vw, 3.5rem);
+      font-weight: 900;
+      color: var(--paper-white);
+      text-shadow: 0 2px 20px rgba(0,0,0,0.5);
+      margin-bottom: 0.75rem;
+      letter-spacing: 0.15em;
+    }
+
+    .daily-poem-author {
+      font-size: clamp(1rem, 2.5vw, 1.3rem);
+      color: rgba(245, 240, 232, 0.85);
+      margin-bottom: 2rem;
+      letter-spacing: 0.2em;
+    }
+
+    .daily-poem-lines {
+      writing-mode: vertical-rl;
+      text-orientation: mixed;
+      display: inline-flex;
+      gap: 1.5rem;
+      font-size: clamp(1.2rem, 3vw, 1.8rem);
+      color: var(--paper-white);
+      text-shadow: 0 1px 10px rgba(0,0,0,0.4);
+      line-height: 2;
+      max-height: 50vh;
+      letter-spacing: 0.1em;
+    }
+
+    @keyframes fadeInUp {
+      from { opacity: 0; transform: translateY(30px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .filter-bar {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: rgba(245, 240, 232, 0.95);
+      backdrop-filter: blur(10px);
+      border-bottom: 1px solid rgba(192, 57, 43, 0.2);
+      padding: 1rem 2rem;
+      display: flex;
+      gap: 1rem;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .filter-bar input,
+    .filter-bar select {
+      font-family: var(--font-serif);
+      font-size: 0.95rem;
+      padding: 0.5rem 1rem;
+      border: 1px solid rgba(192, 57, 43, 0.3);
+      background: var(--paper-white);
+      color: var(--ink-black);
+      border-radius: 2px;
+      outline: none;
+      transition: border-color 0.3s, box-shadow 0.3s;
+    }
+
+    .filter-bar input:focus,
+    .filter-bar select:focus {
+      border-color: var(--vermilion);
+      box-shadow: 0 0 0 2px rgba(192, 57, 43, 0.15);
+    }
+
+    .filter-bar input {
+      flex: 1;
+      min-width: 200px;
+    }
+
+    .filter-bar select {
+      min-width: 120px;
+      cursor: pointer;
+    }
+
+    .filter-bar .filter-label {
+      font-size: 0.8rem;
+      color: var(--indigo);
+      letter-spacing: 0.1em;
+    }
+
+    .waterfall-container {
+      position: relative;
+      z-index: 1;
+      padding: 2rem;
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+
+    .waterfall-grid {
+      position: relative;
+      width: 100%;
+      transition: opacity 0.3s ease;
+    }
+
+    .waterfall-grid.filtering {
+      opacity: 0.5;
+    }
+
+    .skeleton-card {
+      position: absolute;
+      background: var(--skeleton-base);
+      border-radius: 4px;
+      overflow: hidden;
+    }
+
+    .skeleton-card::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(
+        90deg,
+        transparent 0%,
+        var(--skeleton-shine) 50%,
+        transparent 100%
+      );
+      animation: skeleton-pulse 1.5s ease-in-out infinite;
+    }
+
+    @keyframes skeleton-pulse {
+      0% { transform: translateX(-100%); }
+      100% { transform: translateX(100%); }
+    }
+
+    .card-wrapper {
+      position: absolute;
+      perspective: 1000px;
+      cursor: pointer;
+      transition: opacity 0.4s ease, transform 0.4s ease;
+    }
+
+    .card-wrapper.entering {
+      opacity: 0;
+      transform: translateY(20px);
+    }
+
+    .card-wrapper.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    .card-wrapper.exiting {
+      opacity: 0;
+      transform: scale(0.9);
+    }
+
+    .card-inner {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+      transform-style: preserve-3d;
+    }
+
+    .card-wrapper:hover .card-inner {
+      transform: rotateY(180deg);
+    }
+
+    .card-front,
+    .card-back {
+      position: absolute;
+      inset: 0;
+      backface-visibility: hidden;
+      border-radius: 4px;
+      overflow: hidden;
+      padding: 1.5rem;
+    }
+
+    .card-front {
+      background: var(--card-bg);
+      border: 1px solid rgba(192, 57, 43, 0.2);
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    .card-front::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.06'/%3E%3C/svg%3E");
+      pointer-events: none;
+      border-radius: 4px;
+    }
+
+    .card-back {
+      background: var(--ink-black);
+      border: 1px solid var(--vermilion);
+      transform: rotateY(180deg);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      color: var(--paper-white);
+      text-align: center;
+    }
+
+    .card-excerpt {
+      font-size: clamp(1rem, 2vw, 1.2rem);
+      line-height: 1.8;
+      color: var(--ink-black);
+      flex: 1;
+      position: relative;
+      z-index: 1;
+    }
+
+    .card-meta {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 1rem;
+      position: relative;
+      z-index: 1;
+    }
+
+    .card-author {
+      font-size: 0.85rem;
+      color: var(--indigo);
+      letter-spacing: 0.1em;
+    }
+
+    .card-dynasty {
+      font-size: 0.75rem;
+      color: var(--vermilion);
+      border: 1px solid var(--vermilion);
+      padding: 0.1rem 0.5rem;
+      border-radius: 2px;
+    }
+
+    .card-back-title {
+      font-size: 1.1rem;
+      font-weight: 700;
+      margin-bottom: 1rem;
+      color: var(--vermilion);
+      letter-spacing: 0.15em;
+    }
+
+    .card-back-lines {
+      font-size: 0.95rem;
+      line-height: 2;
+      writing-mode: vertical-rl;
+      text-orientation: mixed;
+      display: inline-flex;
+      gap: 1rem;
+      max-height: 80%;
+    }
+
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(26, 26, 46, 0.75);
+      backdrop-filter: blur(4px);
+      z-index: 1000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity 0.3s ease, visibility 0.3s ease;
+    }
+
+    .modal-overlay.active {
+      opacity: 1;
+      visibility: visible;
+    }
+
+    .modal-content {
+      background: var(--card-bg);
+      border: 1px solid rgba(192, 57, 43, 0.3);
+      border-radius: 8px;
+      padding: 2.5rem;
+      max-width: 640px;
+      width: 90%;
+      max-height: 85vh;
+      overflow-y: auto;
+      position: relative;
+      transform: scale(0.85);
+      opacity: 0;
+      transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease;
+    }
+
+    .modal-overlay.active .modal-content {
+      transform: scale(1);
+      opacity: 1;
+    }
+
+    .modal-close {
+      position: absolute;
+      top: 1rem;
+      right: 1rem;
+      width: 36px;
+      height: 36px;
+      border: 1px solid var(--vermilion);
+      border-radius: 50%;
+      background: transparent;
+      color: var(--vermilion);
+      font-size: 1.2rem;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.2s, color 0.2s;
+    }
+
+    .modal-close:hover {
+      background: var(--vermilion);
+      color: var(--paper-white);
+    }
+
+    .modal-title {
+      font-size: 1.8rem;
+      font-weight: 900;
+      color: var(--ink-black);
+      margin-bottom: 0.5rem;
+      letter-spacing: 0.15em;
+    }
+
+    .modal-author {
+      font-size: 1rem;
+      color: var(--indigo);
+      margin-bottom: 2rem;
+      letter-spacing: 0.2em;
+    }
+
+    .modal-poem-lines {
+      font-size: 1.15rem;
+      line-height: 2.2;
+      color: var(--ink-black);
+      margin-bottom: 2rem;
+      text-align: center;
+    }
+
+    .modal-annotations {
+      border-top: 1px solid rgba(192, 57, 43, 0.15);
+      padding-top: 1.5rem;
+    }
+
+    .modal-annotations h3 {
+      font-size: 0.9rem;
+      color: var(--vermilion);
+      letter-spacing: 0.2em;
+      margin-bottom: 1rem;
+    }
+
+    .modal-annotations p {
+      font-size: 0.9rem;
+      line-height: 1.8;
+      color: var(--indigo);
+      margin-bottom: 0.5rem;
+    }
+
+    .tts-button {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      margin-top: 1.5rem;
+      padding: 0.6rem 1.5rem;
+      background: transparent;
+      border: 1px solid var(--vermilion);
+      color: var(--vermilion);
+      font-family: var(--font-serif);
+      font-size: 0.95rem;
+      cursor: pointer;
+      border-radius: 2px;
+      transition: background 0.2s, color 0.2s;
+      letter-spacing: 0.1em;
+    }
+
+    .tts-button:hover {
+      background: var(--vermilion);
+      color: var(--paper-white);
+    }
+
+    .tts-button.playing {
+      background: var(--vermilion);
+      color: var(--paper-white);
+      animation: tts-pulse 1.5s ease-in-out infinite;
+    }
+
+    @keyframes tts-pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.7; }
+    }
+
+    @media (max-width: 1023px) {
+      .daily-poem-section {
+        min-height: 60vh;
+      }
+
+      .filter-bar {
+        padding: 0.75rem 1rem;
+      }
+    }
+
+    @media (max-width: 767px) {
+      .daily-poem-lines {
+        max-height: 40vh;
+      }
+
+      .daily-poem-content {
+        padding: 2rem 1rem;
+      }
+
+      .filter-bar {
+        flex-direction: column;
+        align-items: stretch;
+      }
+
+      .filter-bar input {
+        min-width: unset;
+      }
+
+      .waterfall-container {
+        padding: 1rem;
+      }
+
+      .modal-content {
+        width: 95%;
+        max-height: 90vh;
+        padding: 1.5rem;
+      }
+    }
+  </style>
+</head>
+<body>
+  <section class="daily-poem-section" id="dailyPoemSection">
+    <canvas class="daily-poem-canvas" id="dailyPoemCanvas"></canvas>
+    <div class="daily-poem-content" id="dailyPoemContent"></div>
+  </section>
+
+  <nav class="filter-bar" id="filterBar">
+    <span class="filter-label">筛选</span>
+    <input type="text" id="keywordInput" placeholder="搜索关键词..." />
+    <select id="authorSelect">
+      <option value="">全部作者</option>
+    </select>
+    <select id="dynastySelect">
+      <option value="">全部朝代</option>
+    </select>
+  </nav>
+
+  <main class="waterfall-container" id="waterfallContainer">
+    <div class="waterfall-grid" id="waterfallGrid"></div>
+  </main>
+
+  <div class="modal-overlay" id="modalOverlay">
+    <div class="modal-content" id="modalContent"></div>
+  </div>
+
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
