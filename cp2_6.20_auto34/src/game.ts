@@ -1,7 +1,13 @@
 import { Level, TILE_SIZE, LEVEL_PIXEL_WIDTH, LEVEL_PIXEL_HEIGHT } from './level';
 import { Player, Particle } from './player';
 
-export type GameState = 'menu' | 'playing' | 'rewind' | 'dead' | 'gameover' | 'win';
+export type GameState = 'menu' | 'levelselect' | 'playing' | 'rewind' | 'dead' | 'gameover' | 'win';
+
+export interface LevelInfo {
+  id: number;
+  name: string;
+  unlocked: boolean;
+}
 
 export interface WinParticle {
   x: number;
@@ -20,6 +26,9 @@ export class Game {
   state: GameState;
   lives: number;
   gameTime: number;
+  currentLevel: number;
+
+  levels: LevelInfo[];
 
   input: {
     left: boolean;
@@ -31,6 +40,12 @@ export class Game {
     rewindQ: boolean;
     rewindW: boolean;
     rewindE: boolean;
+  };
+
+  mouse: {
+    x: number;
+    y: number;
+    clicked: boolean;
   };
 
   lastCheckpoint: { x: number; y: number };
@@ -51,6 +66,11 @@ export class Game {
     this.state = 'menu';
     this.lives = 3;
     this.gameTime = 0;
+    this.currentLevel = 1;
+
+    this.levels = [
+      { id: 1, name: 'Level 1', unlocked: true },
+    ];
 
     this.input = {
       left: false,
@@ -64,6 +84,12 @@ export class Game {
       rewindE: false,
     };
 
+    this.mouse = {
+      x: 0,
+      y: 0,
+      clicked: false,
+    };
+
     this.lastCheckpoint = { ...this.level.spawnPoint };
 
     this.deathFlashTime = 0;
@@ -75,7 +101,8 @@ export class Game {
     this.gameOverTextTime = 0;
   }
 
-  startGame() {
+  startGame(levelId: number = 1) {
+    this.currentLevel = levelId;
     this.state = 'playing';
     this.lives = 3;
     this.gameTime = 0;
@@ -85,24 +112,65 @@ export class Game {
     this.winParticles = [];
     this.winTextTime = 0;
     this.gameOverTextTime = 0;
+    this.mouse.clicked = false;
+  }
+
+  openLevelSelect() {
+    this.state = 'levelselect';
+    this.mouse.clicked = false;
+    for (let i = 0; i < this.levels.length; i++) {
+      this.levels[i].unlocked = (i === 0);
+    }
   }
 
   restartGame() {
-    this.startGame();
+    this.startGame(this.currentLevel);
+  }
+
+  getLevelButtonRects(canvasWidth: number, canvasHeight: number): { id: number; x: number; y: number; w: number; h: number }[] {
+    const rects: { id: number; x: number; y: number; w: number; h: number }[] = [];
+    const buttonW = 200;
+    const buttonH = 60;
+    const gap = 20;
+    const totalW = this.levels.length * buttonW + (this.levels.length - 1) * gap;
+    let startX = (canvasWidth - totalW) / 2;
+    const y = canvasHeight / 2 - buttonH / 2;
+
+    for (const lv of this.levels) {
+      rects.push({ id: lv.id, x: startX, y: y, w: buttonW, h: buttonH });
+      startX += buttonW + gap;
+    }
+    return rects;
+  }
+
+  handleMouseMove(x: number, y: number) {
+    this.mouse.x = x;
+    this.mouse.y = y;
+  }
+
+  handleMouseClick(x: number, y: number) {
+    this.mouse.x = x;
+    this.mouse.y = y;
+    this.mouse.clicked = true;
   }
 
   update(dt: number) {
     if (this.state === 'menu') {
       if (this.input.jump) {
-        this.startGame();
+        this.openLevelSelect();
       }
+      return;
+    }
+
+    if (this.state === 'levelselect') {
+      this.updateLevelSelect();
       return;
     }
 
     if (this.state === 'gameover') {
       this.gameOverTextTime += dt;
       if (this.gameOverTextTime >= 2) {
-        this.startGame();
+        this.openLevelSelect();
       }
       return;
     }
@@ -120,7 +188,7 @@ export class Game {
         }
       }
       if (this.winTextTime >= 2) {
-        this.state = 'menu';
+        this.openLevelSelect();
       }
       return;
     }
@@ -324,6 +392,52 @@ export class Game {
     }
   }
 
+  updateLevelSelect() {
+    if (this.mouse.clicked) {
+      this.mouse.clicked = false;
+    }
+  }
+
+  handleLevelButtonClick(levelId: number, canvasWidth: number, canvasHeight: number): boolean {
+    const rects = this.getLevelButtonRects(canvasWidth, canvasHeight);
+    for (const rect of rects) {
+      if (
+        this.mouse.x >= rect.x &&
+        this.mouse.x <= rect.x + rect.w &&
+        this.mouse.y >= rect.y &&
+        this.mouse.y <= rect.y + rect.h
+      ) {
+        if (rect.id === levelId) {
+          const lv = this.levels.find(l => l.id === levelId);
+          if (lv && lv.unlocked) {
+            this.startGame(levelId);
+            return true;
+          }
+        }
+      }
+    }
+    return false;
+  }
+
+  handleAllLevelButtonsClick(canvasWidth: number, canvasHeight: number) {
+    const rects = this.getLevelButtonRects(canvasWidth, canvasHeight);
+    for (const rect of rects) {
+      if (
+        this.mouse.x >= rect.x &&
+        this.mouse.x <= rect.x + rect.w &&
+        this.mouse.y >= rect.y &&
+        this.mouse.y <= rect.y + rect.h
+      ) {
+        const lv = this.levels.find(l => l.id === rect.id);
+        if (lv && lv.unlocked) {
+          this.startGame(rect.id);
+          return;
+        }
+      }
+    }
+    this.mouse.clicked = false;
+  }
+
   die() {
     this.lives--;
     this.deathFlashTime = 0.2;
@@ -379,6 +493,12 @@ export class Game {
 
   handleKeyDown(e: KeyboardEvent) {
     switch (e.code) {
+      case 'Escape':
+        if (this.state === 'playing' || this.state === 'rewind') {
+          this.openLevelSelect();
+          this.input.rewind = false;
+        }
+        break;
       case 'KeyA':
       case 'ArrowLeft':
         this.input.left = true;
@@ -422,6 +542,8 @@ export class Game {
 
   handleKeyUp(e: KeyboardEvent) {
     switch (e.code) {
+      case 'Escape':
+        break;
       case 'KeyA':
       case 'ArrowLeft':
         this.input.left = false;

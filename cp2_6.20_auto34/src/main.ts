@@ -31,8 +31,24 @@ function handleKeyUp(e: KeyboardEvent) {
   game.handleKeyUp(e);
 }
 
+function handleMouseMove(e: MouseEvent) {
+  const rect = canvas.getBoundingClientRect();
+  const x = e.clientX - rect.left;
+  const y = e.clientY - rect.top;
+  game.handleMouseMove(x, y);
+}
+
+function handleMouseClick(e: MouseEvent) {
+  const rect = canvas.getBoundingClientRect();
+  const x = e.clientX - rect.left;
+  const y = e.clientY - rect.top;
+  game.handleMouseClick(x, y);
+}
+
 window.addEventListener('keydown', handleKeyDown);
 window.addEventListener('keyup', handleKeyUp);
+canvas.addEventListener('mousemove', handleMouseMove);
+canvas.addEventListener('click', handleMouseClick);
 
 window.addEventListener('blur', () => {
   game.input.left = false;

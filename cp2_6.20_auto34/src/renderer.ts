@@ -60,6 +60,15 @@ export class Renderer {
       this.drawPlayer(game.player);
       this.drawParticles(game.player);
       ctx.restore();
+    } else if (game.state === 'playing') {
+      this.drawLevel(game.level);
+      this.drawPlayer(game.player);
+      this.drawParticles(game.player);
+    } else if (game.state === 'levelselect') {
+      this.drawLevel(game.level);
+      ctx.globalAlpha = 0.3;
+      this.drawPlayer(game.player);
+      ctx.globalAlpha = 1;
     } else {
       this.drawLevel(game.level);
       this.drawPlayer(game.player);
@@ -88,6 +97,13 @@ export class Renderer {
 
     if (game.state === 'menu') {
       this.drawMenu(game);
+    }
+
+    if (game.state === 'levelselect') {
+      this.drawLevelSelect(game);
+      if (game.mouse.clicked) {
+        game.handleAllLevelButtonsClick(this.canvas.width, this.canvas.height);
+      }
     }
 
     if (game.state === 'gameover') {
@@ -387,6 +403,87 @@ export class Renderer {
     );
   }
 
+  drawLevelSelect(game: Game) {
+    const ctx = this.ctx;
+    const w = this.canvas.width;
+    const h = this.canvas.height;
+
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+    ctx.fillRect(0, 0, w, h);
+
+    ctx.fillStyle = '#00ffcc';
+    ctx.font = 'bold 40px monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText('选择关卡', w / 2, h / 2 - 80);
+
+    const rects = game.getLevelButtonRects(w, h);
+    for (let i = 0; i < rects.length; i++) {
+      const rect = rects[i];
+      const lv = game.levels[i];
+      const mouseX = game.mouse.x;
+      const mouseY = game.mouse.y;
+
+      const hovered =
+        mouseX >= rect.x &&
+        mouseX <= rect.x + rect.w &&
+        mouseY >= rect.y &&
+        mouseY <= rect.y + rect.h;
+
+      let bgColor: string;
+      let textColor: string;
+      if (!lv.unlocked) {
+        bgColor = '#2a2a2a';
+        textColor = '#666666';
+      } else if (hovered) {
+        bgColor = '#4a4a4a';
+        textColor = '#ffffff';
+      } else {
+        bgColor = '#333333';
+        textColor = '#ffffff';
+      }
+
+      ctx.fillStyle = bgColor;
+      const radius = 10;
+      this.roundRect(rect.x, rect.y, rect.w, rect.h, radius);
+      ctx.fill();
+
+      if (lv.unlocked && hovered) {
+        ctx.strokeStyle = '#00ffcc';
+        ctx.lineWidth = 2;
+        this.roundRect(rect.x, rect.y, rect.w, rect.h, radius);
+        ctx.stroke();
+      }
+
+      ctx.fillStyle = textColor;
+      ctx.font = 'bold 22px monospace';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(lv.name, rect.x + rect.w / 2, rect.y + rect.h / 2);
+      ctx.textBaseline = 'alphabetic';
+    }
+
+    const alpha = this.mouseHoveringHint ? 1 : 0.4;
+    ctx.fillStyle = `rgba(200, 200, 200, ${alpha})`;
+    ctx.font = '14px monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText('点击关卡按钮开始游戏 | 游戏中按 Esc 返回此界面', w / 2, h - 30);
+  }
+
+  roundRect(x: number, y: number, w: number, h: number, r: number) {
+    const ctx = this.ctx;
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.lineTo(x + w - r, y);
+    ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+    ctx.lineTo(x + w, y + h - r);
+    ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+    ctx.lineTo(x + r, y + h);
+    ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+    ctx.lineTo(x, y + r);
+    ctx.quadraticCurveTo(x, y, x + r, y);
+    ctx.closePath();
+  }
+
   drawMenu(game: Game) {
     const ctx = this.ctx;
 
@@ -405,7 +502,7 @@ export class Renderer {
     const pulse = 0.7 + 0.3 * Math.sin(this.spikePulseTime * Math.PI * 2);
     ctx.fillStyle = `rgba(255, 255, 255, ${pulse})`;
     ctx.font = '20px monospace';
-    ctx.fillText('Press SPACE to Start', this.canvas.width / 2, this.canvas.height / 2 + 60);
+    ctx.fillText('Press SPACE to Select Level', this.canvas.width / 2, this.canvas.height / 2 + 60);
 
     ctx.fillStyle = 'rgba(200, 200, 200, 0.6)';
     ctx.font = '14px monospace';
