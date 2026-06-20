@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="theme-color" content="#0a1128" />
+  <title>节奏光点追逐 · Rhythm Dot Chase</title>
+  <link rel="stylesheet" href="./src/style.css" />
+</head>
+<body>
+  <div id="app">
+    <canvas id="game-canvas"></canvas>
+
+    <div id="start-screen" class="screen visible">
+      <div class="glass-panel">
+        <h1 class="game-title">
+          <span class="title-main">节奏光点追逐</span>
+          <span class="title-sub">Rhythm Dot Chase</span>
+        </h1>
+
+        <label class="upload-btn glass-btn" for="audio-upload">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+            <polyline points="17 8 12 3 7 8"/>
+            <line x1="12" y1="3" x2="12" y2="15"/>
+          </svg>
+          <span id="upload-text">点击上传 MP3 音频</span>
+          <input type="file" id="audio-upload" accept="audio/mpeg,audio/mp3" hidden />
+        </label>
+
+        <p class="difficulty-label">选择难度</p>
+
+        <div class="difficulty-cards">
+          <button class="diff-card" data-difficulty="easy">
+            <span class="diff-name">简单</span>
+            <span class="diff-desc">慢速节拍</span>
+            <span class="diff-stars">★☆☆</span>
+          </button>
+          <button class="diff-card active" data-difficulty="normal">
+            <span class="diff-name">中等</span>
+            <span class="diff-desc">中等节拍</span>
+            <span class="diff-stars">★★☆</span>
+          </button>
+          <button class="diff-card" data-difficulty="hard">
+            <span class="diff-name">困难</span>
+            <span class="diff-desc">快速节拍</span>
+            <span class="diff-stars">★★★</span>
+          </button>
+        </div>
+
+        <button id="start-btn" class="primary-btn" disabled>
+          开始游戏
+        </button>
+      </div>
+    </div>
+
+    <div id="game-screen" class="screen">
+      <div class="hud-top-left">
+        <div class="hud-item">
+          <span class="hud-label">得分</span>
+          <span id="score-value" class="hud-value score">0</span>
+        </div>
+        <div class="hud-item">
+          <span class="hud-label">连击</span>
+          <span id="combo-value" class="hud-value combo">0</span>
+        </div>
+      </div>
+
+      <div class="hud-top-right">
+        <button id="pause-btn" class="icon-btn glass-btn" title="暂停">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+            <rect x="6" y="4" width="4" height="16" rx="1"/>
+            <rect x="14" y="4" width="4" height="16" rx="1"/>
+          </svg>
+        </button>
+      </div>
+
+      <div class="hud-bottom-right">
+        <span class="hud-label">剩余时间</span>
+        <span id="time-value" class="hud-value time">00:00</span>
+      </div>
+    </div>
+
+    <div id="pause-screen" class="screen overlay">
+      <div class="glass-panel">
+        <h2 class="screen-title">游戏暂停</h2>
+        <div class="btn-group">
+          <button id="resume-btn" class="primary-btn">继续游戏</button>
+          <button id="quit-btn" class="secondary-btn">退出到主菜单</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="result-screen" class="screen overlay">
+      <div class="glass-panel">
+        <h2 class="screen-title">游戏结束</h2>
+        <div class="result-stats">
+          <div class="stat-row">
+            <span class="stat-label">最终得分</span>
+            <span id="final-score" class="stat-value score">0</span>
+          </div>
+          <div class="stat-row">
+            <span class="stat-label">最高连击</span>
+            <span id="max-combo" class="stat-value combo">0</span>
+          </div>
+          <div class="stat-row">
+            <span class="stat-label">命中率</span>
+            <span id="hit-rate" class="stat-value hitrate">0%</span>
+          </div>
+          <div class="stat-row">
+            <span class="stat-label">Perfect / Good / Miss</span>
+            <span id="judge-count" class="stat-value">0 / 0 / 0</span>
+          </div>
+        </div>
+        <div class="btn-group">
+          <button id="retry-btn" class="primary-btn">再来一次</button>
+          <button id="home-btn" class="secondary-btn">返回主菜单</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="hit-popup-layer"></div>
+  </div>
+
+  <script type="module" src="./src/main.ts"></script>
+</body>
+</html>
