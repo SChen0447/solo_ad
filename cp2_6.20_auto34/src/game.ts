@@ -147,9 +147,10 @@ export class Game {
       this.input,
       (x, w, pb, cb, vy) => this.level.getGroundY(x, w, pb, cb, vy),
       (x, y, w, h, vx) => this.level.checkWallCollision(x, y, w, h, vx),
-      (x, y, w, h, vy) => this.level.checkCeilingCollision(x, y, w, h, vy),
-      this.level.pushBox
+      (x, y, w, h, vy) => this.level.checkCeilingCollision(x, y, w, h, vy)
     );
+
+    this.handlePushBox(dt);
 
     this.player.recordHistory(this.gameTime);
 
@@ -252,6 +253,75 @@ export class Game {
     const newDuration = this.player.getHistoryDuration();
     const maxDuration = 30;
     this.rewindProgress = 1 - newDuration / maxDuration;
+  }
+
+  handlePushBox(dt: number) {
+    const pushBox = this.level.pushBox;
+    const player = this.player;
+
+    if (!this.input.interact) return;
+
+    const nearThreshold = 8;
+
+    const yOverlap =
+      player.y + player.height > pushBox.y + 2 &&
+      player.y < pushBox.y + pushBox.height - 2;
+
+    if (!yOverlap) return;
+
+    const playerRight = player.x + player.width;
+    const playerLeft = player.x;
+    const boxRight = pushBox.x + pushBox.width;
+    const boxLeft = pushBox.x;
+
+    const onRightSide = Math.abs(playerLeft - boxRight) < nearThreshold;
+    const onLeftSide = Math.abs(playerRight - boxLeft) < nearThreshold;
+
+    let pushDirection = 0;
+
+    if (this.input.right && onLeftSide) {
+      pushDirection = 1;
+    } else if (this.input.left && onRightSide) {
+      pushDirection = -1;
+    } else if (onLeftSide && !onRightSide) {
+      pushDirection = 1;
+    } else if (onRightSide && !onLeftSide) {
+      pushDirection = -1;
+    }
+
+    if (pushDirection !== 0) {
+      const speed = this.input.slow ? player.slowSpeed : player.moveSpeed;
+      pushBox.velX = (pushDirection * speed) / 60;
+
+      const pushAmount = pushDirection * speed * dt;
+      const newBoxX = pushBox.x + pushAmount;
+
+      let canPush = true;
+      for (const plat of this.level.platforms) {
+        const platX = plat.x * TILE_SIZE;
+        const platY = plat.y * TILE_SIZE;
+        const platW = plat.width * TILE_SIZE;
+        const platH = plat.height * TILE_SIZE;
+
+        if (
+          newBoxX + pushBox.width > platX &&
+          newBoxX < platX + platW &&
+          pushBox.y + pushBox.height > platY + 1 &&
+          pushBox.y < platY + platH - 1
+        ) {
+          canPush = false;
+          break;
+        }
+      }
+
+      if (newBoxX < 0 || newBoxX + pushBox.width > LEVEL_PIXEL_WIDTH) {
+        canPush = false;
+      }
+
+      if (canPush) {
+        pushBox.x = newBoxX;
+      }
+    }
   }
 
   die() {

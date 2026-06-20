@@ -352,14 +352,19 @@ export class Renderer {
     ctx.arc(cx, cy, radius, 0, Math.PI * 2);
     ctx.stroke();
 
-    const progress = game.rewindProgress;
-    const startAngle = -Math.PI / 2;
-    const endAngle = startAngle + Math.PI * 2 * progress;
+    const progress = Math.min(1, Math.max(0, game.rewindProgress));
+    const startAngle = Math.PI * 0.5;
+    const endAngle = startAngle - Math.PI * 2 * progress;
 
     ctx.strokeStyle = '#00ffff';
     ctx.lineWidth = 4;
+    ctx.lineCap = 'round';
     ctx.beginPath();
-    ctx.arc(cx, cy, radius, endAngle, startAngle, true);
+    if (progress >= 0.999) {
+      ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+    } else {
+      ctx.arc(cx, cy, radius, startAngle, endAngle, true);
+    }
     ctx.stroke();
 
     ctx.fillStyle = game.state === 'rewind' ? '#00ffff' : 'rgba(0, 255, 255, 0.5)';
@@ -376,7 +381,7 @@ export class Renderer {
     ctx.font = '14px monospace';
     ctx.textAlign = 'center';
     ctx.fillText(
-      'WASD/Arrows: Move | Space: Jump | Shift: Slow | Tab: Rewind | Q/W/E: Rewind 0.5s/2s/5s',
+      'WASD/Arrows: Move | Space: Jump | Shift: Slow | E: Push Box | Tab: Rewind (Q/W/E: 0.5s/2s/5s)',
       this.canvas.width / 2,
       this.canvas.height - 20
     );

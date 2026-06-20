@@ -41,8 +41,8 @@ export class Player {
 
   history: HistoryFrame[] = [];
   maxHistoryFrames: number;
-  historyInterval: number;
-  lastHistoryTime: number = 0;
+  historyFrameCounter: number = 0;
+  historyFramesInterval: number = 6;
 
   particles: Particle[] = [];
 
@@ -59,16 +59,15 @@ export class Player {
     this.facingRight = true;
     this.color = '#00ffcc';
 
-    this.moveSpeed = 6 * TILE_SIZE;
-    this.slowSpeed = 2 * TILE_SIZE;
+    this.moveSpeed = 240;
+    this.slowSpeed = 80;
     this.jumpForce = -8 * 60;
     this.gravity = 0.4 * 60 * 60;
 
     this.maxHistoryFrames = 300;
-    this.historyInterval = 0.1;
   }
 
-  update(dt: number, input: { left: boolean; right: boolean; jump: boolean; slow: boolean }, getGroundY: (x: number, width: number, prevBottom: number, currentBottom: number, velY: number) => number | null, checkWallCollision: (x: number, y: number, width: number, height: number, velX: number) => { left: boolean; right: boolean }, checkCeilingCollision: (x: number, y: number, width: number, height: number, velY: number) => boolean, pushBox?: { x: number; y: number; width: number; height: number; velX: number }) {
+  update(dt: number, input: { left: boolean; right: boolean; jump: boolean; slow: boolean }, getGroundY: (x: number, width: number, prevBottom: number, currentBottom: number, velY: number) => number | null, checkWallCollision: (x: number, y: number, width: number, height: number, velX: number) => { left: boolean; right: boolean }, checkCeilingCollision: (x: number, y: number, width: number, height: number, velY: number) => boolean) {
     const speed = input.slow ? this.slowSpeed : this.moveSpeed;
 
     if (input.left) {
@@ -131,27 +130,14 @@ export class Player {
       this.velX = 0;
     }
 
-    if (pushBox && this.velX !== 0) {
-      const touchingBox =
-        this.x + this.width > pushBox.x &&
-        this.x < pushBox.x + pushBox.width &&
-        this.y + this.height > pushBox.y + 2 &&
-        this.y < pushBox.y + pushBox.height - 2;
-
-      if (touchingBox) {
-        const boxVel = this.velX * 0.8;
-        pushBox.velX = boxVel / 60;
-      }
-    }
-
-    if (Math.abs(this.velX) > 10 && this.onGround) {
+    if (this.onGround && (input.left || input.right)) {
       this.addParticle();
     }
 
     for (let i = this.particles.length - 1; i >= 0; i--) {
       const p = this.particles[i];
       p.life -= dt;
-      p.alpha = p.life / p.maxLife;
+      p.alpha = Math.max(0, p.life / p.maxLife);
       if (p.life <= 0) {
         this.particles.splice(i, 1);
       }
@@ -177,7 +163,9 @@ export class Player {
   }
 
   recordHistory(timestamp: number) {
-    if (timestamp - this.lastHistoryTime >= this.historyInterval) {
+    this.historyFrameCounter++;
+    if (this.historyFrameCounter >= this.historyFramesInterval) {
+      this.historyFrameCounter = 0;
       this.history.push({
         x: this.x,
         y: this.y,
@@ -192,8 +180,6 @@ export class Player {
       if (this.history.length > this.maxHistoryFrames) {
         this.history.shift();
       }
-
-      this.lastHistoryTime = timestamp;
     }
   }
 
@@ -255,5 +241,6 @@ export class Player {
     this.jumpsLeft = this.maxJumps;
     this.history = [];
     this.particles = [];
+    this.historyFrameCounter = 0;
   }
 }

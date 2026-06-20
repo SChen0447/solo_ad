@@ -134,9 +134,9 @@ export class Level {
     }
 
     this.pushBox.velY += 0.4 * 60 * dt;
+    const prevBoxY = this.pushBox.y;
     this.pushBox.y += this.pushBox.velY * dt * 60;
-    this.pushBox.velX *= 0.8;
-    this.pushBox.x += this.pushBox.velX * dt * 60;
+    this.pushBox.velX *= 0.9;
 
     this.pushBox.onGround = false;
     for (const plat of this.platforms) {
@@ -151,31 +151,20 @@ export class Level {
         this.pushBox.y + this.pushBox.height > platY &&
         this.pushBox.y < platY + platH
       ) {
+        const prevBoxBottom = prevBoxY + this.pushBox.height;
         if (
-          this.pushBox.y + this.pushBox.height - this.pushBox.velY * dt * 60 <= platY &&
+          prevBoxBottom <= platY + 1 &&
           this.pushBox.velY >= 0
         ) {
           this.pushBox.y = platY - this.pushBox.height;
           this.pushBox.velY = 0;
           this.pushBox.onGround = true;
         } else if (
-          this.pushBox.y - this.pushBox.velY * dt * 60 >= platY + platH &&
+          prevBoxY >= platY + platH - 1 &&
           this.pushBox.velY < 0
         ) {
           this.pushBox.y = platY + platH;
           this.pushBox.velY = 0;
-        } else if (
-          this.pushBox.x + this.pushBox.width - this.pushBox.velX * dt * 60 <= platX &&
-          this.pushBox.velX > 0
-        ) {
-          this.pushBox.x = platX - this.pushBox.width;
-          this.pushBox.velX = 0;
-        } else if (
-          this.pushBox.x - this.pushBox.velX * dt * 60 >= platX + platW &&
-          this.pushBox.velX < 0
-        ) {
-          this.pushBox.x = platX + platW;
-          this.pushBox.velX = 0;
         }
       }
     }
@@ -288,6 +277,18 @@ export class Level {
       const platH = plat.height * TILE_SIZE;
 
       if (x + width > platX && x < platX + platW && y + height > platY && y < platY + platH) {
+        if (velX > 0) {
+          right = true;
+        } else if (velX < 0) {
+          left = true;
+        }
+      }
+    }
+
+    const box = this.pushBox;
+    const yOverlap = y + height > box.y + 2 && y < box.y + box.height - 2;
+    if (yOverlap) {
+      if (x + width > box.x && x < box.x + box.width) {
         if (velX > 0) {
           right = true;
         } else if (velX < 0) {
