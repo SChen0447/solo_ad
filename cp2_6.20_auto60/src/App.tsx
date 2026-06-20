@@ -18,17 +18,71 @@ const STYLES: StyleOption[] = [
   { id: 'impressionism', name: 'Impressionism', nameCn: '印象派', gradient: 'linear-gradient(135deg, #FFE4B5 0%, #FFA07A 50%, #FF6347 100%)' },
 ];
 
-function base64ToBlob(base64Data: string): Blob {
-  const parts = base64Data.split(',');
-  const mimeMatch = parts[0].match(/data:(.*?);base64/);
-  const mime = mimeMatch ? mimeMatch[1] : 'image/png';
-  const binary = atob(parts[1]);
-  const len = binary.length;
-  const bytes = new Uint8Array(len);
-  for (let i = 0; i < len; i++) {
-    bytes[i] = binary.charCodeAt(i);
+// 分块解码 base64，避免超大图片导致的内存峰值和 atob 的字符串长度限制
+function base64ToBlob(base64Data: string, chunkSize = 1024 * 512): Blob {
+  try {
+    const commaIdx = base64Data.indexOf(',');
+    const header = commaIdx >= 0 ? base64Data.slice(0, commaIdx) : 'data:image/png;base64';
+    const mimeMatch = header.match(/data:(.*?);base64/);
+    const mime = mimeMatch ? mimeMatch[1] : 'image/png';
+    const base64 = commaIdx >= 0 ? base64Data.slice(commaIdx + 1) : base64Data;
+
+    // 按 chunkSize 分段解码，减小单次 atob 的内存占用
+    const byteArrays: Uint8Array[] = [];
+    for (let offset = 0; offset < base64.length; offset += chunkSize) {
+      const chunk = base64.slice(offset, offset + chunkSize);
+      const decoded = atob(chunk);
+      const bytes = new Uint8Array(decoded.length);
+      for (let i = 0; i < decoded.length; i++) {
+        bytes[i] = decoded.charCodeAt(i);
+      }
+      byteArrays.push(bytes);
+    }
+
+    return new Blob(byteArrays, { type: mime });
+  } catch (e) {
+    console.error('base64ToBlob failed, fallback to simple mode:', e);
+    // 降级方案
+    const fallback = atob(base64Data.split(',')[1] || base64Data);
+    const arr = new Uint8Array(fallback.length);
+    for (let i = 0; i < fallback.length; i++) arr[i] = fallback.charCodeAt(i);
+    return new Blob([arr], { type: 'image/png' });
   }
-  return new Blob([bytes], { type: mime });
+}
+
+// 复制内容到剪贴板（带降级）
+async function copyTextToClipboard(text: string): Promise<void> {
+  try {
+    if (navigator.clipboard && window.isSecureContext) {
+      await navigator.clipboard.writeText(text);
+      return;
+    }
+  } catch (_) { /* ignore */ }
+
+  const ta = document.createElement('textarea');
+  ta.value = text;
+  ta.style.position = 'fixed';
+  ta.style.left = '-9999px';
+  ta.style.top = '0';
+  document.body.appendChild(ta);
+  ta.select();
+  try {
+    document.execCommand('copy');
+  } finally {
+    document.body.removeChild(ta);
+  }
+}
+
+// 尝试将图片 Blob 复制到剪贴板（现代浏览器支持）
+async function copyImageToClipboard(blob: Blob): Promise<boolean> {
+  try {
+    if (navigator.clipboard && (window as any).ClipboardItem && window.isSecureContext) {
+      const item = new (window as any).ClipboardItem({ [blob.type]: blob });
+      await (navigator.clipboard as any).write([item]);
+      return true;
+    }
+  } catch (_) { /* ignore */ }
+  return false;
 }
 
 function App(): React.ReactElement {
@@ -36,6 +90,8 @@ function App(): React.ReactElement {
   const [originalPreview, setOriginalPreview] = useState<string>('');
   const [processedImage, setProcessedImage] = useState<string>('');
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isSharing, setIsSharing] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [dragBlink, setDragBlink] = useState(false);
   const [selectedStyle, setSelectedStyle] = useState<StyleType>('watercolor');
@@ -55,7 +111,7 @@ function App(): React.ReactElement {
 
   const cleanupObjectUrl = useCallback(() => {
     if (objectUrlRef.current) {
-      URL.revokeObjectURL(objectUrlRef.current);
+      try { URL.revokeObjectURL(objectUrlRef.current); } catch (_) { /* ignore */ }
       objectUrlRef.current = null;
     }
   }, []);
@@ -137,11 +193,13 @@ function App(): React.ReactElement {
       });
 
       const data = await response.json();
-      if (data.success) {
+      if (data && data.success) {
         cleanupObjectUrl();
         setProcessedImage(data.image);
         setDisplaySrc(data.image);
         setFadeKey((k) => k + 1);
+      } else {
+        throw new Error(data?.error || 'Unknown error');
       }
     } catch (error) {
       console.error('Processing failed:', error);
@@ -187,6 +245,7 @@ function App(): React.ReactElement {
       setDisplaySrc(src);
       setFadeKey((k) => k + 1);
     };
+    reader.onerror = () => showToastMessage('图片读取失败');
     reader.readAsDataURL(file);
   }, [showToastMessage, cleanupObjectUrl]);
 
@@ -244,19 +303,24 @@ function App(): React.ReactElement {
     setSelectedStyle(style.id);
   }, [selectedStyle, fireConfetti]);
 
-  const handleSave = useCallback(() => {
+  const handleSave = useCallback(async () => {
     const sourceData = processedImage || originalPreview;
     if (!sourceData) return;
 
+    setIsSaving(true);
+    let blob: Blob | null = null;
+    let url: string | null = null;
+
     try {
-      cleanupObjectUrl();
-      const blob = base64ToBlob(sourceData);
-      const url = URL.createObjectURL(blob);
+      // 让浏览器有机会先渲染加载状态
+      await new Promise(r => setTimeout(r, 10));
+      blob = base64ToBlob(sourceData);
+      url = URL.createObjectURL(blob);
       objectUrlRef.current = url;
 
       const link = document.createElement('a');
       link.href = url;
-      const ext = blob.type.includes('jpeg') ? 'jpg' : blob.type.includes('png') ? 'png' : 'png';
+      const ext = blob.type.includes('jpeg') ? 'jpg' : 'png';
       link.download = `styled-${selectedStyle}-${Date.now()}.${ext}`;
       document.body.appendChild(link);
       link.click();
@@ -264,58 +328,57 @@ function App(): React.ReactElement {
 
       setTimeout(() => {
         cleanupObjectUrl();
-      }, 1000);
+      }, 1500);
 
       showToastMessage('图片已保存');
     } catch (err) {
       console.error('Save failed:', err);
-      const link = document.createElement('a');
-      link.href = sourceData;
-      link.download = `styled-${selectedStyle}-${Date.now()}.png`;
-      link.click();
-      showToastMessage('图片已保存');
+      // 降级：直接用 data URL 触发下载
+      try {
+        const link = document.createElement('a');
+        link.href = sourceData;
+        link.download = `styled-${selectedStyle}-${Date.now()}.png`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        showToastMessage('图片已保存');
+      } catch (e2) {
+        showToastMessage('保存失败，请重试');
+      }
+    } finally {
+      setIsSaving(false);
     }
   }, [processedImage, originalPreview, selectedStyle, cleanupObjectUrl, showToastMessage]);
 
+  // 前端本地分享：优先复制图片到剪贴板，其次复制 dataURL
   const handleShare = useCallback(async () => {
     const sourceData = processedImage || originalPreview;
-    if (!sourceData || !originalImage) return;
+    if (!sourceData) return;
+
+    setIsSharing(true);
 
     try {
+      await new Promise(r => setTimeout(r, 10));
       const blob = base64ToBlob(sourceData);
-      const file = new File([blob], originalImage.name, { type: blob.type || 'image/png' });
 
-      const formData = new FormData();
-      formData.append('image', file);
-
-      const res = await fetch('/api/share', {
-        method: 'POST',
-        body: formData
-      });
-
-      const data = await res.json();
-      if (data.success) {
-        const fullUrl = `${window.location.origin}/api/share/${data.token}`;
-        try {
-          await navigator.clipboard.writeText(fullUrl);
-          showToastMessage('分享链接已复制到剪贴板（5分钟内有效）');
-        } catch (clipErr) {
-          const textArea = document.createElement('textarea');
-          textArea.value = fullUrl;
-          textArea.style.position = 'fixed';
-          textArea.style.left = '-9999px';
-          document.body.appendChild(textArea);
-          textArea.select();
-          document.execCommand('copy');
-          document.body.removeChild(textArea);
-          showToastMessage('分享链接已复制（5分钟内有效）');
-        }
+      // 1. 尝试复制图片本身
+      const copiedImage = await copyImageToClipboard(blob);
+      if (copiedImage) {
+        showToastMessage('图片已复制到剪贴板，可直接粘贴分享');
+        setIsSharing(false);
+        return;
       }
-    } catch (error) {
-      console.error('Share failed:', error);
+
+      // 2. 复制图片的 data URL（可在同设备浏览器打开）
+      await copyTextToClipboard(sourceData);
+      showToastMessage('图片链接已复制（data URL 可直接粘贴打开）');
+    } catch (err) {
+      console.error('Share failed:', err);
       showToastMessage('分享失败，请重试');
+    } finally {
+      setIsSharing(false);
     }
-  }, [processedImage, originalPreview, originalImage, showToastMessage]);
+  }, [processedImage, originalPreview, showToastMessage]);
 
   useEffect(() => {
     return () => {
@@ -325,6 +388,8 @@ function App(): React.ReactElement {
       cleanupObjectUrl();
     };
   }, [cleanupObjectUrl]);
+
+  const busy = isProcessing || isSaving || isSharing;
 
   return (
     <div className="app-container">
@@ -350,16 +415,19 @@ function App(): React.ReactElement {
           />
           {displaySrc ? (
             <div className="preview-wrapper">
-              {isProcessing && (
+              {busy && (
                 <div className="loading-overlay">
                   <div className="spinner"></div>
+                  <div className="loading-text">
+                    {isProcessing ? '正在处理中...' : isSaving ? '正在保存...' : '正在分享...'}
+                  </div>
                 </div>
               )}
               <img
                 key={fadeKey}
                 src={displaySrc}
                 alt="预览"
-                className="preview-image fade-in"
+                className={`preview-image fade-in ${busy ? 'dimmed' : ''}`}
               />
             </div>
           ) : (
@@ -422,6 +490,7 @@ function App(): React.ReactElement {
                   value={intensity}
                   onChange={(e) => setIntensity(parseInt(e.target.value, 10))}
                   className="custom-slider"
+                  disabled={busy}
                 />
               </div>
 
@@ -438,6 +507,7 @@ function App(): React.ReactElement {
                   value={contrast}
                   onChange={(e) => setContrast(parseInt(e.target.value, 10))}
                   className="custom-slider"
+                  disabled={busy}
                 />
               </div>
 
@@ -454,21 +524,30 @@ function App(): React.ReactElement {
                   value={detail}
                   onChange={(e) => setDetail(parseInt(e.target.value, 10))}
                   className="custom-slider"
+                  disabled={busy}
                 />
               </div>
             </div>
 
-            {displaySrc && !isProcessing && (
+            {displaySrc && (
               <div className="actions-section">
-                <button className="btn btn-save" onClick={handleSave}>
+                <button
+                  className="btn btn-save"
+                  onClick={handleSave}
+                  disabled={busy}
+                >
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                     <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
                     <polyline points="7 10 12 15 17 10" />
                     <line x1="12" y1="15" x2="12" y2="3" />
                   </svg>
-                  保存图片
+                  {isSaving ? '保存中...' : '保存图片'}
                 </button>
-                <button className="btn btn-share" onClick={handleShare}>
+                <button
+                  className="btn btn-share"
+                  onClick={handleShare}
+                  disabled={busy}
+                >
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                     <circle cx="18" cy="5" r="3" />
                     <circle cx="6" cy="12" r="3" />
@@ -476,7 +555,7 @@ function App(): React.ReactElement {
                     <line x1="8.59" y1="13.51" x2="15.42" y2="17.49" />
                     <line x1="15.41" y1="6.51" x2="8.59" y2="10.49" />
                   </svg>
-                  分享
+                  {isSharing ? '分享中...' : '分享'}
                 </button>
               </div>
             )}
