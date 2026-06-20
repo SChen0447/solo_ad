@@ -1,0 +1,116 @@
+.magnitude-filter {
+  position: absolute;
+  bottom: 150px;
+  left: 20px;
+  width: 200px;
+  background: rgba(26, 26, 46, 0.9);
+  backdrop-filter: blur(8px);
+  border-radius: 12px;
+  padding: 12px;
+  z-index: 100;
+  transition: all 0.3s ease;
+}
+
+.magnitude-filter.collapsed {
+  width: 50px;
+  height: 50px;
+  padding: 0;
+  overflow: hidden;
+}
+
+.filter-toggle {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: linear-gradient(135deg, #ff6600, #cc4400);
+  border: none;
+  color: white;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.filter-toggle:hover {
+  background: linear-gradient(135deg, #ff8833, #dd5500);
+}
+
+.filter-content {
+  animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.filter-title {
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 600;
+  margin: 0 0 12px 0;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(255, 102, 0, 0.2);
+}
+
+.filter-options {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.filter-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  padding: 4px 0;
+}
+
+.filter-option:hover {
+  opacity: 0.8;
+}
+
+.color-box {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+.filter-checkbox {
+  width: 16px;
+  height: 16px;
+  accent-color: #ff6600;
+  cursor: pointer;
+}
+
+.filter-label {
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 13px;
+  user-select: none;
+}
+
+.filter-option:hover .filter-label {
+  color: #ff8833;
+}
+
+@media (max-width: 768px) {
+  .magnitude-filter {
+    position: fixed;
+    bottom: 100px;
+    left: 20px;
+  }
+  
+  .magnitude-filter.collapsed {
+    position: fixed;
+    bottom: 100px;
+    left: 20px;
+  }
+}

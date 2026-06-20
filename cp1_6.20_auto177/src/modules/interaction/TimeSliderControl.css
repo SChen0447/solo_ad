@@ -1,0 +1,197 @@
+.time-slider-container {
+  position: absolute;
+  bottom: 30px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 90%;
+  max-width: 800px;
+  padding: 20px;
+  background: rgba(26, 26, 46, 0.85);
+  backdrop-filter: blur(8px);
+  border-radius: 12px;
+  z-index: 100;
+}
+
+.time-display {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  color: #ffffff;
+  font-size: 14px;
+}
+
+.time-label {
+  color: rgba(255, 255, 255, 0.6);
+  font-family: 'Courier New', monospace;
+}
+
+.time-current {
+  color: #ff6600;
+  font-family: 'Courier New', monospace;
+  font-weight: bold;
+  font-size: 16px;
+}
+
+.slider-wrapper {
+  position: relative;
+  width: 100%;
+  height: 8px;
+  margin-bottom: 20px;
+}
+
+.slider-progress {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  background: linear-gradient(90deg, #ff6600, #cc4400);
+  border-radius: 4px;
+  pointer-events: none;
+}
+
+.time-slider {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 8px;
+  -webkit-appearance: none;
+  appearance: none;
+  background: #2a2a3a;
+  border-radius: 4px;
+  outline: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.time-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: radial-gradient(circle, #ff6600, #cc4400);
+  cursor: pointer;
+  box-shadow: 0 0 10px rgba(255, 102, 0, 0.5);
+  transform: scale(var(--slider-scale, 1));
+  transition: transform 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+}
+
+.time-slider::-webkit-slider-thumb:hover {
+  background: radial-gradient(circle, #ff8833, #dd5500);
+  box-shadow: 0 0 15px rgba(255, 136, 51, 0.7);
+}
+
+.time-slider::-moz-range-thumb {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: radial-gradient(circle, #ff6600, #cc4400);
+  cursor: pointer;
+  border: none;
+  box-shadow: 0 0 10px rgba(255, 102, 0, 0.5);
+  transform: scale(var(--slider-scale, 1));
+  transition: transform 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+}
+
+.time-slider::-moz-range-thumb:hover {
+  background: radial-gradient(circle, #ff8833, #dd5500);
+}
+
+.controls-row {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 20px;
+}
+
+.play-button {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  border: none;
+  background: linear-gradient(135deg, #ff6600, #cc4400);
+  color: white;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 15px rgba(255, 102, 0, 0.4);
+}
+
+.play-button:hover {
+  background: linear-gradient(135deg, #ff8833, #dd5500);
+  transform: scale(1.05);
+  box-shadow: 0 6px 20px rgba(255, 136, 51, 0.5);
+}
+
+.play-button.playing {
+  background: linear-gradient(135deg, #cc4400, #992200);
+}
+
+.speed-controls {
+  display: flex;
+  gap: 8px;
+}
+
+.speed-button {
+  padding: 8px 16px;
+  border: 1px solid rgba(255, 102, 0, 0.3);
+  border-radius: 6px;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.7);
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.speed-button:hover {
+  border-color: #ff8833;
+  color: #ff8833;
+  background: rgba(255, 136, 51, 0.1);
+}
+
+.speed-button.active {
+  background: linear-gradient(135deg, #ff6600, #cc4400);
+  color: white;
+  border-color: transparent;
+}
+
+@media (max-width: 768px) {
+  .time-slider-container {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+  }
+
+  .time-slider-container.expanded {
+    width: 90%;
+    height: auto;
+    border-radius: 12px;
+    padding: 20px;
+    right: 5%;
+    bottom: 20px;
+  }
+
+  .time-slider-container:not(.expanded) .time-display,
+  .time-slider-container:not(.expanded) .slider-wrapper,
+  .time-slider-container:not(.expanded) .controls-row {
+    display: none;
+  }
+
+  .time-slider-container:not(.expanded)::before {
+    content: '⏱';
+    font-size: 24px;
+  }
+}

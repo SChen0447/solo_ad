@@ -1,0 +1,31 @@
+.toast {
+  position: fixed;
+  bottom: -100px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #ff4444;
+  color: #ffffff;
+  padding: 12px 24px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  z-index: 2000;
+  opacity: 0;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 20px rgba(255, 68, 68, 0.4);
+}
+
+.toast.visible {
+  bottom: 50px;
+  opacity: 1;
+}
+
+.toast-message {
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.toast svg {
+  flex-shrink: 0;
+}
