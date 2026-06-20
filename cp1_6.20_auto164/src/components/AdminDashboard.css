@@ -1,0 +1,187 @@
+.admin-dashboard {
+  min-height: 100vh;
+  background: linear-gradient(135deg, #1E3A5F 0%, #2D5A87 100%);
+  padding: 32px 16px;
+}
+
+.dashboard-container {
+  max-width: 1000px;
+  margin: 0 auto;
+}
+
+.dashboard-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.dashboard-title {
+  font-size: 28px;
+  font-weight: 700;
+  color: #fff;
+}
+
+.dept-filter {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.dept-filter label {
+  font-size: 14px;
+  color: #fff;
+  opacity: 0.8;
+}
+
+.dept-select {
+  padding: 10px 16px;
+  border: none;
+  border-radius: 8px;
+  background: #fff;
+  color: #1E3A5F;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  outline: none;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.dept-select:focus {
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.3);
+}
+
+.stats-cards {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.stat-card {
+  background: #fff;
+  border-radius: 12px;
+  padding: 24px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+}
+
+.stat-icon {
+  width: 56px;
+  height: 56px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 28px;
+}
+
+.stat-icon.completion {
+  background: linear-gradient(135deg, #4ECDC4 0%, #26A69A 100%);
+}
+
+.stat-icon.accuracy {
+  background: linear-gradient(135deg, #3B82F6 0%, #2563EB 100%);
+}
+
+.stat-icon.total {
+  background: linear-gradient(135deg, #A855F7 0%, #7C3AED 100%);
+}
+
+.stat-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.stat-label {
+  font-size: 14px;
+  color: #64748B;
+}
+
+.stat-value {
+  font-size: 28px;
+  font-weight: 700;
+  color: #1E3A5F;
+}
+
+.chart-card {
+  background: #fff;
+  border-radius: 16px;
+  padding: 32px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.12);
+}
+
+.chart-title {
+  font-size: 20px;
+  font-weight: 600;
+  color: #1E3A5F;
+  margin-bottom: 24px;
+}
+
+.chart-wrapper {
+  margin-bottom: 20px;
+}
+
+.chart-legend {
+  display: flex;
+  justify-content: center;
+  gap: 32px;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.legend-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+}
+
+.legend-label {
+  font-size: 14px;
+  color: #64748B;
+}
+
+.legend-value {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1E3A5F;
+}
+
+.loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 400px;
+  color: #fff;
+  font-size: 18px;
+}
+
+@media (max-width: 768px) {
+  .stats-cards {
+    grid-template-columns: 1fr;
+  }
+
+  .dashboard-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .chart-card {
+    padding: 20px;
+  }
+
+  .chart-legend {
+    flex-direction: column;
+    gap: 12px;
+    align-items: flex-start;
+  }
+}
