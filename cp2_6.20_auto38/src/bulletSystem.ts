@@ -21,7 +21,6 @@ interface Bullet {
   trail: THREE.Line;
   trailPositions: THREE.Vector3[];
   age: number;
-  jitterOffset: THREE.Vector3;
   jitterTimer: number;
   jitterInterval: number;
 }
@@ -323,7 +322,6 @@ export class BulletSystem {
       trail,
       trailPositions,
       age: 0,
-      jitterOffset: new THREE.Vector3(),
       jitterTimer: 0,
       jitterInterval: 0.02 + Math.random() * 0.06
     };
@@ -337,8 +335,8 @@ export class BulletSystem {
 
   private createExplosion(position: THREE.Vector3): void {
     const count = 10;
-    const paletteStart = new THREE.Color(0xfde047);
-    const paletteEnd = new THREE.Color(0xf97316);
+    const startColor = new THREE.Color(0xfde047);
+    const endColor = new THREE.Color(0xf97316);
 
     for (let i = 0; i < count; i++) {
       const velocity = new THREE.Vector3(
@@ -347,15 +345,17 @@ export class BulletSystem {
         (Math.random() - 0.5) * 2
       ).normalize().multiplyScalar(2 + Math.random() * 3);
 
-      const colorMix = Math.random();
-      const startColor = paletteStart.clone().lerp(paletteEnd, colorMix * 0.3);
-      const endColor = paletteStart.clone().lerp(paletteEnd, 0.7 + colorMix * 0.3);
-
       const mat = this.particleMaterial.clone();
       mat.color.copy(startColor);
       const mesh = new THREE.Mesh(this.particleGeometry, mat);
       mesh.position.copy(position);
       this.scene.add(mesh);
+
+      const hueJitter = (Math.random() - 0.5) * 0.05;
+      const particleStart = startColor.clone();
+      const particleEnd = endColor.clone();
+      particleStart.offsetHSL(hueJitter, 0, 0);
+      particleEnd.offsetHSL(hueJitter, 0, 0);
 
       this.particles.push({
         mesh,
@@ -368,8 +368,8 @@ export class BulletSystem {
           (Math.random() - 0.5) * 10,
           (Math.random() - 0.5) * 10
         ),
-        startColor,
-        endColor
+        startColor: particleStart,
+        endColor: particleEnd
       });
     }
   }
@@ -394,15 +394,15 @@ export class BulletSystem {
         bullet.jitterTimer = 0;
         bullet.jitterInterval = 0.02 + Math.random() * 0.06;
         const amplitude = 0.05;
-        bullet.jitterOffset.set(
+        this.tempVecA.set(
           (Math.random() - 0.5) * 2 * amplitude,
           (Math.random() - 0.5) * 2 * amplitude,
           (Math.random() - 0.5) * 2 * amplitude
         );
+        bullet.position.add(this.tempVecA);
       }
 
-      this.tempVecB.copy(bullet.position).add(bullet.jitterOffset);
-      bullet.mesh.position.copy(this.tempVecB);
+      bullet.mesh.position.copy(bullet.position);
 
       bullet.age += deltaTime;
       bullet.life -= deltaTime;
@@ -466,13 +466,15 @@ export class BulletSystem {
 
       const mat = p.mesh.material as THREE.MeshBasicMaterial;
       const t = Math.max(0, p.life / p.maxLife);
-      mat.opacity = t;
+      const fadeT = t * t;
+      mat.opacity = fadeT;
       this.tempVecA.copy(p.startColor).lerp(p.endColor, 1 - t);
       mat.color.copy(this.tempVecA);
-      const scale = t;
-      p.mesh.scale.setScalar(Math.max(0.001, scale));
+      const scale = fadeT;
+      p.mesh.scale.setScalar(scale);
 
-      if (p.life <= 0) {
+      if (p.life <= 0 || scale < 0.01) {
+        p.mesh.visible = false;
         this.removeParticle(i);
       }
     }

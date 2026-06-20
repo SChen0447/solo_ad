@@ -31,6 +31,8 @@ export interface Enemy {
   health: number;
   isAlive: boolean;
   flashTimer: number;
+  flashAccumulator: number;
+  flashState: number;
   pathType: PathType;
   pathPhase: number;
   currentPos: THREE.Vector3;
@@ -252,6 +254,8 @@ export class EnemyFleet {
       health: 1,
       isAlive: true,
       flashTimer: 0,
+      flashAccumulator: 0,
+      flashState: 0,
       pathType: this.pathType,
       pathPhase: index * 0.3,
       currentPos: initialPos.clone()
@@ -375,12 +379,17 @@ export class EnemyFleet {
 
       if (!enemy.isAlive) {
         if (enemy.flashTimer > 0) {
-          const totalFlash = 0.15;
-          const elapsed = totalFlash - enemy.flashTimer;
-          const flashPeriod = 0.075;
-          const flashOn = Math.floor(elapsed / (flashPeriod / 2)) % 2 === 0;
+          const FLASH_STEP = 0.0375;
+          enemy.flashAccumulator += deltaTime;
+
+          while (enemy.flashAccumulator >= FLASH_STEP && enemy.flashState < 4) {
+            enemy.flashAccumulator -= FLASH_STEP;
+            enemy.flashState++;
+          }
 
           const mat = enemy.mesh.material as THREE.MeshStandardMaterial;
+          const flashOn = enemy.flashState % 2 === 0 && enemy.flashState < 4;
+
           if (flashOn) {
             mat.emissive.setHex(0xff2222);
             mat.emissiveIntensity = 2.5;
@@ -392,7 +401,8 @@ export class EnemyFleet {
           }
 
           enemy.flashTimer -= deltaTime;
-          if (enemy.flashTimer <= 0) {
+          if (enemy.flashTimer <= 0 || enemy.flashState >= 4) {
+            enemy.mesh.visible = false;
             this.removeEnemy(enemy, i);
           }
         }
@@ -456,10 +466,13 @@ export class EnemyFleet {
     if (!enemy.isAlive) return;
     enemy.isAlive = false;
     enemy.flashTimer = 0.15;
+    enemy.flashAccumulator = 0;
+    enemy.flashState = 0;
 
     const mat = enemy.mesh.material as THREE.MeshStandardMaterial;
     mat.emissive.setHex(0xff2222);
-    mat.emissiveIntensity = 3;
+    mat.emissiveIntensity = 2.5;
+    enemy.mesh.visible = true;
 
     enemy.glowMesh.visible = false;
   }
