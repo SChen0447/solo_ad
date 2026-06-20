@@ -1,0 +1,1 @@
+{"root":["./src/app.tsx","./src/main.tsx","./src/vite-env.d.ts","./src/components/canvas.tsx","./src/components/canvascomponent.tsx","./src/components/componentpanel.tsx","./src/components/propertypanel.tsx","./src/components/snapshotview.tsx","./src/utils/layoutengine.ts"],"errors":true,"version":"5.8.3"}
