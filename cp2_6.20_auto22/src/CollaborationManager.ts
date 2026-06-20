@@ -60,13 +60,50 @@ export class CollaborationManager {
   private memberListeners: Set<MemberListener> = new Set();
   private pathListeners: Set<PathListener> = new Set();
   private mockIntervalId: number | null = null;
-  private labelCheckIntervalId: number | null = null;
+  private labelFadeTimeouts: Map<string, number> = new Map();
+  private actingTimeouts: Map<string, number> = new Map();
 
   constructor() {
     this.currentUserId = 'user-local-' + uuidv4().slice(0, 8);
     this.initMembers();
     this.startMockSimulation();
-    this.startLabelFadeCheck();
+  }
+
+  private triggerMemberActivity(memberId: string) {
+    const member = this.members.find(m => m.id === memberId);
+    if (!member) return;
+
+    member.lastActionAt = Date.now();
+    member.isActing = true;
+
+    const actingTimeout = this.actingTimeouts.get(memberId);
+    if (actingTimeout) {
+      window.clearTimeout(actingTimeout);
+    }
+    const newActingTimeout = window.setTimeout(() => {
+      const m = this.members.find(mm => mm.id === memberId);
+      if (m) {
+        m.isActing = false;
+        this.notifyMembers();
+      }
+      this.actingTimeouts.delete(memberId);
+    }, 100);
+    this.actingTimeouts.set(memberId, newActingTimeout);
+
+    member.labelOpacity = 1;
+    const labelTimeout = this.labelFadeTimeouts.get(memberId);
+    if (labelTimeout) {
+      window.clearTimeout(labelTimeout);
+    }
+    const newLabelTimeout = window.setTimeout(() => {
+      const m = this.members.find(mm => mm.id === memberId);
+      if (m) {
+        m.labelOpacity = 0;
+        this.notifyMembers();
+      }
+      this.labelFadeTimeouts.delete(memberId);
+    }, LABEL_FADE_DELAY);
+    this.labelFadeTimeouts.set(memberId, newLabelTimeout);
   }
 
   private initMembers() {
@@ -113,12 +150,10 @@ export class CollaborationManager {
   broadcastAction(action: Omit<ActionEvent, 'timestamp' | 'memberId'>) {
     const member = this.members.find(m => m.id === this.currentUserId);
     if (member) {
-      member.lastActionAt = Date.now();
-      member.isActing = true;
-      member.labelOpacity = 1;
       if (action.type === 'cursor_move' && action.data) {
         member.cursorPos = action.data;
       }
+      this.triggerMemberActivity(this.currentUserId);
       this.notifyMembers();
     }
   }
@@ -145,14 +180,10 @@ export class CollaborationManager {
           x: (Math.random() - 0.5) * 800,
           y: (Math.random() - 0.5) * 600
         };
-        activeMember.lastActionAt = Date.now();
-        activeMember.isActing = true;
-        activeMember.labelOpacity = 1;
+        this.triggerMemberActivity(activeMember.id);
       } else if (action < 0.9) {
         this.simulateRemoteDraw(activeMember);
-        activeMember.lastActionAt = Date.now();
-        activeMember.isActing = true;
-        activeMember.labelOpacity = 1;
+        this.triggerMemberActivity(activeMember.id);
       }
 
       this.notifyMembers();
@@ -185,34 +216,12 @@ export class CollaborationManager {
     }, 100);
   }
 
-  private startLabelFadeCheck() {
-    this.labelCheckIntervalId = window.setInterval(() => {
-      const now = Date.now();
-      let changed = false;
-
-      for (const member of this.members) {
-        const timeSinceAction = now - member.lastActionAt;
-        if (member.isActing && timeSinceAction > 100) {
-          member.isActing = false;
-          changed = true;
-        }
-
-        if (timeSinceAction > LABEL_FADE_DELAY && member.labelOpacity > 0) {
-          const fadeProgress = Math.min(1, (timeSinceAction - LABEL_FADE_DELAY) / LABEL_FADE_DURATION);
-          member.labelOpacity = Math.max(0, 1 - fadeProgress);
-          changed = true;
-        }
-      }
-
-      if (changed) {
-        this.notifyMembers();
-      }
-    }, 50);
-  }
-
   destroy() {
     if (this.mockIntervalId) clearInterval(this.mockIntervalId);
-    if (this.labelCheckIntervalId) clearInterval(this.labelCheckIntervalId);
+    this.labelFadeTimeouts.forEach(id => clearTimeout(id));
+    this.labelFadeTimeouts.clear();
+    this.actingTimeouts.forEach(id => clearTimeout(id));
+    this.actingTimeouts.clear();
     this.memberListeners.clear();
     this.pathListeners.clear();
   }

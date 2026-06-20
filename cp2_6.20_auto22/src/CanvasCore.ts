@@ -17,6 +17,7 @@ export interface BrushPath {
   glowProgress: number;
   isComplete: boolean;
   memberId?: string;
+  cachedLength?: number;
 }
 
 export interface ImageElementData {
@@ -196,6 +197,7 @@ export class CanvasCore {
     if (this.isDrawing && this.currentPath) {
       this.currentPath.isComplete = true;
       this.currentPath.glowProgress = 0;
+      this.currentPath.cachedLength = this.getPathLength(this.currentPath.points);
       this.currentPath = null;
       this.isDrawing = false;
       this.notify();
@@ -208,21 +210,14 @@ export class CanvasCore {
     const mouseX = e.clientX - rect.left;
     const mouseY = e.clientY - rect.top;
 
+    const worldX = (mouseX - this.viewport.x) / this.viewport.scale;
+    const worldY = (mouseY - this.viewport.y) / this.viewport.scale;
+
     const delta = -e.deltaY * 0.001;
-    const oldScale = this.viewport.scale;
-    const newScale = Math.min(MAX_SCALE, Math.max(MIN_SCALE, oldScale * (1 + delta)));
+    const newScale = Math.min(MAX_SCALE, Math.max(MIN_SCALE, this.targetViewport.scale * (1 + delta)));
 
-    const worldX = (mouseX - this.viewport.x) / oldScale;
-    const worldY = (mouseY - this.viewport.y) / oldScale;
-
-    const newX = mouseX - worldX * newScale;
-    const newY = mouseY - worldY * newScale;
-
-    this.viewport.x = newX;
-    this.viewport.y = newY;
-    this.viewport.scale = newScale;
-    this.targetViewport.x = newX;
-    this.targetViewport.y = newY;
+    this.targetViewport.x = mouseX - worldX * newScale;
+    this.targetViewport.y = mouseY - worldY * newScale;
     this.targetViewport.scale = newScale;
   };
 
@@ -243,12 +238,14 @@ export class CanvasCore {
     return [...this.paths];
   }
 
-  addRemotePath(path: Omit<BrushPath, 'animationProgress' | 'glowProgress' | 'isComplete'>) {
+  addRemotePath(path: Omit<BrushPath, 'animationProgress' | 'glowProgress' | 'isComplete' | 'cachedLength'>) {
+    const points = path.points;
     this.paths.push({
       ...path,
       animationProgress: 0,
       glowProgress: 0,
-      isComplete: true
+      isComplete: true,
+      cachedLength: this.getPathLength(points)
     });
   }
 
@@ -408,7 +405,7 @@ export class CanvasCore {
     const { ctx } = this;
     if (path.points.length < 2) return;
 
-    const totalLen = this.getPathLength(path.points);
+    const totalLen = path.cachedLength ?? this.getPathLength(path.points);
     if (totalLen === 0) return;
 
     const progress = path.glowProgress;

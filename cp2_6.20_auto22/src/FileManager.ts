@@ -169,16 +169,27 @@ export class FileManager {
       const centerX = startImageX + startWidth / 2;
       const centerY = startImageY + startHeight / 2;
 
-      const handleStartX = handle.includes('w') ? startImageX : startImageX + startWidth;
-      const handleStartY = handle.includes('n') ? startImageY : startImageY + startHeight;
+      let scaleX = 1;
+      let scaleY = 1;
 
-      const newHandleX = handleStartX + dx;
-      const newHandleY = handleStartY + dy;
+      if (handle.includes('w')) {
+        scaleX = 1 - 2 * dx / startWidth;
+      } else if (handle.includes('e')) {
+        scaleX = 1 + 2 * dx / startWidth;
+      }
 
-      const distFromCenter = Math.hypot(newHandleX - centerX, newHandleY - centerY);
-      const origDistFromCenter = Math.hypot(handleStartX - centerX, handleStartY - centerY);
+      if (handle.includes('n')) {
+        scaleY = 1 - 2 * dy / startHeight;
+      } else if (handle.includes('s')) {
+        scaleY = 1 + 2 * dy / startHeight;
+      }
 
-      let scaleFactor = origDistFromCenter > 0 ? distFromCenter / origDistFromCenter : 1;
+      let scaleFactor: number;
+      if (handle.length === 2) {
+        scaleFactor = Math.sqrt(scaleX * scaleY);
+      } else {
+        scaleFactor = handle.includes('w') || handle.includes('e') ? scaleX : scaleY;
+      }
 
       const newWidth = Math.max(40, startWidth * scaleFactor);
       const newHeight = Math.max(40, newWidth / aspectRatio);
