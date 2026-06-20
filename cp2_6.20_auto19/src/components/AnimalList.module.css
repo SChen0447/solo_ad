@@ -42,6 +42,12 @@
 
 .searchBox svg:first-child {
   flex-shrink: 0;
+  color: var(--color-text-icon);
+}
+
+.searchIcon {
+  color: var(--color-text-icon);
+  flex-shrink: 0;
 }
 
 .searchInput {
@@ -49,13 +55,13 @@
   border: none;
   background: transparent;
   padding: 0 10px;
-  font-size: 15px;
+  font-size: 14px;
   color: var(--color-text);
   height: 100%;
 }
 
 .searchInput::placeholder {
-  color: #A9A9A9;
+  color: var(--color-text-placeholder);
 }
 
 .clearBtn {
@@ -67,7 +73,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #666;
+  color: var(--color-text-light);
   transition: background-color 0.15s ease;
   cursor: pointer;
   flex-shrink: 0;

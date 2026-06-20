@@ -90,7 +90,7 @@ export default function AnimalList({ animals, onSelectAnimal, loading }: Props) 
       <div className={`card ${styles.filterBar}`}>
         <div className={styles.searchRow}>
           <div className={styles.searchBox}>
-            <Search size={18} color="#999" />
+            <Search size={18} className={styles.searchIcon} />
             <input
               type="text"
               placeholder="搜索动物名字..."
@@ -127,7 +127,7 @@ export default function AnimalList({ animals, onSelectAnimal, loading }: Props) 
                 <button
                   key={opt.value}
                   className={`${styles.chip} ${species === opt.value ? styles.chipActive : ''}`}
-                  onClick={() => setSpecies(opt.value)}
+                  onClick={() => setSpecies(opt.value === species ? 'all' : opt.value)}
                 >
                   {opt.label}
                 </button>
@@ -145,7 +145,7 @@ export default function AnimalList({ animals, onSelectAnimal, loading }: Props) 
                 <button
                   key={opt.value}
                   className={`${styles.chip} ${age === opt.value ? styles.chipActive : ''}`}
-                  onClick={() => setAge(opt.value)}
+                  onClick={() => setAge(opt.value === age ? 'all' : opt.value)}
                 >
                   {opt.label}
                 </button>
@@ -163,7 +163,7 @@ export default function AnimalList({ animals, onSelectAnimal, loading }: Props) 
                 <button
                   key={opt.value}
                   className={`${styles.chip} ${personality === opt.value ? styles.chipActive : ''}`}
-                  onClick={() => setPersonality(opt.value)}
+                  onClick={() => setPersonality(opt.value === personality ? 'all' : opt.value)}
                 >
                   {opt.label}
                 </button>
@@ -201,11 +201,11 @@ export default function AnimalList({ animals, onSelectAnimal, loading }: Props) 
         <div className={`card ${styles.empty}`}>
           <PawPrint size={48} color="#D4C4B0" />
           <h3 className={styles.emptyTitle}>
-            {animals.length === 0 ? '暂无动物数据' : '没有找到符合条件的动物'}
+            {animals.length === 0 ? '暂无动物信息' : '没有找到符合条件的动物'}
           </h3>
           <p className={styles.emptyDesc}>
             {animals.length === 0
-              ? '请稍后再来看看吧'
+              ? '请稍后再来查看，可能很快就有新的小动物等待领养哦'
               : '试试调整筛选条件吧'}
           </p>
           {hasActiveFilter && (
