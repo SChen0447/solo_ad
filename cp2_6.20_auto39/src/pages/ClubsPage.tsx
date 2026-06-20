@@ -27,6 +27,7 @@ const ClubsPage: React.FC<ClubsPageProps> = ({ currentUser }) => {
   const [clubs, setClubs] = useState<BookClub[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [newlyCreatedId, setNewlyCreatedId] = useState<string | null>(null);
   const [newClub, setNewClub] = useState({
     name: '',
     bookTitle: '',
@@ -88,6 +89,7 @@ const ClubsPage: React.FC<ClubsPageProps> = ({ currentUser }) => {
         })
       });
       if (res.ok) {
+        const createdClub = await res.json();
         setShowCreateModal(false);
         setNewClub({
           name: '',
@@ -97,7 +99,11 @@ const ClubsPage: React.FC<ClubsPageProps> = ({ currentUser }) => {
           description: '',
           maxMembers: 20
         });
-        fetchClubs();
+        setNewlyCreatedId(createdClub.id);
+        await fetchClubs();
+        setTimeout(() => {
+          setNewlyCreatedId(null);
+        }, 500);
       }
     } catch (err) {
       console.error('Failed to create club:', err);
@@ -123,13 +129,14 @@ const ClubsPage: React.FC<ClubsPageProps> = ({ currentUser }) => {
       ) : (
         <div className="club-list">
           {clubs.map((club, index) => (
-            <div key={club.id} style={{ animationDelay: `${index * 0.08}s` }}>
+            <div key={club.id} style={{ animationDelay: newlyCreatedId === club.id ? '0s' : `${index * 0.08}s` }}>
               <BookClubCard
                 club={club}
                 onClick={() => navigate(`/clubs/${club.id}`)}
                 onJoin={() => handleJoin(club.id)}
                 isMember={isMember(club)}
                 isPending={isPending(club)}
+                isNewlyCreated={newlyCreatedId === club.id}
               />
             </div>
           ))}

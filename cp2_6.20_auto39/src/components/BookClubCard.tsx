@@ -20,6 +20,7 @@ interface BookClubCardProps {
   onJoin?: () => void;
   isMember?: boolean;
   isPending?: boolean;
+  isNewlyCreated?: boolean;
 }
 
 const statusMap = {
@@ -33,7 +34,8 @@ const BookClubCard: React.FC<BookClubCardProps> = ({
   onClick, 
   onJoin,
   isMember = false,
-  isPending = false
+  isPending = false,
+  isNewlyCreated = false
 }) => {
   const handleJoin = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -41,7 +43,10 @@ const BookClubCard: React.FC<BookClubCardProps> = ({
   };
 
   return (
-    <div className="club-card" onClick={onClick}>
+    <div 
+      className={`club-card ${isNewlyCreated ? 'newly-created' : ''}`} 
+      onClick={onClick}
+    >
       <img 
         src={club.coverUrl} 
         alt={club.name}

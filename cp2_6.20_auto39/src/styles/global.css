@@ -190,7 +190,7 @@ a {
   overflow: hidden;
   box-shadow: var(--shadow);
   cursor: pointer;
-  transition: all var(--transition-fast);
+  transition: transform 0.2s ease, box-shadow 0.2s ease-in-out;
   animation: cardScaleIn 0.3s ease-out;
 }
 
@@ -256,7 +256,7 @@ a {
   left: 0;
   right: 0;
   bottom: 0;
-  background-color: rgba(30, 20, 10, 0.6);
+  background-color: rgba(0, 0, 0, 0.6);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -281,7 +281,7 @@ a {
 @keyframes modalZoomIn {
   from {
     opacity: 0;
-    transform: scale(0.9);
+    transform: scale(0);
   }
   to {
     opacity: 1;
@@ -335,6 +335,34 @@ a {
   cursor: pointer;
   transition: all var(--transition-fast);
   animation: clubBounceIn 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+}
+
+.club-card.newly-created {
+  animation: clubPopFromButton 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+  transform-origin: bottom right;
+}
+
+@keyframes clubPopFromButton {
+  0% {
+    opacity: 0;
+    transform: scale(0.8) translate(100vw, 100vh);
+  }
+  30% {
+    opacity: 0.5;
+    transform: scale(0.85) translate(50vw, 50vh);
+  }
+  60% {
+    opacity: 0.9;
+    transform: scale(1.05) translate(0, 0);
+  }
+  80% {
+    opacity: 1;
+    transform: scale(0.98) translate(0, 0);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translate(0, 0);
+  }
 }
 
 @keyframes clubBounceIn {
@@ -537,7 +565,7 @@ a {
 
 .progress-bar-fill {
   height: 100%;
-  background: linear-gradient(90deg, #5CAB9E, #8FD4E5);
+  background: linear-gradient(to right, #00C9A7, #4A90D9);
   border-radius: 3px;
   transition: width 0.3s ease;
 }
@@ -585,7 +613,8 @@ a {
   box-shadow: var(--shadow);
   opacity: 0;
   visibility: hidden;
-  transition: all 0.1s ease 0.1s;
+  transition: all 0.1s ease;
+  transition-delay: 0s;
   pointer-events: none;
   z-index: 10;
 }
@@ -593,6 +622,7 @@ a {
 .achievement-badge:hover .achievement-tooltip {
   opacity: 1;
   visibility: visible;
+  transition-delay: 0.1s;
 }
 
 .achievement-tooltip::after {
