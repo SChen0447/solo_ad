@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>三维场景剖面图查看器</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif;
+      background: #f0f0f0;
+    }
+    #app {
+      display: flex;
+      width: 100%;
+      height: 100vh;
+    }
+    #left-panel {
+      width: 65%;
+      height: 100vh;
+      position: relative;
+      background: #f0f0f0;
+    }
+    #three-canvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+    #info-tooltip {
+      position: absolute;
+      padding: 8px 12px;
+      background: white;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px #cccccc, 0 4px 16px #aaaaaa;
+      font-size: 13px;
+      color: #2c3e50;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.3s ease;
+      z-index: 100;
+      max-width: 200px;
+    }
+    #info-tooltip.visible {
+      opacity: 1;
+    }
+    #info-tooltip .name {
+      font-weight: bold;
+      margin-bottom: 4px;
+      color: #3498db;
+    }
+    #right-panel {
+      width: 35%;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      background: #ffffff;
+      border-left: 1px solid #e0e0e0;
+    }
+    #section-container {
+      height: 50%;
+      position: relative;
+      background: #fafafa;
+      border-bottom: 1px solid #e0e0e0;
+    }
+    #section-canvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+    #control-panel {
+      height: 20%;
+      padding: 16px;
+      background: #ffffff;
+      border-bottom: 1px solid #e0e0e0;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-around;
+    }
+    .control-group {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .control-label {
+      font-size: 13px;
+      color: #2c3e50;
+      font-weight: 500;
+    }
+    .slider-container {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .slider-value {
+      font-size: 12px;
+      color: #7f8c8d;
+      min-width: 50px;
+      text-align: right;
+    }
+    input[type="range"] {
+      flex: 1;
+      -webkit-appearance: none;
+      appearance: none;
+      height: 8px;
+      border-radius: 4px;
+      background: linear-gradient(to right, #ecf0f1, #3498db);
+      outline: none;
+    }
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: white;
+      border: 2px solid #3498db;
+      cursor: pointer;
+    }
+    input[type="range"]::-moz-range-thumb {
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: white;
+      border: 2px solid #3498db;
+      cursor: pointer;
+    }
+    .floor-buttons {
+      display: flex;
+      gap: 8px;
+    }
+    .floor-btn {
+      flex: 1;
+      padding: 8px 12px;
+      border: none;
+      border-radius: 6px;
+      background: #ecf0f1;
+      color: #2c3e50;
+      font-size: 13px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      font-weight: 500;
+    }
+    .floor-btn:hover {
+      background: #d5dbdb;
+    }
+    .floor-btn:active {
+      transform: scale(0.95);
+    }
+    .floor-btn.active {
+      background: #3498db;
+      color: white;
+    }
+    .export-btn {
+      padding: 8px 16px;
+      border: none;
+      border-radius: 6px;
+      background: #e74c3c;
+      color: white;
+      font-size: 13px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      font-weight: 500;
+    }
+    .export-btn:hover {
+      background: #c0392b;
+    }
+    .export-btn:active {
+      transform: scale(0.95);
+    }
+    #annotation-list-container {
+      height: 30%;
+      display: flex;
+      flex-direction: column;
+      background: #ffffff;
+    }
+    .list-header {
+      padding: 10px 16px;
+      background: #f8f9fa;
+      border-bottom: 1px solid #e0e0e0;
+      font-size: 13px;
+      font-weight: 600;
+      color: #2c3e50;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    #annotation-list {
+      flex: 1;
+      overflow-y: auto;
+    }
+    .annotation-item {
+      padding: 10px 16px;
+      font-size: 12px;
+      border-bottom: 1px solid #f0f0f0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      transition: background 0.15s ease;
+    }
+    .annotation-item:nth-child(even) {
+      background: #f8f9fa;
+    }
+    .annotation-item:hover {
+      background: #e8f4fd;
+    }
+    .annotation-item .anno-text {
+      flex: 1;
+      color: #2c3e50;
+    }
+    .annotation-item .anno-coord {
+      color: #7f8c8d;
+      font-size: 11px;
+      margin-right: 8px;
+    }
+    .annotation-item .delete-btn {
+      background: none;
+      border: none;
+      color: #e74c3c;
+      cursor: pointer;
+      font-size: 14px;
+      padding: 2px 6px;
+      border-radius: 3px;
+    }
+    .annotation-item .delete-btn:hover {
+      background: #fadbd8;
+    }
+    .annotation-input-modal {
+      position: absolute;
+      background: white;
+      border-radius: 6px;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+      padding: 12px;
+      z-index: 200;
+      display: none;
+    }
+    .annotation-input-modal input {
+      width: 180px;
+      padding: 6px 8px;
+      border: 1px solid #bdc3c7;
+      border-radius: 4px;
+      font-size: 14px;
+      color: #2c3e50;
+      outline: none;
+      transition: border-color 0.15s ease;
+    }
+    .annotation-input-modal input:focus {
+      border-color: #3498db;
+    }
+    .annotation-input-modal .input-buttons {
+      margin-top: 8px;
+      display: flex;
+      gap: 6px;
+      justify-content: flex-end;
+    }
+    .annotation-input-modal button {
+      padding: 4px 10px;
+      border: none;
+      border-radius: 4px;
+      font-size: 12px;
+      cursor: pointer;
+    }
+    .annotation-input-modal .btn-confirm {
+      background: #3498db;
+      color: white;
+    }
+    .annotation-input-modal .btn-cancel {
+      background: #ecf0f1;
+      color: #2c3e50;
+    }
+    .empty-list {
+      padding: 20px;
+      text-align: center;
+      color: #95a5a6;
+      font-size: 12px;
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <div id="left-panel">
+      <canvas id="three-canvas"></canvas>
+      <div id="info-tooltip">
+        <div class="name"></div>
+        <div class="material"></div>
+      </div>
+    </div>
+    <div id="right-panel">
+      <div id="section-container">
+        <canvas id="section-canvas"></canvas>
+        <div class="annotation-input-modal" id="anno-modal">
+          <input type="text" id="anno-input" placeholder="输入标注文字..." maxlength="50" />
+          <div class="input-buttons">
+            <button class="btn-cancel" id="anno-cancel">取消</button>
+            <button class="btn-confirm" id="anno-confirm">确定</button>
+          </div>
+        </div>
+      </div>
+      <div id="control-panel">
+        <div class="control-group">
+          <span class="control-label">切割高度</span>
+          <div class="slider-container">
+            <input type="range" id="cut-slider" min="0" max="100" step="1" value="10" />
+            <span class="slider-value" id="slider-value">10</span>
+          </div>
+        </div>
+        <div class="control-group">
+          <div style="display:flex; justify-content: space-between; align-items: center;">
+            <span class="control-label">楼层选择</span>
+            <button class="export-btn" id="export-btn">导出PNG</button>
+          </div>
+          <div class="floor-buttons">
+            <button class="floor-btn active" data-floor="1">1层</button>
+            <button class="floor-btn" data-floor="2">2层</button>
+            <button class="floor-btn" data-floor="3">3层</button>
+          </div>
+        </div>
+      </div>
+      <div id="annotation-list-container">
+        <div class="list-header">
+          <span>标注列表</span>
+          <span id="anno-count">0 项</span>
+        </div>
+        <div id="annotation-list">
+          <div class="empty-list">点击剖面图添加标注</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <script type="module" src="/src/sceneModule/main.ts"></script>
+  <script type="module" src="/src/cutModule/main.ts"></script>
+  <script type="module" src="/src/drawingModule/main.ts"></script>
+  <script type="module" src="/src/annotationModule/main.ts"></script>
+</body>
+</html>
