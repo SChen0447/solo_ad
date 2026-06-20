@@ -8,10 +8,10 @@ function escapeRegExp(str: string): string {
 
 function highlight(text: string, query: string): React.ReactNode {
   if (!query.trim()) return text
-  const re = new RegExp(`(${escapeRegExp(query.trim())})`, 'gi')
+  const re = new RegExp('(' + escapeRegExp(query.trim()) + ')', 'gi')
   const parts = text.split(re)
-  return parts.map((p, i) =>
-    re.test(p) ? (
+  return parts.map(function (p, i) {
+    return re.test(p) ? (
       <mark key={i} style={{
         background: '#FED7AA',
         color: '#9A3412',
@@ -24,7 +24,7 @@ function highlight(text: string, query: string): React.ReactNode {
     ) : (
       <span key={i}>{p}</span>
     )
-  )
+  })
 }
 
 export default function SearchBar() {
@@ -36,65 +36,67 @@ export default function SearchBar() {
   const [closing, setClosing] = useState(false)
   const [activeIdx, setActiveIdx] = useState(0)
   const containerRef = useRef<HTMLDivElement>(null)
-  const debounceRef = useRef<number | null>(null)
+  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
-  const closePanel = useCallback(() => {
+  const closePanel = useCallback(function () {
     if (!open) return
     setClosing(true)
-    setTimeout(() => {
+    setTimeout(function () {
       setOpen(false)
       setClosing(false)
     }, 250)
   }, [open])
 
-  const triggerSearch = useCallback((q: string) => {
-    performSearch(q)
+  const debouncedSearch = useCallback(function (searchText: string) {
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current)
+    }
+    debounceTimerRef.current = setTimeout(function () {
+      performSearch(searchText)
+    }, 200)
   }, [performSearch])
 
-  useEffect(() => {
-    if (debounceRef.current) {
-      window.clearTimeout(debounceRef.current)
+  useEffect(function () {
+    debouncedSearch(query)
+    return function () {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current)
+      }
     }
-    debounceRef.current = window.setTimeout(() => {
-      triggerSearch(query)
-    }, 200)
-    return () => {
-      if (debounceRef.current) window.clearTimeout(debounceRef.current)
-    }
-  }, [query, triggerSearch])
+  }, [query, debouncedSearch])
 
-  useEffect(() => {
+  useEffect(function () {
     setActiveIdx(0)
   }, [state.searchResults.length])
 
-  useEffect(() => {
-    const onDocClick = (e: MouseEvent) => {
+  useEffect(function () {
+    function handleDocClick(e: MouseEvent) {
       if (!containerRef.current) return
       if (!containerRef.current.contains(e.target as Node)) {
         closePanel()
       }
     }
-    const onKey = (e: KeyboardEvent) => {
+    function handleKey(e: KeyboardEvent) {
       if (e.key === 'Escape') {
         e.preventDefault()
         closePanel()
-        inputRef.current?.blur()
+        if (inputRef.current) inputRef.current.blur()
       }
       if (open && state.searchResults.length > 0) {
         if (e.key === 'ArrowDown') {
           e.preventDefault()
-          setActiveIdx(i => (i + 1) % state.searchResults.length)
+          setActiveIdx(function (i) { return (i + 1) % state.searchResults.length })
         }
         if (e.key === 'ArrowUp') {
           e.preventDefault()
-          setActiveIdx(i => (i - 1 + state.searchResults.length) % state.searchResults.length)
+          setActiveIdx(function (i) { return (i - 1 + state.searchResults.length) % state.searchResults.length })
         }
         if (e.key === 'Enter') {
           e.preventDefault()
           const r = state.searchResults[activeIdx]
           if (r) {
-            navigate(`/doc/${r.document.id}`)
+            navigate('/doc/' + r.document.id)
             closePanel()
           }
         }
@@ -102,14 +104,15 @@ export default function SearchBar() {
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
         e.preventDefault()
         setOpen(true)
-        inputRef.current?.focus()
+        setClosing(false)
+        if (inputRef.current) inputRef.current.focus()
       }
     }
-    document.addEventListener('click', onDocClick)
-    document.addEventListener('keydown', onKey)
-    return () => {
-      document.removeEventListener('click', onDocClick)
-      document.removeEventListener('keydown', onKey)
+    document.addEventListener('click', handleDocClick)
+    document.addEventListener('keydown', handleKey)
+    return function () {
+      document.removeEventListener('click', handleDocClick)
+      document.removeEventListener('keydown', handleKey)
     }
   }, [open, closePanel, state.searchResults, activeIdx, navigate])
 
@@ -152,7 +155,7 @@ export default function SearchBar() {
           ref={inputRef}
           type="text"
           value={query}
-          onChange={e => {
+          onChange={function (e) {
             const v = e.target.value
             setQuery(v)
             if (v.trim()) {
@@ -160,20 +163,20 @@ export default function SearchBar() {
               setClosing(false)
             }
           }}
-          onFocus={() => {
+          onFocus={function () {
             setFocused(true)
             if (query.trim()) {
               setOpen(true)
               setClosing(false)
             }
           }}
-          onBlur={() => setFocused(false)}
+          onBlur={function () { setFocused(false) }}
           placeholder="搜索文档标题、内容、分类... (Ctrl+K)"
           style={{
             width: '100%',
             padding: '11px 44px 11px 44px',
             borderRadius: 20,
-            border: `1.5px solid ${focused ? '#2563EB' : 'rgba(226, 232, 240, 0.9)'}`,
+            border: '1.5px solid ' + (focused ? '#2563EB' : 'rgba(226, 232, 240, 0.9)'),
             background: 'rgba(255, 255, 255, 0.85)',
             backdropFilter: 'blur(8px)',
             fontSize: 13.5,
@@ -186,10 +189,10 @@ export default function SearchBar() {
         />
         {query && (
           <button
-            onClick={() => {
+            onClick={function () {
               setQuery('')
               performSearch('')
-              inputRef.current?.focus()
+              if (inputRef.current) inputRef.current.focus()
             }}
             style={{
               position: 'absolute',
@@ -207,8 +210,8 @@ export default function SearchBar() {
               transition: 'all 0.15s',
               zIndex: 2
             }}
-            onMouseEnter={e => { e.currentTarget.style.background = '#CBD5E1'; e.currentTarget.style.color = '#0F172A' }}
-            onMouseLeave={e => { e.currentTarget.style.background = '#E2E8F0'; e.currentTarget.style.color = '#64748B' }}
+            onMouseEnter={function (e) { e.currentTarget.style.background = '#CBD5E1'; e.currentTarget.style.color = '#0F172A' }}
+            onMouseLeave={function (e) { e.currentTarget.style.background = '#E2E8F0'; e.currentTarget.style.color = '#64748B' }}
           >
             ×
           </button>
@@ -266,7 +269,7 @@ export default function SearchBar() {
                     搜索中...
                   </span>
                 ) : (
-                  `匹配 ${results.length} / ${state.documents.length} 篇`
+                  '匹配 ' + results.length + ' / ' + state.documents.length + ' 篇'
                 )}
               </div>
             </div>
@@ -283,27 +286,27 @@ export default function SearchBar() {
                   </div>
                 </div>
               ) : (
-                results.map((r, i) => {
+                results.map(function (r, i) {
                   const color = CATEGORY_COLORS[r.document.colorIndex % CATEGORY_COLORS.length]
                   const isActive = i === activeIdx
                   return (
                     <div
                       key={r.document.id}
-                      onClick={() => {
-                        navigate(`/doc/${r.document.id}`)
+                      onClick={function () {
+                        navigate('/doc/' + r.document.id)
                         closePanel()
                         setQuery('')
                         performSearch('')
                       }}
-                      onMouseEnter={() => setActiveIdx(i)}
+                      onMouseEnter={function () { setActiveIdx(i) }}
                       style={{
                         padding: '14px 16px',
                         cursor: 'pointer',
                         background: isActive ? '#EFF6FF' : 'transparent',
-                        borderLeft: `3px solid ${isActive ? '#2563EB' : 'transparent'}`,
+                        borderLeft: '3px solid ' + (isActive ? '#2563EB' : 'transparent'),
                         transition: 'all 0.12s'
                       }}
-                      onMouseEnterCapture={e => { (e.currentTarget as HTMLDivElement).style.background = '#F8FAFC' }}
+                      onMouseEnterCapture={function (e) { (e.currentTarget as HTMLDivElement).style.background = '#F8FAFC' }}
                     >
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
                         <span
@@ -314,7 +317,7 @@ export default function SearchBar() {
                             color: color,
                             fontSize: 10.5,
                             fontWeight: 600,
-                            border: `1px solid ${color}25`
+                            border: '1px solid ' + color + '25'
                           }}
                         >
                           {r.document.category}
@@ -368,24 +371,26 @@ export default function SearchBar() {
                     { key: '↑↓', label: '导航' },
                     { key: '↵', label: '打开' },
                     { key: 'Esc', label: '关闭' }
-                  ].map((h, i) => (
-                    <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                      <kbd style={{
-                        padding: '2px 6px',
-                        borderRadius: 4,
-                        background: 'white',
-                        border: '1px solid #E2E8F0',
-                        borderBottomWidth: 2,
-                        fontSize: 10.5,
-                        fontWeight: 600,
-                        color: '#64748B',
-                        fontFamily: "'SF Mono', monospace"
-                      }}>
-                        {h.key}
-                      </kbd>
-                      <span style={{ fontSize: 11, color: '#94A3B8' }}>{h.label}</span>
-                    </div>
-                  ))}
+                  ].map(function (h, i) {
+                    return (
+                      <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                        <kbd style={{
+                          padding: '2px 6px',
+                          borderRadius: 4,
+                          background: 'white',
+                          border: '1px solid #E2E8F0',
+                          borderBottomWidth: 2,
+                          fontSize: 10.5,
+                          fontWeight: 600,
+                          color: '#64748B',
+                          fontFamily: "'SF Mono', monospace"
+                        }}>
+                          {h.key}
+                        </kbd>
+                        <span style={{ fontSize: 11, color: '#94A3B8' }}>{h.label}</span>
+                      </div>
+                    )
+                  })}
                 </div>
                 <div style={{ fontSize: 11, color: '#94A3B8' }}>
                   最多显示 15 条结果
@@ -397,6 +402,18 @@ export default function SearchBar() {
       )}
 
       <style>{`
+        @keyframes spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+        @keyframes fadeIn {
+          from { opacity: 0; transform: translateY(-8px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes slideDown {
+          from { opacity: 1; transform: translateY(0); }
+          to { opacity: 0; transform: translateY(20px); }
+        }
         @media (max-width: 767px) {
           input::placeholder { font-size: 12px; }
         }

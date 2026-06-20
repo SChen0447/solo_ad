@@ -145,15 +145,6 @@ function AppShell({ children }: { children: React.ReactNode }) {
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
-            <button
-              onClick={() => {
-                const randomCategory = categories[Math.floor(Math.random() * categories.length)]
-                const { addDocument } = useStore()
-              }}
-              style={{
-                display: 'none'
-              }}
-            />
             <div
               style={{
                 width: 36, height: 36,

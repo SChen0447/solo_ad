@@ -1,6 +1,17 @@
 import { useNavigate } from 'react-router-dom'
-import { useStore, CATEGORY_COLORS } from '../data/store'
+import { useStore } from '../data/store'
 import type { Document } from '../data/store'
+
+const CARD_COLORS = ['#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7']
+
+function getColorForCategory(category: string): string {
+  let hash = 0
+  for (let i = 0; i < category.length; i++) {
+    hash = category.charCodeAt(i) + ((hash << 5) - hash)
+  }
+  const index = Math.abs(hash) % CARD_COLORS.length
+  return CARD_COLORS[index]
+}
 
 function formatDate(iso: string): string {
   const d = new Date(iso)
@@ -9,12 +20,12 @@ function formatDate(iso: string): string {
   const day = 86400000
   if (diff < day) return '今天'
   if (diff < 2 * day) return '昨天'
-  if (diff < 7 * day) return `${Math.floor(diff / day)} 天前`
-  return `${d.getMonth() + 1}月${d.getDate()}日`
+  if (diff < 7 * day) return Math.floor(diff / day) + ' 天前'
+  return (d.getMonth() + 1) + '月' + d.getDate() + '日'
 }
 
 function extractPreview(content: string): string {
-  const lines = content.split('\n').filter(l => l.trim())
+  const lines = content.split('\n').filter(function (l) { return l.trim() })
   const noMarkdown = lines
     .slice(0, 3)
     .join(' ')
@@ -29,7 +40,7 @@ interface DocCardProps {
 }
 
 function DocCard({ doc, onClick }: DocCardProps) {
-  const color = CATEGORY_COLORS[doc.colorIndex % CATEGORY_COLORS.length]
+  const color = getColorForCategory(doc.category)
 
   return (
     <div
@@ -38,7 +49,7 @@ function DocCard({ doc, onClick }: DocCardProps) {
         width: 280,
         maxWidth: '100%',
         borderRadius: 12,
-        background: `linear-gradient(160deg, #EFF6FF 0%, #FFFFFF 55%, #FFFFFF 100%)`,
+        background: 'linear-gradient(160deg, #EFF6FF 0%, #FFFFFF 55%, #FFFFFF 100%)',
         boxShadow: '0 1px 2px rgba(15, 23, 42, 0.06), 0 1px 3px rgba(15, 23, 42, 0.04)',
         cursor: 'pointer',
         overflow: 'hidden',
@@ -47,11 +58,11 @@ function DocCard({ doc, onClick }: DocCardProps) {
         position: 'relative',
         willChange: 'transform, box-shadow'
       }}
-      onMouseEnter={e => {
+      onMouseEnter={function (e) {
         e.currentTarget.style.transform = 'translateY(-4px)'
         e.currentTarget.style.boxShadow = '0 10px 20px rgba(15, 23, 42, 0.08), 0 4px 8px rgba(15, 23, 42, 0.06)'
       }}
-      onMouseLeave={e => {
+      onMouseLeave={function (e) {
         e.currentTarget.style.transform = 'translateY(0)'
         e.currentTarget.style.boxShadow = '0 1px 2px rgba(15, 23, 42, 0.06), 0 1px 3px rgba(15, 23, 42, 0.04)'
       }}
@@ -71,12 +82,12 @@ function DocCard({ doc, onClick }: DocCardProps) {
               display: 'inline-block',
               padding: '3px 10px',
               borderRadius: 20,
-              background: color + '15',
+              background: color + '20',
               color: color,
               fontSize: 11,
               fontWeight: 600,
               lineHeight: 1.4,
-              border: `1px solid ${color}25`
+              border: '1px solid ' + color + '35'
             }}
           >
             {doc.category}
@@ -137,7 +148,7 @@ function DocCard({ doc, onClick }: DocCardProps) {
                 width: 22,
                 height: 22,
                 borderRadius: '50%',
-                background: `linear-gradient(135deg, ${color}, #8B5CF6)`,
+                background: 'linear-gradient(135deg, ' + color + ', #8B5CF6)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -210,8 +221,8 @@ export default function DocList() {
               cursor: 'pointer',
               transition: 'all 0.15s'
             }}
-            onMouseEnter={e => { e.currentTarget.style.background = '#F8FAFC'; e.currentTarget.style.borderColor = '#CBD5E1' }}
-            onMouseLeave={e => { e.currentTarget.style.background = 'white'; e.currentTarget.style.borderColor = '#E2E8F0' }}
+            onMouseEnter={function (e) { e.currentTarget.style.background = '#F8FAFC'; e.currentTarget.style.borderColor = '#CBD5E1' }}
+            onMouseLeave={function (e) { e.currentTarget.style.background = 'white'; e.currentTarget.style.borderColor = '#E2E8F0' }}
           >
             🔗 分享空间
           </button>
@@ -228,8 +239,8 @@ export default function DocList() {
               transition: 'all 0.15s',
               boxShadow: '0 1px 2px rgba(37, 99, 235, 0.3)'
             }}
-            onMouseEnter={e => { e.currentTarget.style.background = '#1D4ED8'; e.currentTarget.style.transform = 'translateY(-1px)' }}
-            onMouseLeave={e => { e.currentTarget.style.background = '#2563EB'; e.currentTarget.style.transform = 'translateY(0)' }}
+            onMouseEnter={function (e) { e.currentTarget.style.background = '#1D4ED8'; e.currentTarget.style.transform = 'translateY(-1px)' }}
+            onMouseLeave={function (e) { e.currentTarget.style.background = '#2563EB'; e.currentTarget.style.transform = 'translateY(0)' }}
           >
             + 新建文档
           </button>
@@ -240,25 +251,27 @@ export default function DocList() {
         className="doc-grid"
         style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fill, 280px)',
+          gridTemplateColumns: 'repeat(3, 280px)',
           gap: 24,
-          transition: 'gap 0.25s ease',
-          justifyContent: 'flex-start'
+          transition: 'gap 0.25s ease, grid-template-columns 0.25s ease'
         }}
       >
-        {docs.map(doc => (
-          <DocCard
-            key={doc.id}
-            doc={doc}
-            onClick={() => navigate(`/doc/${doc.id}`)}
-          />
-        ))}
+        {docs.map(function (doc) {
+          return (
+            <DocCard
+              key={doc.id}
+              doc={doc}
+              onClick={function () { navigate('/doc/' + doc.id) }}
+            />
+          )
+        })}
       </div>
 
       <style>{`
         @media (max-width: 1023px) {
           .doc-grid {
             gap: 20px;
+            grid-template-columns: repeat(2, 280px);
             justify-content: center;
           }
         }
@@ -270,12 +283,6 @@ export default function DocList() {
           .doc-grid > div {
             width: 100% !important;
             max-width: 100% !important;
-          }
-        }
-        @media (min-width: 768px) and (max-width: 1023px) {
-          .doc-grid {
-            gap: 20px;
-            grid-template-columns: repeat(2, 280px);
           }
         }
       `}</style>
