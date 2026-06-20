@@ -1,34 +1,54 @@
-import React from 'react';
-import './Toast.css';
+import { useEffect, useState, type FC } from 'react';
 
-interface ToastProps {
+interface ToastItemProps {
+  id: string;
   message: string;
-  onClose?: () => void;
+  duration: number;
+  onRemove: (id: string) => void;
 }
 
-export const Toast: React.FC<ToastProps> = ({ message, onClose }) => {
+const ToastItem: FC<ToastItemProps> = ({ id, message, duration, onRemove }) => {
+  const [isVisible, setIsVisible] = useState(false);
+
+  useEffect(() => {
+    requestAnimationFrame(() => {
+      setIsVisible(true);
+    });
+    const timer = setTimeout(() => {
+      setIsVisible(false);
+      setTimeout(() => onRemove(id), 300);
+    }, duration);
+    return () => clearTimeout(timer);
+  }, [id, duration, onRemove]);
+
   return (
-    <div className="toast-container">
-      <div className="toast" onClick={onClose}>
-        <span>{message}</span>
-      </div>
+    <div
+      className={`toast-item ${isVisible ? 'toast-visible' : ''}`}
+      onClick={() => {
+        setIsVisible(false);
+        setTimeout(() => onRemove(id), 300);
+      }}
+    >
+      <span>{message}</span>
     </div>
   );
 };
 
 interface ToastContainerProps {
-  toasts: Array<{ id: string; message: string }>;
+  toasts: Array<{ id: string; message: string; duration: number }>;
   onRemove: (id: string) => void;
 }
 
-export const ToastContainer: React.FC<ToastContainerProps> = ({ toasts, onRemove }) => {
+export const ToastContainer: FC<ToastContainerProps> = ({ toasts, onRemove }) => {
   return (
     <div className="toast-wrapper">
       {toasts.map(toast => (
-        <Toast
+        <ToastItem
           key={toast.id}
+          id={toast.id}
           message={toast.message}
-          onClose={() => onRemove(toast.id)}
+          duration={toast.duration}
+          onRemove={onRemove}
         />
       ))}
     </div>
