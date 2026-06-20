@@ -170,13 +170,14 @@ body {
 .course-card {
   width: 300px;
   border-radius: 12px;
-  background: linear-gradient(135deg, var(--color-beige) 0%, #ffffff 100%);
+  background: linear-gradient(135deg, #F5F0E1 0%, #FAF8F0 40%, #ffffff 100%);
   border-left: 4px solid var(--card-color, var(--color-terracotta));
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
   padding: 20px;
   cursor: pointer;
   transition: transform 0.2s ease, box-shadow 0.2s ease;
   will-change: transform;
+  overflow: hidden;
 }
 
 .course-card:hover {
@@ -210,25 +211,30 @@ body {
 }
 
 .difficulty-badge {
-  padding: 4px 12px;
+  padding: 4px 14px;
   border-radius: 20px;
   font-size: 0.75rem;
-  font-weight: 500;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  border: 1px solid transparent;
 }
 
 .difficulty-beginner {
   background: rgba(107, 142, 35, 0.15);
   color: var(--color-olive);
+  border-color: rgba(107, 142, 35, 0.3);
 }
 
 .difficulty-intermediate {
   background: rgba(210, 105, 30, 0.15);
   color: var(--color-terracotta);
+  border-color: rgba(210, 105, 30, 0.3);
 }
 
 .difficulty-advanced {
   background: rgba(139, 69, 19, 0.15);
   color: var(--color-brown);
+  border-color: rgba(139, 69, 19, 0.3);
 }
 
 .progress-container {
