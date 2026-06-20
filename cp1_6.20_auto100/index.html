@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>龙蛋孵育模拟器</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+        "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+      color: #f0e6d3;
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+      touch-action: none;
+    }
+
+    #app {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 16px;
+      gap: 16px;
+    }
+
+    .title {
+      font-size: 24px;
+      font-weight: 700;
+      letter-spacing: 2px;
+      text-shadow: 0 2px 8px rgba(244, 208, 63, 0.3);
+      color: #f4d03f;
+    }
+
+    .canvas-wrap {
+      position: relative;
+      width: 100%;
+      flex: 1;
+      min-height: 320px;
+      max-width: 720px;
+      border-radius: 16px;
+      overflow: hidden;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+      backdrop-filter: blur(4px);
+      -webkit-backdrop-filter: blur(4px);
+      background: rgba(0, 0, 0, 0.15);
+    }
+
+    #gameCanvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+      cursor: pointer;
+    }
+
+    .controls {
+      width: 100%;
+      max-width: 720px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      padding: 16px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 16px;
+      backdrop-filter: blur(4px);
+      -webkit-backdrop-filter: blur(4px);
+    }
+
+    .progress-wrap {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .progress-label {
+      display: flex;
+      justify-content: space-between;
+      font-size: 14px;
+      color: #f0e6d3;
+    }
+
+    .progress-bar {
+      width: 100%;
+      height: 20px;
+      background: #2a2a2a;
+      border-radius: 10px;
+      overflow: hidden;
+      box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.5);
+    }
+
+    .progress-fill {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, #f4d03f 0%, #f7dc6f 100%);
+      border-radius: 10px;
+      transition: width 0.3s ease-out;
+      box-shadow: 0 0 8px rgba(244, 208, 63, 0.6);
+    }
+
+    .slider-group {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .slider-row {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .slider-label {
+      display: flex;
+      justify-content: space-between;
+      font-size: 14px;
+      color: #f0e6d3;
+    }
+
+    .slider-value {
+      font-weight: 600;
+      color: #f4d03f;
+    }
+
+    input[type="range"] {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 100%;
+      height: 6px;
+      background: #2a2a2a;
+      border-radius: 3px;
+      outline: none;
+      cursor: pointer;
+    }
+
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 35% 35%, #fff8e7 0%, #f4d03f 40%, #d4a017 100%);
+      box-shadow: 0 0 0 2px rgba(244, 208, 63, 0.3), 0 2px 6px rgba(0, 0, 0, 0.4);
+      cursor: pointer;
+      transition: transform 0.15s ease;
+      min-width: 44px;
+      min-height: 44px;
+      padding: 13px;
+      box-sizing: border-box;
+      background-clip: padding-box;
+    }
+
+    input[type="range"]::-webkit-slider-thumb:active {
+      transform: scale(1.15);
+    }
+
+    input[type="range"]::-moz-range-thumb {
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 35% 35%, #fff8e7 0%, #f4d03f 40%, #d4a017 100%);
+      box-shadow: 0 0 0 2px rgba(244, 208, 63, 0.3), 0 2px 6px rgba(0, 0, 0, 0.4);
+      cursor: pointer;
+      border: none;
+    }
+
+    .btn-group {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      flex: 1;
+      min-width: 120px;
+      min-height: 44px;
+      padding: 10px 16px;
+      background: linear-gradient(135deg, #3a3a5e 0%, #2d3a5e 100%);
+      color: #f0e6d3;
+      border: 1px solid rgba(244, 208, 63, 0.3);
+      border-radius: 8px;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.3s ease, transform 0.15s ease;
+    }
+
+    .btn:hover {
+      background: linear-gradient(135deg, #4a4a7e 0%, #3d4a7e 100%);
+    }
+
+    .btn:active {
+      transform: scale(0.97);
+    }
+
+    .btn.primary {
+      background: linear-gradient(135deg, #f4d03f 0%, #e6b800 100%);
+      color: #1a1a2e;
+      border-color: rgba(255, 255, 255, 0.3);
+    }
+
+    .btn.primary:hover {
+      background: linear-gradient(135deg, #f7dc6f 0%, #f4d03f 100%);
+    }
+
+    .btn:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+      transform: none !important;
+    }
+
+    /* 孵化结果面板 */
+    .result-mask {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.6);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+      padding: 20px;
+    }
+
+    .result-mask.show {
+      display: flex;
+    }
+
+    .result-panel {
+      width: 100%;
+      max-width: 420px;
+      background: rgba(0, 0, 0, 0.8);
+      backdrop-filter: blur(4px);
+      -webkit-backdrop-filter: blur(4px);
+      border-radius: 16px;
+      padding: 24px;
+      border: 1px solid rgba(244, 208, 63, 0.3);
+      box-shadow: 0 16px 48px rgba(0, 0, 0, 0.6);
+    }
+
+    .result-title {
+      font-size: 22px;
+      font-weight: 700;
+      text-align: center;
+      color: #f4d03f;
+      margin-bottom: 16px;
+    }
+
+    .result-silhouette {
+      width: 180px;
+      height: 180px;
+      margin: 0 auto 16px;
+      display: block;
+    }
+
+    .result-attrs {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .attr-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 12px;
+      background: rgba(255, 255, 255, 0.06);
+      border-radius: 8px;
+      font-size: 15px;
+    }
+
+    .attr-name {
+      color: #f0e6d3;
+    }
+
+    .attr-val {
+      font-weight: 600;
+      color: #f4d03f;
+    }
+
+    .stat-bar {
+      flex: 1;
+      max-width: 120px;
+      height: 8px;
+      background: #2a2a2a;
+      border-radius: 4px;
+      overflow: hidden;
+      margin: 0 12px;
+    }
+
+    .stat-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #2ecc71 0%, #f4d03f 100%);
+      border-radius: 4px;
+    }
+
+    .close-hint {
+      text-align: center;
+      font-size: 12px;
+      color: #888;
+      margin-top: 14px;
+    }
+
+    /* 小场景状态提示 */
+    .scene-info {
+      position: absolute;
+      top: 12px;
+      left: 12px;
+      right: 12px;
+      display: flex;
+      justify-content: space-between;
+      pointer-events: none;
+      font-size: 13px;
+      z-index: 10;
+    }
+
+    .scene-info .chip {
+      background: rgba(0, 0, 0, 0.45);
+      backdrop-filter: blur(4px);
+      -webkit-backdrop-filter: blur(4px);
+      padding: 6px 10px;
+      border-radius: 8px;
+      color: #f0e6d3;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .scene-info .chip .val {
+      color: #f4d03f;
+      font-weight: 600;
+      margin-left: 4px;
+    }
+
+    @media (max-width: 480px) {
+      .title {
+        font-size: 18px;
+      }
+      .controls {
+        padding: 12px;
+        gap: 12px;
+      }
+      .btn {
+        font-size: 14px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <div class="title">🐉 龙蛋孵育模拟器 🥚</div>
+
+    <div class="canvas-wrap">
+      <div class="scene-info" id="sceneInfo">
+        <span class="chip">场景<span class="val" id="sceneName">孵育室</span></span>
+        <span class="chip">成长值<span class="val" id="growthText">0 / 30</span></span>
+      </div>
+      <canvas id="gameCanvas"></canvas>
+    </div>
+
+    <div class="controls">
+      <div class="progress-wrap">
+        <div class="progress-label">
+          <span>孵化进度</span>
+          <span id="progressText">0%</span>
+        </div>
+        <div class="progress-bar">
+          <div class="progress-fill" id="progressFill"></div>
+        </div>
+      </div>
+
+      <div class="slider-group" id="eggSliders">
+        <div class="slider-row">
+          <div class="slider-label">
+            <span>🌡️ 温度</span>
+            <span class="slider-value"><span id="tempVal">35.0</span>°C</span>
+          </div>
+          <input type="range" id="tempSlider" min="30" max="40" step="0.5" value="35" />
+        </div>
+        <div class="slider-row">
+          <div class="slider-label">
+            <span>💧 湿度</span>
+            <span class="slider-value"><span id="humVal">60</span>%</span>
+          </div>
+          <input type="range" id="humSlider" min="40" max="80" step="1" value="60" />
+        </div>
+      </div>
+
+      <div class="btn-group">
+        <button class="btn" id="resetBtn">🔄 重新开始</button>
+        <button class="btn primary" id="switchBtn" disabled>🌿 前往喂养场景</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 孵化结果面板 -->
+  <div class="result-mask" id="resultMask">
+    <div class="result-panel" id="resultPanel">
+      <div class="result-title">🎉 孵化成功！你的小龙诞生了 🎉</div>
+      <canvas class="result-silhouette" id="silhouetteCanvas" width="180" height="180"></canvas>
+      <div class="result-attrs" id="resultAttrs"></div>
+      <div class="close-hint">点击面板外区域关闭</div>
+    </div>
+  </div>
+
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
