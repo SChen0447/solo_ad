@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>三维城市天际线 - 昼夜与天气动态模拟</title>
+  <link rel="stylesheet" href="/src/style.css" />
+</head>
+<body>
+  <div class="app-container">
+    <header class="top-bar">
+      <div class="status-info">
+        <span id="time-display">06:00</span>
+        <span class="divider">|</span>
+        <span id="weather-display">晴天</span>
+      </div>
+    </header>
+
+    <main class="main-content">
+      <div class="scene-container">
+        <canvas id="scene-canvas"></canvas>
+      </div>
+
+      <aside class="control-panel">
+        <div class="slider-wrapper">
+          <div class="slider-label">时间</div>
+          <div class="vertical-slider">
+            <div class="slider-track">
+              <div class="slider-fill" id="slider-fill"></div>
+              <div class="slider-thumb" id="slider-thumb"></div>
+              <input
+                type="range"
+                id="time-slider"
+                min="0"
+                max="24"
+                step="0.1"
+                value="6"
+                orient="vertical"
+              />
+            </div>
+            <div class="slider-marks">
+              <span>24</span>
+              <span>18</span>
+              <span>12</span>
+              <span>6</span>
+              <span>0</span>
+            </div>
+          </div>
+        </div>
+      </aside>
+    </main>
+
+    <div class="weather-buttons">
+      <button class="weather-btn active" data-weather="sunny" title="晴天">
+        <span class="btn-icon">☀</span>
+      </button>
+      <button class="weather-btn" data-weather="rainy" title="雨天">
+        <span class="btn-icon">☂</span>
+      </button>
+      <button class="weather-btn" data-weather="cloudy" title="阴天">
+        <span class="btn-icon">☁</span>
+      </button>
+    </div>
+  </div>
+
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
