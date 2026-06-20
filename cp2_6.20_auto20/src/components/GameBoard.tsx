@@ -20,6 +20,10 @@ interface GameBoardProps {
   roomName: string;
 }
 
+const MY_CARD_WIDTH = 100;
+const OPPONENT_CARD_WIDTH = 80;
+const CARD_OVERLAP_PERCENT = 0.3;
+
 const GameBoard: React.FC<GameBoardProps> = ({ ws, playerId, playerName, roomName }) => {
   const navigate = useNavigate();
   const [gameState, setGameState] = useState<GameState | null>(null);
@@ -256,35 +260,50 @@ const GameBoard: React.FC<GameBoardProps> = ({ ws, playerId, playerName, roomNam
     }));
   }, [ws]);
 
-  const easeOutBack = (t: number): number => {
-    const c1 = 1.70158;
-    const c3 = c1 + 1;
-    return 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2);
+  const easeOutCubic = (t: number): number => {
+    return 1 - Math.pow(1 - t, 3);
   };
 
-  const bezierEase = (t: number): number => {
-    if (t < 0.6) {
-      return 4 * t * t * t;
+  const easeInOutSine = (t: number): number => {
+    return -(Math.cos(Math.PI * t) - 1) / 2;
+  };
+
+  const combinedBounceEase = (t: number): number => {
+    const overshoot = 0.08;
+    if (t < 0.7) {
+      return easeOutCubic(t / 0.7) * (1 - overshoot);
     }
-    return easeOutBack(t);
+    const bounceT = (t - 0.7) / 0.3;
+    const bounce = Math.sin(bounceT * Math.PI * 2.5) * (1 - bounceT) * overshoot;
+    return 1 - bounce;
+  };
+
+  const smoothArcProgress = (t: number): number => {
+    return Math.sin(t * Math.PI);
   };
 
   const calculateCardPosition = (card: FlyingCard, currentTime: number) => {
     const rawProgress = Math.min((currentTime - card.startTime) / 500, 1);
     
-    const xProgress = bezierEase(rawProgress);
+    const xProgress = easeInOutSine(rawProgress);
     const x = card.startX + (card.endX - card.startX) * xProgress;
     
     const peakHeight = 280;
-    const arcProgress = Math.sin(rawProgress * Math.PI);
-    const yOffset = -peakHeight * arcProgress;
+    const arcHeight = smoothArcProgress(rawProgress);
+    const yOffset = -peakHeight * arcHeight;
     
-    const yLinear = card.startY + (card.endY - card.startY) * rawProgress;
-    const y = yLinear + yOffset * (1 - rawProgress * 0.3);
+    const yBaseProgress = combinedBounceEase(rawProgress);
+    const yBase = card.startY + (card.endY - card.startY) * yBaseProgress;
+    const y = yBase + yOffset;
     
-    const rotation = rawProgress < 0.7 ? rawProgress * 540 : 378 + (rawProgress - 0.7) * -60;
-    const bounceScale = 1 - Math.abs(rawProgress - 0.5) * 0.3 + (rawProgress > 0.9 ? (rawProgress - 0.9) * -1 : 0);
-    const scale = bounceScale + (rawProgress > 0.85 ? easeOutBack((rawProgress - 0.85) / 0.15) * 0.08 : 0);
+    const rotationProgress = easeInOutSine(rawProgress);
+    const rotation = rotationProgress * 540 - (rawProgress > 0.85 ? (rawProgress - 0.85) / 0.15 * 60 : 0);
+    
+    const arcScale = 1 + arcHeight * 0.15;
+    const landingBounce = rawProgress > 0.8 
+      ? Math.sin((rawProgress - 0.8) / 0.2 * Math.PI * 2) * (1 - (rawProgress - 0.8) / 0.2) * 0.06 
+      : 0;
+    const scale = arcScale + landingBounce;
 
     return { x, y, rotation, progress: rawProgress, scale };
   };
@@ -371,9 +390,9 @@ const GameBoard: React.FC<GameBoardProps> = ({ ws, playerId, playerName, roomNam
   };
 
   const renderHand = (cards: Card[], isMe: boolean) => {
-    const cardWidth = isMe ? 100 : 80;
-    const overlapPercent = 0.3;
-    const overlapPixels = Math.floor(cardWidth * overlapPercent);
+    const cardWidth = isMe ? MY_CARD_WIDTH : OPPONENT_CARD_WIDTH;
+    const overlapPixels = Math.floor(cardWidth * CARD_OVERLAP_PERCENT);
+    const shiftPixels = cardWidth - overlapPixels;
 
     if (!isMe) {
       return (
@@ -384,9 +403,8 @@ const GameBoard: React.FC<GameBoardProps> = ({ ws, playerId, playerName, roomNam
               style={{
                 ...styles.opponentCard,
                 position: 'relative' as const,
-                left: index > 0 ? `${-overlapPixels}px` : '0',
                 zIndex: index + 1,
-                marginLeft: index > 0 ? `${-overlapPixels}px` : '0'
+                marginLeft: index > 0 ? `${-shiftPixels}px` : '0'
               }}
             />
           ))}
@@ -400,6 +418,8 @@ const GameBoard: React.FC<GameBoardProps> = ({ ws, playerId, playerName, roomNam
           const isSelected = selectedCards.includes(card.id);
           const isGlowing = glowingCards.includes(card.id);
           const canSelect = myPlayer?.isTurn;
+          const arcYOffset = Math.sin((index / Math.max(cards.length - 1, 1)) * 0.3) * -8;
+          const fanRotation = (index - (cards.length - 1) / 2) * 1.5;
           
           return (
             <div
@@ -409,10 +429,10 @@ const GameBoard: React.FC<GameBoardProps> = ({ ws, playerId, playerName, roomNam
                 ...styles.card,
                 position: 'relative' as const,
                 zIndex: isSelected ? cards.length + 10 : index + 1,
-                marginLeft: index > 0 ? `${-overlapPixels}px` : '0',
+                marginLeft: index > 0 ? `${-shiftPixels}px` : '0',
                 transform: isSelected 
                   ? `translateY(-30px) scale(1.08)` 
-                  : `translateY(${Math.sin((index / Math.max(cards.length - 1, 1)) * 0.3) * -8}px) rotate(${(index - (cards.length - 1) / 2) * 1.5}deg)`,
+                  : `translateY(${arcYOffset}px) rotate(${fanRotation}deg)`,
                 cursor: canSelect ? 'pointer' : 'not-allowed',
                 opacity: canSelect ? 1 : 0.6,
                 boxShadow: isGlowing 
@@ -546,6 +566,16 @@ const GameBoard: React.FC<GameBoardProps> = ({ ws, playerId, playerName, roomNam
       )}
 
       <style>{`
+        @property --glow-angle {
+          syntax: '<angle>';
+          initial-value: 0deg;
+          inherits: false;
+        }
+        @property --glow-brightness {
+          syntax: '<number>';
+          initial-value: 1;
+          inherits: false;
+        }
         @keyframes spin {
           from { transform: rotate(0deg); }
           to { transform: rotate(360deg); }
@@ -558,46 +588,66 @@ const GameBoard: React.FC<GameBoardProps> = ({ ws, playerId, playerName, roomNam
           0%, 100% { opacity: 0.25; transform: scale(1); }
           50% { opacity: 0.45; transform: scale(1.03); }
         }
-        @keyframes goldGradientShift {
-          0% { 
+        @keyframes goldGradientRotate {
+          0% {
+            --glow-angle: 0deg;
+            --glow-brightness: 1;
             background: conic-gradient(
-              #fff4b8, #ffe066, #ffd700, #ffb700, 
-              #d4a017, #b8860b, #d4a017, #ffb700, 
-              #ffd700, #ffe066, #fff4b8, #fff8dc,
-              #fff4b8
+              from var(--glow-angle),
+              #fff4b8 0%, #ffe066 15%, #ffd700 30%, 
+              #ffb700 45%, #d4a017 55%, #b8860b 65%, 
+              #d4a017 75%, #ffb700 85%, #ffd700 92%, 
+              #fff4b8 100%
             );
+            filter: drop-shadow(0 0 calc(10px * var(--glow-brightness)) rgba(255, 215, 0, calc(0.5 * var(--glow-brightness))));
           }
-          25% { 
+          25% {
+            --glow-angle: 90deg;
+            --glow-brightness: 1.2;
             background: conic-gradient(
-              #ffb700, #d4a017, #b8860b, #d4a017, 
-              #ffb700, #ffd700, #ffe066, #fff4b8, 
-              #fff8dc, #fff4b8, #ffe066, #ffd700,
-              #ffb700
+              from var(--glow-angle),
+              #fff4b8 0%, #ffe066 15%, #ffd700 30%, 
+              #ffb700 45%, #d4a017 55%, #b8860b 65%, 
+              #d4a017 75%, #ffb700 85%, #ffd700 92%, 
+              #fff4b8 100%
             );
+            filter: drop-shadow(0 0 calc(10px * var(--glow-brightness)) rgba(255, 215, 0, calc(0.5 * var(--glow-brightness))));
           }
-          50% { 
+          50% {
+            --glow-angle: 180deg;
+            --glow-brightness: 0.85;
             background: conic-gradient(
-              #b8860b, #d4a017, #ffb700, #ffd700, 
-              #ffe066, #fff4b8, #fff8dc, #fff4b8, 
-              #ffe066, #ffd700, #ffb700, #d4a017,
-              #b8860b
+              from var(--glow-angle),
+              #fff4b8 0%, #ffe066 15%, #ffd700 30%, 
+              #ffb700 45%, #d4a017 55%, #b8860b 65%, 
+              #d4a017 75%, #ffb700 85%, #ffd700 92%, 
+              #fff4b8 100%
             );
+            filter: drop-shadow(0 0 calc(10px * var(--glow-brightness)) rgba(255, 215, 0, calc(0.5 * var(--glow-brightness))));
           }
-          75% { 
+          75% {
+            --glow-angle: 270deg;
+            --glow-brightness: 1.15;
             background: conic-gradient(
-              #ffe066, #fff4b8, #fff8dc, #fff4b8, 
-              #ffe066, #ffd700, #ffb700, #d4a017, 
-              #b8860b, #d4a017, #ffb700, #ffd700,
-              #ffe066
+              from var(--glow-angle),
+              #fff4b8 0%, #ffe066 15%, #ffd700 30%, 
+              #ffb700 45%, #d4a017 55%, #b8860b 65%, 
+              #d4a017 75%, #ffb700 85%, #ffd700 92%, 
+              #fff4b8 100%
             );
+            filter: drop-shadow(0 0 calc(10px * var(--glow-brightness)) rgba(255, 215, 0, calc(0.5 * var(--glow-brightness))));
           }
-          100% { 
+          100% {
+            --glow-angle: 360deg;
+            --glow-brightness: 1;
             background: conic-gradient(
-              #fff4b8, #ffe066, #ffd700, #ffb700, 
-              #d4a017, #b8860b, #d4a017, #ffb700, 
-              #ffd700, #ffe066, #fff4b8, #fff8dc,
-              #fff4b8
+              from var(--glow-angle),
+              #fff4b8 0%, #ffe066 15%, #ffd700 30%, 
+              #ffb700 45%, #d4a017 55%, #b8860b 65%, 
+              #d4a017 75%, #ffb700 85%, #ffd700 92%, 
+              #fff4b8 100%
             );
+            filter: drop-shadow(0 0 calc(10px * var(--glow-brightness)) rgba(255, 215, 0, calc(0.5 * var(--glow-brightness))));
           }
         }
         @keyframes fadeIn {
@@ -617,7 +667,7 @@ const GameBoard: React.FC<GameBoardProps> = ({ ws, playerId, playerName, roomNam
           50% { filter: brightness(2) saturate(0.5) sepia(1) hue-rotate(-50deg); }
         }
         .avatar-glow-active {
-          animation: goldGradientShift 2s linear infinite, spin 0.5s linear infinite;
+          animation: goldGradientRotate 2s linear infinite;
         }
       `}</style>
     </div>
@@ -730,8 +780,6 @@ const styles = {
     right: '-8px',
     bottom: '-8px',
     borderRadius: '50%',
-    background: 'conic-gradient(#fff4b8, #ffe066, #ffd700, #ffb700, #d4a017, #b8860b, #d4a017, #ffb700, #ffd700, #ffe066, #fff4b8)',
-    filter: 'drop-shadow(0 0 12px rgba(255, 215, 0, 0.6))',
     zIndex: 0
   },
   avatarWaitingGlow: {
