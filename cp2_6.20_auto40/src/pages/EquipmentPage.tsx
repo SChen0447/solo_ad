@@ -1,3 +1,11 @@
+/* ============================================
+ * 装备集市页面
+ * 调用关系：被 App.tsx 路由渲染，调用 EquipmentCard、Modal 组件
+ * 数据流向：App.tsx 传入 equipment props → 瀑布流展示
+ *          EquipmentCard.onBorrow(id, days) → 打开确认弹窗 → 
+ *          api.borrowEquipment → 刷新列表
+ * ============================================ */
+
 import React, { useState, useEffect } from 'react'
 import EquipmentCard from '../components/EquipmentCard'
 import Modal from '../components/Modal'
@@ -12,11 +20,13 @@ interface EquipmentPageProps {
 
 const EquipmentPage: React.FC<EquipmentPageProps> = ({ equipment, onEquipmentChange }) => {
   const [showBorrow, setShowBorrow] = useState(false)
-  const [selectedEq, setSelectedEq] = useState<Equipment | null>(null)
-  const [borrowDays, setBorrowDays] = useState<7 | 3 | 14>(7)
+  const [selectedEqId, setSelectedEqId] = useState<string | null>(null)
+  const [selectedDays, setSelectedDays] = useState<7 | 3 | 14>(7)
   const [category, setCategory] = useState<'all' | EquipmentCategory>('all')
   const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(false)
+
+  const selectedEq = equipment.find(e => e.id === selectedEqId) || null
 
   const refresh = async () => {
     const res = await api.getEquipment(1, 20, category, search)
@@ -27,20 +37,20 @@ const EquipmentPage: React.FC<EquipmentPageProps> = ({ equipment, onEquipmentCha
     refresh()
   }, [category, search])
 
-  const handleOpenBorrow = (eq: Equipment) => {
-    setSelectedEq(eq)
-    setBorrowDays(7)
+  const handleOpenBorrow = (equipmentId: string, days: number) => {
+    setSelectedEqId(equipmentId)
+    setSelectedDays(days)
     setShowBorrow(true)
   }
 
   const handleConfirmBorrow = async () => {
-    if (!selectedEq) return
+    if (!selectedEqId) return
     setLoading(true)
     try {
-      await api.borrowEquipment(selectedEq.id, borrowDays)
+      await api.borrowEquipment(selectedEqId, selectedDays)
       await refresh()
       setShowBorrow(false)
-      setSelectedEq(null)
+      setSelectedEqId(null)
     } catch (e) {
       console.error(e)
       alert(e instanceof Error ? e.message : '预约失败')
@@ -55,6 +65,9 @@ const EquipmentPage: React.FC<EquipmentPageProps> = ({ equipment, onEquipmentCha
       key: k, label: EquipmentCategoryLabels[k]
     }))
   ]
+
+  const returnDate = new Date()
+  returnDate.setDate(returnDate.getDate() + selectedDays)
 
   return (
     <div className="page-container page-fade-in">
@@ -123,7 +136,7 @@ const EquipmentPage: React.FC<EquipmentPageProps> = ({ equipment, onEquipmentCha
               </div>
             </div>
             <div className="borrow-days-select">
-              <label className="form-label">选择借用期限:</label>
+              <label className="form-label">确认借用期限:</label>
               <div className="days-options">
                 {([3, 7, 14] as const).map(d => {
                   const retDate = new Date()
@@ -132,8 +145,8 @@ const EquipmentPage: React.FC<EquipmentPageProps> = ({ equipment, onEquipmentCha
                     <button
                       key={d}
                       type="button"
-                      className={`day-option ${borrowDays === d ? 'day-active' : ''}`}
-                      onClick={() => setBorrowDays(d)}
+                      className={`day-option ${selectedDays === d ? 'day-active' : ''}`}
+                      onClick={() => setSelectedDays(d)}
                     >
                       <div className="day-num">{d}天</div>
                       <div className="day-return">
@@ -142,6 +155,9 @@ const EquipmentPage: React.FC<EquipmentPageProps> = ({ equipment, onEquipmentCha
                     </button>
                   )
                 })}
+              </div>
+              <div className="borrow-summary">
+                借用期限: <strong>{selectedDays}天</strong> · 预计归还: <strong>{returnDate.toLocaleDateString('zh-CN')}</strong>
               </div>
             </div>
             <div className="borrow-notice">

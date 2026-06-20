@@ -1,3 +1,9 @@
+/* ============================================
+ * 类型定义文件
+ * 调用关系：被 api.ts、所有组件和页面引用
+ * 数据流向：定义所有数据模型，作为前后端数据交互的契约
+ * ============================================ */
+
 export type Difficulty = 'easy' | 'moderate' | 'hard' | 'expert'
 export type ActivityType = 'hiking' | 'camping' | 'climbing' | 'cycling' | 'running' | 'swimming'
 export type EquipmentCategory = 'tent' | 'backpack' | 'sleeping_bag' | 'climbing' | 'cooking' | 'clothing' | 'navigation' | 'other'

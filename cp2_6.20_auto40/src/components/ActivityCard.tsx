@@ -1,3 +1,9 @@
+/* ============================================
+ * 活动卡片组件
+ * 调用关系：被 ActivityListPage 调用
+ * 数据流向：父组件传入 activity props → 渲染卡片 → onRegister 回调传递活动 id 给父组件
+ * ============================================ */
+
 import React from 'react'
 import { useNavigate } from 'react-router-dom'
 import type { Activity } from '../types'

@@ -1,3 +1,9 @@
+/* ============================================
+ * 通用弹窗组件
+ * 调用关系：被 ActivityListPage、EquipmentPage、ActivityDetailPage 调用
+ * 数据流向：父组件控制 isOpen/onClose → 子组件渲染模态框 → children 展示表单内容
+ * ============================================ */
+
 import React, { useEffect } from 'react'
 
 interface ModalProps {

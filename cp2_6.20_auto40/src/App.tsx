@@ -1,3 +1,10 @@
+/* ============================================
+ * 主应用组件
+ * 调用关系：被 main.tsx 挂载，调用各页面组件
+ * 数据流向：loadInitialData → activities/equipment state → 通过props传递给页面组件
+ *          NavLink → 路由切换 → 对应页面渲染
+ * ============================================ */
+
 import React, { useState, useEffect } from 'react'
 import { Routes, Route, NavLink, useLocation, Navigate } from 'react-router-dom'
 import ActivityListPage from './pages/ActivityListPage'
@@ -45,6 +52,7 @@ const App: React.FC = () => {
 
   return (
     <div className="app-root">
+      {/* 半透明磨砂玻璃导航栏 */}
       <nav className="navbar">
         <div className="nav-inner">
           <div className="nav-brand">
@@ -52,6 +60,7 @@ const App: React.FC = () => {
             <span className="brand-name">山野行者</span>
           </div>
 
+          {/* 导航链接 - 当前页有下划线从中间向两边展开动画 */}
           <div className={`nav-links ${menuOpen ? 'nav-mobile-open' : ''}`}>
             {navItems.map(item => (
               <NavLink
@@ -64,11 +73,13 @@ const App: React.FC = () => {
               >
                 <span className="nav-link-icon">{item.icon}</span>
                 <span className="nav-link-text">{item.label}</span>
+                {/* 下划线动画元素 */}
                 <span className="nav-link-underline" />
               </NavLink>
             ))}
           </div>
 
+          {/* 汉堡菜单 - 移动端 */}
           <button
             className={`hamburger ${menuOpen ? 'hamburger-open' : ''}`}
             onClick={() => setMenuOpen(!menuOpen)}

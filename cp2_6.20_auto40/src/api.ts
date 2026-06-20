@@ -1,3 +1,9 @@
+/* ============================================
+ * API请求模块
+ * 调用关系：被 main.tsx、App.tsx、所有页面组件调用
+ * 数据流向：前端组件 → api函数 → 后端server.ts → 内存数据 → 返回前端
+ * ============================================ */
+
 import type { Activity, Equipment, Review, User, Achievement } from './types'
 
 const BASE = '/api'
