@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>敌机编队与弹幕生成模拟器</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      -webkit-user-select: none;
+      user-select: none;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: linear-gradient(180deg, #0f2b4a 0%, #0a0a1a 30%, #0a0a1a 100%);
+      color: #e5e7eb;
+    }
+
+    #app {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+    }
+
+    #canvas-container {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+    }
+
+    #canvas-container canvas {
+      display: block;
+    }
+
+    .left-panel {
+      position: absolute;
+      top: 16px;
+      left: 16px;
+      width: 240px;
+      max-height: calc(100% - 180px);
+      overflow-y: auto;
+      border-radius: 12px;
+      background: rgba(10, 10, 30, 0.8);
+      border: 4px solid rgba(255, 255, 255, 0.05);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      padding: 16px;
+      z-index: 10;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+    }
+
+    .panel-title {
+      font-size: 14px;
+      font-weight: 600;
+      margin-bottom: 12px;
+      color: #a5b4fc;
+      letter-spacing: 0.5px;
+    }
+
+    .formation-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .formation-card {
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      padding: 12px;
+      cursor: pointer;
+      transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+    }
+
+    .formation-card:hover {
+      transform: scale(1.1);
+      box-shadow: 0 4px 20px rgba(59, 130, 246, 0.3);
+      background: rgba(59, 130, 246, 0.1);
+    }
+
+    .formation-card.active {
+      background: rgba(139, 92, 246, 0.15);
+      border-color: #8b5cf6;
+    }
+
+    .formation-name {
+      font-size: 13px;
+      font-weight: 500;
+      margin-bottom: 8px;
+      color: #f3f4f6;
+    }
+
+    .formation-preview {
+      width: 100%;
+      height: 50px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .formation-preview svg {
+      width: 100%;
+      height: 100%;
+    }
+
+    .top-toolbar {
+      position: absolute;
+      top: 16px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      gap: 10px;
+      padding: 10px 14px;
+      border-radius: 12px;
+      background: rgba(10, 10, 30, 0.8);
+      border: 4px solid rgba(255, 255, 255, 0.05);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      z-index: 10;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+    }
+
+    .bullet-btn {
+      padding: 8px 16px;
+      border: none;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      color: white;
+      background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
+      transition: all 0.15s ease;
+    }
+
+    .bullet-btn:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(139, 92, 246, 0.4);
+    }
+
+    .bullet-btn:active {
+      background: linear-gradient(135deg, #8b5cf6 0%, #3b82f6 100%);
+    }
+
+    .bullet-btn.active {
+      box-shadow: 0 0 0 2px rgba(168, 85, 247, 0.5), 0 4px 12px rgba(139, 92, 246, 0.4);
+    }
+
+    .right-panel {
+      position: absolute;
+      top: 16px;
+      right: 16px;
+      width: 260px;
+      max-height: calc(100% - 180px);
+      overflow-y: auto;
+      border-radius: 12px;
+      background: rgba(10, 10, 30, 0.8);
+      border: 4px solid rgba(255, 255, 255, 0.05);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      padding: 16px;
+      z-index: 10;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+    }
+
+    .param-section {
+      margin-bottom: 20px;
+    }
+
+    .param-section:last-child {
+      margin-bottom: 0;
+    }
+
+    .param-label {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 12px;
+      color: #9ca3af;
+      margin-bottom: 6px;
+    }
+
+    .param-value {
+      color: #a5b4fc;
+      font-weight: 600;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .slider-track {
+      width: 100%;
+      height: 6px;
+      border-radius: 3px;
+      background: linear-gradient(90deg, #06b6d4 0%, #a855f7 100%);
+      position: relative;
+      cursor: pointer;
+    }
+
+    input[type="range"] {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 100%;
+      height: 6px;
+      border-radius: 3px;
+      background: transparent;
+      cursor: pointer;
+      outline: none;
+    }
+
+    input[type="range"]::-webkit-slider-runnable-track {
+      height: 6px;
+      border-radius: 3px;
+      background: linear-gradient(90deg, #06b6d4 0%, #a855f7 100%);
+    }
+
+    input[type="range"]::-moz-range-track {
+      height: 6px;
+      border-radius: 3px;
+      background: linear-gradient(90deg, #06b6d4 0%, #a855f7 100%);
+    }
+
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: #ffffff;
+      border: none;
+      margin-top: -5px;
+      box-shadow: 0 0 8px rgba(255, 255, 255, 0.8), 0 0 16px rgba(168, 85, 247, 0.6);
+      cursor: pointer;
+      transition: transform 0.1s ease;
+    }
+
+    input[type="range"]::-webkit-slider-thumb:hover {
+      transform: scale(1.15);
+    }
+
+    input[type="range"]::-moz-range-thumb {
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: #ffffff;
+      border: none;
+      box-shadow: 0 0 8px rgba(255, 255, 255, 0.8), 0 0 16px rgba(168, 85, 247, 0.6);
+      cursor: pointer;
+    }
+
+    .toggle-switch {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      cursor: pointer;
+      font-size: 12px;
+      color: #d1d5db;
+    }
+
+    .toggle-switch input {
+      display: none;
+    }
+
+    .toggle-track {
+      width: 40px;
+      height: 22px;
+      border-radius: 11px;
+      background: rgba(255, 255, 255, 0.1);
+      position: relative;
+      transition: background 0.15s ease;
+    }
+
+    .toggle-switch input:checked + .toggle-track {
+      background: linear-gradient(90deg, #06b6d4 0%, #a855f7 100%);
+    }
+
+    .toggle-thumb {
+      position: absolute;
+      top: 2px;
+      left: 2px;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: white;
+      transition: transform 0.15s ease;
+    }
+
+    .toggle-switch input:checked + .toggle-track .toggle-thumb {
+      transform: translateX(18px);
+    }
+
+    .bottom-timeline {
+      position: absolute;
+      bottom: 16px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: calc(100% - 64px);
+      max-width: 900px;
+      padding: 14px 20px;
+      border-radius: 12px;
+      background: rgba(10, 10, 30, 0.8);
+      border: 4px solid rgba(255, 255, 255, 0.05);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      z-index: 10;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+    }
+
+    .timeline-controls {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      margin-bottom: 10px;
+    }
+
+    .play-btn {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      border: none;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+      color: white;
+      background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
+      transition: transform 0.1s ease;
+      flex-shrink: 0;
+    }
+
+    .play-btn:hover {
+      box-shadow: 0 4px 16px rgba(139, 92, 246, 0.5);
+    }
+
+    .play-btn:active {
+      transform: scale(0.92);
+    }
+
+    .timestamp {
+      font-size: 13px;
+      font-family: 'SF Mono', Monaco, monospace;
+      color: #a5b4fc;
+      font-weight: 600;
+      min-width: 120px;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .speed-group {
+      display: flex;
+      gap: 4px;
+      margin-left: auto;
+    }
+
+    .speed-btn {
+      padding: 6px 10px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 6px;
+      background: rgba(255, 255, 255, 0.04);
+      color: #9ca3af;
+      font-size: 12px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      font-family: inherit;
+    }
+
+    .speed-btn:hover {
+      color: #e5e7eb;
+      background: rgba(255, 255, 255, 0.08);
+    }
+
+    .speed-btn.active {
+      color: white;
+      background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
+      border-color: transparent;
+    }
+
+    .progress-bar {
+      width: 100%;
+      height: 8px;
+      border-radius: 4px;
+      background: rgba(255, 255, 255, 0.08);
+      position: relative;
+      cursor: pointer;
+      overflow: hidden;
+    }
+
+    .progress-fill {
+      height: 100%;
+      border-radius: 4px;
+      background: linear-gradient(90deg, #06b6d4 0%, #a855f7 100%);
+      transition: width 0.05s linear;
+    }
+
+    .progress-thumb {
+      position: absolute;
+      top: 50%;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: white;
+      transform: translate(-50%, -50%);
+      box-shadow: 0 0 8px rgba(255, 255, 255, 0.8), 0 0 16px rgba(168, 85, 247, 0.6);
+      pointer-events: none;
+      transition: left 0.05s linear;
+    }
+
+    @media (max-width: 768px) {
+      .left-panel {
+        top: auto;
+        left: 16px;
+        right: 16px;
+        bottom: 16px;
+        width: auto;
+        max-height: 180px;
+        display: none;
+      }
+
+      .right-panel {
+        width: 220px;
+        top: 70px;
+      }
+
+      .top-toolbar {
+        top: 8px;
+        left: 8px;
+        right: 8px;
+        transform: none;
+        flex-wrap: wrap;
+        justify-content: center;
+      }
+
+      .bottom-timeline {
+        width: calc(100% - 32px);
+        bottom: 8px;
+      }
+    }
+
+    .section-divider {
+      height: 1px;
+      background: linear-gradient(90deg, transparent, rgba(168, 85, 247, 0.3), transparent);
+      margin: 14px 0;
+    }
+
+    ::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: rgba(168, 85, 247, 0.3);
+      border-radius: 3px;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+      background: rgba(168, 85, 247, 0.5);
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <div id="canvas-container"></div>
+
+    <aside class="left-panel" id="left-panel">
+      <div class="panel-title">敌机编队模板</div>
+      <div class="formation-list" id="formation-list"></div>
+    </aside>
+
+    <div class="top-toolbar" id="top-toolbar">
+      <button class="bullet-btn" data-pattern="fan">扇形弹幕</button>
+      <button class="bullet-btn" data-pattern="spiral">螺旋弹幕</button>
+      <button class="bullet-btn" data-pattern="line">直线弹幕</button>
+    </div>
+
+    <aside class="right-panel" id="right-panel">
+      <div class="panel-title">飞行参数</div>
+      <div class="param-section">
+        <div class="param-label">
+          <span>飞行速度</span>
+          <span class="param-value" id="speed-value">5.0 单位/秒</span>
+        </div>
+        <input type="range" id="speed-slider" min="1" max="10" step="0.5" value="5" />
+      </div>
+
+      <div class="section-divider"></div>
+      <div class="panel-title">弹幕参数</div>
+      <div class="param-section">
+        <div class="param-label">
+          <span>子弹密度</span>
+          <span class="param-value" id="density-value">10 颗/波</span>
+        </div>
+        <input type="range" id="density-slider" min="3" max="20" step="1" value="10" />
+      </div>
+      <div class="param-section">
+        <div class="param-label">
+          <span>发射间隔</span>
+          <span class="param-value" id="interval-value">500 ms</span>
+        </div>
+        <input type="range" id="interval-slider" min="200" max="2000" step="50" value="500" />
+      </div>
+      <div class="param-section">
+        <div class="param-label">
+          <span>扩散角度</span>
+          <span class="param-value" id="spread-value">60 °</span>
+        </div>
+        <input type="range" id="spread-slider" min="15" max="120" step="1" value="60" />
+      </div>
+
+      <div class="section-divider"></div>
+      <div class="panel-title">碰撞判定</div>
+      <div class="param-section">
+        <label class="toggle-switch">
+          <input type="checkbox" id="collision-toggle" />
+          <div class="toggle-track"><div class="toggle-thumb"></div></div>
+          <span>显示碰撞框</span>
+        </label>
+      </div>
+      <div class="param-section">
+        <div class="param-label">
+          <span>碰撞框缩放</span>
+          <span class="param-value" id="collision-scale-value">1.0</span>
+        </div>
+        <input type="range" id="collision-scale-slider" min="0.5" max="1.5" step="0.05" value="1" />
+      </div>
+    </aside>
+
+    <div class="bottom-timeline" id="bottom-timeline">
+      <div class="timeline-controls">
+        <button class="play-btn" id="play-btn">▶</button>
+        <span class="timestamp" id="timestamp">00:00.000</span>
+        <div class="speed-group">
+          <button class="speed-btn" data-speed="0.25">0.25x</button>
+          <button class="speed-btn" data-speed="0.5">0.5x</button>
+          <button class="speed-btn active" data-speed="1">1x</button>
+          <button class="speed-btn" data-speed="2">2x</button>
+          <button class="speed-btn" data-speed="4">4x</button>
+        </div>
+      </div>
+      <div class="progress-bar" id="progress-bar">
+        <div class="progress-fill" id="progress-fill" style="width: 0%"></div>
+        <div class="progress-thumb" id="progress-thumb" style="left: 0%"></div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
