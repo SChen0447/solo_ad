@@ -375,6 +375,22 @@ export class EnemyFleet {
 
       if (!enemy.isAlive) {
         if (enemy.flashTimer > 0) {
+          const totalFlash = 0.15;
+          const elapsed = totalFlash - enemy.flashTimer;
+          const flashPeriod = 0.075;
+          const flashOn = Math.floor(elapsed / (flashPeriod / 2)) % 2 === 0;
+
+          const mat = enemy.mesh.material as THREE.MeshStandardMaterial;
+          if (flashOn) {
+            mat.emissive.setHex(0xff2222);
+            mat.emissiveIntensity = 2.5;
+            enemy.mesh.visible = true;
+          } else {
+            mat.emissive.setHex(0x222244);
+            mat.emissiveIntensity = 1;
+            enemy.mesh.visible = false;
+          }
+
           enemy.flashTimer -= deltaTime;
           if (enemy.flashTimer <= 0) {
             this.removeEnemy(enemy, i);
@@ -439,7 +455,7 @@ export class EnemyFleet {
   public triggerHit(enemy: Enemy): void {
     if (!enemy.isAlive) return;
     enemy.isAlive = false;
-    enemy.flashTimer = 0.1;
+    enemy.flashTimer = 0.15;
 
     const mat = enemy.mesh.material as THREE.MeshStandardMaterial;
     mat.emissive.setHex(0xff2222);

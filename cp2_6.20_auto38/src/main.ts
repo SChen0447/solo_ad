@@ -367,11 +367,10 @@ class Application {
 
   private updateTimelineUI(): void {
     const t = this.state.elapsedTime;
-    const minutes = Math.floor(t / 60);
-    const seconds = Math.floor(t % 60);
+    const totalSeconds = Math.floor(t);
     const ms = Math.floor((t % 1) * 1000);
     const timestamp = this.DOM.timestamp as HTMLElement;
-    timestamp.textContent = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}.${String(ms).padStart(3, '0')}`;
+    timestamp.textContent = `${totalSeconds}.${String(ms).padStart(3, '0')}s`;
 
     const ratio = this.state.elapsedTime / this.state.maxTime;
     const percent = (ratio * 100).toFixed(2);

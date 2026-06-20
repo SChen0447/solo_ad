@@ -21,6 +21,9 @@ interface Bullet {
   trail: THREE.Line;
   trailPositions: THREE.Vector3[];
   age: number;
+  jitterOffset: THREE.Vector3;
+  jitterTimer: number;
+  jitterInterval: number;
 }
 
 interface Particle {
@@ -30,6 +33,14 @@ interface Particle {
   maxLife: number;
   position: THREE.Vector3;
   rotationSpeed: THREE.Vector3;
+  startColor: THREE.Color;
+  endColor: THREE.Color;
+}
+
+interface PendingExplosion {
+  position: THREE.Vector3;
+  delay: number;
+  elapsed: number;
 }
 
 export interface CollisionEvent {
@@ -43,6 +54,7 @@ export class BulletSystem {
   private enemyFleet: EnemyFleet;
   private bullets: Bullet[] = [];
   private particles: Particle[] = [];
+  private pendingExplosions: PendingExplosion[] = [];
   private bulletIdCounter: number = 0;
 
   private bulletGeometry!: THREE.SphereGeometry;
@@ -310,7 +322,10 @@ export class BulletSystem {
       maxLife: 6,
       trail,
       trailPositions,
-      age: 0
+      age: 0,
+      jitterOffset: new THREE.Vector3(),
+      jitterTimer: 0,
+      jitterInterval: 0.02 + Math.random() * 0.06
     };
 
     if (this.showCollisionBoxes) {
@@ -322,6 +337,9 @@ export class BulletSystem {
 
   private createExplosion(position: THREE.Vector3): void {
     const count = 10;
+    const paletteStart = new THREE.Color(0xfde047);
+    const paletteEnd = new THREE.Color(0xf97316);
+
     for (let i = 0; i < count; i++) {
       const velocity = new THREE.Vector3(
         (Math.random() - 0.5) * 2,
@@ -329,7 +347,13 @@ export class BulletSystem {
         (Math.random() - 0.5) * 2
       ).normalize().multiplyScalar(2 + Math.random() * 3);
 
-      const mesh = new THREE.Mesh(this.particleGeometry, this.particleMaterial.clone());
+      const colorMix = Math.random();
+      const startColor = paletteStart.clone().lerp(paletteEnd, colorMix * 0.3);
+      const endColor = paletteStart.clone().lerp(paletteEnd, 0.7 + colorMix * 0.3);
+
+      const mat = this.particleMaterial.clone();
+      mat.color.copy(startColor);
+      const mesh = new THREE.Mesh(this.particleGeometry, mat);
       mesh.position.copy(position);
       this.scene.add(mesh);
 
@@ -343,7 +367,9 @@ export class BulletSystem {
           (Math.random() - 0.5) * 10,
           (Math.random() - 0.5) * 10,
           (Math.random() - 0.5) * 10
-        )
+        ),
+        startColor,
+        endColor
       });
     }
   }
@@ -362,7 +388,21 @@ export class BulletSystem {
       const oldPos = bullet.position.clone();
       this.tempVecA.copy(bullet.velocity).multiplyScalar(deltaTime);
       bullet.position.add(this.tempVecA);
-      bullet.mesh.position.copy(bullet.position);
+
+      bullet.jitterTimer += deltaTime;
+      if (bullet.jitterTimer >= bullet.jitterInterval) {
+        bullet.jitterTimer = 0;
+        bullet.jitterInterval = 0.02 + Math.random() * 0.06;
+        const amplitude = 0.05;
+        bullet.jitterOffset.set(
+          (Math.random() - 0.5) * 2 * amplitude,
+          (Math.random() - 0.5) * 2 * amplitude,
+          (Math.random() - 0.5) * 2 * amplitude
+        );
+      }
+
+      this.tempVecB.copy(bullet.position).add(bullet.jitterOffset);
+      bullet.mesh.position.copy(this.tempVecB);
 
       bullet.age += deltaTime;
       bullet.life -= deltaTime;
@@ -381,7 +421,11 @@ export class BulletSystem {
 
       if (hitEnemy) {
         this.enemyFleet.triggerHit(hitEnemy);
-        this.createExplosion(bullet.position);
+        this.pendingExplosions.push({
+          position: bullet.position.clone(),
+          delay: 0.15,
+          elapsed: 0
+        });
         this.onCollision?.({
           enemy: hitEnemy,
           position: bullet.position.clone(),
@@ -399,6 +443,15 @@ export class BulletSystem {
       }
     }
 
+    for (let i = this.pendingExplosions.length - 1; i >= 0; i--) {
+      const pe = this.pendingExplosions[i];
+      pe.elapsed += deltaTime;
+      if (pe.elapsed >= pe.delay) {
+        this.createExplosion(pe.position);
+        this.pendingExplosions.splice(i, 1);
+      }
+    }
+
     for (let i = this.particles.length - 1; i >= 0; i--) {
       const p = this.particles[i];
       p.life -= deltaTime;
@@ -412,10 +465,12 @@ export class BulletSystem {
       p.mesh.rotation.z += p.rotationSpeed.z * deltaTime;
 
       const mat = p.mesh.material as THREE.MeshBasicMaterial;
-      const t = p.life / p.maxLife;
-      mat.opacity = Math.max(0, t);
-      const scale = 0.5 + t * 0.5;
-      p.mesh.scale.setScalar(scale);
+      const t = Math.max(0, p.life / p.maxLife);
+      mat.opacity = t;
+      this.tempVecA.copy(p.startColor).lerp(p.endColor, 1 - t);
+      mat.color.copy(this.tempVecA);
+      const scale = t;
+      p.mesh.scale.setScalar(Math.max(0.001, scale));
 
       if (p.life <= 0) {
         this.removeParticle(i);
