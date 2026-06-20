@@ -46,7 +46,7 @@ type Listener = () => void;
 const MIN_SCALE = 0.25;
 const MAX_SCALE = 4;
 const GRID_SIZE = 50;
-const INK_SPREAD_DURATION = 400;
+const INK_SPREAD_DURATION = 200;
 const GLOW_DURATION = 200;
 
 export class CanvasCore {
@@ -209,14 +209,21 @@ export class CanvasCore {
     const mouseY = e.clientY - rect.top;
 
     const delta = -e.deltaY * 0.001;
-    const newScale = Math.min(MAX_SCALE, Math.max(MIN_SCALE, this.targetViewport.scale * (1 + delta)));
+    const oldScale = this.viewport.scale;
+    const newScale = Math.min(MAX_SCALE, Math.max(MIN_SCALE, oldScale * (1 + delta)));
 
-    const worldX = (mouseX - this.targetViewport.x) / this.targetViewport.scale;
-    const worldY = (mouseY - this.targetViewport.y) / this.targetViewport.scale;
+    const worldX = (mouseX - this.viewport.x) / oldScale;
+    const worldY = (mouseY - this.viewport.y) / oldScale;
 
+    const newX = mouseX - worldX * newScale;
+    const newY = mouseY - worldY * newScale;
+
+    this.viewport.x = newX;
+    this.viewport.y = newY;
+    this.viewport.scale = newScale;
+    this.targetViewport.x = newX;
+    this.targetViewport.y = newY;
     this.targetViewport.scale = newScale;
-    this.targetViewport.x = mouseX - worldX * newScale;
-    this.targetViewport.y = mouseY - worldY * newScale;
   };
 
   setBrushSettings(settings: Partial<BrushSettings>) {
@@ -369,12 +376,12 @@ export class CanvasCore {
       ctx.lineJoin = 'round';
       ctx.strokeStyle = path.color;
 
-      const spread = 1 + (1 - path.animationProgress) * 0.4;
+      const spread = 1 + (1 - path.animationProgress) * 0.5;
       ctx.lineWidth = path.thickness * spread;
 
       if (path.glowProgress >= 0 && path.glowProgress < 1) {
         ctx.shadowColor = path.color;
-        ctx.shadowBlur = 20 * (1 - path.glowProgress);
+        ctx.shadowBlur = 25 * (1 - path.glowProgress);
       }
 
       ctx.beginPath();
@@ -390,7 +397,99 @@ export class CanvasCore {
       ctx.lineTo(last.x, last.y);
       ctx.stroke();
       ctx.restore();
+
+      if (path.glowProgress >= 0 && path.glowProgress < 1) {
+        this.drawFlowGlow(path);
+      }
     }
+  }
+
+  private drawFlowGlow(path: BrushPath) {
+    const { ctx } = this;
+    if (path.points.length < 2) return;
+
+    const totalLen = this.getPathLength(path.points);
+    if (totalLen === 0) return;
+
+    const progress = path.glowProgress;
+    const headPos = progress * totalLen;
+    const glowWidth = totalLen * 0.25;
+    const tailPos = Math.max(0, headPos - glowWidth);
+
+    ctx.save();
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+
+    const steps = 30;
+    for (let i = 0; i < steps; i++) {
+      const t1 = tailPos + (headPos - tailPos) * (i / steps);
+      const t2 = tailPos + (headPos - tailPos) * ((i + 1) / steps);
+      const p1 = this.getPointAtLength(path.points, t1, totalLen);
+      const p2 = this.getPointAtLength(path.points, t2, totalLen);
+
+      if (!p1 || !p2) continue;
+
+      const segT = i / steps;
+      const alpha = (1 - progress) * Math.sin(segT * Math.PI) * 0.9;
+      const width = path.thickness * (1.5 + Math.sin(segT * Math.PI) * 1.5) * (1 - progress * 0.5);
+
+      ctx.beginPath();
+      ctx.strokeStyle = path.color;
+      ctx.globalAlpha = alpha;
+      ctx.lineWidth = width;
+      ctx.shadowColor = path.color;
+      ctx.shadowBlur = 15 * (1 - progress);
+      ctx.moveTo(p1.x, p1.y);
+      ctx.lineTo(p2.x, p2.y);
+      ctx.stroke();
+    }
+
+    if (headPos > 0) {
+      const tipPoint = this.getPointAtLength(path.points, headPos, totalLen);
+      if (tipPoint) {
+        const tipRadius = path.thickness * (2 + (1 - progress) * 2);
+        const gradient = ctx.createRadialGradient(
+          tipPoint.x, tipPoint.y, 0,
+          tipPoint.x, tipPoint.y, tipRadius
+        );
+        gradient.addColorStop(0, path.color);
+        gradient.addColorStop(0.4, path.color + '80');
+        gradient.addColorStop(1, path.color + '00');
+        ctx.globalAlpha = (1 - progress) * 0.8;
+        ctx.fillStyle = gradient;
+        ctx.beginPath();
+        ctx.arc(tipPoint.x, tipPoint.y, tipRadius, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+
+    ctx.restore();
+  }
+
+  private getPathLength(points: Point[]): number {
+    let len = 0;
+    for (let i = 1; i < points.length; i++) {
+      len += Math.hypot(points[i].x - points[i - 1].x, points[i].y - points[i - 1].y);
+    }
+    return len;
+  }
+
+  private getPointAtLength(points: Point[], targetLen: number, totalLen: number): Point | null {
+    if (points.length === 0 || totalLen === 0) return null;
+    if (targetLen <= 0) return { ...points[0] };
+    let accumulated = 0;
+    for (let i = 1; i < points.length; i++) {
+      const segLen = Math.hypot(points[i].x - points[i - 1].x, points[i].y - points[i - 1].y);
+      if (accumulated + segLen >= targetLen) {
+        const t = segLen > 0 ? (targetLen - accumulated) / segLen : 0;
+        return {
+          x: points[i - 1].x + (points[i].x - points[i - 1].x) * t,
+          y: points[i - 1].y + (points[i].y - points[i - 1].y) * t
+        };
+      }
+      accumulated += segLen;
+    }
+    return { ...points[points.length - 1] };
   }
 
   private drawImages() {

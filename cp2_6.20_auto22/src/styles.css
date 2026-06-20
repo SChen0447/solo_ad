@@ -70,6 +70,7 @@
   box-sizing: border-box;
   animation: fadeInScale 0.3s ease;
   pointer-events: auto;
+  box-shadow: var(--accent-glow);
 }
 
 .resize-handle {
@@ -110,8 +111,8 @@
   font-size: 12px;
   font-weight: 500;
   white-space: nowrap;
-  transition: opacity 0.8s ease;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  pointer-events: none;
 }
 
 .caption-edit-popup {
@@ -172,7 +173,7 @@
   padding: 10px 16px;
   background: var(--bg-toolbar);
   border-radius: 12px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4), 0 0 20px rgba(14, 165, 233, 0.15);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4), var(--accent-glow);
   border: 1px solid var(--border);
   z-index: 500;
   animation: fadeIn 0.3s ease;
@@ -207,6 +208,7 @@
 .tool-btn:hover {
   color: var(--accent);
   background: rgba(14, 165, 233, 0.1);
+  box-shadow: var(--accent-glow);
 }
 
 .tool-btn.active {
@@ -233,6 +235,7 @@
 
 .color-swatch:hover {
   transform: scale(1.15);
+  box-shadow: var(--accent-glow);
 }
 
 .color-swatch.active {
@@ -305,6 +308,7 @@
   padding: 4px 10px;
   background: rgba(14, 165, 233, 0.1);
   border-radius: 6px;
+  box-shadow: inset 0 0 8px rgba(14, 165, 233, 0.1);
 }
 
 .member-panel {
@@ -314,7 +318,7 @@
   width: 220px;
   background: var(--bg-card);
   border-radius: 12px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4), 0 0 20px rgba(14, 165, 233, 0.1);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4), var(--accent-glow);
   border: 1px solid var(--border);
   overflow: hidden;
   z-index: 500;
@@ -342,6 +346,7 @@
   font-size: 12px;
   font-weight: 600;
   border-radius: 10px;
+  box-shadow: var(--accent-glow);
 }
 
 .member-list {
@@ -413,6 +418,7 @@
   font-weight: 600;
   border-radius: 4px;
   flex-shrink: 0;
+  box-shadow: var(--accent-glow);
 }
 
 .import-section {

@@ -166,28 +166,27 @@ export class FileManager {
       x = startImageX + dx;
       y = startImageY + dy;
     } else {
-      if (handle.includes('e')) {
-        width = Math.max(40, startWidth + dx);
-        height = width / aspectRatio;
-      }
-      if (handle.includes('w')) {
-        const newWidth = Math.max(40, startWidth - dx);
-        const deltaW = startWidth - newWidth;
-        x = startImageX + deltaW;
-        width = newWidth;
-        height = width / aspectRatio;
-      }
-      if (handle.includes('s')) {
-        height = Math.max(40, startHeight + dy);
-        width = height * aspectRatio;
-      }
-      if (handle.includes('n')) {
-        const newHeight = Math.max(40, startHeight - dy);
-        const deltaH = startHeight - newHeight;
-        y = startImageY + deltaH;
-        height = newHeight;
-        width = height * aspectRatio;
-      }
+      const centerX = startImageX + startWidth / 2;
+      const centerY = startImageY + startHeight / 2;
+
+      const handleStartX = handle.includes('w') ? startImageX : startImageX + startWidth;
+      const handleStartY = handle.includes('n') ? startImageY : startImageY + startHeight;
+
+      const newHandleX = handleStartX + dx;
+      const newHandleY = handleStartY + dy;
+
+      const distFromCenter = Math.hypot(newHandleX - centerX, newHandleY - centerY);
+      const origDistFromCenter = Math.hypot(handleStartX - centerX, handleStartY - centerY);
+
+      let scaleFactor = origDistFromCenter > 0 ? distFromCenter / origDistFromCenter : 1;
+
+      const newWidth = Math.max(40, startWidth * scaleFactor);
+      const newHeight = Math.max(40, newWidth / aspectRatio);
+
+      x = centerX - newWidth / 2;
+      y = centerY - newHeight / 2;
+      width = newWidth;
+      height = newHeight;
     }
 
     const updates: Partial<ImageElementData> = { x, y, width, height };

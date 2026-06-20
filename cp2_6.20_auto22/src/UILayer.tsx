@@ -217,22 +217,23 @@ export const UILayer: React.FC = () => {
               className="member-cursor"
               style={{
                 left: viewport.x + m.cursorPos!.x * viewport.scale,
-                top: viewport.y + m.cursorPos!.y * viewport.scale,
-                opacity: m.labelOpacity > 0 ? 1 : 0.5
+                top: viewport.y + m.cursorPos!.y * viewport.scale
               }}
             >
               <svg width="24" height="24" viewBox="0 0 24 24" fill={m.color}>
                 <path d="M5 3l14 9-7 2-2 7z" />
               </svg>
-              <div
-                className="member-label"
-                style={{
-                  backgroundColor: m.color,
-                  opacity: m.labelOpacity
-                }}
-              >
-                {m.name}
-              </div>
+              {m.labelOpacity > 0 && (
+                <div
+                  className="member-label"
+                  style={{
+                    backgroundColor: m.color,
+                    opacity: m.labelOpacity
+                  }}
+                >
+                  {m.name}
+                </div>
+              )}
             </div>
           ))}
 
