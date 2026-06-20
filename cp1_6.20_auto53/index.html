@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>虚拟咖啡拉花设计</title>
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        padding: 0;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+        overflow: hidden;
+      }
+      #root {
+        width: 100vw;
+        height: 100vh;
+      }
+
+      @keyframes ripple {
+        0% {
+          box-shadow: 0 4px 12px rgba(212, 165, 116, 0.4);
+          transform: scale(1);
+        }
+        50% {
+          box-shadow: 0 0 0 20px rgba(212, 165, 116, 0.2), 0 0 0 40px rgba(212, 165, 116, 0.1);
+          transform: scale(1.05);
+        }
+        100% {
+          box-shadow: 0 4px 12px rgba(212, 165, 116, 0.4);
+          transform: scale(1);
+        }
+      }
+
+      .save-btn-ripple {
+        animation: ripple 0.3s ease-out;
+      }
+
+      button {
+        font-family: inherit;
+      }
+
+      button:hover {
+        transform: scale(1.05);
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+      }
+
+      button:active {
+        transform: scale(0.98);
+      }
+
+      button:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+        transform: none !important;
+      }
+
+      ::-webkit-scrollbar {
+        width: 8px;
+      }
+
+      ::-webkit-scrollbar-track {
+        background: rgba(62, 39, 35, 0.3);
+      }
+
+      ::-webkit-scrollbar-thumb {
+        background: rgba(212, 165, 116, 0.5);
+        border-radius: 4px;
+      }
+
+      ::-webkit-scrollbar-thumb:hover {
+        background: rgba(212, 165, 116, 0.7);
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
