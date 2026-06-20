@@ -624,7 +624,21 @@ body {
   font-size: 14px;
   font-weight: 500;
   margin-top: 12px;
-  animation: slideUp 0.2s ease;
+}
+
+.booked-tag-enter {
+  animation: bookedTagSlideUp 0.2s ease both;
+}
+
+@keyframes bookedTagSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 @keyframes slideUp {
@@ -757,18 +771,6 @@ body {
 
 .list-item-enter {
   animation: listItemEnter 0.3s ease;
-}
-
-
-@keyframes cardExit {
-  from {
-    opacity: 1;
-    transform: scale(1);
-  }
-  to {
-    opacity: 0;
-    transform: scale(0.8);
-  }
 }
 
 .modal-overlay {

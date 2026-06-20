@@ -39,10 +39,9 @@ export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) 
   
   const [newCourseId, setNewCourseId] = useState<string | null>(null)
   const [mousePosition, setMousePosition] = useState<{ x: number; y: number } | null>(null)
-  const [courseTransforms, setCourseTransforms] = useState<Record<string, { x: number; y: number }>>({})
+  const [newCardStyle, setNewCardStyle] = useState<React.CSSProperties | null>(null)
   const [deletingIds, setDeletingIds] = useState<Set<string>>(new Set())
   const newCourseRef = useRef<HTMLDivElement>(null)
-  const addButtonRef = useRef<HTMLButtonElement>(null)
 
   const fetchCourses = useCallback(async () => {
     try {
@@ -177,39 +176,62 @@ export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) 
         const newCourse = await api.createCourse(submitData)
         setNewCourseId(newCourse.id)
         
-        if (mousePosition && newCourseRef.current) {
-          requestAnimationFrame(() => {
-            const cardRect = newCourseRef.current?.getBoundingClientRect()
-            if (cardRect) {
-              const offsetX = mousePosition.x - (cardRect.left + cardRect.width / 2)
-              const offsetY = mousePosition.y - (cardRect.top + cardRect.height / 2)
-              setCourseTransforms(prev => ({
-                ...prev,
-                [newCourse.id]: { x: offsetX, y: offsetY }
-              }))
-              
-              requestAnimationFrame(() => {
-                setCourseTransforms(prev => ({
-                  ...prev,
-                  [newCourse.id]: { x: 0, y: 0 }
-                }))
-              })
-            }
-          })
-        }
-        
         setCourses(prev => [...prev, newCourse].sort((a, b) => 
           dayjs(a.startTime).valueOf() - dayjs(b.startTime).valueOf()
         ))
-        
-        setTimeout(() => {
-          setNewCourseId(null)
-          setCourseTransforms(prev => {
-            const next = { ...prev }
-            delete next[newCourse.id]
-            return next
+
+        if (mousePosition) {
+          setNewCardStyle({
+            opacity: 0,
+            transform: 'scale(0)',
+            transition: 'none'
           })
-        }, 500)
+
+          requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+              const card = newCourseRef.current
+              if (card) {
+                const rect = card.getBoundingClientRect()
+                const offsetX = mousePosition.x - (rect.left + rect.width / 2)
+                const offsetY = mousePosition.y - (rect.top + rect.height / 2)
+                
+                setNewCardStyle({
+                  opacity: 0,
+                  transform: `translate(${offsetX}px, ${offsetY}px) scale(0)`,
+                  transition: 'none'
+                })
+
+                requestAnimationFrame(() => {
+                  setNewCardStyle({
+                    opacity: 1,
+                    transform: 'translate(0, 0) scale(1)',
+                    transition: 'opacity 0.3s ease, transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)'
+                  })
+
+                  setTimeout(() => {
+                    setNewCardStyle(null)
+                    setNewCourseId(null)
+                  }, 350)
+                })
+              } else {
+                setNewCardStyle({
+                  opacity: 1,
+                  transform: 'scale(1)',
+                  transition: 'opacity 0.3s ease, transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)'
+                })
+                setTimeout(() => {
+                  setNewCardStyle(null)
+                  setNewCourseId(null)
+                }, 350)
+              }
+            })
+          })
+        } else {
+          setTimeout(() => {
+            setNewCourseId(null)
+            setNewCardStyle(null)
+          }, 350)
+        }
       }
       setShowCourseModal(false)
       setMousePosition(null)
@@ -348,15 +370,12 @@ export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) 
                 
                 <div className="courses-grid">
                   {dateCourses.map(course => {
-                    const transform = courseTransforms[course.id]
                     const isNew = newCourseId === course.id
                     const isDeleting = deletingIds.has(course.id)
                     
                     const cardStyle: React.CSSProperties = {}
-                    if (transform && isNew) {
-                      cardStyle.transform = `translate(${transform.x}px, ${transform.y}px) scale(0.8)`
-                      cardStyle.opacity = 0
-                      cardStyle.transition = 'all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)'
+                    if (isNew && newCardStyle) {
+                      Object.assign(cardStyle, newCardStyle)
                     }
                     if (isDeleting) {
                       cardStyle.animation = 'cardExit 0.2s ease forwards'
@@ -367,7 +386,7 @@ export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) 
                       key={course.id}
                       ref={isNew ? newCourseRef : null}
                       style={cardStyle}
-                      className={`course-card ${course.status === 'cancelled' ? 'cancelled' : ''} ${isNew ? 'course-card-enter' : ''}`}
+                      className={`course-card ${course.status === 'cancelled' ? 'cancelled' : ''}`}
                     >
                       {course.status === 'cancelled' && course.cancelReason && (
                         <div className="cancel-reason-bubble">
@@ -413,7 +432,8 @@ export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) 
                         </button>
                       </div>
                     </div>
-                  ))}
+                  );
+                  })}
                 </div>
               </div>
             ))

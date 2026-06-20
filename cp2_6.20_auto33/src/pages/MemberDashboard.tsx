@@ -13,6 +13,7 @@ export default function MemberDashboard({ user, onLogout }: MemberDashboardProps
   const [activeTab, setActiveTab] = useState<'all' | 'my'>('all')
   const [error, setError] = useState('')
   const [bookedIds, setBookedIds] = useState<Set<string>>(new Set())
+  const [justBookedIds, setJustBookedIds] = useState<Set<string>>(new Set())
 
   const fetchCourses = useCallback(async () => {
     try {
@@ -46,6 +47,14 @@ export default function MemberDashboard({ user, onLogout }: MemberDashboardProps
       const updatedCourse = await api.bookCourse(courseId)
       setCourses(prev => prev.map(c => c.id === courseId ? updatedCourse : c))
       setBookedIds(prev => new Set(prev).add(courseId))
+      setJustBookedIds(prev => new Set(prev).add(courseId))
+      setTimeout(() => {
+        setJustBookedIds(prev => {
+          const next = new Set(prev)
+          next.delete(courseId)
+          return next
+        })
+      }, 250)
     } catch (err) {
       setError(err instanceof Error ? err.message : '预约失败')
       setTimeout(() => setError(''), 3000)
@@ -210,7 +219,7 @@ export default function MemberDashboard({ user, onLogout }: MemberDashboardProps
                     </div>
 
                     {bookedIds.has(course.id) ? (
-                      <div className="booked-tag">
+                      <div className={`booked-tag ${justBookedIds.has(course.id) ? 'booked-tag-enter' : ''}`}>
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                           <polyline points="20 6 9 17 4 12" />
                         </svg>
