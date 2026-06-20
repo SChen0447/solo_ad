@@ -1,6 +1,25 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Plus, Search, Edit2, Trash2, X, Guitar, Piano, Drum, Volume2, MoreHorizontal, Calendar, Hash } from 'lucide-react';
 
+const hexToRgb = (hex: string): number[] => {
+  const h = hex.replace('#', '');
+  return [parseInt(h.substring(0, 2), 16), parseInt(h.substring(2, 4), 16), parseInt(h.substring(4, 6), 16)];
+};
+
+const rgbToHex = (r: number, g: number, b: number): string => {
+  return '#' + [r, g, b].map((x) => Math.round(x).toString(16).padStart(2, '0')).join('');
+};
+
+const interpolateColor = (percent: number, startColor: string, endColor: string): string => {
+  const t = Math.max(0, Math.min(100, percent)) / 100;
+  const s = hexToRgb(startColor);
+  const e = hexToRgb(endColor);
+  const r = s[0] + (e[0] - s[0]) * t;
+  const g = s[1] + (e[1] - s[1]) * t;
+  const b = s[2] + (e[2] - s[2]) * t;
+  return rgbToHex(r, g, b);
+};
+
 interface Equipment {
   id: string;
   name: string;
@@ -41,6 +60,7 @@ export default function EquipmentPage() {
   const [sortBy, setSortBy] = useState<SortOption>('brand-asc');
   const [searchQuery, setSearchQuery] = useState('');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [isModalVisible, setIsModalVisible] = useState(false);
   const [editingItem, setEditingItem] = useState<Equipment | null>(null);
   const [isMobile, setIsMobile] = useState(false);
   const [fadeKey, setFadeKey] = useState(0);
@@ -131,6 +151,11 @@ export default function EquipmentPage() {
       usageFrequency: 50,
     });
     setIsAddModalOpen(true);
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        setIsModalVisible(true);
+      });
+    });
   };
 
   const openEditModal = (item: Equipment) => {
@@ -146,6 +171,18 @@ export default function EquipmentPage() {
       usageFrequency: item.usageFrequency,
     });
     setIsAddModalOpen(true);
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        setIsModalVisible(true);
+      });
+    });
+  };
+
+  const closeModal = () => {
+    setIsModalVisible(false);
+    setTimeout(() => {
+      setIsAddModalOpen(false);
+    }, 200);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -170,7 +207,7 @@ export default function EquipmentPage() {
         const created = await res.json();
         setEquipment((prev) => [...prev, created]);
       }
-      setIsAddModalOpen(false);
+      closeModal();
     } catch (err) {
       console.error('提交失败', err);
     }
@@ -190,13 +227,14 @@ export default function EquipmentPage() {
     return (
       <>
         <div
-          onClick={() => setIsAddModalOpen(false)}
+          onClick={closeModal}
           style={{
             position: 'fixed',
             inset: 0,
             background: 'rgba(0,0,0,0.6)',
             zIndex: 200,
-            animation: 'fadeIn 0.2s ease forwards',
+            opacity: isModalVisible ? 1 : 0,
+            transition: 'opacity 0.2s ease',
           }}
         />
         <div
@@ -204,7 +242,9 @@ export default function EquipmentPage() {
             position: 'fixed',
             top: '50%',
             left: '50%',
-            transform: 'translate(-50%, -50%)',
+            transform: isModalVisible
+              ? 'translate(-50%, -50%) scale(1)'
+              : 'translate(-50%, -50%) scale(0.85)',
             width: '500px',
             maxWidth: '94vw',
             background: '#fff',
@@ -215,7 +255,9 @@ export default function EquipmentPage() {
             maxHeight: '90vh',
             overflowY: 'auto',
             boxShadow: '0 24px 60px rgba(0,0,0,0.4)',
-            animation: 'scaleIn 0.25s cubic-bezier(0.34, 1.56, 0.64, 1) forwards',
+            opacity: isModalVisible ? 1 : 0,
+            transition: 'all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1)',
+            pointerEvents: isModalVisible ? 'auto' : 'none',
           }}
         >
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '22px' }}>
@@ -223,7 +265,7 @@ export default function EquipmentPage() {
               {editingItem ? '编辑设备' : '添加设备'}
             </h3>
             <button
-              onClick={() => setIsAddModalOpen(false)}
+              onClick={closeModal}
               style={{ padding: '4px', borderRadius: '6px' }}
               onMouseEnter={(e) => (e.currentTarget.style.background = '#f0f0f0')}
               onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
@@ -342,7 +384,7 @@ export default function EquipmentPage() {
               <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '6px' }}>
                 <button
                   type="button"
-                  onClick={() => setIsAddModalOpen(false)}
+                  onClick={closeModal}
                   style={{
                     padding: '10px 20px',
                     borderRadius: '6px',
@@ -521,7 +563,7 @@ export default function EquipmentPage() {
         ) : (
           filteredList.map((item) => {
             const cardWidth = isMobile ? '100%' : '220px';
-            const usageColor = `linear-gradient(90deg, #6b7280 0%, #6b7280 ${Math.max(0, 100 - item.usageFrequency)}%, #10b981 ${100 - item.usageFrequency}%, #10b981 100%)`;
+            const barColor = interpolateColor(item.usageFrequency, '#cccccc', '#4CAF50');
             const CatIcon = CATEGORY_OPTIONS.find((c) => c.value === item.category)?.icon || MoreHorizontal;
 
             return (
@@ -651,10 +693,20 @@ export default function EquipmentPage() {
                     style={{
                       height: '6px',
                       borderRadius: '3px',
-                      background: usageColor,
-                      transition: 'background 0.3s',
+                      background: '#e5e7eb',
+                      overflow: 'hidden',
                     }}
-                  />
+                  >
+                    <div
+                      style={{
+                        height: '100%',
+                        width: `${item.usageFrequency}%`,
+                        background: barColor,
+                        borderRadius: '3px',
+                        transition: 'width 0.3s ease, background 0.3s ease',
+                      }}
+                    />
+                  </div>
                 </div>
               </div>
             );

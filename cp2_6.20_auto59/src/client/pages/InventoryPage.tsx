@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { Plus, X, ShoppingBag, Tag, DollarSign, Package, Image as ImageIcon } from 'lucide-react';
 
 interface InventoryItem {

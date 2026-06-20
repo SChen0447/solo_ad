@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { ChevronLeft, ChevronRight, X, MapPin, Clock, Users, FileText, Plus } from 'lucide-react';
 
 const TAG_COLORS = ['#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7'];
@@ -21,10 +21,14 @@ export default function CalendarPage() {
   const [currentMonth, setCurrentMonth] = useState(today.getMonth());
   const [events, setEvents] = useState<TourEvent[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isModalVisible, setIsModalVisible] = useState(false);
   const [selectedDate, setSelectedDate] = useState<string>('');
   const [animatingId, setAnimatingId] = useState<string | null>(null);
   const [isMobile, setIsMobile] = useState(false);
   const [monthAnimating, setMonthAnimating] = useState<'left' | 'right' | null>(null);
+
+  const cityColorMapRef = useRef<Map<string, string>>(new Map());
+  const cityColorIndexRef = useRef(0);
 
   const [formData, setFormData] = useState({
     city: '',
@@ -48,12 +52,33 @@ export default function CalendarPage() {
   const fetchEvents = async () => {
     try {
       const res = await fetch('/api/events');
-      const data = await res.json();
+      const data: TourEvent[] = await res.json();
       setEvents(data);
     } catch (err) {
       console.error('获取日程失败', err);
     }
   };
+
+  const getCityColor = useCallback((city: string): string => {
+    const map = cityColorMapRef.current;
+    if (!map.has(city)) {
+      const color = TAG_COLORS[cityColorIndexRef.current % TAG_COLORS.length];
+      cityColorIndexRef.current++;
+      map.set(city, color);
+      return color;
+    }
+    return map.get(city)!;
+  }, []);
+
+  useEffect(() => {
+    events.forEach((e) => {
+      if (!cityColorMapRef.current.has(e.city)) {
+        const color = TAG_COLORS[cityColorIndexRef.current % TAG_COLORS.length];
+        cityColorIndexRef.current++;
+        cityColorMapRef.current.set(e.city, color);
+      }
+    });
+  }, [events]);
 
   const calendarDays = useMemo(() => {
     const firstDay = new Date(currentYear, currentMonth, 1);
@@ -122,6 +147,18 @@ export default function CalendarPage() {
     setSelectedDate(dateStr);
     setFormData({ city: '', venue: '', startTime: '20:00', expectedAudience: 200, notes: '' });
     setIsModalOpen(true);
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        setIsModalVisible(true);
+      });
+    });
+  };
+
+  const closeModal = () => {
+    setIsModalVisible(false);
+    setTimeout(() => {
+      setIsModalOpen(false);
+    }, 200);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -145,7 +182,7 @@ export default function CalendarPage() {
       setAnimatingId(newEvent.id);
       setEvents((prev) => [...prev, newEvent]);
       setTimeout(() => setAnimatingId(null), 400);
-      setIsModalOpen(false);
+      closeModal();
     } catch (err) {
       console.error('创建日程失败', err);
     }
@@ -176,17 +213,19 @@ export default function CalendarPage() {
               <p style={{ fontSize: '14px', color: 'var(--text-secondary)' }}>本月暂无演出安排</p>
             </div>
           ) : (
-            currentMonthEvents.map((e) => (
-              <div
-                key={e.id}
-                style={{
-                  ...styles.eventListItem,
-                  borderLeft: `4px solid ${TAG_COLORS[e.colorIndex % TAG_COLORS.length]}`,
-                }}
-              >
-                <div style={{ fontSize: '18px', fontWeight: 700, color: TAG_COLORS[e.colorIndex % TAG_COLORS.length] }}>
-                  {Number(e.date.split('-')[2])}
-                </div>
+            currentMonthEvents.map((e) => {
+              const color = getCityColor(e.city);
+              return (
+                <div
+                  key={e.id}
+                  style={{
+                    ...styles.eventListItem,
+                    borderLeft: `4px solid ${color}`,
+                  }}
+                >
+                  <div style={{ fontSize: '18px', fontWeight: 700, color }}>
+                    {Number(e.date.split('-')[2])}
+                  </div>
                 <div style={{ flex: 1, marginLeft: '12px' }}>
                   <div style={{ fontSize: '15px', fontWeight: 600, color: '#fff' }}>
                     {e.city} · {e.venue}
@@ -200,7 +239,8 @@ export default function CalendarPage() {
                   </div>
                 </div>
               </div>
-            ))
+              );
+            })
           )}
         </div>
 
@@ -233,13 +273,14 @@ export default function CalendarPage() {
     return (
       <>
         <div
-          onClick={() => setIsModalOpen(false)}
+          onClick={closeModal}
           style={{
             position: 'fixed',
             inset: 0,
             background: 'rgba(0, 0, 0, 0.6)',
             zIndex: 200,
-            animation: 'fadeIn 0.2s ease forwards',
+            opacity: isModalVisible ? 1 : 0,
+            transition: 'opacity 0.2s ease',
           }}
         />
         <div
@@ -247,7 +288,9 @@ export default function CalendarPage() {
             position: 'fixed',
             top: '50%',
             left: '50%',
-            transform: 'translate(-50%, -50%)',
+            transform: isModalVisible
+              ? 'translate(-50%, -50%) scale(1)'
+              : 'translate(-50%, -50%) scale(0.85)',
             width: '440px',
             maxWidth: '92vw',
             background: '#fff',
@@ -256,7 +299,9 @@ export default function CalendarPage() {
             zIndex: 201,
             color: '#1a1a2e',
             boxShadow: '0 24px 60px rgba(0, 0, 0, 0.4)',
-            animation: 'scaleIn 0.25s cubic-bezier(0.34, 1.56, 0.64, 1) forwards',
+            opacity: isModalVisible ? 1 : 0,
+            transition: 'all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1)',
+            pointerEvents: isModalVisible ? 'auto' : 'none',
           }}
         >
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
@@ -264,7 +309,7 @@ export default function CalendarPage() {
               创建演出日程
             </h3>
             <button
-              onClick={() => setIsModalOpen(false)}
+              onClick={closeModal}
               style={{ padding: '4px', borderRadius: '6px' }}
               onMouseEnter={(e) => (e.currentTarget.style.background = '#f0f0f0')}
               onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
@@ -353,7 +398,7 @@ export default function CalendarPage() {
               <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '6px' }}>
                 <button
                   type="button"
-                  onClick={() => setIsModalOpen(false)}
+                  onClick={closeModal}
                   style={{
                     padding: '10px 20px',
                     borderRadius: '6px',
@@ -498,7 +543,7 @@ export default function CalendarPage() {
 
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                       {dayEvents.map((ev) => {
-                        const color = TAG_COLORS[ev.colorIndex % TAG_COLORS.length];
+                        const color = getCityColor(ev.city);
                         const isAnimating = animatingId === ev.id;
                         return (
                           <div
