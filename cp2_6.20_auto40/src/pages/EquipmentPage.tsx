@@ -1,9 +1,12 @@
 /* ============================================
  * 装备集市页面
- * 调用关系：被 App.tsx 路由渲染，调用 EquipmentCard、Modal 组件
- * 数据流向：App.tsx 传入 equipment props → 瀑布流展示
- *          EquipmentCard.onBorrow(id, days) → 打开确认弹窗 → 
- *          api.borrowEquipment → 刷新列表
+ * 上游组件：App.tsx（通过React Router渲染）
+ * 下游组件：EquipmentCard、Modal
+ * 数据流向：
+ *   - 接收：equipment: Equipment[]（来自App.tsx props）
+ *           onEquipmentChange: (Equipment[]) => void（更新父组件状态）
+ *   - 调用EquipmentCard.onBorrow(id, borrowDuration) → 打开确认Modal
+ *   - 确认后 → api.borrowEquipment(id, days) → refresh() → 父组件更新
  * ============================================ */
 
 import React, { useState, useEffect } from 'react'
@@ -37,9 +40,9 @@ const EquipmentPage: React.FC<EquipmentPageProps> = ({ equipment, onEquipmentCha
     refresh()
   }, [category, search])
 
-  const handleOpenBorrow = (equipmentId: string, days: number) => {
+  const handleOpenBorrow = (equipmentId: string, borrowDuration: number) => {
     setSelectedEqId(equipmentId)
-    setSelectedDays(days)
+    setSelectedDays(borrowDuration as 3 | 7 | 14)
     setShowBorrow(true)
   }
 
@@ -148,7 +151,7 @@ const EquipmentPage: React.FC<EquipmentPageProps> = ({ equipment, onEquipmentCha
                       className={`day-option ${selectedDays === d ? 'day-active' : ''}`}
                       onClick={() => setSelectedDays(d)}
                     >
-                      <div className="day-num">{d}天</div>
+                      <div className="day-num">今日起{d}天</div>
                       <div className="day-return">
                         归还: {retDate.toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' })}
                       </div>

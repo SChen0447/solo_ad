@@ -1,67 +1,91 @@
 /* ============================================
- * 类型定义文件
- * 调用关系：被 api.ts、所有组件和页面引用
- * 数据流向：定义所有数据模型，作为前后端数据交互的契约
+ * 共享类型定义
+ * 上游：无（类型定义文件）
+ * 下游：api.ts、所有页面/组件文件
+ * 数据流向：
+ *   - 导出：Activity, Equipment, User, Review, Achievement
+ *     Difficulty, ActivityType, Category 及相关枚举标签
  * ============================================ */
 
+export type ActivityType = 'hiking' | 'camping' | 'climbing' | 'cycling' | 'running'
 export type Difficulty = 'easy' | 'moderate' | 'hard' | 'expert'
-export type ActivityType = 'hiking' | 'camping' | 'climbing' | 'cycling' | 'running' | 'swimming'
-export type EquipmentCategory = 'tent' | 'backpack' | 'sleeping_bag' | 'climbing' | 'cooking' | 'clothing' | 'navigation' | 'other'
-export type EquipmentStatus = 'available' | 'borrowed'
+export type EquipmentCategory = 'tent' | 'backpack' | 'stove' | 'hiking-boots' | 'climbing-gear' | 'sleeping-bag'
 export type ActivityStatus = 'upcoming' | 'ongoing' | 'ended'
+export type EquipmentStatus = 'available' | 'borrowed' | 'maintenance'
+
+export const ActivityTypeLabels: Record<ActivityType, string> = {
+  hiking: '徒步',
+  camping: '露营',
+  climbing: '攀岩',
+  cycling: '骑行',
+  running: '越野跑'
+}
+
+export const DifficultyLabels: Record<Difficulty, { label: string; color: string }> = {
+  easy: { label: '入门', color: '#4CAF50' },
+  moderate: { label: '进阶', color: '#FF8F00' },
+  hard: { label: '挑战', color: '#F44336' },
+  expert: { label: '专家', color: '#9C27B0' }
+}
+
+export const EquipmentCategoryLabels: Record<EquipmentCategory, string> = {
+  tent: '帐篷',
+  backpack: '背包',
+  stove: '炉具',
+  'hiking-boots': '登山鞋',
+  'climbing-gear': '攀岩装备',
+  'sleeping-bag': '睡袋'
+}
 
 export interface Participant {
   id: string
   name: string
   avatar: string
-  registeredAt: string
 }
 
 export interface Activity {
   id: string
   title: string
+  description: string
   type: ActivityType
   date: string
   location: string
+  coverImage: string
   maxParticipants: number
   participants: Participant[]
-  difficulty: Difficulty
-  description: string
-  itinerary: string
-  coverImage: string
   organizer: string
-  createdAt: string
+  difficulty: Difficulty
   status: ActivityStatus
+  itinerary: string
+  createdAt: string
 }
 
 export interface Equipment {
   id: string
   name: string
   category: EquipmentCategory
-  description: string
   imageUrl: string
+  description: string
   status: EquipmentStatus
-  ownerId: string
-  ownerName: string
-  borrowedBy?: string
-  borrowedDate?: string
+  owner: string
+  ownerName?: string
+  ownerAvatar: string
+  condition: string
+  borrowCount: number
   returnDate?: string
-  createdAt: string
 }
 
 export interface User {
   id: string
   name: string
   avatar: string
+  level: number
   bio: string
-  joinDate: string
   registeredActivities: string[]
   completedActivities: string[]
+  unlockedAchievements: string[]
   borrowedEquipment: string[]
-  totalBorrows: number
-  hikingCount: number
-  campingCount: number
-  climbingCount: number
+  activityDates?: { id: string; date: string; title: string; type: string }[]
 }
 
 export interface Review {
@@ -70,8 +94,8 @@ export interface Review {
   userId: string
   userName: string
   userAvatar: string
-  imageUrl?: string
   content: string
+  imageUrl?: string
   likes: number
   likedBy: string[]
   createdAt: string
@@ -79,36 +103,22 @@ export interface Review {
 
 export interface Achievement {
   id: string
-  name: string
+  title: string
   description: string
   icon: string
-  unlocked: boolean
   condition: string
+  unlockedAt?: string
 }
 
-export const ActivityTypeLabels: Record<ActivityType, string> = {
-  hiking: '徒步',
-  camping: '露营',
-  climbing: '登山',
-  cycling: '骑行',
-  running: '跑步',
-  swimming: '游泳'
+export interface PaginatedResponse<T> {
+  data: T[]
+  total: number
+  page: number
+  pageSize: number
 }
 
-export const DifficultyLabels: Record<Difficulty, { label: string; color: string }> = {
-  easy: { label: '简单', color: '#52c41a' },
-  moderate: { label: '中等', color: '#faad14' },
-  hard: { label: '困难', color: '#f5222d' },
-  expert: { label: '专家', color: '#722ed1' }
-}
-
-export const EquipmentCategoryLabels: Record<EquipmentCategory, string> = {
-  tent: '帐篷',
-  backpack: '背包',
-  sleeping_bag: '睡袋',
-  climbing: '攀岩',
-  cooking: '炉具',
-  clothing: '服装',
-  navigation: '导航',
-  other: '其他'
+export interface ApiResponse<T> {
+  success: boolean
+  data: T
+  message?: string
 }

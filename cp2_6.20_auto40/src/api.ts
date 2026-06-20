@@ -1,7 +1,13 @@
 /* ============================================
- * API请求模块
- * 调用关系：被 main.tsx、App.tsx、所有页面组件调用
- * 数据流向：前端组件 → api函数 → 后端server.ts → 内存数据 → 返回前端
+ * API 请求封装模块
+ * 上游组件：App.tsx、ActivityListPage.tsx、ActivityDetailPage.tsx、EquipmentPage.tsx、ProfilePage.tsx
+ * 下游组件：server.ts (Express REST API: /api/*)
+ * 数据流向：
+ *   - 活动：getActivities / getActivity / createActivity / registerActivity / unregisterActivity
+ *   - 装备：getEquipment / borrowEquipment(id, borrowDuration) / returnEquipment
+ *   - 回顾：getReviews / createReview / likeReview
+ *   - 用户：getUser / getUserActivities
+ *   - 成就：getAchievements
  * ============================================ */
 
 import type { Activity, Equipment, Review, User, Achievement } from './types'

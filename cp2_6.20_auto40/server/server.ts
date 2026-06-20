@@ -1,3 +1,25 @@
+/* ============================================
+ * Express 后端服务器 (内存存储)
+ * 上游：前端 src/api.ts (通过 fetch('/api/*') 请求)
+ * 下游：无 (内存数据存储在 activities, equipment, users, reviews, achievements 变量中)
+ * 数据流向：
+ *   REST API:
+ *   GET  /api/user → User
+ *   GET  /api/activities?page=&limit= → { data, total, page, limit }
+ *   GET  /api/activities/:id → Activity
+ *   POST /api/activities → 新建 Activity
+ *   POST /api/activities/:id/register → 用户报名
+ *   POST /api/activities/:id/unregister → 取消报名
+ *   GET  /api/equipment?page=&limit=&category=&search= → 装备列表
+ *   POST /api/equipment/:id/borrow { days } → 借用装备
+ *   POST /api/equipment/:id/return → 归还装备
+ *   GET  /api/reviews/:activityId → Review[]
+ *   POST /api/reviews/:activityId { imageUrl, content } → 新建 Review
+ *   POST /api/reviews/:reviewId/like → 点赞
+ *   GET  /api/achievements → Achievement[]
+ *   GET  /api/user/activities → 用户的活动
+ * ============================================ */
+
 import express, { Request, Response } from 'express'
 import cors from 'cors'
 import { v4 as uuidv4 } from 'uuid'

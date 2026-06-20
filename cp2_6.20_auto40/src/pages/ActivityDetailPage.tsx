@@ -1,3 +1,14 @@
+/* ============================================
+ * 活动详情页面
+ * 上游组件：App.tsx（通过React Router渲染 /activity/:id）
+ * 下游组件：Modal
+ * 数据流向：
+ *   - 接收：useParams() 获取活动id
+ *   - 调用：api.getActivity / api.getReviews / api.getUser → 渲染详情
+ *   - 操作：报名(registerActivity)、取消报名(unregisterActivity)
+ *          点赞(likeReview)、上传回顾(createReview)
+ * ============================================ */
+
 import React, { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import Modal from '../components/Modal'
@@ -62,7 +73,11 @@ const ActivityDetailPage: React.FC = () => {
 
   const handleLike = async (review: Review) => {
     try {
-      setLikeAnimIds(prev => new Set(prev).add(review.id))
+      setLikeAnimIds(prev => {
+        const s = new Set(prev)
+        s.add(review.id)
+        return s
+      })
       setTimeout(() => {
         setLikeAnimIds(prev => {
           const s = new Set(prev)
@@ -132,7 +147,7 @@ const ActivityDetailPage: React.FC = () => {
         <div className="detail-cover-overlay" />
         <div className="detail-cover-content">
           <div className="detail-tags">
-            <span className="detail-tag" style={{ backgroundColor: '#2D6A4F' }}>
+            <span className="detail-tag" style={{ backgroundColor: '#2E7D32' }}>
               {ActivityTypeLabels[activity.type]}
             </span>
             <span className="detail-tag" style={{ backgroundColor: diffInfo.color }}>

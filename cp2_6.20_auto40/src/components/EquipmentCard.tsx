@@ -1,8 +1,11 @@
 /* ============================================
  * 装备卡片组件
- * 调用关系：被 EquipmentPage 调用
- * 数据流向：父组件传入 equipment props → 渲染卡片 → 选择借用期限 → onBorrow 回调
- *          传递 (装备id, 借用天数) 给父组件 → EquipmentPage 调用 api.borrowEquipment
+ * 上游组件：EquipmentPage（父组件）
+ * 下游组件：无（纯展示组件）
+ * 数据流向：
+ *   - 接收：equipment: Equipment（装备对象）
+ *   - 发送：onBorrow(equipmentId: string, borrowDuration: number) 回调给父组件
+ *     → EquipmentPage 打开确认弹窗 → 调用 api.borrowEquipment(id, days)
  * ============================================ */
 
 import React, { useState } from 'react'
@@ -11,7 +14,7 @@ import { EquipmentCategoryLabels } from '../types'
 
 interface EquipmentCardProps {
   equipment: Equipment
-  onBorrow?: (equipmentId: string, days: number) => void
+  onBorrow?: (equipmentId: string, borrowDuration: number) => void
 }
 
 const EquipmentCard: React.FC<EquipmentCardProps> = ({ equipment, onBorrow }) => {
@@ -62,7 +65,7 @@ const EquipmentCard: React.FC<EquipmentCardProps> = ({ equipment, onBorrow }) =>
                   onClick={() => setBorrowDays(d)}
                   disabled={!isAvailable}
                 >
-                  {d}天
+                  今日起{d}天
                 </button>
               ))}
             </div>

@@ -1,3 +1,14 @@
+/* ============================================
+ * 活动列表页面
+ * 上游组件：App.tsx（通过React Router渲染 /）
+ * 下游组件：ActivityCard、Modal
+ * 数据流向：
+ *   - 接收：activities: Activity[]（来自App.tsx props）
+ *           onActivitiesChange: (Activity[]) => void
+ *   - 调用ActivityCard.onRegister(id) → api.registerActivity/unregisterActivity → 更新
+ *   - "新建活动" → Modal 表单 → api.createActivity → 刷新列表
+ * ============================================ */
+
 import React, { useState, useEffect } from 'react'
 import ActivityCard from '../components/ActivityCard'
 import Modal from '../components/Modal'
@@ -135,7 +146,8 @@ const ActivityListPage: React.FC<ActivityListPageProps> = ({ activities, onActiv
         )}
       </div>
 
-      <Modal isOpen={showCreate} title="发布新活动" onClose={() => setShowCreate(false)} width="560px">
+      {/* 新建活动Modal - 从中央淡入放大0.25秒，背景rgba(0,0,0,0.6) */}
+      <Modal isOpen={showCreate} title="发布新活动" onClose={() => !loading && setShowCreate(false)} width="560px">
         <form onSubmit={handleSubmit} className="form-group">
           <div className="form-row">
             <label className="form-label">活动名称 *</label>
@@ -240,7 +252,7 @@ const ActivityListPage: React.FC<ActivityListPageProps> = ({ activities, onActiv
             />
           </div>
           <div className="form-actions">
-            <button type="button" className="btn-ghost" onClick={() => setShowCreate(false)}>取消</button>
+            <button type="button" className="btn-ghost" onClick={() => setShowCreate(false)} disabled={loading}>取消</button>
             <button type="submit" className="btn-primary" disabled={loading}>
               {loading ? '提交中...' : '发布活动'}
             </button>
