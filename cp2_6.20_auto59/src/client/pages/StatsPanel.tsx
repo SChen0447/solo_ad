@@ -24,18 +24,10 @@ interface StatsData {
 
 interface StatsPanelProps {
   standalone?: boolean;
+  highlight?: boolean;
 }
 
-const PANEL_BG = standalone
-  ? {}
-  : {
-      background: 'rgba(255, 255, 255, 0.06)',
-      backdropFilter: 'blur(8px)',
-      WebkitBackdropFilter: 'blur(8px)',
-      border: '1px solid rgba(255, 255, 255, 0.1)',
-    };
-
-export default function StatsPanel({ standalone = false }: StatsPanelProps) {
+export default function StatsPanel({ standalone = false, highlight = false }: StatsPanelProps) {
   const [stats, setStats] = useState<StatsData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isMobile, setIsMobile] = useState(false);
@@ -71,14 +63,14 @@ export default function StatsPanel({ standalone = false }: StatsPanelProps) {
     return (
       <div
         style={{
-          borderRadius: standalone ? '14px' : '16px',
-          padding: standalone ? '0' : '20px 16px',
+          borderRadius: '12px',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
           color: 'var(--text-secondary)',
           fontSize: '13px',
-          height: '200px',
+          height: standalone ? '200px' : '120px',
+          background: standalone ? 'var(--bg-card)' : 'transparent',
         }}
       >
         加载中...
@@ -91,10 +83,9 @@ export default function StatsPanel({ standalone = false }: StatsPanelProps) {
       style={{
         display: 'flex',
         flexDirection: 'column',
-        gap: standalone ? '20px' : '16px',
-        ...(standalone ? {} : PANEL_BG),
-        borderRadius: standalone ? undefined : '16px',
-        padding: standalone ? undefined : '20px 16px',
+        gap: standalone ? '20px' : '14px',
+        transition: 'all 0.3s ease',
+        transform: highlight ? 'scale(1.01)' : 'scale(1)',
       }}
     >
       <StatCard title={`${year}年度演出`} icon={Music2} iconColor="#45B7D1">

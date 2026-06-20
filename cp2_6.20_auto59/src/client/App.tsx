@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { Routes, Route, Navigate, useLocation, NavLink } from 'react-router-dom';
+import { useState, useEffect, useRef } from 'react';
+import { Routes, Route, Navigate, useLocation, useNavigate, NavLink } from 'react-router-dom';
 import { Calendar, Package, Boxes, BarChart3, Music } from 'lucide-react';
 import CalendarPage from './pages/CalendarPage';
 import EquipmentPage from './pages/EquipmentPage';
@@ -15,8 +15,11 @@ const navItems = [
 
 export default function App() {
   const location = useLocation();
+  const navigate = useNavigate();
   const [transitionKey, setTransitionKey] = useState(location.pathname);
   const [isMobile, setIsMobile] = useState(false);
+  const [panelHighlight, setPanelHighlight] = useState(false);
+  const panelRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const checkMobile = () => setIsMobile(window.innerWidth < 768);
@@ -28,6 +31,24 @@ export default function App() {
   useEffect(() => {
     setTransitionKey(location.pathname);
   }, [location.pathname]);
+
+  const handleStatsNavClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    if (isMobile) {
+      navigate('/stats');
+      return;
+    }
+    if (location.pathname === '/stats') {
+      navigate('/calendar');
+    }
+    setPanelHighlight(true);
+    setTimeout(() => setPanelHighlight(false), 1500);
+    if (panelRef.current) {
+      panelRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  };
+
+  const isStatsActive = location.pathname === '/stats' || panelHighlight;
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh', background: 'var(--bg-primary)' }}>
@@ -79,7 +100,57 @@ export default function App() {
             overflowX: isMobile ? 'auto' : 'visible',
           }}
         >
-          {navItems.map(({ path, label, icon: Icon }) => (
+          {navItems.map(({ path, label, icon: Icon }) => {
+            const isStatsItem = path === '/stats';
+            const showAsActive = isStatsItem && !isMobile ? isStatsActive : undefined;
+
+            if (isStatsItem && !isMobile) {
+              return (
+                <button
+                  key={path}
+                  onClick={handleStatsNavClick}
+                  style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '8px',
+                    padding: '16px 12px',
+                    textDecoration: 'none',
+                    color: isStatsActive ? '#fff' : 'var(--text-secondary)',
+                    background: isStatsActive ? 'var(--bg-nav-hover)' : 'transparent',
+                    borderRadius: '8px',
+                    transition: 'all 0.2s ease',
+                    position: 'relative',
+                    whiteSpace: 'nowrap',
+                    flexShrink: 0,
+                    fontSize: '13px',
+                    fontWeight: isStatsActive ? 600 : 400,
+                    borderLeft: isStatsActive ? '4px solid var(--accent-3)' : '4px solid transparent',
+                    boxShadow: isStatsActive
+                      ? '0 0 12px rgba(69,183,209,0.5), inset 0 0 20px rgba(83,52,131,0.3)'
+                      : 'none',
+                    width: '100%',
+                    cursor: 'pointer',
+                  }}
+                  onMouseEnter={(e) => {
+                    if (!isStatsActive) {
+                      e.currentTarget.style.background = 'rgba(83, 52, 131, 0.4)';
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!isStatsActive) {
+                      e.currentTarget.style.background = 'transparent';
+                    }
+                  }}
+                >
+                  <Icon size={22} strokeWidth={2} />
+                  <span>{label}</span>
+                </button>
+              );
+            }
+
+            return (
             <NavLink
               key={path}
               to={path}
@@ -120,7 +191,8 @@ export default function App() {
               <Icon size={isMobile ? 18 : 22} strokeWidth={2} />
               <span>{label}</span>
             </NavLink>
-          ))}
+            );
+          })}
         </div>
       </nav>
 
@@ -128,12 +200,10 @@ export default function App() {
         style={{
           flex: 1,
           marginLeft: isMobile ? 0 : '220px',
-          paddingTop: isMobile ? '72px' : '0',
-          paddingRight: !isMobile && location.pathname !== '/stats' ? '340px' : '20px',
-          padding: isMobile ? '72px 12px 24px' : undefined,
-          paddingLeft: isMobile ? '12px' : '32px',
-          paddingTopDesktop: '32px',
+          marginRight: isMobile ? 0 : '320px',
           paddingTop: isMobile ? '72px' : '32px',
+          paddingLeft: isMobile ? '12px' : '32px',
+          paddingRight: isMobile ? '12px' : '24px',
           paddingBottom: '40px',
           position: 'relative',
           minHeight: '100vh',
@@ -150,20 +220,25 @@ export default function App() {
             <Route path="/equipment" element={<EquipmentPage />} />
             <Route path="/inventory" element={<InventoryPage />} />
             <Route path="/stats" element={
-              <div style={{ maxWidth: '900px', margin: '0 auto' }}>
-                <h2 style={{ fontSize: '22px', fontWeight: 700, marginBottom: '24px', color: '#fff' }}>
-                  数据统计中心
-                </h2>
-                <StatsPanel standalone />
-              </div>
+              isMobile ? (
+                <div>
+                  <h2 style={{ fontSize: '22px', fontWeight: 700, marginBottom: '20px', color: '#fff' }}>
+                    数据统计
+                  </h2>
+                  <StatsPanel standalone />
+                </div>
+              ) : (
+                <Navigate to="/calendar" replace />
+              )
             } />
             <Route path="*" element={<Navigate to="/calendar" replace />} />
           </Routes>
         </div>
       </main>
 
-      {!isMobile && location.pathname !== '/stats' && (
-        <div
+      {!isMobile && (
+        <aside
+          ref={panelRef}
           style={{
             position: 'fixed',
             top: 0,
@@ -173,10 +248,42 @@ export default function App() {
             padding: '20px 16px',
             zIndex: 50,
             overflowY: 'auto',
+            background: 'rgba(255, 255, 255, 0.04)',
+            backdropFilter: 'blur(10px)',
+            WebkitBackdropFilter: 'blur(10px)',
+            borderLeft: '1px solid rgba(255, 255, 255, 0.06)',
+            transition: 'all 0.3s ease',
+            boxShadow: panelHighlight
+              ? 'inset 4px 0 0 var(--accent-3), 0 0 40px rgba(69, 183, 209, 0.2)'
+              : 'none',
           }}
         >
-          <StatsPanel />
-        </div>
+          <div
+            style={{
+              position: 'sticky',
+              top: 0,
+              background: 'linear-gradient(180deg, rgba(255,255,255,0.02) 0%, rgba(255,255,255,0) 100%)',
+              padding: '0 4px 12px',
+              marginBottom: '8px',
+              zIndex: 2,
+            }}
+          >
+            <h3
+              style={{
+                fontSize: '15px',
+                fontWeight: 700,
+                color: '#fff',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+              }}
+            >
+              <BarChart3 size={18} color="#45B7D1" />
+              数据概览
+            </h3>
+          </div>
+          <StatsPanel highlight={panelHighlight} />
+        </aside>
       )}
     </div>
   );

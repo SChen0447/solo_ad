@@ -14,9 +14,13 @@ interface InventoryItem {
 export default function InventoryPage() {
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
   const [selectedItem, setSelectedItem] = useState<InventoryItem | null>(null);
+  const [isDetailVisible, setIsDetailVisible] = useState(false);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [isAddModalVisible, setIsAddModalVisible] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const [lowStockItems, setLowStockItems] = useState<Set<string>>(new Set());
+  const [containerWidth, setContainerWidth] = useState(0);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   const [formData, setFormData] = useState({
     name: '',
@@ -30,10 +34,23 @@ export default function InventoryPage() {
   const [detailData, setDetailData] = useState({ stockQuantity: 0, maxStock: 100 });
 
   useEffect(() => {
-    const checkMobile = () => setIsMobile(window.innerWidth < 768);
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
     checkMobile();
     window.addEventListener('resize', checkMobile);
     return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
+  useEffect(() => {
+    const updateWidth = () => {
+      if (containerRef.current) {
+        setContainerWidth(containerRef.current.offsetWidth);
+      }
+    };
+    updateWidth();
+    window.addEventListener('resize', updateWidth);
+    return () => window.removeEventListener('resize', updateWidth);
   }, []);
 
   useEffect(() => {
@@ -62,10 +79,42 @@ export default function InventoryPage() {
   const openDetail = (item: InventoryItem) => {
     setSelectedItem(item);
     setDetailData({ stockQuantity: item.stockQuantity, maxStock: item.maxStock });
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        setIsDetailVisible(true);
+      });
+    });
   };
 
   const closeDetail = () => {
-    setSelectedItem(null);
+    setIsDetailVisible(false);
+    setTimeout(() => {
+      setSelectedItem(null);
+    }, 200);
+  };
+
+  const openAddModal = () => {
+    setFormData({
+      name: '',
+      category: '服装',
+      unitPrice: 0,
+      stockQuantity: 0,
+      maxStock: 100,
+      coverUrl: '',
+    });
+    setIsAddModalOpen(true);
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        setIsAddModalVisible(true);
+      });
+    });
+  };
+
+  const closeAddModal = () => {
+    setIsAddModalVisible(false);
+    setTimeout(() => {
+      setIsAddModalOpen(false);
+    }, 200);
   };
 
   const handleStockUpdate = async () => {
@@ -95,7 +144,7 @@ export default function InventoryPage() {
       });
       const created = await res.json();
       setInventory((prev) => [...prev, created]);
-      setIsAddModalOpen(false);
+      closeAddModal();
     } catch (err) {
       console.error('创建商品失败', err);
     }
@@ -175,7 +224,7 @@ export default function InventoryPage() {
           </p>
         </div>
         <button
-          onClick={() => setIsAddModalOpen(true)}
+          onClick={openAddModal}
           style={{
             display: 'flex',
             alignItems: 'center',
@@ -227,29 +276,24 @@ export default function InventoryPage() {
       )}
 
       <div
+        ref={containerRef}
         style={{
-          columnCount: isMobile ? 1 : undefined,
-          display: isMobile ? 'flex' : 'grid',
-          gridTemplateColumns: isMobile ? undefined : 'repeat(auto-fill, minmax(200px, 200px))',
-          flexDirection: isMobile ? 'column' : undefined,
-          gap: isMobile ? '14px' : '18px',
-          alignItems: 'start',
-          justifyContent: 'start',
+          columnCount: isMobile ? 1 : Math.max(1, Math.floor(containerWidth / 218)),
+          columnGap: isMobile ? '14px' : '18px',
+          columnFill: 'balance',
         }}
       >
         {inventory.map((item) => {
-          const cardWidth = isMobile ? '100%' : '200px';
           const isLow = lowStockItems.has(item.id);
-          const randomHeights = [240, 270, 220, 250, 230, 260];
-          const cardHeight = randomHeights[item.name.length % randomHeights.length];
 
           return (
             <div
               key={item.id}
               onClick={() => openDetail(item)}
               style={{
-                width: cardWidth,
-                minHeight: isMobile ? undefined : cardHeight,
+                width: '100%',
+                marginBottom: isMobile ? '14px' : '18px',
+                breakInside: 'avoid',
                 background: '#16213e',
                 borderRadius: '8px',
                 overflow: 'hidden',
@@ -258,8 +302,9 @@ export default function InventoryPage() {
                 boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.05), inset 0 4px 12px rgba(0,0,0,0.2)',
                 position: 'relative',
                 border: isLow ? '1px solid rgba(255,107,107,0.3)' : '1px solid transparent',
-                display: 'flex',
+                display: 'inline-flex',
                 flexDirection: 'column',
+                animation: 'fadeIn 0.3s ease forwards',
               }}
               onMouseEnter={(e) => {
                 e.currentTarget.style.transform = 'translateY(-4px) scale(1.01)';
@@ -372,13 +417,14 @@ export default function InventoryPage() {
       {isAddModalOpen && (
         <>
           <div
-            onClick={() => setIsAddModalOpen(false)}
+            onClick={closeAddModal}
             style={{
               position: 'fixed',
               inset: 0,
               background: 'rgba(0,0,0,0.6)',
               zIndex: 200,
-              animation: 'fadeIn 0.2s ease forwards',
+              opacity: isAddModalVisible ? 1 : 0,
+              transition: 'opacity 0.2s ease',
             }}
           />
           <div
@@ -386,7 +432,6 @@ export default function InventoryPage() {
               position: 'fixed',
               top: '50%',
               left: '50%',
-              transform: 'translate(-50%, -50%)',
               width: '480px',
               maxWidth: '94vw',
               background: '#fff',
@@ -395,13 +440,15 @@ export default function InventoryPage() {
               zIndex: 201,
               color: '#1a1a2e',
               boxShadow: '0 24px 60px rgba(0,0,0,0.4)',
-              animation: 'scaleIn 0.25s cubic-bezier(0.34, 1.56, 0.64, 1) forwards',
+              opacity: isAddModalVisible ? 1 : 0,
+              transform: isAddModalVisible ? 'translate(-50%, -50%) scale(1)' : 'translate(-50%, -50%) scale(0.9)',
+              transition: 'all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1)',
             }}
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '22px' }}>
               <h3 style={{ fontSize: '18px', fontWeight: 700, color: '#16213e' }}>添加商品</h3>
               <button
-                onClick={() => setIsAddModalOpen(false)}
+                onClick={closeAddModal}
                 style={{ padding: '4px', borderRadius: '6px' }}
                 onMouseEnter={(e) => (e.currentTarget.style.background = '#f0f0f0')}
                 onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
@@ -538,7 +585,8 @@ export default function InventoryPage() {
               inset: 0,
               background: 'rgba(0,0,0,0.6)',
               zIndex: 200,
-              animation: 'fadeIn 0.2s ease forwards',
+              opacity: isDetailVisible ? 1 : 0,
+              transition: 'opacity 0.2s ease',
             }}
           />
           <div
@@ -555,7 +603,9 @@ export default function InventoryPage() {
               zIndex: 201,
               color: '#1a1a2e',
               boxShadow: '0 24px 60px rgba(0,0,0,0.4)',
-              animation: 'scaleIn 0.25s cubic-bezier(0.34, 1.56, 0.64, 1) forwards',
+              opacity: isDetailVisible ? 1 : 0,
+              transform: isDetailVisible ? 'translate(-50%, -50%) scale(1)' : 'translate(-50%, -50%) scale(0.9)',
+              transition: 'all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1)',
             }}
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '22px' }}>
