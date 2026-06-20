@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>海洋生态模拟 | Ocean Ecosystem Simulation</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Source+Sans+3:wght@300;400;600&display=swap" rel="stylesheet" />
+  </head>
+  <body>
+    <canvas id="ocean-canvas"></canvas>
+    <div id="stats-bar">
+      <div class="stat-item"><span class="stat-label">FPS</span><span id="fps-value" class="stat-value">0</span></div>
+      <div class="stat-item"><span class="stat-label">鱼群</span><span id="fish-count" class="stat-value">0</span></div>
+      <div class="stat-item"><span class="stat-label">粒子</span><span id="particle-count" class="stat-value">0</span></div>
+    </div>
+    <div id="control-panel" class="panel">
+      <h2 class="panel-title">控制面板</h2>
+      <div class="control-group">
+        <label class="control-label">鱼群密度 <span id="fish-density-val" class="control-val">80</span></label>
+        <input type="range" id="fish-density" min="20" max="200" value="80" class="slider" />
+      </div>
+      <div class="control-group">
+        <label class="control-label">洋流速度 <span id="current-speed-val" class="control-val">1.0x</span></label>
+        <input type="range" id="current-speed" min="50" max="300" value="100" step="10" class="slider" />
+      </div>
+      <button id="reset-btn" class="btn-reset">重置模拟</button>
+    </div>
+    <div id="chart-panel" class="panel">
+      <h2 class="panel-title">环境数据</h2>
+      <div class="chart-container">
+        <canvas id="temp-chart"></canvas>
+      </div>
+      <div class="chart-container">
+        <canvas id="salinity-chart"></canvas>
+      </div>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
