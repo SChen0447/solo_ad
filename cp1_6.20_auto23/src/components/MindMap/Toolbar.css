@@ -1,0 +1,194 @@
+.toolbar {
+  height: 60px;
+  background: white;
+  border-bottom: 1px solid #e0e0e0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 24px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
+  z-index: 100;
+}
+
+.toolbar-left {
+  display: flex;
+  align-items: center;
+  min-width: 200px;
+}
+
+.app-logo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.app-logo-icon {
+  width: 28px;
+  height: 28px;
+}
+
+.app-name {
+  font-size: 18px;
+  font-weight: 700;
+  color: #202124;
+}
+
+.toolbar-center {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+}
+
+.room-info {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.room-name {
+  font-size: 16px;
+  font-weight: 600;
+  color: #202124;
+}
+
+.room-id-container {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.room-id-label {
+  font-size: 12px;
+  color: #5f6368;
+}
+
+.room-id-text {
+  font-size: 12px;
+  font-weight: 500;
+  color: #1a73e8;
+  font-family: monospace;
+}
+
+.copy-btn {
+  width: 24px;
+  height: 24px;
+  border: none;
+  background: #f5f5f5;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+}
+
+.copy-btn:hover {
+  background: #e8eaed;
+}
+
+.toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-width: 200px;
+  justify-content: flex-end;
+}
+
+.toolbar-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.toolbar-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border: 1px solid #e0e0e0;
+  background: white;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #5f6368;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.toolbar-btn:hover {
+  border-color: #1a73e8;
+  color: #1a73e8;
+  background: #f8fafd;
+}
+
+.btn-icon {
+  font-size: 16px;
+}
+
+.btn-text {
+  font-size: 12px;
+}
+
+.user-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.user-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: 600;
+  color: white;
+}
+
+.user-name {
+  font-size: 14px;
+  font-weight: 500;
+  color: #202124;
+}
+
+@media (max-width: 768px) {
+  .toolbar {
+    height: 56px;
+    padding: 0 16px;
+  }
+
+  .app-name {
+    display: none;
+  }
+
+  .toolbar-left {
+    min-width: auto;
+  }
+
+  .toolbar-right {
+    min-width: auto;
+  }
+
+  .user-name {
+    display: none;
+  }
+
+  .btn-text {
+    display: none;
+  }
+
+  .toolbar-btn {
+    padding: 8px;
+  }
+
+  .room-name {
+    font-size: 14px;
+  }
+
+  .room-id-container {
+    display: none;
+  }
+}

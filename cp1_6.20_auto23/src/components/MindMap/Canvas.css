@@ -1,0 +1,250 @@
+.canvas-container {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  overflow: hidden;
+  cursor: grab;
+  user-select: none;
+}
+
+.canvas-container:active {
+  cursor: grabbing;
+}
+
+.canvas-svg {
+  width: 100%;
+  height: 100%;
+}
+
+.canvas-bg {
+  cursor: grab;
+}
+
+.canvas-transform {
+  transition: transform 0.05s ease-out;
+}
+
+.mindmap-node {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 16px;
+  border: 2px solid #e0e0e0;
+  border-radius: 12px;
+  background-color: #ffffff;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  text-align: center;
+  overflow: hidden;
+}
+
+.mindmap-node:hover {
+  transform: scale(1.05);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+}
+
+.mindmap-node.selected {
+  box-shadow: 0 0 0 3px rgba(26, 115, 232, 0.3), 0 4px 16px rgba(0, 0, 0, 0.15);
+}
+
+.mindmap-node.hovered {
+  transform: scale(1.05);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+}
+
+.mindmap-node.drop-target {
+  box-shadow: 0 0 0 3px #1a73e8, 0 4px 16px rgba(0, 0, 0, 0.15);
+  transform: scale(1.08);
+}
+
+.mindmap-node.dragging {
+  opacity: 0.8;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+  z-index: 1000;
+}
+
+.node-text {
+  font-size: inherit;
+  font-weight: 500;
+  color: #202124;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  pointer-events: none;
+}
+
+.add-button-group {
+  cursor: pointer;
+}
+
+.add-button-bg {
+  transition: all 0.15s ease;
+}
+
+.add-button-group:hover .add-button-bg {
+  filter: brightness(1.1);
+  r: 14;
+}
+
+.add-button-icon {
+  pointer-events: none;
+}
+
+.cursor-layer {
+  pointer-events: none;
+}
+
+.cursor-label {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 4px;
+  color: white;
+  font-size: 11px;
+  font-weight: 500;
+  white-space: nowrap;
+  opacity: 0.9;
+}
+
+.notification-tooltip {
+  pointer-events: none;
+  animation: fadeIn 0.3s ease;
+}
+
+.notification-content {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  background: rgba(0, 0, 0, 0.8);
+  border-radius: 6px;
+  color: white;
+  font-size: 11px;
+  white-space: nowrap;
+  animation: slideDown 0.3s ease, fadeOut 0.3s ease 2.7s forwards;
+}
+
+.notification-avatar {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 600;
+  color: white;
+}
+
+.notification-text {
+  flex: 1;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes fadeOut {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes slideDown {
+  from {
+    transform: translateY(-10px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.drop-preview-line {
+  animation: dashMove 0.5s linear infinite;
+}
+
+@keyframes dashMove {
+  to {
+    stroke-dashoffset: -12;
+  }
+}
+
+.context-menu {
+  position: absolute;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+  padding: 4px 0;
+  z-index: 1000;
+  min-width: 120px;
+}
+
+.context-menu-item {
+  padding: 8px 16px;
+  cursor: pointer;
+  font-size: 14px;
+  color: #202124;
+  transition: background-color 0.1s ease;
+}
+
+.context-menu-item:hover {
+  background-color: #f5f5f5;
+}
+
+.zoom-controls {
+  position: absolute;
+  bottom: 20px;
+  right: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  z-index: 100;
+}
+
+.zoom-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  background: white;
+  border: 1px solid #e0e0e0;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  font-size: 18px;
+  color: #5f6368;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.zoom-btn:hover {
+  background: #f5f5f5;
+  color: #1a73e8;
+}
+
+.zoom-btn:active {
+  transform: scale(0.95);
+}
+
+@media (max-width: 768px) {
+  .zoom-controls {
+    bottom: 16px;
+    right: 16px;
+  }
+
+  .zoom-btn {
+    width: 40px;
+    height: 40px;
+    font-size: 20px;
+  }
+}
