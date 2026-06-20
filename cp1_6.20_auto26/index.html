@@ -1,0 +1,578 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>日历年轮 · 二十年时光探索</title>
+  <style>
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      font-family: "Segoe UI", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+      color: #e6ecff;
+    }
+
+    body {
+      background:
+        radial-gradient(ellipse at 20% 10%, rgba(0, 240, 255, 0.08) 0%, transparent 50%),
+        radial-gradient(ellipse at 80% 90%, rgba(255, 107, 107, 0.08) 0%, transparent 50%),
+        radial-gradient(ellipse at 50% 50%, rgba(255, 217, 61, 0.05) 0%, transparent 60%),
+        linear-gradient(135deg, #0b0e14 0%, #0f1420 50%, #0b0e14 100%);
+      position: relative;
+    }
+
+    body::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background-image:
+        radial-gradient(1px 1px at 20px 30px, rgba(255,255,255,0.8), transparent),
+        radial-gradient(1px 1px at 60px 70px, rgba(255,255,255,0.5), transparent),
+        radial-gradient(1.5px 1.5px at 120px 140px, rgba(255,255,255,0.7), transparent),
+        radial-gradient(1px 1px at 180px 50px, rgba(255,255,255,0.4), transparent),
+        radial-gradient(1px 1px at 250px 200px, rgba(255,255,255,0.6), transparent),
+        radial-gradient(1px 1px at 320px 80px, rgba(255,255,255,0.3), transparent),
+        radial-gradient(1.5px 1.5px at 400px 300px, rgba(255,255,255,0.8), transparent),
+        radial-gradient(1px 1px at 480px 160px, rgba(255,255,255,0.5), transparent),
+        radial-gradient(1px 1px at 560px 260px, rgba(255,255,255,0.7), transparent),
+        radial-gradient(1px 1px at 640px 90px, rgba(255,255,255,0.4), transparent),
+        radial-gradient(1.5px 1.5px at 720px 350px, rgba(255,255,255,0.6), transparent),
+        radial-gradient(1px 1px at 800px 120px, rgba(255,255,255,0.5), transparent);
+      background-size: 900px 500px;
+      opacity: 0.6;
+      pointer-events: none;
+      animation: twinkle 8s ease-in-out infinite alternate;
+    }
+
+    @keyframes twinkle {
+      0% { opacity: 0.4; }
+      100% { opacity: 0.7; }
+    }
+
+    .app {
+      display: flex;
+      flex-direction: column;
+      width: 100%;
+      height: 100vh;
+      position: relative;
+      z-index: 1;
+    }
+
+    .header {
+      padding: 16px 32px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid rgba(0, 240, 255, 0.12);
+      backdrop-filter: blur(8px);
+      background: rgba(11, 14, 20, 0.5);
+    }
+
+    .header h1 {
+      font-size: 20px;
+      font-weight: 600;
+      letter-spacing: 2px;
+      background: linear-gradient(90deg, #00f0ff, #ffd93d, #ff6b6b);
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .header .legend {
+      display: flex;
+      gap: 20px;
+      font-size: 12px;
+      color: #9aa3bd;
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .legend-shape {
+      width: 12px;
+      height: 12px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .legend-circle {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: #00f0ff;
+      box-shadow: 0 0 8px #00f0ff;
+    }
+
+    .legend-triangle {
+      width: 0;
+      height: 0;
+      border-left: 6px solid transparent;
+      border-right: 6px solid transparent;
+      border-bottom: 10px solid #ffd93d;
+      filter: drop-shadow(0 0 4px #ffd93d);
+    }
+
+    .legend-diamond {
+      width: 9px;
+      height: 9px;
+      background: #ff6b6b;
+      transform: rotate(45deg);
+      box-shadow: 0 0 8px #ff6b6b;
+    }
+
+    .main-area {
+      flex: 1;
+      display: flex;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .svg-container {
+      flex: 1;
+      position: relative;
+      overflow: hidden;
+    }
+
+    svg.ring-viz {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    .tooltip {
+      position: fixed;
+      pointer-events: none;
+      padding: 12px 16px;
+      background: rgba(20, 26, 40, 0.72);
+      backdrop-filter: blur(16px) saturate(140%);
+      -webkit-backdrop-filter: blur(16px) saturate(140%);
+      border: 1px solid rgba(0, 240, 255, 0.25);
+      border-radius: 12px;
+      color: #e6ecff;
+      font-size: 13px;
+      line-height: 1.6;
+      min-width: 220px;
+      max-width: 320px;
+      opacity: 0;
+      transform: translate(-50%, -120%) scale(0.96);
+      transition: opacity 0.22s cubic-bezier(0.4,0,0.2,1),
+                  transform 0.22s cubic-bezier(0.4,0,0.2,1);
+      z-index: 100;
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5),
+                  0 0 20px rgba(0, 240, 255, 0.08);
+    }
+
+    .tooltip.visible {
+      opacity: 1;
+      transform: translate(-50%, -120%) scale(1);
+    }
+
+    .tooltip-title {
+      font-weight: 600;
+      font-size: 14px;
+      color: #ffffff;
+      margin-bottom: 6px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .tooltip-date {
+      font-size: 11px;
+      color: #7cc9ff;
+      margin-bottom: 8px;
+      letter-spacing: 0.5px;
+    }
+
+    .tooltip-type {
+      display: inline-block;
+      font-size: 10px;
+      padding: 2px 8px;
+      border-radius: 10px;
+      margin-bottom: 8px;
+    }
+
+    .tooltip-type.culture { background: rgba(0, 240, 255, 0.18); color: #00f0ff; border: 1px solid rgba(0,240,255,0.35); }
+    .tooltip-type.tech { background: rgba(255, 217, 61, 0.18); color: #ffd93d; border: 1px solid rgba(255,217,61,0.35); }
+    .tooltip-type.politics { background: rgba(255, 107, 107, 0.18); color: #ff6b6b; border: 1px solid rgba(255,107,107,0.35); }
+
+    .tooltip-desc {
+      font-size: 12px;
+      color: #b8c0d8;
+      line-height: 1.6;
+    }
+
+    .tooltip-stars {
+      margin-top: 8px;
+      color: #ffd93d;
+      font-size: 11px;
+      letter-spacing: 2px;
+    }
+
+    .event-panel {
+      width: 25%;
+      min-width: 300px;
+      max-width: 420px;
+      height: 100%;
+      background: rgba(14, 18, 30, 0.78);
+      backdrop-filter: blur(20px) saturate(140%);
+      -webkit-backdrop-filter: blur(20px) saturate(140%);
+      border-left: 1px solid rgba(0, 240, 255, 0.15);
+      transform: translateX(105%);
+      transition: transform 0.35s cubic-bezier(0.4,0,0.2,1);
+      display: flex;
+      flex-direction: column;
+      z-index: 50;
+      flex-shrink: 0;
+    }
+
+    .event-panel.open {
+      transform: translateX(0);
+    }
+
+    .panel-header {
+      padding: 20px 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid rgba(0, 240, 255, 0.12);
+    }
+
+    .panel-year {
+      font-size: 28px;
+      font-weight: 700;
+      background: linear-gradient(135deg, #00f0ff, #00a2ff);
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+      letter-spacing: 2px;
+    }
+
+    .panel-close {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      border: 1px solid rgba(255,255,255,0.15);
+      background: transparent;
+      color: #9aa3bd;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s;
+      font-size: 18px;
+      line-height: 1;
+    }
+
+    .panel-close:hover {
+      background: rgba(255, 107, 107, 0.15);
+      color: #ff6b6b;
+      border-color: rgba(255, 107, 107, 0.4);
+    }
+
+    .panel-count {
+      padding: 8px 24px;
+      font-size: 12px;
+      color: #7c859e;
+      letter-spacing: 1px;
+      background: rgba(0, 240, 255, 0.04);
+    }
+
+    .panel-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 8px 12px 24px;
+      scrollbar-width: thin;
+      scrollbar-color: rgba(0,240,255,0.3) transparent;
+    }
+
+    .panel-list::-webkit-scrollbar {
+      width: 4px;
+    }
+
+    .panel-list::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    .panel-list::-webkit-scrollbar-thumb {
+      background: rgba(0, 240, 255, 0.3);
+      border-radius: 4px;
+    }
+
+    .event-item {
+      padding: 14px 16px;
+      margin: 8px 0;
+      background: rgba(255,255,255,0.03);
+      border: 1px solid rgba(255,255,255,0.06);
+      border-radius: 10px;
+      cursor: pointer;
+      transition: all 0.22s ease;
+    }
+
+    .event-item:hover {
+      background: rgba(0, 240, 255, 0.06);
+      border-color: rgba(0, 240, 255, 0.25);
+      transform: translateX(2px);
+    }
+
+    .event-item.active {
+      background: rgba(0, 240, 255, 0.1);
+      border-color: rgba(0, 240, 255, 0.45);
+    }
+
+    .ei-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 10px;
+      margin-bottom: 6px;
+    }
+
+    .ei-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: #e8ecfa;
+      line-height: 1.4;
+    }
+
+    .ei-date {
+      font-size: 11px;
+      color: #7cc9ff;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+
+    .ei-desc {
+      font-size: 12px;
+      color: #8c94ad;
+      line-height: 1.6;
+      margin-top: 6px;
+    }
+
+    .ei-meta {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-top: 10px;
+    }
+
+    .ei-tag {
+      font-size: 10px;
+      padding: 2px 10px;
+      border-radius: 10px;
+      letter-spacing: 0.5px;
+    }
+
+    .ei-tag.culture { background: rgba(0, 240, 255, 0.15); color: #00f0ff; }
+    .ei-tag.tech { background: rgba(255, 217, 61, 0.15); color: #ffd93d; }
+    .ei-tag.politics { background: rgba(255, 107, 107, 0.15); color: #ff6b6b; }
+
+    .ei-stars {
+      color: #ffd93d;
+      font-size: 11px;
+      letter-spacing: 2px;
+    }
+
+    .slider-container {
+      padding: 16px 40px 22px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      background: rgba(11, 14, 20, 0.5);
+      backdrop-filter: blur(10px);
+      border-top: 1px solid rgba(0, 240, 255, 0.08);
+    }
+
+    .slider-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 12px;
+      color: #7c859e;
+      letter-spacing: 1px;
+    }
+
+    .slider-range {
+      font-weight: 600;
+      color: #00f0ff;
+      font-size: 14px;
+    }
+
+    .slider-wrapper {
+      position: relative;
+      height: 44px;
+      display: flex;
+      align-items: center;
+    }
+
+    .slider-track {
+      position: absolute;
+      left: 0;
+      right: 0;
+      height: 4px;
+      background: rgba(255,255,255,0.08);
+      border-radius: 4px;
+    }
+
+    .slider-fill {
+      position: absolute;
+      height: 4px;
+      background: linear-gradient(90deg, #00f0ff, #ffd93d, #ff6b6b);
+      border-radius: 4px;
+      box-shadow: 0 0 16px rgba(0, 240, 255, 0.3);
+    }
+
+    input[type="range"].range-input {
+      -webkit-appearance: none;
+      appearance: none;
+      position: absolute;
+      width: 100%;
+      height: 44px;
+      background: transparent;
+      pointer-events: none;
+    }
+
+    input[type="range"].range-input::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: #ffffff;
+      border: 3px solid #00f0ff;
+      cursor: pointer;
+      pointer-events: auto;
+      box-shadow: 0 0 16px rgba(0, 240, 255, 0.6),
+                  inset 0 0 4px rgba(0, 240, 255, 0.4);
+      transition: transform 0.15s ease, box-shadow 0.15s ease;
+    }
+
+    input[type="range"].range-input::-webkit-slider-thumb:hover {
+      transform: scale(1.15);
+      box-shadow: 0 0 24px rgba(0, 240, 255, 0.85);
+    }
+
+    input[type="range"].range-input::-moz-range-thumb {
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: #ffffff;
+      border: 3px solid #00f0ff;
+      cursor: pointer;
+      pointer-events: auto;
+      box-shadow: 0 0 16px rgba(0, 240, 255, 0.6);
+    }
+
+    .range-labels {
+      display: flex;
+      justify-content: space-between;
+      font-size: 10px;
+      color: #5a637a;
+      padding: 0 6px;
+      pointer-events: none;
+    }
+
+    @media (max-width: 1023px) {
+      .header {
+        padding: 12px 16px;
+      }
+
+      .header .legend {
+        display: none;
+      }
+
+      .event-panel {
+        position: absolute;
+        bottom: 80px;
+        left: 0;
+        right: 0;
+        width: auto;
+        max-width: none;
+        min-width: 0;
+        height: 55%;
+        border-left: none;
+        border-top: 1px solid rgba(0, 240, 255, 0.18);
+        border-radius: 20px 20px 0 0;
+        transform: translateY(105%);
+      }
+
+      .event-panel.open {
+        transform: translateY(0);
+      }
+
+      .slider-container {
+        padding: 12px 20px 16px;
+      }
+
+      .slider-container {
+        z-index: 60;
+        position: relative;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header class="header">
+      <h1>✦ 日历年轮 · 二十年时光探索 ✦</h1>
+      <div class="legend">
+        <div class="legend-item">
+          <span class="legend-shape"><span class="legend-circle"></span></span>
+          <span>文化</span>
+        </div>
+        <div class="legend-item">
+          <span class="legend-shape"><span class="legend-triangle"></span></span>
+          <span>科技</span>
+        </div>
+        <div class="legend-item">
+          <span class="legend-shape"><span class="legend-diamond"></span></span>
+          <span>政治</span>
+        </div>
+      </div>
+    </header>
+
+    <div class="main-area">
+      <div class="svg-container" id="svgContainer">
+        <svg class="ring-viz" id="ringViz"></svg>
+      </div>
+      <aside class="event-panel" id="eventPanel">
+        <div class="panel-header">
+          <div class="panel-year" id="panelYear">—</div>
+          <button class="panel-close" id="panelClose" title="关闭">×</button>
+        </div>
+        <div class="panel-count" id="panelCount">—</div>
+        <div class="panel-list" id="panelList"></div>
+      </aside>
+    </div>
+
+    <div class="slider-container">
+      <div class="slider-header">
+        <span>⏱ 时间范围过滤</span>
+        <span class="slider-range" id="sliderRangeLabel">—</span>
+      </div>
+      <div class="slider-wrapper">
+        <div class="slider-track"></div>
+        <div class="slider-fill" id="sliderFill"></div>
+        <input type="range" class="range-input" id="rangeStart" min="0" max="19" value="0" />
+        <input type="range" class="range-input" id="rangeEnd" min="0" max="19" value="19" />
+      </div>
+      <div class="range-labels" id="rangeLabels"></div>
+    </div>
+  </div>
+
+  <div class="tooltip" id="tooltip"></div>
+
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
