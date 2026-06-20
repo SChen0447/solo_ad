@@ -19,6 +19,25 @@ export interface CellInfo {
   colorAnimationTime: number;
 }
 
+interface HoverEffects {
+  glowMesh: THREE.Mesh;
+  glowMaterial: THREE.MeshBasicMaterial;
+  particles: THREE.Points;
+  particleGeometry: THREE.BufferGeometry;
+  particlePositions: Float32Array;
+  particleSizes: Float32Array;
+  particleAngles: number[];
+  particleRadii: number[];
+  particleSpeeds: number[];
+  active: boolean;
+}
+
+interface SelectedEffects {
+  borderMesh: THREE.LineSegments;
+  borderMaterial: THREE.LineBasicMaterial;
+  active: boolean;
+}
+
 export class CityGrid {
   private scene: THREE.Scene;
   private camera: THREE.PerspectiveCamera;
@@ -50,13 +69,20 @@ export class CityGrid {
   private instancedBorders: THREE.InstancedMesh | null = null;
   private dummy: THREE.Object3D;
   private borderDummy: THREE.Object3D;
-  private cellColors: THREE.Color[] = [];
+  
+  private hoverEffects: HoverEffects | null = null;
+  private selectedEffects: SelectedEffects | null = null;
   
   private readonly HEIGHT_ANIMATION_DURATION = 0.5;
   private readonly COLOR_ANIMATION_DURATION = 1.0;
   private readonly ROTATION_SPEED = 0.002;
   private readonly ZOOM_SPEED = 0.0015;
   private readonly CAMERA_RESPONSE_TIME = 0.5;
+  
+  private readonly GLOW_CYCLE = 1.2;
+  private readonly PARTICLE_COUNT_MIN = 8;
+  private readonly PARTICLE_COUNT_MAX = 12;
+  private readonly BREATH_CYCLE = 0.8;
 
   constructor(container: HTMLElement, heatmapManager: HeatmapManager) {
     this.container = container;
@@ -84,6 +110,8 @@ export class CityGrid {
 
     this.setupLighting();
     this.createGrid();
+    this.createHoverEffects();
+    this.createSelectedEffects();
     this.createTemperatureLabel();
     this.setupEventListeners(container);
     this.animate();
@@ -167,7 +195,6 @@ export class CityGrid {
           colorAnimationTime: this.COLOR_ANIMATION_DURATION
         };
 
-        this.cellColors[index] = baseColor.clone();
         this.updateInstanceMatrix(index, row, col, baseHeight, false);
       }
     }
@@ -179,11 +206,142 @@ export class CityGrid {
     this.instancedMesh.instanceColor.setUsage(THREE.DynamicDrawUsage);
     this.updateInstanceColors();
 
-    this.instancedMesh.userData = { isGridMesh: true };
-    this.instancedBorders.userData = { isBorderMesh: true };
-
     this.scene.add(this.instancedMesh);
     this.scene.add(this.instancedBorders);
+  }
+
+  private createHoverEffects(): void {
+    const glowGeometry = new THREE.PlaneGeometry(
+      this.cellSize * 1.05,
+      this.cellSize * 1.05
+    );
+    const glowMaterial = new THREE.MeshBasicMaterial({
+      color: 0xffffff,
+      transparent: true,
+      opacity: 0,
+      side: THREE.DoubleSide,
+      depthWrite: false
+    });
+    const glowMesh = new THREE.Mesh(glowGeometry, glowMaterial);
+    glowMesh.rotation.x = -Math.PI / 2;
+    glowMesh.visible = false;
+    this.scene.add(glowMesh);
+
+    const particleCount = Math.floor(
+      Math.random() * (this.PARTICLE_COUNT_MAX - this.PARTICLE_COUNT_MIN + 1)
+    ) + this.PARTICLE_COUNT_MIN;
+
+    const particlePositions = new Float32Array(particleCount * 3);
+    const particleSizes = new Float32Array(particleCount);
+    const particleAngles: number[] = [];
+    const particleRadii: number[] = [];
+    const particleSpeeds: number[] = [];
+
+    for (let i = 0; i < particleCount; i++) {
+      particleAngles.push(Math.random() * Math.PI * 2);
+      particleRadii.push(this.cellSize * 0.45 + Math.random() * this.cellSize * 0.1);
+      particleSpeeds.push(0.5 + Math.random() * 1.0);
+      particleSizes[i] = 0.02 + Math.random() * 0.03;
+      particlePositions[i * 3] = 0;
+      particlePositions[i * 3 + 1] = 0;
+      particlePositions[i * 3 + 2] = 0;
+    }
+
+    const particleGeometry = new THREE.BufferGeometry();
+    particleGeometry.setAttribute('position', new THREE.BufferAttribute(particlePositions, 3));
+    particleGeometry.setAttribute('size', new THREE.BufferAttribute(particleSizes, 1));
+
+    const particleMaterial = new THREE.PointsMaterial({
+      color: 0xffffff,
+      size: 0.04,
+      transparent: true,
+      opacity: 0,
+      sizeAttenuation: true,
+      depthWrite: false
+    });
+
+    const particles = new THREE.Points(particleGeometry, particleMaterial);
+    particles.visible = false;
+    this.scene.add(particles);
+
+    this.hoverEffects = {
+      glowMesh,
+      glowMaterial,
+      particles,
+      particleGeometry,
+      particlePositions,
+      particleSizes,
+      particleAngles,
+      particleRadii,
+      particleSpeeds,
+      active: false
+    };
+  }
+
+  private createSelectedEffects(): void {
+    const geometry = new THREE.EdgesGeometry(
+      new THREE.BoxGeometry(this.cellSize * 1.02, 1.02, this.cellSize * 1.02)
+    );
+    const material = new THREE.LineBasicMaterial({
+      color: 0xffffff,
+      transparent: true,
+      opacity: 0
+    });
+    const borderMesh = new THREE.LineSegments(geometry, material);
+    borderMesh.visible = false;
+    this.scene.add(borderMesh);
+
+    this.selectedEffects = {
+      borderMesh,
+      borderMaterial: material,
+      active: false
+    };
+  }
+
+  private updateHoverEffectsPosition(cell: CellInfo, cellHeight: number): void {
+    if (!this.hoverEffects) return;
+
+    const hoverOffset = 0.1;
+    const topY = cellHeight + hoverOffset + 0.001;
+
+    this.hoverEffects.glowMesh.position.set(cell.x, topY, cell.z);
+    this.hoverEffects.glowMesh.visible = true;
+    this.hoverEffects.glowMaterial.color.copy(cell.currentColor);
+
+    this.hoverEffects.particles.position.set(cell.x, topY + 0.02, cell.z);
+    this.hoverEffects.particles.visible = true;
+    (this.hoverEffects.particles.material as THREE.PointsMaterial).opacity = 1;
+
+    this.hoverEffects.active = true;
+  }
+
+  private hideHoverEffects(): void {
+    if (!this.hoverEffects) return;
+
+    this.hoverEffects.glowMesh.visible = false;
+    this.hoverEffects.glowMaterial.opacity = 0;
+    this.hoverEffects.particles.visible = false;
+    (this.hoverEffects.particles.material as THREE.PointsMaterial).opacity = 0;
+    this.hoverEffects.active = false;
+  }
+
+  private updateSelectedEffectsPosition(cell: CellInfo, cellHeight: number): void {
+    if (!this.selectedEffects) return;
+
+    const actualHeight = Math.max(0.001, cellHeight);
+    this.selectedEffects.borderMesh.position.set(cell.x, actualHeight / 2, cell.z);
+    const scaleY = actualHeight;
+    this.selectedEffects.borderMesh.scale.set(1, scaleY, 1);
+    this.selectedEffects.borderMesh.visible = true;
+    this.selectedEffects.active = true;
+  }
+
+  private hideSelectedEffects(): void {
+    if (!this.selectedEffects) return;
+
+    this.selectedEffects.borderMesh.visible = false;
+    this.selectedEffects.borderMaterial.opacity = 0;
+    this.selectedEffects.active = false;
   }
 
   private updateInstanceMatrix(
@@ -226,13 +384,6 @@ export class CityGrid {
       }
     }
     colors.needsUpdate = true;
-  }
-
-  private updateBorderOpacity(index: number, opacity: number): void {
-    if (!this.instancedBorders) return;
-    const material = this.instancedBorders.material as THREE.LineBasicMaterial;
-    material.opacity = opacity;
-    this.instancedBorders.visible = opacity > 0;
   }
 
   private getRegionId(row: number, col: number): string {
@@ -302,6 +453,8 @@ export class CityGrid {
     this.raycaster.setFromCamera(this.mouse, this.camera);
     const intersects = this.raycaster.intersectObject(this.instancedMesh);
 
+    let newHoveredIndex: number | null = null;
+
     if (this.hoveredCellIndex !== null) {
       const prevRow = Math.floor(this.hoveredCellIndex / this.gridSize);
       const prevCol = this.hoveredCellIndex % this.gridSize;
@@ -316,15 +469,20 @@ export class CityGrid {
         const cell = this.cells[row][col];
         
         cell.isHovered = true;
-        this.hoveredCellIndex = instanceId;
+        newHoveredIndex = instanceId;
+        
+        this.updateHoverEffectsPosition(cell, cell.currentHeight);
         
         this.showTemperatureLabel(cell, event);
-        return;
       }
     }
 
-    this.hoveredCellIndex = null;
-    this.hideTemperatureLabel();
+    if (newHoveredIndex === null && this.hoveredCellIndex !== null) {
+      this.hideHoverEffects();
+      this.hideTemperatureLabel();
+    }
+
+    this.hoveredCellIndex = newHoveredIndex;
   }
 
   private showTemperatureLabel(cell: CellInfo, event: MouseEvent): void {
@@ -372,6 +530,8 @@ export class CityGrid {
     cell.isSelected = true;
     this.selectedCellIndex = index;
 
+    this.updateSelectedEffectsPosition(cell, cell.currentHeight);
+
     const data = this.heatmapManager.getData()[row][col];
     if (this.onCellClick) {
       this.onCellClick(data, row, col);
@@ -397,6 +557,7 @@ export class CityGrid {
       this.cells[row][col].isHovered = false;
       this.hoveredCellIndex = null;
     }
+    this.hideHoverEffects();
     this.hideTemperatureLabel();
   }
 
@@ -483,10 +644,12 @@ export class CityGrid {
 
         this.updateInstanceMatrix(index, row, col, cell.currentHeight, cell.isHovered);
 
-        if (cell.isSelected && this.instancedBorders) {
-          const borderMaterial = this.instancedBorders.material as THREE.LineBasicMaterial;
-          borderMaterial.opacity = 0.5 + 0.5 * Math.sin(time * Math.PI * 2 / 1.5);
-          this.instancedBorders.visible = true;
+        if (cell.isSelected && this.selectedCellIndex === index) {
+          this.updateSelectedEffectsPosition(cell, cell.currentHeight);
+        }
+
+        if (cell.isHovered && this.hoveredCellIndex === index) {
+          this.updateHoverEffectsPosition(cell, cell.currentHeight);
         }
       }
     }
@@ -495,13 +658,56 @@ export class CityGrid {
       this.updateInstanceColors();
     }
 
+    this.updateSpecialEffects(time, delta);
+
     this.renderer.render(this.scene, this.camera);
+  }
+
+  private updateSpecialEffects(time: number, _delta: number): void {
+    if (this.hoverEffects && this.hoverEffects.active) {
+      const glowPhase = (Math.sin(time * Math.PI * 2 / this.GLOW_CYCLE) + 1) / 2;
+      this.hoverEffects.glowMaterial.opacity = 0.1 + glowPhase * 0.2;
+
+      const positions = this.hoverEffects.particlePositions;
+      const count = positions.length / 3;
+      for (let i = 0; i < count; i++) {
+        this.hoverEffects.particleAngles[i] += this.hoverEffects.particleSpeeds[i] * _delta;
+        const angle = this.hoverEffects.particleAngles[i];
+        const radius = this.hoverEffects.particleRadii[i];
+        positions[i * 3] = Math.cos(angle) * radius;
+        positions[i * 3 + 2] = Math.sin(angle) * radius;
+        positions[i * 3 + 1] = 0.02 + Math.sin(time * 2 + i * 0.7) * 0.01;
+      }
+      (this.hoverEffects.particleGeometry.getAttribute('position') as THREE.BufferAttribute).needsUpdate = true;
+      
+      if (this.hoveredCellIndex !== null) {
+        const row = Math.floor(this.hoveredCellIndex / this.gridSize);
+        const col = this.hoveredCellIndex % this.gridSize;
+        this.hoverEffects.glowMaterial.color.copy(this.cells[row][col].currentColor);
+      }
+    }
+
+    if (this.selectedEffects && this.selectedEffects.active) {
+      const breathPhase = (Math.sin(time * Math.PI * 2 / this.BREATH_CYCLE) + 1) / 2;
+      const smoothBreath = 0.5 + 0.5 * (breathPhase * breathPhase * (3 - 2 * breathPhase));
+      this.selectedEffects.borderMaterial.opacity = 0.5 + smoothBreath * 0.5;
+    }
   }
 
   public dispose(): void {
     cancelAnimationFrame(this.animationId);
     if (this.temperatureLabel) {
       this.temperatureLabel.remove();
+    }
+    if (this.hoverEffects) {
+      this.hoverEffects.glowMesh.geometry.dispose();
+      this.hoverEffects.glowMaterial.dispose();
+      this.hoverEffects.particleGeometry.dispose();
+      (this.hoverEffects.particles.material as THREE.Material).dispose();
+    }
+    if (this.selectedEffects) {
+      this.selectedEffects.borderMesh.geometry.dispose();
+      this.selectedEffects.borderMaterial.dispose();
     }
     if (this.instancedMesh) {
       this.instancedMesh.geometry.dispose();
