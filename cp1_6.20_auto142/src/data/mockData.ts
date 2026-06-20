@@ -1,0 +1,217 @@
+import { Venue, Artist, Booking, Review, User } from '../types'
+
+export const mockVenues: Venue[] = [
+  {
+    id: 'v1',
+    name: '人民广场',
+    type: 'square',
+    address: '上海市黄浦区人民大道120号',
+    lat: 31.2304,
+    lng: 121.4737,
+    photo: 'https://images.unsplash.com/photo-1519501025264-65ba15a82390?w=400&h=200&fit=crop',
+    timeSlots: [
+      { id: 'ts1', startTime: '09:00', endTime: '11:00', available: true },
+      { id: 'ts2', startTime: '11:00', endTime: '13:00', available: false, bookedBy: 'a1' },
+      { id: 'ts3', startTime: '13:00', endTime: '15:00', available: true },
+      { id: 'ts4', startTime: '15:00', endTime: '17:00', available: true },
+      { id: 'ts5', startTime: '17:00', endTime: '19:00', available: false, bookedBy: 'a2' },
+      { id: 'ts6', startTime: '19:00', endTime: '21:00', available: true },
+    ],
+  },
+  {
+    id: 'v2',
+    name: '世纪公园',
+    type: 'park',
+    address: '上海市浦东新区锦绣路1001号',
+    lat: 31.2156,
+    lng: 121.5463,
+    photo: 'https://images.unsplash.com/photo-1585938389612-a552a28d6914?w=400&h=200&fit=crop',
+    timeSlots: [
+      { id: 'ts7', startTime: '08:00', endTime: '10:00', available: true },
+      { id: 'ts8', startTime: '10:00', endTime: '12:00', available: true },
+      { id: 'ts9', startTime: '14:00', endTime: '16:00', available: false, bookedBy: 'a3' },
+      { id: 'ts10', startTime: '16:00', endTime: '18:00', available: true },
+      { id: 'ts11', startTime: '18:00', endTime: '20:00', available: true },
+    ],
+  },
+  {
+    id: 'v3',
+    name: '陆家嘴地铁站',
+    type: 'subway',
+    address: '上海市浦东新区世纪大道1号',
+    lat: 31.2397,
+    lng: 121.4998,
+    photo: 'https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?w=400&h=200&fit=crop',
+    timeSlots: [
+      { id: 'ts12', startTime: '07:00', endTime: '09:00', available: false, bookedBy: 'a1' },
+      { id: 'ts13', startTime: '12:00', endTime: '14:00', available: true },
+      { id: 'ts14', startTime: '17:00', endTime: '19:00', available: true },
+      { id: 'ts15', startTime: '19:00', endTime: '21:00', available: false, bookedBy: 'a2' },
+    ],
+  },
+  {
+    id: 'v4',
+    name: '外滩观景平台',
+    type: 'square',
+    address: '上海市黄浦区中山东一路',
+    lat: 31.2400,
+    lng: 121.4900,
+    photo: 'https://images.unsplash.com/photo-1474181487882-5abf3f0ba6c2?w=400&h=200&fit=crop',
+    timeSlots: [
+      { id: 'ts16', startTime: '09:00', endTime: '11:00', available: true },
+      { id: 'ts17', startTime: '14:00', endTime: '16:00', available: true },
+      { id: 'ts18', startTime: '18:00', endTime: '20:00', available: false, bookedBy: 'a3' },
+      { id: 'ts19', startTime: '20:00', endTime: '22:00', available: true },
+    ],
+  },
+  {
+    id: 'v5',
+    name: '静安公园',
+    type: 'park',
+    address: '上海市静安区南京西路1649号',
+    lat: 31.2245,
+    lng: 121.4480,
+    photo: 'https://images.unsplash.com/photo-1441974231531-c6227db76b6e?w=400&h=200&fit=crop',
+    timeSlots: [
+      { id: 'ts20', startTime: '08:00', endTime: '10:00', available: true },
+      { id: 'ts21', startTime: '10:00', endTime: '12:00', available: false, bookedBy: 'a1' },
+      { id: 'ts22', startTime: '14:00', endTime: '16:00', available: true },
+      { id: 'ts23', startTime: '16:00', endTime: '18:00', available: true },
+    ],
+  },
+  {
+    id: 'v6',
+    name: '徐家汇地铁站',
+    type: 'subway',
+    address: '上海市徐汇区虹桥路1号',
+    lat: 31.1947,
+    lng: 121.4365,
+    photo: 'https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?w=400&h=200&fit=crop',
+    timeSlots: [
+      { id: 'ts24', startTime: '08:00', endTime: '10:00', available: true },
+      { id: 'ts25', startTime: '12:00', endTime: '14:00', available: false, bookedBy: 'a2' },
+      { id: 'ts26', startTime: '18:00', endTime: '20:00', available: true },
+    ],
+  },
+]
+
+export const mockArtists: Artist[] = [
+  {
+    id: 'a1',
+    name: '吉他小王',
+    avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200&h=200&fit=crop&crop=face',
+    bio: '街头吉他手，擅长民谣和流行音乐改编，从事街头表演5年，足迹遍布上海各个角落。喜欢用音乐传递温暖，希望每一位路过的听众都能找到属于自己的旋律。',
+    socialLinks: [
+      { platform: '抖音', url: 'https://douyin.com' },
+      { platform: 'B站', url: 'https://bilibili.com' },
+      { platform: '微博', url: 'https://weibo.com' },
+    ],
+    upcomingShows: [
+      { date: '2024-01-15', startTime: '11:00', endTime: '13:00', venueName: '人民广场' },
+      { date: '2024-01-16', startTime: '07:00', endTime: '09:00', venueName: '陆家嘴地铁站' },
+      { date: '2024-01-17', startTime: '10:00', endTime: '12:00', venueName: '静安公园' },
+      { date: '2024-01-18', startTime: '15:00', endTime: '17:00', venueName: '世纪公园' },
+      { date: '2024-01-20', startTime: '19:00', endTime: '21:00', venueName: '外滩观景平台' },
+    ],
+  },
+  {
+    id: 'a2',
+    name: '街舞阿杰',
+    avatar: 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=200&h=200&fit=crop&crop=face',
+    bio: '职业街舞舞者，专攻Breaking和Popping，曾获全国街舞大赛亚军。热爱街头文化，相信舞蹈是最直接的艺术表达。',
+    socialLinks: [
+      { platform: '抖音', url: 'https://douyin.com' },
+      { platform: '小红书', url: 'https://xiaohongshu.com' },
+    ],
+    upcomingShows: [
+      { date: '2024-01-15', startTime: '17:00', endTime: '19:00', venueName: '人民广场' },
+      { date: '2024-01-16', startTime: '19:00', endTime: '21:00', venueName: '陆家嘴地铁站' },
+      { date: '2024-01-17', startTime: '14:00', endTime: '16:00', venueName: '徐家汇地铁站' },
+      { date: '2024-01-19', startTime: '16:00', endTime: '18:00', venueName: '世纪公园' },
+    ],
+  },
+  {
+    id: 'a3',
+    name: '小提琴小雅',
+    avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=200&h=200&fit=crop&crop=face',
+    bio: '古典小提琴手，毕业于上海音乐学院。致力于将古典音乐带给更多人，常在公园和广场演奏经典曲目和原创作品。',
+    socialLinks: [
+      { platform: 'B站', url: 'https://bilibili.com' },
+      { platform: '微博', url: 'https://weibo.com' },
+    ],
+    upcomingShows: [
+      { date: '2024-01-15', startTime: '14:00', endTime: '16:00', venueName: '世纪公园' },
+      { date: '2024-01-16', startTime: '18:00', endTime: '20:00', venueName: '外滩观景平台' },
+      { date: '2024-01-18', startTime: '10:00', endTime: '12:00', venueName: '静安公园' },
+    ],
+  },
+]
+
+export const mockReviews: Review[] = [
+  {
+    id: 'r1',
+    artistId: 'a1',
+    userId: 'u1',
+    userName: '音乐爱好者小明',
+    userAvatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=100&h=100&fit=crop&crop=face',
+    rating: 5,
+    comment: '今天路过人民广场，被小王的吉他声深深吸引了！《成都》改编得特别有味道，唱得也很有感情。希望以后能常来表演！',
+    date: '2024-01-10',
+    reply: '感谢支持！下周还会来人民广场，敬请期待~',
+    replyDate: '2024-01-10',
+  },
+  {
+    id: 'r2',
+    artistId: 'a1',
+    userId: 'u2',
+    userName: '路过的旅人',
+    userAvatar: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=100&h=100&fit=crop&crop=face',
+    rating: 4,
+    comment: '弹得很棒！就是今天风有点大，声音听得不太清楚。建议下次可以带个小音箱~',
+    date: '2024-01-08',
+  },
+  {
+    id: 'r3',
+    artistId: 'a2',
+    userId: 'u3',
+    userName: '街舞迷弟',
+    userAvatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100&h=100&fit=crop&crop=face',
+    rating: 5,
+    comment: '阿杰的breaking太炸了！托马斯全旋超级稳，现场气氛超嗨。支持支持！',
+    date: '2024-01-12',
+    reply: '谢谢兄弟！继续加油！',
+    replyDate: '2024-01-12',
+  },
+]
+
+export const mockUser: User = {
+  id: 'u_artist_1',
+  name: '吉他小王',
+  avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200&h=200&fit=crop&crop=face',
+  role: 'artist',
+}
+
+export const mockBookings: Booking[] = [
+  {
+    id: 'b1',
+    venueId: 'v2',
+    venueName: '世纪公园',
+    artistId: 'a1',
+    artistName: '吉他小王',
+    date: '2024-01-16',
+    startTime: '15:00',
+    endTime: '17:00',
+    status: 'confirmed',
+  },
+  {
+    id: 'b2',
+    venueId: 'v4',
+    venueName: '外滩观景平台',
+    artistId: 'a1',
+    artistName: '吉他小王',
+    date: '2024-01-20',
+    startTime: '19:00',
+    endTime: '21:00',
+    status: 'confirmed',
+  },
+]
