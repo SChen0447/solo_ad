@@ -1,0 +1,122 @@
+[
+  {
+    "id": "fire_001",
+    "name": "火球术",
+    "element": "fire",
+    "manaCost": 2,
+    "damage": 30,
+    "range": 4,
+    "effect": "向目标发射一枚炽热的火球，造成30点火焰伤害",
+    "emoji": "🔥",
+    "gradientStart": "#FF4500",
+    "gradientEnd": "#FF0000"
+  },
+  {
+    "id": "fire_002",
+    "name": "火焰爆发",
+    "element": "fire",
+    "manaCost": 4,
+    "damage": 25,
+    "range": 3,
+    "effect": "在目标区域引发爆炸，对范围内所有敌人造成25点火焰伤害",
+    "emoji": "🔥",
+    "gradientStart": "#FF4500",
+    "gradientEnd": "#FF0000"
+  },
+  {
+    "id": "fire_003",
+    "name": "烈焰喷射",
+    "element": "fire",
+    "manaCost": 3,
+    "damage": 20,
+    "range": 2,
+    "effect": "向前方喷射烈焰，对直线上的敌人造成20点火焰伤害",
+    "emoji": "🔥",
+    "gradientStart": "#FF4500",
+    "gradientEnd": "#FF0000"
+  },
+  {
+    "id": "ice_001",
+    "name": "冰枪术",
+    "element": "ice",
+    "manaCost": 2,
+    "damage": 25,
+    "range": 5,
+    "effect": "投掷一支锋利的冰枪，对目标造成25点冰霜伤害",
+    "emoji": "❄️",
+    "gradientStart": "#00BFFF",
+    "gradientEnd": "#0000FF"
+  },
+  {
+    "id": "ice_002",
+    "name": "冰冻术",
+    "element": "ice",
+    "manaCost": 3,
+    "damage": 15,
+    "range": 4,
+    "effect": "冻结目标，造成15点冰霜伤害并使其无法行动1回合",
+    "emoji": "❄️",
+    "gradientStart": "#00BFFF",
+    "gradientEnd": "#0000FF"
+  },
+  {
+    "id": "ice_003",
+    "name": "冰霜新星",
+    "element": "ice",
+    "manaCost": 4,
+    "damage": 20,
+    "range": 2,
+    "effect": "释放冰霜能量，对周围所有敌人造成20点冰霜伤害并减速",
+    "emoji": "❄️",
+    "gradientStart": "#00BFFF",
+    "gradientEnd": "#0000FF"
+  },
+  {
+    "id": "lightning_001",
+    "name": "闪电箭",
+    "element": "lightning",
+    "manaCost": 2,
+    "damage": 35,
+    "range": 6,
+    "effect": "召唤一道闪电击中目标，造成35点雷电伤害",
+    "emoji": "⚡",
+    "gradientStart": "#8A2BE2",
+    "gradientEnd": "#4B0082"
+  },
+  {
+    "id": "lightning_002",
+    "name": "连锁闪电",
+    "element": "lightning",
+    "manaCost": 4,
+    "damage": 25,
+    "range": 5,
+    "effect": "释放闪电链，在敌人之间弹跳，最多攻击3个目标，每个目标受到25点雷电伤害",
+    "emoji": "⚡",
+    "gradientStart": "#8A2BE2",
+    "gradientEnd": "#4B0082"
+  },
+  {
+    "id": "heal_001",
+    "name": "治疗术",
+    "element": "heal",
+    "manaCost": 2,
+    "healing": 30,
+    "range": 4,
+    "effect": "恢复目标30点生命值",
+    "emoji": "🌿",
+    "gradientStart": "#32CD32",
+    "gradientEnd": "#008000"
+  },
+  {
+    "id": "heal_002",
+    "name": "强效治疗",
+    "element": "heal",
+    "manaCost": 4,
+    "healing": 60,
+    "range": 3,
+    "effect": "强力治愈魔法，恢复目标60点生命值",
+    "emoji": "🌿",
+    "gradientStart": "#32CD32",
+    "gradientEnd": "#008000"
+  }
+]
