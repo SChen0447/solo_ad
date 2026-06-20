@@ -33,7 +33,8 @@ const CANVAS_WIDTH = 800
 const CANVAS_HEIGHT = 400
 const PARTICLE_COUNT = 150
 const HISTORY_KEY = 'story_history'
-const MAX_HISTORY = 5
+const MAX_HISTORY = 10
+const HISTORY_TITLE_LENGTH = 30
 
 const lerp = (a: number, b: number, t: number): number => a + (b - a) * t
 
@@ -95,6 +96,14 @@ const App: React.FC = () => {
   const saveHistory = useCallback((record: StoryRecord): void => {
     setHistory(prev => {
       const newHistory = [record, ...prev].slice(0, MAX_HISTORY)
+      localStorage.setItem(HISTORY_KEY, JSON.stringify(newHistory))
+      return newHistory
+    })
+  }, [])
+
+  const deleteHistory = useCallback((id: string): void => {
+    setHistory(prev => {
+      const newHistory = prev.filter(r => r.id !== id)
       localStorage.setItem(HISTORY_KEY, JSON.stringify(newHistory))
       return newHistory
     })
@@ -324,7 +333,7 @@ const App: React.FC = () => {
       setTimeout(() => {
         const record: StoryRecord = {
           id: Date.now().toString(),
-          title: (userInput.trim() || theme?.name || '故事').slice(0, 20),
+          title: result.slice(0, HISTORY_TITLE_LENGTH),
           content: result,
           theme: selectedThemeId,
           timestamp: Date.now()
@@ -597,6 +606,167 @@ const App: React.FC = () => {
                       animation: 'blink 0.8s step-end infinite'
                     }} />
                   )}
+                </div>
+              )}
+            </div>
+
+            <div style={{
+              marginTop: '20px',
+              background: 'rgba(20, 20, 50, 0.5)',
+              backdropFilter: 'blur(16px)',
+              WebkitBackdropFilter: 'blur(16px)',
+              borderRadius: '12px',
+              padding: '20px',
+              border: '1px solid rgba(108, 99, 255, 0.2)',
+              boxShadow: '0 4px 20px rgba(0, 0, 0, 0.2)'
+            }}>
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                marginBottom: '14px'
+              }}>
+                <h3 style={{
+                  fontSize: '15px',
+                  fontWeight: 600,
+                  color: '#c0c0ff',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  margin: 0
+                }}>
+                  📚 历史记录
+                </h3>
+                <span style={{
+                  fontSize: '12px',
+                  color: '#8080b0'
+                }}>
+                  {history.length}/{MAX_HISTORY}
+                </span>
+              </div>
+
+              {history.length === 0 ? (
+                <div style={{
+                  textAlign: 'center',
+                  padding: '24px 0',
+                  color: '#606090',
+                  fontSize: '13px'
+                }}>
+                  暂无历史记录，生成你的第一个故事吧~
+                </div>
+              ) : (
+                <div style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '8px',
+                  maxHeight: '320px',
+                  overflowY: 'auto'
+                }}>
+                  {history.map((record, index) => (
+                    <div
+                      key={record.id}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        padding: '12px 14px',
+                        background: 'rgba(108, 99, 255, 0.06)',
+                        borderRadius: '8px',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s ease',
+                        border: '1px solid transparent',
+                        position: 'relative'
+                      }}
+                      onClick={() => handleLoadHistory(record)}
+                      onMouseEnter={e => {
+                        e.currentTarget.style.background = 'rgba(108, 99, 255, 0.15)'
+                        e.currentTarget.style.borderColor = 'rgba(108, 99, 255, 0.3)'
+                      }}
+                      onMouseLeave={e => {
+                        e.currentTarget.style.background = 'rgba(108, 99, 255, 0.06)'
+                        e.currentTarget.style.borderColor = 'transparent'
+                      }}
+                    >
+                      <div style={{
+                        flex: 1,
+                        minWidth: 0,
+                        paddingRight: '10px'
+                      }}>
+                        <div style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px',
+                          marginBottom: '4px'
+                        }}>
+                          <span style={{
+                            fontSize: '11px',
+                            color: '#6c63ff',
+                            fontWeight: 600,
+                            background: 'rgba(108, 99, 255, 0.15)',
+                            padding: '2px 6px',
+                            borderRadius: '4px',
+                            flexShrink: 0
+                          }}>
+                            #{index + 1}
+                          </span>
+                          <span style={{
+                            fontSize: '13px',
+                            color: '#e0e0ff',
+                            fontWeight: 500,
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap',
+                            flex: 1
+                          }}>
+                            {record.title}
+                          </span>
+                        </div>
+                        <div style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '10px',
+                          fontSize: '11px',
+                          color: '#8080b0'
+                        }}>
+                          <span>{themes.find(t => t.id === record.theme)?.name || '自定义'}</span>
+                          <span>·</span>
+                          <span>{formatTime(record.timestamp)}</span>
+                        </div>
+                      </div>
+                      <button
+                        onClick={e => {
+                          e.stopPropagation()
+                          deleteHistory(record.id)
+                        }}
+                        style={{
+                          width: '28px',
+                          height: '28px',
+                          borderRadius: '6px',
+                          background: 'rgba(239, 68, 68, 0.1)',
+                          color: '#ef4444',
+                          border: 'none',
+                          cursor: 'pointer',
+                          fontSize: '14px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          transition: 'all 0.2s ease',
+                          flexShrink: 0
+                        }}
+                        onMouseEnter={e => {
+                          e.currentTarget.style.background = 'rgba(239, 68, 68, 0.25)'
+                          e.currentTarget.style.transform = 'scale(1.1)'
+                        }}
+                        onMouseLeave={e => {
+                          e.currentTarget.style.background = 'rgba(239, 68, 68, 0.1)'
+                          e.currentTarget.style.transform = 'scale(1)'
+                        }}
+                        title="删除该记录"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  ))}
                 </div>
               )}
             </div>
