@@ -1,13 +1,8 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
-import { CardTemplate, TextElement, DecorationElement, DecorationType, BackgroundConfig, CardElement } from '../types';
+import { TextElement, DecorationElement, DecorationType, BackgroundConfig, CardElement } from '../types';
 import { CanvasRenderer, CANVAS_W, CANVAS_H } from '../core/CanvasRenderer';
 import { gradientBackgrounds, fontOptions, decorationColors } from '../data/templates';
-
-interface CardEditorProps {
-  template: CardTemplate;
-  onPreview: (renderer: CanvasRenderer) => void;
-  onBack: () => void;
-}
+import { useCardStore } from '../store';
 
 let nextId = 1000;
 function genId(): string {
@@ -38,12 +33,10 @@ const defaultText: Omit<TextElement, 'id'> = {
   shadowColor: 'rgba(0,0,0,0.3)',
 };
 
-const CardEditor: React.FC<CardEditorProps> = ({ template, onPreview, onBack }) => {
+const CardEditor: React.FC = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const rendererRef = useRef<CanvasRenderer | null>(null);
   const [activeTab, setActiveTab] = useState<ToolTab>('text');
-  const [elements, setElements] = useState<CardElement[]>([]);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const dragInfo = useRef<{ startX: number; startY: number; elStartX: number; elStartY: number } | null>(null);
   const [textInput, setTextInput] = useState(defaultText.content);
@@ -59,34 +52,67 @@ const CardEditor: React.FC<CardEditorProps> = ({ template, onPreview, onBack }) 
   const [decoRotation, setDecoRotation] = useState(0);
   const [decoColor, setDecoColor] = useState('#FF6B6B');
   const [bgUrl, setBgUrl] = useState('');
-  const [currentBg, setCurrentBg] = useState<BackgroundConfig>(template.background);
 
-  const selectedElement = selectedId ? elements.find((e) => e.id === selectedId) : null;
+  const template = useCardStore((state) => state.selectedTemplate!);
+  const texts = useCardStore((state) => state.texts);
+  const decorations = useCardStore((state) => state.decorations);
+  const background = useCardStore((state) => state.background);
+  const selectedElementId = useCardStore((state) => state.selectedElementId);
+  const storeAddText = useCardStore((state) => state.addText);
+  const storeUpdateText = useCardStore((state) => state.updateText);
+  const storeAddDecoration = useCardStore((state) => state.addDecoration);
+  const storeUpdateDecoration = useCardStore((state) => state.updateDecoration);
+  const storeRemoveElement = useCardStore((state) => state.removeElement);
+  const storeSetBackground = useCardStore((state) => state.setBackground);
+  const storeSetSelected = useCardStore((state) => state.setSelectedElement);
+  const storeSetPage = useCardStore((state) => state.setPage);
+  const storeSetPreviewData = useCardStore((state) => state.setPreviewCanvasData);
+  const storeGoBack = useCardStore((state) => state.goBack);
+
+  const elements: CardElement[] = [...texts, ...decorations];
+  const selectedElement = selectedElementId ? elements.find((e) => e.id === selectedElementId) : null;
+
+  const syncStoreToRenderer = useCallback(() => {
+    const renderer = rendererRef.current;
+    if (!renderer) return;
+    renderer.setBackground(background);
+    texts.forEach((t) => renderer.addText(t));
+    decorations.forEach((d) => renderer.addDecoration(d));
+    renderer.setSelected(selectedElementId);
+    renderer.markDirty();
+  }, [background, texts, decorations, selectedElementId]);
 
   useEffect(() => {
     if (!canvasRef.current) return;
     const renderer = new CanvasRenderer(canvasRef.current);
     rendererRef.current = renderer;
-    renderer.setBackground(template.background);
-    const allEls: CardElement[] = [...template.defaultTexts, ...template.defaultDecorations];
-    for (const el of allEls) {
-      if (el.type === 'text') renderer.addText(el);
-      else renderer.addDecoration(el);
-    }
-    setElements(allEls);
-    renderer.render();
+    syncStoreToRenderer();
     return () => renderer.destroy();
-  }, [template]);
-
-  const syncToRenderer = useCallback((els: CardElement[]) => {
-    const renderer = rendererRef.current;
-    if (!renderer) return;
-    for (const el of els) {
-      if (el.type === 'text') renderer.addText(el);
-      else renderer.addDecoration(el);
-    }
-    renderer.render();
   }, []);
+
+  useEffect(() => {
+    syncStoreToRenderer();
+  }, [syncStoreToRenderer]);
+
+  useEffect(() => {
+    if (selectedElement) {
+      if (selectedElement.type === 'text') {
+        setTextInput(selectedElement.content);
+        setTextFont(selectedElement.fontFamily);
+        setTextSize(selectedElement.fontSize);
+        setTextColor(selectedElement.color);
+        setStrokeWidth(selectedElement.strokeWidth);
+        setStrokeColor(selectedElement.strokeColor);
+        setShadowBlur(selectedElement.shadowBlur);
+        setShadowColor(selectedElement.shadowColor);
+      } else {
+        setDecoType(selectedElement.shape);
+        setDecoScale(selectedElement.scale);
+        setDecoRotation(selectedElement.rotation);
+        setDecoColor(selectedElement.color);
+      }
+    }
+  }, [selectedElementId]);
 
   const handleCanvasMouseDown = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
@@ -100,7 +126,7 @@ const CardEditor: React.FC<CardEditorProps> = ({ template, onPreview, onBack }) 
 
     const hitId = renderer.hitTest(x, y);
     renderer.setSelected(hitId);
-    setSelectedId(hitId);
+    storeSetSelected(hitId);
 
     if (hitId) {
       const el = elements.find((e) => e.id === hitId);
@@ -109,17 +135,17 @@ const CardEditor: React.FC<CardEditorProps> = ({ template, onPreview, onBack }) 
         dragInfo.current = {
           startX: e.clientX,
           startY: e.clientY,
-          elStartX: el.type === 'text' ? el.x : el.x,
-          elStartY: el.type === 'text' ? el.y : el.y,
+          elStartX: el.x,
+          elStartY: el.y,
         };
         canvas.style.cursor = 'move';
       }
     }
     renderer.markDirty();
-  }, [elements]);
+  }, [elements, storeSetSelected]);
 
   const handleCanvasMouseMove = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (!isDragging || !dragInfo.current || !selectedId) return;
+    if (!isDragging || !dragInfo.current || !selectedElementId) return;
     const renderer = rendererRef.current;
     if (!renderer) return;
     const dx = e.clientX - dragInfo.current.startX;
@@ -132,23 +158,18 @@ const CardEditor: React.FC<CardEditorProps> = ({ template, onPreview, onBack }) 
     const newX = dragInfo.current.elStartX + dx * scaleX;
     const newY = dragInfo.current.elStartY + dy * scaleY;
 
-    setElements((prev) => {
-      const updated = prev.map((el) => {
-        if (el.id === selectedId) {
-          if (el.type === 'text') return { ...el, x: newX, y: newY };
-          else return { ...el, x: newX, y: newY };
-        }
-        return el;
-      });
-      const selEl = updated.find((el) => el.id === selectedId);
-      if (selEl) {
-        if (selEl.type === 'text') renderer.updateText(selEl.id, { x: newX, y: newY });
-        else renderer.updateDecoration(selEl.id, { x: newX, y: newY });
-        renderer.markDirty();
-      }
-      return updated;
-    });
-  }, [isDragging, selectedId]);
+    const el = elements.find((e) => e.id === selectedElementId);
+    if (!el) return;
+
+    if (el.type === 'text') {
+      storeUpdateText(el.id, { x: newX, y: newY });
+      renderer.updateText(el.id, { x: newX, y: newY });
+    } else {
+      storeUpdateDecoration(el.id, { x: newX, y: newY });
+      renderer.updateDecoration(el.id, { x: newX, y: newY });
+    }
+    renderer.markDirty();
+  }, [isDragging, selectedElementId, elements, storeUpdateText, storeUpdateDecoration]);
 
   const handleCanvasMouseUp = useCallback(() => {
     setIsDragging(false);
@@ -175,10 +196,10 @@ const CardEditor: React.FC<CardEditorProps> = ({ template, onPreview, onBack }) 
     };
     renderer.addText(el);
     renderer.setSelected(el.id);
-    setSelectedId(el.id);
-    setElements((prev) => [...prev, el]);
+    storeAddText(el);
+    storeSetSelected(el.id);
     renderer.markDirty();
-  }, [textInput, textSize, textFont, textColor, strokeWidth, strokeColor, shadowBlur, shadowColor]);
+  }, [textInput, textSize, textFont, textColor, strokeWidth, strokeColor, shadowBlur, shadowColor, storeAddText, storeSetSelected]);
 
   const handleAddDecoration = useCallback(() => {
     const renderer = rendererRef.current;
@@ -195,28 +216,28 @@ const CardEditor: React.FC<CardEditorProps> = ({ template, onPreview, onBack }) 
     };
     renderer.addDecoration(el);
     renderer.setSelected(el.id);
-    setSelectedId(el.id);
-    setElements((prev) => [...prev, el]);
+    storeAddDecoration(el);
+    storeSetSelected(el.id);
     renderer.markDirty();
-  }, [decoType, decoScale, decoRotation, decoColor]);
+  }, [decoType, decoScale, decoRotation, decoColor, storeAddDecoration, storeSetSelected]);
 
   const handleDeleteSelected = useCallback(() => {
-    if (!selectedId) return;
+    if (!selectedElementId) return;
     const renderer = rendererRef.current;
     if (!renderer) return;
-    renderer.removeElement(selectedId);
-    setElements((prev) => prev.filter((e) => e.id !== selectedId));
-    setSelectedId(null);
+    renderer.removeElement(selectedElementId);
+    storeRemoveElement(selectedElementId);
+    storeSetSelected(null);
     renderer.markDirty();
-  }, [selectedId]);
+  }, [selectedElementId, storeRemoveElement, storeSetSelected]);
 
   const handleBackgroundSelect = useCallback((bg: BackgroundConfig) => {
     const renderer = rendererRef.current;
     if (!renderer) return;
     renderer.setBackground(bg);
-    setCurrentBg(bg);
+    storeSetBackground(bg);
     renderer.markDirty();
-  }, []);
+  }, [storeSetBackground]);
 
   const handleBgUrlSubmit = useCallback(() => {
     if (!bgUrl.trim()) return;
@@ -224,48 +245,39 @@ const CardEditor: React.FC<CardEditorProps> = ({ template, onPreview, onBack }) 
   }, [bgUrl, handleBackgroundSelect]);
 
   const handleUpdateSelected = useCallback((updates: Partial<TextElement> | Partial<DecorationElement>) => {
-    if (!selectedId) return;
+    if (!selectedElementId || !selectedElement) return;
     const renderer = rendererRef.current;
     if (!renderer) return;
-    setElements((prev) =>
-      prev.map((el) => {
-        if (el.id !== selectedId) return el;
-        const updated = { ...el, ...updates };
-        if (updated.type === 'text') renderer.updateText(updated.id, updates as Partial<TextElement>);
-        else renderer.updateDecoration(updated.id, updates as Partial<DecorationElement>);
-        renderer.markDirty();
-        return updated;
-      })
-    );
-  }, [selectedId]);
+    if (selectedElement.type === 'text') {
+      storeUpdateText(selectedElementId, updates as Partial<TextElement>);
+      renderer.updateText(selectedElementId, updates as Partial<TextElement>);
+    } else {
+      storeUpdateDecoration(selectedElementId, updates as Partial<DecorationElement>);
+      renderer.updateDecoration(selectedElementId, updates as Partial<DecorationElement>);
+    }
+    renderer.markDirty();
+  }, [selectedElementId, selectedElement, storeUpdateText, storeUpdateDecoration]);
 
   const handlePreview = useCallback(() => {
-    if (rendererRef.current) {
-      rendererRef.current.setSelected(null);
-      setSelectedId(null);
-      rendererRef.current.markDirty();
-      setTimeout(() => onPreview(rendererRef.current!), 50);
-    }
-  }, [onPreview]);
+    const renderer = rendererRef.current;
+    if (!renderer) return;
+    renderer.setSelected(null);
+    storeSetSelected(null);
+    renderer.markDirty();
+    setTimeout(() => {
+      const dataUrl = renderer.getCanvasDataURL();
+      storeSetPreviewData(dataUrl);
+      storeSetPage('preview');
+    }, 50);
+  }, [storeSetPage, storeSetSelected, storeSetPreviewData]);
 
-  useEffect(() => {
-    if (!selectedElement) return;
-    if (selectedElement.type === 'text') {
-      setTextInput(selectedElement.content);
-      setTextFont(selectedElement.fontFamily);
-      setTextSize(selectedElement.fontSize);
-      setTextColor(selectedElement.color);
-      setStrokeWidth(selectedElement.strokeWidth);
-      setStrokeColor(selectedElement.strokeColor);
-      setShadowBlur(selectedElement.shadowBlur);
-      setShadowColor(selectedElement.shadowColor);
-    } else {
-      setDecoType(selectedElement.shape);
-      setDecoScale(selectedElement.scale);
-      setDecoRotation(selectedElement.rotation);
-      setDecoColor(selectedElement.color);
-    }
-  }, [selectedId]);
+  const handleReset = useCallback(() => {
+    const renderer = rendererRef.current;
+    if (!renderer) return;
+    renderer.setBackground(template.background);
+    storeSetBackground(template.background);
+    renderer.markDirty();
+  }, [template, storeSetBackground]);
 
   const renderTextPanel = () => (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
@@ -373,8 +385,9 @@ const CardEditor: React.FC<CardEditorProps> = ({ template, onPreview, onBack }) 
             value={shadowColor.startsWith('#') ? shadowColor : '#000000'}
             onChange={(e) => {
               const v = e.target.value;
-              setShadowColor(`rgba(${parseInt(v.slice(1, 3), 16)},${parseInt(v.slice(3, 5), 16)},${parseInt(v.slice(5, 7), 16)},0.5)`);
-              if (selectedElement?.type === 'text') handleUpdateSelected({ shadowColor: v });
+              const rgba = `rgba(${parseInt(v.slice(1, 3), 16)},${parseInt(v.slice(3, 5), 16)},${parseInt(v.slice(5, 7), 16)},0.5)`;
+              setShadowColor(rgba);
+              if (selectedElement?.type === 'text') handleUpdateSelected({ shadowColor: rgba });
             }}
           />
         </div>
@@ -395,7 +408,10 @@ const CardEditor: React.FC<CardEditorProps> = ({ template, onPreview, onBack }) 
             key={dt}
             className={`decoration-item ${decoType === dt ? 'active' : ''}`}
             style={decoType === dt ? { borderColor: '#AA96DA', background: 'rgba(170,150,218,0.2)' } : {}}
-            onClick={() => setDecoType(dt)}
+            onClick={() => {
+              setDecoType(dt);
+              if (selectedElement?.type === 'decoration') handleUpdateSelected({ shape: dt });
+            }}
             role="button"
             tabIndex={0}
             onKeyDown={(e) => { if (e.key === 'Enter') setDecoType(dt); }}
@@ -471,7 +487,7 @@ const CardEditor: React.FC<CardEditorProps> = ({ template, onPreview, onBack }) 
         {gradientBackgrounds.map((bg, idx) => (
           <div
             key={idx}
-            className={`gradient-item ${currentBg.value === bg.value ? 'active' : ''}`}
+            className={`gradient-item ${background.value === bg.value ? 'active' : ''}`}
             style={{ background: bg.value }}
             onClick={() => handleBackgroundSelect(bg)}
             role="button"
@@ -505,7 +521,7 @@ const CardEditor: React.FC<CardEditorProps> = ({ template, onPreview, onBack }) 
               borderRadius: 6,
               background: c,
               cursor: 'pointer',
-              border: currentBg.value === c ? '2px solid #AA96DA' : '2px solid rgba(255,255,255,0.3)',
+              border: background.value === c ? '2px solid #AA96DA' : '2px solid rgba(255,255,255,0.3)',
               transition: 'all 0.15s ease',
             }}
           />
@@ -531,7 +547,7 @@ const CardEditor: React.FC<CardEditorProps> = ({ template, onPreview, onBack }) 
         gap: '12px',
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-          <button className="btn btn-sm" onClick={onBack} style={{ padding: '6px 10px', fontSize: '11px' }}>
+          <button className="btn btn-sm" onClick={storeGoBack} style={{ padding: '6px 10px', fontSize: '11px' }}>
             ← 返回
           </button>
           <span style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)' }}>
@@ -555,7 +571,7 @@ const CardEditor: React.FC<CardEditorProps> = ({ template, onPreview, onBack }) 
         {activeTab === 'decoration' && renderDecorationPanel()}
         {activeTab === 'background' && renderBackgroundPanel()}
 
-        {selectedId && (
+        {selectedElementId && (
           <div style={{ marginTop: 'auto', paddingTop: '12px', borderTop: '1px solid rgba(255,255,255,0.3)' }}>
             <button className="btn btn-danger btn-sm" onClick={handleDeleteSelected} style={{ width: '100%' }}>
               删除选中元素
@@ -583,7 +599,7 @@ const CardEditor: React.FC<CardEditorProps> = ({ template, onPreview, onBack }) 
             onMouseMove={handleCanvasMouseMove}
             onMouseUp={handleCanvasMouseUp}
             onMouseLeave={handleCanvasMouseUp}
-            style={{ maxWidth: '100%', height: 'auto' }}
+            style={{ maxWidth: '100%', height: 'auto', cursor: isDragging ? 'move' : 'default' }}
           />
         </div>
 
@@ -591,13 +607,7 @@ const CardEditor: React.FC<CardEditorProps> = ({ template, onPreview, onBack }) 
           <button className="btn" onClick={handlePreview}>
             预览贺卡
           </button>
-          <button className="btn btn-sm" onClick={() => {
-            if (rendererRef.current) {
-              rendererRef.current.setBackground(template.background);
-              setCurrentBg(template.background);
-              rendererRef.current.markDirty();
-            }
-          }}>
+          <button className="btn btn-sm" onClick={handleReset}>
             重置背景
           </button>
         </div>

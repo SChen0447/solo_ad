@@ -276,23 +276,15 @@ export class CanvasRenderer {
     ctx.rotate((el.rotation * Math.PI) / 180);
     ctx.scale(el.scale, el.scale);
 
-    const drawFn = this.getDecorationDrawFn(el.shape);
-    if (drawFn) {
-      drawFn(ctx, el.color);
+    switch (el.shape) {
+      case 'flower': this.drawFlower(ctx, el.color); break;
+      case 'star': this.drawStar(ctx, el.color); break;
+      case 'heart': this.drawHeart(ctx, el.color); break;
+      case 'balloon': this.drawBalloon(ctx, el.color); break;
+      case 'confetti': this.drawConfetti(ctx, el.color); break;
     }
 
     ctx.restore();
-  }
-
-  private getDecorationDrawFn(shape: DecorationType): ((ctx: CanvasRenderingContext2D, color: string) => void) | null {
-    const fns: Record<DecorationType, (ctx: CanvasRenderingContext2D, color: string) => void> = {
-      flower: this.drawFlower,
-      star: this.drawStar,
-      heart: this.drawHeart,
-      balloon: this.drawBalloon,
-      confetti: this.drawConfetti,
-    };
-    return fns[shape] || null;
   }
 
   private drawFlower(ctx: CanvasRenderingContext2D, color: string) {
