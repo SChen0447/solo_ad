@@ -1,0 +1,29 @@
+:root {
+  --color-bg-primary: #1E1E1E;
+  --color-bg-secondary: #2D2D2D;
+  --color-bg-glass: rgba(255, 255, 255, 0.05);
+  --color-accent-blue: #4A90D9;
+  --color-accent-blue-dark: #357ABD;
+  --color-accent-green: #2ECC71;
+  --color-accent-green-dark: #27AE60;
+  --color-accent-gold: #FFD700;
+  --color-text-primary: #FFFFFF;
+  --color-text-secondary: rgba(255, 255, 255, 0.7);
+  --color-border: rgba(255, 255, 255, 0.2);
+  --color-border-dashed: rgba(255, 255, 255, 0.5);
+  
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  
+  --transition-fast: 0.2s ease;
+  --transition-normal: 0.3s ease;
+  
+  --blur-sm: 10px;
+  --blur-md: 12px;
+  
+  --shadow-card: 0 4px 20px rgba(0, 0, 0, 0.3);
+  --shadow-hover: 0 6px 30px rgba(0, 0, 0, 0.4);
+  
+  --max-width: 1200px;
+}
