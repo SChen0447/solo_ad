@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>城市天际线生成器</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #0a0a23;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+    #app {
+      width: 100%;
+      height: 100%;
+      position: relative;
+    }
+    canvas {
+      display: block;
+      outline: none;
+    }
+
+    /* 统计看板 */
+    #stats-panel {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      background: rgba(0, 0, 0, 0.5);
+      border-radius: 8px;
+      padding: 12px;
+      color: #ffffff;
+      font-size: 14px;
+      line-height: 1.8;
+      backdrop-filter: blur(8px);
+      z-index: 10;
+      min-width: 180px;
+      transition: all 0.3s ease-out;
+    }
+    #stats-panel .stat-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+    }
+    #stats-panel .stat-label {
+      opacity: 0.8;
+    }
+    #stats-panel .stat-value {
+      font-weight: 600;
+      color: #00cec9;
+    }
+
+    /* 日夜滑块容器 */
+    #time-container {
+      position: absolute;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      z-index: 10;
+      background: rgba(0, 0, 0, 0.5);
+      padding: 12px 16px;
+      border-radius: 20px;
+      backdrop-filter: blur(8px);
+    }
+    #time-container .sun-icon,
+    #time-container .moon-icon {
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    #time-container .sun-icon {
+      background: #ffd93d;
+      box-shadow: 0 0 12px rgba(255, 217, 61, 0.8);
+    }
+    #time-container .moon-icon {
+      background: #dfe6e9;
+      box-shadow: 0 0 8px rgba(223, 230, 233, 0.6);
+    }
+    #time-slider {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 300px;
+      height: 8px;
+      border-radius: 4px;
+      background: linear-gradient(to right, #ff9f43, #2d3436);
+      outline: none;
+      cursor: pointer;
+    }
+    #time-slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: #ffffff;
+      cursor: pointer;
+      box-shadow: 0 0 12px rgba(255, 255, 255, 0.9), 0 2px 6px rgba(0, 0, 0, 0.4);
+      transition: transform 0.2s ease-out;
+    }
+    #time-slider::-webkit-slider-thumb:hover {
+      transform: scale(1.2);
+    }
+    #time-slider::-moz-range-thumb {
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: #ffffff;
+      cursor: pointer;
+      border: none;
+      box-shadow: 0 0 12px rgba(255, 255, 255, 0.9), 0 2px 6px rgba(0, 0, 0, 0.4);
+    }
+
+    /* 视角切换按钮 */
+    #view-switcher {
+      position: absolute;
+      bottom: 20px;
+      right: 20px;
+      display: flex;
+      gap: 10px;
+      z-index: 10;
+    }
+    .view-btn {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      border: none;
+      background: #2d3436;
+      color: #ffffff;
+      font-size: 16px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.3s ease-out;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    }
+    .view-btn:hover {
+      transform: scale(1.1);
+      background: #636e72;
+    }
+    .view-btn.active {
+      background: #6c5ce7;
+      box-shadow: 0 0 16px rgba(108, 92, 231, 0.6);
+    }
+    .view-btn svg {
+      width: 18px;
+      height: 18px;
+      fill: #ffffff;
+    }
+
+    /* 建筑参数面板 */
+    #building-panel {
+      position: absolute;
+      background: rgba(45, 52, 54, 0.95);
+      backdrop-filter: blur(12px);
+      border-radius: 12px;
+      padding: 20px;
+      color: #ffffff;
+      z-index: 20;
+      min-width: 220px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+      display: none;
+      border: 1px solid rgba(108, 92, 231, 0.3);
+    }
+    #building-panel.show {
+      display: block;
+      animation: panelFadeIn 0.3s ease-out;
+    }
+    @keyframes panelFadeIn {
+      from { opacity: 0; transform: translateY(-8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    #building-panel .panel-title {
+      font-size: 14px;
+      font-weight: 600;
+      margin-bottom: 16px;
+      color: #00cec9;
+    }
+    #building-panel .panel-row {
+      margin-bottom: 14px;
+    }
+    #building-panel .panel-label {
+      font-size: 12px;
+      opacity: 0.8;
+      margin-bottom: 6px;
+      display: block;
+    }
+    #building-panel select,
+    #building-panel input[type="range"] {
+      width: 100%;
+      background: #1e272e;
+      border: 1px solid rgba(108, 92, 231, 0.3);
+      border-radius: 6px;
+      color: #ffffff;
+      padding: 6px 10px;
+      font-size: 12px;
+      outline: none;
+    }
+    #building-panel select {
+      cursor: pointer;
+    }
+    #building-panel input[type="range"] {
+      -webkit-appearance: none;
+      appearance: none;
+      padding: 0;
+      height: 6px;
+      background: #1e272e;
+    }
+    #building-panel input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: #6c5ce7;
+      cursor: pointer;
+    }
+    #building-panel .height-value {
+      display: inline-block;
+      margin-left: 8px;
+      color: #00cec9;
+      font-weight: 600;
+    }
+    #building-panel .panel-actions {
+      display: flex;
+      gap: 8px;
+      margin-top: 18px;
+    }
+    #building-panel .action-btn {
+      flex: 1;
+      padding: 8px 12px;
+      border: none;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s ease-out;
+    }
+    #building-panel .action-btn:hover {
+      transform: scale(1.05);
+    }
+    #building-panel .action-btn.delete {
+      background: #ff6b6b;
+      color: #ffffff;
+    }
+    #building-panel .action-btn.close {
+      background: #636e72;
+      color: #ffffff;
+    }
+
+    /* 响应式适配 */
+    @media (max-width: 768px) {
+      #stats-panel {
+        transform: scale(0.7);
+        transform-origin: top left;
+        top: 10px;
+        left: 10px;
+      }
+      #time-container {
+        transform: translateX(-50%) scale(0.7);
+        top: 10px;
+      }
+      #time-slider {
+        width: 210px;
+      }
+      #view-switcher {
+        flex-direction: column;
+        bottom: 10px;
+        right: 10px;
+        transform: scale(0.7);
+        transform-origin: bottom right;
+      }
+    }
+
+    /* 提示信息 */
+    #hint {
+      position: absolute;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      color: rgba(255, 255, 255, 0.6);
+      font-size: 12px;
+      z-index: 5;
+      background: rgba(0, 0, 0, 0.3);
+      padding: 8px 16px;
+      border-radius: 16px;
+      pointer-events: none;
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <div id="stats-panel">
+      <div class="stat-row">
+        <span class="stat-label">建筑总数</span>
+        <span class="stat-value" id="stat-count">0</span>
+      </div>
+      <div class="stat-row">
+        <span class="stat-label">最高建筑</span>
+        <span class="stat-value" id="stat-height">0 u</span>
+      </div>
+      <div class="stat-row">
+        <span class="stat-label">时间段</span>
+        <span class="stat-value" id="stat-time">白天</span>
+      </div>
+      <div class="stat-row">
+        <span class="stat-label">FPS</span>
+        <span class="stat-value" id="stat-fps">60</span>
+      </div>
+    </div>
+
+    <div id="time-container">
+      <span class="sun-icon"></span>
+      <input type="range" id="time-slider" min="0" max="24" step="0.1" value="12" />
+      <span class="moon-icon"></span>
+    </div>
+
+    <div id="view-switcher">
+      <button class="view-btn active" id="btn-topview" title="俯视模式">
+        <svg viewBox="0 0 24 24"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>
+      </button>
+      <button class="view-btn" id="btn-fpsview" title="第一人称模式">
+        <svg viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
+      </button>
+    </div>
+
+    <div id="building-panel">
+      <div class="panel-title">建筑属性</div>
+      <div class="panel-row">
+        <span class="panel-label">建筑风格</span>
+        <select id="building-style">
+          <option value="modern">现代风格</option>
+          <option value="classic">古典风格</option>
+          <option value="futuristic">未来主义</option>
+        </select>
+      </div>
+      <div class="panel-row">
+        <span class="panel-label">建筑高度 <span class="height-value" id="height-value">40</span></span>
+        <input type="range" id="building-height" min="10" max="80" step="1" value="40" />
+      </div>
+      <div class="panel-actions">
+        <button class="action-btn delete" id="btn-delete">删除</button>
+        <button class="action-btn close" id="btn-close-panel">关闭</button>
+      </div>
+    </div>
+
+    <div id="hint">点击地面拖拽放置建筑 · 点击建筑可编辑 · 拖动顶部滑块切换日夜</div>
+  </div>
+
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
