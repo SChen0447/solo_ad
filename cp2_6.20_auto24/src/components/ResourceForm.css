@@ -1,0 +1,86 @@
+.form-modal {
+  background-color: var(--color-card-bg);
+  border-radius: var(--radius-card);
+  width: 90%;
+  max-width: 480px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  overflow: hidden;
+}
+
+.form-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 24px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.form-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--color-primary-text);
+}
+
+.close-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #718096;
+  transition: all var(--transition-normal);
+}
+
+.close-btn:hover {
+  background-color: var(--color-secondary-bg);
+  color: var(--color-primary-text);
+}
+
+.form-content {
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.form-group label {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--color-primary-text);
+}
+
+.form-group input,
+.form-group select,
+.form-group textarea {
+  width: 100%;
+  padding: 12px 14px;
+  font-size: 14px;
+  resize: vertical;
+}
+
+.form-group textarea {
+  min-height: 100px;
+}
+
+.form-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+  padding-top: 4px;
+}
+
+.form-actions .btn {
+  padding: 12px 24px;
+}
+
+.form-actions .btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
