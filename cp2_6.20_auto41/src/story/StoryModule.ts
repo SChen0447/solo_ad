@@ -1,4 +1,4 @@
-import { pipeline } from '@xenova/transformers';
+import StoryWorker from './story.worker.ts?worker';
 
 type ModelState = 'idle' | 'loading' | 'ready' | 'error';
 
@@ -49,12 +49,50 @@ function generateTemplateStory(prompt: string): string {
 }
 
 class StoryModule {
-  private generator: any = null;
+  private worker: Worker | null = null;
   private state: ModelState = 'idle';
   private loadPromise: Promise<void> | null = null;
+  private generateCallbacks: Map<string, { onChunk: (t: string) => void; onProgress: (p: number) => void; resolve: (t: string) => void }> = new Map();
+  private requestId = 0;
 
   getState(): ModelState {
     return this.state;
+  }
+
+  private initWorker(): void {
+    if (this.worker) return;
+
+    this.worker = new StoryWorker();
+
+    this.worker.onmessage = (e: MessageEvent) => {
+      const { type, progress, text, message, requestId } = e.data;
+
+      if (type === 'loading') {
+        this.state = 'loading';
+        for (const cb of this.generateCallbacks.values()) {
+          cb.onProgress(progress || 0);
+        }
+      } else if (type === 'ready') {
+        this.state = 'ready';
+        for (const cb of this.generateCallbacks.values()) {
+          cb.onProgress(100);
+        }
+      } else if (type === 'error') {
+        this.state = 'error';
+        console.error('Story worker error:', message);
+      } else if (type === 'chunk') {
+        const cb = this.generateCallbacks.get(requestId);
+        if (cb) {
+          cb.onChunk(text || '');
+        }
+      } else if (type === 'complete') {
+        const cb = this.generateCallbacks.get(requestId);
+        if (cb) {
+          cb.resolve(text || '');
+          this.generateCallbacks.delete(requestId);
+        }
+      }
+    };
   }
 
   private async loadModel(onProgress: (progress: number) => void): Promise<void> {
@@ -64,25 +102,31 @@ class StoryModule {
       return;
     }
 
+    this.initWorker();
     this.state = 'loading';
-    this.loadPromise = (async () => {
-      try {
-        this.generator = await pipeline('text-generation', 'Xenova/distilgpt2', {
-          progress_callback: (progress: any) => {
-            if (progress.status === 'progress' && progress.progress != null) {
-              onProgress(Math.min(Math.round(progress.progress), 100));
-            } else if (progress.status === 'done') {
-              onProgress(100);
-            }
-          },
-        });
-        this.state = 'ready';
-        onProgress(100);
-      } catch (err) {
-        this.state = 'error';
-        throw err;
-      }
-    })();
+
+    this.loadPromise = new Promise((resolve) => {
+      const checkReady = () => {
+        if (this.state === 'ready') {
+          resolve();
+        } else {
+          setTimeout(checkReady, 100);
+        }
+      };
+
+      this.worker?.postMessage({ action: 'load' });
+
+      const onReadyProgress = (p: number) => {
+        onProgress(p);
+      };
+      this.generateCallbacks.set('load_' + Date.now(), {
+        onChunk: () => {},
+        onProgress: onReadyProgress,
+        resolve: () => {},
+      });
+
+      checkReady();
+    });
 
     await this.loadPromise;
   }
@@ -95,26 +139,27 @@ class StoryModule {
     if (this.state !== 'ready') {
       const templateResult = generateTemplateStory(prompt);
       onChunk(templateResult);
-      this.loadModel(onProgress).catch(() => {});
+
+      if (this.state === 'idle') {
+        this.loadModel(onProgress).catch(() => {});
+      }
+
       return templateResult;
     }
 
-    try {
-      const output = await this.generator(prompt, {
-        max_new_tokens: 150,
-        temperature: 0.8,
-        top_p: 0.9,
-        do_sample: true,
-      });
+    return new Promise((resolve) => {
+      const reqId = `req_${++this.requestId}`;
+      this.generateCallbacks.set(reqId, { onChunk, onProgress, resolve });
+      this.worker?.postMessage({ action: 'generate', prompt, maxTokens: 150, requestId: reqId });
+    });
+  }
 
-      const generatedText = output[0]?.generated_text?.slice(prompt.length) || '';
-      onChunk(generatedText);
-      return generatedText;
-    } catch (err) {
-      const templateResult = generateTemplateStory(prompt);
-      onChunk(templateResult);
-      return templateResult;
+  dispose(): void {
+    if (this.worker) {
+      this.worker.terminate();
+      this.worker = null;
     }
+    this.generateCallbacks.clear();
   }
 }
 

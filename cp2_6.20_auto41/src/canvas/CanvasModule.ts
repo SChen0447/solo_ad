@@ -40,6 +40,10 @@ export default class CanvasModule {
         requestAnimationFrame(fadeOut);
       } else {
         this.fadeAlpha = 0.0;
+        this.ctx.save();
+        this.ctx.globalAlpha = 1.0;
+        this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+        this.ctx.restore();
         this.currentSceneData = newSceneData;
         const fadeInStart = performance.now();
 
