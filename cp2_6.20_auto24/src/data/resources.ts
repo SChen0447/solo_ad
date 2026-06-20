@@ -38,12 +38,14 @@ const types: ResourceType[] = ['笔记', '习题', '课件', '其他'];
 export function generateMockResources(count: number): Resource[] {
   const resources: Resource[] = [];
   for (let i = 0; i < count; i++) {
+    const titleIndex = i % mockTitles.length;
+    const suffix = i >= mockTitles.length ? ' (' + (Math.floor(i / mockTitles.length) + 1) + ')' : '';
     resources.push({
       id: uuidv4(),
-      title: mockTitles[i % mockTitles.length] + (i >= mockTitles.length ? ` (${Math.floor(i / mockTitles.length) + 1)` : ''),
+      title: mockTitles[titleIndex] + suffix,
       type: types[i % types.length],
       description: mockDescriptions[i % mockDescriptions.length],
-      ownerId: `user-${(i % mockOwners.length) + 1}`,
+      ownerId: 'user-' + ((i % mockOwners.length) + 1),
       ownerName: mockOwners[i % mockOwners.length],
       createdAt: new Date(Date.now() - Math.random() * 30 * 24 * 60 * 60 * 1000)
     });
@@ -58,6 +60,40 @@ export class ResourceStore {
 
   getResources(): Resource[] {
     return [...this.resources];
+  }
+
+  getResourcesPaginated(startIndex: number, count: number): { items: Resource[]; total: number; hasMore: boolean } {
+    const items = this.resources.slice(startIndex, startIndex + count);
+    const total = this.resources.length;
+    const hasMore = startIndex + count < total;
+    return { items, total, hasMore };
+  }
+
+  getFilteredResourcesPaginated(
+    startIndex: number,
+    count: number,
+    keyword: string,
+    typeFilter: ResourceType | 'all'
+  ): { items: Resource[]; total: number; hasMore: boolean } {
+    let filtered = this.resources;
+
+    if (typeFilter !== 'all') {
+      filtered = filtered.filter(r => r.type === typeFilter);
+    }
+
+    if (keyword.trim()) {
+      const lowerKeyword = keyword.toLowerCase().trim();
+      filtered = filtered.filter(
+        r =>
+          r.title.toLowerCase().includes(lowerKeyword) ||
+          r.description.toLowerCase().includes(lowerKeyword)
+      );
+    }
+
+    const total = filtered.length;
+    const items = filtered.slice(startIndex, startIndex + count);
+    const hasMore = startIndex + count < total;
+    return { items, total, hasMore };
   }
 
   getResourceById(id: string): Resource | undefined {
