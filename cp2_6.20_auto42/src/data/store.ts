@@ -1,11 +1,9 @@
-import React, { createContext, useContext, useReducer, ReactNode, useMemo } from 'react';
-
 export const CATEGORY_COLORS = [
   '#2563EB',
   '#10B981',
-  '#F59E0B',
-  '#EF4444',
   '#8B5CF6',
+  '#EF4444',
+  '#F59E0B',
 ];
 
 export interface User {
@@ -42,7 +40,7 @@ export interface AppState {
   searchResults: Document[];
 }
 
-type Action =
+export type Action =
   | { type: 'ADD_DOCUMENT'; payload: Document }
   | { type: 'UPDATE_DOCUMENT'; payload: Document }
   | { type: 'DELETE_DOCUMENT'; payload: string }
@@ -102,7 +100,7 @@ function generateSampleContent(title: string): string {
 
 ## 概述
 
-本文档详细介绍了${title}相关的核心概念和实践方法。内容涵盖了从入门到进阶的完整知识体系。
+本文档详细介绍了**${title}**相关的核心概念和实践方法。内容涵盖了从入门到进阶的完整知识体系。
 
 ## 核心概念
 
@@ -153,7 +151,7 @@ initialize(appConfig);
 
 | 选项 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
-| debug | boolean | false | 调试模式 |
+| debug | boolean | false | 调试模式开关 |
 | timeout | number | 3000 | 超时时间(ms) |
 | retry | number | 3 | 重试次数 |
 
@@ -165,7 +163,7 @@ initialize(appConfig);
 
 ## 总结
 
-掌握${title}需要持续实践和总结。建议结合实际项目进行练习，在实践中加深理解。
+掌握**${title}**需要持续实践和总结。建议结合实际项目进行练习，在实践中加深理解。
 
 > 💡 **小贴士**: 保持好奇心，多阅读源码，深入理解原理是提升技术水平的有效途径。
 `;
@@ -192,7 +190,7 @@ function generateSampleDocuments(): Document[] {
         version: `v${v + 1}.0`,
         author: vUser,
         title: title + (v > 0 ? ` - 更新${v}` : ''),
-        content: generateSampleContent(title) + (v > 0 ? `\n\n**版本更新内容**: 第${v}次更新优化了文档结构和代码示例。` : ''),
+        content: generateSampleContent(title) + (v > 0 ? `\n\n**版本更新内容**: 第${v}次更新优化了文档结构和代码示例，新增了配置说明章节。` : ''),
         modifiedAt: vDate.toISOString(),
       });
     }
@@ -213,14 +211,14 @@ function generateSampleDocuments(): Document[] {
   return docs.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
 }
 
-const initialState: AppState = {
+export const initialState: AppState = {
   documents: generateSampleDocuments(),
   currentUser: defaultUser,
   searchQuery: '',
   searchResults: [],
 };
 
-function appReducer(state: AppState, action: Action): AppState {
+export function appReducer(state: AppState, action: Action): AppState {
   switch (action.type) {
     case 'ADD_DOCUMENT':
       return {
@@ -254,119 +252,79 @@ function appReducer(state: AppState, action: Action): AppState {
   }
 }
 
-interface AppContextType {
-  state: AppState;
-  dispatch: React.Dispatch<Action>;
-  addDocument: (title: string, content: string, category: string) => void;
-  updateDocument: (id: string, title: string, content: string) => void;
-  deleteDocument: (id: string) => void;
-  getDocument: (id: string) => Document | undefined;
-  performSearch: (query: string) => Document[];
-}
-
-const AppContext = createContext<AppContextType | undefined>(undefined);
-
-export function AppProvider({ children }: { children: ReactNode }) {
-  const [state, dispatch] = useReducer(appReducer, initialState);
-
-  const addDocument = (title: string, content: string, category: string) => {
-    const now = new Date().toISOString();
-    const versionId = `v-new-${Date.now()}`;
-    const newDoc: Document = {
-      id: `doc-${Date.now()}`,
-      title,
-      content,
-      category,
-      categoryColor: CATEGORY_COLORS[Math.floor(Math.random() * CATEGORY_COLORS.length)],
-      author: state.currentUser,
-      createdAt: now,
-      updatedAt: now,
-      versions: [
-        {
-          id: versionId,
-          version: 'v1.0',
-          author: state.currentUser,
-          title,
-          content,
-          modifiedAt: now,
-        },
-      ],
-    };
-    dispatch({ type: 'ADD_DOCUMENT', payload: newDoc });
-  };
-
-  const updateDocument = (id: string, title: string, content: string) => {
-    const doc = state.documents.find((d) => d.id === id);
-    if (!doc) return;
-
-    const now = new Date().toISOString();
-    const newVersionNum = `v${doc.versions.length + 1}.0`;
-    const newVersion: Version = {
-      id: `v-${id}-${Date.now()}`,
-      version: newVersionNum,
-      author: state.currentUser,
-      title,
-      content,
-      modifiedAt: now,
-    };
-
-    dispatch({
-      type: 'UPDATE_DOCUMENT',
-      payload: {
-        ...doc,
+export function createAddDocument(
+  state: AppState,
+  title: string,
+  content: string,
+  category: string
+): Document {
+  const now = new Date().toISOString();
+  return {
+    id: `doc-${Date.now()}`,
+    title,
+    content,
+    category,
+    categoryColor: CATEGORY_COLORS[Math.floor(Math.random() * CATEGORY_COLORS.length)],
+    author: state.currentUser,
+    createdAt: now,
+    updatedAt: now,
+    versions: [
+      {
+        id: `v-new-${Date.now()}`,
+        version: 'v1.0',
+        author: state.currentUser,
         title,
         content,
-        updatedAt: now,
-        versions: [...doc.versions, newVersion],
+        modifiedAt: now,
       },
-    });
+    ],
   };
-
-  const deleteDocument = (id: string) => {
-    dispatch({ type: 'DELETE_DOCUMENT', payload: id });
-  };
-
-  const getDocument = (id: string) => {
-    return state.documents.find((d) => d.id === id);
-  };
-
-  const performSearch = (query: string): Document[] => {
-    if (!query.trim()) return [];
-    const q = query.toLowerCase();
-    const results = state.documents
-      .filter(
-        (doc) =>
-          doc.title.toLowerCase().includes(q) ||
-          doc.content.toLowerCase().includes(q) ||
-          doc.category.toLowerCase().includes(q)
-      )
-      .slice(0, 15);
-    dispatch({ type: 'SET_SEARCH_RESULTS', payload: results });
-    return results;
-  };
-
-  const value = useMemo(
-    () => ({
-      state,
-      dispatch,
-      addDocument,
-      updateDocument,
-      deleteDocument,
-      getDocument,
-      performSearch,
-    }),
-    [state]
-  );
-
-  return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
 }
 
-export function useApp() {
-  const context = useContext(AppContext);
-  if (!context) {
-    throw new Error('useApp must be used within an AppProvider');
-  }
-  return context;
+export function createUpdateDocument(
+  doc: Document,
+  currentUser: User,
+  title: string,
+  content: string
+): Document {
+  const now = new Date().toISOString();
+  const newVersionNum = `v${doc.versions.length + 1}.0`;
+  const newVersion: Version = {
+    id: `v-${doc.id}-${Date.now()}`,
+    version: newVersionNum,
+    author: currentUser,
+    title,
+    content,
+    modifiedAt: now,
+  };
+
+  return {
+    ...doc,
+    title,
+    content,
+    updatedAt: now,
+    versions: [...doc.versions, newVersion],
+  };
+}
+
+export function getDocumentById(documents: Document[], id: string): Document | undefined {
+  return documents.find((d) => d.id === id);
+}
+
+export function searchDocuments(
+  documents: Document[],
+  query: string
+): Document[] {
+  if (!query.trim()) return [];
+  const q = query.toLowerCase();
+  return documents
+    .filter(
+      (doc) =>
+        doc.title.toLowerCase().includes(q) ||
+        doc.content.toLowerCase().includes(q) ||
+        doc.category.toLowerCase().includes(q)
+    )
+    .slice(0, 15);
 }
 
 export function formatDate(isoString: string): string {

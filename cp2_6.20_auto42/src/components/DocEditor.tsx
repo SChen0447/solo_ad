@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { useApp, Version, formatDate } from '../data/store';
+import { useApp } from '../data/store.tsx';
+import { Version, formatDate } from '../data/store.ts';
 
 function escapeHtml(text: string): string {
   const div = document.createElement('div');

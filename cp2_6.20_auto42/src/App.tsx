@@ -3,7 +3,8 @@ import { Routes, Route, useNavigate, useLocation, Link } from 'react-router-dom'
 import DocList from './components/DocList';
 import DocEditor from './components/DocEditor';
 import SearchBar from './components/SearchBar';
-import { useApp, Document, formatDate } from './data/store';
+import { useApp } from './data/store.tsx';
+import { Document, formatDate } from './data/store';
 
 function Sidebar({
   collapsed,

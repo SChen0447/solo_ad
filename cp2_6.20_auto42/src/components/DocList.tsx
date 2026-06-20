@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { Document, formatDate } from '../data/store';
+import { Document, formatDate } from '../data/store.ts';
 
 interface DocListProps {
   documents: Document[];

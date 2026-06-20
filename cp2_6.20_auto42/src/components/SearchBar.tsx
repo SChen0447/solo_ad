@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useApp, Document, formatDate } from '../data/store';
+import { useApp } from '../data/store.tsx';
+import { Document, formatDate } from '../data/store.ts';
 
 function getMatchSnippet(content: string, query: string): string {
   const plain = content
