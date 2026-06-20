@@ -1,0 +1,21 @@
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "module": "commonjs",
+    "lib": ["esnext"],
+    "outDir": "./dist/backend",
+    "rootDir": "./src/backend",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "declaration": true,
+    "baseUrl": ".",
+    "paths": {
+      "@/backend/*": ["src/backend/*"]
+    }
+  },
+  "include": ["src/backend/**/*.ts"],
+  "exclude": ["node_modules"]
+}
