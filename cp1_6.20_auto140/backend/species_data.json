@@ -1,0 +1,95 @@
+[
+  {
+    "id": "sunflower",
+    "name": "向日葵",
+    "stages": [
+      { "name": "seed", "minDuration": 5, "maxDuration": 8, "stemHeight": 0, "leafCount": 0, "budSize": 0, "fruitSize": 0 },
+      { "name": "sprout", "minDuration": 8, "maxDuration": 12, "stemHeight": 8, "leafCount": 2, "budSize": 0, "fruitSize": 0 },
+      { "name": "seedling", "minDuration": 10, "maxDuration": 15, "stemHeight": 30, "leafCount": 4, "budSize": 0, "fruitSize": 0 },
+      { "name": "mature", "minDuration": 12, "maxDuration": 18, "stemHeight": 80, "leafCount": 8, "budSize": 2, "fruitSize": 0 },
+      { "name": "flowering", "minDuration": 15, "maxDuration": 20, "stemHeight": 120, "leafCount": 10, "budSize": 8, "fruitSize": 0 },
+      { "name": "fruiting", "minDuration": 10, "maxDuration": 15, "stemHeight": 150, "leafCount": 12, "budSize": 12, "fruitSize": 5 }
+    ],
+    "colors": {
+      "stem": "#228B22",
+      "stemMature": "#3B7A2E",
+      "leaf": "#228B22",
+      "leafMature": "#FFD700",
+      "flower": "#FFD700",
+      "flowerCenter": "#8B4513",
+      "fruit": "#8B4513"
+    },
+    "morphology": {
+      "maxStemHeight": 150,
+      "stemRadius": 0.8,
+      "petalCount": 18,
+      "flowerRadius": 8,
+      "leafWidth": 3,
+      "leafLength": 5,
+      "spineLength": 0,
+      "vineCurve": 0
+    }
+  },
+  {
+    "id": "cactus",
+    "name": "仙人掌",
+    "stages": [
+      { "name": "seed", "minDuration": 5, "maxDuration": 10, "stemHeight": 0, "leafCount": 0, "budSize": 0, "fruitSize": 0 },
+      { "name": "sprout", "minDuration": 8, "maxDuration": 12, "stemHeight": 3, "leafCount": 0, "budSize": 0, "fruitSize": 0 },
+      { "name": "seedling", "minDuration": 10, "maxDuration": 15, "stemHeight": 10, "leafCount": 0, "budSize": 0, "fruitSize": 0 },
+      { "name": "mature", "minDuration": 12, "maxDuration": 18, "stemHeight": 30, "leafCount": 0, "budSize": 0, "fruitSize": 0 },
+      { "name": "flowering", "minDuration": 15, "maxDuration": 20, "stemHeight": 50, "leafCount": 0, "budSize": 4, "fruitSize": 0 },
+      { "name": "fruiting", "minDuration": 10, "maxDuration": 15, "stemHeight": 60, "leafCount": 0, "budSize": 5, "fruitSize": 3 }
+    ],
+    "colors": {
+      "stem": "#2E8B57",
+      "stemMature": "#1B6B3A",
+      "leaf": "#2E8B57",
+      "leafMature": "#2E8B57",
+      "flower": "#FF69B4",
+      "flowerCenter": "#FFD700",
+      "fruit": "#FF6347"
+    },
+    "morphology": {
+      "maxStemHeight": 60,
+      "stemRadius": 3,
+      "petalCount": 8,
+      "flowerRadius": 4,
+      "leafWidth": 0,
+      "leafLength": 0,
+      "spineLength": 1.2,
+      "vineCurve": 0
+    }
+  },
+  {
+    "id": "vine",
+    "name": "藤蔓",
+    "stages": [
+      { "name": "seed", "minDuration": 5, "maxDuration": 8, "stemHeight": 0, "leafCount": 0, "budSize": 0, "fruitSize": 0 },
+      { "name": "sprout", "minDuration": 6, "maxDuration": 10, "stemHeight": 5, "leafCount": 1, "budSize": 0, "fruitSize": 0 },
+      { "name": "seedling", "minDuration": 8, "maxDuration": 12, "stemHeight": 20, "leafCount": 3, "budSize": 0, "fruitSize": 0 },
+      { "name": "mature", "minDuration": 10, "maxDuration": 16, "stemHeight": 60, "leafCount": 6, "budSize": 0, "fruitSize": 0 },
+      { "name": "flowering", "minDuration": 12, "maxDuration": 18, "stemHeight": 120, "leafCount": 10, "budSize": 2, "fruitSize": 0 },
+      { "name": "fruiting", "minDuration": 10, "maxDuration": 15, "stemHeight": 200, "leafCount": 14, "budSize": 3, "fruitSize": 3 }
+    ],
+    "colors": {
+      "stem": "#32CD32",
+      "stemMature": "#8B4513",
+      "leaf": "#32CD32",
+      "leafMature": "#8B4513",
+      "flower": "#9370DB",
+      "flowerCenter": "#4B0082",
+      "fruit": "#9B2335"
+    },
+    "morphology": {
+      "maxStemHeight": 200,
+      "stemRadius": 0.4,
+      "petalCount": 5,
+      "flowerRadius": 2,
+      "leafWidth": 2.5,
+      "leafLength": 4,
+      "spineLength": 0,
+      "vineCurve": 0.6
+    }
+  }
+]
