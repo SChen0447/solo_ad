@@ -4,8 +4,8 @@ import type { DataRouter } from './dataRouter';
 
 const NODE_RADIUS = 0.3;
 const EDGE_RADIUS = 0.02;
-const TRANSITION_DURATION = 500;
-const BOUNCE_DURATION = 300;
+const TRANSITION_DURATION = 0.5;
+const BOUNCE_DURATION = 0.3;
 
 interface NodeObject {
   mesh: THREE.Mesh;
@@ -15,6 +15,11 @@ interface NodeObject {
   isDragging: boolean;
   scale: number;
   targetScale: number;
+  bounceTime: number;
+  bounceStartPos: THREE.Vector3;
+  bounceEndPos: THREE.Vector3;
+  isBouncing: boolean;
+  baseOpacity: number;
 }
 
 interface EdgeObject {
@@ -24,6 +29,19 @@ interface EdgeObject {
   isHighlighted: boolean;
   targetRadius: number;
   currentRadius: number;
+  baseOpacity: number;
+}
+
+function easeOutElastic(t: number): number {
+  if (t === 0) return 0;
+  if (t === 1) return 1;
+  const p = 0.3;
+  const s = p / 4;
+  return Math.pow(2, -10 * t) * Math.sin((t - s) * (2 * Math.PI) / p) + 1;
+}
+
+function easeOutQuad(t: number): number {
+  return 1 - (1 - t) * (1 - t);
 }
 
 export class TopologyRenderer {
@@ -48,23 +66,23 @@ export class TopologyRenderer {
   private dragPlane: THREE.Plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
   private dragOffset: THREE.Vector3 = new THREE.Vector3();
 
-  private isTransitioning: boolean = false;
-  private transitionProgress: number = 0;
+  private isFadingOut: boolean = false;
+  private isFadingIn: boolean = false;
+  private fadeProgress: number = 0;
+  private pendingTopologyData: TopologyData | null = null;
 
   private onNodeSelect?: (info: SelectedNodeInfo | null) => void;
   private onNodePositionChange?: (nodeId: number, position: { x: number; y: number; z: number }) => void;
 
   private animationFrameId: number = 0;
-  private lastTime: number = 0;
   private clock: THREE.Clock = new THREE.Clock();
 
   private cameraAngle: number = 0;
   private cameraHeight: number = 8;
   private cameraDistance: number = 12;
-  private isCameraRotating: boolean = false;
+  private isRightMouseDown: boolean = false;
   private lastMouseX: number = 0;
   private lastMouseY: number = 0;
-  private isRightMouseDown: boolean = false;
 
   constructor(container: HTMLElement) {
     this.container = container;
@@ -110,8 +128,9 @@ export class TopologyRenderer {
   private setupGrid(): void {
     const gridHelper = new THREE.GridHelper(20, 20, 0x334455, 0x223344);
     gridHelper.position.y = -2;
-    gridHelper.material.transparent = true;
-    gridHelper.material.opacity = 0.3;
+    const mat = gridHelper.material as THREE.Material;
+    mat.transparent = true;
+    mat.opacity = 0.25;
     this.scene.add(gridHelper);
   }
 
@@ -133,6 +152,7 @@ export class TopologyRenderer {
       opacity: 0.8,
       blending: THREE.AdditiveBlending,
       sizeAttenuation: true,
+      depthWrite: false,
     });
 
     this.particles = new THREE.Points(geometry, material);
@@ -175,7 +195,7 @@ export class TopologyRenderer {
     canvas.addEventListener('mousemove', this.onMouseMove);
     canvas.addEventListener('mouseup', this.onMouseUp);
     canvas.addEventListener('mouseleave', this.onMouseUp);
-    canvas.addEventListener('wheel', this.onWheel);
+    canvas.addEventListener('wheel', this.onWheel, { passive: false });
     canvas.addEventListener('contextmenu', (e) => e.preventDefault());
 
     window.addEventListener('resize', this.onResize);
@@ -192,20 +212,42 @@ export class TopologyRenderer {
     this.updateMousePosition(e);
     this.raycaster.setFromCamera(this.mouse, this.camera);
 
-    const meshes = Array.from(this.nodeObjects.values()).map((n) => n.mesh);
-    const intersects = this.raycaster.intersectObjects(meshes);
+    const meshes: THREE.Object3D[] = [];
+    for (const nodeObj of this.nodeObjects.values()) {
+      meshes.push(nodeObj.mesh);
+    }
+    const intersects = this.raycaster.intersectObjects(meshes, true);
 
     if (intersects.length > 0) {
-      const mesh = intersects[0].object as THREE.Mesh;
-      const nodeObj = this.findNodeByMesh(mesh);
+      let hitMesh: THREE.Object3D | null = intersects[0].object;
+      while (hitMesh && !('userData' in hitMesh && (hitMesh as any).userData?.nodeId !== undefined)) {
+        hitMesh = hitMesh.parent;
+      }
+
+      let nodeObj: NodeObject | undefined;
+      const nodeId = (hitMesh as any)?.userData?.nodeId;
+      if (nodeId !== undefined) {
+        nodeObj = this.nodeObjects.get(nodeId);
+      }
+
+      if (!nodeObj) {
+        for (const no of this.nodeObjects.values()) {
+          if (no.mesh === intersects[0].object || intersects[0].object.parent === no.mesh) {
+            nodeObj = no;
+            break;
+          }
+        }
+      }
+
       if (nodeObj) {
         this.draggedNodeId = nodeObj.id;
         this.isDragging = true;
         nodeObj.isDragging = true;
         nodeObj.targetScale = 1.3;
+        nodeObj.isBouncing = false;
         this.setSelectedNode(nodeObj.id);
 
-        const intersectPoint = intersects[0].point;
+        const intersectPoint = intersects[0].point.clone();
         this.dragPlane.setFromNormalAndCoplanarPoint(
           new THREE.Vector3(0, 1, 0),
           intersectPoint
@@ -234,22 +276,23 @@ export class TopologyRenderer {
       const nodeObj = this.nodeObjects.get(this.draggedNodeId);
       if (nodeObj) {
         const intersectPoint = new THREE.Vector3();
-        this.raycaster.ray.intersectPlane(this.dragPlane, intersectPoint);
-        const newPos = intersectPoint.sub(this.dragOffset);
-        nodeObj.mesh.position.copy(newPos);
-        nodeObj.targetPosition.copy(newPos);
-        this.updateEdgesForNode(this.draggedNodeId);
+        if (this.raycaster.ray.intersectPlane(this.dragPlane, intersectPoint)) {
+          const newPos = intersectPoint.clone().sub(this.dragOffset);
+          nodeObj.mesh.position.copy(newPos);
+          nodeObj.targetPosition.copy(newPos);
+          this.updateEdgesForNode(this.draggedNodeId);
 
-        if (this.onNodePositionChange) {
-          this.onNodePositionChange(this.draggedNodeId, {
-            x: newPos.x,
-            y: newPos.y,
-            z: newPos.z,
-          });
-        }
+          if (this.onNodePositionChange) {
+            this.onNodePositionChange(this.draggedNodeId, {
+              x: newPos.x,
+              y: newPos.y,
+              z: newPos.z,
+            });
+          }
 
-        if (this.selectedNodeId === this.draggedNodeId && this.onNodeSelect) {
-          this.onNodeSelect(this.getSelectedNodeInfo());
+          if (this.selectedNodeId === this.draggedNodeId && this.onNodeSelect) {
+            this.onNodeSelect(this.getSelectedNodeInfo());
+          }
         }
       }
     }
@@ -263,6 +306,10 @@ export class TopologyRenderer {
       if (nodeObj) {
         nodeObj.isDragging = false;
         nodeObj.targetScale = 1.0;
+        nodeObj.isBouncing = true;
+        nodeObj.bounceTime = 0;
+        nodeObj.bounceStartPos = nodeObj.mesh.position.clone();
+        nodeObj.bounceEndPos = nodeObj.targetPosition.clone();
       }
     }
     this.isDragging = false;
@@ -271,7 +318,7 @@ export class TopologyRenderer {
 
   private onWheel = (e: WheelEvent): void => {
     e.preventDefault();
-    const zoomSpeed = 0.001;
+    const zoomSpeed = 0.002;
     this.cameraDistance = Math.max(5, Math.min(30, this.cameraDistance + e.deltaY * zoomSpeed));
     this.updateCameraPosition();
   };
@@ -288,15 +335,6 @@ export class TopologyRenderer {
     const rect = this.renderer.domElement.getBoundingClientRect();
     this.mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
     this.mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
-  }
-
-  private findNodeByMesh(mesh: THREE.Mesh): NodeObject | undefined {
-    for (const nodeObj of this.nodeObjects.values()) {
-      if (nodeObj.mesh === mesh || nodeObj.glow === mesh) {
-        return nodeObj;
-      }
-    }
-    return undefined;
   }
 
   private setSelectedNode(nodeId: number | null): void {
@@ -342,9 +380,13 @@ export class TopologyRenderer {
   }
 
   public updateTopology(data: TopologyData): void {
-    this.isTransitioning = true;
-    this.transitionProgress = 0;
+    this.pendingTopologyData = data;
+    this.isFadingOut = true;
+    this.isFadingIn = false;
+    this.fadeProgress = 0;
+  }
 
+  private applyTopologyData(data: TopologyData): void {
     const oldNodes = new Set(this.nodeObjects.keys());
     const newNodeIds = new Set(data.nodes.map((n) => n.id));
 
@@ -353,7 +395,6 @@ export class TopologyRenderer {
         const nodeObj = this.nodeObjects.get(nodeId);
         if (nodeObj) {
           this.scene.remove(nodeObj.mesh);
-          this.scene.remove(nodeObj.glow);
         }
         this.nodeObjects.delete(nodeId);
       }
@@ -370,10 +411,18 @@ export class TopologyRenderer {
       }
       const nodeObj = this.nodeObjects.get(node.id)!;
       nodeObj.targetPosition.set(node.position.x, node.position.y, node.position.z);
+      nodeObj.mesh.position.set(node.position.x, node.position.y, node.position.z);
+      nodeObj.baseOpacity = 0;
+      nodeObj.isBouncing = false;
     }
 
     for (const edge of data.edges) {
       this.createEdgeObject(edge.source, edge.target);
+    }
+
+    for (const edgeObj of this.edgeObjects) {
+      edgeObj.baseOpacity = 0;
+      this.updateEdgePosition(edgeObj);
     }
   }
 
@@ -392,12 +441,14 @@ export class TopologyRenderer {
     const material = this.createNodeMaterial();
     const mesh = new THREE.Mesh(geometry, material);
     mesh.position.set(node.position.x, node.position.y, node.position.z);
+    (mesh as any).userData = { nodeId: node.id };
 
-    const glowGeometry = new THREE.SphereGeometry(NODE_RADIUS * 1.5, 16, 16);
+    const glowGeometry = new THREE.SphereGeometry(NODE_RADIUS * 1.8, 16, 16);
     const glowMaterial = new THREE.MeshBasicMaterial({
       color: 0x00ffff,
       transparent: true,
       opacity: 0,
+      depthWrite: false,
     });
     const glow = new THREE.Mesh(glowGeometry, glowMaterial);
     mesh.add(glow);
@@ -412,6 +463,11 @@ export class TopologyRenderer {
       isDragging: false,
       scale: 1,
       targetScale: 1,
+      bounceTime: 0,
+      bounceStartPos: new THREE.Vector3(),
+      bounceEndPos: new THREE.Vector3(node.position.x, node.position.y, node.position.z),
+      isBouncing: false,
+      baseOpacity: 0,
     });
   }
 
@@ -425,14 +481,17 @@ export class TopologyRenderer {
     const mesh = new THREE.Mesh(geometry, material);
 
     this.scene.add(mesh);
-    this.edgeObjects.push({
+    const edgeObj: EdgeObject = {
       mesh,
       source,
       target,
       isHighlighted: false,
       targetRadius: EDGE_RADIUS,
       currentRadius: EDGE_RADIUS,
-    });
+      baseOpacity: 0,
+    };
+    this.edgeObjects.push(edgeObj);
+    this.updateEdgePosition(edgeObj);
   }
 
   private updateEdgesForNode(nodeId: number): void {
@@ -453,10 +512,18 @@ export class TopologyRenderer {
     const direction = new THREE.Vector3().subVectors(end, start);
     const length = direction.length();
 
-    edgeObj.mesh.scale.y = length;
+    if (length < 0.001) return;
+
+    edgeObj.mesh.scale.y = Math.max(0.001, length);
     edgeObj.mesh.position.copy(start).add(end).multiplyScalar(0.5);
-    edgeObj.mesh.lookAt(end);
-    edgeObj.mesh.rotateX(Math.PI / 2);
+
+    const mid = new THREE.Vector3().copy(start).add(end).multiplyScalar(0.5);
+    edgeObj.mesh.position.copy(mid);
+
+    const up = new THREE.Vector3(0, 1, 0);
+    const dir = direction.clone().normalize();
+    const quaternion = new THREE.Quaternion().setFromUnitVectors(up, dir);
+    edgeObj.mesh.quaternion.copy(quaternion);
   }
 
   private updateEdgeHighlighting(): void {
@@ -552,6 +619,7 @@ export class TopologyRenderer {
       this.dataRouter.update(deltaTime);
     }
 
+    this.updateTransitions(deltaTime);
     this.updateNodeAnimations(deltaTime);
     this.updateEdgeAnimations(deltaTime);
     this.updateEdgeHighlighting();
@@ -562,61 +630,117 @@ export class TopologyRenderer {
     }
     this.updateParticles(deltaTime);
 
-    if (this.isTransitioning) {
-      this.transitionProgress += deltaTime * 2;
-      if (this.transitionProgress >= 1) {
-        this.transitionProgress = 1;
-        this.isTransitioning = false;
-      }
-    }
-
     this.renderer.render(this.scene, this.camera);
   };
 
+  private updateTransitions(deltaTime: number): void {
+    if (this.isFadingOut) {
+      this.fadeProgress += deltaTime / TRANSITION_DURATION;
+      if (this.fadeProgress >= 1) {
+        this.fadeProgress = 1;
+        this.isFadingOut = false;
+        if (this.pendingTopologyData) {
+          this.applyTopologyData(this.pendingTopologyData);
+          this.pendingTopologyData = null;
+          this.isFadingIn = true;
+          this.fadeProgress = 0;
+        }
+      }
+    } else if (this.isFadingIn) {
+      this.fadeProgress += deltaTime / TRANSITION_DURATION;
+      if (this.fadeProgress >= 1) {
+        this.fadeProgress = 1;
+        this.isFadingIn = false;
+      }
+    }
+  }
+
   private updateNodeAnimations(deltaTime: number): void {
+    let fadeMultiplier = 1;
+    if (this.isFadingOut) {
+      fadeMultiplier = 1 - easeOutQuad(this.fadeProgress);
+    } else if (this.isFadingIn) {
+      fadeMultiplier = easeOutQuad(this.fadeProgress);
+    }
+
     for (const nodeObj of this.nodeObjects.values()) {
       const material = nodeObj.mesh.material as THREE.MeshPhongMaterial;
       const glowMaterial = nodeObj.glow.material as THREE.MeshBasicMaterial;
 
-      if (this.isTransitioning && material.opacity < 1) {
-        material.opacity = Math.min(1, material.opacity + deltaTime * 2);
-        glowMaterial.opacity = Math.min(0.3, glowMaterial.opacity + deltaTime * 2);
+      if (nodeObj.isDragging) {
+        const targetGlow = 0.6;
+        glowMaterial.opacity += (targetGlow - glowMaterial.opacity) * Math.min(1, deltaTime * 15);
+      } else if (!nodeObj.isBouncing) {
+        const targetGlow = 0.15;
+        glowMaterial.opacity += (targetGlow - glowMaterial.opacity) * Math.min(1, deltaTime * 10);
       }
 
-      if (!nodeObj.isDragging) {
-        const dx = nodeObj.targetPosition.x - nodeObj.mesh.position.x;
-        const dy = nodeObj.targetPosition.y - nodeObj.mesh.position.y;
-        const dz = nodeObj.targetPosition.z - nodeObj.mesh.position.z;
-        const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+      if (this.isFadingIn) {
+        nodeObj.baseOpacity = Math.min(1, nodeObj.baseOpacity + deltaTime / TRANSITION_DURATION);
+      } else if (this.isFadingOut) {
+        nodeObj.baseOpacity = Math.max(0, nodeObj.baseOpacity - deltaTime / TRANSITION_DURATION);
+      } else if (!this.isFadingIn && !this.isFadingOut) {
+        nodeObj.baseOpacity = Math.min(1, nodeObj.baseOpacity + deltaTime * 3);
+      }
 
-        if (dist > 0.001) {
-          const speed = 8 * deltaTime;
-          nodeObj.mesh.position.x += dx * speed;
-          nodeObj.mesh.position.y += dy * speed;
-          nodeObj.mesh.position.z += dz * speed;
+      material.opacity = nodeObj.baseOpacity * fadeMultiplier;
+      glowMaterial.opacity = Math.min(glowMaterial.opacity, material.opacity + 0.1);
+
+      if (nodeObj.isBouncing && !nodeObj.isDragging) {
+        nodeObj.bounceTime += deltaTime;
+        const t = Math.min(1, nodeObj.bounceTime / BOUNCE_DURATION);
+        const eased = easeOutElastic(t);
+
+        nodeObj.mesh.position.lerpVectors(nodeObj.bounceStartPos, nodeObj.bounceEndPos, eased);
+        this.updateEdgesForNode(nodeObj.id);
+
+        if (t >= 1) {
+          nodeObj.isBouncing = false;
+          nodeObj.mesh.position.copy(nodeObj.bounceEndPos);
           this.updateEdgesForNode(nodeObj.id);
+          if (this.onNodePositionChange) {
+            this.onNodePositionChange(nodeObj.id, {
+              x: nodeObj.mesh.position.x,
+              y: nodeObj.mesh.position.y,
+              z: nodeObj.mesh.position.z,
+            });
+          }
         }
       }
 
       const scaleDiff = nodeObj.targetScale - nodeObj.scale;
       if (Math.abs(scaleDiff) > 0.001) {
-        nodeObj.scale += scaleDiff * 10 * deltaTime;
+        const speed = nodeObj.targetScale > nodeObj.scale ? 15 : 10;
+        nodeObj.scale += scaleDiff * Math.min(1, deltaTime * speed);
         nodeObj.mesh.scale.setScalar(nodeObj.scale);
       }
     }
   }
 
   private updateEdgeAnimations(deltaTime: number): void {
+    let fadeMultiplier = 1;
+    if (this.isFadingOut) {
+      fadeMultiplier = 1 - easeOutQuad(this.fadeProgress);
+    } else if (this.isFadingIn) {
+      fadeMultiplier = easeOutQuad(this.fadeProgress);
+    }
+
     for (const edgeObj of this.edgeObjects) {
       const material = edgeObj.mesh.material as THREE.MeshPhongMaterial;
 
-      if (this.isTransitioning && material.opacity < 1) {
-        material.opacity = Math.min(0.8, material.opacity + deltaTime * 2);
+      if (this.isFadingIn) {
+        edgeObj.baseOpacity = Math.min(0.8, edgeObj.baseOpacity + (deltaTime / TRANSITION_DURATION) * 0.8);
+      } else if (this.isFadingOut) {
+        edgeObj.baseOpacity = Math.max(0, edgeObj.baseOpacity - deltaTime / TRANSITION_DURATION);
+      } else if (!this.isFadingIn && !this.isFadingOut) {
+        edgeObj.baseOpacity = Math.min(0.8, edgeObj.baseOpacity + deltaTime * 3);
       }
+
+      material.opacity = edgeObj.baseOpacity * fadeMultiplier;
 
       const radiusDiff = edgeObj.targetRadius - edgeObj.currentRadius;
       if (Math.abs(radiusDiff) > 0.001) {
-        edgeObj.currentRadius += radiusDiff * 8 * deltaTime;
+        edgeObj.currentRadius += radiusDiff * Math.min(1, deltaTime * 10);
         const geometry = edgeObj.mesh.geometry as THREE.CylinderGeometry;
         geometry.dispose();
         edgeObj.mesh.geometry = new THREE.CylinderGeometry(
@@ -648,6 +772,8 @@ export class TopologyRenderer {
     cancelAnimationFrame(this.animationFrameId);
     window.removeEventListener('resize', this.onResize);
     this.renderer.dispose();
-    this.container.removeChild(this.renderer.domElement);
+    if (this.renderer.domElement.parentNode === this.container) {
+      this.container.removeChild(this.renderer.domElement);
+    }
   }
 }

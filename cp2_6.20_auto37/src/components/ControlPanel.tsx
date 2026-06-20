@@ -1,5 +1,6 @@
 import React from 'react';
 import type { TopologyType, RoutingSpeed, SelectedNodeInfo } from '../types';
+import '../styles.css';
 
 interface ControlPanelProps {
   topologyType: TopologyType;
@@ -54,7 +55,7 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
         <select
           value={topologyType}
           onChange={(e) => setTopologyType(e.target.value as TopologyType)}
-          style={styles.select}
+          className="topo-select"
         >
           {topologyOptions.map((opt) => (
             <option key={opt.value} value={opt.value}>
@@ -74,7 +75,7 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
           max={20}
           value={nodeCount}
           onChange={(e) => setNodeCount(parseInt(e.target.value))}
-          style={styles.slider}
+          className="topo-slider"
         />
         <div style={styles.sliderLabels}>
           <span>8</span>
@@ -93,7 +94,7 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
             max={80}
             value={connectionProbability * 100}
             onChange={(e) => setConnectionProbability(parseInt(e.target.value) / 100)}
-            style={styles.slider}
+            className="topo-slider"
           />
           <div style={styles.sliderLabels}>
             <span>30%</span>
@@ -111,10 +112,7 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
             <button
               key={opt.value}
               onClick={() => setRoutingSpeed(opt.value)}
-              style={{
-                ...styles.speedButton,
-                ...(routingSpeed === opt.value ? styles.speedButtonActive : {}),
-              }}
+              className={`topo-btn-speed ${routingSpeed === opt.value ? 'active' : ''}`}
             >
               {opt.label}
             </button>
@@ -125,10 +123,7 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
       <div style={styles.section}>
         <button
           onClick={isRoutingActive ? onStopRouting : onStartRouting}
-          style={{
-            ...styles.actionButton,
-            ...(isRoutingActive ? styles.stopButton : styles.startButton),
-          }}
+          className={`topo-btn-action ${isRoutingActive ? 'stop' : ''}`}
         >
           {isRoutingActive ? '停止路由' : '开始路由'}
         </button>
@@ -204,31 +199,6 @@ const styles: Record<string, React.CSSProperties> = {
     color: '#00ffff',
     fontWeight: 600,
   },
-  select: {
-    width: '100%',
-    padding: '10px 12px',
-    borderRadius: 8,
-    background: 'rgba(40, 50, 70, 0.9)',
-    color: '#ffffff',
-    border: '1px solid rgba(100, 150, 255, 0.3)',
-    fontSize: 14,
-    cursor: 'pointer',
-    outline: 'none',
-    appearance: 'none',
-    backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23aabbcc' d='M6 8L1 3h10z'/%3E%3C/svg%3E")`,
-    backgroundRepeat: 'no-repeat',
-    backgroundPosition: 'right 12px center',
-    paddingRight: 36,
-  },
-  slider: {
-    width: '100%',
-    height: 6,
-    borderRadius: 3,
-    background: 'linear-gradient(to right, #4488ff, #aa66ff)',
-    outline: 'none',
-    appearance: 'none',
-    cursor: 'pointer',
-  },
   sliderLabels: {
     display: 'flex',
     justifyContent: 'space-between',
@@ -238,41 +208,6 @@ const styles: Record<string, React.CSSProperties> = {
   buttonGroup: {
     display: 'flex',
     gap: 6,
-  },
-  speedButton: {
-    flex: 1,
-    padding: '8px 0',
-    borderRadius: 6,
-    background: 'rgba(40, 50, 70, 0.9)',
-    color: '#aabbcc',
-    border: '1px solid rgba(100, 150, 255, 0.2)',
-    fontSize: 12,
-    cursor: 'pointer',
-    transition: 'all 0.2s ease',
-  },
-  speedButtonActive: {
-    background: 'linear-gradient(135deg, #4466ff, #8855ff)',
-    color: '#ffffff',
-    borderColor: 'rgba(136, 85, 255, 0.5)',
-  },
-  actionButton: {
-    width: '100%',
-    padding: '12px 16px',
-    borderRadius: 6,
-    fontSize: 14,
-    fontWeight: 600,
-    cursor: 'pointer',
-    border: 'none',
-    transition: 'all 0.2s ease',
-    color: '#ffffff',
-  },
-  startButton: {
-    background: 'linear-gradient(135deg, #4466ff, #8855ff)',
-    boxShadow: '0 2px 8px rgba(100, 80, 255, 0.3)',
-  },
-  stopButton: {
-    background: 'linear-gradient(135deg, #ff4466, #ff6644)',
-    boxShadow: '0 2px 8px rgba(255, 80, 100, 0.3)',
   },
   hint: {
     color: '#667788',

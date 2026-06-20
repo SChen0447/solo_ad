@@ -1,11 +1,18 @@
 import * as d3 from 'd3';
-import type { TopologyData, TopologyNode, RoutingState, RoutingSpeed } from './types';
+import type { TopologyData, RoutingState, RoutingSpeed } from './types';
 
 const SPEED_MAP: Record<RoutingSpeed, number> = {
   slow: 1.5,
   medium: 3,
   fast: 6,
 };
+
+const EDGE_HIGHLIGHT_DURATION = 0.2;
+
+interface HighlightedEdge {
+  key: string;
+  remainingTime: number;
+}
 
 export class DataRouter {
   private topologyData: TopologyData;
@@ -18,8 +25,7 @@ export class DataRouter {
     packetPosition: { x: 0, y: 0, z: 0 },
   };
   private speed: number = SPEED_MAP.medium;
-  private highlightedEdges: Set<string> = new Set();
-  private edgeHighlightTimers: Map<string, number> = new Map();
+  private highlightedEdges: Map<string, HighlightedEdge> = new Map();
 
   constructor(topologyData: TopologyData) {
     this.topologyData = topologyData;
@@ -98,7 +104,6 @@ export class DataRouter {
       packetPosition: { ...this.getNodePosition(startNode) },
     };
     this.highlightedEdges.clear();
-    this.edgeHighlightTimers.clear();
     return true;
   }
 
@@ -106,7 +111,6 @@ export class DataRouter {
     this.routingState.isActive = false;
     this.routingState.path = [];
     this.highlightedEdges.clear();
-    this.edgeHighlightTimers.clear();
   }
 
   public getRoutingState(): RoutingState {
@@ -119,7 +123,25 @@ export class DataRouter {
     return this.highlightedEdges.has(key1) || this.highlightedEdges.has(key2);
   }
 
+  private addEdgeHighlight(source: number, target: number): void {
+    const key = `${source}-${target}`;
+    const reverseKey = `${target}-${source}`;
+    if (!this.highlightedEdges.has(key) && !this.highlightedEdges.has(reverseKey)) {
+      this.highlightedEdges.set(key, {
+        key,
+        remainingTime: EDGE_HIGHLIGHT_DURATION,
+      });
+    }
+  }
+
   public update(deltaTime: number): void {
+    for (const [key, edge] of this.highlightedEdges) {
+      edge.remainingTime -= deltaTime;
+      if (edge.remainingTime <= 0) {
+        this.highlightedEdges.delete(key);
+      }
+    }
+
     if (!this.routingState.isActive || this.routingState.path.length < 2) return;
 
     const path = this.routingState.path;
@@ -148,15 +170,12 @@ export class DataRouter {
 
     if (this.routingState.progress >= 1) {
       this.routingState.progress = 0;
-      this.routingState.currentNodeIndex++;
 
       if (currentIndex < path.length - 1) {
-        const edgeKey = `${path[currentIndex]}-${path[currentIndex + 1]}`;
-        this.highlightedEdges.add(edgeKey);
-        setTimeout(() => {
-          this.highlightedEdges.delete(edgeKey);
-        }, 200);
+        this.addEdgeHighlight(path[currentIndex], path[currentIndex + 1]);
       }
+
+      this.routingState.currentNodeIndex++;
 
       if (this.routingState.currentNodeIndex >= path.length - 1) {
         this.routingState.isActive = false;

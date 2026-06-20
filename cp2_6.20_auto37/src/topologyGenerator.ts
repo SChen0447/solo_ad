@@ -1,6 +1,19 @@
 import type { TopologyData, TopologyType, TopologyParams, TopologyNode, TopologyEdge } from './types';
 
+const MIN_NODES = 8;
+const MAX_NODES = 20;
+
+function validateNodeCount(nodeCount: number): void {
+  if (!Number.isInteger(nodeCount)) {
+    throw new Error(`节点数量必须是整数，当前值: ${nodeCount}`);
+  }
+  if (nodeCount < MIN_NODES || nodeCount > MAX_NODES) {
+    throw new Error(`节点数量必须在 ${MIN_NODES} 到 ${MAX_NODES} 之间，当前值: ${nodeCount}`);
+  }
+}
+
 function generateRing(nodeCount: number): TopologyData {
+  validateNodeCount(nodeCount);
   const nodes: TopologyNode[] = [];
   const edges: TopologyEdge[] = [];
   const radius = 5;
@@ -28,6 +41,7 @@ function generateRing(nodeCount: number): TopologyData {
 }
 
 function generateStar(nodeCount: number): TopologyData {
+  validateNodeCount(nodeCount);
   const nodes: TopologyNode[] = [];
   const edges: TopologyEdge[] = [];
   const radius = 5;
@@ -54,6 +68,7 @@ function generateStar(nodeCount: number): TopologyData {
 }
 
 function generateTree(nodeCount: number): TopologyData {
+  validateNodeCount(nodeCount);
   const nodes: TopologyNode[] = [];
   const edges: TopologyEdge[] = [];
 
@@ -124,6 +139,7 @@ function generateTree(nodeCount: number): TopologyData {
 }
 
 function generateMesh(nodeCount: number, probability: number): TopologyData {
+  validateNodeCount(nodeCount);
   const nodes: TopologyNode[] = [];
   const edges: TopologyEdge[] = [];
 
@@ -134,14 +150,19 @@ function generateMesh(nodeCount: number, probability: number): TopologyData {
   for (let i = 0; i < nodeCount; i++) {
     const col = i % cols;
     const row = Math.floor(i / cols);
+    const xOffset = rows * col >= nodeCount ? 0 : 0;
     nodes.push({
       id: i,
       position: {
-        x: (col - (cols - 1) / 2) * spacing,
+        x: (col - (cols - 1) / 2) * spacing + xOffset,
         y: 0,
         z: (row - (rows - 1) / 2) * spacing,
       },
     });
+  }
+
+  if (nodes.length !== nodeCount) {
+    throw new Error(`网格型拓扑生成失败: 期望 ${nodeCount} 个节点，实际生成 ${nodes.length} 个`);
   }
 
   for (let i = 0; i < nodeCount; i++) {
