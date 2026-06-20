@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, reactive, onMounted, onUnmounted } from 'vue'
 import { useMusicStore, getNoteColor } from '@/stores/musicStore'
 import { initAudioContext, playNote } from '@/utils/audioEngine'
 
@@ -9,6 +9,9 @@ const canvasRef = ref<HTMLCanvasElement | null>(null)
 const nextBeat = ref(0)
 let ctx: CanvasRenderingContext2D | null = null
 let rafId: number | null = null
+
+const pressedIds = reactive<Set<string>>(new Set())
+const brightIds = reactive<Set<string>>(new Set())
 
 interface Particle {
   x: number
@@ -22,15 +25,28 @@ interface Particle {
 }
 const particles: Particle[] = []
 
-function spawnParticles(btnEl: HTMLElement) {
+function getParticleCount(index: number): number {
+  if (index <= 4) return 3
+  if (index <= 10) return 5
+  return 7
+}
+
+function getParticleRadius(index: number): number {
+  const t = index / 23
+  return 2 + 3 * t
+}
+
+function spawnParticles(btnEl: HTMLElement, noteIndex: number) {
   if (!paletteRef.value || !canvasRef.value) return
   const paletteRect = paletteRef.value.getBoundingClientRect()
   const btnRect = btnEl.getBoundingClientRect()
   const cx = btnRect.left + btnRect.width / 2 - paletteRect.left
   const cy = btnRect.top + btnRect.height / 2 - paletteRect.top
   const color = getComputedStyle(btnEl).getPropertyValue('--particle-color') || '#7C3AED'
-  for (let i = 0; i < 6; i++) {
-    const angle = (Math.PI * 2 * i) / 6 + Math.random() * 0.5
+  const count = getParticleCount(noteIndex)
+  const baseRadius = getParticleRadius(noteIndex)
+  for (let i = 0; i < count; i++) {
+    const angle = (Math.PI * 2 * i) / count + Math.random() * 0.5
     const speed = 20 + Math.random() * 30
     particles.push({
       x: cx,
@@ -40,7 +56,7 @@ function spawnParticles(btnEl: HTMLElement) {
       life: 300,
       maxLife: 300,
       color,
-      radius: 3 + Math.random() * 2
+      radius: baseRadius + Math.random() * 1.5
     })
   }
 }
@@ -75,6 +91,14 @@ function render() {
 
 function handleNoteClick(noteId: string, frequency: number, index: number) {
   initAudioContext()
+  pressedIds.add(noteId)
+  brightIds.add(noteId)
+  setTimeout(() => {
+    pressedIds.delete(noteId)
+  }, 150)
+  setTimeout(() => {
+    brightIds.delete(noteId)
+  }, 200)
   playNote(`preview-${noteId}`, frequency, 200)
   const beat = nextBeat.value
   store.addNoteToTimeline(noteId, beat)
@@ -92,8 +116,9 @@ function handleNoteDragStart(e: DragEvent, noteId: string) {
 function handleHover(e: MouseEvent) {
   const btn = (e.target as HTMLElement).closest('.note-btn') as HTMLElement | null
   if (btn && !btn.dataset.hovered) {
+    const idx = parseInt(btn.dataset.noteIndex || '0', 10)
     btn.dataset.hovered = '1'
-    spawnParticles(btn)
+    spawnParticles(btn, idx)
     setTimeout(() => {
       if (btn) delete btn.dataset.hovered
     }, 300)
@@ -128,9 +153,15 @@ onUnmounted(() => {
         v-for="note in store.notes"
         :key="note.id"
         class="note-btn"
+        :class="{
+          pressed: pressedIds.has(note.id),
+          bright: brightIds.has(note.id)
+        }"
         draggable="true"
+        :data-note-index="note.index"
         :style="{
           '--particle-color': getNoteColor(note.index),
+          '--bright-color': getNoteColor(note.index),
           background: `linear-gradient(135deg, #4F46E5 0%, ${getNoteColor(note.index)} 100%)`
         }"
         @click="handleNoteClick(note.id, note.frequency, note.index)"
@@ -188,7 +219,7 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, filter 0.2s ease;
   position: relative;
   z-index: 5;
   user-select: none;
@@ -200,8 +231,37 @@ onUnmounted(() => {
   box-shadow: 0 0 16px rgba(99, 102, 241, 0.5);
 }
 
-.note-btn:active {
-  transform: scale(0.95);
+.note-btn.pressed {
+  animation: pressBounce 0.15s ease-out;
+}
+
+@keyframes pressBounce {
+  0% {
+    transform: scale(1.1);
+  }
+  30% {
+    transform: scale(0.9);
+  }
+  100% {
+    transform: scale(1.1);
+  }
+}
+
+.note-btn.bright {
+  animation: brightPulse 0.2s ease-out;
+}
+
+@keyframes brightPulse {
+  0% {
+    filter: brightness(1);
+  }
+  50% {
+    filter: brightness(1.2);
+    box-shadow: 0 0 20px rgba(255, 255, 255, 0.3), 0 0 8px var(--bright-color, #7C3AED);
+  }
+  100% {
+    filter: brightness(1);
+  }
 }
 
 .note-label {
