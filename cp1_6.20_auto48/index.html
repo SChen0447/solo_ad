@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Neon Rhythm Runner</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      overflow: hidden;
+      font-family: 'Courier New', monospace;
+      background: #0d001a;
+      color: #fff;
+    }
+
+    #app {
+      width: 100vw;
+      height: 100vh;
+      position: relative;
+    }
+
+    canvas {
+      display: block;
+    }
+
+    .hud {
+      position: absolute;
+      pointer-events: none;
+      z-index: 10;
+    }
+
+    .score-display {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      font-size: 32px;
+      font-weight: bold;
+      background: linear-gradient(135deg, #ffffff, #ffd700);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      text-shadow: 0 0 20px rgba(255, 215, 0, 0.5);
+    }
+
+    .combo-display {
+      position: absolute;
+      top: 60px;
+      left: 20px;
+      font-size: 18px;
+      color: #00ffff;
+      text-shadow: 0 0 10px rgba(0, 255, 255, 0.8);
+    }
+
+    .song-info {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      text-align: right;
+    }
+
+    .song-name {
+      font-size: 20px;
+      color: #ff00ff;
+      text-shadow: 0 0 15px rgba(255, 0, 255, 0.8);
+      margin-bottom: 5px;
+    }
+
+    .bpm-display {
+      font-size: 16px;
+      color: #00ffff;
+    }
+
+    .spectrum-container {
+      position: absolute;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      gap: 3px;
+      align-items: flex-end;
+      height: 80px;
+      pointer-events: none;
+    }
+
+    .spectrum-bar {
+      width: 8px;
+      background: linear-gradient(to top, #ff0000, #ff7f00, #ffff00, #00ff00, #0000ff, #4b0082, #9400d3);
+      border-radius: 4px 4px 0 0;
+      transition: height 0.016s linear;
+      box-shadow: 0 0 10px currentColor;
+    }
+
+    .menu-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(13, 0, 26, 0.95);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+    }
+
+    .menu-title {
+      font-size: 64px;
+      font-weight: bold;
+      background: linear-gradient(90deg, #00ffff, #ff00ff);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      margin-bottom: 40px;
+      text-shadow: 0 0 30px rgba(255, 0, 255, 0.5);
+    }
+
+    .song-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 20px;
+      margin-bottom: 40px;
+      max-width: 800px;
+      justify-content: center;
+    }
+
+    .song-card {
+      width: 200px;
+      padding: 20px;
+      background: rgba(255, 255, 255, 0.1);
+      backdrop-filter: blur(10px);
+      border: 2px solid rgba(255, 255, 255, 0.2);
+      border-radius: 12px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .song-card:hover {
+      transform: translateY(-5px);
+      border-color: rgba(255, 215, 0, 0.5);
+    }
+
+    .song-card.selected {
+      border-color: #ffd700;
+      box-shadow: 0 0 20px rgba(255, 215, 0, 0.5);
+    }
+
+    .song-card.selected::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: -100%;
+      width: 100%;
+      height: 2px;
+      background: linear-gradient(90deg, transparent, #ffd700, transparent);
+      animation: flow 2s linear infinite;
+    }
+
+    .song-card.selected::after {
+      content: '';
+      position: absolute;
+      bottom: 0;
+      right: -100%;
+      width: 100%;
+      height: 2px;
+      background: linear-gradient(90deg, transparent, #ffd700, transparent);
+      animation: flow 2s linear infinite reverse;
+    }
+
+    @keyframes flow {
+      0% { left: -100%; }
+      100% { left: 100%; }
+    }
+
+    .song-card-title {
+      font-size: 16px;
+      margin-bottom: 8px;
+      color: #fff;
+    }
+
+    .song-card-artist {
+      font-size: 12px;
+      color: rgba(255, 255, 255, 0.6);
+    }
+
+    .upload-btn {
+      padding: 12px 30px;
+      font-size: 16px;
+      background: linear-gradient(135deg, #00ffff, #ff00ff);
+      border: none;
+      border-radius: 25px;
+      color: white;
+      cursor: pointer;
+      margin-bottom: 30px;
+      transition: all 0.3s ease;
+    }
+
+    .upload-btn:hover {
+      transform: scale(1.05);
+      box-shadow: 0 0 20px rgba(255, 0, 255, 0.5);
+    }
+
+    .difficulty-buttons {
+      display: flex;
+      gap: 20px;
+      margin-bottom: 30px;
+    }
+
+    .difficulty-btn {
+      padding: 15px 40px;
+      font-size: 18px;
+      border: none;
+      border-radius: 8px;
+      color: white;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      font-weight: bold;
+    }
+
+    .difficulty-btn:hover {
+      transform: scale(1.1);
+      box-shadow: 0 0 20px currentColor;
+    }
+
+    .difficulty-btn.easy {
+      background: linear-gradient(135deg, #00ff88, #00cc66);
+    }
+
+    .difficulty-btn.normal {
+      background: linear-gradient(135deg, #0088ff, #0066cc);
+    }
+
+    .difficulty-btn.hard {
+      background: linear-gradient(135deg, #ff4444, #cc0000);
+    }
+
+    .start-btn {
+      padding: 15px 60px;
+      font-size: 24px;
+      background: linear-gradient(135deg, #ffd700, #ff8c00);
+      border: none;
+      border-radius: 30px;
+      color: #0d001a;
+      cursor: pointer;
+      font-weight: bold;
+      transition: all 0.3s ease;
+    }
+
+    .start-btn:hover {
+      transform: scale(1.1);
+      box-shadow: 0 0 30px rgba(255, 215, 0, 0.8);
+    }
+
+    .start-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .pause-menu {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(13, 0, 26, 0.8);
+      backdrop-filter: blur(10px);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 20px;
+      z-index: 50;
+    }
+
+    .pause-title {
+      font-size: 48px;
+      color: #ffd700;
+      text-shadow: 0 0 20px rgba(255, 215, 0, 0.8);
+      margin-bottom: 30px;
+    }
+
+    .pause-btn {
+      padding: 15px 50px;
+      font-size: 20px;
+      background: rgba(255, 255, 255, 0.1);
+      border: 2px solid rgba(255, 255, 255, 0.3);
+      border-radius: 10px;
+      color: white;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      min-width: 200px;
+    }
+
+    .pause-btn:hover {
+      transform: scale(1.05);
+      border-color: #00ffff;
+      box-shadow: 0 0 20px rgba(0, 255, 255, 0.5);
+      background: rgba(0, 255, 255, 0.1);
+    }
+
+    .game-over-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(255, 0, 0, 0.5);
+      pointer-events: none;
+      z-index: 20;
+      opacity: 0;
+      transition: opacity 0.3s ease;
+    }
+
+    .game-over-overlay.active {
+      opacity: 1;
+    }
+
+    .hidden {
+      display: none !important;
+    }
+
+    .controls-hint {
+      position: absolute;
+      bottom: 120px;
+      left: 50%;
+      transform: translateX(-50%);
+      text-align: center;
+      color: rgba(255, 255, 255, 0.7);
+      font-size: 14px;
+      line-height: 1.8;
+    }
+
+    .file-input {
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <div class="hud hidden" id="hud">
+      <div class="score-display" id="scoreDisplay">0</div>
+      <div class="combo-display" id="comboDisplay">Combo: 0</div>
+      <div class="song-info">
+        <div class="song-name" id="songName">--</div>
+        <div class="bpm-display" id="bpmDisplay">BPM: --</div>
+      </div>
+      <div class="spectrum-container" id="spectrumContainer"></div>
+    </div>
+
+    <div class="menu-overlay" id="mainMenu">
+      <h1 class="menu-title">Neon Rhythm Runner</h1>
+      <button class="upload-btn" id="uploadBtn">上传音乐</button>
+      <input type="file" class="file-input" id="fileInput" accept="audio/*">
+      <div class="song-list" id="songList"></div>
+      <div class="difficulty-buttons">
+        <button class="difficulty-btn easy" data-difficulty="easy">简单</button>
+        <button class="difficulty-btn normal" data-difficulty="normal">普通</button>
+        <button class="difficulty-btn hard" data-difficulty="hard">困难</button>
+      </div>
+      <button class="start-btn" id="startBtn" disabled>开始游戏</button>
+      <div class="controls-hint">
+        空格键：跳跃 | A/D：左右闪避 | S：蹲下 | ESC：暂停
+      </div>
+    </div>
+
+    <div class="pause-menu hidden" id="pauseMenu">
+      <h2 class="pause-title">游戏暂停</h2>
+      <button class="pause-btn" id="resumeBtn">继续游戏</button>
+      <button class="pause-btn" id="restartBtn">重新开始</button>
+      <button class="pause-btn" id="menuBtn">返回主菜单</button>
+    </div>
+
+    <div class="game-over-overlay" id="gameOverOverlay"></div>
+  </div>
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
