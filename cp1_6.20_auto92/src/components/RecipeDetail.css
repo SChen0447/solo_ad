@@ -1,0 +1,267 @@
+.recipe-detail {
+  max-width: 720px;
+  margin: 0 auto;
+}
+
+.detail-header {
+  margin-bottom: 24px;
+}
+
+.detail-title-section {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.detail-title {
+  font-size: 28px;
+  color: #5c4033;
+  font-weight: 600;
+  flex: 1;
+}
+
+.edit-btn {
+  flex-shrink: 0;
+}
+
+.detail-description {
+  font-size: 16px;
+  color: #6b5344;
+  margin-bottom: 12px;
+  line-height: 1.6;
+}
+
+.detail-meta {
+  font-size: 14px;
+  color: #8b7355;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.edit-recipe-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.recipe-name-input {
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.detail-actions {
+  margin-bottom: 28px;
+}
+
+.start-cooking-btn {
+  width: 100%;
+  padding: 14px 24px;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.steps-section {
+  background-color: rgba(255, 255, 255, 0.5);
+  border-radius: 16px;
+  padding: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.8);
+}
+
+.steps-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.steps-title {
+  font-size: 20px;
+  color: #5c4033;
+  font-weight: 600;
+}
+
+.step-form {
+  background-color: rgba(255, 255, 255, 0.6);
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 16px;
+  border: 1px solid rgba(212, 163, 115, 0.3);
+}
+
+.step-form-row {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.duration-input {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: #5c4033;
+}
+
+.small-input {
+  width: 80px;
+  padding: 6px 10px;
+  font-size: 14px;
+}
+
+.timer-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  color: #5c4033;
+  cursor: pointer;
+}
+
+.timer-checkbox input {
+  cursor: pointer;
+}
+
+.steps-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.step-item {
+  background-color: rgba(255, 255, 255, 0.7);
+  border-radius: 12px;
+  padding: 16px;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  border: 1px solid rgba(92, 64, 51, 0.1);
+  transition: all 0.2s ease;
+  position: relative;
+}
+
+.step-item:hover {
+  background-color: rgba(255, 255, 255, 0.9);
+  border-color: rgba(212, 163, 115, 0.4);
+}
+
+.step-item.dragging {
+  opacity: 0.5;
+  transform: scale(0.98);
+}
+
+.step-number {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #d4a373 0%, #c49363 100%);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+.step-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.step-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+  gap: 12px;
+}
+
+.step-name {
+  font-size: 16px;
+  font-weight: 600;
+  color: #5c4033;
+}
+
+.step-duration {
+  font-size: 13px;
+  color: #8b7355;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.timer-icon {
+  font-size: 14px;
+}
+
+.step-description {
+  font-size: 14px;
+  color: #6b5344;
+  line-height: 1.5;
+}
+
+.step-actions {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.drag-handle {
+  cursor: grab;
+  color: #a0896c;
+  font-size: 16px;
+  padding: 4px;
+  user-select: none;
+  flex-shrink: 0;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.step-item:hover .drag-handle {
+  opacity: 1;
+}
+
+.drag-handle:active {
+  cursor: grabbing;
+}
+
+.step-edit-form {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.empty-steps {
+  text-align: center;
+  padding: 40px 20px;
+  color: #8b7355;
+}
+
+.empty-steps p {
+  margin-bottom: 4px;
+}
+
+.empty-hint {
+  font-size: 13px;
+  color: #a0896c;
+}
+
+@media (max-width: 768px) {
+  .detail-title {
+    font-size: 24px;
+  }
+
+  .steps-section {
+    padding: 16px;
+  }
+
+  .step-actions {
+    flex-direction: column;
+  }
+}
