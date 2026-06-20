@@ -271,6 +271,7 @@ export class ControlPanel {
         this.isExpanded = false;
         const newMax = 3000;
         this.countSlider.max = String(newMax);
+        this.particleSystem.setMaxParticles(newMax);
         if (Number(this.countSlider.value) > newMax) {
           this.countSlider.value = String(newMax);
           const extras = this.countSlider as HTMLInputElement & SliderExtras;
@@ -282,6 +283,7 @@ export class ControlPanel {
         this.panel.style.display = 'block';
         this.isExpanded = true;
         this.countSlider.max = '5000';
+        this.particleSystem.setMaxParticles(5000);
       }
     }
   }

@@ -38,6 +38,71 @@ function randRange(min: number, max: number): number {
   return min + Math.random() * (max - min);
 }
 
+function hslToRgb(h: number, s: number, l: number): [number, number, number] {
+  h = ((h % 360) + 360) % 360;
+  const c = (1 - Math.abs(2 * l - 1)) * s;
+  const x = c * (1 - Math.abs(((h / 60) % 2) - 1));
+  const m = l - c / 2;
+  let r = 0, g = 0, b = 0;
+  if (h < 60) { r = c; g = x; b = 0; }
+  else if (h < 120) { r = x; g = c; b = 0; }
+  else if (h < 180) { r = 0; g = c; b = x; }
+  else if (h < 240) { r = 0; g = x; b = c; }
+  else if (h < 300) { r = x; g = 0; b = c; }
+  else { r = c; g = 0; b = x; }
+  return [r + m, g + m, b + m];
+}
+
+const vertexShader = `
+  attribute float size;
+  attribute float alpha;
+  varying vec3 vColor;
+  varying float vAlpha;
+  void main() {
+    vColor = color;
+    vAlpha = alpha;
+    vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+    gl_PointSize = size * (300.0 / -mvPosition.z);
+    gl_Position = projectionMatrix * mvPosition;
+  }
+`;
+
+const fragmentShader = `
+  varying vec3 vColor;
+  varying float vAlpha;
+  uniform sampler2D pointTexture;
+  void main() {
+    vec4 texColor = texture2D(pointTexture, gl_PointCoord);
+    gl_FragColor = vec4(vColor, vAlpha) * texColor;
+    if (gl_FragColor.a < 0.01) discard;
+  }
+`;
+
+const glowVertexShader = `
+  attribute float size;
+  attribute float alpha;
+  varying vec3 vColor;
+  varying float vAlpha;
+  void main() {
+    vColor = color;
+    vAlpha = alpha;
+    vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+    gl_PointSize = size * (300.0 / -mvPosition.z);
+    gl_Position = projectionMatrix * mvPosition;
+  }
+`;
+
+const glowFragmentShader = `
+  varying vec3 vColor;
+  varying float vAlpha;
+  uniform sampler2D glowTexture;
+  void main() {
+    vec4 texColor = texture2D(glowTexture, gl_PointCoord);
+    gl_FragColor = vec4(vColor, vAlpha * 0.2) * texColor;
+    if (gl_FragColor.a < 0.01) discard;
+  }
+`;
+
 function createParticleTexture(): THREE.Texture {
   const size = 64;
   const canvas = document.createElement('canvas');
@@ -80,19 +145,23 @@ export class ParticleSystem {
   private data!: ParticleData;
   private geometry: THREE.BufferGeometry;
   private glowGeometry: THREE.BufferGeometry;
-  private material: THREE.PointsMaterial;
-  private glowMaterial: THREE.PointsMaterial;
+  private material: THREE.ShaderMaterial;
+  private glowMaterial: THREE.ShaderMaterial;
   private params: ParticleSystemParams;
   private positionAttr: THREE.BufferAttribute;
   private colorAttr: THREE.BufferAttribute;
   private sizeAttr: THREE.BufferAttribute;
+  private alphaAttr: THREE.BufferAttribute;
   private glowPositionAttr: THREE.BufferAttribute;
   private glowColorAttr: THREE.BufferAttribute;
   private glowSizeAttr: THREE.BufferAttribute;
+  private glowAlphaAttr: THREE.BufferAttribute;
   private startTime: number;
   private currentRotation: number;
+  private maxParticles: number;
 
   constructor(maxParticles: number = 5000) {
+    this.maxParticles = maxParticles;
     this.params = {
       count: DEFAULT_COUNT,
       rotationSpeed: DEFAULT_ROTATION_SPEED,
@@ -109,35 +178,39 @@ export class ParticleSystem {
     this.positionAttr = attrResult.position;
     this.colorAttr = attrResult.color;
     this.sizeAttr = attrResult.size;
+    this.alphaAttr = attrResult.alpha;
     this.glowPositionAttr = attrResult.glowPosition;
     this.glowColorAttr = attrResult.glowColor;
     this.glowSizeAttr = attrResult.glowSize;
+    this.glowAlphaAttr = attrResult.glowAlpha;
 
     this.initData(maxParticles);
 
     const particleTexture = createParticleTexture();
     const glowTexture = createGlowTexture();
 
-    this.material = new THREE.PointsMaterial({
-      size: MAX_SIZE,
-      map: particleTexture,
-      vertexColors: true,
+    this.material = new THREE.ShaderMaterial({
+      uniforms: {
+        pointTexture: { value: particleTexture },
+      },
+      vertexShader,
+      fragmentShader,
       transparent: true,
-      opacity: 1,
       depthWrite: false,
       blending: THREE.AdditiveBlending,
-      sizeAttenuation: true,
+      vertexColors: true,
     });
 
-    this.glowMaterial = new THREE.PointsMaterial({
-      size: MAX_SIZE * 1.5,
-      map: glowTexture,
-      vertexColors: true,
+    this.glowMaterial = new THREE.ShaderMaterial({
+      uniforms: {
+        glowTexture: { value: glowTexture },
+      },
+      vertexShader: glowVertexShader,
+      fragmentShader: glowFragmentShader,
       transparent: true,
-      opacity: 0.2,
       depthWrite: false,
       blending: THREE.AdditiveBlending,
-      sizeAttenuation: true,
+      vertexColors: true,
     });
 
     this.points = new THREE.Points(this.geometry, this.material);
@@ -154,43 +227,53 @@ export class ParticleSystem {
     position: THREE.BufferAttribute;
     color: THREE.BufferAttribute;
     size: THREE.BufferAttribute;
+    alpha: THREE.BufferAttribute;
     glowPosition: THREE.BufferAttribute;
     glowColor: THREE.BufferAttribute;
     glowSize: THREE.BufferAttribute;
+    glowAlpha: THREE.BufferAttribute;
   } {
     const positions = new Float32Array(max * 3);
     const colors = new Float32Array(max * 3);
     const sizes = new Float32Array(max);
+    const alphas = new Float32Array(max);
 
     const positionAttr = new THREE.BufferAttribute(positions, 3);
     const colorAttr = new THREE.BufferAttribute(colors, 3);
     const sizeAttr = new THREE.BufferAttribute(sizes, 1);
+    const alphaAttr = new THREE.BufferAttribute(alphas, 1);
 
     positionAttr.setUsage(THREE.DynamicDrawUsage);
     colorAttr.setUsage(THREE.DynamicDrawUsage);
     sizeAttr.setUsage(THREE.DynamicDrawUsage);
+    alphaAttr.setUsage(THREE.DynamicDrawUsage);
 
     this.geometry.setAttribute('position', positionAttr);
     this.geometry.setAttribute('color', colorAttr);
     this.geometry.setAttribute('size', sizeAttr);
+    this.geometry.setAttribute('alpha', alphaAttr);
 
     const glowPositions = new Float32Array(max * 3);
     const glowColors = new Float32Array(max * 3);
     const glowSizes = new Float32Array(max);
+    const glowAlphas = new Float32Array(max);
 
     const glowPositionAttr = new THREE.BufferAttribute(glowPositions, 3);
     const glowColorAttr = new THREE.BufferAttribute(glowColors, 3);
     const glowSizeAttr = new THREE.BufferAttribute(glowSizes, 1);
+    const glowAlphaAttr = new THREE.BufferAttribute(glowAlphas, 1);
 
     glowPositionAttr.setUsage(THREE.DynamicDrawUsage);
     glowColorAttr.setUsage(THREE.DynamicDrawUsage);
     glowSizeAttr.setUsage(THREE.DynamicDrawUsage);
+    glowAlphaAttr.setUsage(THREE.DynamicDrawUsage);
 
     this.glowGeometry.setAttribute('position', glowPositionAttr);
     this.glowGeometry.setAttribute('color', glowColorAttr);
     this.glowGeometry.setAttribute('size', glowSizeAttr);
+    this.glowGeometry.setAttribute('alpha', glowAlphaAttr);
 
-    return { position: positionAttr, color: colorAttr, size: sizeAttr, glowPosition: glowPositionAttr, glowColor: glowColorAttr, glowSize: glowSizeAttr };
+    return { position: positionAttr, color: colorAttr, size: sizeAttr, alpha: alphaAttr, glowPosition: glowPositionAttr, glowColor: glowColorAttr, glowSize: glowSizeAttr, glowAlpha: glowAlphaAttr };
   }
 
   private initData(max: number): void {
@@ -251,14 +334,23 @@ export class ParticleSystem {
   }
 
   public setCount(count: number): void {
+    const clampedCount = Math.min(count, this.maxParticles);
     const currentTime = performance.now() / 1000 - this.startTime;
-    if (count > this.params.count) {
-      for (let i = this.params.count; i < count; i++) {
+    if (clampedCount > this.params.count) {
+      for (let i = this.params.count; i < clampedCount; i++) {
         this.initParticle(i, currentTime);
       }
     }
-    this.params.count = count;
+    this.params.count = clampedCount;
     this.updateDrawRange();
+  }
+
+  public setMaxParticles(max: number): void {
+    this.maxParticles = max;
+    if (this.params.count > max) {
+      this.params.count = max;
+      this.updateDrawRange();
+    }
   }
 
   public setRotationSpeed(speed: number): void {
@@ -285,13 +377,14 @@ export class ParticleSystem {
     const posArray = this.positionAttr.array as Float32Array;
     const colorArray = this.colorAttr.array as Float32Array;
     const sizeArray = this.sizeAttr.array as Float32Array;
+    const alphaArray = this.alphaAttr.array as Float32Array;
     const glowPosArray = this.glowPositionAttr.array as Float32Array;
     const glowColorArray = this.glowColorAttr.array as Float32Array;
     const glowSizeArray = this.glowSizeAttr.array as Float32Array;
+    const glowAlphaArray = this.glowAlphaAttr.array as Float32Array;
 
     const hueRange = MAX_HUE - MIN_HUE;
     const wanderOmega = (Math.PI * 2) / WANDER_PERIOD;
-    const tmpColor = new THREE.Color();
 
     for (let i = 0; i < count; i++) {
       const age = now - this.data.birthTime[i];
@@ -345,11 +438,10 @@ export class ParticleSystem {
         finalHue = MIN_HUE + ((finalHue - MIN_HUE) % hueRange);
       }
 
-      tmpColor.setHSL(finalHue / 360, 0.8, 0.6);
-
-      const r = tmpColor.r * fadeOpacity;
-      const g = tmpColor.g * fadeOpacity;
-      const b = tmpColor.b * fadeOpacity;
+      const rgb = hslToRgb(finalHue, 0.8, 0.6);
+      const r = rgb[0];
+      const g = rgb[1];
+      const b = rgb[2];
 
       colorArray[i * 3] = r;
       colorArray[i * 3 + 1] = g;
@@ -362,13 +454,18 @@ export class ParticleSystem {
       const finalSize = this.data.baseSize[i] * sizeMultiplier;
       sizeArray[i] = finalSize;
       glowSizeArray[i] = finalSize * 3;
+
+      alphaArray[i] = fadeOpacity;
+      glowAlphaArray[i] = fadeOpacity;
     }
 
     this.positionAttr.needsUpdate = true;
     this.colorAttr.needsUpdate = true;
     this.sizeAttr.needsUpdate = true;
+    this.alphaAttr.needsUpdate = true;
     this.glowPositionAttr.needsUpdate = true;
     this.glowColorAttr.needsUpdate = true;
     this.glowSizeAttr.needsUpdate = true;
+    this.glowAlphaAttr.needsUpdate = true;
   }
 }

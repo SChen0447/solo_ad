@@ -151,7 +151,8 @@ function init(): void {
 
   initStars();
 
-  particleSystem = new ParticleSystem(5000);
+  const maxParticles = window.innerWidth < 768 ? 3000 : 5000;
+  particleSystem = new ParticleSystem(maxParticles);
   scene.add(particleSystem.group);
 
   void new ControlPanel(particleSystem);
