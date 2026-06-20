@@ -1,0 +1,129 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;600;700&display=swap');
+
+html, body, #root {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: 'Noto Sans SC', system-ui, -apple-system, sans-serif;
+  color: #2c3e50;
+  background: linear-gradient(135deg, #fdfaf7 0%, #f8f5f0 100%);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #bdc3c7;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #e67e22;
+}
+
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    #e8e8e8 0%,
+    #f0f0f0 40%,
+    #e8e8e8 80%
+  );
+  background-size: 40rem 100%;
+  animation: shimmer 2s linear infinite;
+}
+
+@keyframes shimmer {
+  0% { background-position: -40rem 0; }
+  100% { background-position: 40rem 0; }
+}
+
+@layer components {
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-lg text-white font-medium transition-all duration-200;
+    background-color: #e67e22;
+  }
+  .btn-primary:hover {
+    filter: brightness(1.1);
+    box-shadow: 0 4px 14px rgba(230, 126, 34, 0.4);
+  }
+  .btn-primary:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    filter: none;
+    box-shadow: none;
+  }
+  .btn-outline {
+    @apply inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-lg font-medium border transition-all duration-200;
+    border-color: #e67e22;
+    color: #e67e22;
+    background: white;
+  }
+  .btn-outline:hover {
+    background: #fff5ed;
+  }
+  .btn-ghost {
+    @apply inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-brand-dark font-medium transition-all duration-200 hover:bg-gray-100;
+  }
+
+  .form-input {
+    @apply w-full px-4 py-2.5 rounded-lg border transition-all duration-200 outline-none;
+    background: #f9f9f9;
+    border-color: #bdc3c7;
+  }
+  .form-input:focus {
+    border-color: #e67e22;
+    box-shadow: 0 0 0 3px rgba(230, 126, 34, 0.15);
+    background: white;
+  }
+
+  .form-label {
+    @apply block text-sm font-medium mb-1.5;
+    color: #2c3e50;
+  }
+
+  .form-select {
+    @apply w-full px-4 py-2.5 rounded-lg border outline-none transition-all duration-200 cursor-pointer appearance-none;
+    background: #f9f9f9 url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3E%3Cpath stroke='%237f8c8d' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3E%3C/svg%3E") no-repeat right 0.75rem center/1.25rem;
+    border-color: #bdc3c7;
+    padding-right: 2.5rem;
+  }
+  .form-select:focus {
+    border-color: #e67e22;
+    box-shadow: 0 0 0 3px rgba(230, 126, 34, 0.15);
+    background-color: white;
+  }
+
+  .card {
+    @apply bg-white rounded-2xl border shadow-card overflow-hidden transition-all duration-200;
+    border-color: #ecf0f1;
+  }
+  .card-hoverable:hover {
+    transform: scale(1.05);
+    box-shadow: 0 8px 24px rgba(44, 62, 80, 0.15);
+    z-index: 10;
+  }
+
+  .nav-link {
+    @apply px-3 py-2 rounded-lg text-sm font-medium transition-colors duration-200 hover:bg-white/10;
+  }
+  .nav-link.active {
+    background: rgba(230, 126, 34, 0.2);
+    color: #e67e22;
+  }
+}
