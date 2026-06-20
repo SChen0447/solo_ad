@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
-import type { ColorSwatch, ColorToken } from '../colorSystem/colorTypes';
+import type { ColorSwatch, ColorToken, WCAGLevel } from '../colorSystem/colorTypes';
 import { createColorTokens, exportCSSVariables, exportJSON, exportTailwindConfig } from '../colorSystem/colorEngine';
 
 interface ColorPaletteProps {
@@ -26,6 +26,7 @@ const ColorPalette: React.FC<ColorPaletteProps> = ({
   const [editValue, setEditValue] = useState('');
   const [animationKey, setAnimationKey] = useState<number>(0);
   const prevAnimatingRef = useRef<boolean>(false);
+  const pulseTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (isAnimating && !prevAnimatingRef.current) {
@@ -34,14 +35,31 @@ const ColorPalette: React.FC<ColorPaletteProps> = ({
     prevAnimatingRef.current = isAnimating;
   }, [isAnimating]);
 
+  useEffect(() => {
+    return () => {
+      if (pulseTimeoutRef.current) {
+        clearTimeout(pulseTimeoutRef.current);
+      }
+    };
+  }, []);
+
   const primaryTokens = createColorTokens(primaryScale, 'primary', tokenNames);
   const secondaryTokens = createColorTokens(secondaryScale, 'secondary', tokenNames);
 
   const handleSwatchClick = useCallback((index: number) => {
+    if (pulseTimeoutRef.current) {
+      clearTimeout(pulseTimeoutRef.current);
+    }
     setPulsedIndex(null);
+
     requestAnimationFrame(() => {
-      setPulsedIndex(index);
-      setTimeout(() => setPulsedIndex(null), 300);
+      requestAnimationFrame(() => {
+        setPulsedIndex(index);
+        pulseTimeoutRef.current = setTimeout(() => {
+          setPulsedIndex(null);
+          pulseTimeoutRef.current = null;
+        }, 300);
+      });
     });
   }, []);
 
@@ -91,7 +109,7 @@ const ColorPalette: React.FC<ColorPaletteProps> = ({
     }
   }, [handleTokenNameBlur]);
 
-  const getWCAGColor = (level: string): string => {
+  const getWCAGColor = (level: WCAGLevel): string => {
     switch (level) {
       case 'AAA':
         return '#10b981';
@@ -104,7 +122,7 @@ const ColorPalette: React.FC<ColorPaletteProps> = ({
 
   const renderSwatch = (token: ColorToken, _index: number, totalIndex: number) => {
     const isPulsed = pulsedIndex === totalIndex;
-    const staggerDelay = totalIndex * 0.05;
+    const staggerDelay = totalIndex * 0.03;
 
     return (
       <div
@@ -113,7 +131,7 @@ const ColorPalette: React.FC<ColorPaletteProps> = ({
         style={{
           '--swatch-color': token.swatch.hex,
           '--stagger-delay': `${staggerDelay}s`,
-          '--text-color': token.swatch.l > 50 ? '#000000' : '#ffffff'
+          '--text-color': token.swatch.hsl.l > 50 ? '#000000' : '#ffffff'
         } as React.CSSProperties}
         onClick={() => handleSwatchClick(totalIndex)}
         onKeyDown={(e) => {
@@ -135,8 +153,10 @@ const ColorPalette: React.FC<ColorPaletteProps> = ({
         >
           <span className="swatch-level">{token.swatch.level}</span>
         </div>
-        <div className={`swatch-info ${isAnimating ? 'stagger-fade-in' : ''}`}
-             style={{ animationDelay: `${staggerDelay + 0.1}s` }}>
+        <div
+          className={`swatch-info ${isAnimating ? 'stagger-fade-in' : ''}`}
+          style={{ animationDelay: `${staggerDelay + 0.1}s` }}
+        >
           <div className="swatch-hex">{token.swatch.hex.toUpperCase()}</div>
           <div className="swatch-meta">
             <span
