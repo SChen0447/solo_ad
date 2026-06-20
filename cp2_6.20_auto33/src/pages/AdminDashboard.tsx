@@ -38,7 +38,11 @@ export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) 
   const [deletingCourseName, setDeletingCourseName] = useState('')
   
   const [newCourseId, setNewCourseId] = useState<string | null>(null)
+  const [mousePosition, setMousePosition] = useState<{ x: number; y: number } | null>(null)
+  const [courseTransforms, setCourseTransforms] = useState<Record<string, { x: number; y: number }>>({})
+  const [deletingIds, setDeletingIds] = useState<Set<string>>(new Set())
   const newCourseRef = useRef<HTMLDivElement>(null)
+  const addButtonRef = useRef<HTMLButtonElement>(null)
 
   const fetchCourses = useCallback(async () => {
     try {
@@ -91,7 +95,8 @@ export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) 
     return () => clearInterval(interval)
   }, [activeTab, fetchCourses, fetchUsers])
 
-  const handleAddCourse = () => {
+  const handleAddCourse = (e: React.MouseEvent) => {
+    setMousePosition({ x: e.clientX, y: e.clientY })
     setEditingCourse(null)
     setFormData({
       name: '',
@@ -124,14 +129,28 @@ export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) 
   const handleConfirmDelete = async () => {
     if (!deletingCourseId) return
 
-    try {
-      await api.deleteCourse(deletingCourseId)
-      setCourses(prev => prev.filter(c => c.id !== deletingCourseId))
-      setShowDeleteConfirm(false)
-      setDeletingCourseId(null)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : '删除失败')
-    }
+    setDeletingIds(prev => new Set(prev).add(deletingCourseId!))
+    
+    setTimeout(async () => {
+      try {
+        await api.deleteCourse(deletingCourseId!)
+        setCourses(prev => prev.filter(c => c.id !== deletingCourseId))
+        setDeletingIds(prev => {
+          const next = new Set(prev)
+          next.delete(deletingCourseId!)
+          return next
+        })
+        setShowDeleteConfirm(false)
+        setDeletingCourseId(null)
+      } catch (err) {
+        setError(err instanceof Error ? err.message : '删除失败')
+        setDeletingIds(prev => {
+          const next = new Set(prev)
+          next.delete(deletingCourseId!)
+          return next
+        })
+      }
+    }, 200)
   }
 
   const handleSubmitCourse = async (e: React.FormEvent) => {
@@ -157,12 +176,43 @@ export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) 
       } else {
         const newCourse = await api.createCourse(submitData)
         setNewCourseId(newCourse.id)
+        
+        if (mousePosition && newCourseRef.current) {
+          requestAnimationFrame(() => {
+            const cardRect = newCourseRef.current?.getBoundingClientRect()
+            if (cardRect) {
+              const offsetX = mousePosition.x - (cardRect.left + cardRect.width / 2)
+              const offsetY = mousePosition.y - (cardRect.top + cardRect.height / 2)
+              setCourseTransforms(prev => ({
+                ...prev,
+                [newCourse.id]: { x: offsetX, y: offsetY }
+              }))
+              
+              requestAnimationFrame(() => {
+                setCourseTransforms(prev => ({
+                  ...prev,
+                  [newCourse.id]: { x: 0, y: 0 }
+                }))
+              })
+            }
+          })
+        }
+        
         setCourses(prev => [...prev, newCourse].sort((a, b) => 
           dayjs(a.startTime).valueOf() - dayjs(b.startTime).valueOf()
         ))
-        setTimeout(() => setNewCourseId(null), 500)
+        
+        setTimeout(() => {
+          setNewCourseId(null)
+          setCourseTransforms(prev => {
+            const next = { ...prev }
+            delete next[newCourse.id]
+            return next
+          })
+        }, 500)
       }
       setShowCourseModal(false)
+      setMousePosition(null)
     } catch (err) {
       setError(err instanceof Error ? err.message : '保存失败')
     }
@@ -297,11 +347,27 @@ export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) 
                 </h2>
                 
                 <div className="courses-grid">
-                  {dateCourses.map(course => (
+                  {dateCourses.map(course => {
+                    const transform = courseTransforms[course.id]
+                    const isNew = newCourseId === course.id
+                    const isDeleting = deletingIds.has(course.id)
+                    
+                    const cardStyle: React.CSSProperties = {}
+                    if (transform && isNew) {
+                      cardStyle.transform = `translate(${transform.x}px, ${transform.y}px) scale(0.8)`
+                      cardStyle.opacity = 0
+                      cardStyle.transition = 'all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)'
+                    }
+                    if (isDeleting) {
+                      cardStyle.animation = 'cardExit 0.2s ease forwards'
+                    }
+                    
+                    return (
                     <div
                       key={course.id}
-                      ref={newCourseId === course.id ? newCourseRef : null}
-                      className={`course-card ${course.status === 'cancelled' ? 'cancelled' : ''} ${newCourseId === course.id ? 'course-card-enter' : ''}`}
+                      ref={isNew ? newCourseRef : null}
+                      style={cardStyle}
+                      className={`course-card ${course.status === 'cancelled' ? 'cancelled' : ''} ${isNew ? 'course-card-enter' : ''}`}
                     >
                       {course.status === 'cancelled' && course.cancelReason && (
                         <div className="cancel-reason-bubble">

@@ -211,17 +211,16 @@ export default function MemberDashboard({ user, onLogout }: MemberDashboardProps
 
                     {bookedIds.has(course.id) ? (
                       <div className="booked-tag">
-                        ✓ 已预约
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <polyline points="20 6 9 17 4 12" />
+                        </svg>
+                        已预约
                         <button 
-                          onClick={() => handleCancelBooking(course.id)}
-                          style={{ 
-                            marginLeft: 'auto', 
-                            background: 'none', 
-                            border: 'none', 
-                            color: 'var(--text-secondary)',
-                            cursor: 'pointer',
-                            fontSize: '12px'
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleCancelBooking(course.id);
                           }}
+                          className="cancel-booking-btn"
                         >
                           取消预约
                         </button>
