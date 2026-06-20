@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>程序化地牢探险</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      background-color: #1a1a2e;
+      color: #ffffff;
+      font-family: 'Courier New', monospace;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      overflow: hidden;
+      user-select: none;
+    }
+
+    .game-container {
+      position: relative;
+      width: 100%;
+      max-width: 600px;
+      aspect-ratio: 1 / 1;
+      margin: 0 auto;
+    }
+
+    #gameCanvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      image-rendering: pixelated;
+      image-rendering: crisp-edges;
+      border: 2px solid #00d4ff;
+      box-shadow: 0 0 20px rgba(0, 212, 255, 0.3);
+    }
+
+    .ui-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+    }
+
+    .timer {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      font-size: 16px;
+      color: #ffffff;
+      text-shadow: 2px 2px 0 #000000;
+      z-index: 10;
+    }
+
+    .status-panel {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      z-index: 10;
+    }
+
+    .status-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 14px;
+      text-shadow: 2px 2px 0 #000000;
+    }
+
+    .status-icon {
+      width: 20px;
+      height: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .heart-icon {
+      color: #ff4757;
+      font-size: 18px;
+    }
+
+    .sword-icon {
+      color: #ffa502;
+      font-size: 16px;
+    }
+
+    .heart-beating {
+      animation: heartbeat 0.5s ease-in-out infinite;
+    }
+
+    @keyframes heartbeat {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.3); }
+    }
+
+    .floor-info {
+      position: absolute;
+      bottom: 10px;
+      left: 10px;
+      font-size: 14px;
+      color: #00d4ff;
+      text-shadow: 2px 2px 0 #000000;
+      z-index: 10;
+    }
+
+    .controls {
+      margin-top: 20px;
+      display: flex;
+      gap: 15px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      background: transparent;
+      border: 2px solid #00d4ff;
+      color: #00d4ff;
+      padding: 10px 20px;
+      font-family: 'Courier New', monospace;
+      font-size: 14px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      pointer-events: auto;
+    }
+
+    .btn:hover {
+      background: #00d4ff;
+      color: #1a1a2e;
+      transform: scale(1.05);
+      box-shadow: 0 0 15px rgba(0, 212, 255, 0.5);
+    }
+
+    .virtual-controls {
+      position: absolute;
+      bottom: 60px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: none;
+      gap: 10px;
+      z-index: 20;
+      pointer-events: auto;
+    }
+
+    .dpad {
+      display: grid;
+      grid-template-columns: repeat(3, 50px);
+      grid-template-rows: repeat(3, 50px);
+      gap: 2px;
+    }
+
+    .dpad-btn {
+      width: 50px;
+      height: 50px;
+      border-radius: 50%;
+      background: rgba(0, 212, 255, 0.3);
+      border: 2px solid rgba(0, 212, 255, 0.5);
+      color: #00d4ff;
+      font-size: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      user-select: none;
+      touch-action: manipulation;
+    }
+
+    .dpad-btn:active {
+      background: rgba(0, 212, 255, 0.6);
+      transform: scale(0.95);
+    }
+
+    .dpad-up { grid-column: 2; grid-row: 1; }
+    .dpad-left { grid-column: 1; grid-row: 2; }
+    .dpad-right { grid-column: 3; grid-row: 2; }
+    .dpad-down { grid-column: 2; grid-row: 3; }
+
+    .action-btn {
+      width: 70px;
+      height: 70px;
+      border-radius: 50%;
+      background: rgba(255, 71, 87, 0.3);
+      border: 2px solid rgba(255, 71, 87, 0.5);
+      color: #ff4757;
+      font-size: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      user-select: none;
+      touch-action: manipulation;
+      align-self: center;
+    }
+
+    .action-btn:active {
+      background: rgba(255, 71, 87, 0.6);
+      transform: scale(0.95);
+    }
+
+    .game-over-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.9);
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+      animation: fadeIn 0.5s ease;
+      pointer-events: auto;
+    }
+
+    .game-over-overlay.show {
+      display: flex;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+
+    .game-over-title {
+      font-size: 36px;
+      color: #ff4757;
+      margin-bottom: 20px;
+      text-shadow: 0 0 20px rgba(255, 71, 87, 0.5);
+    }
+
+    .victory-title {
+      color: #2ed573;
+      text-shadow: 0 0 20px rgba(46, 213, 115, 0.5);
+    }
+
+    .score-panel {
+      background: rgba(26, 26, 46, 0.9);
+      border: 2px solid #00d4ff;
+      padding: 30px;
+      margin-bottom: 20px;
+      text-align: center;
+    }
+
+    .score-item {
+      font-size: 16px;
+      margin: 10px 0;
+      color: #aaaaaa;
+    }
+
+    .score-value {
+      color: #00d4ff;
+      font-weight: bold;
+    }
+
+    .final-score {
+      font-size: 28px;
+      color: #ffa502;
+      margin-top: 20px;
+      padding-top: 20px;
+      border-top: 1px solid #3a3a3a;
+    }
+
+    .warning-border {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      border: 4px solid transparent;
+      pointer-events: none;
+      z-index: 5;
+    }
+
+    .warning-border.active {
+      animation: warningFlash 1s ease;
+    }
+
+    @keyframes warningFlash {
+      0%, 100% { border-color: transparent; }
+      50% { border-color: #ff4757; box-shadow: inset 0 0 30px rgba(255, 71, 87, 0.5); }
+    }
+
+    .loading-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(26, 26, 46, 0.95);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 200;
+      pointer-events: auto;
+    }
+
+    .loading-overlay.hidden {
+      display: none;
+    }
+
+    .loading-text {
+      font-size: 20px;
+      color: #00d4ff;
+      animation: pulse 1s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+
+    .hints {
+      margin-top: 15px;
+      font-size: 12px;
+      color: #666;
+      text-align: center;
+    }
+
+    @media (hover: none) and (pointer: coarse) {
+      .virtual-controls {
+        display: flex;
+      }
+    }
+
+    @media (max-width: 640px) {
+      .game-container {
+        max-width: calc(100vw - 20px);
+      }
+
+      .timer, .floor-info, .status-item {
+        font-size: 12px;
+      }
+
+      .status-icon {
+        width: 16px;
+        height: 16px;
+      }
+
+      .game-over-title {
+        font-size: 24px;
+      }
+
+      .score-panel {
+        padding: 20px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="game-container">
+    <canvas id="gameCanvas" width="600" height="600"></canvas>
+    
+    <div class="ui-overlay">
+      <div class="warning-border" id="warningBorder"></div>
+      
+      <div class="timer" id="timer">00:00</div>
+      
+      <div class="status-panel">
+        <div class="status-item">
+          <span class="status-icon heart-icon" id="heartIcon">❤</span>
+          <span id="hpText">100/100</span>
+        </div>
+        <div class="status-item">
+          <span class="status-icon sword-icon">⚔</span>
+          <span id="attackText">10</span>
+        </div>
+      </div>
+      
+      <div class="floor-info" id="floorInfo">
+        楼层: 1 | 宝物: 0/3
+      </div>
+
+      <div class="virtual-controls" id="virtualControls">
+        <div class="dpad">
+          <div class="dpad-btn dpad-up" data-direction="up">▲</div>
+          <div class="dpad-btn dpad-left" data-direction="left">◀</div>
+          <div class="dpad-btn dpad-right" data-direction="right">▶</div>
+          <div class="dpad-btn dpad-down" data-direction="down">▼</div>
+        </div>
+        <div class="action-btn" id="attackBtn">攻击</div>
+      </div>
+
+      <div class="game-over-overlay" id="gameOverOverlay">
+        <div class="game-over-title" id="gameOverTitle">游戏结束</div>
+        <div class="score-panel">
+          <div class="score-item">到达楼层: <span class="score-value" id="finalFloor">1</span></div>
+          <div class="score-item">收集宝物: <span class="score-value" id="finalTreasures">0</span></div>
+          <div class="score-item">用时: <span class="score-value" id="finalTime">00:00</span></div>
+          <div class="score-item">剩余血量: <span class="score-value" id="finalHp">0</span></div>
+          <div class="final-score">总得分: <span id="finalScore">0</span></div>
+        </div>
+        <button class="btn" id="restartBtn">重新开始</button>
+      </div>
+
+      <div class="loading-overlay" id="loadingOverlay">
+        <div class="loading-text">正在生成地牢...</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="controls">
+    <button class="btn" id="newDungeonBtn">新地牢</button>
+  </div>
+
+  <div class="hints">
+    WASD 移动 | 空格 攻击 | 收集宝物提升能力 | 找到出口进入下一层
+  </div>
+
+  <script type="module" src="/src/gameLoop.ts"></script>
+</body>
+</html>
