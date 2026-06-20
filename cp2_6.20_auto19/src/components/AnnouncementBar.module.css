@@ -1,0 +1,56 @@
+.bar {
+  background: linear-gradient(90deg, #FFF3E0 0%, #FFE4B5 100%);
+  border-bottom: 1px solid rgba(245, 166, 35, 0.2);
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  height: 44px;
+  padding: 0 16px;
+  gap: 12px;
+}
+
+.iconWrap {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(245, 166, 35, 0.15);
+  border-radius: 50%;
+  width: 28px;
+  height: 28px;
+}
+
+.track {
+  flex: 1;
+  overflow: hidden;
+  position: relative;
+  height: 100%;
+  display: flex;
+  align-items: center;
+}
+
+.content {
+  display: inline-flex;
+  white-space: nowrap;
+  animation: scrollLeft 30s linear infinite;
+  font-size: 14px;
+  color: #8B6914;
+  font-weight: 600;
+}
+
+.track:hover .content {
+  animation-play-state: paused;
+}
+
+.spacer {
+  opacity: 0.5;
+}
+
+@keyframes scrollLeft {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
+}

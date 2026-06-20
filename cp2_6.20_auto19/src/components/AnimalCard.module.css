@@ -1,0 +1,90 @@
+.card {
+  cursor: pointer;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  break-inside: avoid;
+  margin-bottom: 20px;
+}
+
+.image {
+  height: 180px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+.statusPending,
+.statusAdopted {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.statusPending {
+  background: rgba(250, 173, 20, 0.9);
+  color: white;
+}
+
+.statusAdopted {
+  background: rgba(82, 196, 26, 0.9);
+  color: white;
+}
+
+.content {
+  padding: 16px 18px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.name {
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--color-text);
+}
+
+.breed {
+  font-size: 13px;
+  color: var(--color-text-light);
+  margin: 0;
+  font-weight: 600;
+}
+
+.description {
+  font-size: 14px;
+  color: var(--color-text);
+  margin: 4px 0 0;
+  line-height: 1.5;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.tags {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 4px;
+}
+
+.tag {
+  padding: 4px 12px;
+  background: linear-gradient(135deg, #FFF3E0 0%, #FFE4B5 100%);
+  color: #B8860B;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 700;
+}

@@ -1,0 +1,367 @@
+.wrapper {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 100px 24px 48px;
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.headerLeft {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.iconBadge {
+  width: 56px;
+  height: 56px;
+  border-radius: 16px;
+  background: linear-gradient(135deg, var(--color-secondary) 0%, var(--color-secondary-dark) 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 6px 16px rgba(74, 144, 217, 0.3);
+}
+
+.title {
+  font-size: 28px;
+  font-weight: 800;
+}
+
+.subtitle {
+  margin: 2px 0 0;
+  color: var(--color-text-light);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+}
+
+.statCard {
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.statCard:hover {
+  transform: translateY(-2px);
+}
+
+.statLabel {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-text-light);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.statValue {
+  font-family: var(--font-display);
+  font-size: 36px;
+  font-weight: 800;
+  line-height: 1.1;
+}
+
+.statValueTotal {
+  color: var(--color-text);
+}
+
+.statValuePending {
+  color: var(--color-warning);
+}
+
+.statValueApproved {
+  color: var(--color-success);
+}
+
+.statValueRejected {
+  color: var(--color-danger);
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.flipContainer {
+  perspective: 1200px;
+  min-height: 180px;
+}
+
+.flipInner {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-height: 180px;
+  transition: transform 0.4s ease;
+  transform-style: preserve-3d;
+}
+
+.flipped .flipInner {
+  transform: rotateY(180deg);
+}
+
+.cardFront,
+.cardBack {
+  position: absolute;
+  inset: 0;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
+.cardFront {
+  padding: 20px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.cardFront:hover {
+  transform: none;
+  box-shadow: var(--shadow-card-hover);
+}
+
+.cardMain {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.applicantInfo {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-dark) 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.applicantName {
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--color-text);
+}
+
+.applicantMeta {
+  font-size: 13px;
+  color: var(--color-text-light);
+  margin: 2px 0 0;
+  font-weight: 600;
+}
+
+.animalInfo {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  background: linear-gradient(135deg, #FFF3E0 0%, #FFE4B5 100%);
+  border-radius: 20px;
+  flex-shrink: 0;
+}
+
+.animalName {
+  font-size: 14px;
+  font-weight: 700;
+  color: #B8860B;
+}
+
+.cardDetails {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 16px;
+  background: var(--color-bg);
+  border-radius: 12px;
+}
+
+.detailItem {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--color-text-light);
+  font-weight: 600;
+}
+
+.detailItem svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.reasonText {
+  line-height: 1.6;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.cardFooter {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.statusBadge {
+  padding: 6px 16px;
+  border-radius: 20px;
+  font-size: 13px;
+  font-weight: 700;
+  color: white;
+}
+
+.statusPending {
+  background: linear-gradient(135deg, #FFC53D 0%, var(--color-warning) 100%);
+}
+
+.statusApproved {
+  background: linear-gradient(135deg, #73D13D 0%, var(--color-success) 100%);
+}
+
+.statusRejected {
+  background: linear-gradient(135deg, #FF7875 0%, var(--color-danger) 100%);
+}
+
+.actions {
+  display: flex;
+  gap: 10px;
+}
+
+.actions button {
+  font-size: 14px;
+  gap: 6px;
+}
+
+.cardBack {
+  transform: rotateY(180deg);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 20px;
+  text-align: center;
+  color: white;
+}
+
+.backApproved {
+  background: linear-gradient(135deg, #73D13D 0%, var(--color-success) 100%);
+}
+
+.backRejected {
+  background: linear-gradient(135deg, #FF7875 0%, var(--color-danger) 100%);
+}
+
+.backTitle {
+  font-size: 24px;
+  font-weight: 800;
+  color: white;
+  margin-top: 4px;
+}
+
+.backMeta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  opacity: 0.9;
+  margin: 0;
+}
+
+.backApplicant {
+  font-size: 14px;
+  font-weight: 700;
+  opacity: 0.85;
+  margin: 0;
+}
+
+.skeletonList {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.skeletonRow {
+  height: 180px;
+}
+
+.empty {
+  padding: 60px 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  text-align: center;
+}
+
+.empty:hover {
+  transform: none;
+}
+
+.emptyTitle {
+  font-size: 20px;
+  margin-top: 8px;
+  color: var(--color-text);
+}
+
+.emptyDesc {
+  font-size: 14px;
+  color: var(--color-text-light);
+  margin: 0;
+}
+
+.spin {
+  animation: spin 0.6s linear infinite;
+}
+
+@media (max-width: 768px) {
+  .stats {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .wrapper {
+    padding: 96px 16px 32px;
+  }
+
+  .cardFront {
+    padding: 16px;
+  }
+
+  .actions {
+    width: 100%;
+  }
+
+  .actions button {
+    flex: 1;
+    justify-content: center;
+  }
+}

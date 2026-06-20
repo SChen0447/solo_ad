@@ -1,0 +1,269 @@
+.wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.filterBar {
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.filterBar:hover {
+  transform: none;
+  box-shadow: var(--shadow-card);
+}
+
+.searchRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.searchBox {
+  flex: 1;
+  position: relative;
+  display: flex;
+  align-items: center;
+  background: var(--color-bg);
+  border-radius: 12px;
+  border: 2px solid transparent;
+  padding: 0 14px;
+  height: 48px;
+  transition: border-color 0.2s ease, background-color 0.2s ease;
+}
+
+.searchBox:focus-within {
+  border-color: var(--color-primary);
+  background: white;
+}
+
+.searchBox svg:first-child {
+  flex-shrink: 0;
+}
+
+.searchInput {
+  flex: 1;
+  border: none;
+  background: transparent;
+  padding: 0 10px;
+  font-size: 15px;
+  color: var(--color-text);
+  height: 100%;
+}
+
+.searchInput::placeholder {
+  color: #A9A9A9;
+}
+
+.clearBtn {
+  background: rgba(0, 0, 0, 0.06);
+  border: none;
+  border-radius: 50%;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #666;
+  transition: background-color 0.15s ease;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.clearBtn:hover {
+  background: rgba(0, 0, 0, 0.12);
+}
+
+.resetBtn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 16px;
+  height: 44px;
+  background: white;
+  border: 2px solid var(--color-border);
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text-light);
+  transition: all 0.15s ease;
+  cursor: pointer;
+  min-height: 44px;
+}
+
+.resetBtn:hover {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+.filterRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+}
+
+.filterGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.filterLabel {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-text-light);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.chipGroup {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.chip {
+  padding: 8px 18px;
+  border-radius: 24px;
+  border: 2px solid var(--color-border);
+  background: white;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text-light);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  min-height: 40px;
+}
+
+.chip:hover {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+.chipActive {
+  background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-dark) 100%);
+  border-color: transparent;
+  color: white;
+}
+
+.chipActive:hover {
+  color: white;
+  filter: brightness(1.05);
+}
+
+.resultInfo {
+  font-size: 14px;
+  color: var(--color-text-light);
+  font-weight: 600;
+}
+
+.resultInfo strong {
+  color: var(--color-primary);
+  font-size: 18px;
+  margin: 0 4px;
+}
+
+.grid {
+  column-count: 3;
+  column-gap: 20px;
+}
+
+@media (max-width: 1024px) {
+  .grid {
+    column-count: 2;
+  }
+}
+
+@media (max-width: 768px) {
+  .grid {
+    column-count: 1;
+  }
+
+  .filterRow {
+    gap: 14px;
+  }
+
+  .searchRow {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .resetBtn {
+    justify-content: center;
+  }
+}
+
+.skeletonCard {
+  break-inside: avoid;
+  margin-bottom: 20px;
+  border-radius: var(--radius-card);
+  overflow: hidden;
+}
+
+.skeletonImg {
+  height: 180px;
+}
+
+.skeletonBody {
+  background: white;
+  padding: 16px 18px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.skeletonLine {
+  height: 14px;
+  border-radius: 6px;
+  background: linear-gradient(90deg, #f0e6d6 25%, #f8f1e6 50%, #f0e6d6 75%);
+  background-size: 200px 100%;
+  animation: skeleton 1.5s ease-in-out infinite;
+}
+
+.skeletonTags {
+  display: flex;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.skeletonTag {
+  width: 50px;
+  height: 22px;
+  border-radius: 20px;
+  background: linear-gradient(90deg, #f0e6d6 25%, #f8f1e6 50%, #f0e6d6 75%);
+  background-size: 200px 100%;
+  animation: skeleton 1.5s ease-in-out infinite;
+}
+
+.empty {
+  padding: 60px 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  text-align: center;
+}
+
+.empty:hover {
+  transform: none;
+  box-shadow: var(--shadow-card);
+}
+
+.emptyTitle {
+  font-size: 20px;
+  margin-top: 8px;
+  color: var(--color-text);
+}
+
+.emptyDesc {
+  font-size: 14px;
+  color: var(--color-text-light);
+  margin: 0;
+}
