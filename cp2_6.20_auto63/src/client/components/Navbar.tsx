@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link, NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { getCertificationBorderColor } from '../utils/colors';
 
 function Navbar() {
   const { user, logout } = useAuth();
@@ -11,10 +12,6 @@ function Navbar() {
     logout();
     setMobileMenuOpen(false);
     navigate('/');
-  };
-
-  const getAvatarColor = (level: number) => {
-    return `level-${level}`;
   };
 
   return (
@@ -52,7 +49,13 @@ function Navbar() {
                 className="navbar-user" 
                 onClick={() => navigate('/profile')}
               >
-                <div className={`navbar-avatar ${getAvatarColor(user.certificationLevel)}`}>
+                <div 
+                  className="navbar-avatar"
+                  style={{ 
+                    borderColor: getCertificationBorderColor(user.certificationLevel),
+                    background: `linear-gradient(135deg, #F59E0B, ${getCertificationBorderColor(user.certificationLevel)})`
+                  }}
+                >
                   {user.nickname.charAt(0)}
                 </div>
                 <span style={{ fontSize: '14px', fontWeight: 500 }}>{user.nickname}</span>
@@ -80,6 +83,12 @@ function Navbar() {
         </div>
       </nav>
 
+      {mobileMenuOpen && (
+        <div 
+          className="mobile-menu-overlay"
+          onClick={() => setMobileMenuOpen(false)}
+        />
+      )}
       <div className={`mobile-menu ${mobileMenuOpen ? 'open' : ''}`}>
         <button 
           className="mobile-menu-close"

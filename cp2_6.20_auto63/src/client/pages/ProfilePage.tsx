@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { userApi } from '../api';
 import { User, Registration, ServiceRecord } from '../types';
 import { useAuth } from '../context/AuthContext';
+import { getCertificationBorderColor } from '../utils/colors';
 
 function ProfilePage() {
   const { id } = useParams<{ id: string }>();
@@ -65,6 +66,11 @@ function ProfilePage() {
     return circumference * (1 - progress);
   };
 
+  const getProgressPercentage = (totalHours: number) => {
+    const maxHours = 200;
+    return Math.min((totalHours / maxHours) * 100, 100);
+  };
+
   if (loading) {
     return (
       <div className="profile-container">
@@ -95,7 +101,7 @@ function ProfilePage() {
         <div className="progress-ring-container">
           <svg className="progress-ring" width="140" height="140" viewBox="0 0 140 140">
             <defs>
-              <linearGradient id="progressGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+              <linearGradient id="progressGradient" x1="0%" y1="100%" x2="0%" y2="0%">
                 <stop offset="0%" stopColor="#F59E0B" />
                 <stop offset="100%" stopColor="#F97316" />
               </linearGradient>
@@ -114,15 +120,20 @@ function ProfilePage() {
               r="64"
               strokeWidth="6"
               strokeDasharray={circumference}
-              strokeDashoffset={getProgressOffset(profileUser.totalHours)}
               style={{
-                strokeDashoffset: getProgressOffset(0),
-                animation: 'fillProgress 0.5s ease forwards',
+                strokeDashoffset: circumference,
+                animation: `fillProgress 0.5s ease forwards 0.1s`,
               }}
             />
           </svg>
           <div className="profile-avatar-wrapper">
-            <div className={`profile-avatar level-${profileUser.certificationLevel}`}>
+            <div
+              className="profile-avatar"
+              style={{
+                borderColor: getCertificationBorderColor(profileUser.certificationLevel),
+                background: `linear-gradient(135deg, #F59E0B, ${getCertificationBorderColor(profileUser.certificationLevel)})`,
+              }}
+            >
               {profileUser.nickname.charAt(0)}
             </div>
           </div>
