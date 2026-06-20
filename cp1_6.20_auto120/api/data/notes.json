@@ -1,0 +1,85 @@
+[
+  {
+    "id": "1",
+    "title": "Python基础语法笔记",
+    "date": "2026-06-18",
+    "summary": "本节课讲解了Python的基本数据类型、变量声明、控制流语句以及函数的定义与调用，适合零基础学员入门。",
+    "content": "## Python基础语法\n\n### 数据类型\n- 整数（int）：如 `42`\n- 浮点数（float）：如 `3.14`\n- 字符串（str）：如 `\"Hello\"`\n- 布尔值（bool）：`True` / `False`\n\n### 变量声明\n```python\nname = \"张三\"\nage = 25\nis_student = True\n```\n\n### 控制流\n```python\nif age >= 18:\n    print(\"成年人\")\nelse:\n    print(\"未成年人\")\n```\n\n### 函数定义\n```python\ndef greet(name):\n    return f\"你好, {name}!\"\n```\n",
+    "highlights": [
+      {"start": 0, "end": 6, "text": "数据类型"},
+      {"start": 20, "end": 26, "text": "变量声明"},
+      {"start": 40, "end": 44, "text": "控制流"},
+      {"start": 60, "end": 66, "text": "函数定义"}
+    ],
+    "tags": [
+      {"id": "t1", "label": "Python", "color": "#3776ab"},
+      {"id": "t2", "label": "基础语法", "color": "#f5a623"},
+      {"id": "t3", "label": "入门", "color": "#7ed321"}
+    ],
+    "timestamps": [
+      {"time": "00:00", "text": "课程开始，介绍Python语言概述"},
+      {"time": "03:20", "text": "讲解基本数据类型：整数、浮点数、字符串"},
+      {"time": "08:45", "text": "变量声明与命名规范"},
+      {"time": "15:30", "text": "条件判断与控制流语句"},
+      {"time": "22:10", "text": "函数的定义与调用"},
+      {"time": "28:00", "text": "课堂小结与练习布置"}
+    ],
+    "filePath": ""
+  },
+  {
+    "id": "2",
+    "title": "数据结构与算法导论",
+    "date": "2026-06-19",
+    "summary": "本节课介绍了常见数据结构（数组、链表、栈、队列）的基本概念和操作，并讲解了时间复杂度分析方法。",
+    "content": "## 数据结构与算法导论\n\n### 数组\n- 连续内存空间\n- O(1) 随机访问\n- O(n) 插入/删除\n\n### 链表\n- 非连续存储\n- O(n) 查找\n- O(1) 插入/删除（已知位置）\n\n### 栈\n- 后进先出（LIFO）\n- 应用：函数调用栈、表达式求值\n\n### 队列\n- 先进先出（FIFO）\n- 应用：BFS、任务调度\n\n### 时间复杂度\n- O(1) < O(log n) < O(n) < O(n log n) < O(n²)\n",
+    "highlights": [
+      {"start": 0, "end": 4, "text": "数组"},
+      {"start": 15, "end": 19, "text": "链表"},
+      {"start": 30, "end": 33, "text": "栈"},
+      {"start": 45, "end": 48, "text": "队列"},
+      {"start": 55, "end": 61, "text": "时间复杂度"}
+    ],
+    "tags": [
+      {"id": "t4", "label": "数据结构", "color": "#d0021b"},
+      {"id": "t5", "label": "算法", "color": "#4a90d9"},
+      {"id": "t6", "label": "复杂度分析", "color": "#9b59b6"}
+    ],
+    "timestamps": [
+      {"time": "00:00", "text": "课程导入：为什么学习数据结构"},
+      {"time": "04:15", "text": "数组的定义与基本操作"},
+      {"time": "10:30", "text": "链表的结构与遍历"},
+      {"time": "18:00", "text": "栈的原理与应用场景"},
+      {"time": "25:20", "text": "队列的实现与BFS应用"},
+      {"time": "33:45", "text": "时间复杂度与大O表示法"},
+      {"time": "40:00", "text": "总结与课后作业"}
+    ],
+    "filePath": ""
+  },
+  {
+    "id": "3",
+    "title": "Web开发框架Flask入门",
+    "date": "2026-06-20",
+    "summary": "本节课讲解了Flask框架的安装配置、路由定义、模板渲染以及RESTful API设计的基本原则。",
+    "content": "## Flask Web开发入门\n\n### 安装与配置\n```bash\npip install flask\n```\n\n### 路由定义\n```python\nfrom flask import Flask\napp = Flask(__name__)\n\n@app.route('/')\ndef index():\n    return 'Hello, Flask!'\n```\n\n### 模板渲染\n```python\nfrom flask import render_template\n\n@app.route('/hello/<name>')\ndef hello(name):\n    return render_template('hello.html', name=name)\n```\n\n### RESTful API\n- GET：获取资源\n- POST：创建资源\n- PUT：更新资源\n- DELETE：删除资源\n",
+    "highlights": [
+      {"start": 0, "end": 6, "text": "安装配置"},
+      {"start": 15, "end": 21, "text": "路由定义"},
+      {"start": 35, "end": 41, "text": "模板渲染"},
+      {"start": 55, "end": 68, "text": "RESTful API"}
+    ],
+    "tags": [
+      {"id": "t7", "label": "Flask", "color": "#3776ab"},
+      {"id": "t8", "label": "Web开发", "color": "#e67e22"},
+      {"id": "t9", "label": "API设计", "color": "#2ecc71"}
+    ],
+    "timestamps": [
+      {"time": "00:00", "text": "Flask框架简介与环境搭建"},
+      {"time": "05:30", "text": "路由的定义与参数传递"},
+      {"time": "12:00", "text": "Jinja2模板引擎与模板渲染"},
+      {"time": "20:15", "text": "RESTful API设计原则"},
+      {"time": "28:40", "text": "蓝图与项目结构组织"},
+      {"time": "35:00", "text": "实战演示与答疑"}
+    ],
+    "filePath": ""
+  }
+]
