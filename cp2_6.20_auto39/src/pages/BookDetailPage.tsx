@@ -110,14 +110,18 @@ const BookDetailPage: React.FC = () => {
           <div className="borrow-history">
             <h3>借阅历史</h3>
             {book.borrowHistory?.length ? (
-              book.borrowHistory.map((record: BorrowRecord) => (
-                <div key={record.id} className="borrow-record">
-                  <span>用户ID: {record.userId}</span>
-                  <span>
-                    {record.borrowDate} ~ {record.returnDate || '未归还'}
-                  </span>
-                </div>
-              ))
+              <div className="borrow-timeline">
+                {book.borrowHistory.map((record: BorrowRecord) => (
+                  <div key={record.id} className="borrow-timeline-item">
+                    <div className="borrow-timeline-user">
+                      用户 {record.userId.slice(0, 8)}
+                    </div>
+                    <div className="borrow-timeline-date">
+                      {record.borrowDate} ~ {record.returnDate || '借阅中'}
+                    </div>
+                  </div>
+                ))}
+              </div>
             ) : (
               <div style={{ color: '#7A6554', fontSize: '14px' }}>暂无借阅记录</div>
             )}

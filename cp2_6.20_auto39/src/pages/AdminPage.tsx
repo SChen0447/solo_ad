@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Navigate } from 'react-router-dom';
-import { Book, Users, Edit2, Trash2, Plus, Check, X } from 'lucide-react';
+import { Book, Users, Edit2, Trash2, Plus, Check, X, Clock } from 'lucide-react';
 import Modal from '../components/Modal';
+import BookCard from '../components/BookCard';
 
 interface BookType {
   id: string;
@@ -11,6 +12,7 @@ interface BookType {
   category: string;
   stock: number;
   coverUrl: string;
+  updatedAt: string;
 }
 
 interface BookClub {
@@ -33,6 +35,8 @@ const AdminPage: React.FC<AdminPageProps> = ({ currentUser }) => {
   const [clubs, setClubs] = useState<BookClub[]>([]);
   const [showBookModal, setShowBookModal] = useState(false);
   const [editingBook, setEditingBook] = useState<BookType | null>(null);
+  const [newlyAddedId, setNewlyAddedId] = useState<string | null>(null);
+  const [viewMode, setViewMode] = useState<'table' | 'card'>('card');
   const [bookForm, setBookForm] = useState({
     title: '',
     author: '',
@@ -112,6 +116,7 @@ const AdminPage: React.FC<AdminPageProps> = ({ currentUser }) => {
         });
         if (res.ok) {
           setShowBookModal(false);
+          setEditingBook(null);
           fetchBooks();
         }
       } else {
@@ -121,8 +126,13 @@ const AdminPage: React.FC<AdminPageProps> = ({ currentUser }) => {
           body: JSON.stringify(bookForm)
         });
         if (res.ok) {
+          const createdBook = await res.json();
           setShowBookModal(false);
-          fetchBooks();
+          setNewlyAddedId(createdBook.id);
+          await fetchBooks();
+          setTimeout(() => {
+            setNewlyAddedId(null);
+          }, 500);
         }
       }
     } catch (err) {
@@ -177,57 +187,123 @@ const AdminPage: React.FC<AdminPageProps> = ({ currentUser }) => {
               <Plus size={18} style={{ verticalAlign: 'middle', marginRight: '6px' }} />
               新增图书
             </button>
+            <div className="category-tabs" style={{ marginBottom: 0, marginLeft: 'auto' }}>
+              <span 
+                className={`category-tab ${viewMode === 'card' ? 'active' : ''}`}
+                onClick={() => setViewMode('card')}
+              >
+                卡片视图
+              </span>
+              <span 
+                className={`category-tab ${viewMode === 'table' ? 'active' : ''}`}
+                onClick={() => setViewMode('table')}
+              >
+                表格视图
+              </span>
+            </div>
           </div>
-          <div className="admin-table">
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-              <thead>
-                <tr>
-                  <th>封面</th>
-                  <th>书名</th>
-                  <th>作者</th>
-                  <th>分类</th>
-                  <th>库存</th>
-                  <th>ISBN</th>
-                  <th>操作</th>
-                </tr>
-              </thead>
-              <tbody>
-                {books.map(book => (
-                  <tr key={book.id}>
-                    <td>
-                      <img 
-                        src={book.coverUrl} 
-                        alt={book.title}
-                        style={{ width: '50px', height: '70px', objectFit: 'cover', borderRadius: '4px' }}
-                        onError={(e) => {
-                          (e.target as HTMLImageElement).src = `https://picsum.photos/seed/${book.id}/50/70`;
-                        }}
-                      />
-                    </td>
-                    <td>{book.title}</td>
-                    <td>{book.author}</td>
-                    <td>{book.category}</td>
-                    <td>{book.stock}</td>
-                    <td>{book.isbn}</td>
-                    <td>
-                      <button 
-                        className="icon-btn edit"
-                        onClick={() => handleEditBook(book)}
-                      >
-                        <Edit2 size={16} />
-                      </button>
-                      <button 
-                        className="icon-btn delete"
-                        onClick={() => handleDeleteBook(book.id)}
-                      >
-                        <Trash2 size={16} />
-                      </button>
-                    </td>
+          
+          {viewMode === 'card' ? (
+            <div className="book-grid" style={{ justifyContent: 'flex-start' }}>
+              {books.map((book, index) => (
+                <div 
+                  key={book.id} 
+                  style={{ position: 'relative' }}
+                >
+                  <BookCard 
+                    book={book} 
+                    isNewlyAdded={newlyAddedId === book.id}
+                  />
+                  <div style={{ 
+                    display: 'flex', 
+                    gap: '8px', 
+                    padding: '8px 12px 12px', 
+                    backgroundColor: 'var(--white)',
+                    borderTop: '1px solid #F0E6D2'
+                  }}>
+                    <button 
+                      className="btn btn-outline" 
+                      style={{ flex: 1, padding: '6px 12px', fontSize: '12px' }}
+                      onClick={() => handleEditBook(book)}
+                    >
+                      <Edit2 size={14} style={{ verticalAlign: 'middle', marginRight: '4px' }} />
+                      编辑
+                    </button>
+                    <button 
+                      className="btn btn-warning" 
+                      style={{ flex: 1, padding: '6px 12px', fontSize: '12px' }}
+                      onClick={() => handleDeleteBook(book.id)}
+                    >
+                      <Trash2 size={14} style={{ verticalAlign: 'middle', marginRight: '4px' }} />
+                      删除
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="admin-table">
+              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <thead>
+                  <tr>
+                    <th>封面</th>
+                    <th>书名</th>
+                    <th>作者</th>
+                    <th>分类</th>
+                    <th>库存</th>
+                    <th>ISBN</th>
+                    <th>最近更新</th>
+                    <th>操作</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {books.map(book => (
+                    <tr 
+                      key={book.id}
+                      style={{ 
+                        backgroundColor: newlyAddedId === book.id ? 'rgba(212, 163, 115, 0.1)' : 'transparent',
+                        transition: 'background-color 0.3s ease'
+                      }}
+                    >
+                      <td>
+                        <img 
+                          src={book.coverUrl} 
+                          alt={book.title}
+                          style={{ width: '50px', height: '70px', objectFit: 'cover', borderRadius: '4px' }}
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).src = `https://picsum.photos/seed/${book.id}/50/70`;
+                          }}
+                        />
+                      </td>
+                      <td>{book.title}</td>
+                      <td>{book.author}</td>
+                      <td>{book.category}</td>
+                      <td>{book.stock}</td>
+                      <td>{book.isbn}</td>
+                      <td style={{ fontSize: '13px', color: 'var(--text-light)' }}>
+                        <Clock size={12} style={{ verticalAlign: 'middle', marginRight: '4px' }} />
+                        {new Date(book.updatedAt).toLocaleDateString('zh-CN')}
+                      </td>
+                      <td>
+                        <button 
+                          className="icon-btn edit"
+                          onClick={() => handleEditBook(book)}
+                        >
+                          <Edit2 size={16} />
+                        </button>
+                        <button 
+                          className="icon-btn delete"
+                          onClick={() => handleDeleteBook(book.id)}
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </>
       )}
 

@@ -6,6 +6,7 @@ export interface Book {
   category: string;
   stock: number;
   coverUrl: string;
+  updatedAt: string;
   borrowHistory: BorrowRecord[];
 }
 
@@ -84,6 +85,7 @@ function initData() {
       category: '文学',
       stock: 12,
       coverUrl: 'https://picsum.photos/seed/book1/220/300',
+      updatedAt: '2024-06-18T10:30:00Z',
       borrowHistory: [
         { id: 'br1', userId: 'u2', bookId: 'b1', borrowDate: '2024-01-15', returnDate: '2024-02-15' }
       ]
@@ -96,6 +98,7 @@ function initData() {
       category: '文学',
       stock: 8,
       coverUrl: 'https://picsum.photos/seed/book2/220/300',
+      updatedAt: '2024-06-15T14:20:00Z',
       borrowHistory: []
     },
     {
@@ -106,6 +109,7 @@ function initData() {
       category: '历史',
       stock: 15,
       coverUrl: 'https://picsum.photos/seed/book3/220/300',
+      updatedAt: '2024-06-10T09:15:00Z',
       borrowHistory: [
         { id: 'br2', userId: 'u3', bookId: 'b3', borrowDate: '2024-02-01' }
       ]
@@ -118,6 +122,7 @@ function initData() {
       category: '科幻',
       stock: 20,
       coverUrl: 'https://picsum.photos/seed/book4/220/300',
+      updatedAt: '2024-06-19T16:45:00Z',
       borrowHistory: []
     },
     {
@@ -128,6 +133,7 @@ function initData() {
       category: '科技',
       stock: 6,
       coverUrl: 'https://picsum.photos/seed/book5/220/300',
+      updatedAt: '2024-06-05T11:00:00Z',
       borrowHistory: []
     },
     {
@@ -138,6 +144,7 @@ function initData() {
       category: '文学',
       stock: 25,
       coverUrl: 'https://picsum.photos/seed/book6/220/300',
+      updatedAt: '2024-06-20T08:00:00Z',
       borrowHistory: []
     },
     {
@@ -148,6 +155,7 @@ function initData() {
       category: '艺术',
       stock: 5,
       coverUrl: 'https://picsum.photos/seed/book7/220/300',
+      updatedAt: '2024-05-28T13:30:00Z',
       borrowHistory: []
     },
     {
@@ -158,6 +166,7 @@ function initData() {
       category: '商业',
       stock: 10,
       coverUrl: 'https://picsum.photos/seed/book8/220/300',
+      updatedAt: '2024-06-12T10:00:00Z',
       borrowHistory: []
     },
     {
@@ -168,6 +177,7 @@ function initData() {
       category: '历史',
       stock: 18,
       coverUrl: 'https://picsum.photos/seed/book9/220/300',
+      updatedAt: '2024-06-08T15:20:00Z',
       borrowHistory: []
     },
     {
@@ -178,6 +188,7 @@ function initData() {
       category: '心理',
       stock: 7,
       coverUrl: 'https://picsum.photos/seed/book10/220/300',
+      updatedAt: '2024-06-01T09:45:00Z',
       borrowHistory: []
     },
     {
@@ -188,6 +199,7 @@ function initData() {
       category: '文学',
       stock: 14,
       coverUrl: 'https://picsum.photos/seed/book11/220/300',
+      updatedAt: '2024-06-16T11:15:00Z',
       borrowHistory: []
     },
     {
@@ -198,6 +210,7 @@ function initData() {
       category: '科技',
       stock: 9,
       coverUrl: 'https://picsum.photos/seed/book12/220/300',
+      updatedAt: '2024-06-03T14:00:00Z',
       borrowHistory: []
     }
   ];
@@ -356,20 +369,21 @@ export function getBookById(id: string): Book | undefined {
   return books.find(b => b.id === id);
 }
 
-export function addBook(book: Omit<Book, 'id' | 'borrowHistory'>): Book {
+export function addBook(book: Omit<Book, 'id' | 'borrowHistory' | 'updatedAt'>): Book {
   const newBook: Book = {
     ...book,
     id: generateId(),
+    updatedAt: new Date().toISOString(),
     borrowHistory: []
   };
   books.push(newBook);
   return newBook;
 }
 
-export function updateBook(id: string, updates: Partial<Book>): Book | undefined {
+export function updateBook(id: string, updates: Partial<Omit<Book, 'id' | 'updatedAt'>>): Book | undefined {
   const index = books.findIndex(b => b.id === id);
   if (index === -1) return undefined;
-  books[index] = { ...books[index], ...updates };
+  books[index] = { ...books[index], ...updates, updatedAt: new Date().toISOString() };
   return books[index];
 }
 

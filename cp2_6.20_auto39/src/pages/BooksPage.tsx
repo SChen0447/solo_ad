@@ -10,6 +10,7 @@ interface Book {
   category: string;
   stock: number;
   coverUrl: string;
+  updatedAt: string;
 }
 
 const BooksPage: React.FC = () => {
