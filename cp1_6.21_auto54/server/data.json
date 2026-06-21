@@ -1,0 +1,157 @@
+{
+  "groups": [
+    {
+      "id": "demo-group-1",
+      "name": "幸福家庭",
+      "inviteCode": "FAMILY6",
+      "createdAt": "2024-01-01T00:00:00.000Z",
+      "members": [
+        {
+          "id": "member-1",
+          "name": "爸爸",
+          "avatar": "https://api.dicebear.com/7.x/avataaars/svg?seed=dad"
+        },
+        {
+          "id": "member-2",
+          "name": "妈妈",
+          "avatar": "https://api.dicebear.com/7.x/avataaars/svg?seed=mom"
+        },
+        {
+          "id": "member-3",
+          "name": "小明",
+          "avatar": "https://api.dicebear.com/7.x/avataaars/svg?seed=xiaoming"
+        },
+        {
+          "id": "member-4",
+          "name": "小红",
+          "avatar": "https://api.dicebear.com/7.x/avataaars/svg?seed=xiaohong"
+        }
+      ],
+      "subscriptions": [
+        {
+          "id": "sub-1",
+          "name": "Netflix",
+          "icon": "🎬",
+          "category": "video",
+          "monthlyFee": 98,
+          "paymentDay": 15,
+          "memberLimit": 6,
+          "status": "active",
+          "reminderDays": 3,
+          "members": [
+            { "memberId": "member-1", "active": true, "remainingDays": 25, "activatedDate": "2024-06-20T00:00:00.000Z" },
+            { "memberId": "member-2", "active": true, "remainingDays": 25, "activatedDate": "2024-06-20T00:00:00.000Z" },
+            { "memberId": "member-3", "active": true, "remainingDays": 25, "activatedDate": "2024-06-20T00:00:00.000Z" },
+            { "memberId": "member-4", "active": false, "remainingDays": 0 }
+          ],
+          "paymentHistory": [
+            {
+              "id": "pay-1",
+              "date": "2024-06-15T10:00:00.000Z",
+              "amount": 98,
+              "payerId": "member-1",
+              "subscriptionId": "sub-1",
+              "splitDetails": [
+                { "memberId": "member-1", "amount": 32.67 },
+                { "memberId": "member-2", "amount": 32.67 },
+                { "memberId": "member-3", "amount": 32.66 }
+              ]
+            },
+            {
+              "id": "pay-2",
+              "date": "2024-05-15T10:00:00.000Z",
+              "amount": 98,
+              "payerId": "member-2",
+              "subscriptionId": "sub-1",
+              "splitDetails": [
+                { "memberId": "member-1", "amount": 32.67 },
+                { "memberId": "member-2", "amount": 32.67 },
+                { "memberId": "member-3", "amount": 32.66 }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "sub-2",
+          "name": "Spotify",
+          "icon": "🎵",
+          "category": "music",
+          "monthlyFee": 45,
+          "paymentDay": 22,
+          "memberLimit": 6,
+          "status": "expiring",
+          "reminderDays": 3,
+          "members": [
+            { "memberId": "member-1", "active": true, "remainingDays": 28, "activatedDate": "2024-06-25T00:00:00.000Z" },
+            { "memberId": "member-2", "active": true, "remainingDays": 28, "activatedDate": "2024-06-25T00:00:00.000Z" },
+            { "memberId": "member-3", "active": true, "remainingDays": 28, "activatedDate": "2024-06-25T00:00:00.000Z" },
+            { "memberId": "member-4", "active": true, "remainingDays": 28, "activatedDate": "2024-06-25T00:00:00.000Z" }
+          ],
+          "paymentHistory": [
+            {
+              "id": "pay-3",
+              "date": "2024-05-22T10:00:00.000Z",
+              "amount": 45,
+              "payerId": "member-3",
+              "subscriptionId": "sub-2",
+              "splitDetails": [
+                { "memberId": "member-1", "amount": 11.25 },
+                { "memberId": "member-2", "amount": 11.25 },
+                { "memberId": "member-3", "amount": 11.25 },
+                { "memberId": "member-4", "amount": 11.25 }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "sub-3",
+          "name": "百度网盘",
+          "icon": "☁️",
+          "category": "cloud",
+          "monthlyFee": 30,
+          "paymentDay": 28,
+          "memberLimit": 5,
+          "status": "active",
+          "reminderDays": 3,
+          "members": [
+            { "memberId": "member-1", "active": true, "remainingDays": 20, "activatedDate": "2024-06-08T00:00:00.000Z" },
+            { "memberId": "member-2", "active": false, "remainingDays": 0 },
+            { "memberId": "member-3", "active": true, "remainingDays": 20, "activatedDate": "2024-06-08T00:00:00.000Z" },
+            { "memberId": "member-4", "active": false, "remainingDays": 0 }
+          ],
+          "paymentHistory": [
+            {
+              "id": "pay-4",
+              "date": "2024-05-28T10:00:00.000Z",
+              "amount": 30,
+              "payerId": "member-1",
+              "subscriptionId": "sub-3",
+              "splitDetails": [
+                { "memberId": "member-1", "amount": 15 },
+                { "memberId": "member-3", "amount": 15 }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "sub-4",
+          "name": "iCloud+",
+          "icon": "💾",
+          "category": "cloud",
+          "monthlyFee": 68,
+          "paymentDay": 5,
+          "memberLimit": 6,
+          "status": "paused",
+          "reminderDays": 3,
+          "members": [
+            { "memberId": "member-1", "active": false, "remainingDays": 0 },
+            { "memberId": "member-2", "active": false, "remainingDays": 0 },
+            { "memberId": "member-3", "active": false, "remainingDays": 0 },
+            { "memberId": "member-4", "active": false, "remainingDays": 0 }
+          ],
+          "paymentHistory": []
+        }
+      ]
+    }
+  ]
+}
