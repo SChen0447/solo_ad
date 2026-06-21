@@ -21,6 +21,24 @@ interface MapReadyNotice {
   duration: number;
 }
 
+interface TrailCell {
+  x: number;
+  y: number;
+  startTime: number;
+  duration: number;
+}
+
+interface Particle {
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  size: number;
+  color: string;
+  startTime: number;
+  duration: number;
+}
+
 interface GameCanvasProps {
   gameState: GameState;
   canvasSize?: number;
@@ -42,6 +60,8 @@ export default function GameCanvas({ gameState, canvasSize = 480, onAnimationFra
   const animationRef = useRef<number>(0);
   const highlightsRef = useRef<HighlightCell[]>([]);
   const triggersRef = useRef<TriggerAnimation[]>([]);
+  const trailsRef = useRef<TrailCell[]>([]);
+  const particlesRef = useRef<Particle[]>([]);
   const mapReadyRef = useRef<MapReadyNotice | null>(null);
   const lastPlayerPosRef = useRef({ ...gameState.playerPos });
   const lastCollectedKeysRef = useRef([...gameState.collectedKeys]);
@@ -98,6 +118,20 @@ export default function GameCanvas({ gameState, canvasSize = 480, onAnimationFra
       ctx.fillStyle = HIGHLIGHT_COLOR;
       ctx.globalAlpha = Math.max(0, Math.min(1, alpha)) * 0.6;
       ctx.fillRect(offsetX + h.x * cs, offsetY + h.y * cs, cs, cs);
+      ctx.globalAlpha = 1;
+      return true;
+    });
+
+    trailsRef.current = trailsRef.current.filter(t => {
+      const elapsed = time - t.startTime;
+      if (elapsed >= t.duration) return false;
+
+      const progress = elapsed / t.duration;
+      const alpha = 0.5 * (1 - progress);
+
+      ctx.fillStyle = PLAYER_COLOR;
+      ctx.globalAlpha = Math.max(0, alpha);
+      ctx.fillRect(offsetX + t.x * cs, offsetY + t.y * cs, cs, cs);
       ctx.globalAlpha = 1;
       return true;
     });
@@ -199,6 +233,25 @@ export default function GameCanvas({ gameState, canvasSize = 480, onAnimationFra
       return true;
     });
 
+    particlesRef.current = particlesRef.current.filter(p => {
+      const elapsed = time - p.startTime;
+      if (elapsed >= p.duration) return false;
+
+      const progress = elapsed / p.duration;
+      const alpha = 1 - progress;
+      const currentX = p.x + p.vx * elapsed;
+      const currentY = p.y + p.vy * elapsed;
+
+      ctx.fillStyle = p.color;
+      ctx.globalAlpha = Math.max(0, alpha);
+      ctx.beginPath();
+      ctx.arc(currentX, currentY, p.size, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.globalAlpha = 1;
+
+      return true;
+    });
+
     if (mapReadyRef.current) {
       const notice = mapReadyRef.current;
       const elapsed = time - notice.startTime;
@@ -276,8 +329,39 @@ export default function GameCanvas({ gameState, canvasSize = 480, onAnimationFra
         startTime: performance.now(),
         duration: 200,
       });
+      trailsRef.current.push({
+        x: prevPos.x,
+        y: prevPos.y,
+        startTime: performance.now(),
+        duration: 1000,
+      });
       lastPlayerPosRef.current = { ...gameState.playerPos };
     }
+
+    const cs = canvasSize / Math.max(gameState.map.width, gameState.map.height);
+    const offsetX = (canvasSize - gameState.map.width * cs) / 2;
+    const offsetY = (canvasSize - gameState.map.height * cs) / 2;
+
+    const spawnParticles = (pos: { x: number; y: number }, color: string) => {
+      const count = 10 + Math.floor(Math.random() * 6);
+      const cx = offsetX + pos.x * cs + cs / 2;
+      const cy = offsetY + pos.y * cs + cs / 2;
+      for (let i = 0; i < count; i++) {
+        const angle = Math.random() * Math.PI * 2;
+        const speed = 30 + Math.random() * 50;
+        const size = 3 + Math.random() * 2;
+        particlesRef.current.push({
+          x: cx,
+          y: cy,
+          vx: Math.cos(angle) * speed / 1000,
+          vy: Math.sin(angle) * speed / 1000,
+          size,
+          color,
+          startTime: performance.now(),
+          duration: 600,
+        });
+      }
+    };
 
     const newKeys = gameState.collectedKeys.filter(k => !lastCollectedKeysRef.current.includes(k));
     for (const keyId of newKeys) {
@@ -290,6 +374,7 @@ export default function GameCanvas({ gameState, canvasSize = 480, onAnimationFra
           duration: 1500,
           color: key.color,
         });
+        spawnParticles(key.position, key.color);
       }
     }
     lastCollectedKeysRef.current = [...gameState.collectedKeys];
@@ -305,10 +390,11 @@ export default function GameCanvas({ gameState, canvasSize = 480, onAnimationFra
           duration: 1500,
           color: door.color,
         });
+        spawnParticles(door.position, door.color);
       }
     }
     lastOpenedDoorsRef.current = [...gameState.openedDoors];
-  }, [gameState]);
+  }, [gameState, canvasSize]);
 
   useEffect(() => {
     if (mapReadyKey !== undefined && mapReadyKey !== lastMapReadyKeyRef.current) {

@@ -8,6 +8,13 @@ const RATING_COLORS: Record<Rating, string> = {
   C: '#6B7280',
 };
 
+const RATING_MESSAGES: Record<Rating, string> = {
+  S: '完美通关！',
+  A: '不错哦！',
+  B: '继续加油！',
+  C: '再试一次？',
+};
+
 interface ButtonProps {
   children: React.ReactNode;
   onClick?: () => void;
@@ -212,6 +219,9 @@ export function RatingBadge({ rating, visible, onAnimationEnd }: RatingBadgeProp
         opacity,
         zIndex: 100,
         pointerEvents: 'none',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
       }}
     >
       <div
@@ -239,6 +249,17 @@ export function RatingBadge({ rating, visible, onAnimationEnd }: RatingBadgeProp
           {rating}
         </span>
       </div>
+      <span
+        style={{
+          marginTop: '12px',
+          color: '#CDD6F4',
+          fontSize: '16px',
+          fontWeight: 500,
+          whiteSpace: 'nowrap',
+        }}
+      >
+        {RATING_MESSAGES[rating]}
+      </span>
       <style>{`
         @keyframes pulse-glow {
           0%, 100% { box-shadow: 0 0 20px ${color}44; }
@@ -285,19 +306,23 @@ export function HistoryList({ records }: HistoryListProps) {
             <div
               key={index}
               style={{
-                height: '40px',
                 backgroundColor: '#313244',
                 borderRadius: '4px',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
-                padding: '0 12px',
+                padding: '8px 12px',
                 flexShrink: 0,
               }}
             >
-              <span style={{ color: '#CDD6F4', fontSize: '13px' }}>
-                第 {record.level} 关
-              </span>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                <span style={{ color: '#CDD6F4', fontSize: '13px' }}>
+                  第 {record.level} 关
+                </span>
+                <span style={{ color: '#6B7280', fontSize: '11px' }}>
+                  {90 - record.timeLeft}s · {record.steps}步
+                </span>
+              </div>
               <span
                 style={{
                   color: RATING_COLORS[record.rating],
