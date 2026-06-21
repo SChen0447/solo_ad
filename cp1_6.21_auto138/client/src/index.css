@@ -1,0 +1,220 @@
+:root {
+  --color-primary: #E67E22;
+  --color-primary-hover: #D35400;
+  --color-bg: #F8F5F0;
+  --color-sidebar-from: #34495E;
+  --color-sidebar-to: #5D6D7E;
+  --color-sidebar-accent: #F1C40F;
+  --color-text: #2C3E50;
+  --color-text-light: #7F8C8D;
+  --color-border: #E0D8CC;
+  --color-card: #FFFFFF;
+  --color-pending-from: #FADBD8;
+  --color-pending-to: #E8DAEF;
+  --color-progress-from: #D6EAF8;
+  --color-progress-to: #AED6F1;
+  --color-ready-from: #D5F5E3;
+  --color-ready-to: #ABEBC6;
+  --color-completed-from: #E5E7E9;
+  --color-completed-to: #FFFFFF;
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.08);
+  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.12);
+  --shadow-btn: 0 4px 12px rgba(230, 126, 34, 0.3);
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --transition: all 0.25s ease-out;
+  --sidebar-width: 240px;
+  --nav-height: 56px;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body, #root {
+  width: 100%;
+  height: 100%;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  color: var(--color-text);
+  background: var(--color-bg);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+  border: none;
+  outline: none;
+  background: none;
+  transition: var(--transition);
+}
+
+input, textarea, select {
+  font-family: inherit;
+  outline: none;
+}
+
+a {
+  text-decoration: none;
+  color: inherit;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #D0C8BC;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #B8AEA0;
+}
+
+.btn {
+  padding: 8px 16px;
+  border-radius: var(--radius-sm);
+  font-size: 14px;
+  font-weight: 500;
+  transition: var(--transition);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.btn-primary {
+  background: var(--color-primary);
+  color: white;
+}
+
+.btn-primary:hover {
+  background: var(--color-primary-hover);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-btn);
+}
+
+.btn-primary:active {
+  transform: scale(0.95);
+}
+
+.btn-secondary {
+  background: white;
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
+}
+
+.btn-secondary:hover {
+  background: #FAFAF7;
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-sm);
+}
+
+.btn-danger {
+  background: #E74C3C;
+  color: white;
+}
+
+.btn-danger:hover {
+  background: #C0392B;
+  transform: translateY(-2px);
+}
+
+.card {
+  background: var(--color-card);
+  border-radius: var(--radius-md);
+  padding: 10px;
+  box-shadow: var(--shadow-sm);
+  transition: var(--transition);
+}
+
+.card:hover {
+  box-shadow: var(--shadow-md);
+  transform: translateY(-2px);
+}
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 16px;
+  animation: fadeIn 0.2s ease-out;
+}
+
+.modal-content {
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(16px);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+  max-width: 100%;
+  max-height: 90vh;
+  overflow: auto;
+  animation: slideUp 0.25s ease-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.form-group {
+  margin-bottom: 16px;
+}
+
+.form-label {
+  display: block;
+  font-size: 14px;
+  font-weight: 500;
+  margin-bottom: 6px;
+  color: var(--color-text);
+}
+
+.form-input, .form-textarea, .form-select {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  font-size: 14px;
+  background: white;
+  transition: var(--transition);
+}
+
+.form-input:focus, .form-textarea:focus, .form-select:focus {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(230, 126, 34, 0.1);
+}
+
+.form-textarea {
+  resize: vertical;
+  min-height: 80px;
+}
+
+.wood-bg {
+  background-color: #F5EFE6;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200' viewBox='0 0 200 200'%3E%3Cg fill='%23E8DDD0' fill-opacity='0.5'%3E%3Cpath d='M0 20 Q25 10 50 20 T100 20 T150 20 T200 20 L200 25 Q175 15 150 25 T100 25 T50 25 T0 25 Z'/%3E%3Cpath d='M0 60 Q25 50 50 60 T100 60 T150 60 T200 60 L200 65 Q175 55 150 65 T100 65 T50 65 T0 65 Z'/%3E%3Cpath d='M0 100 Q25 90 50 100 T100 100 T150 100 T200 100 L200 105 Q175 95 150 105 T100 105 T50 105 T0 105 Z'/%3E%3Cpath d='M0 140 Q25 130 50 140 T100 140 T150 140 T200 140 L200 145 Q175 135 150 145 T100 145 T50 145 T0 145 Z'/%3E%3Cpath d='M0 180 Q25 170 50 180 T100 180 T150 180 T200 180 L200 185 Q175 175 150 185 T100 185 T50 185 T0 185 Z'/%3E%3C/g%3E%3C/svg%3E");
+}
+
+@media (max-width: 768px) {
+  :root {
+    --sidebar-width: 0px;
+  }
+}
