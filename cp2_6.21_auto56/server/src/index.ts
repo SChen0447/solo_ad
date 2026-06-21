@@ -300,6 +300,17 @@ app.get('/api/capsules', (_req, res) => {
   res.json(sorted);
 });
 
+app.get('/api/capsules/:id', (req, res) => {
+  const { id } = req.params;
+  const capsule = capsules.find(c => c.id === id);
+
+  if (!capsule) {
+    return res.status(404).json({ error: '胶囊不存在' });
+  }
+
+  res.json(capsule);
+});
+
 app.post('/api/capsules', (req, res) => {
   const body = req.body as CapsuleCreate;
 

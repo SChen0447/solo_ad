@@ -57,6 +57,10 @@ export function getCapsules(): Promise<Capsule[]> {
   return request<Capsule[]>('/capsules');
 }
 
+export function getCapsuleById(id: string): Promise<Capsule> {
+  return request<Capsule>(`/capsules/${id}`);
+}
+
 export function saveCapsule(capsule: CapsuleCreate): Promise<Capsule> {
   return request<Capsule>('/capsules', {
     method: 'POST',
