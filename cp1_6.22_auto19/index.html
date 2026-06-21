@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>连击技能编辑器 & 演示沙盒</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #1a1a2e;
+      font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif;
+      color: #e0e0e0;
+    }
+    #app {
+      display: flex;
+      width: 100%;
+      height: 100%;
+      position: relative;
+    }
+    #game-container {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+    }
+    canvas { display: block; }
+    #editor-panel {
+      width: 360px;
+      min-width: 360px;
+      height: 100%;
+      background: #16213e;
+      border-left: 1px solid #0f3460;
+      overflow-y: auto;
+      padding: 20px 16px;
+      transition: transform 0.3s ease, opacity 0.3s ease;
+      position: relative;
+      z-index: 10;
+    }
+    #editor-panel.collapsed {
+      transform: translateX(100%);
+      opacity: 0;
+      pointer-events: none;
+      position: absolute;
+      right: 0;
+      top: 0;
+    }
+    #editor-panel h2 {
+      font-size: 18px;
+      color: #e94560;
+      margin-bottom: 16px;
+      text-align: center;
+      letter-spacing: 2px;
+    }
+    .combo-card {
+      background: #1a1a2e;
+      border: 1px solid #0f3460;
+      border-radius: 12px;
+      padding: 12px 14px;
+      margin-bottom: 10px;
+      position: relative;
+      transition: border-color 0.2s ease;
+    }
+    .combo-card:hover {
+      border-color: #e94560;
+    }
+    .combo-card .combo-name {
+      font-size: 15px;
+      font-weight: 600;
+      color: #e94560;
+      margin-bottom: 4px;
+    }
+    .combo-card .combo-seq {
+      font-size: 20px;
+      letter-spacing: 6px;
+      color: #00ff88;
+      margin: 6px 0;
+      font-weight: 700;
+    }
+    .combo-card .combo-info {
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+      color: #888;
+    }
+    .combo-card .combo-prob {
+      color: #f0c040;
+      font-weight: 600;
+    }
+    .combo-card .combo-dmg {
+      color: #ff6b6b;
+    }
+    .combo-card .btn-delete {
+      position: absolute;
+      top: 8px;
+      right: 10px;
+      background: none;
+      border: none;
+      color: #666;
+      cursor: pointer;
+      font-size: 16px;
+      transition: color 0.2s;
+    }
+    .combo-card .btn-delete:hover { color: #e94560; }
+    .btn {
+      display: inline-block;
+      padding: 10px 20px;
+      border: none;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      text-align: center;
+    }
+    .btn-primary {
+      background: #e94560;
+      color: #fff;
+      width: 100%;
+      margin-top: 12px;
+    }
+    .btn-primary:hover {
+      background: #c23152;
+      transform: translateY(-2px);
+    }
+    .btn-sandbox {
+      background: #0f3460;
+      color: #e0e0e0;
+      width: 100%;
+      margin-top: 8px;
+    }
+    .btn-sandbox:hover {
+      background: #c23152;
+      transform: translateY(-2px);
+    }
+    #modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.7);
+      z-index: 100;
+      align-items: center;
+      justify-content: center;
+    }
+    #modal-overlay.active { display: flex; }
+    #modal-box {
+      background: #16213e;
+      border: 1px solid #e94560;
+      border-radius: 12px;
+      padding: 24px;
+      width: 340px;
+      max-width: 90vw;
+    }
+    #modal-box h3 {
+      color: #e94560;
+      margin-bottom: 16px;
+      text-align: center;
+    }
+    .form-group {
+      margin-bottom: 14px;
+    }
+    .form-group label {
+      display: block;
+      font-size: 13px;
+      color: #aaa;
+      margin-bottom: 4px;
+    }
+    .form-group input[type="text"],
+    .form-group input[type="range"] {
+      width: 100%;
+      padding: 8px 10px;
+      background: #1a1a2e;
+      border: 2px solid #0f3460;
+      border-radius: 6px;
+      color: #e0e0e0;
+      font-size: 14px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    .form-group input[type="text"].valid { border-color: #00ff88; }
+    .form-group input[type="text"].invalid { border-color: #ff4444; }
+    .form-group .hint {
+      font-size: 11px;
+      margin-top: 2px;
+      min-height: 16px;
+    }
+    .form-group .hint.red { color: #ff4444; }
+    .form-group .hint.green { color: #00ff88; }
+    .form-group input[type="range"] {
+      -webkit-appearance: none;
+      height: 6px;
+      padding: 0;
+      border: none;
+      border-radius: 3px;
+      background: #0f3460;
+    }
+    .form-group input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: #e94560;
+      cursor: pointer;
+    }
+    .form-group .range-val {
+      text-align: right;
+      font-size: 13px;
+      color: #e94560;
+      font-weight: 600;
+    }
+    #stats-panel {
+      display: none;
+      position: absolute;
+      left: 20px;
+      bottom: 20px;
+      background: rgba(22, 33, 62, 0.92);
+      border: 1px solid #0f3460;
+      border-radius: 8px;
+      padding: 14px 18px;
+      min-width: 220px;
+      z-index: 20;
+      font-size: 13px;
+    }
+    #stats-panel.active { display: block; }
+    #stats-panel h4 {
+      color: #e94560;
+      margin-bottom: 8px;
+      font-size: 14px;
+    }
+    #stats-panel .stat-row {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 4px;
+    }
+    #stats-panel .stat-val { color: #00ff88; font-weight: 600; }
+    #stats-panel .btn-export {
+      margin-top: 10px;
+      background: #0f3460;
+      color: #e0e0e0;
+      border: none;
+      padding: 6px 14px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 12px;
+      width: 100%;
+      transition: background 0.2s;
+    }
+    #stats-panel .btn-export:hover { background: #c23152; }
+    #json-output {
+      display: none;
+      margin-top: 8px;
+      background: #1a1a2e;
+      border: 1px solid #0f3460;
+      border-radius: 4px;
+      padding: 8px;
+      font-size: 11px;
+      color: #00ff88;
+      max-height: 120px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+      word-break: break-all;
+      user-select: all;
+    }
+    #btn-back-editor {
+      display: none;
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      z-index: 20;
+      background: #0f3460;
+      color: #e0e0e0;
+      border: none;
+      padding: 8px 16px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 13px;
+      transition: all 0.2s;
+    }
+    #btn-back-editor:hover {
+      background: #c23152;
+      transform: translateY(-2px);
+    }
+    #key-indicator {
+      display: none;
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      z-index: 20;
+      font-size: 24px;
+      font-weight: 700;
+      color: #00ff88;
+      letter-spacing: 4px;
+    }
+    #miss-text {
+      display: none;
+      position: absolute;
+      top: 60px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 30;
+      font-size: 36px;
+      font-weight: 900;
+      color: #ff4444;
+      text-shadow: 0 0 12px rgba(255,68,68,0.6);
+      pointer-events: none;
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <div id="game-container"></div>
+    <div id="editor-panel">
+      <h2>⚔ 连击技能编辑器</h2>
+      <div id="combo-list"></div>
+      <button class="btn btn-primary" id="btn-add-combo">+ 添加新连击</button>
+      <button class="btn btn-sandbox" id="btn-enter-sandbox">🎮 进入沙盒</button>
+    </div>
+    <div id="modal-overlay">
+      <div id="modal-box">
+        <h3>添加新连击</h3>
+        <div class="form-group">
+          <label>技能名称（最多10字符）</label>
+          <input type="text" id="input-name" maxlength="10" placeholder="如：上勾拳" />
+          <div class="hint" id="hint-name"></div>
+        </div>
+        <div class="form-group">
+          <label>伤害值</label>
+          <input type="range" id="input-damage" min="1" max="100" step="1" value="50" />
+          <div class="range-val" id="val-damage">50</div>
+        </div>
+        <div class="form-group">
+          <label>按键序列（仅A/B，最多5个）</label>
+          <input type="text" id="input-seq" placeholder="如：AAB" />
+          <div class="hint" id="hint-seq"></div>
+        </div>
+        <button class="btn btn-primary" id="btn-confirm-add">确认添加</button>
+        <button class="btn btn-sandbox" id="btn-cancel-add" style="margin-top:6px;">取消</button>
+      </div>
+    </div>
+    <div id="stats-panel">
+      <h4>📊 数据统计</h4>
+      <div class="stat-row"><span>连击成功率</span><span class="stat-val" id="stat-rate">0.0%</span></div>
+      <div class="stat-row"><span>平均触发时间</span><span class="stat-val" id="stat-time">0.0s</span></div>
+      <div class="stat-row"><span>最常使用</span><span class="stat-val" id="stat-best">-</span></div>
+      <button class="btn-export" id="btn-export">导出规则为JSON</button>
+      <div id="json-output"></div>
+    </div>
+    <button id="btn-back-editor">↩ 返回编辑</button>
+    <div id="key-indicator"></div>
+    <div id="miss-text">Miss!</div>
+  </div>
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
