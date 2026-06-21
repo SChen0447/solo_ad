@@ -1,0 +1,22 @@
+{
+  "name": "pipeline-3d-visualizer",
+  "version": "1.0.0",
+  "description": "Underground pipeline 3D visualization tool for city road cross-section",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "three": "^0.160.0",
+    "@tweenjs/tween.js": "^21.0.0",
+    "dat.gui": "^0.7.9"
+  },
+  "devDependencies": {
+    "@types/three": "^0.160.0",
+    "@types/dat.gui": "^0.7.12",
+    "typescript": "^5.3.3",
+    "vite": "^5.0.10"
+  }
+}
