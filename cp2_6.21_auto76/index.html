@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>手工坊订单管理系统</title>
+    <style>
+      html, body, #root {
+        margin: 0;
+        padding: 0;
+        height: 100%;
+        background: #F8F9FA;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+        font-size: 14px;
+      }
+      .loading-icon {
+        position: fixed;
+        top: 50%;
+        right: 40px;
+        transform: translateY(-50%);
+        width: 32px;
+        height: 32px;
+        border: 3px solid #E2E8F0;
+        border-top-color: #6366F1;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+      }
+      @keyframes spin {
+        to { transform: translateY(-50%) rotate(360deg); }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <div class="loading-icon" id="loading-icon"></div>
+    <script type="module" src="/src/frontend/main.tsx"></script>
+    <script>
+      window.addEventListener('load', () => {
+        setTimeout(() => {
+          const icon = document.getElementById('loading-icon');
+          if (icon) icon.style.display = 'none';
+        }, 500);
+      });
+    </script>
+  </body>
+</html>
