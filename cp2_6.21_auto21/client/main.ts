@@ -30,6 +30,8 @@ let myPlayerId: string | null = null;
 let myRole: RoleType | null = null;
 let currentRoomCode: string | null = null;
 let state: GameState | null = null;
+let previewAnimRaf: number | null = null;
+let loadingAnimRaf: number | null = null;
 
 function $(id: string): HTMLElement {
   const el = document.getElementById(id);
@@ -38,14 +40,10 @@ function $(id: string): HTMLElement {
 }
 
 function init() {
-  document.querySelectorAll<HTMLCanvasElement>('canvas[data-preview]').forEach((c) => {
-    const role = c.dataset.preview as RoleType;
-    const ctx = c.getContext('2d');
-    if (ctx) {
-      ctx.imageSmoothingEnabled = false;
-      drawRolePreview(ctx, role, c.width, c.height);
-    }
-  });
+  initLoadingRunner();
+
+  const previewCanvases = document.querySelectorAll<HTMLCanvasElement>('canvas[data-preview]');
+  startPreviewAnimations(previewCanvases);
 
   const coinCanvas = $('coin-icon') as HTMLCanvasElement;
   const cctx = coinCanvas.getContext('2d');
@@ -102,6 +100,7 @@ function setStatus(msg: string, isError: boolean = false) {
 }
 
 function connectToServer(role: RoleType, roomInput: string) {
+  showLoading(roomInput ? '正在加入房间...' : '正在创建房间...');
   setStatus('连接服务器中...');
   const btn = $('join-btn') as HTMLButtonElement;
   btn.disabled = true;
@@ -110,6 +109,7 @@ function connectToServer(role: RoleType, roomInput: string) {
   try {
     ws = new WebSocket(WS_URL);
   } catch (e) {
+    hideLoading();
     setStatus('无法连接到服务器，请确认后端是否已启动', true);
     updateJoinButton();
     return;
@@ -118,6 +118,7 @@ function connectToServer(role: RoleType, roomInput: string) {
   const connectTimeout = setTimeout(() => {
     if (ws && ws.readyState !== WebSocket.OPEN) {
       ws.close();
+      hideLoading();
       setStatus('连接超时，请检查服务器是否启动 (ws://localhost:' + WS_PORT + ')', true);
       updateJoinButton();
     }
@@ -147,6 +148,7 @@ function connectToServer(role: RoleType, roomInput: string) {
 
   ws.onclose = () => {
     clearTimeout(connectTimeout);
+    hideLoading();
     setStatus('连接已断开', true);
     updateJoinButton();
     if (game) game.stop();
@@ -154,6 +156,7 @@ function connectToServer(role: RoleType, roomInput: string) {
 
   ws.onerror = () => {
     clearTimeout(connectTimeout);
+    hideLoading();
     setStatus('WebSocket 错误，请检查服务器是否启动 (ws://localhost:' + WS_PORT + ')', true);
     updateJoinButton();
   };
@@ -162,6 +165,7 @@ function connectToServer(role: RoleType, roomInput: string) {
 function handleMessage(msg: WSMessage) {
   switch (msg.type) {
     case 'error':
+      hideLoading();
       setStatus(msg.data?.message || '发生错误', true);
       updateJoinButton();
       break;
@@ -173,6 +177,8 @@ function handleMessage(msg: WSMessage) {
       myRole = d.role;
       currentRoomCode = d.roomCode;
       state = d.state;
+
+      hideLoading();
 
       ($('room-display') as HTMLElement).textContent = '房间: ' + currentRoomCode;
       ($('room-code') as HTMLElement).textContent = currentRoomCode;
@@ -353,6 +359,146 @@ function send(type: string, data: any = {}) {
     return;
   }
   ws.send(JSON.stringify({ type, data }));
+}
+
+function startPreviewAnimations(canvases: NodeListOf<HTMLCanvasElement>) {
+  const previewData: {
+    canvas: HTMLCanvasElement;
+    ctx: CanvasRenderingContext2D;
+    role: RoleType;
+    bobStart: number;
+  }[] = [];
+
+  canvases.forEach((c) => {
+    const ctx = c.getContext('2d');
+    if (!ctx) return;
+    ctx.imageSmoothingEnabled = false;
+    previewData.push({
+      canvas: c,
+      ctx,
+      role: c.dataset.preview as RoleType,
+      bobStart: Math.random() * 1000,
+    });
+  });
+
+  const tick = (t: number) => {
+    for (const pd of previewData) {
+      const bobT = (t + pd.bobStart) / 1000;
+      const bobY = Math.sin(bobT * Math.PI * 2) * 2;
+      pd.ctx.clearRect(0, 0, pd.canvas.width, pd.canvas.height);
+      pd.ctx.save();
+      pd.ctx.translate(0, bobY);
+      drawRolePreview(pd.ctx, pd.role, pd.canvas.width, pd.canvas.height);
+      pd.ctx.restore();
+
+      const hovered = pd.canvas.closest('.role-card')?.matches(':hover') || false;
+      const selected = pd.canvas.closest('.role-card')?.classList.contains('selected') || false;
+      if (hovered || selected) {
+        const pulse = 0.3 + Math.sin(bobT * Math.PI * 4) * 0.15;
+        pd.ctx.save();
+        pd.ctx.globalAlpha = pulse;
+        const cx = pd.canvas.width / 2;
+        const cy = pd.canvas.height / 2 + bobY;
+        const grd = pd.ctx.createRadialGradient(cx, cy, 2, cx, cy, pd.canvas.width * 0.6);
+        grd.addColorStop(0, 'rgba(0, 212, 255, 0.8)');
+        grd.addColorStop(0.5, 'rgba(139, 92, 246, 0.4)');
+        grd.addColorStop(1, 'rgba(0, 212, 255, 0)');
+        pd.ctx.fillStyle = grd;
+        pd.ctx.fillRect(0, 0, pd.canvas.width, pd.canvas.height);
+        pd.ctx.restore();
+      }
+    }
+    previewAnimRaf = requestAnimationFrame(tick);
+  };
+  previewAnimRaf = requestAnimationFrame(tick);
+}
+
+function initLoadingRunner() {
+  const canvas = $('loading-runner') as HTMLCanvasElement;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return;
+  ctx.imageSmoothingEnabled = false;
+
+  const runFrames: { frame: number; startTime: number } = { frame: 0, startTime: 0 };
+
+  const drawRunner = (t: number) => {
+    if (!runFrames.startTime) runFrames.startTime = t;
+    const elapsed = t - runFrames.startTime;
+    const frame = Math.floor(elapsed / 100) % 4;
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    const skin = '#F4C28A';
+    const hair = '#5D4037';
+    const body = '#2196F3';
+    const bodyDk = '#1565C0';
+    const boot = '#5D3A1A';
+    const eye = '#111111';
+
+    const px = (x: number, y: number, c: string) => { ctx.fillStyle = c; ctx.fillRect(x, y, 2, 2); };
+    const rect = (x: number, y: number, w: number, h: number, c: string) => {
+      ctx.fillStyle = c;
+      ctx.fillRect(x, y, w * 2, h * 2);
+    };
+    const ox = 2;
+    const oy = 4;
+
+    rect(ox + 2, oy + 0, 6, 1, bodyDk);
+    rect(ox + 2, oy + 1, 6, 1, body);
+
+    rect(ox + 2, oy + 2, 6, 1, hair);
+    rect(ox + 2, oy + 3, 6, 3, skin);
+    px(ox + 3, oy + 4, eye);
+    px(ox + 6, oy + 4, eye);
+
+    rect(ox + 2, oy + 6, 6, 1, skin);
+    rect(ox + 1, oy + 7, 8, 1, bodyDk);
+    rect(ox + 1, oy + 8, 8, 2, body);
+    rect(ox + 2, oy + 8, 6, 1, bodyDk);
+
+    if (frame === 0) {
+      rect(ox + 0, oy + 7, 1, 3, skin);
+      rect(ox + 9, oy + 7, 1, 3, skin);
+      rect(ox + 2, oy + 10, 3, 2, bodyDk);
+      rect(ox + 6, oy + 10, 3, 2, bodyDk);
+      rect(ox + 2, oy + 12, 3, 1, boot);
+      rect(ox + 6, oy + 12, 3, 1, boot);
+    } else if (frame === 1) {
+      rect(ox + 0, oy + 8, 1, 2, skin);
+      rect(ox + 9, oy + 7, 1, 3, skin);
+      rect(ox + 1, oy + 10, 3, 2, bodyDk);
+      rect(ox + 7, oy + 10, 3, 2, bodyDk);
+      rect(ox + 1, oy + 12, 3, 1, boot);
+      rect(ox + 7, oy + 12, 3, 1, boot);
+    } else if (frame === 2) {
+      rect(ox + 0, oy + 7, 1, 3, skin);
+      rect(ox + 9, oy + 8, 1, 2, skin);
+      rect(ox + 3, oy + 10, 3, 2, bodyDk);
+      rect(ox + 5, oy + 10, 3, 2, bodyDk);
+      rect(ox + 3, oy + 12, 3, 1, boot);
+      rect(ox + 5, oy + 12, 3, 1, boot);
+    } else {
+      rect(ox + 0, oy + 7, 1, 3, skin);
+      rect(ox + 9, oy + 7, 1, 3, skin);
+      rect(ox + 3, oy + 10, 3, 2, bodyDk);
+      rect(ox + 5, oy + 10, 3, 2, bodyDk);
+      rect(ox + 3, oy + 12, 3, 1, boot);
+      rect(ox + 5, oy + 12, 3, 1, boot);
+    }
+    loadingAnimRaf = requestAnimationFrame(drawRunner);
+  };
+  loadingAnimRaf = requestAnimationFrame(drawRunner);
+}
+
+function showLoading(text: string = '正在连接服务器...') {
+  const overlay = $('loading-overlay');
+  const textEl = $('loading-text');
+  textEl.textContent = text;
+  overlay.classList.add('active');
+}
+
+function hideLoading() {
+  const overlay = $('loading-overlay');
+  overlay.classList.remove('active');
 }
 
 document.addEventListener('DOMContentLoaded', init);
