@@ -37,6 +37,7 @@ const SNAP_THRESHOLD = 10;
 const ROTATION_SNAP = 15;
 const MIN_SCALE = 0.2;
 const MAX_SCALE = 3;
+const BOUNDARY_MARGIN = 30;
 
 const Canvas: React.FC<CanvasProps> = ({
   initialData,
@@ -293,6 +294,27 @@ const Canvas: React.FC<CanvasProps> = ({
     return { x: newX, y: newY, gx: null, gy: null };
   };
 
+  const constrainToCanvas = (layer: Layer, x: number, y: number): { x: number; y: number } => {
+    const w = layer.width * layer.scale;
+    const h = layer.height * layer.scale;
+    const angle = Math.abs((layer.rotation % 360) * (Math.PI / 180));
+    const cosA = Math.cos(angle);
+    const sinA = Math.sin(angle);
+    const halfW = w / 2;
+    const halfH = h / 2;
+    const bboxHalfW = halfW * cosA + halfH * sinA;
+    const bboxHalfH = halfW * sinA + halfH * cosA;
+    const cx = x + halfW;
+    const cy = y + halfH;
+    const minCx = BOUNDARY_MARGIN - bboxHalfW;
+    const maxCx = CANVAS_WIDTH - BOUNDARY_MARGIN + bboxHalfW;
+    const minCy = BOUNDARY_MARGIN - bboxHalfH;
+    const maxCy = CANVAS_HEIGHT - BOUNDARY_MARGIN + bboxHalfH;
+    const newCx = Math.max(minCx, Math.min(maxCx, cx));
+    const newCy = Math.max(minCy, Math.min(maxCy, cy));
+    return { x: newCx - halfW, y: newCy - halfH };
+  };
+
   const handleMouseDown = (e: React.MouseEvent, layerId: string) => {
     if (e.button !== 0) return;
     e.stopPropagation();
@@ -313,7 +335,7 @@ const Canvas: React.FC<CanvasProps> = ({
     const dy = y - handleY;
     const distToHandle = Math.sqrt(dx * dx + dy * dy);
 
-    if (distToHandle < 16) {
+    if (distToHandle < 20) {
       const startAngle = Math.atan2(y - cy, x - cx);
       setRotating({
         layerId,
@@ -353,6 +375,9 @@ const Canvas: React.FC<CanvasProps> = ({
             const { x: sx, y: sy, gx, gy } = snapToGuides(l, newX, newY);
             newX = sx;
             newY = sy;
+            const constrained = constrainToCanvas(l, newX, newY);
+            newX = constrained.x;
+            newY = constrained.y;
             setGuides({ x: gx, y: gy });
             return { ...l, x: newX, y: newY };
           })
@@ -540,9 +565,22 @@ const Canvas: React.FC<CanvasProps> = ({
 
   const renderLayer = (layer: Layer) => {
     const isSelected = selectedLayerId === layer.id;
+    const isDragging = dragging?.layerId === layer.id;
+    const isRotating = rotating?.layerId === layer.id;
+    const isActive = isDragging || isRotating;
     const w = layer.width * layer.scale;
     const h = layer.height * layer.scale;
-    const transform = `translate(${layer.x}px, ${layer.y}px) rotate(${layer.rotation}deg)`;
+    const dragScale = isActive ? 1.05 : 1;
+    const transform = `translate(${layer.x}px, ${layer.y}px) rotate(${layer.rotation}deg) scale(${dragScale})`;
+    const transformOrigin = 'center center';
+
+    const boxShadow = isActive
+      ? '0 12px 40px rgba(0, 0, 0, 0.35), 0 4px 12px rgba(59, 130, 246, 0.25)'
+      : isSelected
+      ? '0 4px 16px rgba(0, 0, 0, 0.2)'
+      : '0 2px 8px rgba(0, 0, 0, 0.1)';
+
+    const transition = isActive ? 'none' : 'box-shadow 0.2s ease, transform 0.2s ease';
 
     return (
       <div
@@ -555,10 +593,15 @@ const Canvas: React.FC<CanvasProps> = ({
           width: w,
           height: h,
           transform,
-          zIndex: layer.zIndex,
+          transformOrigin,
+          zIndex: isActive ? 9999 : layer.zIndex,
           cursor: editingTextId === layer.id ? 'text' : 'move',
           outline: isSelected ? '2px solid #3B82F6' : 'none',
           userSelect: 'none',
+          boxShadow: layer.type === 'image' ? boxShadow : 'none',
+          borderRadius: layer.type === 'image' ? 2 : 0,
+          transition,
+          willChange: isActive ? 'transform' : 'auto',
         }}
         onMouseDown={(e) => handleMouseDown(e, layer.id)}
         onWheel={(e) => handleWheel(e, layer.id)}
@@ -646,17 +689,38 @@ const Canvas: React.FC<CanvasProps> = ({
             className="rotate-handle"
             style={{
               position: 'absolute',
-              right: -8,
-              bottom: -8,
-              width: 16,
-              height: 16,
+              right: -12,
+              bottom: -12,
+              width: 24,
+              height: 24,
               borderRadius: '50%',
               background: '#3B82F6',
               border: '2px solid white',
               cursor: 'grab',
               zIndex: 9999,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
+              transition: 'transform 0.2s ease',
             }}
-          />
+            onMouseEnter={(e) => (e.currentTarget.style.transform = 'scale(1.2)')}
+            onMouseLeave={(e) => (e.currentTarget.style.transform = 'scale(1)')}
+          >
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="white"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M21 12a9 9 0 1 1-3-6.7L21 8" />
+              <path d="M21 3v5h-5" />
+            </svg>
+          </div>
         )}
         {rotationAngleDisplay && rotationAngleDisplay.layerId === layer.id && isSelected && (
           <div
