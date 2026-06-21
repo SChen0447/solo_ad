@@ -65,7 +65,9 @@ interface Annotation {
   materialId: string;
   x: number; // pixel coordinate
   y: number; // pixel coordinate
+  color: string; // annotation color (hex)
   text: string;
+  author: string; // author name
   createdAt: number;
 }
 ```
@@ -78,7 +80,7 @@ interface Annotation {
 | POST | /api/materials | multipart/form-data (file, name) | Material | 上传新素材 |
 | GET | /api/materials/:id | - | Material | 获取单个素材 |
 | GET | /api/materials/:id/annotations | - | Annotation[] | 获取素材的所有标注 |
-| POST | /api/materials/:id/annotations | { x, y, text } | Annotation | 创建新标注 |
+| POST | /api/materials/:id/annotations | { x, y, color, text, author } | Annotation | 创建新标注 |
 
 ## 5. 服务器架构
 
@@ -131,7 +133,9 @@ erDiagram
         string materialId FK "素材ID"
         number x "像素X坐标"
         number y "像素Y坐标"
+        string color "标注颜色"
         string text "标注文字"
+        string author "标注者"
         number createdAt "创建时间戳"
     }
 ```
