@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23495057'%3E%3Cpath d='M9.937 15.5h4.126l-2.06-5.89zm3.586-10.389L19.339 21H17.15l-1.742-5.5H8.592L6.85 21H4.662l5.814-15.89h3.047z'/%3E%3C/svg%3E" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Typography Preview Tool</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      html, body, #root {
+        height: 100%;
+        width: 100%;
+      }
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+        background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+        min-height: 100vh;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        padding: 20px;
+        overflow: hidden;
+      }
+      #root {
+        width: 100%;
+        max-width: 1800px;
+        height: calc(100vh - 40px);
+        max-height: 1000px;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
