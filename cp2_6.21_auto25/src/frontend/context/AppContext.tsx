@@ -1,7 +1,7 @@
-import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from 'react';
+import { createContext, useContext, useState, useCallback, useEffect, useRef, type ReactNode } from 'react';
 import type { Pet, Application, MatchResult, FollowUp, FollowUpReminder } from '../../../shared/types';
 
-interface AppState {
+interface AppContextType {
   pets: Pet[];
   applications: Application[];
   followUps: FollowUp[];
@@ -10,9 +10,6 @@ interface AppState {
   showDetail: boolean;
   showApplicationForm: boolean;
   loading: boolean;
-}
-
-interface AppContextType extends AppState {
   fetchPets: () => Promise<void>;
   fetchApplications: () => Promise<void>;
   fetchFollowUps: () => Promise<void>;
@@ -44,6 +41,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [showDetail, setShowDetail] = useState(false);
   const [showApplicationForm, setShowApplicationForm] = useState(false);
   const [loading, setLoading] = useState(false);
+  const reminderTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const fetchPets = useCallback(async () => {
     setLoading(true);
@@ -69,9 +67,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const fetchReminders = useCallback(async () => {
-    const res = await fetch('/api/followups/reminders');
-    const data = await res.json();
-    setReminders(data);
+    try {
+      const res = await fetch('/api/followups/reminders');
+      const data = await res.json();
+      setReminders(data);
+    } catch {
+      // ignore
+    }
   }, []);
 
   const addPet = useCallback(async (pet: Omit<Pet, 'id' | 'createdAt'>) => {
@@ -130,6 +132,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
     fetchFollowUps();
     fetchReminders();
   }, [fetchPets, fetchApplications, fetchFollowUps, fetchReminders]);
+
+  useEffect(() => {
+    reminderTimerRef.current = setInterval(() => {
+      fetchReminders();
+    }, 30000);
+    return () => {
+      if (reminderTimerRef.current) {
+        clearInterval(reminderTimerRef.current);
+      }
+    };
+  }, [fetchReminders]);
 
   return (
     <AppContext.Provider

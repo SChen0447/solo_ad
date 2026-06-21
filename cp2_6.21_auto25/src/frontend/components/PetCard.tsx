@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import type { Pet } from '../../../shared/types';
 
 interface PetCardProps {
@@ -8,12 +8,27 @@ interface PetCardProps {
 
 export default function PetCard({ pet, onSelect }: PetCardProps) {
   const [imgIndex, setImgIndex] = useState(0);
-  const allImages = [pet.mainImage, ...pet.subImages];
+  const allImages = [pet.mainImage, ...pet.subImages].slice(0, 4);
+  const [isHovering, setIsHovering] = useState(false);
+
+  const goTo = useCallback((i: number) => {
+    setImgIndex(((i % allImages.length) + allImages.length) % allImages.length);
+  }, [allImages.length]);
+
+  useEffect(() => {
+    if (allImages.length <= 1 || !isHovering) return;
+    const timer = setInterval(() => {
+      goTo(imgIndex + 1);
+    }, 2500);
+    return () => clearInterval(timer);
+  }, [imgIndex, allImages.length, isHovering, goTo]);
 
   return (
     <div
       className="pet-card"
       onClick={() => onSelect(pet)}
+      onMouseEnter={() => setIsHovering(true)}
+      onMouseLeave={() => setIsHovering(false)}
       style={{
         width: '260px',
         borderRadius: '16px',
@@ -25,14 +40,6 @@ export default function PetCard({ pet, onSelect }: PetCardProps) {
         breakInside: 'avoid',
         marginBottom: '16px',
       }}
-      onMouseEnter={(e) => {
-        e.currentTarget.style.transform = 'translateY(-8px)';
-        e.currentTarget.style.boxShadow = '0px 8px 24px rgba(0,0,0,0.15)';
-      }}
-      onMouseLeave={(e) => {
-        e.currentTarget.style.transform = 'translateY(0)';
-        e.currentTarget.style.boxShadow = '0px 2px 8px rgba(0,0,0,0.08)';
-      }}
     >
       <div
         style={{
@@ -42,23 +49,95 @@ export default function PetCard({ pet, onSelect }: PetCardProps) {
           position: 'relative',
         }}
       >
-        <img
-          src={allImages[imgIndex]}
-          alt={pet.name}
+        <div
           style={{
-            width: '100%',
+            display: 'flex',
+            transition: 'transform 0.4s ease',
+            transform: `translateX(-${imgIndex * 100}%)`,
+            width: `${allImages.length * 100}%`,
             height: '100%',
-            objectFit: 'cover',
-            display: 'block',
           }}
-          onError={(e) => {
-            (e.target as HTMLImageElement).src =
-              'data:image/svg+xml,' +
-              encodeURIComponent(
-                `<svg xmlns="http://www.w3.org/2000/svg" width="260" height="220" viewBox="0 0 260 220"><rect fill="#F0F2F5" width="260" height="220"/><text fill="#999" font-size="14" x="50%" y="50%" text-anchor="middle" dy=".3em">${pet.name}</text></svg>`
-              );
-          }}
-        />
+        >
+          {allImages.map((src, i) => (
+            <img
+              key={i}
+              src={src}
+              alt={`${pet.name}-${i + 1}`}
+              style={{
+                width: `${100 / allImages.length}%`,
+                height: '100%',
+                objectFit: 'cover',
+                display: 'block',
+                flexShrink: 0,
+              }}
+              onError={(e) => {
+                (e.target as HTMLImageElement).src =
+                  'data:image/svg+xml,' +
+                  encodeURIComponent(
+                    `<svg xmlns="http://www.w3.org/2000/svg" width="260" height="220" viewBox="0 0 260 220"><rect fill="#F0F2F5" width="260" height="220"/><text fill="#999" font-size="14" x="50%" y="50%" text-anchor="middle" dy=".3em">${pet.name}</text></svg>`
+                  );
+              }}
+            />
+          ))}
+        </div>
+
+        {allImages.length > 1 && isHovering && (
+          <>
+            <button
+              onClick={(e) => { e.stopPropagation(); goTo(imgIndex - 1); }}
+              style={{
+                position: 'absolute',
+                left: '8px',
+                top: '50%',
+                transform: 'translateY(-50%)',
+                width: '28px',
+                height: '28px',
+                borderRadius: '50%',
+                border: 'none',
+                background: 'rgba(255,255,255,0.85)',
+                color: '#333',
+                fontSize: '14px',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                boxShadow: '0 1px 4px rgba(0,0,0,0.15)',
+                transition: 'background 0.2s',
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(255,255,255,1)')}
+              onMouseLeave={(e) => (e.currentTarget.style.background = 'rgba(255,255,255,0.85)')}
+            >
+              ‹
+            </button>
+            <button
+              onClick={(e) => { e.stopPropagation(); goTo(imgIndex + 1); }}
+              style={{
+                position: 'absolute',
+                right: '8px',
+                top: '50%',
+                transform: 'translateY(-50%)',
+                width: '28px',
+                height: '28px',
+                borderRadius: '50%',
+                border: 'none',
+                background: 'rgba(255,255,255,0.85)',
+                color: '#333',
+                fontSize: '14px',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                boxShadow: '0 1px 4px rgba(0,0,0,0.15)',
+                transition: 'background 0.2s',
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(255,255,255,1)')}
+              onMouseLeave={(e) => (e.currentTarget.style.background = 'rgba(255,255,255,0.85)')}
+            >
+              ›
+            </button>
+          </>
+        )}
+
         {allImages.length > 1 && (
           <div
             style={{
@@ -73,16 +152,14 @@ export default function PetCard({ pet, onSelect }: PetCardProps) {
             {allImages.map((_, i) => (
               <span
                 key={i}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setImgIndex(i);
-                }}
+                onClick={(e) => { e.stopPropagation(); setImgIndex(i); }}
                 style={{
                   width: '6px',
                   height: '6px',
                   borderRadius: '50%',
                   background: i === imgIndex ? '#F58F29' : 'rgba(255,255,255,0.7)',
                   cursor: 'pointer',
+                  transition: 'background 0.2s',
                 }}
               />
             ))}
