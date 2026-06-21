@@ -27,6 +27,7 @@ export class AnimationController {
   constructor(forestScene: ForestScene) {
     this.forestScene = forestScene;
     this.updateDayNightCycle(0);
+    this.updateWindStrength(0);
   }
 
   update(deltaTime: number): void {
@@ -44,7 +45,8 @@ export class AnimationController {
   }
 
   private updateWindStrength(t: number): void {
-    this.windStrength = this.maxWindStrength - (this.maxWindStrength - this.minWindStrength) * t;
+    const clampedT = Math.max(0, Math.min(1, t));
+    this.windStrength = this.maxWindStrength - (this.maxWindStrength - this.minWindStrength) * clampedT;
   }
 
   private updateDayNightCycle(t: number): void {
