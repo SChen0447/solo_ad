@@ -28,7 +28,7 @@ function truncateText(text: string, maxLen: number): string {
 }
 
 function generateShareLink(id: string): string {
-  return `${window.location.origin}${window.location.pathname}#/capsule/${id}`;
+  return `/capsule/${id}`;
 }
 
 function downloadDataUrl(dataUrl: string, filename: string): void {
@@ -139,7 +139,7 @@ async function generatePoster(capsule: Capsule): Promise<string> {
   const infoY = textY + 80;
   ctx.fillStyle = '#94A3B8';
   ctx.font = '32px -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif';
-  ctx.fillText('用户：匿名用户', posterWidth / 2, infoY);
+  ctx.fillText(`用户：${capsule.nickname || '匿名用户'}`, posterWidth / 2, infoY);
   ctx.fillText(`时间：${formatDateForPoster(capsule.timestamp)}`, posterWidth / 2, infoY + 56);
 
   const tagsY = infoY + 130;
@@ -170,16 +170,17 @@ export default function Timeline({ capsules }: TimelineProps) {
   const [selectedCapsule, setSelectedCapsule] = useState<Capsule | null>(null);
   const [shareState, setShareState] = useState<ShareState | null>(null);
   const [mounted, setMounted] = useState(false);
-  const [isClosingShare, setIsClosingShare] = useState(false);
+  const [shareVisible, setShareVisible] = useState(false);
+  const [shareClosing, setShareClosing] = useState(false);
   const copyTimerRef = useRef<number | null>(null);
-  const closeTimerRef = useRef<number | null>(null);
+  const sharePanelRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setMounted(true);
   }, []);
 
   useEffect(() => {
-    if (selectedCapsule || shareState) {
+    if (selectedCapsule || shareVisible) {
       document.body.style.overflow = 'hidden';
     } else {
       document.body.style.overflow = '';
@@ -187,23 +188,24 @@ export default function Timeline({ capsules }: TimelineProps) {
     return () => {
       document.body.style.overflow = '';
     };
-  }, [selectedCapsule, shareState]);
+  }, [selectedCapsule, shareVisible]);
 
   useEffect(() => {
     return () => {
       if (copyTimerRef.current) {
         window.clearTimeout(copyTimerRef.current);
       }
-      if (closeTimerRef.current) {
-        window.clearTimeout(closeTimerRef.current);
-      }
     };
   }, []);
 
   const handleShareClick = (e: React.MouseEvent, capsule: Capsule) => {
     e.stopPropagation();
-    setIsClosingShare(false);
+    if (shareClosing) return;
     setShareState({ capsule, copied: false });
+    setShareClosing(false);
+    requestAnimationFrame(() => {
+      setShareVisible(true);
+    });
   };
 
   const handleCloseShare = () => {
@@ -211,15 +213,15 @@ export default function Timeline({ capsules }: TimelineProps) {
       window.clearTimeout(copyTimerRef.current);
       copyTimerRef.current = null;
     }
-    if (closeTimerRef.current) {
-      window.clearTimeout(closeTimerRef.current);
-      closeTimerRef.current = null;
-    }
-    setIsClosingShare(true);
-    closeTimerRef.current = window.setTimeout(() => {
+    setShareClosing(true);
+  };
+
+  const handleShareAnimationEnd = () => {
+    if (shareClosing) {
+      setShareVisible(false);
+      setShareClosing(false);
       setShareState(null);
-      setIsClosingShare(false);
-    }, 300);
+    }
   };
 
   const handleCopyLink = async () => {
@@ -242,7 +244,7 @@ export default function Timeline({ capsules }: TimelineProps) {
   const handleDownloadImage = async () => {
     if (!shareState) return;
     try {
-      const canvas = await svgDataUrlToCanvas(shareState.capsule.imageDataUrl, 1280, 960);
+      const canvas = await svgDataUrlToCanvas(shareState.capsule.imageDataUrl, 640, 480);
       const dataUrl = canvas.toDataURL('image/png');
       const filename = `wordcloud_${shareState.capsule.id.slice(0, 8)}.png`;
       downloadDataUrl(dataUrl, filename);
@@ -359,14 +361,16 @@ export default function Timeline({ capsules }: TimelineProps) {
         </div>
       )}
 
-      {shareState && (
+      {shareVisible && shareState && (
         <div
-          className={`share-overlay ${isClosingShare ? 'closing' : ''}`}
+          className={`share-overlay ${shareClosing ? 'closing' : ''}`}
           onClick={handleCloseShare}
         >
           <div
+            ref={sharePanelRef}
             className="share-panel"
             onClick={e => e.stopPropagation()}
+            onAnimationEnd={handleShareAnimationEnd}
           >
             <div className="share-header">
               <h3 className="share-title">分享胶囊</h3>

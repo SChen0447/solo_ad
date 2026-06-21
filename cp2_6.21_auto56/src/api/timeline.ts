@@ -22,6 +22,7 @@ export interface Capsule {
   tags: string[];
   imageDataUrl: string;
   timestamp: string;
+  nickname: string;
 }
 
 export interface CapsuleCreate {
@@ -29,6 +30,7 @@ export interface CapsuleCreate {
   tags: string[];
   imageDataUrl: string;
   timestamp: string;
+  nickname?: string;
 }
 
 const API_BASE = '/api';

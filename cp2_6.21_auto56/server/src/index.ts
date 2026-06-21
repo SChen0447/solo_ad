@@ -32,6 +32,7 @@ interface Capsule {
   tags: string[];
   imageDataUrl: string;
   timestamp: string;
+  nickname: string;
 }
 
 interface CapsuleCreate {
@@ -39,6 +40,7 @@ interface CapsuleCreate {
   tags: string[];
   imageDataUrl: string;
   timestamp: string;
+  nickname?: string;
 }
 
 const capsules: Capsule[] = [];
@@ -324,6 +326,7 @@ app.post('/api/capsules', (req, res) => {
     tags: body.tags || [],
     imageDataUrl: body.imageDataUrl,
     timestamp: body.timestamp,
+    nickname: body.nickname || '匿名用户',
   };
 
   capsules.unshift(newCapsule);
