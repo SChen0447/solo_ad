@@ -1,0 +1,23 @@
+{
+  "name": "pixel-farm-collab",
+  "version": "1.0.0",
+  "description": "Multiplayer collaborative 2D pixel-style simulation game",
+  "scripts": {
+    "dev": "concurrently \"npm run client\" \"npm run server\"",
+    "client": "vite",
+    "server": "ts-node server/gameServer.ts",
+    "build": "tsc && vite build",
+    "postinstall": "echo 'Dependencies installed. Run npm run dev to start.'"
+  },
+  "dependencies": {
+    "ws": "8.16.0"
+  },
+  "devDependencies": {
+    "@types/node": "20.10.5",
+    "@types/ws": "8.5.10",
+    "concurrently": "8.2.2",
+    "ts-node": "10.9.2",
+    "typescript": "5.3.3",
+    "vite": "5.0.8"
+  }
+}
