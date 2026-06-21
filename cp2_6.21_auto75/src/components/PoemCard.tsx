@@ -25,18 +25,66 @@ const PoemCard: React.FC<PoemCardProps> = memo(function PoemCard({
   cardWidth,
   onCardClick
 }) {
-  const isMobile = cardWidth < 320
-  const fontScale = isMobile ? 0.8 : 1
+  const baseCardWidth = 320
+  const minFontScale = 0.6
+  let fontScale = 1.0
+  if (cardWidth < baseCardWidth) {
+    const t = Math.max(0, (cardWidth - 200) / (baseCardWidth - 200))
+    fontScale = minFontScale + (1.0 - minFontScale) * t
+  }
+  const isMobile = cardWidth < baseCardWidth
   const [isHovered, setIsHovered] = useState(false)
   const [ripples, setRipples] = useState<Ripple[]>([])
+  const [expandProgress, setExpandProgress] = useState(0)
   const cardRef = useRef<HTMLDivElement>(null)
   const rippleCleanupRef = useRef<Map<number, ReturnType<typeof setTimeout>>>(new Map())
+  const expandAnimRef = useRef<number>()
+  const expandAnimStartRef = useRef<number>(0)
+  const expandAnimTargetRef = useRef<number>(0)
 
   useEffect(() => {
     return () => {
       rippleCleanupRef.current.forEach((timer) => clearTimeout(timer))
+      if (expandAnimRef.current) {
+        cancelAnimationFrame(expandAnimRef.current)
+      }
     }
   }, [])
+
+  useEffect(() => {
+    const targetProgress = isExpanded ? 1 : 0
+    expandAnimTargetRef.current = targetProgress
+
+    if (expandAnimRef.current) {
+      cancelAnimationFrame(expandAnimRef.current)
+    }
+
+    expandAnimStartRef.current = performance.now()
+    const startProgress = expandProgress
+    const duration = 300
+
+    const animateExpand = (nowTime: number) => {
+      const elapsed = nowTime - expandAnimStartRef.current
+      const t = Math.min(elapsed / duration, 1)
+      const easeOutT = 1 - Math.pow(1 - t, 3)
+      const newProgress = startProgress + (targetProgress - startProgress) * easeOutT
+      setExpandProgress(newProgress)
+
+      if (t < 1) {
+        expandAnimRef.current = requestAnimationFrame(animateExpand)
+      } else {
+        setExpandProgress(targetProgress)
+      }
+    }
+
+    expandAnimRef.current = requestAnimationFrame(animateExpand)
+
+    return () => {
+      if (expandAnimRef.current) {
+        cancelAnimationFrame(expandAnimRef.current)
+      }
+    }
+  }, [isExpanded])
 
   const handleClick = useCallback(
     (e: React.MouseEvent<HTMLDivElement>) => {
@@ -66,44 +114,42 @@ const PoemCard: React.FC<PoemCardProps> = memo(function PoemCard({
     [poem.id, onCardClick]
   )
 
-  const scale = isHovered && settled ? 1.08 : 1
-  const bgOpacity = isHovered && settled ? 0.95 : 0.85
-  const shadowSize = isHovered && settled ? 10 : 0
+  const baseScale = isHovered && settled ? 1.08 : 1
+  const expandExtraScale = expandProgress * 0.25
+  const finalScale = baseScale * (1 + expandExtraScale)
+  const bgOpacity = 0.85 + (isHovered && settled ? 0.1 : 0) + expandProgress * 0.1
+  const shadowSize = (isHovered && settled ? 10 : 0) + expandProgress * 15
+  const shadowOpacity = 0.3 + expandProgress * 0.15
+
+  const finalRotation = rotation * (1 - expandProgress * 0.5)
 
   const cardStyle: React.CSSProperties = {
     position: 'absolute',
     left: 0,
     top: 0,
     width: cardWidth,
-    transform: `translate(${x}px, ${y}px) rotate(${rotation}deg) scale(${scale})`,
+    transform: `translate(${x}px, ${y}px) rotate(${finalRotation}deg) scale(${finalScale})`,
     opacity,
     cursor: settled ? 'pointer' : 'default',
-    transition: isExpanded
-      ? 'transform 0.3s ease-out, opacity 0.3s ease'
-      : settled
-      ? 'transform 0.25s ease, opacity 0.3s ease'
+    transition: settled
+      ? 'transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94), opacity 0.3s ease'
       : 'opacity 0.3s ease',
     transformOrigin: 'center center',
-    zIndex: isExpanded ? 100 : isHovered ? 10 : 1,
+    zIndex: isExpanded ? 200 : isHovered ? 10 : 1,
     willChange: 'transform, opacity'
   }
 
-  const titleClass = 'poem-card-title'
-  const authorClass = 'poem-card-author'
-  const contentClass = 'poem-card-content'
-  const notesClass = 'poem-card-notes'
-
   const innerStyle: React.CSSProperties = {
-    backgroundColor: `rgba(250, 240, 230, ${bgOpacity})`,
-    borderRadius: 8,
-    padding: '20px 24px',
+    backgroundColor: `rgba(250, 240, 230, ${Math.min(bgOpacity, 0.98)})`,
+    borderRadius: 8 + expandProgress * 8,
+    padding: `${20 + expandProgress * 10}px ${24 + expandProgress * 16}px`,
     boxShadow: shadowSize
-      ? `0 ${shadowSize}px ${shadowSize * 2}px rgba(0, 0, 0, 0.3), 0 0 0 ${shadowSize}px rgba(0, 0, 0, 0.1)`
+      ? `0 ${shadowSize}px ${shadowSize * 2}px rgba(0, 0, 0, ${shadowOpacity}), 0 0 0 ${Math.max(shadowSize - 5, 0)}px rgba(0, 0, 0, 0.08)`
       : '0 2px 8px rgba(0, 0, 0, 0.1)',
-    transition: 'background-color 0.3s ease, box-shadow 0.3s ease',
+    transition: 'background-color 0.3s ease, box-shadow 0.3s ease, padding 0.3s ease, border-radius 0.3s ease',
     position: 'relative',
     overflow: 'hidden',
-    border: '1px solid rgba(139, 69, 19, 0.2)'
+    border: `1px solid rgba(139, 69, 19, ${0.2 + expandProgress * 0.15})`
   }
 
   const paperTexture: React.CSSProperties = {
@@ -117,17 +163,23 @@ const PoemCard: React.FC<PoemCardProps> = memo(function PoemCard({
     opacity: 0.5
   }
 
+  const titleClass = 'poem-card-title'
+  const authorClass = 'poem-card-author'
+  const contentClass = 'poem-card-content'
+  const notesClass = 'poem-card-notes'
+
   const titleStyle: React.CSSProperties = {
-    fontSize: 24 * fontScale,
+    fontSize: 24 * fontScale + expandProgress * 4,
     fontWeight: 'bold',
     color: '#4A3728',
     marginBottom: 8,
     fontFamily: '"KaiTi", "STKaiti", "楷体", serif',
-    textAlign: 'center'
+    textAlign: 'center',
+    letterSpacing: `${expandProgress * 2}px`
   }
 
   const authorStyle: React.CSSProperties = {
-    fontSize: 14 * fontScale,
+    fontSize: 14 * fontScale + expandProgress * 2,
     color: '#8B4513',
     marginBottom: 16,
     fontFamily: '"KaiTi", "STKaiti", "楷体", serif',
@@ -135,21 +187,28 @@ const PoemCard: React.FC<PoemCardProps> = memo(function PoemCard({
   }
 
   const contentStyle: React.CSSProperties = {
-    fontSize: 18 * fontScale,
+    fontSize: 18 * fontScale + expandProgress * 3,
     color: '#4A3728',
-    lineHeight: 1.8,
+    lineHeight: 1.8 + expandProgress * 0.2,
     fontFamily: '"KaiTi", "STKaiti", "楷体", serif',
     textAlign: 'center'
   }
 
+  const notesContainerStyle: React.CSSProperties = {
+    maxHeight: expandProgress > 0.01 ? (200 * expandProgress + 20) : 0,
+    opacity: expandProgress,
+    overflow: 'hidden',
+    marginTop: 16 * expandProgress,
+    paddingTop: 12 * expandProgress,
+    borderTop: expandProgress > 0.01 ? '1px dashed rgba(139, 69, 19, 0.3)' : 'none',
+    transition: 'max-height 0.3s ease-out, opacity 0.3s ease-out, margin-top 0.3s ease-out, padding-top 0.3s ease-out'
+  }
+
   const notesStyle: React.CSSProperties = {
-    fontSize: 14 * fontScale,
+    fontSize: 14 * fontScale + expandProgress * 2,
     color: '#6B5344',
-    marginTop: 16,
-    paddingTop: 12,
-    borderTop: '1px dashed rgba(139, 69, 19, 0.3)',
     fontFamily: '"KaiTi", "STKaiti", "楷体", serif',
-    lineHeight: 1.6
+    lineHeight: 1.6 + expandProgress * 0.1
   }
 
   return (
@@ -169,17 +228,17 @@ const PoemCard: React.FC<PoemCardProps> = memo(function PoemCard({
         </p>
         <div style={contentStyle} className={contentClass}>
           {poem.content.map((line, index) => (
-            <p key={index} style={{ margin: '4px 0' }}>
+            <p key={index} style={{ margin: `${4 + expandProgress * 2}px 0` }}>
               {line}
             </p>
           ))}
         </div>
-        {isExpanded && (
+        <div style={notesContainerStyle}>
           <div style={notesStyle} className={notesClass}>
             <strong style={{ color: '#8B4513' }}>注释：</strong>
             {poem.notes}
           </div>
-        )}
+        </div>
         {ripples.map((ripple) => (
           <RippleEffect key={ripple.id} x={ripple.x} y={ripple.y} />
         ))}

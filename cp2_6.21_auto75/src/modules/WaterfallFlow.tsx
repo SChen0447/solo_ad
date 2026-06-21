@@ -15,10 +15,11 @@ const CARD_WIDTH_DEFAULT = 320
 const CARD_VERTICAL_GAP = 60
 const CARD_HORIZONTAL_GAP = 30
 const BATCH_SIZE = 10
-const FALL_SPEED_MIN = 1.5
-const FALL_SPEED_MAX = 3
+const FALL_SPEED_MIN_PX_PER_SEC = 250
+const FALL_SPEED_MAX_PX_PER_SEC = 450
 const SETTLE_AREA_TOP = 100
 const MOBILE_BREAKPOINT = 768
+const OPACITY_FADE_IN_SPEED = 2.0
 
 const WaterfallFlow: React.FC<WaterfallFlowProps> = ({
   searchQuery,
@@ -31,6 +32,7 @@ const WaterfallFlow: React.FC<WaterfallFlowProps> = ({
   const [isFiltering, setIsFiltering] = useState(false)
   const [showEmptyTip, setShowEmptyTip] = useState(false)
   const animationFrameRef = useRef<number>()
+  const lastFrameTimeRef = useRef<number>(0)
   const columnsRef = useRef<number>(3)
   const containerWidthRef = useRef<number>(0)
   const cardWidthRef = useRef<number>(CARD_WIDTH_DEFAULT)
@@ -38,6 +40,11 @@ const WaterfallFlow: React.FC<WaterfallFlowProps> = ({
   const allPoemsRef = useRef<Poem[]>([])
   const loadedCountRef = useRef(0)
   const isLoadingRef = useRef(false)
+  const cardsRef = useRef<CardState[]>([])
+
+  useEffect(() => {
+    cardsRef.current = cards
+  }, [cards])
 
   const initColumns = useCallback((containerWidth: number) => {
     const padding = 60
@@ -45,7 +52,7 @@ const WaterfallFlow: React.FC<WaterfallFlowProps> = ({
 
     if (containerWidth < MOBILE_BREAKPOINT) {
       columnsRef.current = 1
-      cardWidthRef.current = availableWidth
+      cardWidthRef.current = Math.max(200, availableWidth)
     } else {
       const cols = Math.floor(
         (availableWidth + CARD_HORIZONTAL_GAP) /
@@ -62,7 +69,8 @@ const WaterfallFlow: React.FC<WaterfallFlowProps> = ({
     const totalWidth =
       columnsRef.current * cardWidth +
       (columnsRef.current - 1) * CARD_HORIZONTAL_GAP
-    const startX = (containerWidth - 60 - totalWidth) / 2 + 30
+    const padding = 60
+    const startX = (containerWidth - padding - totalWidth) / 2 + 30
     return startX + colIndex * (cardWidth + CARD_HORIZONTAL_GAP)
   }, [])
 
@@ -78,6 +86,24 @@ const WaterfallFlow: React.FC<WaterfallFlowProps> = ({
     return minIndex
   }, [])
 
+  const estimateCardHeight = useCallback((poem: Poem, cardWidth: number): number => {
+    const isMobile = cardWidth < 320
+    const fontScale = isMobile ? 0.8 : 1
+    const titleSize = 24 * fontScale
+    const authorSize = 14 * fontScale
+    const contentSize = 18 * fontScale
+    const notesSize = 14 * fontScale
+
+    const titleHeight = titleSize + 8
+    const authorHeight = authorSize + 16
+    const contentLines = poem.content.length
+    const contentHeight = contentLines * (contentSize * 1.8 + 8)
+    const notesHeight = poem.notes ? notesSize * 1.6 + 28 : 0
+    const padding = 40
+
+    return titleHeight + authorHeight + contentHeight + notesHeight + padding
+  }, [])
+
   const createCardState = useCallback(
     (poem: Poem, containerWidth: number): CardState => {
       const colIndex = getShortestColumn()
@@ -86,10 +112,9 @@ const WaterfallFlow: React.FC<WaterfallFlowProps> = ({
       const maxOffset = Math.min(80, cardWidth * 0.2)
       const offsetX = random(-maxOffset, maxOffset)
       const rotation = random(-5, 5)
-      const speed = random(FALL_SPEED_MIN, FALL_SPEED_MAX)
+      const speedPxPerSec = random(FALL_SPEED_MIN_PX_PER_SEC, FALL_SPEED_MAX_PX_PER_SEC)
 
-      const estimatedHeight =
-        80 + poem.content.length * 32 + 40 + (poem.notes ? 60 : 0)
+      const estimatedHeight = estimateCardHeight(poem, cardWidth)
       const settledY =
         lastSettledYRef.current[colIndex] + SETTLE_AREA_TOP
 
@@ -103,13 +128,13 @@ const WaterfallFlow: React.FC<WaterfallFlowProps> = ({
         y: -300 - random(0, 200),
         rotation,
         opacity: 0,
-        speed,
+        speed: speedPxPerSec,
         settled: false,
         settledY,
         scale: 1
       }
     },
-    [getColumnX, getShortestColumn]
+    [getColumnX, getShortestColumn, estimateCardHeight]
   )
 
   const loadMoreCards = useCallback(
@@ -146,10 +171,16 @@ const WaterfallFlow: React.FC<WaterfallFlowProps> = ({
 
   const resetCards = useCallback(() => {
     setIsFiltering(true)
+    if (animationFrameRef.current) {
+      cancelAnimationFrame(animationFrameRef.current)
+    }
+
     setCards([])
+    cardsRef.current = []
     loadedCountRef.current = 0
     lastSettledYRef.current = new Array(columnsRef.current).fill(0)
     isLoadingRef.current = false
+    lastFrameTimeRef.current = 0
 
     setTimeout(() => {
       const filtered = getFilteredPoems(selectedDynasty, searchQuery)
@@ -170,7 +201,10 @@ const WaterfallFlow: React.FC<WaterfallFlowProps> = ({
             )
           }
           setCards(initialCards)
+          cardsRef.current = initialCards
           loadedCountRef.current = initialCount
+          lastFrameTimeRef.current = performance.now()
+          animationFrameRef.current = requestAnimationFrame(updateAnimation)
         }
       }
 
@@ -178,47 +212,70 @@ const WaterfallFlow: React.FC<WaterfallFlowProps> = ({
     }, 300)
   }, [selectedDynasty, searchQuery, createCardState, initColumns])
 
-  useEffect(() => {
-    resetCards()
-  }, [selectedDynasty, searchQuery])
+  const updateAnimation = useCallback((nowTime: number) => {
+    const lastTime = lastFrameTimeRef.current || nowTime
+    const deltaMs = Math.min(nowTime - lastTime, 50)
+    const deltaSec = deltaMs / 1000
+    lastFrameTimeRef.current = nowTime
 
-  useEffect(() => {
-    const updateAnimation = () => {
-      setCards((prevCards) => {
-        return prevCards.map((card) => {
-          if (card.settled) return card
+    const prevCards = cardsRef.current
+    let hasUnsettled = false
+    const nextCards: CardState[] = new Array(prevCards.length)
 
-          const newY = card.y + card.speed
-          const newOpacity = Math.min(card.opacity + 0.02, 1)
+    for (let i = 0; i < prevCards.length; i++) {
+      const card = prevCards[i]
 
-          if (newY >= card.settledY) {
-            return {
-              ...card,
-              y: card.settledY,
-              opacity: 1,
-              settled: true
-            }
-          }
+      if (card.settled) {
+        nextCards[i] = card
+        continue
+      }
 
-          return {
-            ...card,
-            y: newY,
-            opacity: newOpacity
-          }
-        })
-      })
+      hasUnsettled = true
+      const deltaY = card.speed * deltaSec
+      let newY = card.y + deltaY
+      let newOpacity = Math.min(card.opacity + OPACITY_FADE_IN_SPEED * deltaSec, 1)
+      let settled = false
 
-      animationFrameRef.current = requestAnimationFrame(updateAnimation)
+      if (newY >= card.settledY) {
+        newY = card.settledY
+        newOpacity = 1
+        settled = true
+      }
+
+      if (
+        newY === card.y &&
+        newOpacity === card.opacity &&
+        settled === card.settled
+      ) {
+        nextCards[i] = card
+      } else {
+        nextCards[i] = {
+          ...card,
+          y: newY,
+          opacity: newOpacity,
+          settled
+        }
+      }
     }
 
-    animationFrameRef.current = requestAnimationFrame(updateAnimation)
+    if (hasUnsettled) {
+      setCards(nextCards)
+      cardsRef.current = nextCards
+      animationFrameRef.current = requestAnimationFrame(updateAnimation)
+    } else {
+      cardsRef.current = nextCards
+    }
+  }, [])
+
+  useEffect(() => {
+    resetCards()
 
     return () => {
       if (animationFrameRef.current) {
         cancelAnimationFrame(animationFrameRef.current)
       }
     }
-  }, [])
+  }, [resetCards])
 
   useEffect(() => {
     const handleScroll = debounce(() => {
@@ -231,6 +288,11 @@ const WaterfallFlow: React.FC<WaterfallFlowProps> = ({
 
       if (scrollTop + clientHeight >= scrollHeight - 200) {
         loadMoreCards(BATCH_SIZE)
+
+        if (lastFrameTimeRef.current === 0) {
+          lastFrameTimeRef.current = performance.now()
+          animationFrameRef.current = requestAnimationFrame(updateAnimation)
+        }
       }
     }, 100)
 
@@ -244,7 +306,7 @@ const WaterfallFlow: React.FC<WaterfallFlowProps> = ({
         container.removeEventListener('scroll', handleScroll)
       }
     }
-  }, [loadMoreCards])
+  }, [loadMoreCards, updateAnimation])
 
   useEffect(() => {
     const handleResize = debounce(() => {
@@ -274,7 +336,8 @@ const WaterfallFlow: React.FC<WaterfallFlowProps> = ({
     overflowY: 'auto',
     overflowX: 'hidden',
     borderRadius: 8,
-    transition: 'opacity 0.3s ease'
+    transition: 'opacity 0.3s ease',
+    boxSizing: 'border-box'
   }
 
   const emptyTipStyle: React.CSSProperties = {
@@ -307,7 +370,8 @@ const WaterfallFlow: React.FC<WaterfallFlowProps> = ({
         style={{
           position: 'relative',
           width: '100%',
-          minHeight: maxSettledY + 500
+          minHeight: maxSettledY + 500,
+          boxSizing: 'border-box'
         }}
       >
         {cards.map((card) => (

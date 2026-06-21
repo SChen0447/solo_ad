@@ -23,7 +23,12 @@ const MainUI: React.FC<MainUIProps> = ({ onMusicToggle }) => {
   const [isMusicPlaying, setIsMusicPlaying] = useState(false)
   const [expandedCardId, setExpandedCardId] = useState<number | null>(null)
   const audioRef = useRef<HTMLAudioElement | null>(null)
-  const fadeIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const fadeAnimRef = useRef<number>()
+  const isMusicPlayingRef = useRef(false)
+
+  useEffect(() => {
+    isMusicPlayingRef.current = isMusicPlaying
+  }, [isMusicPlaying])
 
   const debouncedSearch = useCallback(
     debounce((query: string) => {
@@ -48,108 +53,114 @@ const MainUI: React.FC<MainUIProps> = ({ onMusicToggle }) => {
     []
   )
 
-  const fadeInAudio = useCallback(() => {
+  const cancelFadeAnim = useCallback(() => {
+    if (fadeAnimRef.current) {
+      cancelAnimationFrame(fadeAnimRef.current)
+      fadeAnimRef.current = undefined
+    }
+  }, [])
+
+  const fadeVolume = useCallback(
+    (targetVolume: number, duration: number, onComplete?: () => void) => {
+      const audio = audioRef.current
+      if (!audio) {
+        if (onComplete) onComplete()
+        return
+      }
+
+      cancelFadeAnim()
+
+      const startVolume = audio.volume
+      const startTime = performance.now()
+
+      const animate = (nowTime: number) => {
+        const elapsed = nowTime - startTime
+        const t = Math.min(elapsed / duration, 1)
+        const easeT = 1 - Math.pow(1 - t, 2)
+        const currentVolume = startVolume + (targetVolume - startVolume) * easeT
+        audio.volume = Math.max(0, Math.min(currentVolume, 1))
+
+        if (t < 1) {
+          fadeAnimRef.current = requestAnimationFrame(animate)
+        } else {
+          audio.volume = targetVolume
+          fadeAnimRef.current = undefined
+          if (onComplete) onComplete()
+        }
+      }
+
+      fadeAnimRef.current = requestAnimationFrame(animate)
+    },
+    [cancelFadeAnim]
+  )
+
+  const startMusicWithFadeIn = useCallback(() => {
     const audio = audioRef.current
     if (!audio) return
 
-    if (fadeIntervalRef.current) {
-      clearInterval(fadeIntervalRef.current)
+    if (fadeAnimRef.current) {
+      cancelAnimationFrame(fadeAnimRef.current)
     }
 
     audio.volume = 0
+
     audio
       .play()
       .then(() => {
-        const targetVolume = 0.3
-        const fadeDuration = 2000
-        const steps = 20
-        const stepDuration = fadeDuration / steps
-        const stepVolume = targetVolume / steps
-        let currentStep = 0
-
-        fadeIntervalRef.current = setInterval(() => {
-          currentStep++
-          if (currentStep >= steps) {
-            audio.volume = targetVolume
-            if (fadeIntervalRef.current) {
-              clearInterval(fadeIntervalRef.current)
-              fadeIntervalRef.current = null
-            }
-          } else {
-            audio.volume = stepVolume * currentStep
-          }
-        }, stepDuration)
-      })
-      .catch(() => {})
-  }, [])
-
-  const fadeOutAudio = useCallback(() => {
-    const audio = audioRef.current
-    if (!audio) return
-
-    if (fadeIntervalRef.current) {
-      clearInterval(fadeIntervalRef.current)
-    }
-
-    const startVolume = audio.volume
-    const fadeDuration = 1000
-    const steps = 15
-    const stepDuration = fadeDuration / steps
-    const stepVolume = startVolume / steps
-    let currentStep = 0
-
-    fadeIntervalRef.current = setInterval(() => {
-      currentStep++
-      if (currentStep >= steps) {
-        audio.volume = 0
-        audio.pause()
-        if (fadeIntervalRef.current) {
-          clearInterval(fadeIntervalRef.current)
-          fadeIntervalRef.current = null
+        if (!isMusicPlayingRef.current) {
+          setIsMusicPlaying(true)
+          isMusicPlayingRef.current = true
         }
-      } else {
-        audio.volume = Math.max(0, startVolume - stepVolume * currentStep)
-      }
-    }, stepDuration)
-  }, [])
-
-  const toggleMusic = useCallback(() => {
-    const newIsPlaying = !isMusicPlaying
-    setIsMusicPlaying(newIsPlaying)
-
-    if (newIsPlaying) {
-      fadeInAudio()
-    } else {
-      fadeOutAudio()
-    }
-
-    if (onMusicToggle) {
-      onMusicToggle(newIsPlaying)
-    }
-  }, [isMusicPlaying, fadeInAudio, fadeOutAudio, onMusicToggle])
-
-  const handleCardClick = useCallback(
-    (poemId: number) => {
-      setExpandedCardId((prev) => (prev === poemId ? null : poemId))
-
-      if (!isMusicPlaying && expandedCardId === null) {
-        setIsMusicPlaying(true)
-        fadeInAudio()
+        fadeVolume(0.3, 2000)
         if (onMusicToggle) {
           onMusicToggle(true)
         }
+      })
+      .catch(() => {})
+  }, [fadeVolume, onMusicToggle])
+
+  const stopMusicWithFadeOut = useCallback(() => {
+    const audio = audioRef.current
+    if (!audio) return
+
+    fadeVolume(0, 1000, () => {
+      audio.pause()
+      setIsMusicPlaying(false)
+      isMusicPlayingRef.current = false
+      if (onMusicToggle) {
+        onMusicToggle(false)
       }
+    })
+  }, [fadeVolume, onMusicToggle])
+
+  const toggleMusic = useCallback(() => {
+    const nowPlaying = isMusicPlayingRef.current
+
+    if (nowPlaying) {
+      stopMusicWithFadeOut()
+    } else {
+      startMusicWithFadeIn()
+    }
+  }, [startMusicWithFadeIn, stopMusicWithFadeOut])
+
+  const handleCardClick = useCallback(
+    (poemId: number) => {
+      setExpandedCardId((prev) => {
+        const willExpand = prev !== poemId
+        if (willExpand && !isMusicPlayingRef.current) {
+          startMusicWithFadeIn()
+        }
+        return willExpand ? poemId : null
+      })
     },
-    [isMusicPlaying, expandedCardId, fadeInAudio, onMusicToggle]
+    [startMusicWithFadeIn]
   )
 
   useEffect(() => {
     return () => {
-      if (fadeIntervalRef.current) {
-        clearInterval(fadeIntervalRef.current)
-      }
+      cancelFadeAnim()
     }
-  }, [])
+  }, [cancelFadeAnim])
 
   const headerStyle: React.CSSProperties = {
     padding: '20px 30px',
@@ -217,7 +228,8 @@ const MainUI: React.FC<MainUIProps> = ({ onMusicToggle }) => {
     justifyContent: 'center',
     transition: 'transform 0.3s ease, background-color 0.3s ease',
     boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
-    flexShrink: 0
+    flexShrink: 0,
+    padding: 0
   }
 
   const playIconStyle: React.CSSProperties = {
@@ -225,19 +237,24 @@ const MainUI: React.FC<MainUIProps> = ({ onMusicToggle }) => {
     height: 0,
     borderStyle: 'solid',
     borderWidth: '6px 0 6px 10px',
-    borderColor: 'transparent transparent transparent white',
-    marginLeft: 3
+    borderColor: 'transparent transparent transparent #FFFFFF',
+    marginLeft: 3,
+    display: 'block'
   }
 
   const pauseIconStyle: React.CSSProperties = {
     display: 'flex',
-    gap: 3
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    width: 14,
+    height: 14
   }
 
   const pauseBarStyle: React.CSSProperties = {
-    width: 3,
+    width: 4,
     height: 12,
-    backgroundColor: 'white',
+    backgroundColor: '#FFFFFF',
     borderRadius: 1
   }
 
