@@ -1,0 +1,175 @@
+.pet-card {
+  width: 340px;
+  height: 220px;
+  border-radius: 16px;
+  background-color: #ffffff;
+  box-shadow: 0 8px 16px #e0e0e0;
+  border: 1px solid #e0e0e0;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.pet-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 24px #d0d0d0;
+}
+
+.pet-card.border-urgent {
+  animation: pulse-orange 1.5s ease-in-out infinite;
+}
+
+.pet-card.border-overdue {
+  animation: flash-red 1s ease-in-out infinite;
+}
+
+@keyframes pulse-orange {
+  0%, 100% {
+    box-shadow: 0 8px 16px #e0e0e0, 0 0 0 0 rgba(255, 179, 71, 0.4);
+    border-color: #ffb347;
+  }
+  50% {
+    box-shadow: 0 8px 16px #e0e0e0, 0 0 0 8px rgba(255, 179, 71, 0);
+    border-color: #ffb347;
+  }
+}
+
+@keyframes flash-red {
+  0%, 100% {
+    box-shadow: 0 8px 16px #e0e0e0, 0 0 0 0 rgba(231, 76, 60, 0.4);
+    border-color: #e74c3c;
+  }
+  50% {
+    box-shadow: 0 8px 16px #e0e0e0, 0 0 0 4px rgba(231, 76, 60, 0.2);
+    border-color: #e74c3c;
+  }
+}
+
+.pet-card-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.pet-avatar {
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #4db6ac 0%, #80cbc4 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 32px;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+.pet-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.pet-name {
+  font-size: 20px;
+  font-weight: 600;
+  color: #333333;
+  margin-bottom: 4px;
+}
+
+.pet-breed {
+  font-size: 14px;
+  color: #666666;
+  margin-bottom: 2px;
+}
+
+.pet-age {
+  font-size: 14px;
+  color: #4db6ac;
+  font-weight: 500;
+}
+
+.pet-card-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.vaccine-info,
+.vaccine-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.info-label {
+  color: #999999;
+  flex-shrink: 0;
+}
+
+.info-value {
+  color: #333333;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.status-badge {
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.status-normal {
+  background-color: #e8f5e9;
+  color: #2e7d32;
+}
+
+.status-urgent {
+  background-color: #fff3e0;
+  color: #e65100;
+}
+
+.status-overdue {
+  background-color: #ffebee;
+  color: #c62828;
+}
+
+.pet-card-footer {
+  padding-top: 12px;
+  border-top: 1px solid #f0f0f0;
+}
+
+.add-vaccine-btn {
+  width: 100%;
+  padding: 10px 16px;
+  background: linear-gradient(135deg, #4db6ac 0%, #26a69a 100%);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.add-vaccine-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(77, 182, 172, 0.4);
+}
+
+@media (max-width: 640px) {
+  .pet-card {
+    width: 100%;
+    height: auto;
+    min-height: 220px;
+  }
+}
