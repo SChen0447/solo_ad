@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>人体工学货架交互模拟</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #e8e8e8;
+      font-family: Arial, sans-serif;
+      color: #333;
+    }
+    #app {
+      width: 100%;
+      height: 100%;
+      position: relative;
+    }
+    #canvas-container {
+      width: 100%;
+      height: 100%;
+    }
+    .vignette {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      background: radial-gradient(ellipse at center, transparent 50%, rgba(0,0,0,0.15) 100%);
+      opacity: 0;
+      transition: opacity 0.3s ease;
+      z-index: 10;
+    }
+    .vignette.active {
+      opacity: 1;
+    }
+    .height-label {
+      position: absolute;
+      pointer-events: none;
+      background: rgba(255,255,255,0.9);
+      padding: 4px 10px;
+      border-radius: 4px;
+      font-size: 14px;
+      font-weight: bold;
+      color: #333;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+      z-index: 20;
+    }
+    .tooltip {
+      position: absolute;
+      pointer-events: none;
+      background: rgba(220, 50, 50, 0.9);
+      color: white;
+      padding: 6px 12px;
+      border-radius: 4px;
+      font-size: 14px;
+      font-weight: bold;
+      z-index: 25;
+      animation: floatUp 2s ease-out forwards;
+    }
+    @keyframes floatUp {
+      0% { opacity: 1; transform: translateY(0); }
+      100% { opacity: 0; transform: translateY(-50px); }
+    }
+    .control-panel {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      width: 280px;
+      background: rgba(255, 255, 255, 0.7);
+      backdrop-filter: blur(3px);
+      -webkit-backdrop-filter: blur(3px);
+      border-radius: 12px;
+      padding: 20px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.15);
+      z-index: 100;
+    }
+    .control-panel h3 {
+      margin-bottom: 16px;
+      font-size: 16px;
+      color: #333;
+      border-bottom: 1px solid rgba(0,0,0,0.1);
+      padding-bottom: 8px;
+    }
+    .control-group {
+      margin-bottom: 16px;
+    }
+    .control-group label {
+      display: block;
+      margin-bottom: 6px;
+      font-size: 13px;
+      color: #555;
+    }
+    .control-group .value-display {
+      float: right;
+      font-weight: bold;
+      color: #4A90D9;
+    }
+    .control-group input[type="range"] {
+      width: 100%;
+      height: 6px;
+      -webkit-appearance: none;
+      appearance: none;
+      background: #d0d0d0;
+      border-radius: 3px;
+      outline: none;
+    }
+    .control-group input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #4A90D9 0%, #357ABD 100%);
+      cursor: pointer;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+      transition: transform 0.2s;
+    }
+    .control-group input[type="range"]::-webkit-slider-thumb:hover {
+      transform: scale(1.1);
+    }
+    .control-group input[type="range"]::-moz-range-thumb {
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #4A90D9 0%, #357ABD 100%);
+      cursor: pointer;
+      border: none;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+    }
+    .control-panel button {
+      width: 100%;
+      padding: 10px;
+      background: linear-gradient(135deg, #4A90D9 0%, #357ABD 100%);
+      color: white;
+      border: none;
+      border-radius: 6px;
+      font-size: 14px;
+      font-weight: bold;
+      cursor: pointer;
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+    .control-panel button:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(74, 144, 217, 0.4);
+    }
+    .control-panel button:active {
+      transform: translateY(0);
+    }
+    .status-display {
+      margin-top: 12px;
+      padding: 10px;
+      background: rgba(0,0,0,0.05);
+      border-radius: 6px;
+      font-size: 12px;
+    }
+    .status-display .status-item {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 6px;
+    }
+    .status-display .status-item:last-child {
+      margin-bottom: 0;
+    }
+    .status-display .reachable {
+      color: #4CAF50;
+      font-weight: bold;
+    }
+    .status-display .unreachable {
+      color: #f44336;
+      font-weight: bold;
+    }
+    .glow-effect {
+      animation: glowPulse 0.5s ease-in-out 3;
+    }
+    @keyframes glowPulse {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(244, 67, 54, 0); }
+      50% { box-shadow: 0 0 20px 5px rgba(244, 67, 54, 0.8); }
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <div id="canvas-container"></div>
+    <div class="vignette" id="vignette"></div>
+    <div class="control-panel" id="control-panel">
+      <h3>角色参数设置</h3>
+      <div class="control-group">
+        <label>身高 <span class="value-display" id="height-value">170 cm</span></label>
+        <input type="range" id="height-slider" min="140" max="200" step="5" value="170" />
+      </div>
+      <div class="control-group">
+        <label>臂长 <span class="value-display" id="arm-length-value">75 cm</span></label>
+        <input type="range" id="arm-length-slider" min="60" max="90" step="2" value="75" />
+      </div>
+      <div class="control-group">
+        <label>肩宽 <span class="value-display" id="shoulder-width-value">45 cm</span></label>
+        <input type="range" id="shoulder-width-slider" min="35" max="55" step="2" value="45" />
+      </div>
+      <div class="control-group">
+        <label>
+          <input type="checkbox" id="show-helpers" checked />
+          显示辅助线
+        </label>
+      </div>
+      <button id="reset-items">重置物品位置</button>
+      <div class="status-display" id="status-display">
+        <div class="status-item">
+          <span>最大可达范围:</span>
+          <span id="reach-display">97.5 cm</span>
+        </div>
+        <div class="status-item">
+          <span>当前选中物品:</span>
+          <span id="selected-item">无</span>
+        </div>
+        <div class="status-item">
+          <span>可达性:</span>
+          <span id="reachability" class="reachable">-</span>
+        </div>
+      </div>
+    </div>
+  </div>
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
