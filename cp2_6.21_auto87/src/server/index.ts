@@ -2,7 +2,10 @@ import express from 'express';
 import cors from 'cors';
 import { getTasks, createTask, claimTask, completeTask } from './services/taskService';
 import { getTools, reserveTool } from './services/toolService';
-import { getRankings, getMemberById, addHarvest, getHarvests, getWeeklyHarvests } from './services/memberService';
+import { getRankings, getMemberById, getMemberIds, getMemberNames } from './services/memberService';
+import { getHarvests, addHarvest, getWeeklyHarvests, initHarvests } from './services/harvestService';
+
+initHarvests(getMemberIds(), getMemberNames());
 
 const app = express();
 const PORT = 3001;

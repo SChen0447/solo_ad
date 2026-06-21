@@ -199,19 +199,35 @@ input, select {
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
 }
 
-.task-card.urgent,
-.task-card.very-urgent {
+.task-card.urgent {
+  border: 2px solid #EF4444;
   animation: urgentBlink 2s ease-in-out infinite;
+}
+
+.task-card.very-urgent {
+  border: 2px solid #DC2626;
+  animation: veryUrgentBlink 2s ease-in-out infinite;
 }
 
 @keyframes urgentBlink {
   0%, 100% {
-    border-color: var(--danger);
-    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4);
+    border-color: #EF4444;
+    box-shadow: 0 0 8px 2px rgba(239, 68, 68, 0.4);
   }
   50% {
     border-color: transparent;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    box-shadow: var(--card-shadow);
+  }
+}
+
+@keyframes veryUrgentBlink {
+  0%, 100% {
+    border-color: #DC2626;
+    box-shadow: 0 0 12px 4px rgba(220, 38, 38, 0.5);
+  }
+  50% {
+    border-color: transparent;
+    box-shadow: var(--card-shadow);
   }
 }
 
@@ -433,18 +449,32 @@ input:focus, select:focus, textarea:focus {
 
 .slot-locked,
 .slot-disabled {
-  background: rgba(156, 163, 175, 0.2);
+  background: transparent;
   color: var(--text-muted);
   cursor: not-allowed;
   position: relative;
+  overflow: hidden;
 }
 
-.slot-locked::after {
-  content: '🔒';
+.slot-overlay {
   position: absolute;
-  top: 2px;
-  right: 4px;
-  font-size: 10px;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(128, 128, 128, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 5px;
+  z-index: 1;
+}
+
+.slot-overlay svg {
+  width: 14px;
+  height: 14px;
+  fill: #FFFFFF;
+  opacity: 0.9;
 }
 
 .reservation-section {
