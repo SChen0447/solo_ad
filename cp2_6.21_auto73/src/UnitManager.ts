@@ -1,11 +1,33 @@
 import { Unit, Point, COLORS } from './types';
 
+/**
+ * UnitManager - 敌方单位管理模块
+ * 
+ * 职责：
+ *  - 管理敌方单位的生成、生命周期和移除
+ *  - 控制单位沿PathManager提供的路径点序列移动
+ *  - 维护单位生命值、受击闪烁状态、死亡状态
+ *  - 渲染单位本体、生命值条
+ *  - 触发单位到达终点和单位死亡的回调
+ * 
+ * 数据流向：
+ *  - 输入：路径点队列 <- PathManager.getPathWorldPoints()
+ *        : 伤害指令 <- GameEngine（来自TowerManager命中结果）
+ *  - 输出：单位位置列表 -> TowerManager（炮塔锁定目标）
+ *        : 到达终点事件 -> GameEngine（扣除生命值）
+ *        : 单位死亡事件 -> GameEngine（加分、粒子效果）
+ *        : 渲染数据 -> GameEngine.render()
+ * 
+ * 调用者：GameEngine（update/render/spawnWave/damageUnit）
+ * 被调用：setPath <- GameEngine.init(); spawnUnit <- setTimeout队列
+ */
 export class UnitManager {
   private units: Unit[] = [];
   private pathPoints: Point[] = [];
   private nextUnitId: number = 0;
   private onUnitReachedEnd: ((unit: Unit) => void) | null = null;
   private onUnitKilled: ((unit: Unit) => void) | null = null;
+  private onUnitSpawned: (() => void) | null = null;
 
   public setPath(pathPoints: Point[]): void {
     this.pathPoints = pathPoints;
@@ -17,6 +39,10 @@ export class UnitManager {
 
   public setOnUnitKilled(callback: (unit: Unit) => void): void {
     this.onUnitKilled = callback;
+  }
+
+  public setOnUnitSpawned(callback: () => void): void {
+    this.onUnitSpawned = callback;
   }
 
   public spawnUnit(startPos: Point): Unit {
@@ -34,7 +60,14 @@ export class UnitManager {
       colorTween: 0
     };
     this.units.push(unit);
+    if (this.onUnitSpawned) {
+      this.onUnitSpawned();
+    }
     return unit;
+  }
+
+  public spawnUnitWithCallback(startPos: Point): Unit {
+    return this.spawnUnit(startPos);
   }
 
   public spawnWave(count: number, startPos: Point, spawnInterval: number = 0.8): void {

@@ -1,5 +1,24 @@
 import { PathNode, Point, CellType, GRID_COLS, GRID_ROWS, CELL_SIZE, COLORS } from './types';
 
+/**
+ * PathManager - 路径管理模块
+ * 
+ * 职责：
+ *  - 程序化生成10x15网格地图，随机放置5-8个障碍物
+ *  - 使用A*寻路算法计算起点(左上)到终点(右下)的最短路径
+ *  - 管理地形格子类型（empty/obstacle/path/start/end/tower）
+ *  - 提供坐标转换（网格坐标 <-> 世界坐标）
+ *  - 绘制路径网格、障碍物、起点终点及路径连线
+ * 
+ * 数据流向：
+ *  - 输入：无（自包含生成逻辑）
+ *  - 输出：路径点队列 -> UnitManager（单位沿路径移动）
+ *        : 格子占用信息 -> GameEngine（炮塔放置合法性校验）
+ *        : 渲染数据 -> GameEngine.render()
+ * 
+ * 调用者：GameEngine
+ * 被调用：getNeighbors -> A*算法；getPathWorldPoints -> UnitManager
+ */
 export class PathManager {
   private grid: CellType[][] = [];
   private path: Point[] = [];
@@ -25,10 +44,51 @@ export class PathManager {
   }
 
   public generateMap(): Point[] {
+    let attempts = 0;
+    const maxAttempts = 10;
+
+    while (attempts < maxAttempts) {
+      this.initializeGrid();
+      this.placeObstacles();
+      this.path = this.aStar(this.startPos, this.endPos);
+      
+      if (this.path.length > 0) {
+        this.markPathOnGrid();
+        return this.path;
+      }
+      attempts++;
+    }
+
     this.initializeGrid();
-    this.placeObstacles();
-    this.calculatePath();
+    this.path = this.generateFallbackPath();
+    this.markPathOnGrid();
     return this.path;
+  }
+
+  private markPathOnGrid(): void {
+    for (const point of this.path) {
+      if (this.grid[point.y][point.x] === 'empty') {
+        this.grid[point.y][point.x] = 'path';
+      }
+    }
+  }
+
+  private generateFallbackPath(): Point[] {
+    const path: Point[] = [];
+    let x = this.startPos.x;
+    let y = this.startPos.y;
+
+    while (x < this.endPos.x) {
+      path.push({ x, y });
+      x++;
+    }
+    while (y < this.endPos.y) {
+      path.push({ x, y });
+      y++;
+    }
+    path.push({ x: this.endPos.x, y: this.endPos.y });
+
+    return path;
   }
 
   private placeObstacles(): void {
@@ -59,16 +119,6 @@ export class PathManager {
   private hasPath(): boolean {
     const path = this.aStar(this.startPos, this.endPos);
     return path.length > 0;
-  }
-
-  public calculatePath(): Point[] {
-    this.path = this.aStar(this.startPos, this.endPos);
-    for (const point of this.path) {
-      if (this.grid[point.y][point.x] === 'empty') {
-        this.grid[point.y][point.x] = 'path';
-      }
-    }
-    return this.path;
   }
 
   private aStar(start: Point, end: Point): Point[] {
@@ -144,7 +194,8 @@ export class PathManager {
       const ny = node.y + dir.y;
 
       if (nx >= 0 && nx < GRID_COLS && ny >= 0 && ny < GRID_ROWS) {
-        if (this.grid[ny][nx] !== 'obstacle') {
+        const cellType = this.grid[ny][nx];
+        if (cellType !== 'obstacle' && cellType !== 'tower') {
           neighbors.push({ x: nx, y: ny });
         }
       }

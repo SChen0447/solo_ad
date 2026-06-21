@@ -1,5 +1,20 @@
 import { Particle, COLORS } from './types';
 
+/**
+ * ParticleSystem - 粒子效果系统
+ * 
+ * 职责：
+ *  - 生成单位死亡时的爆炸碎片粒子（5-8个随机四散，淡出0.5秒）
+ *  - 生成子弹命中时的火花粒子
+ *  - 管理粒子的重力、速度衰减、生命周期
+ *  - 渲染带透明度渐变的粒子
+ * 
+ * 数据流向：
+ *  - 输入：粒子创建指令 <- GameEngine（来自onUnitKilled/命中检测）
+ *  - 输出：渲染数据 -> GameEngine.render()
+ * 
+ * 调用者：GameEngine（update/render/createExplosion/createHitEffect）
+ */
 export class ParticleSystem {
   private particles: Particle[] = [];
   private nextParticleId: number = 0;

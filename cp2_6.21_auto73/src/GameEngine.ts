@@ -4,6 +4,47 @@ import { TowerManager } from './TowerManager';
 import { ParticleSystem } from './ParticleSystem';
 import { GameState, Unit, Tower, COLORS, CANVAS_WIDTH, CANVAS_HEIGHT } from './types';
 
+/**
+ * GameEngine - 游戏主引擎模块（核心协调者）
+ * 
+ * 职责：
+ *  - 初始化并持有PathManager/UnitManager/TowerManager/ParticleSystem四大子模块
+ *  - 驱动requestAnimationFrame主循环，统一调度update()和render()
+ *  - 管理全局游戏状态：波次、得分、生命值、游戏结束判定
+ *  - 协调子模块间的数据流转（单位位置、命中结果、格子占用等）
+ *  - 处理用户输入：画布点击（放炮塔/选炮塔）、下一波按钮、升级/出售
+ * 
+ * 模块调用关系（数据流图）：
+ * 
+ *   ┌─────────────────────────────────────────────────────────┐
+ *   │                       GameEngine                         │
+ *   │  ┌──────────────┐  ┌──────────────┐  ┌───────────────┐  │
+ *   │  │ PathManager  │  │ UnitManager  │  │ TowerManager  │  │
+ *   │  │  (地图/路径) │  │ (敌方单位)   │  │ (炮塔/子弹)   │  │
+ *   │  └──────┬───────┘  └──────┬───────┘  └───────┬───────┘  │
+ *   │         │  路径点          │  单位列表          │  命中结果 │
+ *   │         │────────────────>│──────────────────>│          │
+ *   │         │                 │  (位置信息)        │          │
+ *   │         │                 │                    │          │
+ *   │         │  格子占用更新    │  单位死亡/到达    │          │
+ *   │         │<────────────────│<──────────────────│          │
+ *   │         │                 │                    │          │
+ *   │         │                 │ 造成伤害 (伤害应用)│          │
+ *   │         │                 │<──────────────────│          │
+ *   │  ┌──────────────────────────────────────────────────┐   │
+ *   │  │         ParticleSystem (爆炸/命中粒子)            │   │
+ *   │  └──────────────────────────────────────────────────┘   │
+ *   └─────────────────────────────────────────────────────────┘
+ * 
+ * 关键状态转移：
+ *  - startNextWave() → waveInProgress=true → 单位按0.8秒间隔生成
+ *  - 所有单位 (已生成 - 死亡 - 到达终点) = 0 且 waveSpawnedCount >= waveTotalCount
+ *    → waveInProgress=false, wave++
+ *  - lives <= 0 → isGameOver=true → 显示GameOver遮罩
+ * 
+ * 调用者：main.ts（UI入口）
+ * 被调用：所有子管理器的update/render/各业务方法
+ */
 export class GameEngine {
   private ctx: CanvasRenderingContext2D;
   private pathManager: PathManager;
@@ -20,6 +61,10 @@ export class GameEngine {
     enemiesRemaining: 0,
     waveInProgress: false
   };
+
+  private waveTotalCount: number = 0;
+  private waveSpawnedCount: number = 0;
+  private spawnTimeouts: number[] = [];
 
   private lastTime: number = 0;
   private animationFrameId: number | null = null;
@@ -49,6 +94,10 @@ export class GameEngine {
 
     this.unitManager.setOnUnitKilled((unit: Unit) => {
       this.onUnitKilled(unit);
+    });
+
+    this.unitManager.setOnUnitSpawned(() => {
+      this.waveSpawnedCount++;
     });
 
     this.towerManager.setOnTowerRemoved((tower: Tower) => {
@@ -169,9 +218,12 @@ export class GameEngine {
   }
 
   private checkWaveComplete(): void {
-    if (this.gameState.waveInProgress && this.gameState.enemiesRemaining <= 0) {
+    const allSpawned = this.waveSpawnedCount >= this.waveTotalCount;
+    if (this.gameState.waveInProgress && allSpawned && this.gameState.enemiesRemaining <= 0) {
       this.gameState.waveInProgress = false;
       this.gameState.wave++;
+      this.waveSpawnedCount = 0;
+      this.waveTotalCount = 0;
       this.notifyStateChange();
     }
   }
@@ -189,12 +241,32 @@ export class GameEngine {
     if (this.gameState.isGameOver) return;
     if (this.gameState.waveInProgress) return;
 
+    this.clearSpawnTimeouts();
+
     this.gameState.waveInProgress = true;
     const unitCount = 5;
+    this.waveTotalCount = unitCount;
+    this.waveSpawnedCount = 0;
     const startPos = this.pathManager.getStartWorldPos();
-    this.unitManager.spawnWave(unitCount, startPos, 0.8);
+    const spawnInterval = 0.8;
+
+    for (let i = 0; i < unitCount; i++) {
+      const timeoutId = window.setTimeout(() => {
+        if (!this.gameState.isRunning || this.gameState.isGameOver) return;
+        this.unitManager.spawnUnit(startPos);
+      }, i * spawnInterval * 1000);
+      this.spawnTimeouts.push(timeoutId);
+    }
+
     this.gameState.enemiesRemaining = unitCount;
     this.notifyStateChange();
+  }
+
+  private clearSpawnTimeouts(): void {
+    for (const id of this.spawnTimeouts) {
+      clearTimeout(id);
+    }
+    this.spawnTimeouts = [];
   }
 
   public handleCanvasClick(worldX: number, worldY: number): void {
@@ -205,7 +277,7 @@ export class GameEngine {
 
     const existingTower = this.towerManager.getTowerAt(gridPos.x, gridPos.y);
 
-    if (existingTower) {
+    if (existingTower && !existingTower.isRemoving) {
       this.towerManager.selectTower(existingTower);
       if (this.onTowerSelected) {
         this.onTowerSelected(existingTower);
@@ -221,6 +293,11 @@ export class GameEngine {
         this.towerManager.selectTower(tower);
         if (this.onTowerSelected) {
           this.onTowerSelected(tower);
+        }
+      } else {
+        this.towerManager.selectTower(null);
+        if (this.onTowerSelected) {
+          this.onTowerSelected(null);
         }
       }
     } else {
@@ -266,6 +343,7 @@ export class GameEngine {
 
   public reset(): void {
     this.stop();
+    this.clearSpawnTimeouts();
 
     this.gameState = {
       isRunning: false,
@@ -276,6 +354,9 @@ export class GameEngine {
       enemiesRemaining: 0,
       waveInProgress: false
     };
+
+    this.waveTotalCount = 0;
+    this.waveSpawnedCount = 0;
 
     this.unitManager.clear();
     this.towerManager.clear();

@@ -1,6 +1,36 @@
 import { Tower, Bullet, Unit, COLORS, CELL_SIZE } from './types';
 
+/**
+ * TowerManager - 炮塔管理模块
+ * 
+ * 职责：
+ *  - 管理炮塔的放置、升级、出售（含淡出动画）
+ *  - 每帧检查炮塔射程内的敌方单位，锁定最近目标
+ *  - 按冷却时间发射子弹，追踪并命中目标
+ *  - 维护选中炮塔状态和射程范围显示
+ *  - 渲染炮塔（含升级金色外框）、射程圈、子弹
+ * 
+ * 关键参数：
+ *  - 炮塔基础射程：3格（升级后4格）
+ *  - 基础伤害：20点（升级后35点）
+ *  - 射速：每1.2秒一发
+ *  - 子弹速度：300px/秒
+ *  - 碰撞检测：子弹半径3px + 单位半径12px = 15px命中阈值
+ * 
+ * 数据流向：
+ *  - 输入：单位位置列表 <- GameEngine（来自UnitManager）
+ *        : 放置/选中/升级/出售指令 <- GameEngine（来自UI事件）
+ *  - 输出：命中结果列表 -> GameEngine（转发给UnitManager造成伤害）
+ *        : 炮塔移除事件 -> GameEngine（释放格子占用）
+ *        : 选中炮塔信息 -> GameEngine（驱动UI面板显示）
+ *        : 渲染数据 -> GameEngine.render()
+ * 
+ * 调用者：GameEngine（update/render/placeTower/upgrade等）
+ * 被调用：findTarget <- updateTower(); fireBullet <- updateTower()
+ */
 export class TowerManager {
+  private static readonly BULLET_RADIUS = 3;
+  private static readonly UNIT_RADIUS = 12;
   private towers: Tower[] = [];
   private bullets: Bullet[] = [];
   private nextTowerId: number = 0;
@@ -171,8 +201,9 @@ export class TowerManager {
       const dx = target.x - bullet.x;
       const dy = target.y - bullet.y;
       const distance = Math.sqrt(dx * dx + dy * dy);
+      const hitThreshold = TowerManager.BULLET_RADIUS + TowerManager.UNIT_RADIUS;
 
-      if (distance < 8) {
+      if (distance < hitThreshold) {
         hits.push({ hitUnitIds: [target.id], damage: bullet.damage });
         bulletsToRemove.push(bullet.id);
         continue;
@@ -250,7 +281,7 @@ export class TowerManager {
   private renderBullet(ctx: CanvasRenderingContext2D, bullet: Bullet): void {
     ctx.fillStyle = COLORS.bullet;
     ctx.beginPath();
-    ctx.arc(bullet.x, bullet.y, 3, 0, Math.PI * 2);
+    ctx.arc(bullet.x, bullet.y, TowerManager.BULLET_RADIUS, 0, Math.PI * 2);
     ctx.fill();
 
     ctx.shadowColor = COLORS.bullet;

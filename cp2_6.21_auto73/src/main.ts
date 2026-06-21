@@ -2,6 +2,44 @@ import { GameEngine } from './GameEngine';
 import { GameState, Tower } from './types';
 import './style.css';
 
+/**
+ * main.ts - 应用入口文件（UI层）
+ * 
+ * 职责：
+ *  - 初始化DOM元素引用（画布、信息面板、按钮、遮罩层）
+ *  - 创建GameEngine实例，启动游戏主循环
+ *  - 绑定Canvas点击事件，将像素坐标转换后传递给GameEngine
+ *  - 绑定UI按钮事件（下一波、升级、出售、重新开始）
+ *  - 订阅GameEngine的状态变更回调，实时更新DOM显示
+ *  - 处理响应式布局和DOM级别的动画（游戏结束遮罩等）
+ * 
+ * 模块调用关系（架构总览）：
+ * 
+ *   ┌─────────────────────────────────────────────────────────────┐
+ *   │                        main.ts (UI层)                        │
+ *   │  DOM事件 → handleCanvasClick/按钮事件 → 调用引擎方法          │
+ *   │  ← onStateChange回调 → 更新波次/得分/生命等DOM显示           │
+ *   │  ← onTowerSelected → 显示/隐藏升级出售面板                   │
+ *   │  ← onGameOver → 显示GameOver遮罩层                           │
+ *   └────────────────────────────┬────────────────────────────────┘
+ *                                │
+ *   ┌────────────────────────────▼────────────────────────────────┐
+ *   │                     GameEngine (协调层)                       │
+ *   │  update()循环:  [PathManager] → [UnitManager] → [TowerManager]│
+ *   │  render()循环:  [四个子模块render → Canvas 2D API]            │
+ *   │  状态管理: wave/score/lives/waveInProgress                    │
+ *   │  输入处理: 放置/选中炮塔、下一波、升级/出售、重置             │
+ *   └──────┬──────────────┬───────────────┬───────────────┬────────┘
+ *          │              │               │               │
+ *   ┌──────▼────┐  ┌──────▼─────┐  ┌──────▼─────┐  ┌─────▼──────┐
+ *   │PathManager│  │UnitManager │  │TowerManager│  │ParticleSys │
+ *   │ A*路径    │  │ 单位移动   │  │ 炮塔攻击   │  │ 爆炸粒子  │
+ *   │ 地图生成  │  │ 生命值    │  │ 升级出售   │  │ 命中特效  │
+ *   └───────────┘  └────────────┘  └────────────┘  └────────────┘
+ * 
+ * 调用者：HTML入口 <script type="module">标签
+ * 被调用：GameEngine的所有对外API
+ */
 class GameUI {
   private engine: GameEngine;
   private canvas: HTMLCanvasElement;

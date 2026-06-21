@@ -1,3 +1,16 @@
+/**
+ * types.ts - 全局类型定义与常量模块
+ * 
+ * 职责：
+ *  - 定义所有模块共用的数据接口（Point/Unit/Tower/Bullet/Particle/GameState等）
+ *  - 定义格子类型枚举（CellType）和路径算法节点（PathNode）
+ *  - 导出全局常量：网格尺寸(GRID_COLS/GRID_ROWS/CELL_SIZE)
+ *  - 导出颜色常量(COLORS)，确保各模块配色一致
+ * 
+ * 本文件不包含任何逻辑实现，仅作为各模块间的"契约"存在
+ * 所有模块均从此文件导入需要的类型和常量，避免循环依赖
+ */
+
 export interface Point {
   x: number;
   y: number;
