@@ -1,0 +1,60 @@
+[
+  {
+    "id": "db5ad77c-3bfd-4f61-8377-d7786a6e2a9c",
+    "code": "BDE8CQ",
+    "name": "??????",
+    "meetingPoint": "????",
+    "estimatedDuration": 180,
+    "difficulty": "medium",
+    "maxMembers": 12,
+    "members": [],
+    "checkpoints": [
+      {
+        "id": 0,
+        "distance": 0,
+        "elevation": 100,
+        "estimatedTime": "起点"
+      },
+      {
+        "id": 1,
+        "distance": 500,
+        "elevation": 180,
+        "estimatedTime": "09:30"
+      },
+      {
+        "id": 2,
+        "distance": 1000,
+        "elevation": 260,
+        "estimatedTime": "10:15"
+      },
+      {
+        "id": 3,
+        "distance": 1500,
+        "elevation": 350,
+        "estimatedTime": "11:00"
+      },
+      {
+        "id": 4,
+        "distance": 2000,
+        "elevation": 420,
+        "estimatedTime": "11:45"
+      },
+      {
+        "id": 5,
+        "distance": 2500,
+        "elevation": 380,
+        "estimatedTime": "12:30"
+      },
+      {
+        "id": 6,
+        "distance": 3000,
+        "elevation": 290,
+        "estimatedTime": "13:15"
+      }
+    ],
+    "status": "upcoming",
+    "startTime": null,
+    "endTime": null,
+    "createdAt": "2026-06-21T09:38:34.084Z"
+  }
+]
