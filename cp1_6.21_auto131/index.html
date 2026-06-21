@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>地下管道网络监控系统</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: radial-gradient(ellipse at center, #1a2a1a 0%, #1a1a1a 100%);
+      font-family: 'Courier New', Courier, monospace;
+    }
+    #canvas-container {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+    }
+    #summary-panel {
+      position: fixed;
+      top: 20px;
+      left: 20px;
+      padding: 15px 20px;
+      background: rgba(0, 0, 0, 0.7);
+      border: 2px solid #88ff88;
+      border-radius: 6px;
+      color: #88ff88;
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 13px;
+      line-height: 1.8;
+      min-width: 220px;
+      z-index: 100;
+      pointer-events: none;
+    }
+    #summary-panel h3 {
+      margin-bottom: 10px;
+      font-size: 14px;
+      border-bottom: 1px solid rgba(136, 255, 136, 0.3);
+      padding-bottom: 8px;
+    }
+    #summary-panel .stat-row {
+      display: flex;
+      justify-content: space-between;
+    }
+    #summary-panel .stat-value {
+      color: #ccffcc;
+    }
+    #summary-panel .stat-value.warning {
+      color: #ff6666;
+      font-weight: bold;
+    }
+    #data-panel {
+      position: fixed;
+      bottom: 30px;
+      right: 30px;
+      padding: 20px 25px;
+      background: rgba(20, 20, 30, 0.85);
+      border-radius: 8px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5), 0 0 20px rgba(100, 200, 255, 0.1);
+      color: #ffffff;
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 13px;
+      line-height: 2;
+      min-width: 260px;
+      z-index: 100;
+      transform: translateX(400px);
+      opacity: 0;
+      transition: transform 0.3s ease-out, opacity 0.3s ease-out;
+      pointer-events: none;
+      backdrop-filter: blur(8px);
+    }
+    #data-panel.visible {
+      transform: translateX(0);
+      opacity: 1;
+    }
+    #data-panel h3 {
+      margin-bottom: 12px;
+      font-size: 15px;
+      color: #66ccff;
+      border-bottom: 1px solid rgba(102, 204, 255, 0.3);
+      padding-bottom: 10px;
+    }
+    #data-panel .data-row {
+      display: flex;
+      justify-content: space-between;
+    }
+    #data-panel .data-label {
+      color: #aaaaaa;
+    }
+    #data-panel .data-value {
+      color: #ffffff;
+      font-weight: bold;
+    }
+    #data-panel .data-value.high {
+      color: #ff6666;
+      text-shadow: 0 0 8px rgba(255, 102, 102, 0.5);
+    }
+    #data-panel .status-indicator {
+      display: inline-block;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      margin-right: 8px;
+      vertical-align: middle;
+    }
+    #data-panel .status-indicator.normal {
+      background: #66ff66;
+      box-shadow: 0 0 6px #66ff66;
+    }
+    #data-panel .status-indicator.warning {
+      background: #ffaa33;
+      box-shadow: 0 0 6px #ffaa33;
+      animation: pulse 1s infinite;
+    }
+    #data-panel .status-indicator.danger {
+      background: #ff3333;
+      box-shadow: 0 0 6px #ff3333;
+      animation: pulse 0.5s infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+    #compass {
+      position: fixed;
+      bottom: 30px;
+      left: 30px;
+      width: 60px;
+      height: 60px;
+      z-index: 100;
+      pointer-events: none;
+    }
+  </style>
+</head>
+<body>
+  <div id="canvas-container"></div>
+
+  <div id="summary-panel">
+    <h3>◆ 系统监控摘要</h3>
+    <div class="stat-row">
+      <span>管道总数:</span>
+      <span class="stat-value" id="stat-total">0</span>
+    </div>
+    <div class="stat-row">
+      <span>高压管道:</span>
+      <span class="stat-value" id="stat-highpressure">0</span>
+    </div>
+    <div class="stat-row">
+      <span>平均流速:</span>
+      <span class="stat-value" id="stat-avgflow">0.00 m/s</span>
+    </div>
+    <div class="stat-row">
+      <span>最高温度:</span>
+      <span class="stat-value" id="stat-maxtemp">0.0 °C</span>
+    </div>
+  </div>
+
+  <div id="data-panel">
+    <h3><span class="status-indicator" id="status-dot"></span>管道详情</h3>
+    <div class="data-row">
+      <span class="data-label">管道ID:</span>
+      <span class="data-value" id="data-id">-</span>
+    </div>
+    <div class="data-row">
+      <span class="data-label">压力值:</span>
+      <span class="data-value" id="data-pressure">-</span>
+    </div>
+    <div class="data-row">
+      <span class="data-label">流速:</span>
+      <span class="data-value" id="data-flow">-</span>
+    </div>
+    <div class="data-row">
+      <span class="data-label">温度:</span>
+      <span class="data-value" id="data-temp">-</span>
+    </div>
+    <div class="data-row">
+      <span class="data-label">管径:</span>
+      <span class="data-value" id="data-diameter">-</span>
+    </div>
+  </div>
+
+  <svg id="compass" viewBox="0 0 60 60">
+    <circle cx="30" cy="30" r="28" fill="rgba(0,0,0,0.6)" stroke="rgba(102,204,255,0.6)" stroke-width="1"/>
+    <polygon id="compass-arrow" points="30,8 36,26 30,22 24,26" fill="#66ccff" stroke="#aaeeff" stroke-width="0.5"/>
+    <text x="30" y="50" text-anchor="middle" fill="#88ff88" font-family="Courier New" font-size="10" font-weight="bold">N</text>
+  </svg>
+
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
