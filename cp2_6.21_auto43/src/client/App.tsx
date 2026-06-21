@@ -12,6 +12,8 @@ interface AppContextType {
   selectedIngredientId: string | null;
   setSelectedIngredientId: (id: string | null) => void;
   showIngredientDetail: (id: string) => void;
+  currentPage: PageType;
+  navigateTo: (page: PageType) => void;
 }
 
 const AppContext = createContext<AppContextType>(null!);
@@ -29,12 +31,19 @@ export default function App() {
     setSelectedIngredientId(id);
   }, []);
 
+  const navigateTo = useCallback((p: PageType) => {
+    setPage(p);
+    setMobileMenuOpen(false);
+  }, []);
+
   const ctxValue: AppContextType = {
     refreshFlag,
     triggerRefresh,
     selectedIngredientId,
     setSelectedIngredientId,
     showIngredientDetail,
+    currentPage: page,
+    navigateTo,
   };
 
   useEffect(() => {

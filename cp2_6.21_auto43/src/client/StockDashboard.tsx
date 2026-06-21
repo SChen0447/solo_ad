@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo, useRef } from 'react';
+import { useEffect, useState, useMemo, useRef, useCallback } from 'react';
 import { api } from './api';
 import { useApp } from './App';
 import { Ingredient, IngredientCategory, CATEGORY_COLORS, CATEGORY_LABELS } from '../shared/types';
@@ -14,7 +14,7 @@ interface WarningItem {
 }
 
 export default function StockDashboard() {
-  const { refreshFlag, triggerRefresh, showIngredientDetail } = useApp();
+  const { refreshFlag, triggerRefresh, showIngredientDetail, navigateTo } = useApp();
   const [items, setItems] = useState<Ingredient[]>([]);
   const [warnings, setWarnings] = useState<WarningItem[]>([]);
   const [search, setSearch] = useState('');
@@ -23,11 +23,7 @@ export default function StockDashboard() {
   const [loading, setLoading] = useState(true);
   const warningRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    loadData();
-  }, [refreshFlag]);
-
-  async function loadData() {
+  const loadData = useCallback(async () => {
     setLoading(true);
     try {
       const [inv, warn] = await Promise.all([api.getInventory(), api.getWarnings()]);
@@ -36,22 +32,52 @@ export default function StockDashboard() {
     } finally {
       setLoading(false);
     }
-  }
+  }, []);
+
+  useEffect(() => {
+    loadData();
+  }, [refreshFlag, loadData]);
 
   useEffect(() => {
     const el = warningRef.current;
     if (!el || warnings.length === 0) return;
     let anim: number;
-    let pos = el.scrollWidth;
-    const loop = () => {
-      pos -= 0.5;
-      if (pos < -el.scrollWidth / 2) pos = 0;
-      el.style.transform = `translateX(${pos}px)`;
-      anim = requestAnimationFrame(loop);
-    };
-    anim = requestAnimationFrame(loop);
+    let startTime: number | null = null;
+    const duration = 2000 * warnings.length;
+    const targetEl = el;
+
+    function animate(timestamp: number) {
+      if (!startTime) startTime = timestamp;
+      const elapsed = timestamp - startTime;
+      const progress = (elapsed % duration) / duration;
+      const totalWidth = targetEl.scrollWidth / 2;
+      const pos = totalWidth - progress * totalWidth * 2;
+      targetEl.style.transform = `translateX(${pos}px)`;
+      anim = requestAnimationFrame(animate);
+    }
+    anim = requestAnimationFrame(animate);
     return () => cancelAnimationFrame(anim);
   }, [warnings.length]);
+
+  useEffect(() => {
+    const lastCheck = localStorage.getItem('lastInventoryCheckDate');
+    const today = new Date().toDateString();
+    if (lastCheck !== today) {
+      console.log('🔍 执行每日库存自动检查...');
+      loadData();
+      localStorage.setItem('lastInventoryCheckDate', today);
+    }
+    const checkInterval = setInterval(() => {
+      const now = new Date().toDateString();
+      const last = localStorage.getItem('lastInventoryCheckDate');
+      if (last !== now) {
+        console.log('🔍 每日自动库存检查触发');
+        loadData();
+        localStorage.setItem('lastInventoryCheckDate', now);
+      }
+    }, 60 * 1000);
+    return () => clearInterval(checkInterval);
+  }, [loadData]);
 
   const filtered = useMemo(() => {
     return items.filter((it) => {
@@ -100,13 +126,7 @@ export default function StockDashboard() {
               </span>
             </div>
             <button
-              onClick={() => {
-                const encoded = btoa(JSON.stringify(warnings));
-                window.location.hash = `#purchase?data=${encoded}`;
-                window.dispatchEvent(new HashChangeEvent('hashchange'));
-                const event = new CustomEvent('navigate-orders');
-                window.dispatchEvent(event);
-              }}
+              onClick={() => navigateTo('orders')}
               style={{
                 backgroundColor: '#DC2626',
                 color: 'white',
