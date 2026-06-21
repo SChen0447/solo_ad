@@ -13,12 +13,63 @@ function formatTimestamp(timestamp: number): string {
   return `${hours}:${minutes}:${seconds}`;
 }
 
-function getMedalEmoji(rank: number): string {
+function GoldMedalIcon() {
+  return (
+    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="12" cy="13" r="8" fill="url(#goldGradient)" stroke="#B8860B" strokeWidth="2"/>
+      <path d="M12 8L14 11L17 11.5L15 14L15.5 17L12 15.5L8.5 17L9 14L7 11.5L10 11L12 8Z" fill="#FFD700" stroke="#B8860B" strokeWidth="0.5"/>
+      <path d="M7 2L9 5H15L17 2" stroke="#B8860B" strokeWidth="2" strokeLinecap="round"/>
+      <defs>
+        <linearGradient id="goldGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stopColor="#FFD700"/>
+          <stop offset="50%" stopColor="#FFA500"/>
+          <stop offset="100%" stopColor="#FFD700"/>
+        </linearGradient>
+      </defs>
+    </svg>
+  );
+}
+
+function SilverMedalIcon() {
+  return (
+    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="12" cy="13" r="8" fill="url(#silverGradient)" stroke="#808080" strokeWidth="2"/>
+      <path d="M12 8L14 11L17 11.5L15 14L15.5 17L12 15.5L8.5 17L9 14L7 11.5L10 11L12 8Z" fill="#C0C0C0" stroke="#808080" strokeWidth="0.5"/>
+      <path d="M7 2L9 5H15L17 2" stroke="#808080" strokeWidth="2" strokeLinecap="round"/>
+      <defs>
+        <linearGradient id="silverGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stopColor="#E8E8E8"/>
+          <stop offset="50%" stopColor="#A0A0A0"/>
+          <stop offset="100%" stopColor="#C0C0C0"/>
+        </linearGradient>
+      </defs>
+    </svg>
+  );
+}
+
+function BronzeMedalIcon() {
+  return (
+    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="12" cy="13" r="8" fill="url(#bronzeGradient)" stroke="#8B4513" strokeWidth="2"/>
+      <path d="M12 8L14 11L17 11.5L15 14L15.5 17L12 15.5L8.5 17L9 14L7 11.5L10 11L12 8Z" fill="#CD7F32" stroke="#8B4513" strokeWidth="0.5"/>
+      <path d="M7 2L9 5H15L17 2" stroke="#8B4513" strokeWidth="2" strokeLinecap="round"/>
+      <defs>
+        <linearGradient id="bronzeGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stopColor="#CD7F32"/>
+          <stop offset="50%" stopColor="#8B4513"/>
+          <stop offset="100%" stopColor="#CD7F32"/>
+        </linearGradient>
+      </defs>
+    </svg>
+  );
+}
+
+function getMedalIcon(rank: number) {
   switch (rank) {
-    case 1: return '🥇';
-    case 2: return '🥈';
-    case 3: return '🥉';
-    default: return '';
+    case 1: return <GoldMedalIcon />;
+    case 2: return <SilverMedalIcon />;
+    case 3: return <BronzeMedalIcon />;
+    default: return null;
   }
 }
 
@@ -36,8 +87,10 @@ const Scoreboard: React.FC<ScoreboardProps> = ({ roomState }) => {
           padding: 24px;
           max-width: 1400px;
           margin: 0 auto;
+          width: 100%;
+          box-sizing: border-box;
         }
-        @media (min-width: 768px) and (max-width: 1024px) {
+        @media (min-width: 768px) and (max-width: 1023px) {
           .scoreboard-container {
             grid-template-columns: 1fr 1fr;
           }
@@ -52,6 +105,8 @@ const Scoreboard: React.FC<ScoreboardProps> = ({ roomState }) => {
           border-radius: 16px;
           padding: 24px;
           box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+          width: 100%;
+          box-sizing: border-box;
         }
         .card h2 {
           color: #1E3A5F;
@@ -71,15 +126,25 @@ const Scoreboard: React.FC<ScoreboardProps> = ({ roomState }) => {
           border-radius: 12px;
           background: linear-gradient(90deg, #FFFFFF 0%, #F0F9FF 100%);
           transition: transform 0.2s ease, box-shadow 0.2s ease;
+          width: 100%;
+          box-sizing: border-box;
         }
         .leaderboard-item:hover {
           transform: translateX(4px);
           box-shadow: 0 2px 8px rgba(30, 58, 95, 0.1);
         }
         .leaderboard-rank {
-          width: 32px;
-          text-align: center;
-          font-size: 20px;
+          width: 36px;
+          height: 36px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          flex-shrink: 0;
+        }
+        .leaderboard-rank-number {
+          color: #6B7280;
+          font-size: 16px;
+          font-weight: 600;
         }
         .leaderboard-avatar {
           width: 36px;
@@ -106,12 +171,13 @@ const Scoreboard: React.FC<ScoreboardProps> = ({ roomState }) => {
           text-overflow: ellipsis;
         }
         .leaderboard-score {
-          font-family: 'Courier New', 'Consolas', monospace;
+          font-family: 'Courier New', 'Consolas', 'Monaco', monospace;
           font-size: 24px;
           font-weight: bold;
           color: #1E3A5F;
           min-width: 80px;
           text-align: right;
+          font-variant-numeric: tabular-nums;
         }
         .host-tag {
           display: inline-block;
@@ -137,13 +203,16 @@ const Scoreboard: React.FC<ScoreboardProps> = ({ roomState }) => {
           background: white;
           border-radius: 10px;
           align-items: flex-start;
+          width: 100%;
+          box-sizing: border-box;
         }
         .history-timestamp {
           font-size: 14px;
           color: #9CA3AF;
           white-space: nowrap;
-          font-family: 'Courier New', 'Consolas', monospace;
+          font-family: 'Courier New', 'Consolas', 'Monaco', monospace;
           padding-top: 2px;
+          flex-shrink: 0;
         }
         .history-content {
           flex: 1;
@@ -155,16 +224,18 @@ const Scoreboard: React.FC<ScoreboardProps> = ({ roomState }) => {
           display: flex;
           align-items: center;
           gap: 6px;
+          flex-wrap: wrap;
         }
         .history-word {
           display: flex;
           align-items: center;
           gap: 6px;
           margin-top: 2px;
+          flex-wrap: wrap;
         }
         .history-word-text {
           color: #374151;
-          font-family: 'Courier New', 'Consolas', monospace;
+          font-family: 'Courier New', 'Consolas', 'Monaco', monospace;
         }
         .history-result {
           display: flex;
@@ -207,6 +278,8 @@ const Scoreboard: React.FC<ScoreboardProps> = ({ roomState }) => {
           justify-content: space-between;
           align-items: center;
           margin-bottom: 16px;
+          flex-wrap: wrap;
+          gap: 8px;
         }
         .round-info {
           background: #DBEAFE;
@@ -226,13 +299,15 @@ const Scoreboard: React.FC<ScoreboardProps> = ({ roomState }) => {
           justify-content: space-between;
           align-items: center;
           padding: 8px 0;
+          width: 100%;
+          box-sizing: border-box;
         }
         .total-score-name {
           color: #374151;
           font-size: 14px;
         }
         .total-score-value {
-          font-family: 'Courier New', 'Consolas', monospace;
+          font-family: 'Courier New', 'Consolas', 'Monaco', monospace;
           font-weight: bold;
           color: #1E3A5F;
         }
@@ -254,7 +329,9 @@ const Scoreboard: React.FC<ScoreboardProps> = ({ roomState }) => {
               {sortedPlayers.map((player: Player, index: number) => (
                 <div key={player.id} className="leaderboard-item">
                   <div className="leaderboard-rank">
-                    {getMedalEmoji(index + 1) || <span style={{ color: '#6B7280', fontSize: 16 }}>#{index + 1}</span>}
+                    {getMedalIcon(index + 1) || (
+                      <span className="leaderboard-rank-number">#{index + 1}</span>
+                    )}
                   </div>
                   <div className="leaderboard-avatar">
                     {player.name.charAt(0).toUpperCase()}

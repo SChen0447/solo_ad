@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { emit, on } from '../utils/socket';
 import { RoomState, PublicRoom, GameType, Player } from '../types';
 
@@ -72,15 +72,14 @@ const Lobby: React.FC<LobbyProps> = ({ playerId, roomState, onJoined, onKicked }
 
   useEffect(() => {
     if (roomState) {
-      const playerIds = new Set(roomState.players.map(p => p.id));
-      roomState.players.forEach(p => {
-        setAnimatingPlayers(prev => {
+      roomState.players.forEach((p) => {
+        setAnimatingPlayers((prev) => {
           const next = new Set(prev);
           next.add(p.id);
           return next;
         });
         setTimeout(() => {
-          setAnimatingPlayers(prev => {
+          setAnimatingPlayers((prev) => {
             const next = new Set(prev);
             next.delete(p.id);
             return next;
@@ -88,7 +87,7 @@ const Lobby: React.FC<LobbyProps> = ({ playerId, roomState, onJoined, onKicked }
         }, 300);
       });
     }
-  }, [roomState?.players.length]);
+  }, [roomState?.players.length, roomState?.players]);
 
   const handleCreateRoom = (e: React.FormEvent) => {
     e.preventDefault();
@@ -112,13 +111,13 @@ const Lobby: React.FC<LobbyProps> = ({ playerId, roomState, onJoined, onKicked }
     emit('room:join', { name: playerName.trim(), inviteCode: joinInviteCode.trim() });
   };
 
-  const handleKickPlayer = (targetPlayerId: string) => {
+  const handleKickPlayer = useCallback((targetPlayerId: string) => {
     emit('room:kick', { playerId: targetPlayerId });
-  };
+  }, []);
 
-  const handleTransferHost = (targetPlayerId: string) => {
+  const handleTransferHost = useCallback((targetPlayerId: string) => {
     emit('room:transfer-host', { playerId: targetPlayerId });
-  };
+  }, []);
 
   const handleLeaveRoom = () => {
     emit('room:leave');
@@ -126,7 +125,7 @@ const Lobby: React.FC<LobbyProps> = ({ playerId, roomState, onJoined, onKicked }
     setShowPlayerPanel(false);
   };
 
-  const isHost = roomState?.players.find(p => p.id === playerId)?.isHost ?? false;
+  const isHost = roomState?.players.find((p) => p.id === playerId)?.isHost ?? false;
 
   return (
     <div className="lobby-container">
@@ -138,8 +137,10 @@ const Lobby: React.FC<LobbyProps> = ({ playerId, roomState, onJoined, onKicked }
           padding: 24px;
           max-width: 1400px;
           margin: 0 auto;
+          width: 100%;
+          box-sizing: border-box;
         }
-        @media (min-width: 768px) and (max-width: 1024px) {
+        @media (min-width: 768px) and (max-width: 1023px) {
           .lobby-container {
             grid-template-columns: 1fr 1fr;
           }
@@ -154,6 +155,8 @@ const Lobby: React.FC<LobbyProps> = ({ playerId, roomState, onJoined, onKicked }
           border-radius: 16px;
           padding: 24px;
           box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+          width: 100%;
+          box-sizing: border-box;
         }
         .card h2 {
           color: #1E3A5F;
@@ -178,6 +181,7 @@ const Lobby: React.FC<LobbyProps> = ({ playerId, roomState, onJoined, onKicked }
           font-size: 14px;
           box-sizing: border-box;
           transition: border-color 0.2s ease;
+          font-family: inherit;
         }
         .form-group input:focus,
         .form-group select:focus {
@@ -195,15 +199,20 @@ const Lobby: React.FC<LobbyProps> = ({ playerId, roomState, onJoined, onKicked }
           font-weight: 500;
           cursor: pointer;
           transition: transform 0.2s ease, box-shadow 0.2s ease;
+          font-family: inherit;
         }
-        .btn:hover {
+        .btn:hover:not(:disabled) {
           transform: translateY(-2px);
           box-shadow: 0 4px 12px rgba(30, 58, 95, 0.3);
+        }
+        .btn:disabled {
+          opacity: 0.5;
+          cursor: not-allowed;
         }
         .btn-secondary {
           background: linear-gradient(135deg, #6B7280 0%, #4B5563 100%);
         }
-        .btn-secondary:hover {
+        .btn-secondary:hover:not(:disabled) {
           box-shadow: 0 4px 12px rgba(107, 114, 128, 0.3);
         }
         .btn-danger {
@@ -212,8 +221,17 @@ const Lobby: React.FC<LobbyProps> = ({ playerId, roomState, onJoined, onKicked }
           font-size: 12px;
           width: auto;
         }
-        .btn-danger:hover {
+        .btn-danger:hover:not(:disabled) {
           box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
+        }
+        .btn-warning {
+          background: linear-gradient(135deg, #F59E0B 0%, #D97706 100%);
+          padding: 6px 12px;
+          font-size: 12px;
+          width: auto;
+        }
+        .btn-warning:hover:not(:disabled) {
+          box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
         }
         .room-list {
           display: flex;
@@ -227,6 +245,10 @@ const Lobby: React.FC<LobbyProps> = ({ playerId, roomState, onJoined, onKicked }
           display: flex;
           justify-content: space-between;
           align-items: center;
+          width: 100%;
+          box-sizing: border-box;
+          flex-wrap: wrap;
+          gap: 8px;
         }
         .room-info h3 {
           margin: 0 0 4px 0;
@@ -245,9 +267,13 @@ const Lobby: React.FC<LobbyProps> = ({ playerId, roomState, onJoined, onKicked }
           border-radius: 20px;
           font-size: 12px;
           font-weight: 500;
+          flex-shrink: 0;
         }
         .room-badge.waiting {
           background: #F59E0B;
+        }
+        .room-badge.finished {
+          background: #6B7280;
         }
         .error-message {
           background: #FEE2E2;
@@ -260,11 +286,13 @@ const Lobby: React.FC<LobbyProps> = ({ playerId, roomState, onJoined, onKicked }
         .player-panel {
           max-height: 0;
           overflow: hidden;
-          transition: max-height 0.3s ease-out, padding 0.3s ease-out, opacity 0.3s ease-out;
+          transition: max-height 0.3s ease-out, opacity 0.3s ease-out;
           opacity: 0;
+          width: 100%;
+          box-sizing: border-box;
         }
         .player-panel.open {
-          max-height: 800px;
+          max-height: 1000px;
           opacity: 1;
         }
         .player-list {
@@ -282,6 +310,9 @@ const Lobby: React.FC<LobbyProps> = ({ playerId, roomState, onJoined, onKicked }
           transform: translateX(100%);
           opacity: 0;
           transition: transform 0.3s ease-out, opacity 0.3s ease-out;
+          width: 100%;
+          box-sizing: border-box;
+          flex-wrap: wrap;
         }
         .player-item.animate-in {
           transform: translateX(0);
@@ -299,11 +330,13 @@ const Lobby: React.FC<LobbyProps> = ({ playerId, roomState, onJoined, onKicked }
           font-weight: 600;
           flex-shrink: 0;
           position: relative;
+          overflow: hidden;
         }
         .crown-icon {
           position: absolute;
           top: -6px;
           right: -6px;
+          z-index: 10;
         }
         .player-info {
           flex: 1;
@@ -323,6 +356,15 @@ const Lobby: React.FC<LobbyProps> = ({ playerId, roomState, onJoined, onKicked }
         .player-actions {
           display: flex;
           gap: 6px;
+          width: 100%;
+          justify-content: flex-end;
+          margin-top: 8px;
+        }
+        @media (min-width: 1024px) {
+          .player-actions {
+            width: auto;
+            margin-top: 0;
+          }
         }
         .host-badge {
           background: #FEF3C7;
@@ -342,11 +384,12 @@ const Lobby: React.FC<LobbyProps> = ({ playerId, roomState, onJoined, onKicked }
           color: white;
           padding: 8px 16px;
           border-radius: 8px;
-          font-family: 'Courier New', monospace;
+          font-family: 'Courier New', 'Consolas', monospace;
           font-size: 18px;
           font-weight: bold;
           text-align: center;
           letter-spacing: 4px;
+          user-select: all;
         }
         .invite-label {
           font-size: 12px;
@@ -367,6 +410,13 @@ const Lobby: React.FC<LobbyProps> = ({ playerId, roomState, onJoined, onKicked }
           text-align: center;
           color: #9CA3AF;
           padding: 32px 0;
+        }
+        .player-item-header {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          flex: 1;
+          min-width: 0;
         }
       `}</style>
 
@@ -392,12 +442,16 @@ const Lobby: React.FC<LobbyProps> = ({ playerId, roomState, onJoined, onKicked }
               disabled={!!roomState}
             >
               {Object.entries(gameTypeLabels).map(([value, label]) => (
-                <option key={value} value={value}>{label}</option>
+                <option key={value} value={value}>
+                  {label}
+                </option>
               ))}
             </select>
           </div>
           {!roomState ? (
-            <button type="submit" className="btn">创建房间</button>
+            <button type="submit" className="btn">
+              创建房间
+            </button>
           ) : (
             <button type="button" className="btn btn-secondary" onClick={handleLeaveRoom}>
               离开房间
@@ -431,7 +485,9 @@ const Lobby: React.FC<LobbyProps> = ({ playerId, roomState, onJoined, onKicked }
             />
           </div>
           {!roomState && (
-            <button type="submit" className="btn">加入房间</button>
+            <button type="submit" className="btn">
+              加入房间
+            </button>
           )}
         </form>
 
@@ -445,10 +501,16 @@ const Lobby: React.FC<LobbyProps> = ({ playerId, roomState, onJoined, onKicked }
                 <div key={room.id} className="room-item">
                   <div className="room-info">
                     <h3>{gameTypeLabels[room.gameType]}</h3>
-                    <p>房间号: {room.inviteCode} · {room.playerCount}/8 人</p>
+                    <p>
+                      房间号: {room.inviteCode} · {room.playerCount}/8 人
+                    </p>
                   </div>
                   <span className={`room-badge ${room.gameStatus}`}>
-                    {room.gameStatus === 'waiting' ? '等待中' : room.gameStatus === 'playing' ? '游戏中' : '已结束'}
+                    {room.gameStatus === 'waiting'
+                      ? '等待中'
+                      : room.gameStatus === 'playing'
+                      ? '游戏中'
+                      : '已结束'}
                   </span>
                 </div>
               ))
@@ -473,21 +535,27 @@ const Lobby: React.FC<LobbyProps> = ({ playerId, roomState, onJoined, onKicked }
                     key={player.id}
                     className={`player-item ${animatingPlayers.has(player.id) ? 'animate-in' : ''}`}
                   >
-                    <div className="avatar">
-                      {getInitials(player.name)}
-                      {player.isHost && <CrownIcon />}
-                    </div>
-                    <div className="player-info">
-                      <div className="player-name">
-                        {player.name}
-                        {player.isHost && <span className="host-badge" style={{ marginLeft: 8 }}>房主</span>}
+                    <div className="player-item-header">
+                      <div className="avatar">
+                        {getInitials(player.name)}
+                        {player.isHost && <CrownIcon />}
                       </div>
-                      <div className="player-score">积分: {player.score}</div>
+                      <div className="player-info">
+                        <div className="player-name">
+                          {player.name}
+                          {player.isHost && (
+                            <span className="host-badge" style={{ marginLeft: 8 }}>
+                              房主
+                            </span>
+                          )}
+                        </div>
+                        <div className="player-score">积分: {player.score}</div>
+                      </div>
                     </div>
                     {isHost && !player.isHost && (
                       <div className="player-actions">
                         <button
-                          className="btn btn-danger"
+                          className="btn btn-warning"
                           onClick={() => handleTransferHost(player.id)}
                           title="移交房主"
                         >

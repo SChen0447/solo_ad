@@ -113,15 +113,7 @@ const GameRoom: React.FC<GameRoomProps> = ({ roomState, playerId }) => {
 
   const getProgressColor = useCallback(() => {
     const progress = countdown / roomState.countdownDuration;
-    if (progress > 0.5) {
-      return '#10B981';
-    } else if (progress > 0.2) {
-      const t = (progress - 0.2) / 0.3;
-      return interpolateColor('#10B981', '#F59E0B', 1 - t);
-    } else {
-      const t = progress / 0.2;
-      return interpolateColor('#F59E0B', '#EF4444', 1 - t);
-    }
+    return interpolateColor('#10B981', '#EF4444', 1 - progress);
   }, [countdown, roomState.countdownDuration]);
 
   const interpolateColor = (color1: string, color2: string, t: number): string => {
@@ -196,8 +188,10 @@ const GameRoom: React.FC<GameRoomProps> = ({ roomState, playerId }) => {
           padding: 24px;
           max-width: 1400px;
           margin: 0 auto;
+          width: 100%;
+          box-sizing: border-box;
         }
-        @media (min-width: 768px) and (max-width: 1024px) {
+        @media (min-width: 768px) and (max-width: 1023px) {
           .game-room {
             grid-template-columns: 1fr 1fr;
           }
@@ -212,6 +206,8 @@ const GameRoom: React.FC<GameRoomProps> = ({ roomState, playerId }) => {
           border-radius: 16px;
           padding: 24px;
           box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+          width: 100%;
+          box-sizing: border-box;
         }
         .card h2 {
           color: #1E3A5F;
@@ -223,6 +219,8 @@ const GameRoom: React.FC<GameRoomProps> = ({ roomState, playerId }) => {
           flex-direction: column;
           align-items: center;
           gap: 32px;
+          width: 100%;
+          box-sizing: border-box;
         }
         .circular-container {
           position: relative;
@@ -242,14 +240,17 @@ const GameRoom: React.FC<GameRoomProps> = ({ roomState, playerId }) => {
           transition: color 0.5s ease;
         }
         .pulse {
-          animation: pulse 1s ease-in-out infinite;
+          animation: pulse 0.8s ease-in-out infinite;
+          transform-origin: center center;
         }
         @keyframes pulse {
           0%, 100% {
             transform: scale(1);
+            filter: drop-shadow(0 0 0 rgba(239, 68, 68, 0.4));
           }
           50% {
-            transform: scale(1.1);
+            transform: scale(1.15);
+            filter: drop-shadow(0 0 20px rgba(239, 68, 68, 0.8));
           }
         }
         .hint-card {
