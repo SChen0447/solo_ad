@@ -4,6 +4,16 @@ import { Furniture, FurnitureType } from './models/Furniture';
 import { FloorMaterialType } from './models/Room';
 import { ControlPanel } from './ui/ControlPanel';
 
+interface AmbientLightState {
+  intensity: number;
+  color: string;
+}
+
+const DEFAULT_AMBIENT: AmbientLightState = {
+  intensity: 0.4,
+  color: '#FFFFFF'
+};
+
 const App: React.FC = () => {
   const canvasContainerRef = useRef<HTMLDivElement>(null);
   const sceneManagerRef = useRef<SceneManager | null>(null);
@@ -19,8 +29,8 @@ const App: React.FC = () => {
   const [spotY, setSpotY] = useState(0);
   const [spotZ, setSpotZ] = useState(0);
 
-  const [ambientIntensity, setAmbientIntensity] = useState(0.4);
-  const [ambientColor, setAmbientColor] = useState('#FFFFFF');
+  const [ambient, setAmbient] = useState<AmbientLightState>(DEFAULT_AMBIENT);
+  const ambientRef = useRef<AmbientLightState>(DEFAULT_AMBIENT);
 
   const [pointEnabled, setPointEnabled] = useState(true);
   const [pointIntensity, setPointIntensity] = useState(0.6);
@@ -31,6 +41,8 @@ const App: React.FC = () => {
     const container = canvasContainerRef.current;
     const manager = new SceneManager(container);
     sceneManagerRef.current = manager;
+
+    manager.lightManager.adjustAmbientLight(ambientRef.current.intensity, ambientRef.current.color);
 
     const defaultFurniture1 = new Furniture('sofa');
     defaultFurniture1.setPosition(-1.25, defaultFurniture1.size.y / 2, -0.75);
@@ -134,15 +146,21 @@ const App: React.FC = () => {
     setPointIntensity(v);
   }, []);
 
-  const handleAmbientIntensityChange = useCallback((v: number) => {
-    sceneManagerRef.current?.lightManager.adjustAmbientLight(v, ambientColor);
-    setAmbientIntensity(v);
-  }, [ambientColor]);
+  const handleAmbientIntensityChange = useCallback((intensity: number) => {
+    const sm = sceneManagerRef.current;
+    const next: AmbientLightState = { ...ambientRef.current, intensity };
+    ambientRef.current = next;
+    if (sm) sm.lightManager.adjustAmbientLight(next.intensity, next.color);
+    setAmbient(next);
+  }, []);
 
-  const handleAmbientColorChange = useCallback((v: string) => {
-    sceneManagerRef.current?.lightManager.adjustAmbientLight(ambientIntensity, v);
-    setAmbientColor(v);
-  }, [ambientIntensity]);
+  const handleAmbientColorChange = useCallback((color: string) => {
+    const sm = sceneManagerRef.current;
+    const next: AmbientLightState = { ...ambientRef.current, color };
+    ambientRef.current = next;
+    if (sm) sm.lightManager.adjustAmbientLight(next.intensity, next.color);
+    setAmbient(next);
+  }, []);
 
   return (
     <div className="app-container">
@@ -170,8 +188,8 @@ const App: React.FC = () => {
         pointIntensity={pointIntensity}
         onPointToggle={handlePointToggle}
         onPointIntensityChange={handlePointIntensityChange}
-        ambientIntensity={ambientIntensity}
-        ambientColor={ambientColor}
+        ambientIntensity={ambient.intensity}
+        ambientColor={ambient.color}
         onAmbientIntensityChange={handleAmbientIntensityChange}
         onAmbientColorChange={handleAmbientColorChange}
       />

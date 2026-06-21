@@ -150,7 +150,7 @@ export const ControlPanel: React.FC<ControlPanelProps> = (props) => {
             <input
               type="range"
               min="0"
-              max="2"
+              max="1"
               step="0.05"
               value={ambientIntensity}
               onChange={(e) => onAmbientIntensityChange(parseFloat(e.target.value))}

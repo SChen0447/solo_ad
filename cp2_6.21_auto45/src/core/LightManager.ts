@@ -14,7 +14,7 @@ export class LightManager {
   constructor(scene: THREE.Scene) {
     this.scene = scene;
 
-    this.ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
+    this.ambientLight = new THREE.AmbientLight(0xffffff, 0);
     this.scene.add(this.ambientLight);
 
     this.spotLightTarget = new THREE.Object3D();
@@ -101,14 +101,6 @@ export class LightManager {
 
   public setPointLightColor(color: string): void {
     this.pointLight.color.set(color);
-  }
-
-  public setAmbientIntensity(value: number): void {
-    this.ambientLight.intensity = value;
-  }
-
-  public setAmbientColor(color: string): void {
-    this.ambientLight.color.set(color);
   }
 
   public adjustAmbientLight(intensity: number, color: string): void {
