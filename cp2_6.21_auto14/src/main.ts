@@ -10,11 +10,9 @@ let controls: OrbitControls;
 let gridHelper: THREE.GridHelper;
 
 let autoRotateEnabled = true;
-let userInteracting = false;
 let orbitDragging = false;
-let orbitDamping = false;
 const autoRotateSpeed = 0.01;
-let lastInteractionTime = 0;
+let lastInteractionEndTime = 0;
 const interactionResumeDelay = 2000;
 
 let resettingCamera = false;
@@ -54,7 +52,6 @@ function init(): void {
   controls.target.copy(initialTarget);
   controls.update();
 
-  setupInteractionListeners();
   setupOrbitControlsListeners();
 
   gridHelper = new THREE.GridHelper(20, 20, 0x404080, 0x303060);
@@ -63,6 +60,7 @@ function init(): void {
   gridHelper.position.y = -10;
   scene.add(gridHelper);
 
+  createFpsDisplay();
   createParticles(scene);
 
   createUI({
@@ -96,61 +94,15 @@ function createRadialGradientTexture(): THREE.Texture {
   return texture;
 }
 
-function markInteraction(): void {
-  userInteracting = true;
-  autoRotateEnabled = false;
-  lastInteractionTime = performance.now();
-}
-
-function endInteraction(): void {
-  userInteracting = false;
-  lastInteractionTime = performance.now();
-}
-
-function setupInteractionListeners(): void {
-  const dom = renderer.domElement;
-
-  dom.addEventListener('mousedown', () => {
-    markInteraction();
-  });
-
-  dom.addEventListener('touchstart', () => {
-    markInteraction();
-  }, { passive: true });
-
-  document.addEventListener('mouseup', () => {
-    endInteraction();
-  });
-
-  document.addEventListener('touchend', () => {
-    endInteraction();
-  });
-
-  dom.addEventListener('wheel', () => {
-    markInteraction();
-  }, { passive: true });
-
-  dom.addEventListener('contextmenu', (e) => {
-    e.preventDefault();
-  });
-}
-
 function setupOrbitControlsListeners(): void {
   controls.addEventListener('start', () => {
     orbitDragging = true;
-    orbitDamping = true;
-    markInteraction();
-  });
-
-  controls.addEventListener('change', () => {
-    if (orbitDragging) {
-      markInteraction();
-    }
+    autoRotateEnabled = false;
   });
 
   controls.addEventListener('end', () => {
     orbitDragging = false;
-    endInteraction();
+    lastInteractionEndTime = performance.now();
   });
 }
 
@@ -162,7 +114,6 @@ function resetCamera(): void {
   resetStartPos.copy(camera.position);
   resetStartTarget.copy(controls.target);
   orbitDragging = false;
-  orbitDamping = false;
 }
 
 function updateResetCamera(_deltaMs: number): void {
@@ -179,7 +130,6 @@ function updateResetCamera(_deltaMs: number): void {
 
   if (t >= 1) {
     resettingCamera = false;
-    orbitDamping = false;
   }
 }
 
@@ -190,13 +140,13 @@ function easeInOutCubic(t: number): number {
 function updateAutoRotate(delta: number): void {
   if (resettingCamera) return;
   
-  if (orbitDragging || userInteracting) {
+  if (orbitDragging) {
     return;
   }
 
   if (!autoRotateEnabled) {
     const now = performance.now();
-    if (now - lastInteractionTime > interactionResumeDelay) {
+    if (now - lastInteractionEndTime > interactionResumeDelay) {
       autoRotateEnabled = true;
     } else {
       return;
@@ -217,6 +167,48 @@ function updateAutoRotate(delta: number): void {
 }
 
 let lastTime = performance.now();
+let fps = 0;
+let fpsUpdateTimer = 0;
+let frameCount = 0;
+let fpsDisplay: HTMLDivElement | null = null;
+
+function createFpsDisplay(): void {
+  fpsDisplay = document.createElement('div');
+  fpsDisplay.style.position = 'absolute';
+  fpsDisplay.style.top = '10px';
+  fpsDisplay.style.left = '12px';
+  fpsDisplay.style.padding = '6px 12px';
+  fpsDisplay.style.background = 'rgba(20, 20, 40, 0.6)';
+  fpsDisplay.style.borderRadius = '6px';
+  fpsDisplay.style.color = '#80ff80';
+  fpsDisplay.style.fontFamily = 'Helvetica, Arial, sans-serif';
+  fpsDisplay.style.fontSize = '12px';
+  fpsDisplay.style.zIndex = '200';
+  fpsDisplay.style.pointerEvents = 'none';
+  fpsDisplay.style.backdropFilter = 'blur(8px)';
+  fpsDisplay.textContent = 'FPS: --';
+  document.getElementById('app')?.appendChild(fpsDisplay);
+}
+
+function updateFps(delta: number): void {
+  frameCount++;
+  fpsUpdateTimer += delta;
+  if (fpsUpdateTimer >= 0.5) {
+    fps = Math.round(frameCount / fpsUpdateTimer);
+    frameCount = 0;
+    fpsUpdateTimer = 0;
+    if (fpsDisplay) {
+      fpsDisplay.textContent = 'FPS: ' + fps;
+      if (fps >= 55) {
+        fpsDisplay.style.color = '#80ff80';
+      } else if (fps >= 30) {
+        fpsDisplay.style.color = '#ffff80';
+      } else {
+        fpsDisplay.style.color = '#ff8080';
+      }
+    }
+  }
+}
 
 function animate(): void {
   requestAnimationFrame(animate);
@@ -224,6 +216,8 @@ function animate(): void {
   const now = performance.now();
   const delta = (now - lastTime) / 1000;
   lastTime = now;
+
+  updateFps(delta);
 
   updateResetCamera(delta * 1000);
   

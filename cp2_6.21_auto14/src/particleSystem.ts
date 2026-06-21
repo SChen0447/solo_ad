@@ -48,7 +48,13 @@ const connectionLifetime: number = 0.2;
 const connectionDistance: number = 0.3;
 const CONNECTION_DISTANCE_SQ = connectionDistance * connectionDistance;
 
-const SPATIAL_CELL_SIZE = 0.5;
+const SPATIAL_CELL_SIZE = 0.35;
+
+const GLOW_BASE_R = 0.6;
+const GLOW_BASE_G = 0.4;
+const GLOW_BASE_B = 1.0;
+const GLOW_OPACITY = 0.6;
+const GLOW_RADIUS = 0.15;
 
 const defaultParams: ParticleSystemParams = {
   particleCount: 3000,
@@ -144,22 +150,22 @@ function disposeGlowSprites(): void {
 function createGlowForAllParticles(glowTexture: THREE.Texture): void {
   disposeGlowSprites();
   
+  const intensity = params.glowIntensity;
+  const colorR = Math.min(1.0, GLOW_BASE_R * intensity);
+  const colorG = Math.min(1.0, GLOW_BASE_G * intensity);
+  const colorB = Math.min(1.0, GLOW_BASE_B * intensity);
+  
   for (let i = 0; i < particles.length; i++) {
     const spriteMaterial = new THREE.SpriteMaterial({
       map: glowTexture,
-      color: new THREE.Color().setRGB(
-        0.6 * params.glowIntensity,
-        0.4 * params.glowIntensity,
-        1.0 * params.glowIntensity
-      ),
+      color: new THREE.Color().setRGB(colorR, colorG, colorB),
       transparent: true,
-      opacity: 0.6,
+      opacity: GLOW_OPACITY,
       blending: THREE.AdditiveBlending,
       depthWrite: false
     });
     const sprite = new THREE.Sprite(spriteMaterial);
-    const glowRadius = 0.15;
-    sprite.scale.set(glowRadius * 2, glowRadius * 2, 1.0);
+    sprite.scale.set(GLOW_RADIUS * 2, GLOW_RADIUS * 2, 1.0);
     sprite.position.copy(particles[i].position);
     sprite.visible = true;
     glowSprites.push(sprite);
@@ -512,42 +518,39 @@ export function setSpeedMultiplier(value: number): void {
 
 export function setTrailLength(value: number): void {
   const newTrailLength = Math.max(0, Math.min(MAX_TRAIL_LENGTH, Math.floor(value)));
+  if (newTrailLength === params.trailLength) return;
+  
   const oldTrailLength = params.trailLength;
   params.trailLength = newTrailLength;
   
   if (newTrailLength > oldTrailLength) {
+    const diff = newTrailLength - oldTrailLength;
     for (const p of particles) {
-      while (p.trail.length < newTrailLength) {
+      for (let k = 0; k < diff; k++) {
         p.trail.push(p.position.clone());
       }
     }
   } else {
+    const diff = oldTrailLength - newTrailLength;
     for (const p of particles) {
-      while (p.trail.length > newTrailLength) {
+      for (let k = 0; k < diff; k++) {
         p.trail.pop();
       }
     }
   }
-  
-  updateTrails();
 }
 
 export function setGlowIntensity(value: number): void {
   params.glowIntensity = value;
-  const clampedValue = Math.max(0, value);
+  const intensity = Math.min(2.0, Math.max(0, value));
   
-  const baseR = 0.6;
-  const baseG = 0.4;
-  const baseB = 1.0;
+  const r = Math.min(1.0, GLOW_BASE_R * intensity);
+  const g = Math.min(1.0, GLOW_BASE_G * intensity);
+  const b = Math.min(1.0, GLOW_BASE_B * intensity);
   
   for (const sprite of glowSprites) {
     const mat = sprite.material as THREE.SpriteMaterial;
-    const intensity = Math.min(2.0, clampedValue);
-    mat.color.setRGB(
-      Math.min(1.0, baseR * intensity),
-      Math.min(1.0, baseG * intensity),
-      Math.min(1.0, baseB * intensity)
-    );
+    mat.color.setRGB(r, g, b);
   }
 }
 
