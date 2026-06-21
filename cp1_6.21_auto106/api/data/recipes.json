@@ -1,0 +1,125 @@
+[
+  {
+    "id": "r1",
+    "name": "番茄炒蛋",
+    "ingredients": [
+      { "name": "西红柿", "required": true },
+      { "name": "鸡蛋", "required": true },
+      { "name": "生抽", "required": false }
+    ],
+    "steps": [
+      "西红柿切块，鸡蛋打散",
+      "热锅放油，炒鸡蛋至金黄盛出",
+      "锅内再放少许油，下西红柿翻炒出汁",
+      "倒入炒好的鸡蛋，加少许盐和生抽调味",
+      "翻炒均匀即可出锅"
+    ]
+  },
+  {
+    "id": "r2",
+    "name": "凉拌黄瓜",
+    "ingredients": [
+      { "name": "黄瓜", "required": true },
+      { "name": "生抽", "required": false }
+    ],
+    "steps": [
+      "黄瓜洗净拍碎切段",
+      "加入少许盐腌制10分钟，倒掉多余水分",
+      "加入蒜末、生抽、醋、香油拌匀",
+      "冷藏20分钟更佳"
+    ]
+  },
+  {
+    "id": "r3",
+    "name": "土豆烧牛肉",
+    "ingredients": [
+      { "name": "牛肉", "required": true },
+      { "name": "土豆", "required": true },
+      { "name": "生抽", "required": false },
+      { "name": "料酒", "required": false }
+    ],
+    "steps": [
+      "牛肉切块焯水，土豆切块",
+      "热锅放油，下牛肉煸炒",
+      "加入生抽、料酒、糖调味",
+      "加水没过牛肉，小火炖40分钟",
+      "加入土豆继续炖20分钟至软烂",
+      "大火收汁即可"
+    ]
+  },
+  {
+    "id": "r4",
+    "name": "水果沙拉",
+    "ingredients": [
+      { "name": "苹果", "required": true },
+      { "name": "香蕉", "required": true },
+      { "name": "草莓", "required": true },
+      { "name": "酸奶", "required": false }
+    ],
+    "steps": [
+      "所有水果洗净切块",
+      "放入碗中拌匀",
+      "淋上酸奶或沙拉酱即可"
+    ]
+  },
+  {
+    "id": "r5",
+    "name": "香煎鸡胸肉",
+    "ingredients": [
+      { "name": "鸡胸肉", "required": true },
+      { "name": "生抽", "required": false },
+      { "name": "料酒", "required": false }
+    ],
+    "steps": [
+      "鸡胸肉用刀背拍松，两面划几刀",
+      "用生抽、料酒、黑胡椒腌制20分钟",
+      "平底锅刷少许油，放入鸡胸肉",
+      "每面煎3-4分钟至金黄熟透",
+      "切片装盘即可"
+    ]
+  },
+  {
+    "id": "r6",
+    "name": "牛肉生菜卷",
+    "ingredients": [
+      { "name": "牛肉", "required": true },
+      { "name": "生菜", "required": true },
+      { "name": "生抽", "required": false }
+    ],
+    "steps": [
+      "牛肉切片，用生抽、料酒腌制",
+      "热锅快速翻炒牛肉至变色盛出",
+      "生菜叶洗净沥干",
+      "用生菜叶包裹牛肉食用"
+    ]
+  },
+  {
+    "id": "r7",
+    "name": "黄瓜炒鸡蛋",
+    "ingredients": [
+      { "name": "黄瓜", "required": true },
+      { "name": "鸡蛋", "required": true },
+      { "name": "生抽", "required": false }
+    ],
+    "steps": [
+      "黄瓜切片，鸡蛋打散",
+      "先把鸡蛋炒熟盛出",
+      "再炒黄瓜至断生",
+      "倒入鸡蛋，加盐调味翻炒均匀"
+    ]
+  },
+  {
+    "id": "r8",
+    "name": "草莓奶昔",
+    "ingredients": [
+      { "name": "草莓", "required": true },
+      { "name": "牛奶", "required": true },
+      { "name": "酸奶", "required": false }
+    ],
+    "steps": [
+      "草莓洗净去蒂",
+      "加入牛奶和酸奶",
+      "放入搅拌机打匀即可"
+    ]
+  }
+]
