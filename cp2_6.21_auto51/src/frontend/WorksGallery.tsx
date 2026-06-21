@@ -288,7 +288,16 @@ export default function WorksGallery({
             key={work.id}
             className="work-card"
             style={{ animationDelay: `${idx * 0.1}s` }}
+            tabIndex={0}
+            role="button"
+            aria-label={`查看作品：${work.title}`}
             onClick={() => onSelectWork(work.id)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                onSelectWork(work.id);
+              }
+            }}
           >
             <div className="work-card-image">
               {!imageLoaded[work.id] && (
@@ -300,6 +309,7 @@ export default function WorksGallery({
                 loading="lazy"
                 onLoad={() => handleImageLoad(work.id)}
                 style={{ display: imageLoaded[work.id] ? 'block' : 'none' }}
+                draggable={false}
               />
             </div>
             <div className="work-card-body">
@@ -313,7 +323,7 @@ export default function WorksGallery({
                 ))}
               </div>
             </div>
-            <div className="work-card-hover-overlay">
+            <div className="work-card__hover-overlay" aria-hidden="true">
               <div className="work-card-hover-title">{work.title}</div>
               <div className="work-card-hover-desc">{work.description}</div>
               <div className="work-card-hover-tags">
