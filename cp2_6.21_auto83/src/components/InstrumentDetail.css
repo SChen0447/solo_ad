@@ -184,6 +184,48 @@
   margin-bottom: 8px;
 }
 
+.detail-title-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.detail-title-row .detail-title {
+  margin-bottom: 0;
+}
+
+.detail-fav-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border-radius: 8px;
+  background: #F3F4F6;
+  color: #6B7280;
+  font-size: 14px;
+  font-weight: 500;
+  flex-shrink: 0;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.detail-fav-btn:hover {
+  transform: scale(1.05);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.detail-fav-btn.favorited {
+  background: #FEF2F2;
+  color: #EF4444;
+}
+
+.detail-fav-btn.favorited:hover {
+  background: #FEE2E2;
+  box-shadow: 0 2px 8px rgba(239, 68, 68, 0.3);
+}
+
 .detail-brand {
   font-size: 15px;
   color: #6B7280;

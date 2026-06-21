@@ -205,6 +205,39 @@
   color: #F59E0B;
 }
 
+.card-bottom {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.fav-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+  transition: all 0.2s ease;
+  padding: 0;
+}
+
+.fav-btn:hover {
+  transform: scale(1.15);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.fav-btn.favorited {
+  background: #FEF2F2;
+}
+
+.fav-btn.favorited:hover {
+  background: #FEE2E2;
+  box-shadow: 0 2px 8px rgba(239, 68, 68, 0.3);
+}
+
 .loading-state,
 .empty-state {
   text-align: center;
