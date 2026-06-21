@@ -1,0 +1,417 @@
+{
+  "templates": [
+    {
+      "id": "physics",
+      "name": "物理力学",
+      "color": "#4FC3F7",
+      "nodes": [
+        {
+          "id": "p1",
+          "title": "牛顿力学体系",
+          "summary": "经典力学的核心框架，由三大运动定律和万有引力定律构成，描述宏观物体的运动规律。",
+          "importance": "large",
+          "position": [0, 0, 0],
+          "connections": ["p2", "p3", "p4", "p5"]
+        },
+        {
+          "id": "p2",
+          "title": "牛顿第一定律",
+          "summary": "惯性定律：物体在不受外力作用时保持静止或匀速直线运动状态，是经典力学的基石。",
+          "importance": "medium",
+          "position": [3, 2, 1],
+          "connections": ["p1", "p6"]
+        },
+        {
+          "id": "p3",
+          "title": "牛顿第二定律",
+          "summary": "F=ma：物体加速度与所受合外力成正比，与质量成反比，是动力学的核心公式。",
+          "importance": "large",
+          "position": [-3, 2, 2],
+          "connections": ["p1", "p7", "p8"]
+        },
+        {
+          "id": "p4",
+          "title": "牛顿第三定律",
+          "summary": "作用力与反作用力大小相等、方向相反、作用在同一直线上，揭示力的相互性。",
+          "importance": "medium",
+          "position": [0, 3, -3],
+          "connections": ["p1", "p9"]
+        },
+        {
+          "id": "p5",
+          "title": "万有引力定律",
+          "summary": "F=G*M*m/r²：任何两个物体间存在相互吸引力，与质量乘积成正比，与距离平方成反比。",
+          "importance": "large",
+          "position": [0, -3, 3],
+          "connections": ["p1", "p10", "p11"]
+        },
+        {
+          "id": "p6",
+          "title": "惯性系与非惯性系",
+          "summary": "惯性系中牛顿定律成立，非惯性系需引入惯性力，是相对论的重要预备概念。",
+          "importance": "small",
+          "position": [5, 3, 2],
+          "connections": ["p2"]
+        },
+        {
+          "id": "p7",
+          "title": "功与动能",
+          "summary": "W=F·s，动能定理：合外力做功等于物体动能变化，是能量守恒的特殊形式。",
+          "importance": "medium",
+          "position": [-5, 3, 3],
+          "connections": ["p3", "p12"]
+        },
+        {
+          "id": "p8",
+          "title": "动量与冲量",
+          "summary": "p=mv，动量定理：合外力冲量等于物体动量变化，是矢量守恒定律。",
+          "importance": "medium",
+          "position": [-4, 1, 4],
+          "connections": ["p3", "p13"]
+        },
+        {
+          "id": "p9",
+          "title": "接触力与场力",
+          "summary": "接触力包括弹力、摩擦力，场力包括引力、电磁力，是力的两种基本分类方式。",
+          "importance": "small",
+          "position": [2, 4, -4],
+          "connections": ["p4"]
+        },
+        {
+          "id": "p10",
+          "title": "天体运动",
+          "summary": "开普勒三定律描述行星运动规律，万有引力定律提供理论解释，是天文学基础。",
+          "importance": "medium",
+          "position": [3, -4, 4],
+          "connections": ["p5", "p14"]
+        },
+        {
+          "id": "p11",
+          "title": "重力与失重",
+          "summary": "重力是地球引力的分力，失重是支持力小于重力的现象，常见于自由落体和太空。",
+          "importance": "small",
+          "position": [-3, -4, 2],
+          "connections": ["p5"]
+        },
+        {
+          "id": "p12",
+          "title": "机械能守恒",
+          "summary": "只有保守力做功时，动能与势能之和保持不变，是能量守恒的重要特例。",
+          "importance": "medium",
+          "position": [-6, 4, 2],
+          "connections": ["p7", "p15"]
+        },
+        {
+          "id": "p13",
+          "title": "动量守恒定律",
+          "summary": "系统不受外力或合外力为零时，总动量保持不变，广泛应用于碰撞、爆炸问题。",
+          "importance": "large",
+          "position": [-5, 0, 5],
+          "connections": ["p8"]
+        },
+        {
+          "id": "p14",
+          "title": "宇宙速度",
+          "summary": "第一宇宙速度7.9km/s绕地运行，第二11.2km/s脱离地球，第三16.7km/s脱离太阳系。",
+          "importance": "small",
+          "position": [4, -5, 5],
+          "connections": ["p10"]
+        },
+        {
+          "id": "p15",
+          "title": "能量守恒定律",
+          "summary": "能量既不会凭空产生也不会消失，只能从一种形式转化为另一种，是自然界最基本定律之一。",
+          "importance": "large",
+          "position": [-7, 2, 4],
+          "connections": ["p12"]
+        }
+      ]
+    },
+    {
+      "id": "biology",
+      "name": "细胞生物学",
+      "color": "#4CAF50",
+      "nodes": [
+        {
+          "id": "b1",
+          "title": "细胞学说",
+          "summary": "细胞是生物体结构和功能的基本单位，所有生物都由细胞构成，细胞通过分裂产生新细胞。",
+          "importance": "large",
+          "position": [0, 0, 0],
+          "connections": ["b2", "b3", "b4", "b5"]
+        },
+        {
+          "id": "b2",
+          "title": "原核细胞",
+          "summary": "无成形细胞核的细胞，结构简单，包括细菌和蓝藻，是地球上最早出现的生命形式。",
+          "importance": "medium",
+          "position": [3, 2, 1],
+          "connections": ["b1", "b6"]
+        },
+        {
+          "id": "b3",
+          "title": "真核细胞",
+          "summary": "有成形细胞核和多种细胞器的复杂细胞，构成动物、植物、真菌等高等生物。",
+          "importance": "large",
+          "position": [-3, 2, 2],
+          "connections": ["b1", "b7", "b8", "b9"]
+        },
+        {
+          "id": "b4",
+          "title": "细胞膜",
+          "summary": "由磷脂双分子层和蛋白质构成的选择透过性膜，控制物质进出并进行细胞间信息交流。",
+          "importance": "medium",
+          "position": [0, 3, -3],
+          "connections": ["b1", "b10"]
+        },
+        {
+          "id": "b5",
+          "title": "细胞分裂",
+          "summary": "细胞增殖的方式，包括有丝分裂、减数分裂和无丝分裂，是生物生长发育的基础。",
+          "importance": "large",
+          "position": [0, -3, 3],
+          "connections": ["b1", "b11", "b12"]
+        },
+        {
+          "id": "b6",
+          "title": "细菌结构",
+          "summary": "典型原核生物，有细胞壁、细胞膜、细胞质，无成形细胞核，遗传物质为环状DNA。",
+          "importance": "small",
+          "position": [5, 3, 2],
+          "connections": ["b2"]
+        },
+        {
+          "id": "b7",
+          "title": "细胞核",
+          "summary": "真核细胞的控制中心，包含染色体DNA，负责基因表达和遗传信息传递。",
+          "importance": "large",
+          "position": [-5, 3, 3],
+          "connections": ["b3", "b13"]
+        },
+        {
+          "id": "b8",
+          "title": "细胞器",
+          "summary": "细胞质中具有特定功能的结构，包括线粒体、叶绿体、内质网、高尔基体等。",
+          "importance": "medium",
+          "position": [-4, 1, 4],
+          "connections": ["b3", "b14", "b15", "b16"]
+        },
+        {
+          "id": "b9",
+          "title": "植物细胞",
+          "summary": "特有的结构包括细胞壁、叶绿体和大液泡，能够进行光合作用制造有机物。",
+          "importance": "medium",
+          "position": [-2, 4, -4],
+          "connections": ["b3", "b17"]
+        },
+        {
+          "id": "b10",
+          "title": "物质跨膜运输",
+          "summary": "包括自由扩散、协助扩散等被动运输和主动运输，以及胞吞胞吐等大分子运输方式。",
+          "importance": "medium",
+          "position": [2, 4, -4],
+          "connections": ["b4"]
+        },
+        {
+          "id": "b11",
+          "title": "有丝分裂",
+          "summary": "体细胞增殖的主要方式，经历间期、前期、中期、后期、末期，保证染色体平均分配。",
+          "importance": "medium",
+          "position": [3, -4, 4],
+          "connections": ["b5", "b18"]
+        },
+        {
+          "id": "b12",
+          "title": "减数分裂",
+          "summary": "有性生殖细胞的分裂方式，DNA复制一次细胞分裂两次，产生染色体数目减半的配子。",
+          "importance": "medium",
+          "position": [-3, -4, 2],
+          "connections": ["b5"]
+        },
+        {
+          "id": "b13",
+          "title": "染色体与DNA",
+          "summary": "染色体由DNA和蛋白质构成，DNA是遗传信息的载体，基因是具有遗传效应的DNA片段。",
+          "importance": "large",
+          "position": [-6, 4, 2],
+          "connections": ["b7"]
+        },
+        {
+          "id": "b14",
+          "title": "线粒体",
+          "summary": "有氧呼吸的主要场所，被称为细胞的动力工厂，具有自己的DNA和双层膜结构。",
+          "importance": "medium",
+          "position": [-3, 0, 6],
+          "connections": ["b8"]
+        },
+        {
+          "id": "b15",
+          "title": "叶绿体",
+          "summary": "光合作用的场所，存在于植物细胞中，能够将光能转化为化学能储存在有机物中。",
+          "importance": "medium",
+          "position": [-5, -1, 5],
+          "connections": ["b8"]
+        },
+        {
+          "id": "b16",
+          "title": "内质网与高尔基体",
+          "summary": "内质网参与蛋白质和脂质合成，高尔基体对蛋白质进行加工、分类和包装运输。",
+          "importance": "small",
+          "position": [-6, 1, 3],
+          "connections": ["b8"]
+        },
+        {
+          "id": "b17",
+          "title": "光合作用",
+          "summary": "绿色植物利用光能将CO2和H2O转化为有机物并释放O2，是生态系统能量流动的起点。",
+          "importance": "large",
+          "position": [-1, 5, -5],
+          "connections": ["b9"]
+        },
+        {
+          "id": "b18",
+          "title": "细胞周期",
+          "summary": "连续分裂的细胞从一次分裂完成到下一次完成的全过程，包括间期和分裂期。",
+          "importance": "small",
+          "position": [4, -5, 5],
+          "connections": ["b11"]
+        }
+      ]
+    },
+    {
+      "id": "history",
+      "name": "世界历史年表",
+      "color": "#FFC107",
+      "nodes": [
+        {
+          "id": "h1",
+          "title": "人类文明起源",
+          "summary": "约公元前3000年起，四大文明古国在大河流域兴起，创造了文字、城市和国家制度。",
+          "importance": "large",
+          "position": [0, 0, 0],
+          "connections": ["h2", "h3", "h4", "h5"]
+        },
+        {
+          "id": "h2",
+          "title": "古埃及文明",
+          "summary": "尼罗河流域的古老文明，以金字塔、象形文字和木乃伊闻名，延续三千年之久。",
+          "importance": "medium",
+          "position": [3, 2, 1],
+          "connections": ["h1", "h6"]
+        },
+        {
+          "id": "h3",
+          "title": "两河流域文明",
+          "summary": "幼发拉底河与底格里斯河流域，苏美尔人创造楔形文字，古巴比伦颁布汉谟拉比法典。",
+          "importance": "medium",
+          "position": [-3, 2, 2],
+          "connections": ["h1", "h7"]
+        },
+        {
+          "id": "h4",
+          "title": "古希腊文明",
+          "summary": "西方文明的源头，以城邦民主制、哲学思想和艺术成就著称，影响深远。",
+          "importance": "large",
+          "position": [0, 3, -3],
+          "connections": ["h1", "h8", "h9"]
+        },
+        {
+          "id": "h5",
+          "title": "古罗马文明",
+          "summary": "从城邦发展为横跨欧亚非的大帝国，法律、建筑和政治制度对西方影响巨大。",
+          "importance": "large",
+          "position": [0, -3, 3],
+          "connections": ["h1", "h10", "h11"]
+        },
+        {
+          "id": "h6",
+          "title": "金字塔时代",
+          "summary": "古王国时期约公元前2600-2300年，建造吉萨大金字塔等宏伟建筑，是法老权力的象征。",
+          "importance": "small",
+          "position": [5, 3, 2],
+          "connections": ["h2"]
+        },
+        {
+          "id": "h7",
+          "title": "汉谟拉比法典",
+          "summary": "公元前18世纪古巴比伦颁布，是现存最早的较完整成文法典，包含282条法律条文。",
+          "importance": "small",
+          "position": [-5, 3, 3],
+          "connections": ["h3"]
+        },
+        {
+          "id": "h8",
+          "title": "雅典民主政治",
+          "summary": "公元前5世纪伯里克利改革后，成年男性公民直接参与国家管理，开创民主政治先河。",
+          "importance": "medium",
+          "position": [2, 4, -4],
+          "connections": ["h4", "h12"]
+        },
+        {
+          "id": "h9",
+          "title": "希腊哲学",
+          "summary": "苏格拉底、柏拉图、亚里士多德等哲学家开创理性思维传统，奠定西方哲学基础。",
+          "importance": "medium",
+          "position": [-2, 4, -4],
+          "connections": ["h4", "h13"]
+        },
+        {
+          "id": "h10",
+          "title": "罗马共和国",
+          "summary": "公元前509-27年，实行元老院、执政官和公民大会三权分立，不断扩张征服地中海。",
+          "importance": "medium",
+          "position": [3, -4, 4],
+          "connections": ["h5", "h14"]
+        },
+        {
+          "id": "h11",
+          "title": "罗马帝国",
+          "summary": "公元前27年屋大维建立帝制，至公元395年分裂，476年西罗马帝国灭亡标志古代史结束。",
+          "importance": "medium",
+          "position": [-3, -4, 2],
+          "connections": ["h5", "h15"]
+        },
+        {
+          "id": "h12",
+          "title": "希波战争",
+          "summary": "公元前5世纪希腊城邦与波斯帝国的战争，马拉松战役、温泉关战役等流传千古。",
+          "importance": "small",
+          "position": [4, 5, -5],
+          "connections": ["h8"]
+        },
+        {
+          "id": "h13",
+          "title": "亚历山大大帝",
+          "summary": "公元前336-323年，马其顿国王，征服波斯帝国直至印度，开创希腊化时代。",
+          "importance": "medium",
+          "position": [-4, 5, -5],
+          "connections": ["h9", "h16"]
+        },
+        {
+          "id": "h14",
+          "title": "布匿战争",
+          "summary": "公元前264-146年罗马与迦太基的三次战争，汉尼拔的军事天才与罗马的坚韧对决。",
+          "importance": "small",
+          "position": [4, -5, 5],
+          "connections": ["h10"]
+        },
+        {
+          "id": "h15",
+          "title": "基督教兴起",
+          "summary": "公元1世纪起源于巴勒斯坦，392年成为罗马国教，深刻影响欧洲历史文化发展。",
+          "importance": "large",
+          "position": [-4, -5, 3],
+          "connections": ["h11"]
+        },
+        {
+          "id": "h16",
+          "title": "希腊化时代",
+          "summary": "亚历山大东征后至公元前1世纪，东西方文化交流融合，科学文化繁荣发展。",
+          "importance": "small",
+          "position": [-6, 4, -3],
+          "connections": ["h13"]
+        }
+      ]
+    }
+  ]
+}
