@@ -3,7 +3,7 @@ import { TileType, LevelData } from '@/types'
 import { validateLevel } from './LevelValidator'
 
 const GRID_SIZE = 15
-const CELL_SIZE = 40
+const BASE_CELL_SIZE = 40
 
 interface ToolItem {
   type: TileType | 'eraser'
@@ -22,6 +22,18 @@ const TOOLS: ToolItem[] = [
   { type: 'eraser', name: '橡皮擦', color: '#6B7280' },
 ]
 
+interface FlashCell {
+  x: number
+  y: number
+  timestamp: number
+}
+
+interface ToastState {
+  message: string
+  type: 'success' | 'error'
+  visible: boolean
+}
+
 interface EditorPanelProps {
   onBack: () => void
 }
@@ -37,11 +49,37 @@ const EditorPanel: React.FC<EditorPanelProps> = ({ onBack }) => {
   const [levelName, setLevelName] = useState('自定义关卡')
   const [dragPos, setDragPos] = useState<{ x: number; y: number } | null>(null)
   const [isDragging, setIsDragging] = useState(false)
-  const [validationResult, setValidationResult] = useState<{ valid: boolean; errors: string[]; warnings: string[] } | null>(null)
+  const [validationResult, setValidationResult] = useState<{
+    valid: boolean
+    errors: string[]
+    warnings: string[]
+  } | null>(null)
   const [showExportedJson, setExportedJson] = useState<string>('')
-  const [showExportSuccess, setExportSuccess] = useState(false)
+  const [flashCells, setFlashCells] = useState<FlashCell[]>([])
+  const [toast, setToast] = useState<ToastState>({
+    message: '',
+    type: 'success',
+    visible: false,
+  })
+  const [zoom, setZoom] = useState(1.0)
 
-  const canvasSize = GRID_SIZE * CELL_SIZE
+  const cellSize = Math.round(BASE_CELL_SIZE * zoom)
+  const canvasSize = GRID_SIZE * cellSize
+
+  const showToast = useCallback((message: string, type: 'success' | 'error') => {
+    setToast({ message, type, visible: true })
+    setTimeout(() => {
+      setToast(prev => ({ ...prev, visible: false }))
+    }, 2000)
+  }, [])
+
+  useEffect(() => {
+    const now = Date.now()
+    const active = flashCells.filter(f => now - f.timestamp < 150)
+    if (active.length !== flashCells.length) {
+      setFlashCells(active)
+    }
+  }, [flashCells])
 
   useEffect(() => {
     const canvas = canvasRef.current
@@ -50,14 +88,21 @@ const EditorPanel: React.FC<EditorPanelProps> = ({ onBack }) => {
     const ctx = canvas.getContext('2d')
     if (!ctx) return
 
+    const cs = cellSize
+    const w = GRID_SIZE * cs
+    const h = GRID_SIZE * cs
+
+    canvas.width = w
+    canvas.height = h
+
     ctx.fillStyle = '#0B0E17'
-    ctx.fillRect(0, 0, canvasSize, canvasSize)
+    ctx.fillRect(0, 0, w, h)
 
     for (let y = 0; y < GRID_SIZE; y++) {
       for (let x = 0; x < GRID_SIZE; x++) {
         const tile = grid[y][x]
-        const px = x * CELL_SIZE
-        const py = y * CELL_SIZE
+        const px = x * cs
+        const py = y * cs
 
         let color = '#1F2937'
         switch (tile) {
@@ -85,35 +130,48 @@ const EditorPanel: React.FC<EditorPanelProps> = ({ onBack }) => {
         }
 
         ctx.fillStyle = color
-        ctx.fillRect(px + 1, py + 1, CELL_SIZE - 2, CELL_SIZE - 2)
+        ctx.fillRect(px + 1, py + 1, cs - 2, cs - 2)
 
         ctx.strokeStyle = '#374151'
         ctx.lineWidth = 1
-        ctx.strokeRect(px, py, CELL_SIZE, CELL_SIZE)
+        ctx.strokeRect(px, py, cs, cs)
 
         if (tile === 'start') {
           ctx.fillStyle = '#fff'
-          ctx.font = 'bold 14px sans-serif'
+          ctx.font = `bold ${Math.max(10, Math.round(cs * 0.35))}px sans-serif`
           ctx.textAlign = 'center'
           ctx.textBaseline = 'middle'
-          ctx.fillText('S', px + CELL_SIZE / 2, py + CELL_SIZE / 2)
+          ctx.fillText('S', px + cs / 2, py + cs / 2)
         }
         if (tile === 'exit') {
           ctx.fillStyle = '#fff'
-          ctx.font = 'bold 14px sans-serif'
+          ctx.font = `bold ${Math.max(10, Math.round(cs * 0.35))}px sans-serif`
           ctx.textAlign = 'center'
           ctx.textBaseline = 'middle'
-          ctx.fillText('E', px + CELL_SIZE / 2, py + CELL_SIZE / 2)
+          ctx.fillText('E', px + cs / 2, py + cs / 2)
         }
+      }
+    }
+
+    const now = Date.now()
+    for (const flash of flashCells) {
+      const elapsed = now - flash.timestamp
+      if (elapsed < 150) {
+        const alpha = 1 - elapsed / 150
+        const px = flash.x * cs
+        const py = flash.y * cs
+        ctx.strokeStyle = `rgba(255, 255, 255, ${alpha})`
+        ctx.lineWidth = 2
+        ctx.strokeRect(px + 1, py + 1, cs - 2, cs - 2)
       }
     }
 
     if (dragPos && isDragging) {
       ctx.strokeStyle = '#60A5FA'
       ctx.lineWidth = 2
-      ctx.strokeRect(dragPos.x * CELL_SIZE, dragPos.y * CELL_SIZE, CELL_SIZE, CELL_SIZE)
+      ctx.strokeRect(dragPos.x * cs, dragPos.y * cs, cs, cs)
     }
-  }, [grid, dragPos, isDragging, canvasSize])
+  }, [grid, dragPos, isDragging, cellSize, flashCells])
 
   const getGridPos = useCallback(
     (e: React.MouseEvent<HTMLCanvasElement>): { x: number; y: number } | null => {
@@ -121,15 +179,17 @@ const EditorPanel: React.FC<EditorPanelProps> = ({ onBack }) => {
       if (!canvas) return null
 
       const rect = canvas.getBoundingClientRect()
-      const x = Math.floor((e.clientX - rect.left) / CELL_SIZE)
-      const y = Math.floor((e.clientY - rect.top) / CELL_SIZE)
+      const scaleX = canvas.width / rect.width
+      const scaleY = canvas.height / rect.height
+      const x = Math.floor(((e.clientX - rect.left) * scaleX) / cellSize)
+      const y = Math.floor(((e.clientY - rect.top) * scaleY) / cellSize)
 
       if (x >= 0 && x < GRID_SIZE && y >= 0 && y < GRID_SIZE) {
         return { x, y }
       }
       return null
     },
-    []
+    [cellSize]
   )
 
   const paintCell = useCallback(
@@ -163,6 +223,8 @@ const EditorPanel: React.FC<EditorPanelProps> = ({ onBack }) => {
 
         return newGrid
       })
+
+      setFlashCells(prev => [...prev, { x, y, timestamp: Date.now() }])
     },
     [selectedTool]
   )
@@ -217,6 +279,7 @@ const EditorPanel: React.FC<EditorPanelProps> = ({ onBack }) => {
     setValidationResult(result)
 
     if (!result.valid) {
+      showToast('入口与出口不可达，请调整地形', 'error')
       return
     }
 
@@ -242,8 +305,7 @@ const EditorPanel: React.FC<EditorPanelProps> = ({ onBack }) => {
       })
 
       if (response.ok) {
-        setExportSuccess(true)
-        setTimeout(() => setExportSuccess(false), 2000)
+        showToast('关卡校验通过，已导出为JSON文件', 'success')
       }
     } catch (err) {
       console.error('保存失败:', err)
@@ -271,91 +333,109 @@ const EditorPanel: React.FC<EditorPanelProps> = ({ onBack }) => {
       </div>
 
       <div style={styles.mainContent}>
-        <div style={styles.toolbar}>
-          <h3 style={styles.toolbarTitle}>工具栏</h3>
-          <div style={styles.toolGrid}>
-            {TOOLS.map(tool => (
-              <div
-                key={tool.type}
-                style={{
-                  ...styles.toolItemBase,
-                  border: selectedTool === tool.type ? '2px solid #60A5FA' : '2px solid transparent',
-                }}
-                className="tool-item"
-                onClick={() => setSelectedTool(tool.type)}
-              >
+        <div style={styles.toolbarBorder}>
+          <div style={styles.toolbar}>
+            <h3 style={styles.toolbarTitle}>工具栏</h3>
+            <div style={styles.toolGrid}>
+              {TOOLS.map(tool => (
                 <div
+                  key={tool.type}
                   style={{
-                    ...styles.toolIcon,
-                    backgroundColor: tool.color,
+                    ...styles.toolItemBase,
+                    border:
+                      selectedTool === tool.type
+                        ? '2px solid #60A5FA'
+                        : '2px solid transparent',
                   }}
-                />
-                <span style={styles.toolName}>{tool.name}</span>
+                  onClick={() => setSelectedTool(tool.type)}
+                >
+                  <div
+                    style={{
+                      ...styles.toolIcon,
+                      backgroundColor: tool.color,
+                    }}
+                  />
+                  <span style={styles.toolName}>{tool.name}</span>
+                </div>
+              ))}
+            </div>
+
+            <div style={styles.actions}>
+              <button style={styles.actionButton} onClick={handleClear}>
+                清空
+              </button>
+              <button style={styles.actionButton} onClick={handleValidate}>
+                校验
+              </button>
+              <button
+                style={{ ...styles.actionButton, ...styles.primaryButton }}
+                onClick={handleExport}
+              >
+                保存
+              </button>
+            </div>
+
+            {validationResult && (
+              <div style={styles.validationResult}>
+                {validationResult.errors.length > 0 && (
+                  <div style={styles.errorBox}>
+                    <h4 style={styles.errorTitle}>错误：</h4>
+                    <ul style={styles.errorList}>
+                      {validationResult.errors.map((err, i) => (
+                        <li key={i} style={styles.errorItem}>
+                          {err}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                {validationResult.warnings.length > 0 && (
+                  <div style={styles.warningBox}>
+                    <h4 style={styles.warningTitle}>警告：</h4>
+                    <ul style={styles.warningList}>
+                      {validationResult.warnings.map((warn, i) => (
+                        <li key={i} style={styles.warningItem}>
+                          {warn}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                {validationResult.valid && validationResult.errors.length === 0 && (
+                  <div style={styles.successBox}>✓ 关卡校验通过</div>
+                )}
               </div>
-            ))}
-          </div>
+            )}
 
-          <div style={styles.actions}>
-            <button style={styles.actionButton} onClick={handleClear}>
-              清空
-            </button>
-            <button style={styles.actionButton} onClick={handleValidate}>
-              校验
-            </button>
-            <button style={{ ...styles.actionButton, ...styles.primaryButton }} onClick={handleExport}>
-              保存
-            </button>
-          </div>
+            {showExportedJson && (
+              <div style={styles.jsonSection}>
+                <h4 style={styles.jsonTitle}>JSON 导出</h4>
+                <textarea
+                  value={showExportedJson}
+                  readOnly
+                  style={styles.jsonTextarea}
+                />
+                <button style={styles.downloadButton} onClick={handleDownloadJson}>
+                  下载 JSON
+                </button>
+              </div>
+            )}
 
-          {validationResult && (
-            <div style={styles.validationResult}>
-              {validationResult.errors.length > 0 && (
-                <div style={styles.errorBox}>
-                  <h4 style={styles.errorTitle}>错误：</h4>
-                  <ul style={styles.errorList}>
-                    {validationResult.errors.map((err, i) => (
-                      <li key={i} style={styles.errorItem}>
-                        {err}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-              {validationResult.warnings.length > 0 && (
-                <div style={styles.warningBox}>
-                  <h4 style={styles.warningTitle}>警告：</h4>
-                  <ul style={styles.warningList}>
-                    {validationResult.warnings.map((warn, i) => (
-                      <li key={i} style={styles.warningItem}>
-                        {warn}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-              {validationResult.valid && validationResult.errors.length === 0 && (
-                <div style={styles.successBox}>✓ 关卡校验通过</div>
-              )}
+            <div style={styles.zoomSection}>
+              <label style={styles.zoomLabel}>
+                缩放: {zoom.toFixed(1)}x
+              </label>
+              <input
+                type="range"
+                min="0.8"
+                max="1.5"
+                step="0.1"
+                value={zoom}
+                onChange={e => setZoom(parseFloat(e.target.value))}
+                style={styles.zoomSlider}
+              />
             </div>
-          )}
-
-          {showExportSuccess && (
-            <div style={styles.exportSuccess}>✓ 保存成功！</div>
-          )}
-
-          {showExportedJson && (
-            <div style={styles.jsonSection}>
-              <h4 style={styles.jsonTitle}>JSON 导出</h4>
-            <textarea
-              value={showExportedJson}
-              readOnly
-              style={styles.jsonTextarea}
-            />
-              <button style={styles.downloadButton} onClick={handleDownloadJson}>
-              下载 JSON
-            </button>
-            </div>
-          )}
+          </div>
         </div>
 
         <div style={styles.canvasWrapper}>
@@ -363,7 +443,11 @@ const EditorPanel: React.FC<EditorPanelProps> = ({ onBack }) => {
             ref={canvasRef}
             width={canvasSize}
             height={canvasSize}
-            style={styles.canvas}
+            style={{
+              ...styles.canvas,
+              width: canvasSize,
+              height: canvasSize,
+            }}
             onMouseDown={handleMouseDown}
             onMouseMove={handleMouseMove}
             onMouseUp={handleMouseUp}
@@ -371,6 +455,17 @@ const EditorPanel: React.FC<EditorPanelProps> = ({ onBack }) => {
           />
         </div>
       </div>
+
+      {toast.visible && (
+        <div
+          style={{
+            ...styles.toast,
+            background: toast.type === 'success' ? '#1E293B' : '#7F1D1D',
+          }}
+        >
+          {toast.message}
+        </div>
+      )}
     </div>
   )
 }
@@ -383,6 +478,7 @@ const styles: Record<string, React.CSSProperties> = {
     flexDirection: 'column',
     padding: '20px',
     gap: '16px',
+    position: 'relative',
   },
   header: {
     display: 'flex',
@@ -412,13 +508,18 @@ const styles: Record<string, React.CSSProperties> = {
     justifyContent: 'center',
     alignItems: 'flex-start',
   },
+  toolbarBorder: {
+    borderRadius: '9px',
+    background: 'linear-gradient(135deg, #6366F1, #7C3AED)',
+    padding: '1px',
+    width: '216px',
+  },
   toolbar: {
-    width: '200px',
+    width: '100%',
     padding: '16px',
     borderRadius: '8px',
     background: 'rgba(15, 23, 42, 0.8)',
     backdropFilter: 'blur(10px)',
-    border: '1px solid rgba(99, 102, 241, 0.2)',
     display: 'flex',
     flexDirection: 'column',
     gap: '12px',
@@ -526,15 +627,6 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: '13px',
     textAlign: 'center',
   },
-  exportSuccess: {
-    background: 'rgba(16, 185, 129, 0.1)',
-    border: '1px solid rgba(16, 185, 129, 0.3)',
-    borderRadius: '6px',
-    padding: '8px',
-    color: '#34D399',
-    fontSize: '13px',
-    textAlign: 'center',
-  },
   jsonSection: {
     marginTop: '8px',
     display: 'flex',
@@ -567,17 +659,52 @@ const styles: Record<string, React.CSSProperties> = {
     cursor: 'pointer',
     fontSize: '12px',
   },
+  zoomSection: {
+    marginTop: '8px',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '6px',
+  },
+  zoomLabel: {
+    color: '#9CA3AF',
+    fontSize: '12px',
+  },
+  zoomSlider: {
+    width: '100%',
+    height: '6px',
+    appearance: 'none',
+    background: '#374151',
+    borderRadius: '3px',
+    outline: 'none',
+    cursor: 'pointer',
+  },
   canvasWrapper: {
     padding: '12px',
     borderRadius: '12px',
     background: 'rgba(31, 41, 55, 0.3)',
     boxShadow: '0 0 20px rgba(49, 46, 129, 0.6)',
     border: '1px solid rgba(49, 46, 129, 0.6)',
+    overflow: 'auto',
   },
   canvas: {
     display: 'block',
     borderRadius: '4px',
     cursor: 'crosshair',
+  },
+  toast: {
+    position: 'fixed',
+    bottom: '32px',
+    left: '50%',
+    transform: 'translateX(-50%)',
+    padding: '12px 24px',
+    borderRadius: '8px',
+    color: '#fff',
+    fontSize: '14px',
+    fontWeight: '500',
+    zIndex: 1000,
+    boxShadow: '0 4px 20px rgba(0, 0, 0, 0.4)',
+    transition: 'opacity 0.3s ease',
+    pointerEvents: 'none',
   },
 }
 
