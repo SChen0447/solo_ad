@@ -50,6 +50,7 @@ export class GameEngine {
   private walls: Wall[] = [];
   private exits: Exit[] = [];
   private fragments: BrickFragment[] = [];
+  private walkableShadowRegions: { x: number; y: number; w: number; h: number; points: { x: number; y: number }[] }[] = [];
   private isPlaying: boolean = false;
   private isEditorMode: boolean = true;
   private lastTime: number = 0;
@@ -266,6 +267,26 @@ export class GameEngine {
     } else {
       updateLightSources(this.lightSources, dt);
     }
+
+    this.updateWalkableShadowRegions();
+  }
+
+  private updateWalkableShadowRegions(): void {
+    const regions = computeShadowRegions(this.lightSources, this.shadowBlocks);
+    this.walkableShadowRegions = regions.map(r => {
+      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+      for (const p of r.points) {
+        minX = Math.min(minX, p.x);
+        minY = Math.min(minY, p.y);
+        maxX = Math.max(maxX, p.x);
+        maxY = Math.max(maxY, p.y);
+      }
+      return { x: minX, y: minY, w: maxX - minX, h: maxY - minY, points: r.points };
+    });
+  }
+
+  public isInWalkableShadow(px: number, py: number): boolean {
+    return isPointInShadow(px, py, this.lightSources, this.shadowBlocks);
   }
 
   private updatePlayerPhysics(dt: number): void {

@@ -109,6 +109,8 @@ export class Player {
     if (this.scatterParticlesSpawned) return;
     this.scatterParticlesSpawned = true;
 
+    const totalDuration = this.transitionDuration;
+    const halfDur = totalDuration / 2;
     const count = Math.min(20, this.maxParticles);
     const available = this.maxParticles - this.particles.length;
     const actualCount = Math.min(count, available);
@@ -130,8 +132,8 @@ export class Player {
         x: this.x,
         y: this.y,
         size: 2 + Math.random() * 3,
-        life: this.transitionDuration / 2,
-        maxLife: this.transitionDuration / 2,
+        life: halfDur,
+        maxLife: halfDur,
         phase: 'scatter',
         angle: angle,
         speed: speed
@@ -143,6 +145,7 @@ export class Player {
     if (this.gatherParticlesSpawned) return;
     this.gatherParticlesSpawned = true;
 
+    const halfDur = this.transitionDuration / 2;
     const scatterCount = this.particles.length;
     const count = Math.min(20, this.maxParticles);
     const available = this.maxParticles - scatterCount;
@@ -164,8 +167,8 @@ export class Player {
         x: startX,
         y: startY,
         size: 2 + Math.random() * 3,
-        life: this.transitionDuration / 2,
-        maxLife: this.transitionDuration / 2,
+        life: halfDur,
+        maxLife: halfDur,
         phase: 'gather',
         angle: angle,
         speed: 0
@@ -181,10 +184,11 @@ export class Player {
 
     if (this.transitioning) {
       const prevTimer = this.transitionTimer;
-      this.transitionTimer += dt;
-      const halfDur = this.transitionDuration / 2;
+      this.transitionTimer = Math.min(this.transitionDuration, this.transitionTimer + dt);
+      const totalDuration = this.transitionDuration;
+      const halfDur = totalDuration / 2;
 
-      if (prevTimer < halfDur && this.transitionTimer >= 0) {
+      if (prevTimer < halfDur && this.transitionTimer >= 0 && !this.scatterParticlesSpawned) {
         this.spawnScatterParticles();
       }
 
@@ -195,37 +199,37 @@ export class Player {
         this.spawnGatherParticles();
       }
 
-      this.updateParticles(dt);
+      this.updateParticles(dt, halfDur);
 
-      if (this.transitionTimer >= this.transitionDuration) {
+      if (this.transitionTimer >= totalDuration) {
         this.transitioning = false;
         this.transitionTimer = 0;
+        this.scatterParticlesSpawned = false;
+        this.gatherParticlesSpawned = false;
         this.particles = [];
       }
     }
   }
 
-  private updateParticles(dt: number): void {
-    const halfDur = this.transitionDuration / 2;
-
+  private updateParticles(dt: number, halfDur: number): void {
     for (let i = this.particles.length - 1; i >= 0; i--) {
       const p = this.particles[i];
 
       if (p.phase === 'scatter') {
-        const scatterProgress = 1 - (this.transitionTimer) / halfDur;
-        const t = Math.max(0, Math.min(1, scatterProgress));
-        const easeT = 1 - Math.pow(1 - t, 3);
+        const localT = (halfDur - p.life) / halfDur;
+        const t = Math.max(0, Math.min(1, localT));
+        const easeT = t * t;
         p.x = p.startX + (p.endX - p.startX) * easeT;
         p.y = p.startY + (p.endY - p.startY) * easeT;
       } else {
-        const gatherTimer = this.transitionTimer - halfDur;
-        const t = Math.max(0, Math.min(1, gatherTimer / halfDur));
+        const localT = (halfDur - p.life) / halfDur;
+        const t = Math.max(0, Math.min(1, localT));
         const easeT = t * t * (3 - 2 * t);
         p.x = p.startX + (this.x - p.startX) * easeT;
         p.y = p.startY + (this.y - p.startY) * easeT;
       }
 
-      p.life -= dt;
+      p.life = Math.max(0, p.life - dt);
       if (p.life <= 0) {
         this.particles.splice(i, 1);
       }

@@ -6,6 +6,7 @@ export interface LightSource {
   range: number;
   animTime: number;
   spawnAnim: number;
+  flowOffset: number;
 }
 
 export interface ShadowBlock {
@@ -61,7 +62,7 @@ export interface BrickFragment {
 }
 
 export interface LevelData {
-  lightSources: Omit<LightSource, 'animTime' | 'spawnAnim'>[];
+  lightSources: Omit<LightSource, 'animTime' | 'spawnAnim' | 'flowOffset'>[];
   shadowBlocks: Omit<ShadowBlock, 'vx' | 'vy' | 'spawnAnim'>[];
   bricks: Omit<Brick, 'illuminated' | 'broken' | 'breakTimer' | 'spawnAnim'>[];
   walls: Wall[];
@@ -69,7 +70,7 @@ export interface LevelData {
 }
 
 export function createLightSource(x: number, y: number, angle: number, spread: number, range: number): LightSource {
-  return { x, y, angle, spread, range, animTime: 0, spawnAnim: 0.2 };
+  return { x, y, angle, spread, range, animTime: 0, spawnAnim: 0.2, flowOffset: 0 };
 }
 
 export function createShadowBlock(x: number, y: number, width: number, height: number): ShadowBlock {
@@ -89,10 +90,16 @@ export function createExit(x: number, y: number, width: number, height: number):
 }
 
 export function updateLightSources(sources: LightSource[], dt: number): void {
+  const FLOW_SPEED = 180;
+  const FLOW_THRESHOLD = 200;
   for (const s of sources) {
     s.animTime += dt;
     if (s.spawnAnim > 0) {
       s.spawnAnim = Math.max(0, s.spawnAnim - dt);
+    }
+    s.flowOffset += FLOW_SPEED * dt;
+    if (s.flowOffset >= FLOW_THRESHOLD) {
+      s.flowOffset %= FLOW_THRESHOLD;
     }
   }
 }
@@ -338,12 +345,30 @@ export function renderLightSources(
   ctx: CanvasRenderingContext2D, sources: LightSource[], blocks: ShadowBlock[]
 ): void {
   for (const src of sources) {
+    let beamScale = 1;
+    if (src.spawnAnim > 0) {
+      const t = 1 - src.spawnAnim / 0.2;
+      const ease = t * t * (3 - 2 * t);
+      beamScale = 0.0 + 1.0 * ease;
+    }
+    ctx.save();
+    ctx.translate(src.x, src.y);
+    ctx.scale(beamScale, beamScale);
+    ctx.translate(-src.x, -src.y);
     renderLightBeam(ctx, src, blocks);
+    ctx.restore();
   }
 
   for (const src of sources) {
+    let scale = 1;
+    if (src.spawnAnim > 0) {
+      const t = 1 - src.spawnAnim / 0.2;
+      const ease = t * t * (3 - 2 * t);
+      scale = 0.0 + 1.0 * ease;
+    }
+
     const pulse = 1 + Math.sin(src.animTime * 4) * 0.1;
-    const radius = 14 * pulse;
+    const radius = 14 * pulse * scale;
 
     const glow = ctx.createRadialGradient(src.x, src.y, 2, src.x, src.y, radius * 3);
     glow.addColorStop(0, 'rgba(255, 240, 150, 0.9)');
@@ -414,11 +439,11 @@ function renderLightBeam(
   ctx.clip();
 
   const flowLineCount = 16;
-  const flowSpeed = 140;
+  const FLOW_THRESHOLD = 200;
   for (let i = 0; i < flowLineCount; i++) {
     const rayT = i / (flowLineCount - 1);
     const rayAng = src.angle - src.spread / 2 + src.spread * rayT;
-    
+
     const rayDx = Math.cos(rayAng);
     const rayDy = Math.sin(rayAng);
     const rayOcc = getClosestOccluderAlongRay(src.x, src.y, rayDx, rayDy, src.range, blocks);
@@ -426,7 +451,8 @@ function renderLightBeam(
 
     const lineLen = 50 + (i % 4) * 15;
     const cycleLen = rayMaxDist + lineLen;
-    const phase = ((src.animTime * flowSpeed + i * (cycleLen / flowLineCount)) % cycleLen);
+    const perLineOffset = (cycleLen / flowLineCount) * i;
+    const phase = (src.flowOffset + perLineOffset) % cycleLen;
     const startDist = Math.max(0, phase - lineLen);
     const endDist = Math.min(rayMaxDist, phase);
 
@@ -459,16 +485,18 @@ function renderLightBeam(
   }
 
   const particleCount = 8;
+  const PARTICLE_THRESHOLD = 200;
   for (let i = 0; i < particleCount; i++) {
     const rayT = (i + 0.5) / particleCount + Math.sin(src.animTime * 2 + i) * 0.02;
     const rayAng = src.angle - src.spread / 2 + src.spread * rayT;
     const rayDx = Math.cos(rayAng);
     const rayDy = Math.sin(rayAng);
-    
+
     const rayOcc2 = getClosestOccluderAlongRay(src.x, src.y, rayDx, rayDy, src.range, blocks);
     const rayMaxDist2 = rayOcc2 ? Math.min(rayOcc2.dist, src.range) : src.range;
 
-    const cycle = (src.animTime * 90 + i * 80) % (rayMaxDist2 + 40);
+    const perParticleOffset = (rayMaxDist2 / particleCount) * i;
+    const cycle = (src.flowOffset * 0.5 + perParticleOffset) % (rayMaxDist2 + 40);
     const pDist = cycle;
     const alpha = Math.max(0, 1 - Math.abs(pDist - rayMaxDist2 / 2) / (rayMaxDist2 / 2)) * 0.5;
 
