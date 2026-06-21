@@ -24,9 +24,8 @@ interface BurstParticle {
   color: string
 }
 
-interface StarState {
-  errorShake: number
-  errorFlash: number
+interface StarErrorState {
+  startTime: number
 }
 
 const DESIGN_WIDTH = 1000
@@ -67,21 +66,25 @@ const interpolateColor = (color1: string, color2: string, t: number): string => 
 export default function Constellation({ constellation, onComplete, resetKey }: ConstellationProps) {
   const svgRef = useRef<SVGSVGElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
+  const outlinePathRef = useRef<SVGPathElement>(null)
+
   const [scale, setScale] = useState(1)
   const [offsetX, setOffsetX] = useState(0)
   const [offsetY, setOffsetY] = useState(0)
   const [connectedPairs, setConnectedPairs] = useState<Array<[number, number]>>([])
   const [currentStep, setCurrentStep] = useState(0)
-  const [drawingLines, setDrawingLines] = useState<DrawingLine[]>([])
-  const [starStates, setStarStates] = useState<Record<number, StarState>>({})
-  const [outlineOpacity, setOutlineOpacity] = useState(0)
   const [isComplete, setIsComplete] = useState(false)
   const [completeGlow, setCompleteGlow] = useState(0)
   const [burstParticles, setBurstParticles] = useState<BurstParticle[]>([])
+  const [, setTick] = useState(0)
+
   const startTimeRef = useRef<number>(0)
   const completeTimeRef = useRef<number>(0)
   const animRef = useRef<number>(0)
-  const shakeTimersRef = useRef<Record<number, number>>({})
+  const outlineFadeRef = useRef<{ startTime: number; rafId: number | null }>({ startTime: 0, rafId: null })
+  const drawingLinesRef = useRef<DrawingLine[]>([])
+  const starErrorsRef = useRef<Record<number, StarErrorState>>({})
+  const outlineOpacityRef = useRef(0)
 
   const updateLayout = useCallback(() => {
     if (!containerRef.current) return
@@ -101,37 +104,81 @@ export default function Constellation({ constellation, onComplete, resetKey }: C
     return () => window.removeEventListener('resize', updateLayout)
   }, [updateLayout])
 
+  const startOutlineFadeIn = useCallback(() => {
+    if (outlineFadeRef.current.rafId !== null) {
+      cancelAnimationFrame(outlineFadeRef.current.rafId)
+    }
+    outlineOpacityRef.current = 0
+    if (outlinePathRef.current) {
+      outlinePathRef.current.style.opacity = '0'
+    }
+
+    const startTime = performance.now()
+    outlineFadeRef.current.startTime = startTime
+
+    const animate = () => {
+      const now = performance.now()
+      const rawProgress = Math.min(1, (now - startTime) / OUTLINE_FADE_DURATION)
+      const easedProgress = 1 - Math.pow(1 - rawProgress, 3)
+      const opacity = easedProgress * 0.15
+      outlineOpacityRef.current = opacity
+
+      if (outlinePathRef.current) {
+        outlinePathRef.current.style.opacity = String(opacity)
+      }
+
+      if (rawProgress < 1) {
+        outlineFadeRef.current.rafId = requestAnimationFrame(animate)
+      } else {
+        outlineFadeRef.current.rafId = null
+      }
+    }
+
+    outlineFadeRef.current.rafId = requestAnimationFrame(animate)
+  }, [])
+
   useEffect(() => {
     setConnectedPairs([])
     setCurrentStep(0)
-    setDrawingLines([])
-    setStarStates({})
     setIsComplete(false)
     setCompleteGlow(0)
     setBurstParticles([])
+    drawingLinesRef.current = []
+    starErrorsRef.current = {}
     startTimeRef.current = performance.now()
     completeTimeRef.current = 0
-    Object.values(shakeTimersRef.current).forEach(t => clearTimeout(t))
-    shakeTimersRef.current = {}
 
-    setOutlineOpacity(0)
-    const start = performance.now()
-    const fadeIn = () => {
-      const now = performance.now()
-      const rawProgress = Math.min(1, (now - start) / OUTLINE_FADE_DURATION)
-      const easedProgress = 1 - Math.pow(1 - rawProgress, 3)
-      setOutlineOpacity(easedProgress * 0.15)
-      if (rawProgress < 1) requestAnimationFrame(fadeIn)
-    }
-    requestAnimationFrame(fadeIn)
-  }, [constellation, resetKey])
+    startOutlineFadeIn()
+  }, [constellation, resetKey, startOutlineFadeIn])
 
   useEffect(() => {
     const render = (now: number) => {
-      setDrawingLines(prev =>
-        prev
-          .map(line => ({ ...line }))
-      )
+      const drawingLines = drawingLinesRef.current
+      if (drawingLines.length > 0) {
+        const finished: DrawingLine[] = []
+        const remaining: DrawingLine[] = []
+        for (const line of drawingLines) {
+          if (now - line.startTime >= line.duration) {
+            finished.push(line)
+          } else {
+            remaining.push(line)
+          }
+        }
+        if (finished.length > 0) {
+          drawingLinesRef.current = remaining
+          const newPairs: Array<[number, number]> = finished.map(l => [l.fromIdx, l.toIdx])
+          setConnectedPairs(cp => [...cp, ...newPairs])
+        }
+      }
+
+      const starErrors = starErrorsRef.current
+      let starErrorsChanged = false
+      for (const [idxStr, state] of Object.entries(starErrors)) {
+        if (now - state.startTime >= ERROR_FLASH_DURATION) {
+          delete starErrors[Number(idxStr)]
+          starErrorsChanged = true
+        }
+      }
 
       setBurstParticles(prev =>
         prev
@@ -144,31 +191,14 @@ export default function Constellation({ constellation, onComplete, resetKey }: C
           .filter(p => p.life > 0)
       )
 
-      setStarStates(prev => {
-        let changed = false
-        const next: Record<number, StarState> = {}
-        for (const [idx, s] of Object.entries(prev)) {
-          const i = Number(idx)
-          const ns: StarState = { ...s }
-          if (ns.errorFlash > 0) {
-            ns.errorFlash = Math.max(0, ns.errorFlash - 16)
-            changed = true
-          }
-          if (ns.errorShake > 0) {
-            ns.errorShake = Math.max(0, ns.errorShake - 16)
-            changed = true
-          }
-          next[i] = ns
-        }
-        return changed ? next : prev
-      })
-
       if (isComplete && completeGlow < 0.8) {
         const elapsed = now - completeTimeRef.current
         const progress = Math.min(1, elapsed / COMPLETE_GLOW_DURATION)
         const eased = 1 - Math.pow(1 - progress, 3)
         setCompleteGlow(eased * 0.8)
       }
+
+      setTick(t => t + 1)
 
       animRef.current = requestAnimationFrame(render)
     }
@@ -177,30 +207,18 @@ export default function Constellation({ constellation, onComplete, resetKey }: C
   }, [isComplete, completeGlow])
 
   useEffect(() => {
-    if (drawingLines.length === 0) return
-    const check = setInterval(() => {
-      const now = performance.now()
-      setDrawingLines(prev => {
-        const filtered = prev.filter(line => now - line.startTime < line.duration + 50)
-        const finished = prev.filter(line => now - line.startTime >= line.duration)
-        if (finished.length > 0) {
-          const newPairs: Array<[number, number]> = finished.map(l => [l.fromIdx, l.toIdx])
-          setConnectedPairs(cp => [...cp, ...newPairs])
-        }
-        return filtered.length !== prev.length ? filtered : prev
-      })
-    }, 30)
-    return () => clearInterval(check)
-  }, [drawingLines])
+    return () => {
+      if (outlineFadeRef.current.rafId !== null) {
+        cancelAnimationFrame(outlineFadeRef.current.rafId)
+        outlineFadeRef.current.rafId = null
+      }
+    }
+  }, [])
 
   const triggerError = (starIdx: number) => {
-    setStarStates(prev => ({
-      ...prev,
-      [starIdx]: {
-        errorFlash: ERROR_FLASH_DURATION,
-        errorShake: ERROR_SHAKE_DURATION,
-      },
-    }))
+    starErrorsRef.current[starIdx] = {
+      startTime: performance.now(),
+    }
   }
 
   const triggerBurst = () => {
@@ -238,15 +256,15 @@ export default function Constellation({ constellation, onComplete, resetKey }: C
     }
 
     const fromIdx = constellation.sequence[currentStep]
-    setDrawingLines(prev => [
-      ...prev,
+    drawingLinesRef.current = [
+      ...drawingLinesRef.current,
       {
         fromIdx,
         toIdx: starIdx,
         startTime: performance.now(),
         duration: DRAW_DURATION,
       },
-    ])
+    ]
 
     const nextStep = currentStep + 1
     setCurrentStep(nextStep)
@@ -265,33 +283,50 @@ export default function Constellation({ constellation, onComplete, resetKey }: C
     }
   }
 
-  const getShakeOffset = (starIdx: number) => {
-    const s = starStates[starIdx]
-    if (!s || s.errorShake <= 0 || s.errorFlash <= 0) return { x: 0, y: 0 }
-    const t = 1 - s.errorShake / ERROR_FLASH_DURATION
+  const getShakeOffset = (starIdx: number, now: number) => {
+    const state = starErrorsRef.current[starIdx]
+    if (!state) return { x: 0, y: 0 }
+    const elapsed = now - state.startTime
+    if (elapsed >= ERROR_FLASH_DURATION) return { x: 0, y: 0 }
+    const t = elapsed / ERROR_FLASH_DURATION
     const intensity = Math.sin(t * Math.PI * 8) * ERROR_SHAKE_OFFSET * (1 - t)
     return { x: intensity, y: intensity * 0.7 }
   }
 
-  const getStarColor = (starIdx: number) => {
-    const s = starStates[starIdx]
-    const isError = s && s.errorFlash > 0
-    if (isError) return '#FF4444'
+  const getStarErrorProgress = (starIdx: number, now: number) => {
+    const state = starErrorsRef.current[starIdx]
+    if (!state) return 0
+    const elapsed = now - state.startTime
+    if (elapsed >= ERROR_FLASH_DURATION) return 0
+    return elapsed / ERROR_FLASH_DURATION
+  }
+
+  const isStarInError = (starIdx: number, now: number) => {
+    const state = starErrorsRef.current[starIdx]
+    if (!state) return false
+    return now - state.startTime < ERROR_FLASH_DURATION
+  }
+
+  const getStarColor = (starIdx: number, now: number) => {
+    if (isStarInError(starIdx, now)) return '#FF4444'
     const idxInSeq = constellation.sequence.slice(0, currentStep + 1).includes(starIdx)
     if (idxInSeq && isComplete) return '#FFD700'
     if (idxInSeq) return '#00BFFF'
     return '#FFFFFF'
   }
 
-  const getGlowOpacity = (starIdx: number) => {
+  const getGlowOpacity = (starIdx: number, now: number) => {
     const idxInSeq = constellation.sequence.slice(0, currentStep + 1).includes(starIdx)
+    if (isStarInError(starIdx, now)) return 0.8
     if (isComplete && idxInSeq) return 0.9
     if (idxInSeq) return 0.6
     return 0.25
   }
 
   const stars = constellation.stars
-  const visibleOpacity = 0.15 + completeGlow
+  const now = performance.now()
+  const drawingLines = drawingLinesRef.current
+  const outlineStyleOpacity = outlineOpacityRef.current + completeGlow * 0.6
 
   return (
     <div
@@ -336,32 +371,30 @@ export default function Constellation({ constellation, onComplete, resetKey }: C
         </defs>
 
         <path
+          ref={outlinePathRef}
           d={constellation.outlinePath}
           fill="none"
           stroke="#8A2BE2"
           strokeWidth="2"
           strokeLinecap="round"
           strokeLinejoin="round"
-          style={{ opacity: outlineOpacity + completeGlow * 0.6 }}
+          style={{ opacity: outlineStyleOpacity }}
         />
 
         {connectedPairs.map(([from, to], i) => {
           const [x1, y1] = stars[from]
           const [x2, y2] = stars[to]
-          const t = 1
-          const ex = x1 + (x2 - x1) * t
-          const ey = y1 + (y2 - y1) * t
           return (
             <g key={`conn-${i}`} filter="url(#lineGlow)">
               <line
-                x1={x1} y1={y1} x2={ex} y2={ey}
+                x1={x1} y1={y1} x2={x2} y2={y2}
                 stroke="#FFFFFF"
                 strokeWidth="1"
                 strokeOpacity={0.5 + completeGlow * 0.3}
                 strokeLinecap="round"
               />
               <line
-                x1={x1} y1={y1} x2={ex} y2={ey}
+                x1={x1} y1={y1} x2={x2} y2={y2}
                 stroke="#00BFFF"
                 strokeWidth="3"
                 strokeOpacity={0.8}
@@ -374,7 +407,7 @@ export default function Constellation({ constellation, onComplete, resetKey }: C
         {drawingLines.map((line, i) => {
           const [x1, y1] = stars[line.fromIdx]
           const [x2, y2] = stars[line.toIdx]
-          const progress = Math.min(1, (performance.now() - line.startTime) / line.duration)
+          const progress = Math.min(1, (now - line.startTime) / line.duration)
           const t = Math.min(1, progress)
           const ex = x1 + (x2 - x1) * t
           const ey = y1 + (y2 - y1) * t
@@ -417,14 +450,14 @@ export default function Constellation({ constellation, onComplete, resetKey }: C
         })}
 
         {stars.map(([x, y], idx) => {
-          const shake = getShakeOffset(idx)
-          const color = getStarColor(idx)
-          const glowOpacity = getGlowOpacity(idx)
-          const isError = starStates[idx]?.errorFlash > 0
-          const errorProgress = isError ? 1 - (starStates[idx]!.errorFlash / ERROR_FLASH_DURATION) : 0
+          const shake = getShakeOffset(idx, now)
+          const color = getStarColor(idx, now)
+          const glowOpacity = getGlowOpacity(idx, now)
+          const isError = isStarInError(idx, now)
+          const errorProgress = getStarErrorProgress(idx, now)
           const actualX = x + shake.x
           const actualY = y + shake.y
-          const pulse = 1 + Math.sin(performance.now() / 500 + idx) * 0.05
+          const pulse = 1 + Math.sin(now / 500 + idx) * 0.05
           const r = STAR_RADIUS * (isComplete && errorProgress < 0.5 ? 1.2 : pulse)
 
           return (

@@ -126,7 +126,7 @@ export default function App() {
           {CONSTELLATIONS.map((_, i) => {
             const isDone = completedLevels[i]
             const isCurrent = i === currentLevel
-            const canJump = isDone || isCurrent
+            const canJump = isDone
             return (
               <div
                 key={`progress-dot-${i}`}
