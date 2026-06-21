@@ -58,8 +58,12 @@ const PlayerControls: React.FC<PlayerControlsProps> = ({
   }
 
   const handleProgressMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+    e.preventDefault()
     setIsDragging(true)
     const time = getTimeFromX(e.clientX)
+    const rect = progressRef.current!.getBoundingClientRect()
+    setHoverTime(time)
+    setHoverX(e.clientX - rect.left)
     onSeek(time)
   }
 

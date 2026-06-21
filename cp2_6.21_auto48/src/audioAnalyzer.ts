@@ -32,14 +32,43 @@ export class AudioAnalyzer {
   }
 
   async decodeAudioFile(file: File): Promise<{ duration: number; sampleRate: number; numberOfChannels: number }> {
+    if (!file || file.size === 0) {
+      throw new Error('文件为空，请选择有效的音频文件')
+    }
     if (!this.audioContext) {
       this.initAudioContext()
     }
-    if (this.audioContext!.state === 'suspended') {
-      await this.audioContext!.resume()
+    if (!this.audioContext) {
+      throw new Error('无法初始化音频上下文，请检查浏览器支持')
     }
-    const arrayBuffer = await file.arrayBuffer()
-    this.audioBuffer = await this.audioContext!.decodeAudioData(arrayBuffer.slice(0))
+    if (this.audioContext.state === 'suspended') {
+      try {
+        await this.audioContext.resume()
+      } catch (e) {
+        console.warn('恢复音频上下文失败:', e)
+      }
+    }
+    let arrayBuffer: ArrayBuffer
+    try {
+      arrayBuffer = await file.arrayBuffer()
+    } catch (e) {
+      throw new Error('读取文件失败，请确保文件未被占用')
+    }
+    if (arrayBuffer.byteLength === 0) {
+      throw new Error('音频文件内容为空')
+    }
+    try {
+      const decodeBuffer = arrayBuffer.slice(0)
+      this.audioBuffer = await this.audioContext.decodeAudioData(decodeBuffer)
+    } catch (e) {
+      throw new Error('音频解码失败，请确保文件格式正确（MP3或WAV）')
+    }
+    if (!this.audioBuffer || this.audioBuffer.length === 0) {
+      throw new Error('解码后的音频数据为空，文件可能已损坏')
+    }
+    if (this.audioBuffer.duration <= 0) {
+      throw new Error('音频时长无效，请检查文件')
+    }
     return {
       duration: this.audioBuffer.duration,
       sampleRate: this.audioBuffer.sampleRate,
@@ -49,49 +78,80 @@ export class AudioAnalyzer {
 
   getWaveformData(samples: number = 1000): number[] {
     if (!this.audioBuffer) return []
-    const channelData = this.audioBuffer.getChannelData(0)
-    const blockSize = Math.floor(channelData.length / samples)
-    const waveform: number[] = []
-    for (let i = 0; i < samples; i++) {
-      const start = i * blockSize
-      let sum = 0
-      for (let j = 0; j < blockSize; j++) {
-        sum += Math.abs(channelData[start + j])
+    try {
+      const channelData = this.audioBuffer.getChannelData(0)
+      if (!channelData || channelData.length === 0) return []
+      const blockSize = Math.max(1, Math.floor(channelData.length / samples))
+      const waveform: number[] = []
+      const len = Math.min(samples, Math.floor(channelData.length / blockSize))
+      for (let i = 0; i < len; i++) {
+        const start = i * blockSize
+        let sum = 0
+        let count = 0
+        for (let j = 0; j < blockSize && start + j < channelData.length; j++) {
+          const val = channelData[start + j]
+          if (isFinite(val)) {
+            sum += Math.abs(val)
+            count++
+          }
+        }
+        waveform.push(count > 0 ? sum / count : 0)
       }
-      waveform.push(sum / blockSize)
+      return waveform
+    } catch (e) {
+      console.error('获取波形数据失败:', e)
+      return []
     }
-    return waveform
   }
 
   play(startTime: number = this.pausedAt) {
-    if (!this.audioBuffer || !this.audioContext || !this.analyser) return
-    this.stop()
-    this.source = this.audioContext.createBufferSource()
-    this.source.buffer = this.audioBuffer
-    this.source.playbackRate.value = this.playbackRate
-    this.source.connect(this.analyser)
-    this.source.onended = () => {
-      if (this.isPlaying) {
+    if (!this.audioBuffer || !this.audioContext || !this.analyser) {
+      console.warn('播放失败：音频未就绪')
+      return
+    }
+    try {
+      this.stop()
+      this.source = this.audioContext.createBufferSource()
+      this.source.buffer = this.audioBuffer
+      this.source.playbackRate.value = this.playbackRate
+      this.source.connect(this.analyser)
+      this.source.onended = () => {
+        if (this.isPlaying) {
+          this.isPlaying = false
+          this.pausedAt = 0
+          this.stopAnimation()
+        }
+      }
+      this.source.onerror = (e) => {
+        console.error('音频播放错误:', e)
         this.isPlaying = false
-        this.pausedAt = 0
         this.stopAnimation()
       }
+      const offset = Math.max(0, Math.min(startTime, this.audioBuffer.duration))
+      this.source.start(0, offset)
+      this.startTime = this.audioContext.currentTime - offset
+      this.pausedAt = offset
+      this.isPlaying = true
+      this.startAnimation()
+    } catch (e) {
+      console.error('启动播放失败:', e)
+      this.isPlaying = false
+      this.stopAnimation()
     }
-    const offset = Math.min(startTime, this.audioBuffer.duration)
-    this.source.start(0, offset)
-    this.startTime = this.audioContext.currentTime - offset
-    this.pausedAt = offset
-    this.isPlaying = true
-    this.startAnimation()
   }
 
   pause() {
-    if (this.source && this.audioContext && this.isPlaying) {
-      this.pausedAt = this.audioContext.currentTime - this.startTime
-      this.source.stop()
-      this.source = null
+    try {
+      if (this.source && this.audioContext && this.isPlaying) {
+        this.pausedAt = Math.max(0, this.audioContext.currentTime - this.startTime)
+        this.source.stop()
+        this.source = null
+        this.isPlaying = false
+        this.stopAnimation()
+      }
+    } catch (e) {
+      console.error('暂停失败:', e)
       this.isPlaying = false
-      this.stopAnimation()
     }
   }
 
@@ -99,7 +159,9 @@ export class AudioAnalyzer {
     if (this.source) {
       try {
         this.source.stop()
-      } catch (e) {}
+      } catch (e) {
+        console.warn('停止源失败（可能已停止）:', e)
+      }
       this.source = null
     }
     this.isPlaying = false
@@ -107,29 +169,52 @@ export class AudioAnalyzer {
   }
 
   seek(time: number) {
-    const wasPlaying = this.isPlaying
-    this.pausedAt = Math.max(0, Math.min(time, this.audioBuffer?.duration || 0))
-    if (wasPlaying) {
-      this.play(this.pausedAt)
+    try {
+      const validTime = Math.max(0, Math.min(time, this.audioBuffer?.duration || 0))
+      if (!isFinite(validTime)) return
+      const wasPlaying = this.isPlaying
+      this.pausedAt = validTime
+      if (wasPlaying) {
+        this.play(this.pausedAt)
+      }
+    } catch (e) {
+      console.error('跳转失败:', e)
     }
   }
 
   setPlaybackRate(rate: number) {
-    this.playbackRate = rate
-    if (this.source) {
-      this.source.playbackRate.value = rate
+    try {
+      const validRate = Math.max(0.5, Math.min(2.0, rate))
+      if (!isFinite(validRate)) return
+      this.playbackRate = validRate
+      if (this.source) {
+        this.source.playbackRate.value = validRate
+      }
+    } catch (e) {
+      console.error('设置播放速率失败:', e)
     }
   }
 
   setVolume(volume: number) {
-    if (this.gainNode) {
-      this.gainNode.gain.value = Math.max(0, Math.min(1, volume))
+    try {
+      const validVolume = Math.max(0, Math.min(1, volume))
+      if (!isFinite(validVolume)) return
+      if (this.gainNode) {
+        this.gainNode.gain.value = validVolume
+      }
+    } catch (e) {
+      console.error('设置音量失败:', e)
     }
   }
 
   getCurrentTime(): number {
-    if (!this.isPlaying || !this.audioContext) return this.pausedAt
-    return this.audioContext.currentTime - this.startTime
+    try {
+      if (!this.isPlaying || !this.audioContext) return this.pausedAt
+      const time = this.audioContext.currentTime - this.startTime
+      return Math.max(0, Math.min(time, this.audioBuffer?.duration || 0))
+    } catch (e) {
+      return this.pausedAt
+    }
   }
 
   getIsPlaying(): boolean {

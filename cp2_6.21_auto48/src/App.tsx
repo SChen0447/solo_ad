@@ -417,16 +417,24 @@ const App: React.FC = () => {
 
       {isMobile && (
         <>
-          {showMobilePanel && (
-            <div style={styles.mobilePanelOverlay} onClick={() => setShowMobilePanel(false)} />
-          )}
+          <div
+            style={{
+              ...styles.mobilePanelOverlay,
+              opacity: showMobilePanel ? 1 : 0,
+              pointerEvents: showMobilePanel ? 'auto' : 'none',
+            }}
+            onClick={() => setShowMobilePanel(false)}
+          />
           <div
             style={{
               ...styles.mobilePanel,
               transform: showMobilePanel ? 'translateY(0)' : 'translateY(100%)',
             }}
           >
-            <div style={styles.mobilePanelHandle} />
+            <div
+              style={styles.mobilePanelHandle}
+              onClick={() => setShowMobilePanel(false)}
+            />
             <div style={{ height: 'calc(100% - 30px)', overflow: 'auto' }}>
               <EditorPanel
                 markers={markers}
@@ -446,6 +454,7 @@ const App: React.FC = () => {
             style={{
               ...styles.mobileToggleButton,
               background: showMobilePanel ? '#8B82FF' : '#6C63FF',
+              transform: showMobilePanel ? 'translateY(-60vh)' : 'translateY(0)',
             }}
             onClick={() => setShowMobilePanel(!showMobilePanel)}
           >
@@ -456,7 +465,7 @@ const App: React.FC = () => {
               fill="none"
               style={{
                 transform: showMobilePanel ? 'rotate(180deg)' : 'rotate(0deg)',
-                transition: 'transform 0.2s ease-out',
+                transition: 'transform 0.3s ease-out',
               }}
             >
               <path
@@ -674,6 +683,7 @@ const styles: Record<string, React.CSSProperties> = {
     inset: 0,
     background: 'rgba(0, 0, 0, 0.5)',
     zIndex: 998,
+    transition: 'opacity 0.3s ease-out',
   },
   mobilePanel: {
     position: 'fixed',
@@ -685,7 +695,7 @@ const styles: Record<string, React.CSSProperties> = {
     borderTopLeftRadius: 16,
     borderTopRightRadius: 16,
     zIndex: 999,
-    transition: 'transform 0.3s ease-out',
+    transition: 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
     boxShadow: '0 -4px 24px rgba(0, 0, 0, 0.3)',
   },
   mobilePanelHandle: {
@@ -694,6 +704,8 @@ const styles: Record<string, React.CSSProperties> = {
     borderRadius: 2,
     background: '#3D3D5C',
     margin: '14px auto 0',
+    cursor: 'pointer',
+    transition: 'background 0.2s ease-out',
   },
   mobileToggleButton: {
     position: 'fixed',
@@ -708,7 +720,7 @@ const styles: Record<string, React.CSSProperties> = {
     alignItems: 'center',
     justifyContent: 'center',
     boxShadow: '0 4px 16px rgba(108, 99, 255, 0.4)',
-    transition: 'all 0.2s ease-out',
+    transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
     zIndex: 1000,
   },
 }

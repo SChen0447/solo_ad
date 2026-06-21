@@ -208,8 +208,25 @@ export class WaveformVisualizer {
     let offset = this.getLabelOffset(id)
     const rect = this.getCanvasRect()
     const fivePercent = rect.width * 0.05
-    const snapped = Math.round(offset / fivePercent) * fivePercent
-    offset = snapped
+    let nearestMarkerOffset = offset
+    let minDistance = Infinity
+    for (const marker of this.markers) {
+      if (marker.id === id) continue
+      const markerX = this.timeToX(marker.time)
+      const currentMarkerX = this.timeToX(this.markers.find((m) => m.id === id)!.time)
+      const markerOffset = markerX - currentMarkerX
+      const distance = Math.abs(offset - markerOffset)
+      if (distance < minDistance) {
+        minDistance = distance
+        nearestMarkerOffset = markerOffset
+      }
+    }
+    const snappedToFivePercent = Math.round(offset / fivePercent) * fivePercent
+    if (minDistance < fivePercent) {
+      offset = nearestMarkerOffset
+    } else {
+      offset = snappedToFivePercent
+    }
     this.setLabelOffset(id, offset)
     if (this.onLabelDragEnd) {
       this.onLabelDragEnd(id, offset)
@@ -250,6 +267,7 @@ export class WaveformVisualizer {
     input.style.left = `${canvasRect.left + labelRect.x + 10}px`
     input.style.top = `${canvasRect.top + labelRect.y + 6}px`
     input.style.width = '160px'
+    input.style.maxWidth = '160px'
     input.style.height = `${labelRect.h - 12}px`
     input.style.border = 'none'
     input.style.background = 'transparent'
@@ -258,6 +276,9 @@ export class WaveformVisualizer {
     input.style.fontFamily = '-apple-system, sans-serif'
     input.style.outline = 'none'
     input.style.zIndex = '1000'
+    input.style.overflow = 'hidden'
+    input.style.textOverflow = 'ellipsis'
+    input.style.boxSizing = 'border-box'
     input.className = 'marker-label-input'
     const submit = () => {
       if (this.onLabelSubmit) {
@@ -301,38 +322,28 @@ export class WaveformVisualizer {
     const midY = height / 2
     const step = width / this.staticWaveformData.length
     ctx.save()
-    ctx.beginPath()
     ctx.shadowColor = 'rgba(108, 99, 255, 0.5)'
     ctx.shadowBlur = 4
     ctx.lineWidth = 1.5
     const len = this.staticWaveformData.length
-    for (let i = 0; i < len; i++) {
-      const x = i * step
-      const amp = this.staticWaveformData[i]
-      const barHeight = amp * height * 0.4
-      const t = i / len
+    for (let i = 0; i < len - 1; i++) {
+      const x1 = i * step
+      const x2 = (i + 1) * step
+      const amp1 = this.staticWaveformData[i]
+      const amp2 = this.staticWaveformData[i + 1]
+      const h1 = amp1 * height * 0.4
+      const h2 = amp2 * height * 0.4
+      const t = (i + 0.5) / len
       ctx.strokeStyle = lerpColor(t)
-      if (i === 0) {
-        ctx.moveTo(x, midY - barHeight)
-      } else {
-        ctx.lineTo(x, midY - barHeight)
-      }
+      ctx.beginPath()
+      ctx.moveTo(x1, midY - h1)
+      ctx.lineTo(x2, midY - h2)
+      ctx.stroke()
+      ctx.beginPath()
+      ctx.moveTo(x1, midY + h1)
+      ctx.lineTo(x2, midY + h2)
+      ctx.stroke()
     }
-    ctx.stroke()
-    ctx.beginPath()
-    for (let i = 0; i < len; i++) {
-      const x = i * step
-      const amp = this.staticWaveformData[i]
-      const barHeight = amp * height * 0.4
-      const t = i / len
-      ctx.strokeStyle = lerpColor(t)
-      if (i === 0) {
-        ctx.moveTo(x, midY + barHeight)
-      } else {
-        ctx.lineTo(x, midY + barHeight)
-      }
-    }
-    ctx.stroke()
     ctx.restore()
   }
 
@@ -342,18 +353,19 @@ export class WaveformVisualizer {
     const { frequencies } = this.currentFrequencyData
     const barCount = Math.min(64, frequencies.length)
     const step = width / barCount
-    const padding = step * 0.2
+    const padding = step * 0.25
     for (let i = 0; i < barCount; i++) {
       const freqIndex = Math.floor((i / barCount) * frequencies.length)
       const value = frequencies[freqIndex]
       const normalized = value / 255
-      const barWidth = Math.max(4, Math.min(8, 4 + normalized * 4))
-      const barHeight = normalized * height * 0.5
+      const volume = normalized
+      const barWidth = 4 + volume * 4
+      const barHeight = normalized * height * 0.55
       const x = i * step + padding / 2
       const y = height - barHeight
       const t = i / barCount
       const gradient = ctx.createLinearGradient(0, y, 0, height)
-      gradient.addColorStop(0, lerpColor(t + 0.2))
+      gradient.addColorStop(0, lerpColor(Math.min(1, t + 0.15)))
       gradient.addColorStop(1, lerpColor(t))
       ctx.fillStyle = gradient
       const actualX = x + (step - padding - barWidth) / 2
@@ -610,12 +622,12 @@ export class EnvelopeEditor {
   private handleMouseMove = (e: MouseEvent) => {
     if (!this.draggingPointId) return
     const rect = this.getCanvasRect()
-    const deltaX = e.clientX - this.dragStartX
-    const deltaY = e.clientY - this.dragStartY
-    const deltaTime = (deltaX / rect.width) * this.duration
-    const deltaVolume = -deltaY / rect.height
-    let newTime = Math.max(0, Math.min(this.duration, this.dragStartTime + deltaTime))
-    let newVolume = Math.max(0, Math.min(1, this.dragStartVolume + deltaVolume))
+    const canvasY = e.clientY - rect.top
+    const canvasX = e.clientX - rect.left
+    const clampedX = Math.max(0, Math.min(rect.width, canvasX))
+    const clampedY = Math.max(0, Math.min(rect.height, canvasY))
+    const newTime = Math.max(0, Math.min(this.duration, this.xToTime(clampedX)))
+    const newVolume = Math.max(0, Math.min(1, this.yToVolume(clampedY)))
     if (this.onUpdatePoint) {
       this.onUpdatePoint(this.draggingPointId, newTime, newVolume)
     }
