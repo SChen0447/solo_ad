@@ -1,0 +1,162 @@
+[
+  {
+    "id": "beijing",
+    "name": "北京",
+    "abbr": "BJ",
+    "index": 0,
+    "records": [
+      { "month": 1, "temperature": -3.1, "precipitation": 3, "sunshine": 190, "windSpeed": 2.8, "event": { "description": "1月：寒潮3次，低温极值-18.3℃", "type": "cold", "value": -18.3 } },
+      { "month": 2, "temperature": 0.2, "precipitation": 6, "sunshine": 185, "windSpeed": 3.1, "event": { "description": "2月：大风4天，沙尘1次", "type": "wind", "value": 6.2 } },
+      { "month": 3, "temperature": 7.5, "precipitation": 9, "sunshine": 220, "windSpeed": 3.5, "event": { "description": "3月：沙尘2次，大风5天", "type": "dust", "value": 5.8 } },
+      { "month": 4, "temperature": 15.2, "precipitation": 22, "sunshine": 230, "windSpeed": 3.3, "event": null },
+      { "month": 5, "temperature": 21.8, "precipitation": 35, "sunshine": 260, "windSpeed": 2.9, "event": null },
+      { "month": 6, "temperature": 26.1, "precipitation": 78, "sunshine": 240, "windSpeed": 2.5, "event": { "description": "6月：高温3天，最高37.5℃", "type": "heat", "value": 37.5 } },
+      { "month": 7, "temperature": 27.8, "precipitation": 185, "sunshine": 200, "windSpeed": 2.2, "event": { "description": "7月：大雨5天，高温极值39.2℃", "type": "rain", "value": 39.2 } },
+      { "month": 8, "temperature": 26.5, "precipitation": 160, "sunshine": 210, "windSpeed": 2.1, "event": { "description": "8月：暴雨2次", "type": "rain", "value": 120 } },
+      { "month": 9, "temperature": 21.3, "precipitation": 55, "sunshine": 225, "windSpeed": 2.3, "event": null },
+      { "month": 10, "temperature": 13.8, "precipitation": 20, "sunshine": 210, "windSpeed": 2.6, "event": null },
+      { "month": 11, "temperature": 5.2, "precipitation": 8, "sunshine": 185, "windSpeed": 2.8, "event": { "description": "11月：寒潮2次，初雪提前", "type": "cold", "value": -8.5 } },
+      { "month": 12, "temperature": -1.5, "precipitation": 3, "sunshine": 175, "windSpeed": 2.7, "event": null }
+    ]
+  },
+  {
+    "id": "shanghai",
+    "name": "上海",
+    "abbr": "SH",
+    "index": 1,
+    "records": [
+      { "month": 1, "temperature": 4.8, "precipitation": 50, "sunshine": 120, "windSpeed": 3.2, "event": null },
+      { "month": 2, "temperature": 6.1, "precipitation": 55, "sunshine": 115, "windSpeed": 3.5, "event": null },
+      { "month": 3, "temperature": 10.5, "precipitation": 82, "sunshine": 135, "windSpeed": 3.3, "event": null },
+      { "month": 4, "temperature": 16.2, "precipitation": 90, "sunshine": 155, "windSpeed": 3.0, "event": null },
+      { "month": 5, "temperature": 21.5, "precipitation": 105, "sunshine": 175, "windSpeed": 2.8, "event": null },
+      { "month": 6, "temperature": 25.3, "precipitation": 175, "sunshine": 145, "windSpeed": 2.5, "event": { "description": "6月：入梅，连续降雨12天", "type": "rain", "value": 250 } },
+      { "month": 7, "temperature": 29.8, "precipitation": 145, "sunshine": 210, "windSpeed": 2.8, "event": { "description": "7月：出梅后高温7天，最高38.5℃", "type": "heat", "value": 38.5 } },
+      { "month": 8, "temperature": 29.2, "precipitation": 135, "sunshine": 220, "windSpeed": 2.6, "event": { "description": "8月：台风1次", "type": "typhoon", "value": 85 } },
+      { "month": 9, "temperature": 25.1, "precipitation": 120, "sunshine": 175, "windSpeed": 2.5, "event": null },
+      { "month": 10, "temperature": 19.5, "precipitation": 60, "sunshine": 165, "windSpeed": 2.7, "event": null },
+      { "month": 11, "temperature": 13.2, "precipitation": 48, "sunshine": 140, "windSpeed": 3.0, "event": null },
+      { "month": 12, "temperature": 6.8, "precipitation": 40, "sunshine": 130, "windSpeed": 3.1, "event": null }
+    ]
+  },
+  {
+    "id": "guangzhou",
+    "name": "广州",
+    "abbr": "GZ",
+    "index": 2,
+    "records": [
+      { "month": 1, "temperature": 14.2, "precipitation": 42, "sunshine": 105, "windSpeed": 2.1, "event": null },
+      { "month": 2, "temperature": 15.5, "precipitation": 65, "sunshine": 80, "windSpeed": 2.3, "event": { "description": "2月：回南天5天", "type": "humidity", "value": 95 } },
+      { "month": 3, "temperature": 18.8, "precipitation": 85, "sunshine": 75, "windSpeed": 2.2, "event": null },
+      { "month": 4, "temperature": 23.1, "precipitation": 180, "sunshine": 90, "windSpeed": 2.0, "event": { "description": "4月：暴雨3次", "type": "rain", "value": 180 } },
+      { "month": 5, "temperature": 26.8, "precipitation": 280, "sunshine": 130, "windSpeed": 2.1, "event": { "description": "5月：暴雨4次，龙舟水", "type": "rain", "value": 280 } },
+      { "month": 6, "temperature": 28.5, "precipitation": 295, "sunshine": 150, "windSpeed": 2.3, "event": null },
+      { "month": 7, "temperature": 29.8, "precipitation": 230, "sunshine": 195, "windSpeed": 2.5, "event": { "description": "7月：台风1次，高温5天", "type": "typhoon", "value": 36.8 } },
+      { "month": 8, "temperature": 29.3, "precipitation": 245, "sunshine": 185, "windSpeed": 2.4, "event": null },
+      { "month": 9, "temperature": 27.5, "precipitation": 175, "sunshine": 175, "windSpeed": 2.2, "event": null },
+      { "month": 10, "temperature": 24.2, "precipitation": 75, "sunshine": 185, "windSpeed": 2.5, "event": null },
+      { "month": 11, "temperature": 19.8, "precipitation": 35, "sunshine": 170, "windSpeed": 2.6, "event": null },
+      { "month": 12, "temperature": 15.1, "precipitation": 28, "sunshine": 155, "windSpeed": 2.4, "event": null }
+    ]
+  },
+  {
+    "id": "chengdu",
+    "name": "成都",
+    "abbr": "CD",
+    "index": 3,
+    "records": [
+      { "month": 1, "temperature": 6.2, "precipitation": 8, "sunshine": 55, "windSpeed": 1.2, "event": null },
+      { "month": 2, "temperature": 8.5, "precipitation": 12, "sunshine": 60, "windSpeed": 1.3, "event": null },
+      { "month": 3, "temperature": 13.2, "precipitation": 22, "sunshine": 80, "windSpeed": 1.5, "event": null },
+      { "month": 4, "temperature": 18.5, "precipitation": 48, "sunshine": 95, "windSpeed": 1.4, "event": null },
+      { "month": 5, "temperature": 22.8, "precipitation": 80, "sunshine": 110, "windSpeed": 1.3, "event": null },
+      { "month": 6, "temperature": 25.1, "precipitation": 110, "sunshine": 105, "windSpeed": 1.2, "event": null },
+      { "month": 7, "temperature": 26.8, "precipitation": 225, "sunshine": 120, "windSpeed": 1.1, "event": { "description": "7月：暴雨3次，最大日降雨95mm", "type": "rain", "value": 95 } },
+      { "month": 8, "temperature": 26.2, "precipitation": 200, "sunshine": 130, "windSpeed": 1.1, "event": null },
+      { "month": 9, "temperature": 22.5, "precipitation": 120, "sunshine": 80, "windSpeed": 1.0, "event": null },
+      { "month": 10, "temperature": 17.2, "precipitation": 45, "sunshine": 60, "windSpeed": 1.1, "event": null },
+      { "month": 11, "temperature": 12.1, "precipitation": 18, "sunshine": 55, "windSpeed": 1.2, "event": null },
+      { "month": 12, "temperature": 7.5, "precipitation": 6, "sunshine": 50, "windSpeed": 1.2, "event": null }
+    ]
+  },
+  {
+    "id": "harbin",
+    "name": "哈尔滨",
+    "abbr": "HB",
+    "index": 4,
+    "records": [
+      { "month": 1, "temperature": -18.3, "precipitation": 4, "sunshine": 155, "windSpeed": 3.0, "event": { "description": "1月：极寒持续，低温极值-34.5℃", "type": "cold", "value": -34.5 } },
+      { "month": 2, "temperature": -13.5, "precipitation": 5, "sunshine": 170, "windSpeed": 3.2, "event": null },
+      { "month": 3, "temperature": -3.2, "precipitation": 10, "sunshine": 210, "windSpeed": 3.5, "event": null },
+      { "month": 4, "temperature": 8.5, "precipitation": 20, "sunshine": 225, "windSpeed": 3.8, "event": { "description": "4月：大风6天，扬沙2次", "type": "wind", "value": 7.5 } },
+      { "month": 5, "temperature": 16.8, "precipitation": 40, "sunshine": 255, "windSpeed": 3.5, "event": null },
+      { "month": 6, "temperature": 22.5, "precipitation": 85, "sunshine": 260, "windSpeed": 2.8, "event": null },
+      { "month": 7, "temperature": 24.8, "precipitation": 150, "sunshine": 240, "windSpeed": 2.5, "event": { "description": "7月：暴雨2次，高温极值35.2℃", "type": "rain", "value": 35.2 } },
+      { "month": 8, "temperature": 22.8, "precipitation": 120, "sunshine": 235, "windSpeed": 2.4, "event": null },
+      { "month": 9, "temperature": 15.2, "precipitation": 55, "sunshine": 230, "windSpeed": 2.6, "event": null },
+      { "month": 10, "temperature": 5.5, "precipitation": 22, "sunshine": 205, "windSpeed": 2.9, "event": null },
+      { "month": 11, "temperature": -5.8, "precipitation": 8, "sunshine": 170, "windSpeed": 3.1, "event": { "description": "11月：暴雪2次，积雪30cm", "type": "snow", "value": 30 } },
+      { "month": 12, "temperature": -15.2, "precipitation": 5, "sunshine": 145, "windSpeed": 2.8, "event": null }
+    ]
+  },
+  {
+    "id": "urumqi",
+    "name": "乌鲁木齐",
+    "abbr": "WQ",
+    "index": 5,
+    "records": [
+      { "month": 1, "temperature": -12.5, "precipitation": 12, "sunshine": 130, "windSpeed": 2.5, "event": { "description": "1月：暴雪1次，低温-28.6℃", "type": "cold", "value": -28.6 } },
+      { "month": 2, "temperature": -9.8, "precipitation": 10, "sunshine": 145, "windSpeed": 2.8, "event": null },
+      { "month": 3, "temperature": 0.5, "precipitation": 15, "sunshine": 180, "windSpeed": 3.5, "event": { "description": "3月：沙尘暴1次", "type": "dust", "value": 8.5 } },
+      { "month": 4, "temperature": 12.2, "precipitation": 22, "sunshine": 215, "windSpeed": 3.8, "event": null },
+      { "month": 5, "temperature": 19.5, "precipitation": 28, "sunshine": 260, "windSpeed": 3.2, "event": null },
+      { "month": 6, "temperature": 24.8, "precipitation": 18, "sunshine": 280, "windSpeed": 2.8, "event": { "description": "6月：高温5天，最高38.2℃", "type": "heat", "value": 38.2 } },
+      { "month": 7, "temperature": 27.2, "precipitation": 22, "sunshine": 290, "windSpeed": 2.5, "event": { "description": "7月：高温极值40.5℃", "type": "heat", "value": 40.5 } },
+      { "month": 8, "temperature": 25.8, "precipitation": 18, "sunshine": 280, "windSpeed": 2.4, "event": null },
+      { "month": 9, "temperature": 18.5, "precipitation": 12, "sunshine": 260, "windSpeed": 2.6, "event": null },
+      { "month": 10, "temperature": 8.2, "precipitation": 15, "sunshine": 220, "windSpeed": 2.8, "event": null },
+      { "month": 11, "temperature": -2.5, "precipitation": 18, "sunshine": 155, "windSpeed": 2.9, "event": null },
+      { "month": 12, "temperature": -10.2, "precipitation": 15, "sunshine": 120, "windSpeed": 2.6, "event": null }
+    ]
+  },
+  {
+    "id": "lasa",
+    "name": "拉萨",
+    "abbr": "LS",
+    "index": 6,
+    "records": [
+      { "month": 1, "temperature": -1.5, "precipitation": 1, "sunshine": 250, "windSpeed": 2.8, "event": null },
+      { "month": 2, "temperature": 1.2, "precipitation": 2, "sunshine": 240, "windSpeed": 3.0, "event": null },
+      { "month": 3, "temperature": 5.0, "precipitation": 3, "sunshine": 255, "windSpeed": 3.2, "event": null },
+      { "month": 4, "temperature": 8.5, "precipitation": 8, "sunshine": 260, "windSpeed": 3.5, "event": { "description": "4月：大风7天，扬沙3次", "type": "wind", "value": 8.2 } },
+      { "month": 5, "temperature": 12.8, "precipitation": 25, "sunshine": 270, "windSpeed": 3.2, "event": null },
+      { "month": 6, "temperature": 16.2, "precipitation": 65, "sunshine": 260, "windSpeed": 2.8, "event": null },
+      { "month": 7, "temperature": 16.5, "precipitation": 125, "sunshine": 230, "windSpeed": 2.5, "event": { "description": "7月：连阴雨8天", "type": "rain", "value": 125 } },
+      { "month": 8, "temperature": 15.8, "precipitation": 115, "sunshine": 235, "windSpeed": 2.4, "event": null },
+      { "month": 9, "temperature": 14.2, "precipitation": 60, "sunshine": 250, "windSpeed": 2.5, "event": null },
+      { "month": 10, "temperature": 8.8, "precipitation": 12, "sunshine": 265, "windSpeed": 2.7, "event": null },
+      { "month": 11, "temperature": 2.5, "precipitation": 2, "sunshine": 255, "windSpeed": 2.8, "event": null },
+      { "month": 12, "temperature": -1.2, "precipitation": 1, "sunshine": 250, "windSpeed": 2.7, "event": null }
+    ]
+  },
+  {
+    "id": "kunming",
+    "name": "昆明",
+    "abbr": "KM",
+    "index": 7,
+    "records": [
+      { "month": 1, "temperature": 9.5, "precipitation": 12, "sunshine": 220, "windSpeed": 2.2, "event": null },
+      { "month": 2, "temperature": 11.2, "precipitation": 15, "sunshine": 225, "windSpeed": 2.5, "event": null },
+      { "month": 3, "temperature": 14.5, "precipitation": 18, "sunshine": 245, "windSpeed": 2.8, "event": null },
+      { "month": 4, "temperature": 17.8, "precipitation": 25, "sunshine": 240, "windSpeed": 2.6, "event": null },
+      { "month": 5, "temperature": 20.2, "precipitation": 85, "sunshine": 230, "windSpeed": 2.3, "event": null },
+      { "month": 6, "temperature": 20.8, "precipitation": 165, "sunshine": 165, "windSpeed": 2.0, "event": null },
+      { "month": 7, "temperature": 20.5, "precipitation": 195, "sunshine": 155, "windSpeed": 1.8, "event": { "description": "7月：大雨4天，单日最大72mm", "type": "rain", "value": 72 } },
+      { "month": 8, "temperature": 20.2, "precipitation": 185, "sunshine": 165, "windSpeed": 1.7, "event": null },
+      { "month": 9, "temperature": 18.8, "precipitation": 120, "sunshine": 145, "windSpeed": 1.8, "event": null },
+      { "month": 10, "temperature": 15.5, "precipitation": 80, "sunshine": 155, "windSpeed": 1.9, "event": null },
+      { "month": 11, "temperature": 11.8, "precipitation": 35, "sunshine": 190, "windSpeed": 2.0, "event": null },
+      { "month": 12, "temperature": 8.2, "precipitation": 10, "sunshine": 210, "windSpeed": 2.1, "event": null }
+    ]
+  }
+]
