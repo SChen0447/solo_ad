@@ -7,11 +7,22 @@ interface PlantCardProps {
   plant: Plant;
   onClick: () => void;
   isHighlighted?: boolean;
+  showWarning?: boolean;
 }
 
-export const PlantCard: React.FC<PlantCardProps> = ({ plant, onClick, isHighlighted }) => {
+export const PlantCard: React.FC<PlantCardProps> = ({ plant, onClick, isHighlighted, showWarning = true }) => {
   const daysUntil = getDaysUntilWatering(plant);
   const overdue = isOverdue(plant);
+  const severelyOverdue = showWarning && overdue && Math.abs(daysUntil) > 7;
+  const isAbundant = !overdue && daysUntil > 30;
+
+  const getCountdownColor = () => {
+    if (overdue) return '#DC2626';
+    if (isAbundant) return '#2563EB';
+    return '#16A34A';
+  };
+
+  const countdownColor = getCountdownColor();
 
   const cardStyle: React.CSSProperties = {
     width: 220,
@@ -20,10 +31,11 @@ export const PlantCard: React.FC<PlantCardProps> = ({ plant, onClick, isHighligh
     boxShadow: '0 2px 8px rgba(0, 0, 0, 0.08)',
     cursor: 'pointer',
     overflow: 'hidden',
-    transition: 'transform 0.3s ease-out, box-shadow 0.3s ease-out',
+    transition: 'transform 0.3s ease-out, box-shadow 0.3s ease-out, border 0.3s ease-out',
     position: 'relative',
-    border: isHighlighted ? '3px solid #22C55E' : 'none',
+    border: isHighlighted ? '3px solid #22C55E' : severelyOverdue ? '2px dashed #DC2626' : 'none',
     animation: isHighlighted ? 'pulse-border 0.9s ease-out' : 'none',
+    boxSizing: 'border-box' as const,
   };
 
   const iconContainerStyle: React.CSSProperties = {
@@ -71,13 +83,19 @@ export const PlantCard: React.FC<PlantCardProps> = ({ plant, onClick, isHighligh
     alignItems: 'center',
     gap: 6,
     paddingTop: 10,
-    borderTop: '1px solid #E5E7EB',
+    borderTop: severelyOverdue ? '1px dashed #DC2626' : '1px solid #E5E7EB',
+    flexWrap: 'wrap' as const,
   };
 
   const countdownTextStyle: React.CSSProperties = {
     fontSize: 13,
     fontWeight: 500,
-    color: overdue ? '#DC2626' : '#16A34A',
+    color: countdownColor,
+  };
+
+  const warningIconStyle: React.CSSProperties = {
+    display: 'inline-flex',
+    alignItems: 'center',
   };
 
   const handleMouseEnter = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -116,10 +134,19 @@ export const PlantCard: React.FC<PlantCardProps> = ({ plant, onClick, isHighligh
         <h3 style={nameStyle}>{plant.name}</h3>
         <p style={speciesStyle}>{plant.species}</p>
         <div style={countdownStyle}>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={overdue ? '#DC2626' : '#16A34A'} strokeWidth="2">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={countdownColor} strokeWidth="2">
             <path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z" />
           </svg>
           <span style={countdownTextStyle}>{formatCountdown()}</span>
+          {severelyOverdue && (
+            <span style={warningIconStyle} title="严重逾期">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="#DC2626" stroke="#DC2626" strokeWidth="1">
+                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+                <line x1="12" y1="9" x2="12" y2="13" stroke="white" strokeWidth="2" />
+                <line x1="12" y1="17" x2="12.01" y2="17" stroke="white" strokeWidth="2" />
+              </svg>
+            </span>
+          )}
         </div>
       </div>
       <style>{`

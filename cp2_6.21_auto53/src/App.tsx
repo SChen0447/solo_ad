@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Plant, Reminder, DiagnosisRecord } from '@/types';
 import { PlantCard } from '@/components/PlantCard';
 import { ReminderBar } from '@/components/ReminderBar';
@@ -7,6 +7,7 @@ import { PlantIcon } from '@/components/PlantIcon';
 import { getDaysUntilWatering, isOverdue, formatDate } from '@/utils/dateUtils';
 
 type View = 'home' | 'detail';
+type SortMode = 'time' | 'urgency';
 
 export const App: React.FC = () => {
   const [view, setView] = useState<View>('home');
@@ -16,6 +17,9 @@ export const App: React.FC = () => {
   const [diagnosisRecords, setDiagnosisRecords] = useState<DiagnosisRecord[]>([]);
   const [highlightedPlantId, setHighlightedPlantId] = useState<string | null>(null);
   const [isDetailEntering, setIsDetailEntering] = useState(false);
+  const [sortMode, setSortMode] = useState<SortMode>('time');
+  const gridRef = useRef<HTMLDivElement>(null);
+  const cardPositionsRef = useRef<Map<string, DOMRect>>(new Map());
 
   useEffect(() => {
     fetchPlants();
@@ -124,6 +128,78 @@ export const App: React.FC = () => {
 
   const selectedPlant = plants.find(p => p.id === selectedPlantId);
 
+  const sortedPlants = useMemo(() => {
+    const plantsCopy = [...plants];
+    if (sortMode === 'urgency') {
+      plantsCopy.sort((a, b) => {
+        const daysA = getDaysUntilWatering(a);
+        const daysB = getDaysUntilWatering(b);
+        const overdueA = isOverdue(a);
+        const overdueB = isOverdue(b);
+
+        if (overdueA && overdueB) {
+          return daysA - daysB;
+        }
+        if (overdueA && !overdueB) {
+          return -1;
+        }
+        if (!overdueA && overdueB) {
+          return 1;
+        }
+        if (daysA !== daysB) {
+          return daysA - daysB;
+        }
+        return new Date(b.purchaseDate).getTime() - new Date(a.purchaseDate).getTime();
+      });
+    }
+    return plantsCopy;
+  }, [plants, sortMode]);
+
+  const captureCardPositions = () => {
+    if (!gridRef.current) return;
+    const cardElements = gridRef.current.querySelectorAll<HTMLElement>('[data-plant-id]');
+    cardPositionsRef.current.clear();
+    cardElements.forEach((el) => {
+      const plantId = el.getAttribute('data-plant-id');
+      if (plantId) {
+        cardPositionsRef.current.set(plantId, el.getBoundingClientRect());
+      }
+    });
+  };
+
+  const applyFlipAnimation = () => {
+    if (!gridRef.current) return;
+    requestAnimationFrame(() => {
+      const cardElements = gridRef.current!.querySelectorAll<HTMLElement>('[data-plant-id]');
+      cardElements.forEach((el) => {
+        const plantId = el.getAttribute('data-plant-id');
+        if (!plantId) return;
+        const oldRect = cardPositionsRef.current.get(plantId);
+        const newRect = el.getBoundingClientRect();
+        if (oldRect) {
+          const deltaX = oldRect.left - newRect.left;
+          const deltaY = oldRect.top - newRect.top;
+          if (deltaX !== 0 || deltaY !== 0) {
+            el.style.transition = 'none';
+            el.style.transform = `translate(${deltaX}px, ${deltaY}px)`;
+            requestAnimationFrame(() => {
+              el.style.transition = 'transform 0.3s ease-out';
+              el.style.transform = '';
+            });
+          }
+        }
+      });
+      cardPositionsRef.current.clear();
+    });
+  };
+
+  const handleSortModeChange = (newMode: SortMode) => {
+    if (newMode === sortMode) return;
+    captureCardPositions();
+    setSortMode(newMode);
+    setTimeout(() => applyFlipAnimation(), 0);
+  };
+
   const appStyle: React.CSSProperties = {
     maxWidth: 480,
     margin: '0 auto',
@@ -168,6 +244,36 @@ export const App: React.FC = () => {
     margin: 0,
     marginBottom: 12,
   };
+
+  const sortToggleContainerStyle: React.CSSProperties = {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  };
+
+  const sortToggleWrapperStyle: React.CSSProperties = {
+    display: 'flex',
+    backgroundColor: '#F3F4F6',
+    borderRadius: 8,
+    padding: 3,
+  };
+
+  const getSortButtonStyle = (isActive: boolean): React.CSSProperties => ({
+    padding: '6px 14px',
+    borderRadius: 6,
+    border: 'none',
+    cursor: 'pointer',
+    fontSize: 13,
+    fontWeight: isActive ? 600 : 500,
+    backgroundColor: isActive ? 'white' : 'transparent',
+    color: isActive ? '#22C55E' : '#6B7280',
+    transition: 'all 0.2s ease',
+    boxShadow: isActive ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+    display: 'flex',
+    alignItems: 'center',
+    gap: 5,
+  });
 
   const plantsSectionStyle: React.CSSProperties = {
     padding: '20px',
@@ -322,15 +428,46 @@ export const App: React.FC = () => {
         </div>
 
         <div style={plantsSectionStyle}>
-          <h2 style={sectionTitleStyle}>我的植物</h2>
-          <div style={plantsGridStyle}>
-            {plants.map((plant) => (
-              <PlantCard
+          <div style={sortToggleContainerStyle}>
+            <h2 style={{ ...sectionTitleStyle, marginBottom: 0 }}>我的植物</h2>
+            <div style={sortToggleWrapperStyle}>
+              <button
+                style={getSortButtonStyle(sortMode === 'time')}
+                onClick={() => handleSortModeChange('time')}
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+                  <line x1="16" y1="2" x2="16" y2="6" />
+                  <line x1="8" y1="2" x2="8" y2="6" />
+                  <line x1="3" y1="10" x2="21" y2="10" />
+                </svg>
+                添加时间
+              </button>
+              <button
+                style={getSortButtonStyle(sortMode === 'urgency')}
+                onClick={() => handleSortModeChange('urgency')}
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
+                </svg>
+                紧急程度
+              </button>
+            </div>
+          </div>
+          <div ref={gridRef} style={plantsGridStyle}>
+            {sortedPlants.map((plant) => (
+              <div
                 key={plant.id}
-                plant={plant}
-                onClick={() => handlePlantClick(plant.id)}
-                isHighlighted={highlightedPlantId === plant.id}
-              />
+                data-plant-id={plant.id}
+                style={{ willChange: 'transform' }}
+              >
+                <PlantCard
+                  plant={plant}
+                  onClick={() => handlePlantClick(plant.id)}
+                  isHighlighted={highlightedPlantId === plant.id}
+                  showWarning={true}
+                />
+              </div>
             ))}
           </div>
         </div>
@@ -344,6 +481,12 @@ export const App: React.FC = () => {
 
   const daysUntil = getDaysUntilWatering(selectedPlant);
   const overdue = isOverdue(selectedPlant);
+  const isAbundant = !overdue && daysUntil > 30;
+  const getNextWateringColor = () => {
+    if (overdue) return '#DC2626';
+    if (isAbundant) return '#2563EB';
+    return '#16A34A';
+  };
 
   return (
     <div style={{ ...appStyle, ...detailContainerStyle }}>
@@ -396,7 +539,7 @@ export const App: React.FC = () => {
               </svg>
               下次浇水
             </span>
-            <span style={{ ...infoValueStyle, color: overdue ? '#DC2626' : '#16A34A', fontWeight: 600 }}>
+            <span style={{ ...infoValueStyle, color: getNextWateringColor(), fontWeight: 600 }}>
               {overdue ? `逾期 ${Math.abs(daysUntil)} 天` : daysUntil === 0 ? '今天' : `还有 ${daysUntil} 天`}
             </span>
           </div>
