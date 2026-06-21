@@ -1,0 +1,67 @@
+.progressBarContainer {
+  position: absolute;
+  top: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 500px;
+  height: 8px;
+  background-color: #374151;
+  border-radius: 4px;
+  overflow: hidden;
+  z-index: 10;
+}
+
+@media (max-width: 768px) {
+  .progressBarContainer {
+    width: 80%;
+    top: 16px;
+  }
+}
+
+.progressBar {
+  height: 100%;
+  background: linear-gradient(90deg, #3b82f6, #8b5cf6);
+  border-radius: 4px;
+  transition: width 0.1s linear;
+}
+
+.timerCircle {
+  position: absolute;
+  bottom: 24px;
+  right: 24px;
+  width: 64px;
+  height: 64px;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+}
+
+@media (max-width: 768px) {
+  .timerCircle {
+    bottom: 80px;
+    right: 16px;
+  }
+}
+
+.progressCircle {
+  transition: stroke-dashoffset 0.1s linear;
+}
+
+.timerText {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -60%);
+  font-size: 12px;
+  font-weight: 600;
+  color: #e5e7eb;
+}
+
+.phaseLabel {
+  position: absolute;
+  bottom: -4px;
+  font-size: 10px;
+  color: #9ca3af;
+}
