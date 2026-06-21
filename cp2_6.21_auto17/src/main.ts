@@ -12,14 +12,13 @@ import {
 import {
   ControlsHandle,
   createControls,
-  createGeodesicLine,
-  updateGeodesicLine,
-  fadeGeodesicLine,
 } from './controls';
 import { ProjectionHandle, createProjection } from './projection';
 
 const MORPH_DURATION = 0.5;
 const GEODESIC_FADE_DURATION = 1.0;
+const GEODESIC_LINE_RADIUS = 0.025;
+const GEODESIC_GLOW_RADIUS = 0.06;
 
 class NonEuclidApp {
   private renderer: THREE.WebGLRenderer;
@@ -31,8 +30,8 @@ class NonEuclidApp {
 
   private mesh: THREE.Mesh;
   private wireframe: THREE.LineSegments;
-  private geodesicLine: THREE.Line;
-  private geodesicGlowLine: THREE.Line;
+  private geodesicMesh: THREE.Mesh;
+  private geodesicGlowMesh: THREE.Mesh;
 
   private currentType: StructureType = 'mobius';
   private currentParams: StructureParams;
@@ -116,20 +115,25 @@ class NonEuclidApp {
     this.wireframe = new THREE.LineSegments(wireGeo, wireMat);
     this.scene.add(this.wireframe);
 
-    this.geodesicLine = createGeodesicLine();
-    this.scene.add(this.geodesicLine);
-    this.geodesicLine.visible = false;
+    const coreMat = new THREE.MeshBasicMaterial({
+      color: 0xff2222,
+      transparent: true,
+      opacity: 1,
+    });
+    this.geodesicMesh = new THREE.Mesh(new THREE.BufferGeometry(), coreMat);
+    this.geodesicMesh.visible = false;
+    this.scene.add(this.geodesicMesh);
 
-    const glowMat = new THREE.LineBasicMaterial({
-      color: 0xff4444,
+    const glowMat = new THREE.MeshBasicMaterial({
+      color: 0xff5533,
       transparent: true,
       opacity: 0.4,
-      linewidth: 2,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
     });
-    const glowGeo = new THREE.BufferGeometry();
-    this.geodesicGlowLine = new THREE.Line(glowGeo, glowMat);
-    this.scene.add(this.geodesicGlowLine);
-    this.geodesicGlowLine.visible = false;
+    this.geodesicGlowMesh = new THREE.Mesh(new THREE.BufferGeometry(), glowMat);
+    this.geodesicGlowMesh.visible = false;
+    this.scene.add(this.geodesicGlowMesh);
 
     this.controlsHandle = createControls(this.currentType, this.currentParams);
     this.controlsHandle.onChange(this.onControlChange.bind(this));
@@ -147,8 +151,8 @@ class NonEuclidApp {
       return new THREE.MeshStandardMaterial({
         vertexColors: true,
         side: THREE.DoubleSide,
-        metalness: 0.2,
-        roughness: 0.6,
+        metalness: 0.15,
+        roughness: 0.7,
         transparent: true,
         opacity: 0.92,
       });
@@ -185,6 +189,8 @@ class NonEuclidApp {
     this.mesh.material = this.createMaterial(this.currentType);
     this.isMorphing = true;
     this.morphProgress = 0;
+
+    this.hideGeodesic();
   }
 
   private updateCurrentGeometry(): void {
@@ -278,22 +284,44 @@ class NonEuclidApp {
     }
   }
 
+  private buildTubeGeometry(points: THREE.Vector3[], radius: number): THREE.BufferGeometry {
+    if (points.length < 2) return new THREE.BufferGeometry();
+
+    const curve = new THREE.CatmullRomCurve3(points, false, 'catmullrom', 0.5);
+    const tubeGeo = new THREE.TubeGeometry(curve, Math.min(200, points.length * 2), radius, 8, false);
+    return tubeGeo;
+  }
+
   private showGeodesic(u: number, v: number): void {
     const points = sampleGeodesicPath(
-      this.mesh.geometry,
       this.currentType,
       this.currentParams,
       u,
       (v - 0.5) * 2
     );
 
-    updateGeodesicLine(this.geodesicLine, points);
-    updateGeodesicLine(this.geodesicGlowLine, points);
+    if (points.length < 2) return;
 
-    this.geodesicLine.visible = true;
-    this.geodesicGlowLine.visible = true;
+    this.geodesicMesh.geometry.dispose();
+    this.geodesicMesh.geometry = this.buildTubeGeometry(points, GEODESIC_LINE_RADIUS);
+
+    this.geodesicGlowMesh.geometry.dispose();
+    this.geodesicGlowMesh.geometry = this.buildTubeGeometry(points, GEODESIC_GLOW_RADIUS);
+
+    this.geodesicMesh.visible = true;
+    this.geodesicGlowMesh.visible = true;
+    (this.geodesicMesh.material as THREE.MeshBasicMaterial).opacity = 1;
+    (this.geodesicGlowMesh.material as THREE.MeshBasicMaterial).opacity = 0.45;
+
     this.geodesicTimer = GEODESIC_FADE_DURATION;
     this.geodesicVisible = true;
+  }
+
+  private hideGeodesic(): void {
+    this.geodesicMesh.visible = false;
+    this.geodesicGlowMesh.visible = false;
+    this.geodesicVisible = false;
+    this.geodesicTimer = 0;
   }
 
   private updateGeodesic(delta: number): void {
@@ -302,15 +330,13 @@ class NonEuclidApp {
     this.geodesicTimer -= delta;
 
     if (this.geodesicTimer <= 0) {
-      this.geodesicLine.visible = false;
-      this.geodesicGlowLine.visible = false;
-      this.geodesicVisible = false;
+      this.hideGeodesic();
       return;
     }
 
     const fadeRatio = this.geodesicTimer / GEODESIC_FADE_DURATION;
-    (this.geodesicLine.material as THREE.LineBasicMaterial).opacity = fadeRatio;
-    (this.geodesicGlowLine.material as THREE.LineBasicMaterial).opacity = fadeRatio * 0.4;
+    (this.geodesicMesh.material as THREE.MeshBasicMaterial).opacity = fadeRatio;
+    (this.geodesicGlowMesh.material as THREE.MeshBasicMaterial).opacity = fadeRatio * 0.45;
   }
 
   private onResize(): void {
@@ -322,12 +348,17 @@ class NonEuclidApp {
   private animate(): void {
     requestAnimationFrame(this.animate.bind(this));
 
-    const delta = this.clock.getDelta();
+    const delta = Math.min(this.clock.getDelta(), 0.05);
 
     this.controls.update();
 
     this.updateMorph(delta);
     this.updateGeodesic(delta);
+
+    if (!this.isMorphing && this.geodesicVisible) {
+      this.geodesicMesh.quaternion.copy(this.mesh.quaternion);
+      this.geodesicGlowMesh.quaternion.copy(this.mesh.quaternion);
+    }
 
     if (!this.isMorphing) {
       this.mesh.rotation.y += delta * 0.08;
