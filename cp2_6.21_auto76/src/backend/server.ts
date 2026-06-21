@@ -96,8 +96,6 @@ function generateMockData() {
     const estimatedHours = order.quantity;
     const endTime = new Date(startTime.getTime() + estimatedHours * 60 * 60 * 1000);
     const priority: WorkOrderPriority = order.amount > 1000 ? 'high' : 'normal';
-    const hasLowStock = materials.some((m) => m.currentStock < m.safetyStock);
-    const status: WorkOrderStatus = i === 0 ? 'completed' : hasLowStock && i > 2 ? 'waiting' : 'inProgress';
 
     workOrders.push({
       id: uuidv4(),
@@ -105,7 +103,7 @@ function generateMockData() {
       startTime: startTime.toISOString(),
       estimatedEndTime: endTime.toISOString(),
       priority,
-      status,
+      status: i === 0 ? 'completed' : 'inProgress',
       logs: [
         `工单创建于 ${startTime.toLocaleString('zh-CN')}`,
         `优先级: ${priority === 'high' ? '高' : '普通'}`,
@@ -130,13 +128,39 @@ function generateMockData() {
   }
 }
 
-generateMockData();
-
 function checkMaterialsAvailable(orderQuantity: number): boolean {
   const lowStockCount = materials.filter((m) => m.currentStock < m.safetyStock).length;
   const totalStock = materials.reduce((sum, m) => sum + m.currentStock, 0);
   return lowStockCount === 0 && totalStock >= orderQuantity * 3;
 }
+
+function scheduleWorkOrders() {
+  workOrders.forEach((wo) => {
+    if (wo.status === 'completed') return;
+
+    const order = orders.find((o) => o.id === wo.orderId);
+    if (!order) return;
+
+    const materialsAvailable = checkMaterialsAvailable(order.quantity);
+    const newStatus: WorkOrderStatus = materialsAvailable ? 'inProgress' : 'waiting';
+
+    if (wo.status !== newStatus) {
+      wo.status = newStatus;
+      if (newStatus === 'waiting') {
+        const lowMats = materials.filter((m) => m.currentStock < m.safetyStock).map((m) => m.name);
+        wo.logs.push(`排程更新: 物料不足，等待补货 - ${new Date().toLocaleString('zh-CN')}`);
+        if (lowMats.length > 0) {
+          wo.logs.push(`库存不足物料: ${lowMats.join(', ')}`);
+        }
+      } else {
+        wo.logs.push(`排程更新: 物料充足，开始生产 - ${new Date().toLocaleString('zh-CN')}`);
+      }
+    }
+  });
+}
+
+generateMockData();
+scheduleWorkOrders();
 
 function createWorkOrderForOrder(order: Order): WorkOrder {
   const startTime = new Date();
