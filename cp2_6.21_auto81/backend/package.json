@@ -1,0 +1,14 @@
+{
+  "name": "reading-tracker-backend",
+  "version": "1.0.0",
+  "description": "Backend for reading progress tracker and blind box recommendation",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node src/server.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.18.2"
+  }
+}
