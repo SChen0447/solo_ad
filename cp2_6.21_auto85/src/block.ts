@@ -90,7 +90,7 @@ export class Block {
     });
     this.label = new THREE.Sprite(labelMat);
     this.label.scale.set(1.0, 0.4, 1.0);
-    this.label.position.set(0, BASE_HEIGHT / 2 + 0.3, 0);
+    this.label.position.set(0, BASE_HEIGHT / 2 + 0.35, 0);
     this.mesh.add(this.label);
     this.updateLabelText(0);
   }
@@ -131,7 +131,7 @@ export class Block {
     this.currentOpacity += (targetOpacity - this.currentOpacity) * 0.15;
     this.material.opacity = this.currentOpacity;
 
-    this.label.position.y = (this.mesh.scale.y * BASE_HEIGHT) / 2 + 0.3;
+    this.label.position.y = (this.mesh.scale.y * BASE_HEIGHT) / 2 + 0.35;
   }
 
   setHovered(hovered: boolean): void {
@@ -162,6 +162,9 @@ export class Block {
     ctx.closePath();
     ctx.fillStyle = 'rgba(0,0,0,0.5)';
     ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,0.4)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
     ctx.fillStyle = '#ffffff';
     ctx.font = 'bold 22px sans-serif';
     ctx.textAlign = 'center';

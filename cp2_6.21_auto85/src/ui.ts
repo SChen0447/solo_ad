@@ -145,25 +145,44 @@ export class UIController {
 
   private createColorLegend(): HTMLElement {
     const container = document.createElement('div');
-    container.style.cssText = 'display:flex; flex-direction:column; gap:4px;';
+    container.style.cssText = 'display:flex; flex-direction:column; gap:4px; padding:0 8px;';
+
+    const barWrapper = document.createElement('div');
+    barWrapper.style.cssText = 'position:relative; height:16px;';
 
     const bar = document.createElement('div');
     bar.style.cssText =
-      'height:16px; border-radius:4px; background:linear-gradient(to right, #1E90FF, #FFD700, #FF4500);';
-    container.appendChild(bar);
+      'height:16px; border-radius:4px; background:linear-gradient(to right, #1E90FF, #FFD700, #FF4500); position:relative;';
+    barWrapper.appendChild(bar);
 
-    const labels = document.createElement('div');
-    labels.style.cssText = 'display:flex; justify-content:space-between; font-size:11px; color:#6B7280;';
-    const low = document.createElement('span');
-    low.textContent = '低';
-    const mid = document.createElement('span');
-    mid.textContent = '中';
-    const high = document.createElement('span');
-    high.textContent = '高';
-    labels.appendChild(low);
-    labels.appendChild(mid);
-    labels.appendChild(high);
-    container.appendChild(labels);
+    const tickMarks = document.createElement('div');
+    tickMarks.style.cssText =
+      'position:absolute; top:0; left:0; right:0; bottom:0; pointer-events:none;';
+    [0, 0.33, 0.66, 1].forEach((pos) => {
+      const tick = document.createElement('div');
+      tick.style.cssText = `position:absolute; left:${pos * 100}%; top:0; height:100%; border-left:1px solid rgba(255,255,255,0.2);`;
+      tickMarks.appendChild(tick);
+    });
+    bar.appendChild(tickMarks);
+    container.appendChild(barWrapper);
+
+    const scaleRow = document.createElement('div');
+    scaleRow.style.cssText =
+      'display:flex; justify-content:space-between; font-size:10px; color:#9CA3AF; padding:0 0px; position:relative;';
+
+    const values = [0.0, 1.0, 2.0, 3.0];
+    values.forEach((v, i) => {
+      const span = document.createElement('span');
+      span.textContent = v.toFixed(1);
+      span.style.cssText =
+        i === 0
+          ? ''
+          : i === values.length - 1
+            ? ''
+            : 'position:absolute; left:' + (i / (values.length - 1)) * 100 + '%; transform:translateX(-50%);';
+      scaleRow.appendChild(span);
+    });
+    container.appendChild(scaleRow);
 
     return container;
   }
