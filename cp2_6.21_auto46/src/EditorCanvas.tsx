@@ -29,6 +29,46 @@ function snapTailDirection(angle: number): number {
   return snapped;
 }
 
+function SpeechBubbleSVG({ width, height, fill, stroke, tailDirection }: {
+  width: number; height: number; fill: string; stroke: string; tailDirection: number;
+}) {
+  const sw = 2;
+  const tailLen = 16;
+  const rad = (tailDirection * Math.PI) / 180;
+  const cx = width / 2;
+  const cy = height;
+  const tipX = cx + Math.cos(rad) * tailLen;
+  const tipY = cy + Math.sin(rad) * tailLen;
+  const baseW = 16;
+  const perpX = Math.cos(rad + Math.PI / 2);
+  const perpY = Math.sin(rad + Math.PI / 2);
+  const leftX = cx + perpX * (baseW / 2);
+  const leftY = cy + perpY * (baseW / 2);
+  const rightX = cx - perpX * (baseW / 2);
+  const rightY = cy - perpY * (baseW / 2);
+
+  const totalW = Math.max(width, Math.ceil(tipX + tailLen));
+  const totalH = Math.max(height, Math.ceil(tipY + tailLen));
+  const r = 6;
+
+  const path = [
+    `M${sw},${sw + r}`,
+    `Q${sw},${sw} ${sw + r},${sw}`,
+    `L${width - sw - r},${sw}`,
+    `Q${width - sw},${sw} ${width - sw},${sw + r}`,
+    `L${width - sw},${cy - r}`,
+    `Q${width - sw},${cy} ${width - sw - r},${cy}`,
+    `L${rightX.toFixed(1)},${rightY.toFixed(1)}`,
+    `L${tipX.toFixed(1)},${tipY.toFixed(1)}`,
+    `L${leftX.toFixed(1)},${leftY.toFixed(1)}`,
+    `L${sw + r},${cy}`,
+    `Q${sw},${cy} ${sw},${cy - r}`,
+    'Z',
+  ].join(' ');
+
+  return { totalW, totalH, path };
+}
+
 function ShapeRenderer({ element }: { element: CanvasElement }) {
   const { type, width, height, fill, stroke, text, tailDirection } = element;
   const sw = 2;
@@ -53,6 +93,7 @@ function ShapeRenderer({ element }: { element: CanvasElement }) {
           lineHeight: 1.4,
           pointerEvents: 'none',
           userSelect: 'none',
+          padding: '0 8px',
         }}
       >
         {text}
@@ -64,98 +105,37 @@ function ShapeRenderer({ element }: { element: CanvasElement }) {
     case 'rectangle':
       return (
         <svg width={width} height={height} style={{ display: 'block' }}>
-          <rect
-            x={sw}
-            y={sw}
-            width={width - sw * 2}
-            height={height - sw * 2}
-            rx={4}
-            fill={fill}
-            stroke={stroke}
-            strokeWidth={sw}
-          />
+          <rect x={sw} y={sw} width={width - sw * 2} height={height - sw * 2} rx={4} fill={fill} stroke={stroke} strokeWidth={sw} />
         </svg>
       );
     case 'circle':
       return (
         <svg width={width} height={height} style={{ display: 'block' }}>
-          <ellipse
-            cx={width / 2}
-            cy={height / 2}
-            rx={width / 2 - sw}
-            ry={height / 2 - sw}
-            fill={fill}
-            stroke={stroke}
-            strokeWidth={sw}
-          />
+          <ellipse cx={width / 2} cy={height / 2} rx={width / 2 - sw} ry={height / 2 - sw} fill={fill} stroke={stroke} strokeWidth={sw} />
         </svg>
       );
     case 'triangle':
       return (
         <svg width={width} height={height} style={{ display: 'block' }}>
-          <polygon
-            points={`${width / 2},${sw} ${width - sw},${height - sw} ${sw},${height - sw}`}
-            fill={fill}
-            stroke={stroke}
-            strokeWidth={sw}
-          />
+          <polygon points={`${width / 2},${sw} ${width - sw},${height - sw} ${sw},${height - sw}`} fill={fill} stroke={stroke} strokeWidth={sw} />
         </svg>
       );
     case 'dialogBox':
       return (
         <div style={{ position: 'relative', width, height }}>
           <svg width={width} height={height} style={{ display: 'block', position: 'absolute' }}>
-            <rect
-              x={sw}
-              y={sw}
-              width={width - sw * 2}
-              height={height - sw * 2}
-              fill={fill}
-              stroke={stroke}
-              strokeWidth={sw}
-              rx={4}
-            />
+            <rect x={sw} y={sw} width={width - sw * 2} height={height - sw * 2} fill={fill} stroke={stroke} strokeWidth={sw} rx={4} />
           </svg>
           {renderText()}
         </div>
       );
     case 'speechBubble': {
-      const tailDir = tailDirection ?? 180;
-      const rad = (tailDir * Math.PI) / 180;
-      const tailLen = 16;
-      const cx = width / 2;
-      const cy = height;
-      const tipX = cx + Math.cos(rad) * tailLen;
-      const tipY = cy + Math.sin(rad) * tailLen;
-      const baseW = 16;
-      const leftX = cx - baseW / 2 + Math.cos(rad + Math.PI / 2) * (baseW / 2);
-      const leftY = cy + Math.sin(rad + Math.PI / 2) * (baseW / 2);
-      const rightX = cx + Math.cos(rad + Math.PI / 2) * (baseW / 2);
-      const rightY = cy + Math.sin(rad + Math.PI / 2) * (baseW / 2);
-
-      const totalW = Math.max(width, tipX + 10);
-      const totalH = Math.max(height, tipY + 10);
-
+      const dir = tailDirection ?? 90;
+      const { totalW, totalH, path } = SpeechBubbleSVG({ width, height, fill, stroke, tailDirection: dir });
       return (
         <div style={{ position: 'relative', width: totalW, height: totalH }}>
           <svg width={totalW} height={totalH} style={{ display: 'block', position: 'absolute' }}>
-            <path
-              d={`M${sw},${sw + 6}
-                  Q${sw},${sw} ${sw + 6},${sw}
-                  L${width - sw - 6},${sw}
-                  Q${width - sw},${sw} ${width - sw},${sw + 6}
-                  L${width - sw},${height - sw - 6}
-                  Q${width - sw},${height - sw} ${width - sw - 6},${height - sw}
-                  L${rightX},${height - sw}
-                  L${tipX},${tipY}
-                  L${leftX},${height - sw}
-                  L${sw + 6},${height - sw}
-                  Q${sw},${height - sw} ${sw},${height - sw - 6}
-                  Z`}
-              fill={fill}
-              stroke={stroke}
-              strokeWidth={sw}
-            />
+            <path d={path} fill={fill} stroke={stroke} strokeWidth={sw} />
           </svg>
           <div style={{ position: 'absolute', top: 0, left: 0, width, height }}>
             {renderText()}
@@ -183,11 +163,11 @@ export default function EditorCanvas({ isDropTarget = true }: EditorCanvasProps)
   const [editingElementId, setEditingElementId] = useState<string | null>(null);
   const [editText, setEditText] = useState('');
   const [showRotation, setShowRotation] = useState<number | null>(null);
+  const [showTailAngle, setShowTailAngle] = useState<number | null>(null);
   const [showGrid, setShowGrid] = useState(false);
 
   const panel = getSelectedPanel();
   const elements = panel?.elements ?? [];
-  const selectedEl = elements.find((e) => e.id === state.selectedElementId);
 
   const updateElement = useCallback(
     (elementId: string, updates: Partial<CanvasElement>) => {
@@ -201,6 +181,16 @@ export default function EditorCanvas({ isDropTarget = true }: EditorCanvasProps)
   );
 
   useEffect(() => {
+    if (dragState.mode === 'move' || dragState.mode === 'resize') {
+      setShowGrid(true);
+    } else {
+      if (!isDropTarget || dragState.mode === null) {
+        setShowGrid(false);
+      }
+    }
+  }, [dragState.mode, isDropTarget]);
+
+  useEffect(() => {
     if (dragState.mode === null) return;
 
     const handleMouseMove = (e: MouseEvent) => {
@@ -212,31 +202,36 @@ export default function EditorCanvas({ isDropTarget = true }: EditorCanvasProps)
       const el = dragState.startEl;
 
       if (dragState.mode === 'move') {
-        const newX = snapToGrid(el.x + dx);
-        const newY = snapToGrid(el.y + dy);
+        const rawX = el.x + dx;
+        const rawY = el.y + dy;
+        const newX = snapToGrid(rawX);
+        const newY = snapToGrid(rawY);
         updateElement(dragState.elementId, { x: newX, y: newY });
       } else if (dragState.mode === 'resize') {
         const newW = Math.max(MIN_SIZE, snapToGrid(el.width + dx));
         const newH = Math.max(MIN_SIZE, snapToGrid(el.height + dy));
         updateElement(dragState.elementId, { width: newW, height: newH });
       } else if (dragState.mode === 'rotate') {
-        const cx = el.x + el.width / 2 - rect.left;
-        const cy = el.y + el.height / 2 - rect.top;
+        const cx = el.x + el.width / 2;
+        const cy = el.y + el.height / 2;
         const angle = (Math.atan2(e.clientY - rect.top - cy, e.clientX - rect.left - cx) * 180) / Math.PI + 90;
         const snapped = snapRotation(angle);
         setShowRotation(snapped);
         updateElement(dragState.elementId, { rotation: snapped });
       } else if (dragState.mode === 'tail') {
-        const cx = el.x + el.width / 2 - rect.left;
-        const cy = el.y + el.height - rect.top;
+        const cx = el.x + el.width / 2;
+        const cy = el.y + el.height;
         const angle = (Math.atan2(e.clientY - rect.top - cy, e.clientX - rect.left - cx) * 180) / Math.PI;
         const snapped = snapTailDirection(angle);
+        setShowTailAngle(snapped);
         updateElement(dragState.elementId, { tailDirection: snapped });
       }
     };
 
     const handleMouseUp = () => {
       setShowRotation(null);
+      setShowTailAngle(null);
+      setShowGrid(false);
       setDragState({ mode: null, elementId: null, startX: 0, startY: 0, startEl: null });
     };
 
@@ -301,6 +296,7 @@ export default function EditorCanvas({ isDropTarget = true }: EditorCanvasProps)
 
   const handleTailMouseDown = (e: React.MouseEvent, element: CanvasElement) => {
     e.stopPropagation();
+    e.preventDefault();
     setDragState({
       mode: 'tail',
       elementId: element.id,
@@ -323,13 +319,11 @@ export default function EditorCanvas({ isDropTarget = true }: EditorCanvasProps)
       handleTextBlur();
     } else if (e.key === 'Escape') {
       setEditingElementId(null);
-    } else if (e.key === 'Delete' || e.key === 'Backspace') {
-      if (!editingElementId && state.selectedElementId && panel) {
-        dispatch({
-          type: 'DELETE_ELEMENT',
-          payload: { panelId: panel.id, elementId: state.selectedElementId },
-        });
-      }
+    } else if ((e.key === 'Delete' || e.key === 'Backspace') && !editingElementId && state.selectedElementId && panel) {
+      dispatch({
+        type: 'DELETE_ELEMENT',
+        payload: { panelId: panel.id, elementId: state.selectedElementId },
+      });
     }
   };
 
@@ -357,11 +351,17 @@ export default function EditorCanvas({ isDropTarget = true }: EditorCanvasProps)
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
     e.dataTransfer.dropEffect = 'copy';
-    if (isDropTarget) setShowGrid(true);
+    setShowGrid(true);
   };
 
-  const handleDragLeave = () => {
-    setShowGrid(false);
+  const handleDragLeave = (e: React.DragEvent) => {
+    const rect = canvasRef.current?.getBoundingClientRect();
+    if (rect) {
+      const { clientX, clientY } = e;
+      if (clientX < rect.left || clientX > rect.right || clientY < rect.top || clientY > rect.bottom) {
+        setShowGrid(false);
+      }
+    }
   };
 
   if (!panel) {
@@ -400,12 +400,11 @@ export default function EditorCanvas({ isDropTarget = true }: EditorCanvasProps)
         overflow: 'hidden',
         outline: 'none',
         backgroundImage: showGrid
-          ? `
-            linear-gradient(to right, #e5e7eb 1px, transparent 1px),
-            linear-gradient(to bottom, #e5e7eb 1px, transparent 1px)
-          `
+          ? `linear-gradient(to right, rgba(0,0,0,0.06) 1px, transparent 1px),
+             linear-gradient(to bottom, rgba(0,0,0,0.06) 1px, transparent 1px)`
           : 'none',
         backgroundSize: `${GRID_SIZE}px ${GRID_SIZE}px`,
+        transition: 'background-image 0.15s ease',
       }}
     >
       <div
@@ -420,6 +419,7 @@ export default function EditorCanvas({ isDropTarget = true }: EditorCanvasProps)
           fontSize: 12,
           fontWeight: 500,
           zIndex: 100,
+          pointerEvents: 'none',
         }}
       >
         分镜 {panel.order}：{panel.description}
@@ -428,6 +428,19 @@ export default function EditorCanvas({ isDropTarget = true }: EditorCanvasProps)
       {elements.map((element) => {
         const isSelected = element.id === state.selectedElementId;
         const isEditing = element.id === editingElementId;
+        const isDragging = dragState.elementId === element.id && dragState.mode !== null;
+
+        let totalW = element.width;
+        let totalH = element.height;
+        if (element.type === 'speechBubble') {
+          const dir = element.tailDirection ?? 90;
+          const rad = (dir * Math.PI) / 180;
+          const tailLen = 16;
+          const tipX = element.width / 2 + Math.cos(rad) * tailLen;
+          const tipY = element.height + Math.sin(rad) * tailLen;
+          totalW = Math.max(element.width, Math.ceil(tipX + tailLen));
+          totalH = Math.max(element.height, Math.ceil(tipY + tailLen));
+        }
 
         return (
           <div
@@ -438,13 +451,15 @@ export default function EditorCanvas({ isDropTarget = true }: EditorCanvasProps)
               position: 'absolute',
               left: 0,
               top: 0,
+              width: totalW,
+              height: totalH,
               transform: `translate(${element.x}px, ${element.y}px) rotate(${element.rotation}deg)`,
-              transformOrigin: 'center center',
-              cursor: dragState.mode === 'move' && dragState.elementId === element.id ? 'grabbing' : 'grab',
-              transition: dragState.mode === null ? 'opacity 0.3s ease-in-out' : 'none',
+              transformOrigin: `${element.width / 2}px ${element.height / 2}px`,
+              cursor: isDragging && dragState.mode === 'move' ? 'grabbing' : 'grab',
               outline: isSelected ? '2px dashed #3B82F6' : 'none',
               outlineOffset: 2,
               willChange: 'transform',
+              opacity: isDragging ? 0.9 : 1,
             }}
           >
             <ShapeRenderer element={element} />
@@ -456,6 +471,7 @@ export default function EditorCanvas({ isDropTarget = true }: EditorCanvasProps)
                 onChange={(e) => setEditText(e.target.value)}
                 onBlur={handleTextBlur}
                 onKeyDown={(e) => {
+                  e.stopPropagation();
                   if (e.key === 'Enter' && !e.shiftKey) {
                     e.preventDefault();
                     handleTextBlur();
@@ -464,6 +480,7 @@ export default function EditorCanvas({ isDropTarget = true }: EditorCanvasProps)
                   }
                 }}
                 onClick={(e) => e.stopPropagation()}
+                onMouseDown={(e) => e.stopPropagation()}
                 style={{
                   position: 'absolute',
                   top: 8,
@@ -495,10 +512,12 @@ export default function EditorCanvas({ isDropTarget = true }: EditorCanvasProps)
                     left: 0,
                     fontSize: 12,
                     color: '#6B7280',
-                    backgroundColor: 'rgba(255,255,255,0.8)',
-                    padding: '1px 4px',
+                    backgroundColor: 'rgba(255,255,255,0.9)',
+                    padding: '1px 6px',
                     borderRadius: 2,
                     whiteSpace: 'nowrap',
+                    pointerEvents: 'none',
+                    zIndex: 7,
                   }}
                 >
                   x:{element.x} y:{element.y}
@@ -508,7 +527,7 @@ export default function EditorCanvas({ isDropTarget = true }: EditorCanvasProps)
                   onMouseDown={(e) => handleRotateMouseDown(e, element)}
                   style={{
                     position: 'absolute',
-                    top: -18,
+                    top: -20,
                     left: '50%',
                     transform: 'translateX(-50%)',
                     width: 12,
@@ -517,26 +536,27 @@ export default function EditorCanvas({ isDropTarget = true }: EditorCanvasProps)
                     backgroundColor: '#10B981',
                     border: '2px solid #fff',
                     cursor: 'grab',
-                    boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
+                    boxShadow: '0 1px 4px rgba(0,0,0,0.3)',
                     zIndex: 5,
                   }}
                   title="旋转（每步15°）"
                 />
 
-                {showRotation !== null && (
+                {showRotation !== null && dragState.elementId === element.id && (
                   <div
                     style={{
                       position: 'absolute',
-                      top: -38,
+                      top: -42,
                       left: '50%',
                       transform: 'translateX(-50%)',
                       fontSize: 12,
                       fontWeight: 600,
                       color: '#10B981',
                       backgroundColor: 'rgba(255,255,255,0.95)',
-                      padding: '2px 6px',
+                      padding: '2px 8px',
                       borderRadius: 3,
-                      animation: 'fadeInOut 0.3s ease',
+                      pointerEvents: 'none',
+                      zIndex: 8,
                     }}
                   >
                     {showRotation}°
@@ -555,43 +575,66 @@ export default function EditorCanvas({ isDropTarget = true }: EditorCanvasProps)
                     backgroundColor: '#3B82F6',
                     border: '2px solid #fff',
                     cursor: 'nwse-resize',
-                    boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
+                    boxShadow: '0 1px 4px rgba(0,0,0,0.3)',
                     zIndex: 5,
                   }}
                   title="缩放"
                 />
 
                 {element.type === 'speechBubble' && (
-                  <div
-                    onMouseDown={(e) => handleTailMouseDown(e, element)}
-                    style={{
-                      position: 'absolute',
-                      bottom: -4,
-                      left: '50%',
-                      transform: 'translateX(-50%)',
-                      width: 8,
-                      height: 8,
-                      borderRadius: '50%',
-                      backgroundColor: '#3B82F6',
-                      border: '2px solid #fff',
-                      cursor: 'grab',
-                      zIndex: 6,
-                    }}
-                    title="调整气泡指向（每步45°）"
-                  />
+                  <>
+                    <div
+                      onMouseDown={(e) => handleTailMouseDown(e, element)}
+                      style={{
+                        position: 'absolute',
+                        bottom: element.height - 4,
+                        left: element.width / 2 - 4,
+                        width: 8,
+                        height: 8,
+                        borderRadius: '50%',
+                        backgroundColor: '#3B82F6',
+                        border: '2px solid #fff',
+                        cursor: 'grab',
+                        boxShadow: '0 1px 4px rgba(0,0,0,0.3)',
+                        zIndex: 6,
+                        transition: 'transform 0.1s ease',
+                      }}
+                      onMouseEnter={(e) => {
+                        (e.currentTarget as HTMLDivElement).style.transform = 'scale(1.4)';
+                      }}
+                      onMouseLeave={(e) => {
+                        (e.currentTarget as HTMLDivElement).style.transform = 'scale(1)';
+                      }}
+                      title="调整气泡指向（8方向，每步45°）"
+                    />
+                    {showTailAngle !== null && dragState.elementId === element.id && (
+                      <div
+                        style={{
+                          position: 'absolute',
+                          bottom: element.height + 8,
+                          left: element.width / 2,
+                          transform: 'translateX(-50%)',
+                          fontSize: 12,
+                          fontWeight: 600,
+                          color: '#3B82F6',
+                          backgroundColor: 'rgba(255,255,255,0.95)',
+                          padding: '2px 8px',
+                          borderRadius: 3,
+                          pointerEvents: 'none',
+                          zIndex: 8,
+                          whiteSpace: 'nowrap',
+                        }}
+                      >
+                        {showTailAngle}°
+                      </div>
+                    )}
+                  </>
                 )}
               </>
             )}
           </div>
         );
       })}
-
-      <style>{`
-        @keyframes fadeInOut {
-          0% { opacity: 0; transform: translateX(-50%) translateY(-4px); }
-          100% { opacity: 1; transform: translateX(-50%) translateY(0); }
-        }
-      `}</style>
     </div>
   );
 }

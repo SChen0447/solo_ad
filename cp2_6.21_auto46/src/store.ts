@@ -204,10 +204,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return state.panels.find((p) => p.id === state.selectedPanelId);
   };
 
-  return (
-    <AppContext.Provider value={{ state, dispatch, getSelectedPanel }}>
-      {children}
-    </AppContext.Provider>
+  return React.createElement(
+    AppContext.Provider,
+    { value: { state, dispatch, getSelectedPanel } },
+    children
   );
 }
 
@@ -283,6 +283,6 @@ export function createElement(type: ElementType, x: number, y: number, colorInde
     fill: colors.fill,
     stroke: colors.stroke,
     text: type === 'speechBubble' || type === 'dialogBox' ? '' : undefined,
-    tailDirection: type === 'speechBubble' ? 180 : undefined,
+    tailDirection: type === 'speechBubble' ? 90 : undefined,
   };
 }

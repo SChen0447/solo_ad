@@ -108,14 +108,19 @@ function PanelCard({
           backgroundColor: SUBJECT_COLORS[panel.subjectType],
           flexShrink: 0,
           display: 'flex',
+          flexDirection: 'column',
           alignItems: 'center',
           justifyContent: 'center',
-          fontSize: 14,
-          fontWeight: 600,
+          gap: 1,
           color: '#fff',
+          boxShadow: `0 2px 8px ${SUBJECT_COLORS[panel.subjectType]}44`,
+          transition: 'background-color 0.3s ease-in-out, box-shadow 0.3s ease-in-out',
         }}
       >
-        {panel.order}
+        <span style={{ fontSize: 14, fontWeight: 600, lineHeight: 1 }}>{panel.order}</span>
+        <span style={{ fontSize: 8, opacity: 0.85, lineHeight: 1 }}>
+          {panel.subjectType === 'scene' ? '场景' : panel.subjectType === 'character' ? '人物' : '物品'}
+        </span>
       </div>
       <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 4 }}>
         {isEditing ? (

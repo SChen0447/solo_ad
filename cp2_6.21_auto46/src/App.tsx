@@ -86,17 +86,17 @@ function renderPanelForExport(panel: Panel) {
     .join('');
 
   return `
-    <div style="width:${panelW}px;display:flex;flex-direction:column;align-items:center;gap:8px">
-      <div style="width:${panelW}px;height:${panelH}px;background-color:#111827;border-radius:6px;overflow:hidden;position:absolute">
+    <div style="width:${panelW}px;display:inline-block;vertical-align:top;margin:0 8px 16px">
+      <div style="width:${panelW}px;height:${panelH}px;background-color:#111827;border-radius:6px;overflow:hidden;position:relative">
         <div style="position:absolute;inset:0;background:linear-gradient(135deg, ${bgColor}22 0%, #111827 100%)"></div>
         <div style="position:relative;width:100%;height:100%">
-          <div style="position:absolute;top:8px;left:8px;padding:2px 8px;background:rgba(0,0,0,0.6);border-radius:3px;color:#fff;font-size:14px;font-weight:600">
+          <div style="position:absolute;top:6px;left:6px;padding:2px 8px;background:rgba(0,0,0,0.6);border-radius:3px;color:#fff;font-size:13px;font-weight:600">
             #${panel.order}
           </div>
           ${elementsHtml}
         </div>
       </div>
-      <div style="position:relative;margin-top:${panelH + 8}px;width:${panelW}px;text-align:center">
+      <div style="width:${panelW}px;text-align:center;margin-top:8px">
         <div style="color:#fff;font-size:12px;font-weight:600;margin-bottom:2px">分镜 ${panel.order}</div>
         <div style="color:#9CA3AF;font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${panel.description}</div>
       </div>
@@ -129,21 +129,10 @@ function AppInner() {
     const cols = 3;
     const gap = 16;
     const panelW = 180;
-    const panelH = 130;
-    const descH = 40;
-    const cardH = panelH + descH + gap;
-    const rows = Math.ceil(state.panels.length / cols);
-    const totalW = cols * panelW + (cols - 1) * gap + 48;
-    const totalH = rows * cardH + 80;
+    const totalRowW = cols * panelW + (cols - 1) * gap + 48;
 
     const panelsHtml = state.panels
-      .map((p, i) => {
-        const col = i % cols;
-        const row = Math.floor(i / cols);
-        const x = 24 + col * (panelW + gap);
-        const y = 64 + row * cardH;
-        return `<div style="position:absolute;left:${x}px;top:${y}px">${renderPanelForExport(p)}</div>`;
-      })
+      .map((p) => renderPanelForExport(p))
       .join('');
 
     const html = `<!DOCTYPE html>
@@ -181,7 +170,9 @@ function AppInner() {
   .btn:hover { filter: brightness(0.9); }
   .btn:active { transform: scale(0.95); }
   .btn-primary { background: #F59E0B; color: #fff; }
+  .btn-primary:hover { background: #D97706; }
   .btn-secondary { background: #4B5563; color: #fff; }
+  .btn-secondary:hover { background: #374151; }
   .preview-title {
     text-align: center;
     color: #fff;
@@ -191,17 +182,18 @@ function AppInner() {
     padding-top: 20px;
   }
   .preview-container {
-    position: relative;
-    width: ${totalW}px;
+    max-width: ${totalRowW}px;
     margin: 0 auto;
     background: #111827;
     border-radius: 12px;
-    padding: 16px;
+    padding: 24px;
+    text-align: center;
   }
-  .preview-inner {
-    position: relative;
-    width: ${totalW - 32}px;
-    height: ${totalH - 32}px;
+  .panels-grid {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: ${gap}px;
   }
   @media print {
     body { background: #fff; padding: 0; }
@@ -218,7 +210,7 @@ function AppInner() {
   </div>
   <div class="preview-title">📚 漫画分镜预览（共 ${state.panels.length} 个分镜）</div>
   <div id="preview" class="preview-container">
-    <div class="preview-inner">
+    <div class="panels-grid">
       ${panelsHtml}
     </div>
   </div>
@@ -228,23 +220,11 @@ function AppInner() {
       btn.disabled = true;
       btn.textContent = '生成中...';
       
-      const preview = document.getElementById('preview');
-      const w = preview.offsetWidth;
-      const h = preview.offsetHeight + 40;
-      
-      const svg = \`<svg xmlns="http://www.w3.org/2000/svg" width="\${w}" height="\${h}">
-        <foreignObject width="100%" height="100%">
-          <div xmlns="http://www.w3.org/1999/xhtml">
-            \${new XMLSerializer().serializeToString(preview)}
-          </div>
-        </foreignObject>
-      </svg>\`;
-      
-      const img = new Image();
-      const blob = new Blob([svg], { type: 'image/svg+xml;charset=utf-8' });
-      const url = URL.createObjectURL(blob);
-      
-      img.onload = () => {
+      try {
+        const preview = document.getElementById('preview');
+        const w = preview.scrollWidth;
+        const h = preview.scrollHeight + 40;
+        
         const canvas = document.createElement('canvas');
         canvas.width = w * 2;
         canvas.height = h * 2;
@@ -252,6 +232,20 @@ function AppInner() {
         ctx.scale(2, 2);
         ctx.fillStyle = '#111827';
         ctx.fillRect(0, 0, w, h);
+        
+        const data = new XMLSerializer().serializeToString(preview);
+        const svgStr = '<svg xmlns="http://www.w3.org/2000/svg" width="' + w + '" height="' + h + '"><foreignObject width="100%" height="100%"><div xmlns="http://www.w3.org/1999/xhtml">' + data + '</div></foreignObject></svg>';
+        
+        const img = new Image();
+        const blob = new Blob([svgStr], { type: 'image/svg+xml;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        
+        await new Promise((resolve, reject) => {
+          img.onload = resolve;
+          img.onerror = reject;
+          img.src = url;
+        });
+        
         ctx.drawImage(img, 0, 0);
         URL.revokeObjectURL(url);
         
@@ -265,13 +259,11 @@ function AppInner() {
           btn.disabled = false;
           btn.textContent = '⬇️ 下载PNG';
         }, 'image/png');
-      };
-      img.onerror = () => {
+      } catch (err) {
         btn.disabled = false;
         btn.textContent = '⬇️ 下载PNG';
-        alert('下载失败，请尝试打印另存为PDF');
-      };
-      img.src = url;
+        alert('下载失败，请尝试使用打印功能另存为PDF');
+      }
     }
   <\/script>
 </body>
@@ -364,19 +356,25 @@ function AppInner() {
         {isMobile && drawerOpen && (
           <div
             style={{
-              position: 'absolute',
+              position: 'fixed',
               inset: 0,
-              backgroundColor: 'rgba(0, 0, 0, 0.6)',
+              backgroundColor: 'rgba(0, 0, 0, 0.5)',
               backdropFilter: 'blur(4px)',
               WebkitBackdropFilter: 'blur(4px)',
               zIndex: 50,
               display: 'flex',
               justifyContent: 'flex-end',
-              transition: 'opacity 0.3s ease-in-out',
+              animation: 'fadeIn 0.3s ease-in-out',
             }}
             onClick={() => setDrawerOpen(false)}
           >
-            <div onClick={(e) => e.stopPropagation()}>
+            <div
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                height: '100vh',
+                animation: 'slideInRight 0.3s ease-in-out',
+              }}
+            >
               <ElementsPanel
                 onDragStart={handleElementDragStart}
                 isMobileDrawer
@@ -404,7 +402,7 @@ function AppInner() {
               justifyContent: 'center',
               boxShadow: '0 4px 12px rgba(245, 158, 11, 0.4)',
               zIndex: 40,
-              transition: 'transform 0.1s ease, background-color 0.2s ease',
+              transition: 'background-color 0.2s ease, transform 0.1s ease',
             }}
             onMouseEnter={(e) => {
               (e.currentTarget as HTMLButtonElement).style.backgroundColor = '#D97706';
