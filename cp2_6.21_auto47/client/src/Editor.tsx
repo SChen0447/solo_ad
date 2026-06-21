@@ -1,21 +1,29 @@
 import { useEffect, useRef } from 'react'
-import { EditorState } from '@codemirror/state'
+import { EditorState, Transaction } from '@codemirror/state'
 import { EditorView, keymap, lineNumbers, highlightActiveLine, highlightActiveLineGutter } from '@codemirror/view'
-import { defaultKeymap, history, historyKeymap } from '@codemirror/commands'
+import { defaultKeymap, history, historyKeymap, indentLess, indentMore } from '@codemirror/commands'
 import { javascript } from '@codemirror/lang-javascript'
 import { oneDark } from '@codemirror/theme-one-dark'
-import { bracketMatching } from '@codemirror/language'
+import { bracketMatching, indentOnInput } from '@codemirror/language'
 import { closeBrackets, closeBracketsKeymap } from '@codemirror/autocomplete'
 import { highlightSelectionMatches, searchKeymap } from '@codemirror/search'
+
+export interface SelectionRange {
+  from: number
+  to: number
+  head: number
+  anchor: number
+}
 
 interface EditorProps {
   value: string
   onChange: (value: string) => void
+  onSelectionChange?: (selection: SelectionRange) => void
   onActivity?: () => void
   readOnly?: boolean
 }
 
-export default function Editor({ value, onChange, onActivity, readOnly = false }: EditorProps) {
+export default function Editor({ value, onChange, onSelectionChange, onActivity, readOnly = false }: EditorProps) {
   const editorRef = useRef<HTMLDivElement>(null)
   const viewRef = useRef<EditorView | null>(null)
   const isRemoteUpdate = useRef(false)
@@ -30,7 +38,49 @@ export default function Editor({ value, onChange, onActivity, readOnly = false }
           onActivity()
         }
       }
+
+      if (update.selectionSet && !isRemoteUpdate.current) {
+        if (onSelectionChange) {
+          const range = update.state.selection.main
+          onSelectionChange({
+            from: range.from,
+            to: range.to,
+            head: range.head,
+            anchor: range.anchor,
+          })
+        }
+        if (onActivity) {
+          onActivity()
+        }
+      }
+
+      if (update.transactions) {
+        for (const tr of update.transactions) {
+          if (tr.isUserEvent('input') || tr.isUserEvent('delete') || tr.isUserEvent('move')) {
+            if (onActivity) {
+              onActivity()
+            }
+          }
+        }
+      }
     })
+
+    const indentKeymap = keymap.of([
+      {
+        key: 'Tab',
+        run: (view) => {
+          if (view.state.selection.main.empty) {
+            return indentMore(view)
+          }
+          const tr: Transaction = view.state.update({
+            annotations: Transaction.userEvent.of('indent'),
+          })
+          view.dispatch(tr)
+          return indentMore(view)
+        },
+        shift: indentLess,
+      },
+    ])
 
     const extensions = [
       lineNumbers(),
@@ -39,9 +89,11 @@ export default function Editor({ value, onChange, onActivity, readOnly = false }
       history(),
       bracketMatching(),
       closeBrackets(),
+      indentOnInput(),
       highlightSelectionMatches(),
       javascript({ typescript: true, jsx: true }),
       oneDark,
+      indentKeymap,
       keymap.of([
         ...defaultKeymap,
         ...historyKeymap,
@@ -50,6 +102,17 @@ export default function Editor({ value, onChange, onActivity, readOnly = false }
       ]),
       EditorView.lineWrapping,
       handleChange,
+      EditorView.domEventHandlers({
+        click() {
+          if (onActivity) onActivity()
+        },
+        keyup() {
+          if (onActivity) onActivity()
+        },
+        keydown() {
+          if (onActivity) onActivity()
+        },
+      }),
       EditorView.theme({
         '&': {
           height: '100%',

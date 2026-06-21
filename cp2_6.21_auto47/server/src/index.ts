@@ -2,7 +2,7 @@ import express from 'express'
 import { createServer } from 'http'
 import { Server, Socket } from 'socket.io'
 import cors from 'cors'
-import { exec } from 'child_process'
+import { spawn } from 'child_process'
 import { writeFile, unlink } from 'fs/promises'
 import { tmpdir } from 'os'
 import { join } from 'path'
@@ -24,6 +24,7 @@ interface User {
   username: string
   color: string
   lastActive: number
+  disconnectedAt?: number
 }
 
 interface RoomState {
@@ -31,7 +32,15 @@ interface RoomState {
   code: string
 }
 
+interface SelectionRange {
+  from: number
+  to: number
+  head: number
+  anchor: number
+}
+
 const rooms = new Map<string, RoomState>()
+const disconnectTimers = new Map<string, Map<string, ReturnType<typeof setTimeout>>>()
 
 const COLORS = ['#60A5FA', '#F59E0B', '#10B981', '#EF4444']
 
@@ -49,6 +58,13 @@ function getRoom(roomId: string): RoomState {
   return rooms.get(roomId)!
 }
 
+function getRoomTimers(roomId: string): Map<string, ReturnType<typeof setTimeout>> {
+  if (!disconnectTimers.has(roomId)) {
+    disconnectTimers.set(roomId, new Map())
+  }
+  return disconnectTimers.get(roomId)!
+}
+
 function updateUserActivity(socket: Socket, roomId: string) {
   const room = getRoom(roomId)
   const user = room.users.get(socket.id)
@@ -57,13 +73,47 @@ function updateUserActivity(socket: Socket, roomId: string) {
   }
 }
 
+function clearDisconnectTimer(roomId: string, userId: string) {
+  const roomTimers = getRoomTimers(roomId)
+  const timer = roomTimers.get(userId)
+  if (timer) {
+    clearTimeout(timer)
+    roomTimers.delete(userId)
+  }
+}
+
+function scheduleDisconnectCleanup(socket: Socket, roomId: string, user: User) {
+  const roomTimers = getRoomTimers(roomId)
+  clearDisconnectTimer(roomId, socket.id)
+
+  const timer = setTimeout(() => {
+    const room = getRoom(roomId)
+    if (room.users.has(socket.id)) {
+      room.users.delete(socket.id)
+      roomTimers.delete(socket.id)
+
+      io.to(roomId).emit('user-left', {
+        userId: socket.id,
+        username: user.username,
+        message: `${user.username} 已离开`,
+      })
+
+      io.to(roomId).emit('user-list', Array.from(room.users.values()))
+
+      console.log(`User ${user.username} cleaned up from room ${roomId} after 10s timeout`)
+    }
+  }, 10000)
+
+  roomTimers.set(socket.id, timer)
+}
+
 setInterval(() => {
   const now = Date.now()
   const INACTIVE_TIMEOUT = 10000
 
   rooms.forEach((room, roomId) => {
     room.users.forEach((user, userId) => {
-      if (now - user.lastActive > INACTIVE_TIMEOUT) {
+      if (now - user.lastActive > INACTIVE_TIMEOUT && !user.disconnectedAt) {
         const socket = io.sockets.sockets.get(userId)
         if (socket) {
           socket.leave(roomId)
@@ -93,29 +143,41 @@ io.on('connection', (socket) => {
     const room = getRoom(roomId)
 
     socket.join(roomId)
+    clearDisconnectTimer(roomId, socket.id)
 
-    const user: User = {
+    const existingUser = room.users.get(socket.id)
+    const user: User = existingUser || {
       id: socket.id,
       username: displayName,
       color: getRandomColor(),
       lastActive: Date.now(),
     }
+    user.lastActive = Date.now()
+    delete user.disconnectedAt
 
     room.users.set(socket.id, user)
 
     socket.emit('joined', {
       roomId,
       userId: socket.id,
-      username: displayName,
+      username: user.username,
       code: room.code,
       users: Array.from(room.users.values()),
     })
 
-    io.to(roomId).emit('user-joined', {
-      userId: socket.id,
-      username: displayName,
-      message: `${displayName} 加入了房间`,
-    })
+    if (!existingUser) {
+      io.to(roomId).emit('user-joined', {
+        userId: socket.id,
+        username: displayName,
+        message: `${displayName} 加入了房间`,
+      })
+    } else {
+      io.to(roomId).emit('user-joined', {
+        userId: socket.id,
+        username: displayName,
+        message: `${displayName} 重新连接`,
+      })
+    }
 
     io.to(roomId).emit('user-list', Array.from(room.users.values()))
 
@@ -129,6 +191,14 @@ io.on('connection', (socket) => {
 
     socket.to(roomId).emit('code-change', {
       code,
+      userId: socket.id,
+    })
+  })
+
+  socket.on('selection-change', ({ roomId, selection }: { roomId: string; selection: SelectionRange }) => {
+    updateUserActivity(socket, roomId)
+    socket.to(roomId).emit('selection-change', {
+      selection,
       userId: socket.id,
     })
   })
@@ -157,40 +227,77 @@ io.on('connection', (socket) => {
 
     if (!user) return
 
+    let tmpFile = ''
     try {
-      const tmpFile = join(tmpdir(), `code-${Date.now()}-${Math.random().toString(36).slice(2)}.js`)
+      tmpFile = join(tmpdir(), `code-${Date.now()}-${Math.random().toString(36).slice(2)}.js`)
       await writeFile(tmpFile, code)
 
-      exec(`node "${tmpFile}"`, { timeout: 5000, maxBuffer: 1024 * 1024 }, async (error, stdout, stderr) => {
+      const child = spawn('node', [tmpFile], {
+        timeout: 5000,
+        env: { ...process.env, NODE_OPTIONS: '--max-old-space-size=64' },
+      })
+
+      let stdoutData = ''
+      let stderrData = ''
+      let timedOut = false
+
+      child.stdout.on('data', (data) => {
+        stdoutData += data.toString()
+      })
+
+      child.stderr.on('data', (data) => {
+        stderrData += data.toString()
+      })
+
+      child.on('error', (err) => {
+        stderrData += `[执行错误：${err.message}]\n`
+      })
+
+      child.on('close', async (code) => {
         try {
           await unlink(tmpFile)
         } catch (e) {
           // ignore cleanup errors
         }
 
-        let output = ''
-        if (stdout) output += stdout
-        if (stderr) output += stderr
-        if (error && error.killed) {
-          output += '\n[执行超时：代码运行超过5秒]'
-        } else if (error && !stderr) {
-          output += `\n[执行错误：${error.message}]`
+        if (timedOut) {
+          stderrData += '\n[执行超时：代码运行超过5秒]'
         }
 
-        if (!output) {
-          output = '[代码执行完成，无输出]'
+        if (code !== null && code !== 0 && !stderrData && !stdoutData) {
+          stderrData += `[进程退出码：${code}]`
+        }
+
+        if (!stdoutData && !stderrData) {
+          stdoutData = '[代码执行完成，无输出]'
         }
 
         io.to(roomId).emit('run-result', {
-          output,
+          stdout: stdoutData,
+          stderr: stderrData,
           userId: socket.id,
           username: user.username,
           timestamp: Date.now(),
         })
       })
+
+      setTimeout(() => {
+        if (!child.killed) {
+          timedOut = true
+          child.kill('SIGKILL')
+        }
+      }, 5000)
     } catch (err) {
+      if (tmpFile) {
+        try {
+          await unlink(tmpFile)
+        } catch (e) {
+          // ignore
+        }
+      }
       io.to(roomId).emit('run-result', {
-        output: `[执行错误：${(err as Error).message}]`,
+        stdout: '',
+        stderr: `[执行错误：${(err as Error).message}]`,
         userId: socket.id,
         username: user.username,
         timestamp: Date.now(),
@@ -208,21 +315,20 @@ io.on('connection', (socket) => {
     rooms.forEach((room, roomId) => {
       const user = room.users.get(socket.id)
       if (user) {
-        room.users.delete(socket.id)
+        user.disconnectedAt = Date.now()
 
-        io.to(roomId).emit('user-left', {
+        socket.to(roomId).emit('user-offline', {
           userId: socket.id,
           username: user.username,
-          message: `${user.username} 已离开`,
         })
 
-        io.to(roomId).emit('user-list', Array.from(room.users.values()))
+        scheduleDisconnectCleanup(socket, roomId, user)
       }
     })
   })
 })
 
-const PORT = 3001
+const PORT = Number(process.env.PORT) || 3002
 server.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`)
 })

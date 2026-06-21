@@ -1,7 +1,8 @@
 import { useState, useRef } from 'react'
 
 export interface RunResult {
-  output: string
+  stdout: string
+  stderr: string
   userId: string
   username: string
   timestamp: number
@@ -105,6 +106,9 @@ export function OutputPanel({ output }: OutputPanelProps) {
     window.addEventListener('mouseup', handleMouseUp)
   }
 
+  const hasStdout = output?.stdout && output.stdout.length > 0
+  const hasStderr = output?.stderr && output.stderr.length > 0
+
   return (
     <div style={{ position: 'relative' }}>
       <div
@@ -164,7 +168,32 @@ export function OutputPanel({ output }: OutputPanelProps) {
             <div style={{ color: '#9CA3AF', fontSize: '12px', marginBottom: '8px' }}>
               {output.username} 运行于 {new Date(output.timestamp).toLocaleTimeString()}
             </div>
-            <div>{output.output}</div>
+
+            {hasStdout && (
+              <div style={{ marginBottom: hasStderr ? '8px' : 0 }}>
+                {output.stdout.split('\n').map((line, i) => (
+                  <div key={`stdout-${i}`} style={{ color: '#E5E7EB' }}>
+                    {line}
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {hasStderr && (
+              <div
+                style={{
+                  backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                  borderLeft: '3px solid #EF4444',
+                  paddingLeft: '10px',
+                }}
+              >
+                {output.stderr.split('\n').map((line, i) => (
+                  <div key={`stderr-${i}`} style={{ color: '#FCA5A5' }}>
+                    {line}
+                  </div>
+                ))}
+              </div>
+            )}
           </>
         ) : (
           <div style={{ color: '#6B7280' }}>点击运行按钮执行代码，输出将显示在这里</div>

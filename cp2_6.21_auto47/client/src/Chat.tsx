@@ -21,38 +21,43 @@ function formatTime(timestamp: number): string {
   return `${hours}:${minutes}`
 }
 
-function parseMessage(message: string): Array<{ type: 'text' | 'code'; content: string; language?: string }> {
-  const parts: Array<{ type: 'text' | 'code'; content: string; language?: string }> = []
-  const codeBlockRegex = /```(\w*)\n([\s\S]*?)```/g
+type MessagePart =
+  | { type: 'text'; content: string }
+  | { type: 'code'; content: string; language: string }
 
-  let lastIndex = 0
-  let match
+function parseMessage(message: string): MessagePart[] {
+  const parts: MessagePart[] = []
+  if (!message) {
+    return parts
+  }
 
-  while ((match = codeBlockRegex.exec(message)) !== null) {
-    if (match.index > lastIndex) {
-      parts.push({
-        type: 'text',
-        content: message.slice(lastIndex, match.index),
-      })
+  const regex = /```(\w*)\r?\n([\s\S]*?)```/g
+  let lastEnd = 0
+  let match: RegExpExecArray | null
+
+  while ((match = regex.exec(message)) !== null) {
+    if (match.index > lastEnd) {
+      const textContent = message.slice(lastEnd, match.index)
+      if (textContent.length > 0) {
+        parts.push({ type: 'text', content: textContent })
+      }
     }
 
-    parts.push({
-      type: 'code',
-      content: match[2],
-      language: match[1] || 'javascript',
-    })
+    const language = (match[1] || '').trim() || 'javascript'
+    const codeContent = match[2].replace(/\r?\n$/, '')
+    parts.push({ type: 'code', content: codeContent, language })
 
-    lastIndex = match.index + match[0].length
+    lastEnd = regex.lastIndex
   }
 
-  if (lastIndex < message.length) {
-    parts.push({
-      type: 'text',
-      content: message.slice(lastIndex),
-    })
+  if (lastEnd < message.length) {
+    const remaining = message.slice(lastEnd)
+    if (remaining.length > 0) {
+      parts.push({ type: 'text', content: remaining })
+    }
   }
 
-  if (parts.length === 0) {
+  if (parts.length === 0 && message.length > 0) {
     parts.push({ type: 'text', content: message })
   }
 
@@ -61,7 +66,7 @@ function parseMessage(message: string): Array<{ type: 'text' | 'code'; content: 
 
 function CodeBlock({ code, language }: { code: string; language: string }) {
   return (
-    <div>
+    <div style={{ marginTop: '4px', marginBottom: '4px' }}>
       {language && (
         <div
           style={{
@@ -69,6 +74,9 @@ function CodeBlock({ code, language }: { code: string; language: string }) {
             color: '#9CA3AF',
             marginBottom: '4px',
             fontFamily: 'sans-serif',
+            fontWeight: 500,
+            textTransform: 'uppercase',
+            letterSpacing: '0.5px',
           }}
         >
           {language}
@@ -81,17 +89,41 @@ function CodeBlock({ code, language }: { code: string; language: string }) {
           padding: '12px',
           borderRadius: '6px',
           overflowX: 'auto',
-          margin: '8px 0',
+          margin: 0,
           fontFamily: 'Consolas, Monaco, "Courier New", monospace',
           fontSize: '13px',
           lineHeight: '1.5',
           whiteSpace: 'pre-wrap',
           wordBreak: 'break-all',
+          border: '1px solid #2D2D3F',
         }}
       >
         <code>{code}</code>
       </pre>
     </div>
+  )
+}
+
+function MessageContent({ content }: { content: string }) {
+  const parts = parseMessage(content)
+
+  if (parts.length === 0) {
+    return null
+  }
+
+  return (
+    <>
+      {parts.map((part, i) => {
+        if (part.type === 'code') {
+          return <CodeBlock key={i} code={part.content} language={part.language} />
+        }
+        return (
+          <span key={i} style={{ whiteSpace: 'pre-wrap' }}>
+            {part.content}
+          </span>
+        )
+      })}
+    </>
   )
 }
 
@@ -138,7 +170,23 @@ export default function Chat({ messages, onSendMessage, onlineCount, isMobileExp
   }
 
   return (
-    <div style={chatStyle}>
+    <div style={chatStyle} className={isMobileExpanded !== undefined ? (isMobileExpanded ? 'chat-expanded' : 'chat-collapsed') : ''}>
+      <style>{`
+        @keyframes slideDown {
+          from { height: 0; opacity: 0; }
+          to { height: 200px; opacity: 1; }
+        }
+        @keyframes slideUp {
+          from { height: 200px; opacity: 1; }
+          to { height: 0; opacity: 0; }
+        }
+        .chat-expanded {
+          animation: slideDown 0.3s ease forwards;
+        }
+        .chat-collapsed {
+          animation: slideUp 0.3s ease forwards;
+        }
+      `}</style>
       <div
         style={{
           padding: '12px 16px',
@@ -173,6 +221,7 @@ export default function Chat({ messages, onSendMessage, onlineCount, isMobileExp
           padding: '12px',
           scrollbarWidth: 'thin',
           scrollbarColor: '#4B5563 transparent',
+          minHeight: 0,
         }}
         className="chat-messages"
       >
@@ -202,40 +251,32 @@ export default function Chat({ messages, onSendMessage, onlineCount, isMobileExp
           </div>
         )}
 
-        {messages.map((msg, index) => {
-          const parts = parseMessage(msg.message)
-          return (
+        {messages.map((msg, index) => (
+          <div
+            key={index}
+            style={{
+              marginBottom: '12px',
+              wordBreak: 'break-word',
+            }}
+          >
             <div
-              key={index}
               style={{
-                marginBottom: '12px',
-                wordBreak: 'break-word',
+                marginBottom: '4px',
+                fontSize: '13px',
               }}
             >
-              <div
-                style={{
-                  marginBottom: '4px',
-                  fontSize: '13px',
-                }}
-              >
-                <span style={{ color: '#60A5FA', fontWeight: 500 }}>
-                  {msg.username}
-                </span>
-                <span style={{ color: '#9CA3AF', marginLeft: '8px', fontSize: '12px' }}>
-                  {formatTime(msg.timestamp)}
-                </span>
-              </div>
-              <div style={{ fontSize: '14px', lineHeight: '1.5', color: '#D1D5DB' }}>
-                {parts.map((part, i) => {
-                  if (part.type === 'code') {
-                    return <CodeBlock key={i} code={part.content} language={part.language || 'javascript'} />
-                  }
-                  return <span key={i}>{part.content}</span>
-                })}
-              </div>
+              <span style={{ color: '#60A5FA', fontWeight: 500 }}>
+                {msg.username}
+              </span>
+              <span style={{ color: '#9CA3AF', marginLeft: '8px', fontSize: '12px' }}>
+                {formatTime(msg.timestamp)}
+              </span>
             </div>
-          )
-        })}
+            <div style={{ fontSize: '14px', lineHeight: '1.6', color: '#D1D5DB' }}>
+              <MessageContent content={msg.message} />
+            </div>
+          </div>
+        ))}
         <div ref={messagesEndRef} />
       </div>
 
@@ -253,7 +294,7 @@ export default function Chat({ messages, onSendMessage, onlineCount, isMobileExp
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="输入消息..."
+            placeholder="输入消息... (支持```包裹代码块)"
             style={{
               flex: 1,
               padding: '10px 12px',

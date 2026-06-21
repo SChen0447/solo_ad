@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { io, Socket } from 'socket.io-client'
-import Editor from './Editor'
+import Editor, { SelectionRange } from './Editor'
 import Chat from './Chat'
 import RunButton, { OutputPanel, RunResult } from './RunButton'
 
@@ -25,7 +25,7 @@ interface RoomJoinedData {
   users: User[]
 }
 
-function UserAvatar({ username, color, size = 32 }: { username: string; color: string; size?: number }) {
+function UserAvatar({ username, color, size = 32, dimmed = false }: { username: string; color: string; size?: number; dimmed?: boolean }) {
   const initial = username.charAt(0).toUpperCase()
   return (
     <div
@@ -33,7 +33,7 @@ function UserAvatar({ username, color, size = 32 }: { username: string; color: s
         width: `${size}px`,
         height: `${size}px`,
         borderRadius: '50%',
-        backgroundColor: color,
+        backgroundColor: dimmed ? '#4B5563' : color,
         color: '#FFFFFF',
         display: 'flex',
         alignItems: 'center',
@@ -41,6 +41,8 @@ function UserAvatar({ username, color, size = 32 }: { username: string; color: s
         fontSize: `${size * 0.45}px`,
         fontWeight: 600,
         flexShrink: 0,
+        opacity: dimmed ? 0.5 : 1,
+        transition: 'opacity 0.3s ease',
       }}
       title={username}
     >
@@ -49,7 +51,7 @@ function UserAvatar({ username, color, size = 32 }: { username: string; color: s
   )
 }
 
-function OnlineUsersList({ users }: { users: User[] }) {
+function OnlineUsersList({ users, offlineUsers = [] }: { users: User[]; offlineUsers?: Set<string> }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', position: 'relative' }}>
       <div style={{ position: 'relative' }}>
@@ -63,7 +65,11 @@ function OnlineUsersList({ users }: { users: User[] }) {
                 position: 'relative',
               }}
             >
-              <UserAvatar username={user.username} color={user.color} />
+              <UserAvatar
+                username={user.username}
+                color={user.color}
+                dimmed={offlineUsers.has(user.id)}
+              />
             </div>
           ))}
         </div>
@@ -252,14 +258,18 @@ export default function App() {
   const [socket, setSocket] = useState<Socket | null>(null)
   const [isJoined, setIsJoined] = useState(false)
   const [roomId, setRoomId] = useState('')
+  const [currentUsername, setCurrentUsername] = useState('')
   const [code, setCode] = useState('')
   const [users, setUsers] = useState<User[]>([])
+  const [offlineUsers, setOfflineUsers] = useState<Set<string>>(new Set())
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [runResult, setRunResult] = useState<RunResult | null>(null)
   const [isRunning, setIsRunning] = useState(false)
   const [isMobile, setIsMobile] = useState(false)
   const [isChatExpanded, setIsChatExpanded] = useState(false)
-  const activityTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const [isReconnecting, setIsReconnecting] = useState(false)
+  const reconnectAttemptsRef = useRef(0)
+  const savedRoomRef = useRef<{ roomId: string; username: string } | null>(null)
 
   useEffect(() => {
     const checkMobile = () => {
@@ -270,12 +280,30 @@ export default function App() {
     return () => window.removeEventListener('resize', checkMobile)
   }, [])
 
-  const handleJoin = useCallback((room: string, username: string) => {
-    const newSocket = io()
+  const createSocketConnection = useCallback((room: string, username: string) => {
+    const newSocket = io({
+      reconnection: true,
+      reconnectionAttempts: 5,
+      reconnectionDelay: 1000,
+      reconnectionDelayMax: 5000,
+    })
 
     newSocket.on('connect', () => {
       console.log('Connected to server')
+      setIsReconnecting(false)
+      reconnectAttemptsRef.current = 0
       newSocket.emit('join-room', { roomId: room, username })
+    })
+
+    newSocket.on('reconnecting', (attempt) => {
+      console.log(`Reconnecting attempt ${attempt}...`)
+      setIsReconnecting(true)
+      reconnectAttemptsRef.current = attempt
+    })
+
+    newSocket.on('reconnect_failed', () => {
+      console.log('Reconnection failed')
+      setIsReconnecting(false)
     })
 
     newSocket.on('error-message', (msg: string) => {
@@ -287,6 +315,7 @@ export default function App() {
       setCode(data.code)
       setUsers(data.users)
       setIsJoined(true)
+      setCurrentUsername(data.username)
 
       const systemMessage: ChatMessage = {
         userId: 'system',
@@ -294,7 +323,14 @@ export default function App() {
         message: `欢迎加入房间「${data.roomId}」`,
         timestamp: Date.now(),
       }
-      setMessages([systemMessage])
+      setMessages((prev) => {
+        if (prev.length === 0 || prev[prev.length - 1].message !== systemMessage.message) {
+          return [...prev, systemMessage]
+        }
+        return prev
+      })
+
+      setOfflineUsers(new Set())
     })
 
     newSocket.on('user-joined', (data: { userId: string; username: string; message: string }) => {
@@ -305,6 +341,19 @@ export default function App() {
         timestamp: Date.now(),
       }
       setMessages((prev) => [...prev, newMessage])
+      setOfflineUsers((prev) => {
+        const next = new Set(prev)
+        next.delete(data.userId)
+        return next
+      })
+    })
+
+    newSocket.on('user-offline', (data: { userId: string; username: string }) => {
+      setOfflineUsers((prev) => {
+        const next = new Set(prev)
+        next.add(data.userId)
+        return next
+      })
     })
 
     newSocket.on('user-left', (data: { userId: string; username: string; message: string }) => {
@@ -315,6 +364,11 @@ export default function App() {
         timestamp: Date.now(),
       }
       setMessages((prev) => [...prev, newMessage])
+      setOfflineUsers((prev) => {
+        const next = new Set(prev)
+        next.delete(data.userId)
+        return next
+      })
     })
 
     newSocket.on('user-list', (userList: User[]) => {
@@ -323,6 +377,12 @@ export default function App() {
 
     newSocket.on('code-change', (data: { code: string; userId: string }) => {
       setCode(data.code)
+    })
+
+    newSocket.on('selection-change', (data: { selection: SelectionRange; userId: string }) => {
+      // 远程选区变化可以在这里处理，例如显示其他用户的光标
+      // 目前保留接口供未来扩展
+      void data
     })
 
     newSocket.on('chat-message', (msg: ChatMessage) => {
@@ -336,18 +396,29 @@ export default function App() {
 
     newSocket.on('disconnect', () => {
       console.log('Disconnected from server')
+      setIsReconnecting(true)
+      users.forEach((u) => {
+        if (u.id === newSocket.id) {
+          setOfflineUsers((prev) => {
+            const next = new Set(prev)
+            next.add(u.id)
+            return next
+          })
+        }
+      })
     })
 
     setSocket(newSocket)
   }, [])
 
+  const handleJoin = useCallback((room: string, username: string) => {
+    savedRoomRef.current = { roomId: room, username }
+    createSocketConnection(room, username)
+  }, [createSocketConnection])
+
   const sendActivity = useCallback(() => {
     if (socket && isJoined) {
       socket.emit('user-activity', { roomId })
-
-      if (activityTimerRef.current) {
-        clearTimeout(activityTimerRef.current)
-      }
     }
   }, [socket, roomId, isJoined])
 
@@ -356,6 +427,16 @@ export default function App() {
       setCode(newCode)
       if (socket) {
         socket.emit('code-change', { roomId, code: newCode })
+      }
+      sendActivity()
+    },
+    [socket, roomId, sendActivity]
+  )
+
+  const handleSelectionChange = useCallback(
+    (selection: SelectionRange) => {
+      if (socket) {
+        socket.emit('selection-change', { roomId, selection })
       }
       sendActivity()
     },
@@ -384,12 +465,43 @@ export default function App() {
     setRunResult(null)
   }, [])
 
-  const toggleChat = () => {
-    setIsChatExpanded(!isChatExpanded)
-  }
+  const toggleChat = useCallback(() => {
+    setIsChatExpanded((prev) => !prev)
+  }, [])
 
   if (!isJoined) {
     return <JoinScreen onJoin={handleJoin} />
+  }
+
+  const ConnectionStatus = () => {
+    if (isReconnecting) {
+      return (
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+            fontSize: '12px',
+            color: '#F59E0B',
+            backgroundColor: 'rgba(245, 158, 11, 0.1)',
+            padding: '4px 10px',
+            borderRadius: '12px',
+          }}
+        >
+          <span
+            style={{
+              width: '8px',
+              height: '8px',
+              borderRadius: '50%',
+              backgroundColor: '#F59E0B',
+              animation: 'pulse 1.5s infinite',
+            }}
+          />
+          重连中...
+        </div>
+      )
+    }
+    return null
   }
 
   const desktopLayout = (
@@ -401,6 +513,12 @@ export default function App() {
         overflow: 'hidden',
       }}
     >
+      <style>{`
+        @keyframes pulse {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0.4; }
+        }
+      `}</style>
       <div style={{ flex: '0 0 70%', display: 'flex', flexDirection: 'column', minWidth: 0 }}>
         <div
           style={{
@@ -411,13 +529,26 @@ export default function App() {
             justifyContent: 'space-between',
             borderBottom: '1px solid #4B5563',
             flexShrink: 0,
+            gap: '12px',
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-            <h2 style={{ color: '#FFFFFF', fontSize: '16px', margin: 0, fontWeight: 600 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '16px', minWidth: 0 }}>
+            <h2
+              style={{
+                color: '#FFFFFF',
+                fontSize: '16px',
+                margin: 0,
+                fontWeight: 600,
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                maxWidth: '200px',
+              }}
+            >
               {roomId}
             </h2>
-            <OnlineUsersList users={users} />
+            <OnlineUsersList users={users} offlineUsers={offlineUsers} />
+            <ConnectionStatus />
           </div>
           <RunButton
             onRun={handleRunCode}
@@ -428,13 +559,25 @@ export default function App() {
 
         <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
           <div style={{ flex: 1, minHeight: 0 }}>
-            <Editor value={code} onChange={handleCodeChange} onActivity={sendActivity} />
+            <Editor
+              value={code}
+              onChange={handleCodeChange}
+              onSelectionChange={handleSelectionChange}
+              onActivity={sendActivity}
+            />
           </div>
           <OutputPanel output={runResult} />
         </div>
       </div>
 
-      <div style={{ flex: '0 0 30%', minWidth: '300px', borderLeft: '1px solid #4B5563' }}>
+      <div
+        style={{
+          flex: '0 0 30%',
+          minWidth: '300px',
+          maxWidth: '400px',
+          borderLeft: '1px solid #4B5563',
+        }}
+      >
         <Chat messages={messages} onSendMessage={handleSendMessage} onlineCount={users.length} />
       </div>
     </div>
@@ -450,6 +593,25 @@ export default function App() {
         overflow: 'hidden',
       }}
     >
+      <style>{`
+        @keyframes pulse {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0.4; }
+        }
+        @keyframes chatSlideIn {
+          from { height: 0; opacity: 0; }
+          to { height: 200px; opacity: 1; }
+        }
+        @keyframes chatSlideOut {
+          from { height: 200px; opacity: 1; }
+          to { height: 0; opacity: 0; }
+        }
+        .mobile-chat-panel {
+          overflow: hidden;
+          transition: height 0.3s ease, opacity 0.3s ease;
+        }
+      `}</style>
+
       <div
         style={{
           backgroundColor: '#2D2D3F',
@@ -462,7 +624,7 @@ export default function App() {
           gap: '8px',
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0, flex: 1 }}>
           <h2
             style={{
               color: '#FFFFFF',
@@ -472,14 +634,15 @@ export default function App() {
               whiteSpace: 'nowrap',
               overflow: 'hidden',
               textOverflow: 'ellipsis',
-              maxWidth: '120px',
+              maxWidth: '80px',
             }}
           >
             {roomId}
           </h2>
-          <OnlineUsersList users={users} />
+          <OnlineUsersList users={users} offlineUsers={offlineUsers} />
+          {isReconnecting && <ConnectionStatus />}
         </div>
-        <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexShrink: 0 }}>
           <button
             onClick={handleRunCode}
             disabled={isRunning}
@@ -492,12 +655,14 @@ export default function App() {
               fontSize: '12px',
               cursor: isRunning ? 'not-allowed' : 'pointer',
               fontWeight: 500,
+              transition: 'background-color 0.2s',
             }}
           >
             ▶
           </button>
           <button
             onClick={toggleChat}
+            aria-label={isChatExpanded ? '收起聊天' : '展开聊天'}
             style={{
               padding: '6px 10px',
               backgroundColor: isChatExpanded ? '#60A5FA' : '#374151',
@@ -506,9 +671,23 @@ export default function App() {
               borderRadius: '6px',
               fontSize: '14px',
               cursor: 'pointer',
+              transition: 'background-color 0.2s',
+              position: 'relative',
             }}
           >
             💬
+            <span
+              style={{
+                position: 'absolute',
+                top: '-2px',
+                right: '-2px',
+                width: '8px',
+                height: '8px',
+                borderRadius: '50%',
+                backgroundColor: isChatExpanded ? '#10B981' : '#60A5FA',
+                border: '1px solid #2D2D3F',
+              }}
+            />
           </button>
         </div>
       </div>
@@ -516,18 +695,23 @@ export default function App() {
       <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
           <div style={{ flex: 1, minHeight: 0 }}>
-            <Editor value={code} onChange={handleCodeChange} onActivity={sendActivity} />
+            <Editor
+              value={code}
+              onChange={handleCodeChange}
+              onSelectionChange={handleSelectionChange}
+              onActivity={sendActivity}
+            />
           </div>
           <OutputPanel output={runResult} />
         </div>
 
         <div
+          className="mobile-chat-panel"
           style={{
             height: isChatExpanded ? '200px' : '0',
-            transition: 'height 0.3s ease',
-            overflow: 'hidden',
-            borderTop: isChatExpanded ? '1px solid #4B5563' : 'none',
+            opacity: isChatExpanded ? 1 : 0,
             flexShrink: 0,
+            borderTop: isChatExpanded ? '1px solid #4B5563' : 'none',
           }}
         >
           <Chat
