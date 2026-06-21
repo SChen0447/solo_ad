@@ -377,11 +377,11 @@ function IngredientCard({
           position: 'absolute',
           top: 14,
           left: 14,
-          width: 10,
-          height: 10,
+          width: 12,
+          height: 12,
           borderRadius: '50%',
           backgroundColor: categoryColor,
-          boxShadow: `0 0 0 2px ${categoryColor}30`,
+          boxShadow: `0 0 0 3px ${categoryColor}30`,
         }}
       />
 

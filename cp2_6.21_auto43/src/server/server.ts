@@ -1,23 +1,24 @@
 import express from 'express';
 import cors from 'cors';
 import path from 'path';
+import fs from 'fs';
 import router from './routes';
 
 const app = express();
-const PORT = 3001;
+const PORT = Number(process.env.PORT) || 4000;
 
 app.use(cors());
 app.use(express.json());
 app.use('/api', router);
 
-try {
-  const distDir = path.resolve(__dirname, '../../dist');
+const distDir = path.resolve(__dirname, '../../dist');
+if (fs.existsSync(distDir)) {
   app.use(express.static(distDir));
   app.get('*', (_req, res) => {
     res.sendFile(path.join(distDir, 'index.html'));
   });
-} catch {
-  // In dev mode, dist may not exist
+} else {
+  console.log('ℹ️  开发模式：dist目录不存在，仅提供API服务');
 }
 
 app.listen(PORT, () => {

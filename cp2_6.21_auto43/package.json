@@ -5,7 +5,7 @@
   "main": "src/server/server.ts",
   "scripts": {
     "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\"",
-    "dev:server": "ts-node src/server/server.ts",
+    "dev:server": "ts-node --project tsconfig.server.json src/server/server.ts",
     "dev:client": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview"

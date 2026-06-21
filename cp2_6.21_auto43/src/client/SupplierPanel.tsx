@@ -429,10 +429,10 @@ function PriceBar({
             background: 'transparent',
             fontSize: 16,
             padding: 0,
-            color: isPreferred ? '#F59E0B' : '#D1D5DB',
+            color: isCheapest ? '#F59E0B' : '#D1D5DB',
             lineHeight: 1,
           }}
-          title={isPreferred ? '取消首选（点击其他星标切换）' : '设为首选供应商'}
+          title={isPreferred ? '当前首选（点击其他切换）' : '设为首选供应商'}
         >
           ★
         </button>

@@ -417,7 +417,7 @@ export default function IngredientDetail({
                               background: 'transparent',
                               fontSize: 14,
                               padding: 0,
-                              color: item.supplier.isPreferred ? '#F59E0B' : '#D1D5DB',
+                              color: item.isCheapest ? '#F59E0B' : '#D1D5DB',
                             }}
                           >
                             ★
