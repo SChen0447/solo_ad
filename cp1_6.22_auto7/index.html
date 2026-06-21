@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>博物馆文物时光机</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      font-family: 'Microsoft YaHei', 'PingFang SC', sans-serif;
+      background: linear-gradient(180deg, #2a1a0f 0%, #3d2a18 50%, #1a1208 100%);
+    }
+    #app {
+      width: 100%;
+      height: 100%;
+      position: relative;
+    }
+    #canvas-container {
+      width: 100%;
+      height: 100%;
+    }
+    #title {
+      position: absolute;
+      top: 30px;
+      left: 50%;
+      transform: translateX(-50%);
+      color: #d4af37;
+      font-size: 30px;
+      font-weight: bold;
+      text-shadow: 0 0 20px rgba(212, 175, 55, 0.6);
+      z-index: 10;
+      letter-spacing: 4px;
+    }
+    #timeline-container {
+      position: absolute;
+      bottom: 40px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 80%;
+      height: 60px;
+      z-index: 10;
+      cursor: grab;
+    }
+    #timeline-container:active {
+      cursor: grabbing;
+    }
+    #timeline-line {
+      position: absolute;
+      top: 50%;
+      left: 0;
+      width: 100%;
+      height: 3px;
+      background: linear-gradient(90deg, transparent, #d4af37, #d4af37, transparent);
+      box-shadow: 0 0 10px #d4af37, 0 0 20px rgba(212, 175, 55, 0.5);
+      transform: translateY(-50%);
+    }
+    .timeline-node {
+      position: absolute;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: #d4af37;
+      cursor: pointer;
+      transition: transform 0.3s ease, box-shadow 0.3s ease;
+      z-index: 2;
+    }
+    .timeline-node:hover {
+      transform: translate(-50%, -50%) scale(1.3);
+    }
+    .timeline-node.active {
+      transform: translate(-50%, -50%) scale(1.5);
+      box-shadow: 0 0 15px #d4af37, 0 0 30px rgba(212, 175, 55, 0.5);
+      animation: pulse 1s infinite;
+    }
+    @keyframes pulse {
+      0%, 100% {
+        box-shadow: 0 0 15px #d4af37, 0 0 30px rgba(212, 175, 55, 0.5);
+      }
+      50% {
+        box-shadow: 0 0 25px #d4af37, 0 0 50px rgba(212, 175, 55, 0.8);
+      }
+    }
+    .timeline-label {
+      position: absolute;
+      top: calc(50% + 25px);
+      transform: translateX(-50%);
+      color: #ffffff;
+      font-size: 12px;
+      white-space: nowrap;
+      pointer-events: none;
+    }
+    #info-card {
+      position: absolute;
+      width: 300px;
+      padding: 20px;
+      background: rgba(42, 26, 15, 0.85);
+      border: 1px solid rgba(212, 175, 55, 0.3);
+      border-radius: 12px;
+      color: #ffffff;
+      z-index: 20;
+      opacity: 0;
+      transform: scale(0.8);
+      pointer-events: none;
+      transition: opacity 0.3s ease, transform 0.3s ease;
+      backdrop-filter: blur(8px);
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+    }
+    #info-card.visible {
+      opacity: 1;
+      transform: scale(1);
+      pointer-events: auto;
+    }
+    #info-card h3 {
+      color: #ffffff;
+      font-size: 22px;
+      font-weight: bold;
+      margin-bottom: 8px;
+    }
+    #info-card .era {
+      color: #d4af37;
+      font-size: 18px;
+      margin-bottom: 12px;
+    }
+    #info-card p {
+      color: #b0a898;
+      font-size: 16px;
+      line-height: 1.6;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+    @media (max-width: 1400px) {
+      #title {
+        font-size: 24px;
+      }
+      #info-card {
+        width: 250px;
+        padding: 15px;
+      }
+      #info-card h3 {
+        font-size: 18px;
+      }
+      #info-card .era {
+        font-size: 16px;
+      }
+      #info-card p {
+        font-size: 14px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <div id="canvas-container"></div>
+    <div id="title">博物馆文物时光机</div>
+    <div id="timeline-container">
+      <div id="timeline-line"></div>
+    </div>
+    <div id="info-card">
+      <h3 id="card-title"></h3>
+      <div class="era" id="card-era"></div>
+      <p id="card-desc"></p>
+    </div>
+  </div>
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
