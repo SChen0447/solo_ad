@@ -31,9 +31,16 @@ export default function CommunityPage() {
   const [submittingComment, setSubmittingComment] = useState(false)
   const [likeAnimations, setLikeAnimations] = useState<Set<string>>(new Set())
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const closeDetailTimer = useRef<number | null>(null)
+  const likeAnimTimers = useRef<Map<string, number>>(new Map())
 
   useEffect(() => {
     loadPosts()
+    return () => {
+      if (closeDetailTimer.current) clearTimeout(closeDetailTimer.current)
+      likeAnimTimers.current.forEach(id => clearTimeout(id))
+      likeAnimTimers.current.clear()
+    }
   }, [])
 
   async function loadPosts() {
@@ -55,6 +62,10 @@ export default function CommunityPage() {
   )
 
   function handlePostClick(post: Post) {
+    if (closeDetailTimer.current) {
+      clearTimeout(closeDetailTimer.current)
+      closeDetailTimer.current = null
+    }
     setSelectedPost(post)
     setCommentText('')
     requestAnimationFrame(() => {
@@ -64,8 +75,10 @@ export default function CommunityPage() {
 
   function handleCloseDetail() {
     setDetailVisible(false)
-    setTimeout(() => {
+    if (closeDetailTimer.current) clearTimeout(closeDetailTimer.current)
+    closeDetailTimer.current = window.setTimeout(() => {
       setSelectedPost(null)
+      closeDetailTimer.current = null
     }, 300)
   }
 
@@ -105,13 +118,18 @@ export default function CommunityPage() {
 
       if (updated.liked) {
         setLikeAnimations(prev => new Set(prev).add(postId))
-        setTimeout(() => {
+        if (likeAnimTimers.current.has(postId)) {
+          clearTimeout(likeAnimTimers.current.get(postId)!)
+        }
+        const timerId = window.setTimeout(() => {
           setLikeAnimations(prev => {
             const next = new Set(prev)
             next.delete(postId)
             return next
           })
+          likeAnimTimers.current.delete(postId)
         }, 200)
+        likeAnimTimers.current.set(postId, timerId)
       }
     } catch (error) {
       console.error('点赞失败:', error)

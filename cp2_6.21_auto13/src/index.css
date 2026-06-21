@@ -219,22 +219,20 @@ body {
 }
 
 .water-drop-icon.blue {
-  filter: drop-shadow(0 0 2px #2196F3);
+  color: #2196F3;
 }
 
 .water-drop-icon.red {
+  color: #F44336;
   animation: blink 1s ease-in-out infinite;
-  filter: drop-shadow(0 0 4px #F44336);
 }
 
 @keyframes blink {
   0%, 100% {
     opacity: 1;
-    transform: scale(1);
   }
   50% {
     opacity: 0.3;
-    transform: scale(0.9);
   }
 }
 
@@ -709,11 +707,13 @@ body {
   max-width: 480px;
   margin: 0 auto;
   transform: translateX(100%);
-  transition: transform 0.3s ease;
+  opacity: 0;
+  transition: transform 0.3s ease, opacity 0.3s ease;
 }
 
 .post-detail.visible {
   transform: translateX(0);
+  opacity: 1;
 }
 
 .post-detail-header {

@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import PlantCard from '../components/PlantCard'
 import { getPlants, addPlant, waterPlant } from '../api'
 import type { Plant } from '../types'
@@ -14,6 +14,10 @@ export default function PlantsPage() {
   const [lightFilter, setLightFilter] = useState('')
   const [newPlantIds, setNewPlantIds] = useState<Set<string>>(new Set())
 
+  const closeDetailTimer = useRef<number | null>(null)
+  const closeAddTimer = useRef<number | null>(null)
+  const newPlantTimer = useRef<number | null>(null)
+
   const [formData, setFormData] = useState({
     name: '',
     species: '',
@@ -25,6 +29,11 @@ export default function PlantsPage() {
 
   useEffect(() => {
     loadPlants()
+    return () => {
+      if (closeDetailTimer.current) clearTimeout(closeDetailTimer.current)
+      if (closeAddTimer.current) clearTimeout(closeAddTimer.current)
+      if (newPlantTimer.current) clearTimeout(newPlantTimer.current)
+    }
   }, [])
 
   async function loadPlants() {
@@ -60,6 +69,10 @@ export default function PlantsPage() {
   const isFiltered = speciesFilter !== '' || lightFilter !== ''
 
   function handleCardClick(plant: Plant) {
+    if (closeDetailTimer.current) {
+      clearTimeout(closeDetailTimer.current)
+      closeDetailTimer.current = null
+    }
     setSelectedPlant(plant)
     requestAnimationFrame(() => {
       setDetailVisible(true)
@@ -68,12 +81,18 @@ export default function PlantsPage() {
 
   function handleCloseDetail() {
     setDetailVisible(false)
-    setTimeout(() => {
+    if (closeDetailTimer.current) clearTimeout(closeDetailTimer.current)
+    closeDetailTimer.current = window.setTimeout(() => {
       setSelectedPlant(null)
+      closeDetailTimer.current = null
     }, 300)
   }
 
   function handleOpenAddModal() {
+    if (closeAddTimer.current) {
+      clearTimeout(closeAddTimer.current)
+      closeAddTimer.current = null
+    }
     setShowAddModal(true)
     setFormData({
       name: '',
@@ -89,8 +108,10 @@ export default function PlantsPage() {
 
   function handleCloseAddModal() {
     setAddModalVisible(false)
-    setTimeout(() => {
+    if (closeAddTimer.current) clearTimeout(closeAddTimer.current)
+    closeAddTimer.current = window.setTimeout(() => {
       setShowAddModal(false)
+      closeAddTimer.current = null
     }, 250)
   }
 
@@ -112,14 +133,21 @@ export default function PlantsPage() {
 
       setPlants(prev => [newPlant, ...prev])
       setNewPlantIds(prev => new Set(prev).add(newPlant.id))
-      setShowAddModal(false)
+      setAddModalVisible(false)
+      if (closeAddTimer.current) clearTimeout(closeAddTimer.current)
+      closeAddTimer.current = window.setTimeout(() => {
+        setShowAddModal(false)
+        closeAddTimer.current = null
+      }, 250)
 
-      setTimeout(() => {
+      if (newPlantTimer.current) clearTimeout(newPlantTimer.current)
+      newPlantTimer.current = window.setTimeout(() => {
         setNewPlantIds(prev => {
           const next = new Set(prev)
           next.delete(newPlant.id)
           return next
         })
+        newPlantTimer.current = null
       }, 500)
     } catch (error) {
       console.error('添加植物失败:', error)
