@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>室内绿植光照模拟器</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background-color: #1A1A1A;
+    }
+
+    #canvas-container {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+    }
+
+    canvas {
+      display: block;
+    }
+
+    .light-slider-panel {
+      position: fixed;
+      top: 20px;
+      left: 20px;
+      background: #2A2A2A;
+      border-radius: 12px;
+      padding: 16px 20px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+      cursor: move;
+      user-select: none;
+      z-index: 100;
+      min-width: 220px;
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .light-slider-panel:hover {
+      box-shadow: 0 6px 24px rgba(0, 0, 0, 0.6);
+    }
+
+    .slider-label {
+      color: #E0E0E0;
+      font-size: 14px;
+      margin-bottom: 10px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .slider-value {
+      color: #81C784;
+      font-weight: 600;
+      font-size: 16px;
+    }
+
+    .light-slider {
+      width: 100%;
+      height: 6px;
+      -webkit-appearance: none;
+      appearance: none;
+      background: linear-gradient(to right, #3A3A3A, #4CAF50);
+      border-radius: 3px;
+      outline: none;
+      cursor: pointer;
+    }
+
+    .light-slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: #81C784;
+      cursor: pointer;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+      transition: transform 0.15s ease;
+    }
+
+    .light-slider::-webkit-slider-thumb:hover {
+      transform: scale(1.2);
+    }
+
+    .light-slider::-moz-range-thumb {
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: #81C784;
+      cursor: pointer;
+      border: none;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+    }
+
+    .info-panel {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      width: 280px;
+      background: #2A2A2A;
+      border-radius: 12px;
+      padding: 20px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+      z-index: 100;
+    }
+
+    .panel-title {
+      color: #E0E0E0;
+      font-size: 16px;
+      font-weight: 600;
+      margin-bottom: 16px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid #3A3A3A;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .panel-title::before {
+      content: '';
+      width: 4px;
+      height: 16px;
+      background: linear-gradient(to bottom, #4CAF50, #81C784);
+      border-radius: 2px;
+    }
+
+    .info-item {
+      margin-bottom: 14px;
+    }
+
+    .info-label {
+      color: #9E9E9E;
+      font-size: 12px;
+      margin-bottom: 4px;
+    }
+
+    .info-value {
+      color: #E0E0E0;
+      font-size: 14px;
+      font-weight: 500;
+    }
+
+    .light-range-bar {
+      width: 100%;
+      height: 8px;
+      background: #3A3A3A;
+      border-radius: 4px;
+      margin-top: 6px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .light-range-fill {
+      height: 100%;
+      background: linear-gradient(to right, #F44336, #FF9800, #FFEB3B, #4CAF50);
+      border-radius: 4px;
+      transition: width 0.3s ease;
+    }
+
+    .status-badge {
+      display: inline-block;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 12px;
+      font-weight: 600;
+      transition: all 0.3s ease;
+    }
+
+    .status-excellent {
+      background: rgba(76, 175, 80, 0.2);
+      color: #81C784;
+    }
+
+    .status-normal {
+      background: rgba(255, 235, 59, 0.2);
+      color: #FFEB3B;
+    }
+
+    .status-warning {
+      background: rgba(255, 152, 0, 0.2);
+      color: #FF9800;
+    }
+
+    .status-danger {
+      background: rgba(244, 67, 54, 0.2);
+      color: #F44336;
+    }
+
+    .plant-selector {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-bottom: 16px;
+    }
+
+    .plant-btn {
+      padding: 6px 12px;
+      background: #3A3A3A;
+      color: #E0E0E0;
+      border: none;
+      border-radius: 8px;
+      font-size: 12px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .plant-btn:hover {
+      background: #4CAF50;
+      transform: scale(1.05);
+    }
+
+    .plant-btn.active {
+      background: linear-gradient(135deg, #4CAF50, #81C784);
+      color: white;
+    }
+
+    .hint-text {
+      color: #757575;
+      font-size: 11px;
+      margin-top: 8px;
+      font-style: italic;
+    }
+
+    .plant-label {
+      position: absolute;
+      pointer-events: none;
+      padding: 4px 10px;
+      border-radius: 12px;
+      font-size: 11px;
+      font-weight: 600;
+      color: white;
+      text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+      white-space: nowrap;
+      z-index: 50;
+      transition: background-color 0.3s ease;
+      transform: translate(-50%, -100%);
+    }
+
+    .ghost-circle {
+      position: absolute;
+      pointer-events: none;
+      border-radius: 50%;
+      background: rgba(76, 175, 80, 0.3);
+      border: 2px dashed rgba(129, 199, 132, 0.6);
+      z-index: 40;
+      transform: translate(-50%, -50%);
+    }
+  </style>
+</head>
+<body>
+  <div id="canvas-container"></div>
+
+  <div class="light-slider-panel" id="slider-panel">
+    <div class="slider-label">
+      <span>光照强度</span>
+      <span class="slider-value" id="slider-value">50%</span>
+    </div>
+    <input type="range" class="light-slider" id="light-slider" min="0" max="100" value="50" />
+  </div>
+
+  <div class="info-panel" id="info-panel">
+    <div class="panel-title">植物信息</div>
+    
+    <div class="info-item">
+      <div class="info-label">当前选择</div>
+      <div class="plant-selector" id="plant-selector"></div>
+    </div>
+
+    <div class="info-item">
+      <div class="info-label">品种名称</div>
+      <div class="info-value" id="plant-name">-</div>
+    </div>
+
+    <div class="info-item">
+      <div class="info-label">理想光照范围</div>
+      <div class="info-value" id="ideal-light">-</div>
+    </div>
+
+    <div class="info-item">
+      <div class="info-label">当前光照</div>
+      <div class="info-value" id="current-light">-</div>
+      <div class="light-range-bar">
+        <div class="light-range-fill" id="light-fill" style="width: 0%"></div>
+      </div>
+    </div>
+
+    <div class="info-item">
+      <div class="info-label">状态评级</div>
+      <span class="status-badge status-normal" id="status-badge">未选择</span>
+    </div>
+
+    <p class="hint-text">💡 点击地面放置植物，拖拽滑条调节光照</p>
+  </div>
+
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
