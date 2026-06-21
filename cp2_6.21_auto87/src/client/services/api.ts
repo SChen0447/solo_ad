@@ -28,6 +28,7 @@ export const api = {
     request('/tools/reserve', { method: 'POST', body: JSON.stringify(data) }),
 
   getRankings: () => request<Member[]>('/members/rankings'),
+  getCurrentUser: (name: string) => request<Member>(`/members/me?name=${encodeURIComponent(name)}`),
 
   getHarvests: () => request<Harvest[]>('/harvests'),
   addHarvest: (data: { memberId: string; memberName: string; productName: string; weightG: number; quantity: number }) =>

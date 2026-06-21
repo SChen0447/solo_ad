@@ -201,12 +201,12 @@ input, select {
 
 .task-card.urgent {
   border: 2px solid #EF4444;
-  animation: urgentBlink 2s ease-in-out infinite;
+  animation: fadeInUp 0.3s ease-out, urgentBlink 2s ease-in-out infinite;
 }
 
 .task-card.very-urgent {
   border: 2px solid #DC2626;
-  animation: veryUrgentBlink 2s ease-in-out infinite;
+  animation: fadeInUp 0.3s ease-out, veryUrgentBlink 2s ease-in-out infinite;
 }
 
 @keyframes urgentBlink {
@@ -449,32 +449,23 @@ input:focus, select:focus, textarea:focus {
 
 .slot-locked,
 .slot-disabled {
-  background: transparent;
-  color: var(--text-muted);
+  background: rgba(128, 128, 128, 0.35);
+  color: rgba(255, 255, 255, 0.9);
   cursor: not-allowed;
   position: relative;
-  overflow: hidden;
 }
 
-.slot-overlay {
+.slot-locked::after {
+  content: '';
   position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(128, 128, 128, 0.5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 5px;
-  z-index: 1;
-}
-
-.slot-overlay svg {
-  width: 14px;
-  height: 14px;
-  fill: #FFFFFF;
-  opacity: 0.9;
+  top: 2px;
+  right: 3px;
+  width: 12px;
+  height: 12px;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 24 24' xmlns='http://www.w3.org/2000/svg' fill='%23FFFFFF'%3E%3Cpath d='M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zM12 17c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zM15.1 8H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z'/%3E%3C/svg%3E");
+  background-size: contain;
+  background-repeat: no-repeat;
+  opacity: 0.85;
 }
 
 .reservation-section {
@@ -573,10 +564,48 @@ input:focus, select:focus, textarea:focus {
 .bar-chart {
   display: flex;
   align-items: flex-end;
-  justify-content: space-around;
-  height: 120px;
-  gap: 10px;
-  padding: 10px 0;
+  position: relative;
+  height: 140px;
+  gap: 12px;
+  padding: 24px 0 0 0;
+  border-bottom: 2px solid #D1D5DB;
+  border-left: 2px solid #D1D5DB;
+}
+
+.bar-chart::before {
+  content: '产量';
+  position: absolute;
+  top: 2px;
+  left: -2px;
+  font-size: 9px;
+  color: var(--text-muted);
+  transform: translateY(-100%);
+}
+
+.bar-chart-grid {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  pointer-events: none;
+}
+
+.bar-chart-gridline {
+  position: absolute;
+  left: 0;
+  right: 0;
+  border-top: 1px dashed #E5E7EB;
+}
+
+.bar-chart-gridline-label {
+  position: absolute;
+  left: -4px;
+  transform: translateX(-100%);
+  font-size: 9px;
+  color: var(--text-muted);
+  line-height: 1;
+  padding-right: 2px;
 }
 
 .bar-group {
@@ -591,11 +620,16 @@ input:focus, select:focus, textarea:focus {
 
 .bar {
   width: 100%;
-  max-width: 36px;
+  max-width: 40px;
   background: linear-gradient(180deg, var(--primary-light) 0%, var(--primary) 100%);
   border-radius: 4px 4px 0 0;
-  transition: height 0.5s ease-out;
+  transition: height 0.5s ease-out, opacity 0.3s;
   position: relative;
+  min-height: 4px;
+}
+
+.bar:hover {
+  opacity: 0.85;
 }
 
 .bar-value {

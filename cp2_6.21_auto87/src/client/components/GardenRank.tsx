@@ -137,6 +137,17 @@ export default function GardenRank({ currentUser }: Props) {
             <div className="empty-state">暂无数据</div>
           ) : (
             <div className="bar-chart">
+              <div className="bar-chart-grid">
+                {[0, 25, 50, 75, 100].map((pct) => (
+                  <div key={pct} className="bar-chart-gridline" style={{ bottom: `${pct}%` }}>
+                    <span className="bar-chart-gridline-label">
+                      {pct === 0 ? '' : maxWeight >= 1000
+                        ? `${((maxWeight * pct) / 100 / 1000).toFixed(1)}kg`
+                        : `${Math.round(maxWeight * pct / 100)}g`}
+                    </span>
+                  </div>
+                ))}
+              </div>
               {weeklyData.map((week) => {
                 const pct = Math.max((week.totalWeightG / maxWeight) * 100, 2);
                 return (

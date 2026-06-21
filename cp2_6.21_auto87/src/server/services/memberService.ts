@@ -40,6 +40,10 @@ export function getMemberById(id: string): Member | undefined {
   return members.find((m) => m.id === id);
 }
 
+export function getMemberByName(name: string): Member | undefined {
+  return members.find((m) => m.name === name);
+}
+
 export function getRankings(): Member[] {
   return [...members].sort((a, b) => b.points - a.points);
 }

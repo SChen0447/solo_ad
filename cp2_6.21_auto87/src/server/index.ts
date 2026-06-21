@@ -2,7 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import { getTasks, createTask, claimTask, completeTask } from './services/taskService';
 import { getTools, reserveTool } from './services/toolService';
-import { getRankings, getMemberById, getMemberIds, getMemberNames } from './services/memberService';
+import { getRankings, getMemberById, getMemberIds, getMemberNames, getMemberByName } from './services/memberService';
 import { getHarvests, addHarvest, getWeeklyHarvests, initHarvests } from './services/harvestService';
 
 initHarvests(getMemberIds(), getMemberNames());
@@ -64,6 +64,14 @@ app.post('/api/tools/reserve', (req, res) => {
 
 app.get('/api/members/rankings', (_req, res) => {
   res.json(getRankings());
+});
+
+app.get('/api/members/me', (req, res) => {
+  const name = req.query.name as string;
+  if (!name) return res.status(400).json({ error: 'name参数缺失' });
+  const member = getMemberByName(name);
+  if (!member) return res.status(404).json({ error: '成员不存在' });
+  res.json(member);
 });
 
 app.get('/api/members/:id', (req, res) => {

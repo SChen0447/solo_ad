@@ -8,19 +8,25 @@ const products = ['西红柿', '生菜', '黄瓜', '茄子', '辣椒', '豆角',
 
 export function initHarvests(memberIds: string[], memberNames: string[]) {
   if (harvests.length > 0) return;
+  if (memberIds.length === 0) return;
   const now = Date.now();
-  for (let i = 0; i < 30; i++) {
-    const idx = Math.floor(Math.random() * memberIds.length);
-    const daysAgo = Math.floor(Math.random() * 28);
-    harvests.push({
-      id: uuidv4(),
-      memberId: memberIds[idx],
-      memberName: memberNames[idx],
-      productName: products[Math.floor(Math.random() * products.length)],
-      weightG: Math.floor(Math.random() * 800) + 100,
-      quantity: Math.floor(Math.random() * 10) + 1,
-      recordedAt: new Date(now - daysAgo * 24 * 3600 * 1000).toISOString(),
-    });
+  const MS_PER_DAY = 24 * 3600 * 1000;
+  for (let weekOffset = 0; weekOffset < 4; weekOffset++) {
+    const weekStartMs = now - (weekOffset + 1) * 7 * MS_PER_DAY;
+    const countPerWeek = 6 + Math.floor(Math.random() * 4);
+    for (let j = 0; j < countPerWeek; j++) {
+      const idx = Math.floor(Math.random() * memberIds.length);
+      const dayOffset = Math.floor(Math.random() * 7);
+      harvests.push({
+        id: uuidv4(),
+        memberId: memberIds[idx],
+        memberName: memberNames[idx],
+        productName: products[Math.floor(Math.random() * products.length)],
+        weightG: Math.floor(Math.random() * 800) + 100,
+        quantity: Math.floor(Math.random() * 10) + 1,
+        recordedAt: new Date(weekStartMs + dayOffset * MS_PER_DAY).toISOString(),
+      });
+    }
   }
 }
 

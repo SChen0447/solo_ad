@@ -1,32 +1,51 @@
 import { useState, useEffect } from 'react';
-import type { Member, CurrentUser } from '@/types';
+import type { CurrentUser } from '@/types';
 import { api } from '@/client/services/api';
 import TaskBoard from '@/client/components/TaskBoard';
 import ToolShelf from '@/client/components/ToolShelf';
 import GardenRank from '@/client/components/GardenRank';
 
-const MOCK_USER_ID = 'current-user-001';
-const MOCK_USER_NAME = '陈静';
+const LOGIN_USER_NAME = '陈静';
 
 export default function App() {
-  const [currentUser, setCurrentUser] = useState<CurrentUser>({ id: MOCK_USER_ID, name: MOCK_USER_NAME });
+  const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
   const [userPoints, setUserPoints] = useState<number>(0);
 
   useEffect(() => {
-    async function initUser() {
+    let mounted = true;
+    async function fetchUser() {
       try {
-        const rankings = await api.getRankings();
-        const me = rankings.find((m: Member) => m.name === MOCK_USER_NAME);
-        if (me) {
-          setCurrentUser({ id: me.id, name: me.name });
-          setUserPoints(me.points);
+        const member = await api.getCurrentUser(LOGIN_USER_NAME);
+        if (mounted) {
+          setCurrentUser({ id: member.id, name: member.name });
+          setUserPoints(member.points);
         }
       } catch {
-        setCurrentUser({ id: MOCK_USER_ID, name: MOCK_USER_NAME });
+        if (mounted) {
+          setCurrentUser({ id: 'unknown', name: LOGIN_USER_NAME });
+        }
       }
     }
-    initUser();
+    fetchUser();
+    const interval = setInterval(async () => {
+      try {
+        const member = await api.getCurrentUser(LOGIN_USER_NAME);
+        if (mounted) setUserPoints(member.points);
+      } catch {}
+    }, 5000);
+    return () => {
+      mounted = false;
+      clearInterval(interval);
+    };
   }, []);
+
+  if (!currentUser) {
+    return (
+      <div className="app-root" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh' }}>
+        <div className="empty-state">加载中...</div>
+      </div>
+    );
+  }
 
   return (
     <div className="app-root">
