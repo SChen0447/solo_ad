@@ -70,7 +70,7 @@ export class Renderer {
     this.drawStars(ctx);
 
     if (gameState === 'playing' || gameState === 'levelComplete') {
-      this.drawFields(ctx, fieldManager);
+      this.drawFields(ctx, fieldManager, particleSystem);
       this.drawObstacles(ctx, obstacles);
       this.drawTargets(ctx, targets);
 
@@ -111,24 +111,50 @@ export class Renderer {
     ctx.globalAlpha = 1;
   }
 
-  private drawFields(ctx: CanvasRenderingContext2D, fieldManager: FieldManager): void {
+  private drawFields(ctx: CanvasRenderingContext2D, fieldManager: FieldManager, particleSystem: ParticleSystem): void {
     const fields = fieldManager.getFields();
-    for (const field of fields) {
+    const activeParticles = particleSystem.particles.filter(p => !p.reached);
+
+    for (let i = 0; i < fields.length; i++) {
+      const field = fields[i];
+      const hasParticle = fieldManager.hasParticleInside(i, activeParticles);
+
       const gradient = ctx.createRadialGradient(
         field.x, field.y, 0,
         field.x, field.y, field.radius,
       );
       if (field.charge > 0) {
+        gradient.addColorStop(0, 'rgba(46, 134, 222, 0.3)');
+        gradient.addColorStop(1, 'rgba(46, 134, 222, 0)');
+      } else {
         gradient.addColorStop(0, 'rgba(255, 71, 87, 0.3)');
         gradient.addColorStop(1, 'rgba(255, 71, 87, 0)');
-      } else {
-        gradient.addColorStop(0, 'rgba(46, 213, 115, 0.3)');
-        gradient.addColorStop(1, 'rgba(46, 213, 115, 0)');
       }
       ctx.fillStyle = gradient;
       ctx.beginPath();
       ctx.arc(field.x, field.y, field.radius, 0, Math.PI * 2);
       ctx.fill();
+
+      if (hasParticle) {
+        const pulse = 0.5 + 0.5 * Math.sin(this.time * Math.PI * 2 / 0.8);
+        const edgeColor = field.charge > 0
+          ? `rgba(46, 134, 222, ${0.4 + pulse * 0.4})`
+          : `rgba(255, 71, 87, ${0.4 + pulse * 0.4})`;
+        ctx.strokeStyle = edgeColor;
+        ctx.lineWidth = 2 + pulse * 2;
+        ctx.beginPath();
+        ctx.arc(field.x, field.y, field.radius - 2, 0, Math.PI * 2);
+        ctx.stroke();
+      } else {
+        const edgeColor = field.charge > 0
+          ? 'rgba(46, 134, 222, 0.3)'
+          : 'rgba(255, 71, 87, 0.3)';
+        ctx.strokeStyle = edgeColor;
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.arc(field.x, field.y, field.radius, 0, Math.PI * 2);
+        ctx.stroke();
+      }
     }
   }
 
@@ -196,7 +222,7 @@ export class Renderer {
         const r = p.radius * (1 - t * 0.5);
 
         ctx.globalAlpha = alpha;
-        ctx.fillStyle = p.charge > 0 ? '#FF4757' : '#2ED573';
+        ctx.fillStyle = p.charge > 0 ? '#FF4757' : '#1E88E5';
         ctx.beginPath();
         ctx.arc(tx, ty, r, 0, Math.PI * 2);
         ctx.fill();
@@ -220,8 +246,8 @@ export class Renderer {
         gradient.addColorStop(0, '#FF4757');
         gradient.addColorStop(1, '#FF6B81');
       } else {
-        gradient.addColorStop(0, '#2ED573');
-        gradient.addColorStop(1, '#7BED9F');
+        gradient.addColorStop(0, '#1E88E5');
+        gradient.addColorStop(1, '#42A5F5');
       }
 
       ctx.fillStyle = gradient;
@@ -264,7 +290,7 @@ export class Renderer {
       const alpha = 1 - progress;
 
       ctx.globalAlpha = alpha * 0.6;
-      ctx.strokeStyle = p.charge > 0 ? '#FF4757' : '#2ED573';
+      ctx.strokeStyle = p.charge > 0 ? '#FF4757' : '#1E88E5';
       ctx.lineWidth = 2;
       ctx.beginPath();
       ctx.arc(pe.x, pe.y, radius, 0, Math.PI * 2);

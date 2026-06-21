@@ -44,6 +44,24 @@ export class FieldManager {
     return this.fields;
   }
 
+  isPointInside(px: number, py: number, fieldIndex: number): boolean {
+    if (fieldIndex < 0 || fieldIndex >= this.fields.length) return false;
+    const field = this.fields[fieldIndex];
+    const dx = px - field.x;
+    const dy = py - field.y;
+    const distSq = dx * dx + dy * dy;
+    return distSq < field.radius * field.radius;
+  }
+
+  hasParticleInside(fieldIndex: number, particles: { x: number; y: number }[]): boolean {
+    for (const p of particles) {
+      if (this.isPointInside(p.x, p.y, fieldIndex)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   removeField(index: number): void {
     if (index >= 0 && index < this.fields.length) {
       this.fields.splice(index, 1);
