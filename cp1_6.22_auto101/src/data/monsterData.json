@@ -1,0 +1,43 @@
+{
+  "monsters": [
+    {
+      "id": "skeleton_1",
+      "name": "骷髅战士",
+      "hp": 12,
+      "maxHp": 12,
+      "attack": 3,
+      "x": 4,
+      "y": 1,
+      "weakness": "physical",
+      "resistance": "fire",
+      "color": "#e8e8e8",
+      "description": "惧怕物理攻击"
+    },
+    {
+      "id": "slime_1",
+      "name": "火焰史莱姆",
+      "hp": 18,
+      "maxHp": 18,
+      "attack": 4,
+      "x": 6,
+      "y": 5,
+      "weakness": "fire",
+      "resistance": "physical",
+      "color": "#ff6b35",
+      "description": "惧怕火焰攻击"
+    },
+    {
+      "id": "bat_1",
+      "name": "暗影蝙蝠",
+      "hp": 10,
+      "maxHp": 10,
+      "attack": 5,
+      "x": 3,
+      "y": 3,
+      "weakness": "ranged",
+      "resistance": "physical",
+      "color": "#4a1a7a",
+      "description": "惧怕远程攻击"
+    }
+  ]
+}
