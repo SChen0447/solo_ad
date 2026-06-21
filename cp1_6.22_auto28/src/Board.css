@@ -1,0 +1,159 @@
+.board-container {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background-color: #F5F3EE;
+  cursor: default;
+}
+
+.board-container.panning {
+  cursor: grabbing;
+}
+
+.board-canvas {
+  position: absolute;
+  width: 10000px;
+  height: 10000px;
+  left: -5000px;
+  top: -5000px;
+  background-color: #F5F3EE;
+  background-image: 
+    radial-gradient(circle, #E0DDD5 1px, transparent 1px);
+  background-size: 20px 20px;
+}
+
+.connections-layer {
+  pointer-events: none;
+}
+
+.connections-layer g {
+  pointer-events: stroke;
+}
+
+.connection-line {
+  transition: stroke 0.2s ease, stroke-width 0.2s ease;
+}
+
+.connection-line:hover {
+  stroke-width: 4px;
+}
+
+.temp-connection {
+  pointer-events: none;
+}
+
+.new-sticky-input {
+  position: absolute;
+  background: white;
+  border-radius: 8px;
+  padding: 12px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  animation: fadeInScale 0.2s ease-out;
+  z-index: 100;
+  min-width: 200px;
+}
+
+.new-sticky-input input {
+  padding: 8px 12px;
+  border: 2px solid #E0DDD5;
+  border-radius: 6px;
+  font-size: 14px;
+  transition: border-color 0.2s ease;
+}
+
+.new-sticky-input input:focus {
+  border-color: #1E3A5F;
+}
+
+.new-sticky-input button {
+  padding: 6px 16px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.new-sticky-input button:first-of-type {
+  background: #1E3A5F;
+  color: white;
+}
+
+.new-sticky-input button:first-of-type:hover {
+  background: #2d4f7a;
+}
+
+.new-sticky-input button:last-of-type {
+  background: #f0f0f0;
+  color: #666;
+}
+
+.new-sticky-input button:last-of-type:hover {
+  background: #e0e0e0;
+}
+
+.zoom-controls {
+  position: absolute;
+  bottom: 20px;
+  right: 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  background: white;
+  border-radius: 8px;
+  padding: 6px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  z-index: 10;
+}
+
+.zoom-controls button {
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  background: #f5f5f5;
+  color: #333;
+  font-size: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s ease;
+}
+
+.zoom-controls button:hover {
+  background: #e0e0e0;
+}
+
+.zoom-level {
+  font-size: 11px;
+  color: #666;
+  font-weight: 500;
+  padding: 2px 0;
+}
+
+.board-hint {
+  position: absolute;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(255, 255, 255, 0.9);
+  color: #888;
+  font-size: 12px;
+  padding: 8px 16px;
+  border-radius: 20px;
+  pointer-events: none;
+  z-index: 10;
+}
+
+@media (max-width: 768px) {
+  .zoom-controls {
+    bottom: 280px;
+  }
+  
+  .board-hint {
+    display: none;
+  }
+}
