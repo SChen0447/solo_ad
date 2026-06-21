@@ -69,16 +69,31 @@ export default function Editor({ value, onChange, onSelectionChange, onActivity,
       {
         key: 'Tab',
         run: (view) => {
-          if (view.state.selection.main.empty) {
-            return indentMore(view)
+          const prevDoc = view.state.doc.toString()
+          const success = indentMore(view)
+          if (success && !view.state.selection.main.empty) {
+            const newDoc = view.state.doc.toString()
+            if (newDoc !== prevDoc) {
+              view.dispatch({
+                annotations: Transaction.userEvent.of('indent'),
+              })
+            }
           }
-          const tr: Transaction = view.state.update({
-            annotations: Transaction.userEvent.of('indent'),
-          })
-          view.dispatch(tr)
-          return indentMore(view)
+          return success
         },
-        shift: indentLess,
+        shift: (view) => {
+          const prevDoc = view.state.doc.toString()
+          const success = indentLess(view)
+          if (success) {
+            const newDoc = view.state.doc.toString()
+            if (newDoc !== prevDoc) {
+              view.dispatch({
+                annotations: Transaction.userEvent.of('indent'),
+              })
+            }
+          }
+          return success
+        },
       },
     ])
 

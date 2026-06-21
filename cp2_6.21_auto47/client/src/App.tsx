@@ -51,7 +51,7 @@ function UserAvatar({ username, color, size = 32, dimmed = false }: { username: 
   )
 }
 
-function OnlineUsersList({ users, offlineUsers = [] }: { users: User[]; offlineUsers?: Set<string> }) {
+function OnlineUsersList({ users, offlineUsers }: { users: User[]; offlineUsers: Set<string> }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', position: 'relative' }}>
       <div style={{ position: 'relative' }}>
@@ -270,6 +270,7 @@ export default function App() {
   const [isReconnecting, setIsReconnecting] = useState(false)
   const reconnectAttemptsRef = useRef(0)
   const savedRoomRef = useRef<{ roomId: string; username: string } | null>(null)
+  const isLeavingRef = useRef(false)
 
   useEffect(() => {
     const checkMobile = () => {
@@ -396,6 +397,11 @@ export default function App() {
 
     newSocket.on('disconnect', () => {
       console.log('Disconnected from server')
+      if (isLeavingRef.current) {
+        console.log('User intentionally left, no reconnection')
+        isLeavingRef.current = false
+        return
+      }
       setIsReconnecting(true)
       users.forEach((u) => {
         if (u.id === newSocket.id) {
@@ -469,6 +475,23 @@ export default function App() {
     setIsChatExpanded((prev) => !prev)
   }, [])
 
+  const handleLeaveRoom = useCallback(() => {
+    if (socket && isJoined) {
+      isLeavingRef.current = true
+      socket.emit('leave-room', { roomId })
+      socket.disconnect()
+      setIsJoined(false)
+      setSocket(null)
+      setCode('')
+      setUsers([])
+      setMessages([])
+      setRunResult(null)
+      setOfflineUsers(new Set())
+      setIsReconnecting(false)
+      setIsChatExpanded(false)
+    }
+  }, [socket, roomId, isJoined])
+
   if (!isJoined) {
     return <JoinScreen onJoin={handleJoin} />
   }
@@ -498,6 +521,32 @@ export default function App() {
             }}
           />
           重连中...
+        </div>
+      )
+    }
+    if (currentUsername) {
+      return (
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+            fontSize: '12px',
+            color: '#10B981',
+            backgroundColor: 'rgba(16, 185, 129, 0.1)',
+            padding: '4px 10px',
+            borderRadius: '12px',
+          }}
+        >
+          <span
+            style={{
+              width: '8px',
+              height: '8px',
+              borderRadius: '50%',
+              backgroundColor: '#10B981',
+            }}
+          />
+          {currentUsername}
         </div>
       )
     }
@@ -555,6 +604,29 @@ export default function App() {
             isRunning={isRunning}
             onClearOutput={handleClearOutput}
           />
+          <button
+            onClick={handleLeaveRoom}
+            title="离开房间"
+            style={{
+              padding: '8px 14px',
+              backgroundColor: '#6B7280',
+              color: '#FFFFFF',
+              border: 'none',
+              borderRadius: '8px',
+              cursor: 'pointer',
+              fontSize: '14px',
+              fontWeight: 500,
+              transition: 'background-color 0.2s',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = '#EF4444'
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = '#6B7280'
+            }}
+          >
+            退出
+          </button>
         </div>
 
         <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
@@ -688,6 +760,28 @@ export default function App() {
                 border: '1px solid #2D2D3F',
               }}
             />
+          </button>
+          <button
+            onClick={handleLeaveRoom}
+            title="离开房间"
+            style={{
+              padding: '6px 10px',
+              backgroundColor: '#6B7280',
+              color: '#FFFFFF',
+              border: 'none',
+              borderRadius: '6px',
+              fontSize: '12px',
+              cursor: 'pointer',
+              transition: 'background-color 0.2s',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = '#EF4444'
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = '#6B7280'
+            }}
+          >
+            退出
           </button>
         </div>
       </div>

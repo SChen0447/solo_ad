@@ -1,8 +1,14 @@
 import { useState, useRef } from 'react'
 
+export interface OutputItem {
+  type: 'stdout' | 'stderr'
+  content: string
+}
+
 export interface RunResult {
   stdout: string
   stderr: string
+  output: OutputItem[]
   userId: string
   username: string
   timestamp: number
@@ -106,8 +112,57 @@ export function OutputPanel({ output }: OutputPanelProps) {
     window.addEventListener('mouseup', handleMouseUp)
   }
 
-  const hasStdout = output?.stdout && output.stdout.length > 0
-  const hasStderr = output?.stderr && output.stderr.length > 0
+  const hasOutput = output?.output && output.output.length > 0
+  const hasItems = hasOutput && output.output.some(item => item.content && item.content.trim().length > 0)
+
+  const renderOutputItem = (item: OutputItem, index: number) => {
+    if (!item.content || item.content.length === 0) return null
+
+    const isStderr = item.type === 'stderr'
+    return (
+      <div
+        key={`${item.type}-${index}`}
+        style={{
+          marginBottom: index < (output?.output?.length || 0) - 1 ? '8px' : 0,
+          backgroundColor: isStderr ? 'rgba(239, 68, 68, 0.1)' : 'transparent',
+          borderLeft: isStderr ? '3px solid #EF4444' : '3px solid transparent',
+          paddingLeft: isStderr ? '10px' : '0',
+        }}
+      >
+        {item.content.split('\n').map((line, i) => (
+          <div
+            key={i}
+            style={{
+              color: isStderr ? '#FCA5A5' : '#E5E7EB',
+              display: 'flex',
+              alignItems: 'flex-start',
+              gap: '6px',
+            }}
+          >
+            {i === 0 && (
+              <span
+                style={{
+                  flexShrink: 0,
+                  fontSize: '11px',
+                  fontWeight: 600,
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.5px',
+                  color: isStderr ? '#FCA5A5' : '#6EE7B7',
+                  backgroundColor: isStderr ? 'rgba(239, 68, 68, 0.2)' : 'rgba(16, 185, 129, 0.2)',
+                  padding: '1px 6px',
+                  borderRadius: '4px',
+                  marginTop: '2px',
+                }}
+              >
+                {isStderr ? '✕ ERR' : '› OUT'}
+              </span>
+            )}
+            <span style={{ flex: 1 }}>{i === 0 ? line : line || ' '}</span>
+          </div>
+        ))}
+      </div>
+    )
+  }
 
   return (
     <div style={{ position: 'relative' }}>
@@ -169,29 +224,14 @@ export function OutputPanel({ output }: OutputPanelProps) {
               {output.username} 运行于 {new Date(output.timestamp).toLocaleTimeString()}
             </div>
 
-            {hasStdout && (
-              <div style={{ marginBottom: hasStderr ? '8px' : 0 }}>
-                {output.stdout.split('\n').map((line, i) => (
-                  <div key={`stdout-${i}`} style={{ color: '#E5E7EB' }}>
-                    {line}
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {hasStderr && (
-              <div
-                style={{
-                  backgroundColor: 'rgba(239, 68, 68, 0.1)',
-                  borderLeft: '3px solid #EF4444',
-                  paddingLeft: '10px',
-                }}
-              >
-                {output.stderr.split('\n').map((line, i) => (
-                  <div key={`stderr-${i}`} style={{ color: '#FCA5A5' }}>
-                    {line}
-                  </div>
-                ))}
+            {hasItems ? (
+              output.output.map((item, index) => renderOutputItem(item, index))
+            ) : (
+              <div style={{ color: '#6B7280', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <span style={{ color: '#6EE7B7', fontSize: '11px', fontWeight: 600, textTransform: 'uppercase' }}>
+                  ✓ OK
+                </span>
+                代码执行成功，无输出内容
               </div>
             )}
           </>

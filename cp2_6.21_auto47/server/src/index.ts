@@ -227,6 +227,7 @@ io.on('connection', (socket) => {
 
     if (!user) return
 
+    const MAX_OUTPUT_SIZE = 10 * 1024
     let tmpFile = ''
     try {
       tmpFile = join(tmpdir(), `code-${Date.now()}-${Math.random().toString(36).slice(2)}.js`)
@@ -240,13 +241,39 @@ io.on('connection', (socket) => {
       let stdoutData = ''
       let stderrData = ''
       let timedOut = false
+      let stdoutTruncated = false
+      let stderrTruncated = false
 
       child.stdout.on('data', (data) => {
-        stdoutData += data.toString()
+        const chunk = data.toString()
+        if (stdoutData.length + chunk.length <= MAX_OUTPUT_SIZE) {
+          stdoutData += chunk
+        } else {
+          if (!stdoutTruncated) {
+            const remaining = MAX_OUTPUT_SIZE - stdoutData.length
+            if (remaining > 0) {
+              stdoutData += chunk.slice(0, remaining)
+            }
+            stdoutData += '\n[输出已截断：超过10KB限制]'
+            stdoutTruncated = true
+          }
+        }
       })
 
       child.stderr.on('data', (data) => {
-        stderrData += data.toString()
+        const chunk = data.toString()
+        if (stderrData.length + chunk.length <= MAX_OUTPUT_SIZE) {
+          stderrData += chunk
+        } else {
+          if (!stderrTruncated) {
+            const remaining = MAX_OUTPUT_SIZE - stderrData.length
+            if (remaining > 0) {
+              stderrData += chunk.slice(0, remaining)
+            }
+            stderrData += '\n[错误输出已截断：超过10KB限制]'
+            stderrTruncated = true
+          }
+        }
       })
 
       child.on('error', (err) => {
@@ -272,9 +299,18 @@ io.on('connection', (socket) => {
           stdoutData = '[代码执行完成，无输出]'
         }
 
+        const output: Array<{ type: 'stdout' | 'stderr'; content: string }> = []
+        if (stdoutData) {
+          output.push({ type: 'stdout', content: stdoutData })
+        }
+        if (stderrData) {
+          output.push({ type: 'stderr', content: stderrData })
+        }
+
         io.to(roomId).emit('run-result', {
           stdout: stdoutData,
           stderr: stderrData,
+          output,
           userId: socket.id,
           username: user.username,
           timestamp: Date.now(),
@@ -295,9 +331,11 @@ io.on('connection', (socket) => {
           // ignore
         }
       }
+      const stderr = `[执行错误：${(err as Error).message}]`
       io.to(roomId).emit('run-result', {
         stdout: '',
-        stderr: `[执行错误：${(err as Error).message}]`,
+        stderr,
+        output: [{ type: 'stderr', content: stderr }],
         userId: socket.id,
         username: user.username,
         timestamp: Date.now(),
@@ -309,20 +347,50 @@ io.on('connection', (socket) => {
     updateUserActivity(socket, roomId)
   })
 
+  socket.on('leave-room', ({ roomId }: { roomId: string }) => {
+    const room = rooms.get(roomId)
+    if (!room) return
+
+    const user = room.users.get(socket.id)
+    if (!user) return
+
+    clearDisconnectTimer(roomId, socket.id)
+    room.users.delete(socket.id)
+    socket.leave(roomId)
+
+    io.to(roomId).emit('user-left', {
+      userId: socket.id,
+      username: user.username,
+      message: `${user.username} 已离开`,
+    })
+
+    io.to(roomId).emit('user-list', Array.from(room.users.values()))
+
+    console.log(`User ${user.username} left room ${roomId}`)
+
+    if (room.users.size === 0) {
+      rooms.delete(roomId)
+      disconnectTimers.delete(roomId)
+      console.log(`Room ${roomId} cleaned up (empty)`)
+    }
+  })
+
   socket.on('disconnect', () => {
     console.log('User disconnected:', socket.id)
 
     rooms.forEach((room, roomId) => {
       const user = room.users.get(socket.id)
       if (user) {
-        user.disconnectedAt = Date.now()
+        if (!user.disconnectedAt) {
+          user.disconnectedAt = Date.now()
 
-        socket.to(roomId).emit('user-offline', {
-          userId: socket.id,
-          username: user.username,
-        })
+          socket.to(roomId).emit('user-offline', {
+            userId: socket.id,
+            username: user.username,
+          })
 
-        scheduleDisconnectCleanup(socket, roomId, user)
+          scheduleDisconnectCleanup(socket, roomId, user)
+        }
       }
     })
   })

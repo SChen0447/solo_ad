@@ -31,7 +31,7 @@ function parseMessage(message: string): MessagePart[] {
     return parts
   }
 
-  const regex = /```(\w*)\r?\n([\s\S]*?)```/g
+  const regex = /```([a-zA-Z0-9+\-#.]*)\r?\n([\s\S]*?)```/g
   let lastEnd = 0
   let match: RegExpExecArray | null
 
