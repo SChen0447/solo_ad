@@ -1,0 +1,213 @@
+.song-list-container {
+  padding: 20px;
+  background: rgba(30, 20, 40, 0.95);
+  border-radius: 16px;
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(212, 175, 55, 0.2);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+}
+
+.song-list-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.section-title {
+  font-size: 1.5rem;
+  color: #d4af37;
+  margin: 0;
+  font-weight: 600;
+  text-shadow: 0 0 20px rgba(212, 175, 55, 0.3);
+}
+
+.search-box {
+  flex: 1;
+  max-width: 300px;
+}
+
+.search-input {
+  width: 100%;
+  padding: 10px 16px;
+  background: rgba(50, 30, 70, 0.8);
+  border: 1px solid rgba(212, 175, 55, 0.3);
+  border-radius: 8px;
+  color: #e8dcc8;
+  font-size: 0.95rem;
+  outline: none;
+  transition: all 0.3s ease;
+}
+
+.search-input:focus {
+  border-color: #d4af37;
+  box-shadow: 0 0 15px rgba(212, 175, 55, 0.3);
+}
+
+.search-input::placeholder {
+  color: rgba(232, 220, 200, 0.5);
+}
+
+.song-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 20px;
+}
+
+.song-card {
+  position: relative;
+  background: linear-gradient(145deg, rgba(50, 30, 70, 0.9), rgba(30, 20, 50, 0.9));
+  border-radius: 16px;
+  padding: 20px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  border: 2px solid rgba(212, 175, 55, 0.15);
+  overflow: hidden;
+}
+
+.song-card:hover {
+  transform: translateY(-4px);
+  border-color: rgba(212, 175, 55, 0.5);
+  box-shadow: 0 12px 40px rgba(212, 175, 55, 0.2), 0 0 30px rgba(128, 0, 128, 0.2);
+}
+
+.song-card.selected {
+  border-color: #d4af37;
+  box-shadow: 0 0 25px rgba(212, 175, 55, 0.4);
+}
+
+.vinyl-decoration {
+  position: absolute;
+  right: -30px;
+  top: -30px;
+  width: 120px;
+  height: 120px;
+  pointer-events: none;
+  opacity: 0.6;
+}
+
+.song-card:hover .vinyl-disc {
+  animation: spin 3s linear infinite;
+}
+
+.vinyl-disc {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  background: radial-gradient(circle, #1a1a2e 0%, #0f0f1a 50%, #1a1a2e 100%);
+  position: relative;
+  box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.8), 0 4px 15px rgba(0, 0, 0, 0.5);
+}
+
+.vinyl-label {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: linear-gradient(145deg, #d4af37, #b8941f);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+}
+
+.vinyl-title {
+  color: #1a1a2e;
+  font-size: 1.1rem;
+  font-weight: bold;
+}
+
+.vinyl-grooves {
+  position: absolute;
+  top: 10%;
+  left: 10%;
+  right: 10%;
+  bottom: 10%;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.03);
+  box-shadow: 
+    inset 0 0 0 3px rgba(255, 255, 255, 0.02),
+    inset 0 0 0 6px rgba(255, 255, 255, 0.015),
+    inset 0 0 0 9px rgba(255, 255, 255, 0.01);
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.song-info {
+  position: relative;
+  z-index: 1;
+  padding-right: 40px;
+}
+
+.song-title {
+  font-size: 1.25rem;
+  color: #e8dcc8;
+  margin: 0 0 12px 0;
+  font-weight: 600;
+}
+
+.song-meta {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.song-key,
+.song-bpm {
+  font-size: 0.85rem;
+  color: #b8a988;
+  padding: 4px 10px;
+  background: rgba(212, 175, 55, 0.1);
+  border-radius: 4px;
+}
+
+.difficulty-stars {
+  margin-bottom: 12px;
+}
+
+.star {
+  font-size: 0.9rem;
+  color: rgba(212, 175, 55, 0.2);
+  margin-right: 2px;
+}
+
+.star.filled {
+  color: #d4af37;
+  text-shadow: 0 0 8px rgba(212, 175, 55, 0.5);
+}
+
+.parts-count {
+  font-size: 0.85rem;
+  color: #9a8a70;
+}
+
+.song-list-loading,
+.empty-state {
+  text-align: center;
+  padding: 40px;
+  color: #9a8a70;
+  font-size: 1rem;
+}
+
+@media (max-width: 768px) {
+  .song-list-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .search-box {
+    max-width: 100%;
+  }
+
+  .song-grid {
+    grid-template-columns: 1fr;
+  }
+}
