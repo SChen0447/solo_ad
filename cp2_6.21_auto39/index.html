@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>太阳系行星三维比对与交互漫游</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background-color: #0B0C10;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    }
+
+    #app {
+      width: 100%;
+      height: 100%;
+      position: relative;
+    }
+
+    #canvas-container {
+      width: 100%;
+      height: 100%;
+      position: absolute;
+      top: 0;
+      left: 0;
+    }
+
+    canvas {
+      display: block;
+    }
+
+    .glass-panel {
+      background: rgba(255, 255, 255, 0.08);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 12px;
+    }
+
+    #control-panel {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      width: 280px;
+      max-height: calc(100% - 40px);
+      padding: 16px;
+      color: #FFFFFF;
+      overflow-y: auto;
+      z-index: 10;
+    }
+
+    #info-panel {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      width: 320px;
+      max-height: calc(100% - 40px);
+      padding: 16px;
+      color: #FFFFFF;
+      overflow-y: auto;
+      z-index: 10;
+    }
+
+    .panel-title {
+      font-size: 18px;
+      font-weight: 600;
+      margin-bottom: 16px;
+      color: #FFFFFF;
+    }
+
+    .control-section {
+      margin-bottom: 20px;
+    }
+
+    .section-title {
+      font-size: 14px;
+      color: #AAAAAA;
+      margin-bottom: 10px;
+    }
+
+    .slider-container {
+      margin-bottom: 12px;
+    }
+
+    .slider-label {
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+      color: #CCCCCC;
+      margin-bottom: 6px;
+    }
+
+    .slider {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 100%;
+      height: 6px;
+      border-radius: 3px;
+      background: rgba(255, 255, 255, 0.15);
+      outline: none;
+      cursor: pointer;
+    }
+
+    .slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: #4ECDC4;
+      cursor: pointer;
+      box-shadow: 0 0 0 0 rgba(78, 205, 196, 0);
+      transition: box-shadow 0.2s ease;
+    }
+
+    .slider::-webkit-slider-thumb:hover {
+      box-shadow: 0 0 12px 4px rgba(78, 205, 196, 0.3);
+    }
+
+    .slider::-moz-range-thumb {
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: #4ECDC4;
+      cursor: pointer;
+      border: none;
+    }
+
+    .btn-group {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      padding: 8px 16px;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 6px;
+      background: rgba(255, 255, 255, 0.05);
+      color: #FFFFFF;
+      font-size: 12px;
+      cursor: pointer;
+      transition: background-color 0.1s ease, transform 0.1s ease;
+    }
+
+    .btn:hover {
+      background: rgba(255, 255, 255, 0.12);
+    }
+
+    .btn:active {
+      background: rgba(255, 255, 255, 0.2);
+      transform: scale(0.97);
+    }
+
+    .btn.active {
+      background: rgba(0, 255, 136, 0.25);
+      border-color: #00FF88;
+      color: #00FF88;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #4ECDC4, #45B7D1);
+      border: none;
+      font-weight: 500;
+    }
+
+    .btn-primary:hover {
+      background: linear-gradient(135deg, #5DDDD4, #55C7E1);
+    }
+
+    .planet-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 10px;
+    }
+
+    .planet-thumb {
+      width: 50px;
+      height: 50px;
+      border-radius: 50%;
+      cursor: pointer;
+      transition: box-shadow 0.2s ease, transform 0.2s ease;
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .planet-thumb:hover {
+      transform: scale(1.1);
+    }
+
+    .planet-thumb.selected {
+      box-shadow: 0 0 0 2px #00FF88, 0 0 15px 3px rgba(0, 255, 136, 0.4);
+    }
+
+    .planet-thumb-color {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+    }
+
+    .info-empty {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 200px;
+      color: #AAAAAA;
+      font-size: 16px;
+      text-align: center;
+    }
+
+    .planet-name {
+      font-size: 24px;
+      font-weight: bold;
+      color: #FFFFFF;
+      margin-bottom: 16px;
+    }
+
+    .info-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 8px 0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .info-label {
+      color: #AAAAAA;
+      font-size: 13px;
+    }
+
+    .info-value {
+      color: #FFFFFF;
+      font-size: 13px;
+      font-weight: 500;
+    }
+
+    .compare-section {
+      margin-top: 20px;
+      padding-top: 20px;
+      border-top: 1px solid rgba(255, 255, 255, 0.12);
+    }
+
+    .compare-title {
+      font-size: 14px;
+      color: #AAAAAA;
+      margin-bottom: 12px;
+    }
+
+    .compare-planet-names {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 12px;
+      font-size: 13px;
+    }
+
+    .compare-planet-names .name1 { color: #F9A826; }
+    .compare-planet-names .name2 { color: #4ECDC4; }
+
+    .bar-chart {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .bar-item {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .bar-label {
+      font-size: 11px;
+      color: #888888;
+    }
+
+    .bar-row {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .bar {
+      height: 16px;
+      border-radius: 3px;
+      transition: width 0.5s ease;
+    }
+
+    .bar.value1 { background: #F9A826; }
+    .bar.value2 { background: #4ECDC4; }
+
+    .bar-value {
+      font-size: 11px;
+      color: #CCCCCC;
+      min-width: 50px;
+    }
+
+    #hamburger-btn {
+      display: none;
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      width: 40px;
+      height: 40px;
+      z-index: 20;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+    }
+
+    #hamburger-btn span {
+      display: block;
+      width: 22px;
+      height: 2px;
+      background: #FFFFFF;
+      position: relative;
+    }
+
+    #hamburger-btn span::before,
+    #hamburger-btn span::after {
+      content: '';
+      position: absolute;
+      width: 22px;
+      height: 2px;
+      background: #FFFFFF;
+      left: 0;
+    }
+
+    #hamburger-btn span::before { top: -7px; }
+    #hamburger-btn span::after { top: 7px; }
+
+    @media (max-width: 900px) {
+      #hamburger-btn {
+        display: flex;
+      }
+
+      #control-panel {
+        top: auto;
+        bottom: 0;
+        left: 0;
+        width: 100%;
+        max-height: 180px;
+        border-radius: 12px 12px 0 0;
+        display: flex;
+        flex-direction: row;
+        gap: 16px;
+        overflow-x: auto;
+        overflow-y: hidden;
+      }
+
+      #info-panel {
+        top: 60px;
+        right: 10px;
+        width: calc(100% - 20px);
+        max-height: calc(100% - 250px);
+        display: none;
+      }
+
+      #info-panel.show {
+        display: block;
+      }
+
+      .control-section {
+        flex-shrink: 0;
+        width: 200px;
+      }
+
+      .planet-grid {
+        grid-template-columns: repeat(4, 1fr);
+      }
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <div id="canvas-container"></div>
+
+    <div id="hamburger-btn" class="glass-panel">
+      <span></span>
+    </div>
+
+    <div id="control-panel" class="glass-panel">
+      <div class="panel-title">太阳系探索</div>
+
+      <div class="control-section">
+        <div class="section-title">速度控制</div>
+        <div class="slider-container">
+          <div class="slider-label">
+            <span>公转速度</span>
+            <span id="orbit-speed-value">1.0x</span>
+          </div>
+          <input type="range" id="orbit-speed" class="slider" min="0.5" max="5" step="0.1" value="1">
+        </div>
+        <div class="slider-container">
+          <div class="slider-label">
+            <span>自转速度</span>
+            <span id="rotation-speed-value">1.0x</span>
+          </div>
+          <input type="range" id="rotation-speed" class="slider" min="0" max="3" step="0.1" value="1">
+        </div>
+      </div>
+
+      <div class="control-section">
+        <div class="section-title">纹理样式</div>
+        <div class="btn-group">
+          <button class="btn active" data-texture="realistic">真实</button>
+          <button class="btn" data-texture="cartoon">卡通</button>
+          <button class="btn" data-texture="wireframe">线框</button>
+        </div>
+      </div>
+
+      <div class="control-section">
+        <div class="section-title">行星选择</div>
+        <div class="planet-grid" id="planet-grid"></div>
+      </div>
+
+      <div class="control-section">
+        <div class="section-title">对比模式</div>
+        <button class="btn btn-primary" id="compare-btn" disabled>并排对比</button>
+        <button class="btn" id="exit-compare-btn" style="display:none;">退出对比</button>
+      </div>
+    </div>
+
+    <div id="info-panel" class="glass-panel">
+      <div class="panel-title">行星信息</div>
+      <div id="info-content">
+        <div class="info-empty">选择行星以查看详情</div>
+      </div>
+      <div id="compare-content" class="compare-section" style="display:none;">
+        <div class="compare-title">对比数据</div>
+        <div class="compare-planet-names">
+          <span class="name1" id="compare-name1">-</span>
+          <span class="name2" id="compare-name2">-</span>
+        </div>
+        <div class="bar-chart" id="bar-chart"></div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
