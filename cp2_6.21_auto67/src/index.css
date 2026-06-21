@@ -1,0 +1,121 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  font-family: 'PingFang SC', 'Microsoft YaHei', 'Hiragino Sans GB', sans-serif;
+  background: linear-gradient(180deg, #34495E 0%, #2C3E50 40%, #1A252F 100%);
+  background-attachment: fixed;
+  min-height: 100vh;
+  color: #FAF0E6;
+  overflow-x: hidden;
+}
+
+#root {
+  width: 100%;
+  min-height: 100vh;
+  position: relative;
+}
+
+#root::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-image: 
+    radial-gradient(ellipse 80% 50% at 50% -20%, rgba(139, 69, 19, 0.08) 0%, transparent 50%),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='400' viewBox='0 0 400 400'%3E%3Cfilter id='mountain'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.01' numOctaves='3'/%3E%3CfeDisplacementMap in='SourceGraphic' scale='40'/%3E%3C/filter%3E%3Cpath d='M0 320 Q50 280 80 300 Q120 260 160 290 Q200 240 240 270 Q280 230 320 260 Q360 240 400 270 L400 400 L0 400 Z' fill='rgba(26,37,47,0.4)' filter='url(%23mountain)'/%3E%3Cpath d='M0 350 Q60 320 100 340 Q140 300 180 330 Q220 290 260 310 Q300 280 340 300 Q380 290 400 310 L400 400 L0 400 Z' fill='rgba(26,37,47,0.6)'/%3E%3C/svg%3E");
+  background-size: 100% 100%, 800px 600px;
+  background-repeat: no-repeat, repeat-x;
+  background-position: center top, center bottom;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.8;
+}
+
+.waterfall-container {
+  position: relative;
+  z-index: 1;
+  background: linear-gradient(180deg, rgba(26, 37, 47, 0.5) 0%, rgba(26, 37, 47, 0.8) 100%);
+  margin: 0;
+  padding: 0;
+  min-height: 100vh;
+}
+
+button {
+  font-family: inherit;
+}
+
+input, select {
+  font-family: inherit;
+}
+
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+::selection {
+  background-color: rgba(139, 69, 19, 0.4);
+  color: #FAF0E6;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(26, 37, 47, 0.6);
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(139, 69, 19, 0.5);
+  border-radius: 4px;
+  transition: background 0.3s ease;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(139, 69, 19, 0.7);
+}
+
+@media (max-width: 768px) {
+  body {
+    background-attachment: scroll;
+  }
+  
+  * {
+    font-size: 80%;
+  }
+  
+  h2 {
+    font-size: 20px !important;
+  }
+  
+  h2 ~ div:nth-of-type(1) {
+    font-size: 12px !important;
+  }
+  
+  div[style*="font-size: 18px"],
+  div[style*="font-size:18px"] {
+    font-size: 15px !important;
+  }
+  
+  div[style*="font-size: 20px"],
+  div[style*="font-size:20px"] {
+    font-size: 16px !important;
+  }
+  
+  div[style*="font-size: 24px"],
+  div[style*="font-size:24px"] {
+    font-size: 20px !important;
+  }
+}
