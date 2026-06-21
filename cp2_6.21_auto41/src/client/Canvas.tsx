@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useCallback, forwardRef, useImperativeHandle, useMemo } from 'react';
 import {
   Layer,
   FilterParams,
@@ -26,6 +26,14 @@ interface CanvasProps {
   addImageMode: boolean;
   addTextMode: boolean;
   onModeReset: () => void;
+  onHistoryChange?: (canUndo: boolean, canRedo: boolean) => void;
+}
+
+export interface CanvasHandle {
+  undo: () => void;
+  redo: () => void;
+  canUndo: () => boolean;
+  canRedo: () => boolean;
 }
 
 interface AlignmentGuides {
@@ -33,13 +41,20 @@ interface AlignmentGuides {
   y: number | null;
 }
 
+interface HistoryState {
+  layers: Layer[];
+  selectedLayerId: string | null;
+}
+
 const SNAP_THRESHOLD = 10;
 const ROTATION_SNAP = 15;
 const MIN_SCALE = 0.2;
 const MAX_SCALE = 3;
 const BOUNDARY_MARGIN = 30;
+const MAX_HISTORY = 50;
+const HISTORY_DEBOUNCE = 300;
 
-const Canvas: React.FC<CanvasProps> = ({
+const Canvas = forwardRef<CanvasHandle, CanvasProps>(({
   initialData,
   selectedLayerId,
   onSelectLayer,
@@ -51,10 +66,19 @@ const Canvas: React.FC<CanvasProps> = ({
   addImageMode,
   addTextMode,
   onModeReset,
-}) => {
+  onHistoryChange,
+}, ref) => {
   const canvasRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [layers, setLayers] = useState<Layer[]>(initialData?.layers || []);
+  const [internalSelectedId, setInternalSelectedId] = useState<string | null>(null);
+  const historyRef = useRef<HistoryState[]>([]);
+  const historyIndexRef = useRef(-1);
+  const isUndoingRedoingRef = useRef(false);
+  const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const historyPausedRef = useRef(false);
+  const isScalingRef = useRef(false);
+  const scaleTimerRef = useRef<NodeJS.Timeout | null>(null);
   const [dragging, setDragging] = useState<{
     layerId: string;
     startX: number;
@@ -88,6 +112,145 @@ const Canvas: React.FC<CanvasProps> = ({
       setLayers(initialData.layers);
     }
   }, [initialData]);
+
+  const notifyHistoryChange = useCallback(() => {
+    if (onHistoryChange) {
+      const canUndo = historyIndexRef.current > 0;
+      const canRedo = historyIndexRef.current < historyRef.current.length - 1;
+      onHistoryChange(canUndo, canRedo);
+    }
+  }, [onHistoryChange]);
+
+  const pushHistory = useCallback(
+    (currentLayers: Layer[], currentSelected: string | null, immediate = false) => {
+      if (isUndoingRedoingRef.current || historyPausedRef.current) return;
+
+      const state: HistoryState = {
+        layers: JSON.parse(JSON.stringify(currentLayers)),
+        selectedLayerId: currentSelected,
+      };
+
+      const saveHistory = () => {
+        if (isUndoingRedoingRef.current || historyPausedRef.current) return;
+
+        const history = historyRef.current;
+        const index = historyIndexRef.current;
+
+        if (index < history.length - 1) {
+          history.splice(index + 1);
+        }
+
+        const lastState = history[history.length - 1];
+        if (
+          lastState &&
+          JSON.stringify(lastState.layers) === JSON.stringify(state.layers) &&
+          lastState.selectedLayerId === state.selectedLayerId
+        ) {
+          return;
+        }
+
+        history.push(state);
+        if (history.length > MAX_HISTORY) {
+          history.shift();
+        } else {
+          historyIndexRef.current++;
+        }
+
+        notifyHistoryChange();
+      };
+
+      if (immediate) {
+        if (debounceTimerRef.current) {
+          clearTimeout(debounceTimerRef.current);
+          debounceTimerRef.current = null;
+        }
+        saveHistory();
+      } else {
+        if (debounceTimerRef.current) {
+          clearTimeout(debounceTimerRef.current);
+        }
+        debounceTimerRef.current = setTimeout(saveHistory, HISTORY_DEBOUNCE);
+      }
+    },
+    [notifyHistoryChange]
+  );
+
+  const undo = useCallback(() => {
+    if (historyIndexRef.current <= 0) return;
+
+    isUndoingRedoingRef.current = true;
+    historyIndexRef.current--;
+    const state = historyRef.current[historyIndexRef.current];
+
+    if (state) {
+      setLayers(JSON.parse(JSON.stringify(state.layers)));
+      setInternalSelectedId(state.selectedLayerId);
+      if (state.selectedLayerId) {
+        onSelectLayer(state.selectedLayerId);
+      }
+    }
+
+    notifyHistoryChange();
+    setTimeout(() => {
+      isUndoingRedoingRef.current = false;
+    }, 0);
+  }, [notifyHistoryChange, onSelectLayer]);
+
+  const redo = useCallback(() => {
+    if (historyIndexRef.current >= historyRef.current.length - 1) return;
+
+    isUndoingRedoingRef.current = true;
+    historyIndexRef.current++;
+    const state = historyRef.current[historyIndexRef.current];
+
+    if (state) {
+      setLayers(JSON.parse(JSON.stringify(state.layers)));
+      setInternalSelectedId(state.selectedLayerId);
+      if (state.selectedLayerId) {
+        onSelectLayer(state.selectedLayerId);
+      }
+    }
+
+    notifyHistoryChange();
+    setTimeout(() => {
+      isUndoingRedoingRef.current = false;
+    }, 0);
+  }, [notifyHistoryChange, onSelectLayer]);
+
+  const canUndo = useCallback(() => historyIndexRef.current > 0, []);
+  const canRedo = useCallback(
+    () => historyIndexRef.current < historyRef.current.length - 1,
+    []
+  );
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      undo,
+      redo,
+      canUndo,
+      canRedo,
+    }),
+    [undo, redo, canUndo, canRedo]
+  );
+
+  useEffect(() => {
+    if (historyRef.current.length === 0) {
+      const initialState: HistoryState = {
+        layers: JSON.parse(JSON.stringify(layers)),
+        selectedLayerId: selectedLayerId,
+      };
+      historyRef.current.push(initialState);
+      historyIndexRef.current = 0;
+      notifyHistoryChange();
+    }
+  }, []);
+
+  useEffect(() => {
+    if (layers.length > 0 || historyRef.current.length > 0) {
+      pushHistory(layers, selectedLayerId, false);
+    }
+  }, [layers]);
 
   useEffect(() => {
     onLayersChange(layers);
@@ -131,11 +294,17 @@ const Canvas: React.FC<CanvasProps> = ({
         imageUrl: dataUrl,
         filters: { ...DEFAULT_FILTERS },
       };
-      setLayers((prev) => [...prev, newLayer]);
+      setLayers((prev) => {
+        const newLayers = [...prev, newLayer];
+        setTimeout(() => {
+          pushHistory(newLayers, newLayer.id, true);
+        }, 0);
+        return newLayers;
+      });
       onSelectLayer(newLayer.id);
       if (addImageMode) onModeReset();
     },
-    [getNextZIndex, onSelectLayer, addImageMode, onModeReset]
+    [getNextZIndex, onSelectLayer, addImageMode, onModeReset, pushHistory]
   );
 
   const addTextLayer = useCallback(() => {
@@ -154,10 +323,16 @@ const Canvas: React.FC<CanvasProps> = ({
       text: '双击编辑文字',
       textStyle: { ...textStyle },
     };
-    setLayers((prev) => [...prev, newLayer]);
+    setLayers((prev) => {
+      const newLayers = [...prev, newLayer];
+      setTimeout(() => {
+        pushHistory(newLayers, newLayer.id, true);
+      }, 0);
+      return newLayers;
+    });
     onSelectLayer(newLayer.id);
     if (addTextMode) onModeReset();
-  }, [getNextZIndex, onSelectLayer, addTextMode, onModeReset, textStyle]);
+  }, [getNextZIndex, onSelectLayer, addTextMode, onModeReset, textStyle, pushHistory]);
 
   useEffect(() => {
     if (addTextMode) {
@@ -336,6 +511,11 @@ const Canvas: React.FC<CanvasProps> = ({
     const distToHandle = Math.sqrt(dx * dx + dy * dy);
 
     if (distToHandle < 20) {
+      historyPausedRef.current = true;
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+        debounceTimerRef.current = null;
+      }
       const startAngle = Math.atan2(y - cy, x - cx);
       setRotating({
         layerId,
@@ -345,6 +525,11 @@ const Canvas: React.FC<CanvasProps> = ({
         origRotation: layer.rotation,
       });
     } else {
+      historyPausedRef.current = true;
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+        debounceTimerRef.current = null;
+      }
       onSelectLayer(layerId);
       setDragging({
         layerId,
@@ -412,11 +597,18 @@ const Canvas: React.FC<CanvasProps> = ({
 
   const handleMouseUp = useCallback(() => {
     if (dragging || rotating) {
+      const wasPaused = historyPausedRef.current;
       setDragging(null);
       setRotating(null);
       setGuides({ x: null, y: null });
+      if (wasPaused) {
+        setTimeout(() => {
+          historyPausedRef.current = false;
+          pushHistory(layers, selectedLayerId, true);
+        }, 0);
+      }
     }
-  }, [dragging, rotating]);
+  }, [dragging, rotating, layers, selectedLayerId, pushHistory]);
 
   useEffect(() => {
     window.addEventListener('mousemove', handleMouseMove);
@@ -430,6 +622,19 @@ const Canvas: React.FC<CanvasProps> = ({
   const handleWheel = (e: React.WheelEvent, layerId: string) => {
     if (!e.ctrlKey && !e.metaKey) return;
     e.preventDefault();
+
+    if (!isScalingRef.current) {
+      isScalingRef.current = true;
+      historyPausedRef.current = true;
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+        debounceTimerRef.current = null;
+      }
+    }
+    if (scaleTimerRef.current) {
+      clearTimeout(scaleTimerRef.current);
+    }
+
     setLayers((prev) =>
       prev.map((l) => {
         if (l.id !== layerId) return l;
@@ -438,6 +643,12 @@ const Canvas: React.FC<CanvasProps> = ({
         return { ...l, scale: newScale };
       })
     );
+
+    scaleTimerRef.current = setTimeout(() => {
+      isScalingRef.current = false;
+      historyPausedRef.current = false;
+      pushHistory(layers, selectedLayerId, true);
+    }, 300);
   };
 
   useEffect(() => {
@@ -494,28 +705,46 @@ const Canvas: React.FC<CanvasProps> = ({
         filters: l.filters ? { ...l.filters } : undefined,
         textStyle: l.textStyle ? { ...l.textStyle } : undefined,
       };
-      return [...prev, copy];
+      const newLayers = [...prev, copy];
+      setTimeout(() => {
+        pushHistory(newLayers, selectedLayerId, true);
+      }, 0);
+      return newLayers;
     });
     closeContextMenu();
   };
 
   const deleteLayer = (layerId: string) => {
-    setLayers((prev) => prev.filter((l) => l.id !== layerId));
+    setLayers((prev) => {
+      const newLayers = prev.filter((l) => l.id !== layerId);
+      setTimeout(() => {
+        pushHistory(newLayers, selectedLayerId === layerId ? null : selectedLayerId, true);
+      }, 0);
+      return newLayers;
+    });
     if (selectedLayerId === layerId) onSelectLayer(null);
     closeContextMenu();
   };
 
   const bringToFront = (layerId: string) => {
-    setLayers((prev) =>
-      prev.map((l) => (l.id === layerId ? { ...l, zIndex: getNextZIndex() } : l))
-    );
+    setLayers((prev) => {
+      const newLayers = prev.map((l) => (l.id === layerId ? { ...l, zIndex: getNextZIndex() } : l));
+      setTimeout(() => {
+        pushHistory(newLayers, selectedLayerId, true);
+      }, 0);
+      return newLayers;
+    });
     closeContextMenu();
   };
 
   const sendToBack = (layerId: string) => {
     setLayers((prev) => {
       const minZ = Math.min(...prev.map((l) => l.zIndex));
-      return prev.map((l) => (l.id === layerId ? { ...l, zIndex: minZ - 1 } : l));
+      const newLayers = prev.map((l) => (l.id === layerId ? { ...l, zIndex: minZ - 1 } : l));
+      setTimeout(() => {
+        pushHistory(newLayers, selectedLayerId, true);
+      }, 0);
+      return newLayers;
     });
     closeContextMenu();
   };
@@ -919,6 +1148,6 @@ const Canvas: React.FC<CanvasProps> = ({
       `}</style>
     </div>
   );
-};
+});
 
 export default Canvas;

@@ -1,5 +1,5 @@
-import React, { useState, useMemo, useCallback } from 'react';
-import Canvas from './Canvas';
+import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
+import Canvas, { CanvasHandle } from './Canvas';
 import FilterControl from './FilterControl';
 import Gallery from './Gallery';
 import {
@@ -335,6 +335,39 @@ const App: React.FC = () => {
   const [publishOpen, setPublishOpen] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const [filterPanelCollapsed, setFilterPanelCollapsed] = useState(true);
+  const [canUndo, setCanUndo] = useState(false);
+  const [canRedo, setCanRedo] = useState(false);
+  const canvasRef = useRef<CanvasHandle>(null);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (publishOpen) return;
+      if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
+        e.preventDefault();
+        canvasRef.current?.undo();
+      } else if (
+        ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.key === 'z' && e.shiftKey)))
+      ) {
+        e.preventDefault();
+        canvasRef.current?.redo();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [publishOpen]);
+
+  const handleHistoryChange = useCallback((canUndo: boolean, canRedo: boolean) => {
+    setCanUndo(canUndo);
+    setCanRedo(canRedo);
+  }, []);
+
+  const handleUndo = () => {
+    canvasRef.current?.undo();
+  };
+
+  const handleRedo = () => {
+    canvasRef.current?.redo();
+  };
 
   const collageData = useMemo<CollageData>(
     () => ({
@@ -443,6 +476,78 @@ const App: React.FC = () => {
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div
+            style={{
+              display: 'flex',
+              background: '#2D2D44',
+              borderRadius: 10,
+              padding: 4,
+              gap: 4,
+              marginRight: 4,
+            }}
+          >
+            {[
+              {
+                key: 'undo',
+                icon: '↩',
+                label: '撤销 (Ctrl+Z)',
+                disabled: !canUndo,
+                onClick: handleUndo,
+              },
+              {
+                key: 'redo',
+                icon: '↪',
+                label: '重做 (Ctrl+Y)',
+                disabled: !canRedo,
+                onClick: handleRedo,
+              },
+            ].map((tool) => (
+              <button
+                key={tool.key}
+                onClick={tool.onClick}
+                title={tool.label}
+                disabled={tool.disabled}
+                style={{
+                  width: 40,
+                  height: 40,
+                  border: 'none',
+                  borderRadius: 8,
+                  background: 'transparent',
+                  color: tool.disabled ? '#555' : '#E0E0E0',
+                  cursor: tool.disabled ? 'not-allowed' : 'pointer',
+                  fontSize: 18,
+                  fontWeight: 700,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  transition: 'all 0.2s',
+                  opacity: tool.disabled ? 0.5 : 1,
+                }}
+                onMouseEnter={(e) => {
+                  if (!tool.disabled) {
+                    e.currentTarget.style.background = 'rgba(255,255,255,0.06)';
+                    e.currentTarget.style.filter = 'brightness(1.1)';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!tool.disabled) {
+                    e.currentTarget.style.background = 'transparent';
+                    e.currentTarget.style.filter = 'brightness(1)';
+                  }
+                }}
+              >
+                {tool.icon}
+              </button>
+            ))}
+          </div>
+          <div
+            style={{
+              width: 1,
+              height: 28,
+              background: 'rgba(255,255,255,0.1)',
+              marginRight: 4,
+            }}
+          />
           <div
             style={{
               display: 'flex',
@@ -579,6 +684,7 @@ const App: React.FC = () => {
               }}
             >
               <Canvas
+                ref={canvasRef}
                 initialData={collageData}
                 selectedLayerId={selectedLayerId}
                 onSelectLayer={setSelectedLayerId}
@@ -590,6 +696,7 @@ const App: React.FC = () => {
                 addImageMode={addImageMode}
                 addTextMode={addTextMode}
                 onModeReset={handleModeReset}
+                onHistoryChange={handleHistoryChange}
               />
             </div>
             <FilterControl
