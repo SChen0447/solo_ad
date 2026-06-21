@@ -1,126 +1,171 @@
 import type { Pet, Application, MatchResult, PersonalityTag, HousingType } from './types';
 
 interface PersonalityProfile {
-  minCompanionHours: number;
   optimalCompanionHours: number;
+  minCompanionHours: number;
   preferredHousing: HousingType[];
   unfavorableHousing: HousingType[];
   prefersNoOtherPets: boolean;
   canTolerateOtherPets: boolean;
-  environmentNoiseTolerance: 'low' | 'medium' | 'high';
+  noiseTolerance: 'low' | 'medium' | 'high';
+  timeDecayFactor: number;
+  spaceDecayFactor: number;
 }
 
 const PERSONALITY_PROFILES: Record<PersonalityTag, PersonalityProfile> = {
   '活泼': {
-    minCompanionHours: 2,
     optimalCompanionHours: 5,
+    minCompanionHours: 1.5,
     preferredHousing: ['独栋'],
     unfavorableHousing: ['合租'],
     prefersNoOtherPets: false,
     canTolerateOtherPets: true,
-    environmentNoiseTolerance: 'high'
+    noiseTolerance: 'high',
+    timeDecayFactor: 0.8,
+    spaceDecayFactor: 1.2
   },
   '胆小': {
-    minCompanionHours: 1,
     optimalCompanionHours: 3,
+    minCompanionHours: 0.5,
     preferredHousing: ['公寓', '独栋'],
     unfavorableHousing: ['合租'],
     prefersNoOtherPets: true,
     canTolerateOtherPets: false,
-    environmentNoiseTolerance: 'low'
+    noiseTolerance: 'low',
+    timeDecayFactor: 0.5,
+    spaceDecayFactor: 1.5
   },
   '亲人': {
-    minCompanionHours: 2,
     optimalCompanionHours: 4,
+    minCompanionHours: 1,
     preferredHousing: ['公寓', '独栋'],
     unfavorableHousing: [],
     prefersNoOtherPets: false,
     canTolerateOtherPets: true,
-    environmentNoiseTolerance: 'medium'
+    noiseTolerance: 'medium',
+    timeDecayFactor: 0.6,
+    spaceDecayFactor: 0.8
   },
   '爱玩': {
-    minCompanionHours: 3,
     optimalCompanionHours: 5,
+    minCompanionHours: 2,
     preferredHousing: ['独栋'],
     unfavorableHousing: ['合租'],
     prefersNoOtherPets: false,
     canTolerateOtherPets: true,
-    environmentNoiseTolerance: 'high'
+    noiseTolerance: 'high',
+    timeDecayFactor: 0.9,
+    spaceDecayFactor: 1.3
   },
   '安静': {
-    minCompanionHours: 0.5,
     optimalCompanionHours: 2,
+    minCompanionHours: 0.3,
     preferredHousing: ['公寓', '独栋'],
     unfavorableHousing: [],
     prefersNoOtherPets: true,
     canTolerateOtherPets: false,
-    environmentNoiseTolerance: 'low'
+    noiseTolerance: 'low',
+    timeDecayFactor: 0.4,
+    spaceDecayFactor: 0.5
   },
   '独立': {
-    minCompanionHours: 0.5,
     optimalCompanionHours: 2,
+    minCompanionHours: 0.5,
     preferredHousing: ['公寓', '独栋'],
     unfavorableHousing: [],
     prefersNoOtherPets: true,
     canTolerateOtherPets: false,
-    environmentNoiseTolerance: 'low'
+    noiseTolerance: 'low',
+    timeDecayFactor: 0.3,
+    spaceDecayFactor: 0.4
   }
 };
 
-const HOUSING_NOISE_LEVEL: Record<HousingType, number> = {
+const HOUSING_BASE_SCORE: Record<HousingType, number> = {
+  '独栋': 100,
+  '公寓': 75,
+  '合租': 55
+};
+
+const NOISE_LEVEL: Record<HousingType, number> = {
   '独栋': 1,
   '公寓': 2,
   '合租': 3
 };
 
-function calculateTimeScore(hours: number, personality: PersonalityTag[]): number {
-  let totalScore = 0;
+function smoothDecay(
+  current: number,
+  optimal: number,
+  min: number,
+  decayFactor: number
+): number {
+  if (current >= optimal) return 100;
+  if (current <= 0) return 0;
 
+  const ratio = current / optimal;
+  const decay = Math.pow(1 - ratio, decayFactor);
+  const score = 100 * (1 - decay);
+
+  if (current < min) {
+    const minRatio = current / min;
+    return Math.round(score * (0.3 + 0.7 * minRatio));
+  }
+
+  return Math.round(score);
+}
+
+function calculateTimeScore(hours: number, personality: PersonalityTag[]): number {
+  if (personality.length === 0) {
+    return hours >= 2 ? 80 : 60;
+  }
+
+  let totalScore = 0;
   for (const tag of personality) {
     const profile = PERSONALITY_PROFILES[tag];
-    if (hours >= profile.optimalCompanionHours) {
-      totalScore += 100;
-    } else if (hours >= profile.minCompanionHours) {
-      const range = profile.optimalCompanionHours - profile.minCompanionHours;
-      const progress = hours - profile.minCompanionHours;
-      totalScore += 60 + Math.round((progress / range) * 40);
-    } else if (hours >= profile.minCompanionHours * 0.5) {
-      totalScore += 30;
-    } else {
-      totalScore += 10;
-    }
+    const score = smoothDecay(
+      hours,
+      profile.optimalCompanionHours,
+      profile.minCompanionHours,
+      profile.timeDecayFactor
+    );
+    totalScore += score;
   }
 
   return Math.round(totalScore / personality.length);
 }
 
 function calculateSpaceScore(housingType: HousingType, personality: PersonalityTag[]): number {
+  if (personality.length === 0) {
+    return HOUSING_BASE_SCORE[housingType];
+  }
+
   let totalScore = 0;
 
   for (const tag of personality) {
     const profile = PERSONALITY_PROFILES[tag];
-    let score = 60;
+    let baseScore = HOUSING_BASE_SCORE[housingType];
 
     if (profile.preferredHousing.includes(housingType)) {
-      score = 100;
-    } else if (profile.unfavorableHousing.includes(housingType)) {
-      score = 25;
-    } else if (housingType === '独栋') {
-      score = 90;
-    } else if (housingType === '公寓') {
-      score = 70;
-    } else {
-      score = 50;
+      baseScore = Math.min(100, baseScore + 15);
+    }
+    if (profile.unfavorableHousing.includes(housingType)) {
+      const penalty = 20 * profile.spaceDecayFactor;
+      baseScore = Math.max(25, baseScore - penalty);
     }
 
-    if (profile.environmentNoiseTolerance === 'low') {
-      const noiseLevel = HOUSING_NOISE_LEVEL[housingType];
-      if (noiseLevel > 1) {
-        score -= (noiseLevel - 1) * 15;
+    if (profile.noiseTolerance === 'low') {
+      const noise = NOISE_LEVEL[housingType];
+      if (noise > 1) {
+        baseScore -= (noise - 1) * 10;
+      }
+    } else if (profile.noiseTolerance === 'medium') {
+      const noise = NOISE_LEVEL[housingType];
+      if (noise > 2) {
+        baseScore -= 8;
       }
     }
 
-    totalScore += Math.max(score, 10);
+    totalScore += Math.max(baseScore, 20);
   }
 
   return Math.round(totalScore / personality.length);
@@ -130,10 +175,14 @@ function calculatePetFriendlyScore(hasOtherPets: boolean, personality: Personali
   if (!hasOtherPets) {
     let bonus = 0;
     for (const tag of personality) {
-      if (PERSONALITY_PROFILES[tag].prefersNoOtherPets) bonus += 10;
+      if (PERSONALITY_PROFILES[tag].prefersNoOtherPets) {
+        bonus += 8;
+      }
     }
-    return Math.min(100, 90 + bonus);
+    return Math.min(100, 85 + bonus);
   }
+
+  if (personality.length === 0) return 60;
 
   let totalScore = 0;
   for (const tag of personality) {
@@ -142,46 +191,52 @@ function calculatePetFriendlyScore(hasOtherPets: boolean, personality: Personali
       if (profile.prefersNoOtherPets) {
         totalScore += 65;
       } else {
-        totalScore += 80;
+        totalScore += 82;
       }
     } else {
-      totalScore += 30;
+      totalScore += 35;
     }
   }
 
   return Math.round(totalScore / personality.length);
 }
 
-function calculatePersonalityFitScore(personality: PersonalityTag[], app: Application): number {
+function calculatePersonalityFit(personality: PersonalityTag[], app: Application): number {
+  if (personality.length === 0) return 60;
+
   let totalFit = 0;
 
   for (const tag of personality) {
     const profile = PERSONALITY_PROFILES[tag];
     let fit = 50;
 
-    if (app.dailyCompanionHours >= profile.optimalCompanionHours) {
-      fit += 25;
-    } else if (app.dailyCompanionHours >= profile.minCompanionHours) {
+    const timeScore = smoothDecay(
+      app.dailyCompanionHours,
+      profile.optimalCompanionHours,
+      profile.minCompanionHours,
+      profile.timeDecayFactor
+    );
+    fit += (timeScore - 50) * 0.5;
+
+    if (profile.preferredHousing.includes(app.housingType)) {
       fit += 15;
-    } else {
+    } else if (profile.unfavorableHousing.includes(app.housingType)) {
       fit -= 15;
     }
 
-    if (profile.preferredHousing.includes(app.housingType)) {
-      fit += 20;
-    } else if (profile.unfavorableHousing.includes(app.housingType)) {
-      fit -= 20;
-    }
-
     if (!app.hasOtherPets && profile.prefersNoOtherPets) {
-      fit += 15;
+      fit += 12;
     } else if (app.hasOtherPets && !profile.canTolerateOtherPets) {
-      fit -= 20;
+      fit -= 18;
     } else if (!app.hasOtherPets) {
-      fit += 5;
+      fit += 4;
     }
 
-    totalFit += Math.min(Math.max(fit, 0), 100);
+    if (profile.noiseTolerance === 'low' && NOISE_LEVEL[app.housingType] <= 1) {
+      fit += 8;
+    }
+
+    totalFit += Math.min(Math.max(fit, 15), 100);
   }
 
   return Math.round(totalFit / personality.length);
@@ -193,52 +248,51 @@ function generateMatchReasons(
   timeScore: number,
   spaceScore: number,
   petFriendlyScore: number,
-  personalityFitScore: number
+  personalityFit: number
 ): string[] {
   const reasons: string[] = [];
 
-  if (timeScore >= 80) {
+  if (timeScore >= 85) {
     reasons.push(`每日${app.dailyCompanionHours}小时陪伴时间充足`);
-  } else if (timeScore >= 50) {
-    reasons.push('陪伴时间基本满足需求');
+  } else if (timeScore >= 60) {
+    reasons.push('陪伴时间基本满足');
   } else {
-    reasons.push('陪伴时间可能不足');
+    reasons.push('陪伴时间略显不足');
   }
 
   if (spaceScore >= 80) {
     reasons.push(`${app.housingType}居住空间合适`);
-  } else if (spaceScore >= 50) {
+  } else if (spaceScore >= 55) {
     reasons.push(`${app.housingType}居住空间尚可`);
   }
 
-  if (petFriendlyScore >= 80) {
+  if (petFriendlyScore >= 75) {
     reasons.push(app.hasOtherPets ? '与其他宠物相处融洽' : '无其他宠物干扰');
   }
 
-  const tagReasons: string[] = [];
+  const strongMatches: string[] = [];
   for (const tag of pet.personality) {
     const profile = PERSONALITY_PROFILES[tag];
-    if (tag === '活泼' && app.dailyCompanionHours >= profile.optimalCompanionHours) {
-      tagReasons.push(`"${tag}"性格与高陪伴时间匹配`);
-    } else if (tag === '胆小' && !app.hasOtherPets && !profile.unfavorableHousing.includes(app.housingType)) {
-      tagReasons.push(`"${tag}"性格适合安静环境`);
-    } else if (tag === '亲人' && app.dailyCompanionHours >= profile.minCompanionHours) {
-      tagReasons.push(`"${tag}"性格与陪伴需求匹配`);
-    } else if (tag === '爱玩' && app.housingType === '独栋') {
-      tagReasons.push(`"${tag}"性格适合宽敞空间`);
-    } else if (tag === '安静' && app.housingType === '公寓') {
-      tagReasons.push(`"${tag}"性格适合公寓生活`);
-    } else if (tag === '独立' && app.dailyCompanionHours <= 2) {
-      tagReasons.push(`"${tag}"性格可适应较少陪伴`);
+
+    if (app.dailyCompanionHours >= profile.optimalCompanionHours * 0.8) {
+      strongMatches.push(`"${tag}"性格与陪伴节奏契合`);
+    }
+
+    if (tag === '胆小' && !app.hasOtherPets && !profile.unfavorableHousing.includes(app.housingType)) {
+      strongMatches.push(`"${tag}"性格适合安静环境`);
+    }
+    if (tag === '活泼' && app.housingType === '独栋') {
+      strongMatches.push(`"${tag}"性格有充足活动空间`);
+    }
+    if (tag === '独立' && app.dailyCompanionHours <= profile.optimalCompanionHours) {
+      strongMatches.push(`"${tag}"性格可适应自主生活`);
     }
   }
 
-  if (tagReasons.length > 0) {
-    reasons.push(...tagReasons.slice(0, 2));
-  }
+  reasons.push(...strongMatches.slice(0, 2));
 
-  if (personalityFitScore >= 80) {
-    reasons.push('整体性格高度匹配');
+  if (personalityFit >= 80) {
+    reasons.push('性格契合度高');
   }
 
   return reasons.slice(0, 4);
@@ -248,20 +302,20 @@ export function calculateMatchScore(pet: Pet, application: Application): MatchRe
   const timeScore = calculateTimeScore(application.dailyCompanionHours, pet.personality);
   const spaceScore = calculateSpaceScore(application.housingType, pet.personality);
   const petFriendlyScore = calculatePetFriendlyScore(application.hasOtherPets, pet.personality);
-  const personalityFitScore = calculatePersonalityFitScore(pet.personality, application);
+  const personalityFit = calculatePersonalityFit(pet.personality, application);
 
   const weightedScore =
-    timeScore * 0.25 +
-    spaceScore * 0.2 +
-    petFriendlyScore * 0.2 +
-    personalityFitScore * 0.35;
+    timeScore * 0.28 +
+    spaceScore * 0.22 +
+    petFriendlyScore * 0.18 +
+    personalityFit * 0.32;
 
   const finalScore = Math.round(weightedScore);
 
   const reasons = generateMatchReasons(
     pet, application,
     timeScore, spaceScore,
-    petFriendlyScore, personalityFitScore
+    petFriendlyScore, personalityFit
   );
 
   return {

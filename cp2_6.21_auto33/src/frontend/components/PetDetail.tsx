@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useApp } from '../context/AppContext';
 import type { Pet, MatchResult } from '../types';
 
@@ -13,20 +13,17 @@ export default function PetDetail({ pet, onClose, onApply }: PetDetailProps) {
   const [currentImage, setCurrentImage] = useState(0);
   const [matches, setMatches] = useState<MatchResult[]>([]);
   const [expandedMatch, setExpandedMatch] = useState<string | null>(null);
-  const [visible, setVisible] = useState(false);
+  const [isOpen, setIsOpen] = useState(false);
+  const panelRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (pet) {
       setCurrentImage(0);
       setExpandedMatch(null);
       setMatches([]);
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          setVisible(true);
-        });
-      });
+      setIsOpen(true);
     } else {
-      setVisible(false);
+      setIsOpen(false);
     }
   }, [pet]);
 
@@ -46,8 +43,13 @@ export default function PetDetail({ pet, onClose, onApply }: PetDetailProps) {
   };
 
   const handleClose = () => {
-    setVisible(false);
-    setTimeout(onClose, 300);
+    setIsOpen(false);
+  };
+
+  const handleTransitionEnd = (e: React.TransitionEvent) => {
+    if (e.target === panelRef.current && !isOpen) {
+      onClose();
+    }
   };
 
   const handleConfirmAdoption = (applicationId: string) => {
@@ -62,10 +64,14 @@ export default function PetDetail({ pet, onClose, onApply }: PetDetailProps) {
 
   return (
     <div
-      className={`detail-overlay ${visible ? 'detail-overlay-visible' : ''}`}
+      className={`detail-overlay ${isOpen ? 'detail-overlay-open' : ''}`}
       onClick={handleOverlayClick}
     >
-      <div className={`detail-panel ${visible ? 'detail-panel-visible' : ''}`}>
+      <div
+        ref={panelRef}
+        className={`detail-panel ${isOpen ? 'detail-panel-open' : ''}`}
+        onTransitionEnd={handleTransitionEnd}
+      >
         <button className="close-btn" onClick={handleClose}>×</button>
 
         <div className="detail-image-section">

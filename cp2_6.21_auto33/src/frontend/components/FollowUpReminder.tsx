@@ -2,8 +2,6 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useApp } from '../context/AppContext';
 import type { AdoptionRecord } from '../types';
 
-const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
-
 interface ReminderInfo {
   record: AdoptionRecord;
   dueDate: Date;
@@ -41,14 +39,43 @@ export default function FollowUpReminder() {
   const { adoptionRecords, loadAdoptionRecords } = useApp();
   const [visibleReminders, setVisibleReminders] = useState<ReminderInfo[]>([]);
   const [dismissedIds, setDismissedIds] = useState<Set<string>>(new Set());
-  const timersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+  const timersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const delayTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isMountedRef = useRef(true);
 
   const clearAllTimers = useCallback(() => {
-    timersRef.current.forEach(t => clearTimeout(t));
-    timersRef.current = [];
+    timersRef.current.forEach(timer => clearTimeout(timer));
+    timersRef.current.clear();
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+      intervalRef.current = null;
+    }
+    if (delayTimerRef.current) {
+      clearTimeout(delayTimerRef.current);
+      delayTimerRef.current = null;
+    }
+  }, []);
+
+  const handleDismiss = useCallback((recordId: string) => {
+    if (!isMountedRef.current) return;
+    setDismissedIds(prev => {
+      const next = new Set(prev);
+      next.add(recordId);
+      return next;
+    });
+    setVisibleReminders(prev => prev.filter(r => r.record.id !== recordId));
+
+    const autoHideTimer = timersRef.current.get(`autohide_${recordId}`);
+    if (autoHideTimer) {
+      clearTimeout(autoHideTimer);
+      timersRef.current.delete(`autohide_${recordId}`);
+    }
   }, []);
 
   const checkAndShowReminders = useCallback(() => {
+    if (!isMountedRef.current) return;
+
     const due = getDueReminders(adoptionRecords);
     const newReminders = due.filter(info => !dismissedIds.has(info.record.id));
 
@@ -56,53 +83,64 @@ export default function FollowUpReminder() {
       setVisibleReminders(prev => {
         const existingIds = new Set(prev.map(r => r.record.id));
         const toAdd = newReminders.filter(r => !existingIds.has(r.record.id));
+
+        for (const reminder of toAdd) {
+          const timerId = `autohide_${reminder.record.id}`;
+          if (!timersRef.current.has(timerId)) {
+            const timer = setTimeout(() => {
+              handleDismiss(reminder.record.id);
+            }, 5000);
+            timersRef.current.set(timerId, timer);
+          }
+        }
+
         return [...prev, ...toAdd];
       });
     }
-  }, [adoptionRecords, dismissedIds]);
+  }, [adoptionRecords, dismissedIds, handleDismiss]);
 
   useEffect(() => {
+    isMountedRef.current = true;
     loadAdoptionRecords();
-  }, [loadAdoptionRecords]);
+
+    return () => {
+      isMountedRef.current = false;
+      clearAllTimers();
+    };
+  }, [loadAdoptionRecords, clearAllTimers]);
 
   useEffect(() => {
-    clearAllTimers();
+    if (!isMountedRef.current) return;
 
     checkAndShowReminders();
 
-    const delay = getNextReminderDelay(adoptionRecords);
-    if (delay !== null && delay > 0) {
-      const timer = setTimeout(() => {
-        checkAndShowReminders();
-      }, delay);
-      timersRef.current.push(timer);
+    if (delayTimerRef.current) {
+      clearTimeout(delayTimerRef.current);
+      delayTimerRef.current = null;
     }
 
-    const pollTimer = setInterval(checkAndShowReminders, 60000);
-    timersRef.current.push(pollTimer);
+    const delay = getNextReminderDelay(adoptionRecords);
+    if (delay !== null && delay > 0) {
+      delayTimerRef.current = setTimeout(() => {
+        checkAndShowReminders();
+      }, delay);
+    }
 
-    return clearAllTimers;
-  }, [adoptionRecords, checkAndShowReminders, clearAllTimers]);
-
-  const handleDismiss = (recordId: string) => {
-    setDismissedIds(prev => new Set(prev).add(recordId));
-    setVisibleReminders(prev => prev.filter(r => r.record.id !== recordId));
-  };
-
-  useEffect(() => {
-    const autoHideTimers: ReturnType<typeof setTimeout>[] = [];
-
-    for (const reminder of visibleReminders) {
-      const timer = setTimeout(() => {
-        handleDismiss(reminder.record.id);
-      }, 5000);
-      autoHideTimers.push(timer);
+    if (!intervalRef.current) {
+      intervalRef.current = setInterval(checkAndShowReminders, 60000);
     }
 
     return () => {
-      autoHideTimers.forEach(t => clearTimeout(t));
+      if (delayTimerRef.current) {
+        clearTimeout(delayTimerRef.current);
+        delayTimerRef.current = null;
+      }
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
     };
-  }, [visibleReminders]);
+  }, [adoptionRecords, checkAndShowReminders]);
 
   if (visibleReminders.length === 0) return null;
 

@@ -138,7 +138,7 @@ body {
 }
 
 .pet-card {
-  width: 260px;
+  width: clamp(220px, 22vw, 280px);
   min-width: 0;
   background: var(--white);
   border-radius: var(--card-radius);
@@ -172,17 +172,23 @@ body {
   object-fit: cover;
 }
 
+@media (max-width: 768px) {
+  .pet-card-image {
+    aspect-ratio: 16 / 9;
+  }
+}
+
 .image-nav {
   position: absolute;
   top: 50%;
   transform: translateY(-50%);
-  width: 32px;
-  height: 32px;
+  width: clamp(28px, 2.5vw, 36px);
+  height: clamp(28px, 2.5vw, 36px);
   border-radius: 50%;
   background: rgba(255,255,255,0.9);
   border: none;
   cursor: pointer;
-  font-size: 20px;
+  font-size: clamp(16px, 1.5vw, 22px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -190,26 +196,26 @@ body {
 }
 
 .image-nav.prev {
-  left: 8px;
+  left: clamp(6px, 0.6vw, 10px);
 }
 
 .image-nav.next {
-  right: 8px;
+  right: clamp(6px, 0.6vw, 10px);
 }
 
 .image-indicators {
   position: absolute;
-  bottom: 8px;
+  bottom: clamp(6px, 0.8vw, 10px);
   left: 50%;
   transform: translateX(-50%);
   display: flex;
-  gap: 6px;
+  gap: clamp(4px, 0.5vw, 8px);
   z-index: 2;
 }
 
 .indicator {
-  width: 6px;
-  height: 6px;
+  width: clamp(5px, 0.5vw, 7px);
+  height: clamp(5px, 0.5vw, 7px);
   border-radius: 50%;
   background: rgba(255,255,255,0.5);
   transition: all 0.2s;
@@ -217,62 +223,62 @@ body {
 
 .indicator.active {
   background: var(--white);
-  width: 16px;
+  width: clamp(12px, 1.5vw, 20px);
   border-radius: 3px;
 }
 
 .pet-card-content {
-  padding: 16px;
+  padding: clamp(12px, 1.5vw, 20px);
 }
 
 .pet-card-header {
   display: flex;
   justify-content: space-between;
   align-items: baseline;
-  margin-bottom: 4px;
+  margin-bottom: clamp(2px, 0.3vw, 6px);
 }
 
 .pet-name {
-  font-size: 18px;
+  font-size: clamp(15px, 1.5vw, 20px);
   font-weight: 700;
 }
 
 .pet-age {
-  font-size: 14px;
+  font-size: clamp(12px, 1.1vw, 15px);
   color: var(--text-light);
 }
 
 .pet-breed {
-  font-size: 14px;
+  font-size: clamp(12px, 1.1vw, 15px);
   color: var(--text-light);
-  margin-bottom: 12px;
+  margin-bottom: clamp(8px, 1vw, 14px);
 }
 
 .pet-tags {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
-  margin-bottom: 12px;
+  gap: clamp(4px, 0.5vw, 8px);
+  margin-bottom: clamp(8px, 1vw, 14px);
 }
 
 .tag {
-  padding: 4px 12px;
+  padding: clamp(3px, 0.4vw, 5px) clamp(8px, 1vw, 14px);
   background: #FFF4E6;
   color: var(--primary-color);
   border-radius: 8px;
-  font-size: 12px;
+  font-size: clamp(10px, 1vw, 13px);
   font-weight: 500;
 }
 
 .apply-btn {
   width: 100%;
-  padding: 10px;
+  padding: clamp(8px, 1vw, 12px);
   background: var(--primary-color);
   color: var(--white);
   border: none;
   border-radius: var(--border-radius);
   cursor: pointer;
-  font-size: 14px;
+  font-size: clamp(12px, 1.1vw, 15px);
   font-weight: 500;
   transition: background 0.2s;
 }
@@ -296,10 +302,11 @@ body {
   transition: background 0.3s ease-out, backdrop-filter 0.3s ease-out;
 }
 
-.detail-overlay-visible {
+.detail-overlay-open {
   background: rgba(0,0,0,0.5);
   backdrop-filter: blur(10px);
   pointer-events: auto;
+  opacity: 1;
 }
 
 .detail-panel {
@@ -313,7 +320,7 @@ body {
   transition: transform 0.3s ease-out;
 }
 
-.detail-panel-visible {
+.detail-panel-open {
   transform: translateX(0);
 }
 

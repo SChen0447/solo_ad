@@ -8,7 +8,7 @@ interface VirtualScrollOptions {
 }
 
 interface VirtualScrollResult {
-  containerRef: React.RefObject<HTMLDivElement | null>;
+  containerRef: React.RefObject<HTMLDivElement>;
   visibleItems: number[];
   offsetY: number;
   totalHeight: number;
@@ -22,16 +22,27 @@ export function useVirtualScroll({
   columns,
   overscan = 3
 }: VirtualScrollOptions): VirtualScrollResult {
-  const containerRef = useRef<HTMLDivElement | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const [scrollTop, setScrollTop] = useState(0);
   const [containerHeight, setContainerHeight] = useState(0);
+  const rafIdRef = useRef<number | null>(null);
+  const lastScrollTopRef = useRef(0);
+
+  const updateScrollTop = useCallback((newScrollTop: number) => {
+    if (rafIdRef.current !== null) return;
+    lastScrollTopRef.current = newScrollTop;
+    rafIdRef.current = requestAnimationFrame(() => {
+      setScrollTop(lastScrollTopRef.current);
+      rafIdRef.current = null;
+    });
+  }, []);
 
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
 
     const handleScroll = () => {
-      setScrollTop(el.scrollTop);
+      updateScrollTop(el.scrollTop);
     };
 
     const resizeObserver = new ResizeObserver((entries) => {
@@ -47,8 +58,12 @@ export function useVirtualScroll({
     return () => {
       el.removeEventListener('scroll', handleScroll);
       resizeObserver.disconnect();
+      if (rafIdRef.current !== null) {
+        cancelAnimationFrame(rafIdRef.current);
+        rafIdRef.current = null;
+      }
     };
-  }, []);
+  }, [updateScrollTop]);
 
   const rowCount = Math.ceil(itemCount / columns);
   const rowHeight = itemHeight;
@@ -79,7 +94,8 @@ export function useVirtualScroll({
     totalHeight,
     containerStyle: {
       overflowY: 'auto',
-      position: 'relative' as const
+      position: 'relative' as const,
+      willChange: 'transform'
     },
     contentStyle: {
       position: 'relative' as const,
