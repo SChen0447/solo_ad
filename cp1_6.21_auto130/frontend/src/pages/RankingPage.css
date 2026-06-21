@@ -1,0 +1,249 @@
+.ranking-page {
+  animation: fadeIn 0.4s ease;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.page-header {
+  margin-bottom: 24px;
+}
+
+.page-title {
+  font-size: 28px;
+  font-weight: 700;
+  color: #fff;
+  margin-bottom: 8px;
+}
+
+.page-subtitle {
+  font-size: 15px;
+  color: #94a3b8;
+}
+
+.ranking-header-card {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 24px;
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.2) 0%, rgba(139, 92, 246, 0.2) 100%);
+  border: 1px solid rgba(99, 102, 241, 0.3);
+  border-radius: 16px;
+  margin-bottom: 28px;
+}
+
+.ranking-header-icon {
+  width: 64px;
+  height: 64px;
+  border-radius: 16px;
+  background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+}
+
+.ranking-header-info h2 {
+  font-size: 20px;
+  font-weight: 600;
+  color: #fff;
+  margin-bottom: 4px;
+}
+
+.ranking-header-info p {
+  font-size: 14px;
+  color: #94a3b8;
+}
+
+.ranking-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.ranking-item {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 16px 20px;
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border-left: 4px solid transparent;
+}
+
+.ranking-item:hover {
+  background: rgba(255, 255, 255, 0.1);
+  transform: translateX(4px);
+}
+
+.ranking-item.gold {
+  border-left-color: #fbbf24;
+  background: linear-gradient(90deg, rgba(251, 191, 36, 0.1) 0%, rgba(255, 255, 255, 0.06) 100%);
+}
+
+.ranking-item.silver {
+  border-left-color: #94a3b8;
+  background: linear-gradient(90deg, rgba(148, 163, 184, 0.1) 0%, rgba(255, 255, 255, 0.06) 100%);
+}
+
+.ranking-item.bronze {
+  border-left-color: #f97316;
+  background: linear-gradient(90deg, rgba(249, 115, 22, 0.1) 0%, rgba(255, 255, 255, 0.06) 100%);
+}
+
+.ranking-rank {
+  width: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.rank-medal {
+  color: #64748b;
+}
+
+.rank-medal.gold {
+  color: #fbbf24;
+  filter: drop-shadow(0 2px 4px rgba(251, 191, 36, 0.4));
+}
+
+.rank-medal.silver {
+  color: #94a3b8;
+  filter: drop-shadow(0 2px 4px rgba(148, 163, 184, 0.4));
+}
+
+.rank-medal.bronze {
+  color: #f97316;
+  filter: drop-shadow(0 2px 4px rgba(249, 115, 22, 0.4));
+}
+
+.rank-number {
+  font-size: 18px;
+  font-weight: 700;
+  color: #64748b;
+}
+
+.ranking-cover {
+  width: 56px;
+  height: 76px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.9);
+  flex-shrink: 0;
+}
+
+.ranking-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.ranking-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #fff;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ranking-author {
+  font-size: 13px;
+  color: #94a3b8;
+}
+
+.ranking-meta {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.ranking-meta .meta-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: #64748b;
+}
+
+.ranking-meta .meta-item:nth-child(1) {
+  color: #fbbf24;
+}
+
+.ranking-meta .rating-value {
+  font-weight: 600;
+}
+
+.ranking-score {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.ranking-stars {
+  display: flex;
+  gap: 2px;
+}
+
+.ranking-star {
+  color: #334155;
+}
+
+.ranking-star.filled {
+  color: #fbbf24;
+}
+
+.score-text {
+  font-size: 18px;
+  font-weight: 700;
+  color: #fbbf24;
+}
+
+@media (max-width: 640px) {
+  .ranking-item {
+    padding: 12px 16px;
+    gap: 12px;
+  }
+
+  .ranking-rank {
+    width: 28px;
+  }
+
+  .rank-medal {
+    width: 20px;
+    height: 20px;
+  }
+
+  .ranking-cover {
+    width: 44px;
+    height: 60px;
+    font-size: 18px;
+  }
+
+  .ranking-meta {
+    gap: 10px;
+  }
+
+  .ranking-score {
+    display: none;
+  }
+}

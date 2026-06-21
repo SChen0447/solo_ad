@@ -1,0 +1,382 @@
+.loans-page {
+  animation: fadeIn 0.4s ease;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.page-header {
+  margin-bottom: 24px;
+}
+
+.page-title {
+  font-size: 28px;
+  font-weight: 700;
+  color: #fff;
+  margin-bottom: 8px;
+}
+
+.page-subtitle {
+  font-size: 15px;
+  color: #94a3b8;
+}
+
+.stats-cards {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  margin-bottom: 28px;
+}
+
+.stat-card {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 20px;
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 12px;
+  transition: all 0.2s ease;
+}
+
+.stat-card:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.stat-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.stat-icon.total {
+  background: rgba(99, 102, 241, 0.2);
+  color: #818cf8;
+}
+
+.stat-icon.borrowed {
+  background: rgba(59, 130, 246, 0.2);
+  color: #60a5fa;
+}
+
+.stat-icon.returned {
+  background: rgba(34, 197, 94, 0.2);
+  color: #4ade80;
+}
+
+.stat-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.stat-value {
+  font-size: 24px;
+  font-weight: 700;
+  color: #fff;
+}
+
+.stat-label {
+  font-size: 13px;
+  color: #94a3b8;
+}
+
+.tab-buttons {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 24px;
+}
+
+.tab-button {
+  padding: 8px 20px;
+  background: rgba(255, 255, 255, 0.06);
+  color: #94a3b8;
+  font-size: 14px;
+  font-weight: 500;
+  border-radius: 20px;
+  transition: all 0.2s ease;
+}
+
+.tab-button:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: #e2e8f0;
+}
+
+.tab-button.active {
+  background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+  color: #fff;
+}
+
+.tab-button:active {
+  transform: scale(0.95);
+}
+
+.loans-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.loan-card {
+  display: flex;
+  gap: 20px;
+  padding: 20px;
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 12px;
+  transition: all 0.2s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.loan-card:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.loan-card.overdue {
+  animation: pulseRed 2s ease-in-out infinite;
+}
+
+@keyframes pulseRed {
+  0%, 100% {
+    background: rgba(239, 68, 68, 0.08);
+    box-shadow: inset 0 0 0 1px rgba(239, 68, 68, 0.2);
+  }
+  50% {
+    background: rgba(239, 68, 68, 0.18);
+    box-shadow: inset 0 0 0 1px rgba(239, 68, 68, 0.4);
+  }
+}
+
+.loan-book-cover {
+  flex-shrink: 0;
+  width: 80px;
+  height: 110px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 32px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.9);
+  cursor: pointer;
+  transition: transform 0.2s ease;
+}
+
+.loan-book-cover:hover {
+  transform: scale(1.05);
+}
+
+.loan-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.loan-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.loan-title {
+  font-size: 17px;
+  font-weight: 600;
+  color: #fff;
+  cursor: pointer;
+  transition: color 0.2s ease;
+}
+
+.loan-title:hover {
+  color: #818cf8;
+}
+
+.status-badge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 500;
+  flex-shrink: 0;
+}
+
+.status-badge.borrowed {
+  background: rgba(59, 130, 246, 0.15);
+  color: #60a5fa;
+  border: 1px solid rgba(59, 130, 246, 0.3);
+}
+
+.status-badge.returned {
+  background: rgba(34, 197, 94, 0.15);
+  color: #4ade80;
+  border: 1px solid rgba(34, 197, 94, 0.3);
+}
+
+.status-badge.overdue {
+  background: rgba(239, 68, 68, 0.15);
+  color: #f87171;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.loan-author {
+  font-size: 13px;
+  color: #94a3b8;
+}
+
+.loan-dates {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-top: 4px;
+}
+
+.date-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: #64748b;
+}
+
+.days-remaining {
+  margin-top: 4px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #94a3b8;
+}
+
+.days-remaining.warning .warning-text {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: #f87171;
+}
+
+.loan-actions {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.return-button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 24px;
+  background: rgba(239, 68, 68, 0.15);
+  color: #f87171;
+  font-size: 14px;
+  font-weight: 500;
+  border-radius: 8px;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  transition: all 0.2s ease;
+}
+
+.return-button:hover:not(:disabled) {
+  background: rgba(239, 68, 68, 0.25);
+}
+
+.return-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.return-button:active:not(:disabled) {
+  transform: scale(0.95);
+}
+
+.primary-button {
+  padding: 10px 24px;
+  background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 500;
+  border-radius: 8px;
+  transition: all 0.2s ease;
+}
+
+.primary-button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4);
+}
+
+.primary-button:active {
+  transform: scale(0.95);
+}
+
+.primary-button.small {
+  padding: 8px 16px;
+  font-size: 13px;
+}
+
+.small-spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid currentColor;
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 20px;
+  gap: 16px;
+  color: #64748b;
+}
+
+.empty-state p {
+  font-size: 15px;
+}
+
+.empty-state .primary-button {
+  margin-top: 8px;
+}
+
+@media (max-width: 768px) {
+  .stats-cards {
+    grid-template-columns: 1fr;
+  }
+
+  .loan-card {
+    flex-direction: column;
+  }
+
+  .loan-book-cover {
+    width: 100%;
+    height: 140px;
+    font-size: 48px;
+  }
+
+  .loan-actions {
+    width: 100%;
+  }
+
+  .return-button,
+  .primary-button {
+    width: 100%;
+    justify-content: center;
+  }
+}
