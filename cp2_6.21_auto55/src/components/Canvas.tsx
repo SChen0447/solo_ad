@@ -60,6 +60,7 @@ const Canvas = forwardRef(function Canvas(props: CanvasProps, ref) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const previewCanvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const stickerRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   
   const [isDrawing, setIsDrawing] = useState(false);
   const [currentPath, setCurrentPath] = useState<Path | null>(null);
@@ -338,16 +339,24 @@ const Canvas = forwardRef(function Canvas(props: CanvasProps, ref) {
   };
 
   const handleMouseEnter = () => {
+    if (cursorFadeTimerRef.current) {
+      clearTimeout(cursorFadeTimerRef.current);
+      cursorFadeTimerRef.current = null;
+    }
     setCursorTipVisible(true);
     setCursorTipFading(false);
   };
 
   const handleMouseLeave = () => {
-    setCursorTipVisible(false);
-    setCursorTipFading(false);
     if (cursorFadeTimerRef.current) {
       clearTimeout(cursorFadeTimerRef.current);
     }
+    setCursorTipFading(true);
+    cursorFadeTimerRef.current = setTimeout(() => {
+      setCursorTipVisible(false);
+      setCursorTipFading(false);
+      cursorFadeTimerRef.current = null;
+    }, 100);
     if (isDrawing) {
       handleMouseUp();
     }
@@ -382,12 +391,14 @@ const Canvas = forwardRef(function Canvas(props: CanvasProps, ref) {
   const handleStickerMouseDown = (e: React.MouseEvent, sticker: StickerItem) => {
     e.stopPropagation();
     e.preventDefault();
-    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    const STICKER_SIZE = 40;
+    const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect();
     setDraggingSticker({
       id: sticker.id,
       offsetX: e.clientX - rect.left,
       offsetY: e.clientY - rect.top
     });
+    stickerRefs.current.set(sticker.id, e.currentTarget as HTMLDivElement);
   };
 
   useEffect(() => {
@@ -474,6 +485,13 @@ const Canvas = forwardRef(function Canvas(props: CanvasProps, ref) {
       {stickers.map(sticker => (
         <div
           key={sticker.id}
+          ref={(el) => {
+            if (el) {
+              stickerRefs.current.set(sticker.id, el);
+            } else {
+              stickerRefs.current.delete(sticker.id);
+            }
+          }}
           className={`sticker-item ${draggingSticker?.id === sticker.id ? 'dragging' : ''}`}
           style={{ left: sticker.x, top: sticker.y }}
           onMouseDown={(e) => handleStickerMouseDown(e, sticker)}

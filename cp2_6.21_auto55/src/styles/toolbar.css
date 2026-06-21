@@ -37,7 +37,8 @@
   width: 100%;
   aspect-ratio: 1;
   border-radius: 8px;
-  background-color: #F3F4F6;
+  background: #F3F4F6;
+  background-image: none;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -46,7 +47,8 @@
 }
 
 .tool-btn:hover {
-  background-color: #E5E7EB;
+  background: #E5E7EB;
+  background-image: none;
 }
 
 .tool-btn:active {

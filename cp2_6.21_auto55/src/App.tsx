@@ -139,7 +139,11 @@ function App() {
         setStickers(state.stickers || []);
         setHistoryIndex(state.historyIndex);
         setHistoryLength(state.historyLength);
-        setUndoRedoAnimating(false);
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            setUndoRedoAnimating(false);
+          });
+        });
       }, 250);
     });
 
@@ -151,7 +155,11 @@ function App() {
         setStickers(state.stickers || []);
         setHistoryIndex(state.historyIndex);
         setHistoryLength(state.historyLength);
-        setUndoRedoAnimating(false);
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            setUndoRedoAnimating(false);
+          });
+        });
       }, 250);
     });
 
@@ -263,19 +271,33 @@ function App() {
     });
 
     texts.forEach(textItem => {
-      ctx.font = `${textItem.fontSize}px sans-serif`;
+      ctx.font = `${textItem.fontSize}px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif`;
+      ctx.textBaseline = 'alphabetic';
       const metrics = ctx.measureText(textItem.text);
-      allX.push(textItem.x);
-      allX.push(textItem.x + metrics.width);
-      allY.push(textItem.y - textItem.fontSize);
-      allY.push(textItem.y);
+      
+      let xMin, xMax, yMin, yMax;
+      if ((metrics as any).actualBoundingBoxLeft !== undefined) {
+        xMin = textItem.x - (metrics as any).actualBoundingBoxLeft;
+        xMax = textItem.x + (metrics as any).actualBoundingBoxRight;
+        yMin = textItem.y - (metrics as any).actualBoundingBoxAscent;
+        yMax = textItem.y + (metrics as any).actualBoundingBoxDescent;
+      } else {
+        xMin = textItem.x;
+        xMax = textItem.x + metrics.width;
+        yMin = textItem.y - textItem.fontSize;
+        yMax = textItem.y;
+      }
+      allX.push(xMin, xMax);
+      allY.push(yMin, yMax);
     });
 
     stickers.forEach(sticker => {
-      allX.push(sticker.x);
-      allX.push(sticker.x + 40);
-      allY.push(sticker.y);
-      allY.push(sticker.y + 40);
+      const stickerSize = 40;
+      const stickerPadding = 4;
+      allX.push(sticker.x - stickerPadding);
+      allX.push(sticker.x + stickerSize + stickerPadding);
+      allY.push(sticker.y - stickerPadding);
+      allY.push(sticker.y + stickerSize + stickerPadding);
     });
 
     const padding = 20;
@@ -336,7 +358,7 @@ function App() {
 
     texts.forEach(textItem => {
       ctx.fillStyle = textItem.color;
-      ctx.font = `${textItem.fontSize}px sans-serif`;
+      ctx.font = `${textItem.fontSize}px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif`;
       ctx.fillText(textItem.text, textItem.x, textItem.y);
     });
 
