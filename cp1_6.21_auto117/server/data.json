@@ -1,0 +1,198 @@
+{
+  "wordbanks": [
+    {
+      "id": "wb-demo-1",
+      "name": "初中基础词汇(第一册)",
+      "description": "适合七年级学生的英语基础词汇",
+      "words": [
+        {
+          "id": "w-001",
+          "english": "apple",
+          "chinese": "苹果",
+          "example": "I eat an apple every day.",
+          "partOfSpeech": "noun",
+          "createdAt": "2025-01-01T00:00:00.000Z"
+        },
+        {
+          "id": "w-002",
+          "english": "book",
+          "chinese": "书",
+          "example": "This is an interesting book.",
+          "partOfSpeech": "noun",
+          "createdAt": "2025-01-01T00:00:00.000Z"
+        },
+        {
+          "id": "w-003",
+          "english": "beautiful",
+          "chinese": "美丽的",
+          "example": "She is a beautiful girl.",
+          "partOfSpeech": "adjective",
+          "createdAt": "2025-01-01T00:00:00.000Z"
+        },
+        {
+          "id": "w-004",
+          "english": "run",
+          "chinese": "跑",
+          "example": "I run to school every morning.",
+          "partOfSpeech": "verb",
+          "createdAt": "2025-01-01T00:00:00.000Z"
+        },
+        {
+          "id": "w-005",
+          "english": "quickly",
+          "chinese": "快速地",
+          "example": "He runs very quickly.",
+          "partOfSpeech": "adverb",
+          "createdAt": "2025-01-01T00:00:00.000Z"
+        },
+        {
+          "id": "w-006",
+          "english": "happy",
+          "chinese": "快乐的",
+          "example": "I am happy today.",
+          "partOfSpeech": "adjective",
+          "createdAt": "2025-01-01T00:00:00.000Z"
+        },
+        {
+          "id": "w-007",
+          "english": "teacher",
+          "chinese": "老师",
+          "example": "My teacher is very kind.",
+          "partOfSpeech": "noun",
+          "createdAt": "2025-01-01T00:00:00.000Z"
+        },
+        {
+          "id": "w-008",
+          "english": "study",
+          "chinese": "学习",
+          "example": "I study English every day.",
+          "partOfSpeech": "verb",
+          "createdAt": "2025-01-01T00:00:00.000Z"
+        },
+        {
+          "id": "w-009",
+          "english": "water",
+          "chinese": "水",
+          "example": "Please give me some water.",
+          "partOfSpeech": "noun",
+          "createdAt": "2025-01-01T00:00:00.000Z"
+        },
+        {
+          "id": "w-010",
+          "english": "friend",
+          "chinese": "朋友",
+          "example": "He is my best friend.",
+          "partOfSpeech": "noun",
+          "createdAt": "2025-01-01T00:00:00.000Z"
+        },
+        {
+          "id": "w-011",
+          "english": "school",
+          "chinese": "学校",
+          "example": "Our school is very big.",
+          "partOfSpeech": "noun",
+          "createdAt": "2025-01-01T00:00:00.000Z"
+        },
+        {
+          "id": "w-012",
+          "english": "listen",
+          "chinese": "听",
+          "example": "Listen to the teacher carefully.",
+          "partOfSpeech": "verb",
+          "createdAt": "2025-01-01T00:00:00.000Z"
+        }
+      ],
+      "createdAt": "2025-01-01T00:00:00.000Z"
+    },
+    {
+      "id": "wb-demo-2",
+      "name": "高中高频动词",
+      "description": "高考英语高频动词汇总",
+      "words": [
+        {
+          "id": "w-101",
+          "english": "achieve",
+          "chinese": "实现；达到",
+          "example": "We achieved our goal.",
+          "partOfSpeech": "verb",
+          "createdAt": "2025-01-01T00:00:00.000Z"
+        },
+        {
+          "id": "w-102",
+          "english": "believe",
+          "chinese": "相信",
+          "example": "I believe in you.",
+          "partOfSpeech": "verb",
+          "createdAt": "2025-01-01T00:00:00.000Z"
+        },
+        {
+          "id": "w-103",
+          "english": "consider",
+          "chinese": "考虑；认为",
+          "example": "Please consider my suggestion.",
+          "partOfSpeech": "verb",
+          "createdAt": "2025-01-01T00:00:00.000Z"
+        },
+        {
+          "id": "w-104",
+          "english": "develop",
+          "chinese": "发展；开发",
+          "example": "We need to develop new skills.",
+          "partOfSpeech": "verb",
+          "createdAt": "2025-01-01T00:00:00.000Z"
+        },
+        {
+          "id": "w-105",
+          "english": "experience",
+          "chinese": "经历；经验",
+          "example": "It was a great experience.",
+          "partOfSpeech": "noun",
+          "createdAt": "2025-01-01T00:00:00.000Z"
+        },
+        {
+          "id": "w-106",
+          "english": "important",
+          "chinese": "重要的",
+          "example": "This is very important.",
+          "partOfSpeech": "adjective",
+          "createdAt": "2025-01-01T00:00:00.000Z"
+        },
+        {
+          "id": "w-107",
+          "english": "knowledge",
+          "chinese": "知识",
+          "example": "Knowledge is power.",
+          "partOfSpeech": "noun",
+          "createdAt": "2025-01-01T00:00:00.000Z"
+        },
+        {
+          "id": "w-108",
+          "english": "opportunity",
+          "chinese": "机会",
+          "example": "This is a great opportunity.",
+          "partOfSpeech": "noun",
+          "createdAt": "2025-01-01T00:00:00.000Z"
+        },
+        {
+          "id": "w-109",
+          "english": "provide",
+          "chinese": "提供",
+          "example": "They provide food for us.",
+          "partOfSpeech": "verb",
+          "createdAt": "2025-01-01T00:00:00.000Z"
+        },
+        {
+          "id": "w-110",
+          "english": "success",
+          "chinese": "成功",
+          "example": "Hard work leads to success.",
+          "partOfSpeech": "noun",
+          "createdAt": "2025-01-01T00:00:00.000Z"
+        }
+      ],
+      "createdAt": "2025-01-02T00:00:00.000Z"
+    }
+  ],
+  "tests": [],
+  "submissions": []
+}
