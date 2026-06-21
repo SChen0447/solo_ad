@@ -1,12 +1,12 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import type { Card, Rarity } from './types'
-import { getCards, addCard } from './api'
+import { getAllCards, addCard } from './api'
 import { RARITY_COLORS, RARITY_NAMES } from './types'
 
 interface CardGridProps {
   selectedCards?: string[]
   onCardSelect?: (card: Card) => void
-  maxSelectable?: boolean
+  selectable?: boolean
   showAddForm?: boolean
 }
 
@@ -15,12 +15,13 @@ export default function CardGrid({
   onCardSelect,
   selectable = false,
   showAddForm = true
-}: CardGridProps & { selectable?: boolean }) {
-  const [cards, setCards] = useState<Card[]>([])
-  const [total, setTotal] = useState(0)
-  const [page, setPage] = useState(1)
+}: CardGridProps) {
+  const [allCards, setAllCards] = useState<Card[]>([])
   const [loading, setLoading] = useState(false)
   const [showForm, setShowForm] = useState(false)
+  const [page, setPage] = useState(1)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [rarityFilter, setRarityFilter] = useState<string>('all')
   const [newCard, setNewCard] = useState({
     name: '',
     rarity: 'common' as Rarity,
@@ -31,22 +32,41 @@ export default function CardGrid({
 
   const pageSize = 24
 
-  const fetchCards = useCallback(async () => {
-    setLoading(true)
-    try {
-      const data = await getCards(page, pageSize)
-      setCards(data.cards)
-      setTotal(data.total)
-    } catch (e) {
-      console.error('Failed to fetch cards:', e)
-    } finally {
-      setLoading(false)
+  useEffect(() => {
+    const fetchAll = async () => {
+      setLoading(true)
+      try {
+        const data = await getAllCards()
+        setAllCards(data.cards)
+      } catch (e) {
+        console.error('Failed to fetch cards:', e)
+      } finally {
+        setLoading(false)
+      }
     }
-  }, [page])
+    fetchAll()
+  }, [])
+
+  const filteredCards = useMemo(() => {
+    return allCards.filter(card => {
+      const matchesSearch = card.name.toLowerCase().includes(searchQuery.toLowerCase())
+      const matchesRarity = rarityFilter === 'all' || card.rarity === rarityFilter
+      return matchesSearch && matchesRarity
+    })
+  }, [allCards, searchQuery, rarityFilter])
 
   useEffect(() => {
-    fetchCards()
-  }, [fetchCards])
+    setPage(1)
+  }, [searchQuery, rarityFilter])
+
+  const paginatedCards = useMemo(() => {
+    const start = (page - 1) * pageSize
+    const end = start + pageSize
+    return filteredCards.slice(start, end)
+  }, [filteredCards, page])
+
+  const total = filteredCards.length
+  const totalPages = Math.ceil(total / pageSize)
 
   const handleAddCard = async () => {
     if (!newCard.name.trim()) return
@@ -58,16 +78,13 @@ export default function CardGrid({
         defense: newCard.defense,
         imageUrl: newCard.imageUrl || undefined
       } as Omit<Card, 'id'>)
-      setCards(prev => [...prev, card])
-      setTotal(prev => prev + 1)
+      setAllCards(prev => [...prev, card])
       setNewCard({ name: '', rarity: 'common', attack: 3, defense: 3, imageUrl: '' })
       setShowForm(false)
     } catch (e) {
       console.error('Failed to add card:', e)
     }
   }
-
-  const totalPages = Math.ceil(total / pageSize)
 
   const handlePageChange = (newPage: number) => {
     if (newPage >= 1 && newPage <= totalPages) {
@@ -105,7 +122,7 @@ export default function CardGrid({
           />
           <select
             value={newCard.rarity}
-            onChange={e => setNewCard(prev => ({ ...prev, rarity: e.target.value as Rarity })}
+            onChange={e => setNewCard(prev => ({ ...prev, rarity: e.target.value as Rarity }))}
             className="form-select"
           >
             <option value="common">普通</option>
@@ -146,11 +163,58 @@ export default function CardGrid({
         </div>
       )}
 
+      <div className="search-filter-bar">
+        <div className="search-input-wrapper">
+          <span className="search-icon">🔍</span>
+          <input
+            type="text"
+            placeholder="搜索卡牌名称..."
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            className="search-input"
+          />
+          {searchQuery && (
+            <button 
+              className="clear-search" 
+              onClick={() => setSearchQuery('')}
+              aria-label="清除搜索"
+            >
+              ✕
+            </button>
+          )}
+        </div>
+        <select
+          value={rarityFilter}
+          onChange={e => setRarityFilter(e.target.value)}
+          className="rarity-filter"
+        >
+          <option value="all">全部稀有度</option>
+          <option value="common">普通</option>
+          <option value="rare">稀有</option>
+          <option value="epic">史诗</option>
+          <option value="legendary">传说</option>
+        </select>
+      </div>
+
+      <div className="filter-info">
+        {searchQuery || rarityFilter !== 'all' ? (
+          <span>找到 <strong>{total}</strong> 张卡牌</span>
+        ) : (
+          <span>共 <strong>{total}</strong> 张卡牌</span>
+        )}
+      </div>
+
       {loading ? (
         <div className="loading">加载中...</div>
+      ) : paginatedCards.length === 0 ? (
+        <div className="empty-state">
+          <div className="empty-icon">🃏</div>
+          <div className="empty-text">没有找到匹配的卡牌</div>
+          <div className="empty-hint">试试其他搜索词或筛选条件</div>
+        </div>
       ) : (
         <div className="card-grid">
-          {cards.map(card => (
+          {paginatedCards.map(card => (
             <div
               key={card.id}
               className={`card-item ${isSelected(card.id) ? 'selected' : ''} ${selectable ? 'selectable' : ''}`}
@@ -288,10 +352,117 @@ export default function CardGrid({
           color: #E5E7EB;
           font-size: 14px;
         }
+        .search-filter-bar {
+          display: flex;
+          justify-content: center;
+          align-items: center;
+          gap: 16px;
+          margin-bottom: 12px;
+        }
+        .search-input-wrapper {
+          position: relative;
+          width: 300px;
+        }
+        .search-icon {
+          position: absolute;
+          left: 14px;
+          top: 50%;
+          transform: translateY(-50%);
+          font-size: 14px;
+          opacity: 0.6;
+          pointer-events: none;
+        }
+        .search-input {
+          width: 100%;
+          height: 42px;
+          padding: 0 40px 0 40px;
+          border-radius: 8px;
+          border: 1px solid #475569;
+          background: #1E293B;
+          color: #E5E7EB;
+          font-size: 14px;
+          transition: border-color 0.2s ease, box-shadow 0.2s ease;
+        }
+        .search-input::placeholder {
+          color: #64748B;
+        }
+        .search-input:focus {
+          outline: none;
+          border-color: #F59E0B;
+          box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.15);
+        }
+        .clear-search {
+          position: absolute;
+          right: 10px;
+          top: 50%;
+          transform: translateY(-50%);
+          width: 22px;
+          height: 22px;
+          border-radius: 50%;
+          background: #475569;
+          color: #E5E7EB;
+          font-size: 12px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 0;
+          transition: background 0.2s ease;
+        }
+        .clear-search:hover {
+          background: #64748B;
+        }
+        .rarity-filter {
+          width: 180px;
+          height: 42px;
+          padding: 0 14px;
+          border-radius: 8px;
+          border: 1px solid #475569;
+          background: #1E293B;
+          color: #E5E7EB;
+          font-size: 14px;
+          cursor: pointer;
+          transition: border-color 0.2s ease;
+        }
+        .rarity-filter:focus {
+          outline: none;
+          border-color: #F59E0B;
+        }
+        .rarity-filter option {
+          background: #1E293B;
+          color: #E5E7EB;
+        }
+        .filter-info {
+          text-align: center;
+          color: #9CA3AF;
+          font-size: 14px;
+          margin-bottom: 16px;
+        }
+        .filter-info strong {
+          color: #F59E0B;
+          font-weight: 600;
+        }
         .loading {
           text-align: center;
           padding: 40px;
           color: #9CA3AF;
+        }
+        .empty-state {
+          text-align: center;
+          padding: 60px 20px;
+        }
+        .empty-icon {
+          font-size: 48px;
+          margin-bottom: 16px;
+          opacity: 0.5;
+        }
+        .empty-text {
+          font-size: 18px;
+          color: #D1D5DB;
+          margin-bottom: 8px;
+        }
+        .empty-hint {
+          font-size: 14px;
+          color: #64748B;
         }
         .card-grid {
           display: grid;
@@ -400,6 +571,17 @@ export default function CardGrid({
         @media (max-width: 900px) {
           .card-grid {
             grid-template-columns: repeat(2, 200px);
+          }
+          .search-filter-bar {
+            flex-direction: column;
+          }
+          .search-input-wrapper {
+            width: 100%;
+            max-width: 300px;
+          }
+          .rarity-filter {
+            width: 100%;
+            max-width: 300px;
           }
         }
       `}</style>

@@ -133,13 +133,25 @@ app.get('/api/cards/all', (req, res) => {
   res.json({ cards, total: cards.length })
 })
 
-const PORT = 3001
+const PORT = 3002
+
+let serverInstance: any = null
 
 export function startServer() {
-  app.listen(PORT, () => {
+  if (serverInstance) {
+    return serverInstance
+  }
+  
+  serverInstance = app.listen(PORT, () => {
     console.log(`Backend server running on port ${PORT}`)
+  }).on('error', (err: any) => {
+    if (err.code === 'EADDRINUSE') {
+      console.log(`Port ${PORT} in use, server already running`)
+    } else {
+      console.error('Server error:', err)
+    }
   })
-  return app
+  return serverInstance
 }
 
 export default app
