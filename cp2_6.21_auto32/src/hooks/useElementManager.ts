@@ -71,6 +71,7 @@ interface ElementManagerActions {
   deleteElements: (ids: string[]) => void
   selectElement: (id: string, multi?: boolean) => void
   deselectAll: () => void
+  toggleElementLock: (id: string) => void
   alignSelected: (alignment: 'top' | 'bottom' | 'left' | 'right' | 'centerH' | 'centerV') => void
   undo: () => void
   redo: () => void
@@ -124,6 +125,7 @@ export const useElementManager = create<ElementManagerStore>((set, get) => ({
       borderWidth: defaults.borderWidth ?? 0,
       borderColor: defaults.borderColor ?? '#000000',
       borderRadius: defaults.borderRadius ?? 0,
+      locked: false,
       ...(defaults.text !== undefined ? { text: defaults.text } : {}),
       ...(defaults.fontSize !== undefined ? { fontSize: defaults.fontSize } : {}),
       ...(defaults.fontColor !== undefined ? { fontColor: defaults.fontColor } : {}),
@@ -175,26 +177,36 @@ export const useElementManager = create<ElementManagerStore>((set, get) => ({
 
   deselectAll: () => set({ selectedIds: [] }),
 
+  toggleElementLock: (id) => {
+    const state = get()
+    set({
+      elements: state.elements.map((el) =>
+        el.id === id ? { ...el, locked: !el.locked } : el
+      ),
+    })
+  },
+
   alignSelected: (alignment) => {
     const state = get()
     if (state.selectedIds.length < 2) return
-    const selected = state.elements.filter((el) =>
-      state.selectedIds.includes(el.id)
+    const selected = state.elements.filter(
+      (el) => state.selectedIds.includes(el.id) && !el.locked
     )
     if (selected.length < 2) return
     let updated = [...state.elements]
+    const alignableIds = new Set(selected.map((el) => el.id))
     switch (alignment) {
       case 'top': {
         const minY = Math.min(...selected.map((el) => el.y))
         updated = updated.map((el) =>
-          state.selectedIds.includes(el.id) ? { ...el, y: minY } : el
+          alignableIds.has(el.id) ? { ...el, y: minY } : el
         )
         break
       }
       case 'bottom': {
         const maxBottom = Math.max(...selected.map((el) => el.y + el.height))
         updated = updated.map((el) =>
-          state.selectedIds.includes(el.id)
+          alignableIds.has(el.id)
             ? { ...el, y: maxBottom - el.height }
             : el
         )
@@ -203,14 +215,14 @@ export const useElementManager = create<ElementManagerStore>((set, get) => ({
       case 'left': {
         const minX = Math.min(...selected.map((el) => el.x))
         updated = updated.map((el) =>
-          state.selectedIds.includes(el.id) ? { ...el, x: minX } : el
+          alignableIds.has(el.id) ? { ...el, x: minX } : el
         )
         break
       }
       case 'right': {
         const maxRight = Math.max(...selected.map((el) => el.x + el.width))
         updated = updated.map((el) =>
-          state.selectedIds.includes(el.id)
+          alignableIds.has(el.id)
             ? { ...el, x: maxRight - el.width }
             : el
         )
@@ -221,7 +233,7 @@ export const useElementManager = create<ElementManagerStore>((set, get) => ({
           selected.reduce((sum, el) => sum + el.x + el.width / 2, 0) /
           selected.length
         updated = updated.map((el) =>
-          state.selectedIds.includes(el.id)
+          alignableIds.has(el.id)
             ? { ...el, x: avgCenterX - el.width / 2 }
             : el
         )
@@ -232,7 +244,7 @@ export const useElementManager = create<ElementManagerStore>((set, get) => ({
           selected.reduce((sum, el) => sum + el.y + el.height / 2, 0) /
           selected.length
         updated = updated.map((el) =>
-          state.selectedIds.includes(el.id)
+          alignableIds.has(el.id)
             ? { ...el, y: avgCenterY - el.height / 2 }
             : el
         )

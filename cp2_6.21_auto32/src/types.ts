@@ -15,6 +15,7 @@ export interface CanvasElement {
   borderWidth: number
   borderColor: string
   borderRadius: number
+  locked: boolean
   text?: string
   fontSize?: number
   fontColor?: string
