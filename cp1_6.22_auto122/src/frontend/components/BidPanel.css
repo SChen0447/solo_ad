@@ -1,0 +1,351 @@
+.panel-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 998;
+  backdrop-filter: blur(2px);
+}
+
+.bid-panel {
+  position: fixed;
+  right: 0;
+  top: 64px;
+  bottom: 0;
+  width: 280px;
+  background: #111827;
+  border-left: 1px solid rgba(56, 189, 248, 0.15);
+  border-top-left-radius: 12px;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  background: rgba(17, 24, 39, 0.92);
+  z-index: 999;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  transition: transform 300ms ease-out;
+}
+
+.bid-panel.mobile-open {
+  transform: translateY(0);
+  top: auto;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  width: 100%;
+  height: 85vh;
+  border-radius: 20px 20px 0 0;
+  border-left: none;
+  border-top: 2px solid #38bdf8;
+}
+
+.bid-panel.mobile-closed {
+  transform: translateY(100%);
+  top: auto;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  width: 100%;
+  height: 85vh;
+}
+
+.bid-panel.desktop {
+  transform: translateX(0);
+}
+
+.panel-mobile-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.1);
+}
+
+.panel-mobile-header h3 {
+  margin: 0;
+  color: #f1f5f9;
+  font-size: 17px;
+}
+
+.panel-close {
+  background: rgba(148, 163, 184, 0.1);
+  border: none;
+  color: #94a3b8;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 16px;
+  transition: all 200ms;
+}
+
+.panel-close:hover {
+  background: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+}
+
+.panel-header {
+  padding: 18px 16px 12px 16px;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.08);
+}
+
+.bid-panel.mobile-open .panel-header,
+.bid-panel.mobile-closed .panel-header {
+  display: none;
+}
+
+.panel-title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.panel-icon {
+  font-size: 18px;
+}
+
+.panel-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: #f1f5f9;
+  letter-spacing: 0.5px;
+}
+
+.panel-count {
+  font-size: 12px;
+  color: #38bdf8;
+  font-weight: 500;
+}
+
+.panel-bids {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px 12px 4px 12px;
+}
+
+.panel-bids::-webkit-scrollbar {
+  width: 4px;
+}
+
+.panel-bids::-webkit-scrollbar-thumb {
+  background: rgba(56, 189, 248, 0.2);
+  border-radius: 4px;
+}
+
+.panel-empty {
+  text-align: center;
+  padding: 40px 16px;
+  color: #64748b;
+}
+
+.empty-icon {
+  font-size: 40px;
+  margin-bottom: 12px;
+}
+
+.empty-icon + p {
+  font-size: 14px;
+  color: #94a3b8;
+  margin: 0 0 6px 0;
+}
+
+.empty-tip {
+  font-size: 12px !important;
+  color: #475569;
+  margin: 0;
+}
+
+.panel-bid-item {
+  background: rgba(30, 41, 59, 0.6);
+  border-radius: 10px;
+  padding: 12px;
+  margin-bottom: 10px;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: all 200ms ease-out;
+  position: relative;
+}
+
+.panel-bid-item:hover {
+  background: rgba(56, 189, 248, 0.08);
+  border-color: rgba(56, 189, 248, 0.3);
+  transform: translateX(-2px);
+}
+
+.panel-bid-item.active {
+  border-color: #38bdf8;
+  background: rgba(56, 189, 248, 0.1);
+}
+
+.panel-bid-item.outbid {
+  background: rgba(239, 68, 68, 0.06);
+  border-color: rgba(239, 68, 68, 0.2);
+}
+
+.bid-item-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.bid-item-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: #e2e8f0;
+  flex: 1;
+  line-height: 1.4;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.outbid-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+  flex-shrink: 0;
+  animation: badgePulse 2s infinite;
+}
+
+@keyframes badgePulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
+.red-dot {
+  width: 6px;
+  height: 6px;
+  background: #ef4444;
+  border-radius: 50%;
+  display: inline-block;
+  box-shadow: 0 0 6px #ef4444;
+  animation: redDot 1s infinite;
+}
+
+@keyframes redDot {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.4); }
+}
+
+.leading-badge {
+  background: linear-gradient(135deg, #fbbf24, #f59e0b);
+  color: #0f172a;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.ended-badge {
+  background: rgba(100, 116, 139, 0.2);
+  color: #64748b;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.bid-item-stats {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.bid-price {
+  font-size: 13px;
+  font-weight: 700;
+  color: #38bdf8;
+  font-family: 'SF Mono', monospace;
+}
+
+.bid-time {
+  font-size: 11px;
+  color: #94a3b8;
+  font-family: 'SF Mono', monospace;
+  background: rgba(148, 163, 184, 0.08);
+  padding: 3px 8px;
+  border-radius: 6px;
+}
+
+.bid-time.urgent {
+  color: #ef4444;
+  background: rgba(239, 68, 68, 0.1);
+  animation: urgentPulse 1.5s infinite;
+}
+
+@keyframes urgentPulse {
+  0%, 100% { box-shadow: 0 0 6px rgba(239, 68, 68, 0.2); }
+  50% { box-shadow: 0 0 12px rgba(239, 68, 68, 0.5); }
+}
+
+.panel-strategy {
+  margin: 0 12px 12px 12px;
+  padding: 14px;
+  background: linear-gradient(135deg, rgba(251, 191, 36, 0.08), rgba(139, 92, 246, 0.08));
+  border-radius: 10px;
+  border: 1px solid rgba(251, 191, 36, 0.2);
+}
+
+.strategy-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.strategy-icon {
+  font-size: 15px;
+}
+
+.strategy-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: #fbbf24;
+}
+
+.strategy-tips {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.strategy-tip {
+  margin: 0;
+  font-size: 12px;
+  color: #e2e8f0;
+  line-height: 1.6;
+  padding: 8px 10px;
+  background: rgba(15, 23, 42, 0.5);
+  border-radius: 6px;
+  border-left: 3px solid #fbbf24;
+}
+
+@media (max-width: 1024px) {
+  .bid-panel {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    width: 100%;
+    height: 85vh;
+    border-radius: 20px 20px 0 0;
+    border-left: none;
+    border-top: 2px solid #38bdf8;
+    top: auto;
+  }
+}
