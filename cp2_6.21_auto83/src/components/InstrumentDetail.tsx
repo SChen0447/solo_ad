@@ -73,20 +73,22 @@ function InstrumentDetail() {
       ) / 10
     : 0;
 
+  const switchImage = (index: number) => {
+    if (!instrument || index < 0 || index >= instrument.images.length) return;
+    setCurrentImageIndex(index);
+    setImageKey((prev) => prev + 1);
+  };
+
   const handlePrevImage = () => {
     if (!instrument) return;
-    setCurrentImageIndex((prev) =>
-      prev === 0 ? instrument.images.length - 1 : prev - 1
-    );
-    setImageKey((prev) => prev + 1);
+    const prevIndex = currentImageIndex === 0 ? instrument.images.length - 1 : currentImageIndex - 1;
+    switchImage(prevIndex);
   };
 
   const handleNextImage = () => {
     if (!instrument) return;
-    setCurrentImageIndex((prev) =>
-      prev === instrument.images.length - 1 ? 0 : prev + 1
-    );
-    setImageKey((prev) => prev + 1);
+    const nextIndex = currentImageIndex === instrument.images.length - 1 ? 0 : currentImageIndex + 1;
+    switchImage(nextIndex);
   };
 
   const handleEvaluationSubmit = (newEvaluation: Evaluation) => {
@@ -123,7 +125,7 @@ function InstrumentDetail() {
             <img
               key={imageKey}
               src={instrument.images[currentImageIndex]}
-              alt={instrument.name}
+              alt={`${instrument.name} - 图${currentImageIndex + 1}`}
               className="carousel-image"
             />
             {instrument.images.length > 1 && (
@@ -131,32 +133,45 @@ function InstrumentDetail() {
                 <button
                   className="carousel-btn prev"
                   onClick={handlePrevImage}
+                  aria-label="上一张"
                 >
                   ‹
                 </button>
                 <button
                   className="carousel-btn next"
                   onClick={handleNextImage}
+                  aria-label="下一张"
                 >
                   ›
                 </button>
               </>
             )}
+            {instrument.images.length > 1 && (
+              <div className="carousel-dots">
+                {instrument.images.map((_, index) => (
+                  <button
+                    key={index}
+                    className={`carousel-dot ${index === currentImageIndex ? 'active' : ''}`}
+                    onClick={() => switchImage(index)}
+                    aria-label={`切换到第${index + 1}张图`}
+                  />
+                ))}
+              </div>
+            )}
           </div>
-          <div className="thumbnail-list">
-            {instrument.images.map((img, index) => (
-              <img
-                key={index}
-                src={img}
-                alt={`${instrument.name} ${index + 1}`}
-                className={`thumbnail ${index === currentImageIndex ? 'active' : ''}`}
-                onClick={() => {
-                  setCurrentImageIndex(index);
-                  setImageKey((prev) => prev + 1);
-                }}
-              />
-            ))}
-          </div>
+          {instrument.images.length > 1 && (
+            <div className="thumbnail-list">
+              {instrument.images.map((img, index) => (
+                <img
+                  key={index}
+                  src={img}
+                  alt={`${instrument.name} 缩略图${index + 1}`}
+                  className={`thumbnail ${index === currentImageIndex ? 'active' : ''}`}
+                  onClick={() => switchImage(index)}
+                />
+              ))}
+            </div>
+          )}
         </div>
 
         <div className="detail-info">
