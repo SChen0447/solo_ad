@@ -1,23 +1,23 @@
-import { defineConfig, loadEnv } from 'vite';
+import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
-import { fileURLToPath } from 'url';
+import { fileURLToPath, pathToFileURL } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 function expressBackendPlugin() {
-  let serverInstance = null;
   return {
     name: 'vite-plugin-express-backend',
     async configureServer(server) {
       const esbuild = await import('esbuild');
       const fs = await import('fs');
-      const os = await import('os');
 
+      const outDir = path.resolve(__dirname, '.vite-dev');
+      if (!fs.existsSync(outDir)) {
+        fs.mkdirSync(outDir, { recursive: true });
+      }
       const tmpFile = path.join(
-        os.tmpdir(),
-        `vite-express-server-${Date.now()}.mjs`
-      );
+        outDir, `server.mjs`);
 
       await esbuild.build({
         entryPoints: [path.resolve(__dirname, 'src/backend/server.ts')],
@@ -31,15 +31,10 @@ function expressBackendPlugin() {
         },
       });
 
-      const { default: app } = await import(tmpFile + '?t=' + Date.now());
+      const fileUrl = pathToFileURL(tmpFile).href + `?t=${Date.now()}`;
+      const { default: app } = await import(fileUrl);
       server.middlewares.use('/api', (req, res, next) => {
         app(req, res, next);
-      });
-
-      server.httpServer?.on('close', () => {
-        try {
-          fs.unlinkSync(tmpFile);
-        } catch (_) {}
       });
 
       console.log('\n✅  Express API 已挂载到 Vite 开发服务器');

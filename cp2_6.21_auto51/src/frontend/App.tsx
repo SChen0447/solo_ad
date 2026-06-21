@@ -1,6 +1,6 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import WorksGallery from './WorksGallery';
-import type { Work, Order, MaterialRecommendation } from '../shared/types';
+import type { Work, Order, MaterialRecommendation, ComboItem } from '../shared/types';
 import { fetchWorks, fetchOrders, createOrder } from './api/MaterialAPI';
 import './styles.css';
 
@@ -68,10 +68,13 @@ export default function App() {
   const [notification, setNotification] = useState<string | null>(null);
   const [notificationFading, setNotificationFading] = useState(false);
 
+  const [comboItems, setComboItems] = useState<ComboItem[]>([]);
+
   const [bookingModal, setBookingModal] = useState<{
     open: boolean;
     pack: MaterialRecommendation | null;
-  }>({ open: false, pack: null });
+    isComboCheckout: boolean;
+  }>({ open: false, pack: null, isComboCheckout: false });
   const [bookingForm, setBookingForm] = useState<BookingFormData>({
     customerName: '',
     customerPhone: '',
@@ -90,6 +93,12 @@ export default function App() {
   }, []);
 
   const allTags = Array.from(new Set(works.flatMap((w) => w.tags)));
+  const comboItemIds = useMemo(() => comboItems.map((c) => c.packId), [comboItems]);
+  const comboSummary = useMemo(() => {
+    const totalQty = comboItems.reduce((sum, c) => sum + c.quantity, 0);
+    const totalPrice = comboItems.reduce((sum, c) => sum + c.price * c.quantity, 0);
+    return { totalQty, totalPrice };
+  }, [comboItems]);
 
   const showNotification = useCallback((message: string) => {
     setNotification(message);
@@ -108,9 +117,84 @@ export default function App() {
   }, []);
 
   const handleBookMaterial = useCallback((pack: MaterialRecommendation) => {
-    setBookingModal({ open: true, pack });
+    setBookingModal({ open: true, pack, isComboCheckout: false });
     setBookingForm({ customerName: '', customerPhone: '', quantity: 1 });
   }, []);
+
+  const handleAddToCombo = useCallback((pack: MaterialRecommendation) => {
+    setComboItems((prev) => {
+      const existing = prev.find((c) => c.packId === pack.id);
+      if (existing) {
+        return prev.filter((c) => c.packId !== pack.id);
+      }
+      const newItem: ComboItem = {
+        packId: pack.id,
+        packName: pack.name,
+        price: pack.price,
+        quantity: 1,
+        recommendReason: pack.recommendReason,
+      };
+      showNotification(`已将「${pack.name}」加入搭配清单`);
+      return [...prev, newItem];
+    });
+  }, [showNotification]);
+
+  const handleOneClickCombo = useCallback((packs: MaterialRecommendation[]) => {
+    setComboItems((prev) => {
+      const existingIds = new Set(prev.map((c) => c.packId));
+      const newItems: ComboItem[] = packs
+        .filter((p) => !existingIds.has(p.id))
+        .map((pack) => ({
+          packId: pack.id,
+          packName: pack.name,
+          price: pack.price,
+          quantity: 1,
+          recommendReason: pack.recommendReason,
+        }));
+      if (newItems.length > 0) {
+        showNotification(`已一键搭配 ${newItems.length} 个材料包`);
+      } else {
+        showNotification('推荐材料包均已在搭配清单中');
+      }
+      return [...prev, ...newItems];
+    });
+  }, [showNotification]);
+
+  const handleRemoveFromCombo = (packId: string) => {
+    setComboItems((prev) => prev.filter((c) => c.packId !== packId));
+  };
+
+  const handleUpdateComboQty = (packId: string, delta: number) => {
+    setComboItems((prev) =>
+      prev.map((c) =>
+        c.packId === packId
+          ? { ...c, quantity: Math.max(1, c.quantity + delta) }
+          : c
+      )
+    );
+  };
+
+  const handleClearCombo = () => {
+    setComboItems([]);
+    showNotification('搭配清单已清空');
+  };
+
+  const handleCheckoutCombo = () => {
+    if (comboItems.length === 0) return;
+    const totalQty = comboSummary.totalQty;
+    const totalPrice = comboSummary.totalPrice;
+    const firstPack: MaterialRecommendation = {
+      id: comboItems[0].packId,
+      name: `搭配组合（${comboItems.length}件）`,
+      price: totalPrice,
+      components: comboItems.map((c) => `${c.packName} x${c.quantity}`),
+      tagList: [],
+      matchScore: 100,
+      recommendReason: `包含${comboItems.length}个材料包，共${totalQty}件`,
+    };
+    setBookingModal({ open: true, pack: firstPack, isComboCheckout: true });
+    setBookingForm({ customerName: '', customerPhone: '', quantity: 1 });
+  };
 
   const handleSubmitBooking = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -118,15 +202,32 @@ export default function App() {
 
     setBookingSubmitting(true);
     try {
-      const newOrder = await createOrder({
-        materialPackId: bookingModal.pack.id,
-        quantity: bookingForm.quantity,
-        customerName: bookingForm.customerName,
-        customerPhone: bookingForm.customerPhone,
-      });
-      setOrders((prev) => [newOrder, ...prev]);
-      setBookingModal({ open: false, pack: null });
-      showNotification('您的订单已提交，预计3个工作日内联系');
+      if (bookingModal.isComboCheckout) {
+        const results = await Promise.all(
+          comboItems.map((item) =>
+            createOrder({
+              materialPackId: item.packId,
+              quantity: item.quantity,
+              customerName: bookingForm.customerName,
+              customerPhone: bookingForm.customerPhone,
+            })
+          )
+        );
+        setOrders((prev) => [...results, ...prev]);
+        setComboItems([]);
+        setBookingModal({ open: false, pack: null, isComboCheckout: false });
+        showNotification(`搭配订单已提交，共 ${results.length} 个材料包，预计3个工作日内联系`);
+      } else {
+        const newOrder = await createOrder({
+          materialPackId: bookingModal.pack.id,
+          quantity: bookingForm.quantity,
+          customerName: bookingForm.customerName,
+          customerPhone: bookingForm.customerPhone,
+        });
+        setOrders((prev) => [newOrder, ...prev]);
+        setBookingModal({ open: false, pack: null, isComboCheckout: false });
+        showNotification('您的订单已提交，预计3个工作日内联系');
+      }
     } catch (err) {
       console.error(err);
       alert('提交失败，请稍后重试');
@@ -142,7 +243,9 @@ export default function App() {
   };
 
   const bookingTotal = bookingModal.pack
-    ? bookingModal.pack.price * bookingForm.quantity
+    ? bookingModal.isComboCheckout
+      ? comboSummary.totalPrice
+      : bookingModal.pack.price * bookingForm.quantity
     : 0;
 
   return (
@@ -190,6 +293,9 @@ export default function App() {
               onBookMaterial={handleBookMaterial}
               onRecordView={recordView}
               activeFilters={activeFilters}
+              comboItemIds={comboItemIds}
+              onAddToCombo={handleAddToCombo}
+              onOneClickCombo={handleOneClickCombo}
             />
           )}
 
@@ -236,6 +342,80 @@ export default function App() {
         </main>
 
         <aside className="app-sidebar">
+          {comboItems.length > 0 && (
+            <div className="sidebar-section">
+              <h3 className="sidebar-title">🧺 当前搭配清单</h3>
+              <div className="combo-list">
+                {comboItems.map((item) => (
+                  <div key={item.packId} className="combo-item">
+                    <div className="combo-item-header">
+                      <div className="combo-item-name">{item.packName}</div>
+                      <button
+                        className="combo-item-remove"
+                        onClick={() => handleRemoveFromCombo(item.packId)}
+                      >
+                        ×
+                      </button>
+                    </div>
+                    <div className="combo-item-reason">💡 {item.recommendReason}</div>
+                    <div className="combo-item-footer">
+                      <div className="combo-item-qty">
+                        <button
+                          className="combo-qty-btn"
+                          onClick={() => handleUpdateComboQty(item.packId, -1)}
+                        >
+                          −
+                        </button>
+                        <span className="combo-qty-value">{item.quantity}</span>
+                        <button
+                          className="combo-qty-btn"
+                          onClick={() => handleUpdateComboQty(item.packId, 1)}
+                        >
+                          +
+                        </button>
+                      </div>
+                      <div className="combo-item-price">¥{item.price * item.quantity}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div className="combo-summary">
+                <div className="combo-summary-row">
+                  <span>材料包数量</span>
+                  <span>{comboItems.length} 种</span>
+                </div>
+                <div className="combo-summary-row">
+                  <span>总件数</span>
+                  <span>{comboSummary.totalQty} 件</span>
+                </div>
+                <div className="combo-summary-total">
+                  <span>预估总价</span>
+                  <span className="total-price">¥{comboSummary.totalPrice}</span>
+                </div>
+                <div className="combo-summary-actions">
+                  <button
+                    className="combo-summary-btn clear"
+                    onClick={(e) => {
+                      createRipple(e);
+                      handleClearCombo();
+                    }}
+                  >
+                    清空
+                  </button>
+                  <button
+                    className="combo-summary-btn checkout"
+                    onClick={(e) => {
+                      createRipple(e);
+                      handleCheckoutCombo();
+                    }}
+                  >
+                    批量预订
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
           <div className="sidebar-section">
             <h3 className="sidebar-title">🏷 标签筛选</h3>
             <div className="tag-filter-list">
@@ -298,40 +478,58 @@ export default function App() {
       </div>
 
       {bookingModal.open && bookingModal.pack && (
-        <div className="modal-overlay" onClick={() => setBookingModal({ open: false, pack: null })}>
+        <div className="modal-overlay" onClick={() => setBookingModal({ open: false, pack: null, isComboCheckout: false })}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <button
               className="modal-close"
-              onClick={() => setBookingModal({ open: false, pack: null })}
+              onClick={() => setBookingModal({ open: false, pack: null, isComboCheckout: false })}
             >
               ×
             </button>
-            <h2 className="modal-title">预订材料包</h2>
+            <h2 className="modal-title">
+              {bookingModal.isComboCheckout ? '批量预订搭配清单' : '预订材料包'}
+            </h2>
             <div style={{ marginBottom: 16, padding: 16, background: '#F9FAFB', borderRadius: 8 }}>
               <div style={{ fontWeight: 600, marginBottom: 4 }}>{bookingModal.pack.name}</div>
-              <div style={{ color: '#10B981', fontWeight: 700, fontSize: 18 }}>¥{bookingModal.pack.price}/件</div>
-              <div style={{ marginTop: 8, fontSize: 13, color: '#6B7280' }}>
-                包含：{bookingModal.pack.components.slice(0, 3).join('、')}...
-              </div>
+              {bookingModal.isComboCheckout ? (
+                <div>
+                  <div style={{ color: '#10B981', fontWeight: 700, fontSize: 18 }}>¥{comboSummary.totalPrice}</div>
+                  <div style={{ marginTop: 8, fontSize: 13, color: '#6B7280' }}>
+                    共 {comboItems.length} 种材料包 / {comboSummary.totalQty} 件
+                  </div>
+                  <div style={{ marginTop: 8, fontSize: 12, color: '#6B7280' }}>
+                    {comboItems.map((c) => `· ${c.packName} x${c.quantity}`).join('\n')}
+                  </div>
+                </div>
+              ) : (
+                <div>
+                  <div style={{ color: '#10B981', fontWeight: 700, fontSize: 18 }}>¥{bookingModal.pack.price}/件</div>
+                  <div style={{ marginTop: 8, fontSize: 13, color: '#6B7280' }}>
+                    包含：{bookingModal.pack.components.slice(0, 3).join('、')}...
+                  </div>
+                </div>
+              )}
             </div>
 
             <form onSubmit={handleSubmitBooking} className="booking-form">
-              <div className="form-group">
-                <label className="form-label">预订数量</label>
-                <input
-                  type="number"
-                  min="1"
-                  className="form-input"
-                  value={bookingForm.quantity}
-                  onChange={(e) =>
-                    setBookingForm((prev) => ({
-                      ...prev,
-                      quantity: Math.max(1, Number(e.target.value) || 1),
-                    }))
-                  }
-                  required
-                />
-              </div>
+              {!bookingModal.isComboCheckout && (
+                <div className="form-group">
+                  <label className="form-label">预订数量</label>
+                  <input
+                    type="number"
+                    min="1"
+                    className="form-input"
+                    value={bookingForm.quantity}
+                    onChange={(e) =>
+                      setBookingForm((prev) => ({
+                        ...prev,
+                        quantity: Math.max(1, Number(e.target.value) || 1),
+                      }))
+                    }
+                    required
+                  />
+                </div>
+              )}
               <div className="form-group">
                 <label className="form-label">姓名</label>
                 <input
@@ -365,7 +563,7 @@ export default function App() {
                 disabled={bookingSubmitting}
                 onClick={createRipple}
               >
-                {bookingSubmitting ? '提交中...' : '确认预订'}
+                {bookingSubmitting ? '提交中...' : bookingModal.isComboCheckout ? '确认批量预订' : '确认预订'}
               </button>
             </form>
           </div>

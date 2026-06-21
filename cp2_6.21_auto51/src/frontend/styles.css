@@ -209,6 +209,54 @@ button:focus {
   box-shadow: var(--shadow-lg);
 }
 
+.work-card-hover-overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(31, 41, 55, 0.1) 0%, rgba(31, 41, 55, 0.85) 100%);
+  color: #fff;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  pointer-events: none;
+}
+
+.work-card:hover .work-card-hover-overlay {
+  opacity: 1;
+}
+
+.work-card-hover-title {
+  font-size: 16px;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+
+.work-card-hover-desc {
+  font-size: 13px;
+  line-height: 1.6;
+  margin-bottom: 12px;
+  opacity: 0.92;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.work-card-hover-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.work-card-hover-tags .tag-pill {
+  font-size: 11px;
+  height: 22px;
+  padding: 0 10px;
+  opacity: 0.95;
+}
+
 .work-card-image {
   width: 100%;
   height: calc(280px * 0.55 * 1.2);
@@ -467,20 +515,35 @@ button:focus {
 .rec-card-components {
   font-size: 12px;
   color: var(--color-gray);
-  margin-bottom: 12px;
+  margin-bottom: 8px;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
 
+.rec-card-reason {
+  font-size: 12px;
+  color: var(--color-secondary);
+  background: rgba(217, 119, 6, 0.1);
+  padding: 6px 10px;
+  border-radius: 6px;
+  margin-bottom: 12px;
+  line-height: 1.5;
+}
+
+.rec-card-btn-group {
+  display: flex;
+  gap: 8px;
+}
+
 .rec-card-btn {
-  width: 100%;
-  padding: 10px 16px;
+  flex: 1;
+  padding: 10px 12px;
   border-radius: 8px;
   background: var(--color-primary);
   color: #fff;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 600;
   transition: all 0.2s ease;
   position: relative;
@@ -492,7 +555,49 @@ button:focus {
   box-shadow: var(--shadow-md);
 }
 
+.rec-card-btn.secondary {
+  background: rgba(139, 92, 246, 0.1);
+  color: var(--color-primary);
+}
+
+.rec-card-btn.secondary:hover {
+  background: rgba(139, 92, 246, 0.18);
+}
+
+.rec-card-btn.added {
+  background: var(--color-success);
+}
+
 .rec-card-btn .ripple {
+  position: absolute;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.5);
+  pointer-events: none;
+  animation: ripple 0.4s ease-out;
+}
+
+.one-click-combo-btn {
+  margin-top: 16px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 24px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, var(--color-secondary) 0%, #B45309 100%);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  transition: all 0.2s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.one-click-combo-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-lg);
+}
+
+.one-click-combo-btn .ripple {
   position: absolute;
   border-radius: 50%;
   background: rgba(255, 255, 255, 0.5);
@@ -502,6 +607,186 @@ button:focus {
 
 .sidebar-section {
   margin-bottom: 32px;
+}
+
+.combo-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.combo-item {
+  background: #fff;
+  border-radius: 10px;
+  padding: 12px;
+  box-shadow: var(--shadow-sm);
+}
+
+.combo-item-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 6px;
+}
+
+.combo-item-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text);
+  flex: 1;
+  margin-right: 8px;
+}
+
+.combo-item-remove {
+  background: transparent;
+  color: var(--color-gray);
+  font-size: 18px;
+  line-height: 1;
+  padding: 0 4px;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+}
+
+.combo-item-remove:hover {
+  background: rgba(239, 68, 68, 0.1);
+  color: #EF4444;
+}
+
+.combo-item-reason {
+  font-size: 11px;
+  color: var(--color-secondary);
+  margin-bottom: 8px;
+}
+
+.combo-item-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.combo-item-qty {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.combo-qty-btn {
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  background: var(--color-card-bg);
+  color: var(--color-text);
+  font-size: 14px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.combo-qty-btn:hover {
+  background: rgba(139, 92, 246, 0.15);
+  color: var(--color-primary);
+}
+
+.combo-qty-value {
+  font-size: 13px;
+  font-weight: 600;
+  min-width: 20px;
+  text-align: center;
+}
+
+.combo-item-price {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--color-success);
+}
+
+.combo-summary {
+  background: #fff;
+  border-radius: 10px;
+  padding: 14px;
+  margin-top: 12px;
+  box-shadow: var(--shadow-md);
+  border: 1px solid rgba(139, 92, 246, 0.15);
+}
+
+.combo-summary-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+  margin-bottom: 6px;
+  color: var(--color-gray);
+}
+
+.combo-summary-total {
+  display: flex;
+  justify-content: space-between;
+  padding-top: 10px;
+  margin-top: 6px;
+  border-top: 1px dashed var(--color-placeholder);
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.combo-summary-total .total-price {
+  color: var(--color-success);
+}
+
+.combo-summary-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.combo-summary-btn {
+  flex: 1;
+  padding: 10px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  transition: all 0.2s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.combo-summary-btn.clear {
+  background: var(--color-card-bg);
+  color: var(--color-gray);
+}
+
+.combo-summary-btn.clear:hover {
+  background: rgba(239, 68, 68, 0.1);
+  color: #EF4444;
+}
+
+.combo-summary-btn.checkout {
+  background: linear-gradient(135deg, var(--color-primary) 0%, #7C3AED 100%);
+  color: #fff;
+}
+
+.combo-summary-btn.checkout:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+
+.combo-summary-btn .ripple {
+  position: absolute;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.4);
+  pointer-events: none;
+  animation: ripple 0.4s ease-out;
+}
+
+.combo-empty {
+  text-align: center;
+  padding: 20px 12px;
+  color: var(--color-gray);
+  font-size: 13px;
+  background: #fff;
+  border-radius: 10px;
+  border: 1px dashed var(--color-placeholder);
 }
 
 .sidebar-title {

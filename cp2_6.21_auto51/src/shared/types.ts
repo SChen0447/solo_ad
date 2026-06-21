@@ -30,4 +30,13 @@ export interface Order {
 
 export interface MaterialRecommendation extends MaterialPack {
   matchScore: number;
+  recommendReason: string;
+}
+
+export interface ComboItem {
+  packId: string;
+  packName: string;
+  price: number;
+  quantity: number;
+  recommendReason: string;
 }

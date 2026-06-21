@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import type { Work, MaterialRecommendation } from '../shared/types';
+import type { Work, MaterialRecommendation, ComboItem } from '../shared/types';
 import { getRecommendations } from './RecommendationEngine';
 
 interface WorksGalleryProps {
@@ -9,6 +9,9 @@ interface WorksGalleryProps {
   onBookMaterial: (pack: MaterialRecommendation) => void;
   onRecordView: (work: Work) => void;
   activeFilters: string[];
+  comboItemIds: string[];
+  onAddToCombo: (pack: MaterialRecommendation) => void;
+  onOneClickCombo: (packs: MaterialRecommendation[]) => void;
 }
 
 const TAG_COLOR_MAP: Record<string, string> = {
@@ -129,6 +132,9 @@ export default function WorksGallery({
   onBookMaterial,
   onRecordView,
   activeFilters,
+  comboItemIds,
+  onAddToCombo,
+  onOneClickCombo,
 }: WorksGalleryProps) {
   const [recommendations, setRecommendations] = useState<MaterialRecommendation[]>([]);
   const [showRecommendations, setShowRecommendations] = useState(false);
@@ -200,12 +206,25 @@ export default function WorksGallery({
 
           <p className="work-detail-desc">{selectedWork.description}</p>
 
-          <button
-            className="primary-btn"
-            onClick={handleShowRecommendations}
-          >
-            查看推荐材料包
-          </button>
+          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+            <button
+              className="primary-btn"
+              onClick={handleShowRecommendations}
+            >
+              查看推荐材料包
+            </button>
+            {showRecommendations && recommendations.length > 0 && (
+              <button
+                className="one-click-combo-btn"
+                onClick={(e) => {
+                  createRipple(e);
+                  onOneClickCombo(recommendations);
+                }}
+              >
+                ✨ 一键搭配全部推荐
+              </button>
+            )}
+          </div>
 
           {showRecommendations && (
             <div className="recommendation-section">
@@ -214,27 +233,44 @@ export default function WorksGallery({
                 {recommendations.length === 0 && (
                   <div style={{ padding: '20px', color: '#6B7280' }}>加载中...</div>
                 )}
-                {recommendations.map((pack) => (
-                  <div key={pack.id} className="rec-card">
-                    <div className="rec-card-header">
-                      <div className="rec-card-name">{pack.name}</div>
-                      <div className="match-badge">{pack.matchScore}%</div>
+                {recommendations.map((pack) => {
+                  const isInCombo = comboItemIds.includes(pack.id);
+                  return (
+                    <div key={pack.id} className="rec-card">
+                      <div className="rec-card-header">
+                        <div className="rec-card-name">{pack.name}</div>
+                        <div className="match-badge">{pack.matchScore}%</div>
+                      </div>
+                      <div className="rec-card-price">¥{pack.price}</div>
+                      <div className="rec-card-components">
+                        {pack.components.slice(0, 2).join('、')}...
+                      </div>
+                      <div className="rec-card-reason">
+                        💡 {pack.recommendReason}
+                      </div>
+                      <div className="rec-card-btn-group">
+                        <button
+                          className={`rec-card-btn secondary ${isInCombo ? 'added' : ''}`}
+                          onClick={(e) => {
+                            createRipple(e);
+                            onAddToCombo(pack);
+                          }}
+                        >
+                          {isInCombo ? '✓ 已加入' : '+ 搭配'}
+                        </button>
+                        <button
+                          className="rec-card-btn"
+                          onClick={(e) => {
+                            createRipple(e);
+                            onBookMaterial(pack);
+                          }}
+                        >
+                          立即预订
+                        </button>
+                      </div>
                     </div>
-                    <div className="rec-card-price">¥{pack.price}</div>
-                    <div className="rec-card-components">
-                      {pack.components.slice(0, 2).join('、')}...
-                    </div>
-                    <button
-                      className="rec-card-btn"
-                      onClick={(e) => {
-                        createRipple(e);
-                        onBookMaterial(pack);
-                      }}
-                    >
-                      立即预订
-                    </button>
-                  </div>
-                ))}
+                  );
+                })}
               </InertiaScroll>
             </div>
           )}
@@ -271,6 +307,17 @@ export default function WorksGallery({
               <p className="work-card-desc">{work.description}</p>
               <div className="work-card-tags">
                 {work.tags.slice(0, 3).map((tag) => (
+                  <span key={tag} className={getTagClass(tag)}>
+                    {tag}
+                  </span>
+                ))}
+              </div>
+            </div>
+            <div className="work-card-hover-overlay">
+              <div className="work-card-hover-title">{work.title}</div>
+              <div className="work-card-hover-desc">{work.description}</div>
+              <div className="work-card-hover-tags">
+                {work.tags.map((tag) => (
                   <span key={tag} className={getTagClass(tag)}>
                     {tag}
                   </span>
