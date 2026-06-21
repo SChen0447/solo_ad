@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>森林生态四季可视化</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      font-family: 'Microsoft YaHei', 'PingFang SC', sans-serif;
+      background: linear-gradient(180deg, #0d3b1f 0%, #1a5c30 50%, #0a2915 100%);
+    }
+    #app {
+      width: 100vw;
+      height: 100vh;
+      position: relative;
+    }
+    #canvas-container {
+      width: 100%;
+      height: 100%;
+    }
+    #timeline-container {
+      position: absolute;
+      bottom: 40px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 70%;
+      max-width: 800px;
+      z-index: 10;
+    }
+    #month-label {
+      text-align: center;
+      color: #f0e6d2;
+      font-size: 18px;
+      margin-bottom: 12px;
+      text-shadow: 0 0 10px rgba(255, 220, 150, 0.5);
+      letter-spacing: 2px;
+    }
+    #poem-label {
+      text-align: center;
+      color: #c9e4c5;
+      font-size: 14px;
+      margin-bottom: 8px;
+      font-style: italic;
+      opacity: 0.9;
+    }
+    #timeline {
+      width: 100%;
+      height: 6px;
+      -webkit-appearance: none;
+      appearance: none;
+      background: transparent;
+      cursor: pointer;
+      position: relative;
+    }
+    #timeline::-webkit-slider-runnable-track {
+      width: 100%;
+      height: 6px;
+      background: linear-gradient(90deg,
+        rgba(255, 182, 193, 0.6) 0%,
+        rgba(144, 238, 144, 0.6) 25%,
+        rgba(255, 165, 0, 0.6) 50%,
+        rgba(139, 119, 101, 0.6) 75%,
+        rgba(255, 182, 193, 0.6) 100%
+      );
+      border-radius: 3px;
+      position: relative;
+    }
+    #timeline::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 20px;
+      height: 20px;
+      background: radial-gradient(circle, #fffacd 0%, #ffd700 50%, #ffa500 100%);
+      border-radius: 50%;
+      cursor: grab;
+      box-shadow: 0 0 15px rgba(255, 215, 0, 0.9), 0 0 30px rgba(255, 165, 0, 0.5);
+      margin-top: -7px;
+      transition: transform 0.2s ease;
+    }
+    #timeline::-webkit-slider-thumb:hover {
+      transform: scale(1.2);
+    }
+    #timeline-ticks {
+      display: flex;
+      justify-content: space-between;
+      position: relative;
+      margin-top: -10px;
+      pointer-events: none;
+    }
+    .tick {
+      width: 1px;
+      height: 8px;
+      background: rgba(255, 255, 255, 0.3);
+    }
+    .tick:nth-child(3n+1) {
+      height: 12px;
+      background: rgba(255, 255, 255, 0.5);
+    }
+    #info-panel {
+      position: absolute;
+      top: 30px;
+      right: 30px;
+      width: 300px;
+      padding: 24px;
+      background: rgba(245, 235, 210, 0.75);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border-radius: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.3);
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+      z-index: 20;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.3s ease;
+    }
+    #info-panel.visible {
+      opacity: 1;
+      pointer-events: auto;
+    }
+    #info-panel h3 {
+      color: #3d2b1f;
+      font-size: 20px;
+      margin-bottom: 16px;
+      border-bottom: 2px solid rgba(139, 90, 43, 0.3);
+      padding-bottom: 8px;
+    }
+    .info-row {
+      margin-bottom: 12px;
+    }
+    .info-label {
+      font-size: 13px;
+      color: #6b5344;
+      margin-bottom: 4px;
+    }
+    .info-value {
+      font-size: 16px;
+      color: #3d2b1f;
+      font-weight: 600;
+    }
+    .progress-bar-container {
+      width: 100%;
+      height: 10px;
+      background: rgba(139, 90, 43, 0.2);
+      border-radius: 5px;
+      overflow: hidden;
+      margin-top: 4px;
+    }
+    .progress-bar {
+      height: 100%;
+      background: linear-gradient(90deg, #7cb342, #9ccc65);
+      border-radius: 5px;
+      transition: width 0.3s ease;
+    }
+    #focus-btn {
+      margin-top: 16px;
+      float: right;
+      padding: 10px 20px;
+      background: linear-gradient(135deg, #6b8e23, #556b2f);
+      color: #fff8dc;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 600;
+      transition: all 0.3s ease;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+    }
+    #focus-btn:hover {
+      background: linear-gradient(135deg, #7cae2e, #667d3a);
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    }
+    #focus-btn:active {
+      transform: translateY(0);
+    }
+    #close-panel {
+      position: absolute;
+      top: 10px;
+      right: 14px;
+      width: 24px;
+      height: 24px;
+      border: none;
+      background: rgba(139, 90, 43, 0.15);
+      color: #6b5344;
+      border-radius: 50%;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: bold;
+      transition: all 0.3s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    #close-panel:hover {
+      background: rgba(139, 90, 43, 0.35);
+    }
+    .clearfix::after {
+      content: "";
+      clear: both;
+      display: table;
+    }
+    #fps-counter {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      color: rgba(255, 255, 255, 0.6);
+      font-size: 12px;
+      font-family: monospace;
+      z-index: 5;
+      pointer-events: none;
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <div id="canvas-container"></div>
+    <div id="fps-counter">FPS: --</div>
+    <div id="timeline-container">
+      <div id="month-label">一月 January</div>
+      <div id="poem-label">寒冬腊月，万木沉寂</div>
+      <div id="timeline-ticks"></div>
+      <input type="range" id="timeline" min="1" max="12" step="0.01" value="1" />
+    </div>
+    <div id="info-panel">
+      <button id="close-panel">×</button>
+      <h3 id="tree-name">树种</h3>
+      <div class="info-row">
+        <div class="info-label">当前叶片密度</div>
+        <div class="info-value"><span id="leaf-density">0</span>%</div>
+      </div>
+      <div class="info-row">
+        <div class="info-label">最佳生长温度</div>
+        <div class="info-value"><span id="temp-range">--</span></div>
+      </div>
+      <div class="info-row">
+        <div class="info-label">生长进度</div>
+        <div class="progress-bar-container">
+          <div class="progress-bar" id="growth-progress" style="width: 0%"></div>
+        </div>
+      </div>
+      <div class="clearfix">
+        <button id="focus-btn">聚焦</button>
+      </div>
+    </div>
+  </div>
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
