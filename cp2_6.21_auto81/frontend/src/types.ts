@@ -16,6 +16,7 @@ export interface BookContextType {
   updateProgress: (id: string, pagesRead: number) => void;
   updateBookInfo: (id: string, title: string, author: string) => void;
   filterByTags: (tags: string[]) => Book[];
+  filterBooks: (keyword: string) => Book[];
   getRecentReadTags: () => string[];
   fetchInitialBooks: () => Promise<void>;
 }

@@ -53,6 +53,27 @@ export const BookProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     [books]
   );
 
+  const filterBooks = useCallback(
+    (keyword: string) => {
+      const t0 = performance.now();
+      const term = keyword.trim().toLowerCase();
+      let result = books;
+      if (term.length > 0) {
+        result = books.filter(
+          b =>
+            b.title.toLowerCase().includes(term) ||
+            b.author.toLowerCase().includes(term)
+        );
+      }
+      const elapsed = performance.now() - t0;
+      if (elapsed > 150) {
+        console.warn(`Search filtering took ${elapsed.toFixed(0)}ms (exceeds 150ms target)`);
+      }
+      return result;
+    },
+    [books]
+  );
+
   const getRecentReadTags = useCallback(() => {
     const sorted = [...books]
       .filter(b => b.pagesRead > 0)
@@ -72,6 +93,7 @@ export const BookProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         updateProgress,
         updateBookInfo,
         filterByTags,
+        filterBooks,
         getRecentReadTags,
         fetchInitialBooks
       }}

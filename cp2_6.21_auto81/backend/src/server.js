@@ -18,13 +18,30 @@ app.get('/api/allbooks', (req, res) => {
 
 app.get('/api/recommend', (req, res) => {
   const tagsParam = req.query.tags;
+  const existingIds = req.query.excludeIds
+    ? (Array.isArray(req.query.excludeIds) ? req.query.excludeIds : String(req.query.excludeIds).split(','))
+    : [];
+
+  const fisherYatesShuffle = (arr) => {
+    const result = [...arr];
+    for (let i = result.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [result[i], result[j]] = [result[j], result[i]];
+    }
+    return result;
+  };
+
   if (!tagsParam || (Array.isArray(tagsParam) && tagsParam.length === 0) || String(tagsParam).trim() === '') {
-    return res.status(400).json({ error: 'tags参数不能为空，请提供至少一个标签' });
+    const candidates = presetBooks.filter(book => !existingIds.includes(book.id));
+    if (candidates.length === 0) {
+      const shuffled = fisherYatesShuffle(presetBooks);
+      return res.json(shuffled[0]);
+    }
+    const shuffled = fisherYatesShuffle(candidates);
+    return res.json(shuffled[0]);
   }
 
   const tags = Array.isArray(tagsParam) ? tagsParam : String(tagsParam).split(',');
-  const existingIds = req.query.excludeIds ? (Array.isArray(req.query.excludeIds) ? req.query.excludeIds : String(req.query.excludeIds).split(',')) : [];
-
   const candidates = presetBooks.filter(book => !existingIds.includes(book.id));
 
   if (candidates.length === 0) {
@@ -44,7 +61,8 @@ app.get('/api/recommend', (req, res) => {
   scored.sort((a, b) => b.score - a.score);
   const maxScore = scored[0].score;
   const topCandidates = scored.filter(s => s.score === maxScore).map(s => s.book);
-  const chosen = topCandidates[Math.floor(Math.random() * topCandidates.length)];
+  const shuffledTop = fisherYatesShuffle(topCandidates);
+  const chosen = shuffledTop[0];
 
   res.json(chosen);
 });

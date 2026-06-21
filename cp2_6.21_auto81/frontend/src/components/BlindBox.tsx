@@ -103,26 +103,24 @@ const BlindBox: React.FC<BlindBoxProps> = ({ onClose }) => {
     []
   );
 
+  const fisherYatesShuffle = useCallback(<T,>(arr: T[]): T[] => {
+    const result = [...arr];
+    for (let i = result.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [result[i], result[j]] = [result[j], result[i]];
+    }
+    return result;
+  }, []);
+
   const fetchRecommendation = useCallback(async () => {
     try {
       const tags = getRecentReadTags();
       const existingIds = books.map(b => b.id);
 
-      if (tags.length === 0) {
-        const allPreset = await fetch(`${API_BASE}/allbooks`).then(r => r.json());
-        const notInShelf = allPreset.filter((b: Book) => !existingIds.includes(b.id));
-        const candidates = notInShelf.length > 0 ? notInShelf : allPreset;
-        const randomBook = candidates[Math.floor(Math.random() * candidates.length)];
-        const recommended: Book = {
-          ...randomBook,
-          pagesRead: 0
-        };
-        await performFlip(recommended);
-        return;
-      }
-
       const query = new URLSearchParams();
-      query.set('tags', tags.join(','));
+      if (tags.length > 0) {
+        query.set('tags', tags.join(','));
+      }
       if (existingIds.length > 0) {
         query.set('excludeIds', existingIds.join(','));
       }
@@ -140,22 +138,33 @@ const BlindBox: React.FC<BlindBoxProps> = ({ onClose }) => {
       await performFlip(recommended);
     } catch (err) {
       console.error('Failed to fetch recommendation:', err);
-      const fallbackBooks = books.map(b => b.id);
-      const fallback: Book = {
-        id: `fallback_${Date.now()}`,
-        title: '小王子',
-        author: '圣埃克苏佩里',
-        coverUrl: 'https://picsum.photos/seed/xiaowangzi/400/580',
-        totalPages: 120,
-        pagesRead: 0,
-        tags: ['经典', '治愈'],
-        isbn: '9787020042494'
-      };
-      if (!fallbackBooks.includes(fallback.id)) {
+      try {
+        const allRes = await fetch(`${API_BASE}/allbooks`);
+        const allBooks: Book[] = await allRes.json();
+        const existingIds = books.map(b => b.id);
+        const notInShelf = allBooks.filter(b => !existingIds.includes(b.id));
+        const candidates = notInShelf.length > 0 ? notInShelf : allBooks;
+        const shuffled = fisherYatesShuffle(candidates);
+        const fallback: Book = {
+          ...shuffled[0],
+          pagesRead: 0
+        };
         await performFlip(fallback);
+      } catch (fallbackErr) {
+        const finalFallback: Book = {
+          id: `fallback_${Date.now()}`,
+          title: '小王子',
+          author: '圣埃克苏佩里',
+          coverUrl: 'https://picsum.photos/seed/xiaowangzi/400/580',
+          totalPages: 120,
+          pagesRead: 0,
+          tags: ['经典', '治愈'],
+          isbn: '9787020042494'
+        };
+        await performFlip(finalFallback);
       }
     }
-  }, [getRecentReadTags, books, performFlip]);
+  }, [getRecentReadTags, books, performFlip, fisherYatesShuffle]);
 
   useEffect(() => {
     const t = setTimeout(() => {

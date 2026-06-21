@@ -38,25 +38,22 @@ const PlusIcon: React.FC<{ className?: string }> = ({ className }) => (
 );
 
 const BookShelf: React.FC<BookShelfProps> = ({ onBookClick, onOpenBlindBox }) => {
-  const { books, addBook } = useBooks();
+  const { books, addBook, filterBooks } = useBooks();
   const [searchTerm, setSearchTerm] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
 
   const filteredBooks = useMemo(() => {
-    const t0 = performance.now();
-    const term = searchTerm.trim().toLowerCase();
-    let result = books;
-    if (term.length > 0) {
-      result = books.filter(
-        b => b.title.toLowerCase().includes(term) || b.author.toLowerCase().includes(term)
-      );
-    }
-    const elapsed = performance.now() - t0;
-    if (elapsed > 150) {
-      console.warn(`Search filtering took ${elapsed.toFixed(0)}ms (exceeds 150ms target)`);
-    }
-    return result;
-  }, [books, searchTerm]);
+    return filterBooks(searchTerm);
+  }, [filterBooks, searchTerm]);
+
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setSearchTerm(value);
+  };
+
+  const handleSearchClear = () => {
+    setSearchTerm('');
+  };
 
   const handleAddRandomBook = () => {
     const otherBooks = [
@@ -85,8 +82,30 @@ const BookShelf: React.FC<BookShelfProps> = ({ onBookClick, onOpenBlindBox }) =>
             type="text"
             placeholder="搜索书名或作者..."
             value={searchTerm}
-            onChange={e => setSearchTerm(e.target.value)}
+            onChange={handleSearchChange}
+            onKeyDown={e => {
+              if (e.key === 'Escape') {
+                handleSearchClear();
+              }
+            }}
           />
+          {searchTerm && (
+            <button
+              onClick={handleSearchClear}
+              style={{
+                background: 'none',
+                border: 'none',
+                color: '#9CA3AF',
+                cursor: 'pointer',
+                padding: '0 4px',
+                fontSize: 18,
+                lineHeight: 1
+              }}
+              aria-label="清空搜索"
+            >
+              ×
+            </button>
+          )}
         </div>
       </div>
 
@@ -105,7 +124,7 @@ const BookShelf: React.FC<BookShelfProps> = ({ onBookClick, onOpenBlindBox }) =>
               >
                 <div className="book-cover">
                   <img src={book.coverUrl} alt={book.title} loading="lazy" />
-                  <ProgressRing percent={percent} />
+                  <ProgressRing percent={percent} bookId={book.id} />
                 </div>
                 <div className="book-title">{book.title}</div>
                 <div className="book-author">{book.author}</div>

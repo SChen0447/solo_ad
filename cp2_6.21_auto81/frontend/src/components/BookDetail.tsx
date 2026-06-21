@@ -122,7 +122,7 @@ const BookDetail: React.FC<BookDetailProps> = ({ book, onClose }) => {
         <div className="detail-top">
           <div className="detail-cover">
             <img src={book.coverUrl} alt={book.title} />
-            <ProgressRing percent={percent} />
+            <ProgressRing percent={percent} bookId={book.id} />
           </div>
 
           <div className="detail-info">

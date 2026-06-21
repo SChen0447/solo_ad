@@ -92,16 +92,15 @@ body {
   width: 100%;
   height: 100%;
   transform: rotate(-90deg);
+  display: block;
 }
 
 .progress-ring .circle-bg {
-  stroke: #E5E7EB;
   fill: none;
   stroke-width: 6;
 }
 
 .progress-ring .circle-fg {
-  stroke: url(#gradientStroke);
   fill: none;
   stroke-width: 6;
   stroke-linecap: round;
@@ -466,6 +465,7 @@ body {
   width: 280px;
   height: 400px;
   margin-bottom: 32px;
+  -webkit-perspective: 1200px;
 }
 
 .flip-card {
@@ -473,11 +473,19 @@ body {
   width: 100%;
   height: 100%;
   transform-style: preserve-3d;
+  -webkit-transform-style: preserve-3d;
   transition: transform 1s cubic-bezier(0.4, 0.0, 0.2, 1);
+  -webkit-transition: -webkit-transform 1s cubic-bezier(0.4, 0.0, 0.2, 1);
+  will-change: transform;
+  transform: translateZ(0);
+  -webkit-transform: translateZ(0);
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
 }
 
 .flip-card.flipped {
   transform: rotateY(180deg);
+  -webkit-transform: rotateY(180deg);
 }
 
 .flip-face {
@@ -489,6 +497,9 @@ body {
   border-radius: 12px;
   overflow: hidden;
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+  transform: translateZ(0);
+  -webkit-transform: translateZ(0);
+  will-change: transform;
 }
 
 .flip-front {
