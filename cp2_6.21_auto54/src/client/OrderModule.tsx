@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import type { Order, OrderStatus, OrderItem } from './types';
 import { STATUS_LABELS, ZONE_COLORS } from './types';
 
@@ -19,8 +19,8 @@ const STATUS_COLORS: Record<OrderStatus, string> = {
 
 function TruckIcon() {
   return (
-    <span className="truck-icon" style={{ display: 'inline-flex', marginRight: 4 }}>
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <span className="truck-icon" style={{ display: 'inline-flex', marginRight: 4, color: '#F97316' }}>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="16" height="16">
         <rect x="1" y="3" width="15" height="13" />
         <polygon points="16,8 20,8 23,11 23,16 16,16 16,8" />
         <circle cx="5.5" cy="18.5" r="2.5" />
@@ -32,14 +32,15 @@ function TruckIcon() {
 
 function OrderCard({
   order,
+  flash,
   onViewDetail,
   onAdvanceStatus,
 }: {
   order: Order;
+  flash: boolean;
   onViewDetail: (o: Order) => void;
   onAdvanceStatus: (o: Order) => void;
 }) {
-  const [flash, setFlash] = useState(false);
   const [clicked, setClicked] = useState(false);
   const pulseColor = ZONE_COLORS[order.zone];
 
@@ -51,8 +52,6 @@ function OrderCard({
 
   const handleAdvance = (e: React.MouseEvent) => {
     e.stopPropagation();
-    setFlash(true);
-    setTimeout(() => setFlash(false), 400);
     onAdvanceStatus(order);
   };
 
@@ -69,9 +68,9 @@ function OrderCard({
       onClick={handleClick}
     >
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
-        <div style={{ flex: 1 }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-            {order.status === 'delivering' && <span style={{ color: STATUS_COLORS[order.status] }}><TruckIcon /></span>}
+            {order.status === 'delivering' && <TruckIcon />}
             <span style={{ fontSize: 15, fontWeight: 600, color: '#374151' }}>
               {order.items.map((i) => i.productName).join('、')}
             </span>
@@ -83,7 +82,7 @@ function OrderCard({
             {order.contactName} · {order.contactPhone}
           </div>
         </div>
-        <div style={{ textAlign: 'right', marginLeft: 12 }}>
+        <div style={{ textAlign: 'right', marginLeft: 12, flexShrink: 0 }}>
           <div style={{ fontSize: 18, fontWeight: 700, color: '#F97316', marginBottom: 4 }}>
             ¥{order.totalAmount.toFixed(1)}
           </div>
@@ -448,6 +447,27 @@ export default function OrderModule({
   const [filter, setFilter] = useState<OrderStatus | 'all'>('all');
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [showNewModal, setShowNewModal] = useState(false);
+  const [flashingOrderIds, setFlashingOrderIds] = useState<Set<string>>(new Set());
+  const prevOrdersRef = useRef<Map<string, OrderStatus>>(new Map());
+
+  useEffect(() => {
+    const newFlashing: Set<string> = new Set();
+    const currentStatuses = new Map<string, OrderStatus>();
+    orders.forEach((o) => {
+      currentStatuses.set(o.id, o.status);
+      const prevStatus = prevOrdersRef.current.get(o.id);
+      if (prevStatus && prevStatus !== o.status) {
+        newFlashing.add(o.id);
+      }
+    });
+    if (newFlashing.size > 0) {
+      setFlashingOrderIds(newFlashing);
+      setTimeout(() => {
+        setFlashingOrderIds(new Set());
+      }, 400);
+    }
+    prevOrdersRef.current = currentStatuses;
+  }, [orders]);
 
   const filteredOrders = useMemo(() => {
     if (filter === 'all') return orders;
@@ -549,6 +569,7 @@ export default function OrderModule({
                 <OrderCard
                   key={order.id}
                   order={order}
+                  flash={flashingOrderIds.has(order.id)}
                   onViewDetail={setSelectedOrder}
                   onAdvanceStatus={handleAdvanceStatus}
                 />

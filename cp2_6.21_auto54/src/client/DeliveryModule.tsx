@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import type { Order, DeliveryTask, DeliveryZone } from './types';
 import { ZONE_COLORS, ZONE_LABELS, STATUS_LABELS } from './types';
 
@@ -28,10 +28,10 @@ function DragIcon() {
   );
 }
 
-function TruckIconSmall({ spinning }: { spinning: boolean }) {
+function TruckIconSmall() {
   return (
-    <span className={spinning ? 'truck-icon' : ''} style={{ display: 'inline-flex' }}>
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <span className="truck-icon" style={{ display: 'inline-flex', color: '#F97316' }}>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="16" height="16">
         <rect x="1" y="3" width="15" height="13" />
         <polygon points="16,8 20,8 23,11 23,16 16,16 16,8" />
         <circle cx="5.5" cy="18.5" r="2.5" />
@@ -56,29 +56,34 @@ function DeliveryNode({
   index,
   total,
   zone,
+  draggingId,
+  dragOverId,
+  estimatedTime,
   onDragStart,
+  onDragEnter,
   onDragOver,
   onDrop,
   onDragEnd,
-  isDragging,
-  isDragOver,
 }: {
   order: Order;
   task: DeliveryTask;
   index: number;
   total: number;
   zone: DeliveryZone;
-  onDragStart: (orderId: string) => void;
+  draggingId: string | null;
+  dragOverId: string | null;
+  estimatedTime: number;
+  onDragStart: (e: React.DragEvent, orderId: string) => void;
+  onDragEnter: (orderId: string) => void;
   onDragOver: (e: React.DragEvent) => void;
-  onDrop: (targetOrderId: string) => void;
+  onDrop: (e: React.DragEvent, targetOrderId: string) => void;
   onDragEnd: () => void;
-  isDragging: boolean;
-  isDragOver: boolean;
 }) {
   const [clicked, setClicked] = useState(false);
   const isFirst = index === 0;
-  const isLast = index === total - 1;
   const isDelivering = order.status === 'delivering';
+  const isDragging = draggingId === order.id;
+  const isDragOver = dragOverId === order.id && draggingId !== order.id;
 
   const handleClick = () => {
     setClicked(true);
@@ -88,9 +93,10 @@ function DeliveryNode({
   return (
     <div
       draggable
-      onDragStart={() => onDragStart(order.id)}
+      onDragStart={(e) => onDragStart(e, order.id)}
+      onDragEnter={() => onDragEnter(order.id)}
       onDragOver={onDragOver}
-      onDrop={() => onDrop(order.id)}
+      onDrop={(e) => onDrop(e, order.id)}
       onDragEnd={onDragEnd}
       onClick={handleClick}
       className={`card ${isDragging ? 'dragging' : ''} ${isDragOver ? 'drag-over' : ''} ${clicked ? 'clicked' : ''}`}
@@ -133,15 +139,15 @@ function DeliveryNode({
           </div>
         </div>
 
-        <div style={{ flex: 1 }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              {isDelivering && <span style={{ color: '#F97316' }}><TruckIconSmall spinning /></span>}
+              {isDelivering && <TruckIconSmall />}
               <span style={{ fontSize: 14, fontWeight: 600, color: '#374151' }}>
                 {order.items.map((i) => i.productName).join('、')}
               </span>
             </div>
-            <span style={{ fontSize: 12, fontWeight: 600, color: '#F97316' }}>
+            <span style={{ fontSize: 12, fontWeight: 600, color: '#F97316', flexShrink: 0, marginLeft: 8 }}>
               ¥{order.totalAmount.toFixed(1)}
             </span>
           </div>
@@ -173,7 +179,7 @@ function DeliveryNode({
                 <polyline points="12 6 12 12 16 14" />
               </svg>
               <span style={{ fontSize: 12, color: '#6B7280', fontWeight: 500 }}>
-                预计 {task.estimatedTime} 分钟
+                预计 {estimatedTime} 分钟
               </span>
             </div>
           </div>
@@ -192,6 +198,8 @@ function ZoneSection({
 }) {
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [dragOverId, setDragOverId] = useState<string | null>(null);
+  const [localOrder, setLocalOrder] = useState<Order[]>([]);
+  const hasAppliedRef = useRef(false);
 
   const sortedOrders = useMemo(() => {
     return [...data.orders].sort((a, b) => {
@@ -201,28 +209,61 @@ function ZoneSection({
     });
   }, [data.orders, data.tasks]);
 
-  const handleDragStart = (orderId: string) => {
+  useEffect(() => {
+    setLocalOrder(sortedOrders);
+  }, [sortedOrders]);
+
+  const getEstimatedTime = (order: Order, index: number) => {
+    const task = data.tasks.find((t) => t.orderId === order.id);
+    if (draggingId && !hasAppliedRef.current) {
+      return 15 + (index + 1) * 10;
+    }
+    return task?.estimatedTime || 15;
+  };
+
+  const handleDragStart = (e: React.DragEvent, orderId: string) => {
     setDraggingId(orderId);
+    hasAppliedRef.current = false;
+    try {
+      e.dataTransfer.setData('text/plain', orderId);
+      e.dataTransfer.effectAllowed = 'move';
+    } catch {
+      // ignore
+    }
   };
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
+    e.stopPropagation();
+    e.dataTransfer.dropEffect = 'move';
   };
 
   const handleDragEnter = (orderId: string) => {
-    if (draggingId && draggingId !== orderId) {
-      setDragOverId(orderId);
-    }
+    if (!draggingId || draggingId === orderId) return;
+    setDragOverId(orderId);
+    const currentIdx = localOrder.findIndex((o) => o.id === draggingId);
+    const targetIdx = localOrder.findIndex((o) => o.id === orderId);
+    if (currentIdx === -1 || targetIdx === -1) return;
+
+    const newOrder = [...localOrder];
+    const [moved] = newOrder.splice(currentIdx, 1);
+    newOrder.splice(targetIdx, 0, moved);
+    setLocalOrder(newOrder);
   };
 
-  const handleDrop = (targetOrderId: string) => {
+  const handleDrop = (e: React.DragEvent, targetOrderId: string) => {
+    e.preventDefault();
+    e.stopPropagation();
     if (!draggingId || draggingId === targetOrderId) {
       setDraggingId(null);
       setDragOverId(null);
       return;
     }
-    const newPosition = sortedOrders.findIndex((o) => o.id === targetOrderId);
-    onReordered(draggingId, newPosition);
+    hasAppliedRef.current = true;
+    const newPosition = localOrder.findIndex((o) => o.id === draggingId);
+    if (newPosition !== -1) {
+      onReordered(draggingId, newPosition);
+    }
     setDraggingId(null);
     setDragOverId(null);
   };
@@ -230,7 +271,16 @@ function ZoneSection({
   const handleDragEnd = () => {
     setDraggingId(null);
     setDragOverId(null);
+    hasAppliedRef.current = false;
+    setLocalOrder(sortedOrders);
   };
+
+  const displayTotalTime = useMemo(() => {
+    if (draggingId) {
+      return localOrder.reduce((sum, _o, idx) => sum + 15 + (idx + 1) * 10, 0);
+    }
+    return data.totalTime;
+  }, [draggingId, localOrder, data.totalTime]);
 
   return (
     <div style={{ marginBottom: 20 }}>
@@ -273,11 +323,13 @@ function ZoneSection({
         </div>
         <div style={{ textAlign: 'right' }}>
           <div style={{ fontSize: 12, color: '#6B7280' }}>预计总耗时</div>
-          <div style={{ fontSize: 18, fontWeight: 700, color: '#1F2937' }}>{data.totalTime} 分钟</div>
+          <div style={{ fontSize: 18, fontWeight: 700, color: '#1F2937' }}>
+            {displayTotalTime} 分钟
+          </div>
         </div>
       </div>
 
-      {sortedOrders.length === 0 ? (
+      {localOrder.length === 0 ? (
         <div
           style={{
             padding: 24,
@@ -292,24 +344,25 @@ function ZoneSection({
           暂无待配送订单
         </div>
       ) : (
-        sortedOrders.map((order, idx) => {
+        localOrder.map((order, idx) => {
           const task = data.tasks.find((t) => t.orderId === order.id)!;
           return (
-            <div key={order.id} onDragEnter={() => handleDragEnter(order.id)}>
-              <DeliveryNode
-                order={order}
-                task={task}
-                index={idx}
-                total={sortedOrders.length}
-                zone={data.zone}
-                onDragStart={handleDragStart}
-                onDragOver={handleDragOver}
-                onDrop={handleDrop}
-                onDragEnd={handleDragEnd}
-                isDragging={draggingId === order.id}
-                isDragOver={dragOverId === order.id}
-              />
-            </div>
+            <DeliveryNode
+              key={order.id}
+              order={order}
+              task={task}
+              index={idx}
+              total={localOrder.length}
+              zone={data.zone}
+              draggingId={draggingId}
+              dragOverId={dragOverId}
+              estimatedTime={getEstimatedTime(order, idx)}
+              onDragStart={handleDragStart}
+              onDragEnter={handleDragEnter}
+              onDragOver={handleDragOver}
+              onDrop={handleDrop}
+              onDragEnd={handleDragEnd}
+            />
           );
         })
       )}

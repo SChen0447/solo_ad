@@ -1,14 +1,67 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import OrderModule from './OrderModule';
 import DeliveryModule from './DeliveryModule';
 import type { Order, DeliveryTask, Stats } from './types';
 import { ZONE_COLORS } from './types';
 
+function AnimatedNumber({
+  value,
+  duration = 500,
+  formatter,
+}: {
+  value: number;
+  duration?: number;
+  formatter?: (v: number) => string;
+}) {
+  const [displayValue, setDisplayValue] = useState(value);
+  const prevValueRef = useRef(value);
+  const animationRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    const startValue = prevValueRef.current;
+    const endValue = value;
+    const startTime = performance.now();
+
+    if (animationRef.current) {
+      cancelAnimationFrame(animationRef.current);
+    }
+
+    if (startValue === endValue) {
+      prevValueRef.current = endValue;
+      return;
+    }
+
+    const animate = (currentTime: number) => {
+      const elapsed = currentTime - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+      const easeProgress = 1 - Math.pow(1 - progress, 3);
+      const current = startValue + (endValue - startValue) * easeProgress;
+      setDisplayValue(current);
+
+      if (progress < 1) {
+        animationRef.current = requestAnimationFrame(animate);
+      } else {
+        prevValueRef.current = endValue;
+      }
+    };
+
+    animationRef.current = requestAnimationFrame(animate);
+
+    return () => {
+      if (animationRef.current) {
+        cancelAnimationFrame(animationRef.current);
+      }
+    };
+  }, [value, duration]);
+
+  const display = formatter ? formatter(displayValue) : Math.round(displayValue).toString();
+  return <span className="count-animate">{display}</span>;
+}
+
 function App() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [deliveryTasks, setDeliveryTasks] = useState<DeliveryTask[]>([]);
   const [stats, setStats] = useState<Stats>({ totalOrders: 0, totalAmount: 0, deliveryRate: 0 });
-  const [statsKey, setStatsKey] = useState(0);
   const [loading, setLoading] = useState(true);
 
   const fetchOrders = useCallback(async () => {
@@ -27,7 +80,6 @@ function App() {
     const res = await fetch('/api/stats');
     const data = await res.json();
     setStats(data);
-    setStatsKey((k) => k + 1);
   }, []);
 
   const fetchAll = useCallback(async () => {
@@ -47,14 +99,14 @@ function App() {
 
   const handleStatusChanged = useCallback(async () => {
     await Promise.all([fetchOrders(), fetchDelivery(), fetchStats()]);
-  }, [fetchOrders, fetchDelivery(), fetchStats]);
+  }, [fetchOrders, fetchDelivery, fetchStats]);
 
   const handleDeliveryReordered = useCallback(async () => {
     await Promise.all([fetchOrders(), fetchDelivery()]);
   }, [fetchOrders, fetchDelivery]);
 
   return (
-    <div style={{ minHeight: '100vh', background: '#F9FAFB' }}>
+    <div className="app-container">
       <div
         style={{
           position: 'sticky',
@@ -65,7 +117,7 @@ function App() {
           padding: '16px 24px',
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16, flexWrap: 'wrap', gap: 12 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <div
               style={{
@@ -92,29 +144,29 @@ function App() {
         </div>
 
         <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
-          <div style={{ background: '#ffffff', borderRadius: 12, padding: 12, minWidth: 140 }}>
+          <div style={{ background: '#ffffff', borderRadius: 12, padding: 12, minWidth: 140, boxShadow: 'inset 0 0 0 1px #F3F4F6' }}>
             <div style={{ fontSize: 12, color: '#9CA3AF', marginBottom: 4 }}>总订单数</div>
             <div style={{ display: 'flex', alignItems: 'baseline', gap: 4 }}>
-              <span key={`orders-${statsKey}`} className="count-animate" style={{ fontSize: 24, fontWeight: 700, color: '#1F2937' }}>
-                {stats.totalOrders}
+              <span style={{ fontSize: 24, fontWeight: 700, color: '#1F2937' }}>
+                <AnimatedNumber value={stats.totalOrders} />
               </span>
               <span style={{ fontSize: 12, color: '#9CA3AF' }}>单</span>
             </div>
           </div>
-          <div style={{ background: '#ffffff', borderRadius: 12, padding: 12, minWidth: 140 }}>
+          <div style={{ background: '#ffffff', borderRadius: 12, padding: 12, minWidth: 140, boxShadow: 'inset 0 0 0 1px #F3F4F6' }}>
             <div style={{ fontSize: 12, color: '#9CA3AF', marginBottom: 4 }}>总金额</div>
             <div style={{ display: 'flex', alignItems: 'baseline', gap: 4 }}>
-              <span key={`amount-${statsKey}`} className="count-animate" style={{ fontSize: 24, fontWeight: 700, color: '#1F2937' }}>
-                ¥{stats.totalAmount.toFixed(1)}
+              <span style={{ fontSize: 24, fontWeight: 700, color: '#1F2937' }}>
+                ¥<AnimatedNumber value={stats.totalAmount} duration={500} formatter={(v) => v.toFixed(1)} />
               </span>
               <span style={{ fontSize: 12, color: '#9CA3AF' }}>元</span>
             </div>
           </div>
-          <div style={{ background: '#ffffff', borderRadius: 12, padding: 12, minWidth: 140 }}>
+          <div style={{ background: '#ffffff', borderRadius: 12, padding: 12, minWidth: 140, boxShadow: 'inset 0 0 0 1px #F3F4F6' }}>
             <div style={{ fontSize: 12, color: '#9CA3AF', marginBottom: 4 }}>配送完成率</div>
             <div style={{ display: 'flex', alignItems: 'baseline', gap: 4 }}>
-              <span key={`rate-${statsKey}`} className="count-animate" style={{ fontSize: 24, fontWeight: 700, color: '#1F2937' }}>
-                {stats.deliveryRate}
+              <span style={{ fontSize: 24, fontWeight: 700, color: '#1F2937' }}>
+                <AnimatedNumber value={stats.deliveryRate} />
               </span>
               <span style={{ fontSize: 12, color: '#9CA3AF' }}>%</span>
             </div>
@@ -136,16 +188,8 @@ function App() {
         </div>
       </div>
 
-      <div
-        style={{
-          display: 'flex',
-          padding: 20,
-          gap: 0,
-          minHeight: 'calc(100vh - 160px)',
-          flexDirection: window.innerWidth < 768 ? 'column' : 'row',
-        }}
-      >
-        <div style={{ flex: window.innerWidth < 768 ? 'none' : '0 0 55%', paddingRight: window.innerWidth < 768 ? 0 : 20 }}>
+      <div className="main-layout">
+        <div className="order-section">
           <OrderModule
             orders={orders}
             loading={loading}
@@ -153,16 +197,8 @@ function App() {
             onStatusChanged={handleStatusChanged}
           />
         </div>
-        <div
-          style={{
-            width: window.innerWidth < 768 ? '100%' : 2,
-            height: window.innerWidth < 768 ? 2 : 'auto',
-            borderLeft: window.innerWidth < 768 ? 'none' : '2px dashed #E5E7EB',
-            borderTop: window.innerWidth < 768 ? '2px dashed #E5E7EB' : 'none',
-            margin: window.innerWidth < 768 ? '20px 0' : '0',
-          }}
-        />
-        <div style={{ flex: window.innerWidth < 768 ? 'none' : '1', paddingLeft: window.innerWidth < 768 ? 0 : 20 }}>
+        <div className="divider" />
+        <div className="delivery-section">
           <DeliveryModule
             orders={orders}
             deliveryTasks={deliveryTasks}
