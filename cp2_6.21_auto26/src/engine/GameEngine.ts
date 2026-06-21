@@ -10,6 +10,11 @@ export class GameEngine {
   private frameCount: number = 0
   private fpsTime: number = 0
   private currentFps: number = 60
+  private avgFps: number = 60
+  private minFps: number = 60
+  private fpsHistory: number[] = []
+  private totalFpsSamples: number = 0
+  private totalFpsSum: number = 0
   private frameCallback: FrameCallback | null = null
   private canvasWidth: number = 800
   private canvasHeight: number = 600
@@ -112,6 +117,11 @@ export class GameEngine {
     this.frameCount = 0
     this.fpsTime = this.lastTime
     this.currentFps = 60
+    this.avgFps = 60
+    this.minFps = 60
+    this.fpsHistory = []
+    this.totalFpsSamples = 0
+    this.totalFpsSum = 0
     this.loop()
   }
 
@@ -147,6 +157,12 @@ export class GameEngine {
       this.currentFps = Math.round((this.frameCount * 1000) / (now - this.fpsTime))
       this.frameCount = 0
       this.fpsTime = now
+      this.fpsHistory.push(this.currentFps)
+      if (this.fpsHistory.length > 120) this.fpsHistory.shift()
+      this.totalFpsSamples++
+      this.totalFpsSum += this.currentFps
+      this.avgFps = Math.round(this.totalFpsSum / this.totalFpsSamples)
+      this.minFps = Math.min(...this.fpsHistory)
     }
 
     if (!this.state.isPaused) {
@@ -163,6 +179,8 @@ export class GameEngine {
         elements: this.state.elements,
         score: this.state.score,
         fps: this.currentFps,
+        avgFps: this.avgFps,
+        minFps: this.minFps,
         isPaused: this.state.isPaused
       })
     }

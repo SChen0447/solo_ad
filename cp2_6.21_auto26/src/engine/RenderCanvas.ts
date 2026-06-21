@@ -6,12 +6,54 @@ export class RenderCanvas {
   private showGrid: boolean = true
   private selectedId: string | null = null
   private isEditing: boolean = true
+  private lastScore: number = 0
+  private scoreAnimTime: number = 0
+  private pauseBtnRect: { x: number; y: number; r: number } = { x: 0, y: 0, r: 16 }
+  private isPauseBtnHover: boolean = false
+  private onPauseClick: (() => void) | null = null
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas
     const ctx = canvas.getContext('2d')
     if (!ctx) throw new Error('Cannot get canvas context')
     this.ctx = ctx
+    this.setupCanvasEvents()
+  }
+
+  private setupCanvasEvents() {
+    this.canvas.addEventListener('mousemove', (e) => {
+      if (this.isEditing) return
+      const rect = this.canvas.getBoundingClientRect()
+      const x = e.clientX - rect.left
+      const y = e.clientY - rect.top
+      const dx = x - this.pauseBtnRect.x
+      const dy = y - this.pauseBtnRect.y
+      const wasHover = this.isPauseBtnHover
+      this.isPauseBtnHover = dx * dx + dy * dy <= this.pauseBtnRect.r * this.pauseBtnRect.r
+      if (wasHover !== this.isPauseBtnHover) {
+        this.canvas.style.cursor = this.isPauseBtnHover ? 'pointer' : 'default'
+      }
+    })
+    this.canvas.addEventListener('click', (e) => {
+      if (this.isEditing || !this.onPauseClick) return
+      const rect = this.canvas.getBoundingClientRect()
+      const x = e.clientX - rect.left
+      const y = e.clientY - rect.top
+      if (this.isPointInPauseButton(x, y)) {
+        e.stopPropagation()
+        this.onPauseClick()
+      }
+    })
+  }
+
+  setOnPauseClick(cb: () => void) {
+    this.onPauseClick = cb
+  }
+
+  isPointInPauseButton(x: number, y: number): boolean {
+    const dx = x - this.pauseBtnRect.x
+    const dy = y - this.pauseBtnRect.y
+    return dx * dx + dy * dy <= this.pauseBtnRect.r * this.pauseBtnRect.r
   }
 
   setEditing(editing: boolean) {
@@ -36,9 +78,14 @@ export class RenderCanvas {
   }
 
   render(data: FrameData) {
-    const { elements, score, fps, isPaused } = data
+    const { elements, score, fps, avgFps, minFps, isPaused } = data
     const w = this.canvas.width / (window.devicePixelRatio || 1)
     const h = this.canvas.height / (window.devicePixelRatio || 1)
+
+    if (score !== this.lastScore) {
+      this.scoreAnimTime = performance.now()
+      this.lastScore = score
+    }
 
     this.ctx.fillStyle = '#E0E0E0'
     this.ctx.fillRect(0, 0, w, h)
@@ -59,7 +106,8 @@ export class RenderCanvas {
     }
 
     if (!this.isEditing) {
-      this.drawFPS(fps, w)
+      const perfX = this.drawPerfPanel(fps, avgFps, minFps, w)
+      this.drawPauseButton(perfX - 24, 24, isPaused)
       this.drawScore(score)
       if (isPaused) {
         this.drawPauseMask(w, h)
@@ -143,31 +191,121 @@ export class RenderCanvas {
     this.ctx.restore()
   }
 
-  private drawFPS(fps: number, w: number) {
+  private drawPerfPanel(fps: number, avgFps: number, minFps: number, w: number): number {
+    const panelW = 110
+    const panelH = 72
+    const x = w - panelW - 10
+    const y = 10
+
     this.ctx.save()
     this.ctx.fillStyle = 'rgba(0, 0, 0, 0.6)'
     this.ctx.beginPath()
-    this.ctx.roundRect(w - 80, 10, 70, 28, 4)
+    this.ctx.roundRect(x, y, panelW, panelH, 4)
     this.ctx.fill()
+
     this.ctx.fillStyle = '#FFFFFF'
-    this.ctx.font = '14px monospace'
-    this.ctx.textAlign = 'center'
-    this.ctx.textBaseline = 'middle'
-    this.ctx.fillText(`${fps} FPS`, w - 45, 24)
+    this.ctx.font = '11px monospace'
+    this.ctx.textAlign = 'left'
+    this.ctx.textBaseline = 'top'
+
+    const lineHeight = 20
+    const labelW = 36
+
+    const fpsColor = fps >= 55 ? '#10B981' : fps >= 30 ? '#F59E0B' : '#EF4444'
+    this.ctx.fillStyle = '#aaa'
+    this.ctx.fillText('当前', x + 10, y + 8)
+    this.ctx.fillStyle = fpsColor
+    this.ctx.textAlign = 'right'
+    this.ctx.fillText(`${fps}`, x + panelW - 10, y + 8)
+    this.ctx.textAlign = 'left'
+    this.ctx.fillText('FPS', x + labelW + 10, y + 8)
+
+    this.ctx.fillStyle = '#aaa'
+    this.ctx.fillText('平均', x + 10, y + 8 + lineHeight)
+    this.ctx.fillStyle = '#fff'
+    this.ctx.textAlign = 'right'
+    this.ctx.fillText(`${avgFps}`, x + panelW - 10, y + 8 + lineHeight)
+    this.ctx.textAlign = 'left'
+    this.ctx.fillText('FPS', x + labelW + 10, y + 8 + lineHeight)
+
+    this.ctx.fillStyle = '#aaa'
+    this.ctx.fillText('最低', x + 10, y + 8 + lineHeight * 2)
+    const minColor = minFps >= 55 ? '#10B981' : minFps >= 30 ? '#F59E0B' : '#EF4444'
+    this.ctx.fillStyle = minColor
+    this.ctx.textAlign = 'right'
+    this.ctx.fillText(`${minFps}`, x + panelW - 10, y + 8 + lineHeight * 2)
+    this.ctx.textAlign = 'left'
+    this.ctx.fillText('FPS', x + labelW + 10, y + 8 + lineHeight * 2)
+
+    this.ctx.restore()
+    return x
+  }
+
+  private drawPauseButton(x: number, y: number, isPaused: boolean) {
+    this.pauseBtnRect = { x, y, r: 16 }
+    this.ctx.save()
+
+    const alpha = this.isPauseBtnHover ? 0.85 : 0.6
+    this.ctx.fillStyle = `rgba(0, 0, 0, ${alpha})`
+    this.ctx.beginPath()
+    this.ctx.arc(x, y, 16, 0, Math.PI * 2)
+    this.ctx.fill()
+
+    this.ctx.fillStyle = '#FFFFFF'
+    if (isPaused) {
+      this.ctx.beginPath()
+      this.ctx.moveTo(x - 4, y - 8)
+      this.ctx.lineTo(x - 4, y + 8)
+      this.ctx.lineTo(x + 8, y)
+      this.ctx.closePath()
+      this.ctx.fill()
+    } else {
+      this.ctx.fillRect(x - 6, y - 7, 4, 14)
+      this.ctx.fillRect(x + 2, y - 7, 4, 14)
+    }
+
     this.ctx.restore()
   }
 
   private drawScore(score: number) {
+    const animElapsed = performance.now() - this.scoreAnimTime
+    const animDuration = 200
+    let scale = 1
+    if (animElapsed < animDuration) {
+      const t = animElapsed / animDuration
+      if (t < 0.5) {
+        scale = 1 + t * 0.6
+      } else {
+        scale = 1.3 - (t - 0.5) * 0.6
+      }
+    }
+
     this.ctx.save()
+    const x = 70
+    const y = 24
+
     this.ctx.fillStyle = 'rgba(0, 0, 0, 0.6)'
     this.ctx.beginPath()
     this.ctx.roundRect(10, 10, 120, 28, 4)
     this.ctx.fill()
+
     this.ctx.fillStyle = '#FFFFFF'
     this.ctx.font = '14px monospace'
-    this.ctx.textAlign = 'center'
+    this.ctx.textAlign = 'left'
     this.ctx.textBaseline = 'middle'
-    this.ctx.fillText(`得分: ${score}`, 70, 24)
+    this.ctx.fillText('得分: ', 20, y)
+
+    if (scale !== 1) {
+      this.ctx.translate(x + 10, y)
+      this.ctx.scale(scale, scale)
+      this.ctx.translate(-(x + 10), -y)
+    }
+    this.ctx.fillStyle = '#10B981'
+    this.ctx.font = `${14 * scale}px monospace`
+    this.ctx.textAlign = 'left'
+    this.ctx.textBaseline = 'middle'
+    this.ctx.fillText(`${score}`, x + 10, y)
+
     this.ctx.restore()
   }
 

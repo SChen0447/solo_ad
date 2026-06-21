@@ -55,6 +55,8 @@ export interface FrameData {
   elements: GameElement[]
   score: number
   fps: number
+  avgFps: number
+  minFps: number
   isPaused: boolean
 }
 

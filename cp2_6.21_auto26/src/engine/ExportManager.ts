@@ -5,6 +5,8 @@ const RUNTIME_CODE = `
   const state = __GAME_STATE__;
   let elements = JSON.parse(JSON.stringify(state.elements));
   let score = 0;
+  let lastScore = 0;
+  let scoreAnimTime = 0;
   let isPaused = false;
   let isRunning = true;
   const keys = new Set();
@@ -13,6 +15,13 @@ const RUNTIME_CODE = `
   let frameCount = 0;
   let fpsTime = lastTime;
   let currentFps = 60;
+  let avgFps = 60;
+  let minFps = 60;
+  let fpsHistory = [];
+  let totalFpsSamples = 0;
+  let totalFpsSum = 0;
+  let pauseBtnRect = { x: 0, y: 0, r: 16 };
+  let isPauseBtnHover = false;
 
   const canvas = document.getElementById('game');
   if (!canvas) return;
@@ -33,6 +42,29 @@ const RUNTIME_CODE = `
     if (e.code === 'Space') { e.preventDefault(); isPaused = !isPaused; }
   });
   window.addEventListener('keyup', (e) => keys.delete(e.code));
+
+  canvas.addEventListener('mousemove', (e) => {
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    const dx = x - pauseBtnRect.x;
+    const dy = y - pauseBtnRect.y;
+    const wasHover = isPauseBtnHover;
+    isPauseBtnHover = dx * dx + dy * dy <= pauseBtnRect.r * pauseBtnRect.r;
+    if (wasHover !== isPauseBtnHover) {
+      canvas.style.cursor = isPauseBtnHover ? 'pointer' : 'default';
+    }
+  });
+  canvas.addEventListener('click', (e) => {
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    const dx = x - pauseBtnRect.x;
+    const dy = y - pauseBtnRect.y;
+    if (dx * dx + dy * dy <= pauseBtnRect.r * pauseBtnRect.r) {
+      isPaused = !isPaused;
+    }
+  });
 
   function generateId() { return Math.random().toString(36).substring(2, 11); }
   function addElement(el) { elements.push(JSON.parse(JSON.stringify(el))); }
@@ -121,7 +153,52 @@ const RUNTIME_CODE = `
     resolveCollisions();
   }
 
+  function drawPerfPanel(fps, avgFps, minFps, w) {
+    const panelW = 110, panelH = 72, x = w - panelW - 10, y = 10;
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+    ctx.beginPath(); ctx.roundRect(x, y, panelW, panelH, 4); ctx.fill();
+    ctx.font = '11px monospace';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'top';
+    const lineHeight = 20, labelW = 36;
+    const fpsColor = fps >= 55 ? '#10B981' : fps >= 30 ? '#F59E0B' : '#EF4444';
+    ctx.fillStyle = '#aaa'; ctx.fillText('当前', x + 10, y + 8);
+    ctx.fillStyle = fpsColor; ctx.textAlign = 'right'; ctx.fillText(fps, x + panelW - 10, y + 8);
+    ctx.textAlign = 'left'; ctx.fillText('FPS', x + labelW + 10, y + 8);
+    ctx.fillStyle = '#aaa'; ctx.fillText('平均', x + 10, y + 8 + lineHeight);
+    ctx.fillStyle = '#fff'; ctx.textAlign = 'right'; ctx.fillText(avgFps, x + panelW - 10, y + 8 + lineHeight);
+    ctx.textAlign = 'left'; ctx.fillText('FPS', x + labelW + 10, y + 8 + lineHeight);
+    ctx.fillStyle = '#aaa'; ctx.fillText('最低', x + 10, y + 8 + lineHeight * 2);
+    const minColor = minFps >= 55 ? '#10B981' : minFps >= 30 ? '#F59E0B' : '#EF4444';
+    ctx.fillStyle = minColor; ctx.textAlign = 'right'; ctx.fillText(minFps, x + panelW - 10, y + 8 + lineHeight * 2);
+    ctx.textAlign = 'left'; ctx.fillText('FPS', x + labelW + 10, y + 8 + lineHeight * 2);
+    return x;
+  }
+
+  function drawPauseButton(x, y) {
+    pauseBtnRect = { x, y, r: 16 };
+    const alpha = isPauseBtnHover ? 0.85 : 0.6;
+    ctx.fillStyle = 'rgba(0, 0, 0, ' + alpha + ')';
+    ctx.beginPath(); ctx.arc(x, y, 16, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#FFFFFF';
+    if (isPaused) {
+      ctx.beginPath();
+      ctx.moveTo(x - 4, y - 8);
+      ctx.lineTo(x - 4, y + 8);
+      ctx.lineTo(x + 8, y);
+      ctx.closePath();
+      ctx.fill();
+    } else {
+      ctx.fillRect(x - 6, y - 7, 4, 14);
+      ctx.fillRect(x + 2, y - 7, 4, 14);
+    }
+  }
+
   function render() {
+    if (score !== lastScore) {
+      scoreAnimTime = performance.now();
+      lastScore = score;
+    }
     const w = window.innerWidth, h = window.innerHeight;
     ctx.fillStyle = '#E0E0E0';
     ctx.fillRect(0, 0, w, h);
@@ -149,16 +226,40 @@ const RUNTIME_CODE = `
       }
       ctx.restore();
     }
-    ctx.fillStyle = 'rgba(0,0,0,0.6)';
-    ctx.beginPath(); ctx.roundRect(w - 80, 10, 70, 28, 4); ctx.fill();
-    ctx.fillStyle = '#fff'; ctx.font = '14px monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillText(currentFps + ' FPS', w - 45, 24);
+    const perfX = drawPerfPanel(currentFps, avgFps, minFps, w);
+    drawPauseButton(perfX - 24, 24);
+
+    const animElapsed = performance.now() - scoreAnimTime;
+    const animDuration = 200;
+    let scale = 1;
+    if (animElapsed < animDuration) {
+      const t = animElapsed / animDuration;
+      if (t < 0.5) { scale = 1 + t * 0.6; } else { scale = 1.3 - (t - 0.5) * 0.6; }
+    }
+    const sx = 70, sy = 24;
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
     ctx.beginPath(); ctx.roundRect(10, 10, 120, 28, 4); ctx.fill();
-    ctx.fillStyle = '#fff'; ctx.fillText('得分: ' + score, 70, 24);
+    ctx.fillStyle = '#FFFFFF';
+    ctx.font = '14px monospace';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('得分: ', 20, sy);
+    if (scale !== 1) {
+      ctx.save();
+      ctx.translate(sx + 10, sy);
+      ctx.scale(scale, scale);
+      ctx.translate(-(sx + 10), -sy);
+    }
+    ctx.fillStyle = '#10B981';
+    ctx.font = (14 * scale) + 'px monospace';
+    ctx.fillText(score, sx + 10, sy);
+    if (scale !== 1) ctx.restore();
+
     if (isPaused) {
       ctx.fillStyle = 'rgba(0,0,0,0.3)';
       ctx.fillRect(0, 0, w, h);
       ctx.fillStyle = '#fff'; ctx.font = 'bold 48px sans-serif';
+      ctx.textAlign = 'center';
       ctx.fillText('已暂停', w / 2, h / 2);
     }
   }
@@ -172,6 +273,12 @@ const RUNTIME_CODE = `
     if (now - fpsTime >= 500) {
       currentFps = Math.round(frameCount * 1000 / (now - fpsTime));
       frameCount = 0; fpsTime = now;
+      fpsHistory.push(currentFps);
+      if (fpsHistory.length > 120) fpsHistory.shift();
+      totalFpsSamples++;
+      totalFpsSum += currentFps;
+      avgFps = Math.round(totalFpsSum / totalFpsSamples);
+      minFps = Math.min.apply(null, fpsHistory);
     }
     if (!isPaused) update(dt);
     render();

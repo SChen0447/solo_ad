@@ -256,6 +256,9 @@ const EditorPanel: React.FC = () => {
     if (canvasRef.current && !rendererRef.current) {
       rendererRef.current = new RenderCanvas(canvasRef.current)
       rendererRef.current.setEditing(!gameState.isRunning)
+      rendererRef.current.setOnPauseClick(() => {
+        engineRef.current?.togglePause()
+      })
       resizeCanvas()
     }
     if (rendererRef.current) {
@@ -291,6 +294,8 @@ const EditorPanel: React.FC = () => {
         elements: engineRef.current.getState().elements,
         score: 0,
         fps: 0,
+        avgFps: 0,
+        minFps: 0,
         isPaused: false
       })
     }
