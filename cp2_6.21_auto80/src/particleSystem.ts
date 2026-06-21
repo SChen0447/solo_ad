@@ -11,7 +11,7 @@ interface ParticleData {
 export class ParticleSystem {
   public points: THREE.Points
   private geometry: THREE.BufferGeometry
-  private material: THREE.PointsMaterial
+  private material: THREE.ShaderMaterial
   private particles: ParticleData[] = []
   private positions: Float32Array
   private colors: Float32Array
@@ -38,15 +38,37 @@ export class ParticleSystem {
     this.geometry.setAttribute('position', new THREE.BufferAttribute(this.positions, 3))
     this.geometry.setAttribute('color', new THREE.BufferAttribute(this.colors, 3))
     this.geometry.setAttribute('size', new THREE.BufferAttribute(this.sizes, 1))
+    this.geometry.setAttribute('alpha', new THREE.BufferAttribute(this.alphas, 1))
 
-    this.material = new THREE.PointsMaterial({
-      size: 0.2,
+    this.material = new THREE.ShaderMaterial({
+      vertexShader: `
+        attribute float size;
+        attribute float alpha;
+        varying vec3 vColor;
+        varying float vAlpha;
+        void main() {
+          vColor = color;
+          vAlpha = alpha;
+          vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+          gl_PointSize = size * (300.0 / -mvPosition.z);
+          gl_Position = projectionMatrix * mvPosition;
+        }
+      `,
+      fragmentShader: `
+        varying vec3 vColor;
+        varying float vAlpha;
+        void main() {
+          vec2 center = gl_PointCoord - vec2(0.5);
+          float dist = length(center);
+          if (dist > 0.5) discard;
+          float edge = 1.0 - smoothstep(0.4, 0.5, dist);
+          gl_FragColor = vec4(vColor, vAlpha * edge);
+        }
+      `,
       vertexColors: true,
       transparent: true,
-      opacity: 0.9,
       blending: THREE.AdditiveBlending,
       depthWrite: false,
-      sizeAttenuation: true,
     })
 
     this.points = new THREE.Points(this.geometry, this.material)
@@ -155,12 +177,12 @@ export class ParticleSystem {
     const positionAttr = this.geometry.getAttribute('position') as THREE.BufferAttribute
     const colorAttr = this.geometry.getAttribute('color') as THREE.BufferAttribute
     const sizeAttr = this.geometry.getAttribute('size') as THREE.BufferAttribute
+    const alphaAttr = this.geometry.getAttribute('alpha') as THREE.BufferAttribute
 
     positionAttr.needsUpdate = true
     colorAttr.needsUpdate = true
     sizeAttr.needsUpdate = true
-
-    this.material.opacity = 0.8 + audioAmplitude * 0.2
+    alphaAttr.needsUpdate = true
   }
 
   public setParticleCount(count: number): void {
@@ -183,15 +205,37 @@ export class ParticleSystem {
     this.geometry.setAttribute('position', new THREE.BufferAttribute(this.positions, 3))
     this.geometry.setAttribute('color', new THREE.BufferAttribute(this.colors, 3))
     this.geometry.setAttribute('size', new THREE.BufferAttribute(this.sizes, 1))
+    this.geometry.setAttribute('alpha', new THREE.BufferAttribute(this.alphas, 1))
 
-    this.material = new THREE.PointsMaterial({
-      size: 0.2,
+    this.material = new THREE.ShaderMaterial({
+      vertexShader: `
+        attribute float size;
+        attribute float alpha;
+        varying vec3 vColor;
+        varying float vAlpha;
+        void main() {
+          vColor = color;
+          vAlpha = alpha;
+          vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+          gl_PointSize = size * (300.0 / -mvPosition.z);
+          gl_Position = projectionMatrix * mvPosition;
+        }
+      `,
+      fragmentShader: `
+        varying vec3 vColor;
+        varying float vAlpha;
+        void main() {
+          vec2 center = gl_PointCoord - vec2(0.5);
+          float dist = length(center);
+          if (dist > 0.5) discard;
+          float edge = 1.0 - smoothstep(0.4, 0.5, dist);
+          gl_FragColor = vec4(vColor, vAlpha * edge);
+        }
+      `,
       vertexColors: true,
       transparent: true,
-      opacity: 0.9,
       blending: THREE.AdditiveBlending,
       depthWrite: false,
-      sizeAttenuation: true,
     })
 
     this.points = new THREE.Points(this.geometry, this.material)

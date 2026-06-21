@@ -128,12 +128,15 @@ export class SceneManager {
     this.scene.add(this.reflectionPlane)
   }
 
-  public updateLights(audioAmplitude: number): void {
-    const pulseRange = 0.5
+  public updateLights(audioAmplitude: number, lowFrequencyAmplitude: number = 0): void {
+    const beatPulse = 0.5 + lowFrequencyAmplitude * 0.5
     this.pointLights.forEach((light, index) => {
-      const offset = index * 0.33
-      const pulse = 0.5 + 0.5 * Math.sin(Date.now() * 0.003 + offset * Math.PI * 2)
-      const intensity = this.lightBaseIntensities[index] * (0.5 + pulseRange * pulse) * (0.5 + audioAmplitude)
+      const phaseOffset = index * (Math.PI * 2 / this.pointLights.length)
+      const rhythmPulse = 0.5 + 0.5 * Math.sin(Date.now() * 0.005 + phaseOffset)
+      const combinedPulse = beatPulse * 0.7 + rhythmPulse * 0.3
+      const pulseIntensity = 0.5 + combinedPulse * 1.0
+      const clampedIntensity = Math.max(0.5, Math.min(1.5, pulseIntensity))
+      const intensity = this.lightBaseIntensities[index] * clampedIntensity * (0.6 + audioAmplitude * 0.4)
       light.intensity = Math.min(2.5, intensity)
     })
 

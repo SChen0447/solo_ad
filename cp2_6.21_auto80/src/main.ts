@@ -570,10 +570,12 @@ function startAnimationLoop(): void {
 
     let frequencyData = new Uint8Array(128)
     let amplitude = 0
+    let lowFreqAmplitude = 0
 
     if (audioAnalyzer && audioAnalyzer.isPlaying()) {
       frequencyData = audioAnalyzer.getFrequencyData()
       amplitude = audioAnalyzer.getAverageAmplitude()
+      lowFreqAmplitude = audioAnalyzer.getLowFrequencyAmplitude()
     }
 
     if (spectrumVisualizer) {
@@ -583,7 +585,7 @@ function startAnimationLoop(): void {
       particleSystem.update(time, amplitude)
     }
     if (sceneManager) {
-      sceneManager.updateLights(amplitude)
+      sceneManager.updateLights(amplitude, lowFreqAmplitude)
       sceneManager.render(time)
     }
   }
