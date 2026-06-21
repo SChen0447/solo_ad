@@ -1,0 +1,50 @@
+[
+  {
+    "id": "proj-001",
+    "title": "智能数据可视化平台",
+    "description": "基于 WebGL 的实时数据可视化系统，支持百万级数据点的流畅渲染与交互，采用模块化架构设计，可自定义图表类型与主题。",
+    "thumbnailUrl": "https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=modern%20data%20visualization%20dashboard%20with%20charts%20and%20graphs%20dark%20theme&image_size=square",
+    "projectUrl": "https://example.com/project-1",
+    "previewImageUrl": "https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=modern%20data%20visualization%20dashboard%20with%20charts%20and%20graphs%20dark%20theme&image_size=landscape_4_3"
+  },
+  {
+    "id": "proj-002",
+    "title": "3D 产品展示商城",
+    "description": "沉浸式电商产品展示平台，使用 Three.js 实现 3D 商品模型的 360 度浏览、动态光照效果和实时材质切换。",
+    "thumbnailUrl": "https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=3d%20product%20showcase%20ecommerce%20modern%20interface&image_size=square",
+    "projectUrl": "https://example.com/project-2",
+    "previewImageUrl": "https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=3d%20product%20showcase%20ecommerce%20modern%20interface&image_size=landscape_4_3"
+  },
+  {
+    "id": "proj-003",
+    "title": "音乐可视化播放器",
+    "description": "基于音频频谱分析的动态音乐可视化应用，支持多种可视化模式切换，实时生成与音乐节奏同步的粒子特效。",
+    "thumbnailUrl": "https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=music%20visualizer%20audio%20spectrum%20neon%20colors&image_size=square",
+    "projectUrl": "https://example.com/project-3",
+    "previewImageUrl": "https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=music%20visualizer%20audio%20spectrum%20neon%20colors&image_size=landscape_4_3"
+  },
+  {
+    "id": "proj-004",
+    "title": "虚拟艺术画廊",
+    "description": "线上 VR 艺术展览空间，支持第一人称漫游浏览艺术品，提供作品详情查看与收藏功能，打造沉浸式艺术体验。",
+    "thumbnailUrl": "https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=virtual%20art%20gallery%20museum%20interior%20modern&image_size=square",
+    "projectUrl": "https://example.com/project-4",
+    "previewImageUrl": "https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=virtual%20art%20gallery%20museum%20interior%20modern&image_size=landscape_4_3"
+  },
+  {
+    "id": "proj-005",
+    "title": "AI 图像生成工具",
+    "description": "集成多种 AI 模型的图像生成与编辑平台，支持文字转图像、风格迁移、智能修图等功能，操作简单直观。",
+    "thumbnailUrl": "https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=ai%20image%20generation%20tool%20interface%20creative&image_size=square",
+    "projectUrl": "https://example.com/project-5",
+    "previewImageUrl": "https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=ai%20image%20generation%20tool%20interface%20creative&image_size=landscape_4_3"
+  },
+  {
+    "id": "proj-006",
+    "title": "实时协作白板",
+    "description": "支持多人实时协作的在线白板应用，具备丰富的绘图工具、便签、思维导图等功能，同步延迟低于 50ms。",
+    "thumbnailUrl": "https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=online%20collaborative%20whiteboard%20teamwork%20digital&image_size=square",
+    "projectUrl": "https://example.com/project-6",
+    "previewImageUrl": "https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=online%20collaborative%20whiteboard%20teamwork%20digital&image_size=landscape_4_3"
+  }
+]

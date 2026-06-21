@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>3D 作品集展厅</title>
+  <link rel="stylesheet" href="/src/styles/main.css">
+</head>
+<body>
+  <div id="loading-screen" class="loading-screen">
+    <div class="loading-content">
+      <div class="hexagon-loader"></div>
+      <p class="loading-text">加载展厅中...</p>
+    </div>
+  </div>
+
+  <div id="canvas-container" class="canvas-container"></div>
+
+  <div id="controls-hint" class="controls-hint">
+    <div class="hint-item"><span class="hint-key">WASD</span> 移动</div>
+    <div class="hint-item"><span class="hint-key">鼠标</span> 视角</div>
+    <div class="hint-item"><span class="hint-key">点击</span> 交互</div>
+  </div>
+
+  <div id="fps-counter" class="fps-counter">
+    <div class="fps-value">-- FPS</div>
+    <div class="fps-chart">
+      <div class="fps-bar"></div>
+      <div class="fps-bar"></div>
+      <div class="fps-bar"></div>
+      <div class="fps-bar"></div>
+      <div class="fps-bar"></div>
+      <div class="fps-bar"></div>
+      <div class="fps-bar"></div>
+      <div class="fps-bar"></div>
+      <div class="fps-bar"></div>
+      <div class="fps-bar"></div>
+    </div>
+  </div>
+
+  <div id="detail-card" class="detail-card hidden">
+    <div class="card-content">
+      <img id="card-thumbnail" class="card-thumbnail" src="" alt="项目缩略图">
+      <div class="card-info">
+        <h2 id="card-title" class="card-title"></h2>
+        <p id="card-description" class="card-description"></p>
+      </div>
+      <a id="card-button" class="card-button" href="#" target="_blank" rel="noopener">查看项目</a>
+    </div>
+  </div>
+
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
