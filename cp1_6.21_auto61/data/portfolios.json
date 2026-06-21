@@ -1,0 +1,102 @@
+[
+  {
+    "id": "portfolio-1",
+    "name": "梦幻森林系列",
+    "coverImage": "https://images.unsplash.com/photo-1513364776144-60967b0f800f?w=600",
+    "createdAt": "2024-01-15",
+    "tools": ["Procreate", "Photoshop"],
+    "description": "探索神秘森林中的精灵与奇幻生物，使用数字绘画技法营造梦幻氛围。通过细腻的光影和丰富的色彩层次，呈现出一个充满魔力的童话世界。",
+    "images": [
+      "https://images.unsplash.com/photo-1513364776144-60967b0f800f?w=1200",
+      "https://images.unsplash.com/photo-1578301978693-85fa9c0320b9?w=1200",
+      "https://images.unsplash.com/photo-1579783902614-a3fb3927b6a5?w=1200"
+    ],
+    "comments": [
+      {
+        "id": "comment-1",
+        "author": "艺术爱好者",
+        "content": "这个系列的色彩太梦幻了！请问是用什么画笔绘制的？",
+        "createdAt": "2024-01-20T10:30:00Z"
+      }
+    ]
+  },
+  {
+    "id": "portfolio-2",
+    "name": "城市速写日记",
+    "coverImage": "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=600",
+    "createdAt": "2024-02-10",
+    "tools": ["水彩", "速写本", "钢笔"],
+    "description": "记录旅途中的城市风景，用水彩和钢笔捕捉街角巷尾的生活气息。每一幅都是一个故事，记录着不同城市的独特韵味。",
+    "images": [
+      "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=1200",
+      "https://images.unsplash.com/photo-1513519245088-0e12902e5a38?w=1200",
+      "https://images.unsplash.com/photo-1521133573892-e44906baee46?w=1200"
+    ],
+    "comments": []
+  },
+  {
+    "id": "portfolio-3",
+    "name": "角色概念设计",
+    "coverImage": "https://images.unsplash.com/photo-1560807707-8cc77767d783?w=600",
+    "createdAt": "2024-03-05",
+    "tools": ["Photoshop", "Illustrator", "手绘板"],
+    "description": "为游戏和动画项目创作的原创角色，结合数字绘画与传统手绘技法，赋予角色独特的个性与故事背景。",
+    "images": [
+      "https://images.unsplash.com/photo-1560807707-8cc77767d783?w=1200",
+      "https://images.unsplash.com/photo-1547891654-e66ed7ebb968?w=1200",
+      "https://images.unsplash.com/photo-1549490349-8643362247b5?w=1200"
+    ],
+    "comments": [
+      {
+        "id": "comment-2",
+        "author": "游戏制作人",
+        "content": "角色设计非常有特色，想邀请您参与我们的新项目。",
+        "createdAt": "2024-03-10T14:20:00Z",
+        "reply": "感谢您的认可！期待与您合作，请通过询价表单联系我。",
+        "replyAt": "2024-03-10T16:00:00Z"
+      }
+    ]
+  },
+  {
+    "id": "portfolio-4",
+    "name": "东方神话系列",
+    "coverImage": "https://images.unsplash.com/photo-1549289524-06cf8837ace5?w=600",
+    "createdAt": "2024-04-12",
+    "tools": ["水彩", "Photoshop", "金粉"],
+    "description": "以东方神话传说为灵感的插画系列，融合传统水墨意境与现代数字技法，展现古老故事的当代诠释。",
+    "images": [
+      "https://images.unsplash.com/photo-1549289524-06cf8837ace5?w=1200",
+      "https://images.unsplash.com/photo-1518640467707-6811f4a6ab73?w=1200",
+      "https://images.unsplash.com/photo-1578926375605-eaf7559b1458?w=1200"
+    ],
+    "comments": []
+  },
+  {
+    "id": "portfolio-5",
+    "name": "科幻未来主义",
+    "coverImage": "https://images.unsplash.com/photo-1633186710895-309db2eca9e4?w=600",
+    "createdAt": "2024-05-20",
+    "tools": ["Blender", "Photoshop", "Procreate"],
+    "description": "探索未来科技与人类文明的边界，通过3D辅助数字绘画构建宏大的科幻场景，展现对未来的无限想象。",
+    "images": [
+      "https://images.unsplash.com/photo-1633186710895-309db2eca9e4?w=1200",
+      "https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=1200",
+      "https://images.unsplash.com/photo-1446776811953-b23d57bd21aa?w=1200"
+    ],
+    "comments": []
+  },
+  {
+    "id": "portfolio-6",
+    "name": "治愈系植物绘",
+    "coverImage": "https://images.unsplash.com/photo-1490750967868-88aa4486c946?w=600",
+    "createdAt": "2024-06-08",
+    "tools": ["水彩", "彩铅"],
+    "description": "描绘自然界中的花草植物，用细腻的笔触和柔和的色彩传递温暖治愈的力量，让观者感受到自然的美好。",
+    "images": [
+      "https://images.unsplash.com/photo-1490750967868-88aa4486c946?w=1200",
+      "https://images.unsplash.com/photo-1509423350716-97f9360b4e09?w=1200",
+      "https://images.unsplash.com/photo-1485955900006-10f4d324d411?w=1200"
+    ],
+    "comments": []
+  }
+]

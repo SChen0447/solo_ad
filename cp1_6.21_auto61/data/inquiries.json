@@ -1,0 +1,74 @@
+[
+  {
+    "id": "inquiry-1",
+    "budget": "3000-5000",
+    "description": "需要一张商业插画用于产品包装设计，产品是有机茶叶品牌，希望风格偏自然、清新、有东方韵味。参考您的东方神话系列风格。",
+    "expectedDate": "2024-07-15",
+    "createdAt": "2024-06-15T10:30:00Z",
+    "status": "pending",
+    "messages": [
+      {
+        "id": "msg-1",
+        "sender": "client",
+        "content": "您好！非常喜欢您的东方神话系列，想邀请您为我们的茶叶品牌创作一张主视觉插画。",
+        "createdAt": "2024-06-15T10:30:00Z"
+      }
+    ]
+  },
+  {
+    "id": "inquiry-2",
+    "budget": "1000-3000",
+    "description": "需要绘制5个社交媒体头像，用于个人品牌形象，风格简约可爱，每个头像代表不同的性格特征。",
+    "expectedDate": "2024-07-01",
+    "createdAt": "2024-06-10T14:20:00Z",
+    "status": "replied",
+    "messages": [
+      {
+        "id": "msg-2",
+        "sender": "client",
+        "content": "您好！我是一名博主，需要一套社交媒体头像。",
+        "createdAt": "2024-06-10T14:20:00Z"
+      },
+      {
+        "id": "msg-3",
+        "sender": "designer",
+        "content": "您好！感谢您的询价。5个头像的费用是2500元，包含2轮修改，预计7天完成。请问您有具体的风格参考吗？",
+        "createdAt": "2024-06-10T16:00:00Z"
+      }
+    ]
+  },
+  {
+    "id": "inquiry-3",
+    "budget": "5000以上",
+    "description": "独立游戏工作室需要整套角色设计，包括主角、3个NPC、BOSS，需要立绘和三视图，风格偏向赛博朋克。",
+    "expectedDate": "2024-08-30",
+    "createdAt": "2024-05-28T09:00:00Z",
+    "status": "completed",
+    "messages": [
+      {
+        "id": "msg-4",
+        "sender": "client",
+        "content": "您好！我们是独立游戏工作室，看到您的科幻系列非常符合我们的需求。",
+        "createdAt": "2024-05-28T09:00:00Z"
+      },
+      {
+        "id": "msg-5",
+        "sender": "designer",
+        "content": "您好！非常荣幸能参与你们的项目。整套角色设计报价8000元，包含每个角色的立绘、三视图和3轮修改。",
+        "createdAt": "2024-05-28T11:00:00Z"
+      },
+      {
+        "id": "msg-6",
+        "sender": "client",
+        "content": "价格可以接受，我们希望下周能开始。",
+        "createdAt": "2024-05-28T14:30:00Z"
+      },
+      {
+        "id": "msg-7",
+        "sender": "designer",
+        "content": "没问题！我会准备好合同和预付款链接发给您。期待合作！",
+        "createdAt": "2024-05-28T15:00:00Z"
+      }
+    ]
+  }
+]
