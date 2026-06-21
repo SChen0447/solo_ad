@@ -2,13 +2,21 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { poems, EMOTION_COLORS, type EmotionTag, type Poem } from './PoemData';
 
 interface CardState {
+  uid: number;
   poem: Poem;
   x: number;
+  startY: number;
   targetY: number;
   currentY: number;
   rotation: number;
+  startTime: number;
+  duration: number;
   settled: boolean;
+  settledAt: number | null;
+  fadingOut: boolean;
   opacity: number;
+  offsetX: number;
+  forcedOpacity: number | null;
 }
 
 function getCardWidth(): number {
@@ -32,19 +40,48 @@ function shuffleArray<T>(arr: T[]): T[] {
   return a;
 }
 
+function easeOutCubic(t: number): number {
+  return 1 - Math.pow(1 - t, 3);
+}
+
+const MAX_CARDS = 15;
+const MIN_CARDS = 10;
+const SETTLE_DURATION = 5000;
+const FADE_DURATION = 1000;
+
 const PoemFall: React.FC = () => {
   const [cards, setCards] = useState<CardState[]>([]);
   const [activeTag, setActiveTag] = useState<EmotionTag | null>(null);
   const [scrollY, setScrollY] = useState(0);
+  const [hoveredUid, setHoveredUid] = useState<number | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const animFrameRef = useRef<number>(0);
   const nextIndexRef = useRef(0);
+  const nextUidRef = useRef(1);
   const cardsRef = useRef<CardState[]>([]);
+  const speedRef = useRef(getFallSpeed());
   const shuffledPoems = useMemo(() => shuffleArray(poems), []);
 
   cardsRef.current = cards;
 
-  const addCard = useCallback(() => {
+  const findNeighbors = useCallback((uid: number): { prevUid: number | null; nextUid: number | null } => {
+    const settledCards = cardsRef.current
+      .filter(c => c.settled)
+      .sort((a, b) => a.targetY - b.targetY);
+    const idx = settledCards.findIndex(c => c.uid === uid);
+    if (idx === -1) return { prevUid: null, nextUid: null };
+    return {
+      prevUid: idx > 0 ? settledCards[idx - 1].uid : null,
+      nextUid: idx < settledCards.length - 1 ? settledCards[idx + 1].uid : null,
+    };
+  }, []);
+
+  const { prevUid, nextUid } = useMemo(() => {
+    if (hoveredUid === null) return { prevUid: null, nextUid: null };
+    return findNeighbors(hoveredUid);
+  }, [hoveredUid, findNeighbors]);
+
+  const createCard = useCallback((): CardState => {
     const idx = nextIndexRef.current % shuffledPoems.length;
     nextIndexRef.current += 1;
     const poem = shuffledPoems[idx];
@@ -53,59 +90,130 @@ const PoemFall: React.FC = () => {
     const centerX = containerWidth / 2 - cardWidth / 2;
     const x = centerX + (Math.random() * 160 - 80);
     const rotation = Math.random() * 10 - 5;
-    const existingSettled = cardsRef.current.filter(c => c.settled);
+    const existingSettled = cardsRef.current.filter(c => c.settled && !c.fadingOut);
     const maxY = existingSettled.length > 0
       ? Math.max(...existingSettled.map(c => c.targetY)) + 60
       : 80;
     const targetY = maxY + Math.random() * 40;
+    const baseDuration = 15000 + Math.random() * 10000;
+    const duration = baseDuration / speedRef.current;
+    const startY = -400;
 
-    const newCard: CardState = {
+    return {
+      uid: nextUidRef.current++,
       poem,
       x,
+      startY,
       targetY,
-      currentY: -400,
+      currentY: startY,
       rotation,
+      startTime: performance.now(),
+      duration,
       settled: false,
+      settledAt: null,
+      fadingOut: false,
       opacity: 1,
+      offsetX: 0,
+      forcedOpacity: null,
     };
-
-    setCards(prev => [...prev, newCard]);
   }, [shuffledPoems]);
+
+  const addCard = useCallback(() => {
+    if (cardsRef.current.length >= MAX_CARDS) return;
+    const newCard = createCard();
+    setCards(prev => [...prev, newCard]);
+  }, [createCard]);
 
   useEffect(() => {
     const initialCount = 5;
     for (let i = 0; i < initialCount; i++) {
-      setTimeout(() => addCard(), i * 600);
+      setTimeout(() => {
+        const card = createCard();
+        setCards(prev => [...prev, card]);
+      }, i * 600);
     }
+  }, [createCard]);
+
+  useEffect(() => {
     const interval = setInterval(() => {
-      if (cardsRef.current.length < 30) {
+      const total = cardsRef.current.length;
+      if (total < MIN_CARDS) {
+        const toAdd = Math.min(2, MIN_CARDS - total);
+        for (let i = 0; i < toAdd; i++) {
+          setTimeout(() => addCard(), i * 400);
+        }
+      } else if (total < MAX_CARDS && Math.random() > 0.5) {
         addCard();
       }
-    }, 1800);
+    }, 2000);
     return () => clearInterval(interval);
   }, [addCard]);
 
   useEffect(() => {
-    const speed = getFallSpeed();
-    let lastTime = performance.now();
+    const onResize = () => {
+      speedRef.current = getFallSpeed();
+    };
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
 
+  useEffect(() => {
     const animate = (time: number) => {
-      const delta = (time - lastTime) / 16.67;
-      lastTime = time;
-
       setCards(prev => {
         let changed = false;
-        const next = prev.map(card => {
-          if (card.settled) return card;
-          const step = 1.2 * speed * delta;
-          const newY = card.currentY + step;
-          if (newY >= card.targetY) {
+        const next: CardState[] = [];
+        let removedCount = 0;
+
+        for (const card of prev) {
+          let updated = { ...card };
+
+          if (card.fadingOut) {
+            const fadeStart = (card.settledAt ?? 0) + SETTLE_DURATION;
+            const fadeProgress = Math.min((time - fadeStart) / FADE_DURATION, 1);
+            updated.opacity = 1 - fadeProgress;
+            if (updated.opacity <= 0) {
+              removedCount++;
+              changed = true;
+              continue;
+            }
             changed = true;
-            return { ...card, currentY: card.targetY, settled: true };
+          } else if (!card.settled) {
+            const elapsed = time - card.startTime;
+            const progress = Math.min(elapsed / card.duration, 1);
+            const easedProgress = easeOutCubic(progress);
+            updated.currentY = card.startY + (card.targetY - card.startY) * easedProgress;
+
+            if (progress >= 1) {
+              updated.settled = true;
+              updated.settledAt = time;
+            }
+            changed = true;
+          } else if (card.settled && card.settledAt !== null && !card.fadingOut) {
+            if (time - card.settledAt >= SETTLE_DURATION) {
+              updated.fadingOut = true;
+              changed = true;
+            }
           }
-          changed = true;
-          return { ...card, currentY: newY };
-        });
+
+          if (updated.uid === prevUid || updated.uid === nextUid) {
+            updated.offsetX = updated.uid === prevUid ? -10 : 10;
+            updated.forcedOpacity = 0.7;
+            changed = true;
+          } else if (updated.offsetX !== 0 || updated.forcedOpacity !== null) {
+            updated.offsetX = 0;
+            updated.forcedOpacity = null;
+            changed = true;
+          }
+
+          next.push(updated);
+        }
+
+        if (removedCount > 0) {
+          for (let i = 0; i < removedCount; i++) {
+            setTimeout(() => addCard(), i * 600 + Math.random() * 300);
+          }
+        }
+
         return changed ? next : prev;
       });
 
@@ -114,7 +222,7 @@ const PoemFall: React.FC = () => {
 
     animFrameRef.current = requestAnimationFrame(animate);
     return () => cancelAnimationFrame(animFrameRef.current);
-  }, []);
+  }, [prevUid, nextUid, addCard]);
 
   useEffect(() => {
     const onScroll = () => setScrollY(window.scrollY);
@@ -162,39 +270,45 @@ const PoemFall: React.FC = () => {
           paddingBottom: 200,
         }}
       >
-        {cards.map((card, idx) => {
+        {cards.map(card => {
           const isFiltered = activeTag !== null && card.poem.tag !== activeTag;
           const tagColor = EMOTION_COLORS[card.poem.tag];
           const cardWidth = getCardWidth();
+          const isHovered = hoveredUid === card.uid;
+          const isNeighbor = card.uid === prevUid || card.uid === nextUid;
+
+          const baseOpacity = card.forcedOpacity !== null ? card.forcedOpacity : card.opacity;
+          const displayedOpacity = isFiltered ? Math.min(0.2, baseOpacity) : baseOpacity;
+
+          const scale = isHovered ? 1.08 : 1.0;
+          const offsetX = card.offsetX;
+          const boxShadow = isHovered
+            ? '4px 8px 28px rgba(0,0,0,0.45)'
+            : '2px 4px 16px rgba(0,0,0,0.25)';
 
           return (
             <div
-              key={`${card.poem.id}-${idx}`}
+              key={card.uid}
               className="poem-card"
               style={{
                 position: 'absolute',
-                left: card.x,
+                left: card.x + offsetX,
                 top: card.currentY,
                 width: cardWidth,
-                opacity: isFiltered ? 0.2 : card.opacity,
-                transform: `rotate(${card.rotation}deg) translateZ(0)`,
-                willChange: 'transform, opacity',
-                transition: 'opacity 0.4s ease-out, transform 0.3s ease-out',
+                opacity: displayedOpacity,
+                transform: `rotate(${card.rotation}deg) scale(${scale}) translateZ(0)`,
+                willChange: 'transform, opacity, left',
+                transition: 'transform 0.3s ease-out, left 0.3s ease-out, opacity 0.4s ease-out',
                 background: 'rgba(250, 240, 230, 0.85)',
                 borderRadius: 6,
                 padding: '20px 24px',
-                boxShadow: '2px 4px 16px rgba(0,0,0,0.25)',
+                boxShadow,
                 fontFamily: "'KaiTi', 'STKaiti', serif",
                 cursor: 'pointer',
+                zIndex: isHovered ? 10 : (isNeighbor ? 5 : 1),
               }}
-              onMouseEnter={e => {
-                (e.currentTarget as HTMLDivElement).style.transform = `rotate(${card.rotation}deg) scale(1.08) translateZ(0)`;
-                (e.currentTarget as HTMLDivElement).style.boxShadow = '4px 8px 28px rgba(0,0,0,0.45)';
-              }}
-              onMouseLeave={e => {
-                (e.currentTarget as HTMLDivElement).style.transform = `rotate(${card.rotation}deg) scale(1) translateZ(0)`;
-                (e.currentTarget as HTMLDivElement).style.boxShadow = '2px 4px 16px rgba(0,0,0,0.25)';
-              }}
+              onMouseEnter={() => setHoveredUid(card.uid)}
+              onMouseLeave={() => setHoveredUid(null)}
             >
               <div
                 style={{
