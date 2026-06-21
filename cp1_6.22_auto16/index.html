@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>四季光照与树冠密度交互可视化</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #1a1a2e;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      color: #ffffff;
+    }
+
+    #app {
+      width: 100%;
+      height: 100%;
+      position: relative;
+    }
+
+    #canvas-container {
+      width: 100%;
+      height: 100%;
+    }
+
+    #stats-panel {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      background: rgba(26, 26, 46, 0.85);
+      padding: 16px 20px;
+      border-radius: 8px;
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      font-size: 14px;
+      line-height: 1.8;
+      z-index: 100;
+    }
+
+    #stats-panel .stat-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 20px;
+    }
+
+    #stats-panel .stat-label {
+      color: rgba(255, 255, 255, 0.6);
+    }
+
+    #stats-panel .stat-value {
+      color: #fff;
+      font-weight: 600;
+    }
+
+    #season-selector {
+      position: absolute;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      gap: 10px;
+      z-index: 100;
+      background: rgba(26, 26, 46, 0.85);
+      padding: 10px;
+      border-radius: 8px;
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .season-btn {
+      padding: 10px 24px;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 600;
+      color: #fff;
+      transition: all 0.2s ease;
+      transform-origin: center;
+    }
+
+    .season-btn:active {
+      transform: scale(0.92);
+    }
+
+    .season-btn[data-season="spring"] {
+      background: #6bbf59;
+    }
+    .season-btn[data-season="spring"].active {
+      background: #88cc44;
+      box-shadow: 0 0 20px rgba(136, 204, 68, 0.5);
+    }
+
+    .season-btn[data-season="summer"] {
+      background: #1e5631;
+    }
+    .season-btn[data-season="summer"].active {
+      background: #2d7f2d;
+      box-shadow: 0 0 20px rgba(45, 127, 45, 0.5);
+    }
+
+    .season-btn[data-season="autumn"] {
+      background: #cc7722;
+    }
+    .season-btn[data-season="autumn"].active {
+      background: #ff9933;
+      box-shadow: 0 0 20px rgba(255, 153, 51, 0.5);
+    }
+
+    .season-btn[data-season="winter"] {
+      background: #4a6b8a;
+    }
+    .season-btn[data-season="winter"].active {
+      background: #7ab8e0;
+      box-shadow: 0 0 20px rgba(122, 184, 224, 0.5);
+    }
+
+    #params-panel {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      width: 280px;
+      background: rgba(26, 26, 46, 0.85);
+      padding: 16px 20px;
+      border-radius: 8px;
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      z-index: 100;
+      max-height: calc(100vh - 200px);
+      overflow-y: auto;
+    }
+
+    #params-panel .panel-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      cursor: pointer;
+      margin-bottom: 12px;
+      user-select: none;
+    }
+
+    #params-panel .panel-header h3 {
+      font-size: 15px;
+      font-weight: 600;
+    }
+
+    #params-panel .panel-header .toggle-icon {
+      transition: transform 0.3s ease;
+      font-size: 12px;
+    }
+
+    #params-panel.collapsed .panel-header .toggle-icon {
+      transform: rotate(-90deg);
+    }
+
+    #params-panel.collapsed .panel-content {
+      display: none;
+    }
+
+    .param-group {
+      margin-bottom: 16px;
+    }
+
+    .param-group label {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 6px;
+      font-size: 13px;
+      color: rgba(255, 255, 255, 0.8);
+    }
+
+    .param-group .param-value {
+      color: #64b5f6;
+      font-weight: 600;
+    }
+
+    .param-group input[type="range"] {
+      width: 100%;
+      height: 6px;
+      border-radius: 3px;
+      background: linear-gradient(90deg, #667eea, #764ba2);
+      outline: none;
+      -webkit-appearance: none;
+      appearance: none;
+    }
+
+    .param-group input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: #fff;
+      cursor: pointer;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+    }
+
+    .param-group input[type="range"]::-moz-range-thumb {
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: #fff;
+      cursor: pointer;
+      border: none;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+    }
+
+    #timeline-container {
+      position: absolute;
+      bottom: 30px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 80%;
+      max-width: 800px;
+      z-index: 100;
+    }
+
+    #timeline-labels {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 8px;
+      font-size: 12px;
+      color: rgba(255, 255, 255, 0.6);
+      padding: 0 10px;
+    }
+
+    #timeline {
+      position: relative;
+      height: 12px;
+      background: linear-gradient(90deg, 
+        #0a1628 0%, 
+        #1a237e 15%, 
+        #ff9800 40%, 
+        #ffc107 50%, 
+        #ff9800 60%, 
+        #1a237e 85%, 
+        #0a1628 100%
+      );
+      border-radius: 6px;
+      cursor: pointer;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+    }
+
+    #timeline-thumb {
+      position: absolute;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      width: 24px;
+      height: 24px;
+      background: #fff;
+      border-radius: 50%;
+      cursor: grab;
+      box-shadow: 0 0 15px rgba(255, 193, 7, 0.8), 0 2px 8px rgba(0, 0, 0, 0.4);
+      transition: box-shadow 0.1s ease;
+      user-select: none;
+    }
+
+    #timeline-thumb.dragging {
+      cursor: grabbing;
+      box-shadow: 0 0 25px rgba(255, 193, 7, 1), 0 2px 8px rgba(0, 0, 0, 0.4);
+    }
+
+    #timeline-thumb::after {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 10px;
+      height: 10px;
+      background: linear-gradient(135deg, #ff9800, #ffc107);
+      border-radius: 50%;
+    }
+
+    @media (max-width: 768px) {
+      #season-selector {
+        top: auto;
+        bottom: 100px;
+        flex-wrap: wrap;
+        justify-content: center;
+        max-width: 90%;
+      }
+
+      #params-panel {
+        width: calc(100% - 40px);
+        top: auto;
+        bottom: 200px;
+        right: 20px;
+        left: 20px;
+      }
+
+      #stats-panel {
+        top: 10px;
+        left: 10px;
+        right: 10px;
+        padding: 10px 14px;
+      }
+
+      #timeline-container {
+        width: 90%;
+        bottom: 20px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <div id="canvas-container"></div>
+
+    <div id="stats-panel">
+      <div class="stat-row">
+        <span class="stat-label">季节:</span>
+        <span class="stat-value" id="stat-season">春季</span>
+      </div>
+      <div class="stat-row">
+        <span class="stat-label">时间:</span>
+        <span class="stat-value" id="stat-time">12:00</span>
+      </div>
+      <div class="stat-row">
+        <span class="stat-label">太阳高度角:</span>
+        <span class="stat-value" id="stat-elevation">60°</span>
+      </div>
+      <div class="stat-row">
+        <span class="stat-label">叶片数量:</span>
+        <span class="stat-value" id="stat-leaves">0</span>
+      </div>
+    </div>
+
+    <div id="season-selector">
+      <button class="season-btn active" data-season="spring">春</button>
+      <button class="season-btn" data-season="summer">夏</button>
+      <button class="season-btn" data-season="autumn">秋</button>
+      <button class="season-btn" data-season="winter">冬</button>
+    </div>
+
+    <div id="params-panel">
+      <div class="panel-header">
+        <h3>树木参数</h3>
+        <span class="toggle-icon">▼</span>
+      </div>
+      <div class="panel-content">
+        <div class="param-group">
+          <label>
+            <span>树高 (米)</span>
+            <span class="param-value" id="height-value">8</span>
+          </label>
+          <input type="range" id="height-slider" min="2" max="15" step="0.5" value="8">
+        </div>
+        <div class="param-group">
+          <label>
+            <span>冠幅 (米)</span>
+            <span class="param-value" id="crown-value">5</span>
+          </label>
+          <input type="range" id="crown-slider" min="1" max="8" step="0.5" value="5">
+        </div>
+        <div class="param-group">
+          <label>
+            <span>主干弯曲度 (弧度)</span>
+            <span class="param-value" id="curvature-value">0.1</span>
+          </label>
+          <input type="range" id="curvature-slider" min="0" max="0.5" step="0.01" value="0.1">
+        </div>
+      </div>
+    </div>
+
+    <div id="timeline-container">
+      <div id="timeline-labels">
+        <span>0:00</span>
+        <span>6:00</span>
+        <span>12:00</span>
+        <span>18:00</span>
+        <span>24:00</span>
+      </div>
+      <div id="timeline">
+        <div id="timeline-thumb" style="left: 50%;"></div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
