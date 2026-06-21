@@ -368,44 +368,52 @@ export class ForestScene {
     this.camera.lookAt(lookAt);
   }
 
-  private updateTrees(deltaTime: number, time: number): void {
-    this.trees.forEach(tree => {
-      const swayAngle = Math.sin(time * tree.data.swayFrequency + tree.data.swayOffset) * tree.data.swayAmplitude;
-      tree.data.group.rotation.z = swayAngle * 0.3;
-      tree.data.group.rotation.x = swayAngle * 0.2;
-      
-      const crown = tree.data.group.children.find(c => c.userData.isCrown);
-      if (crown) {
-        crown.position.x = swayAngle * 2;
-        crown.position.z = swayAngle * 1.5;
-      }
-    });
-  }
-
   private updateMorph(deltaTime: number): void {
     const morphSpeed = 1 / 0.8;
     
     this.trees.forEach(tree => {
-      if (!tree.isMorphing || !tree.originalPositions || !tree.targetPositions) return;
+      if (!tree.isMorphing || !tree.nextData) return;
       
       tree.morphProgress += deltaTime * morphSpeed;
       
       if (tree.morphProgress >= 1) {
+        this.scene.remove(tree.data.group);
+        this.disposeTreeData(tree.data);
+        
+        tree.data = tree.nextData;
+        tree.data.group.scale.setScalar(tree.baseScale);
+        tree.nextData = null;
         tree.morphProgress = 1;
         tree.isMorphing = false;
         return;
       }
       
       const t = this.easeInOutCubic(tree.morphProgress);
-      const positions = tree.data.trunkGeometry.attributes.position.array as Float32Array;
+      const halfT = 0.5;
       
-      for (let i = 0; i < tree.targetPositions.length; i++) {
-        positions[i] = tree.originalPositions[i] * (1 - t) + tree.targetPositions[i] * t;
+      if (t < halfT) {
+        const fadeOutT = t / halfT;
+        const outScale = tree.baseScale * (1 - this.easeInCubic(fadeOutT));
+        tree.data.group.scale.setScalar(Math.max(0, outScale));
+      } else {
+        if (!tree.nextData.group.visible) {
+          tree.nextData.group.visible = true;
+        }
+        tree.data.group.scale.setScalar(0);
+        
+        const fadeInT = (t - halfT) / halfT;
+        const inScale = tree.baseScale * this.easeOutCubic(fadeInT);
+        tree.nextData.group.scale.setScalar(Math.min(tree.baseScale, inScale));
       }
-      
-      tree.data.trunkGeometry.attributes.position.needsUpdate = true;
-      tree.data.trunkGeometry.computeVertexNormals();
     });
+  }
+
+  private easeInCubic(t: number): number {
+    return t * t * t;
+  }
+
+  private easeOutCubic(t: number): number {
+    return 1 - Math.pow(1 - t, 3);
   }
 
   private easeInOutCubic(t: number): number {

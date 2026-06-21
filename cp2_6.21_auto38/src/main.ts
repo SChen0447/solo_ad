@@ -16,6 +16,7 @@ class FractalForestApp {
   
   private statusBar: HTMLElement;
   private fpsElement: HTMLElement;
+  private windElement: HTMLElement;
   private treeCountElement: HTMLElement;
   private speedElement: HTMLElement;
   
@@ -53,6 +54,7 @@ class FractalForestApp {
     
     this.statusBar = document.createElement('div');
     this.fpsElement = document.createElement('span');
+    this.windElement = document.createElement('span');
     this.treeCountElement = document.createElement('span');
     this.speedElement = document.createElement('span');
     
@@ -100,14 +102,17 @@ class FractalForestApp {
     `;
     
     this.fpsElement.textContent = 'FPS: 60';
+    this.windElement.textContent = '风力: 100%';
     this.treeCountElement.textContent = '树木: 0';
     this.speedElement.textContent = '速度: 0.0x';
     
     this.fpsElement.style.cssText = 'font-family: monospace;';
+    this.windElement.style.cssText = 'font-family: monospace;';
     this.treeCountElement.style.cssText = 'font-family: monospace;';
     this.speedElement.style.cssText = 'font-family: monospace;';
     
     this.statusBar.appendChild(this.fpsElement);
+    this.statusBar.appendChild(this.windElement);
     this.statusBar.appendChild(this.treeCountElement);
     this.statusBar.appendChild(this.speedElement);
     
@@ -453,6 +458,9 @@ class FractalForestApp {
     
     this.animationController.update(deltaTime);
     this.forestScene.update(deltaTime, this.animationController.getTime());
+    
+    const windPercent = Math.round(this.animationController.getWindStrength() * 100);
+    this.windElement.textContent = `风力: ${windPercent}%`;
   }
 
   stop(): void {

@@ -19,6 +19,10 @@ export class AnimationController {
   
   private ambientStartColor: THREE.Color = new THREE.Color(0x404060);
   private ambientEndColor: THREE.Color = new THREE.Color(0x101020);
+  
+  private windStrength: number = 1.0;
+  private maxWindStrength: number = 1.0;
+  private minWindStrength: number = 0.3;
 
   constructor(forestScene: ForestScene) {
     this.forestScene = forestScene;
@@ -35,7 +39,12 @@ export class AnimationController {
     
     const t = this.dayNightCycleTime / this.dayNightCycleDuration;
     this.updateDayNightCycle(t);
+    this.updateWindStrength(t);
     this.updateTreeSway(deltaTime, this.time);
+  }
+
+  private updateWindStrength(t: number): void {
+    this.windStrength = this.maxWindStrength - (this.maxWindStrength - this.minWindStrength) * t;
   }
 
   private updateDayNightCycle(t: number): void {
@@ -71,23 +80,30 @@ export class AnimationController {
 
   private updateTreeSway(deltaTime: number, time: number): void {
     const trees = this.forestScene.getTrees();
+    const wind = this.windStrength;
     
     trees.forEach(tree => {
-      const swayAngle = Math.sin(time * tree.data.swayFrequency + tree.data.swayOffset) * tree.data.swayAmplitude;
-      const swayAngleX = Math.cos(time * tree.data.swayFrequency * 0.7 + tree.data.swayOffset * 1.3) * tree.data.swayAmplitude * 0.7;
+      const effectiveFrequency = tree.data.swayFrequency * wind;
+      const effectiveAmplitude = tree.data.swayAmplitude * wind;
+      
+      const swayAngle = Math.sin(time * effectiveFrequency + tree.data.swayOffset) * effectiveAmplitude;
+      const swayAngleX = Math.cos(time * effectiveFrequency * 0.7 + tree.data.swayOffset * 1.3) * effectiveAmplitude * 0.7;
       
       tree.data.group.rotation.z = swayAngle;
       tree.data.group.rotation.x = swayAngleX;
       
-      this.updateBranchSway(tree, time);
+      this.updateBranchSway(tree, time, wind);
     });
   }
 
-  private updateBranchSway(tree: TreeInstance, time: number): void {
+  private updateBranchSway(tree: TreeInstance, time: number, wind: number): void {
     const crown = tree.data.group.children.find(c => c.userData.isCrown);
     if (crown) {
-      const swayX = Math.sin(time * tree.data.swayFrequency + tree.data.swayOffset) * tree.data.swayAmplitude * 3;
-      const swayZ = Math.cos(time * tree.data.swayFrequency * 0.8 + tree.data.swayOffset) * tree.data.swayAmplitude * 2;
+      const effectiveFrequency = tree.data.swayFrequency * wind;
+      const effectiveAmplitude = tree.data.swayAmplitude * wind;
+      
+      const swayX = Math.sin(time * effectiveFrequency + tree.data.swayOffset) * effectiveAmplitude * 3;
+      const swayZ = Math.cos(time * effectiveFrequency * 0.8 + tree.data.swayOffset) * effectiveAmplitude * 2;
       crown.position.x = swayX;
       crown.position.z = swayZ;
     }
@@ -107,6 +123,10 @@ export class AnimationController {
 
   getTime(): number {
     return this.time;
+  }
+
+  getWindStrength(): number {
+    return this.windStrength;
   }
 
   setDayNightCycleDuration(seconds: number): void {
