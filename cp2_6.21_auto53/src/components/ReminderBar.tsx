@@ -45,6 +45,7 @@ export const ReminderBar: React.FC<ReminderBarProps> = ({ reminders, onReminderC
     gap: 8,
     cursor: 'pointer',
     transition: 'transform 0.2s ease, box-shadow 0.2s ease',
+    position: 'relative',
   });
 
   const iconCircleStyle: React.CSSProperties = {
@@ -64,6 +65,21 @@ export const ReminderBar: React.FC<ReminderBarProps> = ({ reminders, onReminderC
     display: 'flex',
     flexDirection: 'column',
     gap: 2,
+  };
+
+  const overdueExclamationStyle: React.CSSProperties = {
+    width: 16,
+    height: 16,
+    borderRadius: '50%',
+    backgroundColor: '#DC2626',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+    color: 'white',
+    fontSize: 11,
+    fontWeight: 'bold' as const,
+    lineHeight: 1,
   };
 
   const nameStyle: React.CSSProperties = {
@@ -212,6 +228,11 @@ export const ReminderBar: React.FC<ReminderBarProps> = ({ reminders, onReminderC
                 {formatCountdown(reminder.daysUntil)}
               </span>
             </div>
+            {reminder.daysUntil < 0 && (
+              <div style={overdueExclamationStyle} title="已逾期">
+                !
+              </div>
+            )}
           </div>
         ))}
       </div>

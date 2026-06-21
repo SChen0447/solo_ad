@@ -18,8 +18,12 @@ export const App: React.FC = () => {
   const [highlightedPlantId, setHighlightedPlantId] = useState<string | null>(null);
   const [isDetailEntering, setIsDetailEntering] = useState(false);
   const [sortMode, setSortMode] = useState<SortMode>('time');
+  const [showToast, setShowToast] = useState(false);
+  const [toastMessage, setToastMessage] = useState('');
+  const [scrollToLog, setScrollToLog] = useState(false);
   const gridRef = useRef<HTMLDivElement>(null);
   const cardPositionsRef = useRef<Map<string, DOMRect>>(new Map());
+  const logSectionRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     fetchPlants();
@@ -121,10 +125,50 @@ export const App: React.FC = () => {
       const updatedPlant = await response.json();
       setPlants(prev => prev.map(p => p.id === selectedPlantId ? updatedPlant : p));
       fetchReminders();
+      showToastMessage('已记录浇水操作');
     } catch (error) {
       console.error('浇水失败:', error);
     }
   };
+
+  const showToastMessage = (message: string) => {
+    setToastMessage(message);
+    setShowToast(true);
+    setTimeout(() => setShowToast(false), 2500);
+  };
+
+  const handleQuickWater = async (plantId: string) => {
+    try {
+      const response = await fetch(`/api/plants/${plantId}/water`, {
+        method: 'POST',
+      });
+      const updatedPlant = await response.json();
+      setPlants(prev => prev.map(p => p.id === plantId ? updatedPlant : p));
+      fetchReminders();
+      showToastMessage('已记录浇水操作');
+    } catch (error) {
+      console.error('浇水失败:', error);
+    }
+  };
+
+  const handleViewLog = async (plantId: string) => {
+    setScrollToLog(true);
+    setSelectedPlantId(plantId);
+    setIsDetailEntering(true);
+    setTimeout(() => {
+      setView('detail');
+      setIsDetailEntering(false);
+    }, 150);
+  };
+
+  useEffect(() => {
+    if (view === 'detail' && scrollToLog && logSectionRef.current) {
+      setTimeout(() => {
+        logSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        setScrollToLog(false);
+      }, 400);
+    }
+  }, [view, scrollToLog]);
 
   const selectedPlant = plants.find(p => p.id === selectedPlantId);
 
@@ -206,6 +250,27 @@ export const App: React.FC = () => {
     minHeight: '100vh',
     backgroundColor: '#F9FAFB',
     position: 'relative',
+  };
+
+  const toastStyle: React.CSSProperties = {
+    position: 'fixed',
+    top: 20,
+    left: '50%',
+    transform: showToast ? 'translate(-50%, 0)' : 'translate(-50%, -100px)',
+    backgroundColor: '#22C55E',
+    color: 'white',
+    padding: '12px 24px',
+    borderRadius: 10,
+    fontSize: 14,
+    fontWeight: 500,
+    boxShadow: '0 4px 16px rgba(34, 197, 94, 0.4)',
+    zIndex: 1000,
+    transition: 'transform 0.3s ease-out, opacity 0.3s ease-out',
+    opacity: showToast ? 1 : 0,
+    display: 'flex',
+    alignItems: 'center',
+    gap: 8,
+    whiteSpace: 'nowrap' as const,
   };
 
   const headerStyle: React.CSSProperties = {
@@ -417,6 +482,12 @@ export const App: React.FC = () => {
   if (view === 'home') {
     return (
       <div style={appStyle}>
+        <div style={toastStyle}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="20 6 9 17 4 12" />
+          </svg>
+          {toastMessage}
+        </div>
         <div style={headerStyle}>
           <h1 style={titleStyle}>🌿 花草养护助手</h1>
           <p style={subtitleStyle}>悉心照料每一株绿色生命</p>
@@ -466,6 +537,8 @@ export const App: React.FC = () => {
                   onClick={() => handlePlantClick(plant.id)}
                   isHighlighted={highlightedPlantId === plant.id}
                   showWarning={true}
+                  onQuickWater={handleQuickWater}
+                  onViewLog={handleViewLog}
                 />
               </div>
             ))}
@@ -490,6 +563,12 @@ export const App: React.FC = () => {
 
   return (
     <div style={{ ...appStyle, ...detailContainerStyle }}>
+      <div style={toastStyle}>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <polyline points="20 6 9 17 4 12" />
+        </svg>
+        {toastMessage}
+      </div>
       <button style={backButtonStyle} onClick={handleBackClick}>
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#374151" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <path d="M19 12H5M12 19l-7-7 7-7" />
@@ -572,12 +651,14 @@ export const App: React.FC = () => {
           💧 立即浇水
         </button>
 
-        <DiagnosisPanel
-          plantId={selectedPlant.id}
-          records={diagnosisRecords}
-          onDiagnosisComplete={handleDiagnosisComplete}
-          plantPhotoUrl={selectedPlant.photoUrl}
-        />
+        <div ref={logSectionRef}>
+          <DiagnosisPanel
+            plantId={selectedPlant.id}
+            records={diagnosisRecords}
+            onDiagnosisComplete={handleDiagnosisComplete}
+            plantPhotoUrl={selectedPlant.photoUrl}
+          />
+        </div>
       </div>
 
       <style>{`
