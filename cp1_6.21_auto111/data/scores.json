@@ -1,0 +1,82 @@
+[
+  {
+    "id": "sc-1",
+    "rehearsalId": "reh-1",
+    "performerId": "perf-1",
+    "score": 4,
+    "comment": "高音部分表现出色，音准稳定。第三乐章节奏需要更精准。",
+    "createdAt": "2026-06-14T20:00:00.000Z"
+  },
+  {
+    "id": "sc-2",
+    "rehearsalId": "reh-2",
+    "performerId": "perf-1",
+    "score": 3,
+    "comment": "音准需要加强，高把位不够稳定。建议每日练习音阶。",
+    "createdAt": "2026-06-10T20:00:00.000Z"
+  },
+  {
+    "id": "sc-3",
+    "rehearsalId": "reh-3",
+    "performerId": "perf-1",
+    "score": 5,
+    "comment": "表现优秀！情感表达到位，技术娴熟。",
+    "createdAt": "2026-06-07T20:00:00.000Z"
+  },
+  {
+    "id": "sc-4",
+    "rehearsalId": "reh-4",
+    "performerId": "perf-1",
+    "score": 4,
+    "comment": "节奏需加强，快板部分有些抢拍。使用节拍器练习会有帮助。",
+    "createdAt": "2026-06-03T20:00:00.000Z"
+  },
+  {
+    "id": "sc-5",
+    "rehearsalId": "reh-5",
+    "performerId": "perf-1",
+    "score": 3,
+    "comment": "换把不够流畅，需要多加练习。整体音乐性很好。",
+    "createdAt": "2026-05-31T20:00:00.000Z"
+  },
+  {
+    "id": "sc-6",
+    "rehearsalId": "reh-6",
+    "performerId": "perf-1",
+    "score": 4,
+    "comment": "进步明显！音准问题改善很多，继续保持。",
+    "createdAt": "2026-05-28T20:00:00.000Z"
+  },
+  {
+    "id": "sc-7",
+    "rehearsalId": "reh-7",
+    "performerId": "perf-1",
+    "score": 2,
+    "comment": "今天状态不佳，节奏和音准都有问题。注意休息，调整好状态。",
+    "createdAt": "2026-05-24T20:00:00.000Z"
+  },
+  {
+    "id": "sc-8",
+    "rehearsalId": "reh-8",
+    "performerId": "perf-1",
+    "score": 4,
+    "comment": "恢复得不错，继续努力！慢板乐章的情感表达很好。",
+    "createdAt": "2026-05-21T20:00:00.000Z"
+  },
+  {
+    "id": "sc-9",
+    "rehearsalId": "reh-1",
+    "performerId": "perf-2",
+    "score": 4,
+    "comment": "音色沉稳，低音部分很有力量。弓法需要更统一。",
+    "createdAt": "2026-06-14T20:00:00.000Z"
+  },
+  {
+    "id": "sc-10",
+    "rehearsalId": "reh-2",
+    "performerId": "perf-2",
+    "score": 5,
+    "comment": "大提琴首席表现优秀！独奏段落很有感染力。",
+    "createdAt": "2026-06-10T20:00:00.000Z"
+  }
+]

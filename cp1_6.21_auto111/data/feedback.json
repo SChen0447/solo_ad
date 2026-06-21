@@ -1,0 +1,110 @@
+[
+  {
+    "id": "fb-1",
+    "performerId": "perf-1",
+    "fromId": "conductor-1",
+    "fromName": "王指挥",
+    "score": 4,
+    "content": "今天的高音部分表现非常出色，音准很稳。注意第三乐章的节奏变化，需要更精准的把控。",
+    "likes": 3,
+    "replies": [
+      {
+        "id": "r-1",
+        "fromName": "张小明",
+        "content": "谢谢指挥！我会多加练习第三乐章的节奏部分。",
+        "createdAt": "2026-06-15T10:30:00.000Z"
+      }
+    ],
+    "createdAt": "2026-06-14T20:00:00.000Z"
+  },
+  {
+    "id": "fb-2",
+    "performerId": "perf-1",
+    "fromId": "perf-2",
+    "fromName": "李小红",
+    "score": 5,
+    "content": "独奏部分太精彩了！跟你配合很有默契，继续保持！",
+    "likes": 5,
+    "replies": [],
+    "createdAt": "2026-06-13T18:00:00.000Z"
+  },
+  {
+    "id": "fb-3",
+    "performerId": "perf-1",
+    "fromId": "conductor-1",
+    "fromName": "王指挥",
+    "score": 3,
+    "content": "音准问题需要注意，特别是高把位的音准稳定性。建议每天练习音阶15分钟。",
+    "likes": 2,
+    "replies": [],
+    "createdAt": "2026-06-10T20:00:00.000Z"
+  },
+  {
+    "id": "fb-4",
+    "performerId": "perf-1",
+    "fromId": "conductor-1",
+    "fromName": "王指挥",
+    "score": 5,
+    "content": "表现优秀！今天的排练状态很好，情感表达很到位，继续保持这种状态。",
+    "likes": 8,
+    "replies": [
+      {
+        "id": "r-2",
+        "fromName": "张小明",
+        "content": "谢谢指挥的鼓励！",
+        "createdAt": "2026-06-08T21:00:00.000Z"
+      },
+      {
+        "id": "r-3",
+        "fromName": "刘芳",
+        "content": "确实很棒！向你学习！",
+        "createdAt": "2026-06-08T21:30:00.000Z"
+      }
+    ],
+    "createdAt": "2026-06-07T20:00:00.000Z"
+  },
+  {
+    "id": "fb-5",
+    "performerId": "perf-1",
+    "fromId": "conductor-1",
+    "fromName": "王指挥",
+    "score": 4,
+    "content": "节奏需加强，快板部分有些抢拍。建议使用节拍器练习，从慢到快逐步提高。",
+    "likes": 1,
+    "replies": [],
+    "createdAt": "2026-06-03T20:00:00.000Z"
+  },
+  {
+    "id": "fb-6",
+    "performerId": "perf-2",
+    "fromId": "conductor-1",
+    "fromName": "王指挥",
+    "score": 4,
+    "content": "大提琴的音色控制得很好，低音沉稳有力。注意弓法的统一性，让音色更加连贯。",
+    "likes": 4,
+    "replies": [],
+    "createdAt": "2026-06-14T20:00:00.000Z"
+  },
+  {
+    "id": "fb-7",
+    "performerId": "perf-3",
+    "fromId": "conductor-1",
+    "fromName": "王指挥",
+    "score": 5,
+    "content": "长笛的华彩段落演奏得非常精彩，音色清澈通透，气息控制也很稳定。",
+    "likes": 6,
+    "replies": [],
+    "createdAt": "2026-06-14T20:00:00.000Z"
+  },
+  {
+    "id": "fb-8",
+    "performerId": "perf-5",
+    "fromId": "conductor-1",
+    "fromName": "王指挥",
+    "score": 3,
+    "content": "高音部分有些吃力，建议加强嘴唇力量训练。注意气息的支撑，不要用蛮力。",
+    "likes": 2,
+    "replies": [],
+    "createdAt": "2026-06-10T20:00:00.000Z"
+  }
+]

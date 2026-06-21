@@ -1,0 +1,188 @@
+[
+  {
+    "id": "rep-1",
+    "name": "贝多芬第九交响曲",
+    "difficulty": "hard",
+    "progress": 75,
+    "rehearsalCount": 8,
+    "nextRehearsal": "2026-06-25",
+    "parts": [
+      { "name": "第一小提琴", "difficulty": "hard" },
+      { "name": "第二小提琴", "difficulty": "medium" },
+      { "name": "中提琴", "difficulty": "medium" },
+      { "name": "大提琴", "difficulty": "hard" },
+      { "name": "低音提琴", "difficulty": "easy" },
+      { "name": "长笛", "difficulty": "hard" },
+      { "name": "单簧管", "difficulty": "medium" },
+      { "name": "小号", "difficulty": "hard" },
+      { "name": "大号", "difficulty": "easy" },
+      { "name": "打击乐", "difficulty": "medium" }
+    ]
+  },
+  {
+    "id": "rep-2",
+    "name": "蓝色多瑙河",
+    "difficulty": "medium",
+    "progress": 60,
+    "rehearsalCount": 5,
+    "nextRehearsal": "2026-06-26",
+    "parts": [
+      { "name": "第一小提琴", "difficulty": "medium" },
+      { "name": "第二小提琴", "difficulty": "easy" },
+      { "name": "中提琴", "difficulty": "easy" },
+      { "name": "大提琴", "difficulty": "medium" },
+      { "name": "长笛", "difficulty": "hard" },
+      { "name": "双簧管", "difficulty": "medium" },
+      { "name": "圆号", "difficulty": "medium" }
+    ]
+  },
+  {
+    "id": "rep-3",
+    "name": "卡农",
+    "difficulty": "easy",
+    "progress": 90,
+    "rehearsalCount": 12,
+    "nextRehearsal": "2026-06-24",
+    "parts": [
+      { "name": "第一小提琴", "difficulty": "medium" },
+      { "name": "第二小提琴", "difficulty": "easy" },
+      { "name": "第三小提琴", "difficulty": "easy" },
+      { "name": "大提琴", "difficulty": "easy" },
+      { "name": "钢琴", "difficulty": "medium" }
+    ]
+  },
+  {
+    "id": "rep-4",
+    "name": "莫扎特第四十交响曲",
+    "difficulty": "medium",
+    "progress": 45,
+    "rehearsalCount": 3,
+    "nextRehearsal": "2026-06-27",
+    "parts": [
+      { "name": "第一小提琴", "difficulty": "hard" },
+      { "name": "第二小提琴", "difficulty": "medium" },
+      { "name": "中提琴", "difficulty": "medium" },
+      { "name": "大提琴", "difficulty": "medium" },
+      { "name": "低音提琴", "difficulty": "easy" },
+      { "name": "长笛", "difficulty": "medium" },
+      { "name": "单簧管", "difficulty": "medium" },
+      { "name": "大管", "difficulty": "easy" },
+      { "name": "圆号", "difficulty": "medium" }
+    ]
+  },
+  {
+    "id": "rep-5",
+    "name": "拉德斯基进行曲",
+    "difficulty": "easy",
+    "progress": 85,
+    "rehearsalCount": 10,
+    "nextRehearsal": "2026-06-23",
+    "parts": [
+      { "name": "小提琴", "difficulty": "easy" },
+      { "name": "中提琴", "difficulty": "easy" },
+      { "name": "大提琴", "difficulty": "easy" },
+      { "name": "低音提琴", "difficulty": "easy" },
+      { "name": "长笛", "difficulty": "easy" },
+      { "name": "单簧管", "difficulty": "easy" },
+      { "name": "小号", "difficulty": "medium" },
+      { "name": "打击乐", "difficulty": "easy" }
+    ]
+  },
+  {
+    "id": "rep-6",
+    "name": "巴赫D小调双小提琴协奏曲",
+    "difficulty": "hard",
+    "progress": 35,
+    "rehearsalCount": 2,
+    "nextRehearsal": "2026-06-28",
+    "parts": [
+      { "name": "第一小提琴独奏", "difficulty": "hard" },
+      { "name": "第二小提琴独奏", "difficulty": "hard" },
+      { "name": "第一小提琴伴奏", "difficulty": "medium" },
+      { "name": "第二小提琴伴奏", "difficulty": "easy" },
+      { "name": "中提琴", "difficulty": "easy" },
+      { "name": "大提琴", "difficulty": "easy" },
+      { "name": "低音提琴", "difficulty": "easy" },
+      { "name": "钢琴", "difficulty": "medium" }
+    ]
+  },
+  {
+    "id": "rep-7",
+    "name": "茉莉花",
+    "difficulty": "easy",
+    "progress": 70,
+    "rehearsalCount": 6,
+    "nextRehearsal": "2026-06-25",
+    "parts": [
+      { "name": "小提琴", "difficulty": "easy" },
+      { "name": "中提琴", "difficulty": "easy" },
+      { "name": "大提琴", "difficulty": "easy" },
+      { "name": "长笛", "difficulty": "medium" },
+      { "name": "二胡", "difficulty": "medium" },
+      { "name": "古筝", "difficulty": "medium" }
+    ]
+  },
+  {
+    "id": "rep-8",
+    "name": "柴可夫斯基第五交响曲",
+    "difficulty": "hard",
+    "progress": 25,
+    "rehearsalCount": 1,
+    "nextRehearsal": "2026-06-29",
+    "parts": [
+      { "name": "第一小提琴", "difficulty": "hard" },
+      { "name": "第二小提琴", "difficulty": "hard" },
+      { "name": "中提琴", "difficulty": "medium" },
+      { "name": "大提琴", "difficulty": "hard" },
+      { "name": "低音提琴", "difficulty": "medium" },
+      { "name": "长笛", "difficulty": "hard" },
+      { "name": "双簧管", "difficulty": "medium" },
+      { "name": "单簧管", "difficulty": "medium" },
+      { "name": "大管", "difficulty": "medium" },
+      { "name": "圆号", "difficulty": "hard" },
+      { "name": "小号", "difficulty": "medium" },
+      { "name": "长号", "difficulty": "medium" },
+      { "name": "大号", "difficulty": "easy" },
+      { "name": "定音鼓", "difficulty": "medium" },
+      { "name": "打击乐", "difficulty": "easy" }
+    ]
+  },
+  {
+    "id": "rep-9",
+    "name": "欢乐颂",
+    "difficulty": "easy",
+    "progress": 95,
+    "rehearsalCount": 15,
+    "nextRehearsal": "2026-06-22",
+    "parts": [
+      { "name": "第一小提琴", "difficulty": "easy" },
+      { "name": "第二小提琴", "difficulty": "easy" },
+      { "name": "中提琴", "difficulty": "easy" },
+      { "name": "大提琴", "difficulty": "easy" },
+      { "name": "低音提琴", "difficulty": "easy" },
+      { "name": "长笛", "difficulty": "easy" },
+      { "name": "单簧管", "difficulty": "easy" },
+      { "name": "圆号", "difficulty": "easy" },
+      { "name": "打击乐", "difficulty": "easy" }
+    ]
+  },
+  {
+    "id": "rep-10",
+    "name": "匈牙利舞曲第五号",
+    "difficulty": "medium",
+    "progress": 55,
+    "rehearsalCount": 4,
+    "nextRehearsal": "2026-06-30",
+    "parts": [
+      { "name": "第一小提琴", "difficulty": "hard" },
+      { "name": "第二小提琴", "difficulty": "medium" },
+      { "name": "中提琴", "difficulty": "medium" },
+      { "name": "大提琴", "difficulty": "medium" },
+      { "name": "低音提琴", "difficulty": "easy" },
+      { "name": "长笛", "difficulty": "medium" },
+      { "name": "单簧管", "difficulty": "medium" },
+      { "name": "圆号", "difficulty": "easy" },
+      { "name": "钢琴", "difficulty": "hard" }
+    ]
+  }
+]
