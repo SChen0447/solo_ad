@@ -21,15 +21,45 @@ function CrownIcon() {
   );
 }
 
+interface GameTypeOption {
+  value: GameType;
+  label: string;
+  icon: string;
+  description: string;
+}
+
+const gameTypeOptions: GameTypeOption[] = [
+  {
+    value: 'word-guess',
+    label: '猜词游戏',
+    icon: '🔤',
+    description: '根据提示猜词，支持抢答加分',
+  },
+  {
+    value: 'spy',
+    label: '谁是卧底',
+    icon: '🕵️',
+    description: '找出隐藏在玩家中的卧底',
+  },
+  {
+    value: 'draw-relay',
+    label: '画图接力',
+    icon: '🎨',
+    description: '玩家轮流画画，接力猜词',
+  },
+];
+
 interface LobbyProps {
   playerId: string | null;
   roomState: RoomState | null;
   onJoined: (roomId: string, playerId: string, inviteCode: string) => void;
   onKicked: () => void;
+  onRoomCreated?: () => void;
 }
 
-const Lobby: React.FC<LobbyProps> = ({ playerId, roomState, onJoined, onKicked }) => {
+const Lobby: React.FC<LobbyProps> = ({ playerId, roomState, onJoined, onKicked, onRoomCreated }) => {
   const [playerName, setPlayerName] = useState('');
+  const [roomName, setRoomName] = useState('');
   const [createGameType, setCreateGameType] = useState<GameType>('word-guess');
   const [joinInviteCode, setJoinInviteCode] = useState('');
   const [publicRooms, setPublicRooms] = useState<PublicRoom[]>([]);
@@ -45,6 +75,9 @@ const Lobby: React.FC<LobbyProps> = ({ playerId, roomState, onJoined, onKicked }
     const offJoined = on<{ roomId: string; playerId: string; inviteCode: string }>('room:joined', (data) => {
       onJoined(data.roomId, data.playerId, data.inviteCode);
       setShowPlayerPanel(true);
+      if (onRoomCreated) {
+        onRoomCreated();
+      }
     });
 
     const offError = on<{ message: string }>('error', (data) => {
@@ -95,7 +128,11 @@ const Lobby: React.FC<LobbyProps> = ({ playerId, roomState, onJoined, onKicked }
       setError('请输入你的名字');
       return;
     }
-    emit('room:create', { name: playerName.trim(), gameType: createGameType });
+    emit('room:create', {
+      playerName: playerName.trim(),
+      roomName: roomName.trim(),
+      gameType: createGameType,
+    });
   };
 
   const handleJoinRoom = (e: React.FormEvent) => {
@@ -172,8 +209,7 @@ const Lobby: React.FC<LobbyProps> = ({ playerId, roomState, onJoined, onKicked }
           font-weight: 500;
           margin-bottom: 8px;
         }
-        .form-group input,
-        .form-group select {
+        .form-group input {
           width: 100%;
           padding: 12px 16px;
           border: 1px solid #D1D5DB;
@@ -183,10 +219,74 @@ const Lobby: React.FC<LobbyProps> = ({ playerId, roomState, onJoined, onKicked }
           transition: border-color 0.2s ease;
           font-family: inherit;
         }
-        .form-group input:focus,
-        .form-group select:focus {
+        .form-group input:focus {
           outline: none;
           border-color: #6366F1;
+        }
+        .game-type-cards {
+          display: grid;
+          grid-template-columns: 1fr;
+          gap: 12px;
+        }
+        @media (min-width: 480px) {
+          .game-type-cards {
+            grid-template-columns: repeat(3, 1fr);
+          }
+        }
+        .game-type-card {
+          position: relative;
+          background: white;
+          border: 2px solid #E5E7EB;
+          border-radius: 12px;
+          padding: 16px 12px;
+          text-align: center;
+          cursor: pointer;
+          transition: all 0.2s ease;
+        }
+        .game-type-card:hover:not(.selected) {
+          border-color: #A5B4FC;
+          transform: translateY(-2px);
+          box-shadow: 0 4px 12px rgba(99, 102, 241, 0.15);
+        }
+        .game-type-card.selected {
+          border-color: #6366F1;
+          background: linear-gradient(135deg, #EEF2FF 0%, #E0E7FF 100%);
+          animation: cardSelect 0.3s ease;
+        }
+        @keyframes cardSelect {
+          0% { transform: scale(1); }
+          50% { transform: scale(1.05); }
+          100% { transform: scale(1); }
+        }
+        .game-type-icon {
+          font-size: 32px;
+          margin-bottom: 8px;
+        }
+        .game-type-label {
+          font-weight: 600;
+          color: #1E3A5F;
+          font-size: 14px;
+          margin-bottom: 4px;
+        }
+        .game-type-desc {
+          font-size: 11px;
+          color: #6B7280;
+          line-height: 1.4;
+        }
+        .game-type-check {
+          position: absolute;
+          top: 8px;
+          right: 8px;
+          width: 20px;
+          height: 20px;
+          background: #6366F1;
+          color: white;
+          border-radius: 50%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 12px;
+          font-weight: bold;
         }
         .btn {
           width: 100%;
@@ -379,6 +479,12 @@ const Lobby: React.FC<LobbyProps> = ({ playerId, roomState, onJoined, onKicked }
           padding-bottom: 16px;
           border-bottom: 1px solid #BFDBFE;
         }
+        .room-title {
+          font-size: 20px;
+          font-weight: bold;
+          color: #1E3A5F;
+          margin-bottom: 8px;
+        }
         .invite-code {
           background: #1E3A5F;
           color: white;
@@ -435,18 +541,34 @@ const Lobby: React.FC<LobbyProps> = ({ playerId, roomState, onJoined, onKicked }
             />
           </div>
           <div className="form-group">
-            <label>游戏类型</label>
-            <select
-              value={createGameType}
-              onChange={(e) => setCreateGameType(e.target.value as GameType)}
+            <label>房间名称（可选）</label>
+            <input
+              type="text"
+              value={roomName}
+              onChange={(e) => setRoomName(e.target.value)}
+              placeholder="给房间起个响亮的名字"
               disabled={!!roomState}
-            >
-              {Object.entries(gameTypeLabels).map(([value, label]) => (
-                <option key={value} value={value}>
-                  {label}
-                </option>
+              maxLength={20}
+            />
+          </div>
+          <div className="form-group">
+            <label>选择游戏类型</label>
+            <div className="game-type-cards">
+              {gameTypeOptions.map((option) => (
+                <div
+                  key={option.value}
+                  className={`game-type-card ${createGameType === option.value ? 'selected' : ''}`}
+                  onClick={() => !roomState && setCreateGameType(option.value)}
+                >
+                  <div className="game-type-icon">{option.icon}</div>
+                  <div className="game-type-label">{option.label}</div>
+                  <div className="game-type-desc">{option.description}</div>
+                  {createGameType === option.value && (
+                    <div className="game-type-check">✓</div>
+                  )}
+                </div>
               ))}
-            </select>
+            </div>
           </div>
           {!roomState ? (
             <button type="submit" className="btn">
@@ -500,9 +622,9 @@ const Lobby: React.FC<LobbyProps> = ({ playerId, roomState, onJoined, onKicked }
               publicRooms.map((room) => (
                 <div key={room.id} className="room-item">
                   <div className="room-info">
-                    <h3>{gameTypeLabels[room.gameType]}</h3>
+                    <h3>{room.name}</h3>
                     <p>
-                      房间号: {room.inviteCode} · {room.playerCount}/8 人
+                      {gameTypeLabels[room.gameType]} · 房间号: {room.inviteCode} · {room.playerCount}/8 人
                     </p>
                   </div>
                   <span className={`room-badge ${room.gameStatus}`}>
@@ -524,6 +646,7 @@ const Lobby: React.FC<LobbyProps> = ({ playerId, roomState, onJoined, onKicked }
           {roomState ? (
             <>
               <div className="room-header">
+                <div className="room-title">{roomState.name}</div>
                 <span className="game-type-tag">{gameTypeLabels[roomState.gameType]}</span>
                 <div className="invite-label">房间邀请码</div>
                 <div className="invite-code">{roomState.inviteCode}</div>

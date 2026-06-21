@@ -25,6 +25,10 @@ const App: React.FC = () => {
     setView('lobby');
   }, []);
 
+  const handleRoomCreated = useCallback(() => {
+    setView('game');
+  }, []);
+
   useEffect(() => {
     const offRoomState = on<RoomState>('room:state', (state) => {
       setRoomState(state);
@@ -97,6 +101,14 @@ const App: React.FC = () => {
           display: flex;
           align-items: center;
           gap: 12px;
+          flex-wrap: wrap;
+          justify-content: center;
+        }
+        .room-name {
+          font-weight: 600;
+          font-size: 16px;
+          color: white;
+          margin-right: 8px;
         }
         .room-code {
           background: rgba(255,255,255,0.2);
@@ -170,7 +182,8 @@ const App: React.FC = () => {
 
         {roomState ? (
           <div className="room-indicator">
-            <span>房间:</span>
+            <span className="room-name">{roomState.name}</span>
+            <span>房间号:</span>
             <span className="room-code">{roomState.inviteCode}</span>
             <button className="leave-btn" onClick={handleKicked}>
               离开
@@ -190,6 +203,7 @@ const App: React.FC = () => {
             roomState={roomState}
             onJoined={handleJoined}
             onKicked={handleKicked}
+            onRoomCreated={handleRoomCreated}
           />
         )}
         {view === 'game' && roomState && playerId && (

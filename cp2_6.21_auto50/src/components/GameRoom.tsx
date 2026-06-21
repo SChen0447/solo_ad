@@ -214,6 +214,31 @@ const GameRoom: React.FC<GameRoomProps> = ({ roomState, playerId }) => {
           margin: 0 0 16px 0;
           font-size: 20px;
         }
+        .game-room-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-bottom: 16px;
+          gap: 12px;
+          flex-wrap: wrap;
+        }
+        .game-room-title {
+          color: #1E3A5F;
+          font-size: 22px;
+          font-weight: bold;
+          margin: 0;
+          flex: 1;
+          min-width: 0;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+        .game-section-title {
+          color: #1E3A5F;
+          margin: 0 0 16px 0;
+          font-size: 18px;
+          font-weight: 600;
+        }
         .center-area {
           display: flex;
           flex-direction: column;
@@ -625,11 +650,14 @@ const GameRoom: React.FC<GameRoomProps> = ({ roomState, playerId }) => {
       )}
 
       <div className="card">
-        <div className="status-badge waiting">
-          {roomState.gameStatus === 'waiting' ? '等待开始' :
-           roomState.gameStatus === 'playing' ? '游戏中' : '已结束'}
+        <div className="game-room-header">
+          <h2 className="game-room-title">{roomState.name}</h2>
+          <div className={`status-badge ${roomState.gameStatus}`}>
+            {roomState.gameStatus === 'waiting' ? '等待开始' :
+             roomState.gameStatus === 'playing' ? '游戏中' : '已结束'}
+          </div>
         </div>
-        <h2>🎯 游戏控制</h2>
+        <h3 className="game-section-title">🎯 游戏控制</h3>
 
         {roomState.gameStatus === 'waiting' && isHost && (
           <>

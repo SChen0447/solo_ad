@@ -113,6 +113,17 @@ const Scoreboard: React.FC<ScoreboardProps> = ({ roomState }) => {
           margin: 0 0 16px 0;
           font-size: 20px;
         }
+        .scoreboard-header {
+          margin-bottom: 16px;
+          padding-bottom: 12px;
+          border-bottom: 1px solid #BFDBFE;
+        }
+        .scoreboard-title {
+          color: #1E3A5F;
+          font-size: 22px;
+          font-weight: bold;
+          margin: 0;
+        }
         .leaderboard {
           display: flex;
           flex-direction: column;
@@ -314,6 +325,9 @@ const Scoreboard: React.FC<ScoreboardProps> = ({ roomState }) => {
       `}</style>
 
       <div className="card">
+        <div className="scoreboard-header">
+          <h2 className="scoreboard-title">{roomState.name}</h2>
+        </div>
         <div className="section-header">
           <h2>🏆 积分排行榜</h2>
           {roomState.currentRound > 0 && (

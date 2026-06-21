@@ -22,6 +22,7 @@ export interface RoundHistory {
 
 export interface RoomState {
   id: string;
+  name: string;
   inviteCode: string;
   gameType: GameType;
   hostId: string;
@@ -36,6 +37,7 @@ export interface RoomState {
 
 export interface PublicRoom {
   id: string;
+  name: string;
   inviteCode: string;
   gameType: GameType;
   playerCount: number;

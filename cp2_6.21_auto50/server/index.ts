@@ -15,6 +15,12 @@ const io = new Server(server, {
 const PORT = 3005;
 
 type GameType = 'word-guess' | 'spy' | 'draw-relay';
+
+const gameTypeLabels: Record<GameType, string> = {
+  'word-guess': '猜词',
+  'spy': '谁是卧底',
+  'draw-relay': '画图接力',
+};
 type GameStatus = 'waiting' | 'playing' | 'finished';
 
 interface Player {
@@ -38,6 +44,7 @@ interface RoundHistory {
 
 interface Room {
   id: string;
+  name: string;
   inviteCode: string;
   gameType: GameType;
   hostId: string;
@@ -86,6 +93,7 @@ function broadcastRoomState(roomId: string) {
   if (!room) return;
   io.to(roomId).emit('room:state', {
     id: room.id,
+    name: room.name,
     inviteCode: room.inviteCode,
     gameType: room.gameType,
     hostId: room.hostId,
@@ -102,6 +110,7 @@ function broadcastRoomState(roomId: string) {
 app.get('/api/rooms', (req: Request, res: Response) => {
   const publicRooms = Array.from(rooms.values()).map((r) => ({
     id: r.id,
+    name: r.name,
     inviteCode: r.inviteCode,
     gameType: r.gameType,
     playerCount: r.players.length,
@@ -113,14 +122,14 @@ app.get('/api/rooms', (req: Request, res: Response) => {
 io.on('connection', (socket: Socket) => {
   console.log('Client connected:', socket.id);
 
-  socket.on('room:create', ({ name, gameType }: { name: string; gameType: GameType }) => {
+  socket.on('room:create', ({ playerName, roomName, gameType }: { playerName: string; roomName: string; gameType: GameType }) => {
     const roomId = uuidv4();
     const inviteCode = generateInviteCode();
     const playerId = uuidv4();
 
     const player: Player = {
       id: playerId,
-      name,
+      name: playerName,
       socketId: socket.id,
       isHost: true,
       score: 0,
@@ -128,6 +137,7 @@ io.on('connection', (socket: Socket) => {
 
     const room: Room = {
       id: roomId,
+      name: roomName || `${gameTypeLabels[gameType]}房间`,
       inviteCode,
       gameType,
       hostId: playerId,
