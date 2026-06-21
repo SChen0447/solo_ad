@@ -1,0 +1,201 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body, #root {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  background-color: #1a1a1a;
+}
+
+.app-container {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+.canvas-container {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.weather-switcher {
+  position: absolute;
+  top: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 0;
+  background: rgba(30, 30, 35, 0.7);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(74, 144, 217, 0.2);
+  border-radius: 8px;
+  padding: 4px;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.3);
+  z-index: 10;
+}
+
+.weather-button {
+  position: relative;
+  padding: 10px 20px;
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.88);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  border-radius: 6px;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.weather-button:hover {
+  background: rgba(74, 144, 217, 0.15);
+  color: rgba(255, 255, 255, 1);
+}
+
+.weather-button.active {
+  color: #4A90D9;
+}
+
+.weather-button .underline {
+  position: absolute;
+  bottom: 2px;
+  left: 20%;
+  width: 60%;
+  height: 2px;
+  background: #4A90D9;
+  border-radius: 1px;
+  transition: all 0.2s ease;
+  transform: scaleX(0);
+}
+
+.weather-button.active .underline {
+  transform: scaleX(1);
+}
+
+.control-panel {
+  position: absolute;
+  bottom: 24px;
+  left: 24px;
+  width: 280px;
+  background: rgba(30, 30, 35, 0.7);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(74, 144, 217, 0.2);
+  border-radius: 8px;
+  padding: 20px;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.3);
+  z-index: 10;
+}
+
+.panel-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.88);
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid rgba(74, 144, 217, 0.2);
+}
+
+.control-group {
+  margin-bottom: 16px;
+}
+
+.control-group:last-child {
+  margin-bottom: 0;
+}
+
+.control-label {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.88);
+}
+
+.control-value {
+  color: #4A90D9;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.slider {
+  width: 100%;
+  height: 4px;
+  -webkit-appearance: none;
+  appearance: none;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 2px;
+  outline: none;
+  cursor: pointer;
+}
+
+.slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  background: #4A90D9;
+  border-radius: 50%;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(74, 144, 217, 0.4);
+  transition: transform 0.15s ease;
+}
+
+.slider::-webkit-slider-thumb:hover {
+  transform: scale(1.15);
+}
+
+.slider::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  background: #4A90D9;
+  border-radius: 50%;
+  cursor: pointer;
+  border: none;
+  box-shadow: 0 2px 8px rgba(74, 144, 217, 0.4);
+}
+
+.weather-info {
+  position: absolute;
+  bottom: 24px;
+  right: 24px;
+  background: rgba(30, 30, 35, 0.7);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(74, 144, 217, 0.2);
+  border-radius: 8px;
+  padding: 16px 24px;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.3);
+  z-index: 10;
+  text-align: right;
+  transition: opacity 0.3s ease;
+}
+
+.weather-info-name {
+  font-size: 20px;
+  font-weight: 600;
+  color: #4A90D9;
+  margin-bottom: 4px;
+}
+
+.weather-info-desc {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.6);
+  line-height: 1.4;
+}
+
+.weather-icon {
+  font-size: 28px;
+  margin-bottom: 8px;
+}
