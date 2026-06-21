@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>像素无接缝纹理生成器 | Pixel Seamless Texture Generator</title>
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap');
+      
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      
+      :root {
+        --bg-primary: #1a1a2e;
+        --bg-panel: #16213e;
+        --bg-hover: #0f3460;
+        --border-color: #cccccc;
+        --text-primary: #e0e0e0;
+        --text-secondary: #a0a0a0;
+        --accent-yellow: #ffff00;
+        --accent-green: #00ff88;
+      }
+      
+      html, body {
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        background-color: var(--bg-primary);
+        color: var(--text-primary);
+        font-family: 'VT323', monospace;
+        font-size: 14px;
+      }
+      
+      #app {
+        display: flex;
+        flex-direction: column;
+        width: 100%;
+        height: 100vh;
+      }
+      
+      /* Header */
+      header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 8px 16px;
+        background-color: var(--bg-panel);
+        border-bottom: 1px solid var(--border-color);
+        flex-shrink: 0;
+      }
+      
+      .app-title {
+        font-family: 'Press Start 2P', monospace;
+        font-size: 12px;
+        color: var(--accent-green);
+        text-shadow: 2px 2px 0 #000;
+        letter-spacing: 1px;
+      }
+      
+      .header-controls {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+      }
+      
+      /* Main Content */
+      main {
+        display: flex;
+        flex: 1;
+        overflow: hidden;
+      }
+      
+      /* Left Sidebar - Tools */
+      .sidebar-left {
+        width: 200px;
+        background-color: var(--bg-panel);
+        border-right: 1px solid var(--border-color);
+        padding: 12px;
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+        overflow-y: auto;
+        flex-shrink: 0;
+      }
+      
+      .panel {
+        border: 1px solid var(--border-color);
+        padding: 8px;
+        background-color: var(--bg-primary);
+      }
+      
+      .panel-title {
+        font-family: 'Press Start 2P', monospace;
+        font-size: 8px;
+        color: var(--accent-yellow);
+        margin-bottom: 8px;
+        letter-spacing: 1px;
+      }
+      
+      /* Tools */
+      .tools-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 4px;
+      }
+      
+      .tool-btn {
+        width: 100%;
+        aspect-ratio: 1;
+        background-color: var(--bg-panel);
+        border: 1px solid var(--border-color);
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.1s ease;
+        position: relative;
+      }
+      
+      .tool-btn:hover {
+        background-color: var(--bg-hover);
+      }
+      
+      .tool-btn.active {
+        background-color: var(--bg-hover);
+        border-color: var(--accent-yellow);
+        box-shadow: inset 0 0 0 2px var(--accent-yellow);
+      }
+      
+      .tool-btn svg {
+        width: 24px;
+        height: 24px;
+      }
+      
+      .tool-btn .tooltip {
+        position: absolute;
+        bottom: 100%;
+        left: 50%;
+        transform: translateX(-50%);
+        padding: 4px 8px;
+        background-color: #000;
+        color: #fff;
+        font-size: 10px;
+        white-space: nowrap;
+        border: 1px solid var(--border-color);
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.2s ease;
+        z-index: 100;
+        margin-bottom: 4px;
+      }
+      
+      .tool-btn:hover .tooltip {
+        opacity: 1;
+      }
+      
+      /* Palette */
+      .palette-grid {
+        display: grid;
+        grid-template-columns: repeat(8, 1fr);
+        gap: 2px;
+      }
+      
+      .palette-group {
+        margin-bottom: 8px;
+      }
+      
+      .palette-group-title {
+        font-size: 10px;
+        color: var(--text-secondary);
+        margin-bottom: 4px;
+      }
+      
+      .color-swatch {
+        width: 100%;
+        aspect-ratio: 1;
+        border: 1px solid var(--border-color);
+        cursor: pointer;
+        position: relative;
+        box-shadow: 
+          inset 2px 2px 0 rgba(255,255,255,0.3),
+          inset -2px -2px 0 rgba(0,0,0,0.3);
+        transition: transform 0.1s ease;
+      }
+      
+      .color-swatch:hover {
+        transform: scale(1.1);
+        z-index: 10;
+      }
+      
+      .color-swatch.active {
+        outline: 2px solid var(--accent-yellow);
+        outline-offset: 1px;
+      }
+      
+      .color-swatch .hex-tooltip {
+        position: absolute;
+        bottom: 100%;
+        left: 50%;
+        transform: translateX(-50%);
+        padding: 2px 6px;
+        background-color: #000;
+        color: #fff;
+        font-size: 10px;
+        white-space: nowrap;
+        border: 1px solid var(--border-color);
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.2s ease;
+        z-index: 100;
+        margin-bottom: 2px;
+      }
+      
+      .color-swatch:hover .hex-tooltip {
+        opacity: 1;
+      }
+      
+      /* Templates */
+      .template-list {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+      
+      .template-btn {
+        padding: 6px 8px;
+        background-color: var(--bg-panel);
+        border: 1px solid var(--border-color);
+        color: var(--text-primary);
+        font-family: 'VT323', monospace;
+        font-size: 14px;
+        cursor: pointer;
+        text-align: left;
+        transition: all 0.1s ease;
+      }
+      
+      .template-btn:hover {
+        background-color: var(--bg-hover);
+        border-color: var(--accent-yellow);
+      }
+      
+      /* Center - Editor */
+      .editor-container {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 20px;
+        overflow: auto;
+        background-color: var(--bg-primary);
+      }
+      
+      .editor-wrapper {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 12px;
+      }
+      
+      .editor-title {
+        font-family: 'Press Start 2P', monospace;
+        font-size: 10px;
+        color: var(--accent-green);
+        letter-spacing: 1px;
+      }
+      
+      .editor-info {
+        font-size: 12px;
+        color: var(--text-secondary);
+      }
+      
+      .editor-canvas-wrapper {
+        border: 2px solid var(--border-color);
+        box-shadow: 
+          inset 0 0 0 1px #000,
+          4px 4px 0 rgba(0,0,0,0.
