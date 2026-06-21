@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌍</text></svg>" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>物种迁徙可视化</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      html, body {
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+        background: radial-gradient(ellipse at center, #1e1b4b 0%, #0f172a 50%, #020617 100%);
+        color: #fff;
+        user-select: none;
+        -webkit-user-select: none;
+      }
+      #app {
+        width: 100%;
+        height: 100%;
+        position: relative;
+      }
+      #canvas-container {
+        width: 100%;
+        height: 100%;
+        position: absolute;
+        top: 0;
+        left: 0;
+      }
+      #canvas-container canvas {
+        display: block;
+        touch-action: none;
+      }
+      .logo {
+        position: absolute;
+        top: 24px;
+        left: 24px;
+        font-size: 20px;
+        font-weight: 600;
+        color: #ffffff;
+        text-shadow: 0 0 10px rgba(59, 130, 246, 0.5), 0 0 20px rgba(59, 130, 246, 0.2);
+        z-index: 10;
+        letter-spacing: 1px;
+      }
+      .side-panel {
+        position: absolute;
+        top: 80px;
+        right: 24px;
+        width: 260px;
+        background: rgba(255, 255, 255, 0.08);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        border: 1px solid rgba(255, 255, 255, 0.15);
+        border-radius: 12px;
+        padding: 20px;
+        z-index: 10;
+        max-height: calc(100vh - 180px);
+        overflow-y: auto;
+      }
+      .panel-title {
+        font-size: 14px;
+        font-weight: 600;
+        margin-bottom: 16px;
+        color: #e0e7ff;
+        padding-bottom: 12px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      }
+      .species-list {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      .species-item {
+        display: flex;
+        align-items: center;
+        padding: 10px 12px;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: all 0.25s ease;
+        position: relative;
+        font-size: 13px;
+      }
+      .species-item:hover {
+        background: rgba(59, 130, 246, 0.15);
+      }
+      .species-item.active {
+        background: rgba(59, 130, 246, 0.25);
+      }
+      .species-item.active::before {
+        content: '';
+        position: absolute;
+        left: 0;
+        top: 8px;
+        bottom: 8px;
+        width: 3px;
+        background: #3B82F6;
+        border-radius: 0 2px 2px 0;
+      }
+      .species-icon {
+        font-size: 18px;
+        margin-right: 10px;
+      }
+      .species-name {
+        flex: 1;
+      }
+      .species-count {
+        font-size: 11px;
+        color: #94a3b8;
+        background: rgba(255,255,255,0.08);
+        padding: 2px 8px;
+        border-radius: 10px;
+      }
+      .stats-section {
+        margin-top: 24px;
+        padding-top: 16px;
+        border-top: 1px solid rgba(255, 255, 255, 0.1);
+      }
+      .stat-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 8px 0;
+        font-size: 12px;
+      }
+      .stat-label {
+        color: #94a3b8;
+      }
+      .stat-value {
+        font-weight: 600;
+        color: #60a5fa;
+      }
+      .time-bar {
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        height: 60px;
+        background: rgba(0, 0, 0, 0.65);
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0 24px;
+        z-index: 10;
+      }
+      @media (max-width: 768px) {
+        .time-bar {
+          height: 80px;
+          padding: 0 16px;
+        }
+        .side-panel {
+          width: 220px;
+          right: 12px;
+          top: 70px;
+          padding: 16px;
+        }
+        .logo {
+          top: 16px;
+          left: 16px;
+          font-size: 16px;
+        }
+      }
+      .play-btn {
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        background: rgba(59, 130, 246, 0.2);
+        border: 1px solid rgba(59, 130, 246, 0.4);
+        color: #3B82F6;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.25s ease;
+        flex-shrink: 0;
+        margin-right: 20px;
+      }
+      .play-btn:hover {
+        background: rgba(59, 130, 246, 0.35);
+        transform: scale(1.08);
+      }
+      .play-btn.playing {
+        background: rgba(239, 68, 68, 0.2);
+        border-color: rgba(239, 68, 68, 0.4);
+        color: #ef4444;
+      }
+      .play-btn svg {
+        width: 14px;
+        height: 14px;
+      }
+      .slider-wrapper {
+        flex: 1;
+        max-width: calc(100% - 160px);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        position: relative;
+      }
+      .slider-track {
+        width: 80%;
+        height: 4px;
+        background: rgba(255, 255, 255, 0.15);
+        border-radius: 2px;
+        position: relative;
+        cursor: pointer;
+      }
+      .slider-progress {
+        position: absolute;
+        left: 0;
+        top: 0;
+        height: 100%;
+        background: linear-gradient(90deg, #3B82F6, #8b5cf6);
+        border-radius: 2px;
+        pointer-events: none;
+      }
+      .slider-thumb {
+        position: absolute;
+        top: 50%;
+        transform: translate(-50%, -50%);
+        width: 16px;
+        height: 16px;
+        border-radius: 50%;
+        background: #3B82F6;
+        border: 2px solid #ffffff;
+        cursor: grab;
+        box-shadow: 0 2px 12px rgba(59, 130, 246, 0.6);
+        transition: transform 0.15s ease, box-shadow 0.15s ease;
+        z-index: 2;
+      }
+      .slider-thumb:hover {
+        transform: translate(-50%, -50%) scale(1.25);
+        box-shadow: 0 4px 16px rgba(59, 130, 246, 0.8);
+      }
+      .slider-thumb:active {
+        cursor: grabbing;
+      }
+      .time-label {
+        margin-top: 10px;
+        font-size: 14px;
+        color: #ffffff;
+        font-family: 'SF Mono', Monaco, 'Cascadia Code', monospace;
+        letter-spacing: 0.5px;
+      }
+      .info-card {
+        position: absolute;
+        background: rgba(255, 255, 255, 0.1);
+        backdrop-filter: blur(8px);
+        -webkit-backdrop-filter: blur(8px);
+        border: 1px solid rgba(255, 255, 255, 0.3);
+        border-radius: 12px;
+        padding: 16px 18px;
+        min-width: 220px;
+        z-index: 20;
+        pointer-events: auto;
+        transform-origin: bottom center;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+      }
+      .info-card.hidden {
+        opacity: 0;
+        pointer-events: none;
+        transform: translateY(20px) scale(0.9);
+      }
+      .info-card.visible {
+        opacity: 1;
+        animation: cardPopIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+      }
+      .info-card.closing {
+        animation: cardFadeOut 0.25s ease-in forwards;
+      }
+      @keyframes cardPopIn {
+        0% { opacity: 0; transform: translateY(30px) scale(0.85); }
+        60% { opacity: 1; transform: translateY(-8px) scale(1.02); }
+        100% { opacity: 1; transform: translateY(0) scale(1); }
+      }
+      @keyframes cardFadeOut {
+        0% { opacity: 1; transform: translateY(0) scale(1); }
+        100% { opacity: 0; transform: translateY(20px) scale(0.9); }
+      }
+      .card-header {
+        display: flex;
+        align-items: center;
+        margin-bottom: 12px;
+        padding-bottom: 10px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+      }
+      .card-species-icon {
+        font-size: 24px;
+        margin-right: 10px;
+      }
+      .card-species-name {
+        font-size: 16px;
+        font-weight: 600;
+      }
+      .card-row {
+        display: flex;
+        justify-content: space-between;
+        padding: 6px 0;
+        font-size: 12px;
+      }
+      .card-row-label {
+        color: #c7d2fe;
+      }
+      .card-row-value {
+        font-weight: 500;
+        color: #ffffff;
+      }
+      .card-row-value.high {
+        color: #f87171;
+      }
+      .card-row-value.mid {
+        color: #fbbf24;
+      }
+      .card-row-value.low {
+        color: #60a5fa;
+      }
+      .card-chart-title {
+        font-size: 11px;
+        color: #a5b4fc;
+        margin-top: 12px;
+        margin-bottom: 6px;
+      }
+      .card-chart {
+        width: 100%;
+        height: 50px;
+        display: block;
+      }
+      .card-close {
+        position: absolute;
+        top: 8px;
+        right: 10px;
+        width: 20px;
+        height: 20px;
+        border: none;
+        background: rgba(255, 255, 255, 0.1);
+        color: #cbd5e1;
+        border-radius: 50%;
+        cursor: pointer;
+        font-size: 12px;
+        line-height: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.2s ease;
+      }
+      .card-close:hover {
+        background: rgba(239, 68, 68, 0.3);
+        color: #fca5a5;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app">
+      <div id="canvas-container"></div>
+      <div class="logo">🌍 物种迁徙可视化</div>
+
+      <div class="side-panel">
+        <div class="panel-title">选择物种</div>
+        <div class="species-list" id="speciesList">
+        </div>
+        <div class="stats-section">
+          <div class="panel-title">当前统计</div>
+          <div class="stat-item">
+            <span class="stat-label">监测区域数</span>
+            <span class="stat-value" id="statAreas">-</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-label">记录总数</span>
+            <span class="stat-value" id="statRecords">-</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-label">平均密度</span>
+            <span class="stat-value" id="statDensity">-</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-label">迁徙活跃性</span>
+            <span class="stat-value" id="statActivity">-</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="time-bar">
+        <button class="play-btn" id="playBtn" title="播放/暂停">
+          <svg id="playIcon" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M8 5v14l11-7z"/>
+          </svg>
+          <svg id="pauseIcon" viewBox="0 0 24 24" fill="currentColor" style="display:none">
+            <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>
+          </svg>
+        </button>
+        <div class="slider-wrapper">
+          <div class="slider-track" id="sliderTrack">
+            <div class="slider-progress" id="sliderProgress"></div>
+            <div class="slider-thumb" id="sliderThumb"></div>
+          </div>
+          <div class="time-label" id="timeLabel">2024-01-01</div>
+        </div>
+      </div>
+
+      <div class="info-card hidden" id="infoCard">
+        <button class="card-close" id="cardClose">×</button>
+        <div class="card-header">
+          <span class="card-species-icon" id="cardSpeciesIcon">🦓</span>
+          <span class="card-species-name" id="cardSpeciesName">斑马</span>
+        </div>
+        <div class="card-row">
+          <span class="card-row-label">记录时间</span>
+          <span class="card-row-value" id="cardDate">2024-01-15</span>
+        </div>
+        <div class="card-row">
+          <span class="card-row-label">密度指数</span>
+          <span class="card-row-value" id="cardDensity">68</span>
+        </div>
+        <div class="card-row">
+          <span class="card-row-label">经纬度</span>
+          <span class="card-row-value" id="cardCoords">-</span>
+        </div>
+        <div class="card-chart-title">近三月变化趋势</div>
+        <canvas class="card-chart" id="cardChart" width="200" height="50"></canvas>
+      </div>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
