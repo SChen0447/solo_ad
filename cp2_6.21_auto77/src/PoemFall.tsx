@@ -4,7 +4,7 @@ import { poems, EMOTION_COLORS, type EmotionTag, type Poem } from './PoemData';
 interface CardState {
   uid: number;
   poem: Poem;
-  x: number;
+  baseX: number;
   startY: number;
   targetY: number;
   currentY: number;
@@ -17,6 +17,16 @@ interface CardState {
   opacity: number;
   offsetX: number;
   forcedOpacity: number | null;
+  swayAmplitude: number;
+  swayFrequency: number;
+  swayOffset: number;
+}
+
+interface NeighborInfo {
+  prevUid: number | null;
+  nextUid: number | null;
+  prevDirection: number;
+  nextDirection: number;
 }
 
 function getCardWidth(): number {
@@ -40,14 +50,15 @@ function shuffleArray<T>(arr: T[]): T[] {
   return a;
 }
 
-function easeOutCubic(t: number): number {
-  return 1 - Math.pow(1 - t, 3);
+function easeOutSine(t: number): number {
+  return Math.sin((t * Math.PI) / 2);
 }
 
 const MAX_CARDS = 15;
 const MIN_CARDS = 10;
 const SETTLE_DURATION = 5000;
 const FADE_DURATION = 1000;
+const SWAY_MAX_AMPLITUDE = 3;
 
 const PoemFall: React.FC = () => {
   const [cards, setCards] = useState<CardState[]>([]);
@@ -64,20 +75,33 @@ const PoemFall: React.FC = () => {
 
   cardsRef.current = cards;
 
-  const findNeighbors = useCallback((uid: number): { prevUid: number | null; nextUid: number | null } => {
-    const settledCards = cardsRef.current
-      .filter(c => c.settled)
-      .sort((a, b) => a.targetY - b.targetY);
-    const idx = settledCards.findIndex(c => c.uid === uid);
-    if (idx === -1) return { prevUid: null, nextUid: null };
-    return {
-      prevUid: idx > 0 ? settledCards[idx - 1].uid : null,
-      nextUid: idx < settledCards.length - 1 ? settledCards[idx + 1].uid : null,
-    };
+  const findNeighbors = useCallback((uid: number): NeighborInfo => {
+    const sorted = [...cardsRef.current].sort((a, b) => a.currentY - b.currentY);
+    const idx = sorted.findIndex(c => c.uid === uid);
+    if (idx === -1) return { prevUid: null, nextUid: null, prevDirection: -1, nextDirection: 1 };
+
+    const hovered = sorted[idx];
+    let prevUid: number | null = null;
+    let nextUid: number | null = null;
+    let prevDirection = -1;
+    let nextDirection = 1;
+
+    if (idx > 0) {
+      const prevCard = sorted[idx - 1];
+      prevUid = prevCard.uid;
+      prevDirection = prevCard.baseX < hovered.baseX ? -1 : 1;
+    }
+    if (idx < sorted.length - 1) {
+      const nextCard = sorted[idx + 1];
+      nextUid = nextCard.uid;
+      nextDirection = nextCard.baseX < hovered.baseX ? -1 : 1;
+    }
+
+    return { prevUid, nextUid, prevDirection, nextDirection };
   }, []);
 
-  const { prevUid, nextUid } = useMemo(() => {
-    if (hoveredUid === null) return { prevUid: null, nextUid: null };
+  const neighborInfo = useMemo((): NeighborInfo => {
+    if (hoveredUid === null) return { prevUid: null, nextUid: null, prevDirection: -1, nextDirection: 1 };
     return findNeighbors(hoveredUid);
   }, [hoveredUid, findNeighbors]);
 
@@ -88,21 +112,23 @@ const PoemFall: React.FC = () => {
     const cardWidth = getCardWidth();
     const containerWidth = window.innerWidth;
     const centerX = containerWidth / 2 - cardWidth / 2;
-    const x = centerX + (Math.random() * 160 - 80);
+    const baseX = centerX + (Math.random() * 160 - 80);
     const rotation = Math.random() * 10 - 5;
-    const existingSettled = cardsRef.current.filter(c => c.settled && !c.fadingOut);
-    const maxY = existingSettled.length > 0
-      ? Math.max(...existingSettled.map(c => c.targetY)) + 60
+    const existingActive = cardsRef.current.filter(c => !c.fadingOut);
+    const maxY = existingActive.length > 0
+      ? Math.max(...existingActive.map(c => c.targetY)) + 60
       : 80;
     const targetY = maxY + Math.random() * 40;
     const baseDuration = 15000 + Math.random() * 10000;
     const duration = baseDuration / speedRef.current;
     const startY = -400;
+    const swayAmplitude = 1.5 + Math.random() * (SWAY_MAX_AMPLITUDE - 1.5);
+    const swayFrequency = 0.0008 + Math.random() * 0.0006;
 
     return {
       uid: nextUidRef.current++,
       poem,
-      x,
+      baseX,
       startY,
       targetY,
       currentY: startY,
@@ -115,6 +141,9 @@ const PoemFall: React.FC = () => {
       opacity: 1,
       offsetX: 0,
       forcedOpacity: null,
+      swayAmplitude,
+      swayFrequency,
+      swayOffset: 0,
     };
   }, [shuffledPoems]);
 
@@ -136,14 +165,11 @@ const PoemFall: React.FC = () => {
 
   useEffect(() => {
     const interval = setInterval(() => {
-      const total = cardsRef.current.length;
-      if (total < MIN_CARDS) {
-        const toAdd = Math.min(2, MIN_CARDS - total);
+      if (cardsRef.current.length < MIN_CARDS) {
+        const toAdd = MIN_CARDS - cardsRef.current.length;
         for (let i = 0; i < toAdd; i++) {
           setTimeout(() => addCard(), i * 400);
         }
-      } else if (total < MAX_CARDS && Math.random() > 0.5) {
-        addCard();
       }
     }, 2000);
     return () => clearInterval(interval);
@@ -162,7 +188,7 @@ const PoemFall: React.FC = () => {
       setCards(prev => {
         let changed = false;
         const next: CardState[] = [];
-        let removedCount = 0;
+        const newCardsToAdd: CardState[] = [];
 
         for (const card of prev) {
           let updated = { ...card };
@@ -172,7 +198,8 @@ const PoemFall: React.FC = () => {
             const fadeProgress = Math.min((time - fadeStart) / FADE_DURATION, 1);
             updated.opacity = 1 - fadeProgress;
             if (updated.opacity <= 0) {
-              removedCount++;
+              const replacement = createCard();
+              newCardsToAdd.push(replacement);
               changed = true;
               continue;
             }
@@ -180,12 +207,14 @@ const PoemFall: React.FC = () => {
           } else if (!card.settled) {
             const elapsed = time - card.startTime;
             const progress = Math.min(elapsed / card.duration, 1);
-            const easedProgress = easeOutCubic(progress);
+            const easedProgress = easeOutSine(progress);
             updated.currentY = card.startY + (card.targetY - card.startY) * easedProgress;
+            updated.swayOffset = Math.sin(elapsed * card.swayFrequency) * card.swayAmplitude;
 
             if (progress >= 1) {
               updated.settled = true;
               updated.settledAt = time;
+              updated.swayOffset = 0;
             }
             changed = true;
           } else if (card.settled && card.settledAt !== null && !card.fadingOut) {
@@ -195,8 +224,12 @@ const PoemFall: React.FC = () => {
             }
           }
 
-          if (updated.uid === prevUid || updated.uid === nextUid) {
-            updated.offsetX = updated.uid === prevUid ? -10 : 10;
+          if (updated.uid === neighborInfo.prevUid) {
+            updated.offsetX = 10 * neighborInfo.prevDirection;
+            updated.forcedOpacity = 0.7;
+            changed = true;
+          } else if (updated.uid === neighborInfo.nextUid) {
+            updated.offsetX = 10 * neighborInfo.nextDirection;
             updated.forcedOpacity = 0.7;
             changed = true;
           } else if (updated.offsetX !== 0 || updated.forcedOpacity !== null) {
@@ -208,10 +241,9 @@ const PoemFall: React.FC = () => {
           next.push(updated);
         }
 
-        if (removedCount > 0) {
-          for (let i = 0; i < removedCount; i++) {
-            setTimeout(() => addCard(), i * 600 + Math.random() * 300);
-          }
+        if (newCardsToAdd.length > 0) {
+          next.push(...newCardsToAdd);
+          changed = true;
         }
 
         return changed ? next : prev;
@@ -222,7 +254,7 @@ const PoemFall: React.FC = () => {
 
     animFrameRef.current = requestAnimationFrame(animate);
     return () => cancelAnimationFrame(animFrameRef.current);
-  }, [prevUid, nextUid, addCard]);
+  }, [neighborInfo, createCard]);
 
   useEffect(() => {
     const onScroll = () => setScrollY(window.scrollY);
@@ -275,13 +307,13 @@ const PoemFall: React.FC = () => {
           const tagColor = EMOTION_COLORS[card.poem.tag];
           const cardWidth = getCardWidth();
           const isHovered = hoveredUid === card.uid;
-          const isNeighbor = card.uid === prevUid || card.uid === nextUid;
+          const isNeighbor = card.uid === neighborInfo.prevUid || card.uid === neighborInfo.nextUid;
 
           const baseOpacity = card.forcedOpacity !== null ? card.forcedOpacity : card.opacity;
           const displayedOpacity = isFiltered ? Math.min(0.2, baseOpacity) : baseOpacity;
 
           const scale = isHovered ? 1.08 : 1.0;
-          const offsetX = card.offsetX;
+          const totalOffsetX = card.swayOffset + card.offsetX;
           const boxShadow = isHovered
             ? '4px 8px 28px rgba(0,0,0,0.45)'
             : '2px 4px 16px rgba(0,0,0,0.25)';
@@ -292,13 +324,13 @@ const PoemFall: React.FC = () => {
               className="poem-card"
               style={{
                 position: 'absolute',
-                left: card.x + offsetX,
+                left: card.baseX,
                 top: card.currentY,
                 width: cardWidth,
                 opacity: displayedOpacity,
-                transform: `rotate(${card.rotation}deg) scale(${scale}) translateZ(0)`,
-                willChange: 'transform, opacity, left',
-                transition: 'transform 0.3s ease-out, left 0.3s ease-out, opacity 0.4s ease-out',
+                transform: `translateX(${totalOffsetX}px) rotate(${card.rotation}deg) scale(${scale}) translateZ(0)`,
+                willChange: 'transform, opacity',
+                transition: 'transform 0.3s ease-out, opacity 0.4s ease-out',
                 background: 'rgba(250, 240, 230, 0.85)',
                 borderRadius: 6,
                 padding: '20px 24px',
