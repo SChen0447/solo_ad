@@ -50,6 +50,7 @@ function injectProjectionStyles(): void {
 export interface ProjectionHandle {
   update(type: StructureType, params: StructureParams): void;
   triggerEnterAnimation(): void;
+  setRotation(angle: number): void;
   dispose(): void;
 }
 
@@ -70,6 +71,7 @@ export function createProjection(): ProjectionHandle {
 
   let currentType: StructureType = 'mobius';
   let currentParams: StructureParams = { twist: 1, density: 48, curvature: 1.0 };
+  let rotationAngle = 0;
 
   function draw(): void {
     const w = canvas.width;
@@ -108,6 +110,10 @@ export function createProjection(): ProjectionHandle {
     radius: number
   ): void {
     ctx.save();
+    ctx.translate(cx, cy);
+    ctx.rotate(rotationAngle);
+    ctx.translate(-cx, -cy);
+
     ctx.strokeStyle = 'rgba(167, 139, 250, 0.4)';
     ctx.lineWidth = 1;
     ctx.setLineDash([4, 4]);
@@ -276,6 +282,10 @@ export function createProjection(): ProjectionHandle {
       container.classList.remove('ne-projection-enter');
       void container.offsetWidth;
       container.classList.add('ne-projection-enter');
+    },
+    setRotation(angle: number): void {
+      rotationAngle = angle;
+      draw();
     },
     dispose(): void {
       container.remove();

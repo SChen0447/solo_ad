@@ -3,6 +3,7 @@ import { StructureType, StructureParams } from './structures';
 
 export type ControlChangeCallback = (type: StructureType, params: StructureParams) => void;
 export type GeodesicCallback = (point: { u: number; v: number }) => void;
+export type AutoRotateCallback = (enabled: boolean) => void;
 
 const STYLE_ID = 'non-euclid-controls-style';
 
@@ -148,6 +149,59 @@ function injectStyles(): void {
       box-shadow: 0 0 6px 2px #FFB347;
     }
 
+    .ne-toggle-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      margin-top: 4px;
+      padding-top: 12px;
+      border-top: 1px solid rgba(255, 255, 255, 0.06);
+    }
+
+    .ne-toggle-label {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      color: #9999aa;
+      font-size: 12px;
+      font-family: 'Segoe UI', system-ui, sans-serif;
+    }
+
+    .ne-toggle {
+      position: relative;
+      width: 44px;
+      height: 22px;
+      border-radius: 11px;
+      background: #333340;
+      cursor: pointer;
+      transition: background 0.2s ease;
+      flex-shrink: 0;
+    }
+
+    .ne-toggle::before {
+      content: '';
+      position: absolute;
+      top: 3px;
+      left: 3px;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: #fff;
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .ne-toggle:hover::before {
+      box-shadow: 0 0 6px 2px #FFB347;
+    }
+
+    .ne-toggle.active {
+      background: linear-gradient(135deg, #6C63FF, #A78BFA);
+    }
+
+    .ne-toggle.active::before {
+      transform: translateX(22px);
+    }
+
     .ne-hint {
       color: #666677;
       font-size: 11px;
@@ -166,6 +220,8 @@ export interface ControlsHandle {
   getParams(): StructureParams;
   onChange(cb: ControlChangeCallback): void;
   onGeodesicSelect(cb: GeodesicCallback): void;
+  onAutoRotateChange(cb: AutoRotateCallback): void;
+  getAutoRotate(): boolean;
 }
 
 export function createControls(
@@ -178,6 +234,8 @@ export function createControls(
   let currentParams = { ...initialParams };
   const changeCallbacks: ControlChangeCallback[] = [];
   const geodesicCallbacks: GeodesicCallback[] = [];
+  const autoRotateCallbacks: AutoRotateCallback[] = [];
+  let autoRotate = false;
 
   const nav = document.createElement('div');
   nav.className = 'ne-nav';
@@ -299,6 +357,28 @@ export function createControls(
     panel.appendChild(group);
   });
 
+  const toggleGroup = document.createElement('div');
+  toggleGroup.className = 'ne-toggle-group';
+
+  const toggleLabel = document.createElement('div');
+  toggleLabel.className = 'ne-toggle-label';
+
+  const toggleText = document.createElement('span');
+  toggleText.textContent = '自动旋转';
+
+  const toggleBtn = document.createElement('div');
+  toggleBtn.className = 'ne-toggle';
+  toggleBtn.addEventListener('click', () => {
+    autoRotate = !autoRotate;
+    toggleBtn.classList.toggle('active', autoRotate);
+    notifyAutoRotate();
+  });
+
+  toggleLabel.appendChild(toggleText);
+  toggleLabel.appendChild(toggleBtn);
+  toggleGroup.appendChild(toggleLabel);
+  panel.appendChild(toggleGroup);
+
   const hint = document.createElement('div');
   hint.className = 'ne-hint';
   hint.textContent = '点击结构上的点可显示测地线路径（红色发光线，1秒后淡出）';
@@ -310,11 +390,17 @@ export function createControls(
     changeCallbacks.forEach(cb => cb(currentType, { ...currentParams }));
   }
 
+  function notifyAutoRotate(): void {
+    autoRotateCallbacks.forEach(cb => cb(autoRotate));
+  }
+
   return {
     getType() { return currentType; },
     getParams() { return { ...currentParams }; },
     onChange(cb: ControlChangeCallback) { changeCallbacks.push(cb); },
     onGeodesicSelect(cb: GeodesicCallback) { geodesicCallbacks.push(cb); },
+    onAutoRotateChange(cb: AutoRotateCallback) { autoRotateCallbacks.push(cb); },
+    getAutoRotate() { return autoRotate; },
   };
 }
 

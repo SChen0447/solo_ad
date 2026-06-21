@@ -19,6 +19,8 @@ const MORPH_DURATION = 0.5;
 const GEODESIC_FADE_DURATION = 1.0;
 const GEODESIC_LINE_RADIUS = 0.025;
 const GEODESIC_GLOW_RADIUS = 0.06;
+const AUTO_ROTATE_SPEED = 0.5;
+const AUTO_ROTATE_RESUME_DELAY = 2.0;
 
 class NonEuclidApp {
   private renderer: THREE.WebGLRenderer;
@@ -43,6 +45,10 @@ class NonEuclidApp {
 
   private geodesicTimer = 0;
   private geodesicVisible = false;
+
+  private autoRotateEnabled = false;
+  private autoRotatePaused = false;
+  private autoRotateResumeTimer = 0;
 
   private raycaster = new THREE.Raycaster();
   private mouse = new THREE.Vector2();
@@ -137,6 +143,10 @@ class NonEuclidApp {
 
     this.controlsHandle = createControls(this.currentType, this.currentParams);
     this.controlsHandle.onChange(this.onControlChange.bind(this));
+    this.controlsHandle.onAutoRotateChange(this.onAutoRotateChange.bind(this));
+
+    this.controls.addEventListener('start', this.onControlsStart.bind(this));
+    this.controls.addEventListener('end', this.onControlsEnd.bind(this));
 
     this.projectionHandle = createProjection();
 
@@ -345,6 +355,44 @@ class NonEuclidApp {
     this.renderer.setSize(window.innerWidth, window.innerHeight);
   }
 
+  private onAutoRotateChange(enabled: boolean): void {
+    this.autoRotateEnabled = enabled;
+    if (!enabled) {
+      this.autoRotatePaused = false;
+      this.autoRotateResumeTimer = 0;
+    }
+  }
+
+  private onControlsStart(): void {
+    if (this.autoRotateEnabled) {
+      this.autoRotatePaused = true;
+      this.autoRotateResumeTimer = 0;
+    }
+  }
+
+  private onControlsEnd(): void {
+    if (this.autoRotateEnabled) {
+      this.autoRotateResumeTimer = AUTO_ROTATE_RESUME_DELAY;
+    }
+  }
+
+  private updateAutoRotate(delta: number): void {
+    if (!this.autoRotateEnabled) return;
+
+    if (this.autoRotatePaused && this.autoRotateResumeTimer > 0) {
+      this.autoRotateResumeTimer -= delta;
+      if (this.autoRotateResumeTimer <= 0) {
+        this.autoRotatePaused = false;
+      }
+    }
+
+    if (!this.autoRotatePaused && !this.isMorphing) {
+      const rot = delta * AUTO_ROTATE_SPEED;
+      this.mesh.rotation.y += rot;
+      this.projectionHandle.setRotation(this.mesh.rotation.y);
+    }
+  }
+
   private animate(): void {
     requestAnimationFrame(this.animate.bind(this));
 
@@ -354,14 +402,11 @@ class NonEuclidApp {
 
     this.updateMorph(delta);
     this.updateGeodesic(delta);
+    this.updateAutoRotate(delta);
 
     if (!this.isMorphing && this.geodesicVisible) {
       this.geodesicMesh.quaternion.copy(this.mesh.quaternion);
       this.geodesicGlowMesh.quaternion.copy(this.mesh.quaternion);
-    }
-
-    if (!this.isMorphing) {
-      this.mesh.rotation.y += delta * 0.08;
     }
 
     this.renderer.render(this.scene, this.camera);
