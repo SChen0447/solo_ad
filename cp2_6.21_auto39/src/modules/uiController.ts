@@ -7,6 +7,10 @@ export class UIController {
   private rotationSpeedSlider: HTMLInputElement;
   private orbitSpeedValue: HTMLElement;
   private rotationSpeedValue: HTMLElement;
+  private orbitFill: HTMLElement;
+  private rotationFill: HTMLElement;
+  private orbitTooltip: HTMLElement;
+  private rotationTooltip: HTMLElement;
   private textureButtons: NodeListOf<HTMLButtonElement>;
   private compareBtn: HTMLButtonElement;
   private exitCompareBtn: HTMLButtonElement;
@@ -29,6 +33,10 @@ export class UIController {
     this.rotationSpeedSlider = document.getElementById('rotation-speed') as HTMLInputElement;
     this.orbitSpeedValue = document.getElementById('orbit-speed-value')!;
     this.rotationSpeedValue = document.getElementById('rotation-speed-value')!;
+    this.orbitFill = document.getElementById('orbit-fill')!;
+    this.rotationFill = document.getElementById('rotation-fill')!;
+    this.orbitTooltip = document.getElementById('orbit-tooltip')!;
+    this.rotationTooltip = document.getElementById('rotation-tooltip')!;
     this.textureButtons = document.querySelectorAll('[data-texture]') as NodeListOf<HTMLButtonElement>;
     this.compareBtn = document.getElementById('compare-btn') as HTMLButtonElement;
     this.exitCompareBtn = document.getElementById('exit-compare-btn') as HTMLButtonElement;
@@ -53,22 +61,27 @@ export class UIController {
     this.planetGrid.innerHTML = '';
 
     this.planetDataList.forEach((planet) => {
-      const thumb = document.createElement('div');
-      thumb.className = 'planet-thumb';
-      thumb.dataset.planet = planet.name;
-      thumb.title = planet.nameCN;
+      const card = document.createElement('div');
+      card.className = 'planet-thumb';
+      card.dataset.planet = planet.name;
+      card.title = planet.nameCN;
 
-      const colorDiv = document.createElement('div');
-      colorDiv.className = 'planet-thumb-color';
-      colorDiv.style.background = `radial-gradient(circle at 30% 30%, ${this.lightenColor(planet.color, 0.3)}, #${planet.color.toString(16).padStart(6, '0')})`;
+      const dot = document.createElement('div');
+      dot.className = 'planet-dot';
+      dot.style.background = `radial-gradient(circle at 30% 30%, ${this.lightenColor(planet.color, 0.35)}, #${planet.color.toString(16).padStart(6, '0')} 70%, ${this.darkenColor(planet.color, 0.2)})`;
 
-      thumb.appendChild(colorDiv);
+      const nameText = document.createElement('div');
+      nameText.className = 'planet-name-text';
+      nameText.textContent = planet.nameCN;
 
-      thumb.addEventListener('click', () => {
+      card.appendChild(dot);
+      card.appendChild(nameText);
+
+      card.addEventListener('click', () => {
         this.togglePlanetSelection(planet.name);
       });
 
-      this.planetGrid.appendChild(thumb);
+      this.planetGrid.appendChild(card);
     });
   }
 
@@ -86,17 +99,65 @@ export class UIController {
     return `rgb(${Math.floor(r)}, ${Math.floor(g)}, ${Math.floor(b)})`;
   }
 
+  private colorToHex(hex: number): string {
+    return `#${hex.toString(16).padStart(6, '0')}`;
+  }
+
   private setupEventListeners(): void {
+    const orbitMin = parseFloat(this.orbitSpeedSlider.min);
+    const orbitMax = parseFloat(this.orbitSpeedSlider.max);
+    const rotMin = parseFloat(this.rotationSpeedSlider.min);
+    const rotMax = parseFloat(this.rotationSpeedSlider.max);
+
+    const updateSliderUI = (slider: HTMLInputElement, fill: HTMLElement, tooltip: HTMLElement, valueEl: HTMLElement, min: number, max: number, suffix: string = 'x') => {
+      const value = parseFloat(slider.value);
+      const pct = ((value - min) / (max - min)) * 100;
+      fill.style.width = `${pct}%`;
+      tooltip.style.left = `${pct}%`;
+      tooltip.textContent = `${value.toFixed(1)}${suffix}`;
+      valueEl.textContent = `${value.toFixed(1)}${suffix}`;
+    };
+
     this.orbitSpeedSlider.addEventListener('input', (e) => {
-      const value = parseFloat((e.target as HTMLInputElement).value);
-      this.orbitSpeedValue.textContent = `${value.toFixed(1)}x`;
+      const slider = e.target as HTMLInputElement;
+      const value = parseFloat(slider.value);
+      updateSliderUI(slider, this.orbitFill, this.orbitTooltip, this.orbitSpeedValue, orbitMin, orbitMax);
+      slider.classList.add('slider-dragging');
+      this.orbitTooltip.classList.add('show');
       eventBus.emit('orbitSpeedChange', value);
     });
 
+    this.orbitSpeedSlider.addEventListener('pointerdown', () => {
+      this.orbitTooltip.classList.add('show');
+      this.orbitSpeedSlider.classList.add('slider-dragging');
+    });
+
+    this.orbitSpeedSlider.addEventListener('pointerup', () => {
+      setTimeout(() => {
+        this.orbitTooltip.classList.remove('show');
+        this.orbitSpeedSlider.classList.remove('slider-dragging');
+      }, 400);
+    });
+
     this.rotationSpeedSlider.addEventListener('input', (e) => {
-      const value = parseFloat((e.target as HTMLInputElement).value);
-      this.rotationSpeedValue.textContent = `${value.toFixed(1)}x`;
+      const slider = e.target as HTMLInputElement;
+      const value = parseFloat(slider.value);
+      updateSliderUI(slider, this.rotationFill, this.rotationTooltip, this.rotationSpeedValue, rotMin, rotMax);
+      slider.classList.add('slider-dragging');
+      this.rotationTooltip.classList.add('show');
       eventBus.emit('rotationSpeedChange', value);
+    });
+
+    this.rotationSpeedSlider.addEventListener('pointerdown', () => {
+      this.rotationTooltip.classList.add('show');
+      this.rotationSpeedSlider.classList.add('slider-dragging');
+    });
+
+    this.rotationSpeedSlider.addEventListener('pointerup', () => {
+      setTimeout(() => {
+        this.rotationTooltip.classList.remove('show');
+        this.rotationSpeedSlider.classList.remove('slider-dragging');
+      }, 400);
     });
 
     this.textureButtons.forEach((btn) => {
@@ -135,9 +196,7 @@ export class UIController {
       this.updateComparePanel(data);
     });
 
-    eventBus.on('planetHover', (planetData: PlanetData) => {
-      // Visual feedback could be added here
-    });
+    eventBus.on('planetHover', (_planetData: PlanetData) => {});
 
     eventBus.on('planetClicked', (planetData: PlanetData) => {
       if (!this.isCompareMode) {
@@ -178,6 +237,15 @@ export class UIController {
 
     this.updatePlanetThumbs();
     this.updateCompareButtonState();
+
+    if (this.selectedPlanets.length > 0) {
+      const lastSelected = this.planetDataList.find(p => p.name === this.selectedPlanets[this.selectedPlanets.length - 1]);
+      if (lastSelected) {
+        this.updateInfoPanel(lastSelected);
+      }
+    } else {
+      this.updateInfoPanel(null);
+    }
   }
 
   private updatePlanetThumbs(): void {
@@ -202,27 +270,70 @@ export class UIController {
       return;
     }
 
+    const typeClass = planet.textureType || 'rocky';
+    const typeLabel = this.getTextureTypeLabel(planet.textureType);
+    const previewBg = `radial-gradient(circle at 30% 30%, ${this.lightenColor(planet.color, 0.4)}, #${planet.color.toString(16).padStart(6, '0')} 60%, ${this.darkenColor(planet.color, 0.3)})`;
+    const colorHex = this.colorToHex(planet.color);
+
     this.infoContent.innerHTML = `
-      <div class="planet-name">${planet.nameCN}</div>
-      <div class="info-row">
-        <span class="info-label">轨道半径</span>
-        <span class="info-value">${planet.orbitRadius.toFixed(1)} 单位</span>
+      <div class="planet-header">
+        <div class="planet-color-preview" style="background: ${previewBg};"></div>
+        <div class="planet-title-wrap">
+          <div class="planet-name">${planet.nameCN}</div>
+          <span class="planet-type-tag ${typeClass}">${typeLabel}</span>
+        </div>
       </div>
-      <div class="info-row">
-        <span class="info-label">行星直径</span>
-        <span class="info-value">${planet.diameter.toFixed(2)} 单位</span>
-      </div>
-      <div class="info-row">
-        <span class="info-label">公转速度</span>
-        <span class="info-value">${planet.orbitSpeed.toFixed(2)} rad/s</span>
-      </div>
-      <div class="info-row">
-        <span class="info-label">自转倾角</span>
-        <span class="info-value">${planet.axialTilt.toFixed(2)}°</span>
-      </div>
-      <div class="info-row">
-        <span class="info-label">纹理类型</span>
-        <span class="info-value">${this.getTextureTypeLabel(planet.textureType)}</span>
+      <div class="info-list">
+        <div class="info-row">
+          <div class="info-label-wrap">
+            <div class="info-icon orbit">🪐</div>
+            <span class="info-label">轨道半径</span>
+          </div>
+          <div class="info-value-wrap">
+            <div class="info-color-block" style="background: #4ECDC4;"></div>
+            <span class="info-value">${planet.orbitRadius.toFixed(1)} 单位</span>
+          </div>
+        </div>
+        <div class="info-row">
+          <div class="info-label-wrap">
+            <div class="info-icon diameter">📏</div>
+            <span class="info-label">行星直径</span>
+          </div>
+          <div class="info-value-wrap">
+            <div class="info-color-block" style="background: #F9A826;"></div>
+            <span class="info-value">${planet.diameter.toFixed(2)} 单位</span>
+          </div>
+        </div>
+        <div class="info-row">
+          <div class="info-label-wrap">
+            <div class="info-icon speed">⚡</div>
+            <span class="info-label">公转速度</span>
+          </div>
+          <div class="info-value-wrap">
+            <div class="info-color-block" style="background: #45B7D1;"></div>
+            <span class="info-value">${planet.orbitSpeed.toFixed(2)} rad/s</span>
+          </div>
+        </div>
+        <div class="info-row">
+          <div class="info-label-wrap">
+            <div class="info-icon tilt">📐</div>
+            <span class="info-label">自转倾角</span>
+          </div>
+          <div class="info-value-wrap">
+            <div class="info-color-block" style="background: #DDA0DD;"></div>
+            <span class="info-value">${planet.axialTilt.toFixed(2)}°</span>
+          </div>
+        </div>
+        <div class="info-row">
+          <div class="info-label-wrap">
+            <div class="info-icon texture">🎨</div>
+            <span class="info-label">代表色</span>
+          </div>
+          <div class="info-value-wrap">
+            <div class="info-color-block" style="background: ${colorHex}; border: 1px solid rgba(255,255,255,0.2);"></div>
+            <span class="info-value">${colorHex.toUpperCase()}</span>
+          </div>
+        </div>
       </div>
     `;
   }
@@ -313,9 +424,7 @@ export class UIController {
     `;
   }
 
-  public dispose(): void {
-    // Clean up event listeners if needed
-  }
+  public dispose(): void {}
 }
 
 export default UIController;
