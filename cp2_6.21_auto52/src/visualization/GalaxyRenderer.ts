@@ -1,5 +1,8 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
 import { ParticleEngine } from '@/core/ParticleEngine';
 import { eventBus, EVENTS } from '@/utils/EventBus';
 
@@ -12,11 +15,12 @@ export class GalaxyRenderer {
   private particleEngine: ParticleEngine;
   private clock: THREE.Clock;
 
+  private composer: EffectComposer;
+  private bloomPass: UnrealBloomPass;
+  private renderPass: RenderPass;
+
   private autoRotate: boolean = false;
   private readonly AUTO_ROTATE_SPEED = 0.002;
-
-  private glowSprite: THREE.Sprite | null = null;
-  private glowMaterial: THREE.SpriteMaterial | null = null;
 
   private animationId: number = 0;
   private isRunning: boolean = false;
@@ -24,6 +28,9 @@ export class GalaxyRenderer {
   private readonly MIN_DISTANCE = 5;
   private readonly MAX_DISTANCE = 200;
   private readonly ROTATE_SPEED = 0.5;
+
+  private readonly BLOOM_INTENSITY_HIGH = 0.3;
+  private readonly BLOOM_INTENSITY_LOW = 0;
 
   constructor(container: HTMLElement) {
     this.container = container;
@@ -49,6 +56,8 @@ export class GalaxyRenderer {
     this.renderer.setSize(container.clientWidth, container.clientHeight);
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     this.renderer.setClearColor(0x000000, 1);
+    this.renderer.toneMapping = THREE.ReinhardToneMapping;
+    this.renderer.toneMappingExposure = 1.0;
 
     container.appendChild(this.renderer.domElement);
 
@@ -59,6 +68,19 @@ export class GalaxyRenderer {
     this.scene.add(this.particleEngine.getPoints());
 
     this.createAmbientStars();
+
+    this.composer = new EffectComposer(this.renderer);
+    this.renderPass = new RenderPass(this.scene, this.camera);
+    this.composer.addPass(this.renderPass);
+
+    this.bloomPass = new UnrealBloomPass(
+      new THREE.Vector2(container.clientWidth, container.clientHeight),
+      this.BLOOM_INTENSITY_LOW,
+      0.6,
+      0.2
+    );
+    this.composer.addPass(this.bloomPass);
+
     this.setupEventListeners();
 
     window.addEventListener('resize', this.onWindowResize);
@@ -114,52 +136,18 @@ export class GalaxyRenderer {
     this.scene.add(stars);
   }
 
-  private createGlowEffect(): void {
-    if (this.glowSprite) return;
-
-    const texture = this.particleEngine.getGlowSpriteTexture();
-    this.glowMaterial = new THREE.SpriteMaterial({
-      map: texture,
-      color: 0xffffff,
-      transparent: true,
-      opacity: 0.3,
-      blending: THREE.AdditiveBlending,
-      depthWrite: false
-    });
-
-    this.glowSprite = new THREE.Sprite(this.glowMaterial);
-    this.glowSprite.scale.set(80, 80, 1);
-    this.glowSprite.position.set(0, 0, 0);
-    this.scene.add(this.glowSprite);
-  }
-
-  private removeGlowEffect(): void {
-    if (this.glowSprite) {
-      this.scene.remove(this.glowSprite);
-      this.glowSprite.material.dispose();
-      (this.glowSprite.material as THREE.Material).dispose();
-      this.glowSprite = null;
-      this.glowMaterial = null;
-    }
-  }
-
-  private updateGlowEffect(): void {
+  private updateBloomEffect(): void {
     const gravity = this.particleEngine.getGravity();
 
     if (gravity > 2) {
-      if (!this.glowSprite) {
-        this.createGlowEffect();
-      }
-      if (this.glowMaterial) {
-        const glowIntensity = 0.2 + Math.min(0.4, (gravity - 2) / 3 * 0.4);
-        this.glowMaterial.opacity = glowIntensity;
-        const scale = 60 + (gravity - 2) / 3 * 60;
-        this.glowSprite!.scale.set(scale, scale, 1);
-      }
+      const t = Math.min(1, (gravity - 2) / 3);
+      this.bloomPass.strength = this.BLOOM_INTENSITY_LOW + (this.BLOOM_INTENSITY_HIGH - this.BLOOM_INTENSITY_LOW) * t;
+      this.bloomPass.radius = 0.4 + t * 0.4;
+      this.renderer.toneMappingExposure = 1.0 + t * 0.3;
     } else {
-      if (this.glowSprite) {
-        this.removeGlowEffect();
-      }
+      this.bloomPass.strength = this.BLOOM_INTENSITY_LOW;
+      this.bloomPass.radius = 0.4;
+      this.renderer.toneMappingExposure = 1.0;
     }
   }
 
@@ -179,6 +167,8 @@ export class GalaxyRenderer {
     this.camera.updateProjectionMatrix();
 
     this.renderer.setSize(width, height);
+    this.composer.setSize(width, height);
+    this.bloomPass.resolution.set(width, height);
   };
 
   private animate = (): void => {
@@ -190,7 +180,7 @@ export class GalaxyRenderer {
 
     this.particleEngine.update(delta);
 
-    this.updateGlowEffect();
+    this.updateBloomEffect();
 
     this.controls.update();
 
@@ -203,7 +193,7 @@ export class GalaxyRenderer {
       this.camera.lookAt(0, 0, 0);
     }
 
-    this.renderer.render(this.scene, this.camera);
+    this.composer.render();
   };
 
   start(): void {
@@ -228,22 +218,25 @@ export class GalaxyRenderer {
     window.removeEventListener('resize', this.onWindowResize);
 
     this.particleEngine.dispose();
-    this.removeGlowEffect();
 
     this.controls.dispose();
     this.renderer.dispose();
+
+    this.bloomPass.dispose();
+    this.composer.dispose();
 
     if (this.renderer.domElement.parentNode) {
       this.renderer.domElement.parentNode.removeChild(this.renderer.domElement);
     }
 
     this.scene.traverse((object) => {
-      if (object instanceof THREE.Mesh) {
-        object.geometry.dispose();
-        if (Array.isArray(object.material)) {
-          object.material.forEach((m) => m.dispose());
-        } else {
-          object.material.dispose();
+      if (object instanceof THREE.Mesh || object instanceof THREE.Points) {
+        const mesh = object as THREE.Mesh | THREE.Points;
+        if (mesh.geometry) mesh.geometry.dispose();
+        if (Array.isArray(mesh.material)) {
+          mesh.material.forEach((m) => m.dispose());
+        } else if (mesh.material) {
+          mesh.material.dispose();
         }
       }
     });

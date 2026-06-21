@@ -11,6 +11,7 @@ export class ParticleEngine {
   private velocities: Float32Array;
   private colors: Float32Array;
   private targetColors: Float32Array;
+  private startColors: Float32Array;
   private sizes: Float32Array;
 
   private gravity: number = 1.5;
@@ -20,6 +21,8 @@ export class ParticleEngine {
   private colorTransitionDuration: number = 1.5;
   private isTransitioning: boolean = false;
   private transitionTimer: number = 0;
+  private colorAnimationId: number = 0;
+  private colorLastTime: number = 0;
 
   private readonly SPHERE_RADIUS = 100;
   private readonly PERTURBATION = 0.01;
@@ -41,11 +44,13 @@ export class ParticleEngine {
     this.velocities = new Float32Array(this.count * 3);
     this.colors = new Float32Array(this.count * 3);
     this.targetColors = new Float32Array(this.count * 3);
+    this.startColors = new Float32Array(this.count * 3);
     this.sizes = new Float32Array(this.count);
 
     this.generateParticles();
     this.setupEventListeners();
     this.createPoints();
+    this.startColorTransitionLoop();
   }
 
   private setupEventListeners(): void {
@@ -98,6 +103,10 @@ export class ParticleEngine {
       this.targetColors[i3 + 1] = color.g;
       this.targetColors[i3 + 2] = color.b;
 
+      this.startColors[i3] = color.r;
+      this.startColors[i3 + 1] = color.g;
+      this.startColors[i3 + 2] = color.b;
+
       this.sizes[i] = 2 + Math.random() * 2;
     }
   }
@@ -121,31 +130,55 @@ export class ParticleEngine {
   setDensity(newCount: number): void {
     if (newCount === this.count) return;
 
+    const oldPosAttr = this.geometry.getAttribute('position') as THREE.BufferAttribute | null;
+    const oldColorAttr = this.geometry.getAttribute('color') as THREE.BufferAttribute | null;
+    const oldSizeAttr = this.geometry.getAttribute('size') as THREE.BufferAttribute | null;
+
     this.count = newCount;
 
     this.positions = new Float32Array(this.count * 3);
     this.velocities = new Float32Array(this.count * 3);
     this.colors = new Float32Array(this.count * 3);
     this.targetColors = new Float32Array(this.count * 3);
+    this.startColors = new Float32Array(this.count * 3);
     this.sizes = new Float32Array(this.count);
 
     this.generateParticles();
 
-    const posAttr = new THREE.BufferAttribute(this.positions, 3);
-    posAttr.setUsage(THREE.DynamicDrawUsage);
-    this.geometry.setAttribute('position', posAttr);
+    if (oldPosAttr) {
+      oldPosAttr.array = this.positions;
+      oldPosAttr.count = this.count;
+      oldPosAttr.needsUpdate = true;
+    } else {
+      const posAttr = new THREE.BufferAttribute(this.positions, 3);
+      posAttr.setUsage(THREE.DynamicDrawUsage);
+      this.geometry.setAttribute('position', posAttr);
+    }
 
-    const colorAttr = new THREE.BufferAttribute(this.colors, 3);
-    colorAttr.setUsage(THREE.DynamicDrawUsage);
-    this.geometry.setAttribute('color', colorAttr);
+    if (oldColorAttr) {
+      oldColorAttr.array = this.colors;
+      oldColorAttr.count = this.count;
+      oldColorAttr.needsUpdate = true;
+    } else {
+      const colorAttr = new THREE.BufferAttribute(this.colors, 3);
+      colorAttr.setUsage(THREE.DynamicDrawUsage);
+      this.geometry.setAttribute('color', colorAttr);
+    }
 
-    const sizeAttr = new THREE.BufferAttribute(this.sizes, 1);
-    sizeAttr.setUsage(THREE.DynamicDrawUsage);
-    this.geometry.setAttribute('size', sizeAttr);
+    if (oldSizeAttr) {
+      oldSizeAttr.array = this.sizes;
+      oldSizeAttr.count = this.count;
+      oldSizeAttr.needsUpdate = true;
+    } else {
+      const sizeAttr = new THREE.BufferAttribute(this.sizes, 1);
+      sizeAttr.setUsage(THREE.DynamicDrawUsage);
+      this.geometry.setAttribute('size', sizeAttr);
+    }
 
     this.geometry.attributes.position.needsUpdate = true;
     this.geometry.attributes.color.needsUpdate = true;
     this.geometry.attributes.size.needsUpdate = true;
+    this.geometry.computeBoundingSphere();
   }
 
   setTheme(theme: ColorTheme): void {
@@ -153,6 +186,8 @@ export class ParticleEngine {
 
     this.currentTheme = theme;
     const themeColors = THEME_COLORS[theme].map(hex => new THREE.Color(hex));
+
+    this.startColors.set(this.colors);
 
     for (let i = 0; i < this.count; i++) {
       const i3 = i * 3;
@@ -165,6 +200,41 @@ export class ParticleEngine {
     this.isTransitioning = true;
     this.transitionTimer = 0;
     this.colorTransitionProgress = 0;
+    this.colorLastTime = performance.now();
+  }
+
+  private startColorTransitionLoop(): void {
+    const animate = () => {
+      this.colorAnimationId = requestAnimationFrame(animate);
+
+      if (!this.isTransitioning) return;
+
+      const now = performance.now();
+      const dt = (now - this.colorLastTime) / 1000;
+      this.colorLastTime = now;
+
+      this.transitionTimer += dt;
+      this.colorTransitionProgress = Math.min(1, this.transitionTimer / this.colorTransitionDuration);
+      const t = this.easeInOutCubic(this.colorTransitionProgress);
+
+      for (let i = 0; i < this.count; i++) {
+        const i3 = i * 3;
+        this.colors[i3] = this.startColors[i3] + (this.targetColors[i3] - this.startColors[i3]) * t;
+        this.colors[i3 + 1] = this.startColors[i3 + 1] + (this.targetColors[i3 + 1] - this.startColors[i3 + 1]) * t;
+        this.colors[i3 + 2] = this.startColors[i3 + 2] + (this.targetColors[i3 + 2] - this.startColors[i3 + 2]) * t;
+      }
+
+      const colorAttr = this.geometry.getAttribute('color') as THREE.BufferAttribute | undefined;
+      if (colorAttr) {
+        colorAttr.needsUpdate = true;
+      }
+
+      if (this.colorTransitionProgress >= 1) {
+        this.isTransitioning = false;
+      }
+    };
+
+    this.colorAnimationId = requestAnimationFrame(animate);
   }
 
   private updateGlowIntensity(): void {
@@ -179,7 +249,8 @@ export class ParticleEngine {
   update(deltaTime: number): void {
     const dt = Math.min(deltaTime, 0.05);
     const gravityScale = this.gravity * 0.001;
-    const spiralFactor = this.gravity > 2 ? (this.gravity - 2) * 0.02 : 0;
+    const spiralFactor = this.gravity > 2 ? (this.gravity - 2) * 0.05 : 0;
+    const dt60 = dt * 60;
 
     for (let i = 0; i < this.count; i++) {
       const i3 = i * 3;
@@ -201,27 +272,35 @@ export class ParticleEngine {
       this.velocities[i3 + 1] -= ny * force;
       this.velocities[i3 + 2] -= nz * force;
 
-      if (spiralFactor > 0 && dist > 5) {
-        const tangentX = -ny * spiralFactor;
-        const tangentY = nx * spiralFactor * 0.3;
-        const tangentZ = (nx * nz / (Math.sqrt(nx * nx + nz * nz) + 0.001)) * spiralFactor;
-        this.velocities[i3] += tangentX * dt * 60;
-        this.velocities[i3 + 1] += tangentY * dt * 60;
-        this.velocities[i3 + 2] += tangentZ * dt * 60;
+      if (spiralFactor > 0 && dist > 3) {
+        const tx = -ny;
+        const ty = (nx * nz) / (Math.sqrt(nx * nx + nz * nz) + 0.001);
+        const tz = nx;
+
+        const tangentialSpeed = spiralFactor * (1 + 1 / Math.max(dist * 0.02, 0.5));
+
+        this.velocities[i3] += tx * tangentialSpeed * dt60;
+        this.velocities[i3 + 1] += ty * tangentialSpeed * dt60 * 0.4;
+        this.velocities[i3 + 2] += tz * tangentialSpeed * dt60;
+
+        const upX = nz;
+        const upZ = -nx;
+        this.velocities[i3] += upX * tangentialSpeed * 0.15 * dt60;
+        this.velocities[i3 + 2] += upZ * tangentialSpeed * 0.15 * dt60;
       }
 
       this.velocities[i3] += (Math.random() - 0.5) * this.PERTURBATION;
       this.velocities[i3 + 1] += (Math.random() - 0.5) * this.PERTURBATION;
       this.velocities[i3 + 2] += (Math.random() - 0.5) * this.PERTURBATION;
 
-      const damp = Math.pow(this.damping, dt * 60);
+      const damp = Math.pow(this.damping, dt60);
       this.velocities[i3] *= damp;
       this.velocities[i3 + 1] *= damp;
       this.velocities[i3 + 2] *= damp;
 
-      this.positions[i3] += this.velocities[i3] * dt * 60;
-      this.positions[i3 + 1] += this.velocities[i3 + 1] * dt * 60;
-      this.positions[i3 + 2] += this.velocities[i3 + 2] * dt * 60;
+      this.positions[i3] += this.velocities[i3] * dt60;
+      this.positions[i3 + 1] += this.velocities[i3 + 1] * dt60;
+      this.positions[i3 + 2] += this.velocities[i3 + 2] * dt60;
 
       if (dist > this.SPHERE_RADIUS * 3 && this.gravity < 1) {
         const resetRadius = Math.random() * this.SPHERE_RADIUS;
@@ -238,25 +317,7 @@ export class ParticleEngine {
       }
     }
 
-    if (this.isTransitioning) {
-      this.transitionTimer += dt;
-      this.colorTransitionProgress = Math.min(1, this.transitionTimer / this.colorTransitionDuration);
-      const t = this.easeInOutCubic(this.colorTransitionProgress);
-
-      for (let i = 0; i < this.count; i++) {
-        const i3 = i * 3;
-        this.colors[i3] = this.colors[i3] + (this.targetColors[i3] - this.colors[i3]) * 0.08;
-        this.colors[i3 + 1] = this.colors[i3 + 1] + (this.targetColors[i3 + 1] - this.colors[i3 + 1]) * 0.08;
-        this.colors[i3 + 2] = this.colors[i3 + 2] + (this.targetColors[i3 + 2] - this.colors[i3 + 2]) * 0.08;
-      }
-
-      if (this.colorTransitionProgress >= 1) {
-        this.isTransitioning = false;
-      }
-    }
-
     (this.geometry.attributes.position as THREE.BufferAttribute).needsUpdate = true;
-    (this.geometry.attributes.color as THREE.BufferAttribute).needsUpdate = true;
   }
 
   private easeInOutCubic(t: number): number {
@@ -289,6 +350,18 @@ export class ParticleEngine {
   }
 
   dispose(): void {
+    if (this.colorAnimationId) {
+      cancelAnimationFrame(this.colorAnimationId);
+    }
+
+    const posAttr = this.geometry.getAttribute('position') as THREE.BufferAttribute | undefined;
+    const colorAttr = this.geometry.getAttribute('color') as THREE.BufferAttribute | undefined;
+    const sizeAttr = this.geometry.getAttribute('size') as THREE.BufferAttribute | undefined;
+
+    if (posAttr) posAttr.dispose();
+    if (colorAttr) colorAttr.dispose();
+    if (sizeAttr) sizeAttr.dispose();
+
     this.geometry.dispose();
     this.material.dispose();
   }

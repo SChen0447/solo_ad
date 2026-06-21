@@ -54,8 +54,10 @@ export class ControlPanel {
     this.header = this.createHeader();
     this.content = document.createElement('div');
     this.content.style.cssText = `
-      transition: all 0.3s ease-out;
+      transition: max-height 0.3s ease-out, opacity 0.3s ease-out, margin 0.3s ease-out;
       overflow: hidden;
+      max-height: 2000px;
+      opacity: 1;
     `;
 
     this.densitySlider = this.createSlider('粒子密度', 5000, 20000, 500, 8000, (v) => {
@@ -391,22 +393,31 @@ export class ControlPanel {
       this.content.style.maxHeight = '0px';
       this.content.style.opacity = '0';
       this.content.style.marginTop = '-20px';
+      this.content.style.marginBottom = '0px';
       this.panel.style.padding = '10px 20px';
       this.collapseBtn.innerHTML = `
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <line x1="12" y1="5" x2="12" y2="19"></line>
-          <line x1="5" y1="12" x2="19" y2="12"></line>
+          <polyline points="6 9 12 15 18 9"></polyline>
         </svg>
       `;
+
+      setTimeout(() => {
+        if (this.isCollapsed) {
+          this.content.style.visibility = 'hidden';
+          this.content.style.pointerEvents = 'none';
+        }
+      }, 300);
     } else {
-      this.content.style.maxHeight = '1000px';
+      this.content.style.visibility = 'visible';
+      this.content.style.pointerEvents = 'auto';
+      this.content.style.maxHeight = '2000px';
       this.content.style.opacity = '1';
       this.content.style.marginTop = '0';
+      this.content.style.marginBottom = '0';
       this.panel.style.padding = '20px';
       this.collapseBtn.innerHTML = `
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <line x1="18" y1="6" x2="6" y2="18"></line>
-          <line x1="6" y1="6" x2="18" y2="18"></line>
+          <polyline points="18 15 12 9 6 15"></polyline>
         </svg>
       `;
     }
