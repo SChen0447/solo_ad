@@ -224,26 +224,37 @@ function App() {
         />
       )}
 
-      <div
-        className={`mobile-order-bar ${mobileOrderExpanded ? 'expanded' : ''}`}
-        onClick={() => setMobileOrderExpanded(!mobileOrderExpanded)}
-      >
+      <div className="mobile-order-bar" onClick={() => !mobileOrderExpanded && setMobileOrderExpanded(true)}>
         <div className="mobile-bar-content">
           <span>🛒 购物车 ({totalItems})</span>
           <span className="mobile-total">¥{totalPrice}</span>
         </div>
-        {mobileOrderExpanded && (
-          <div className="mobile-order-panel">
-            <OrderSummary
-              cart={cart}
-              totalPrice={totalPrice}
-              onRemove={removeFromCart}
-              onCheckout={handleCheckout}
-            />
-            {queueInfo && <OrderQueue queueInfo={queueInfo} />}
-          </div>
-        )}
       </div>
+
+      {mobileOrderExpanded && (
+        <div className="mobile-overlay" onClick={() => setMobileOrderExpanded(false)}>
+          <div className="mobile-overlay-panel" onClick={e => e.stopPropagation()}>
+            <div className="mobile-overlay-header">
+              <h3 className="mobile-overlay-title">订单详情</h3>
+              <button className="mobile-overlay-close" onClick={() => setMobileOrderExpanded(false)}>
+                ×
+              </button>
+            </div>
+            <div className="mobile-overlay-content">
+              <OrderSummary
+                cart={cart}
+                totalPrice={totalPrice}
+                onRemove={removeFromCart}
+                onCheckout={() => {
+                  setMobileOrderExpanded(false);
+                  handleCheckout();
+                }}
+              />
+              {queueInfo && <OrderQueue queueInfo={queueInfo} />}
+            </div>
+          </div>
+        </div>
+      )}
 
       {showLogin && (
         <LoginModal

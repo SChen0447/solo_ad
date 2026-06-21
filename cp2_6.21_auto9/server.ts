@@ -2,7 +2,7 @@ import express, { Request, Response } from 'express';
 import cors from 'cors';
 
 const app = express();
-const PORT = 3001;
+const PORT = 3002;
 
 app.use(cors());
 app.use(express.json());
@@ -272,15 +272,33 @@ app.get('/api/orders/:id', (req: Request, res: Response) => {
   res.json(order);
 });
 
+app.get('/api/queue/:orderId', (req: Request, res: Response) => {
+  const { orderId } = req.params;
+  updateQueuePositions();
+
+  const order = orders.find(o => o.id === orderId);
+  if (!order) {
+    return res.status(404).json({ error: '订单不存在' });
+  }
+
+  res.json({
+    id: order.id,
+    orderNumber: order.orderNumber,
+    status: order.status,
+    queuePosition: order.queuePosition,
+    estimatedWaitTime: order.estimatedWaitTime,
+  });
+});
+
 app.get('/api/recommendations/:memberId', (req: Request, res: Response) => {
   const { memberId } = req.params;
   const history = memberOrderHistory.get(memberId) || [];
 
   if (history.length === 0) {
-    const recommendations: Recommendation[] = drinks.slice(0, 2).map(drink => ({
+    const recommendations: Recommendation[] = drinks.slice(0, 2).map((drink, idx) => ({
       drinkId: drink.id,
       drinkName: drink.name,
-      reason: '本店招牌，人气之选',
+      reason: idx === 0 ? '本店招牌，必点爆款' : '新客首选，口碑佳品',
       icon: drink.icon,
       price: drink.price,
     }));
@@ -288,13 +306,25 @@ app.get('/api/recommendations/:memberId', (req: Request, res: Response) => {
   }
 
   const drinkCount: Map<string, number> = new Map();
+  const categoryCount: Map<string, number> = new Map();
   history.forEach(drinkId => {
     drinkCount.set(drinkId, (drinkCount.get(drinkId) || 0) + 1);
+    const drink = getDrinkById(drinkId);
+    if (drink) {
+      categoryCount.set(drink.category, (categoryCount.get(drink.category) || 0) + 1);
+    }
   });
 
   const sortedDrinkIds = Array.from(drinkCount.entries())
     .sort((a, b) => b[1] - a[1])
     .map(entry => entry[0]);
+
+  const topCategory = Array.from(categoryCount.entries())
+    .sort((a, b) => b[1] - a[1])[0]?.[0];
+
+  const lastDrinkId = history[history.length - 1];
+  const lastDrink = getDrinkById(lastDrinkId);
+  const totalOrders = history.length;
 
   const recommendations: Recommendation[] = [];
   const usedIds = new Set<string>();
@@ -302,11 +332,52 @@ app.get('/api/recommendations/:memberId', (req: Request, res: Response) => {
   for (const drinkId of sortedDrinkIds) {
     if (recommendations.length >= 2) break;
     const drink = getDrinkById(drinkId);
-    if (drink) {
+    if (drink && !usedIds.has(drink.id)) {
+      const count = drinkCount.get(drinkId) || 0;
+      let reason = '';
+      if (count >= 5) {
+        reason = `您已点过${count}次，绝对真爱`;
+      } else if (count >= 3) {
+        reason = `您的常点饮品之一（${count}次）`;
+      } else if (drink.category === topCategory && topCategory) {
+        reason = `${topCategory}类是您的最爱`;
+      } else {
+        reason = `回头客的放心之选`;
+      }
       recommendations.push({
         drinkId: drink.id,
         drinkName: drink.name,
-        reason: '根据您的口味偏好推荐',
+        reason,
+        icon: drink.icon,
+        price: drink.price,
+      });
+      usedIds.add(drink.id);
+    }
+  }
+
+  if (recommendations.length < 2 && topCategory) {
+    const categoryDrinks = drinks.filter(d => d.category === topCategory && !usedIds.has(d.id));
+    for (const drink of categoryDrinks) {
+      if (recommendations.length >= 2) break;
+      recommendations.push({
+        drinkId: drink.id,
+        drinkName: drink.name,
+        reason: `同属${topCategory}类，您可能喜欢`,
+        icon: drink.icon,
+        price: drink.price,
+      });
+      usedIds.add(drink.id);
+    }
+  }
+
+  if (recommendations.length < 2 && lastDrink) {
+    const similarDrinks = drinks.filter(d => d.category === lastDrink.category && !usedIds.has(d.id));
+    for (const drink of similarDrinks) {
+      if (recommendations.length >= 2) break;
+      recommendations.push({
+        drinkId: drink.id,
+        drinkName: drink.name,
+        reason: `与上次点的${lastDrink.name}风味相近`,
         icon: drink.icon,
         price: drink.price,
       });
@@ -318,13 +389,15 @@ app.get('/api/recommendations/:memberId', (req: Request, res: Response) => {
     for (const drink of drinks) {
       if (recommendations.length >= 2) break;
       if (!usedIds.has(drink.id)) {
+        const reason = totalOrders >= 10 ? '老客专享新品推荐' : '尝尝新口味吧';
         recommendations.push({
           drinkId: drink.id,
           drinkName: drink.name,
-          reason: '新品上市，欢迎品尝',
+          reason,
           icon: drink.icon,
           price: drink.price,
         });
+        usedIds.add(drink.id);
       }
     }
   }
