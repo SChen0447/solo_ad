@@ -16,10 +16,16 @@ interface TriggerAnimation {
   color: string;
 }
 
+interface MapReadyNotice {
+  startTime: number;
+  duration: number;
+}
+
 interface GameCanvasProps {
   gameState: GameState;
   canvasSize?: number;
   onAnimationFrame?: () => void;
+  mapReadyKey?: number;
 }
 
 const BG_COLOR = '#1E1E2E';
@@ -31,14 +37,16 @@ const PLAYER_COLOR = '#10B981';
 const HIGHLIGHT_COLOR = '#FDE68A';
 const PLAYER_SIZE = 32;
 
-export default function GameCanvas({ gameState, canvasSize = 480, onAnimationFrame }: GameCanvasProps) {
+export default function GameCanvas({ gameState, canvasSize = 480, onAnimationFrame, mapReadyKey }: GameCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animationRef = useRef<number>(0);
   const highlightsRef = useRef<HighlightCell[]>([]);
   const triggersRef = useRef<TriggerAnimation[]>([]);
+  const mapReadyRef = useRef<MapReadyNotice | null>(null);
   const lastPlayerPosRef = useRef({ ...gameState.playerPos });
   const lastCollectedKeysRef = useRef([...gameState.collectedKeys]);
   const lastOpenedDoorsRef = useRef([...gameState.openedDoors]);
+  const lastMapReadyKeyRef = useRef(mapReadyKey);
 
   const cellSize = canvasSize / Math.max(gameState.map.width, gameState.map.height);
 
@@ -155,22 +163,79 @@ export default function GameCanvas({ gameState, canvasSize = 480, onAnimationFra
       if (elapsed >= t.duration) return false;
 
       const progress = elapsed / t.duration;
-      const scale = 1 + progress * 0.5;
-      const alpha = 1 - progress;
+      let alpha: number;
+      let scale: number;
+
+      if (progress < 0.15) {
+        const fadeInProgress = progress / 0.15;
+        alpha = fadeInProgress;
+        scale = 0.8 + fadeInProgress * 0.4;
+      } else if (progress < 0.6) {
+        alpha = 1;
+        scale = 1.2;
+      } else {
+        const fadeOutProgress = (progress - 0.6) / 0.4;
+        alpha = 1 - fadeOutProgress;
+        scale = 1.2 + fadeOutProgress * 0.3;
+      }
 
       const px = offsetX + t.position.x * cs + cs / 2;
       const py = offsetY + t.position.y * cs + cs / 2;
 
       ctx.strokeStyle = t.color;
-      ctx.globalAlpha = alpha;
+      ctx.globalAlpha = Math.max(0, alpha);
       ctx.lineWidth = 3;
       ctx.beginPath();
       ctx.arc(px, py, cs * 0.4 * scale, 0, Math.PI * 2);
       ctx.stroke();
+
+      ctx.fillStyle = t.color;
+      ctx.globalAlpha = Math.max(0, alpha) * 0.15;
+      ctx.beginPath();
+      ctx.arc(px, py, cs * 0.4 * scale, 0, Math.PI * 2);
+      ctx.fill();
       ctx.globalAlpha = 1;
 
       return true;
     });
+
+    if (mapReadyRef.current) {
+      const notice = mapReadyRef.current;
+      const elapsed = time - notice.startTime;
+      if (elapsed >= notice.duration) {
+        mapReadyRef.current = null;
+      } else {
+        const progress = elapsed / notice.duration;
+        let alpha: number;
+        let translateY: number;
+
+        if (progress < 0.25) {
+          const fadeInProgress = progress / 0.25;
+          alpha = fadeInProgress;
+          translateY = 10 * (1 - fadeInProgress);
+        } else if (progress < 0.6) {
+          alpha = 1;
+          translateY = 0;
+        } else {
+          const fadeOutProgress = (progress - 0.6) / 0.4;
+          alpha = 1 - fadeOutProgress;
+          translateY = -10 * fadeOutProgress;
+        }
+
+        ctx.save();
+        ctx.globalAlpha = Math.max(0, alpha);
+        ctx.fillStyle = '#FFFFFF';
+        ctx.font = '16px system-ui, -apple-system, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(
+          '地图已生成',
+          canvasSize / 2,
+          canvasSize / 2 + translateY
+        );
+        ctx.restore();
+      }
+    }
   }, [gameState, cellSize, canvasSize]);
 
   useEffect(() => {
@@ -222,7 +287,7 @@ export default function GameCanvas({ gameState, canvasSize = 480, onAnimationFra
           type: 'key',
           position: { ...key.position },
           startTime: performance.now(),
-          duration: 500,
+          duration: 1500,
           color: key.color,
         });
       }
@@ -237,13 +302,23 @@ export default function GameCanvas({ gameState, canvasSize = 480, onAnimationFra
           type: 'door',
           position: { ...door.position },
           startTime: performance.now(),
-          duration: 500,
+          duration: 1500,
           color: door.color,
         });
       }
     }
     lastOpenedDoorsRef.current = [...gameState.openedDoors];
   }, [gameState]);
+
+  useEffect(() => {
+    if (mapReadyKey !== undefined && mapReadyKey !== lastMapReadyKeyRef.current) {
+      mapReadyRef.current = {
+        startTime: performance.now(),
+        duration: 800,
+      };
+      lastMapReadyKeyRef.current = mapReadyKey;
+    }
+  }, [mapReadyKey]);
 
   return (
     <canvas

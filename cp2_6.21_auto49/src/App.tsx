@@ -24,6 +24,7 @@ export default function App() {
   const [isRegenerating, setIsRegenerating] = useState(false);
   const [canvasSize, setCanvasSize] = useState(480);
   const [gameStatus, setGameStatus] = useState<'playing' | 'completed' | 'failed' | 'idle'>('idle');
+  const [mapReadyKey, setMapReadyKey] = useState(0);
 
   const timerRef = useRef<number | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -39,6 +40,7 @@ export default function App() {
       setShowRating(false);
       setGameStatus('playing');
       setIsRegenerating(false);
+      setMapReadyKey(k => k + 1);
     }, 50);
   }, []);
 
@@ -49,6 +51,7 @@ export default function App() {
     setTimeLeft(TOTAL_TIME);
     setShowRating(false);
     setGameStatus('playing');
+    setMapReadyKey(k => k + 1);
   }, [gameState]);
 
   const skipLevel = useCallback(() => {
@@ -232,7 +235,7 @@ export default function App() {
             }}
           >
             {gameState && (
-              <GameCanvas gameState={gameState} canvasSize={canvasSize} />
+              <GameCanvas gameState={gameState} canvasSize={canvasSize} mapReadyKey={mapReadyKey} />
             )}
 
             <RegeneratingNotice visible={isRegenerating} />

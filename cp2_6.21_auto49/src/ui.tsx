@@ -53,20 +53,33 @@ interface TimerProps {
 }
 
 export function Timer({ timeLeft, totalTime = 90 }: TimerProps) {
-  const [shake, setShake] = useState(0);
+  const [shakeTick, setShakeTick] = useState(0);
   const isLow = timeLeft <= 15;
 
   useEffect(() => {
     if (!isLow) return;
 
     const interval = setInterval(() => {
-      setShake(s => s + 1);
+      setShakeTick(s => s + 1);
     }, 100);
 
     return () => clearInterval(interval);
   }, [isLow]);
 
-  const shakeOffset = isLow ? Math.sin(shake * Math.PI * 0.2) * 3 : 0;
+  const shakeOffsetX = isLow ? Math.sin(shakeTick * Math.PI * 0.2) * 5 : 0;
+  const shakeOffsetY = isLow ? Math.cos(shakeTick * Math.PI * 0.3) * 2 : 0;
+
+  let scale = 1;
+  if (isLow) {
+    const scalePhase = (shakeTick % 10) / 10;
+    if (scalePhase < 0.3) {
+      scale = 1 + scalePhase / 0.3 * 0.05;
+    } else if (scalePhase < 0.5) {
+      scale = 1.05 - (scalePhase - 0.3) / 0.2 * 0.05;
+    } else {
+      scale = 1;
+    }
+  }
 
   const minutes = Math.floor(timeLeft / 60);
   const seconds = Math.floor(timeLeft % 60);
@@ -79,9 +92,10 @@ export function Timer({ timeLeft, totalTime = 90 }: TimerProps) {
         fontSize: '18px',
         fontWeight: 400,
         color: isLow ? '#EF4444' : '#CDD6F4',
-        transform: `translateX(${shakeOffset}px)`,
+        transform: `translate(${shakeOffsetX}px, ${shakeOffsetY}px) scale(${scale})`,
         transition: 'color 0.3s ease',
         userSelect: 'none',
+        textShadow: isLow ? '0 0 10px rgba(239, 68, 68, 0.5)' : 'none',
       }}
     >
       {timeStr}
