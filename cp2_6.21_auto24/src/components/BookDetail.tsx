@@ -113,10 +113,11 @@ const BookDetail: React.FC<BookDetailProps> = ({ bookId, onClose, onBorrow, curr
         )}
         {!loading && book && (
           <>
-            <div style={{ position: 'relative' }}>
+            <div style={{ position: 'relative', overflow: 'hidden' }}>
               <img
                 src={book.coverUrl}
                 alt={book.title}
+                className="detail-cover-fade"
                 style={{ width: '100%', height: 260, objectFit: 'cover' }}
               />
               <button
@@ -249,6 +250,14 @@ const BookDetail: React.FC<BookDetailProps> = ({ bookId, onClose, onBorrow, curr
           @keyframes fadeIn {
             from { opacity: 0; }
             to { opacity: 1; }
+          }
+          @keyframes coverSlideUp {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+          }
+          .detail-cover-fade {
+            opacity: 0;
+            animation: coverSlideUp 0.3s ease-out 0.1s forwards;
           }
         `}</style>
       </div>

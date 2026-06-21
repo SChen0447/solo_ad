@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 
 interface Book {
   id: string;
@@ -43,10 +43,13 @@ const BookCard: React.FC<BookCardProps> = ({ book, onClick }) => {
 
   const statusInfo = statusConfig[book.status] || statusConfig.available;
   const dotColor = getLastBorrowedColor(book.lastBorrowed);
+  const [hovered, setHovered] = useState(false);
 
   return (
     <div
       onClick={() => onClick(book.id)}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
       style={{
         width: 240,
         borderRadius: 12,
@@ -55,14 +58,8 @@ const BookCard: React.FC<BookCardProps> = ({ book, onClick }) => {
         cursor: 'pointer',
         transition: 'transform 0.3s ease, box-shadow 0.3s ease',
         position: 'relative',
-      }}
-      onMouseEnter={(e) => {
-        (e.currentTarget as HTMLDivElement).style.transform = 'translateY(-4px)';
-        (e.currentTarget as HTMLDivElement).style.boxShadow = '0 8px 24px rgba(0,0,0,0.15)';
-      }}
-      onMouseLeave={(e) => {
-        (e.currentTarget as HTMLDivElement).style.transform = 'translateY(0)';
-        (e.currentTarget as HTMLDivElement).style.boxShadow = 'none';
+        transform: hovered ? 'translateY(-4px)' : 'translateY(0)',
+        boxShadow: hovered ? '0 8px 24px rgba(0,0,0,0.15)' : 'none',
       }}
     >
       <div
@@ -84,17 +81,13 @@ const BookCard: React.FC<BookCardProps> = ({ book, onClick }) => {
             width: '100%',
             height: '100%',
             objectFit: 'cover',
-            transition: 'transform 0.3s',
-          }}
-          onMouseEnter={(e) => {
-            (e.currentTarget as HTMLImageElement).style.transform = 'scale(1.05)';
-          }}
-          onMouseLeave={(e) => {
-            (e.currentTarget as HTMLImageElement).style.transform = 'scale(1)';
+            transition: 'transform 0.3s ease, filter 0.3s ease',
+            transform: hovered ? 'scale(1.08)' : 'scale(1)',
+            filter: hovered ? 'drop-shadow(0 4px 12px rgba(0,0,0,0.25))' : 'none',
           }}
         />
       </div>
-      <div style={{ padding: '12px', color: '#fff' }}>
+      <div style={{ padding: '12px', transition: 'color 0.3s ease', color: hovered ? '#8B5CF6' : '#fff' }}>
         <div
           style={{
             fontSize: 14,
@@ -102,7 +95,8 @@ const BookCard: React.FC<BookCardProps> = ({ book, onClick }) => {
             whiteSpace: 'nowrap',
             overflow: 'hidden',
             textOverflow: 'ellipsis',
-            textShadow: '0 1px 2px rgba(0,0,0,0.3)',
+            textShadow: hovered ? 'none' : '0 1px 2px rgba(0,0,0,0.3)',
+            transition: 'text-shadow 0.3s ease',
           }}
         >
           {book.title}
@@ -110,11 +104,12 @@ const BookCard: React.FC<BookCardProps> = ({ book, onClick }) => {
         <div
           style={{
             fontSize: 12,
-            opacity: 0.85,
+            opacity: hovered ? 0.95 : 0.85,
             marginTop: 4,
             whiteSpace: 'nowrap',
             overflow: 'hidden',
             textOverflow: 'ellipsis',
+            transition: 'opacity 0.3s ease',
           }}
         >
           {book.author}
@@ -152,8 +147,8 @@ const BookCard: React.FC<BookCardProps> = ({ book, onClick }) => {
       </div>
       <style>{`
         @keyframes pulseDot {
-          0%, 100% { opacity: 0.6; transform: scale(1); }
-          50% { opacity: 1; transform: scale(1.15); }
+          0%, 100% { opacity: 0.6; }
+          50% { opacity: 1; }
         }
         @keyframes fadeInCover {
           from { opacity: 0; }
