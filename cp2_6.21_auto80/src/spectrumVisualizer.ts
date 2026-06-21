@@ -150,6 +150,22 @@ export class SpectrumVisualizer {
     return this.arrangementRadius
   }
 
+  public getBarCount(): number {
+    return this.barCount
+  }
+
+  public getBaseRadius(): number {
+    return this.baseRadius
+  }
+
+  public getMaxHeight(): number {
+    return this.maxHeight
+  }
+
+  public getMinHeight(): number {
+    return this.minHeight
+  }
+
   public dispose(): void {
     this.bars.forEach((bar) => {
       bar.geometry.dispose()

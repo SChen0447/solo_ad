@@ -129,15 +129,13 @@ export class SceneManager {
   }
 
   public updateLights(audioAmplitude: number, lowFrequencyAmplitude: number = 0): void {
-    const beatPulse = 0.5 + lowFrequencyAmplitude * 0.5
     this.pointLights.forEach((light, index) => {
       const phaseOffset = index * (Math.PI * 2 / this.pointLights.length)
-      const rhythmPulse = 0.5 + 0.5 * Math.sin(Date.now() * 0.005 + phaseOffset)
-      const combinedPulse = beatPulse * 0.7 + rhythmPulse * 0.3
-      const pulseIntensity = 0.5 + combinedPulse * 1.0
-      const clampedIntensity = Math.max(0.5, Math.min(1.5, pulseIntensity))
-      const intensity = this.lightBaseIntensities[index] * clampedIntensity * (0.6 + audioAmplitude * 0.4)
-      light.intensity = Math.min(2.5, intensity)
+      const beatIntensity = 0.5 + lowFrequencyAmplitude * 1.0
+      const phaseShimmer = 1.0 + Math.sin(Date.now() * 0.004 + phaseOffset) * 0.05
+      const clampedPulse = Math.max(0.5, Math.min(1.5, beatIntensity))
+      const intensity = this.lightBaseIntensities[index] * clampedPulse * phaseShimmer * (0.6 + audioAmplitude * 0.4)
+      light.intensity = Math.min(3.0, intensity)
     })
 
     this.ambientLight.intensity = 0.2 + audioAmplitude * 0.3
@@ -173,7 +171,7 @@ export class SceneManager {
     } else if (width > 1200) {
       return 7.5
     }
-    return 6
+    return 6.25
   }
 
   public dispose(): void {

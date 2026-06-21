@@ -6,6 +6,10 @@ interface ParticleData {
   birthTime: number
   lifetime: number
   baseSize: number
+  orbitRadius: number
+  orbitAngle: number
+  orbitSpeed: number
+  orbitTilt: number
 }
 
 export class ParticleSystem {
@@ -36,36 +40,41 @@ export class ParticleSystem {
     this.initParticles()
 
     this.geometry.setAttribute('position', new THREE.BufferAttribute(this.positions, 3))
-    this.geometry.setAttribute('color', new THREE.BufferAttribute(this.colors, 3))
-    this.geometry.setAttribute('size', new THREE.BufferAttribute(this.sizes, 1))
-    this.geometry.setAttribute('alpha', new THREE.BufferAttribute(this.alphas, 1))
+    this.geometry.setAttribute('aColor', new THREE.BufferAttribute(this.colors, 3))
+    this.geometry.setAttribute('aSize', new THREE.BufferAttribute(this.sizes, 1))
+    this.geometry.setAttribute('aAlpha', new THREE.BufferAttribute(this.alphas, 1))
 
     this.material = new THREE.ShaderMaterial({
+      uniforms: {
+        uGlobalOpacity: { value: 1.0 },
+      },
       vertexShader: `
-        attribute float size;
-        attribute float alpha;
+        attribute vec3 aColor;
+        attribute float aSize;
+        attribute float aAlpha;
         varying vec3 vColor;
         varying float vAlpha;
         void main() {
-          vColor = color;
-          vAlpha = alpha;
+          vColor = aColor;
+          vAlpha = aAlpha;
           vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
-          gl_PointSize = size * (300.0 / -mvPosition.z);
+          gl_PointSize = aSize * (300.0 / -mvPosition.z);
           gl_Position = projectionMatrix * mvPosition;
         }
       `,
       fragmentShader: `
+        uniform float uGlobalOpacity;
         varying vec3 vColor;
         varying float vAlpha;
         void main() {
           vec2 center = gl_PointCoord - vec2(0.5);
           float dist = length(center);
           if (dist > 0.5) discard;
-          float edge = 1.0 - smoothstep(0.4, 0.5, dist);
-          gl_FragColor = vec4(vColor, vAlpha * edge);
+          float edge = 1.0 - smoothstep(0.35, 0.5, dist);
+          float finalAlpha = vAlpha * edge * uGlobalOpacity;
+          gl_FragColor = vec4(vColor, finalAlpha);
         }
       `,
-      vertexColors: true,
       transparent: true,
       blending: THREE.AdditiveBlending,
       depthWrite: false,
@@ -82,13 +91,14 @@ export class ParticleSystem {
   }
 
   private initParticle(index: number, time: number): void {
-    const theta = Math.random() * Math.PI * 2
-    const phi = Math.acos(2 * Math.random() - 1)
-    const r = this.shellRadius * (0.5 + Math.random() * 0.5)
+    const orbitRadius = this.shellRadius * (0.4 + Math.random() * 0.6)
+    const orbitAngle = Math.random() * Math.PI * 2
+    const orbitSpeed = (0.3 + Math.random() * 0.7) * (Math.random() > 0.5 ? 1 : -1)
+    const orbitTilt = (Math.random() - 0.5) * Math.PI * 0.4
 
-    const x = r * Math.sin(phi) * Math.cos(theta)
-    const y = r * Math.sin(phi) * Math.sin(theta) * 0.6 + 2
-    const z = r * Math.cos(phi)
+    const x = Math.cos(orbitAngle) * orbitRadius
+    const y = Math.sin(orbitTilt) * orbitRadius * 0.3 + 2 + Math.random() * 4
+    const z = Math.sin(orbitAngle) * orbitRadius
 
     this.positions[index * 3] = x
     this.positions[index * 3 + 1] = y
@@ -100,23 +110,26 @@ export class ParticleSystem {
 
     const size = 0.1 + Math.random() * 0.2
     this.sizes[index] = size
-
     this.alphas[index] = 1
 
     const particle: ParticleData = {
       velocity: new THREE.Vector3(
-        (Math.random() - 0.5) * 0.02,
-        Math.random() * 0.01 + 0.005,
-        (Math.random() - 0.5) * 0.02
+        (Math.random() - 0.5) * 0.01,
+        Math.random() * 0.005 + 0.002,
+        (Math.random() - 0.5) * 0.01
       ),
       angularVelocity: new THREE.Vector3(
-        (Math.random() - 0.5) * 0.002,
-        (Math.random() - 0.5) * 0.005,
-        (Math.random() - 0.5) * 0.002
+        (Math.random() - 0.5) * 0.001,
+        orbitSpeed * 0.01,
+        (Math.random() - 0.5) * 0.001
       ),
       birthTime: time,
       lifetime: 2000,
       baseSize: size,
+      orbitRadius,
+      orbitAngle,
+      orbitSpeed,
+      orbitTilt,
     }
 
     if (index < this.particles.length) {
@@ -141,48 +154,44 @@ export class ParticleSystem {
       const lifeRatio = age / particle.lifetime
       const fadeOut = 1 - lifeRatio
 
+      particle.orbitAngle += particle.orbitSpeed * speedMultiplier * 0.02
+
       const ix = i * 3
       const iy = i * 3 + 1
       const iz = i * 3 + 2
 
-      const px = this.positions[ix]
-      const py = this.positions[iy]
-      const pz = this.positions[iz]
+      const spiralOffset = age * 0.0001 * speedMultiplier
+      const currentRadius = particle.orbitRadius + Math.sin(spiralOffset) * 0.5
+      const currentAngle = particle.orbitAngle + spiralOffset * 0.1
 
-      const angle = particle.angularVelocity.y * speedMultiplier
-      const cosA = Math.cos(angle)
-      const sinA = Math.sin(angle)
+      this.positions[ix] = Math.cos(currentAngle) * currentRadius + particle.velocity.x * age * 0.01
+      this.positions[iy] = Math.sin(particle.orbitTilt) * currentRadius * 0.3 + 2 + Math.abs(Math.sin(spiralOffset * 2)) * 3 + particle.velocity.y * age * 0.01
+      this.positions[iz] = Math.sin(currentAngle) * currentRadius + particle.velocity.z * age * 0.01
 
-      const newX = px * cosA - pz * sinA + particle.velocity.x * speedMultiplier
-      const newZ = px * sinA + pz * cosA + particle.velocity.z * speedMultiplier
-      let newY = py + particle.velocity.y * speedMultiplier
-
-      if (newY > 10) {
-        newY = -2
+      if (this.positions[iy] > 12) {
+        this.positions[iy] = -1
       }
-
-      this.positions[ix] = newX
-      this.positions[iy] = newY
-      this.positions[iz] = newZ
 
       const color = this.lowColor.clone().lerp(this.highColor, audioAmplitude)
       this.colors[ix] = color.r
       this.colors[iy] = color.g
       this.colors[iz] = color.b
 
-      this.sizes[i] = particle.baseSize * (1 + audioAmplitude * 0.5) * (0.5 + fadeOut * 0.5)
+      this.sizes[i] = particle.baseSize * (1 + audioAmplitude * 0.5) * (0.3 + fadeOut * 0.7)
       this.alphas[i] = fadeOut * 0.9
     }
 
     const positionAttr = this.geometry.getAttribute('position') as THREE.BufferAttribute
-    const colorAttr = this.geometry.getAttribute('color') as THREE.BufferAttribute
-    const sizeAttr = this.geometry.getAttribute('size') as THREE.BufferAttribute
-    const alphaAttr = this.geometry.getAttribute('alpha') as THREE.BufferAttribute
+    const colorAttr = this.geometry.getAttribute('aColor') as THREE.BufferAttribute
+    const sizeAttr = this.geometry.getAttribute('aSize') as THREE.BufferAttribute
+    const alphaAttr = this.geometry.getAttribute('aAlpha') as THREE.BufferAttribute
 
     positionAttr.needsUpdate = true
     colorAttr.needsUpdate = true
     sizeAttr.needsUpdate = true
     alphaAttr.needsUpdate = true
+
+    this.material.uniforms.uGlobalOpacity.value = 0.8 + audioAmplitude * 0.2
   }
 
   public setParticleCount(count: number): void {
@@ -203,36 +212,41 @@ export class ParticleSystem {
 
     this.geometry = new THREE.BufferGeometry()
     this.geometry.setAttribute('position', new THREE.BufferAttribute(this.positions, 3))
-    this.geometry.setAttribute('color', new THREE.BufferAttribute(this.colors, 3))
-    this.geometry.setAttribute('size', new THREE.BufferAttribute(this.sizes, 1))
-    this.geometry.setAttribute('alpha', new THREE.BufferAttribute(this.alphas, 1))
+    this.geometry.setAttribute('aColor', new THREE.BufferAttribute(this.colors, 3))
+    this.geometry.setAttribute('aSize', new THREE.BufferAttribute(this.sizes, 1))
+    this.geometry.setAttribute('aAlpha', new THREE.BufferAttribute(this.alphas, 1))
 
     this.material = new THREE.ShaderMaterial({
+      uniforms: {
+        uGlobalOpacity: { value: 1.0 },
+      },
       vertexShader: `
-        attribute float size;
-        attribute float alpha;
+        attribute vec3 aColor;
+        attribute float aSize;
+        attribute float aAlpha;
         varying vec3 vColor;
         varying float vAlpha;
         void main() {
-          vColor = color;
-          vAlpha = alpha;
+          vColor = aColor;
+          vAlpha = aAlpha;
           vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
-          gl_PointSize = size * (300.0 / -mvPosition.z);
+          gl_PointSize = aSize * (300.0 / -mvPosition.z);
           gl_Position = projectionMatrix * mvPosition;
         }
       `,
       fragmentShader: `
+        uniform float uGlobalOpacity;
         varying vec3 vColor;
         varying float vAlpha;
         void main() {
           vec2 center = gl_PointCoord - vec2(0.5);
           float dist = length(center);
           if (dist > 0.5) discard;
-          float edge = 1.0 - smoothstep(0.4, 0.5, dist);
-          gl_FragColor = vec4(vColor, vAlpha * edge);
+          float edge = 1.0 - smoothstep(0.35, 0.5, dist);
+          float finalAlpha = vAlpha * edge * uGlobalOpacity;
+          gl_FragColor = vec4(vColor, finalAlpha);
         }
       `,
-      vertexColors: true,
       transparent: true,
       blending: THREE.AdditiveBlending,
       depthWrite: false,
