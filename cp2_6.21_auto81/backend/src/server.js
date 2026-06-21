@@ -18,9 +18,8 @@ app.get('/api/allbooks', (req, res) => {
 
 app.get('/api/recommend', (req, res) => {
   const tagsParam = req.query.tags;
-  if (!tagsParam) {
-    const randomIdx = Math.floor(Math.random() * presetBooks.length);
-    return res.json(presetBooks[randomIdx]);
+  if (!tagsParam || (Array.isArray(tagsParam) && tagsParam.length === 0) || String(tagsParam).trim() === '') {
+    return res.status(400).json({ error: 'tags参数不能为空，请提供至少一个标签' });
   }
 
   const tags = Array.isArray(tagsParam) ? tagsParam : String(tagsParam).split(',');
@@ -29,8 +28,7 @@ app.get('/api/recommend', (req, res) => {
   const candidates = presetBooks.filter(book => !existingIds.includes(book.id));
 
   if (candidates.length === 0) {
-    const randomIdx = Math.floor(Math.random() * presetBooks.length);
-    return res.json(presetBooks[randomIdx]);
+    return res.status(404).json({ error: '没有找到符合条件的推荐书籍' });
   }
 
   const scored = candidates.map(book => {

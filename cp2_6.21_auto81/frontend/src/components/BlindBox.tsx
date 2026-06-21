@@ -107,14 +107,31 @@ const BlindBox: React.FC<BlindBoxProps> = ({ onClose }) => {
     try {
       const tags = getRecentReadTags();
       const existingIds = books.map(b => b.id);
-      const query = new URLSearchParams();
-      if (tags.length > 0) {
-        query.set('tags', tags.join(','));
+
+      if (tags.length === 0) {
+        const allPreset = await fetch(`${API_BASE}/allbooks`).then(r => r.json());
+        const notInShelf = allPreset.filter((b: Book) => !existingIds.includes(b.id));
+        const candidates = notInShelf.length > 0 ? notInShelf : allPreset;
+        const randomBook = candidates[Math.floor(Math.random() * candidates.length)];
+        const recommended: Book = {
+          ...randomBook,
+          pagesRead: 0
+        };
+        await performFlip(recommended);
+        return;
       }
+
+      const query = new URLSearchParams();
+      query.set('tags', tags.join(','));
       if (existingIds.length > 0) {
         query.set('excludeIds', existingIds.join(','));
       }
       const res = await fetch(`${API_BASE}/recommend?${query.toString()}`);
+
+      if (!res.ok) {
+        throw new Error(`Recommendation failed: ${res.status}`);
+      }
+
       const data = await res.json();
       const recommended: Book = {
         ...data,
@@ -123,6 +140,7 @@ const BlindBox: React.FC<BlindBoxProps> = ({ onClose }) => {
       await performFlip(recommended);
     } catch (err) {
       console.error('Failed to fetch recommendation:', err);
+      const fallbackBooks = books.map(b => b.id);
       const fallback: Book = {
         id: `fallback_${Date.now()}`,
         title: '小王子',
@@ -133,7 +151,9 @@ const BlindBox: React.FC<BlindBoxProps> = ({ onClose }) => {
         tags: ['经典', '治愈'],
         isbn: '9787020042494'
       };
-      await performFlip(fallback);
+      if (!fallbackBooks.includes(fallback.id)) {
+        await performFlip(fallback);
+      }
     }
   }, [getRecentReadTags, books, performFlip]);
 
