@@ -1,0 +1,484 @@
+{
+  "fairs": [
+    {
+      "id": "a12d4eba-18df-49ad-928d-416526aae960",
+      "name": "春日手作市集",
+      "date": "2026-04-15",
+      "totalStalls": 30,
+      "price": 150,
+      "stalls": [
+        {
+          "id": "b5ea79cc-86d9-458a-8919-a22b7462db7c",
+          "label": "A1",
+          "status": "available"
+        },
+        {
+          "id": "66ce0fe6-d72e-4842-a41b-444a3e293f34",
+          "label": "A2",
+          "status": "available"
+        },
+        {
+          "id": "4693807c-747e-484c-b9a8-bf3d5e67b93c",
+          "label": "A3",
+          "status": "available"
+        },
+        {
+          "id": "c08d6612-93e3-4927-b8ad-bb825de81382",
+          "label": "A4",
+          "status": "available"
+        },
+        {
+          "id": "c6d7368c-e74e-4ead-9e04-baa1a69dc810",
+          "label": "A5",
+          "status": "available"
+        },
+        {
+          "id": "7465ae3c-f2e4-4159-8837-101b1e054c2b",
+          "label": "A6",
+          "status": "available"
+        },
+        {
+          "id": "026d9c7f-4bdf-4431-b627-75e002681258",
+          "label": "B1",
+          "status": "available"
+        },
+        {
+          "id": "4764a4db-6c83-46a7-825d-8ea99fc05976",
+          "label": "B2",
+          "status": "available"
+        },
+        {
+          "id": "8c347c2a-8df9-4bcb-975a-bfe965b5d941",
+          "label": "B3",
+          "status": "available"
+        },
+        {
+          "id": "fbdc6d1a-57c9-40f2-9987-45ef84b66802",
+          "label": "B4",
+          "status": "available"
+        },
+        {
+          "id": "e5c2c410-c5d2-46b5-9ba4-2ebaafb9b613",
+          "label": "B5",
+          "status": "available"
+        },
+        {
+          "id": "a8265a81-b0e0-4a86-b6ce-2c2b9e03d113",
+          "label": "B6",
+          "status": "available"
+        },
+        {
+          "id": "b8315a42-9d4a-4665-b9f2-e154635926d3",
+          "label": "C1",
+          "status": "available"
+        },
+        {
+          "id": "f1c023be-337d-468b-939d-6fea844dd095",
+          "label": "C2",
+          "status": "available"
+        },
+        {
+          "id": "2fc7ac40-dff7-47d9-8f10-e3bbe7063880",
+          "label": "C3",
+          "status": "available"
+        },
+        {
+          "id": "313b0520-cd17-4adb-af39-bc248bd8aeba",
+          "label": "C4",
+          "status": "available"
+        },
+        {
+          "id": "ec8bcb98-3202-41cc-a88d-4ccb9d640ff0",
+          "label": "C5",
+          "status": "available"
+        },
+        {
+          "id": "aa632c38-c76d-41f8-a581-ec1258b2b719",
+          "label": "C6",
+          "status": "available"
+        },
+        {
+          "id": "e5febd21-30fd-4990-a6c2-5de436ee5fee",
+          "label": "D1",
+          "status": "available"
+        },
+        {
+          "id": "c0503ec5-33c6-4102-a011-cbe44dd1f3c6",
+          "label": "D2",
+          "status": "available"
+        },
+        {
+          "id": "364f7ead-adf0-4f74-94d9-9fc486590961",
+          "label": "D3",
+          "status": "available"
+        },
+        {
+          "id": "36e8dc59-4220-4119-963b-e67f672a2857",
+          "label": "D4",
+          "status": "available"
+        },
+        {
+          "id": "a30ad8d7-a498-4e14-b2bb-afe391a75d34",
+          "label": "D5",
+          "status": "available"
+        },
+        {
+          "id": "81723b16-6959-4649-8ab8-cbe4ad82a94c",
+          "label": "D6",
+          "status": "available"
+        },
+        {
+          "id": "cba5b6a4-401b-4fa8-8971-cda8d13582f1",
+          "label": "E1",
+          "status": "available"
+        },
+        {
+          "id": "3f0814c5-a10b-48d7-a31d-e652251633de",
+          "label": "E2",
+          "status": "available"
+        },
+        {
+          "id": "d9f7b953-bd01-466f-a5ab-7f42fb75a851",
+          "label": "E3",
+          "status": "available"
+        },
+        {
+          "id": "4dbf0a89-81d8-404d-9fc6-206fdf95348a",
+          "label": "E4",
+          "status": "available"
+        },
+        {
+          "id": "4efbc4f5-069b-4b2b-96e9-936dd2e77616",
+          "label": "E5",
+          "status": "available"
+        },
+        {
+          "id": "891b517b-a7a1-4ff4-bd59-be417d958174",
+          "label": "E6",
+          "status": "available"
+        }
+      ],
+      "createdAt": "2026-06-21T10:34:08.460Z"
+    },
+    {
+      "id": "be5948ad-3451-4c86-a503-80c380deaea8",
+      "name": "复古跳蚤市场",
+      "date": "2026-05-20",
+      "totalStalls": 24,
+      "price": 120,
+      "stalls": [
+        {
+          "id": "7dc21166-a57a-4595-8c51-b6c924e97fd2",
+          "label": "A1",
+          "status": "available"
+        },
+        {
+          "id": "ac7d9fba-bd89-413e-b8b9-03c13be1cfc6",
+          "label": "A2",
+          "status": "available"
+        },
+        {
+          "id": "29cadda1-835f-473c-8725-9ce5c89bd354",
+          "label": "A3",
+          "status": "available"
+        },
+        {
+          "id": "dfb44228-6987-48d0-a036-ce90654d7da3",
+          "label": "A4",
+          "status": "available"
+        },
+        {
+          "id": "84bb9b26-b576-4d87-b9b2-62a927658bd8",
+          "label": "A5",
+          "status": "available"
+        },
+        {
+          "id": "e4a29edd-913d-4dfc-8c7f-dd857066678d",
+          "label": "A6",
+          "status": "available"
+        },
+        {
+          "id": "8aa28feb-b0e7-4322-b649-beeb5906de6e",
+          "label": "B1",
+          "status": "available"
+        },
+        {
+          "id": "8b1dc5cf-4b90-4b79-a77f-d6d31566be1f",
+          "label": "B2",
+          "status": "available"
+        },
+        {
+          "id": "53e11623-0a5d-4796-a21a-350cc183478b",
+          "label": "B3",
+          "status": "available"
+        },
+        {
+          "id": "96fe20e3-e027-4548-a168-ea844cc693da",
+          "label": "B4",
+          "status": "available"
+        },
+        {
+          "id": "e6b1dbdb-f901-46b6-8fc1-0890e27ef668",
+          "label": "B5",
+          "status": "available"
+        },
+        {
+          "id": "452ec5a2-d88a-48f5-9187-19dd7fbc1706",
+          "label": "B6",
+          "status": "available"
+        },
+        {
+          "id": "6026b80d-c1a1-42f8-b8bd-fe4248394e3b",
+          "label": "C1",
+          "status": "available"
+        },
+        {
+          "id": "0c43451e-256b-462a-9754-65342a93e445",
+          "label": "C2",
+          "status": "available"
+        },
+        {
+          "id": "1f555c9b-a981-477d-a6c3-17078086140c",
+          "label": "C3",
+          "status": "available"
+        },
+        {
+          "id": "4c2a5984-8be0-422f-b393-e77cbb81ea51",
+          "label": "C4",
+          "status": "available"
+        },
+        {
+          "id": "e48155d0-1c71-42b6-aea5-0ac654e2ef69",
+          "label": "C5",
+          "status": "available"
+        },
+        {
+          "id": "af55a2e4-4e25-42a1-8f50-725a3243d233",
+          "label": "C6",
+          "status": "available"
+        },
+        {
+          "id": "469b14a1-ba86-464f-8aa2-827d99672e75",
+          "label": "D1",
+          "status": "available"
+        },
+        {
+          "id": "3e4ea953-ec63-4d12-9eb6-50be1b80492c",
+          "label": "D2",
+          "status": "available"
+        },
+        {
+          "id": "a07a0ce8-5118-4dbb-b17f-f6cc62383ad7",
+          "label": "D3",
+          "status": "available"
+        },
+        {
+          "id": "bc7963c7-5fc7-42a7-add6-5c7c61a0820c",
+          "label": "D4",
+          "status": "available"
+        },
+        {
+          "id": "d4ae0e0d-7246-4d9a-942d-47f751950f1d",
+          "label": "D5",
+          "status": "available"
+        },
+        {
+          "id": "3a9108c6-b90a-425b-b942-b748b34a7b31",
+          "label": "D6",
+          "status": "available"
+        }
+      ],
+      "createdAt": "2026-06-21T10:34:08.460Z"
+    },
+    {
+      "id": "f817991d-d3ae-432e-992d-2318a53012a7",
+      "name": "夏日创意集市",
+      "date": "2026-07-10",
+      "totalStalls": 36,
+      "price": 180,
+      "stalls": [
+        {
+          "id": "6c886ee7-e0e4-4b64-9f76-6cb41146c804",
+          "label": "A1",
+          "status": "available"
+        },
+        {
+          "id": "bbe7e0ed-d5fa-4d2f-967f-b87fecf7ac6b",
+          "label": "A2",
+          "status": "available"
+        },
+        {
+          "id": "9093df65-bdbd-4e1f-98a1-5b908c722098",
+          "label": "A3",
+          "status": "available"
+        },
+        {
+          "id": "8dae1b2e-c606-4d98-bbb1-cab5b1348ac2",
+          "label": "A4",
+          "status": "available"
+        },
+        {
+          "id": "0868bf2a-3a85-49d3-9da1-149ebe1233b4",
+          "label": "A5",
+          "status": "available"
+        },
+        {
+          "id": "4b643590-a3b9-4f4c-ae0e-8c6569878420",
+          "label": "A6",
+          "status": "available"
+        },
+        {
+          "id": "75054452-068f-40f9-a0bb-ef43b648beba",
+          "label": "B1",
+          "status": "available"
+        },
+        {
+          "id": "50b631df-e24b-47a9-b264-06aa9462895c",
+          "label": "B2",
+          "status": "available"
+        },
+        {
+          "id": "4109bb3a-e55f-44c7-8f76-2bee4886cfbb",
+          "label": "B3",
+          "status": "available"
+        },
+        {
+          "id": "79736937-992f-4734-bbbf-13e4834698cc",
+          "label": "B4",
+          "status": "available"
+        },
+        {
+          "id": "38c39d0b-9e18-4240-9a74-8d28a50b97b3",
+          "label": "B5",
+          "status": "available"
+        },
+        {
+          "id": "eadf8377-14ef-406b-8351-8da134e4a194",
+          "label": "B6",
+          "status": "available"
+        },
+        {
+          "id": "23168cc9-4a03-4555-83f7-6b0bd5903750",
+          "label": "C1",
+          "status": "available"
+        },
+        {
+          "id": "a3638943-ca86-4ad5-9554-f267085ffebf",
+          "label": "C2",
+          "status": "available"
+        },
+        {
+          "id": "b0f69435-7a12-4534-9a1e-51d75738c398",
+          "label": "C3",
+          "status": "available"
+        },
+        {
+          "id": "91827cc4-9234-42af-9db8-5ab0e905554d",
+          "label": "C4",
+          "status": "available"
+        },
+        {
+          "id": "6aa975d4-bbaf-4cae-bb3d-e2ebb33f11c0",
+          "label": "C5",
+          "status": "available"
+        },
+        {
+          "id": "f006615b-f320-43ae-87ec-64a6ad001b23",
+          "label": "C6",
+          "status": "available"
+        },
+        {
+          "id": "41efe97b-c490-4755-8b67-dbe48d5972e8",
+          "label": "D1",
+          "status": "available"
+        },
+        {
+          "id": "85b1c49f-217c-4aab-b680-fe962f430fe8",
+          "label": "D2",
+          "status": "available"
+        },
+        {
+          "id": "ead0eb60-1ba7-42b3-ab34-3b9d25417abb",
+          "label": "D3",
+          "status": "available"
+        },
+        {
+          "id": "8c59f7dd-6c66-4e06-9e93-23486fa811a1",
+          "label": "D4",
+          "status": "available"
+        },
+        {
+          "id": "0b0b419d-fc63-4676-97ec-724cfb49cd4e",
+          "label": "D5",
+          "status": "available"
+        },
+        {
+          "id": "a2b0bdc0-c90d-4f93-bafd-88655931cdfc",
+          "label": "D6",
+          "status": "available"
+        },
+        {
+          "id": "f6158876-f6d4-48ef-bd23-adc484ca7f6f",
+          "label": "E1",
+          "status": "available"
+        },
+        {
+          "id": "3f16f0a9-e00c-4800-841a-b9318b6cb678",
+          "label": "E2",
+          "status": "available"
+        },
+        {
+          "id": "8dfec9c7-83bf-4369-a4e3-879d9915c7cd",
+          "label": "E3",
+          "status": "available"
+        },
+        {
+          "id": "fd25d6ac-9f0a-4a7a-873a-b07c3647c186",
+          "label": "E4",
+          "status": "available"
+        },
+        {
+          "id": "b886adf3-3c48-4bb7-a624-b708b81cac3a",
+          "label": "E5",
+          "status": "available"
+        },
+        {
+          "id": "97d81e58-7cdb-4033-ba44-398218fc8cee",
+          "label": "E6",
+          "status": "available"
+        },
+        {
+          "id": "32e17e38-c41f-4f0a-9aea-faadb5fded95",
+          "label": "F1",
+          "status": "available"
+        },
+        {
+          "id": "f4515d77-8639-4ff1-9693-d5be2d1d4cb0",
+          "label": "F2",
+          "status": "available"
+        },
+        {
+          "id": "9e0a5c94-8c1f-473e-a82d-44e6f4be852c",
+          "label": "F3",
+          "status": "available"
+        },
+        {
+          "id": "b40b9472-9dcb-4784-942a-ff17a19aaddc",
+          "label": "F4",
+          "status": "available"
+        },
+        {
+          "id": "5f226bce-4635-4f36-8015-666e40ad25da",
+          "label": "F5",
+          "status": "available"
+        },
+        {
+          "id": "208198ac-c52c-43c9-830e-79b44cff0732",
+          "label": "F6",
+          "status": "available"
+        }
+      ],
+      "createdAt": "2026-06-21T10:34:08.460Z"
+    }
+  ]
+}
