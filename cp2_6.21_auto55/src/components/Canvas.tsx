@@ -35,6 +35,7 @@ interface CanvasProps {
   onAddSticker: (sticker: StickerItem) => void;
   onMoveSticker: (stickerId: string, x: number, y: number) => void;
   stickerType: StickerType | null;
+  undoRedoAnimating: boolean;
 }
 
 const Canvas = forwardRef(function Canvas(props: CanvasProps, ref) {
@@ -52,7 +53,8 @@ const Canvas = forwardRef(function Canvas(props: CanvasProps, ref) {
     onAddText,
     onAddSticker,
     onMoveSticker,
-    stickerType
+    stickerType,
+    undoRedoAnimating
   } = props;
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -63,7 +65,10 @@ const Canvas = forwardRef(function Canvas(props: CanvasProps, ref) {
   const [currentPath, setCurrentPath] = useState<Path | null>(null);
   const [currentPoints, setCurrentPoints] = useState<Point[]>([]);
   const [cursorPos, setCursorPos] = useState({ x: 0, y: 0 });
-  const [showCursorTip, setShowCursorTip] = useState(false);
+  const [clientCursorPos, setClientCursorPos] = useState({ x: 0, y: 0 });
+  const [cursorTipVisible, setCursorTipVisible] = useState(false);
+  const [cursorTipFading, setCursorTipFading] = useState(false);
+  const cursorFadeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   
   const [editingText, setEditingText] = useState<{ id: string; x: number; y: number; fontSize: number; color: string; text: string } | null>(null);
   const [newTextPosition, setNewTextPosition] = useState<{ x: number; y: number } | null>(null);
@@ -265,6 +270,20 @@ const Canvas = forwardRef(function Canvas(props: CanvasProps, ref) {
   const handleMouseMove = (e: React.MouseEvent) => {
     const point = getCanvasCoords(e);
     setCursorPos(point);
+    setClientCursorPos({ x: e.clientX, y: e.clientY });
+
+    if (cursorFadeTimerRef.current) {
+      clearTimeout(cursorFadeTimerRef.current);
+    }
+    setCursorTipVisible(true);
+    setCursorTipFading(false);
+    cursorFadeTimerRef.current = setTimeout(() => {
+      setCursorTipFading(true);
+      setTimeout(() => {
+        setCursorTipVisible(false);
+        setCursorTipFading(false);
+      }, 100);
+    }, 100);
 
     if (!isDrawing || !currentPath) return;
 
@@ -319,11 +338,16 @@ const Canvas = forwardRef(function Canvas(props: CanvasProps, ref) {
   };
 
   const handleMouseEnter = () => {
-    setShowCursorTip(true);
+    setCursorTipVisible(true);
+    setCursorTipFading(false);
   };
 
   const handleMouseLeave = () => {
-    setShowCursorTip(false);
+    setCursorTipVisible(false);
+    setCursorTipFading(false);
+    if (cursorFadeTimerRef.current) {
+      clearTimeout(cursorFadeTimerRef.current);
+    }
     if (isDrawing) {
       handleMouseUp();
     }
@@ -357,7 +381,8 @@ const Canvas = forwardRef(function Canvas(props: CanvasProps, ref) {
 
   const handleStickerMouseDown = (e: React.MouseEvent, sticker: StickerItem) => {
     e.stopPropagation();
-    const rect = (e.target as HTMLElement).getBoundingClientRect();
+    e.preventDefault();
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
     setDraggingSticker({
       id: sticker.id,
       offsetX: e.clientX - rect.left,
@@ -411,7 +436,7 @@ const Canvas = forwardRef(function Canvas(props: CanvasProps, ref) {
 
   return (
     <div 
-      className="canvas-container"
+      className={`canvas-container ${undoRedoAnimating ? 'undo-redo-animating' : ''}`}
       ref={containerRef}
       onMouseDown={handleMouseDown}
       onMouseMove={handleMouseMove}
@@ -480,16 +505,19 @@ const Canvas = forwardRef(function Canvas(props: CanvasProps, ref) {
         </div>
       )}
 
-      {showCursorTip && !isDrawing && (
+      {cursorTipVisible && !isDrawing && (
         <div
-          className="tool-cursor-tip"
+          className={`tool-cursor-tip ${cursorTipFading ? 'fading' : ''}`}
           style={{
-            left: cursorPos.x + 15,
-            top: cursorPos.y + 15,
-            opacity: showCursorTip ? 1 : 0
+            left: clientCursorPos.x + 18,
+            top: clientCursorPos.y + 18
           }}
         >
-          <span>{getToolName()}</span>
+          <svg className="tool-cursor-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/>
+            <path d="m15 5 4 4"/>
+          </svg>
+          <span className="tool-cursor-label">{getToolName()}</span>
           {selectedTool !== 'eraser' && selectedTool !== 'sticker' && (
             <span
               className="color-dot"

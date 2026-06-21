@@ -4,6 +4,11 @@
   position: relative;
   overflow: hidden;
   cursor: crosshair;
+  transition: opacity 0.25s ease-in-out;
+}
+
+.canvas-container.undo-redo-animating {
+  opacity: 0.3;
 }
 
 .canvas-bg {
@@ -46,7 +51,21 @@
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
   font-size: 12px;
   color: #374151;
-  transition: opacity 0.1s;
+  opacity: 1;
+  transition: opacity 0.1s ease-out;
+}
+
+.tool-cursor-tip.fading {
+  opacity: 0;
+}
+
+.tool-cursor-icon {
+  flex-shrink: 0;
+  color: #6B7280;
+}
+
+.tool-cursor-label {
+  white-space: nowrap;
 }
 
 .tool-cursor-tip .color-dot {
@@ -54,6 +73,7 @@
   height: 12px;
   border-radius: 50%;
   border: 1px solid #E5E7EB;
+  flex-shrink: 0;
 }
 
 .text-editor-overlay {
@@ -80,17 +100,18 @@
   justify-content: center;
   font-size: 32px;
   user-select: none;
-  transition: transform 0.2s;
+  transition: transform 0.2s ease;
   z-index: 50;
 }
 
 .sticker-item:hover {
-  transform: scale(1.1);
+  transform: scale(1.05);
 }
 
 .sticker-item.dragging {
-  transform: scale(1.15);
+  transform: scale(1.1);
   z-index: 100;
+  transition: transform 0.2s ease;
 }
 
 .canvas-text-item {

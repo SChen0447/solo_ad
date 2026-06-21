@@ -44,6 +44,7 @@ function App() {
   const [selectedStickerType, setSelectedStickerType] = useState<StickerType>('smile');
   const [copiedTip, setCopiedTip] = useState(false);
   const [nicknameError, setNicknameError] = useState('');
+  const [undoRedoAnimating, setUndoRedoAnimating] = useState(false);
   
   const socketRef = useRef<Socket | null>(null);
   const remoteDrawingRef = useRef<Map<string, { points: { x: number; y: number }[]; color: string; size: number; tool: string }>>(new Map());
@@ -131,19 +132,27 @@ function App() {
     });
 
     socket.on('canvasUndo', (state) => {
-      setPaths(state.paths || []);
-      setTexts(state.texts || []);
-      setStickers(state.stickers || []);
-      setHistoryIndex(state.historyIndex);
-      setHistoryLength(state.historyLength);
+      setUndoRedoAnimating(true);
+      setTimeout(() => {
+        setPaths(state.paths || []);
+        setTexts(state.texts || []);
+        setStickers(state.stickers || []);
+        setHistoryIndex(state.historyIndex);
+        setHistoryLength(state.historyLength);
+        setUndoRedoAnimating(false);
+      }, 250);
     });
 
     socket.on('canvasRedo', (state) => {
-      setPaths(state.paths || []);
-      setTexts(state.texts || []);
-      setStickers(state.stickers || []);
-      setHistoryIndex(state.historyIndex);
-      setHistoryLength(state.historyLength);
+      setUndoRedoAnimating(true);
+      setTimeout(() => {
+        setPaths(state.paths || []);
+        setTexts(state.texts || []);
+        setStickers(state.stickers || []);
+        setHistoryIndex(state.historyIndex);
+        setHistoryLength(state.historyLength);
+        setUndoRedoAnimating(false);
+      }, 250);
     });
 
     socket.on('canvasCleared', ({ historyIndex, historyLength }) => {
@@ -229,20 +238,51 @@ function App() {
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    const allX = [0, ...paths.flatMap(p => p.points.map(pt => pt.x)), ...texts.map(t => t.x), ...stickers.map(s => s.x)];
-    const allY = [0, ...paths.flatMap(p => p.points.map(pt => pt.y)), ...texts.map(t => t.y), ...stickers.map(s => s.y)];
-    
-    let minX = Math.min(...allX) - 20;
-    let minY = Math.min(...allY) - 20;
-    let maxX = Math.max(...allX) + 20;
-    let maxY = Math.max(...allY) + 20;
-
     if (paths.length === 0 && texts.length === 0 && stickers.length === 0) {
-      minX = 0;
-      minY = 0;
-      maxX = 800;
-      maxY = 600;
+      canvas.width = 800;
+      canvas.height = 600;
+      ctx.fillStyle = '#FFFFFF';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      const link = document.createElement('a');
+      link.download = `whiteboard_${Date.now()}.png`;
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+      return;
     }
+
+    const allX: number[] = [];
+    const allY: number[] = [];
+
+    paths.forEach(path => {
+      path.points.forEach(pt => {
+        allX.push(pt.x - path.size / 2);
+        allX.push(pt.x + path.size / 2);
+        allY.push(pt.y - path.size / 2);
+        allY.push(pt.y + path.size / 2);
+      });
+    });
+
+    texts.forEach(textItem => {
+      ctx.font = `${textItem.fontSize}px sans-serif`;
+      const metrics = ctx.measureText(textItem.text);
+      allX.push(textItem.x);
+      allX.push(textItem.x + metrics.width);
+      allY.push(textItem.y - textItem.fontSize);
+      allY.push(textItem.y);
+    });
+
+    stickers.forEach(sticker => {
+      allX.push(sticker.x);
+      allX.push(sticker.x + 40);
+      allY.push(sticker.y);
+      allY.push(sticker.y + 40);
+    });
+
+    const padding = 20;
+    const minX = Math.min(...allX) - padding;
+    const minY = Math.min(...allY) - padding;
+    const maxX = Math.max(...allX) + padding;
+    const maxY = Math.max(...allY) + padding;
 
     canvas.width = maxX - minX;
     canvas.height = maxY - minY;
@@ -407,6 +447,7 @@ function App() {
           onAddSticker={handleAddSticker}
           onMoveSticker={handleMoveSticker}
           stickerType={selectedTool === 'sticker' ? selectedStickerType : null}
+          undoRedoAnimating={undoRedoAnimating}
         />
       </div>
       
