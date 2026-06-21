@@ -41,6 +41,23 @@ const zoneColors: Record<DeliveryZone, string> = {
   C: '#FEF9C3',
 };
 
+const zoneBaseTime: Record<DeliveryZone, number> = {
+  A: 8,
+  B: 12,
+  C: 18,
+};
+
+const TRAVEL_BETWEEN_STOPS = 3;
+const BASE_DELIVERY_PER_ORDER = 5;
+const TIME_PER_ITEM = 1.5;
+
+function calculateDeliveryTime(order: Order, position: number, zone: DeliveryZone): number {
+  const totalItems = order.items.reduce((sum, item) => sum + item.quantity, 0);
+  const handlingTime = BASE_DELIVERY_PER_ORDER + totalItems * TIME_PER_ITEM;
+  const travelTime = position * TRAVEL_BETWEEN_STOPS;
+  return Math.round(zoneBaseTime[zone] + travelTime + handlingTime);
+}
+
 function assignZone(address: string): DeliveryZone {
   if (address.includes('阳光') || address.includes('新城') || address.includes('花园')) return 'A';
   if (address.includes('幸福') || address.includes('和平') || address.includes('绿洲')) return 'B';
@@ -162,16 +179,28 @@ function initTestData() {
 
   orders = testOrders;
 
-  deliveryTasks = orders
-    .filter((o) => o.status === 'paid' || o.status === 'delivering')
-    .map((o, idx) => ({
-      id: uuidv4(),
-      orderId: o.id,
-      zone: o.zone,
-      estimatedTime: 15 + (o.deliveryOrder || idx + 1) * 10,
-      deliveryOrder: o.deliveryOrder || idx + 1,
-      status: o.status === 'delivering' ? 'in_progress' : 'pending',
-    }));
+  const paidAndDelivering = orders.filter((o) => o.status === 'paid' || o.status === 'delivering');
+  const zoneOrderMap = new Map<DeliveryZone, Order[]>();
+  paidAndDelivering.forEach((o) => {
+    if (!zoneOrderMap.has(o.zone)) zoneOrderMap.set(o.zone, []);
+    zoneOrderMap.get(o.zone)!.push(o);
+  });
+
+  deliveryTasks = [];
+  zoneOrderMap.forEach((zoneOrders, zone) => {
+    zoneOrders
+      .sort((a, b) => (a.deliveryOrder || 0) - (b.deliveryOrder || 0))
+      .forEach((o, idx) => {
+        deliveryTasks.push({
+          id: uuidv4(),
+          orderId: o.id,
+          zone: zone,
+          estimatedTime: calculateDeliveryTime(o, idx, zone),
+          deliveryOrder: idx + 1,
+          status: o.status === 'delivering' ? 'in_progress' : 'pending',
+        });
+      });
+  };
 }
 
 initTestData();
@@ -221,13 +250,16 @@ export function updateOrderStatus(id: string, status: OrderStatus): Order | unde
   order.status = status;
 
   if (status === 'paid') {
-    const zoneOrders = orders.filter((o) => o.zone === order.zone && (o.status === 'paid' || o.status === 'delivering'));
+    const zoneOrders = orders.filter(
+      (o) => o.zone === order.zone && (o.status === 'paid' || o.status === 'delivering')
+    );
+    const position = zoneOrders.length - 1;
     order.deliveryOrder = zoneOrders.length;
     deliveryTasks.push({
       id: uuidv4(),
       orderId: order.id,
       zone: order.zone,
-      estimatedTime: 15 + zoneOrders.length * 10,
+      estimatedTime: calculateDeliveryTime(order, position, order.zone),
       deliveryOrder: zoneOrders.length,
       status: 'pending',
     });
@@ -267,9 +299,11 @@ export function reorderDelivery(zone: DeliveryZone, orderId: string, newPosition
 
   zoneTasks.forEach((task, idx) => {
     task.deliveryOrder = idx + 1;
-    task.estimatedTime = 15 + (idx + 1) * 10;
     const order = orders.find((o) => o.id === task.orderId);
-    if (order) order.deliveryOrder = idx + 1;
+    if (order) {
+      order.deliveryOrder = idx + 1;
+      task.estimatedTime = calculateDeliveryTime(order, idx, zone);
+    }
   });
 
   return deliveryTasks.filter((t) => t.zone === zone);

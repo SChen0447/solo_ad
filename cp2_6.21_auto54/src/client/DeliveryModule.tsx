@@ -2,6 +2,23 @@ import { useState, useMemo, useEffect, useRef } from 'react';
 import type { Order, DeliveryTask, DeliveryZone } from './types';
 import { ZONE_COLORS, ZONE_LABELS, STATUS_LABELS } from './types';
 
+const ZONE_BASE_TIME: Record<DeliveryZone, number> = {
+  A: 8,
+  B: 12,
+  C: 18,
+};
+
+const TRAVEL_BETWEEN_STOPS = 3;
+const BASE_DELIVERY_PER_ORDER = 5;
+const TIME_PER_ITEM = 1.5;
+
+function calculateDeliveryTime(order: Order, position: number, zone: DeliveryZone): number {
+  const totalItems = order.items.reduce((sum, item) => sum + item.quantity, 0);
+  const handlingTime = BASE_DELIVERY_PER_ORDER + totalItems * TIME_PER_ITEM;
+  const travelTime = position * TRAVEL_BETWEEN_STOPS;
+  return Math.round(ZONE_BASE_TIME[zone] + travelTime + handlingTime);
+}
+
 interface DeliveryModuleProps {
   orders: Order[];
   deliveryTasks: DeliveryTask[];
@@ -216,9 +233,9 @@ function ZoneSection({
   const getEstimatedTime = (order: Order, index: number) => {
     const task = data.tasks.find((t) => t.orderId === order.id);
     if (draggingId && !hasAppliedRef.current) {
-      return 15 + (index + 1) * 10;
+      return calculateDeliveryTime(order, index, data.zone);
     }
-    return task?.estimatedTime || 15;
+    return task?.estimatedTime || calculateDeliveryTime(order, index, data.zone);
   };
 
   const handleDragStart = (e: React.DragEvent, orderId: string) => {
@@ -277,10 +294,10 @@ function ZoneSection({
 
   const displayTotalTime = useMemo(() => {
     if (draggingId) {
-      return localOrder.reduce((sum, _o, idx) => sum + 15 + (idx + 1) * 10, 0);
+      return localOrder.reduce((sum, order, idx) => sum + calculateDeliveryTime(order, idx, data.zone), 0);
     }
     return data.totalTime;
-  }, [draggingId, localOrder, data.totalTime]);
+  }, [draggingId, localOrder, data.totalTime, data.zone]);
 
   return (
     <div style={{ marginBottom: 20 }}>

@@ -16,14 +16,27 @@ function AnimatedNumber({
   const [displayValue, setDisplayValue] = useState(value);
   const prevValueRef = useRef(value);
   const animationRef = useRef<number | null>(null);
+  const isMountedRef = useRef(true);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+      if (animationRef.current !== null) {
+        cancelAnimationFrame(animationRef.current);
+        animationRef.current = null;
+      }
+    };
+  }, []);
 
   useEffect(() => {
     const startValue = prevValueRef.current;
     const endValue = value;
     const startTime = performance.now();
 
-    if (animationRef.current) {
+    if (animationRef.current !== null) {
       cancelAnimationFrame(animationRef.current);
+      animationRef.current = null;
     }
 
     if (startValue === endValue) {
@@ -32,6 +45,7 @@ function AnimatedNumber({
     }
 
     const animate = (currentTime: number) => {
+      if (!isMountedRef.current) return;
       const elapsed = currentTime - startTime;
       const progress = Math.min(elapsed / duration, 1);
       const easeProgress = 1 - Math.pow(1 - progress, 3);
@@ -42,14 +56,16 @@ function AnimatedNumber({
         animationRef.current = requestAnimationFrame(animate);
       } else {
         prevValueRef.current = endValue;
+        animationRef.current = null;
       }
     };
 
     animationRef.current = requestAnimationFrame(animate);
 
     return () => {
-      if (animationRef.current) {
+      if (animationRef.current !== null) {
         cancelAnimationFrame(animationRef.current);
+        animationRef.current = null;
       }
     };
   }, [value, duration]);

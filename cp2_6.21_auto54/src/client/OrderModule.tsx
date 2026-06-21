@@ -448,25 +448,51 @@ export default function OrderModule({
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [showNewModal, setShowNewModal] = useState(false);
   const [flashingOrderIds, setFlashingOrderIds] = useState<Set<string>>(new Set());
-  const prevOrdersRef = useRef<Map<string, OrderStatus>>(new Map());
+  const prevStatusMapRef = useRef<Map<string, OrderStatus> | null>(null);
+  const flashTimeoutRef = useRef<number | null>(null);
 
   useEffect(() => {
-    const newFlashing: Set<string> = new Set();
-    const currentStatuses = new Map<string, OrderStatus>();
-    orders.forEach((o) => {
-      currentStatuses.set(o.id, o.status);
-      const prevStatus = prevOrdersRef.current.get(o.id);
-      if (prevStatus && prevStatus !== o.status) {
-        newFlashing.add(o.id);
+    return () => {
+      if (flashTimeoutRef.current !== null) {
+        clearTimeout(flashTimeoutRef.current);
+        flashTimeoutRef.current = null;
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (prevStatusMapRef.current === null) {
+      const initialMap = new Map<string, OrderStatus>();
+      orders.forEach((o) => initialMap.set(o.id, o.status));
+      prevStatusMapRef.current = initialMap;
+      return;
+    }
+
+    const changedIds: string[] = [];
+    const currentMap = new Map<string, OrderStatus>();
+
+    orders.forEach((order) => {
+      currentMap.set(order.id, order.status);
+      const prevStatus = prevStatusMapRef.current!.get(order.id);
+      if (prevStatus !== undefined && prevStatus !== order.status) {
+        changedIds.push(order.id);
       }
     });
-    if (newFlashing.size > 0) {
-      setFlashingOrderIds(newFlashing);
-      setTimeout(() => {
-        setFlashingOrderIds(new Set());
-      }, 400);
+
+    prevStatusMapRef.current = currentMap;
+
+    if (changedIds.length === 0) return;
+
+    if (flashTimeoutRef.current !== null) {
+      clearTimeout(flashTimeoutRef.current);
     }
-    prevOrdersRef.current = currentStatuses;
+
+    setFlashingOrderIds(new Set(changedIds));
+
+    flashTimeoutRef.current = window.setTimeout(() => {
+      setFlashingOrderIds(new Set());
+      flashTimeoutRef.current = null;
+    }, 400);
   }, [orders]);
 
   const filteredOrders = useMemo(() => {
