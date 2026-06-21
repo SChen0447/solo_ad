@@ -118,6 +118,38 @@ export class UIController {
       valueEl.textContent = `${value.toFixed(1)}${suffix}`;
     };
 
+    const addButtonPressEffect = (btn: HTMLElement, skipActiveToggle: boolean = false) => {
+      let pressTimeout: number | null = null;
+
+      const onPress = () => {
+        if (!skipActiveToggle) {
+          btn.classList.add('pressed');
+        }
+        btn.style.transform = 'translateY(0) scale(0.96)';
+        btn.style.transition = 'transform 0.05s ease';
+      };
+
+      const onRelease = () => {
+        if (pressTimeout) {
+          window.clearTimeout(pressTimeout);
+        }
+        pressTimeout = window.setTimeout(() => {
+          if (!skipActiveToggle) {
+            btn.classList.remove('pressed');
+          }
+          btn.style.transform = '';
+          btn.style.transition = '';
+        }, 80);
+      };
+
+      btn.addEventListener('mousedown', onPress);
+      btn.addEventListener('touchstart', onPress, { passive: true });
+      btn.addEventListener('mouseup', onRelease);
+      btn.addEventListener('touchend', onRelease);
+      btn.addEventListener('touchcancel', onRelease);
+      btn.addEventListener('mouseleave', onRelease);
+    };
+
     this.orbitSpeedSlider.addEventListener('input', (e) => {
       const slider = e.target as HTMLInputElement;
       const value = parseFloat(slider.value);
@@ -137,6 +169,18 @@ export class UIController {
         this.orbitTooltip.classList.remove('show');
         this.orbitSpeedSlider.classList.remove('slider-dragging');
       }, 400);
+    });
+
+    this.orbitSpeedSlider.addEventListener('touchstart', () => {
+      this.orbitTooltip.classList.add('show');
+      this.orbitSpeedSlider.classList.add('slider-dragging');
+    }, { passive: true });
+
+    this.orbitSpeedSlider.addEventListener('touchend', () => {
+      setTimeout(() => {
+        this.orbitTooltip.classList.remove('show');
+        this.orbitSpeedSlider.classList.remove('slider-dragging');
+      }, 600);
     });
 
     this.rotationSpeedSlider.addEventListener('input', (e) => {
@@ -160,7 +204,20 @@ export class UIController {
       }, 400);
     });
 
+    this.rotationSpeedSlider.addEventListener('touchstart', () => {
+      this.rotationTooltip.classList.add('show');
+      this.rotationSpeedSlider.classList.add('slider-dragging');
+    }, { passive: true });
+
+    this.rotationSpeedSlider.addEventListener('touchend', () => {
+      setTimeout(() => {
+        this.rotationTooltip.classList.remove('show');
+        this.rotationSpeedSlider.classList.remove('slider-dragging');
+      }, 600);
+    });
+
     this.textureButtons.forEach((btn) => {
+      addButtonPressEffect(btn, true);
       btn.addEventListener('click', () => {
         const texture = btn.dataset.texture as 'realistic' | 'cartoon' | 'wireframe';
         this.setTextureStyle(texture);
@@ -168,6 +225,7 @@ export class UIController {
       });
     });
 
+    addButtonPressEffect(this.compareBtn, true);
     this.compareBtn.addEventListener('click', () => {
       if (this.selectedPlanets.length === 2) {
         this.enterCompareMode();
@@ -175,11 +233,13 @@ export class UIController {
       }
     });
 
+    addButtonPressEffect(this.exitCompareBtn, true);
     this.exitCompareBtn.addEventListener('click', () => {
       this.exitCompareMode();
       eventBus.emit('exitCompareMode');
     });
 
+    addButtonPressEffect(this.hamburgerBtn, true);
     this.hamburgerBtn.addEventListener('click', () => {
       this.infoPanel.classList.toggle('show');
     });
