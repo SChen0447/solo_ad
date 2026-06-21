@@ -6,10 +6,14 @@ export class Renderer {
   private canvasWidth: number;
   private canvasHeight: number;
   private streakLines: StreakLine[] = [];
+  private streakPool: StreakLine[] = [];
+  private readonly POOL_MAX = 50;
   private streakTimer: number = 0;
   private readonly STREAK_INTERVAL = 0.3;
   private goldParticles: Particle[] = [];
   private readonly MAX_GOLD_PARTICLES = 100;
+  private mouseOverRestart = false;
+  private hoverCheckBound: ((e: MouseEvent) => void) | null = null;
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
@@ -18,6 +22,26 @@ export class Renderer {
     this.ctx = ctx;
     this.canvasWidth = canvas.width;
     this.canvasHeight = canvas.height;
+    this.hoverCheckBound = (e: MouseEvent) => this.updateHoverState(e);
+    this.canvas.addEventListener('mousemove', this.hoverCheckBound);
+  }
+
+  private updateHoverState(e: MouseEvent): void {
+    const rect = this.canvas.getBoundingClientRect();
+    const scaleX = this.canvas.width / rect.width;
+    const scaleY = this.canvas.height / rect.height;
+    const x = (e.clientX - rect.left) * scaleX;
+    const y = (e.clientY - rect.top) * scaleY;
+    const panelW = 400;
+    const panelH = 380;
+    const panelX = (this.canvasWidth - panelW) / 2;
+    const panelY = (this.canvasHeight - panelH) / 2;
+    const btnW = 180;
+    const btnH = 50;
+    const btnX = (this.canvasWidth - btnW) / 2;
+    const btnY = panelY + panelH - btnH - 30;
+    this.mouseOverRestart =
+      x >= btnX && x <= btnX + btnW && y >= btnY && y <= btnY + btnH;
   }
 
   public getStreakLines(): StreakLine[] {
@@ -60,6 +84,9 @@ export class Renderer {
       s.x += s.speed * dt;
       if (s.x > this.canvasWidth + 20) {
         this.streakLines.splice(i, 1);
+        if (this.streakPool.length < this.POOL_MAX) {
+          this.streakPool.push(s);
+        }
       }
     }
 
@@ -76,18 +103,24 @@ export class Renderer {
     }
   }
 
+  private acquireStreak(): StreakLine {
+    if (this.streakPool.length > 0) {
+      return this.streakPool.pop()!;
+    }
+    return { x: 0, y: 0, height: 0, speed: 0, alpha: 0, color: '#00FFFF' };
+  }
+
   private spawnStreaks(): void {
     const count = 6 + Math.floor(Math.random() * 3);
     for (let i = 0; i < count; i++) {
-      const height = 40 + Math.random() * (this.canvasHeight - 160);
-      this.streakLines.push({
-        x: -20,
-        y: 60 + Math.random() * (this.canvasHeight - 160),
-        height,
-        speed: 200 + Math.random() * 400,
-        alpha: 0.15 + Math.random() * 0.1,
-        color: '#00FFFF'
-      });
+      const s = this.acquireStreak();
+      s.x = -20;
+      s.y = 60 + Math.random() * (this.canvasHeight - 160);
+      s.height = 40 + Math.random() * (this.canvasHeight - 160);
+      s.speed = 200 + Math.random() * 400;
+      s.alpha = 0.15 + Math.random() * 0.1;
+      s.color = '#00FFFF';
+      this.streakLines.push(s);
     }
   }
 
@@ -365,21 +398,39 @@ export class Renderer {
     const ctx = this.ctx;
     ctx.save();
 
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
-    ctx.fillRect(0, 0, this.canvasWidth, this.canvasHeight);
-
     const panelW = 400;
     const panelH = 380;
     const panelX = (this.canvasWidth - panelW) / 2;
     const panelY = (this.canvasHeight - panelH) / 2;
     const panelR = 16;
 
-    ctx.fillStyle = 'rgba(26, 26, 26, 0.85)';
-    ctx.shadowColor = '#00FFFF';
-    ctx.shadowBlur = 30;
-    this.roundRect(ctx, panelX, panelY, panelW, panelH, panelR);
-    ctx.fill();
-    ctx.shadowBlur = 0;
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.55)';
+    ctx.fillRect(0, 0, this.canvasWidth, this.canvasHeight);
+
+    try {
+      ctx.save();
+      this.roundRect(ctx, panelX, panelY, panelW, panelH, panelR);
+      ctx.clip();
+      ctx.filter = 'blur(12px) saturate(1.1)';
+      const srcX = Math.max(0, panelX - 10);
+      const srcY = Math.max(0, panelY - 10);
+      const srcW = Math.min(this.canvasWidth - srcX, panelW + 20);
+      const srcH = Math.min(this.canvasHeight - srcY, panelH + 20);
+      try {
+        ctx.drawImage(
+          this.canvas,
+          srcX, srcY, srcW, srcH,
+          srcX, srcY, srcW, srcH
+        );
+      } catch (_) {
+        // ignore - fallback if drawImage fails
+      }
+      ctx.restore();
+    } catch (_) {
+      // ignore - fallback if filter not supported
+    }
+
+    glassPanelBg(ctx, panelX, panelY, panelW, panelH, panelR);
 
     ctx.strokeStyle = 'rgba(0,255,255,0.4)';
     ctx.lineWidth = 1.5;
@@ -417,27 +468,65 @@ export class Renderer {
       ctx.shadowBlur = 0;
     }
 
-    const btnW = 180;
-    const btnH = 50;
+    const btnScale = this.mouseOverRestart ? 1.05 : 1.0;
+    const baseBtnW = 180;
+    const baseBtnH = 50;
+    const btnW = baseBtnW * btnScale;
+    const btnH = baseBtnH * btnScale;
     const btnX = (this.canvasWidth - btnW) / 2;
-    const btnY = panelY + panelH - btnH - 30;
+    const btnY = panelY + panelH - baseBtnH - 30 + (baseBtnH - btnH) / 2;
     const btnR = 25;
 
     const btnGrad = ctx.createLinearGradient(btnX, btnY, btnX + btnW, btnY + btnH);
-    btnGrad.addColorStop(0, '#00FFFF');
-    btnGrad.addColorStop(1, '#FF00FF');
+    if (this.mouseOverRestart) {
+      btnGrad.addColorStop(0, '#00CCCC');
+      btnGrad.addColorStop(0.5, '#CC00CC');
+      btnGrad.addColorStop(1, '#CC0088');
+    } else {
+      btnGrad.addColorStop(0, '#00FFFF');
+      btnGrad.addColorStop(1, '#FF00FF');
+    }
     ctx.fillStyle = btnGrad;
     ctx.shadowColor = '#00FFFF';
-    ctx.shadowBlur = 20;
+    ctx.shadowBlur = this.mouseOverRestart ? 32 : 20;
     this.roundRect(ctx, btnX, btnY, btnW, btnH, btnR);
     ctx.fill();
     ctx.shadowBlur = 0;
 
-    ctx.font = "bold 20px 'Segoe UI', sans-serif";
+    ctx.font = "bold " + Math.floor(20 * btnScale) + "px 'Segoe UI', sans-serif";
     ctx.fillStyle = '#0D0D2B';
     ctx.textBaseline = 'middle';
     ctx.fillText('重新开始', this.canvasWidth / 2, btnY + btnH / 2);
 
     ctx.restore();
   }
+}
+
+function glassPanelBg(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  r: number
+): void {
+  const grad = ctx.createLinearGradient(x, y, x, y + h);
+  grad.addColorStop(0, 'rgba(45, 45, 45, 0.75)');
+  grad.addColorStop(1, 'rgba(26, 26, 26, 0.75)');
+  ctx.fillStyle = grad;
+  ctx.shadowColor = '#00FFFF';
+  ctx.shadowBlur = 30;
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + w - r, y);
+  ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+  ctx.lineTo(x + w, y + h - r);
+  ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+  ctx.lineTo(x + r, y + h);
+  ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+  ctx.lineTo(x, y + r);
+  ctx.quadraticCurveTo(x, y, x + r, y);
+  ctx.closePath();
+  ctx.fill();
+  ctx.shadowBlur = 0;
 }

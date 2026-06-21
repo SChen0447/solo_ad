@@ -13,6 +13,7 @@ export class Player {
   private canvasHeight: number;
   private particles: Particle[] = [];
   private trailAccumulator: number = 0;
+  private elapsedTime: number = 0;
   private readonly MAX_PARTICLES = 200;
   private readonly PLAYER_RADIUS = 12;
   private readonly BASE_SPEED = 280;
@@ -56,12 +57,17 @@ export class Player {
     this.particles = [];
   }
 
+  public resetElapsedTime(): void {
+    this.elapsedTime = 0;
+  }
+
   public update(
     dt: number,
     playerState: GameState['player'],
-    totalTime: number,
     scrollSpeed: number
   ): void {
+    this.elapsedTime += dt;
+
     const moveSpeed = 350 * dt;
 
     if (this.keys.left) {
@@ -81,10 +87,11 @@ export class Player {
     playerState.x = Math.max(margin, Math.min(this.canvasWidth - margin, playerState.x));
     playerState.y = Math.max(margin + 60, Math.min(this.canvasHeight - margin - 30, playerState.y));
 
-    const growthMult = 1.0 + Math.min(totalTime * this.SPEED_GROWTH_PER_SEC / this.BASE_SPEED, this.MAX_SPEED_MULT - 1.0);
-    playerState.speedMultiplier = growthMult;
+    const speedGrowthPerFrame = (this.SPEED_GROWTH_PER_SEC / this.BASE_SPEED) * dt;
+    const targetGrowth = 1.0 + Math.min(this.elapsedTime * this.SPEED_GROWTH_PER_SEC / this.BASE_SPEED, this.MAX_SPEED_MULT - 1.0);
+    playerState.speedMultiplier = Math.min(playerState.speedMultiplier + speedGrowthPerFrame, targetGrowth);
     const slowMult = playerState.isSlowed ? 0.5 : 1.0;
-    playerState.speed = playerState.baseSpeed * growthMult * slowMult;
+    playerState.speed = playerState.baseSpeed * playerState.speedMultiplier * slowMult;
 
     if (playerState.isSlowed) {
       playerState.slowTimer -= dt;
@@ -149,14 +156,12 @@ export class Player {
   }
 
   public triggerHit(playerState: GameState['player']): void {
-    if (!playerState.isSlowed) {
-      playerState.isSlowed = true;
-      playerState.slowTimer = playerState.slowDuration;
-      playerState.flashCount = 0;
-      playerState.flashTimer = 0;
-      playerState.isVisible = false;
-      playerState.borderAlpha = 0.5;
-    }
+    playerState.isSlowed = true;
+    playerState.slowTimer = playerState.slowDuration;
+    playerState.flashCount = 0;
+    playerState.flashTimer = 0;
+    playerState.isVisible = false;
+    playerState.borderAlpha = 0.5;
   }
 
   public resize(width: number, height: number): void {

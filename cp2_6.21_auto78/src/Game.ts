@@ -152,6 +152,7 @@ export class Game {
 
   private restart(): void {
     this.player.clearParticles();
+    this.player.resetElapsedTime();
     this.obstacleGenerator.clear();
     this.collectibleGenerator.clear();
     this.collectibleGenerator.resetCollectedCount();
@@ -196,9 +197,9 @@ export class Game {
     this.scrollSpeed = this.BASE_SCROLL_SPEED + Math.min(this.totalTime * this.SCROLL_SPEED_GROWTH, 350);
 
     this.player.setKeys(this.keys);
-    this.player.update(dt, this.state.player, this.totalTime, this.scrollSpeed);
+    this.player.update(dt, this.state.player, this.scrollSpeed);
     this.obstacleGenerator.update(dt, this.scrollSpeed, this.state.player);
-    this.collectibleGenerator.update(dt, this.scrollSpeed, this.state.player);
+    this.collectibleGenerator.update(dt, this.scrollSpeed, this.state.player, this.obstacleGenerator.getObstacles());
     this.renderer.update(dt, this.scrollSpeed);
 
     if (this.state.screenFlash > 0) {

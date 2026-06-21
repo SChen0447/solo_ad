@@ -41,11 +41,16 @@ export class CollectibleGenerator {
     this.collectedInWave = 0;
   }
 
-  public update(dt: number, scrollSpeed: number, playerState: GameState['player']): void {
+  public update(
+    dt: number,
+    scrollSpeed: number,
+    playerState: GameState['player'],
+    obstacles: GameState['obstacles']
+  ): void {
     this.waveTimer += dt;
     if (this.waveTimer >= this.WAVE_INTERVAL) {
       this.waveTimer = 0;
-      this.spawnWave();
+      this.spawnWave(obstacles);
     }
 
     for (let i = this.collectibles.length - 1; i >= 0; i--) {
@@ -65,16 +70,36 @@ export class CollectibleGenerator {
     }
   }
 
-  private spawnWave(): void {
+  private spawnWave(obstacles: GameState['obstacles']): void {
     if (this.collectibles.length >= this.MAX_COLLECTIBLES) return;
     const groupId = this.groupIdCounter++;
     const count = 4 + Math.floor(Math.random() * 4);
     const topMargin = 100;
     const bottomMargin = 80;
     const useArc = Math.random() < 0.5;
-    const baseY = topMargin + Math.random() * (this.canvasHeight - topMargin - bottomMargin);
+    let attempts = 0;
+    let baseY = topMargin + Math.random() * (this.canvasHeight - topMargin - bottomMargin);
     const startX = this.canvasWidth + 40;
     const amplitude = 40;
+
+    while (attempts < 5) {
+      let valid = true;
+      for (let i = 0; i < count; i++) {
+        let y = baseY;
+        if (useArc) {
+          const t = i / (count - 1);
+          y = baseY + Math.sin(t * Math.PI) * amplitude;
+        }
+        const x = startX + i * this.SPACING;
+        if (this.circleRectsOverlap(x, y, 14, obstacles)) {
+          valid = false;
+          break;
+        }
+      }
+      if (valid) break;
+      baseY = topMargin + Math.random() * (this.canvasHeight - topMargin - bottomMargin);
+      attempts++;
+    }
 
     for (let i = 0; i < count; i++) {
       let y = baseY;
@@ -94,6 +119,26 @@ export class CollectibleGenerator {
         });
       }
     }
+  }
+
+  private circleRectsOverlap(
+    cx: number,
+    cy: number,
+    cr: number,
+    obstacles: GameState['obstacles']
+  ): boolean {
+    for (const o of obstacles) {
+      if (o.x + o.width < cx - cr) continue;
+      if (o.x > cx + cr) continue;
+      const closestX = Math.max(o.x, Math.min(cx, o.x + o.width));
+      const closestY = Math.max(o.y, Math.min(cy, o.y + o.height));
+      const dx = cx - closestX;
+      const dy = cy - closestY;
+      if (dx * dx + dy * dy < cr * cr) {
+        return true;
+      }
+    }
+    return false;
   }
 
   private checkCollision(c: Collectible, p: GameState['player']): boolean {
