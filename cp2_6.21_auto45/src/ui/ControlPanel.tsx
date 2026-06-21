@@ -43,6 +43,10 @@ interface ControlPanelProps {
   pointIntensity: number;
   onPointToggle: () => void;
   onPointIntensityChange: (v: number) => void;
+  ambientIntensity: number;
+  ambientColor: string;
+  onAmbientIntensityChange: (v: number) => void;
+  onAmbientColorChange: (v: string) => void;
 }
 
 export const ControlPanel: React.FC<ControlPanelProps> = (props) => {
@@ -66,7 +70,11 @@ export const ControlPanel: React.FC<ControlPanelProps> = (props) => {
     pointEnabled,
     pointIntensity,
     onPointToggle,
-    onPointIntensityChange
+    onPointIntensityChange,
+    ambientIntensity,
+    ambientColor,
+    onAmbientIntensityChange,
+    onAmbientColorChange
   } = props;
 
   const [isCollapsed, setIsCollapsed] = useState(false);
@@ -129,6 +137,36 @@ export const ControlPanel: React.FC<ControlPanelProps> = (props) => {
 
         <div className="panel-header">
           <h2 className="panel-title">光照控制</h2>
+        </div>
+
+        <div className="section">
+          <div className="section-subtitle">环境光</div>
+
+          <div className="slider-container">
+            <div className="slider-label">
+              <span>强度</span>
+              <span className="slider-value">{ambientIntensity.toFixed(1)}</span>
+            </div>
+            <input
+              type="range"
+              min="0"
+              max="2"
+              step="0.05"
+              value={ambientIntensity}
+              onChange={(e) => onAmbientIntensityChange(parseFloat(e.target.value))}
+              className="slider"
+            />
+          </div>
+
+          <div className="color-picker-row">
+            <span className="color-picker-label">颜色</span>
+            <input
+              type="color"
+              value={ambientColor}
+              onChange={(e) => onAmbientColorChange(e.target.value)}
+              className="color-input"
+            />
+          </div>
         </div>
 
         <div className="section">

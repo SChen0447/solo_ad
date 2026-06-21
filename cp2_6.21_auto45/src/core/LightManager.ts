@@ -107,6 +107,15 @@ export class LightManager {
     this.ambientLight.intensity = value;
   }
 
+  public setAmbientColor(color: string): void {
+    this.ambientLight.color.set(color);
+  }
+
+  public adjustAmbientLight(intensity: number, color: string): void {
+    this.ambientLight.intensity = intensity;
+    this.ambientLight.color.set(color);
+  }
+
   public updateFloorLampLight(furnitureList: Furniture[]): void {
     const floorLamps = furnitureList.filter(f => f.type === 'floorLamp');
     if (floorLamps.length > 0) {

@@ -19,6 +19,9 @@ const App: React.FC = () => {
   const [spotY, setSpotY] = useState(0);
   const [spotZ, setSpotZ] = useState(0);
 
+  const [ambientIntensity, setAmbientIntensity] = useState(0.4);
+  const [ambientColor, setAmbientColor] = useState('#FFFFFF');
+
   const [pointEnabled, setPointEnabled] = useState(true);
   const [pointIntensity, setPointIntensity] = useState(0.6);
 
@@ -131,6 +134,16 @@ const App: React.FC = () => {
     setPointIntensity(v);
   }, []);
 
+  const handleAmbientIntensityChange = useCallback((v: number) => {
+    sceneManagerRef.current?.lightManager.adjustAmbientLight(v, ambientColor);
+    setAmbientIntensity(v);
+  }, [ambientColor]);
+
+  const handleAmbientColorChange = useCallback((v: string) => {
+    sceneManagerRef.current?.lightManager.adjustAmbientLight(ambientIntensity, v);
+    setAmbientColor(v);
+  }, [ambientIntensity]);
+
   return (
     <div className="app-container">
       <div ref={canvasContainerRef} className="canvas-container" />
@@ -157,6 +170,10 @@ const App: React.FC = () => {
         pointIntensity={pointIntensity}
         onPointToggle={handlePointToggle}
         onPointIntensityChange={handlePointIntensityChange}
+        ambientIntensity={ambientIntensity}
+        ambientColor={ambientColor}
+        onAmbientIntensityChange={handleAmbientIntensityChange}
+        onAmbientColorChange={handleAmbientColorChange}
       />
       <div className="app-title">
         <h1>三维室内房间布局与光照模拟</h1>
