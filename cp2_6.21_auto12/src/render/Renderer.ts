@@ -1,5 +1,5 @@
 import { eventBus } from '../EventBus';
-import type { GameState, SoundData, Level, SoundPlatform, SoundDoor, PushableBlock } from '../types';
+import type { GameState, SoundData, Level, SoundPlatform, SoundDoor, PushableBlock, Particle } from '../types';
 import { GAME_WIDTH, GAME_HEIGHT } from '../types';
 
 export class Renderer {
@@ -12,6 +12,12 @@ export class Renderer {
   private calibrationProgress: number = 0;
   private calibrationVolume: number = 0;
   private currentSoundData: SoundData;
+  private particles: Particle[] = [];
+  private readonly PARTICLE_COUNT = 50;
+  private auraRadius: number = 0;
+  private auraAlpha: number = 0;
+  private auraColor: string = '#66FCF1';
+  private audioReactiveTime: number = 0;
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
@@ -25,6 +31,7 @@ export class Renderer {
       waveform: new Float32Array(40)
     };
 
+    this.initParticles();
     this.setupEventListeners();
     this.resize();
     window.addEventListener('resize', () => this.resize());
@@ -76,15 +83,19 @@ export class Renderer {
 
   render(state: GameState, dt: number): void {
     this.time += dt;
+    this.audioReactiveTime += dt;
     this.ctx.clearRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
 
+    this.updateAudioReactiveValues(dt);
     this.drawBackground();
 
     if (state.currentScreen === 'calibration') {
       this.drawCalibrationScreen();
     } else if (state.level && (state.currentScreen === 'playing' || state.currentScreen === 'complete')) {
+      this.updateAndDrawParticles(dt);
       this.drawLevel(state.level);
       this.drawPlayer(state);
+      this.drawPlayerAura(state);
       this.drawGoal(state.level, this.time);
       this.drawWaveformVisualizer();
       this.drawSoundStatusIndicator(state);
@@ -112,6 +123,146 @@ export class Renderer {
     gradient.addColorStop(1, '#0B0C10');
     this.ctx.fillStyle = gradient;
     this.ctx.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
+  }
+
+  private initParticles(): void {
+    this.particles = [];
+    const colors = ['#66FCF1', '#45A29E', '#9D4EDD', '#C77DFF', '#FFD700'];
+    
+    for (let i = 0; i < this.PARTICLE_COUNT; i++) {
+      this.particles.push({
+        x: Math.random() * GAME_WIDTH,
+        y: Math.random() * GAME_HEIGHT,
+        vx: (Math.random() - 0.5) * 20,
+        vy: (Math.random() - 0.5) * 20,
+        baseSize: 2 + Math.random() * 4,
+        size: 2 + Math.random() * 4,
+        alpha: 0.3 + Math.random() * 0.4,
+        color: colors[Math.floor(Math.random() * colors.length)],
+        life: Math.random() * 100,
+        maxLife: 100 + Math.random() * 100
+      });
+    }
+  }
+
+  private updateAudioReactiveValues(dt: number): void {
+    const { frequency, volume } = this.currentSoundData;
+    
+    const targetRadius = 30 + volume * 150;
+    this.auraRadius += (targetRadius - this.auraRadius) * Math.min(1, dt * 8);
+    
+    const targetAlpha = 0.1 + volume * 0.5;
+    this.auraAlpha += (targetAlpha - this.auraAlpha) * Math.min(1, dt * 6);
+    
+    const freqNorm = Math.min(1, Math.max(0, (frequency - 80) / 800));
+    const r = Math.floor(102 + freqNorm * 55);
+    const g = Math.floor(252 - freqNorm * 100);
+    const b = Math.floor(241 - freqNorm * 50);
+    const targetColor = `rgb(${r}, ${g}, ${b})`;
+    
+    this.auraColor = targetColor;
+  }
+
+  private updateAndDrawParticles(dt: number): void {
+    const { volume, frequency } = this.currentSoundData;
+    const audioInfluence = volume * 0.7 + (frequency > 100 ? 0.3 : 0);
+    
+    for (let i = 0; i < this.particles.length; i++) {
+      const p = this.particles[i];
+      
+      const speedMultiplier = 1 + audioInfluence * 3;
+      const sizeMultiplier = 1 + audioInfluence * 2;
+      
+      p.x += p.vx * dt * speedMultiplier;
+      p.y += p.vy * dt * speedMultiplier;
+      
+      p.vy += 5 * dt * (1 + audioInfluence);
+      
+      p.life += dt * 60;
+      if (p.life >= p.maxLife) {
+        p.x = Math.random() * GAME_WIDTH;
+        p.y = -10;
+        p.vx = (Math.random() - 0.5) * 30;
+        p.vy = (Math.random() * 20 + 10);
+        p.life = 0;
+        p.maxLife = 150 + Math.random() * 150;
+        p.alpha = 0.3 + Math.random() * 0.4;
+      }
+      
+      if (p.x < 0) { p.x = GAME_WIDTH; }
+      if (p.x > GAME_WIDTH) { p.x = 0; }
+      if (p.y > GAME_HEIGHT + 20) {
+        p.y = -10;
+        p.x = Math.random() * GAME_WIDTH;
+      }
+      
+      p.size = p.baseSize * sizeMultiplier;
+      
+      const lifeFade = p.life < p.maxLife * 0.2 
+        ? p.life / (p.maxLife * 0.2) 
+        : p.life > p.maxLife * 0.8 
+          ? 1 - (p.life - p.maxLife * 0.8) / (p.maxLife * 0.2)
+          : 1;
+      
+      this.ctx.globalAlpha = p.alpha * lifeFade * 0.8;
+      this.ctx.fillStyle = p.color;
+      this.ctx.shadowColor = p.color;
+      this.ctx.shadowBlur = p.size * 2;
+      this.ctx.beginPath();
+      this.ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+      this.ctx.fill();
+      this.ctx.shadowBlur = 0;
+    }
+    
+    this.ctx.globalAlpha = 1;
+  }
+
+  private drawPlayerAura(state: GameState): void {
+    const player = state.player;
+    const centerX = player.x + player.width / 2;
+    const centerY = player.y + player.height / 2;
+    
+    if (this.auraAlpha > 0.05 && this.auraRadius > 5) {
+      const gradient = this.ctx.createRadialGradient(
+        centerX, centerY, 0,
+        centerX, centerY, this.auraRadius
+      );
+      gradient.addColorStop(0, this.auraColor);
+      gradient.addColorStop(0.6, this.hexToRgba(this.auraColor, this.auraAlpha * 0.3));
+      gradient.addColorStop(1, this.hexToRgba(this.auraColor, 0));
+      
+      this.ctx.globalAlpha = this.auraAlpha;
+      this.ctx.fillStyle = gradient;
+      this.ctx.beginPath();
+      this.ctx.arc(centerX, centerY, this.auraRadius, 0, Math.PI * 2);
+      this.ctx.fill();
+      this.ctx.globalAlpha = 1;
+      
+      const ringCount = 3;
+      for (let i = 0; i < ringCount; i++) {
+        const ringPhase = (this.audioReactiveTime * 1.5 + i * 0.33) % 1;
+        const ringRadius = this.auraRadius * (0.3 + ringPhase * 0.7);
+        const ringAlpha = this.auraAlpha * (1 - ringPhase) * 0.6;
+        
+        this.ctx.globalAlpha = ringAlpha;
+        this.ctx.strokeStyle = this.auraColor;
+        this.ctx.lineWidth = 2 * (1 - ringPhase);
+        this.ctx.beginPath();
+        this.ctx.arc(centerX, centerY, ringRadius, 0, Math.PI * 2);
+        this.ctx.stroke();
+      }
+      this.ctx.globalAlpha = 1;
+    }
+  }
+
+  private hexToRgba(hex: string, alpha: number): string {
+    if (hex.startsWith('rgb')) {
+      return hex.replace('rgb', 'rgba').replace(')', `, ${alpha})`);
+    }
+    const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+    return result
+      ? `rgba(${parseInt(result[1], 16)}, ${parseInt(result[2], 16)}, ${parseInt(result[3], 16)}, ${alpha})`
+      : `rgba(102, 252, 241, ${alpha})`;
   }
 
   private drawCalibrationScreen(): void {
@@ -209,7 +360,6 @@ export class Renderer {
   private drawPlatform(platform: SoundPlatform): void {
     const pulse = platform.activationPulse;
     const glowSize = 10 + pulse * 30;
-    const glowAlpha = 0.3 + pulse * 0.5;
 
     if (platform.isActivated || pulse > 0) {
       this.ctx.shadowColor = '#66FCF1';
@@ -518,16 +668,13 @@ export class Renderer {
     const { frequency, volume } = this.currentSoundData;
     const level = state.level;
 
-    let inAnyRange = false;
     let platformMatch = false;
     let doorMatch = false;
-    let blockMatch = false;
 
     if (level) {
       for (const p of level.platforms) {
         if (frequency >= p.activeFrequencyRange[0] && frequency <= p.activeFrequencyRange[1]) {
           platformMatch = true;
-          inAnyRange = true;
           break;
         }
       }
@@ -536,7 +683,6 @@ export class Renderer {
         if (frequency >= d.requiredFrequencyRange[0] && frequency <= d.requiredFrequencyRange[1]
             && volume >= d.requiredVolume) {
           doorMatch = true;
-          inAnyRange = true;
           break;
         }
       }
@@ -604,7 +750,6 @@ export class Renderer {
     this.ctx.fillText(`${Math.round(volume * 100)}%`, volBarX + volBarWidth / 2, volBarY + 12);
 
     if (level && level.platforms.length > 0) {
-      const rangeY = indicatorY + height - 8;
       this.ctx.font = '10px "Segoe UI", sans-serif';
       this.ctx.textAlign = 'left';
 

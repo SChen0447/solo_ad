@@ -38,8 +38,8 @@ export class SoundEngine {
         }
       });
 
-      this.microphone = this.audioContext.createMediaStreamSource(this.stream);
-      this.analyser = this.audioContext.createAnalyser();
+      this.microphone = this.audioContext!.createMediaStreamSource(this.stream!);
+      this.analyser = this.audioContext!.createAnalyser();
       this.analyser.fftSize = 2048;
       this.analyser.smoothingTimeConstant = 0.1;
       

@@ -87,6 +87,19 @@ export interface Rect {
   height: number;
 }
 
+export interface Particle {
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  baseSize: number;
+  size: number;
+  alpha: number;
+  color: string;
+  life: number;
+  maxLife: number;
+}
+
 export const GAME_WIDTH = 1280;
 export const GAME_HEIGHT = 720;
 export const GRAVITY = 500;

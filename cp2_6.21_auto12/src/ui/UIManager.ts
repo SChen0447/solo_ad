@@ -1,12 +1,15 @@
 import { eventBus } from '../EventBus';
 import { getTotalLevels } from '../game/levelData';
-import type { GameScreen, GameState } from '../types';
+import type { GameScreen, GameState, SoundData } from '../types';
 
 export class UIManager {
   private container: HTMLElement;
   private screens: Map<GameScreen, HTMLElement> = new Map();
   private unlockedLevels: number[] = [1];
   private currentScreen: GameScreen = 'start';
+  private hudContainer: HTMLElement | null = null;
+  private volumeBarFill: HTMLElement | null = null;
+  private volumeText: HTMLElement | null = null;
 
   constructor(container: HTMLElement) {
     this.container = container;
@@ -14,6 +17,7 @@ export class UIManager {
     this.createStartScreen();
     this.createLevelSelectScreen();
     this.createCompleteScreen();
+    this.createHUD();
 
     this.setupEventListeners();
     this.showScreen('start');
@@ -46,17 +50,27 @@ export class UIManager {
 
       if (state.currentScreen === 'calibration') {
         this.hideAllScreens();
+        this.hideHUD();
+      } else if (state.currentScreen === 'playing') {
+        this.hideAllScreens();
+        this.showHUD();
       } else {
         this.showScreen(state.currentScreen);
+        this.hideHUD();
       }
     });
 
     eventBus.on('game:levelComplete', () => {
       this.showScreen('complete');
+      this.hideHUD();
     });
 
     eventBus.on('sound:calibrationComplete', () => {
       eventBus.emit('ui:showScreen', 'levelSelect');
+    });
+
+    eventBus.on('sound:data', (data: SoundData) => {
+      this.updateHUDVolume(data.volume);
     });
   }
 
@@ -353,6 +367,97 @@ export class UIManager {
         ));
         const hasNext = this.unlockedLevels.includes(currentLevel + 1);
         nextBtn.style.display = hasNext ? 'block' : 'none';
+      }
+    }
+  }
+
+  private createHUD(): void {
+    this.hudContainer = document.createElement('div');
+    this.hudContainer.id = 'hud-container';
+    this.hudContainer.style.cssText = `
+      position: fixed;
+      left: 20px;
+      bottom: 20px;
+      z-index: 50;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.3s ease;
+    `;
+
+    const volumeLabel = document.createElement('div');
+    volumeLabel.textContent = '音量';
+    volumeLabel.style.cssText = `
+      color: #C5C6C7;
+      font-size: 12px;
+      font-weight: bold;
+      margin-bottom: 6px;
+      text-shadow: 0 0 10px rgba(102, 252, 241, 0.5);
+    `;
+
+    const volumeBarContainer = document.createElement('div');
+    volumeBarContainer.style.cssText = `
+      width: 180px;
+      height: 14px;
+      background: rgba(31, 40, 51, 0.7);
+      border-radius: 7px;
+      overflow: hidden;
+      border: 1px solid rgba(102, 252, 241, 0.3);
+      backdrop-filter: blur(4px);
+    `;
+
+    this.volumeBarFill = document.createElement('div');
+    this.volumeBarFill.style.cssText = `
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, #45A29E 0%, #66FCF1 50%, #FFD700 80%, #FF6B6B 100%);
+      border-radius: 7px;
+      transition: width 0.05s ease-out;
+      box-shadow: 0 0 10px rgba(102, 252, 241, 0.5);
+    `;
+
+    this.volumeText = document.createElement('div');
+    this.volumeText.style.cssText = `
+      color: #FFFFFF;
+      font-size: 11px;
+      font-weight: bold;
+      margin-top: 4px;
+      text-align: center;
+      text-shadow: 0 0 8px rgba(102, 252, 241, 0.6);
+    `;
+
+    volumeBarContainer.appendChild(this.volumeBarFill);
+    this.hudContainer.appendChild(volumeLabel);
+    this.hudContainer.appendChild(volumeBarContainer);
+    this.hudContainer.appendChild(this.volumeText);
+
+    this.container.appendChild(this.hudContainer);
+  }
+
+  private showHUD(): void {
+    if (this.hudContainer) {
+      this.hudContainer.style.opacity = '1';
+    }
+  }
+
+  private hideHUD(): void {
+    if (this.hudContainer) {
+      this.hudContainer.style.opacity = '0';
+    }
+  }
+
+  private updateHUDVolume(volume: number): void {
+    if (this.volumeBarFill && this.volumeText) {
+      const clampedVolume = Math.max(0, Math.min(1, volume));
+      const percentage = Math.round(clampedVolume * 100);
+      this.volumeBarFill.style.width = `${percentage}%`;
+      this.volumeText.textContent = `${percentage}%`;
+      
+      if (percentage > 70) {
+        this.volumeBarFill.style.boxShadow = '0 0 15px rgba(255, 107, 107, 0.8)';
+      } else if (percentage > 40) {
+        this.volumeBarFill.style.boxShadow = '0 0 12px rgba(255, 215, 0, 0.6)';
+      } else {
+        this.volumeBarFill.style.boxShadow = '0 0 10px rgba(102, 252, 241, 0.5)';
       }
     }
   }

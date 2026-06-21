@@ -66,7 +66,7 @@ class Game {
   private gameLoop(currentTime: number): void {
     if (!this.isRunning) return;
 
-    const dt = Math.min((currentTime - this.lastTime) / 1000;
+    const dt = Math.min((currentTime - this.lastTime) / 1000, 0.05);
     this.lastTime = currentTime;
 
     const fixedDt = 1 / 60;

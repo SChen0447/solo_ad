@@ -25,7 +25,6 @@ export class GameEngine {
   private state: GameState;
   private currentSoundData: SoundData;
   private keys: Set<string> = new Set();
-  private lastSoundData: SoundData | null = null;
 
   constructor() {
     this.state = {
@@ -171,6 +170,18 @@ export class GameEngine {
       this.state.transitionAlpha += dt * transitionSpeed;
       if (this.state.transitionAlpha >= 1) {
         this.state.transitionAlpha = 1;
+
+        if (!this._hasShownCompleteScreen && this.state.currentScreen === 'playing') {
+          this._levelCompleteTimer += dt;
+          if (this._levelCompleteTimer >= 0.5) {
+            this._hasShownCompleteScreen = true;
+            this.state.currentScreen = 'complete';
+            eventBus.emit('game:levelComplete', this.state.currentLevel);
+            eventBus.emit('game:stateChange', this.state);
+          }
+        }
+      } else {
+        this._levelCompleteTimer = 0;
       }
     }
 
