@@ -1,0 +1,80 @@
+[
+  {
+    "id": "living",
+    "name": "客厅",
+    "polygon": [
+      [0, 0],
+      [6, 0],
+      [6, 4],
+      [0, 4]
+    ],
+    "area": 24.0,
+    "adjacentRooms": ["master", "second", "kitchen", "bathroom"],
+    "doorPosition": [3, 4]
+  },
+  {
+    "id": "master",
+    "name": "主卧",
+    "polygon": [
+      [0, 4],
+      [5, 4],
+      [5, 8],
+      [0, 8]
+    ],
+    "area": 20.0,
+    "adjacentRooms": ["living", "balcony"],
+    "doorPosition": [2.5, 4]
+  },
+  {
+    "id": "second",
+    "name": "次卧",
+    "polygon": [
+      [5, 4],
+      [9, 4],
+      [9, 8],
+      [5, 8]
+    ],
+    "area": 16.0,
+    "adjacentRooms": ["living"],
+    "doorPosition": [7, 4]
+  },
+  {
+    "id": "kitchen",
+    "name": "厨房",
+    "polygon": [
+      [6, 0],
+      [9, 0],
+      [9, 2],
+      [6, 2]
+    ],
+    "area": 6.0,
+    "adjacentRooms": ["living"],
+    "doorPosition": [6, 1]
+  },
+  {
+    "id": "bathroom",
+    "name": "卫生间",
+    "polygon": [
+      [6, 2],
+      [9, 2],
+      [9, 4],
+      [6, 4]
+    ],
+    "area": 6.0,
+    "adjacentRooms": ["living"],
+    "doorPosition": [6, 3]
+  },
+  {
+    "id": "balcony",
+    "name": "阳台",
+    "polygon": [
+      [0, 8],
+      [5, 8],
+      [5, 10],
+      [0, 10]
+    ],
+    "area": 10.0,
+    "adjacentRooms": ["master"],
+    "doorPosition": [2.5, 8]
+  }
+]
