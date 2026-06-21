@@ -252,6 +252,39 @@ export class AudioAnalyzer {
     return this.audioContext
   }
 
+  getWaveformInTimeRange(centerTime: number, rangeSeconds: number, samples: number = 200): number[] {
+    if (!this.audioBuffer) return []
+    try {
+      const channelData = this.audioBuffer.getChannelData(0)
+      if (!channelData || channelData.length === 0) return []
+      const sampleRate = this.audioBuffer.sampleRate
+      const halfRange = rangeSeconds / 2
+      const startSample = Math.max(0, Math.floor((centerTime - halfRange) * sampleRate))
+      const endSample = Math.min(channelData.length, Math.floor((centerTime + halfRange) * sampleRate))
+      if (endSample <= startSample) return []
+      const blockSize = Math.max(1, Math.floor((endSample - startSample) / samples))
+      const waveform: number[] = []
+      const len = Math.min(samples, Math.floor((endSample - startSample) / blockSize))
+      for (let i = 0; i < len; i++) {
+        const start = startSample + i * blockSize
+        let sum = 0
+        let count = 0
+        for (let j = 0; j < blockSize && start + j < endSample; j++) {
+          const val = channelData[start + j]
+          if (isFinite(val)) {
+            sum += Math.abs(val)
+            count++
+          }
+        }
+        waveform.push(count > 0 ? sum / count : 0)
+      }
+      return waveform
+    } catch (e) {
+      console.error('获取时间范围波形数据失败:', e)
+      return []
+    }
+  }
+
   cleanup() {
     this.stop()
     this.stopAnimation()

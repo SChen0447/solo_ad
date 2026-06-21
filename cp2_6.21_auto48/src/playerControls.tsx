@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef, useCallback } from 'react'
 
 interface PlayerControlsProps {
   isPlaying: boolean
@@ -8,6 +8,7 @@ interface PlayerControlsProps {
   onPlayPause: () => void
   onSeek: (time: number) => void
   onRateChange: (rate: number) => void
+  getWaveformInRange?: (centerTime: number, rangeSeconds: number, samples: number) => number[]
 }
 
 const formatTime = (seconds: number): string => {
@@ -25,15 +26,131 @@ const PlayerControls: React.FC<PlayerControlsProps> = ({
   onPlayPause,
   onSeek,
   onRateChange,
+  getWaveformInRange,
 }) => {
   const [hoverTime, setHoverTime] = useState<number | null>(null)
   const [hoverX, setHoverX] = useState(0)
   const [isDragging, setIsDragging] = useState(false)
   const [showRateTooltip, setShowRateTooltip] = useState(false)
+  const [isRateDragging, setIsRateDragging] = useState(false)
+  const [rateDisplay, setRateDisplay] = useState(playbackRate)
+  const [shiftPressed, setShiftPressed] = useState(false)
+  const [previewWaveform, setPreviewWaveform] = useState<number[]>([])
+  const [showPreview, setShowPreview] = useState(false)
+  const [previewX, setPreviewX] = useState(0)
+  const [previewCenterTime, setPreviewCenterTime] = useState(0)
+
   const progressRef = useRef<HTMLDivElement>(null)
   const rateSliderRef = useRef<HTMLInputElement>(null)
+  const previewCanvasRef = useRef<HTMLCanvasElement>(null)
+  const lastWaveformFetchRef = useRef(0)
 
   const progress = duration > 0 ? (currentTime / duration) * 100 : 0
+
+  useEffect(() => {
+    setRateDisplay(playbackRate)
+  }, [playbackRate])
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Shift') {
+        setShiftPressed(true)
+      }
+    }
+    const handleKeyUp = (e: KeyboardEvent) => {
+      if (e.key === 'Shift') {
+        setShiftPressed(false)
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    window.addEventListener('keyup', handleKeyUp)
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown)
+      window.removeEventListener('keyup', handleKeyUp)
+    }
+  }, [])
+
+  const renderPreviewWaveform = useCallback((waveformData: number[], centerTime: number) => {
+    const canvas = previewCanvasRef.current
+    if (!canvas || waveformData.length === 0) return
+    const dpr = window.devicePixelRatio || 1
+    const cssWidth = 180
+    const cssHeight = 40
+    canvas.width = cssWidth * dpr
+    canvas.height = cssHeight * dpr
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+    ctx.clearRect(0, 0, cssWidth, cssHeight)
+    ctx.fillStyle = 'rgba(37, 37, 64, 0.95)'
+    ctx.beginPath()
+    const r = 8
+    ctx.moveTo(r, 0)
+    ctx.lineTo(cssWidth - r, 0)
+    ctx.quadraticCurveTo(cssWidth, 0, cssWidth, r)
+    ctx.lineTo(cssWidth, cssHeight - r)
+    ctx.quadraticCurveTo(cssWidth, cssHeight, cssWidth - r, cssHeight)
+    ctx.lineTo(r, cssHeight)
+    ctx.quadraticCurveTo(0, cssHeight, 0, cssHeight - r)
+    ctx.lineTo(0, r)
+    ctx.quadraticCurveTo(0, 0, r, 0)
+    ctx.closePath()
+    ctx.fill()
+    const padding = 6
+    const w = cssWidth - padding * 2
+    const h = cssHeight - padding * 2
+    const midY = cssHeight / 2
+    const step = w / waveformData.length
+    const len = waveformData.length
+    const centerIndex = Math.floor(len / 2)
+    for (let i = 0; i < len - 1; i++) {
+      const x1 = padding + i * step
+      const x2 = padding + (i + 1) * step
+      const amp1 = Math.min(1, waveformData[i] * 3)
+      const amp2 = Math.min(1, waveformData[i + 1] * 3)
+      const h1 = amp1 * (h / 2)
+      const h2 = amp2 * (h / 2)
+      const t = Math.abs(i - centerIndex) / centerIndex
+      const alpha = 1 - t * 0.5
+      const colorT = i / len
+      let r1: number, g1: number, b1: number
+      if (colorT < 0.5) {
+        const lt = colorT * 2
+        r1 = Math.round(108 + (255 - 108) * lt)
+        g1 = Math.round(99 + (101 - 99) * lt)
+        b1 = Math.round(255 + (132 - 255) * lt)
+      } else {
+        const lt = (colorT - 0.5) * 2
+        r1 = Math.round(255 + (255 - 255) * lt)
+        g1 = Math.round(101 + (209 - 101) * lt)
+        b1 = Math.round(132 + (102 - 132) * lt)
+      }
+      ctx.strokeStyle = `rgba(${r1}, ${g1}, ${b1}, ${alpha})`
+      ctx.lineWidth = 1.5
+      ctx.beginPath()
+      ctx.moveTo(x1, midY - h1)
+      ctx.lineTo(x2, midY - h2)
+      ctx.stroke()
+      ctx.beginPath()
+      ctx.moveTo(x1, midY + h1)
+      ctx.lineTo(x2, midY + h2)
+      ctx.stroke()
+    }
+    ctx.strokeStyle = 'rgba(255, 209, 102, 0.9)'
+    ctx.lineWidth = 1.5
+    ctx.setLineDash([3, 2])
+    ctx.beginPath()
+    ctx.moveTo(cssWidth / 2, padding)
+    ctx.lineTo(cssWidth / 2, cssHeight - padding)
+    ctx.stroke()
+    ctx.setLineDash([])
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.9)'
+    ctx.font = '10px -apple-system, sans-serif'
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'top'
+    ctx.fontVariantNumeric = 'tabular-nums'
+    ctx.fillText(formatTime(centerTime), cssWidth / 2, 4)
+  }, [])
 
   const getTimeFromX = (clientX: number): number => {
     if (!progressRef.current || duration <= 0) return 0
@@ -47,11 +164,32 @@ const PlayerControls: React.FC<PlayerControlsProps> = ({
     onSeek(time)
   }
 
+  const updatePreviewWaveform = useCallback((time: number, x: number) => {
+    const now = performance.now()
+    if (now - lastWaveformFetchRef.current < 50) return
+    lastWaveformFetchRef.current = now
+    if (getWaveformInRange) {
+      const data = getWaveformInRange(time, 2, 120)
+      setPreviewWaveform(data)
+      setPreviewCenterTime(time)
+    }
+    setPreviewX(x)
+  }, [getWaveformInRange])
+
+  useEffect(() => {
+    if (previewWaveform.length > 0 && showPreview) {
+      renderPreviewWaveform(previewWaveform, previewCenterTime)
+    }
+  }, [previewWaveform, showPreview, previewCenterTime, renderPreviewWaveform])
+
   const handleProgressMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
     const time = getTimeFromX(e.clientX)
     const rect = progressRef.current!.getBoundingClientRect()
+    const localX = e.clientX - rect.left
     setHoverTime(time)
-    setHoverX(e.clientX - rect.left)
+    setHoverX(localX)
+    setShowPreview(true)
+    updatePreviewWaveform(time, localX)
     if (isDragging) {
       onSeek(time)
     }
@@ -62,8 +200,11 @@ const PlayerControls: React.FC<PlayerControlsProps> = ({
     setIsDragging(true)
     const time = getTimeFromX(e.clientX)
     const rect = progressRef.current!.getBoundingClientRect()
+    const localX = e.clientX - rect.left
     setHoverTime(time)
-    setHoverX(e.clientX - rect.left)
+    setHoverX(localX)
+    setShowPreview(true)
+    updatePreviewWaveform(time, localX)
     onSeek(time)
   }
 
@@ -74,10 +215,14 @@ const PlayerControls: React.FC<PlayerControlsProps> = ({
     const handleMouseMove = (e: MouseEvent) => {
       if (isDragging && progressRef.current) {
         const rect = progressRef.current.getBoundingClientRect()
-        if (e.clientX >= rect.left && e.clientX <= rect.right) {
-          const time = getTimeFromX(e.clientX)
+        if (e.clientX >= rect.left - 10 && e.clientX <= rect.right + 10) {
+          const clampedX = Math.max(rect.left, Math.min(rect.right, e.clientX))
+          const time = getTimeFromX(clampedX)
+          const localX = clampedX - rect.left
           setHoverTime(time)
-          setHoverX(e.clientX - rect.left)
+          setHoverX(localX)
+          setShowPreview(true)
+          updatePreviewWaveform(time, localX)
           onSeek(time)
         }
       }
@@ -90,7 +235,54 @@ const PlayerControls: React.FC<PlayerControlsProps> = ({
       document.removeEventListener('mouseup', handleMouseUp)
       document.removeEventListener('mousemove', handleMouseMove)
     }
-  }, [isDragging])
+  }, [isDragging, updatePreviewWaveform])
+
+  const handleRateMouseDown = () => {
+    setIsRateDragging(true)
+  }
+
+  const handleRateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const rawValue = parseFloat(e.target.value)
+    if (!isFinite(rawValue)) return
+    if (shiftPressed) {
+      const fineStep = 0.01
+      const rounded = Math.round(rawValue / fineStep) * fineStep
+      const clamped = Math.max(0.5, Math.min(2.0, rounded))
+      setRateDisplay(clamped)
+      onRateChange(parseFloat(clamped.toFixed(2)))
+    } else {
+      setRateDisplay(rawValue)
+      onRateChange(rawValue)
+    }
+  }
+
+  const handleRateMouseUp = () => {
+    setIsRateDragging(false)
+  }
+
+  useEffect(() => {
+    if (isRateDragging) {
+      document.addEventListener('mouseup', handleRateMouseUp)
+    }
+    return () => {
+      document.removeEventListener('mouseup', handleRateMouseUp)
+    }
+  }, [isRateDragging])
+
+  const formatRate = (rate: number): string => {
+    return shiftPressed || rateDisplay !== playbackRate ? rateDisplay.toFixed(2) : rate.toFixed(1)
+  }
+
+  const progressPercent = Math.max(0, Math.min(100, progress))
+  const handleCssX = progressRef.current
+    ? (progressPercent / 100) * progressRef.current.getBoundingClientRect().width
+    : 0
+
+  let previewCanvasLeft = previewX - 90
+  if (progressRef.current) {
+    const rect = progressRef.current.getBoundingClientRect()
+    previewCanvasLeft = Math.max(0, Math.min(rect.width - 180, previewX - 90))
+  }
 
   return (
     <div style={styles.container}>
@@ -127,25 +319,37 @@ const PlayerControls: React.FC<PlayerControlsProps> = ({
         onClick={handleProgressClick}
         onMouseMove={handleProgressMouseMove}
         onMouseDown={handleProgressMouseDown}
-        onMouseEnter={() => setHoverTime(null)}
         onMouseLeave={() => {
-          setHoverTime(null)
-          if (!isDragging) setIsDragging(false)
+          if (!isDragging) {
+            setHoverTime(null)
+            setShowPreview(false)
+          }
         }}
       >
+        {showPreview && previewWaveform.length > 0 && (
+          <canvas
+            ref={previewCanvasRef}
+            style={{
+              ...styles.previewCanvas,
+              left: previewCanvasLeft,
+              opacity: 1,
+            }}
+          />
+        )}
         <div style={styles.progressTrack}>
           <div
             style={{
               ...styles.progressFill,
-              width: `${progress}%`,
+              width: `${progressPercent}%`,
               background: 'linear-gradient(90deg, #6C63FF 0%, #FF6584 100%)',
             }}
           />
         </div>
         <div
+          className={isDragging ? 'progress-handle-pulsing' : ''}
           style={{
             ...styles.progressHandle,
-            left: `${progress}%`,
+            left: `${progressPercent}%`,
             transform: `translate(-50%, -50%) scale(${isDragging ? 1.2 : 1})`,
           }}
         />
@@ -173,25 +377,30 @@ const PlayerControls: React.FC<PlayerControlsProps> = ({
             type="range"
             min="0.5"
             max="2.0"
-            step="0.1"
-            value={playbackRate}
-            onChange={(e) => onRateChange(parseFloat(e.target.value))}
+            step={shiftPressed ? '0.01' : '0.1'}
+            value={rateDisplay}
+            onChange={handleRateChange}
+            onMouseDown={handleRateMouseDown}
             onMouseEnter={() => setShowRateTooltip(true)}
-            onMouseLeave={() => setShowRateTooltip(false)}
+            onMouseLeave={() => {
+              if (!isRateDragging) setShowRateTooltip(false)
+              setRateDisplay(playbackRate)
+            }}
             style={styles.rateSlider}
           />
           <div
             style={{
               ...styles.rateTooltip,
-              left: `${((playbackRate - 0.5) / 1.5) * 100}%`,
-              opacity: showRateTooltip ? 1 : 0,
+              left: `${((rateDisplay - 0.5) / 1.5) * 100}%`,
+              opacity: showRateTooltip || isRateDragging ? 1 : 0,
               transform: `translate(-50%, -120%)`,
             }}
           >
-            {playbackRate.toFixed(1)}x
+            {formatRate(rateDisplay)}
+            {shiftPressed && <span style={styles.rateShiftHint}> (精细)</span>}
           </div>
         </div>
-        <span style={styles.rateValue}>{playbackRate.toFixed(1)}x</span>
+        <span style={styles.rateValue}>{formatRate(playbackRate)}x</span>
       </div>
     </div>
   )
@@ -233,6 +442,17 @@ const styles: Record<string, React.CSSProperties> = {
     cursor: 'pointer',
     display: 'flex',
     alignItems: 'center',
+  },
+  previewCanvas: {
+    position: 'absolute',
+    bottom: 40,
+    width: 180,
+    height: 40,
+    borderRadius: 8,
+    pointerEvents: 'none',
+    transition: 'opacity 0.15s ease-out',
+    zIndex: 20,
+    boxShadow: '0 4px 16px rgba(0, 0, 0, 0.3)',
   },
   progressTrack: {
     width: '100%',
@@ -306,6 +526,13 @@ const styles: Record<string, React.CSSProperties> = {
     transition: 'opacity 0.2s ease-out, transform 0.2s ease-out',
     fontVariantNumeric: 'tabular-nums',
     zIndex: 10,
+    display: 'flex',
+    alignItems: 'center',
+  },
+  rateShiftHint: {
+    color: '#FFD166',
+    fontSize: 10,
+    marginLeft: 4,
   },
   rateValue: {
     color: '#FFFFFF',

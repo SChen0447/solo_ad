@@ -391,6 +391,10 @@ const App: React.FC = () => {
                 onPlayPause={handlePlayPause}
                 onSeek={handleSeek}
                 onRateChange={handleRateChange}
+                getWaveformInRange={(centerTime, rangeSeconds, samples) => {
+                  if (!audioAnalyzerRef.current) return []
+                  return audioAnalyzerRef.current.getWaveformInTimeRange(centerTime, rangeSeconds, samples)
+                }}
               />
             </div>
           )}
