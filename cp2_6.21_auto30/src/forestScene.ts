@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { TreeGenerator, TreeParams, TreeRuleType, TreeData } from './treeGenerator';
+import { TreeGenerator, TreeParams, TreeRuleType, TreeData, FoliagePulseData } from './treeGenerator';
 
 export interface TreeInstance {
   id: number;
@@ -11,6 +11,7 @@ export interface TreeInstance {
   swayAmplitude: number;
   group: THREE.Group;
   foliageParticles: THREE.Points;
+  foliagePulseData: FoliagePulseData;
 }
 
 export interface ForestConfig {
@@ -50,7 +51,7 @@ export class ForestScene {
   private directionalLight!: THREE.DirectionalLight;
   private sunPosition: THREE.Vector3 = new THREE.Vector3(50, 30, 20);
 
-  private onSpeedChangeCallback?: (speedRatio: number) => void;
+  private onSpeedChangeCallback?: (speedRatio: number, moveDirection: THREE.Vector2) => void;
   private onTreeCountChangeCallback?: (count: number) => void;
 
   private currentParams: TreeParams;
@@ -222,7 +223,8 @@ export class ForestScene {
         swayFrequency,
         swayAmplitude,
         group: treeData.group,
-        foliageParticles: treeData.foliageParticles
+        foliageParticles: treeData.foliageParticles,
+        foliagePulseData: treeData.foliagePulseData
       };
 
       this.trees.push(treeInstance);
@@ -277,17 +279,34 @@ export class ForestScene {
         const newScale = this.trees[i].scale * (0.01 + eased * 0.99);
         newGroup.scale.setScalar(newScale);
 
+        newGroup.traverse((child) => {
+          const mesh = child as THREE.Mesh;
+          const points = child as THREE.Points;
+          if (mesh.material) {
+            const mat = mesh.material as THREE.Material;
+            mat.opacity = eased;
+            mat.transparent = true;
+          }
+          if (points.material) {
+            const mat = points.material as THREE.Material;
+            mat.opacity = eased * 0.9;
+            mat.transparent = true;
+          }
+        });
+
         const oldScale = this.trees[i].scale * (1 - eased * 0.99);
         oldGroup.scale.setScalar(oldScale);
         oldGroup.traverse((child) => {
-          if ((child as THREE.Mesh).material) {
-            const mat = (child as THREE.Mesh).material as THREE.Material;
+          const mesh = child as THREE.Mesh;
+          const points = child as THREE.Points;
+          if (mesh.material) {
+            const mat = mesh.material as THREE.Material;
             mat.opacity = 1 - eased;
             mat.transparent = true;
           }
-          if ((child as THREE.Points).material) {
-            const mat = (child as THREE.Points).material as THREE.PointsMaterial;
-            mat.opacity = 1 - eased;
+          if (points.material) {
+            const mat = points.material as THREE.Material;
+            mat.opacity = (1 - eased) * 0.9;
             mat.transparent = true;
           }
         });
@@ -317,6 +336,7 @@ export class ForestScene {
   public update(deltaTime: number, time: number): void {
     this.updateCamera(deltaTime, time);
     this.updateTreeSway(time);
+    this.updateFoliagePulse(time);
   }
 
   private updateCamera(deltaTime: number, time: number): void {
@@ -373,7 +393,13 @@ export class ForestScene {
 
     if (this.onSpeedChangeCallback) {
       const speedRatio = isMoving ? (this.cameraState.speed - 0.5) / 2.5 : 0;
-      this.onSpeedChangeCallback(speedRatio);
+      const moveDir = new THREE.Vector2();
+      if (this.keys['KeyW']) moveDir.y += 1;
+      if (this.keys['KeyS']) moveDir.y -= 1;
+      if (this.keys['KeyA']) moveDir.x -= 1;
+      if (this.keys['KeyD']) moveDir.x += 1;
+      if (moveDir.length() > 0) moveDir.normalize();
+      this.onSpeedChangeCallback(speedRatio, moveDir);
     }
   }
 
@@ -384,6 +410,15 @@ export class ForestScene {
 
       tree.group.rotation.x = sway;
       tree.group.rotation.z = swaySide;
+    }
+  }
+
+  private updateFoliagePulse(time: number): void {
+    for (const tree of this.trees) {
+      const material = tree.foliageParticles.material as THREE.ShaderMaterial;
+      if (material.uniforms && material.uniforms.uTime) {
+        material.uniforms.uTime.value = time;
+      }
     }
   }
 
@@ -414,7 +449,7 @@ export class ForestScene {
     return this.trees;
   }
 
-  public onSpeedChange(callback: (speedRatio: number) => void): void {
+  public onSpeedChange(callback: (speedRatio: number, moveDirection: THREE.Vector2) => void): void {
     this.onSpeedChangeCallback = callback;
   }
 

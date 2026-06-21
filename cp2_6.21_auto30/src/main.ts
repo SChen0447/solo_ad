@@ -133,8 +133,8 @@ class FractalForestApp {
 
     this.animationController = new AnimationController(this.forestScene);
 
-    this.forestScene.onSpeedChange((speedRatio) => {
-      this.updateVignette(speedRatio);
+    this.forestScene.onSpeedChange((speedRatio, moveDirection) => {
+      this.updateVignette(speedRatio, moveDirection);
     });
 
     this.forestScene.onTreeCountChange((count) => {
@@ -144,10 +144,25 @@ class FractalForestApp {
     this.treeCountEl.textContent = this.forestScene.getTreeCount().toString();
   }
 
-  private updateVignette(speedRatio: number): void {
+  private updateVignette(speedRatio: number, moveDirection: THREE.Vector2): void {
     const opacity = 0.1 + speedRatio * 0.3;
     const pixelRadius = 150 * (1 - speedRatio * 0.5);
-    this.vignetteEl.style.boxShadow = `inset 0 0 ${pixelRadius}px rgba(0,0,0,${opacity})`;
+
+    const offsetX = -moveDirection.x * speedRatio * 15;
+    const offsetY = -moveDirection.y * speedRatio * 15;
+
+    const centerX = `calc(50% + ${offsetX}%)`;
+    const centerY = `calc(50% + ${offsetY}%)`;
+
+    const innerOpacity = opacity * 0.3;
+    const outerOpacity = opacity;
+
+    this.vignetteEl.style.background = `radial-gradient(circle at ${centerX} ${centerY}, 
+      rgba(0,0,0,${innerOpacity}) 0%, 
+      rgba(0,0,0,${innerOpacity}) ${30 + speedRatio * 10}%, 
+      rgba(0,0,0,${outerOpacity * 0.5}) ${60 - speedRatio * 10}%, 
+      rgba(0,0,0,${outerOpacity}) 100%)`;
+    this.vignetteEl.style.boxShadow = `inset 0 0 ${pixelRadius}px rgba(0,0,0,${opacity * 0.5})`;
   }
 
   private onResize(): void {

@@ -14,6 +14,13 @@ export interface TreeData {
   branchSegments: THREE.LineSegments[];
   foliageParticles: THREE.Points;
   params: TreeParams;
+  foliagePulseData: FoliagePulseData;
+}
+
+export interface FoliagePulseData {
+  baseSizes: Float32Array;
+  frequencies: Float32Array;
+  offsets: Float32Array;
 }
 
 export interface BranchSegment {
@@ -61,9 +68,14 @@ export class TreeGenerator {
     }
 
     const trunkGeometry = this.createTrunkGeometry(segments);
-    const trunkMaterial = new THREE.MeshLambertMaterial({
+    const barkTextures = this.createBarkTextures(seed);
+    const trunkMaterial = new THREE.MeshStandardMaterial({
       color: TRUNK_COLOR,
-      map: this.createBarkTexture(seed)
+      map: barkTextures.diffuse,
+      normalMap: barkTextures.normal,
+      normalScale: new THREE.Vector2(0.3, 0.3),
+      roughness: 0.9,
+      metalness: 0.0
     });
     const trunkMesh = new THREE.Mesh(trunkGeometry, trunkMaterial);
     group.add(trunkMesh);
@@ -71,14 +83,15 @@ export class TreeGenerator {
     const branchLineSegments = this.createBranchLineSegments(segments);
     group.add(branchLineSegments);
 
-    const foliage = this.createFoliage(segments, rng);
-    group.add(foliage);
+    const foliageData = this.createFoliage(segments, rng, seed);
+    group.add(foliageData.points);
 
     return {
       group,
       branchSegments: [branchLineSegments],
-      foliageParticles: foliage,
-      params: { ...this.params }
+      foliageParticles: foliageData.points,
+      params: { ...this.params },
+      foliagePulseData: foliageData.pulseData
     };
   }
 
@@ -352,13 +365,21 @@ export class TreeGenerator {
     return new THREE.LineSegments(geometry, material);
   }
 
-  private createFoliage(segments: BranchSegment[], rng: () => number): THREE.Points {
+  private createFoliage(
+    segments: BranchSegment[],
+    rng: () => number,
+    seed: number
+  ): { points: THREE.Points; pulseData: FoliagePulseData } {
     const densityFactor = this.params.canopyDensity / 60;
     const particleCount = Math.floor((200 + densityFactor * 600));
 
     const positions = new Float32Array(particleCount * 3);
     const colors = new Float32Array(particleCount * 3);
-    const sizes = new Float32Array(particleCount);
+    const baseSizes = new Float32Array(particleCount);
+    const frequencies = new Float32Array(particleCount);
+    const offsets = new Float32Array(particleCount);
+
+    const pulseRng = this.seededRandom(seed + 5000);
 
     const endSegments = segments.filter(s => s.level >= this.params.branchLayers - 2);
     if (endSegments.length === 0) endSegments.push(...segments);
@@ -390,79 +411,179 @@ export class TreeGenerator {
       colors[i * 3 + 1] = color.g;
       colors[i * 3 + 2] = color.b;
 
-      sizes[i] = 0.01 + rng() * 0.02;
+      baseSizes[i] = 0.01 + pulseRng() * 0.02;
+      frequencies[i] = 0.2 + pulseRng() * 0.3;
+      offsets[i] = pulseRng() * Math.PI * 2;
     }
 
     const geometry = new THREE.BufferGeometry();
     geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
     geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-    geometry.setAttribute('size', new THREE.BufferAttribute(sizes, 1));
+    geometry.setAttribute('aBaseSize', new THREE.BufferAttribute(baseSizes, 1));
+    geometry.setAttribute('aFrequency', new THREE.BufferAttribute(frequencies, 1));
+    geometry.setAttribute('aOffset', new THREE.BufferAttribute(offsets, 1));
 
-    const material = new THREE.PointsMaterial({
-      size: 0.05,
-      vertexColors: true,
+    const material = new THREE.ShaderMaterial({
+      uniforms: {
+        uTime: { value: 0 },
+        uSizeScale: { value: 30.0 }
+      },
+      vertexShader: `
+        attribute float aBaseSize;
+        attribute float aFrequency;
+        attribute float aOffset;
+        attribute vec3 color;
+        varying vec3 vColor;
+        uniform float uTime;
+        uniform float uSizeScale;
+        void main() {
+          vColor = color;
+          vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+          float pulse = 0.7 + 0.3 * sin(uTime * aFrequency + aOffset);
+          float size = aBaseSize * pulse * uSizeScale;
+          gl_PointSize = size * (300.0 / -mvPosition.z);
+          gl_Position = projectionMatrix * mvPosition;
+        }
+      `,
+      fragmentShader: `
+        varying vec3 vColor;
+        void main() {
+          float dist = length(gl_PointCoord - vec2(0.5));
+          if (dist > 0.5) discard;
+          float alpha = 1.0 - smoothstep(0.0, 0.5, dist);
+          gl_FragColor = vec4(vColor, alpha * 0.9);
+        }
+      `,
       transparent: true,
-      opacity: 0.9,
-      sizeAttenuation: true
+      depthWrite: false,
+      blending: THREE.NormalBlending
     });
 
-    return new THREE.Points(geometry, material);
+    const points = new THREE.Points(geometry, material);
+
+    return {
+      points,
+      pulseData: { baseSizes, frequencies, offsets }
+    };
   }
 
-  private createBarkTexture(seed: number): THREE.Texture {
-    const size = 128;
-    const canvas = document.createElement('canvas');
-    canvas.width = size;
-    canvas.height = size;
-    const ctx = canvas.getContext('2d')!;
+  private createBarkTextures(seed: number): { diffuse: THREE.Texture; normal: THREE.Texture } {
+    const size = 256;
+    const diffuseCanvas = document.createElement('canvas');
+    diffuseCanvas.width = size;
+    diffuseCanvas.height = size;
+    const diffuseCtx = diffuseCanvas.getContext('2d')!;
 
-    const baseColor = '#5D4037';
-    ctx.fillStyle = baseColor;
-    ctx.fillRect(0, 0, size, size);
+    const normalCanvas = document.createElement('canvas');
+    normalCanvas.width = size;
+    normalCanvas.height = size;
+    const normalCtx = normalCanvas.getContext('2d')!;
 
     const rng = this.seededRandom(seed);
 
-    const imageData = ctx.getImageData(0, 0, size, size);
-    const data = imageData.data;
+    const baseColor = { r: 93, g: 64, b: 55 };
+
+    const diffuseData = diffuseCtx.createImageData(size, size);
+    const normalData = normalCtx.createImageData(size, size);
+
+    const grooveCount = 8 + Math.floor(rng() * 8);
+    const groovePositions: { pos: number; width: number; depth: number }[] = [];
+    for (let i = 0; i < grooveCount; i++) {
+      groovePositions.push({
+        pos: rng() * size,
+        width: 3 + rng() * 10,
+        depth: 0.3 + rng() * 0.5
+      });
+    }
 
     for (let y = 0; y < size; y++) {
       for (let x = 0; x < size; x++) {
         const idx = (y * size + x) * 4;
-        const noise = this.perlin2D(x * 0.05, y * 0.02, seed);
-        const noise2 = this.perlin2D(x * 0.15, y * 0.08, seed + 100);
-        const val = (noise * 0.7 + noise2 * 0.3) * 40 + 20;
 
-        data[idx] = Math.min(255, Math.max(0, 93 + val));
-        data[idx + 1] = Math.min(255, Math.max(0, 64 + val * 0.7));
-        data[idx + 2] = Math.min(255, Math.max(0, 55 + val * 0.5));
+        const noise1 = this.perlin2D(x * 0.04, y * 0.015, seed);
+        const noise2 = this.perlin2D(x * 0.12, y * 0.06, seed + 100);
+        const noise3 = this.perlin2D(x * 0.3, y * 0.2, seed + 200);
+        const val = (noise1 * 0.6 + noise2 * 0.25 + noise3 * 0.15) * 50;
+
+        let grooveDepth = 0;
+        let grooveNormalX = 0;
+        for (const groove of groovePositions) {
+          const dist = Math.abs(x - groove.pos);
+          const wobble = Math.sin(y * 0.05 + groove.pos * 0.1) * 3;
+          const adjustedDist = Math.abs(x - (groove.pos + wobble));
+
+          if (adjustedDist < groove.width) {
+            const t = adjustedDist / groove.width;
+            const depth = (1 - t * t) * groove.depth * 60;
+            grooveDepth += depth;
+
+            if (adjustedDist > 0.1) {
+              const dx = (x - (groove.pos + wobble)) / adjustedDist;
+              grooveNormalX += dx * groove.depth * (1 - t);
+            }
+          }
+        }
+
+        const totalNoise = val - grooveDepth * 0.8;
+
+        diffuseData.data[idx] = Math.min(255, Math.max(0, baseColor.r + totalNoise));
+        diffuseData.data[idx + 1] = Math.min(255, Math.max(0, baseColor.g + totalNoise * 0.75));
+        diffuseData.data[idx + 2] = Math.min(255, Math.max(0, baseColor.b + totalNoise * 0.55));
+        diffuseData.data[idx + 3] = 255;
+
+        const nx = noise2 * 0.3 + grooveNormalX * 2;
+        const ny = noise3 * 0.2;
+        const nz = 1.0;
+
+        const len = Math.sqrt(nx * nx + ny * ny + nz * nz);
+        normalData.data[idx] = Math.floor(((nx / len) * 0.5 + 0.5) * 255);
+        normalData.data[idx + 1] = Math.floor(((ny / len) * 0.5 + 0.5) * 255);
+        normalData.data[idx + 2] = Math.floor(((nz / len) * 0.5 + 0.5) * 255);
+        normalData.data[idx + 3] = 255;
       }
     }
 
-    for (let i = 0; i < 20; i++) {
-      const x = Math.floor(rng() * size);
-      const width = 1 + Math.floor(rng() * 3);
+    diffuseCtx.putImageData(diffuseData, 0, 0);
+    normalCtx.putImageData(normalData, 0, 0);
+
+    for (let i = 0; i < 15; i++) {
+      const startX = rng() * size;
+      const width = 0.5 + rng() * 2;
       const startY = Math.floor(rng() * size);
-      const length = Math.floor(rng() * size * 0.5);
+      const length = Math.floor(rng() * size * 0.6);
 
-      ctx.strokeStyle = `rgba(40, 25, 20, ${0.3 + rng() * 0.3})`;
-      ctx.lineWidth = width;
-      ctx.beginPath();
-      ctx.moveTo(x, startY);
-      for (let y = 0; y < length; y += 2) {
-        const wobble = Math.sin(y * 0.1 + rng() * 10) * 2;
-        ctx.lineTo(x + wobble, startY + y);
+      diffuseCtx.strokeStyle = `rgba(35, 20, 15, ${0.25 + rng() * 0.35})`;
+      diffuseCtx.lineWidth = width;
+      diffuseCtx.beginPath();
+      diffuseCtx.moveTo(startX, startY);
+      for (let y = 0; y < length; y += 3) {
+        const wobble = Math.sin(y * 0.08 + rng() * 15) * 4;
+        diffuseCtx.lineTo(startX + wobble, startY + y);
       }
-      ctx.stroke();
+      diffuseCtx.stroke();
+
+      normalCtx.strokeStyle = `rgba(180, 128, 128, ${0.3 + rng() * 0.4})`;
+      normalCtx.lineWidth = width;
+      normalCtx.beginPath();
+      normalCtx.moveTo(startX, startY);
+      for (let y = 0; y < length; y += 3) {
+        const wobble = Math.sin(y * 0.08 + rng() * 15) * 4;
+        normalCtx.lineTo(startX + wobble, startY + y);
+      }
+      normalCtx.stroke();
     }
 
-    ctx.putImageData(imageData, 0, 0);
+    const diffuseTexture = new THREE.CanvasTexture(diffuseCanvas);
+    diffuseTexture.wrapS = THREE.RepeatWrapping;
+    diffuseTexture.wrapT = THREE.RepeatWrapping;
+    diffuseTexture.repeat.set(1, 2);
 
-    const texture = new THREE.CanvasTexture(canvas);
-    texture.wrapS = THREE.RepeatWrapping;
-    texture.wrapT = THREE.RepeatWrapping;
-    texture.repeat.set(1, 2);
+    const normalTexture = new THREE.CanvasTexture(normalCanvas);
+    normalTexture.wrapS = THREE.RepeatWrapping;
+    normalTexture.wrapT = THREE.RepeatWrapping;
+    normalTexture.repeat.set(1, 2);
 
-    return texture;
+    return { diffuse: diffuseTexture, normal: normalTexture };
   }
 
   private perlin2D(x: number, y: number, seed: number): number {
