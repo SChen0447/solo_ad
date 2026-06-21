@@ -25,18 +25,27 @@ const VersionManager: React.FC<Props> = ({ versionList, selectedIds, onSelectVer
     setShowRightMask(el.scrollLeft + el.clientWidth < el.scrollWidth - 4);
   }, []);
 
+  const debouncedUpdateMasks = useCallback(() => {
+    const timer = (debouncedUpdateMasks as any)._timer as number | undefined;
+    if (timer) clearTimeout(timer);
+    (debouncedUpdateMasks as any)._timer = window.setTimeout(() => {
+      updateMasks();
+    }, 300);
+  }, [updateMasks]);
+
   useEffect(() => {
     updateMasks();
     const el = scrollRef.current;
     if (!el) return;
-    const handler = () => updateMasks();
-    el.addEventListener('scroll', handler);
-    window.addEventListener('resize', handler);
+    el.addEventListener('scroll', debouncedUpdateMasks);
+    window.addEventListener('resize', debouncedUpdateMasks);
     return () => {
-      el.removeEventListener('scroll', handler);
-      window.removeEventListener('resize', handler);
+      el.removeEventListener('scroll', debouncedUpdateMasks);
+      window.removeEventListener('resize', debouncedUpdateMasks);
+      const timer = (debouncedUpdateMasks as any)._timer as number | undefined;
+      if (timer) clearTimeout(timer);
     };
-  }, [updateMasks, versionList.length]);
+  }, [updateMasks, debouncedUpdateMasks, versionList.length]);
 
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     isDragging = true;

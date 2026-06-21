@@ -60,7 +60,6 @@ const App: React.FC = () => {
     for (let i = 0; i < fileArr.length; i++) {
       try {
         const { url, thumbUrl, width, height } = await generateThumbnail(fileArr[i]);
-        const versionNumber = `v${(startIdx + i - 1) / 1 + 0.0}`;
         newVersions.push({
           id: generateId(),
           versionNumber: `v${(startIdx + i).toFixed(1)}`,
