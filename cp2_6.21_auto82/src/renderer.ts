@@ -73,12 +73,15 @@ export class Renderer {
       this.drawFields(ctx, fieldManager, particleSystem);
       this.drawObstacles(ctx, obstacles);
       this.drawTargets(ctx, targets);
+      if (!performanceMode) {
+        fieldManager.drawFieldIndicators(ctx, this.time);
+      }
 
       if (!performanceMode) {
         this.drawTrails(ctx, particleSystem);
       }
 
-      this.drawParticles(ctx, particleSystem);
+      this.drawParticles(ctx, particleSystem, fieldManager);
       this.drawSparks(ctx, particleSystem.sparks);
       this.drawPulseEffects(ctx, particleSystem);
 
@@ -231,10 +234,22 @@ export class Renderer {
     }
   }
 
-  private drawParticles(ctx: CanvasRenderingContext2D, particleSystem: ParticleSystem): void {
+  private drawParticles(ctx: CanvasRenderingContext2D, particleSystem: ParticleSystem, fieldManager: FieldManager): void {
     for (const p of particleSystem.particles) {
       if (p.reached) {
         ctx.globalAlpha = 0.4;
+      }
+
+      const affected = !p.reached && fieldManager.isParticleAffected(p.x, p.y);
+      if (affected) {
+        const pulse = 0.5 + 0.5 * Math.sin(this.time * Math.PI * 2 / 0.6);
+        const haloColor = p.charge > 0
+          ? `rgba(255, 71, 87, ${0.25 + pulse * 0.2})`
+          : `rgba(46, 134, 222, ${0.25 + pulse * 0.2})`;
+        ctx.fillStyle = haloColor;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.radius + 6 + pulse * 3, 0, Math.PI * 2);
+        ctx.fill();
       }
 
       const gradient = ctx.createRadialGradient(
