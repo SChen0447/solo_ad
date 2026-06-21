@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>音律跑酷 | Rhythm Parkour</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+    #game-container {
+      width: 100%;
+      height: 100%;
+      position: relative;
+      display: flex;
+    }
+    #game-canvas {
+      width: 70%;
+      height: 100%;
+    }
+    #ui-panel {
+      width: 30%;
+      height: 100%;
+      padding: 20px;
+      background: rgba(255, 255, 255, 0.05);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      border-left: 1px solid rgba(255, 255, 255, 0.1);
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+    .control-group {
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 12px;
+      padding: 16px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      box-shadow: 0 0 20px rgba(100, 150, 255, 0.1);
+    }
+    .control-title {
+      color: #a0b4f0;
+      font-size: 14px;
+      margin-bottom: 12px;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+    }
+    .button-row {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+    #play-btn {
+      width: 56px;
+      height: 56px;
+      border-radius: 50%;
+      border: none;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      box-shadow: 0 0 15px rgba(100, 255, 150, 0.4);
+    }
+    #play-btn.playing {
+      background: linear-gradient(135deg, #ff6b6b, #ee5a5a);
+      box-shadow: 0 0 15px rgba(255, 100, 100, 0.4);
+    }
+    #play-btn.paused {
+      background: linear-gradient(135deg, #51cf66, #40c057);
+    }
+    #play-btn:hover {
+      transform: scale(1.08);
+    }
+    #play-btn:active {
+      transform: scale(0.95);
+    }
+    select, input[type="range"] {
+      width: 100%;
+      padding: 10px 14px;
+      border-radius: 8px;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      background: rgba(0, 0, 0, 0.3);
+      color: #e0e8ff;
+      font-size: 14px;
+      outline: none;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    select:hover, input[type="range"]:hover {
+      border-color: rgba(100, 150, 255, 0.5);
+      box-shadow: 0 0 10px rgba(100, 150, 255, 0.2);
+    }
+    select option {
+      background: #1a1a2e;
+      color: #e0e8ff;
+    }
+    input[type="range"] {
+      -webkit-appearance: none;
+      height: 8px;
+      padding: 0;
+    }
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #74b9ff, #0984e3);
+      cursor: pointer;
+      box-shadow: 0 0 10px rgba(116, 185, 255, 0.5);
+      transition: transform 0.2s;
+    }
+    input[type="range"]::-webkit-slider-thumb:hover {
+      transform: scale(1.2);
+    }
+    .speed-value {
+      color: #74b9ff;
+      font-weight: 600;
+      text-align: right;
+      margin-top: 8px;
+      font-size: 13px;
+    }
+    #waveform-canvas {
+      width: 100%;
+      height: 120px;
+      border-radius: 8px;
+      background: rgba(0, 0, 0, 0.3);
+      border: 1px solid rgba(100, 150, 255, 0.2);
+    }
+    .score-display {
+      color: #ffd93d;
+      font-size: 32px;
+      font-weight: bold;
+      text-align: center;
+      text-shadow: 0 0 20px rgba(255, 217, 61, 0.5);
+    }
+    .score-label {
+      color: #a0b4f0;
+      font-size: 12px;
+      text-align: center;
+      margin-bottom: 4px;
+      letter-spacing: 2px;
+    }
+    .instructions {
+      color: rgba(255, 255, 255, 0.6);
+      font-size: 12px;
+      line-height: 1.6;
+      margin-top: auto;
+    }
+    .instructions kbd {
+      background: rgba(255, 255, 255, 0.1);
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-family: monospace;
+      color: #74b9ff;
+    }
+    @media (max-width: 1024px) {
+      #game-canvas {
+        width: 65%;
+      }
+      #ui-panel {
+        width: 35%;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div id="game-container">
+    <div id="game-canvas"></div>
+    <div id="ui-panel">
+      <div class="control-group">
+        <div class="score-label">SCORE</div>
+        <div class="score-display" id="score-display">0</div>
+      </div>
+      
+      <div class="control-group">
+        <div class="control-title">播放控制</div>
+        <div class="button-row">
+          <button id="play-btn" class="paused">▶</button>
+          <select id="song-select">
+            <option value="song1">电子节拍.mp3</option>
+            <option value="song2">动感节奏.mp3</option>
+            <option value="song3">活力旋律.mp3</option>
+          </select>
+        </div>
+      </div>
+      
+      <div class="control-group">
+        <div class="control-title">游戏速度</div>
+        <input type="range" id="speed-slider" min="1.0" max="2.0" step="0.1" value="1.0" />
+        <div class="speed-value" id="speed-value">1.0x</div>
+      </div>
+      
+      <div class="control-group">
+        <div class="control-title">音频波形</div>
+        <canvas id="waveform-canvas"></canvas>
+      </div>
+      
+      <div class="instructions">
+        <strong>操作说明：</strong><br/>
+        <kbd>空格</kbd> - 跳跃（躲避尖刺）<br/>
+        <kbd>↓</kbd> - 滑铲（躲避横杆）<br/>
+        跟随音乐节奏，精准躲避障碍物！
+      </div>
+    </div>
+  </div>
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
