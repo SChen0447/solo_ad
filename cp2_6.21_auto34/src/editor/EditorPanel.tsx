@@ -102,7 +102,8 @@ export const EditorPanel: React.FC<EditorPanelProps> = () => {
         isPaused: false,
         score: 0,
         fps: 0,
-        selectedElementId: selectedId
+        selectedElementId: selectedId,
+        currentKey: null
       });
     }
   }, [elements, selectedId]);

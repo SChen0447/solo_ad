@@ -50,6 +50,9 @@ export class RenderCanvas {
     if (!this.isEditorMode) {
       this.drawFPS(this.state.fps);
       this.drawScore(this.state.score);
+      if (this.state.currentKey) {
+        this.drawKeyTip(this.state.currentKey, w, h);
+      }
       if (this.state.isPaused) {
         this.drawPauseOverlay(w, h);
       }
@@ -190,6 +193,29 @@ export class RenderCanvas {
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText('已暂停', w / 2, h / 2);
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
+    ctx.font = '16px sans-serif';
+    ctx.fillText('按空格键继续', w / 2, h / 2 + 52);
+  }
+
+  private drawKeyTip(keyName: string, w: number, h: number): void {
+    const { ctx } = this;
+    const text = keyName;
+    ctx.font = 'bold 16px sans-serif';
+    const metrics = ctx.measureText(text);
+    const paddingX = 14;
+    const paddingY = 8;
+    const boxW = metrics.width + paddingX * 2;
+    const boxH = 32;
+    const x = w - boxW - 16;
+    const y = h - boxH - 16;
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+    this.roundRect(x, y, boxW, boxH, 6);
+    ctx.fill();
+    ctx.fillStyle = '#FFFFFF';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'top';
+    ctx.fillText(text, x + paddingX, y + (boxH - 16) / 2);
   }
 
   private roundRect(x: number, y: number, w: number, h: number, r: number): void {

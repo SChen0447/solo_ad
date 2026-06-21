@@ -3,6 +3,60 @@ import { getElementAABB, aabbIntersect, resolveCollision, clamp } from '../utils
 
 export type FrameCallback = (state: GameState) => void;
 
+const KEY_DISPLAY_NAMES: Record<string, string> = {
+    Space: '空格',
+    ArrowUp: '方向键上',
+    ArrowDown: '方向键下',
+    ArrowLeft: '方向键左',
+    ArrowRight: '方向键右',
+    KeyA: 'A',
+    KeyB: 'B',
+    KeyC: 'C',
+    KeyD: 'D',
+    KeyE: 'E',
+    KeyF: 'F',
+    KeyG: 'G',
+    KeyH: 'H',
+    KeyI: 'I',
+    KeyJ: 'J',
+    KeyK: 'K',
+    KeyL: 'L',
+    KeyM: 'M',
+    KeyN: 'N',
+    KeyO: 'O',
+    KeyP: 'P',
+    KeyQ: 'Q',
+    KeyR: 'R',
+    KeyS: 'S',
+    KeyT: 'T',
+    KeyU: 'U',
+    KeyV: 'V',
+    KeyW: 'W',
+    KeyX: 'X',
+    KeyY: 'Y',
+    KeyZ: 'Z',
+    Digit0: '0',
+    Digit1: '1',
+    Digit2: '2',
+    Digit3: '3',
+    Digit4: '4',
+    Digit5: '5',
+    Digit6: '6',
+    Digit7: '7',
+    Digit8: '8',
+    Digit9: '9',
+    ShiftLeft: 'Shift',
+    ShiftRight: 'Shift',
+    ControlLeft: 'Ctrl',
+    ControlRight: 'Ctrl',
+    AltLeft: 'Alt',
+    AltRight: 'Alt',
+    Escape: 'Esc',
+    Enter: 'Enter',
+    Backspace: 'Backspace',
+    Tab: 'Tab'
+  };
+
 export class GameEngine {
   private elements: GameElement[] = [];
   private isRunning = false;
@@ -10,6 +64,8 @@ export class GameEngine {
   private score = 0;
   private fps = 0;
   private selectedElementId: string | null = null;
+  private currentKey: string | null = null;
+  private clearKeyTimeout: number | null = null;
   private animationFrameId: number | null = null;
   private lastFrameTime = 0;
   private frameCount = 0;
@@ -18,8 +74,13 @@ export class GameEngine {
   private canvasWidth = 800;
   private canvasHeight = 600;
   private scriptContexts: Map<string, any> = new Map();
+  private boundKeyDown: (e: KeyboardEvent) => void;
+  private boundKeyUp: (e: KeyboardEvent) => void;
 
-  constructor() {}
+  constructor() {
+    this.boundKeyDown = this.handleKeyDown.bind(this);
+    this.boundKeyUp = this.handleKeyUp.bind(this);
+  }
 
   setElements(elements: GameElement[]): void {
     this.elements = elements.map((el) => ({
@@ -50,6 +111,7 @@ export class GameEngine {
     this.isRunning = true;
     this.isPaused = false;
     this.score = 0;
+    this.currentKey = null;
     this.lastFrameTime = performance.now();
     this.frameCount = 0;
     this.fpsTimer = 0;
@@ -57,6 +119,8 @@ export class GameEngine {
     this.elements.forEach((el) => {
       this.scriptContexts.set(el.id, { t: 0 });
     });
+    window.addEventListener('keydown', this.boundKeyDown);
+    window.addEventListener('keyup', this.boundKeyUp);
     this.loop();
   }
 
@@ -69,10 +133,17 @@ export class GameEngine {
   stop(): void {
     this.isRunning = false;
     this.isPaused = false;
+    this.currentKey = null;
+    if (this.clearKeyTimeout !== null) {
+      clearTimeout(this.clearKeyTimeout);
+      this.clearKeyTimeout = null;
+    }
     if (this.animationFrameId !== null) {
       cancelAnimationFrame(this.animationFrameId);
       this.animationFrameId = null;
     }
+    window.removeEventListener('keydown', this.boundKeyDown);
+    window.removeEventListener('keyup', this.boundKeyUp);
     this.emitState();
   }
 
@@ -218,6 +289,25 @@ export class GameEngine {
     }
   }
 
+  private handleKeyDown(e: KeyboardEvent): void {
+    if (this.clearKeyTimeout !== null) {
+      clearTimeout(this.clearKeyTimeout);
+      this.clearKeyTimeout = null;
+    }
+    const keyName = KEY_DISPLAY_NAMES[e.code] || e.key;
+    this.currentKey = keyName;
+  }
+
+  private handleKeyUp(e: KeyboardEvent): void {
+    if (this.clearKeyTimeout !== null) {
+      clearTimeout(this.clearKeyTimeout);
+    }
+    this.clearKeyTimeout = window.setTimeout(() => {
+      this.currentKey = null;
+      this.clearKeyTimeout = null;
+    }, 300);
+  }
+
   private emitState(): void {
     if (this.onFrameCallback) {
       this.onFrameCallback({
@@ -229,7 +319,8 @@ export class GameEngine {
         isPaused: this.isPaused,
         score: this.score,
         fps: this.fps,
-        selectedElementId: this.selectedElementId
+        selectedElementId: this.selectedElementId,
+        currentKey: this.currentKey
       });
     }
   }

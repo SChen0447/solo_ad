@@ -35,6 +35,7 @@ export interface GameState {
   score: number;
   fps: number;
   selectedElementId: string | null;
+  currentKey: string | null;
 }
 
 export type EditorActionType =
