@@ -1,0 +1,51 @@
+.relation-graph {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  background-color: #2d3748;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.relation-graph canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.graph-legend {
+  position: absolute;
+  bottom: 12px;
+  right: 16px;
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  background: rgba(45, 55, 72, 0.8);
+  padding: 8px 12px;
+  border-radius: 8px;
+  backdrop-filter: blur(4px);
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  color: #a0aec0;
+}
+
+.legend-line {
+  display: block;
+  width: 24px;
+  height: 2px;
+  background-color: #a0aec0;
+  border-radius: 1px;
+}
+
+.legend-line.thick {
+  height: 3px;
+}
+
+.legend-line.thin {
+  height: 1px;
+}
