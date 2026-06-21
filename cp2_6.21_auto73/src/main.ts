@@ -149,12 +149,13 @@ class GameUI {
     const levelText = tower.level >= 2 ? '二级（已升级）' : '一级';
     const rangeText = tower.level >= 2 ? '4格' : '3格';
     const damageText = tower.level >= 2 ? '35点' : '20点';
+    const fireRateText = tower.fireRate.toFixed(2);
 
     this.towerStatsEl.innerHTML = `
       <div>等级: ${levelText}</div>
       <div>射程: ${rangeText}</div>
       <div>伤害: ${damageText}</div>
-      <div>射速: 1.2秒/次</div>
+      <div>攻击间隔: ${fireRateText}秒/次</div>
     `;
 
     if (tower.level >= 2) {
@@ -164,7 +165,8 @@ class GameUI {
     } else {
       this.upgradeBtn.disabled = false;
       this.upgradeBtn.style.opacity = '1';
-      this.upgradeBtn.textContent = '升级 (50分)';
+      const nextFireRate = (tower.fireRate - 0.15).toFixed(2);
+      this.upgradeBtn.textContent = `升级 (50分) → ${nextFireRate}秒`;
     }
   }
 

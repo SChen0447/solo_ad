@@ -45,14 +45,19 @@ export class UnitManager {
     this.onUnitSpawned = callback;
   }
 
-  public spawnUnit(startPos: Point): Unit {
+  public spawnUnit(startPos: Point, wave: number = 1): Unit {
+    const baseHealth = 30;
+    const healthPerWave = 10;
+    const maxHealth = baseHealth + (wave - 1) * healthPerWave;
+    const speed = 40;
+
     const unit: Unit = {
       id: this.nextUnitId++,
       x: startPos.x,
       y: startPos.y,
-      health: 100,
-      maxHealth: 100,
-      speed: 40,
+      health: maxHealth,
+      maxHealth,
+      speed,
       pathIndex: 0,
       isDead: false,
       reachedEnd: false,
@@ -66,8 +71,16 @@ export class UnitManager {
     return unit;
   }
 
-  public spawnUnitWithCallback(startPos: Point): Unit {
-    return this.spawnUnit(startPos);
+  public spawnUnitWithCallback(startPos: Point, wave: number = 1): Unit {
+    return this.spawnUnit(startPos, wave);
+  }
+
+  public static calculateUnitCount(wave: number): number {
+    const baseCount = 5;
+    const perWaveIncrease = 3;
+    const maxCount = 32;
+    const count = baseCount + (wave - 1) * perWaveIncrease;
+    return Math.min(count, maxCount);
   }
 
   public spawnWave(count: number, startPos: Point, spawnInterval: number = 0.8): void {

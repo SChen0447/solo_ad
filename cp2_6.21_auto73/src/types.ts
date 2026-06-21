@@ -53,8 +53,22 @@ export interface Bullet {
   x: number;
   y: number;
   targetId: number;
+  targetX: number;
+  targetY: number;
+  hasTarget: boolean;
   speed: number;
   damage: number;
+}
+
+export interface Explosion {
+  id: number;
+  x: number;
+  y: number;
+  life: number;
+  maxLife: number;
+  startRadius: number;
+  endRadius: number;
+  color: string;
 }
 
 export interface Tower {

@@ -1,4 +1,4 @@
-import { Tower, Bullet, Unit, COLORS, CELL_SIZE } from './types';
+import { Tower, Bullet, Unit, Explosion, COLORS, CELL_SIZE } from './types';
 
 /**
  * TowerManager - 炮塔管理模块
@@ -8,14 +8,17 @@ import { Tower, Bullet, Unit, COLORS, CELL_SIZE } from './types';
  *  - 每帧检查炮塔射程内的敌方单位，锁定最近目标
  *  - 按冷却时间发射子弹，追踪并命中目标
  *  - 维护选中炮塔状态和射程范围显示
- *  - 渲染炮塔（含升级金色外框）、射程圈、子弹
+ *  - 渲染炮塔（含升级金色外框）、射程圈、子弹、爆炸效果
  * 
  * 关键参数：
  *  - 炮塔基础射程：3格（升级后4格）
  *  - 基础伤害：20点（升级后35点）
- *  - 射速：每1.2秒一发
- *  - 子弹速度：300px/秒
- *  - 碰撞检测：子弹半径3px + 单位半径12px = 15px命中阈值
+ *  - 基础射速：每1.2秒一发（每升一级减少0.15秒，最低0.6秒）
+ *  - 子弹速度：300px/秒（约每帧5px @60FPS）
+ *  - 子弹半径：4px
+ *  - 碰撞检测：子弹半径4px + 单位半径12px = 16px命中阈值
+ *  - 爆炸效果：半径6→12px扩散，持续0.15秒
+ *  - 子弹丢失目标后：飞向最后已知位置，到达后产生小爆炸消散
  * 
  * 数据流向：
  *  - 输入：单位位置列表 <- GameEngine（来自UnitManager）
@@ -29,12 +32,21 @@ import { Tower, Bullet, Unit, COLORS, CELL_SIZE } from './types';
  * 被调用：findTarget <- updateTower(); fireBullet <- updateTower()
  */
 export class TowerManager {
-  private static readonly BULLET_RADIUS = 3;
+  private static readonly BULLET_RADIUS = 4;
   private static readonly UNIT_RADIUS = 12;
+  private static readonly BASE_FIRE_RATE = 1.2;
+  private static readonly FIRE_RATE_STEP = 0.15;
+  private static readonly MIN_FIRE_RATE = 0.6;
+  private static readonly EXPLOSION_LIFE = 0.15;
+  private static readonly EXPLOSION_START_RADIUS = 6;
+  private static readonly EXPLOSION_END_RADIUS = 12;
+
   private towers: Tower[] = [];
   private bullets: Bullet[] = [];
+  private explosions: Explosion[] = [];
   private nextTowerId: number = 0;
   private nextBulletId: number = 0;
+  private nextExplosionId: number = 0;
   private selectedTower: Tower | null = null;
   private onTowerRemoved: ((tower: Tower) => void) | null = null;
 
@@ -50,8 +62,17 @@ export class TowerManager {
     return this.bullets;
   }
 
+  public getExplosions(): Explosion[] {
+    return this.explosions;
+  }
+
   public getSelectedTower(): Tower | null {
     return this.selectedTower;
+  }
+
+  public static calculateFireRate(level: number): number {
+    const rate = TowerManager.BASE_FIRE_RATE - (level - 1) * TowerManager.FIRE_RATE_STEP;
+    return Math.max(rate, TowerManager.MIN_FIRE_RATE);
   }
 
   public placeTower(gridX: number, gridY: number, worldX: number, worldY: number): Tower | null {
@@ -65,7 +86,7 @@ export class TowerManager {
       y: worldY,
       range: 3 * CELL_SIZE,
       damage: 20,
-      fireRate: 1.2,
+      fireRate: TowerManager.BASE_FIRE_RATE,
       lastFireTime: 0,
       level: 1,
       isSelected: false,
@@ -97,6 +118,7 @@ export class TowerManager {
     tower.level = 2;
     tower.damage = 35;
     tower.range = 4 * CELL_SIZE;
+    tower.fireRate = TowerManager.calculateFireRate(tower.level);
     return true;
   }
 
@@ -119,6 +141,7 @@ export class TowerManager {
     }
 
     this.updateBullets(deltaTime, units, hits);
+    this.updateExplosions(deltaTime);
 
     for (const tower of this.towers) {
       if (tower.isRemoving) {
@@ -177,6 +200,9 @@ export class TowerManager {
       x: tower.x,
       y: tower.y,
       targetId: target.id,
+      targetX: target.x,
+      targetY: target.y,
+      hasTarget: true,
       speed: 300,
       damage: tower.damage
     };
@@ -192,29 +218,77 @@ export class TowerManager {
 
     for (const bullet of this.bullets) {
       const target = units.find(u => u.id === bullet.targetId);
+      let targetX: number;
+      let targetY: number;
 
-      if (!target || target.isDead || target.reachedEnd) {
+      if (target && !target.isDead && !target.reachedEnd) {
+        targetX = target.x;
+        targetY = target.y;
+        bullet.targetX = targetX;
+        bullet.targetY = targetY;
+        bullet.hasTarget = true;
+      } else {
+        targetX = bullet.targetX;
+        targetY = bullet.targetY;
+        bullet.hasTarget = false;
+      }
+
+      const dx = targetX - bullet.x;
+      const dy = targetY - bullet.y;
+      const distance = Math.sqrt(dx * dx + dy * dy);
+
+      if (distance < 1) {
+        if (bullet.hasTarget && target && !target.isDead && !target.reachedEnd) {
+          const hitThreshold = TowerManager.BULLET_RADIUS + TowerManager.UNIT_RADIUS;
+          if (distance < hitThreshold) {
+            hits.push({ hitUnitIds: [target.id], damage: bullet.damage });
+          }
+        }
+        this.spawnExplosion(bullet.x, bullet.y);
         bulletsToRemove.push(bullet.id);
         continue;
       }
 
-      const dx = target.x - bullet.x;
-      const dy = target.y - bullet.y;
-      const distance = Math.sqrt(dx * dx + dy * dy);
       const hitThreshold = TowerManager.BULLET_RADIUS + TowerManager.UNIT_RADIUS;
-
-      if (distance < hitThreshold) {
-        hits.push({ hitUnitIds: [target.id], damage: bullet.damage });
+      if (bullet.hasTarget && distance < hitThreshold) {
+        hits.push({ hitUnitIds: [bullet.targetId], damage: bullet.damage });
+        this.spawnExplosion(bullet.x, bullet.y);
         bulletsToRemove.push(bullet.id);
         continue;
       }
 
       const moveDistance = bullet.speed * deltaTime;
-      bullet.x += (dx / distance) * moveDistance;
-      bullet.y += (dy / distance) * moveDistance;
+      if (moveDistance >= distance) {
+        bullet.x = targetX;
+        bullet.y = targetY;
+      } else {
+        bullet.x += (dx / distance) * moveDistance;
+        bullet.y += (dy / distance) * moveDistance;
+      }
     }
 
     this.bullets = this.bullets.filter(b => !bulletsToRemove.includes(b.id));
+  }
+
+  private spawnExplosion(x: number, y: number): void {
+    const explosion: Explosion = {
+      id: this.nextExplosionId++,
+      x,
+      y,
+      life: TowerManager.EXPLOSION_LIFE,
+      maxLife: TowerManager.EXPLOSION_LIFE,
+      startRadius: TowerManager.EXPLOSION_START_RADIUS,
+      endRadius: TowerManager.EXPLOSION_END_RADIUS,
+      color: COLORS.bullet
+    };
+    this.explosions.push(explosion);
+  }
+
+  private updateExplosions(deltaTime: number): void {
+    for (const explosion of this.explosions) {
+      explosion.life -= deltaTime;
+    }
+    this.explosions = this.explosions.filter(e => e.life > 0);
   }
 
   public render(ctx: CanvasRenderingContext2D, showRanges: boolean = false): void {
@@ -230,6 +304,10 @@ export class TowerManager {
 
     for (const bullet of this.bullets) {
       this.renderBullet(ctx, bullet);
+    }
+
+    for (const explosion of this.explosions) {
+      this.renderExplosion(ctx, explosion);
     }
   }
 
@@ -285,16 +363,39 @@ export class TowerManager {
     ctx.fill();
 
     ctx.shadowColor = COLORS.bullet;
-    ctx.shadowBlur = 6;
+    ctx.shadowBlur = 8;
     ctx.fill();
     ctx.shadowBlur = 0;
+  }
+
+  private renderExplosion(ctx: CanvasRenderingContext2D, explosion: Explosion): void {
+    const progress = 1 - explosion.life / explosion.maxLife;
+    const radius = explosion.startRadius + (explosion.endRadius - explosion.startRadius) * progress;
+    const alpha = 1 - progress;
+
+    ctx.globalAlpha = alpha;
+    ctx.strokeStyle = explosion.color;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(explosion.x, explosion.y, radius, 0, Math.PI * 2);
+    ctx.stroke();
+
+    ctx.fillStyle = explosion.color;
+    ctx.globalAlpha = alpha * 0.3;
+    ctx.beginPath();
+    ctx.arc(explosion.x, explosion.y, radius, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.globalAlpha = 1;
   }
 
   public clear(): void {
     this.towers = [];
     this.bullets = [];
+    this.explosions = [];
     this.selectedTower = null;
     this.nextTowerId = 0;
     this.nextBulletId = 0;
+    this.nextExplosionId = 0;
   }
 }

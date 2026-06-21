@@ -243,8 +243,9 @@ export class GameEngine {
 
     this.clearSpawnTimeouts();
 
+    const currentWave = this.gameState.wave;
     this.gameState.waveInProgress = true;
-    const unitCount = 5;
+    const unitCount = UnitManager.calculateUnitCount(currentWave);
     this.waveTotalCount = unitCount;
     this.waveSpawnedCount = 0;
     const startPos = this.pathManager.getStartWorldPos();
@@ -253,7 +254,7 @@ export class GameEngine {
     for (let i = 0; i < unitCount; i++) {
       const timeoutId = window.setTimeout(() => {
         if (!this.gameState.isRunning || this.gameState.isGameOver) return;
-        this.unitManager.spawnUnit(startPos);
+        this.unitManager.spawnUnit(startPos, currentWave);
       }, i * spawnInterval * 1000);
       this.spawnTimeouts.push(timeoutId);
     }
