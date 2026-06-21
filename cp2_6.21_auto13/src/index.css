@@ -219,20 +219,22 @@ body {
 }
 
 .water-drop-icon.blue {
-  color: #2196F3;
+  filter: drop-shadow(0 0 2px #2196F3);
 }
 
 .water-drop-icon.red {
-  color: #F44336;
   animation: blink 1s ease-in-out infinite;
+  filter: drop-shadow(0 0 4px #F44336);
 }
 
 @keyframes blink {
   0%, 100% {
     opacity: 1;
+    transform: scale(1);
   }
   50% {
-    opacity: 0.5;
+    opacity: 0.3;
+    transform: scale(0.9);
   }
 }
 
@@ -277,16 +279,14 @@ body {
   display: flex;
   align-items: flex-end;
   justify-content: center;
-  animation: fadeIn 0.3s ease;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  pointer-events: none;
 }
 
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
+.modal-overlay.visible {
+  opacity: 1;
+  pointer-events: auto;
 }
 
 .modal-content {
@@ -296,16 +296,12 @@ body {
   border-radius: 16px 16px 0 0;
   max-height: 85vh;
   overflow-y: auto;
-  animation: slideUp 0.3s ease;
+  transform: translateY(100%);
+  transition: transform 0.3s ease;
 }
 
-@keyframes slideUp {
-  from {
-    transform: translateY(100%);
-  }
-  to {
-    transform: translateY(0);
-  }
+.modal-overlay.visible .modal-content {
+  transform: translateY(0);
 }
 
 .modal-content.center-modal {
@@ -314,18 +310,14 @@ body {
   max-width: 400px;
   width: 90%;
   max-height: 80vh;
-  animation: zoomIn 0.25s ease;
+  transform: scale(0.8);
+  opacity: 0;
+  transition: transform 0.25s ease, opacity 0.25s ease;
 }
 
-@keyframes zoomIn {
-  from {
-    transform: scale(0.9);
-    opacity: 0;
-  }
-  to {
-    transform: scale(1);
-    opacity: 1;
-  }
+.modal-overlay.visible .modal-content.center-modal {
+  transform: scale(1);
+  opacity: 1;
 }
 
 .modal-header {
@@ -714,18 +706,14 @@ body {
   z-index: 300;
   display: flex;
   flex-direction: column;
-  animation: slideInRight 0.3s ease;
   max-width: 480px;
   margin: 0 auto;
+  transform: translateX(100%);
+  transition: transform 0.3s ease;
 }
 
-@keyframes slideInRight {
-  from {
-    transform: translateX(100%);
-  }
-  to {
-    transform: translateX(0);
-  }
+.post-detail.visible {
+  transform: translateX(0);
 }
 
 .post-detail-header {

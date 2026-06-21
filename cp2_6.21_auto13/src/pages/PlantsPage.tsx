@@ -7,7 +7,9 @@ export default function PlantsPage() {
   const [plants, setPlants] = useState<Plant[]>([])
   const [loading, setLoading] = useState(true)
   const [showAddModal, setShowAddModal] = useState(false)
+  const [addModalVisible, setAddModalVisible] = useState(false)
   const [selectedPlant, setSelectedPlant] = useState<Plant | null>(null)
+  const [detailVisible, setDetailVisible] = useState(false)
   const [speciesFilter, setSpeciesFilter] = useState('')
   const [lightFilter, setLightFilter] = useState('')
   const [newPlantIds, setNewPlantIds] = useState<Set<string>>(new Set())
@@ -59,10 +61,16 @@ export default function PlantsPage() {
 
   function handleCardClick(plant: Plant) {
     setSelectedPlant(plant)
+    requestAnimationFrame(() => {
+      setDetailVisible(true)
+    })
   }
 
   function handleCloseDetail() {
-    setSelectedPlant(null)
+    setDetailVisible(false)
+    setTimeout(() => {
+      setSelectedPlant(null)
+    }, 300)
   }
 
   function handleOpenAddModal() {
@@ -74,10 +82,16 @@ export default function PlantsPage() {
       lightNeeds: '',
       imageUrl: ''
     })
+    requestAnimationFrame(() => {
+      setAddModalVisible(true)
+    })
   }
 
   function handleCloseAddModal() {
-    setShowAddModal(false)
+    setAddModalVisible(false)
+    setTimeout(() => {
+      setShowAddModal(false)
+    }, 250)
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -207,7 +221,7 @@ export default function PlantsPage() {
       </button>
 
       {showAddModal && (
-        <div className="modal-overlay" onClick={handleCloseAddModal}>
+        <div className={`modal-overlay ${addModalVisible ? 'visible' : ''}`} onClick={handleCloseAddModal}>
           <div
             className="modal-content center-modal"
             onClick={e => e.stopPropagation()}
@@ -306,7 +320,7 @@ export default function PlantsPage() {
       )}
 
       {selectedPlant && (
-        <div className="modal-overlay" onClick={handleCloseDetail}>
+        <div className={`modal-overlay ${detailVisible ? 'visible' : ''}`} onClick={handleCloseDetail}>
           <div
             className="modal-content"
             onClick={e => e.stopPropagation()}

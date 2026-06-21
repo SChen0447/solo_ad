@@ -26,6 +26,7 @@ export default function CommunityPage() {
   const [newPostContent, setNewPostContent] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [selectedPost, setSelectedPost] = useState<Post | null>(null)
+  const [detailVisible, setDetailVisible] = useState(false)
   const [commentText, setCommentText] = useState('')
   const [submittingComment, setSubmittingComment] = useState(false)
   const [likeAnimations, setLikeAnimations] = useState<Set<string>>(new Set())
@@ -56,10 +57,16 @@ export default function CommunityPage() {
   function handlePostClick(post: Post) {
     setSelectedPost(post)
     setCommentText('')
+    requestAnimationFrame(() => {
+      setDetailVisible(true)
+    })
   }
 
   function handleCloseDetail() {
-    setSelectedPost(null)
+    setDetailVisible(false)
+    setTimeout(() => {
+      setSelectedPost(null)
+    }, 300)
   }
 
   function handleOpenAddPost() {
@@ -276,7 +283,7 @@ export default function CommunityPage() {
       )}
 
       {selectedPost && (
-        <div className="post-detail">
+        <div className={`post-detail ${detailVisible ? 'visible' : ''}`}>
           <div className="post-detail-header">
             <button className="back-btn" onClick={handleCloseDetail}>
               ←

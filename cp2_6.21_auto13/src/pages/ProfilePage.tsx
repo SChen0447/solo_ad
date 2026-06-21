@@ -77,10 +77,10 @@ function ProgressRing({
             fill="none"
             stroke="#43A047"
             strokeWidth={thickness}
-            strokeDasharray={circumference}
-            strokeDashoffset={offset}
             strokeLinecap="round"
             style={{
+              strokeDasharray: circumference,
+              strokeDashoffset: offset,
               transition: 'stroke-dashoffset 0.5s ease'
             }}
           />
