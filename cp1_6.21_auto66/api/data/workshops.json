@@ -1,0 +1,83 @@
+[
+  {
+    "id": "ws1",
+    "name": "陶艺手作初体验",
+    "description": "从揉泥到拉坯，体验陶艺创作的完整过程，感受泥土在指尖成型的乐趣，适合零基础爱好者参与。",
+    "maxParticipants": 8,
+    "currentParticipants": 3,
+    "fee": 199,
+    "datetime": "2026-07-15T14:00:00",
+    "coverImage": "https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=handmade%20pottery%20workshop%20clay%20ceramics%20warm%20light&image_size=landscape_4_3",
+    "materialKits": [
+      {
+        "id": "mk1",
+        "name": "陶土套装",
+        "price": 68,
+        "stock": 10,
+        "required": true
+      },
+      {
+        "id": "mk2",
+        "name": "上釉工具包",
+        "price": 35,
+        "stock": 8,
+        "required": false
+      }
+    ],
+    "createdAt": "2026-06-01T10:00:00.000Z"
+  },
+  {
+    "id": "ws2",
+    "name": "实木置物架制作",
+    "description": "学习木工基础技法，亲手制作一款简约实用的实木置物架，从选材到组装全程指导，成品可带回家。",
+    "maxParticipants": 6,
+    "currentParticipants": 5,
+    "fee": 299,
+    "datetime": "2026-07-20T10:00:00",
+    "coverImage": "https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=woodworking%20workshop%20wooden%20shelf%20crafts&image_size=landscape_4_3",
+    "materialKits": [
+      {
+        "id": "mk3",
+        "name": "木工基础套装",
+        "price": 88,
+        "stock": 6,
+        "required": true
+      },
+      {
+        "id": "mk4",
+        "name": "打磨工具包",
+        "price": 45,
+        "stock": 6,
+        "required": false
+      }
+    ],
+    "createdAt": "2026-06-05T10:00:00.000Z"
+  },
+  {
+    "id": "ws3",
+    "name": "法式甜点烘焙",
+    "description": "跟随专业烘焙师学习制作经典法式甜点，掌握马卡龙与千层酥的烘焙技巧，享受甜蜜的创作时光。",
+    "maxParticipants": 10,
+    "currentParticipants": 10,
+    "fee": 159,
+    "datetime": "2026-07-25T15:00:00",
+    "coverImage": "https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=french%20pastry%20baking%20workshop%20desserts&image_size=landscape_4_3",
+    "materialKits": [
+      {
+        "id": "mk5",
+        "name": "烘焙材料包",
+        "price": 58,
+        "stock": 0,
+        "required": true
+      },
+      {
+        "id": "mk6",
+        "name": "装饰工具包",
+        "price": 28,
+        "stock": 10,
+        "required": false
+      }
+    ],
+    "createdAt": "2026-06-10T10:00:00.000Z"
+  }
+]
