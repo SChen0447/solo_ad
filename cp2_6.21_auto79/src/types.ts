@@ -7,6 +7,7 @@ export interface Material {
   mimeType: string;
   data: string;
   uploadedAt: number;
+  uploadTime: string;
   annotationCount?: number;
 }
 

@@ -26,6 +26,16 @@ function getMimeType(file: Express.Multer.File): MaterialType {
   return 'PNG';
 }
 
+function formatUploadTime(ts: number): string {
+  const d = new Date(ts);
+  const Y = d.getFullYear();
+  const M = String(d.getMonth() + 1).padStart(2, '0');
+  const D = String(d.getDate()).padStart(2, '0');
+  const h = String(d.getHours()).padStart(2, '0');
+  const m = String(d.getMinutes()).padStart(2, '0');
+  return `${Y}-${M}-${D} ${h}:${m}`;
+}
+
 function materialWithCount(material: Material): Material {
   const count = annotations.get(material.id)?.length || 0;
   return { ...material, annotationCount: count };
@@ -67,6 +77,7 @@ app.post('/api/materials', upload.single('file'), (req: Request & { file?: Expre
     mimeType: file.mimetype,
     data: `data:${file.mimetype};base64,${data}`,
     uploadedAt: Date.now(),
+    uploadTime: formatUploadTime(Date.now()),
     annotationCount: 0,
   };
 
