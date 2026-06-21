@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>塔防原型布局工具</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #1a1a2e;
+      font-family: 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+      color: #e0e0e0;
+    }
+    #app {
+      display: flex;
+      width: 100%;
+      height: 100%;
+    }
+    #game-container {
+      width: 70%;
+      height: 100%;
+      position: relative;
+    }
+    #game-container canvas {
+      display: block;
+    }
+    #right-panel {
+      width: 30%;
+      height: 100%;
+      background: #16213e;
+      display: flex;
+      flex-direction: column;
+      border-left: 1px solid #2a3a5e;
+      overflow-y: auto;
+    }
+    .panel-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: #8899bb;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      padding: 16px 16px 8px;
+      border-bottom: 1px solid #2a3a5e;
+    }
+    #toolbar {
+      padding: 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      border-bottom: 1px solid #2a3a5e;
+    }
+    .tower-btn, .tool-btn {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 12px;
+      border: 1px solid transparent;
+      border-radius: 8px;
+      background: rgba(255,255,255,0.04);
+      color: #c0c8d8;
+      cursor: pointer;
+      font-size: 13px;
+      font-family: inherit;
+      transition: all 0.15s ease;
+      width: 100%;
+      text-align: left;
+    }
+    .tower-btn:hover, .tool-btn:hover {
+      background: rgba(255,255,255,0.08);
+      border-color: rgba(255,255,255,0.1);
+    }
+    .tower-btn.active {
+      background: rgba(255,255,255,0.1);
+      border-color: rgba(255,255,255,0.2);
+    }
+    .tower-btn:hover .btn-icon {
+      transform: scale(1.15);
+    }
+    .btn-icon {
+      font-size: 16px;
+      width: 24px;
+      text-align: center;
+      transition: transform 0.15s ease;
+    }
+    .btn-label {
+      flex: 1;
+    }
+    .btn-cost {
+      font-size: 11px;
+      color: #7a8a9a;
+      font-weight: 600;
+    }
+    .tool-btn.accent {
+      background: rgba(0,200,120,0.12);
+      border-color: rgba(0,200,120,0.25);
+      color: #66ffaa;
+    }
+    .tool-btn.accent:hover {
+      background: rgba(0,200,120,0.2);
+    }
+    .tool-btn.accent.active {
+      background: rgba(0,200,120,0.25);
+      border-color: rgba(0,200,120,0.4);
+    }
+    .tool-btn.danger {
+      background: rgba(255,80,80,0.08);
+      border-color: rgba(255,80,80,0.15);
+      color: #ff6b6b;
+    }
+    .tool-btn.danger:hover {
+      background: rgba(255,80,80,0.15);
+    }
+    #path-btn.active {
+      background: rgba(255,204,0,0.15);
+      border-color: rgba(255,204,0,0.3);
+      color: #ffcc44;
+    }
+    #property-panel {
+      padding: 12px;
+      flex: 1;
+    }
+    .prop-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 14px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid #2a3a5e;
+    }
+    .prop-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      box-shadow: 0 0 8px currentColor;
+    }
+    .prop-name {
+      font-size: 16px;
+      font-weight: 700;
+    }
+    .prop-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 7px 0;
+      border-bottom: 1px solid rgba(255,255,255,0.04);
+    }
+    .prop-label {
+      font-size: 12px;
+      color: #7a8a9a;
+    }
+    .prop-value {
+      font-size: 13px;
+      font-weight: 600;
+      color: #c8d8e8;
+    }
+    .remove-btn {
+      width: 100%;
+      margin-top: 16px;
+      padding: 8px;
+      border-radius: 6px;
+      border: 1px solid rgba(255,80,80,0.3);
+      background: rgba(255,80,80,0.1);
+      color: #ff6b6b;
+      cursor: pointer;
+      font-size: 12px;
+      font-family: inherit;
+      transition: all 0.15s ease;
+    }
+    .remove-btn:hover {
+      background: rgba(255,80,80,0.2);
+    }
+    .prop-empty {
+      text-align: center;
+      padding: 30px 10px;
+      color: #5a6a7a;
+    }
+    .prop-empty-icon {
+      font-size: 28px;
+      margin-bottom: 12px;
+      opacity: 0.3;
+    }
+    .prop-empty-text {
+      font-size: 13px;
+      margin-bottom: 4px;
+    }
+    .prop-empty-hint {
+      font-size: 11px;
+      color: #4a5a6a;
+    }
+    .panel-section-info {
+      padding: 12px 16px;
+      border-top: 1px solid #2a3a5e;
+      font-size: 11px;
+      color: #5a6a7a;
+      line-height: 1.6;
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <div id="game-container"></div>
+    <div id="right-panel">
+      <div class="panel-title">防御塔</div>
+      <div id="toolbar"></div>
+      <div class="panel-title">属性</div>
+      <div id="property-panel"></div>
+      <div class="panel-section-info">
+        左键点击网格放置/选择防御塔<br>
+        选择防御塔后再次点击移除<br>
+        绘制路径模式拖拽创建敌人路线<br>
+        路径完成后点击开始模拟
+      </div>
+    </div>
+  </div>
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
