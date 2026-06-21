@@ -1,5 +1,5 @@
-import React, { useRef, useCallback } from 'react';
-import { Upload, Plus } from 'lucide-react';
+import React, { useRef, useCallback, useState, useEffect } from 'react';
+import { Plus } from 'lucide-react';
 import type { VersionItem } from '../types';
 
 interface Props {
@@ -12,9 +12,31 @@ interface Props {
 const VersionManager: React.FC<Props> = ({ versionList, selectedIds, onSelectVersion, onUpload }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const [showLeftMask, setShowLeftMask] = useState(false);
+  const [showRightMask, setShowRightMask] = useState(false);
   let isDragging = false;
   let startX = 0;
   let scrollLeft = 0;
+
+  const updateMasks = useCallback(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    setShowLeftMask(el.scrollLeft > 4);
+    setShowRightMask(el.scrollLeft + el.clientWidth < el.scrollWidth - 4);
+  }, []);
+
+  useEffect(() => {
+    updateMasks();
+    const el = scrollRef.current;
+    if (!el) return;
+    const handler = () => updateMasks();
+    el.addEventListener('scroll', handler);
+    window.addEventListener('resize', handler);
+    return () => {
+      el.removeEventListener('scroll', handler);
+      window.removeEventListener('resize', handler);
+    };
+  }, [updateMasks, versionList.length]);
 
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     isDragging = true;
@@ -53,10 +75,12 @@ const VersionManager: React.FC<Props> = ({ versionList, selectedIds, onSelectVer
     }
   };
 
-  const formatDate = (date: Date) => {
+  const formatDateTime = (date: Date) => {
     const m = String(date.getMonth() + 1).padStart(2, '0');
     const d = String(date.getDate()).padStart(2, '0');
-    return `${m}/${d}`;
+    const h = String(date.getHours()).padStart(2, '0');
+    const min = String(date.getMinutes()).padStart(2, '0');
+    return `${m}/${d} ${h}:${min}`;
   };
 
   let touchStartX = 0;
@@ -75,6 +99,8 @@ const VersionManager: React.FC<Props> = ({ versionList, selectedIds, onSelectVer
 
   return (
     <div className="timeline-area">
+      {showLeftMask && <div className="timeline-mask timeline-mask-left" />}
+      {showRightMask && <div className="timeline-mask timeline-mask-right" />}
       <div
         ref={scrollRef}
         className="timeline-scroll"
@@ -98,20 +124,30 @@ const VersionManager: React.FC<Props> = ({ versionList, selectedIds, onSelectVer
         />
 
         {versionList.map((v, i) => {
-          const isActive = selectedIds.includes(v.id);
+          const slotA = selectedIds[0] === v.id ? 0 : null;
+          const slotB = selectedIds[1] === v.id ? 1 : null;
+          const activeSlot = slotA !== null ? slotA : slotB;
           return (
             <React.Fragment key={v.id}>
               {i > 0 && <div className="timeline-connector" />}
               <div
-                className={`timeline-node${isActive ? ' active' : ''}`}
+                className={`timeline-node${activeSlot !== null ? ' active' : ''}${activeSlot === 0 ? ' slot-a' : ''}${activeSlot === 1 ? ' slot-b' : ''}`}
                 onClick={() => handleNodeClick(v.id)}
               >
-                <div className="timeline-thumb">
-                  <img src={v.thumbnailUrl} alt={v.versionNumber} draggable={false} />
+                <div className="timeline-thumb-wrap">
+                  <div className="timeline-thumb-ring" />
+                  <div className="timeline-thumb">
+                    <img src={v.thumbnailUrl} alt={v.versionNumber} draggable={false} />
+                    {activeSlot !== null && (
+                      <div className={`timeline-slot-badge slot-${activeSlot === 0 ? 'a' : 'b'}`}>
+                        {activeSlot === 0 ? 'A' : 'B'}
+                      </div>
+                    )}
+                  </div>
                 </div>
                 <div className="timeline-info">
                   <div className="timeline-version">{v.versionNumber}</div>
-                  <div className="timeline-date">{formatDate(v.uploadTime)}</div>
+                  <div className="timeline-date">{formatDateTime(v.uploadTime)}</div>
                 </div>
               </div>
             </React.Fragment>
