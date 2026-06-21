@@ -1,0 +1,35 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body, #root {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background-color: #000000;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  position: relative;
+}
+
+@media (max-width: 768px) {
+  .info-panel {
+    transform: scale(0.8);
+    transform-origin: bottom left;
+  }
+
+  .control-panel {
+    transform: scale(0.8);
+    transform-origin: top right;
+  }
+}
+
+canvas {
+  display: block;
+}
