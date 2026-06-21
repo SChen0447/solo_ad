@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>城市天际线演变 3D 可视化</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      color: #333;
+    }
+
+    #scene-container {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 0;
+    }
+
+    #scene-container canvas {
+      display: block;
+    }
+
+    .ui-layer {
+      position: fixed;
+      z-index: 10;
+      pointer-events: none;
+    }
+
+    .ui-layer > * {
+      pointer-events: auto;
+    }
+
+    .timeline-wrapper {
+      position: fixed;
+      bottom: 40px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 80%;
+      max-width: 900px;
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      padding: 20px 24px;
+      background: rgba(255, 255, 255, 0.9);
+      backdrop-filter: blur(10px);
+      border-radius: 12px;
+      border: 1px solid rgba(0, 0, 0, 0.08);
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+    }
+
+    .play-btn {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      border: none;
+      background: transparent;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background-color 0.2s ease;
+      flex-shrink: 0;
+    }
+
+    .play-btn:hover {
+      background: rgba(74, 144, 217, 0.1);
+    }
+
+    .play-btn svg {
+      width: 18px;
+      height: 18px;
+      fill: #333;
+    }
+
+    .timeline-content {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .timeline-slider-container {
+      position: relative;
+      width: 100%;
+      height: 24px;
+      display: flex;
+      align-items: center;
+    }
+
+    .timeline-track {
+      position: absolute;
+      width: 100%;
+      height: 4px;
+      background: #e0e0e0;
+      border-radius: 2px;
+    }
+
+    .timeline-fill {
+      position: absolute;
+      left: 0;
+      height: 4px;
+      background: #4A90D9;
+      border-radius: 2px;
+      width: 0%;
+      transition: width 0.1s linear;
+    }
+
+    .timeline-input {
+      position: absolute;
+      width: 100%;
+      height: 24px;
+      opacity: 0;
+      cursor: pointer;
+      z-index: 2;
+    }
+
+    .timeline-thumb {
+      position: absolute;
+      width: 16px;
+      height: 16px;
+      background: #4A90D9;
+      border-radius: 50%;
+      transform: translateX(-50%);
+      left: 0%;
+      transition: left 0.1s linear, width 0.2s ease, height 0.2s ease, box-shadow 0.2s ease;
+      z-index: 1;
+      pointer-events: none;
+    }
+
+    .timeline-thumb.hover {
+      width: 20px;
+      height: 20px;
+      box-shadow: 0 0 12px rgba(74, 144, 217, 0.5);
+    }
+
+    .timeline-marks {
+      display: flex;
+      justify-content: space-between;
+      position: relative;
+    }
+
+    .timeline-mark {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      cursor: pointer;
+      gap: 4px;
+    }
+
+    .timeline-mark-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #ccc;
+      transition: background-color 0.2s ease;
+    }
+
+    .timeline-mark.active .timeline-mark-dot {
+      background: #4A90D9;
+    }
+
+    .timeline-mark-label {
+      font-size: 13px;
+      font-weight: 500;
+      color: #666;
+      transition: color 0.2s ease;
+    }
+
+    .timeline-mark.active .timeline-mark-label {
+      color: #4A90D9;
+      font-weight: 600;
+    }
+
+    .timeline-year-display {
+      font-size: 28px;
+      font-weight: 700;
+      color: #333;
+      min-width: 80px;
+      text-align: center;
+    }
+
+    .info-panel {
+      position: fixed;
+      top: 50%;
+      right: -360px;
+      transform: translateY(-50%);
+      width: 320px;
+      background: rgba(255, 255, 255, 0.9);
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(0, 0, 0, 0.08);
+      border-radius: 12px;
+      padding: 24px;
+      box-shadow: 0 4px 24px rgba(0, 0, 0, 0.12);
+      transition: right 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      z-index: 20;
+    }
+
+    .info-panel.visible {
+      right: 24px;
+    }
+
+    .info-panel-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 20px;
+    }
+
+    .info-panel-title {
+      font-size: 18px;
+      font-weight: 600;
+      color: #333;
+    }
+
+    .info-panel-close {
+      width: 28px;
+      height: 28px;
+      border: none;
+      background: transparent;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 6px;
+      transition: background-color 0.2s ease;
+    }
+
+    .info-panel-close:hover {
+      background: rgba(0, 0, 0, 0.06);
+    }
+
+    .info-panel-close svg {
+      width: 16px;
+      height: 16px;
+      stroke: #666;
+    }
+
+    .info-panel-body {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .info-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .info-item-label {
+      font-size: 14px;
+      color: #999;
+      font-weight: 400;
+    }
+
+    .info-item-value {
+      font-size: 14px;
+      color: #333;
+      font-weight: 500;
+    }
+
+    .info-type-badge {
+      display: inline-block;
+      padding: 4px 12px;
+      border-radius: 12px;
+      font-size: 12px;
+      font-weight: 500;
+    }
+
+    .info-type-badge.commercial {
+      background: rgba(138, 43, 226, 0.15);
+      color: #8A2BE2;
+    }
+
+    .info-type-badge.residential {
+      background: rgba(255, 140, 0, 0.15);
+      color: #FF8C00;
+    }
+
+    .info-type-badge.public {
+      background: rgba(0, 128, 0, 0.15);
+      color: #008000;
+    }
+
+    .building-label {
+      position: absolute;
+      padding: 6px 12px;
+      background: rgba(255, 255, 255, 0.85);
+      backdrop-filter: blur(5px);
+      -webkit-backdrop-filter: blur(5px);
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 500;
+      color: #333;
+      white-space: nowrap;
+      pointer-events: none;
+      border: 1px solid rgba(0, 0, 0, 0.08);
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+      transform: translate(-50%, -100%);
+      margin-top: -8px;
+      opacity: 0;
+      transition: opacity 0.2s ease;
+    }
+
+    .building-label.visible {
+      opacity: 1;
+    }
+
+    .label-container {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 5;
+    }
+
+    @media (max-width: 768px) {
+      .timeline-wrapper {
+        width: 95%;
+        bottom: 20px;
+        padding: 16px;
+        gap: 12px;
+      }
+
+      .timeline-year-display {
+        font-size: 20px;
+        min-width: 60px;
+      }
+
+      .info-panel {
+        width: 100%;
+        height: 50%;
+        top: auto;
+        bottom: -55%;
+        right: auto !important;
+        left: 0;
+        transform: none;
+        border-radius: 16px 16px 0 0;
+        transition: bottom 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      }
+
+      .info-panel.visible {
+        bottom: 0;
+      }
+
+      .building-label {
+        font-size: 12px;
+        padding: 4px 10px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div id="scene-container"></div>
+
+  <div class="label-container" id="label-container"></div>
+
+  <div class="timeline-wrapper">
+    <button class="play-btn" id="play-btn" aria-label="播放/暂停">
+      <svg id="play-icon" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M8 5v14l11-7z"/>
+      </svg>
+      <svg id="pause-icon" viewBox="0 0 24 24" fill="currentColor" style="display:none">
+        <path d="M6 4h4v16H6V4zm8 0h4v16h-4V4z"/>
+      </svg>
+    </button>
+
+    <div class="timeline-content">
+      <div class="timeline-slider-container">
+        <div class="timeline-track"></div>
+        <div class="timeline-fill" id="timeline-fill"></div>
+        <input type="range" class="timeline-input" id="timeline-input" min="0" max="3" step="1" value="0">
+        <div class="timeline-thumb" id="timeline-thumb"></div>
+      </div>
+      <div class="timeline-marks" id="timeline-marks">
+        <div class="timeline-mark active" data-index="0">
+          <div class="timeline-mark-dot"></div>
+          <span class="timeline-mark-label">1990</span>
+        </div>
+        <div class="timeline-mark" data-index="1">
+          <div class="timeline-mark-dot"></div>
+          <span class="timeline-mark-label">2000</span>
+        </div>
+        <div class="timeline-mark" data-index="2">
+          <div class="timeline-mark-dot"></div>
+          <span class="timeline-mark-label">2010</span>
+        </div>
+        <div class="timeline-mark" data-index="3">
+          <div class="timeline-mark-dot"></div>
+          <span class="timeline-mark-label">2020</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="timeline-year-display" id="year-display">1990</div>
+  </div>
+
+  <div class="info-panel" id="info-panel">
+    <div class="info-panel-header">
+      <h2 class="info-panel-title" id="info-title">建筑名称</h2>
+      <button class="info-panel-close" id="info-close" aria-label="关闭">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M18 6L6 18M6 6l12 12"/>
+        </svg>
+      </button>
+    </div>
+    <div class="info-panel-body">
+      <div class="info-item">
+        <span class="info-item-label">建造年代</span>
+        <span class="info-item-value" id="info-year">-</span>
+      </div>
+      <div class="info-item">
+        <span class="info-item-label">建筑高度</span>
+        <span class="info-item-value" id="info-height">-</span>
+      </div>
+      <div class="info-item">
+        <span class="info-item-label">功能类型</span>
+        <span class="info-type-badge" id="info-type">-</span>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
