@@ -74,43 +74,24 @@ export class EffectManager {
 
 export const effectManager = new EffectManager();
 
-export const renderSpeedlines = (type: string, rotation: number, opacity: number, size: number = 100): React.ReactNode => {
+export interface SpeedlineData {
+  lines: { x1: number; y1: number; x2: number; y2: number; width: number }[];
+  size: number;
+}
+
+export function getSpeedlineData(type: string, size: number = 100): SpeedlineData {
   const lineCount = 12;
-  const lines: React.ReactNode[] = [];
+  const lines: { x1: number; y1: number; x2: number; y2: number; width: number }[] = [];
 
   if (type === 'horizontal') {
     for (let i = 0; i < lineCount; i++) {
       const y = (i / lineCount) * size;
-      lines.push(
-        <line
-          key={i}
-          x1={0}
-          y1={y}
-          x2={size}
-          y2={y}
-          stroke="#333"
-          strokeWidth={1.5}
-          opacity={opacity}
-          strokeLinecap="round"
-        />
-      );
+      lines.push({ x1: 0, y1: y, x2: size, y2: y, width: 1.5 });
     }
   } else if (type === 'vertical') {
     for (let i = 0; i < lineCount; i++) {
       const x = (i / lineCount) * size;
-      lines.push(
-        <line
-          key={i}
-          x1={x}
-          y1={0}
-          x2={x}
-          y2={size}
-          stroke="#333"
-          strokeWidth={1.5}
-          opacity={opacity}
-          strokeLinecap="round"
-        />
-      );
+      lines.push({ x1: x, y1: 0, x2: x, y2: size, width: 1.5 });
     }
   } else if (type === 'radial') {
     const centerX = size / 2;
@@ -122,32 +103,9 @@ export const renderSpeedlines = (type: string, rotation: number, opacity: number
       const y1 = centerY + Math.sin(angle) * (radius * 0.3);
       const x2 = centerX + Math.cos(angle) * radius;
       const y2 = centerY + Math.sin(angle) * radius;
-      lines.push(
-        <line
-          key={i}
-          x1={x1}
-          y1={y1}
-          x2={x2}
-          y2={y2}
-          stroke="#333"
-          strokeWidth={2}
-          opacity={opacity}
-          strokeLinecap="round"
-        />
-      );
+      lines.push({ x1, y1, x2, y2, width: 2 });
     }
   }
 
-  return (
-    <svg
-      width={size}
-      height={size}
-      style={{
-        transform: `rotate(${rotation}deg)`,
-        transformOrigin: 'center center'
-      }}
-    >
-      {lines}
-    </svg>
-  );
-};
+  return { lines, size };
+}

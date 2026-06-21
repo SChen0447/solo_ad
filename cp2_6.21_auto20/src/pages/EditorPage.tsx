@@ -4,7 +4,7 @@ import PanelComponent from '../modules/storyboard/PanelComponent';
 import BubbleOverlay from '../modules/dialogue/BubbleOverlay';
 import { storyboardEngine } from '../modules/storyboard/StoryboardEngine';
 import { dialogueEditor } from '../modules/dialogue/DialogueEditor';
-import { effectManager, renderSpeedlines } from '../modules/effects/EffectManager';
+import { effectManager, getSpeedlineData } from '../modules/effects/EffectManager';
 import {
   Panel,
   Bubble,
@@ -158,6 +158,12 @@ const EditorPage: React.FC = () => {
 
   const handlePanelSizeChange = useCallback((id: string, width: number, height: number) => {
     setPanels(prev => prev.map(p => p.id === id ? { ...p, width: Math.round(width), height: Math.round(height) } : p));
+  }, []);
+
+  const handlePanelPositionAndSizeChange = useCallback((id: string, x: number, y: number, width: number, height: number) => {
+    setPanels(prev => prev.map(p =>
+      p.id === id ? { ...p, x, y, width: Math.round(width), height: Math.round(height) } : p
+    ));
   }, []);
 
   const applyPanelSize = useCallback((dim: 'width' | 'height') => {
@@ -407,6 +413,7 @@ const EditorPage: React.FC = () => {
                   onDoubleClick={setSelectedPanelId}
                   onPositionChange={handlePanelPositionChange}
                   onSizeChange={handlePanelSizeChange}
+                  onPositionAndSizeChange={handlePanelPositionAndSizeChange}
                   canvasSize={canvasSize}
                   showWarning={overlappingPanelIds.includes(panel.id)}
                 >
@@ -1204,6 +1211,40 @@ const EffectPropertyEditor: React.FC<{
   </div>
 );
 
+const SpeedlineSvg: React.FC<{
+  subtype: string;
+  size: number;
+  opacity: number;
+  rotation: number;
+}> = ({ subtype, size, opacity, rotation }) => {
+  const data = getSpeedlineData(subtype, size);
+  return (
+    <svg
+      width={size}
+      height={size}
+      style={{
+        transform: `rotate(${rotation}deg)`,
+        transformOrigin: 'center center',
+        display: 'block'
+      }}
+    >
+      {data.lines.map((line, i) => (
+        <line
+          key={i}
+          x1={line.x1}
+          y1={line.y1}
+          x2={line.x2}
+          y2={line.y2}
+          stroke="#333"
+          strokeWidth={line.width}
+          opacity={opacity}
+          strokeLinecap="round"
+        />
+      ))}
+    </svg>
+  );
+};
+
 const EffectRenderer: React.FC<{
   effect: EffectItem;
   isSelected: boolean;
@@ -1289,7 +1330,7 @@ const EffectRenderer: React.FC<{
         pointerEvents: 'auto'
       }}
     >
-      {renderSpeedlines(effect.subtype, 0, 1, 80)}
+      <SpeedlineSvg subtype={effect.subtype} size={80} opacity={effect.opacity} rotation={0} />
     </div>
   );
 };
