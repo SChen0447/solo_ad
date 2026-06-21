@@ -20,11 +20,41 @@ const iconOptions = ['star', 'heart', 'arrow'];
 
 const genId = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
 
-function snapToGrid(value: number): number {
+function snapSingle(value: number): number {
   const mod = value % GRID_SIZE;
   if (mod < SNAP_THRESHOLD) return value - mod;
   if (mod > GRID_SIZE - SNAP_THRESHOLD) return value + (GRID_SIZE - mod);
   return value;
+}
+
+function snapPositionForElement(
+  x: number,
+  y: number,
+  width: number,
+  height: number
+): { x: number; y: number } {
+  const corners = [
+    { px: x, py: y },
+    { px: x + width, py: y },
+    { px: x, py: y + height },
+    { px: x + width, py: y + height },
+  ];
+  let bestX = x;
+  let bestY = y;
+  let minDist = Infinity;
+  for (const c of corners) {
+    const sx = snapSingle(c.px);
+    const sy = snapSingle(c.py);
+    const dx = Math.abs(sx - c.px);
+    const dy = Math.abs(sy - c.py);
+    const dist = dx + dy;
+    if (dist < minDist && (dx > 0 || dy > 0)) {
+      minDist = dist;
+      bestX = x + (sx - c.px);
+      bestY = y + (sy - c.py);
+    }
+  }
+  return { x: bestX, y: bestY };
 }
 
 function snapSize(value: number): number {
@@ -39,10 +69,13 @@ const Canvas: React.FC = () => {
   const [isDrawing, setIsDrawing] = useState(false);
   const [isSmoothing, setIsSmoothing] = useState(true);
   const [iconPickerPos, setIconPickerPos] = useState<{ x: number; y: number } | null>(null);
+  const [editingStickyId, setEditingStickyId] = useState<string | null>(null);
   const dragStart = useRef<{ x: number; y: number; ox: number; oy: number } | null>(null);
-  const elementDragStart = useRef<{ x: number; y: number; ex: number; ey: number } | null>(null);
+  const elementDragStart = useRef<{
+    x: number; y: number; ex: number; ey: number; ew: number; eh: number } | null>(null);
   const drawingPoints = useRef<{ x: number; y: number }[]>([]);
   const [newIds, setNewIds] = useState<Set<string>>(new Set());
+  const lastSnappedPos = useRef<{ x: number; y: number } | null>(null);
 
   const activeTool = useCanvasStore((s) => s.activeTool);
   const elements = useCanvasStore((s) => s.elements);
@@ -65,6 +98,16 @@ const Canvas: React.FC = () => {
       return {
         x: (clientX - rect.left - offsetX) / zoom,
         y: (clientY - rect.top - offsetY) / zoom,
+      };
+    },
+    [offsetX, offsetY, zoom]
+  );
+
+  const canvasToScreen = useCallback(
+    (cx: number, cy: number) => {
+      return {
+        x: cx * zoom + offsetX,
+        y: cy * zoom + offsetY,
       };
     },
     [offsetX, offsetY, zoom]
@@ -99,6 +142,7 @@ const Canvas: React.FC = () => {
     if (activeTool === 'select' || activeTool === 'pen') {
       if (activeTool === 'select') {
         selectElement(null);
+        setEditingStickyId(null);
         setIsDraggingCanvas(true);
         dragStart.current = {
           x: e.clientX,
@@ -118,8 +162,11 @@ const Canvas: React.FC = () => {
       let placedX = x;
       let placedY = y;
       if (activeTool === 'rectangle' || activeTool === 'circle') {
-        placedX = snapToGrid(x);
-        placedY = snapToGrid(y);
+        const snapped = snapPositionForElement(x, y,
+          activeTool === 'rectangle' ? snapSize(100) : snapSize(90),
+          activeTool === 'rectangle' ? snapSize(70) : snapSize(90));
+        placedX = snapped.x;
+        placedY = snapped.y;
       }
       createShapeElement(activeTool, placedX, placedY);
     }
@@ -222,9 +269,16 @@ const Canvas: React.FC = () => {
         let nx = elementDragStart.current.ex + (x - elementDragStart.current.x);
         let ny = elementDragStart.current.ey + (y - elementDragStart.current.y);
         if (el.type === 'rectangle' || el.type === 'circle') {
-          nx = snapToGrid(nx);
-          ny = snapToGrid(ny);
+          const snapped = snapPositionForElement(
+            nx,
+            ny,
+            elementDragStart.current.ew,
+            elementDragStart.current.eh
+          );
+          nx = snapped.x;
+          ny = snapped.y;
         }
+        lastSnappedPos.current = { x: nx, y: ny };
         const existing = elements.find((e2) => e2.id === id);
         if (existing && (existing.x !== nx || existing.y !== ny)) {
           updateElement(id, { x: nx, y: ny });
@@ -265,6 +319,7 @@ const Canvas: React.FC = () => {
     if (isDraggingElement) {
       setIsDraggingElement(null);
       elementDragStart.current = null;
+      lastSnappedPos.current = null;
     }
     if (isDrawing) {
       setIsDrawing(false);
@@ -311,13 +366,15 @@ const Canvas: React.FC = () => {
     e.preventDefault();
     const rect = containerRef.current?.getBoundingClientRect();
     if (!rect) return;
-    const mouseX = e.clientX - rect.left;
-    const mouseY = e.clientY - rect.top;
+    const mouseScreenX = e.clientX - rect.left;
+    const mouseScreenY = e.clientY - rect.top;
     const factor = e.deltaY < 0 ? 1.1 : 1 / 1.1;
     const newZoom = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, zoom * factor));
     const ratio = newZoom / zoom;
-    const newOffsetX = mouseX - (mouseX - offsetX) * ratio;
-    const newOffsetY = mouseY - (mouseY - offsetY) * ratio;
+    const canvasX = (mouseScreenX - offsetX) / zoom;
+    const canvasY = (mouseScreenY - offsetY) / zoom;
+    const newOffsetX = mouseScreenX - canvasX * newZoom;
+    const newOffsetY = mouseScreenY - canvasY * newZoom;
     setIsSmoothing(true);
     setView(newZoom, newOffsetX, newOffsetY);
   };
@@ -329,7 +386,7 @@ const Canvas: React.FC = () => {
       const el = elements.find((x) => x.id === id);
       if (el) {
         const { x, y } = screenToCanvas(e.clientX, e.clientY);
-        elementDragStart.current = { x, y, ex: el.x, ey: el.y };
+        elementDragStart.current = { x, y, ex: el.x, ey: el.y, ew: el.width, eh: el.height };
         snapshot();
         setIsDraggingElement(id);
       }
@@ -339,7 +396,10 @@ const Canvas: React.FC = () => {
   const handleElementDoubleClick = (id: string) => {
     const el = elements.find((x) => x.id === id);
     if (!el) return;
-    if (el.type === 'text' || el.type === 'sticky') {
+    if (el.type === 'text') {
+      setEditing(id);
+    } else if (el.type === 'sticky') {
+      setEditingStickyId(id);
       setEditing(id);
     }
   };
@@ -390,6 +450,13 @@ const Canvas: React.FC = () => {
       );
     }
   }
+
+  const editingSticky = editingStickyId
+    ? (elements.find((e) => e.id === editingStickyId) as StickyElement | undefined)
+    : undefined;
+  const stickyScreenPos = editingSticky
+    ? canvasToScreen(editingSticky.x + editingSticky.width / 2, editingSticky.y + editingSticky.height / 2)
+    : null;
 
   const cursorStyle =
     activeTool === 'select'
@@ -524,6 +591,58 @@ const Canvas: React.FC = () => {
           >
             ✕
           </button>
+        </div>
+      )}
+      {editingSticky && stickyScreenPos && (
+        <div
+          style={{
+            position: 'absolute',
+            left: stickyScreenPos.x,
+            top: stickyScreenPos.y,
+            transform: 'translate(-50%, -50%)',
+            background: 'var(--sticky-bg)',
+            boxShadow: '0 8px 24px rgba(0,0,0,0.15)',
+            borderRadius: 10,
+            padding: 14,
+            minWidth: editingSticky.width,
+            minHeight: editingSticky.height,
+            zIndex: 100,
+          }}
+        >
+          <div
+            style={{
+              fontSize: 12,
+              color: '#6b7280',
+              marginBottom: 8,
+              fontWeight: 600,
+            }}
+          >
+            编辑便签
+          </div>
+          <textarea
+            autoFocus
+            defaultValue={editingSticky.content}
+            onChange={(e) =>
+              updateElement(editingStickyId!, {
+                content: e.target.value,
+              } as Partial<CanvasElement>)
+            }
+            onBlur={() => {
+              setEditing(null);
+              setEditingStickyId(null);
+            }}
+            style={{
+              width: Math.max(editingSticky.width, 200),
+              height: Math.max(editingSticky.height, 120),
+              background: 'var(--sticky-bg)',
+              border: 'none',
+              fontSize: 14,
+              lineHeight: 1.5,
+              color: '#1f2937',
+              resize: 'both',
+              outline: 'none',
+            }}
+          />
         </div>
       )}
     </div>

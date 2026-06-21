@@ -3,7 +3,10 @@ import { useCanvasStore } from '../store/canvasStore';
 import { MAX_HISTORY } from '../types';
 
 const HistoryIndicator: React.FC = () => {
-  const past = useCanvasStore((s) => s.past);
+  const pastLength = useCanvasStore((s) => s.past.length);
+  const futureLength = useCanvasStore((s) => s.future.length);
+  const currentStep = pastLength;
+
   return (
     <div
       style={{
@@ -21,8 +24,9 @@ const HistoryIndicator: React.FC = () => {
         letterSpacing: 0.3,
         fontVariantNumeric: 'tabular-nums',
       }}
+      title={`${currentStep} 步操作记录，可撤销 ${pastLength} 步，可重做 ${futureLength} 步`}
     >
-      {past.length}/{MAX_HISTORY}
+      {currentStep}/{MAX_HISTORY}
     </div>
   );
 };

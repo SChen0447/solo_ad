@@ -27,19 +27,20 @@ const ElementRenderer: React.FC<Props> = ({
   isNew,
 }) => {
   const svgRef = useRef<SVGGElement>(null);
-  const [popKey, setPopKey] = useState(0);
+  const [shouldAnimate, setShouldAnimate] = useState(false);
   const editingId = useCanvasStore((s) => s.editingId);
   const setEditing = useCanvasStore((s) => s.setEditing);
   const updateElement = useCanvasStore((s) => s.updateElement);
-  const zoom = useCanvasStore((s) => s.zoom);
-  const offsetX = useCanvasStore((s) => s.offsetX);
-  const offsetY = useCanvasStore((s) => s.offsetY);
 
   useEffect(() => {
     if (isNew) {
-      setPopKey((k) => k + 1);
+      setShouldAnimate(true);
+      const timer = setTimeout(() => {
+        setShouldAnimate(false);
+      }, 250);
+      return () => clearTimeout(timer);
     }
-  }, [isNew, element.id]);
+  }, [isNew]);
 
   const isEditing = editingId === element.id;
 
@@ -53,26 +54,46 @@ const ElementRenderer: React.FC<Props> = ({
       fill: (element as { fill?: string }).fill
         ? (element as { fill: string }).fill
         : undefined,
-      fillStyle: 'solid',
+      fillStyle: 'solid' as const,
       fillWeight: 1,
     };
 
     switch (element.type) {
       case 'rectangle': {
         const shape = generator.rectangle(x, y, width, height, opts);
-        return <path {...shape.sets[0]} d={shape.sets[0].operations[0].data as string} />;
+        return shape.sets.map((s, i) => {
+          const d = s.operations.map((o) => o.data as string).join(' ');
+          return (
+            <path
+              key={i}
+              d={d}
+              fill={i === 0 && opts.fill ? opts.fill : 'none'}
+              stroke={color}
+              strokeWidth={strokeWidth}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          );
+        });
       }
       case 'circle': {
         const cx = x + width / 2;
         const cy = y + height / 2;
         const shape = generator.ellipse(cx, cy, width, height, opts);
-        const d = shape.sets
-          .flatMap((s) => s.operations.map((o) => o.data as string))
-          .join(' ');
-        return <g>{shape.sets.map((s, i) => {
+        return shape.sets.map((s, i) => {
           const d = s.operations.map((o) => o.data as string).join(' ');
-          return <path key={i} d={d} fill="none" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" />;
-        })}</g>;
+          return (
+            <path
+              key={i}
+              d={d}
+              fill="none"
+              stroke={color}
+              strokeWidth={strokeWidth}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          );
+        });
       }
       case 'pen': {
         const pen = element as PenElement;
@@ -210,8 +231,7 @@ const ElementRenderer: React.FC<Props> = ({
   return (
     <g
       ref={svgRef}
-      key={popKey}
-      className={isNew ? 'element-pop' : ''}
+      className={shouldAnimate ? 'element-pop' : ''}
       style={{
         transformOrigin: `${element.x + element.width / 2}px ${element.y + element.height / 2}px`,
         cursor: 'move',
@@ -264,71 +284,6 @@ const ElementRenderer: React.FC<Props> = ({
               resize: 'none',
             }}
           />
-        </foreignObject>
-      )}
-      {isEditing && element.type === 'sticky' && (
-        <foreignObject
-          x={element.x + offsetX - 60 / zoom}
-          y={element.y + offsetY - 20 / zoom}
-          width={element.width + 120 / zoom}
-          height={element.height + 120 / zoom}
-          style={{ overflow: 'visible' }}
-        >
-          <div
-            style={{
-              transform: `scale(${1 / zoom})`,
-              transformOrigin: 'top left',
-              width: (element.width + 120 / zoom) * zoom,
-              height: (element.height + 120 / zoom) * zoom,
-            }}
-          >
-            <div
-              style={{
-                position: 'absolute',
-                top: 30,
-                left: 60,
-                background: 'var(--sticky-bg)',
-                boxShadow: '0 8px 24px rgba(0,0,0,0.15)',
-                borderRadius: 10,
-                padding: 14,
-                minWidth: element.width,
-                minHeight: element.height,
-                zIndex: 100,
-              }}
-            >
-              <div
-                style={{
-                  fontSize: 12,
-                  color: '#6b7280',
-                  marginBottom: 8,
-                  fontWeight: 600,
-                }}
-              >
-                编辑便签
-              </div>
-              <textarea
-                autoFocus
-                defaultValue={(element as StickyElement).content}
-                onChange={(e) =>
-                  updateElement(element.id, {
-                    content: e.target.value,
-                  } as Partial<CanvasElement>)
-                }
-                onBlur={() => setEditing(null)}
-                style={{
-                  width: Math.max(element.width, 200),
-                  height: Math.max(element.height, 120),
-                  background: 'var(--sticky-bg)',
-                  border: 'none',
-                  fontSize: 14,
-                  lineHeight: 1.5,
-                  color: '#1f2937',
-                  resize: 'both',
-                  outline: 'none',
-                }}
-              />
-            </div>
-          </div>
         </foreignObject>
       )}
     </g>
