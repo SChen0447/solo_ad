@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>塔防路线规划与单位攻防模拟</title>
+  <link rel="stylesheet" href="/src/style.css">
+</head>
+<body>
+  <div class="game-container" id="gameContainer">
+    <div class="canvas-wrapper">
+      <canvas id="gameCanvas" width="900" height="600"></canvas>
+    </div>
+    <div class="control-panel" id="controlPanel">
+      <div class="panel-section">
+        <div class="wave-info">
+          <div class="wave-label">当前波次</div>
+          <div class="wave-number" id="waveNumber">第 1 波</div>
+          <div class="enemy-count" id="enemyCount">剩余单位: 0</div>
+        </div>
+      </div>
+      <div class="panel-section">
+        <div class="score-info">
+          <div class="score-label">总得分</div>
+          <div class="score-value" id="scoreValue">0</div>
+        </div>
+      </div>
+      <div class="panel-section">
+        <div class="lives-info">
+          <div class="lives-label">生命值</div>
+          <div class="lives-value" id="livesValue">3</div>
+        </div>
+      </div>
+      <div class="panel-section">
+        <button class="btn-primary" id="nextWaveBtn">下一波</button>
+      </div>
+      <div class="panel-section tower-panel" id="towerPanel" style="display: none;">
+        <div class="tower-panel-title">炮塔操作</div>
+        <div class="tower-stats" id="towerStats"></div>
+        <div class="tower-actions">
+          <button class="btn-upgrade" id="upgradeBtn">升级 (50分)</button>
+          <button class="btn-sell" id="sellBtn">出售 (+30分)</button>
+        </div>
+      </div>
+    </div>
+    <div class="game-over-overlay" id="gameOverOverlay">
+      <div class="game-over-content">
+        <div class="game-over-text">游戏结束</div>
+        <div class="game-over-score" id="gameOverScore">得分: 0</div>
+        <button class="btn-primary" id="restartBtn">重新开始</button>
+      </div>
+    </div>
+  </div>
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>

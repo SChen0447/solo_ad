@@ -1,0 +1,16 @@
+{
+  "name": "tower-defense-simulator",
+  "version": "1.0.0",
+  "description": "2D塔防路线规划与单位攻防模拟应用",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview"
+  },
+  "devDependencies": {
+    "typescript": "5.3.3",
+    "vite": "5.0.8",
+    "@types/node": "20.10.0"
+  }
+}
