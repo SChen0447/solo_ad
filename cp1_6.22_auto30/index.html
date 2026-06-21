@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>柔体物理沙盒 - Soft Body Physics Sandbox</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #1a2332;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      color: #cccccc;
+      user-select: none;
+    }
+
+    #app {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      position: relative;
+    }
+
+    #canvas-container {
+      flex: 1;
+      position: relative;
+      overflow: hidden;
+      background: linear-gradient(135deg, #1a2332 0%, #2a3b4c 100%);
+    }
+
+    #main-canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      cursor: grab;
+    }
+
+    #main-canvas:active {
+      cursor: grabbing;
+    }
+
+    #control-panel {
+      width: 280px;
+      backdrop-filter: blur(15px);
+      -webkit-backdrop-filter: blur(15px);
+      background: rgba(42, 59, 76, 0.6);
+      border-left: 1px solid rgba(255, 255, 255, 0.1);
+      padding: 20px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      overflow-y: auto;
+      transition: transform 0.3s ease;
+    }
+
+    .panel-title {
+      font-size: 16px;
+      font-weight: 600;
+      color: #ffffff;
+      margin-bottom: 4px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .control-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .control-label {
+      font-size: 13px;
+      color: #cccccc;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .control-value {
+      font-weight: 600;
+      color: #ff8800;
+    }
+
+    .slider {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 100%;
+      height: 6px;
+      border-radius: 3px;
+      background: #444444;
+      outline: none;
+      cursor: pointer;
+    }
+
+    .slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #ff8800 0%, #ff4488 100%);
+      cursor: pointer;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+      transition: transform 0.15s ease;
+    }
+
+    .slider::-webkit-slider-thumb:hover {
+      transform: scale(1.15);
+    }
+
+    .slider::-moz-range-thumb {
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #ff8800 0%, #ff4488 100%);
+      cursor: pointer;
+      border: none;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+      transition: transform 0.15s ease;
+    }
+
+    .slider::-moz-range-thumb:hover {
+      transform: scale(1.15);
+    }
+
+    select {
+      width: 100%;
+      padding: 8px 12px;
+      border-radius: 6px;
+      background: rgba(68, 68, 68, 0.8);
+      color: #cccccc;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      font-size: 13px;
+      cursor: pointer;
+      outline: none;
+      transition: border-color 0.15s ease;
+    }
+
+    select:hover, select:focus {
+      border-color: #ff8800;
+    }
+
+    .gravity-buttons {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 4px;
+    }
+
+    .gravity-btn {
+      padding: 8px;
+      border-radius: 6px;
+      background: rgba(68, 68, 68, 0.8);
+      color: #cccccc;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      font-size: 12px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .gravity-btn:hover {
+      background: rgba(255, 136, 0, 0.3);
+      border-color: #ff8800;
+    }
+
+    .gravity-btn.active {
+      background: linear-gradient(135deg, #ff8800 0%, #ff4488 100%);
+      color: #ffffff;
+      border-color: transparent;
+    }
+
+    .gravity-btn.empty {
+      visibility: hidden;
+    }
+
+    .toggle-group {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .toggle-switch {
+      position: relative;
+      width: 44px;
+      height: 24px;
+      background: #444444;
+      border-radius: 12px;
+      cursor: pointer;
+      transition: background 0.2s ease;
+    }
+
+    .toggle-switch.active {
+      background: linear-gradient(135deg, #ff8800 0%, #ff4488 100%);
+    }
+
+    .toggle-switch::after {
+      content: '';
+      position: absolute;
+      top: 2px;
+      left: 2px;
+      width: 20px;
+      height: 20px;
+      background: #ffffff;
+      border-radius: 50%;
+      transition: transform 0.2s ease;
+    }
+
+    .toggle-switch.active::after {
+      transform: translateX(20px);
+    }
+
+    #fps-display {
+      position: absolute;
+      bottom: 16px;
+      left: 16px;
+      font-size: 14px;
+      font-weight: 600;
+      color: #00ff88;
+      text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+      z-index: 10;
+      font-family: 'Consolas', 'Monaco', monospace;
+    }
+
+    #fps-display.low {
+      color: #ff4444;
+      animation: blink 0.5s ease-in-out infinite;
+    }
+
+    @keyframes blink {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+
+    #deformation-info {
+      position: absolute;
+      bottom: 16px;
+      right: 16px;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 8px;
+      z-index: 10;
+      pointer-events: none;
+    }
+
+    #deformation-rate {
+      font-size: 13px;
+      color: #cccccc;
+      text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+      background: rgba(0, 0, 0, 0.3);
+      padding: 6px 12px;
+      border-radius: 6px;
+    }
+
+    #deformation-rate span {
+      font-weight: 600;
+      color: #ff8800;
+    }
+
+    #heatmap-canvas {
+      border-radius: 6px;
+      background: rgba(0, 0, 0, 0.3);
+    }
+
+    #mobile-toggle {
+      display: none;
+      position: absolute;
+      bottom: 16px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 60px;
+      height: 6px;
+      background: rgba(255, 255, 255, 0.3);
+      border-radius: 3px;
+      cursor: grab;
+      z-index: 20;
+    }
+
+    @media (max-width: 768px) {
+      #app {
+        flex-direction: column;
+      }
+
+      #control-panel {
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        width: 100%;
+        max-height: 60%;
+        border-left: none;
+        border-top: 1px solid rgba(255, 255, 255, 0.1);
+        transform: translateY(calc(100% - 20px));
+        z-index: 15;
+      }
+
+      #control-panel.open {
+        transform: translateY(0);
+      }
+
+      #mobile-toggle {
+        display: block;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <div id="canvas-container">
+      <canvas id="main-canvas"></canvas>
+      <div id="fps-display">60 FPS</div>
+      <div id="deformation-info">
+        <div id="deformation-rate">形变率: <span>0%</span></div>
+        <canvas id="heatmap-canvas" width="120" height="80"></canvas>
+      </div>
+      <div id="mobile-toggle"></div>
+    </div>
+    <div id="control-panel">
+      <div class="panel-title">柔体物理沙盒</div>
+      
+      <div class="control-group">
+        <div class="control-label">
+          <span>形状</span>
+        </div>
+        <select id="shape-select">
+          <option value="circle">圆形</option>
+          <option value="square">方形</option>
+          <option value="triangle">三角形</option>
+        </select>
+      </div>
+
+      <div class="control-group">
+        <div class="control-label">
+          <span>刚度 (k)</span>
+          <span class="control-value" id="stiffness-value">1.0</span>
+        </div>
+        <input type="range" class="slider" id="stiffness-slider" min="0.1" max="5.0" step="0.1" value="1.0">
+      </div>
+
+      <div class="control-group">
+        <div class="control-label">
+          <span>阻尼</span>
+          <span class="control-value" id="damping-value">0.5</span>
+        </div>
+        <input type="range" class="slider" id="damping-slider" min="0.0" max="1.0" step="0.01" value="0.5">
+      </div>
+
+      <div class="control-group">
+        <div class="control-label">
+          <span>压力</span>
+          <span class="control-value" id="pressure-value">1.0</span>
+        </div>
+        <input type="range" class="slider" id="pressure-slider" min="0.5" max="2.0" step="0.05" value="1.0">
+      </div>
+
+      <div class="control-group">
+        <div class="control-label">
+          <span>重力方向</span>
+        </div>
+        <div class="gravity-buttons">
+          <div class="gravity-btn empty"></div>
+          <button class="gravity-btn" data-direction="up">↑</button>
+          <div class="gravity-btn empty"></div>
+          <button class="gravity-btn" data-direction="left">←</button>
+          <button class="gravity-btn" data-direction="down">↓</button>
+          <button class="gravity-btn" data-direction="right">→</button>
+        </div>
+      </div>
+
+      <div class="control-group">
+        <div class="control-label toggle-group">
+          <span>性能模式</span>
+          <div class="toggle-switch" id="perf-toggle"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
