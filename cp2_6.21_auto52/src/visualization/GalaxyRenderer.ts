@@ -31,6 +31,7 @@ export class GalaxyRenderer {
 
   private readonly BLOOM_INTENSITY_HIGH = 0.3;
   private readonly BLOOM_INTENSITY_LOW = 0;
+  private readonly BLOOM_PARTICLE_THRESHOLD = 15000;
 
   constructor(container: HTMLElement) {
     this.container = container;
@@ -138,16 +139,29 @@ export class GalaxyRenderer {
 
   private updateBloomEffect(): void {
     const gravity = this.particleEngine.getGravity();
+    const count = this.particleEngine.getCount();
+    const countScale = count > this.BLOOM_PARTICLE_THRESHOLD
+      ? Math.max(0.3, 1 - (count - this.BLOOM_PARTICLE_THRESHOLD) / 25000)
+      : 1;
 
     if (gravity > 2) {
       const t = Math.min(1, (gravity - 2) / 3);
-      this.bloomPass.strength = this.BLOOM_INTENSITY_LOW + (this.BLOOM_INTENSITY_HIGH - this.BLOOM_INTENSITY_LOW) * t;
-      this.bloomPass.radius = 0.4 + t * 0.4;
-      this.renderer.toneMappingExposure = 1.0 + t * 0.3;
+      this.bloomPass.strength = (this.BLOOM_INTENSITY_LOW + (this.BLOOM_INTENSITY_HIGH - this.BLOOM_INTENSITY_LOW) * t) * countScale;
+      this.bloomPass.radius = count > this.BLOOM_PARTICLE_THRESHOLD
+        ? 0.3
+        : 0.4 + t * 0.4;
+      this.renderer.toneMappingExposure = 1.0 + t * 0.3 * countScale;
     } else {
       this.bloomPass.strength = this.BLOOM_INTENSITY_LOW;
       this.bloomPass.radius = 0.4;
       this.renderer.toneMappingExposure = 1.0;
+    }
+
+    const targetPixelRatio = count > this.BLOOM_PARTICLE_THRESHOLD
+      ? Math.min(window.devicePixelRatio, 1.5)
+      : Math.min(window.devicePixelRatio, 2);
+    if (this.renderer.getPixelRatio() !== targetPixelRatio) {
+      this.renderer.setPixelRatio(targetPixelRatio);
     }
   }
 

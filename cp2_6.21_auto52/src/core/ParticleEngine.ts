@@ -21,8 +21,6 @@ export class ParticleEngine {
   private colorTransitionDuration: number = 1.5;
   private isTransitioning: boolean = false;
   private transitionTimer: number = 0;
-  private colorAnimationId: number = 0;
-  private colorLastTime: number = 0;
 
   private readonly SPHERE_RADIUS = 100;
   private readonly PERTURBATION = 0.01;
@@ -50,7 +48,6 @@ export class ParticleEngine {
     this.generateParticles();
     this.setupEventListeners();
     this.createPoints();
-    this.startColorTransitionLoop();
   }
 
   private setupEventListeners(): void {
@@ -130,9 +127,12 @@ export class ParticleEngine {
   setDensity(newCount: number): void {
     if (newCount === this.count) return;
 
-    const oldPosAttr = this.geometry.getAttribute('position') as THREE.BufferAttribute | null;
-    const oldColorAttr = this.geometry.getAttribute('color') as THREE.BufferAttribute | null;
-    const oldSizeAttr = this.geometry.getAttribute('size') as THREE.BufferAttribute | null;
+    this.positions = null as unknown as Float32Array;
+    this.velocities = null as unknown as Float32Array;
+    this.colors = null as unknown as Float32Array;
+    this.targetColors = null as unknown as Float32Array;
+    this.startColors = null as unknown as Float32Array;
+    this.sizes = null as unknown as Float32Array;
 
     this.count = newCount;
 
@@ -145,39 +145,18 @@ export class ParticleEngine {
 
     this.generateParticles();
 
-    if (oldPosAttr) {
-      oldPosAttr.array = this.positions;
-      oldPosAttr.count = this.count;
-      oldPosAttr.needsUpdate = true;
-    } else {
-      const posAttr = new THREE.BufferAttribute(this.positions, 3);
-      posAttr.setUsage(THREE.DynamicDrawUsage);
-      this.geometry.setAttribute('position', posAttr);
-    }
+    const posAttr = new THREE.BufferAttribute(this.positions, 3);
+    posAttr.setUsage(THREE.DynamicDrawUsage);
+    this.geometry.setAttribute('position', posAttr);
 
-    if (oldColorAttr) {
-      oldColorAttr.array = this.colors;
-      oldColorAttr.count = this.count;
-      oldColorAttr.needsUpdate = true;
-    } else {
-      const colorAttr = new THREE.BufferAttribute(this.colors, 3);
-      colorAttr.setUsage(THREE.DynamicDrawUsage);
-      this.geometry.setAttribute('color', colorAttr);
-    }
+    const colorAttr = new THREE.BufferAttribute(this.colors, 3);
+    colorAttr.setUsage(THREE.DynamicDrawUsage);
+    this.geometry.setAttribute('color', colorAttr);
 
-    if (oldSizeAttr) {
-      oldSizeAttr.array = this.sizes;
-      oldSizeAttr.count = this.count;
-      oldSizeAttr.needsUpdate = true;
-    } else {
-      const sizeAttr = new THREE.BufferAttribute(this.sizes, 1);
-      sizeAttr.setUsage(THREE.DynamicDrawUsage);
-      this.geometry.setAttribute('size', sizeAttr);
-    }
+    const sizeAttr = new THREE.BufferAttribute(this.sizes, 1);
+    sizeAttr.setUsage(THREE.DynamicDrawUsage);
+    this.geometry.setAttribute('size', sizeAttr);
 
-    this.geometry.attributes.position.needsUpdate = true;
-    this.geometry.attributes.color.needsUpdate = true;
-    this.geometry.attributes.size.needsUpdate = true;
     this.geometry.computeBoundingSphere();
   }
 
@@ -200,41 +179,6 @@ export class ParticleEngine {
     this.isTransitioning = true;
     this.transitionTimer = 0;
     this.colorTransitionProgress = 0;
-    this.colorLastTime = performance.now();
-  }
-
-  private startColorTransitionLoop(): void {
-    const animate = () => {
-      this.colorAnimationId = requestAnimationFrame(animate);
-
-      if (!this.isTransitioning) return;
-
-      const now = performance.now();
-      const dt = (now - this.colorLastTime) / 1000;
-      this.colorLastTime = now;
-
-      this.transitionTimer += dt;
-      this.colorTransitionProgress = Math.min(1, this.transitionTimer / this.colorTransitionDuration);
-      const t = this.easeInOutCubic(this.colorTransitionProgress);
-
-      for (let i = 0; i < this.count; i++) {
-        const i3 = i * 3;
-        this.colors[i3] = this.startColors[i3] + (this.targetColors[i3] - this.startColors[i3]) * t;
-        this.colors[i3 + 1] = this.startColors[i3 + 1] + (this.targetColors[i3 + 1] - this.startColors[i3 + 1]) * t;
-        this.colors[i3 + 2] = this.startColors[i3 + 2] + (this.targetColors[i3 + 2] - this.startColors[i3 + 2]) * t;
-      }
-
-      const colorAttr = this.geometry.getAttribute('color') as THREE.BufferAttribute | undefined;
-      if (colorAttr) {
-        colorAttr.needsUpdate = true;
-      }
-
-      if (this.colorTransitionProgress >= 1) {
-        this.isTransitioning = false;
-      }
-    };
-
-    this.colorAnimationId = requestAnimationFrame(animate);
   }
 
   private updateGlowIntensity(): void {
@@ -249,7 +193,6 @@ export class ParticleEngine {
   update(deltaTime: number): void {
     const dt = Math.min(deltaTime, 0.05);
     const gravityScale = this.gravity * 0.001;
-    const spiralFactor = this.gravity > 2 ? (this.gravity - 2) * 0.05 : 0;
     const dt60 = dt * 60;
 
     for (let i = 0; i < this.count; i++) {
@@ -272,21 +215,18 @@ export class ParticleEngine {
       this.velocities[i3 + 1] -= ny * force;
       this.velocities[i3 + 2] -= nz * force;
 
-      if (spiralFactor > 0 && dist > 3) {
-        const tx = -ny;
-        const ty = (nx * nz) / (Math.sqrt(nx * nx + nz * nz) + 0.001);
-        const tz = nx;
+      if (this.gravity > 2 && dist > 5) {
+        const rXZ = Math.sqrt(nx * nx + nz * nz);
+        if (rXZ > 0.01) {
+          const tx = nz / rXZ;
+          const tz = -nx / rXZ;
 
-        const tangentialSpeed = spiralFactor * (1 + 1 / Math.max(dist * 0.02, 0.5));
+          const spiralFactor = (this.gravity - 2) * 0.04;
+          const tangentialMag = spiralFactor * Math.sqrt(Math.max(force, 0));
 
-        this.velocities[i3] += tx * tangentialSpeed * dt60;
-        this.velocities[i3 + 1] += ty * tangentialSpeed * dt60 * 0.4;
-        this.velocities[i3 + 2] += tz * tangentialSpeed * dt60;
-
-        const upX = nz;
-        const upZ = -nx;
-        this.velocities[i3] += upX * tangentialSpeed * 0.15 * dt60;
-        this.velocities[i3 + 2] += upZ * tangentialSpeed * 0.15 * dt60;
+          this.velocities[i3] += tx * tangentialMag * dt60;
+          this.velocities[i3 + 2] += tz * tangentialMag * dt60;
+        }
       }
 
       this.velocities[i3] += (Math.random() - 0.5) * this.PERTURBATION;
@@ -318,6 +258,25 @@ export class ParticleEngine {
     }
 
     (this.geometry.attributes.position as THREE.BufferAttribute).needsUpdate = true;
+
+    if (this.isTransitioning) {
+      this.transitionTimer += dt;
+      this.colorTransitionProgress = Math.min(1, this.transitionTimer / this.colorTransitionDuration);
+      const t = this.easeInOutCubic(this.colorTransitionProgress);
+
+      for (let i = 0; i < this.count; i++) {
+        const i3 = i * 3;
+        this.colors[i3] = this.startColors[i3] + (this.targetColors[i3] - this.startColors[i3]) * t;
+        this.colors[i3 + 1] = this.startColors[i3 + 1] + (this.targetColors[i3 + 1] - this.startColors[i3 + 1]) * t;
+        this.colors[i3 + 2] = this.startColors[i3 + 2] + (this.targetColors[i3 + 2] - this.startColors[i3 + 2]) * t;
+      }
+
+      (this.geometry.attributes.color as THREE.BufferAttribute).needsUpdate = true;
+
+      if (this.colorTransitionProgress >= 1) {
+        this.isTransitioning = false;
+      }
+    }
   }
 
   private easeInOutCubic(t: number): number {
@@ -328,40 +287,15 @@ export class ParticleEngine {
     return this.points;
   }
 
-  getGlowSpriteTexture(): THREE.Texture {
-    const canvas = document.createElement('canvas');
-    canvas.width = 64;
-    canvas.height = 64;
-    const ctx = canvas.getContext('2d')!;
-    const gradient = ctx.createRadialGradient(32, 32, 0, 32, 32, 32);
-    gradient.addColorStop(0, 'rgba(255, 255, 255, 1)');
-    gradient.addColorStop(0.2, 'rgba(255, 255, 255, 0.8)');
-    gradient.addColorStop(0.5, 'rgba(255, 255, 255, 0.2)');
-    gradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
-    ctx.fillStyle = gradient;
-    ctx.fillRect(0, 0, 64, 64);
-    const texture = new THREE.CanvasTexture(canvas);
-    texture.needsUpdate = true;
-    return texture;
-  }
-
   getGravity(): number {
     return this.gravity;
   }
 
+  getCount(): number {
+    return this.count;
+  }
+
   dispose(): void {
-    if (this.colorAnimationId) {
-      cancelAnimationFrame(this.colorAnimationId);
-    }
-
-    const posAttr = this.geometry.getAttribute('position') as THREE.BufferAttribute | undefined;
-    const colorAttr = this.geometry.getAttribute('color') as THREE.BufferAttribute | undefined;
-    const sizeAttr = this.geometry.getAttribute('size') as THREE.BufferAttribute | undefined;
-
-    if (posAttr) posAttr.dispose();
-    if (colorAttr) colorAttr.dispose();
-    if (sizeAttr) sizeAttr.dispose();
-
     this.geometry.dispose();
     this.material.dispose();
   }

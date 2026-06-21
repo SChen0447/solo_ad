@@ -401,6 +401,8 @@ export class ControlPanel {
         </svg>
       `;
 
+      this.setControlsDisabled(true);
+
       setTimeout(() => {
         if (this.isCollapsed) {
           this.content.style.visibility = 'hidden';
@@ -420,7 +422,21 @@ export class ControlPanel {
           <polyline points="18 15 12 9 6 15"></polyline>
         </svg>
       `;
+
+      this.setControlsDisabled(false);
     }
+  }
+
+  private setControlsDisabled(disabled: boolean): void {
+    const inputs = this.content.querySelectorAll('input');
+    inputs.forEach((input) => {
+      (input as HTMLInputElement).disabled = disabled;
+    });
+
+    const buttons = this.content.querySelectorAll('button');
+    buttons.forEach((btn) => {
+      (btn as HTMLButtonElement).disabled = disabled;
+    });
   }
 
   private setupEventListeners(): void {
