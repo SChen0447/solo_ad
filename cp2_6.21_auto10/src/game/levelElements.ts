@@ -5,6 +5,7 @@ export interface LightSource {
   spread: number;
   range: number;
   animTime: number;
+  spawnAnim: number;
 }
 
 export interface ShadowBlock {
@@ -60,7 +61,7 @@ export interface BrickFragment {
 }
 
 export interface LevelData {
-  lightSources: Omit<LightSource, 'animTime'>[];
+  lightSources: Omit<LightSource, 'animTime' | 'spawnAnim'>[];
   shadowBlocks: Omit<ShadowBlock, 'vx' | 'vy' | 'spawnAnim'>[];
   bricks: Omit<Brick, 'illuminated' | 'broken' | 'breakTimer' | 'spawnAnim'>[];
   walls: Wall[];
@@ -68,7 +69,7 @@ export interface LevelData {
 }
 
 export function createLightSource(x: number, y: number, angle: number, spread: number, range: number): LightSource {
-  return { x, y, angle, spread, range, animTime: 0 };
+  return { x, y, angle, spread, range, animTime: 0, spawnAnim: 0.2 };
 }
 
 export function createShadowBlock(x: number, y: number, width: number, height: number): ShadowBlock {
@@ -90,6 +91,9 @@ export function createExit(x: number, y: number, width: number, height: number):
 export function updateLightSources(sources: LightSource[], dt: number): void {
   for (const s of sources) {
     s.animTime += dt;
+    if (s.spawnAnim > 0) {
+      s.spawnAnim = Math.max(0, s.spawnAnim - dt);
+    }
   }
 }
 
@@ -236,19 +240,33 @@ export function computeShadowRegions(
   for (const src of sources) {
     for (const b of blocks) {
       const corners = getBlockCorners(b);
+      const centerX = b.x + b.width / 2;
+      const centerY = b.y + b.height / 2;
+      const toBlockAngle = Math.atan2(centerY - src.y, centerX - src.x);
+      const blockDist = Math.sqrt((centerX - src.x) ** 2 + (centerY - src.y) ** 2);
+
+      let relAngle = toBlockAngle - src.angle;
+      while (relAngle > Math.PI) relAngle -= Math.PI * 2;
+      while (relAngle < -Math.PI) relAngle += Math.PI * 2;
+      if (Math.abs(relAngle) > src.spread / 2 + 0.5) continue;
+      if (blockDist > src.range + Math.max(b.width, b.height)) continue;
+
       let minIdx = -1;
       let maxIdx = -1;
       let minAngle = Infinity;
       let maxAngle = -Infinity;
+      const cornerAngles: number[] = [];
 
       for (let i = 0; i < 4; i++) {
         const c = corners[i];
         const ang = Math.atan2(c.y - src.y, c.x - src.x);
+        cornerAngles.push(ang);
+
         let rel = ang - src.angle;
         while (rel > Math.PI) rel -= Math.PI * 2;
         while (rel < -Math.PI) rel += Math.PI * 2;
 
-        if (Math.abs(rel) <= src.spread / 2 + 0.2) {
+        if (Math.abs(rel) <= src.spread / 2 + 0.4) {
           if (rel < minAngle) { minAngle = rel; minIdx = i; }
           if (rel > maxAngle) { maxAngle = rel; maxIdx = i; }
         }
@@ -256,8 +274,23 @@ export function computeShadowRegions(
 
       if (minIdx === -1 || maxIdx === -1) continue;
 
-      const c1 = corners[minIdx];
-      const c2 = corners[maxIdx];
+      let c1 = corners[minIdx];
+      let c2 = corners[maxIdx];
+
+      {
+        const ang1 = cornerAngles[minIdx];
+        const ang2 = cornerAngles[maxIdx];
+        let angDiff = ang2 - ang1;
+        while (angDiff > Math.PI) angDiff -= Math.PI * 2;
+        while (angDiff < -Math.PI) angDiff += Math.PI * 2;
+
+        if (angDiff < 0) {
+          const tmp = c1;
+          c1 = c2;
+          c2 = tmp;
+        }
+      }
+
       const d1x = c1.x - src.x;
       const d1y = c1.y - src.y;
       const d1 = Math.sqrt(d1x * d1x + d1y * d1y) || 0.001;
@@ -265,7 +298,11 @@ export function computeShadowRegions(
       const d2y = c2.y - src.y;
       const d2 = Math.sqrt(d2x * d2x + d2y * d2y) || 0.001;
 
-      const projLen = src.range * 1.5;
+      const maxShadowLen = src.range * 1.2;
+      const blockSize = Math.max(b.width, b.height);
+      const scaleFactor = Math.min(maxShadowLen / Math.max(d1, d2, 1), 3);
+      const projLen = Math.max(blockSize * 1.5, scaleFactor * 100);
+
       const ext1 = {
         x: c1.x + (d1x / d1) * projLen,
         y: c1.y + (d1y / d1) * projLen
@@ -275,7 +312,22 @@ export function computeShadowRegions(
         y: c2.y + (d2y / d2) * projLen
       };
 
-      const points: { x: number; y: number }[] = [c1, c2, ext2, ext1];
+      const midPoints: { x: number; y: number }[] = [];
+      const subCount = 3;
+      for (let i = 1; i <= subCount; i++) {
+        const t = i / (subCount + 1);
+        const px = c1.x + (c2.x - c1.x) * t;
+        const py = c1.y + (c2.y - c1.y) * t;
+        const pdx = px - src.x;
+        const pdy = py - src.y;
+        const pd = Math.sqrt(pdx * pdx + pdy * pdy) || 0.001;
+        midPoints.push({
+          x: px + (pdx / pd) * projLen * (0.85 + t * 0.15),
+          y: py + (pdy / pd) * projLen * (0.85 + t * 0.15)
+        });
+      }
+
+      const points: { x: number; y: number }[] = [c1, c2, ext2, ...midPoints.reverse(), ext1];
       regions.push({ points });
     }
   }
@@ -360,25 +412,84 @@ function renderLightBeam(
   ctx.fill();
 
   ctx.clip();
-  for (let i = 0; i < 6; i++) {
-    const offset = ((src.animTime * 80 + i * 60) % 120) - 20;
-    const angleOffset = (i - 3) * 0.04;
-    const rayAng = src.angle + angleOffset;
-    const endX = src.x + Math.cos(rayAng) * src.range;
-    const endY = src.y + Math.sin(rayAng) * src.range;
-    const startX = src.x + Math.cos(rayAng) * offset;
-    const startY = src.y + Math.sin(rayAng) * offset;
+
+  const flowLineCount = 16;
+  const flowSpeed = 140;
+  for (let i = 0; i < flowLineCount; i++) {
+    const rayT = i / (flowLineCount - 1);
+    const rayAng = src.angle - src.spread / 2 + src.spread * rayT;
+    
+    const rayDx = Math.cos(rayAng);
+    const rayDy = Math.sin(rayAng);
+    const rayOcc = getClosestOccluderAlongRay(src.x, src.y, rayDx, rayDy, src.range, blocks);
+    const rayMaxDist = rayOcc ? Math.min(rayOcc.dist, src.range) : src.range;
+
+    const lineLen = 50 + (i % 4) * 15;
+    const cycleLen = rayMaxDist + lineLen;
+    const phase = ((src.animTime * flowSpeed + i * (cycleLen / flowLineCount)) % cycleLen);
+    const startDist = Math.max(0, phase - lineLen);
+    const endDist = Math.min(rayMaxDist, phase);
+
+    if (endDist <= startDist) continue;
+
+    const startX = src.x + rayDx * startDist;
+    const startY = src.y + rayDy * startDist;
+    const endX = src.x + rayDx * endDist;
+    const endY = src.y + rayDy * endDist;
+
+    const midDist = (startDist + endDist) / 2;
+    const fadeIn = Math.min(1, (phase - startDist) / 25);
+    const fadeOut = Math.min(1, (rayMaxDist - phase + lineLen) / 25);
+    const alpha = 0.18 + (i % 3) * 0.06;
+    const finalAlpha = alpha * Math.min(fadeIn, fadeOut);
 
     const lineGrad = ctx.createLinearGradient(startX, startY, endX, endY);
-    lineGrad.addColorStop(0, 'rgba(255, 250, 200, 0)');
-    lineGrad.addColorStop(0.5, 'rgba(255, 250, 200, 0.3)');
-    lineGrad.addColorStop(1, 'rgba(255, 250, 200, 0)');
+    lineGrad.addColorStop(0, `rgba(255, 250, 200, 0)`);
+    lineGrad.addColorStop(0.3, `rgba(255, 250, 200, ${finalAlpha * 0.7})`);
+    lineGrad.addColorStop(0.5, `rgba(255, 255, 220, ${finalAlpha})`);
+    lineGrad.addColorStop(0.7, `rgba(255, 250, 200, ${finalAlpha * 0.7})`);
+    lineGrad.addColorStop(1, `rgba(255, 250, 200, 0)`);
     ctx.strokeStyle = lineGrad;
-    ctx.lineWidth = 1.5;
+    ctx.lineWidth = 1.8 + (midDist / src.range) * 0.8;
+    ctx.lineCap = 'round';
     ctx.beginPath();
     ctx.moveTo(startX, startY);
     ctx.lineTo(endX, endY);
     ctx.stroke();
+  }
+
+  const particleCount = 8;
+  for (let i = 0; i < particleCount; i++) {
+    const rayT = (i + 0.5) / particleCount + Math.sin(src.animTime * 2 + i) * 0.02;
+    const rayAng = src.angle - src.spread / 2 + src.spread * rayT;
+    const rayDx = Math.cos(rayAng);
+    const rayDy = Math.sin(rayAng);
+    
+    const rayOcc2 = getClosestOccluderAlongRay(src.x, src.y, rayDx, rayDy, src.range, blocks);
+    const rayMaxDist2 = rayOcc2 ? Math.min(rayOcc2.dist, src.range) : src.range;
+
+    const cycle = (src.animTime * 90 + i * 80) % (rayMaxDist2 + 40);
+    const pDist = cycle;
+    const alpha = Math.max(0, 1 - Math.abs(pDist - rayMaxDist2 / 2) / (rayMaxDist2 / 2)) * 0.5;
+
+    if (pDist >= 0 && pDist <= rayMaxDist2) {
+      const px = src.x + rayDx * pDist;
+      const py = src.y + rayDy * pDist;
+      const size = 2 + (pDist / rayMaxDist2) * 2;
+
+      const glow = ctx.createRadialGradient(px, py, 0, px, py, size * 3);
+      glow.addColorStop(0, `rgba(255, 255, 220, ${alpha})`);
+      glow.addColorStop(1, 'rgba(255, 255, 200, 0)');
+      ctx.fillStyle = glow;
+      ctx.beginPath();
+      ctx.arc(px, py, size * 3, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = `rgba(255, 255, 240, ${alpha * 1.2})`;
+      ctx.beginPath();
+      ctx.arc(px, py, size, 0, Math.PI * 2);
+      ctx.fill();
+    }
   }
   ctx.restore();
 
@@ -484,15 +595,17 @@ export function renderBricks(ctx: CanvasRenderingContext2D, bricks: Brick[]): vo
 
     if (b.illuminated) {
       ctx.save();
-      ctx.shadowColor = 'rgba(255, 160, 80, 0.6)';
-      ctx.shadowBlur = 15;
+      const heatPulse = 1 + Math.sin(performance.now() * 0.008) * 0.08;
+      ctx.shadowColor = `rgba(255, ${140 + Math.sin(performance.now() * 0.01) * 30}, 60, ${0.5 * heatPulse})`;
+      ctx.shadowBlur = 18 * heatPulse;
     }
 
     const grad = ctx.createLinearGradient(dx, dy, dx, dy + dh);
     if (b.illuminated) {
-      grad.addColorStop(0, '#E8B878');
-      grad.addColorStop(0.5, '#D29860');
-      grad.addColorStop(1, '#B07840');
+      grad.addColorStop(0, '#FFB366');
+      grad.addColorStop(0.3, '#E89240');
+      grad.addColorStop(0.7, '#D47828');
+      grad.addColorStop(1, '#B86020');
     } else {
       grad.addColorStop(0, '#C8A882');
       grad.addColorStop(0.5, '#B09066');
@@ -503,13 +616,40 @@ export function renderBricks(ctx: CanvasRenderingContext2D, bricks: Brick[]): vo
 
     if (b.illuminated) {
       ctx.restore();
+
+      const crackAlpha = 0.4 + Math.sin(performance.now() * 0.012) * 0.2;
+      ctx.strokeStyle = `rgba(80, 30, 10, ${crackAlpha})`;
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(dx + dw * 0.2, dy + 2);
+      ctx.lineTo(dx + dw * 0.35, dy + dh * 0.45);
+      ctx.lineTo(dx + dw * 0.25, dy + dh * 0.8);
+      ctx.lineTo(dx + dw * 0.5, dy + dh - 2);
+      ctx.moveTo(dx + dw * 0.7, dy + 4);
+      ctx.lineTo(dx + dw * 0.6, dy + dh * 0.5);
+      ctx.lineTo(dx + dw * 0.8, dy + dh * 0.65);
+      ctx.moveTo(dx + dw * 0.45, dy + dh * 0.3);
+      ctx.lineTo(dx + dw * 0.55, dy + dh * 0.55);
+      ctx.stroke();
+
+      for (let i = 0; i < 3; i++) {
+        const heatX = dx + dw * (0.2 + i * 0.3);
+        const heatY = dy + dh * (0.3 + Math.sin(performance.now() * 0.006 + i) * 0.2);
+        const heatGrad = ctx.createRadialGradient(heatX, heatY, 0, heatX, heatY, 8);
+        heatGrad.addColorStop(0, 'rgba(255, 220, 150, 0.35)');
+        heatGrad.addColorStop(1, 'rgba(255, 180, 100, 0)');
+        ctx.fillStyle = heatGrad;
+        ctx.beginPath();
+        ctx.arc(heatX, heatY, 8, 0, Math.PI * 2);
+        ctx.fill();
+      }
     }
 
-    ctx.strokeStyle = b.illuminated ? 'rgba(255, 200, 100, 0.7)' : '#8A6848';
+    ctx.strokeStyle = b.illuminated ? 'rgba(255, 170, 80, 0.85)' : '#8A6848';
     ctx.lineWidth = 1.5;
     ctx.strokeRect(dx + 0.75, dy + 0.75, dw - 1.5, dh - 1.5);
 
-    ctx.strokeStyle = b.illuminated ? 'rgba(180, 120, 70, 0.4)' : 'rgba(120, 90, 60, 0.3)';
+    ctx.strokeStyle = b.illuminated ? 'rgba(200, 100, 40, 0.5)' : 'rgba(120, 90, 60, 0.3)';
     ctx.lineWidth = 1;
     ctx.beginPath();
     ctx.moveTo(dx, dy + dh / 2);
@@ -523,10 +663,18 @@ export function renderBricks(ctx: CanvasRenderingContext2D, bricks: Brick[]): vo
     ctx.stroke();
 
     if (b.illuminated) {
-      ctx.fillStyle = 'rgba(255, 255, 200, 0.3)';
+      ctx.fillStyle = 'rgba(255, 255, 220, 0.4)';
       const shimmer = (Math.sin(performance.now() * 0.005) + 1) / 2;
-      ctx.globalAlpha = 0.2 + shimmer * 0.3;
-      ctx.fillRect(dx + 3, dy + 3, dw * 0.3, dh * 0.2);
+      ctx.globalAlpha = 0.25 + shimmer * 0.35;
+      ctx.fillRect(dx + 3, dy + 3, dw * 0.35, dh * 0.22);
+      ctx.globalAlpha = 1;
+
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+      ctx.font = 'bold 10px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.globalAlpha = 0.7 + Math.sin(performance.now() * 0.008) * 0.3;
+      ctx.fillText('⚠', cx, cy);
       ctx.globalAlpha = 1;
     }
   }

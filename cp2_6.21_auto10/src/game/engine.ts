@@ -383,18 +383,35 @@ export class GameEngine {
 
   private spawnFragments(brick: Brick): void {
     const count = 3 + Math.floor(Math.random() * 3);
-    for (let i = 0; i < count; i++) {
-      if (this.fragments.length >= 30) break;
+    const available = Math.max(0, 30 - this.fragments.length);
+    const actualCount = Math.min(count, available);
+
+    const cx = brick.x + brick.width / 2;
+    const cy = brick.y + brick.height / 2;
+    const corners = [
+      { x: brick.x + 4, y: brick.y + 4 },
+      { x: brick.x + brick.width - 4, y: brick.y + 4 },
+      { x: brick.x + brick.width - 4, y: brick.y + brick.height - 4 },
+      { x: brick.x + 4, y: brick.y + brick.height - 4 },
+    ];
+
+    for (let i = 0; i < actualCount; i++) {
+      const corner = corners[i % corners.length];
+      const jitterX = (i < 4 ? corner.x : cx) + (Math.random() - 0.5) * 8;
+      const jitterY = (i < 4 ? corner.y : cy) + (Math.random() - 0.5) * 8;
+      const angle = Math.atan2(jitterY - cy, jitterX - cx) + (Math.random() - 0.5) * 0.6;
+      const speed = 200 + Math.random() * 200;
+
       this.fragments.push({
-        x: brick.x + brick.width / 2,
-        y: brick.y + brick.height / 2,
-        vx: (Math.random() - 0.5) * 300,
-        vy: (Math.random() - 0.5) * 300 - 100,
-        size: 6 + Math.random() * 8,
+        x: jitterX,
+        y: jitterY,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed - 150,
+        size: 5 + Math.random() * 9,
         life: 0.5,
         maxLife: 0.5,
         rotation: Math.random() * Math.PI * 2,
-        rotSpeed: (Math.random() - 0.5) * 8
+        rotSpeed: (Math.random() - 0.5) * 10
       });
     }
   }
@@ -450,7 +467,24 @@ export class GameEngine {
 
     const shadowRegions = computeShadowRegions(this.lightSources, this.shadowBlocks);
     for (const region of shadowRegions) {
-      ctx.fillStyle = 'rgba(30, 0, 60, 0.55)';
+      if (region.points.length < 3) continue;
+
+      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+      for (const p of region.points) {
+        minX = Math.min(minX, p.x);
+        minY = Math.min(minY, p.y);
+        maxX = Math.max(maxX, p.x);
+        maxY = Math.max(maxY, p.y);
+      }
+      const cx = (minX + maxX) / 2;
+      const cy = (minY + maxY) / 2;
+
+      const shadowGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, Math.max(maxX - minX, maxY - minY));
+      shadowGrad.addColorStop(0, 'rgba(20, 0, 50, 0.7)');
+      shadowGrad.addColorStop(0.6, 'rgba(30, 0, 70, 0.55)');
+      shadowGrad.addColorStop(1, 'rgba(50, 10, 90, 0.35)');
+
+      ctx.fillStyle = shadowGrad;
       ctx.beginPath();
       ctx.moveTo(region.points[0].x, region.points[0].y);
       for (let i = 1; i < region.points.length; i++) {
@@ -458,6 +492,33 @@ export class GameEngine {
       }
       ctx.closePath();
       ctx.fill();
+
+      ctx.save();
+      ctx.clip();
+      const patternTime = performance.now() * 0.001;
+      ctx.strokeStyle = 'rgba(120, 60, 180, 0.12)';
+      ctx.lineWidth = 1;
+      for (let i = 0; i < 8; i++) {
+        const offset = ((patternTime * 25 + i * 30) % 60) - 10;
+        ctx.beginPath();
+        ctx.moveTo(minX - 20, minY + i * 18 + offset);
+        ctx.lineTo(maxX + 20, minY + i * 18 + offset + 10);
+        ctx.stroke();
+      }
+      ctx.restore();
+
+      ctx.strokeStyle = 'rgba(150, 70, 220, 0.3)';
+      ctx.lineWidth = 1.5;
+      ctx.setLineDash([4, 6]);
+      ctx.lineDashOffset = -performance.now() * 0.02;
+      ctx.beginPath();
+      ctx.moveTo(region.points[0].x, region.points[0].y);
+      for (let i = 1; i < region.points.length; i++) {
+        ctx.lineTo(region.points[i].x, region.points[i].y);
+      }
+      ctx.closePath();
+      ctx.stroke();
+      ctx.setLineDash([]);
     }
 
     renderLightSources(ctx, this.lightSources, this.shadowBlocks);

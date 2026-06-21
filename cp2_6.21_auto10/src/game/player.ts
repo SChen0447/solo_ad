@@ -4,16 +4,20 @@ export enum PlayerForm {
 }
 
 interface Particle {
+  startX: number;
+  startY: number;
+  endX: number;
+  endY: number;
   x: number;
   y: number;
-  vx: number;
-  vy: number;
+  size: number;
   life: number;
   maxLife: number;
-  size: number;
-  targetX: number;
-  targetY: number;
   phase: 'scatter' | 'gather';
+  scatterEndX: number;
+  scatterEndY: number;
+  angle: number;
+  speed: number;
 }
 
 export interface PlayerState {
@@ -42,6 +46,8 @@ export class Player {
   private maxParticles: number = 30;
   private animTime: number = 0;
   private onFormChange: FormChangeCallback;
+  private scatterParticlesSpawned: boolean = false;
+  private gatherParticlesSpawned: boolean = false;
 
   constructor(x: number, y: number, onFormChange: FormChangeCallback) {
     this.x = x;
@@ -94,29 +100,75 @@ export class Player {
     if (this.transitioning) return;
     this.transitioning = true;
     this.transitionTimer = 0;
-    this.spawnTransitionParticles();
+    this.scatterParticlesSpawned = false;
+    this.gatherParticlesSpawned = false;
+    this.particles = [];
   }
 
-  private spawnTransitionParticles(): void {
-    const count = 20;
-    
-    for (let i = this.particles.length; i < this.maxParticles && (i - this.particles.length) < count; i++) {
-      const angle = (Math.PI * 2 * (i - this.particles.length)) / count + Math.random() * 0.3;
-      const dist = 20 + Math.random() * 30;
-      const tx = this.x + Math.cos(angle) * dist;
-      const ty = this.y + Math.sin(angle) * dist;
-      
+  private spawnScatterParticles(): void {
+    if (this.scatterParticlesSpawned) return;
+    this.scatterParticlesSpawned = true;
+
+    const count = Math.min(20, this.maxParticles);
+    const available = this.maxParticles - this.particles.length;
+    const actualCount = Math.min(count, available);
+
+    for (let i = 0; i < actualCount; i++) {
+      const angle = (Math.PI * 2 * i) / actualCount + Math.random() * 0.2;
+      const dist = 45 + Math.random() * 25;
+      const endX = this.x + Math.cos(angle) * dist;
+      const endY = this.y + Math.sin(angle) * dist;
+      const speed = 180 + Math.random() * 120;
+
       this.particles.push({
+        startX: this.x,
+        startY: this.y,
+        endX: endX,
+        endY: endY,
+        scatterEndX: endX,
+        scatterEndY: endY,
         x: this.x,
         y: this.y,
-        vx: Math.cos(angle) * 150,
-        vy: Math.sin(angle) * 150,
-        life: this.transitionDuration,
-        maxLife: this.transitionDuration,
         size: 2 + Math.random() * 3,
-        targetX: tx,
-        targetY: ty,
-        phase: 'scatter'
+        life: this.transitionDuration / 2,
+        maxLife: this.transitionDuration / 2,
+        phase: 'scatter',
+        angle: angle,
+        speed: speed
+      });
+    }
+  }
+
+  private spawnGatherParticles(): void {
+    if (this.gatherParticlesSpawned) return;
+    this.gatherParticlesSpawned = true;
+
+    const scatterCount = this.particles.length;
+    const count = Math.min(20, this.maxParticles);
+    const available = this.maxParticles - scatterCount;
+    const actualCount = Math.min(count, available);
+
+    for (let i = 0; i < actualCount; i++) {
+      const angle = (Math.PI * 2 * i) / actualCount + Math.random() * 0.2 + 0.1;
+      const dist = 50 + Math.random() * 30;
+      const startX = this.x + Math.cos(angle) * dist;
+      const startY = this.y + Math.sin(angle) * dist;
+
+      this.particles.push({
+        startX: startX,
+        startY: startY,
+        endX: this.x,
+        endY: this.y,
+        scatterEndX: 0,
+        scatterEndY: 0,
+        x: startX,
+        y: startY,
+        size: 2 + Math.random() * 3,
+        life: this.transitionDuration / 2,
+        maxLife: this.transitionDuration / 2,
+        phase: 'gather',
+        angle: angle,
+        speed: 0
       });
     }
   }
@@ -128,18 +180,22 @@ export class Player {
     this.velocityY = this.moveY * this.speed;
 
     if (this.transitioning) {
+      const prevTimer = this.transitionTimer;
       this.transitionTimer += dt;
       const halfDur = this.transitionDuration / 2;
 
-      if (this.transitionTimer >= halfDur && this.transitionTimer - dt < halfDur) {
+      if (prevTimer < halfDur && this.transitionTimer >= 0) {
+        this.spawnScatterParticles();
+      }
+
+      if (prevTimer < halfDur && this.transitionTimer >= halfDur) {
         this.form = this.form === PlayerForm.LIGHT ? PlayerForm.DARK : PlayerForm.LIGHT;
         this.onFormChange(this.form);
-        for (const p of this.particles) {
-          p.phase = 'gather';
-          p.vx = 0;
-          p.vy = 0;
-        }
+        this.particles = this.particles.filter(p => p.phase !== 'scatter');
+        this.spawnGatherParticles();
       }
+
+      this.updateParticles(dt);
 
       if (this.transitionTimer >= this.transitionDuration) {
         this.transitioning = false;
@@ -147,31 +203,30 @@ export class Player {
         this.particles = [];
       }
     }
-
-    this.updateParticles(dt);
   }
 
   private updateParticles(dt: number): void {
-    const progress = this.transitioning ? this.transitionTimer / this.transitionDuration : 0;
-    const halfPoint = 0.5;
+    const halfDur = this.transitionDuration / 2;
 
     for (let i = this.particles.length - 1; i >= 0; i--) {
       const p = this.particles[i];
 
-      if (progress < halfPoint) {
-        p.x += p.vx * dt;
-        p.y += p.vy * dt;
-        p.vx *= 0.96;
-        p.vy *= 0.96;
+      if (p.phase === 'scatter') {
+        const scatterProgress = 1 - (this.transitionTimer) / halfDur;
+        const t = Math.max(0, Math.min(1, scatterProgress));
+        const easeT = 1 - Math.pow(1 - t, 3);
+        p.x = p.startX + (p.endX - p.startX) * easeT;
+        p.y = p.startY + (p.endY - p.startY) * easeT;
       } else {
-        const gatherT = (progress - halfPoint) / (1 - halfPoint);
-        const ease = gatherT * gatherT * (3 - 2 * gatherT);
-        p.x = p.targetX + (this.x - p.targetX) * ease;
-        p.y = p.targetY + (this.y - p.targetY) * ease;
+        const gatherTimer = this.transitionTimer - halfDur;
+        const t = Math.max(0, Math.min(1, gatherTimer / halfDur));
+        const easeT = t * t * (3 - 2 * t);
+        p.x = p.startX + (this.x - p.startX) * easeT;
+        p.y = p.startY + (this.y - p.startY) * easeT;
       }
 
       p.life -= dt;
-      if (p.life <= 0 && !this.transitioning) {
+      if (p.life <= 0) {
         this.particles.splice(i, 1);
       }
     }
@@ -185,6 +240,8 @@ export class Player {
     this.transitioning = false;
     this.transitionTimer = 0;
     this.particles = [];
+    this.scatterParticlesSpawned = false;
+    this.gatherParticlesSpawned = false;
     this.form = PlayerForm.LIGHT;
     this.onFormChange(this.form);
   }
@@ -265,39 +322,56 @@ export class Player {
   }
 
   private renderParticles(ctx: CanvasRenderingContext2D): void {
+    const halfDur = this.transitionDuration / 2;
+
     for (const p of this.particles) {
-      const alpha = Math.min(1, p.life / p.maxLife * 2);
+      let alpha: number;
+      let sizeScale: number;
+
+      if (p.phase === 'scatter') {
+        const scatterProgress = 1 - (this.transitionTimer) / halfDur;
+        alpha = Math.max(0, Math.min(1, scatterProgress * 1.5));
+        sizeScale = 0.6 + 0.4 * scatterProgress;
+      } else {
+        const gatherTimer = this.transitionTimer - halfDur;
+        const t = Math.max(0, Math.min(1, gatherTimer / halfDur));
+        alpha = Math.max(0, Math.min(1, t * 1.5));
+        sizeScale = 0.4 + 0.6 * t;
+      }
+
       const color = this.getParticleColor(p, alpha);
       ctx.fillStyle = color;
       ctx.beginPath();
-      ctx.arc(p.x, p.y, p.size * (this.transitioning ? Math.sin((p.life / p.maxLife) * Math.PI) : 1), 0, Math.PI * 2);
+      ctx.arc(p.x, p.y, Math.max(0.5, p.size * sizeScale), 0, Math.PI * 2);
       ctx.fill();
+
+      if (alpha > 0.3) {
+        ctx.fillStyle = color.replace(/[\d.]+\)$/, `${alpha * 0.25})`);
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, Math.max(1, p.size * sizeScale * 2), 0, Math.PI * 2);
+        ctx.fill();
+      }
     }
   }
 
   private getParticleColor(_p: Particle, alpha: number): string {
-    if (!this.transitioning) {
-      return this.form === PlayerForm.LIGHT
-        ? `rgba(255, 215, 0, ${alpha})`
-        : `rgba(150, 50, 200, ${alpha})`;
-    }
-
-    const progress = this.transitionTimer / this.transitionDuration;
+    const halfDur = this.transitionDuration / 2;
     const fromLight = this.form === PlayerForm.DARK;
 
-    if (progress < 0.5) {
-      const t = progress / 0.5;
+    if (_p.phase === 'scatter') {
+      const t = 1 - (this.transitionTimer) / halfDur;
       if (fromLight) {
-        return this.lerpColor('255,215,0', '150,50,200', t, alpha);
+        return this.lerpColor('255,215,0', '180,80,220', 1 - t, alpha);
       } else {
-        return this.lerpColor('150,50,200', '255,215,0', t, alpha);
+        return this.lerpColor('150,50,200', '255,220,100', 1 - t, alpha);
       }
     } else {
-      const t = (progress - 0.5) / 0.5;
+      const gatherTimer = this.transitionTimer - halfDur;
+      const t = Math.max(0, Math.min(1, gatherTimer / halfDur));
       if (fromLight) {
-        return this.lerpColor('150,50,200', '74,0,128', t, alpha);
+        return this.lerpColor('180,80,220', '120,40,180', t, alpha);
       } else {
-        return this.lerpColor('255,215,0', '255,248,176', t, alpha);
+        return this.lerpColor('255,220,100', '255,240,180', t, alpha);
       }
     }
   }
