@@ -43,12 +43,11 @@ const CourseCard: React.FC<CourseCardProps> = ({ id, title, coverImage, instruct
       </div>
       <div className="course-card-info">
         <div className="course-card-title" title={title}>{title}</div>
-        <div className="course-card-instructor">
-          <span className="instructor-dot" />
-          <span>{instructorName}</span>
-        </div>
-        <div className="course-card-bottom">
-          <span className="progress-label">课程进度</span>
+        <div className="course-card-meta">
+          <div className="course-card-instructor">
+            <span className="instructor-dot" />
+            <span>{instructorName}</span>
+          </div>
           <div
             className="progress-ring-wrapper"
             onMouseEnter={() => setShowTooltip(true)}
@@ -62,6 +61,7 @@ const CourseCard: React.FC<CourseCardProps> = ({ id, title, coverImage, instruct
                 r="16"
                 cx="18"
                 cy="18"
+                strokeLinecap="round"
               />
               <circle
                 className="progress-ring-bar"
