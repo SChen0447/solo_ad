@@ -9,6 +9,25 @@ interface VolunteerProfileProps {
   onTreeClick: (treeId: string) => void;
 }
 
+const GoldCrown: React.FC<{ size?: number }> = ({ size = 20 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+    <path
+      d="M5 16L3 8L8 11L12 5L16 11L21 8L19 16H5Z"
+      fill="url(#goldGradient)"
+      stroke="#DAA520"
+      strokeWidth="1"
+    />
+    <rect x="4" y="17" width="16" height="3" rx="1" fill="url(#goldGradient)" stroke="#DAA520" strokeWidth="1" />
+    <defs>
+      <linearGradient id="goldGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+        <stop offset="0%" stopColor="#FFE55C" />
+        <stop offset="50%" stopColor="#FFD700" />
+        <stop offset="100%" stopColor="#DAA520" />
+      </linearGradient>
+    </defs>
+  </svg>
+);
+
 const ProgressRing: React.FC<{ value: number; max: number; size?: number }> = ({
   value,
   max,
@@ -146,9 +165,13 @@ const VolunteerProfile: React.FC<VolunteerProfileProps> = ({
           <div className="leaderboard-card">
             <h3 className="section-title">🏆 服务时长排行榜</h3>
             {top5.map((v, index) => (
-              <div key={v.id} className="leaderboard-item">
+              <div key={v.id} className={`leaderboard-item ${index === 0 ? 'rank-1-item' : ''}`}>
                 <span className={`leaderboard-rank rank-${index + 1}`}>
-                  {index === 0 ? <span className="leaderboard-crown">👑</span> : index + 1}
+                  {index === 0 ? (
+                    <span className="leaderboard-crown"><GoldCrown size={22} /></span>
+                  ) : (
+                    index + 1
+                  )}
                 </span>
                 <div className="leaderboard-avatar">{getInitial(v.name)}</div>
                 <div className="leaderboard-info">

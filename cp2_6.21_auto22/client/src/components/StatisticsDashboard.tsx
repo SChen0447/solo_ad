@@ -1,9 +1,29 @@
 import React, { useRef, useEffect, useState } from 'react';
-import type { Stats } from '../types';
+import type { Stats, Volunteer } from '../types';
 
 interface StatisticsDashboardProps {
   stats: Stats;
+  volunteers: Volunteer[];
 }
+
+const GoldCrown: React.FC<{ size?: number }> = ({ size = 20 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+    <path
+      d="M5 16L3 8L8 11L12 5L16 11L21 8L19 16H5Z"
+      fill="url(#goldGrad)"
+      stroke="#DAA520"
+      strokeWidth="1"
+    />
+    <rect x="4" y="17" width="16" height="3" rx="1" fill="url(#goldGrad)" stroke="#DAA520" strokeWidth="1" />
+    <defs>
+      <linearGradient id="goldGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+        <stop offset="0%" stopColor="#FFE55C" />
+        <stop offset="50%" stopColor="#FFD700" />
+        <stop offset="100%" stopColor="#DAA520" />
+      </linearGradient>
+    </defs>
+  </svg>
+);
 
 const BarChart: React.FC<{ data: { month: string; count: number }[] }> = ({ data }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -204,7 +224,11 @@ const SpeciesTreemap: React.FC<{ data: { species: string; color: string; count: 
   );
 };
 
-const StatisticsDashboard: React.FC<StatisticsDashboardProps> = ({ stats }) => {
+const StatisticsDashboard: React.FC<StatisticsDashboardProps> = ({ stats, volunteers }) => {
+  const topVolunteers = [...volunteers]
+    .sort((a, b) => b.serviceHours - a.serviceHours)
+    .slice(0, 5);
+
   return (
     <div className="page">
       <h1 className="page-title">数据统计看板</h1>
@@ -232,6 +256,28 @@ const StatisticsDashboard: React.FC<StatisticsDashboardProps> = ({ stats }) => {
       <div className="stats-chart-section">
         <h3>树种分布</h3>
         <SpeciesTreemap data={stats.speciesDistribution} />
+      </div>
+
+      <div className="stats-chart-section">
+        <h3>🏆 志愿者服务时长排行榜</h3>
+        <div className="stats-leaderboard">
+          {topVolunteers.map((v, index) => (
+            <div key={v.id} className={`leaderboard-item ${index === 0 ? 'rank-1-item' : ''}`}>
+              <span className={`leaderboard-rank rank-${index + 1}`}>
+                {index === 0 ? (
+                  <span className="leaderboard-crown"><GoldCrown size={22} /></span>
+                ) : (
+                  index + 1
+                )}
+              </span>
+              <div className="leaderboard-avatar">{v.name.charAt(0)}</div>
+              <div className="leaderboard-info">
+                <div className="leaderboard-name">{v.name}</div>
+                <div className="leaderboard-hours">{v.serviceHours} 小时</div>
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );

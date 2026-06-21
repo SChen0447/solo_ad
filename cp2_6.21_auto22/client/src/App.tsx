@@ -171,7 +171,7 @@ const App: React.FC = () => {
           />
         ) : <div className="loading">加载中...</div>;
       case 'stats':
-        return stats ? <StatisticsDashboard stats={stats} /> : <div className="loading">加载中...</div>;
+        return stats ? <StatisticsDashboard stats={stats} volunteers={volunteers} /> : <div className="loading">加载中...</div>;
       case 'treeDetail':
         return selectedTree ? (
           <TreeDetail
