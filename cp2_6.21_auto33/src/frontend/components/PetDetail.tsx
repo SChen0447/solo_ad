@@ -3,7 +3,7 @@ import { useApp } from '../context/AppContext';
 import type { Pet, MatchResult } from '../types';
 
 interface PetDetailProps {
-  pet: Pet;
+  pet: Pet | null;
   onClose: () => void;
   onApply: () => void;
 }
@@ -13,33 +13,61 @@ export default function PetDetail({ pet, onClose, onApply }: PetDetailProps) {
   const [currentImage, setCurrentImage] = useState(0);
   const [matches, setMatches] = useState<MatchResult[]>([]);
   const [expandedMatch, setExpandedMatch] = useState<string | null>(null);
-  const allImages = pet.images.length > 0 ? pet.images : [pet.mainImage];
+  const [visible, setVisible] = useState(false);
 
   useEffect(() => {
+    if (pet) {
+      setCurrentImage(0);
+      setExpandedMatch(null);
+      setMatches([]);
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          setVisible(true);
+        });
+      });
+    } else {
+      setVisible(false);
+    }
+  }, [pet]);
+
+  useEffect(() => {
+    if (!pet) return;
     let mounted = true;
     getMatches(pet.id).then(data => {
       if (mounted) setMatches(data);
     });
     return () => { mounted = false; };
-  }, [pet.id, getMatches]);
+  }, [pet?.id, getMatches]);
 
   const handleOverlayClick = (e: React.MouseEvent) => {
     if (e.target === e.currentTarget) {
-      onClose();
+      handleClose();
     }
   };
 
+  const handleClose = () => {
+    setVisible(false);
+    setTimeout(onClose, 300);
+  };
+
   const handleConfirmAdoption = (applicationId: string) => {
+    if (!pet) return;
     confirmAdoption(applicationId, pet.id);
   };
 
+  if (!pet) return null;
+
+  const allImages = pet.images.length > 0 ? pet.images : [pet.mainImage];
   const petApplications = applications.filter(a => a.petId === pet.id);
 
   return (
-    <div className="detail-overlay" onClick={handleOverlayClick}>
-      <div className="detail-panel">
-        <button className="close-btn" onClick={onClose}>×</button>
-        
+    <div
+      className={`detail-overlay ${visible ? 'detail-overlay-visible' : ''}`}
+      onClick={handleOverlayClick}
+    >
+      <div className={`detail-panel ${visible ? 'detail-panel-visible' : ''}`}>
+        <button className="close-btn" onClick={handleClose}>×</button>
+
         <div className="detail-image-section">
           <img src={allImages[currentImage]} alt={pet.name} />
           {allImages.length > 1 && (

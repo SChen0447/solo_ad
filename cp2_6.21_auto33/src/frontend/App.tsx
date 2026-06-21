@@ -8,7 +8,12 @@ import AdoptionRecords from './components/AdoptionRecords';
 import AddPetModal from './components/AddPetModal';
 import ToastContainer from './components/ToastContainer';
 import FollowUpReminder from './components/FollowUpReminder';
+import { useVirtualScroll } from './hooks/useVirtualScroll';
 import type { Pet, PageView } from './types';
+
+const CARD_HEIGHT = 400;
+const CARD_WIDTH = 260;
+const GRID_GAP = 24;
 
 export default function App() {
   const { pets, loading, adoptionRecords, addToast } = useApp();
@@ -16,7 +21,28 @@ export default function App() {
   const [selectedPet, setSelectedPet] = useState<Pet | null>(null);
   const [showApplicationModal, setShowApplicationModal] = useState(false);
   const [showAddPetModal, setShowAddPetModal] = useState(false);
-  const [showReminders, setShowReminders] = useState(false);
+  const [gridColumns, setGridColumns] = useState(4);
+
+  const adoptablePets = useMemo(() => pets.filter(p => p.adoptable), [pets]);
+
+  const virtualScroll = useVirtualScroll({
+    itemCount: adoptablePets.length,
+    itemHeight: CARD_HEIGHT + GRID_GAP,
+    columns: gridColumns,
+    overscan: 2
+  });
+
+  useEffect(() => {
+    const calculateColumns = () => {
+      const mainEl = document.querySelector('.app-main');
+      const availableWidth = mainEl ? mainEl.clientWidth - 48 : 1200;
+      const cols = Math.max(1, Math.floor((availableWidth + GRID_GAP) / (CARD_WIDTH + GRID_GAP)));
+      setGridColumns(cols);
+    };
+    calculateColumns();
+    window.addEventListener('resize', calculateColumns);
+    return () => window.removeEventListener('resize', calculateColumns);
+  }, []);
 
   const checkReminders = useCallback(() => {
     const now = new Date();
@@ -25,19 +51,16 @@ export default function App() {
       const nextDate = new Date(record.nextFollowUpDate);
       return nextDate <= now;
     });
-    if (due.length > 0 && !showReminders) {
-      setShowReminders(true);
+    if (due.length > 0) {
       addToast('warning', `您有${due.length}条回访待处理`);
     }
-  }, [adoptionRecords, addToast, showReminders]);
+  }, [adoptionRecords, addToast]);
 
   useEffect(() => {
     checkReminders();
     const interval = setInterval(checkReminders, 60000);
     return () => clearInterval(interval);
   }, [checkReminders]);
-
-  const adoptablePets = useMemo(() => pets.filter(p => p.adoptable), [pets]);
 
   const handleApplyClick = useCallback((pet: Pet) => {
     setSelectedPet(pet);
@@ -87,24 +110,40 @@ export default function App() {
           <>
             <div className="page-header">
               <h2 className="page-title">待领养宠物</h2>
-              {currentView === 'home' && (
-                <button className="add-pet-btn" onClick={() => setShowAddPetModal(true)}>
-                  + 添加宠物
-                </button>
-              )}
+              <button className="add-pet-btn" onClick={() => setShowAddPetModal(true)}>
+                + 添加宠物
+              </button>
             </div>
             {loading ? (
               <div className="loading">加载中...</div>
             ) : (
-              <div className="pet-grid">
-                {adoptablePets.map(pet => (
-                  <PetCard
-                    key={pet.id}
-                    pet={pet}
-                    onClick={() => handleCardClick(pet)}
-                    onApply={() => handleApplyClick(pet)}
-                  />
-                ))}
+              <div
+                ref={virtualScroll.containerRef}
+                className="pet-grid-virtual"
+                style={virtualScroll.containerStyle}
+              >
+                <div style={virtualScroll.contentStyle}>
+                  <div
+                    className="pet-grid-inner"
+                    style={{
+                      transform: `translateY(${virtualScroll.offsetY}px)`,
+                      gridTemplateColumns: `repeat(${gridColumns}, ${CARD_WIDTH}px)`,
+                    }}
+                  >
+                    {virtualScroll.visibleItems.map(idx => {
+                      const pet = adoptablePets[idx];
+                      if (!pet) return null;
+                      return (
+                        <PetCard
+                          key={pet.id}
+                          pet={pet}
+                          onClick={() => handleCardClick(pet)}
+                          onApply={() => handleApplyClick(pet)}
+                        />
+                      );
+                    })}
+                  </div>
+                </div>
               </div>
             )}
           </>
@@ -114,13 +153,11 @@ export default function App() {
         {currentView === 'adoptions' && <AdoptionRecords />}
       </main>
 
-      {selectedPet && (
-        <PetDetail
-          pet={selectedPet}
-          onClose={closeDetail}
-          onApply={() => handleApplyClick(selectedPet)}
-        />
-      )}
+      <PetDetail
+        pet={selectedPet}
+        onClose={closeDetail}
+        onApply={() => selectedPet && handleApplyClick(selectedPet)}
+      />
 
       {showApplicationModal && selectedPet && (
         <ApplicationModal
