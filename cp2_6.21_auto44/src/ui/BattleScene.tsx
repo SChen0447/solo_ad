@@ -83,15 +83,23 @@ function PixelSprite({
 
 function HpBar({ current, max, label }: { current: number; max: number; label?: string }) {
   const ratio = Math.max(0, Math.min(1, current / max));
-  const bg = ratio > 0.5 ? '#4ADE80' : ratio > 0.25 ? '#F59E0B' : '#EF4444';
+  const color = ratio > 0.6 ? '#4ADE80' : ratio > 0.3 ? '#F59E0B' : '#EF4444';
+  const glowColor = ratio > 0.6 ? 'rgba(74, 222, 128, 0.4)' : ratio > 0.3 ? 'rgba(245, 158, 11, 0.4)' : 'rgba(239, 68, 68, 0.4)';
   return (
     <div style={{ minWidth: 220 }}>
-      {label && <div style={{ fontSize: 9, marginBottom: 4, display: 'flex', justifyContent: 'space-between' }}>
+      {label && <div style={{ fontSize: 9, marginBottom: 4, display: 'flex', justifyContent: 'space-between', fontWeight: 'bold' }}>
         <span>{label}</span>
-        <span style={{ color: bg }}>{current}/{max}</span>
+        <span style={{ color, textShadow: `0 0 6px ${glowColor}` }}>{current} / {max}</span>
       </div>}
-      <div className="hp-bar-container" style={{ height: 14 }}>
-        <div className="hp-bar-fill" style={{ width: `${ratio * 100}%`, background: `linear-gradient(90deg, ${bg}, ${bg}dd)` }} />
+      <div className="hp-bar-container" style={{ height: 14, boxShadow: `inset 0 0 4px rgba(0,0,0,0.8)` }}>
+        <div
+          className="hp-bar-fill"
+          style={{
+            width: `${ratio * 100}%`,
+            background: `linear-gradient(180deg, ${color} 0%, ${color}dd 50%, ${color}aa 100%)`,
+            boxShadow: `0 0 8px ${glowColor}, inset 0 1px 0 rgba(255,255,255,0.3)`,
+          }}
+        />
       </div>
     </div>
   );
@@ -99,15 +107,22 @@ function HpBar({ current, max, label }: { current: number; max: number; label?: 
 
 function MpBar({ current, max }: { current: number; max: number }) {
   const ratio = Math.max(0, Math.min(1, current / max));
-  const bg = '#60A5FA';
+  const color = '#60A5FA';
   return (
     <div style={{ minWidth: 220 }}>
-      <div style={{ fontSize: 9, marginBottom: 4, display: 'flex', justifyContent: 'space-between' }}>
+      <div style={{ fontSize: 9, marginBottom: 4, display: 'flex', justifyContent: 'space-between', fontWeight: 'bold' }}>
         <span>MP</span>
-        <span style={{ color: bg }}>{current}/{max}</span>
+        <span style={{ color, textShadow: '0 0 6px rgba(96, 165, 250, 0.5)' }}>{current} / {max}</span>
       </div>
-      <div className="hp-bar-container" style={{ height: 10 }}>
-        <div className="hp-bar-fill" style={{ width: `${ratio * 100}%`, background: `linear-gradient(90deg, ${bg}, ${bg}dd)` }} />
+      <div className="hp-bar-container" style={{ height: 10, boxShadow: 'inset 0 0 4px rgba(0,0,0,0.8)' }}>
+        <div
+          className="hp-bar-fill"
+          style={{
+            width: `${ratio * 100}%`,
+            background: `linear-gradient(180deg, ${color} 0%, ${color}dd 50%, ${color}aa 100%)`,
+            boxShadow: '0 0 6px rgba(96, 165, 250, 0.4), inset 0 1px 0 rgba(255,255,255,0.3)',
+          }}
+        />
       </div>
     </div>
   );
@@ -244,39 +259,85 @@ export default function BattleScene(props: BattleSceneProps) {
           }} />
 
           <div style={{ position: 'relative', zIndex: 1, textAlign: 'center' }}>
-            <div style={{ fontSize: 9, color: '#FFD700', marginBottom: 8 }}>
+            <div style={{ fontSize: 9, color: '#FFD700', marginBottom: 8, fontWeight: 'bold', textShadow: '0 0 8px rgba(255, 215, 0, 0.5)' }}>
               {battleState.hero.name} · Lv.{battleState.hero.level} {classInfo?.name}
             </div>
-            <div style={{ marginBottom: 12 }} className={battleState.animatingHero ? 'attack-animation-left' : ''}>
-              <PixelSprite sprite={heroSprite} colors={heroColors as any} size={8} />
+            <div
+              className={`battle-sprite-wrapper ${battleState.isDefending ? 'defending' : ''}`}
+              style={{ marginBottom: 12, display: 'inline-block' }}
+            >
+              <div
+                className={`
+                  ${battleState.animatingHero ? 'attack-animation-left flash-animation' : ''}
+                  ${battleState.animatingMonster ? 'shake-animation' : ''}
+                `}
+              >
+                <PixelSprite sprite={heroSprite} colors={heroColors as any} size={8} />
+              </div>
+              {battleState.animatingMonster && (
+                <div style={{
+                  position: 'absolute',
+                  top: '50%',
+                  left: '50%',
+                  transform: 'translate(-50%, -50%)',
+                  fontSize: 20,
+                  animation: 'slashEffect 0.4s ease-out forwards',
+                  pointerEvents: 'none',
+                }}>
+                  💥
+                </div>
+              )}
             </div>
             <HpBar current={battleState.hero.hp} max={battleState.hero.maxHp} label="HP" />
             <div style={{ marginTop: 6 }}>
               <MpBar current={battleState.hero.mp} max={battleState.hero.maxMp} />
             </div>
             {battleState.isDefending && (
-              <div style={{ marginTop: 8, fontSize: 9, color: '#60A5FA', animation: 'bounce 0.5s ease infinite' }}>
+              <div style={{ marginTop: 8, fontSize: 9, color: '#60A5FA', fontWeight: 'bold', textShadow: '0 0 8px rgba(96, 165, 250, 0.8)', animation: 'bounce 0.8s ease-in-out infinite' }}>
                 🛡 防御中
               </div>
             )}
           </div>
 
           <div style={{ position: 'relative', zIndex: 1, textAlign: 'center' }}>
-            <div style={{ fontSize: 28, color: '#EF4444', marginBottom: 8 }}>VS</div>
+            <div style={{ fontSize: 32, color: '#EF4444', marginBottom: 8, textShadow: '0 0 12px rgba(239, 68, 68, 0.6)', fontWeight: 'bold' }}>VS</div>
             <div style={{ fontSize: 9, color: '#888' }}>回合制战斗</div>
           </div>
 
           <div style={{ position: 'relative', zIndex: 1, textAlign: 'center' }}>
-            <div style={{ fontSize: 9, color: '#EF4444', marginBottom: 8 }}>
+            <div style={{ fontSize: 9, color: '#EF4444', marginBottom: 8, fontWeight: 'bold', textShadow: '0 0 8px rgba(239, 68, 68, 0.5)' }}>
               {battleState.monster.name} · Lv.{battleState.monster.level}
             </div>
-            <div style={{ marginBottom: 12 }} className={battleState.animatingMonster ? 'attack-animation-right shake-animation' : ''}>
-              <PixelSprite
-                sprite={battleState.monster.sprite}
-                colors={MonsterSpriteColors(battleState.monster.color)}
-                size={8}
-                mirror
-              />
+            <div
+              className="battle-sprite-wrapper"
+              style={{ marginBottom: 12, display: 'inline-block' }}
+            >
+              <div
+                className={`
+                  ${battleState.animatingMonster ? 'attack-animation-right flash-animation' : ''}
+                  ${battleState.animatingHero ? 'shake-animation' : ''}
+                `}
+              >
+                <PixelSprite
+                  sprite={battleState.monster.sprite}
+                  colors={MonsterSpriteColors(battleState.monster.color)}
+                  size={8}
+                  mirror
+                />
+              </div>
+              {battleState.animatingHero && (
+                <div style={{
+                  position: 'absolute',
+                  top: '50%',
+                  left: '50%',
+                  transform: 'translate(-50%, -50%)',
+                  fontSize: 24,
+                  animation: 'slashEffect 0.4s ease-out forwards',
+                  pointerEvents: 'none',
+                }}>
+                  ⚔️
+                </div>
+              )}
             </div>
             <HpBar current={battleState.monster.hp} max={battleState.monster.maxHp} label="HP" />
           </div>
@@ -286,18 +347,58 @@ export default function BattleScene(props: BattleSceneProps) {
           display: 'flex', gap: 16, flexWrap: 'wrap',
         }}>
           <div style={{ flex: 1, minWidth: 300 }}>
-            <div style={{ fontSize: 9, color: '#FFD700', marginBottom: 8 }}>📜 战斗日志</div>
+            <div style={{ fontSize: 9, color: '#FFD700', marginBottom: 8, fontWeight: 'bold' }}>📜 战斗日志</div>
             <div
               ref={logsRef}
               style={{
                 height: 160, overflowY: 'auto',
-                background: '#0D0D0D', border: '1px solid #333',
-                padding: '8px 12px',
+                background: 'linear-gradient(180deg, #050505 0%, #0D0D0D 100%)',
+                border: '1px solid #333',
+                padding: '10px 12px',
+                boxShadow: 'inset 0 2px 8px rgba(0,0,0,0.5)',
               }}
             >
-              {battleState.logs.map((log, i) => (
-                <div key={i} className="log-item">{log}</div>
-              ))}
+              {battleState.logs.slice(-5).map((log, i) => {
+                let color = '#CCCCCC';
+                let icon = '▸';
+                if (log.includes('攻击') || log.includes('伤害') || log.includes('造成')) {
+                  color = '#F87171';
+                  icon = '⚔';
+                } else if (log.includes('防御') || log.includes('减伤')) {
+                  color = '#60A5FA';
+                  icon = '🛡';
+                } else if (log.includes('治疗') || log.includes('恢复') || log.includes('药水') || log.includes('回复')) {
+                  color = '#4ADE80';
+                  icon = '💚';
+                } else if (log.includes('技能') || log.includes('施放') || log.includes('MP')) {
+                  color = '#C084FC';
+                  icon = '✨';
+                } else if (log.includes('胜利') || log.includes('击败')) {
+                  color = '#FFD700';
+                  icon = '🏆';
+                } else if (log.includes('战斗') || log.includes('开始')) {
+                  color = '#F59E0B';
+                  icon = '⚡';
+                }
+                return (
+                  <div
+                    key={i}
+                    className="log-item"
+                    style={{
+                      color,
+                      fontSize: 9,
+                      padding: '5px 0',
+                      borderBottom: '1px dashed #222',
+                      display: 'flex',
+                      gap: 6,
+                      alignItems: 'flex-start',
+                    }}
+                  >
+                    <span style={{ flexShrink: 0 }}>{icon}</span>
+                    <span style={{ flex: 1 }}>{log}</span>
+                  </div>
+                );
+              })}
             </div>
           </div>
 
