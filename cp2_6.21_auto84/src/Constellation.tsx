@@ -34,7 +34,7 @@ const DESIGN_HEIGHT = 600
 const STAR_RADIUS = 14
 const DRAW_DURATION = 500
 const ERROR_FLASH_DURATION = 300
-const ERROR_SHAKE_DURATION = 200
+const ERROR_SHAKE_DURATION = 300
 const ERROR_SHAKE_OFFSET = 3
 const BURST_COUNT = 12
 const BURST_DISTANCE = 80
@@ -42,7 +42,27 @@ const BURST_LIFE = 1000
 const COMPLETE_GLOW_DURATION = 1500
 const OUTLINE_FADE_DURATION = 1000
 
-const BURST_COLORS = ['#FFD700', '#FFA500', '#FF69B4', '#DA70D6', '#FF8C00', '#FFD700']
+const hexToRgb = (hex: string): [number, number, number] => {
+  const r = parseInt(hex.slice(1, 3), 16)
+  const g = parseInt(hex.slice(3, 5), 16)
+  const b = parseInt(hex.slice(5, 7), 16)
+  return [r, g, b]
+}
+
+const rgbToHex = (r: number, g: number, b: number): string => {
+  const toHex = (n: number) => Math.round(n).toString(16).padStart(2, '0')
+  return `#${toHex(r)}${toHex(g)}${toHex(b)}`
+}
+
+const interpolateColor = (color1: string, color2: string, t: number): string => {
+  const [r1, g1, b1] = hexToRgb(color1)
+  const [r2, g2, b2] = hexToRgb(color2)
+  return rgbToHex(
+    r1 + (r2 - r1) * t,
+    g1 + (g2 - g1) * t,
+    b1 + (b2 - b1) * t,
+  )
+}
 
 export default function Constellation({ constellation, onComplete, resetKey }: ConstellationProps) {
   const svgRef = useRef<SVGSVGElement>(null)
@@ -94,12 +114,14 @@ export default function Constellation({ constellation, onComplete, resetKey }: C
     Object.values(shakeTimersRef.current).forEach(t => clearTimeout(t))
     shakeTimersRef.current = {}
 
+    setOutlineOpacity(0)
     const start = performance.now()
     const fadeIn = () => {
       const now = performance.now()
-      const progress = Math.min(1, (now - start) / OUTLINE_FADE_DURATION)
-      setOutlineOpacity(progress * 0.15)
-      if (progress < 1) requestAnimationFrame(fadeIn)
+      const rawProgress = Math.min(1, (now - start) / OUTLINE_FADE_DURATION)
+      const easedProgress = 1 - Math.pow(1 - rawProgress, 3)
+      setOutlineOpacity(easedProgress * 0.15)
+      if (rawProgress < 1) requestAnimationFrame(fadeIn)
     }
     requestAnimationFrame(fadeIn)
   }, [constellation, resetKey])
@@ -189,6 +211,8 @@ export default function Constellation({ constellation, onComplete, resetKey }: C
     for (let i = 0; i < BURST_COUNT; i++) {
       const angle = (i / BURST_COUNT) * Math.PI * 2 + Math.random() * 0.3
       const speed = BURST_DISTANCE / (BURST_LIFE / 1000)
+      const colorT = Math.random()
+      const particleColor = interpolateColor('#FFD700', '#FF69B4', colorT)
       particles.push({
         x: cx,
         y: cy,
@@ -196,7 +220,7 @@ export default function Constellation({ constellation, onComplete, resetKey }: C
         vy: Math.sin(angle) * speed,
         life: BURST_LIFE,
         maxLife: BURST_LIFE,
-        color: BURST_COLORS[i % BURST_COLORS.length],
+        color: particleColor,
       })
     }
     setBurstParticles(particles)
@@ -243,8 +267,8 @@ export default function Constellation({ constellation, onComplete, resetKey }: C
 
   const getShakeOffset = (starIdx: number) => {
     const s = starStates[starIdx]
-    if (!s || s.errorShake <= 0) return { x: 0, y: 0 }
-    const t = 1 - s.errorShake / ERROR_SHAKE_DURATION
+    if (!s || s.errorShake <= 0 || s.errorFlash <= 0) return { x: 0, y: 0 }
+    const t = 1 - s.errorShake / ERROR_FLASH_DURATION
     const intensity = Math.sin(t * Math.PI * 8) * ERROR_SHAKE_OFFSET * (1 - t)
     return { x: intensity, y: intensity * 0.7 }
   }
@@ -354,20 +378,22 @@ export default function Constellation({ constellation, onComplete, resetKey }: C
           const t = Math.min(1, progress)
           const ex = x1 + (x2 - x1) * t
           const ey = y1 + (y2 - y1) * t
+          const lineOpacity = t * 0.8
+          const haloOpacity = t * 0.5
           return (
             <g key={`draw-${i}`} filter="url(#lineGlow)">
               <line
                 x1={x1} y1={y1} x2={ex} y2={ey}
                 stroke="#FFFFFF"
                 strokeWidth="1"
-                strokeOpacity={0.5}
+                strokeOpacity={haloOpacity}
                 strokeLinecap="round"
               />
               <line
                 x1={x1} y1={y1} x2={ex} y2={ey}
                 stroke="#00BFFF"
                 strokeWidth="3"
-                strokeOpacity={0.8}
+                strokeOpacity={lineOpacity}
                 strokeLinecap="round"
               />
             </g>

@@ -126,11 +126,14 @@ export default function App() {
           {CONSTELLATIONS.map((_, i) => {
             const isDone = completedLevels[i]
             const isCurrent = i === currentLevel
+            const canJump = isDone || isCurrent
             return (
               <div
                 key={`progress-dot-${i}`}
                 onClick={() => {
-                  if (isDone || i <= currentLevel) {
+                  if (canJump) {
+                    stopTimer()
+                    setDisplayScore(0)
                     setCurrentLevel(i)
                     setResetKey(prev => prev + 1)
                   }
@@ -148,7 +151,7 @@ export default function App() {
                     : isDone
                     ? '0 0 6px #8A2BE2'
                     : 'none',
-                  cursor: isDone || i <= currentLevel ? 'pointer' : 'default',
+                  cursor: canJump ? 'pointer' : 'default',
                 }}
               />
             )
