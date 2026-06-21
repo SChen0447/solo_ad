@@ -49,6 +49,7 @@ const App: React.FC = () => {
   const [toast, setToast] = useState<{ msg: string; color?: string } | null>(null);
   const [windowWidth, setWindowWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 1200);
   const [mobileExpanded, setMobileExpanded] = useState(true);
+  const [fontReady, setFontReady] = useState(0);
 
   const [zoom, setZoom] = useState(1);
   const [panX, setPanX] = useState(0);
@@ -113,7 +114,7 @@ const App: React.FC = () => {
         (document as any).fonts?.add(f);
         f.load().then(() => {
           // trigger re-render
-          setFont((prev) => prev ? { ...prev } : prev);
+          setFontReady((v) => v + 1);
         }).catch(() => {});
       } catch (e) {}
     } catch (e) {}
@@ -276,7 +277,7 @@ const App: React.FC = () => {
       };
       renderer.render(layout, debouncedText, typesetParams, renderOptions);
     }
-  }, [font, values, debouncedText, zoom, panX, panY, useOffscreen, customFontFamily, defaultFontFamily, computeLayout]);
+  }, [font, values, debouncedText, zoom, panX, panY, useOffscreen, customFontFamily, defaultFontFamily, computeLayout, fontReady]);
 
   const renderHalf = (
     renderer: CanvasRenderer,
@@ -361,10 +362,9 @@ const App: React.FC = () => {
         ctx.save();
         ctx.strokeStyle = '#CCC';
         ctx.lineWidth = 0.5;
-        const baselineY = startY + (lineIdx + 1) * line.lineHeight;
         ctx.beginPath();
-        ctx.moveTo(contentStartX - 20, baselineY);
-        ctx.lineTo(contentStartX + (params.maxWidth || 600) + 40, baselineY);
+        ctx.moveTo(contentStartX - 20, lineY);
+        ctx.lineTo(contentStartX + (params.maxWidth || 600) + 40, lineY);
         ctx.stroke();
         ctx.restore();
       }

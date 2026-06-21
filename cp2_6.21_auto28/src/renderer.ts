@@ -215,10 +215,9 @@ export class CanvasRenderer {
         ctx.save();
         ctx.strokeStyle = '#CCC';
         ctx.lineWidth = 0.5;
-        const baselineY = startY + (lineIdx + 1) * line.lineHeight;
         ctx.beginPath();
-        ctx.moveTo(startX - 20, baselineY);
-        ctx.lineTo(startX + (typesetParams.maxWidth || 600) + 40, baselineY);
+        ctx.moveTo(startX - 20, lineY);
+        ctx.lineTo(startX + (typesetParams.maxWidth || 600) + 40, lineY);
         ctx.stroke();
         ctx.restore();
       }

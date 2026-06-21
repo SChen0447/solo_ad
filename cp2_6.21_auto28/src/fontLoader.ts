@@ -196,7 +196,7 @@ export class FontWrapper {
 
 export async function loadFontFromFile(file: File): Promise<FontWrapper> {
   if (file.size > 5 * 1024 * 1024) {
-    throw new Error('文件过大，不能超过5MB');
+    throw new Error('文件格式不支持或解析失败');
   }
 
   const ext = file.name.split('.').pop()?.toLowerCase();
@@ -214,7 +214,7 @@ export async function loadFontFromFile(file: File): Promise<FontWrapper> {
           reject(new Error('文件格式不支持或解析失败'));
           return;
         }
-        opentype.parse(buffer, (err, font) => {
+        opentype.parse(buffer, (err: Error | null, font: opentype.Font | null) => {
           if (err || !font) {
             reject(new Error('文件格式不支持或解析失败'));
             return;
