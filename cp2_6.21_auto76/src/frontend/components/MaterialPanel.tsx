@@ -122,20 +122,15 @@ function MaterialRow({
   isLowStock: boolean;
   onPurchase: () => void;
 }) {
-  const [flash, setFlash] = useState(false);
+  const [shouldBlink, setShouldBlink] = useState(isLowStock);
 
   useEffect(() => {
     if (isLowStock) {
-      let count = 0;
-      const interval = setInterval(() => {
-        setFlash((prev) => !prev);
-        count++;
-        if (count >= 6) {
-          clearInterval(interval);
-          setFlash(false);
-        }
-      }, 500);
-      return () => clearInterval(interval);
+      setShouldBlink(true);
+      const timer = setTimeout(() => {
+        setShouldBlink(false);
+      }, 3000);
+      return () => clearTimeout(timer);
     }
   }, [isLowStock, material.id]);
 
@@ -178,11 +173,11 @@ function MaterialRow({
       </td>
       <td style={{ padding: '0 16px' }}>
         <span
+          className={isLowStock && shouldBlink ? 'blink-red' : ''}
           style={{
             fontSize: 14,
             fontWeight: isLowStock ? 700 : 500,
-            color: isLowStock ? (flash ? '#EF4444' : '#B91C1C') : '#1E293B',
-            transition: 'color 0.3s',
+            color: isLowStock ? '#EF4444' : '#1E293B',
           }}
         >
           {material.currentStock} {material.unit}
@@ -358,6 +353,22 @@ function MaterialPanel({ materials, onPurchase }: MaterialPanelProps) {
           onConfirm={() => onPurchase(selectedMaterial.id)}
         />
       )}
+
+      <style>{`
+        .blink-red {
+          animation: blink-red 1s ease-in-out 3;
+        }
+        @keyframes blink-red {
+          0%, 100% {
+            color: #EF4444;
+            opacity: 1;
+          }
+          50% {
+            color: #EF4444;
+            opacity: 0.2;
+          }
+        }
+      `}</style>
     </div>
   );
 }

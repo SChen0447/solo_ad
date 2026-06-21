@@ -199,13 +199,12 @@ function App() {
                   display: 'flex',
                   alignItems: 'center',
                   gap: 12,
-                  padding: '12px 20px',
+                  padding: '12px 20px 12px 16px',
                   color: '#fff',
                   textDecoration: 'none',
                   position: 'relative',
                   transition: 'background-color 0.2s ease-out',
                   backgroundColor: isActive ? '#334155' : 'transparent',
-                  borderLeft: isActive ? '4px solid #6366F1' : '4px solid transparent',
                 })}
                 onMouseEnter={(e) => {
                   if (!isActive) {
@@ -218,6 +217,19 @@ function App() {
                   }
                 }}
               >
+                {isActive && (
+                  <div
+                    style={{
+                      position: 'absolute',
+                      left: 0,
+                      top: '10%',
+                      width: 4,
+                      height: '80%',
+                      background: '#6366F1',
+                      borderRadius: '0 2px 2px 0',
+                    }}
+                  />
+                )}
                 <div style={{ position: 'relative' }}>
                   <Icon name={item.icon} size={20} />
                   {showAlert && (

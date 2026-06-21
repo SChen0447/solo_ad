@@ -133,8 +133,9 @@ function generateMockData() {
 generateMockData();
 
 function checkMaterialsAvailable(orderQuantity: number): boolean {
-  const avgStock = materials.reduce((sum, m) => sum + m.currentStock, 0) / materials.length;
-  return avgStock >= orderQuantity * 2;
+  const lowStockCount = materials.filter((m) => m.currentStock < m.safetyStock).length;
+  const totalStock = materials.reduce((sum, m) => sum + m.currentStock, 0);
+  return lowStockCount === 0 && totalStock >= orderQuantity * 3;
 }
 
 function createWorkOrderForOrder(order: Order): WorkOrder {
@@ -149,12 +150,17 @@ function createWorkOrderForOrder(order: Order): WorkOrder {
     `工单创建于 ${startTime.toLocaleString('zh-CN')}`,
     `优先级: ${priority === 'high' ? '高' : '普通'}`,
     `预计耗时: ${estimatedHours} 小时`,
+    `物料可用性检查: ${materialsAvailable ? '通过' : '未通过'}`,
   ];
 
   if (!materialsAvailable) {
-    logs.push('物料不足，等待补货');
+    const lowMats = materials.filter((m) => m.currentStock < m.safetyStock).map((m) => m.name);
+    if (lowMats.length > 0) {
+      logs.push(`库存不足物料: ${lowMats.join(', ')}`);
+    }
+    logs.push('工单状态: 等待物料补货');
   } else {
-    logs.push('物料充足，开始生产');
+    logs.push('工单状态: 物料充足，已开始生产');
   }
 
   return {
