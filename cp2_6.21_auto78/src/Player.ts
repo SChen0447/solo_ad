@@ -19,7 +19,8 @@ export class Player {
   private readonly BASE_SPEED = 280;
   private readonly SPEED_GROWTH_PER_SEC = 8;
   private readonly MAX_SPEED_MULT = 3.0;
-  private readonly TRAIL_EMIT_INTERVAL = 0.016;
+  private readonly TRAIL_EMIT_INTERVAL = 0.012;
+  private readonly PARTICLES_PER_EMIT = 2;
 
   constructor(canvasWidth: number, canvasHeight: number) {
     this.canvasWidth = canvasWidth;
@@ -118,7 +119,8 @@ export class Player {
     const isMoving = this.keys.up || this.keys.down || this.keys.left || this.keys.right;
     if (this.trailAccumulator >= this.TRAIL_EMIT_INTERVAL) {
       this.trailAccumulator = 0;
-      if (isMoving || Math.random() < 0.5) {
+      const emitCount = isMoving ? this.PARTICLES_PER_EMIT : 1;
+      for (let i = 0; i < emitCount; i++) {
         this.emitTrailParticle(playerState, scrollSpeed);
       }
     }
@@ -132,10 +134,10 @@ export class Player {
     }
     const size = 5 + Math.random() * 5;
     this.particles.push({
-      x: playerState.x + (Math.random() - 0.5) * 8,
-      y: playerState.y + (Math.random() - 0.5) * 8,
-      vx: -scrollSpeed * (0.3 + Math.random() * 0.4) + (Math.random() - 0.5) * 40,
-      vy: (Math.random() - 0.5) * 30,
+      x: playerState.x + (Math.random() - 0.5) * 10,
+      y: playerState.y + (Math.random() - 0.5) * 10,
+      vx: -scrollSpeed * (0.2 + Math.random() * 0.3) + (Math.random() - 0.5) * 60,
+      vy: (Math.random() - 0.5) * 60,
       size,
       color: randomTrailColor(),
       life: 0.5,

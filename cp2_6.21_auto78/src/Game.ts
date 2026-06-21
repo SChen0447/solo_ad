@@ -64,7 +64,7 @@ export class Game {
       this.state.score += count * 10;
       this.state.collectedCount += count;
       this.state.screenFlash = 1.0;
-      this.state.scoreAnim.targetScale = 1.2;
+      this.state.scoreAnim.targetScale = 1.25;
       this.state.scoreAnim.animTime = 0;
       const high = parseInt(localStorage.getItem(HIGH_SCORE_KEY) || '0', 10);
       if (this.state.score > high) {
@@ -203,18 +203,14 @@ export class Game {
     this.renderer.update(dt, this.scrollSpeed);
 
     if (this.state.screenFlash > 0) {
-      this.state.screenFlash = Math.max(0, this.state.screenFlash - dt / 0.1);
+      this.state.screenFlash = Math.max(0, this.state.screenFlash - dt / 0.15);
     }
 
     const anim = this.state.scoreAnim;
     anim.animTime += dt;
     if (anim.animTime < anim.animDuration) {
       const t = anim.animTime / anim.animDuration;
-      if (t < 0.5) {
-        anim.scale = 1.0 + (anim.targetScale - 1.0) * (t * 2);
-      } else {
-        anim.scale = anim.targetScale - (anim.targetScale - 1.0) * ((t - 0.5) * 2);
-      }
+      anim.scale = this.scoreBounceEase(t, anim.targetScale);
     } else {
       anim.scale = 1.0;
     }
@@ -227,6 +223,22 @@ export class Game {
         const barW = this.canvas.width - 40;
         this.renderer.emitGoldParticles(barX + barW, barY + 3);
       }
+    }
+  }
+
+  private scoreBounceEase(t: number, peakScale: number): number {
+    if (t >= 1) return 1.0;
+    const c1 = 1.70158;
+    const c3 = c1 + 1;
+    const amplitude = peakScale - 1.0;
+    if (t < 0.4) {
+      const p = t / 0.4;
+      const eased = 1 + c3 * Math.pow(p - 1, 3) + c1 * Math.pow(p - 1, 2);
+      return 1.0 + amplitude * eased;
+    } else {
+      const p = (t - 0.4) / 0.6;
+      const easeDown = 1 - Math.pow(1 - p, 3);
+      return peakScale + (1.0 - peakScale) * easeDown;
     }
   }
 }

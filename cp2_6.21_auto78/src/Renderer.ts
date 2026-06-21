@@ -218,13 +218,18 @@ export class Renderer {
     const ctx = this.ctx;
     ctx.save();
     for (const p of particles) {
-      const alpha = Math.max(0, p.life / p.maxLife);
-      ctx.globalAlpha = alpha;
-      ctx.fillStyle = p.color;
-      ctx.shadowColor = p.color;
-      ctx.shadowBlur = 8;
+      const lifeRatio = Math.max(0, p.life / p.maxLife);
+      const currentSize = p.size * lifeRatio;
+      if (currentSize < 0.5) continue;
+      const outerRadius = currentSize * 1.8;
+      const gradient = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, outerRadius);
+      gradient.addColorStop(0, p.color);
+      gradient.addColorStop(0.4, p.color);
+      gradient.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.globalAlpha = lifeRatio;
+      ctx.fillStyle = gradient;
       ctx.beginPath();
-      ctx.arc(p.x, p.y, p.size * alpha, 0, Math.PI * 2);
+      ctx.arc(p.x, p.y, outerRadius, 0, Math.PI * 2);
       ctx.fill();
     }
     ctx.restore();
