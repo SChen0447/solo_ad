@@ -1,0 +1,647 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Fossil 3D Studio - 古生物化石三维可视化系统</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: radial-gradient(ellipse at center, #0A1628 0%, #1a120a 50%, #2D1F14 100%);
+      color: #fff;
+      user-select: none;
+    }
+
+    #app {
+      position: relative;
+      width: 100%;
+      height: 100%;
+    }
+
+    #canvas-container {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+    }
+
+    canvas {
+      display: block;
+      outline: none;
+    }
+
+    .logo {
+      position: absolute;
+      top: 24px;
+      left: 24px;
+      font-family: 'Inter', sans-serif;
+      font-size: 20px;
+      font-weight: 600;
+      letter-spacing: 1px;
+      color: #fff;
+      text-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+      z-index: 100;
+      pointer-events: none;
+    }
+
+    .comparison-panel {
+      position: absolute;
+      bottom: 24px;
+      left: 24px;
+      background: rgba(30, 30, 30, 0.75);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 8px;
+      padding: 16px;
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      z-index: 100;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      min-width: 280px;
+    }
+
+    .thumbnail-group {
+      display: flex;
+      gap: 12px;
+    }
+
+    .thumbnail-btn {
+      width: 70px;
+      height: 70px;
+      border-radius: 8px;
+      border: 2px solid transparent;
+      background: rgba(139, 115, 85, 0.3);
+      cursor: pointer;
+      position: relative;
+      overflow: hidden;
+      transition: all 200ms ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .thumbnail-btn:hover {
+      transform: scale(1.08);
+      border-color: rgba(255, 179, 71, 0.6);
+    }
+
+    .thumbnail-btn.active {
+      border-color: #FFB347;
+      box-shadow: 0 0 16px rgba(255, 179, 71, 0.4);
+    }
+
+    .thumbnail-btn .overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0);
+      transition: background 200ms ease;
+      display: flex;
+      align-items: flex-end;
+      padding: 6px;
+    }
+
+    .thumbnail-btn:hover .overlay {
+      background: rgba(0, 0, 0, 0.4);
+    }
+
+    .thumbnail-btn .overlay span {
+      color: #fff;
+      font-size: 11px;
+      opacity: 0;
+      transition: opacity 200ms ease;
+      white-space: nowrap;
+    }
+
+    .thumbnail-btn:hover .overlay span {
+      opacity: 1;
+    }
+
+    .thumbnail-icon {
+      font-size: 28px;
+      filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3));
+    }
+
+    .mode-switch {
+      display: flex;
+      background: rgba(0, 0, 0, 0.3);
+      border-radius: 6px;
+      overflow: hidden;
+    }
+
+    .mode-btn {
+      flex: 1;
+      padding: 8px 12px;
+      border: none;
+      background: transparent;
+      color: rgba(255, 255, 255, 0.6);
+      font-size: 12px;
+      cursor: pointer;
+      transition: all 200ms ease;
+      font-family: inherit;
+    }
+
+    .mode-btn:hover {
+      color: #fff;
+      background: rgba(255, 255, 255, 0.1);
+    }
+
+    .mode-btn.active {
+      background: #FFB347;
+      color: #2D1F14;
+      font-weight: 600;
+    }
+
+    .opacity-controls {
+      display: none;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .opacity-controls.visible {
+      display: flex;
+    }
+
+    .opacity-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .opacity-label {
+      font-size: 11px;
+      color: rgba(255, 255, 255, 0.7);
+      min-width: 60px;
+    }
+
+    .opacity-slider {
+      flex: 1;
+      -webkit-appearance: none;
+      appearance: none;
+      height: 6px;
+      border-radius: 3px;
+      background: rgba(255, 255, 255, 0.15);
+      outline: none;
+      cursor: pointer;
+      transition: background 200ms ease;
+    }
+
+    .opacity-slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: #FFB347;
+      cursor: pointer;
+      transition: all 200ms ease;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+    }
+
+    .opacity-slider::-webkit-slider-thumb:hover {
+      transform: scale(1.2);
+      background: #ffc977;
+    }
+
+    .opacity-slider::-moz-range-thumb {
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: #FFB347;
+      cursor: pointer;
+      border: none;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+    }
+
+    .opacity-value {
+      font-size: 11px;
+      color: #FFB347;
+      min-width: 32px;
+      text-align: right;
+    }
+
+    .info-panel {
+      position: absolute;
+      bottom: 24px;
+      right: 24px;
+      width: 360px;
+      max-height: 80vh;
+      background: rgba(92, 64, 51, 0.88);
+      border-radius: 8px;
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      border: 1px solid rgba(196, 168, 130, 0.3);
+      z-index: 100;
+      overflow: hidden;
+      transform: translateX(120%);
+      opacity: 0;
+      transition: all 350ms cubic-bezier(0.4, 0, 0.2, 1);
+      display: flex;
+      flex-direction: column;
+    }
+
+    .info-panel.visible {
+      transform: translateX(0);
+      opacity: 1;
+    }
+
+    .info-header {
+      padding: 20px 20px 16px;
+      border-bottom: 1px solid rgba(196, 168, 130, 0.2);
+      position: relative;
+    }
+
+    .info-title {
+      font-family: 'Playfair Display', Georgia, serif;
+      font-size: 22px;
+      font-weight: 600;
+      color: #fff;
+      margin-bottom: 4px;
+    }
+
+    .info-subtitle {
+      font-size: 12px;
+      color: #C4A882;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+    }
+
+    .info-close {
+      position: absolute;
+      top: 16px;
+      right: 16px;
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      border: none;
+      background: rgba(255, 255, 255, 0.15);
+      color: #fff;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 200ms ease;
+      font-size: 16px;
+    }
+
+    .info-close:hover {
+      background: #fff;
+      color: #5C4033;
+      transform: rotate(90deg);
+    }
+
+    .info-close .icon {
+      transition: all 200ms ease;
+    }
+
+    .info-close:hover .icon.close {
+      opacity: 0;
+      position: absolute;
+    }
+
+    .info-close .icon.back {
+      opacity: 0;
+      position: absolute;
+    }
+
+    .info-close:hover .icon.back {
+      opacity: 1;
+    }
+
+    .info-image {
+      width: 100%;
+      height: 180px;
+      background: linear-gradient(135deg, #8B7355 0%, #5C4033 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+
+    .info-image img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .info-image-placeholder {
+      font-size: 48px;
+      opacity: 0.6;
+    }
+
+    .info-content {
+      padding: 20px;
+      flex: 1;
+      overflow-y: auto;
+    }
+
+    .info-content p {
+      font-family: 'Playfair Display', Georgia, serif;
+      font-size: 14px;
+      line-height: 1.8;
+      color: rgba(255, 255, 255, 0.9);
+    }
+
+    .info-content::-webkit-scrollbar {
+      width: 4px;
+    }
+
+    .info-content::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    .info-content::-webkit-scrollbar-thumb {
+      background: rgba(196, 168, 130, 0.4);
+      border-radius: 2px;
+    }
+
+    .annotation-dot {
+      position: absolute;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #FFB347;
+      border: 2px solid rgba(255, 255, 255, 0.8);
+      cursor: pointer;
+      transform: translate(-50%, -50%);
+      transition: all 200ms ease;
+      z-index: 50;
+      pointer-events: auto;
+      box-shadow: 0 0 8px rgba(255, 179, 71, 0.5);
+    }
+
+    .annotation-dot:hover {
+      width: 16px;
+      height: 16px;
+      background: #FFD700;
+      box-shadow: 0 0 16px rgba(255, 215, 0, 0.8);
+    }
+
+    .annotation-tooltip {
+      position: absolute;
+      background: rgba(255, 255, 255, 0.95);
+      color: #2D1F14;
+      padding: 8px 12px;
+      border-radius: 6px;
+      font-size: 12px;
+      pointer-events: none;
+      z-index: 60;
+      max-width: 200px;
+      opacity: 0;
+      transform: translate(-50%, -120%);
+      transition: opacity 200ms ease;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    }
+
+    .annotation-tooltip.visible {
+      opacity: 1;
+    }
+
+    .annotation-tooltip::after {
+      content: '';
+      position: absolute;
+      bottom: -6px;
+      left: 50%;
+      transform: translateX(-50%);
+      border-left: 6px solid transparent;
+      border-right: 6px solid transparent;
+      border-top: 6px solid rgba(255, 255, 255, 0.95);
+    }
+
+    .annotation-tooltip strong {
+      display: block;
+      margin-bottom: 2px;
+      color: #5C4033;
+      font-size: 13px;
+    }
+
+    .annotation-tooltip span {
+      color: #666;
+      font-size: 11px;
+      line-height: 1.4;
+    }
+
+    .action-buttons {
+      position: absolute;
+      bottom: 24px;
+      right: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      z-index: 100;
+    }
+
+    .action-btn {
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      border: none;
+      background: rgba(255, 179, 71, 0.9);
+      color: #2D1F14;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 200ms ease;
+      font-size: 20px;
+      box-shadow: 0 4px 12px rgba(255, 179, 71, 0.3);
+    }
+
+    .action-btn:hover {
+      transform: scale(1.1);
+      background: #FFB347;
+      box-shadow: 0 6px 16px rgba(255, 179, 71, 0.5);
+    }
+
+    .action-btn:active {
+      transform: scale(0.95);
+    }
+
+    .action-btn.xray {
+      background: rgba(68, 136, 255, 0.9);
+      color: #fff;
+      box-shadow: 0 4px 12px rgba(68, 136, 255, 0.3);
+    }
+
+    .action-btn.xray:hover {
+      background: #4488ff;
+      box-shadow: 0 6px 16px rgba(68, 136, 255, 0.5);
+    }
+
+    .action-btn.xray.active {
+      background: #4488ff;
+      box-shadow: 0 0 0 3px rgba(68, 136, 255, 0.4);
+    }
+
+    .loading-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: radial-gradient(ellipse at center, #0A1628 0%, #2D1F14 100%);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+      transition: opacity 500ms ease;
+    }
+
+    .loading-overlay.hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .loading-spinner {
+      width: 50px;
+      height: 50px;
+      border: 3px solid rgba(255, 179, 71, 0.2);
+      border-top-color: #FFB347;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin-bottom: 16px;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .loading-text {
+      font-size: 14px;
+      color: rgba(255, 255, 255, 0.7);
+      letter-spacing: 2px;
+    }
+
+    @media (max-width: 768px) {
+      .comparison-panel {
+        bottom: 0;
+        left: 0;
+        right: 0;
+        width: 100%;
+        border-radius: 16px 16px 0 0;
+        padding: 12px;
+        min-width: auto;
+      }
+
+      .thumbnail-btn {
+        width: 60px;
+        height: 60px;
+      }
+
+      .action-buttons {
+        bottom: auto;
+        top: 24px;
+        right: 24px;
+        flex-direction: row;
+      }
+
+      .info-panel {
+        bottom: 0;
+        left: 0;
+        right: 0;
+        width: 100%;
+        max-height: 70vh;
+        border-radius: 16px 16px 0 0;
+        transform: translateY(100%);
+      }
+
+      .info-panel.visible {
+        transform: translateY(0);
+      }
+
+      .logo {
+        font-size: 16px;
+        top: 16px;
+        left: 16px;
+      }
+    }
+
+    .hint-text {
+      position: absolute;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 12px;
+      color: rgba(255, 255, 255, 0.4);
+      z-index: 50;
+      pointer-events: none;
+      transition: opacity 500ms ease;
+    }
+
+    .hint-text.hidden {
+      opacity: 0;
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <div id="canvas-container"></div>
+    
+    <div class="logo">Fossil 3D Studio</div>
+    
+    <div class="hint-text" id="hint-text">
+      左键旋转 · 右键平移 · 滚轮缩放
+    </div>
+    
+    <div class="comparison-panel" id="comparison-panel">
+      <div class="thumbnail-group" id="thumbnail-group"></div>
+      <div class="mode-switch" id="mode-switch">
+        <button class="mode-btn active" data-mode="single">单模型</button>
+        <button class="mode-btn" data-mode="sideBySide">并排对比</button>
+        <button class="mode-btn" data-mode="overlay">叠加重叠</button>
+      </div>
+      <div class="opacity-controls" id="opacity-controls"></div>
+    </div>
+    
+    <div class="info-panel" id="info-panel">
+      <div class="info-header">
+        <div class="info-subtitle" id="info-subtitle">解剖特征</div>
+        <h2 class="info-title" id="info-title">特征名称</h2>
+        <button class="info-close" id="info-close">
+          <span class="icon close">✕</span>
+          <span class="icon back">←</span>
+        </button>
+      </div>
+      <div class="info-image" id="info-image">
+        <span class="info-image-placeholder">🦴</span>
+      </div>
+      <div class="info-content" id="info-content">
+        <p>详细说明文字...</p>
+      </div>
+    </div>
+    
+    <div class="action-buttons">
+      <button class="action-btn xray" id="xray-btn" title="X光透视模式">
+        <span>X</span>
+      </button>
+      <button class="action-btn" id="export-btn" title="导出快照">
+        <span>📷</span>
+      </button>
+    </div>
+    
+    <div class="loading-overlay" id="loading-overlay">
+      <div class="loading-spinner"></div>
+      <div class="loading-text">加载化石模型中...</div>
+    </div>
+  </div>
+  
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
