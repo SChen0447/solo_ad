@@ -20,7 +20,9 @@ function createPlatform(
     minY,
     maxY,
     speed: 100,
-    activeFrequencyRange: freqRange
+    activeFrequencyRange: freqRange,
+    isActivated: false,
+    activationPulse: 0
   };
 }
 
@@ -40,7 +42,9 @@ function createDoor(
     isOpen: false,
     openProgress: 0,
     requiredVolume: 0.6,
-    requiredFrequencyRange: freqRange
+    requiredFrequencyRange: freqRange,
+    isActivated: false,
+    activationPulse: 0
   };
 }
 
@@ -52,7 +56,9 @@ function createBlock(id: string, x: number, y: number): PushableBlock {
     y,
     width: 40,
     height: 40,
-    vx: 0
+    vx: 0,
+    isActivated: false,
+    activationPulse: 0
   };
 }
 

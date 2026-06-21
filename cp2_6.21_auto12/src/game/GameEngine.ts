@@ -34,7 +34,11 @@ export class GameEngine {
       unlockedLevels: [1],
       player: this.createPlayer(),
       level: null,
-      isPaused: false
+      isPaused: false,
+      transitionAlpha: 0,
+      transitionPhase: 'none',
+      levelHintText: '',
+      levelHintAlpha: 0
     };
 
     this.currentSoundData = {
@@ -117,6 +121,12 @@ export class GameEngine {
     this.state.level = level;
     this.state.player = this.createPlayer(level.playerStart.x, level.playerStart.y);
     this.state.currentScreen = 'playing';
+    this.state.transitionPhase = 'fadeIn';
+    this.state.transitionAlpha = 1;
+    this.state.levelHintText = level.name;
+    this.state.levelHintAlpha = 1;
+    this._hasShownCompleteScreen = false;
+    this._levelCompleteTimer = 0;
 
     eventBus.emit('game:stateChange', this.state);
     eventBus.emit('game:levelLoaded', level);
@@ -129,19 +139,47 @@ export class GameEngine {
   }
 
   update(dt: number): void {
-    if (this.state.currentScreen !== 'playing' || !this.state.level || this.state.isPaused) {
+    if ((this.state.currentScreen !== 'playing' && this.state.currentScreen !== 'complete') || !this.state.level) {
       return;
     }
 
-    this.updateMechanisms(dt);
-    this.updatePlayer(dt);
-    this.checkLevelComplete();
-    this.checkPlayerFall();
+    if (!this.state.isPaused && this.state.currentScreen === 'playing') {
+      this.updateMechanisms(dt);
+      this.updatePlayer(dt);
+      this.checkLevelComplete();
+      this.checkPlayerFall();
+    }
+
+    this.updateTransitions(dt);
 
     eventBus.emit('game:update', {
       state: this.state,
       soundData: this.currentSoundData
     });
+  }
+
+  private updateTransitions(dt: number): void {
+    const transitionSpeed = 1.5;
+
+    if (this.state.transitionPhase === 'fadeIn') {
+      this.state.transitionAlpha -= dt * transitionSpeed;
+      if (this.state.transitionAlpha <= 0) {
+        this.state.transitionAlpha = 0;
+        this.state.transitionPhase = 'none';
+      }
+    } else if (this.state.transitionPhase === 'fadeOut') {
+      this.state.transitionAlpha += dt * transitionSpeed;
+      if (this.state.transitionAlpha >= 1) {
+        this.state.transitionAlpha = 1;
+      }
+    }
+
+    if (this.state.levelHintAlpha > 0) {
+      this.state.levelHintAlpha -= dt * 0.4;
+      if (this.state.levelHintAlpha < 0) {
+        this.state.levelHintAlpha = 0;
+      }
+    }
   }
 
   private updateMechanisms(dt: number): void {
@@ -166,6 +204,16 @@ export class GameEngine {
     const [minFreq, maxFreq] = platform.activeFrequencyRange;
     const isActive = frequency >= minFreq && frequency <= maxFreq;
 
+    const wasActivated = platform.isActivated;
+    platform.isActivated = isActive;
+
+    if (isActive && !wasActivated) {
+      platform.activationPulse = 1;
+      eventBus.emit('mechanism:activated', { type: 'platform', id: platform.id });
+    }
+
+    platform.activationPulse = Math.max(0, platform.activationPulse - dt * 3);
+
     platform.targetY = isActive ? platform.minY : platform.maxY;
 
     const diff = platform.targetY - platform.y;
@@ -177,6 +225,16 @@ export class GameEngine {
     const [minFreq, maxFreq] = door.requiredFrequencyRange;
     const shouldOpen = volume >= door.requiredVolume &&
       frequency >= minFreq && frequency <= maxFreq;
+
+    const wasActivated = door.isActivated;
+    door.isActivated = shouldOpen;
+
+    if (shouldOpen && !wasActivated) {
+      door.activationPulse = 1;
+      eventBus.emit('mechanism:activated', { type: 'door', id: door.id });
+    }
+
+    door.activationPulse = Math.max(0, door.activationPulse - dt * 3);
 
     if (shouldOpen) {
       door.openProgress = Math.min(1, door.openProgress + dt / 0.3);
@@ -199,7 +257,17 @@ export class GameEngine {
     };
 
     const isTouching = this.aabbCollides(playerRect, blockRect);
-    const isPushing = isTouching && this.keys.has('KeyW');
+    const isPushing = isTouching && this.keys.has('KeyW') && volume > 0.1;
+
+    const wasActivated = block.isActivated;
+    block.isActivated = isPushing;
+
+    if (isPushing && !wasActivated) {
+      block.activationPulse = 1;
+      eventBus.emit('mechanism:activated', { type: 'block', id: block.id });
+    }
+
+    block.activationPulse = Math.max(0, block.activationPulse - dt * 3);
 
     if (isPushing && volume > 0.1) {
       const pushDirection = playerRect.x < blockRect.x ? 1 : -1;
@@ -355,10 +423,17 @@ export class GameEngine {
       this.state.unlockedLevels.push(nextLevel);
     }
 
-    this.state.currentScreen = 'complete';
-    eventBus.emit('game:levelComplete', this.state.currentLevel);
-    eventBus.emit('game:stateChange', this.state);
+    this.state.transitionPhase = 'fadeOut';
+    this.state.transitionAlpha = 0;
+    this.state.levelHintText = '关卡完成！';
+    this.state.levelHintAlpha = 0;
+    this._levelCompleteTimer = 0;
+
+    eventBus.emit('game:levelCompleteStart', this.state.currentLevel);
   }
+
+  private _levelCompleteTimer: number = 0;
+  private _hasShownCompleteScreen: boolean = false;
 
   private checkPlayerFall(): void {
     const player = this.state.player;

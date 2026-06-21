@@ -87,10 +87,19 @@ export class Renderer {
       this.drawPlayer(state);
       this.drawGoal(state.level, this.time);
       this.drawWaveformVisualizer();
+      this.drawSoundStatusIndicator(state);
     }
 
     if (state.currentScreen === 'complete') {
       this.drawCompleteOverlay();
+    }
+
+    if (state.levelHintAlpha > 0) {
+      this.drawLevelHint(state.levelHintText, state.levelHintAlpha);
+    }
+
+    if (state.transitionAlpha > 0) {
+      this.drawTransition(state.transitionAlpha);
     }
   }
 
@@ -198,20 +207,33 @@ export class Renderer {
   }
 
   private drawPlatform(platform: SoundPlatform): void {
+    const pulse = platform.activationPulse;
+    const glowSize = 10 + pulse * 30;
+    const glowAlpha = 0.3 + pulse * 0.5;
+
+    if (platform.isActivated || pulse > 0) {
+      this.ctx.shadowColor = '#66FCF1';
+      this.ctx.shadowBlur = glowSize;
+    }
+
     const gradient = this.ctx.createLinearGradient(
       platform.x, platform.y,
       platform.x, platform.y + platform.height
     );
-    gradient.addColorStop(0, '#45A29E');
-    gradient.addColorStop(1, '#66FCF1');
+    gradient.addColorStop(0, platform.isActivated ? '#66FCF1' : '#45A29E');
+    gradient.addColorStop(1, platform.isActivated ? '#FFFFFF' : '#66FCF1');
 
     this.ctx.fillStyle = gradient;
     this.ctx.beginPath();
     this.ctx.roundRect(platform.x, platform.y, platform.width, platform.height, 4);
     this.ctx.fill();
 
-    this.ctx.shadowColor = '#66FCF1';
-    this.ctx.shadowBlur = 10;
+    if (pulse > 0) {
+      this.ctx.strokeStyle = `rgba(255, 255, 255, ${pulse * 0.8})`;
+      this.ctx.lineWidth = 3;
+      this.ctx.stroke();
+    }
+
     this.ctx.strokeStyle = '#66FCF1';
     this.ctx.lineWidth = 2;
     this.ctx.stroke();
@@ -230,28 +252,48 @@ export class Renderer {
 
     if (effectiveWidth < 1) return;
 
+    const pulse = door.activationPulse;
+
+    if (door.isActivated || pulse > 0) {
+      const glowSize = 8 + pulse * 25;
+      this.ctx.shadowColor = '#9D4EDD';
+      this.ctx.shadowBlur = glowSize;
+    }
+
     const gradient = this.ctx.createLinearGradient(
       renderX, door.y,
       renderX + effectiveWidth, door.y
     );
-    gradient.addColorStop(0, '#C5C6C7');
-    gradient.addColorStop(1, '#8B0000');
+    if (door.isActivated) {
+      gradient.addColorStop(0, '#9D4EDD');
+      gradient.addColorStop(1, '#C77DFF');
+    } else {
+      gradient.addColorStop(0, '#C5C6C7');
+      gradient.addColorStop(1, '#8B0000');
+    }
 
     this.ctx.fillStyle = gradient;
     this.ctx.beginPath();
     this.ctx.roundRect(renderX, door.y, effectiveWidth, door.height, 3);
     this.ctx.fill();
 
-    this.ctx.strokeStyle = '#C5C6C7';
+    if (pulse > 0) {
+      this.ctx.strokeStyle = `rgba(255, 255, 255, ${pulse * 0.8})`;
+      this.ctx.lineWidth = 3;
+      this.ctx.stroke();
+    }
+
+    this.ctx.strokeStyle = door.isActivated ? '#C77DFF' : '#C5C6C7';
     this.ctx.lineWidth = 2;
     this.ctx.stroke();
+    this.ctx.shadowBlur = 0;
 
     if (effectiveWidth > 15) {
       const [minFreq, maxFreq] = door.requiredFrequencyRange;
       this.ctx.save();
       this.ctx.translate(renderX + effectiveWidth / 2, door.y + door.height / 2);
       this.ctx.rotate(-Math.PI / 2);
-      this.ctx.fillStyle = '#FFFFFF';
+      this.ctx.fillStyle = door.isActivated ? '#FFFFFF' : '#FFFFFF';
       this.ctx.font = 'bold 10px "Segoe UI", sans-serif';
       this.ctx.textAlign = 'center';
       this.ctx.fillText(`${minFreq}-${maxFreq}Hz`, 0, 4);
@@ -260,21 +302,41 @@ export class Renderer {
   }
 
   private drawBlock(block: PushableBlock): void {
+    const pulse = block.activationPulse;
+
+    if (block.isActivated || pulse > 0) {
+      const glowSize = 8 + pulse * 25;
+      this.ctx.shadowColor = '#F3A183';
+      this.ctx.shadowBlur = glowSize;
+    }
+
     const gradient = this.ctx.createLinearGradient(
       block.x, block.y,
       block.x + block.width, block.y + block.height
     );
-    gradient.addColorStop(0, '#F3A183');
-    gradient.addColorStop(1, '#EC6F66');
+    if (block.isActivated) {
+      gradient.addColorStop(0, '#FFD93D');
+      gradient.addColorStop(1, '#F3A183');
+    } else {
+      gradient.addColorStop(0, '#F3A183');
+      gradient.addColorStop(1, '#EC6F66');
+    }
 
     this.ctx.fillStyle = gradient;
     this.ctx.beginPath();
     this.ctx.roundRect(block.x, block.y, block.width, block.height, 6);
     this.ctx.fill();
 
-    this.ctx.strokeStyle = '#F3A183';
+    if (pulse > 0) {
+      this.ctx.strokeStyle = `rgba(255, 255, 255, ${pulse * 0.8})`;
+      this.ctx.lineWidth = 3;
+      this.ctx.stroke();
+    }
+
+    this.ctx.strokeStyle = block.isActivated ? '#FFD93D' : '#F3A183';
     this.ctx.lineWidth = 2;
     this.ctx.stroke();
+    this.ctx.shadowBlur = 0;
 
     this.ctx.fillStyle = '#FFFFFF';
     this.ctx.font = 'bold 14px "Segoe UI", sans-serif';
@@ -436,6 +498,155 @@ export class Renderer {
     this.ctx.textAlign = 'center';
     this.ctx.fillText('恭喜通关！', centerX, centerY - 20);
     this.ctx.shadowBlur = 0;
+  }
+
+  private drawSoundStatusIndicator(state: GameState): void {
+    const indicatorX = 20;
+    const indicatorY = 20;
+    const width = 220;
+    const height = 100;
+
+    this.ctx.fillStyle = 'rgba(31, 40, 51, 0.9)';
+    this.ctx.beginPath();
+    this.ctx.roundRect(indicatorX, indicatorY, width, height, 8);
+    this.ctx.fill();
+
+    this.ctx.strokeStyle = 'rgba(102, 252, 241, 0.3)';
+    this.ctx.lineWidth = 1;
+    this.ctx.stroke();
+
+    const { frequency, volume } = this.currentSoundData;
+    const level = state.level;
+
+    let inAnyRange = false;
+    let platformMatch = false;
+    let doorMatch = false;
+    let blockMatch = false;
+
+    if (level) {
+      for (const p of level.platforms) {
+        if (frequency >= p.activeFrequencyRange[0] && frequency <= p.activeFrequencyRange[1]) {
+          platformMatch = true;
+          inAnyRange = true;
+          break;
+        }
+      }
+
+      for (const d of level.doors) {
+        if (frequency >= d.requiredFrequencyRange[0] && frequency <= d.requiredFrequencyRange[1]
+            && volume >= d.requiredVolume) {
+          doorMatch = true;
+          inAnyRange = true;
+          break;
+        }
+      }
+    }
+
+    let statusColor = '#FF6B6B';
+    let statusText = '未触发';
+    if (platformMatch) {
+      statusColor = '#45A29E';
+      statusText = '平台激活';
+    } else if (doorMatch) {
+      statusColor = '#9D4EDD';
+      statusText = '门已开启';
+    } else if (volume > 0.1 && frequency > 0) {
+      statusColor = '#FFD700';
+      statusText = '声音输入中';
+    }
+
+    this.ctx.fillStyle = statusColor;
+    this.ctx.font = 'bold 12px "Segoe UI", sans-serif';
+    this.ctx.textAlign = 'left';
+    this.ctx.fillText(statusText, indicatorX + 12, indicatorY + 22);
+
+    const freqLabelY = indicatorY + 42;
+    this.ctx.fillStyle = '#C5C6C7';
+    this.ctx.font = '12px "Segoe UI", sans-serif';
+    this.ctx.fillText('频率', indicatorX + 12, freqLabelY);
+
+    this.ctx.fillStyle = statusColor;
+    this.ctx.font = 'bold 20px "Segoe UI", sans-serif';
+    this.ctx.textAlign = 'right';
+    this.ctx.fillText(`${Math.round(frequency)} Hz`, indicatorX + width - 12, freqLabelY + 4);
+
+    const volBarX = indicatorX + 12;
+    const volBarY = indicatorY + 60;
+    const volBarWidth = width - 24;
+    const volBarHeight = 16;
+
+    this.ctx.fillStyle = 'rgba(255, 255, 255, 0.1)';
+    this.ctx.beginPath();
+    this.ctx.roundRect(volBarX, volBarY, volBarWidth, volBarHeight, 4);
+    this.ctx.fill();
+
+    const volGradient = this.ctx.createLinearGradient(volBarX, 0, volBarX + volBarWidth, 0);
+    if (volume < 0.3) {
+      volGradient.addColorStop(0, '#45A29E');
+      volGradient.addColorStop(1, '#66FCF1');
+    } else if (volume < 0.6) {
+      volGradient.addColorStop(0, '#66FCF1');
+      volGradient.addColorStop(1, '#FFD700');
+    } else {
+      volGradient.addColorStop(0, '#FFD700');
+      volGradient.addColorStop(1, '#FF6B6B');
+    }
+
+    const volFillWidth = volBarWidth * Math.min(1, volume);
+    this.ctx.fillStyle = volGradient;
+    this.ctx.beginPath();
+    this.ctx.roundRect(volBarX, volBarY, volFillWidth, volBarHeight, 4);
+    this.ctx.fill();
+
+    this.ctx.fillStyle = '#FFFFFF';
+    this.ctx.font = 'bold 10px "Segoe UI", sans-serif';
+    this.ctx.textAlign = 'center';
+    this.ctx.fillText(`${Math.round(volume * 100)}%`, volBarX + volBarWidth / 2, volBarY + 12);
+
+    if (level && level.platforms.length > 0) {
+      const rangeY = indicatorY + height - 8;
+      this.ctx.font = '10px "Segoe UI", sans-serif';
+      this.ctx.textAlign = 'left';
+
+      const [minF, maxF] = level.platforms[0].activeFrequencyRange;
+      const markerX = indicatorX + 12 + ((frequency - minF) / (maxF - minF)) * (volBarWidth);
+
+      if (frequency > 0) {
+        const clampedX = Math.max(indicatorX + 12, Math.min(indicatorX + 12 + volBarWidth, markerX));
+        this.ctx.strokeStyle = '#FFFFFF';
+        this.ctx.lineWidth = 2;
+        this.ctx.beginPath();
+        this.ctx.moveTo(clampedX, indicatorY + 58);
+        this.ctx.lineTo(clampedX, indicatorY + 78);
+        this.ctx.stroke();
+      }
+    }
+  }
+
+  private drawLevelHint(text: string, alpha: number): void {
+    const centerX = GAME_WIDTH / 2;
+    const centerY = GAME_HEIGHT / 2;
+
+    this.ctx.globalAlpha = alpha;
+
+    this.ctx.shadowColor = '#66FCF1';
+    this.ctx.shadowBlur = 30;
+    this.ctx.fillStyle = '#66FCF1';
+    this.ctx.font = 'bold 56px "Segoe UI", sans-serif';
+    this.ctx.textAlign = 'center';
+    this.ctx.fillText(text, centerX, centerY);
+    this.ctx.shadowBlur = 0;
+
+    this.ctx.fillStyle = '#C5C6C7';
+    this.ctx.font = '18px "Segoe UI", sans-serif';
+    this.ctx.fillText('准备开始', centerX, centerY + 40);
+
+    this.ctx.globalAlpha = 1;
+  }
+
+  private drawTransition(alpha: number): void {
+    this.ctx.fillStyle = `rgba(11, 12, 16, ${alpha})`;
+    this.ctx.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
   }
 
   private lerpColor(color1: string, color2: string, t: number): string {

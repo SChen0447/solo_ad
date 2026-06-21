@@ -35,6 +35,8 @@ export interface SoundPlatform extends Mechanism {
   maxY: number;
   speed: number;
   activeFrequencyRange: [number, number];
+  isActivated: boolean;
+  activationPulse: number;
 }
 
 export interface SoundDoor extends Mechanism {
@@ -43,11 +45,15 @@ export interface SoundDoor extends Mechanism {
   openProgress: number;
   requiredVolume: number;
   requiredFrequencyRange: [number, number];
+  isActivated: boolean;
+  activationPulse: number;
 }
 
 export interface PushableBlock extends Mechanism {
   type: 'block';
   vx: number;
+  isActivated: boolean;
+  activationPulse: number;
 }
 
 export interface Level {
@@ -68,6 +74,10 @@ export interface GameState {
   player: Player;
   level: Level | null;
   isPaused: boolean;
+  transitionAlpha: number;
+  transitionPhase: 'none' | 'fadeOut' | 'fadeIn';
+  levelHintText: string;
+  levelHintAlpha: number;
 }
 
 export interface Rect {
