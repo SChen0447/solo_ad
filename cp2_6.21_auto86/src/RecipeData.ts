@@ -21,7 +21,7 @@ const CALORIE_MAP: Record<string, number> = {
   '三文鱼': 208, '金枪鱼': 144, '海带': 43, '紫菜': 35, '味噌': 199,
   '火腿': 145, '培根': 541, '香肠': 301, '玉米': 86, '豌豆': 81,
   '芹菜': 14, '黄瓜': 15, '茄子': 25, '南瓜': 26, '西兰花': 34,
-  '米饭': 130, '面粉': 364, '意大利面': 157, '芝士': 402, '罗勒': 23,
+  '面粉': 364, '意大利面': 157, '芝士': 402, '罗勒': 23,
 };
 
 const AMOUNT_MAP: Record<string, string> = {
@@ -73,6 +73,31 @@ let recipes: Recipe[] = [
 ];
 
 let availableIngredients: string[] = ['鸡肉', '鸡蛋', '番茄', '米饭', '豆腐', '牛肉', '洋葱', '胡萝卜', '土豆', '蘑菇'];
+
+let favoriteRecipeIds: string[] = ['1', '3', '6'];
+
+export function toggleFavorite(recipeId: string): boolean {
+  const idx = favoriteRecipeIds.indexOf(recipeId);
+  if (idx === -1) {
+    favoriteRecipeIds = [...favoriteRecipeIds, recipeId];
+    return true;
+  } else {
+    favoriteRecipeIds = favoriteRecipeIds.filter(id => id !== recipeId);
+    return false;
+  }
+}
+
+export function isFavorite(recipeId: string): boolean {
+  return favoriteRecipeIds.includes(recipeId);
+}
+
+export function getFavoriteRecipes(): Recipe[] {
+  return recipes.filter(r => favoriteRecipeIds.includes(r.id));
+}
+
+export function getFavoriteIds(): string[] {
+  return [...favoriteRecipeIds];
+}
 
 export function getRecipes(): Recipe[] {
   return [...recipes];

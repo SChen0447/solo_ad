@@ -26,8 +26,35 @@ const recipes = [
 
 let availableIngredients = ['鸡肉', '鸡蛋', '番茄', '米饭', '豆腐', '牛肉', '洋葱', '胡萝卜', '土豆', '蘑菇'];
 
+let favoriteRecipeIds = ['1', '3', '6'];
+
 app.get('/api/recipes', (req, res) => {
   res.json(recipes);
+});
+
+app.get('/api/recipes/favorites', (req, res) => {
+  const favoriteRecipes = recipes.filter(r => favoriteRecipeIds.includes(r.id));
+  res.json(favoriteRecipes);
+});
+
+app.get('/api/recipes/favorites/ids', (req, res) => {
+  res.json(favoriteRecipeIds);
+});
+
+app.post('/api/recipes/:id/favorite', (req, res) => {
+  const { id } = req.params;
+  const recipe = recipes.find(r => r.id === id);
+  if (!recipe) return res.status(404).json({ error: '食谱不存在' });
+  if (!favoriteRecipeIds.includes(id)) {
+    favoriteRecipeIds.push(id);
+  }
+  res.json({ favorited: true, favoriteIds: favoriteRecipeIds });
+});
+
+app.delete('/api/recipes/:id/favorite', (req, res) => {
+  const { id } = req.params;
+  favoriteRecipeIds = favoriteRecipeIds.filter(fid => fid !== id);
+  res.json({ favorited: false, favoriteIds: favoriteRecipeIds });
 });
 
 app.post('/api/recipes', (req, res) => {
