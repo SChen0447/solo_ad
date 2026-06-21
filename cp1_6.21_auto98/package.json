@@ -1,0 +1,20 @@
+{
+  "name": "top-down-shooter-combat",
+  "version": "1.0.0",
+  "description": "2D top-down shooter with stamina-based dash, wall bounce, and bullet time effects",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "phaser": "^3.80.1",
+    "uuid": "^9.0.1"
+  },
+  "devDependencies": {
+    "@types/uuid": "^9.0.8",
+    "typescript": "^5.4.5",
+    "vite": "^5.2.11"
+  }
+}
