@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>3D健身训练追踪器</title>
+  <link rel="stylesheet" href="/src/style.css">
+</head>
+<body>
+  <div id="app">
+    <div id="model-container"></div>
+    <div id="sidebar">
+      <h1 class="title">训练记录</h1>
+      <div id="current-date"></div>
+      <div id="cards-container"></div>
+      <div id="chart-container">
+        <h2 class="subtitle">本周训练统计</h2>
+        <canvas id="stat-chart"></canvas>
+        <div id="day-markers"></div>
+      </div>
+    </div>
+    <div id="action-panel" class="hidden">
+      <div class="panel-header">
+        <h3 id="panel-title">选择动作</h3>
+        <button id="close-panel" class="close-btn">&times;</button>
+      </div>
+      <div id="action-grid"></div>
+    </div>
+    <div id="tooltip" class="hidden"></div>
+  </div>
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
