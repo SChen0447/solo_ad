@@ -24,6 +24,8 @@ const GUIDE_COLOR = '#CCC';
 const RULER_WIDTH = 20;
 const RULER_FONT_SIZE = 10;
 const RULER_COLOR = '#999';
+const REF_BOX_BORDER = '#D0D0D0';
+const REF_BOX_FILL = '#F8F8F8';
 
 export function render(
   ctx: CanvasRenderingContext2D,
@@ -47,6 +49,10 @@ export function render(
 
   const textAreaX = options.showRuler ? RULER_WIDTH : 0;
   const textAreaWidth = canvasWidth / scale - textAreaX;
+
+  if (result.lines.length > 0) {
+    drawReferenceBox(ctx, result, textAreaX, options);
+  }
 
   drawTextLines(ctx, result, textAreaX, options);
 
@@ -81,6 +87,27 @@ function drawGrid(
   }
 
   ctx.stroke();
+}
+
+function drawReferenceBox(
+  ctx: CanvasRenderingContext2D,
+  result: TypesetResult,
+  baseX: number,
+  options: RenderOptions
+): void {
+  const padding = 8;
+  const x = baseX + 10 - padding;
+  const y = 20 - padding;
+  const width = result.maxLineWidth + padding * 2;
+  const height = result.totalHeight + padding * 2;
+
+  ctx.save();
+  ctx.fillStyle = REF_BOX_FILL;
+  ctx.fillRect(x, y, width, height);
+  ctx.strokeStyle = REF_BOX_BORDER;
+  ctx.lineWidth = 1;
+  ctx.strokeRect(x, y, width, height);
+  ctx.restore();
 }
 
 function drawRuler(

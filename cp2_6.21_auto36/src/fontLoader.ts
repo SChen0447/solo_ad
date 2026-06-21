@@ -3,6 +3,7 @@ import opentype from 'opentype.js';
 export interface FontMeta {
   familyName: string;
   styleName: string;
+  version: string;
   glyphCount: number;
   supportedRange: string;
   hasChinese: boolean;
@@ -96,6 +97,7 @@ export async function loadFontFile(file: File): Promise<FontData> {
       const meta: FontMeta = {
         familyName: displayName,
         styleName: 'Regular',
+        version: '',
         glyphCount: 0,
         supportedRange: 'WOFF2 (需浏览器解码)',
         hasChinese: false,
@@ -119,10 +121,12 @@ export async function loadFontFile(file: File): Promise<FontData> {
 
   const familyName = parsedFont.names.fontFamily?.en || parsedFont.names.fontFamily?.zh || displayName;
   const styleName = parsedFont.names.fontSubfamily?.en || 'Regular';
+  const version = parsedFont.names.version?.en || parsedFont.names.version?.zh || '';
 
   const meta: FontMeta = {
     familyName: familyName as string,
     styleName: styleName as string,
+    version,
     glyphCount: parsedFont.glyphs.length,
     supportedRange: getSupportedRange(parsedFont),
     hasChinese: detectChineseSupport(parsedFont),

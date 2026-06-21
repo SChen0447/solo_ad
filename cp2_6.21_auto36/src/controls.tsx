@@ -187,6 +187,11 @@ export const Controls: React.FC<ControlsProps> = ({
           <div style={{ fontSize: 12, color: '#999', lineHeight: 1.6, marginTop: 2 }}>
             {fontData.meta.fileName} · {formatFileSize(fontData.meta.fileSize)}
           </div>
+          {fontData.meta.version && (
+            <div style={{ fontSize: 12, color: '#999', lineHeight: 1.6, marginTop: 2 }}>
+              版本: {fontData.meta.version}
+            </div>
+          )}
         </div>
       );
     }

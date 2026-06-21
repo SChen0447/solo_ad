@@ -14,6 +14,7 @@ declare module 'opentype.js' {
   interface FontNames {
     fontFamily?: { en?: string; zh?: string };
     fontSubfamily?: { en?: string; zh?: string };
+    version?: { en?: string; zh?: string };
   }
 
   interface OS2Table {
