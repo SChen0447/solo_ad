@@ -1,0 +1,229 @@
+{
+  "activities": [
+    {
+      "id": "act-001",
+      "name": "《百年孤独》深度共读",
+      "date": "2026-06-15",
+      "location": "offline",
+      "description": "一起探讨马尔克斯笔下的马孔多小镇，分享魔幻现实主义的魅力。",
+      "maxParticipants": 15,
+      "inviteCode": "BOOK202606",
+      "status": "upcoming",
+      "registeredMembers": [
+        { "memberId": "mem-001", "checkedIn": false },
+        { "memberId": "mem-002", "checkedIn": true },
+        { "memberId": "mem-003", "checkedIn": false }
+      ]
+    },
+    {
+      "id": "act-002",
+      "name": "诗歌之夜：现代诗朗诵会",
+      "date": "2026-06-22",
+      "location": "online",
+      "description": "线上诗歌朗诵活动，欢迎每位书友带来自己喜爱的诗作。",
+      "maxParticipants": 30,
+      "inviteCode": "POEM202606",
+      "status": "upcoming",
+      "registeredMembers": [
+        { "memberId": "mem-001", "checkedIn": false },
+        { "memberId": "mem-004", "checkedIn": false }
+      ]
+    },
+    {
+      "id": "act-003",
+      "name": "日本文学鉴赏会",
+      "date": "2026-06-28",
+      "location": "offline",
+      "description": "聚焦川端康成与村上春树，品味日本文学的细腻之美。",
+      "maxParticipants": 12,
+      "inviteCode": "JP202606",
+      "status": "upcoming",
+      "registeredMembers": [
+        { "memberId": "mem-002", "checkedIn": false },
+        { "memberId": "mem-005", "checkedIn": false }
+      ]
+    },
+    {
+      "id": "act-004",
+      "name": "科幻读书会：三体宇宙",
+      "date": "2026-07-05",
+      "location": "offline",
+      "description": "深入探讨刘慈欣的《三体》三部曲，从黑暗森林到降维打击。",
+      "maxParticipants": 20,
+      "inviteCode": "SCIFI202607",
+      "status": "upcoming",
+      "registeredMembers": [
+        { "memberId": "mem-003", "checkedIn": false }
+      ]
+    },
+    {
+      "id": "act-005",
+      "name": "亲子阅读时光",
+      "date": "2026-07-12",
+      "location": "offline",
+      "description": "为家长和小朋友准备的共读活动，精选绘本与童话。",
+      "maxParticipants": 25,
+      "inviteCode": "KID202607",
+      "status": "upcoming",
+      "registeredMembers": []
+    },
+    {
+      "id": "act-006",
+      "name": "女性作家作品分享",
+      "date": "2026-05-20",
+      "location": "online",
+      "description": "回顾活动：伍尔夫、张爱玲等女性作家作品分享会。",
+      "maxParticipants": 20,
+      "inviteCode": "WOMEN202605",
+      "status": "completed",
+      "registeredMembers": [
+        { "memberId": "mem-001", "checkedIn": true },
+        { "memberId": "mem-002", "checkedIn": true },
+        { "memberId": "mem-004", "checkedIn": true }
+      ]
+    }
+  ],
+  "members": [
+    {
+      "id": "mem-001",
+      "name": "林小溪",
+      "avatar": "https://api.dicebear.com/7.x/avataaars/svg?seed=Linxiaoxi",
+      "points": 150,
+      "pointsHistory": [
+        { "date": "2026-05-20", "activity": "女性作家作品分享", "points": 10 },
+        { "date": "2026-05-10", "activity": "阅读打卡奖励", "points": 20 },
+        { "date": "2026-04-28", "activity": "经典文学共读", "points": 10 },
+        { "date": "2026-04-15", "activity": "诗歌朗诵会", "points": 10 },
+        { "date": "2026-04-05", "activity": "新书推荐分享", "points": 30 },
+        { "date": "2026-03-20", "activity": "春日读书季", "points": 40 },
+        { "date": "2026-03-08", "activity": "妇女节特别活动", "points": 30 }
+      ]
+    },
+    {
+      "id": "mem-002",
+      "name": "陈书远",
+      "avatar": "https://api.dicebear.com/7.x/avataaars/svg?seed=Chenshuyuan",
+      "points": 220,
+      "pointsHistory": [
+        { "date": "2026-06-15", "activity": "《百年孤独》深度共读", "points": 10 },
+        { "date": "2026-05-20", "activity": "女性作家作品分享", "points": 10 },
+        { "date": "2026-05-12", "activity": "月度优秀会员奖励", "points": 50 },
+        { "date": "2026-04-28", "activity": "经典文学共读", "points": 10 },
+        { "date": "2026-04-18", "activity": "书评投稿奖励", "points": 40 },
+        { "date": "2026-04-02", "activity": "悬疑小说夜谈", "points": 10 },
+        { "date": "2026-03-25", "activity": "春日读书季", "points": 40 },
+        { "date": "2026-03-10", "activity": "诗歌朗诵会", "points": 10 },
+        { "date": "2026-02-28", "activity": "元宵节特别活动", "points": 40 }
+      ]
+    },
+    {
+      "id": "mem-003",
+      "name": "王墨涵",
+      "avatar": "https://api.dicebear.com/7.x/avataaars/svg?seed=Wangmohan",
+      "points": 95,
+      "pointsHistory": [
+        { "date": "2026-05-28", "activity": "历史书籍分享", "points": 10 },
+        { "date": "2026-05-15", "activity": "古籍鉴赏会", "points": 20 },
+        { "date": "2026-04-30", "activity": "经典文学共读", "points": 10 },
+        { "date": "2026-04-12", "activity": "书法体验活动", "points": 30 },
+        { "date": "2026-03-28", "activity": "春日读书季", "points": 25 }
+      ]
+    },
+    {
+      "id": "mem-004",
+      "name": "苏婉清",
+      "avatar": "https://api.dicebear.com/7.x/avataaars/svg?seed=Suwanqing",
+      "points": 180,
+      "pointsHistory": [
+        { "date": "2026-05-20", "activity": "女性作家作品分享", "points": 10 },
+        { "date": "2026-05-08", "activity": "咖啡与书时光", "points": 20 },
+        { "date": "2026-04-22", "activity": "世界读书日特别活动", "points": 50 },
+        { "date": "2026-04-10", "activity": "散文朗诵会", "points": 10 },
+        { "date": "2026-03-30", "activity": "书评投稿奖励", "points": 40 },
+        { "date": "2026-03-18", "activity": "春日读书季", "points": 30 },
+        { "date": "2026-03-05", "activity": "惊蛰读书会", "points": 20 }
+      ]
+    },
+    {
+      "id": "mem-005",
+      "name": "张知行",
+      "avatar": "https://api.dicebear.com/7.x/avataaars/svg?seed=Zhangzhixing",
+      "points": 75,
+      "pointsHistory": [
+        { "date": "2026-05-25", "activity": "哲学读书会", "points": 10 },
+        { "date": "2026-05-10", "activity": "新书推荐分享", "points": 15 },
+        { "date": "2026-04-20", "activity": "悬疑小说夜谈", "points": 10 },
+        { "date": "2026-04-05", "activity": "清明诗歌会", "points": 20 },
+        { "date": "2026-03-22", "activity": "春日读书季", "points": 20 }
+      ]
+    }
+  ],
+  "rewards": [
+    {
+      "id": "rw-001",
+      "name": "满50减5优惠券",
+      "type": "coupon",
+      "pointsCost": 30,
+      "stock": 100,
+      "description": "全场图书消费满50元减5元"
+    },
+    {
+      "id": "rw-002",
+      "name": "满100减15优惠券",
+      "type": "coupon",
+      "pointsCost": 50,
+      "stock": 80,
+      "description": "全场图书消费满100元减15元"
+    },
+    {
+      "id": "rw-003",
+      "name": "书店定制书签",
+      "type": "physical",
+      "pointsCost": 80,
+      "stock": 30,
+      "description": "手工制作的木质书签，刻有书店logo"
+    },
+    {
+      "id": "rw-004",
+      "name": "书店定制帆布袋",
+      "type": "physical",
+      "pointsCost": 200,
+      "stock": 15,
+      "description": "优质帆布材质，印有书店经典书脊图案"
+    }
+  ],
+  "exchangeRecords": [
+    {
+      "id": "ex-001",
+      "memberId": "mem-002",
+      "rewardId": "rw-001",
+      "rewardName": "满50减5优惠券",
+      "pointsCost": 30,
+      "date": "2026-06-01"
+    },
+    {
+      "id": "ex-002",
+      "memberId": "mem-001",
+      "rewardId": "rw-003",
+      "rewardName": "书店定制书签",
+      "pointsCost": 80,
+      "date": "2026-05-25"
+    },
+    {
+      "id": "ex-003",
+      "memberId": "mem-004",
+      "rewardId": "rw-002",
+      "rewardName": "满100减15优惠券",
+      "pointsCost": 50,
+      "date": "2026-05-18"
+    },
+    {
+      "id": "ex-004",
+      "memberId": "mem-002",
+      "rewardId": "rw-004",
+      "rewardName": "书店定制帆布袋",
+      "pointsCost": 200,
+      "date": "2026-04-20"
+    }
+  ]
+}
