@@ -1,0 +1,222 @@
+import { PresetData } from './types';
+
+const N = null;
+const BLK = '#000000';
+const WHT = '#ffffff';
+const GRY = '#7f7f7f';
+const LGRY = '#c3c3c3';
+const RED = '#ed1c24';
+const DRD = '#880015';
+const ORG = '#ff7f27';
+const YLW = '#fff200';
+const GRN = '#22b14c';
+const BLU = '#3f48cc';
+const SKY = '#00a2e8';
+const PUR = '#a349a4';
+const BRN = '#b97a57';
+const PNK = '#ffaec9';
+const GLD = '#ffc90e';
+const CRM = '#efe4b0';
+const OLV = '#b5e61d';
+const LBLU = '#99d9ea';
+const MBLU = '#7092be';
+const VLT = '#c8bfe7';
+const RD1 = '#f44336';
+const RD2 = '#e91e63';
+const PU1 = '#9c27b0';
+const PU2 = '#673ab7';
+const IN1 = '#3f51b5';
+const BL1 = '#2196f3';
+const CY1 = '#00bcd4';
+const TE1 = '#009688';
+const LG1 = '#4caf50';
+const LG2 = '#8bc34a';
+const LM1 = '#cddc39';
+
+const cat: (string | null)[][] = [
+  [N,N,N,N,N,ORG,ORG,N,N,ORG,ORG,N,N,N],
+  [N,N,N,N,ORG,DRD,ORG,ORG,ORG,DRD,ORG,N,N,N],
+  [N,N,N,ORG,ORG,ORG,ORG,ORG,ORG,ORG,ORG,ORG,N,N],
+  [N,N,ORG,ORG,GRN,ORG,ORG,ORG,ORG,GRN,ORG,ORG,ORG,N],
+  [N,N,ORG,ORG,ORG,ORG,BLK,BLK,ORG,ORG,ORG,ORG,ORG,N],
+  [N,N,ORG,ORG,ORG,ORG,ORG,ORG,ORG,ORG,ORG,ORG,ORG,N],
+  [N,N,ORG,ORG,ORG,PNK,ORG,ORG,PNK,ORG,ORG,ORG,ORG,N],
+  [N,N,N,ORG,ORG,ORG,ORG,ORG,ORG,ORG,ORG,ORG,N,N],
+  [N,N,N,N,ORG,ORG,ORG,ORG,ORG,ORG,ORG,N,N,N],
+  [N,N,N,N,N,ORG,ORG,ORG,ORG,ORG,N,N,N,N],
+  [N,N,N,N,N,N,ORG,ORG,ORG,N,N,N,N,N],
+  [N,N,N,N,N,N,N,ORG,N,N,N,N,N,N],
+  [N,N,N,N,N,N,N,N,N,N,N,N,N,N],
+  [N,N,N,N,N,N,N,N,N,N,N,N,N,N],
+];
+
+const dog: (string | null)[][] = [
+  [N,N,N,N,BRN,N,N,N,N,N,BRN,N,N,N],
+  [N,N,N,BRN,BRN,BRN,N,N,N,BRN,BRN,BRN,N,N],
+  [N,N,BRN,BRN,BRN,BRN,BRN,BRN,BRN,BRN,BRN,BRN,BRN,N],
+  [N,BRN,BRN,BRN,GRN,BRN,BRN,BRN,BRN,GRN,BRN,BRN,BRN,BRN],
+  [N,BRN,BRN,BRN,BRN,BRN,BLK,BLK,BRN,BRN,BRN,BRN,BRN,BRN],
+  [N,BRN,BRN,BRN,BRN,BRN,BRN,BRN,BRN,BRN,BRN,BRN,BRN,BRN],
+  [N,N,BRN,BRN,BRN,BRN,BRN,BRN,BRN,BRN,BRN,BRN,BRN,N],
+  [N,N,N,BRN,BRN,BLK,BRN,BRN,BLK,BRN,BRN,N,N,N],
+  [N,N,N,N,BRN,BRN,BRN,BRN,BRN,BRN,N,N,N,N],
+  [N,N,N,N,N,BRN,BRN,BRN,BRN,N,N,N,N,N],
+  [N,N,N,N,N,N,BRN,BRN,N,N,N,N,N,N],
+  [N,N,N,N,N,N,N,N,N,N,N,N,N,N],
+  [N,N,N,N,N,N,N,N,N,N,N,N,N,N],
+  [N,N,N,N,N,N,N,N,N,N,N,N,N,N],
+];
+
+const rabbit: (string | null)[][] = [
+  [N,WHT,N,N,N,N,N,N,N,N,N,N,WHT,N],
+  [WHT,WHT,WHT,N,N,N,N,N,N,N,N,WHT,WHT,WHT],
+  [WHT,PNK,WHT,N,N,N,N,N,N,N,WHT,PNK,WHT,N],
+  [WHT,PNK,WHT,WHT,WHT,WHT,WHT,WHT,WHT,WHT,WHT,PNK,WHT,N],
+  [N,WHT,WHT,WHT,WHT,RED,WHT,WHT,RED,WHT,WHT,WHT,WHT,N],
+  [N,N,WHT,WHT,WHT,WHT,BLK,BLK,WHT,WHT,WHT,WHT,N,N],
+  [N,N,WHT,WHT,WHT,WHT,WHT,WHT,WHT,WHT,WHT,WHT,N,N],
+  [N,N,N,WHT,WHT,WHT,PNK,PNK,WHT,WHT,WHT,N,N,N],
+  [N,N,N,N,WHT,WHT,WHT,WHT,WHT,WHT,N,N,N,N],
+  [N,N,N,N,N,WHT,WHT,WHT,WHT,N,N,N,N,N],
+  [N,N,N,N,N,N,WHT,WHT,N,N,N,N,N,N],
+  [N,N,N,N,N,N,N,N,N,N,N,N,N,N],
+  [N,N,N,N,N,N,N,N,N,N,N,N,N,N],
+  [N,N,N,N,N,N,N,N,N,N,N,N,N,N],
+];
+
+const fox: (string | null)[][] = [
+  [N,N,N,ORG,N,N,N,N,N,N,ORG,N,N,N],
+  [N,N,ORG,WHT,ORG,N,N,N,N,ORG,WHT,ORG,N,N],
+  [N,ORG,WHT,WHT,ORG,ORG,ORG,ORG,ORG,ORG,WHT,WHT,ORG,N],
+  [ORG,WHT,WHT,ORG,ORG,ORG,ORG,ORG,ORG,ORG,ORG,WHT,WHT,ORG],
+  [ORG,WHT,ORG,ORG,GRN,ORG,ORG,ORG,ORG,GRN,ORG,ORG,WHT,ORG],
+  [ORG,ORG,ORG,ORG,ORG,ORG,BLK,BLK,ORG,ORG,ORG,ORG,ORG,ORG],
+  [ORG,ORG,ORG,ORG,ORG,WHT,WHT,WHT,WHT,ORG,ORG,ORG,ORG,ORG],
+  [N,ORG,ORG,ORG,WHT,WHT,BLK,BLK,WHT,WHT,ORG,ORG,ORG,N],
+  [N,N,ORG,ORG,ORG,WHT,WHT,WHT,WHT,ORG,ORG,ORG,N,N],
+  [N,N,N,ORG,ORG,ORG,WHT,ORG,ORG,ORG,ORG,N,N,N],
+  [N,N,N,N,ORG,ORG,ORG,ORG,ORG,ORG,N,N,N,N],
+  [N,N,N,N,N,ORG,ORG,ORG,ORG,N,N,N,N,N],
+  [N,N,N,N,N,N,ORG,ORG,N,N,N,N,N,N],
+  [N,N,N,N,N,N,N,N,N,N,N,N,N,N],
+];
+
+const bear: (string | null)[][] = [
+  [N,BRN,BRN,N,N,N,N,N,N,N,N,BRN,BRN,N],
+  [BRN,BRN,BRN,BRN,N,N,N,N,N,N,BRN,BRN,BRN,BRN],
+  [N,BRN,BRN,BRN,BRN,BRN,BRN,BRN,BRN,BRN,BRN,BRN,BRN,N],
+  [N,N,BRN,BRN,BRN,BRN,BLK,BLK,BRN,BRN,BRN,BRN,N,N],
+  [N,N,BRN,BRN,BRN,BRN,BRN,BRN,BRN,BRN,BRN,BRN,N,N],
+  [N,N,BRN,BRN,BRN,BLK,BLK,BLK,BLK,BRN,BRN,BRN,N,N],
+  [N,N,N,BRN,BRN,BRN,BRN,BRN,BRN,BRN,BRN,N,N,N],
+  [N,N,N,N,BRN,BRN,PNK,PNK,BRN,BRN,N,N,N,N],
+  [N,N,N,N,N,BRN,BRN,BRN,BRN,N,N,N,N,N],
+  [N,N,N,N,N,N,BRN,BRN,N,N,N,N,N,N],
+  [N,N,N,N,N,N,N,N,N,N,N,N,N,N],
+  [N,N,N,N,N,N,N,N,N,N,N,N,N,N],
+  [N,N,N,N,N,N,N,N,N,N,N,N,N,N],
+  [N,N,N,N,N,N,N,N,N,N,N,N,N,N],
+];
+
+const smile: (string | null)[][] = [
+  [N,N,N,N,YLW,YLW,YLW,YLW,YLW,YLW,N,N,N,N],
+  [N,N,YLW,YLW,GLD,GLD,GLD,GLD,GLD,GLD,YLW,YLW,N,N],
+  [N,YLW,GLD,GLD,GLD,GLD,GLD,GLD,GLD,GLD,GLD,GLD,YLW,N],
+  [YLW,GLD,GLD,BLK,BLK,GLD,GLD,GLD,GLD,BLK,BLK,GLD,GLD,YLW],
+  [YLW,GLD,GLD,BLK,WHT,GLD,GLD,GLD,GLD,BLK,WHT,GLD,GLD,YLW],
+  [YLW,GLD,GLD,GLD,GLD,GLD,GLD,GLD,GLD,GLD,GLD,GLD,GLD,YLW],
+  [YLW,GLD,GLD,GLD,GLD,GLD,GLD,GLD,GLD,GLD,GLD,GLD,GLD,YLW],
+  [YLW,GLD,GLD,BLK,GLD,GLD,GLD,GLD,GLD,GLD,GLD,BLK,GLD,YLW],
+  [N,YLW,GLD,GLD,BLK,BLK,GLD,GLD,BLK,BLK,GLD,GLD,YLW,N],
+  [N,N,YLW,YLW,GLD,GLD,BLK,BLK,GLD,GLD,YLW,YLW,N,N],
+  [N,N,N,N,YLW,YLW,YLW,YLW,YLW,YLW,N,N,N,N],
+  [N,N,N,N,N,N,N,N,N,N,N,N,N,N],
+  [N,N,N,N,N,N,N,N,N,N,N,N,N,N],
+  [N,N,N,N,N,N,N,N,N,N,N,N,N,N],
+];
+
+const cool: (string | null)[][] = [
+  [N,N,N,N,YLW,YLW,YLW,YLW,YLW,YLW,N,N,N,N],
+  [N,N,YLW,YLW,GLD,GLD,GLD,GLD,GLD,GLD,YLW,YLW,N,N],
+  [N,YLW,GLD,GLD,GLD,GLD,GLD,GLD,GLD,GLD,GLD,GLD,YLW,N],
+  [YLW,GLD,BLK,BLK,BLK,BLK,BLK,BLK,BLK,BLK,BLK,BLK,GLD,YLW],
+  [YLW,GLD,BLK,SKY,BLK,BLK,SKY,SKY,BLK,BLK,SKY,BLK,GLD,YLW],
+  [YLW,GLD,BLK,BLK,BLK,BLK,BLK,BLK,BLK,BLK,BLK,BLK,GLD,YLW],
+  [YLW,GLD,GLD,GLD,GLD,GLD,GLD,GLD,GLD,GLD,GLD,GLD,GLD,YLW],
+  [YLW,GLD,GLD,GLD,GLD,GLD,GLD,GLD,GLD,GLD,GLD,GLD,GLD,YLW],
+  [N,YLW,GLD,GLD,GLD,BLK,BLK,BLK,BLK,GLD,GLD,GLD,YLW,N],
+  [N,N,YLW,YLW,GLD,GLD,GLD,GLD,GLD,GLD,YLW,YLW,N,N],
+  [N,N,N,N,YLW,YLW,YLW,YLW,YLW,YLW,N,N,N,N],
+  [N,N,N,N,N,N,N,N,N,N,N,N,N,N],
+  [N,N,N,N,N,N,N,N,N,N,N,N,N,N],
+  [N,N,N,N,N,N,N,N,N,N,N,N,N,N],
+];
+
+const surprised: (string | null)[][] = [
+  [N,N,N,N,YLW,YLW,YLW,YLW,YLW,YLW,N,N,N,N],
+  [N,N,YLW,YLW,GLD,GLD,GLD,GLD,GLD,GLD,YLW,YLW,N,N],
+  [N,YLW,GLD,GLD,GLD,GLD,GLD,GLD,GLD,GLD,GLD,GLD,YLW,N],
+  [YLW,GLD,GLD,BLK,BLK,GLD,GLD,GLD,GLD,BLK,BLK,GLD,GLD,YLW],
+  [YLW,GLD,GLD,BLK,WHT,BLK,GLD,GLD,BLK,WHT,BLK,GLD,GLD,YLW],
+  [YLW,GLD,GLD,BLK,BLK,BLK,GLD,GLD,BLK,BLK,BLK,GLD,GLD,YLW],
+  [YLW,GLD,GLD,GLD,GLD,GLD,GLD,GLD,GLD,GLD,GLD,GLD,GLD,YLW],
+  [YLW,GLD,GLD,GLD,BLK,BLK,GLD,GLD,BLK,BLK,GLD,GLD,GLD,YLW],
+  [N,YLW,GLD,GLD,BLK,WHT,WHT,BLK,GLD,GLD,GLD,GLD,YLW,N],
+  [N,N,YLW,YLW,GLD,GLD,GLD,GLD,YLW,YLW,N,N,N,N],
+  [N,N,N,N,YLW,YLW,YLW,YLW,YLW,YLW,N,N,N,N],
+  [N,N,N,N,N,N,N,N,N,N,N,N,N,N],
+  [N,N,N,N,N,N,N,N,N,N,N,N,N,N],
+  [N,N,N,N,N,N,N,N,N,N,N,N,N,N],
+];
+
+const wink: (string | null)[][] = [
+  [N,N,N,N,YLW,YLW,YLW,YLW,YLW,YLW,N,N,N,N],
+  [N,N,YLW,YLW,GLD,GLD,GLD,GLD,GLD,GLD,YLW,YLW,N,N],
+  [N,YLW,GLD,GLD,GLD,GLD,GLD,GLD,GLD,GLD,GLD,GLD,YLW,N],
+  [YLW,GLD,GLD,BLK,BLK,GLD,GLD,GLD,GLD,GLD,GLD,GLD,GLD,YLW],
+  [YLW,GLD,GLD,BLK,WHT,GLD,GLD,BLK,BLK,BLK,BLK,GLD,GLD,YLW],
+  [YLW,GLD,GLD,GLD,GLD,GLD,GLD,GLD,GLD,GLD,GLD,GLD,GLD,YLW],
+  [YLW,GLD,GLD,GLD,GLD,GLD,GLD,GLD,GLD,GLD,GLD,GLD,GLD,YLW],
+  [YLW,GLD,GLD,PNK,GLD,GLD,GLD,GLD,GLD,GLD,PNK,GLD,GLD,YLW],
+  [N,YLW,GLD,GLD,PNK,PNK,GLD,GLD,PNK,PNK,GLD,GLD,YLW,N],
+  [N,N,YLW,YLW,GLD,GLD,BLK,BLK,GLD,GLD,YLW,YLW,N,N],
+  [N,N,N,N,YLW,YLW,YLW,YLW,YLW,YLW,N,N,N,N],
+  [N,N,N,N,N,N,N,N,N,N,N,N,N,N],
+  [N,N,N,N,N,N,N,N,N,N,N,N,N,N],
+  [N,N,N,N,N,N,N,N,N,N,N,N,N,N],
+];
+
+const tongue: (string | null)[][] = [
+  [N,N,N,N,YLW,YLW,YLW,YLW,YLW,YLW,N,N,N,N],
+  [N,N,YLW,YLW,GLD,GLD,GLD,GLD,GLD,GLD,YLW,YLW,N,N],
+  [N,YLW,GLD,GLD,GLD,GLD,GLD,GLD,GLD,GLD,GLD,GLD,YLW,N],
+  [YLW,GLD,GLD,BLK,BLK,GLD,GLD,GLD,GLD,BLK,BLK,GLD,GLD,YLW],
+  [YLW,GLD,GLD,BLK,WHT,GLD,GLD,GLD,GLD,BLK,WHT,GLD,GLD,YLW],
+  [YLW,GLD,GLD,GLD,GLD,GLD,GLD,GLD,GLD,GLD,GLD,GLD,GLD,YLW],
+  [YLW,GLD,GLD,GLD,BLK,BLK,GLD,GLD,BLK,BLK,GLD,GLD,GLD,YLW],
+  [N,YLW,GLD,BLK,BLK,BLK,BLK,BLK,BLK,BLK,BLK,BLK,GLD,YLW],
+  [N,N,YLW,GLD,GLD,RED,RED,RED,RED,GLD,GLD,YLW,N,N],
+  [N,N,N,YLW,GLD,RED,RD1,RD1,RED,GLD,YLW,N,N,N],
+  [N,N,N,N,YLW,RED,RED,RED,RED,YLW,N,N,N,N],
+  [N,N,N,N,N,N,N,N,N,N,N,N,N,N],
+  [N,N,N,N,N,N,N,N,N,N,N,N,N,N],
+  [N,N,N,N,N,N,N,N,N,N,N,N,N,N],
+];
+
+export const ANIMAL_PRESETS: PresetData[] = [
+  { key: 'cat', name: '猫咪', icon: '🐱', pattern: cat },
+  { key: 'dog', name: '小狗', icon: '🐶', pattern: dog },
+  { key: 'rabbit', name: '兔子', icon: '🐰', pattern: rabbit },
+  { key: 'fox', name: '狐狸', icon: '🦊', pattern: fox },
+  { key: 'bear', name: '小熊', icon: '🐻', pattern: bear },
+];
+
+export const EMOTION_PRESETS: PresetData[] = [
+  { key: 'smile', name: '微笑', icon: '😊', pattern: smile },
+  { key: 'cool', name: '酷炫', icon: '😎', pattern: cool },
+  { key: 'surprised', name: '惊讶', icon: '😮', pattern: surprised },
+  { key: 'wink', name: '眨眼', icon: '😉', pattern: wink },
+  { key: 'tongue', name: '吐舌', icon: '😛', pattern: tongue },
+];
+
+export const ALL_PRESETS = [...ANIMAL_PRESETS, ...EMOTION_PRESETS];
