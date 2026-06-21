@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>城市风环境可视化 - 3D交互模拟</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    }
+
+    body {
+      background: linear-gradient(180deg, #0a1628 0%, #050a14 60%, #000000 100%);
+      color: #ffffff;
+    }
+
+    #app {
+      position: relative;
+      width: 100%;
+      height: 100%;
+    }
+
+    #canvas-container {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+    }
+
+    canvas {
+      display: block;
+    }
+
+    #tooltip {
+      position: absolute;
+      pointer-events: none;
+      background: rgba(10, 22, 40, 0.92);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 8px;
+      padding: 10px 14px;
+      font-size: 13px;
+      line-height: 1.6;
+      color: #ffffff;
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      transform: translate(-50%, -120%);
+      opacity: 0;
+      transition: opacity 0.15s ease-out;
+      white-space: nowrap;
+      z-index: 100;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+    }
+
+    #tooltip.visible {
+      opacity: 1;
+    }
+
+    #tooltip .label {
+      color: #8ab4ff;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 4px;
+    }
+
+    #tooltip .value {
+      color: #ffffff;
+      font-weight: 600;
+      font-size: 15px;
+    }
+
+    #legend {
+      position: absolute;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(10, 22, 40, 0.75);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 12px;
+      padding: 14px 28px 18px;
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      z-index: 50;
+      box-shadow: 0 4px 24px rgba(0, 0, 0, 0.3);
+    }
+
+    #legend .legend-title {
+      text-align: center;
+      font-size: 12px;
+      color: #8ab4ff;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 10px;
+      font-weight: 500;
+    }
+
+    #legend .legend-bar {
+      width: 320px;
+      height: 14px;
+      border-radius: 7px;
+      background: linear-gradient(90deg, 
+        #1e90ff 0%, 
+        #00ced1 25%, 
+        #32cd32 50%, 
+        #ffd700 75%, 
+        #ff4500 100%
+      );
+      position: relative;
+      box-shadow: inset 0 0 4px rgba(0, 0, 0, 0.3);
+    }
+
+    #legend .legend-labels {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 8px;
+      font-size: 11px;
+      color: #a0b4d0;
+    }
+
+    #legend .legend-labels span {
+      font-variant-numeric: tabular-nums;
+    }
+
+    #title {
+      position: absolute;
+      top: 24px;
+      left: 28px;
+      z-index: 50;
+    }
+
+    #title h1 {
+      font-size: 20px;
+      font-weight: 600;
+      color: #ffffff;
+      letter-spacing: 0.5px;
+      margin-bottom: 4px;
+    }
+
+    #title p {
+      font-size: 12px;
+      color: #6b8ab8;
+      letter-spacing: 0.3px;
+    }
+
+    .dg.ac {
+      z-index: 90 !important;
+    }
+
+    .dg.main {
+      border-radius: 12px !important;
+      overflow: hidden !important;
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+    }
+
+    .dg.main,
+    .dg.main .close-button {
+      background: rgba(10, 22, 40, 0.78) !important;
+    }
+
+    .dg li:not(.folder) {
+      background: transparent !important;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.06) !important;
+    }
+
+    .dg .c .slider {
+      background: rgba(255, 255, 255, 0.08) !important;
+      border-radius: 4px;
+    }
+
+    .dg .c .slider-fg {
+      background: linear-gradient(90deg, #1e90ff, #00ced1) !important;
+      border-radius: 4px;
+    }
+
+    .dg .c input[type='text'] {
+      background: rgba(255, 255, 255, 0.06) !important;
+      border: 1px solid rgba(255, 255, 255, 0.1) !important;
+      border-radius: 4px;
+      color: #e0ecff !important;
+    }
+
+    .dg .cr.number input[type=text] {
+      color: #8ab4ff !important;
+    }
+
+    .dg .property-name {
+      color: #c0d4f0 !important;
+    }
+
+    .dg .c .slider {
+      transition: all 0.15s ease;
+    }
+
+    .dg .c .slider:hover .slider-fg {
+      filter: brightness(1.2);
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <div id="canvas-container"></div>
+
+    <div id="title">
+      <h1>城市风环境可视化</h1>
+      <p>City Wind Environment Visualization</p>
+    </div>
+
+    <div id="tooltip">
+      <div class="label">建筑信息</div>
+      <div class="value" id="tooltip-height"></div>
+      <div class="value" id="tooltip-floors"></div>
+    </div>
+
+    <div id="legend">
+      <div class="legend-title">风速 (Wind Speed)</div>
+      <div class="legend-bar"></div>
+      <div class="legend-labels">
+        <span>0 m/s</span>
+        <span>5 m/s</span>
+        <span>10 m/s</span>
+      </div>
+    </div>
+  </div>
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
