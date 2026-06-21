@@ -1,0 +1,27 @@
+{
+  "name": "community-greening-tracker",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "concurrently \"npm run server\" \"npm run client\"",
+    "server": "tsx watch server/src/app.ts",
+    "client": "vite"
+  },
+  "dependencies": {
+    "react": "18.2.0",
+    "react-dom": "18.2.0",
+    "express": "4.18.2",
+    "typescript": "5.3.3",
+    "axios": "1.6.0"
+  },
+  "devDependencies": {
+    "vite": "5.0.8",
+    "@vitejs/plugin-react": "4.2.0",
+    "tsx": "4.7.0",
+    "concurrently": "8.2.2",
+    "@types/react": "18.2.43",
+    "@types/react-dom": "18.2.17",
+    "@types/express": "4.17.21",
+    "@types/cors": "2.8.17"
+  }
+}
