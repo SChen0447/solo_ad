@@ -1,0 +1,252 @@
+.paramPanel {
+  padding: 20px 24px;
+  background: #fff;
+  border-top: 1px solid rgba(0, 0, 0, 0.08);
+  display: flex;
+  gap: 32px;
+  align-items: flex-end;
+  flex-wrap: wrap;
+}
+
+.paramsGrid {
+  display: flex;
+  gap: 24px;
+  flex: 1;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.sliderContainer {
+  flex: 1;
+  min-width: 180px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sliderLabel {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 13px;
+  color: #555;
+  font-weight: 500;
+}
+
+.sliderValue {
+  background: linear-gradient(135deg, #6366f1, #a855f7);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.sliderTrack {
+  position: relative;
+  height: 6px;
+  background: #e0e0e0;
+  border-radius: 3px;
+  cursor: pointer;
+  touch-action: none;
+  transition: height 200ms ease;
+}
+
+.sliderTrack:hover {
+  height: 8px;
+}
+
+.sliderTrack.dragging {
+  height: 8px;
+}
+
+.sliderFill {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  background: linear-gradient(90deg, #6366f1, #a855f7);
+  border-radius: 3px;
+  transition: background 200ms ease;
+  pointer-events: none;
+}
+
+.sliderTrack.dragging .sliderFill {
+  background: linear-gradient(90deg, #4f46e5, #9333ea);
+}
+
+.sliderThumb {
+  position: absolute;
+  top: 50%;
+  width: 16px;
+  height: 16px;
+  background: #fff;
+  border: 3px solid #6366f1;
+  border-radius: 50%;
+  transform: translateY(-50%);
+  cursor: grab;
+  box-shadow: 0 2px 6px rgba(99, 102, 241, 0.3);
+  transition: all 200ms ease;
+  pointer-events: none;
+}
+
+.sliderTrack:hover .sliderThumb,
+.sliderTrack.dragging .sliderThumb {
+  width: 20px;
+  height: 20px;
+  border-color: #a855f7;
+  box-shadow: 0 4px 12px rgba(168, 85, 247, 0.4);
+}
+
+.sliderTrack.dragging .sliderThumb {
+  cursor: grabbing;
+}
+
+.sliderRange {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: #999;
+}
+
+.iterationContainer {
+  flex: 1;
+  min-width: 220px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.iterationButtons {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.iterationButton {
+  flex: 1;
+  min-width: 44px;
+  height: 36px;
+  border: 2px solid #e0e0e0;
+  background: #fff;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #666;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 200ms ease;
+}
+
+.iterationButton:hover {
+  border-color: #6366f1;
+  color: #6366f1;
+}
+
+.iterationButton.active {
+  border-color: #6366f1;
+  background: linear-gradient(135deg, #6366f1, #a855f7);
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(99, 102, 241, 0.3);
+}
+
+.exportContainer {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.exportButton {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 24px;
+  height: 44px;
+  background: linear-gradient(135deg, #6366f1, #a855f7);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(99, 102, 241, 0.3);
+  transition: all 200ms cubic-bezier(0.4, 0, 0.2, 1);
+  white-space: nowrap;
+}
+
+.exportButton:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 16px rgba(99, 102, 241, 0.4);
+}
+
+.exportButton.pressed {
+  transform: translateY(2px) scale(0.98);
+  box-shadow: 0 1px 4px rgba(99, 102, 241, 0.3);
+}
+
+.copiedToast {
+  position: absolute;
+  bottom: calc(100% + 10px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: #10b981;
+  color: #fff;
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+  animation: toastIn 200ms ease, toastOut 200ms ease 1300ms forwards;
+}
+
+@keyframes toastIn {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+}
+
+@keyframes toastOut {
+  from {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-10px);
+  }
+}
+
+@media (max-width: 768px) {
+  .paramPanel {
+    padding: 16px;
+    gap: 16px;
+  }
+
+  .paramsGrid {
+    width: 100%;
+    flex-direction: column;
+  }
+
+  .sliderContainer,
+  .iterationContainer {
+    min-width: 100%;
+  }
+
+  .exportContainer {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .exportButton {
+    width: 100%;
+    justify-content: center;
+  }
+}
