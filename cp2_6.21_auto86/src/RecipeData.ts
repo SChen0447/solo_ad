@@ -76,6 +76,60 @@ let availableIngredients: string[] = ['鸡肉', '鸡蛋', '番茄', '米饭', '�
 
 let favoriteRecipeIds: string[] = ['1', '3', '6'];
 
+export async function syncFavoritesFromBackend(): Promise<void> {
+  try {
+    const res = await fetch('/api/recipes/favorites/ids');
+    if (res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data)) {
+        favoriteRecipeIds = [...data];
+      }
+    }
+  } catch (e) {
+    console.warn('同步收藏状态失败:', e);
+  }
+}
+
+export async function toggleFavoriteAsync(recipeId: string): Promise<boolean> {
+  try {
+    const isFav = isFavorite(recipeId);
+    let res;
+    if (isFav) {
+      res = await fetch(`/api/recipes/${recipeId}/favorite`, { method: 'DELETE' });
+    } else {
+      res = await fetch(`/api/recipes/${recipeId}/favorite`, { method: 'POST' });
+    }
+    if (res.ok) {
+      const data = await res.json();
+      if (data.favoriteIds) {
+        favoriteRecipeIds = [...data.favoriteIds];
+      }
+      return !!data.favorited;
+    }
+    return toggleFavorite(recipeId);
+  } catch (e) {
+    console.warn('切换收藏状态失败，使用本地回退:', e);
+    return toggleFavorite(recipeId);
+  }
+}
+
+export async function fetchFavoriteRecipes(): Promise<Recipe[]> {
+  try {
+    const res = await fetch('/api/recipes/favorites');
+    if (res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data)) {
+        favoriteRecipeIds = data.map(r => r.id);
+        return data;
+      }
+    }
+    return getFavoriteRecipes();
+  } catch (e) {
+    console.warn('获取收藏食谱失败，使用本地回退:', e);
+    return getFavoriteRecipes();
+  }
+}
+
 export function toggleFavorite(recipeId: string): boolean {
   const idx = favoriteRecipeIds.indexOf(recipeId);
   if (idx === -1) {

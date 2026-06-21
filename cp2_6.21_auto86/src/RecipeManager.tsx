@@ -1,12 +1,14 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import {
   Recipe,
   getRecipes,
   addRecipe,
   deleteRecipe,
-  toggleFavorite,
   isFavorite,
   getFavoriteRecipes,
+  syncFavoritesFromBackend,
+  toggleFavoriteAsync,
+  fetchFavoriteRecipes,
 } from './RecipeData';
 
 interface RecipeManagerProps {
@@ -45,6 +47,8 @@ const CUISINE_ICON: Record<string, React.ReactNode> = {
   ),
 };
 
+const FORM_INPUT_WIDTH = '100%';
+
 function HeartIcon({ filled }: { filled: boolean }) {
   return (
     <svg width="18" height="18" viewBox="0 0 24 24" fill={filled ? '#EF4444' : 'none'}
@@ -69,21 +73,45 @@ export default function RecipeManager({ onSelectRecipe, refreshKey }: RecipeMana
   const [shakeIngredients, setShakeIngredients] = useState(false);
   const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
   const [favoritesTick, setFavoritesTick] = useState(0);
+  const [favoriteRecipesCache, setFavoriteRecipesCache] = useState<Recipe[]>([]);
+  const [isFilterLoading, setIsFilterLoading] = useState(false);
+
+  useEffect(() => {
+    syncFavoritesFromBackend().then(() => setFavoritesTick(prev => prev + 1));
+  }, []);
 
   const refresh = useCallback(() => {
     setRecipes(getRecipes());
+    setFavoritesTick(prev => prev + 1);
   }, []);
 
-  React.useEffect(() => {
+  useEffect(() => {
     refresh();
   }, [refreshKey, refresh]);
 
-  const displayedRecipes = showFavoritesOnly ? getFavoriteRecipes() : recipes;
+  const displayedRecipes = showFavoritesOnly ? favoriteRecipesCache : recipes;
 
-  const handleToggleFavorite = (e: React.MouseEvent, recipeId: string) => {
+  const handleToggleFavorite = async (e: React.MouseEvent, recipeId: string) => {
     e.stopPropagation();
-    toggleFavorite(recipeId);
+    await toggleFavoriteAsync(recipeId);
     setFavoritesTick(prev => prev + 1);
+    if (showFavoritesOnly) {
+      const favs = await fetchFavoriteRecipes();
+      setFavoriteRecipesCache(favs);
+    }
+  };
+
+  const handleToggleFilter = async () => {
+    const nextShowFavorites = !showFavoritesOnly;
+    setShowFavoritesOnly(nextShowFavorites);
+    if (nextShowFavorites) {
+      setIsFilterLoading(true);
+      const favs = await fetchFavoriteRecipes();
+      setFavoriteRecipesCache(favs);
+      setIsFilterLoading(false);
+    } else {
+      refresh();
+    }
   };
 
   const handleAddIngredientTag = () => {
@@ -131,9 +159,36 @@ export default function RecipeManager({ onSelectRecipe, refreshKey }: RecipeMana
     refresh();
   };
 
+  const inputStyle: React.CSSProperties = {
+    width: FORM_INPUT_WIDTH,
+    height: 40,
+    padding: '0 10px',
+    margin: '0 0 10px 0',
+    boxSizing: 'border-box',
+    border: `1px solid ${validationError && !formName.trim() ? '#EF4444' : '#ddd'}`,
+    borderRadius: 8,
+    fontSize: 14,
+    outline: 'none',
+    transition: 'border-color 0.2s, transform 0.2s',
+  };
+
+  const selectStyle: React.CSSProperties = {
+    width: FORM_INPUT_WIDTH,
+    height: 40,
+    padding: '0 10px',
+    margin: '0 0 10px 0',
+    border: '1px solid #ddd',
+    borderRadius: 8,
+    fontSize: 14,
+    outline: 'none',
+    boxSizing: 'border-box',
+    background: '#fff',
+    transition: 'border-color 0.2s, transform 0.2s',
+  };
+
   return (
     <div style={{ position: 'relative' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20, flexWrap: 'wrap' }}>
         <button
           onClick={() => setShowModal(true)}
           style={{
@@ -155,22 +210,24 @@ export default function RecipeManager({ onSelectRecipe, refreshKey }: RecipeMana
         </button>
 
         <button
-          onClick={() => setShowFavoritesOnly(prev => !prev)}
+          onClick={handleToggleFilter}
+          disabled={isFilterLoading}
           style={{
             height: 44, padding: '0 20px', borderRadius: 22, border: 'none',
             background: showFavoritesOnly
               ? 'linear-gradient(135deg, #EF4444, #DC2626)'
               : 'linear-gradient(135deg, #FEF3C7, #FDE68A)',
             color: showFavoritesOnly ? '#fff' : '#92400E',
-            fontSize: 14, fontWeight: 'bold', cursor: 'pointer',
+            fontSize: 14, fontWeight: 'bold', cursor: isFilterLoading ? 'wait' : 'pointer',
             transition: 'all 0.2s ease',
             display: 'flex', alignItems: 'center', gap: 6,
+            opacity: isFilterLoading ? 0.7 : 1,
           }}
-          onMouseEnter={e => { (e.currentTarget as HTMLElement).style.transform = 'scale(1.05)'; }}
+          onMouseEnter={e => { if (!isFilterLoading) (e.currentTarget as HTMLElement).style.transform = 'scale(1.05)'; }}
           onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform = 'scale(1)'; }}
         >
           <HeartIcon filled={showFavoritesOnly} />
-          {showFavoritesOnly ? '全部食谱' : '只看收藏'}
+          {isFilterLoading ? '加载中...' : (showFavoritesOnly ? '全部食谱' : '只看收藏')}
         </button>
       </div>
 
@@ -270,7 +327,7 @@ export default function RecipeManager({ onSelectRecipe, refreshKey }: RecipeMana
         })}
       </div>
 
-      {displayedRecipes.length === 0 && (
+      {displayedRecipes.length === 0 && !isFilterLoading && (
         <div style={{
           textAlign: 'center', padding: 60, color: '#9CA3AF', fontSize: 14,
         }}>
@@ -300,11 +357,7 @@ export default function RecipeManager({ onSelectRecipe, refreshKey }: RecipeMana
               value={formName}
               onChange={e => { setFormName(e.target.value); setValidationError(false); }}
               style={{
-                width: 360, height: 40, padding: '0 10px', margin: '0 0 10px 0',
-                border: `1px solid ${validationError && !formName.trim() ? '#EF4444' : '#ddd'}`,
-                borderRadius: 8, fontSize: 14, outline: 'none',
-                transition: 'border-color 0.2s, transform 0.2s',
-                boxSizing: 'border-box',
+                ...inputStyle,
                 animation: shakeName ? 'shake 0.3s ease' : 'none',
               }}
               onFocus={e => {
@@ -319,13 +372,7 @@ export default function RecipeManager({ onSelectRecipe, refreshKey }: RecipeMana
             <select
               value={formCuisine}
               onChange={e => setFormCuisine(e.target.value as Recipe['cuisine'])}
-              style={{
-                width: 360, height: 40, padding: '0 10px', margin: '0 0 10px 0',
-                border: '1px solid #ddd', borderRadius: 8, fontSize: 14,
-                outline: 'none', boxSizing: 'border-box',
-                background: '#fff',
-                transition: 'border-color 0.2s, transform 0.2s',
-              }}
+              style={selectStyle}
               onFocus={e => {
                 (e.target as HTMLElement).style.borderColor = '#F97316';
                 (e.target as HTMLElement).style.transform = 'scale(1.02)';
