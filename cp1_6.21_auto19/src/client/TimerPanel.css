@@ -1,0 +1,210 @@
+.timer-panel {
+  background: var(--surface);
+  border-radius: var(--radius);
+  padding: 24px;
+  box-shadow: var(--shadow);
+}
+
+.timer-panel-title {
+  font-size: 20px;
+  font-weight: 600;
+  margin-bottom: 20px;
+  color: var(--text-primary);
+}
+
+.timer-display {
+  background: linear-gradient(135deg, #F59E0B 0%, #FCD34D 100%);
+  border-radius: 16px;
+  padding: 32px;
+  text-align: center;
+  color: white;
+  margin-bottom: 24px;
+  position: relative;
+  overflow: hidden;
+}
+
+.timer-display.running {
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+
+.timer-display.finished {
+  animation: pulse-finished 0.5s ease-in-out infinite;
+}
+
+@keyframes pulse-glow {
+  0%, 100% {
+    box-shadow: 0 4px 20px rgba(245, 158, 11, 0.3);
+  }
+  50% {
+    box-shadow: 0 8px 30px rgba(245, 158, 11, 0.5);
+  }
+}
+
+@keyframes pulse-finished {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.02);
+  }
+}
+
+.timer-step-name {
+  font-size: 18px;
+  font-weight: 500;
+  margin-bottom: 12px;
+  opacity: 0.95;
+}
+
+.timer-time {
+  font-size: 64px;
+  font-weight: 700;
+  font-family: 'SF Mono', Monaco, 'Cascadia Code', monospace;
+  letter-spacing: 4px;
+  margin-bottom: 16px;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.timer-progress-container {
+  width: 100%;
+  height: 8px;
+  background: rgba(255, 255, 255, 0.3);
+  border-radius: 4px;
+  overflow: hidden;
+  margin-bottom: 20px;
+}
+
+.timer-progress-bar {
+  height: 100%;
+  background: white;
+  border-radius: 4px;
+  transition: width 1s linear;
+}
+
+.timer-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+}
+
+.timer-session-info {
+  margin-top: 16px;
+  font-size: 13px;
+  opacity: 0.9;
+}
+
+.timer-steps-list {
+  border-top: 1px solid var(--border);
+  padding-top: 20px;
+}
+
+.timer-steps-title {
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 16px;
+  color: var(--text-primary);
+}
+
+.timer-step-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border-radius: 8px;
+  margin-bottom: 8px;
+  background: #f9fafb;
+  transition: all 0.2s ease;
+}
+
+.timer-step-item:hover {
+  background: #f3f4f6;
+}
+
+.timer-step-item.active {
+  background: #FEF3C7;
+  border: 2px solid var(--primary);
+}
+
+.step-number {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--primary);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.step-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.step-title {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-primary);
+  margin-bottom: 4px;
+}
+
+.step-duration {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.btn {
+  padding: 10px 24px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  cursor: pointer;
+  border: none;
+}
+
+.btn-primary {
+  background: var(--primary);
+  color: white;
+}
+
+.btn-primary:hover {
+  background: var(--primary-dark);
+  transform: translateY(-1px);
+}
+
+.btn-primary:active {
+  transform: translateY(0);
+}
+
+.btn-primary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.btn-secondary {
+  background: rgba(255, 255, 255, 0.2);
+  color: white;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.btn-secondary:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.btn-small {
+  padding: 6px 12px;
+  font-size: 12px;
+}
+
+.timer-display .btn-secondary {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.timer-display .btn-secondary:hover {
+  background: rgba(255, 255, 255, 0.35);
+}

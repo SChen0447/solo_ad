@@ -1,0 +1,257 @@
+.community-feed {
+  background: var(--surface);
+  border-radius: var(--radius);
+  padding: 24px;
+  box-shadow: var(--shadow);
+}
+
+.feed-title {
+  font-size: 20px;
+  font-weight: 600;
+  margin-bottom: 4px;
+  color: var(--text-primary);
+}
+
+.feed-subtitle {
+  font-size: 14px;
+  color: var(--text-secondary);
+  margin-bottom: 20px;
+}
+
+.watching-panel {
+  background: linear-gradient(135deg, #FEF3C7 0%, #FDE68A 100%);
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 20px;
+  border: 2px solid var(--primary);
+}
+
+.watching-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.watching-badge {
+  background: var(--primary);
+  color: white;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 500;
+  animation: pulse-badge 2s ease-in-out infinite;
+}
+
+@keyframes pulse-badge {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+.btn-leave {
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 13px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+}
+
+.btn-leave:hover {
+  background: rgba(0, 0, 0, 0.05);
+  color: var(--text-primary);
+}
+
+.watching-recipe {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 4px;
+  display: block;
+}
+
+.watching-recipe:hover {
+  color: var(--primary);
+}
+
+.watching-step {
+  font-size: 14px;
+  color: var(--text-secondary);
+  margin-bottom: 12px;
+}
+
+.watching-time {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--primary-dark);
+  margin-bottom: 12px;
+  font-family: 'SF Mono', Monaco, monospace;
+}
+
+.watching-progress {
+  width: 100%;
+  height: 6px;
+  background: rgba(245, 158, 11, 0.2);
+  border-radius: 3px;
+  overflow: hidden;
+  margin-bottom: 12px;
+}
+
+.watching-progress-bar {
+  height: 100%;
+  background: var(--primary);
+  border-radius: 3px;
+  transition: width 1s linear;
+}
+
+.watching-user {
+  font-size: 12px;
+  color: var(--text-secondary);
+  text-align: right;
+}
+
+.sessions-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.no-sessions {
+  text-align: center;
+  padding: 40px 20px;
+  color: var(--text-secondary);
+}
+
+.no-sessions p {
+  font-size: 16px;
+  margin-bottom: 8px;
+}
+
+.no-sessions-sub {
+  font-size: 13px !important;
+  opacity: 0.7;
+}
+
+.session-card {
+  background: #f9fafb;
+  border-radius: 10px;
+  padding: 16px;
+  transition: all 0.2s ease;
+  border: 2px solid transparent;
+}
+
+.session-card:hover {
+  background: #f3f4f6;
+}
+
+.session-card.active {
+  border-color: var(--primary);
+  background: #FFFBEB;
+}
+
+.session-user {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.user-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #F59E0B 0%, #FCD34D 100%);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.user-info {
+  flex: 1;
+}
+
+.user-name {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.session-action {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.session-recipe {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 4px;
+}
+
+.session-step {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin-bottom: 8px;
+}
+
+.step-label {
+  font-weight: 500;
+}
+
+.session-time {
+  font-size: 13px;
+  color: var(--primary-dark);
+  font-weight: 500;
+  margin-bottom: 8px;
+}
+
+.session-progress {
+  width: 100%;
+  height: 4px;
+  background: #e5e7eb;
+  border-radius: 2px;
+  overflow: hidden;
+  margin-bottom: 10px;
+}
+
+.session-progress-bar {
+  height: 100%;
+  background: linear-gradient(90deg, #F59E0B, #FCD34D);
+  border-radius: 2px;
+  transition: width 1s linear;
+}
+
+.btn-watch {
+  width: 100%;
+  padding: 8px;
+  background: var(--primary);
+  color: white;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.btn-watch:hover {
+  background: var(--primary-dark);
+  transform: translateY(-1px);
+}
+
+.btn-watch:active {
+  transform: translateY(0);
+}
+
+.watching-indicator {
+  text-align: center;
+  padding: 8px;
+  color: var(--primary);
+  font-size: 13px;
+  font-weight: 500;
+}
