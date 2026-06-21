@@ -2,7 +2,7 @@ import type { IHero } from './character';
 import { generateEquipment, type IEquipment } from './equipment';
 
 export type MonsterType = 'slime' | 'skeleton' | 'bat' | 'goblin';
-export type BattleAction = 'attack' | 'defend' | 'potion';
+export type BattleAction = 'attack' | 'defend' | 'potion' | 'skill';
 export type BattlePhase = 'player' | 'enemy' | 'victory' | 'defeat' | 'animating';
 
 export interface IMonster {
@@ -24,6 +24,7 @@ export interface IBattleResult {
   expGained: number;
   drop?: IEquipment;
   heroHp: number;
+  heroMp: number;
 }
 
 export interface IBattleState {
@@ -155,6 +156,49 @@ export function startBattle(hero: IHero, monster: IMonster): IBattleState {
 
 const healPotionAmount = 30;
 
+export function executePlayerSkill(
+  state: IBattleState,
+  skillId: string
+): { state: IBattleState; success: boolean; message?: string } {
+  if (state.phase !== 'player') return { state, success: false };
+  const skill = state.hero.skills.find(s => s.id === skillId);
+  if (!skill) return { state, success: false, message: '技能不存在' };
+  if (state.hero.mp < skill.mpCost) {
+    return { state, success: false, message: 'MP不足！' };
+  }
+  const s: IBattleState = JSON.parse(JSON.stringify(state));
+  s.isDefending = false;
+  s.animatingHero = true;
+  s.hero.mp -= skill.mpCost;
+
+  if (skill.type === 'attack') {
+    const baseAtk = skill.power > 2 ? s.hero.matk : s.hero.atk + Math.floor(s.hero.matk * 0.3);
+    const damage = Math.floor(baseAtk * skill.power) - s.monster.def;
+    const finalDamage = Math.max(1, Math.floor(damage * (0.85 + Math.random() * 0.3)));
+    s.monster.hp = Math.max(0, s.monster.hp - finalDamage);
+    s.logs.push(`✨ 使用【${skill.name}】，对${s.monster.name}造成了 ${finalDamage} 点伤害！（消耗${skill.mpCost}MP）`);
+  } else if (skill.type === 'heal') {
+    const healed = Math.min(skill.power, s.hero.maxHp - s.hero.hp);
+    s.hero.hp += healed;
+    s.logs.push(`💚 使用【${skill.name}】，恢复了 ${healed} 点HP！（消耗${skill.mpCost}MP）`);
+  } else if (skill.type === 'buff') {
+    if (skill.id === 'iron_wall') {
+      s.isDefending = true;
+      s.logs.push(`🛡 使用【${skill.name}】，防御力大幅提升！（消耗${skill.mpCost}MP）`);
+    } else {
+      s.logs.push(`✨ 使用了【${skill.name}】！（消耗${skill.mpCost}MP）`);
+    }
+  }
+
+  if (s.monster.hp <= 0) {
+    s.phase = 'victory';
+    s.logs.push(`✨ ${s.monster.name} 被击败了！胜利！`);
+  } else {
+    s.phase = 'enemy';
+  }
+  return { state: s, success: true };
+}
+
 export function executePlayerAction(
   state: IBattleState,
   action: BattleAction
@@ -239,5 +283,6 @@ export function buildBattleResult(
     expGained,
     drop,
     heroHp: state.hero.hp,
+    heroMp: state.hero.mp,
   };
 }

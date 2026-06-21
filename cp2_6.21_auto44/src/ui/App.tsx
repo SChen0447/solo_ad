@@ -27,6 +27,7 @@ import {
 import {
   startBattle,
   executePlayerAction,
+  executePlayerSkill,
   executeEnemyTurn,
   clearAnimations,
   generateMapMonsters,
@@ -142,24 +143,59 @@ export default function App() {
           }, 450);
         }
         if (s.phase === 'victory') {
-          const result = buildBattleResult(s, hero.level);
-          setBattleResult(result);
-          setCurrentDrop(result.drop || null);
-          let updatedHero: IHero = JSON.parse(JSON.stringify(hero));
-          updatedHero.hp = result.heroHp;
-          const expRes = gainExp(updatedHero, result.expGained);
-          updatedHero = expRes.hero;
-          setLeveledUpCount(expRes.leveledUp);
-          if (result.drop) {
-            const addRes = addToInventory(updatedHero, result.drop);
-            updatedHero = addRes.hero;
-            if (!addRes.added) warnOnce(`背包已满，装备丢失！（${INVENTORY_LIMIT}件上限）`);
-          }
-          setHero(recalcStatsFromAttrs(updatedHero));
+          handleVictory(s);
         }
         return s;
       });
     }, 600);
+  };
+
+  const handleUseSkill = (skillId: string) => {
+    if (!battleState || !hero) return;
+    const res = executePlayerSkill(battleState, skillId);
+    if (!res.success) {
+      if (res.message) alert(res.message);
+      return;
+    }
+    setBattleState(res.state);
+    setTimeout(() => {
+      setBattleState(prev => prev ? clearAnimations(prev) : prev);
+    }, 450);
+    setTimeout(() => {
+      setBattleState(prevState => {
+        if (!prevState) return prevState;
+        let s = prevState;
+        if (s.phase === 'enemy') {
+          s = executeEnemyTurn(s);
+          setTimeout(() => {
+            setBattleState(p => p ? clearAnimations(p) : p);
+          }, 450);
+        }
+        if (s.phase === 'victory') {
+          handleVictory(s);
+        }
+        return s;
+      });
+    }, 600);
+  };
+
+  const handleVictory = (s: IBattleState) => {
+    if (!hero) return;
+    const result = buildBattleResult(s, hero.level);
+    setBattleResult(result);
+    setCurrentDrop(result.drop || null);
+    let updatedHero: IHero = JSON.parse(JSON.stringify(hero));
+    updatedHero.hp = result.heroHp;
+    updatedHero.mp = result.heroMp;
+    const expRes = gainExp(updatedHero, result.expGained);
+    updatedHero = expRes.hero;
+    setLeveledUpCount(expRes.leveledUp);
+    if (result.drop) {
+      const addRes = addToInventory(updatedHero, result.drop);
+      updatedHero = addRes.hero;
+      if (!addRes.added) warnOnce(`背包已满，装备丢失！（${INVENTORY_LIMIT}件上限）`);
+    }
+    setHero(recalcStatsFromAttrs(updatedHero));
   };
 
   const handleContinue = () => {
@@ -238,6 +274,7 @@ export default function App() {
             battleState={battleState}
             heroClass={hero.heroClass}
             onAction={handleBattleAction}
+            onUseSkill={handleUseSkill}
             drop={currentDrop}
             result={battleResult}
             leveledUpCount={leveledUpCount}
@@ -314,6 +351,7 @@ function CreateScene({
                     </div>
                     <div style={{ fontSize: 8, lineHeight: 2, textAlign: 'left', color: '#bbb' }}>
                       <div>HP：<span style={{ color: '#4ADE80' }}>{s.hp}</span></div>
+                      <div>MP：<span style={{ color: '#60A5FA' }}>{s.mp}</span></div>
                       <div>ATK：<span style={{ color: '#F87171' }}>{s.atk}</span></div>
                       <div>DEF：<span style={{ color: '#60A5FA' }}>{s.def}</span></div>
                       <div>SPD：<span style={{ color: '#34D399' }}>{s.spd}</span></div>

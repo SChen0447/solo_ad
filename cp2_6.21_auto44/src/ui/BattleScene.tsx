@@ -11,6 +11,7 @@ interface BattleSceneProps {
   battleState: IBattleState;
   heroClass: string;
   onAction: (action: BattleAction) => void;
+  onUseSkill: (skillId: string) => void;
   onBattleEnd?: (result: IBattleResult) => void;
   drop?: IEquipment | null;
   result?: IBattleResult | null;
@@ -96,6 +97,22 @@ function HpBar({ current, max, label }: { current: number; max: number; label?: 
   );
 }
 
+function MpBar({ current, max }: { current: number; max: number }) {
+  const ratio = Math.max(0, Math.min(1, current / max));
+  const bg = '#60A5FA';
+  return (
+    <div style={{ minWidth: 220 }}>
+      <div style={{ fontSize: 9, marginBottom: 4, display: 'flex', justifyContent: 'space-between' }}>
+        <span>MP</span>
+        <span style={{ color: bg }}>{current}/{max}</span>
+      </div>
+      <div className="hp-bar-container" style={{ height: 10 }}>
+        <div className="hp-bar-fill" style={{ width: `${ratio * 100}%`, background: `linear-gradient(90deg, ${bg}, ${bg}dd)` }} />
+      </div>
+    </div>
+  );
+}
+
 function adjustColor(hex: string, amount: number): string {
   const num = parseInt(hex.replace('#', ''), 16);
   let r = (num >> 16) + amount;
@@ -109,7 +126,7 @@ function adjustColor(hex: string, amount: number): string {
 
 export default function BattleScene(props: BattleSceneProps) {
   const {
-    battleState, heroClass, onAction, drop, result, leveledUpCount = 0,
+    battleState, heroClass, onAction, onUseSkill, drop, result, leveledUpCount = 0,
     onContinue, onRest, onRetry,
   } = props;
 
@@ -234,6 +251,9 @@ export default function BattleScene(props: BattleSceneProps) {
               <PixelSprite sprite={heroSprite} colors={heroColors as any} size={8} />
             </div>
             <HpBar current={battleState.hero.hp} max={battleState.hero.maxHp} label="HP" />
+            <div style={{ marginTop: 6 }}>
+              <MpBar current={battleState.hero.mp} max={battleState.hero.maxMp} />
+            </div>
             {battleState.isDefending && (
               <div style={{ marginTop: 8, fontSize: 9, color: '#60A5FA', animation: 'bounce 0.5s ease infinite' }}>
                 🛡 防御中
@@ -281,36 +301,70 @@ export default function BattleScene(props: BattleSceneProps) {
             </div>
           </div>
 
-          <div style={{ minWidth: 280 }}>
+          <div style={{ minWidth: 280, maxWidth: 320 }}>
             <div style={{ fontSize: 9, color: '#FFD700', marginBottom: 12 }}>
               {battleState.phase === 'player' ? '⚔ 你的回合 - 选择行动' :
                battleState.phase === 'enemy' ? '⏳ 敌方回合中...' :
                battleState.phase === 'victory' ? '🎉 胜利！' : '💀 战败！'}
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               <button
                 className="btn btn-wide"
                 disabled={isBusy}
                 onClick={() => onAction('attack')}
-                style={{ background: '#B91C1C', borderColor: '#DC2626', width: '100%', height: 44 }}
-              >🗡 攻击</button>
+                style={{ background: '#B91C1C', borderColor: '#DC2626', width: '100%', height: 38, fontSize: 9 }}
+              >🗡 普通攻击</button>
               <button
                 className="btn btn-wide"
                 disabled={isBusy}
                 onClick={() => onAction('defend')}
-                style={{ background: '#1E40AF', borderColor: '#3B82F6', width: '100%', height: 44 }}
+                style={{ background: '#1E40AF', borderColor: '#3B82F6', width: '100%', height: 38, fontSize: 9 }}
               >🛡 防御</button>
               <button
                 className="btn btn-wide"
                 disabled={isBusy || battleState.hero.potions <= 0}
                 onClick={() => onAction('potion')}
-                style={{ background: '#166534', borderColor: '#22C55E', width: '100%', height: 44 }}
+                style={{ background: '#166534', borderColor: '#22C55E', width: '100%', height: 38, fontSize: 9 }}
               >🧪 治疗药水（{battleState.hero.potions}瓶）</button>
             </div>
-            <div style={{ marginTop: 16, fontSize: 9, color: '#666', lineHeight: 1.8 }}>
+            <div style={{ marginTop: 14 }}>
+              <div style={{ fontSize: 9, color: '#C084FC', marginBottom: 8 }}>✨ 技能</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {battleState.hero.skills.map((skill: any) => {
+                  const canUse = !isBusy && battleState.hero.mp >= skill.mpCost;
+                  const skillColor = skill.type === 'attack' ? '#DC2626' :
+                                     skill.type === 'heal' ? '#16A34A' : '#7C3AED';
+                  return (
+                    <button
+                      key={skill.id}
+                      className="btn"
+                      disabled={!canUse}
+                      onClick={() => onUseSkill(skill.id)}
+                      title={skill.description}
+                      style={{
+                        width: '100%',
+                        height: 38,
+                        fontSize: 8,
+                        background: canUse ? skillColor : '#374151',
+                        borderColor: canUse ? skillColor : '#4B5563',
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        padding: '0 10px',
+                      }}
+                    >
+                      <span>{skill.type === 'attack' ? '⚔' : skill.type === 'heal' ? '💚' : '✨'} {skill.name}</span>
+                      <span style={{ color: '#60A5FA', fontSize: 8 }}>MP {skill.mpCost}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+            <div style={{ marginTop: 14, fontSize: 8, color: '#666', lineHeight: 1.8 }}>
               <div>⚔ 攻击：对敌方造成伤害</div>
-              <div>🛡 防御：本回合大幅减伤（2.5倍DEF）</div>
-              <div>🧪 药水：恢复30HP（单场上限3瓶）</div>
+              <div>🛡 防御：本回合大幅减伤</div>
+              <div>🧪 药水：恢复30HP</div>
+              <div>✨ 技能：消耗MP释放强力技能</div>
             </div>
           </div>
         </div>
@@ -328,7 +382,7 @@ function DropEquipmentCard({ eq }: { eq: IEquipment }) {
       className="equipment-card drop-animation"
       style={{
         background: gradient,
-        width: 140,
+        width: 160,
         padding: 12,
       }}
     >
@@ -336,7 +390,17 @@ function DropEquipmentCard({ eq }: { eq: IEquipment }) {
         {eq.name}
       </div>
       <div style={{ fontSize: 9, textAlign: 'center' }}>
-        {bonuses.map((b, i) => <div key={i} style={{ margin: '4px 0' }}>{b}</div>)}
+        {bonuses.map((b, i) => <div key={i} style={{ margin: '3px 0' }}>{b}</div>)}
+        {eq.skills && eq.skills.length > 0 && (
+          <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px dashed rgba(255,255,255,0.3)' }}>
+            <div style={{ fontSize: 8, marginBottom: 4, color: '#FFD700' }}>✨ 附带技能</div>
+            {eq.skills.map((s, i) => (
+              <div key={i} style={{ fontSize: 8, margin: '2px 0' }}>
+                {s.name} (MP{s.mpCost})
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

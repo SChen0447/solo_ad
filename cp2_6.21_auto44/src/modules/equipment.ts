@@ -12,7 +12,16 @@ export interface IEquipment {
     spd?: number;
     hp?: number;
     matk?: number;
+    mp?: number;
   };
+  skills?: Array<{
+    id: string;
+    name: string;
+    type: 'attack' | 'heal' | 'buff';
+    power: number;
+    mpCost: number;
+    description: string;
+  }>;
 }
 
 export const QUALITY_CONFIG: Record<Quality, {
@@ -31,28 +40,45 @@ export const EQUIPMENT_CONFIG: Record<EquipmentType, {
   label: string;
   names: string[];
   bonusKeys: (keyof IEquipment['bonus'])[];
+  skillPool?: IEquipment['skills'];
 }> = {
   weapon: {
     label: '武器',
     names: ['铁剑', '战斧', '长弓', '法杖', '匕首', '巨锤', '双刀', '魔法书'],
     bonusKeys: ['atk', 'matk', 'spd'],
+    skillPool: [
+      { id: 'flame_slash', name: '烈焰斩', type: 'attack', power: 2.4, mpCost: 18, description: '附着火焰的斩击，造成2.4倍伤害' },
+      { id: 'ice_arrow', name: '冰箭术', type: 'attack', power: 2.1, mpCost: 14, description: '射出冰箭，造成2.1倍魔法伤害' },
+      { id: 'thunder_strike', name: '雷霆一击', type: 'attack', power: 2.8, mpCost: 22, description: '召唤雷电，造成2.8倍攻击伤害' },
+    ],
   },
   helmet: {
     label: '头盔',
     names: ['铁盔', '皮帽', '法师冠', '兜帽', '王冠', '龙鳞盔'],
-    bonusKeys: ['def', 'hp', 'matk'],
+    bonusKeys: ['def', 'hp', 'mp'],
   },
   armor: {
     label: '铠甲',
     names: ['锁子甲', '皮甲', '法袍', '板甲', '龙鳞甲', '隐身衣'],
     bonusKeys: ['def', 'hp', 'atk'],
+    skillPool: [
+      { id: 'iron_wall', name: '铁壁', type: 'buff', power: 2, mpCost: 15, description: '本回合防御力翻倍' },
+    ],
   },
   boots: {
     label: '靴子',
     names: ['皮靴', '铁靴', '疾风靴', '魔法鞋', '龙皮靴', '暗影靴'],
-    bonusKeys: ['spd', 'def', 'hp'],
+    bonusKeys: ['spd', 'def', 'mp'],
+    skillPool: [
+      { id: 'dash', name: '疾步', type: 'buff', power: 1.5, mpCost: 8, description: '提升50%速度（暂未实现）' },
+    ],
   },
 };
+
+const HEAL_SKILL_POOL = [
+  { id: 'regen', name: '生命回复', type: 'heal', power: 45, mpCost: 12, description: '消耗12MP，恢复45点HP' },
+  { id: 'mass_heal', name: '大治愈', type: 'heal', power: 80, mpCost: 25, description: '消耗25MP，恢复80点HP' },
+];
 
 export const INVENTORY_LIMIT = 10;
 
@@ -95,9 +121,19 @@ export function generateEquipment(monsterLevel: number = 1, forceType?: Equipmen
   }
   if (quality === 'legendary' || quality === 'epic') {
     if (Math.random() < 0.5) {
-      const extra: (keyof IEquipment['bonus'])[] = ['hp', 'def', 'atk', 'spd', 'matk'];
-      const ek = extra[randInt(0, 4)];
+      const extra: (keyof IEquipment['bonus'])[] = ['hp', 'def', 'atk', 'spd', 'matk', 'mp'];
+      const ek = extra[randInt(0, 5)];
       if (!bonus[ek]) bonus[ek] = Math.round(randInt(2, 5) * lvlMul);
+    }
+  }
+  let skills: IEquipment['skills'] | undefined;
+  if ((quality === 'legendary' || quality === 'epic') && cfg.skillPool && cfg.skillPool.length > 0) {
+    const skillChance = quality === 'legendary' ? 0.8 : 0.5;
+    if (Math.random() < skillChance) {
+      const pool = [...cfg.skillPool];
+      if (Math.random() < 0.3) pool.push(...HEAL_SKILL_POOL);
+      const skill = pool[randInt(0, pool.length - 1)];
+      skills = [skill];
     }
   }
   const prefix = qCfg.name;
@@ -107,6 +143,7 @@ export function generateEquipment(monsterLevel: number = 1, forceType?: Equipmen
     type,
     quality,
     bonus,
+    skills,
   };
 }
 
@@ -168,6 +205,7 @@ export function formatBonus(bonus: IEquipment['bonus']): string[] {
     spd: '速度',
     hp: '生命',
     matk: '魔攻',
+    mp: '魔法',
   };
   const parts: string[] = [];
   Object.entries(bonus).forEach(([k, v]) => {

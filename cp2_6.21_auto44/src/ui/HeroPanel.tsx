@@ -67,6 +67,21 @@ function HpBar({ current, max }: { current: number; max: number }) {
   );
 }
 
+function MpBar({ current, max }: { current: number; max: number }) {
+  const ratio = Math.max(0, Math.min(1, current / max));
+  const bg = '#60A5FA';
+  return (
+    <div style={{ marginTop: 6 }}>
+      <div style={{ fontSize: 8, marginBottom: 4, display: 'flex', justifyContent: 'space-between' }}>
+        <span>MP</span><span style={{ color: bg }}>{current}/{max}</span>
+      </div>
+      <div className="hp-bar-container" style={{ height: 10 }}>
+        <div className="hp-bar-fill" style={{ width: `${ratio * 100}%`, background: bg }} />
+      </div>
+    </div>
+  );
+}
+
 function PixelSprite({ sprite, colors, size = 5 }: { sprite: number[][]; colors: Record<string, string>; size?: number }) {
   const colorMap = { 0: 'transparent', ...colors } as Record<number, string>;
   return (
@@ -107,6 +122,16 @@ function EquipmentCard({
       <div style={{ fontSize: small ? 6 : 7, opacity: 0.9 }}>
         {bonuses.map((b, i) => <div key={i} style={{ margin: '2px 0' }}>{b}</div>)}
       </div>
+      {eq.skills && eq.skills.length > 0 && (
+        <div style={{ marginTop: 4, paddingTop: 4, borderTop: '1px dashed rgba(255,255,255,0.3)' }}>
+          <div style={{ fontSize: small ? 5.5 : 6.5, color: '#FFD700', marginBottom: 2 }}>✨技能</div>
+          {eq.skills.map((s, i) => (
+            <div key={i} style={{ fontSize: small ? 5.5 : 6.5 }}>
+              {s.name}
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -193,6 +218,7 @@ export default function HeroPanel(props: HeroPanelProps) {
             </div>
             <div style={{ width: 160, marginTop: 8 }}>
               <HpBar current={hero.hp} max={hero.maxHp} />
+              <MpBar current={hero.mp} max={hero.maxMp} />
             </div>
             <div style={{ marginTop: 8, fontSize: 9, color: '#999' }}>
               EXP: {hero.exp} / {hero.expToNext}
@@ -288,6 +314,37 @@ export default function HeroPanel(props: HeroPanelProps) {
               </div>
             );
           })}
+        </div>
+
+        <div style={{ marginBottom: 16 }}>
+          <div style={{ fontSize: 11, color: '#FFD700', marginBottom: 10 }}>✨ 技能列表</div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 8 }}>
+            {hero.skills.map((skill: any) => (
+              <div
+                key={skill.id}
+                style={{
+                  background: '#0D0D0D',
+                  border: '1px solid #333',
+                  padding: '8px 10px',
+                  borderRadius: 4,
+                  borderLeft: `3px solid ${skill.type === 'attack' ? '#DC2626' : skill.type === 'heal' ? '#16A34A' : '#7C3AED'}`,
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                  <span style={{ fontSize: 9, fontWeight: 'bold' }}>
+                    {skill.type === 'attack' ? '⚔' : skill.type === 'heal' ? '💚' : '✨'} {skill.name}
+                  </span>
+                  <span style={{ fontSize: 8, color: '#60A5FA' }}>MP {skill.mpCost}</span>
+                </div>
+                <div style={{ fontSize: 8, color: '#999', lineHeight: 1.5 }}>
+                  {skill.description}
+                </div>
+                {skill.fromEquipment && (
+                  <div style={{ fontSize: 7, color: '#A78BFA', marginTop: 4 }}>（装备附带）</div>
+                )}
+              </div>
+            ))}
+          </div>
         </div>
 
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
