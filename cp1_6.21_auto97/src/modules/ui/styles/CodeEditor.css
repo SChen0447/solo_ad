@@ -1,0 +1,39 @@
+.code-editor-wrapper {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  background: var(--bg-editor);
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.code-editor-wrapper::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, 
+    var(--accent-primary), 
+    var(--success), 
+    var(--accent-primary)
+  );
+  background-size: 200% 100%;
+  animation: gradient-shift 3s ease infinite;
+  z-index: 10;
+  opacity: 0.8;
+}
+
+@keyframes gradient-shift {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
