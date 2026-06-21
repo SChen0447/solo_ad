@@ -1,0 +1,83 @@
+[
+  {
+    "id": "water",
+    "name": "水",
+    "formula": "H₂O",
+    "atoms": [
+      {"id": "o1", "element": "O", "x": 0, "y": 0, "z": 0, "index": 1},
+      {"id": "h1", "element": "H", "x": 0.957, "y": 0, "z": 0, "index": 2},
+      {"id": "h2", "element": "H", "x": -0.239, "y": 0.927, "z": 0, "index": 3}
+    ],
+    "bonds": [
+      {"id": "b1", "atom1Id": "o1", "atom2Id": "h1", "order": 1},
+      {"id": "b2", "atom1Id": "o1", "atom2Id": "h2", "order": 1}
+    ]
+  },
+  {
+    "id": "methane",
+    "name": "甲烷",
+    "formula": "CH₄",
+    "atoms": [
+      {"id": "c1", "element": "C", "x": 0, "y": 0, "z": 0, "index": 1},
+      {"id": "h1", "element": "H", "x": 1.089, "y": 0, "z": 0, "index": 2},
+      {"id": "h2", "element": "H", "x": -0.363, "y": 1.027, "z": 0, "index": 3},
+      {"id": "h3", "element": "H", "x": -0.363, "y": -0.513, "z": 0.889, "index": 4},
+      {"id": "h4", "element": "H", "x": -0.363, "y": -0.513, "z": -0.889, "index": 5}
+    ],
+    "bonds": [
+      {"id": "b1", "atom1Id": "c1", "atom2Id": "h1", "order": 1},
+      {"id": "b2", "atom1Id": "c1", "atom2Id": "h2", "order": 1},
+      {"id": "b3", "atom1Id": "c1", "atom2Id": "h3", "order": 1},
+      {"id": "b4", "atom1Id": "c1", "atom2Id": "h4", "order": 1}
+    ]
+  },
+  {
+    "id": "ammonia",
+    "name": "氨气",
+    "formula": "NH₃",
+    "atoms": [
+      {"id": "n1", "element": "N", "x": 0, "y": 0, "z": 0, "index": 1},
+      {"id": "h1", "element": "H", "x": 1.012, "y": 0, "z": 0, "index": 2},
+      {"id": "h2", "element": "H", "x": -0.337, "y": 0.954, "z": 0, "index": 3},
+      {"id": "h3", "element": "H", "x": -0.337, "y": -0.477, "z": 0.827, "index": 4}
+    ],
+    "bonds": [
+      {"id": "b1", "atom1Id": "n1", "atom2Id": "h1", "order": 1},
+      {"id": "b2", "atom1Id": "n1", "atom2Id": "h2", "order": 1},
+      {"id": "b3", "atom1Id": "n1", "atom2Id": "h3", "order": 1}
+    ]
+  },
+  {
+    "id": "benzene",
+    "name": "苯",
+    "formula": "C₆H₆",
+    "atoms": [
+      {"id": "c1", "element": "C", "x": 1.39, "y": 0, "z": 0, "index": 1},
+      {"id": "c2", "element": "C", "x": 0.695, "y": 1.203, "z": 0, "index": 2},
+      {"id": "c3", "element": "C", "x": -0.695, "y": 1.203, "z": 0, "index": 3},
+      {"id": "c4", "element": "C", "x": -1.39, "y": 0, "z": 0, "index": 4},
+      {"id": "c5", "element": "C", "x": -0.695, "y": -1.203, "z": 0, "index": 5},
+      {"id": "c6", "element": "C", "x": 0.695, "y": -1.203, "z": 0, "index": 6},
+      {"id": "h1", "element": "H", "x": 2.47, "y": 0, "z": 0, "index": 7},
+      {"id": "h2", "element": "H", "x": 1.235, "y": 2.137, "z": 0, "index": 8},
+      {"id": "h3", "element": "H", "x": -1.235, "y": 2.137, "z": 0, "index": 9},
+      {"id": "h4", "element": "H", "x": -2.47, "y": 0, "z": 0, "index": 10},
+      {"id": "h5", "element": "H", "x": -1.235, "y": -2.137, "z": 0, "index": 11},
+      {"id": "h6", "element": "H", "x": 1.235, "y": -2.137, "z": 0, "index": 12}
+    ],
+    "bonds": [
+      {"id": "b1", "atom1Id": "c1", "atom2Id": "c2", "order": 1.5},
+      {"id": "b2", "atom1Id": "c2", "atom2Id": "c3", "order": 1.5},
+      {"id": "b3", "atom1Id": "c3", "atom2Id": "c4", "order": 1.5},
+      {"id": "b4", "atom1Id": "c4", "atom2Id": "c5", "order": 1.5},
+      {"id": "b5", "atom1Id": "c5", "atom2Id": "c6", "order": 1.5},
+      {"id": "b6", "atom1Id": "c6", "atom2Id": "c1", "order": 1.5},
+      {"id": "b7", "atom1Id": "c1", "atom2Id": "h1", "order": 1},
+      {"id": "b8", "atom1Id": "c2", "atom2Id": "h2", "order": 1},
+      {"id": "b9", "atom1Id": "c3", "atom2Id": "h3", "order": 1},
+      {"id": "b10", "atom1Id": "c4", "atom2Id": "h4", "order": 1},
+      {"id": "b11", "atom1Id": "c5", "atom2Id": "h5", "order": 1},
+      {"id": "b12", "atom1Id": "c6", "atom2Id": "h6", "order": 1}
+    ]
+  }
+]
