@@ -1,0 +1,123 @@
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  color: #6b3a55;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-family: "PingFang SC", "Microsoft YaHei", "Hiragino Sans GB", "Segoe UI",
+    system-ui, -apple-system, sans-serif;
+}
+
+body {
+  background: linear-gradient(180deg, #fff5e6 0%, #ffe8ee 100%);
+  min-height: 100vh;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(255, 245, 230, 0.5);
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: linear-gradient(135deg, #e8a0bf 0%, #d48aa6 100%);
+  border-radius: 10px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(135deg, #d48aa6 0%, #c26a92 100%);
+  background-clip: padding-box;
+  border: 2px solid transparent;
+}
+
+::selection {
+  background: rgba(232, 160, 191, 0.35);
+  color: #8b4a6b;
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+  border-color: rgba(232, 160, 191, 0.8) !important;
+}
+
+@media (max-width: 768px) {
+  header {
+    padding: 18px 14px 0 !important;
+  }
+
+  main {
+    padding: 18px 14px 32px !important;
+  }
+
+  h1 {
+    font-size: 20px !important;
+  }
+
+  nav {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  nav button {
+    flex: 1;
+    justify-content: center;
+    padding: 9px 12px !important;
+    font-size: 13px !important;
+  }
+
+  .shift-calendar-grid {
+    grid-template-columns: 1fr !important;
+    grid-auto-flow: row !important;
+  }
+
+  .shift-calendar-grid > div:nth-child(n + 1):nth-child(-n + 7) {
+    display: none;
+  }
+
+  .shift-calendar-grid > div {
+    min-height: auto !important;
+    padding: 12px !important;
+  }
+
+  .shift-calendar-grid > div[style*="grid-template-columns"] {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+@media (max-width: 768px) {
+  div[style*="grid-template-columns: repeat(7"] {
+    grid-template-columns: 1fr !important;
+  }
+
+  div[style*="grid-template-columns: repeat(7"]
+    > div:nth-child(n + 1):nth-child(-n + 7) {
+    display: none !important;
+  }
+
+  div[style*="grid-template-columns: repeat(auto-fill, minmax(340px"] {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}

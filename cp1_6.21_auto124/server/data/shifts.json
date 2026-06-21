@@ -1,0 +1,47 @@
+[
+  {
+    "id": "73484c81-a7f4-457e-8efb-eb910f3d2149",
+    "employeeId": "1dfbd74f-b6a0-4e17-8857-ef75fc05533c",
+    "employeeName": "小美",
+    "shiftType": "morning",
+    "date": "2026-06-21",
+    "note": "整理新到货的玫瑰"
+  },
+  {
+    "id": "119bdd2a-96d0-4eab-9ef0-5da2e93e516c",
+    "employeeId": "522e8891-4f6f-434f-9c24-d007abcc330a",
+    "employeeName": "阿琳",
+    "shiftType": "afternoon",
+    "date": "2026-06-21"
+  },
+  {
+    "id": "0052d142-1935-4405-9044-981cd4da3c3d",
+    "employeeId": "eb07a791-d9e2-4845-801f-5c9ae8d91cf3",
+    "employeeName": "莉莉",
+    "shiftType": "evening",
+    "date": "2026-06-21",
+    "note": "盘点库存"
+  },
+  {
+    "id": "9e469d07-ba13-4193-9c62-16463c2a7af3",
+    "employeeId": "1dfbd74f-b6a0-4e17-8857-ef75fc05533c",
+    "employeeName": "小美",
+    "shiftType": "morning",
+    "date": "2026-06-22"
+  },
+  {
+    "id": "91b0e20d-06c2-4636-80c5-733ead47a027",
+    "employeeId": "256b196b-a60b-434c-b41a-030e5b99da94",
+    "employeeName": "晓雯",
+    "shiftType": "afternoon",
+    "date": "2026-06-23",
+    "note": "大型婚礼花束订单"
+  },
+  {
+    "id": "03a21e1f-ac95-4280-a9f8-36b68d61b452",
+    "employeeId": "522e8891-4f6f-434f-9c24-d007abcc330a",
+    "employeeName": "阿琳",
+    "shiftType": "morning",
+    "date": "2026-06-24"
+  }
+]

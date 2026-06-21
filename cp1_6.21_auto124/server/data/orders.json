@@ -1,0 +1,42 @@
+[
+  {
+    "id": "e8eb4f48-7532-462f-993e-7acfa8bc06b4",
+    "customerName": "张女士",
+    "bouquetName": "浪漫红玫瑰花束",
+    "purchaseDate": "2026-06-18",
+    "quote": "花语传情，感谢你成为我们的贵客~",
+    "isFavorite": true
+  },
+  {
+    "id": "58249635-9b41-46e2-9364-dd3810839550",
+    "customerName": "李先生",
+    "bouquetName": "向日葵阳光花篮",
+    "purchaseDate": "2026-06-19",
+    "quote": "感谢你选择花语轩，愿美好常伴你左右！",
+    "isFavorite": false
+  },
+  {
+    "id": "65e6ac97-626d-4740-8b9f-0ed8efd0d350",
+    "customerName": "王小姐",
+    "bouquetName": "粉色满天星花束",
+    "purchaseDate": "2026-06-20",
+    "quote": "每一朵花都承载着我们最真挚的祝福~",
+    "isFavorite": false
+  },
+  {
+    "id": "515c610e-ed2f-4bb5-94a9-003fc7dd3705",
+    "customerName": "陈阿姨",
+    "bouquetName": "康乃馨温馨礼盒",
+    "purchaseDate": "2026-06-21",
+    "quote": "感谢遇见，愿花香常驻你心间 💐",
+    "isFavorite": false
+  },
+  {
+    "id": "13f5afe0-5a9f-4c90-acb8-290c36caec45",
+    "customerName": "林先生",
+    "bouquetName": "白百合纯洁花束",
+    "purchaseDate": "2026-06-21",
+    "quote": "愿你的每一天都像盛开的花朵一样美丽 ✨",
+    "isFavorite": true
+  }
+]
