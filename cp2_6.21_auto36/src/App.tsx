@@ -43,6 +43,7 @@ export const App: React.FC = () => {
   const [toast, setToast] = useState<string | null>(null);
   const [panelOpen, setPanelOpen] = useState(false);
   const [renderTick, setRenderTick] = useState(0);
+  const [uploadFlash, setUploadFlash] = useState(false);
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const cardCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -66,12 +67,15 @@ export const App: React.FC = () => {
   const handleFontUpload = useCallback(async (file: File) => {
     setLoading(true);
     setFontError(null);
+    setUploadFlash(false);
     try {
       const data = await loadFontFile(file);
       await registerFontFace(data);
       setFontData(data);
       setFontFamily(data.fontFamilyName);
       setFontError(null);
+      setUploadFlash(true);
+      setTimeout(() => setUploadFlash(false), 1000);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : '文件格式不支持或解析失败';
       setFontError(message);
@@ -89,6 +93,21 @@ export const App: React.FC = () => {
     setToast(msg);
     setTimeout(() => setToast(null), 2000);
   }, []);
+
+  const handleClearFont = useCallback(() => {
+    if (fontData) {
+      const existingFont = document.fonts as FontFaceSet;
+      for (const f of Array.from(existingFont)) {
+        if ((f as FontFace).family === fontData.fontFamilyName) {
+          document.fonts.delete(f as FontFace);
+        }
+      }
+    }
+    setFontData(null);
+    setFontFamily('sans-serif');
+    setFontError(null);
+    setUploadFlash(false);
+  }, [fontData]);
 
   const handleGenerateCard = useCallback(() => {
     const cardCanvas = cardCanvasRef.current;
@@ -260,7 +279,9 @@ export const App: React.FC = () => {
         loading={loading}
         controls={controls}
         text={text}
+        uploadFlash={uploadFlash}
         onFontUpload={handleFontUpload}
+        onClearFont={handleClearFont}
         onControlChange={handleControlChange}
         onTextChange={handleTextChange}
         onGenerateCard={handleGenerateCard}

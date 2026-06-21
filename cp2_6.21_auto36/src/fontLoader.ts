@@ -5,6 +5,9 @@ export interface FontMeta {
   styleName: string;
   glyphCount: number;
   supportedRange: string;
+  hasChinese: boolean;
+  fileName: string;
+  fileSize: number;
   unitsPerEm: number;
   ascender: number;
   descender: number;
@@ -20,6 +23,20 @@ export interface FontData {
 }
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024;
+
+function detectChineseSupport(font: opentype.Font): boolean {
+  const cjkStart = 0x4E00;
+  const cjkEnd = 0x9FFF;
+  let found = 0;
+  for (let i = 0; i < font.glyphs.length; i++) {
+    const glyph = font.glyphs.get(i);
+    if (glyph.unicode !== undefined && glyph.unicode >= cjkStart && glyph.unicode <= cjkEnd) {
+      found++;
+      if (found >= 10) return true;
+    }
+  }
+  return false;
+}
 
 function getSupportedRange(font: opentype.Font): string {
   const unicodes: number[] = [];
@@ -81,6 +98,9 @@ export async function loadFontFile(file: File): Promise<FontData> {
         styleName: 'Regular',
         glyphCount: 0,
         supportedRange: 'WOFF2 (需浏览器解码)',
+        hasChinese: false,
+        fileName: file.name,
+        fileSize: file.size,
         unitsPerEm: 1000,
         ascender: 800,
         descender: -200,
@@ -105,6 +125,9 @@ export async function loadFontFile(file: File): Promise<FontData> {
     styleName: styleName as string,
     glyphCount: parsedFont.glyphs.length,
     supportedRange: getSupportedRange(parsedFont),
+    hasChinese: detectChineseSupport(parsedFont),
+    fileName: file.name,
+    fileSize: file.size,
     unitsPerEm: parsedFont.unitsPerEm,
     ascender: parsedFont.ascender,
     descender: parsedFont.descender,
@@ -118,6 +141,12 @@ export async function loadFontFile(file: File): Promise<FontData> {
     arrayBuffer: arrayBuffer.slice(0),
     fontFormat: ext === 'woff2' ? 'woff2' : 'truetype',
   };
+}
+
+export function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
 }
 
 export async function registerFontFace(fontData: FontData): Promise<void> {

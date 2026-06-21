@@ -1,5 +1,5 @@
 import React, { useCallback, useRef } from 'react';
-import { FontData } from './fontLoader';
+import { FontData, formatFileSize } from './fontLoader';
 
 export interface TypesetControls {
   fontSize: number;
@@ -16,7 +16,9 @@ interface ControlsProps {
   loading: boolean;
   controls: TypesetControls;
   text: string;
+  uploadFlash: boolean;
   onFontUpload: (file: File) => void;
+  onClearFont: () => void;
   onControlChange: (controls: Partial<TypesetControls>) => void;
   onTextChange: (text: string) => void;
   onGenerateCard: () => void;
@@ -68,7 +70,9 @@ export const Controls: React.FC<ControlsProps> = ({
   loading,
   controls,
   text,
+  uploadFlash,
   onFontUpload,
+  onClearFont,
   onControlChange,
   onTextChange,
   onGenerateCard,
@@ -131,18 +135,57 @@ export const Controls: React.FC<ControlsProps> = ({
     }
 
     if (fontData) {
+      const chineseLabel = fontData.meta.hasChinese ? '包含中文' : '仅支持西文';
       return (
         <div style={{
           width: '100%',
           padding: 12,
           borderRadius: 8,
           background: '#F5F5F5',
+          position: 'relative',
         }}>
-          <div style={{ fontSize: 16, fontWeight: 600, color: '#333', marginBottom: 4 }}>
+          <button
+            onClick={onClearFont}
+            className="btn-action"
+            title="清除字体"
+            style={{
+              position: 'absolute',
+              top: 8,
+              right: 8,
+              width: 20,
+              height: 20,
+              borderRadius: '50%',
+              border: 'none',
+              background: '#E0E0E0',
+              color: '#666',
+              fontSize: 11,
+              lineHeight: '20px',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: 0,
+              transition: 'all 0.15s',
+            }}
+            onMouseEnter={e => {
+              e.currentTarget.style.background = '#D32F2F';
+              e.currentTarget.style.color = '#FFF';
+            }}
+            onMouseLeave={e => {
+              e.currentTarget.style.background = '#E0E0E0';
+              e.currentTarget.style.color = '#666';
+            }}
+          >
+            ✕
+          </button>
+          <div style={{ fontSize: 16, fontWeight: 600, color: '#333', marginBottom: 4, paddingRight: 24 }}>
             {fontData.meta.familyName}
           </div>
           <div style={{ fontSize: 12, color: '#666', lineHeight: 1.6 }}>
-            {fontData.meta.styleName} · {fontData.meta.glyphCount} 字形 · {fontData.meta.supportedRange}
+            {fontData.meta.styleName} · {fontData.meta.glyphCount} 字形 · {chineseLabel}
+          </div>
+          <div style={{ fontSize: 12, color: '#999', lineHeight: 1.6, marginTop: 2 }}>
+            {fontData.meta.fileName} · {formatFileSize(fontData.meta.fileSize)}
           </div>
         </div>
       );
@@ -169,14 +212,14 @@ export const Controls: React.FC<ControlsProps> = ({
 
       <button
         onClick={() => fileInputRef.current?.click()}
-        className="btn-action"
+        className={`btn-action ${uploadFlash ? 'upload-flash' : ''}`}
         style={{
           width: '100%',
           height: 36,
           borderRadius: 6,
-          border: '1px dashed #1976D2',
-          background: 'transparent',
-          color: '#1976D2',
+          border: `1px dashed ${uploadFlash ? '#4CAF50' : '#1976D2'}`,
+          background: uploadFlash ? 'rgba(76, 175, 80, 0.08)' : 'transparent',
+          color: uploadFlash ? '#4CAF50' : '#1976D2',
           fontSize: 13,
           cursor: 'pointer',
           transition: 'all 0.15s',
