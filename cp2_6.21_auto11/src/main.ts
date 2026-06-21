@@ -84,37 +84,61 @@ gui.add(params, 'reset').name('重置');
 
 const raycaster = new THREE.Raycaster();
 const mouse = new THREE.Vector2();
-let isMouseOnCanvas = false;
 
-renderer.domElement.addEventListener('mousemove', (event: MouseEvent) => {
+function updateMouseHover(event: MouseEvent): void {
   mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
   mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
-  isMouseOnCanvas = true;
 
   raycaster.setFromCamera(mouse, camera);
-  const direction = raycaster.ray.direction;
   const origin = raycaster.ray.origin;
+  const dir = raycaster.ray.direction;
 
-  const t = (2 - origin.y) / direction.y;
-  if (t > 0) {
-    const hitPoint = new THREE.Vector3(
-      origin.x + direction.x * t,
-      origin.y + direction.y * t,
-      origin.z + direction.z * t
-    );
-    const dist = Math.sqrt(hitPoint.x * hitPoint.x + hitPoint.z * hitPoint.z);
-    if (dist < 3 && hitPoint.y > -1 && hitPoint.y < 8) {
-      flame.setMouseWorld(hitPoint);
-    } else {
-      flame.setMouseWorld(null);
-    }
+  const flameBase = new THREE.Vector3(0, -0.5, 0);
+  const toOrigin = new THREE.Vector3().subVectors(origin, flameBase);
+
+  const axisDir = new THREE.Vector3(0, 1, 0);
+  const proj = toOrigin.dot(axisDir);
+  const dirProj = dir.dot(axisDir);
+
+  if (Math.abs(dirProj) < 0.001) {
+    flame.setMouseWorld(null);
+    return;
+  }
+
+  const tClosest = -proj / dirProj;
+  if (tClosest < 0) {
+    flame.setMouseWorld(null);
+    return;
+  }
+
+  const closestPoint = new THREE.Vector3(
+    origin.x + dir.x * tClosest,
+    origin.y + dir.y * tClosest,
+    origin.z + dir.z * tClosest
+  );
+
+  if (closestPoint.y < -1.5 || closestPoint.y > 8) {
+    flame.setMouseWorld(null);
+    return;
+  }
+
+  const horizDist = Math.sqrt(closestPoint.x * closestPoint.x + closestPoint.z * closestPoint.z);
+  const baseWidth = flame.getParams().flameWidth;
+  const maxR = baseWidth * (1 - Math.max(0, Math.min(1, (closestPoint.y + 1) / 7)) * (1 - 0.5 / 1.5));
+  const threshold = Math.max(1.5, maxR + 0.5);
+
+  if (horizDist < threshold) {
+    flame.setMouseWorld(closestPoint);
   } else {
     flame.setMouseWorld(null);
   }
+}
+
+renderer.domElement.addEventListener('mousemove', (event: MouseEvent) => {
+  updateMouseHover(event);
 });
 
 renderer.domElement.addEventListener('mouseleave', () => {
-  isMouseOnCanvas = false;
   flame.setMouseWorld(null);
 });
 

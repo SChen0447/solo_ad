@@ -43,6 +43,8 @@ export function getFlameColor(lifeRatio: number, scheme: ColorScheme): THREE.Col
 }
 
 export function getFlameRadius(y: number, baseWidth: number): number {
-  const t = Math.max(0, Math.min(1, (y + 1) / 8));
-  return baseWidth * (1 - t * 0.667);
+  const flameHeight = 7;
+  const t = Math.max(0, Math.min(1, (y + 1) / flameHeight));
+  const topRatio = 0.5 / 1.5;
+  return baseWidth * (1 - t * (1 - topRatio));
 }

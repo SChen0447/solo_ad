@@ -73,6 +73,7 @@ export class Flame {
   private defaultTexture: THREE.Texture;
   private circleTexture: THREE.Texture;
   private usingCircleTexture: boolean = false;
+  private nextEmitIndex: number = 0;
 
   constructor(scene: THREE.Scene) {
     this.params = { ...DEFAULT_PARAMS };
@@ -121,9 +122,23 @@ export class Flame {
     this.glowMesh.position.y = -0.99;
     scene.add(this.glowMesh);
 
+    this.initializeParticles();
+    this.updateTextureForCount();
+  }
+
+  private initializeParticles(): void {
+    this.particles = [];
     for (let i = 0; i < this.params.particleCount; i++) {
-      this.particles.push(this.createParticle());
+      const p = this.createParticle();
+      p.age = Math.random() * p.maxLife;
+      p.life = p.age / p.maxLife;
+      const yAtAge = p.position.y + p.velocity.y * p.age;
+      const r = getFlameRadius(yAtAge, this.params.flameWidth) * Math.sqrt(Math.random());
+      const angle = Math.random() * Math.PI * 2;
+      p.position.set(Math.cos(angle) * r, yAtAge, Math.sin(angle) * r);
+      this.particles.push(p);
     }
+    this.nextEmitIndex = 0;
   }
 
   private createDefaultTexture(): THREE.Texture {
@@ -134,8 +149,8 @@ export class Flame {
     const ctx = canvas.getContext('2d')!;
     const gradient = ctx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
     gradient.addColorStop(0, 'rgba(255,255,255,1)');
-    gradient.addColorStop(0.3, 'rgba(255,255,255,0.8)');
-    gradient.addColorStop(0.7, 'rgba(255,255,255,0.3)');
+    gradient.addColorStop(0.3, 'rgba(255,255,255,0.85)');
+    gradient.addColorStop(0.7, 'rgba(255,255,255,0.4)');
     gradient.addColorStop(1, 'rgba(255,255,255,0)');
     ctx.fillStyle = gradient;
     ctx.fillRect(0, 0, size, size);
@@ -152,7 +167,7 @@ export class Flame {
     const ctx = canvas.getContext('2d')!;
     const gradient = ctx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
     gradient.addColorStop(0, 'rgba(255,255,255,1)');
-    gradient.addColorStop(0.4, 'rgba(255,255,255,0.6)');
+    gradient.addColorStop(0.5, 'rgba(255,255,255,0.7)');
     gradient.addColorStop(1, 'rgba(255,255,255,0)');
     ctx.fillStyle = gradient;
     ctx.fillRect(0, 0, size, size);
@@ -163,7 +178,7 @@ export class Flame {
 
   private createParticle(): Particle {
     const angle = Math.random() * Math.PI * 2;
-    const radius = Math.random() * this.params.flameWidth;
+    const radius = Math.sqrt(Math.random()) * this.params.flameWidth;
     const x = Math.cos(angle) * radius;
     const z = Math.sin(angle) * radius;
     const y = randomRange(-1, 0);
@@ -188,7 +203,7 @@ export class Flame {
 
   private resetParticle(p: Particle): void {
     const angle = Math.random() * Math.PI * 2;
-    const radius = Math.random() * this.params.flameWidth;
+    const radius = Math.sqrt(Math.random()) * this.params.flameWidth;
     p.position.set(
       Math.cos(angle) * radius,
       randomRange(-1, 0),
@@ -209,8 +224,31 @@ export class Flame {
     p.active = true;
   }
 
+  private emitBatch(count: number): void {
+    let emitted = 0;
+    const total = this.particles.length;
+    for (let tries = 0; tries < total * 2 && emitted < count; tries++) {
+      const idx = this.nextEmitIndex % total;
+      this.nextEmitIndex = (this.nextEmitIndex + 1) % total;
+      if (!this.particles[idx].active) {
+        this.resetParticle(this.particles[idx]);
+        emitted++;
+      }
+    }
+  }
+
+  private getBatchSize(): number {
+    const avgLifetime = 4.5;
+    return Math.max(1, Math.ceil(this.params.particleCount * this.params.emitInterval / avgLifetime));
+  }
+
   update(delta: number): void {
     this.emitTimer += delta;
+
+    while (this.emitTimer >= this.params.emitInterval) {
+      this.emitTimer -= this.params.emitInterval;
+      this.emitBatch(this.getBatchSize());
+    }
 
     const scheme: ColorScheme = COLOR_SCHEMES[this.params.colorScheme] || COLOR_SCHEMES['橙黄渐变'];
 
@@ -218,14 +256,14 @@ export class Flame {
       const p = this.particles[i];
 
       if (!p.active) {
-        if (this.emitTimer >= this.params.emitInterval) {
-          this.resetParticle(p);
-        }
         this.positions[i * 3] = 0;
         this.positions[i * 3 + 1] = -100;
         this.positions[i * 3 + 2] = 0;
         this.sizes[i] = 0;
         this.opacities[i] = 0;
+        this.colors[i * 3] = 0;
+        this.colors[i * 3 + 1] = 0;
+        this.colors[i * 3 + 2] = 0;
         continue;
       }
 
@@ -239,6 +277,9 @@ export class Flame {
         this.positions[i * 3 + 2] = 0;
         this.sizes[i] = 0;
         this.opacities[i] = 0;
+        this.colors[i * 3] = 0;
+        this.colors[i * 3 + 1] = 0;
+        this.colors[i * 3 + 2] = 0;
         continue;
       }
 
@@ -248,8 +289,8 @@ export class Flame {
 
       const maxR = getFlameRadius(p.position.y, this.params.flameWidth);
       const dist = Math.sqrt(p.position.x * p.position.x + p.position.z * p.position.z);
-      if (dist > maxR && dist > 0) {
-        const pull = (dist - maxR) * 2.0;
+      if (dist > maxR && dist > 0.0001) {
+        const pull = (dist - maxR) * 3.0;
         p.position.x -= (p.position.x / dist) * pull * delta;
         p.position.z -= (p.position.z / dist) * pull * delta;
       }
@@ -259,7 +300,7 @@ export class Flame {
         const dy = p.position.y - this.mouseWorld.y;
         const dz = p.position.z - this.mouseWorld.z;
         const distToMouse = Math.sqrt(dx * dx + dy * dy + dz * dz);
-        if (distToMouse < 1.5 && distToMouse > 0.01) {
+        if (distToMouse < 1.5 && distToMouse > 0.0001) {
           p.position.x += (dx / distToMouse) * 0.02;
           p.position.y += (dy / distToMouse) * 0.02;
           p.position.z += (dz / distToMouse) * 0.02;
@@ -273,9 +314,9 @@ export class Flame {
       }
       p.size = Math.max(0, p.size);
 
-      const lastSecondStart = 1.0 - 1.0 / p.maxLife;
-      if (p.life > lastSecondStart) {
-        p.opacity = 1.0 - (p.life - lastSecondStart) / (1.0 - lastSecondStart);
+      const remainingLife = p.maxLife - p.age;
+      if (remainingLife < 1.0) {
+        p.opacity = Math.max(0, remainingLife);
       } else {
         p.opacity = 1.0;
       }
@@ -291,10 +332,6 @@ export class Flame {
       this.opacities[i] = p.opacity;
     }
 
-    if (this.emitTimer >= this.params.emitInterval) {
-      this.emitTimer = 0;
-    }
-
     const posAttr = this.geometry.getAttribute('position') as THREE.BufferAttribute;
     posAttr.needsUpdate = true;
     const colAttr = this.geometry.getAttribute('color') as THREE.BufferAttribute;
@@ -304,6 +341,10 @@ export class Flame {
     const opaAttr = this.geometry.getAttribute('aOpacity') as THREE.BufferAttribute;
     opaAttr.needsUpdate = true;
 
+    this.updateTextureForCount();
+  }
+
+  private updateTextureForCount(): void {
     if (this.params.particleCount > 2000 && !this.usingCircleTexture) {
       this.material.uniforms.uTexture.value = this.circleTexture;
       this.usingCircleTexture = true;
@@ -329,13 +370,7 @@ export class Flame {
     if (params.colorScheme !== undefined) {
       const scheme = COLOR_SCHEMES[params.colorScheme];
       if (scheme) {
-        this.glowMesh.material = new THREE.MeshBasicMaterial({
-          color: scheme.bottom,
-          transparent: true,
-          opacity: 0.1,
-          side: THREE.DoubleSide,
-          depthWrite: false,
-        });
+        (this.glowMesh.material as THREE.MeshBasicMaterial).color = scheme.bottom.clone();
       }
     }
 
@@ -343,6 +378,8 @@ export class Flame {
       this.glowMesh.geometry.dispose();
       this.glowMesh.geometry = new THREE.CircleGeometry(params.flameWidth * 1.33, 64);
     }
+
+    this.updateTextureForCount();
   }
 
   private rebuildParticles(count: number): void {
@@ -356,16 +393,21 @@ export class Flame {
     this.geometry.setAttribute('aSize', new THREE.BufferAttribute(this.sizes, 1));
     this.geometry.setAttribute('aOpacity', new THREE.BufferAttribute(this.opacities, 1));
 
-    const newParticles: Particle[] = [];
+    const oldParticles = this.particles;
+    this.particles = [];
     for (let i = 0; i < count; i++) {
-      if (i < this.particles.length) {
-        newParticles.push(this.particles[i]);
+      if (i < oldParticles.length) {
+        this.particles.push(oldParticles[i]);
       } else {
         const p = this.createParticle();
-        newParticles.push(p);
+        p.active = false;
+        p.age = 0;
+        p.life = 0;
+        this.particles.push(p);
       }
     }
-    this.particles = newParticles;
+    this.nextEmitIndex = 0;
+    this.updateTextureForCount();
   }
 
   getParams(): FlameParams {
