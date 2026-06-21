@@ -134,6 +134,7 @@ export default function DiyPerfumeWorkspace({ onSaveToCommunity }: DiyPerfumeWor
                 display: 'grid',
                 gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 120px))',
                 gap: 10,
+                justifyContent: 'flex-start',
               }}
             >
               {groupedScents[noteType].map((scent) => {
@@ -143,7 +144,7 @@ export default function DiyPerfumeWorkspace({ onSaveToCommunity }: DiyPerfumeWor
                     key={scent.id}
                     onClick={() => !added && addScent({ id: scent.id, name: scent.name, noteType: scent.noteType })}
                     style={{
-                      background: added ? '#E0E0E0' : NOTE_BG[noteType],
+                      background: added ? '#E0E0E0' : noteType === 'top' ? '#FFF3E0' : noteType === 'middle' ? '#FCE4EC' : '#EFEBE9',
                       borderRadius: 8,
                       padding: '12px 8px',
                       textAlign: 'center',
@@ -152,7 +153,9 @@ export default function DiyPerfumeWorkspace({ onSaveToCommunity }: DiyPerfumeWor
                       border: added ? '2px solid #BDBDBD' : '2px solid transparent',
                       opacity: added ? 0.6 : 1,
                       maxWidth: 120,
+                      minWidth: 100,
                       width: '100%',
+                      flexShrink: 0,
                     }}
                     onMouseEnter={(e) => {
                       if (!added) {
@@ -192,6 +195,9 @@ export default function DiyPerfumeWorkspace({ onSaveToCommunity }: DiyPerfumeWor
       <div
         style={{
           width: 280,
+          minWidth: 280,
+          maxWidth: 280,
+          flexShrink: 0,
           background: '#FFF8F0',
           border: '2px dashed #D7CCC8',
           borderRadius: 12,

@@ -19,6 +19,15 @@ const NOTE_COLORS: Record<string, string> = {
   base: '#BCAAA4',
 }
 
+function getNoteColor(noteType: string): string {
+  switch (noteType) {
+    case 'top': return '#FFCC80'
+    case 'middle': return '#F48FB1'
+    case 'base': return '#BCAAA4'
+    default: return '#BDBDBD'
+  }
+}
+
 function polarToCartesian(cx: number, cy: number, r: number, angleDeg: number) {
   const angleRad = ((angleDeg - 90) * Math.PI) / 180
   return {
@@ -140,7 +149,7 @@ export default function ScentWheel({ scents, size = 260, interactive = true }: S
           const isHovered = hoveredId === s.id && interactive
           const expand = isHovered ? 5 : 0
           const pathD = describeArc(cx, cy, outerR, s.startAngle, s.endAngle, expand)
-          const color = NOTE_COLORS[s.noteType] || '#BDBDBD'
+          const color = getNoteColor(s.noteType)
 
           return (
             <path
@@ -151,10 +160,10 @@ export default function ScentWheel({ scents, size = 260, interactive = true }: S
               stroke="#FFFFFF"
               strokeWidth="2"
               style={{
-                transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
+                transition: 'd 0.4s cubic-bezier(0.4, 0, 0.2, 1), filter 0.2s ease-out',
                 transformOrigin: `${cx}px ${cy}px`,
                 cursor: interactive ? 'pointer' : 'default',
-                filter: isHovered ? `url(#shadow-${s.id})` : undefined,
+                filter: isHovered ? `url(#shadow-${s.id}) drop-shadow(0 0 6px ${color})` : undefined,
                 animation: interactive ? 'wheel-spin 0.4s ease-out' : undefined,
               }}
               onMouseEnter={(e) => {
@@ -222,14 +231,14 @@ export default function ScentWheel({ scents, size = 260, interactive = true }: S
               position: 'absolute',
               left: hoverPos.x + 12,
               top: hoverPos.y - 10,
-              background: 'rgba(62, 39, 35, 0.9)',
+              background: 'rgba(62, 39, 35, 0.92)',
               color: '#FFFFFF',
               padding: '8px 12px',
               borderRadius: '8px',
               fontSize: '13px',
               fontFamily: 'Noto Sans SC',
               pointerEvents: 'none',
-              boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
+              boxShadow: '0 6px 16px rgba(0,0,0,0.3), 0 2px 4px rgba(0,0,0,0.15)',
               whiteSpace: 'nowrap',
               zIndex: 10,
               transform: 'translateY(-50%)',

@@ -159,21 +159,24 @@ export default function CommunityFeed({ pendingFormula, onClearPendingFormula }:
                   onClick={() => handleOpenDetail(post)}
                   style={{
                     width: 320,
+                    minWidth: 320,
+                    maxWidth: 320,
                     borderRadius: 12,
                     background: '#FFFFFF',
                     border: '0.5px solid #E0E0E0',
-                    boxShadow: '0 8px 24px rgba(0,0,0,0.06)',
+                    boxShadow: '0 8px 24px rgba(0,0,0,0.08)',
                     padding: 16,
                     cursor: 'pointer',
                     transition: 'transform 0.2s, box-shadow 0.2s',
+                    flexShrink: 0,
                   }}
                   onMouseEnter={(e) => {
                     ;(e.currentTarget as HTMLDivElement).style.transform = 'translateY(-4px)'
-                    ;(e.currentTarget as HTMLDivElement).style.boxShadow = '0 12px 32px rgba(0,0,0,0.1)'
+                    ;(e.currentTarget as HTMLDivElement).style.boxShadow = '0 12px 32px rgba(0,0,0,0.12)'
                   }}
                   onMouseLeave={(e) => {
                     ;(e.currentTarget as HTMLDivElement).style.transform = 'translateY(0)'
-                    ;(e.currentTarget as HTMLDivElement).style.boxShadow = '0 8px 24px rgba(0,0,0,0.06)'
+                    ;(e.currentTarget as HTMLDivElement).style.boxShadow = '0 8px 24px rgba(0,0,0,0.08)'
                   }}
                 >
                   <div
@@ -297,7 +300,7 @@ export default function CommunityFeed({ pendingFormula, onClearPendingFormula }:
               bottom: 0,
               background: 'rgba(0,0,0,0.6)',
               zIndex: 100,
-              animation: 'fade-in 0.3s ease-out',
+              animation: 'mask-fade-in 0.3s ease-out forwards',
             }}
           />
           <div
@@ -311,7 +314,7 @@ export default function CommunityFeed({ pendingFormula, onClearPendingFormula }:
               zIndex: 101,
               boxShadow: '-8px 0 32px rgba(0,0,0,0.15)',
               overflowY: 'auto',
-              animation: 'slide-in-right 0.3s ease-out',
+              animation: 'detail-slide-in-right 0.3s ease-out forwards',
             }}
           >
             <div
@@ -683,13 +686,19 @@ export default function CommunityFeed({ pendingFormula, onClearPendingFormula }:
       )}
 
       <style>{`
-        @keyframes fade-in {
-          from { opacity: 0; }
-          to { opacity: 1; }
+        @keyframes mask-fade-in {
+          from { opacity: 0; background: rgba(0,0,0,0); }
+          to { opacity: 1; background: rgba(0,0,0,0.6); }
         }
-        @keyframes slide-in-right {
-          from { transform: translateX(100%); }
-          to { transform: translateX(0); }
+        @keyframes detail-slide-in-right {
+          from {
+            transform: translateX(100%);
+            opacity: 0.5;
+          }
+          to {
+            transform: translateX(0);
+            opacity: 1;
+          }
         }
       `}</style>
     </div>
