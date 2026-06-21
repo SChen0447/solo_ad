@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import './CourseCard.css';
 
@@ -18,9 +18,19 @@ const getProgressColor = (progress: number): string => {
 
 const CourseCard: React.FC<CourseCardProps> = ({ id, title, coverImage, instructorName, progress }) => {
   const navigate = useNavigate();
-  const color = getProgressColor(progress);
+  const [animatedProgress, setAnimatedProgress] = useState(0);
+  const [showTooltip, setShowTooltip] = useState(false);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setAnimatedProgress(progress);
+    }, 50);
+    return () => clearTimeout(timer);
+  }, [progress]);
+
+  const color = getProgressColor(animatedProgress);
   const circumference = 2 * Math.PI * 16;
-  const offset = circumference - (progress / 100) * circumference;
+  const offset = circumference - (animatedProgress / 100) * circumference;
 
   return (
     <div
@@ -39,7 +49,11 @@ const CourseCard: React.FC<CourseCardProps> = ({ id, title, coverImage, instruct
         </div>
         <div className="course-card-bottom">
           <span className="progress-label">课程进度</span>
-          <div className="progress-ring-wrapper">
+          <div
+            className="progress-ring-wrapper"
+            onMouseEnter={() => setShowTooltip(true)}
+            onMouseLeave={() => setShowTooltip(false)}
+          >
             <svg className="progress-ring" width="36" height="36">
               <circle
                 className="progress-ring-bg"
@@ -71,9 +85,14 @@ const CourseCard: React.FC<CourseCardProps> = ({ id, title, coverImage, instruct
                 fontWeight="600"
                 fill={color}
               >
-                {progress}%
+                {animatedProgress}%
               </text>
             </svg>
+            {showTooltip && (
+              <div className="progress-tooltip">
+                完成进度: {progress}%
+              </div>
+            )}
           </div>
         </div>
       </div>

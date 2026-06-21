@@ -147,15 +147,11 @@
 
   .course-grid,
   .skeleton-grid {
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: 1fr;
     gap: 16px;
   }
-}
 
-@media (max-width: 560px) {
-  .course-grid,
-  .skeleton-grid {
-    grid-template-columns: 1fr;
-    justify-items: center;
+  .skeleton-card {
+    width: 100%;
   }
 }
