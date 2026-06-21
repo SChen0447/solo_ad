@@ -1,0 +1,150 @@
+.portfolio-card {
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  break-inside: avoid;
+  margin-bottom: 16px;
+}
+
+.card-image-wrapper {
+  position: relative;
+  width: 100%;
+  overflow: hidden;
+  background: #F0F0F0;
+}
+
+.card-image {
+  width: 100%;
+  height: auto;
+  display: block;
+  opacity: 0;
+  transition: opacity 0.5s ease-in-out, transform 0.3s ease-in-out;
+}
+
+.card-image.loaded {
+  opacity: 1;
+}
+
+.portfolio-card:hover .card-image {
+  transform: scale(1.05);
+}
+
+.card-image-placeholder {
+  width: 100%;
+  height: 200px;
+  background: linear-gradient(90deg, #F0F0F0 25%, #E8E8E8 50%, #F0F0F0 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+.card-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0);
+  display: flex;
+  align-items: flex-end;
+  padding: 20px;
+  transition: background 0.3s ease-in-out;
+  cursor: pointer;
+}
+
+.portfolio-card:hover .card-overlay {
+  background: rgba(0, 0, 0, 0.5);
+}
+
+.card-overlay-content {
+  transform: translateY(20px);
+  opacity: 0;
+  transition: all 0.3s ease-in-out;
+  color: var(--white);
+}
+
+.portfolio-card:hover .card-overlay-content {
+  transform: translateY(0);
+  opacity: 1;
+}
+
+.card-title {
+  font-size: 18px;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+
+.card-date {
+  font-size: 13px;
+  opacity: 0.9;
+}
+
+.card-footer {
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.card-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.tag {
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.tag-category {
+  color: var(--white);
+}
+
+.tag-digital {
+  background: linear-gradient(135deg, var(--digital-color), var(--digital-light));
+}
+
+.tag-traditional {
+  background: linear-gradient(135deg, var(--traditional-color), var(--traditional-light));
+}
+
+.tag-mixed {
+  background: linear-gradient(135deg, var(--mixed-color), var(--mixed-light));
+}
+
+.tag-tool {
+  background: #F5F0EB;
+  color: var(--text-secondary);
+}
+
+.btn-inquiry {
+  width: 100%;
+  padding: 8px 16px;
+  background: transparent;
+  border: 1px solid var(--accent-color);
+  color: var(--accent-color);
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  transition: all 0.3s ease-in-out;
+}
+
+.btn-inquiry:hover {
+  background: var(--accent-color);
+  color: var(--white);
+}
+
+.btn-inquiry:active {
+  transform: scale(0.98);
+}

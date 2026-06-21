@@ -1,0 +1,294 @@
+{
+  "portfolio": [
+    {
+      "id": "portfolio-1",
+      "title": "山间晨雾",
+      "coverImage": "https://picsum.photos/seed/art1/400/200",
+      "createdAt": "2024-09-19T16:00:00.000Z",
+      "tools": [
+        "Procreate",
+        "Photoshop"
+      ],
+      "description": "探索自然与人文的交融，用柔和的笔触描绘生活中的美好瞬间。",
+      "category": "digital"
+    },
+    {
+      "id": "portfolio-2",
+      "title": "城市之夜",
+      "coverImage": "https://picsum.photos/seed/art2/400/280",
+      "createdAt": "2024-02-12T16:00:00.000Z",
+      "tools": [
+        "丙烯",
+        "素描铅笔"
+      ],
+      "description": "以独特的视角展现城市的繁华与宁静，光影交错间流露情感。",
+      "category": "traditional"
+    },
+    {
+      "id": "portfolio-3",
+      "title": "梦幻花园",
+      "coverImage": "https://picsum.photos/seed/art3/400/360",
+      "createdAt": "2024-09-03T16:00:00.000Z",
+      "tools": [
+        "混合媒介",
+        "水彩+Procreate"
+      ],
+      "description": "融合东方美学与现代设计语言，创造富有诗意的视觉体验。",
+      "category": "mixed"
+    },
+    {
+      "id": "portfolio-4",
+      "title": "海洋深处",
+      "coverImage": "https://picsum.photos/seed/art4/400/440",
+      "createdAt": "2024-09-17T16:00:00.000Z",
+      "tools": [
+        "Clip Studio Paint",
+        "Procreate"
+      ],
+      "description": "通过色彩与形态的实验，表达内心深处的情感与思考。",
+      "category": "digital"
+    },
+    {
+      "id": "portfolio-5",
+      "title": "秋日私语",
+      "coverImage": "https://picsum.photos/seed/art5/400/520",
+      "createdAt": "2024-04-04T16:00:00.000Z",
+      "tools": [
+        "水彩",
+        "丙烯"
+      ],
+      "description": "探索自然与人文的交融，用柔和的笔触描绘生活中的美好瞬间。",
+      "category": "traditional"
+    },
+    {
+      "id": "portfolio-6",
+      "title": "星空漫步",
+      "coverImage": "https://picsum.photos/seed/art6/400/200",
+      "createdAt": "2024-01-26T16:00:00.000Z",
+      "tools": [
+        "混合媒介",
+        "水彩+Procreate"
+      ],
+      "description": "以独特的视角展现城市的繁华与宁静，光影交错间流露情感。",
+      "category": "mixed"
+    },
+    {
+      "id": "portfolio-7",
+      "title": "古城记忆",
+      "coverImage": "https://picsum.photos/seed/art7/400/280",
+      "createdAt": "2024-10-31T16:00:00.000Z",
+      "tools": [
+        "Illustrator",
+        "Clip Studio Paint"
+      ],
+      "description": "融合东方美学与现代设计语言，创造富有诗意的视觉体验。",
+      "category": "digital"
+    },
+    {
+      "id": "portfolio-8",
+      "title": "花之韵",
+      "coverImage": "https://picsum.photos/seed/art8/400/360",
+      "createdAt": "2024-07-27T16:00:00.000Z",
+      "tools": [
+        "色粉笔",
+        "水彩"
+      ],
+      "description": "通过色彩与形态的实验，表达内心深处的情感与思考。",
+      "category": "traditional"
+    },
+    {
+      "id": "portfolio-9",
+      "title": "人物肖像",
+      "coverImage": "https://picsum.photos/seed/art9/400/440",
+      "createdAt": "2024-04-25T16:00:00.000Z",
+      "tools": [
+        "混合媒介",
+        "水彩+Procreate"
+      ],
+      "description": "探索自然与人文的交融，用柔和的笔触描绘生活中的美好瞬间。",
+      "category": "mixed"
+    },
+    {
+      "id": "portfolio-10",
+      "title": "风景速写",
+      "coverImage": "https://picsum.photos/seed/art10/400/520",
+      "createdAt": "2024-01-13T16:00:00.000Z",
+      "tools": [
+        "Photoshop",
+        "Illustrator"
+      ],
+      "description": "以独特的视角展现城市的繁华与宁静，光影交错间流露情感。",
+      "category": "digital"
+    },
+    {
+      "id": "portfolio-11",
+      "title": "概念设计",
+      "coverImage": "https://picsum.photos/seed/art11/400/200",
+      "createdAt": "2024-12-19T16:00:00.000Z",
+      "tools": [
+        "素描铅笔",
+        "色粉笔"
+      ],
+      "description": "融合东方美学与现代设计语言，创造富有诗意的视觉体验。",
+      "category": "traditional"
+    },
+    {
+      "id": "portfolio-12",
+      "title": "角色设定",
+      "coverImage": "https://picsum.photos/seed/art12/400/280",
+      "createdAt": "2024-02-14T16:00:00.000Z",
+      "tools": [
+        "混合媒介",
+        "水彩+Procreate"
+      ],
+      "description": "通过色彩与形态的实验，表达内心深处的情感与思考。",
+      "category": "mixed"
+    },
+    {
+      "id": "portfolio-13",
+      "title": "商业插画",
+      "coverImage": "https://picsum.photos/seed/art13/400/360",
+      "createdAt": "2024-03-26T16:00:00.000Z",
+      "tools": [
+        "Procreate",
+        "Photoshop"
+      ],
+      "description": "探索自然与人文的交融，用柔和的笔触描绘生活中的美好瞬间。",
+      "category": "digital"
+    },
+    {
+      "id": "portfolio-14",
+      "title": "书籍封面",
+      "coverImage": "https://picsum.photos/seed/art14/400/440",
+      "createdAt": "2024-08-03T16:00:00.000Z",
+      "tools": [
+        "丙烯",
+        "素描铅笔"
+      ],
+      "description": "以独特的视角展现城市的繁华与宁静，光影交错间流露情感。",
+      "category": "traditional"
+    },
+    {
+      "id": "portfolio-15",
+      "title": "海报设计",
+      "coverImage": "https://picsum.photos/seed/art15/400/520",
+      "createdAt": "2024-06-06T16:00:00.000Z",
+      "tools": [
+        "混合媒介",
+        "水彩+Procreate"
+      ],
+      "description": "融合东方美学与现代设计语言，创造富有诗意的视觉体验。",
+      "category": "mixed"
+    },
+    {
+      "id": "portfolio-16",
+      "title": "品牌插画",
+      "coverImage": "https://picsum.photos/seed/art16/400/200",
+      "createdAt": "2024-08-21T16:00:00.000Z",
+      "tools": [
+        "Clip Studio Paint",
+        "Procreate"
+      ],
+      "description": "通过色彩与形态的实验，表达内心深处的情感与思考。",
+      "category": "digital"
+    },
+    {
+      "id": "portfolio-17",
+      "title": "儿童绘本",
+      "coverImage": "https://picsum.photos/seed/art17/400/280",
+      "createdAt": "2024-04-10T16:00:00.000Z",
+      "tools": [
+        "水彩",
+        "丙烯"
+      ],
+      "description": "探索自然与人文的交融，用柔和的笔触描绘生活中的美好瞬间。",
+      "category": "traditional"
+    },
+    {
+      "id": "portfolio-18",
+      "title": "科幻场景",
+      "coverImage": "https://picsum.photos/seed/art18/400/360",
+      "createdAt": "2024-04-04T16:00:00.000Z",
+      "tools": [
+        "混合媒介",
+        "水彩+Procreate"
+      ],
+      "description": "以独特的视角展现城市的繁华与宁静，光影交错间流露情感。",
+      "category": "mixed"
+    },
+    {
+      "id": "portfolio-19",
+      "title": "奇幻生物",
+      "coverImage": "https://picsum.photos/seed/art19/400/440",
+      "createdAt": "2024-08-23T16:00:00.000Z",
+      "tools": [
+        "Illustrator",
+        "Clip Studio Paint"
+      ],
+      "description": "融合东方美学与现代设计语言，创造富有诗意的视觉体验。",
+      "category": "digital"
+    },
+    {
+      "id": "portfolio-20",
+      "title": "日常小品",
+      "coverImage": "https://picsum.photos/seed/art20/400/520",
+      "createdAt": "2024-09-02T16:00:00.000Z",
+      "tools": [
+        "色粉笔",
+        "水彩"
+      ],
+      "description": "通过色彩与形态的实验，表达内心深处的情感与思考。",
+      "category": "traditional"
+    },
+    {
+      "id": "portfolio-21",
+      "title": "春日樱花",
+      "coverImage": "https://picsum.photos/seed/art21/400/200",
+      "createdAt": "2024-12-06T16:00:00.000Z",
+      "tools": [
+        "混合媒介",
+        "水彩+Procreate"
+      ],
+      "description": "探索自然与人文的交融，用柔和的笔触描绘生活中的美好瞬间。",
+      "category": "mixed"
+    },
+    {
+      "id": "portfolio-22",
+      "title": "夏日海滩",
+      "coverImage": "https://picsum.photos/seed/art22/400/280",
+      "createdAt": "2024-07-04T16:00:00.000Z",
+      "tools": [
+        "Photoshop",
+        "Illustrator"
+      ],
+      "description": "以独特的视角展现城市的繁华与宁静，光影交错间流露情感。",
+      "category": "digital"
+    },
+    {
+      "id": "portfolio-23",
+      "title": "冬日雪景",
+      "coverImage": "https://picsum.photos/seed/art23/400/360",
+      "createdAt": "2024-04-26T16:00:00.000Z",
+      "tools": [
+        "素描铅笔",
+        "色粉笔"
+      ],
+      "description": "融合东方美学与现代设计语言，创造富有诗意的视觉体验。",
+      "category": "traditional"
+    },
+    {
+      "id": "portfolio-24",
+      "title": "美食插画",
+      "coverImage": "https://picsum.photos/seed/art24/400/440",
+      "createdAt": "2024-10-09T16:00:00.000Z",
+      "tools": [
+        "混合媒介",
+        "水彩+Procreate"
+      ],
+      "description": "通过色彩与形态的实验，表达内心深处的情感与思考。",
+      "category": "mixed"
+    }
+  ],
+  "inquiries": [],
+  "quotes": []
+}
