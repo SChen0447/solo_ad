@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>分子结构交互式可视化展示台</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      font-family: 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+      font-weight: 300;
+      color: #a8d4ff;
+      background: linear-gradient(135deg, #000000 0%, #000a1a 50%, #001533 100%);
+    }
+
+    #canvas-container {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 1;
+    }
+
+    .panel {
+      position: fixed;
+      top: 50%;
+      transform: translateY(-50%);
+      background: rgba(10, 25, 50, 0.6);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(100, 180, 255, 0.2);
+      border-radius: 16px;
+      padding: 24px 20px;
+      z-index: 10;
+      box-shadow: 0 8px 32px rgba(0, 50, 100, 0.3),
+                  inset 0 1px 0 rgba(255, 255, 255, 0.05);
+      transition: all 0.3s ease;
+    }
+
+    .panel:hover {
+      border-color: rgba(100, 180, 255, 0.4);
+      box-shadow: 0 8px 32px rgba(0, 80, 150, 0.4),
+                  inset 0 1px 0 rgba(255, 255, 255, 0.08);
+    }
+
+    .panel-left {
+      left: 24px;
+      width: 200px;
+    }
+
+    .panel-right {
+      right: 24px;
+      width: 220px;
+    }
+
+    .panel-title {
+      font-size: 14px;
+      font-weight: 400;
+      color: #7ec8ff;
+      margin-bottom: 16px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid rgba(100, 180, 255, 0.15);
+      letter-spacing: 2px;
+      text-transform: uppercase;
+    }
+
+    .tool-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      padding: 12px 16px;
+      margin-bottom: 10px;
+      background: rgba(30, 80, 140, 0.3);
+      border: 1px solid rgba(100, 180, 255, 0.2);
+      border-radius: 10px;
+      color: #a8d4ff;
+      font-size: 13px;
+      font-weight: 300;
+      cursor: pointer;
+      transition: all 0.25s ease;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .tool-btn:hover {
+      background: rgba(50, 130, 220, 0.5);
+      border-color: rgba(100, 200, 255, 0.5);
+      color: #ffffff;
+      transform: translateY(-1px);
+      box-shadow: 0 4px 16px rgba(50, 150, 255, 0.3);
+    }
+
+    .tool-btn:active {
+      transform: translateY(0);
+    }
+
+    .tool-btn.active {
+      background: rgba(60, 160, 255, 0.6);
+      border-color: rgba(120, 200, 255, 0.7);
+      color: #ffffff;
+    }
+
+    .mode-group {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-bottom: 24px;
+    }
+
+    .mode-btn {
+      display: flex;
+      align-items: center;
+      padding: 10px 14px;
+      background: rgba(30, 80, 140, 0.2);
+      border: 1px solid rgba(100, 180, 255, 0.15);
+      border-radius: 8px;
+      color: #88b8e8;
+      font-size: 13px;
+      cursor: pointer;
+      transition: all 0.25s ease;
+    }
+
+    .mode-btn:hover {
+      background: rgba(50, 130, 220, 0.4);
+      border-color: rgba(100, 200, 255, 0.4);
+      color: #ffffff;
+    }
+
+    .mode-btn.active {
+      background: rgba(60, 160, 255, 0.5);
+      border-color: rgba(100, 200, 255, 0.6);
+      color: #ffffff;
+      box-shadow: 0 2px 12px rgba(60, 160, 255, 0.3);
+    }
+
+    .mode-btn::before {
+      content: '';
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      margin-right: 10px;
+      background: currentColor;
+      opacity: 0.6;
+    }
+
+    .slider-group {
+      margin-top: 8px;
+    }
+
+    .slider-label {
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+      color: #7ec8ff;
+      margin-bottom: 10px;
+    }
+
+    .slider-value {
+      color: #a8d4ff;
+      font-weight: 400;
+    }
+
+    input[type="range"] {
+      -webkit-appearance: none;
+      width: 100%;
+      height: 6px;
+      background: rgba(30, 80, 140, 0.5);
+      border-radius: 3px;
+      outline: none;
+      cursor: pointer;
+    }
+
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 18px;
+      height: 18px;
+      background: linear-gradient(135deg, #5ab0ff, #3080e0);
+      border: 2px solid rgba(200, 230, 255, 0.8);
+      border-radius: 50%;
+      cursor: grab;
+      transition: all 0.2s ease;
+      box-shadow: 0 2px 8px rgba(50, 150, 255, 0.5);
+    }
+
+    input[type="range"]::-webkit-slider-thumb:hover {
+      transform: scale(1.15);
+      box-shadow: 0 4px 16px rgba(50, 150, 255, 0.7);
+    }
+
+    input[type="range"]::-webkit-slider-thumb:active {
+      cursor: grabbing;
+      transform: scale(1.1);
+    }
+
+    input[type="range"]::-moz-range-thumb {
+      width: 18px;
+      height: 18px;
+      background: linear-gradient(135deg, #5ab0ff, #3080e0);
+      border: 2px solid rgba(200, 230, 255, 0.8);
+      border-radius: 50%;
+      cursor: grab;
+      transition: all 0.2s ease;
+      box-shadow: 0 2px 8px rgba(50, 150, 255, 0.5);
+    }
+
+    #info-card {
+      position: fixed;
+      top: 24px;
+      left: 24px;
+      width: 220px;
+      background: rgba(10, 25, 50, 0.75);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(100, 200, 255, 0.3);
+      border-radius: 14px;
+      padding: 20px;
+      z-index: 20;
+      display: none;
+      box-shadow: 0 8px 32px rgba(0, 80, 150, 0.4);
+    }
+
+    .info-header {
+      display: flex;
+      align-items: center;
+      margin-bottom: 16px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid rgba(100, 180, 255, 0.2);
+    }
+
+    .info-symbol {
+      font-size: 36px;
+      font-weight: 500;
+      color: #ffffff;
+      margin-right: 14px;
+      line-height: 1;
+    }
+
+    .info-name {
+      font-size: 18px;
+      color: #a8d4ff;
+    }
+
+    .info-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 6px 0;
+      font-size: 13px;
+    }
+
+    .info-label {
+      color: #6fa0d0;
+    }
+
+    .info-data {
+      color: #d0e8ff;
+      font-weight: 400;
+    }
+
+    .particle {
+      position: fixed;
+      width: 6px;
+      height: 6px;
+      background: radial-gradient(circle, #7ec8ff 0%, transparent 70%);
+      border-radius: 50%;
+      pointer-events: none;
+      z-index: 100;
+    }
+
+    .header-title {
+      position: fixed;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 20px;
+      font-weight: 300;
+      color: #7ec8ff;
+      letter-spacing: 4px;
+      z-index: 5;
+      text-shadow: 0 0 20px rgba(100, 180, 255, 0.3);
+    }
+
+    .header-subtitle {
+      position: fixed;
+      top: 52px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 12px;
+      font-weight: 300;
+      color: #5a90c0;
+      letter-spacing: 2px;
+      z-index: 5;
+    }
+
+    .molecule-name {
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%);
+      text-align: center;
+      z-index: 5;
+    }
+
+    .molecule-name-main {
+      font-size: 18px;
+      color: #a8d4ff;
+      margin-bottom: 4px;
+    }
+
+    .molecule-name-formula {
+      font-size: 14px;
+      color: #6fa0d0;
+    }
+
+    @media (max-width: 768px) {
+      .panel-left,
+      .panel-right {
+        width: calc(50% - 16px);
+        top: auto;
+        bottom: 80px;
+        transform: none;
+        padding: 16px;
+      }
+
+      .panel-left {
+        left: 8px;
+      }
+
+      .panel-right {
+        right: 8px;
+      }
+
+      .panel-title {
+        font-size: 12px;
+        margin-bottom: 12px;
+        padding-bottom: 8px;
+      }
+
+      .tool-btn {
+        padding: 10px 12px;
+        font-size: 12px;
+      }
+
+      .header-title {
+        font-size: 16px;
+        letter-spacing: 2px;
+      }
+
+      .header-subtitle {
+        font-size: 10px;
+      }
+
+      #info-card {
+        top: auto;
+        left: 8px;
+        bottom: 180px;
+        width: calc(100% - 16px);
+      }
+
+      .molecule-name {
+        bottom: 16px;
+      }
+    }
+
+    @media (max-width: 480px) {
+      .panel-left,
+      .panel-right {
+        width: calc(50% - 8px);
+        padding: 12px;
+      }
+
+      .mode-btn {
+        padding: 8px 10px;
+        font-size: 11px;
+      }
+
+      .tool-btn {
+        padding: 8px 10px;
+        font-size: 11px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <canvas id="canvas-container"></canvas>
+
+  <div class="header-title">分子结构可视化</div>
+  <div class="header-subtitle">MOLECULAR VISUALIZER</div>
+
+  <div id="info-card">
+    <div class="info-header">
+      <div class="info-symbol" id="atom-symbol">C</div>
+      <div class="info-name" id="atom-name">碳</div>
+    </div>
+    <div class="info-row">
+      <span class="info-label">原子序号</span>
+      <span class="info-data" id="atom-number">6</span>
+    </div>
+    <div class="info-row">
+      <span class="info-label">杂化类型</span>
+      <span class="info-data" id="atom-hybrid">sp²</span>
+    </div>
+    <div class="info-row">
+      <span class="info-label">键合数</span>
+      <span class="info-data" id="atom-bonds">4</span>
+    </div>
+  </div>
+
+  <div class="panel panel-left">
+    <div class="panel-title">工具栏</div>
+    <button class="tool-btn" id="btn-reset">复位视角</button>
+    <button class="tool-btn active" id="btn-autorotate">自动旋转: 开</button>
+    <button class="tool-btn" id="btn-screenshot">截图保存</button>
+  </div>
+
+  <div class="panel panel-right">
+    <div class="panel-title">显示模式</div>
+    <div class="mode-group">
+      <div class="mode-btn active" id="mode-ballstick">球棍模型</div>
+      <div class="mode-btn" id="mode-wireframe">线框模型</div>
+      <div class="mode-btn" id="mode-spacefill">空间填充</div>
+    </div>
+
+    <div class="panel-title" style="margin-top: 20px;">拆解模式</div>
+    <div class="slider-group">
+      <div class="slider-label">
+        <span>拆解程度</span>
+        <span class="slider-value" id="slider-value">0%</span>
+      </div>
+      <input type="range" id="explode-slider" min="0" max="100" value="0" />
+    </div>
+  </div>
+
+  <div class="molecule-name">
+    <div class="molecule-name-main">咖啡因</div>
+    <div class="molecule-name-formula">C₈H₁₀N₄O₂</div>
+  </div>
+
+  <script type="module" src="/src/main.ts"></script>
+  <script>
+    const slider = document.getElementById('explode-slider');
+    const sliderValue = document.getElementById('slider-value');
+    if (slider && sliderValue) {
+      slider.addEventListener('input', function() {
+        sliderValue.textContent = this.value + '%';
+      });
+    }
+  </script>
+</body>
+</html>
