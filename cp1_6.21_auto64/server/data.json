@@ -1,0 +1,71 @@
+{
+  "dishes": [
+    {
+      "id": "dish-1",
+      "name": "番茄鸡胸肉沙拉",
+      "price": 32,
+      "ingredients": [
+        { "ingredientId": "ing-1", "amount": 150 },
+        { "ingredientId": "ing-2", "amount": 100 },
+        { "ingredientId": "ing-3", "amount": 50 },
+        { "ingredientId": "ing-4", "amount": 30 }
+      ],
+      "soldOut": false,
+      "manualSoldOut": false
+    },
+    {
+      "id": "dish-2",
+      "name": "牛油果鸡蛋三明治",
+      "price": 28,
+      "ingredients": [
+        { "ingredientId": "ing-5", "amount": 1 },
+        { "ingredientId": "ing-6", "amount": 100 },
+        { "ingredientId": "ing-7", "amount": 2 },
+        { "ingredientId": "ing-8", "amount": 80 }
+      ],
+      "soldOut": false,
+      "manualSoldOut": false
+    },
+    {
+      "id": "dish-3",
+      "name": "藜麦蔬菜碗",
+      "price": 38,
+      "ingredients": [
+        { "ingredientId": "ing-9", "amount": 120 },
+        { "ingredientId": "ing-1", "amount": 80 },
+        { "ingredientId": "ing-10", "amount": 60 },
+        { "ingredientId": "ing-11", "amount": 40 }
+      ],
+      "soldOut": false,
+      "manualSoldOut": false
+    },
+    {
+      "id": "dish-4",
+      "name": "虾仁牛油果奶昔",
+      "price": 22,
+      "ingredients": [
+        { "ingredientId": "ing-6", "amount": 150 },
+        { "ingredientId": "ing-12", "amount": 200 },
+        { "ingredientId": "ing-13", "amount": 20 }
+      ],
+      "soldOut": false,
+      "manualSoldOut": false
+    }
+  ],
+  "ingredients": [
+    { "id": "ing-1", "name": "番茄", "emoji": "🍅", "stock": 500, "unit": "g", "minStock": 200, "price": 0.02 },
+    { "id": "ing-2", "name": "鸡胸肉", "emoji": "🍗", "stock": 300, "unit": "g", "minStock": 150, "price": 0.08 },
+    { "id": "ing-3", "name": "生菜", "emoji": "🥬", "stock": 400, "unit": "g", "minStock": 200, "price": 0.015 },
+    { "id": "ing-4", "name": "沙拉酱", "emoji": "🥫", "stock": 180, "unit": "g", "minStock": 100, "price": 0.03 },
+    { "id": "ing-5", "name": "全麦面包", "emoji": "🍞", "stock": 20, "unit": "片", "minStock": 10, "price": 2.5 },
+    { "id": "ing-6", "name": "牛油果", "emoji": "🥑", "stock": 500, "unit": "g", "minStock": 200, "price": 0.06 },
+    { "id": "ing-7", "name": "鸡蛋", "emoji": "🥚", "stock": 30, "unit": "个", "minStock": 15, "price": 1.2 },
+    { "id": "ing-8", "name": "火腿", "emoji": "🥓", "stock": 200, "unit": "g", "minStock": 100, "price": 0.05 },
+    { "id": "ing-9", "name": "藜麦", "emoji": "🌾", "stock": 600, "unit": "g", "minStock": 300, "price": 0.04 },
+    { "id": "ing-10", "name": "黄瓜", "emoji": "🥒", "stock": 100, "unit": "g", "minStock": 200, "price": 0.012 },
+    { "id": "ing-11", "name": "玉米粒", "emoji": "🌽", "stock": 300, "unit": "g", "minStock": 150, "price": 0.025 },
+    { "id": "ing-12", "name": "牛奶", "emoji": "🥛", "stock": 1000, "unit": "ml", "minStock": 500, "price": 0.008 },
+    { "id": "ing-13", "name": "蜂蜜", "emoji": "🍯", "stock": 150, "unit": "g", "minStock": 100, "price": 0.1 }
+  ],
+  "orders": []
+}
