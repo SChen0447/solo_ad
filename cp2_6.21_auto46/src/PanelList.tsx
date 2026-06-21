@@ -1,11 +1,218 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { useApp, SUBJECT_COLORS, Panel, SubjectType } from './store';
+import { useApp, SUBJECT_COLORS, Panel, SubjectType, CanvasElement } from './store';
 
 const subjectOptions: { value: SubjectType; label: string }[] = [
   { value: 'scene', label: '场景' },
   { value: 'character', label: '人物' },
   { value: 'object', label: '物品' },
 ];
+
+function MiniElementRenderer({ element, canvasW, canvasH, scale }: {
+  element: CanvasElement; canvasW: number; canvasH: number; scale: number;
+}) {
+  const { type, width, height, fill, stroke, text, tailDirection, rotation, x, y } = element;
+  const w = Math.max(1, width * scale);
+  const h = Math.max(1, height * scale);
+  const sw = Math.max(0.5, 1 * scale);
+  const fontSize = Math.max(5, 10 * scale);
+  const textColor = fill === '#1F2937' || fill === '#111827' ? '#FFFFFF' : '#374151';
+  const tx = x * scale;
+  const ty = y * scale;
+
+  const commonTransform = {
+    position: 'absolute' as const,
+    left: tx,
+    top: ty,
+    transform: `rotate(${rotation}deg)`,
+    transformOrigin: 'center center',
+    width: w,
+    height: h,
+    pointerEvents: 'none' as const,
+  };
+
+  switch (type) {
+    case 'rectangle':
+      return (
+        <svg width={w} height={h} style={commonTransform}>
+          <rect x={sw} y={sw} width={Math.max(1, w - sw * 2)} height={Math.max(1, h - sw * 2)} rx={Math.max(0.5, 2 * scale)} fill={fill} stroke={stroke} strokeWidth={sw} />
+        </svg>
+      );
+    case 'circle':
+      return (
+        <svg width={w} height={h} style={commonTransform}>
+          <ellipse cx={w / 2} cy={h / 2} rx={Math.max(1, w / 2 - sw)} ry={Math.max(1, h / 2 - sw)} fill={fill} stroke={stroke} strokeWidth={sw} />
+        </svg>
+      );
+    case 'triangle':
+      return (
+        <svg width={w} height={h} style={commonTransform}>
+          <polygon points={`${w / 2},${sw} ${Math.max(1, w - sw)},${Math.max(1, h - sw)} ${sw},${Math.max(1, h - sw)}`} fill={fill} stroke={stroke} strokeWidth={sw} />
+        </svg>
+      );
+    case 'dialogBox':
+      return (
+        <div style={commonTransform}>
+          <svg width={w} height={h} style={{ position: 'absolute', inset: 0 }}>
+            <rect x={sw} y={sw} width={Math.max(1, w - sw * 2)} height={Math.max(1, h - sw * 2)} fill={fill} stroke={stroke} strokeWidth={sw} rx={Math.max(0.5, 2 * scale)} />
+          </svg>
+          {text && (
+            <div style={{
+              position: 'absolute',
+              top: 2 * scale,
+              left: '50%',
+              transform: 'translateX(-50%)',
+              width: '90%',
+              fontSize,
+              color: textColor,
+              textAlign: 'center',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+              lineHeight: 1.2,
+              pointerEvents: 'none',
+            }}>
+              {text}
+            </div>
+          )}
+        </div>
+      );
+    case 'speechBubble': {
+      const dir = tailDirection ?? 90;
+      const rad = (dir * Math.PI) / 180;
+      const tailLen = Math.max(4, 12 * scale);
+      const cx = w / 2;
+      const cy = h;
+      const tipX = cx + Math.cos(rad) * tailLen;
+      const tipY = cy + Math.sin(rad) * tailLen;
+      const baseW = Math.max(4, 12 * scale);
+      const perpX = Math.cos(rad + Math.PI / 2);
+      const perpY = Math.sin(rad + Math.PI / 2);
+      const leftX = cx + perpX * (baseW / 2);
+      const leftY = cy + perpY * (baseW / 2);
+      const rightX = cx - perpX * (baseW / 2);
+      const rightY = cy - perpY * (baseW / 2);
+      const totalW = Math.max(w, Math.ceil(tipX + 4));
+      const totalH = Math.max(h, Math.ceil(tipY + 4));
+      const r = Math.max(1, 4 * scale);
+      const path = [
+        `M${sw},${sw + r}`,
+        `Q${sw},${sw} ${sw + r},${sw}`,
+        `L${w - sw - r},${sw}`,
+        `Q${w - sw},${sw} ${w - sw},${sw + r}`,
+        `L${w - sw},${cy - r}`,
+        `Q${w - sw},${cy} ${w - sw - r},${cy}`,
+        `L${rightX.toFixed(1)},${rightY.toFixed(1)}`,
+        `L${tipX.toFixed(1)},${tipY.toFixed(1)}`,
+        `L${leftX.toFixed(1)},${leftY.toFixed(1)}`,
+        `L${sw + r},${cy}`,
+        `Q${sw},${cy} ${sw},${cy - r}`,
+        'Z',
+      ].join(' ');
+      return (
+        <div style={{ ...commonTransform, width: totalW, height: totalH }}>
+          <svg width={totalW} height={totalH} style={{ position: 'absolute', inset: 0 }}>
+            <path d={path} fill={fill} stroke={stroke} strokeWidth={sw} />
+          </svg>
+          {text && (
+            <div style={{
+              position: 'absolute',
+              top: 2 * scale,
+              left: '50%',
+              transform: 'translateX(-50%)',
+              width: w,
+              fontSize,
+              color: textColor,
+              textAlign: 'center',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+              lineHeight: 1.2,
+              pointerEvents: 'none',
+            }}>
+              {text}
+            </div>
+          )}
+        </div>
+      );
+    }
+  }
+}
+
+function PanelThumbnail({ panel }: { panel: Panel }) {
+  const PREVIEW_W = 60;
+  const PREVIEW_H = 40;
+  const CANVAS_BASE_W = 600;
+  const CANVAS_BASE_H = 400;
+  const scaleX = PREVIEW_W / CANVAS_BASE_W;
+  const scaleY = PREVIEW_H / CANVAS_BASE_H;
+  const scale = Math.min(scaleX, scaleY, 0.12);
+  const borderColor = SUBJECT_COLORS[panel.subjectType];
+
+  if (panel.elements.length === 0) {
+    return (
+      <div
+        style={{
+          width: PREVIEW_W,
+          height: PREVIEW_H,
+          borderRadius: 4,
+          backgroundColor: borderColor,
+          flexShrink: 0,
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: 1,
+          color: '#fff',
+          boxShadow: `0 2px 8px ${borderColor}44`,
+          transition: 'background-color 0.3s ease-in-out, box-shadow 0.3s ease-in-out',
+        }}
+      >
+        <span style={{ fontSize: 14, fontWeight: 600, lineHeight: 1 }}>{panel.order}</span>
+        <span style={{ fontSize: 8, opacity: 0.85, lineHeight: 1 }}>
+          {panel.subjectType === 'scene' ? '场景' : panel.subjectType === 'character' ? '人物' : '物品'}
+        </span>
+      </div>
+    );
+  }
+
+  return (
+    <div
+      style={{
+        width: PREVIEW_W,
+        height: PREVIEW_H,
+        borderRadius: 4,
+        backgroundColor: '#F5F5F5',
+        flexShrink: 0,
+        position: 'relative',
+        overflow: 'hidden',
+        border: `1.5px solid ${borderColor}`,
+        boxShadow: `0 2px 8px ${borderColor}44`,
+        transition: 'border-color 0.3s ease-in-out, box-shadow 0.3s ease-in-out',
+      }}
+    >
+      <div
+        style={{
+          position: 'absolute',
+          left: 2,
+          top: 2,
+          padding: '0 3px',
+          borderRadius: 2,
+          backgroundColor: `${borderColor}`,
+          color: '#fff',
+          fontSize: 7,
+          fontWeight: 600,
+          lineHeight: '10px',
+          zIndex: 2,
+        }}
+      >
+        #{panel.order}
+      </div>
+      {panel.elements.map((el) => (
+        <MiniElementRenderer key={el.id} element={el} canvasW={PREVIEW_W} canvasH={PREVIEW_H} scale={scale} />
+      ))}
+    </div>
+  );
+}
 
 function PanelCard({
   panel,
@@ -100,28 +307,7 @@ function PanelCard({
         userSelect: 'none',
       }}
     >
-      <div
-        style={{
-          width: 60,
-          height: 40,
-          borderRadius: 4,
-          backgroundColor: SUBJECT_COLORS[panel.subjectType],
-          flexShrink: 0,
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'center',
-          gap: 1,
-          color: '#fff',
-          boxShadow: `0 2px 8px ${SUBJECT_COLORS[panel.subjectType]}44`,
-          transition: 'background-color 0.3s ease-in-out, box-shadow 0.3s ease-in-out',
-        }}
-      >
-        <span style={{ fontSize: 14, fontWeight: 600, lineHeight: 1 }}>{panel.order}</span>
-        <span style={{ fontSize: 8, opacity: 0.85, lineHeight: 1 }}>
-          {panel.subjectType === 'scene' ? '场景' : panel.subjectType === 'character' ? '人物' : '物品'}
-        </span>
-      </div>
+      <PanelThumbnail panel={panel} />
       <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 4 }}>
         {isEditing ? (
           <input

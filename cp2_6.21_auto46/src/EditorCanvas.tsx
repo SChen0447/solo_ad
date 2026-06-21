@@ -2,6 +2,7 @@ import React, { useRef, useState, useEffect, useCallback } from 'react';
 import { useApp, CanvasElement, createElement, ElementType } from './store';
 
 const GRID_SIZE = 8;
+const BASE_GRID_SIZE = 16;
 const ROTATION_STEP = 15;
 const TAIL_STEP = 45;
 const MIN_SIZE = 20;
@@ -376,12 +377,20 @@ export default function EditorCanvas({ isDropTarget = true }: EditorCanvasProps)
           justifyContent: 'center',
           color: '#6B7280',
           fontSize: 16,
+          backgroundImage: `linear-gradient(to right, #E5E7EB 1px, transparent 1px),
+            linear-gradient(to bottom, #E5E7EB 1px, transparent 1px)`,
+          backgroundSize: `${BASE_GRID_SIZE}px ${BASE_GRID_SIZE}px`,
         }}
       >
         请从左侧选择或创建一个分镜开始编辑
       </div>
     );
   }
+
+  const baseGridBg = `linear-gradient(to right, #E5E7EB 1px, transparent 1px),
+    linear-gradient(to bottom, #E5E7EB 1px, transparent 1px)`;
+  const dragGridBg = `linear-gradient(to right, rgba(59, 130, 246, 0.35) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(59, 130, 246, 0.35) 1px, transparent 1px)`;
 
   return (
     <div
@@ -399,12 +408,11 @@ export default function EditorCanvas({ isDropTarget = true }: EditorCanvasProps)
         position: 'relative',
         overflow: 'hidden',
         outline: 'none',
-        backgroundImage: showGrid
-          ? `linear-gradient(to right, rgba(0,0,0,0.06) 1px, transparent 1px),
-             linear-gradient(to bottom, rgba(0,0,0,0.06) 1px, transparent 1px)`
-          : 'none',
-        backgroundSize: `${GRID_SIZE}px ${GRID_SIZE}px`,
-        transition: 'background-image 0.15s ease',
+        backgroundImage: showGrid ? `${dragGridBg}, ${baseGridBg}` : baseGridBg,
+        backgroundSize: showGrid
+          ? `${GRID_SIZE}px ${GRID_SIZE}px, ${BASE_GRID_SIZE}px ${BASE_GRID_SIZE}px`
+          : `${BASE_GRID_SIZE}px ${BASE_GRID_SIZE}px`,
+        transition: 'background-image 0.15s ease, background-size 0.15s ease',
       }}
     >
       <div

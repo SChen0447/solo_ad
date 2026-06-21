@@ -75,7 +75,7 @@ function renderElementForExport(element: CanvasElement, scale = 1) {
   return `<div style="position:absolute;left:0;top:0;transform:translate(${element.x * scale}px, ${element.y * scale}px) rotate(${rotation}deg);transform-origin:center center;will-change:transform">${shapeHtml}</div>`;
 }
 
-function renderPanelForExport(panel: Panel) {
+function renderPanelForExport(panel: Panel, showMeta: boolean) {
   const panelW = 180;
   const panelH = 130;
   const previewScale = 0.5;
@@ -84,6 +84,12 @@ function renderPanelForExport(panel: Panel) {
   const elementsHtml = panel.elements
     .map((el) => renderElementForExport(el, previewScale))
     .join('');
+
+  const metaHtml = showMeta ? `
+      <div style="width:${panelW}px;text-align:center;margin-top:8px">
+        <div style="color:#fff;font-size:12px;font-weight:600;margin-bottom:2px">分镜 ${panel.order}</div>
+        <div style="color:#9CA3AF;font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${panel.description}</div>
+      </div>` : '';
 
   return `
     <div style="width:${panelW}px;display:inline-block;vertical-align:top;margin:0 8px 16px">
@@ -96,10 +102,7 @@ function renderPanelForExport(panel: Panel) {
           ${elementsHtml}
         </div>
       </div>
-      <div style="width:${panelW}px;text-align:center;margin-top:8px">
-        <div style="color:#fff;font-size:12px;font-weight:600;margin-bottom:2px">分镜 ${panel.order}</div>
-        <div style="color:#9CA3AF;font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${panel.description}</div>
-      </div>
+      ${metaHtml}
     </div>
   `;
 }
@@ -126,14 +129,20 @@ function AppInner() {
   );
 
   const handleExport = useCallback(() => {
-    const cols = 3;
     const gap = 16;
     const panelW = 180;
-    const totalRowW = cols * panelW + (cols - 1) * gap + 48;
+    const defaultCols = 3;
+    const defaultShowMeta = true;
+    const panelsData = state.panels.map((p) => ({
+      id: p.id,
+      order: p.order,
+      description: p.description,
+      subjectType: p.subjectType,
+      elementsHtml: p.elements.map((el) => renderElementForExport(el, 0.5)).join(''),
+      bgColor: SUBJECT_COLORS[p.subjectType],
+    }));
 
-    const panelsHtml = state.panels
-      .map((p) => renderPanelForExport(p))
-      .join('');
+    const panelsJson = JSON.stringify(panelsData);
 
     const html = `<!DOCTYPE html>
 <html lang="zh-CN">
@@ -169,6 +178,7 @@ function AppInner() {
   }
   .btn:hover { filter: brightness(0.9); }
   .btn:active { transform: scale(0.95); }
+  .btn:disabled { opacity: 0.5; cursor: not-allowed; }
   .btn-primary { background: #F59E0B; color: #fff; }
   .btn-primary:hover { background: #D97706; }
   .btn-secondary { background: #4B5563; color: #fff; }
@@ -182,7 +192,7 @@ function AppInner() {
     padding-top: 20px;
   }
   .preview-container {
-    max-width: ${totalRowW}px;
+    max-width: 1200px;
     margin: 0 auto;
     background: #111827;
     border-radius: 12px;
@@ -195,9 +205,132 @@ function AppInner() {
     justify-content: center;
     gap: ${gap}px;
   }
+  .panel-card {
+    width: ${panelW}px;
+    display: inline-block;
+    vertical-align: top;
+  }
+  .panel-preview {
+    width: ${panelW}px;
+    height: 130px;
+    background-color: #111827;
+    border-radius: 6px;
+    overflow: hidden;
+    position: relative;
+  }
+  .panel-gradient {
+    position: absolute;
+    inset: 0;
+  }
+  .panel-order-tag {
+    position: absolute;
+    top: 6px;
+    left: 6px;
+    padding: 2px 8px;
+    background: rgba(0,0,0,0.6);
+    border-radius: 3px;
+    color: #fff;
+    font-size: 13px;
+    font-weight: 600;
+  }
+  .panel-elements {
+    position: relative;
+    width: 100%;
+    height: 100%;
+  }
+  .panel-meta {
+    width: ${panelW}px;
+    text-align: center;
+    margin-top: 8px;
+  }
+  .panel-order-label {
+    color: #fff;
+    font-size: 12px;
+    font-weight: 600;
+    margin-bottom: 2px;
+  }
+  .panel-desc {
+    color: #9CA3AF;
+    font-size: 11px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .settings-bar {
+    max-width: 1200px;
+    margin: 24px auto 0;
+    background: #2D2D44;
+    border-radius: 12px;
+    padding: 16px 24px;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 24px;
+  }
+  .setting-group {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .setting-label {
+    font-size: 13px;
+    color: #E5E7EB;
+    font-weight: 500;
+  }
+  .cols-buttons {
+    display: flex;
+    gap: 4px;
+  }
+  .cols-btn {
+    padding: 6px 14px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 500;
+    border: 1px solid #4B5563;
+    background: #1F2937;
+    color: #D1D5DB;
+    cursor: pointer;
+    transition: all 0.15s;
+    font-family: inherit;
+  }
+  .cols-btn:hover { border-color: #F59E0B; color: #fff; }
+  .cols-btn.active {
+    background: #F59E0B;
+    border-color: #F59E0B;
+    color: #fff;
+  }
+  .checkbox-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+  }
+  .custom-checkbox {
+    width: 18px;
+    height: 18px;
+    border-radius: 4px;
+    border: 2px solid #F59E0B;
+    background: #1F2937;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  .custom-checkbox.checked {
+    background: #F59E0B;
+  }
+  .custom-checkbox.checked::after {
+    content: '✓';
+    color: #fff;
+    font-size: 12px;
+    font-weight: bold;
+  }
   @media print {
     body { background: #fff; padding: 0; }
     .toolbar { display: none; }
+    .settings-bar { display: none; }
     .preview-container { background: #fff; box-shadow: none; }
     .preview-title { color: #000; }
   }
@@ -206,62 +339,146 @@ function AppInner() {
 <body>
   <div class="toolbar">
     <button class="btn btn-primary" onclick="window.print()">🖨️ 打印</button>
-    <button class="btn btn-secondary" onclick="downloadPNG()">⬇️ 下载PNG</button>
+    <button class="btn btn-secondary" id="dlBtn" onclick="downloadPNG()">⬇️ 下载PNG</button>
   </div>
   <div class="preview-title">📚 漫画分镜预览（共 ${state.panels.length} 个分镜）</div>
   <div id="preview" class="preview-container">
-    <div class="panels-grid">
-      ${panelsHtml}
+    <div id="panelsRoot" class="panels-grid"></div>
+  </div>
+  <div class="settings-bar">
+    <div class="setting-group">
+      <span class="setting-label">每行列数：</span>
+      <div class="cols-buttons" id="colsButtons">
+        <button class="cols-btn" data-cols="2">2 列</button>
+        <button class="cols-btn active" data-cols="3">3 列</button>
+        <button class="cols-btn" data-cols="4">4 列</button>
+      </div>
+    </div>
+    <div class="setting-group">
+      <label class="checkbox-wrapper" id="metaToggle">
+        <div class="custom-checkbox checked" id="metaCheckbox"></div>
+        <span class="setting-label">显示序号和描述摘要</span>
+      </label>
     </div>
   </div>
   <script>
+    const panels = ${panelsJson};
+    let currentCols = ${defaultCols};
+    let currentShowMeta = ${defaultShowMeta};
+    const panelW = ${panelW};
+    const gap = ${gap};
+
+    function escapeHtml(s) {
+      var d = document.createElement('div');
+      d.textContent = s == null ? '' : String(s);
+      return d.innerHTML;
+    }
+
+    function renderPanels() {
+      var root = document.getElementById('panelsRoot');
+      var preview = document.getElementById('preview');
+      var totalRowW = currentCols * panelW + (currentCols - 1) * gap + 48;
+      preview.style.maxWidth = totalRowW + 'px';
+
+      var html = '';
+      for (var i = 0; i < panels.length; i++) {
+        var p = panels[i];
+        var metaHtml = currentShowMeta
+          ? '<div class="panel-meta">' +
+              '<div class="panel-order-label">分镜 ' + p.order + '</div>' +
+              '<div class="panel-desc">' + escapeHtml(p.description) + '</div>' +
+            '</div>'
+          : '';
+        html +=
+          '<div class="panel-card">' +
+            '<div class="panel-preview">' +
+              '<div class="panel-gradient" style="background:linear-gradient(135deg,' + p.bgColor + '22 0%,#111827 100%)"></div>' +
+              '<div class="panel-elements">' +
+                '<div class="panel-order-tag">#' + p.order + '</div>' +
+                p.elementsHtml +
+              '</div>' +
+            '</div>' +
+            metaHtml +
+          '</div>';
+      }
+      root.innerHTML = html;
+    }
+
+    var colsButtons = document.querySelectorAll('#colsButtons .cols-btn');
+    for (var i = 0; i < colsButtons.length; i++) {
+      colsButtons[i].addEventListener('click', function (e) {
+        var btn = e.currentTarget;
+        currentCols = parseInt(btn.getAttribute('data-cols'), 10);
+        for (var j = 0; j < colsButtons.length; j++) {
+          colsButtons[j].classList.remove('active');
+        }
+        btn.classList.add('active');
+        renderPanels();
+      });
+    }
+
+    var metaToggle = document.getElementById('metaToggle');
+    var metaCheckbox = document.getElementById('metaCheckbox');
+    metaToggle.addEventListener('click', function () {
+      currentShowMeta = !currentShowMeta;
+      if (currentShowMeta) {
+        metaCheckbox.classList.add('checked');
+      } else {
+        metaCheckbox.classList.remove('checked');
+      }
+      renderPanels();
+    });
+
+    renderPanels();
+
     async function downloadPNG() {
-      const btn = event.target;
+      var btn = document.getElementById('dlBtn');
       btn.disabled = true;
-      btn.textContent = '生成中...';
-      
+      var origText = btn.innerHTML;
+      btn.innerHTML = '生成中...';
+
       try {
-        const preview = document.getElementById('preview');
-        const w = preview.scrollWidth;
-        const h = preview.scrollHeight + 40;
-        
-        const canvas = document.createElement('canvas');
+        var preview = document.getElementById('preview');
+        var w = preview.scrollWidth;
+        var h = preview.scrollHeight + 40;
+
+        var canvas = document.createElement('canvas');
         canvas.width = w * 2;
         canvas.height = h * 2;
-        const ctx = canvas.getContext('2d');
+        var ctx = canvas.getContext('2d');
         ctx.scale(2, 2);
         ctx.fillStyle = '#111827';
         ctx.fillRect(0, 0, w, h);
-        
-        const data = new XMLSerializer().serializeToString(preview);
-        const svgStr = '<svg xmlns="http://www.w3.org/2000/svg" width="' + w + '" height="' + h + '"><foreignObject width="100%" height="100%"><div xmlns="http://www.w3.org/1999/xhtml">' + data + '</div></foreignObject></svg>';
-        
-        const img = new Image();
-        const blob = new Blob([svgStr], { type: 'image/svg+xml;charset=utf-8' });
-        const url = URL.createObjectURL(blob);
-        
-        await new Promise((resolve, reject) => {
+
+        var data = new XMLSerializer().serializeToString(preview);
+        var svgStr = '<svg xmlns="http://www.w3.org/2000/svg" width="' + w + '" height="' + h + '"><foreignObject width="100%" height="100%"><div xmlns="http://www.w3.org/1999/xhtml">' + data + '</div></foreignObject></svg>';
+
+        var img = new Image();
+        var blob = new Blob([svgStr], { type: 'image/svg+xml;charset=utf-8' });
+        var url = URL.createObjectURL(blob);
+
+        await new Promise(function (resolve, reject) {
           img.onload = resolve;
           img.onerror = reject;
           img.src = url;
         });
-        
+
         ctx.drawImage(img, 0, 0);
         URL.revokeObjectURL(url);
-        
-        canvas.toBlob((b) => {
+
+        canvas.toBlob(function (b) {
           if (b) {
-            const a = document.createElement('a');
+            var a = document.createElement('a');
             a.href = URL.createObjectURL(b);
             a.download = 'comic-storyboard-' + Date.now() + '.png';
             a.click();
           }
           btn.disabled = false;
-          btn.textContent = '⬇️ 下载PNG';
+          btn.innerHTML = origText;
         }, 'image/png');
       } catch (err) {
         btn.disabled = false;
-        btn.textContent = '⬇️ 下载PNG';
+        btn.innerHTML = origText;
         alert('下载失败，请尝试使用打印功能另存为PDF');
       }
     }
