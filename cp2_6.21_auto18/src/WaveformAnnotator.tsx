@@ -27,8 +27,11 @@ const WaveformAnnotator: React.FC<WaveformAnnotatorProps> = ({
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const [canvasWidth, setCanvasWidth] = useState(0);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const [baseWidth, setBaseWidth] = useState(0);
   const [canvasHeight, setCanvasHeight] = useState(120);
+  const [zoom, setZoom] = useState(1);
+  const [scrollLeft, setScrollLeft] = useState(0);
   const [showNoteInput, setShowNoteInput] = useState(false);
   const [noteInputPosition, setNoteInputPosition] = useState({ x: 0, y: 0 });
   const [noteInputTime, setNoteInputTime] = useState(0);
@@ -39,6 +42,8 @@ const WaveformAnnotator: React.FC<WaveformAnnotatorProps> = ({
   const [assistLineX, setAssistLineX] = useState(0);
   const [deletingNoteId, setDeletingNoteId] = useState<string | null>(null);
 
+  const canvasWidth = useMemo(() => baseWidth * zoom, [baseWidth, zoom]);
+
   const sortedNotes = useMemo(
     () => [...notes].sort((a, b) => a.time - b.time),
     [notes]
@@ -47,8 +52,8 @@ const WaveformAnnotator: React.FC<WaveformAnnotatorProps> = ({
   useEffect(() => {
     const updateSize = () => {
       if (containerRef.current) {
-        const width = containerRef.current.clientWidth;
-        setCanvasWidth(width);
+        const width = containerRef.current.clientWidth - 32;
+        setBaseWidth(Math.max(width, 300));
         const isMobile = window.innerWidth < 768;
         setCanvasHeight(isMobile ? 80 : 120);
       }
@@ -58,6 +63,27 @@ const WaveformAnnotator: React.FC<WaveformAnnotatorProps> = ({
     window.addEventListener('resize', updateSize);
     return () => window.removeEventListener('resize', updateSize);
   }, []);
+
+  useEffect(() => {
+    if (scrollContainerRef.current) {
+      scrollContainerRef.current.scrollLeft = scrollLeft;
+    }
+  }, [scrollLeft]);
+
+  useEffect(() => {
+    if (zoom > 1 && duration > 0) {
+      const targetX = (currentTime / duration) * canvasWidth;
+      const viewportWidth = baseWidth;
+      const halfViewport = viewportWidth / 2;
+
+      let newScrollLeft = targetX - halfViewport;
+      newScrollLeft = clamp(newScrollLeft, 0, canvasWidth - viewportWidth);
+
+      if (Math.abs(newScrollLeft - scrollLeft) > 10) {
+        setScrollLeft(newScrollLeft);
+      }
+    }
+  }, [currentTime, zoom, duration, canvasWidth, baseWidth, scrollLeft]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -79,7 +105,7 @@ const WaveformAnnotator: React.FC<WaveformAnnotatorProps> = ({
 
     const channelData = audioBuffer.getChannelData(0);
     const samples = canvasWidth * 2;
-    const blockSize = Math.floor(channelData.length / samples);
+    const blockSize = Math.max(1, Math.floor(channelData.length / samples));
     const filteredData: number[] = [];
 
     for (let i = 0; i < samples; i++) {
@@ -94,23 +120,6 @@ const WaveformAnnotator: React.FC<WaveformAnnotatorProps> = ({
     const centerY = canvasHeight / 2;
     const amplitude = (canvasHeight * 0.8) / 2;
 
-    ctx.beginPath();
-    ctx.strokeStyle = waveColor;
-    ctx.lineWidth = 1;
-
-    for (let i = 0; i < canvasWidth; i++) {
-      const dataIndex = i * 2;
-      const val = (filteredData[dataIndex] || 0) / maxVal;
-      const x = i;
-      const y = centerY - val * amplitude;
-      const yBottom = centerY + val * amplitude;
-
-      ctx.moveTo(x, y);
-      ctx.lineTo(x, yBottom);
-    }
-
-    ctx.stroke();
-
     const gradient = ctx.createLinearGradient(0, 0, 0, canvasHeight);
     gradient.addColorStop(0, 'rgba(74, 144, 217, 0.3)');
     gradient.addColorStop(0.5, 'rgba(74, 144, 217, 0.6)');
@@ -123,7 +132,7 @@ const WaveformAnnotator: React.FC<WaveformAnnotatorProps> = ({
       const x = i;
       const yTop = centerY - val * amplitude;
       const yBottom = centerY + val * amplitude;
-      ctx.fillRect(x, yTop, 1, yBottom - yTop);
+      ctx.fillRect(x, yTop, 1, Math.max(1, yBottom - yTop));
     }
   }, [audioBuffer, canvasWidth, canvasHeight, theme]);
 
@@ -143,23 +152,43 @@ const WaveformAnnotator: React.FC<WaveformAnnotatorProps> = ({
     [canvasWidth, duration]
   );
 
+  const handleScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
+    setScrollLeft(e.currentTarget.scrollLeft);
+  }, []);
+
   const handleCanvasClick = useCallback(
     (e: React.MouseEvent<HTMLCanvasElement>) => {
       if (!canvasRef.current || !duration) return;
       const rect = canvasRef.current.getBoundingClientRect();
-      const x = e.clientX - rect.left;
+      const x = e.clientX - rect.left + scrollLeft;
       const time = xToTime(x);
 
       if (draggingNoteId) return;
 
-      setNoteInputPosition({ x: e.clientX - rect.left, y: e.clientY - rect.top + 10 });
+      setNoteInputPosition({ x: x - scrollLeft, y: e.clientY - rect.top + 10 });
       setNoteInputTime(time);
       setNoteInputText('');
       setEditingNoteId(null);
       setShowNoteInput(true);
     },
-    [duration, xToTime, draggingNoteId]
+    [duration, xToTime, draggingNoteId, scrollLeft]
   );
+
+  const handleZoomChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const newZoom = parseFloat(e.target.value);
+    const viewportWidth = baseWidth;
+    const centerX = scrollLeft + viewportWidth / 2;
+    const centerTime = xToTime(centerX);
+
+    setZoom(newZoom);
+
+    setTimeout(() => {
+      const newCanvasWidth = baseWidth * newZoom;
+      const newCenterX = (centerTime / Math.max(duration, 0.01)) * newCanvasWidth;
+      const newScrollLeft = clamp(newCenterX - viewportWidth / 2, 0, Math.max(0, newCanvasWidth - viewportWidth));
+      setScrollLeft(newScrollLeft);
+    }, 0);
+  }, [baseWidth, scrollLeft, xToTime, duration]);
 
   const handleNoteSubmit = useCallback(() => {
     if (!noteInputText.trim()) {
@@ -200,11 +229,11 @@ const WaveformAnnotator: React.FC<WaveformAnnotatorProps> = ({
       setEditingNoteId(note.id);
       setNoteInputText(note.text);
       setNoteInputTime(note.time);
-      const x = timeToX(note.time);
+      const x = timeToX(note.time) - scrollLeft;
       setNoteInputPosition({ x, y: canvasHeight + 10 });
       setShowNoteInput(true);
     },
-    [timeToX, canvasHeight]
+    [timeToX, canvasHeight, scrollLeft]
   );
 
   const handleNoteCardRightClick = useCallback(
@@ -236,7 +265,7 @@ const WaveformAnnotator: React.FC<WaveformAnnotatorProps> = ({
     const handleMouseMove = (e: MouseEvent) => {
       if (!canvasRef.current) return;
       const rect = canvasRef.current.getBoundingClientRect();
-      const x = clamp(e.clientX - rect.left, 0, canvasWidth);
+      const x = clamp(e.clientX - rect.left + scrollLeft, 0, canvasWidth);
       setAssistLineX(x);
 
       const note = notes.find((n) => n.id === draggingNoteId);
@@ -258,122 +287,211 @@ const WaveformAnnotator: React.FC<WaveformAnnotatorProps> = ({
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mouseup', handleMouseUp);
     };
-  }, [draggingNoteId, canvasWidth, notes, xToTime, onUpdateNote]);
+  }, [draggingNoteId, canvasWidth, notes, xToTime, onUpdateNote, scrollLeft]);
 
   const playheadX = timeToX(currentTime);
 
+  const timeMarkers = useMemo(() => {
+    const markers: { time: number; label: string }[] = [];
+    if (duration <= 0) return markers;
+
+    let interval = 10;
+    if (duration > 60) interval = 30;
+    if (duration > 180) interval = 60;
+    if (duration > 600) interval = 120;
+    if (zoom > 2) interval = Math.max(5, Math.floor(interval / zoom));
+
+    for (let t = 0; t <= duration; t += interval) {
+      markers.push({ time: t, label: formatTime(t) });
+    }
+    return markers;
+  }, [duration, zoom]);
+
   return (
     <div style={styles.container} ref={containerRef}>
-      <div style={styles.waveformWrapper}>
-        <canvas
-          ref={canvasRef}
-          style={{
-            ...styles.canvas,
-            width: canvasWidth,
-            height: canvasHeight,
-          }}
-          onClick={handleCanvasClick}
+      <div style={styles.zoomControls}>
+        <span style={styles.zoomLabel}>🔍 缩放</span>
+        <input
+          type="range"
+          min="1"
+          max="5"
+          step="0.1"
+          value={zoom}
+          onChange={handleZoomChange}
+          style={styles.zoomSlider}
         />
-
-        <div
-          style={{
-            ...styles.playhead,
-            left: playheadX,
-            height: canvasHeight,
-          }}
-        />
-
-        {sortedNotes.map((note) => (
-          <div
-            key={note.id}
-            onMouseDown={(e) => handleMarkerMouseDown(note, e)}
-            style={{
-              ...styles.noteMarker,
-              left: timeToX(note.time),
-              height: canvasHeight,
-              cursor: draggingNoteId === note.id ? 'grabbing' : 'grab',
-            }}
-            title={`${formatTime(note.time)} - ${note.text}`}
-          />
-        ))}
-
-        {showAssistLine && (
-          <div
-            style={{
-              ...styles.assistLine,
-              left: assistLineX,
-              height: canvasHeight,
-            }}
-          />
-        )}
-
-        {showNoteInput && (
-          <div
-            style={{
-              ...styles.noteInputWrapper,
-              left: Math.min(
-                Math.max(noteInputPosition.x - 100, 0),
-                canvasWidth - 200
-              ),
-              top: Math.max(
-                noteInputPosition.y - 80,
-                10
-              ),
-            }}
-            onClick={(e) => e.stopPropagation()}
+        <span style={styles.zoomValue}>{zoom.toFixed(1)}x</span>
+        {zoom > 1 && (
+          <button
+            onClick={() => setZoom(1)}
+            style={styles.resetZoomBtn}
+            title="重置缩放"
           >
-            <div style={styles.noteInputTimeLabel}>
-              {formatTime(noteInputTime)}
-            </div>
-            <input
-              type="text"
-              value={noteInputText}
-              onChange={(e) => setNoteInputText(e.target.value)}
-              onKeyDown={handleNoteKeyDown}
-              autoFocus
-              placeholder="输入笔记内容..."
-              style={styles.noteInput}
-            />
-            <div style={styles.noteInputActions}>
-              <button
-                onClick={() => {
-                  setShowNoteInput(false);
-                  setNoteInputText('');
-                  setEditingNoteId(null);
-                }}
-                style={styles.cancelBtn}
-              >
-                取消
-              </button>
-              <button onClick={handleNoteSubmit} style={styles.saveBtn}>
-                {editingNoteId ? '更新' : '添加'}
-              </button>
-            </div>
-          </div>
+            重置
+          </button>
         )}
       </div>
 
-      <div style={styles.notesContainer}>
-        {sortedNotes.map((note) => (
-          <div
-            key={note.id}
-            onClick={(e) => handleNoteCardClick(note, e)}
-            onContextMenu={(e) => handleNoteCardRightClick(note, e)}
+      <div
+        ref={scrollContainerRef}
+        onScroll={handleScroll}
+        style={{
+          ...styles.scrollContainer,
+          overflowX: zoom > 1 ? 'auto' : 'hidden',
+        }}
+      >
+        <div
+          style={{
+            ...styles.waveformWrapper,
+            width: canvasWidth,
+            minWidth: '100%',
+          }}
+        >
+          <canvas
+            ref={canvasRef}
             style={{
-              ...styles.noteCard,
-              left: `${(note.time / Math.max(duration, 0.01)) * 100}%`,
-              transform: 'translateX(-50%)',
-              opacity: deletingNoteId === note.id ? 0 : 1,
-              transformOrigin: 'center',
-              transition: 'opacity 0.2s ease, transform 0.2s ease',
+              ...styles.canvas,
+              width: canvasWidth,
+              height: canvasHeight,
             }}
-            className={deletingNoteId === note.id ? 'note-card-exit' : ''}
-            title="点击编辑，右键删除"
+            onClick={handleCanvasClick}
+          />
+
+          <div
+            style={{
+              ...styles.playhead,
+              left: playheadX,
+              height: canvasHeight,
+            }}
+          />
+
+          {sortedNotes.map((note) => (
+            <div
+              key={note.id}
+              onMouseDown={(e) => handleMarkerMouseDown(note, e)}
+              style={{
+                ...styles.noteMarker,
+                left: timeToX(note.time),
+                height: canvasHeight,
+                cursor: draggingNoteId === note.id ? 'grabbing' : 'grab',
+              }}
+              title={`${formatTime(note.time)} - ${note.text}`}
+            />
+          ))}
+
+          {showAssistLine && (
+            <div
+              style={{
+                ...styles.assistLine,
+                left: assistLineX,
+                height: canvasHeight,
+              }}
+            />
+          )}
+
+          {showNoteInput && (
+            <div
+              style={{
+                ...styles.noteInputWrapper,
+                left: Math.min(
+                  Math.max(noteInputPosition.x - 100, 0),
+                  baseWidth - 200
+                ),
+                top: Math.max(
+                  noteInputPosition.y - 80,
+                  10
+                ),
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div style={styles.noteInputTimeLabel}>
+                {formatTime(noteInputTime)}
+              </div>
+              <input
+                type="text"
+                value={noteInputText}
+                onChange={(e) => setNoteInputText(e.target.value)}
+                onKeyDown={handleNoteKeyDown}
+                autoFocus
+                placeholder="输入笔记内容..."
+                style={styles.noteInput}
+              />
+              <div style={styles.noteInputActions}>
+                <button
+                  onClick={() => {
+                    setShowNoteInput(false);
+                    setNoteInputText('');
+                    setEditingNoteId(null);
+                  }}
+                  style={styles.cancelBtn}
+                >
+                  取消
+                </button>
+                <button onClick={handleNoteSubmit} style={styles.saveBtn}>
+                  {editingNoteId ? '更新' : '添加'}
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div style={styles.timeRuler}>
+        {timeMarkers.map((marker) => (
+          <div
+            key={marker.time}
+            style={{
+              ...styles.timeMarker,
+              left: `${(marker.time / Math.max(duration, 0.01)) * 100}%`,
+              transform: 'translateX(-50%)',
+            }}
           >
-            <div style={styles.noteCardTime}>{formatTime(note.time)}</div>
-            <div style={styles.noteCardText}>{note.text || '(空笔记)'}</div>
+            <div style={styles.timeMarkerTick} />
+            <span style={styles.timeMarkerLabel}>{marker.label}</span>
           </div>
         ))}
+      </div>
+
+      <div
+        style={{
+          ...styles.notesContainer,
+          overflowX: zoom > 1 ? 'auto' : 'hidden',
+        }}
+        onScroll={(e) => {
+          if (zoom > 1) {
+            scrollContainerRef.current?.scrollTo({ left: e.currentTarget.scrollLeft });
+          }
+        }}
+      >
+        <div
+          style={{
+            ...styles.notesInner,
+            width: canvasWidth,
+            minWidth: '100%',
+            position: 'relative',
+          }}
+        >
+          {sortedNotes.map((note) => (
+            <div
+              key={note.id}
+              onClick={(e) => handleNoteCardClick(note, e)}
+              onContextMenu={(e) => handleNoteCardRightClick(note, e)}
+              style={{
+                ...styles.noteCard,
+                left: `${(note.time / Math.max(duration, 0.01)) * 100}%`,
+                transform: 'translateX(-50%)',
+                opacity: deletingNoteId === note.id ? 0 : 1,
+                transformOrigin: 'center',
+                transition: 'opacity 0.2s ease, transform 0.2s ease',
+              }}
+              className={deletingNoteId === note.id ? 'note-card-exit' : ''}
+              title="点击编辑，右键删除"
+            >
+              <div style={styles.noteCardTime}>{formatTime(note.time)}</div>
+              <div style={styles.noteCardText}>{note.text || '(空笔记)'}</div>
+            </div>
+          ))}
+        </div>
       </div>
 
       <div style={styles.timeLabels}>
@@ -396,9 +514,51 @@ const styles: Record<string, React.CSSProperties> = {
     minHeight: 0,
     borderBottom: '1px solid #2A2A40',
   },
+  zoomControls: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '12px',
+    padding: '8px 12px',
+    marginBottom: '12px',
+    backgroundColor: 'var(--bg-secondary)',
+    borderRadius: '6px',
+  },
+  zoomLabel: {
+    fontSize: '12px',
+    color: 'var(--text-secondary)',
+    flexShrink: 0,
+  },
+  zoomSlider: {
+    flex: 1,
+    height: '4px',
+    cursor: 'pointer',
+    accentColor: '#4A90D9',
+  },
+  zoomValue: {
+    fontSize: '12px',
+    color: 'var(--accent-blue)',
+    fontWeight: 600,
+    minWidth: '40px',
+    textAlign: 'right',
+    fontFamily: 'monospace',
+  },
+  resetZoomBtn: {
+    padding: '4px 10px',
+    fontSize: '11px',
+    borderRadius: '4px',
+    backgroundColor: 'var(--bg-card)',
+    color: 'var(--text-secondary)',
+    border: '1px solid var(--border-color)',
+    cursor: 'pointer',
+    transition: 'all 0.2s ease',
+  },
+  scrollContainer: {
+    width: '100%',
+    position: 'relative',
+    flexShrink: 0,
+  },
   waveformWrapper: {
     position: 'relative',
-    width: '100%',
     flexShrink: 0,
   },
   canvas: {
@@ -480,17 +640,47 @@ const styles: Record<string, React.CSSProperties> = {
     border: 'none',
     cursor: 'pointer',
   },
-  notesContainer: {
+  timeRuler: {
     position: 'relative',
     width: '100%',
+    height: '24px',
+    marginTop: '4px',
+    borderBottom: '1px solid var(--border-color)',
+    overflow: 'hidden',
+  },
+  timeMarker: {
+    position: 'absolute',
+    top: 0,
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+  },
+  timeMarkerTick: {
+    width: '1px',
+    height: '6px',
+    backgroundColor: 'var(--text-secondary)',
+    opacity: 0.5,
+  },
+  timeMarkerLabel: {
+    fontSize: '9px',
+    color: 'var(--text-secondary)',
+    fontFamily: 'monospace',
+    marginTop: '2px',
+  },
+  notesContainer: {
+    width: '100%',
     minHeight: '80px',
-    marginTop: '16px',
+    marginTop: '8px',
     flex: 1,
-    overflowX: 'auto',
     overflowY: 'hidden',
+    position: 'relative',
+  },
+  notesInner: {
+    height: '100%',
   },
   noteCard: {
     position: 'absolute',
+    top: '8px',
     width: '160px',
     backgroundColor: 'var(--bg-card)',
     borderRadius: '6px',
