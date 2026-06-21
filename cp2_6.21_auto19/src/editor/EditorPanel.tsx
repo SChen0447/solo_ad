@@ -55,7 +55,8 @@ const EditorPanel: React.FC<EditorPanelProps> = ({ onBack }) => {
     warnings: string[]
   } | null>(null)
   const [showExportedJson, setExportedJson] = useState<string>('')
-  const [flashCells, setFlashCells] = useState<FlashCell[]>([])
+  const flashCellsRef = useRef<FlashCell[]>([])
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [toast, setToast] = useState<ToastState>({
     message: '',
     type: 'success',
@@ -65,21 +66,35 @@ const EditorPanel: React.FC<EditorPanelProps> = ({ onBack }) => {
 
   const cellSize = Math.round(BASE_CELL_SIZE * zoom)
   const canvasSize = GRID_SIZE * cellSize
+  const cellSizeRef = useRef(cellSize)
+  cellSizeRef.current = cellSize
 
   const showToast = useCallback((message: string, type: 'success' | 'error') => {
+    if (toastTimerRef.current) {
+      clearTimeout(toastTimerRef.current)
+    }
     setToast({ message, type, visible: true })
-    setTimeout(() => {
+    toastTimerRef.current = setTimeout(() => {
       setToast(prev => ({ ...prev, visible: false }))
+      toastTimerRef.current = null
     }, 2000)
   }, [])
 
   useEffect(() => {
-    const now = Date.now()
-    const active = flashCells.filter(f => now - f.timestamp < 150)
-    if (active.length !== flashCells.length) {
-      setFlashCells(active)
+    return () => {
+      if (toastTimerRef.current) {
+        clearTimeout(toastTimerRef.current)
+      }
     }
-  }, [flashCells])
+  }, [])
+
+  useEffect(() => {
+    const canvas = canvasRef.current
+    if (!canvas) return
+
+    canvas.width = canvasSize
+    canvas.height = canvasSize
+  }, [canvasSize])
 
   useEffect(() => {
     const canvas = canvasRef.current
@@ -91,9 +106,6 @@ const EditorPanel: React.FC<EditorPanelProps> = ({ onBack }) => {
     const cs = cellSize
     const w = GRID_SIZE * cs
     const h = GRID_SIZE * cs
-
-    canvas.width = w
-    canvas.height = h
 
     ctx.fillStyle = '#0B0E17'
     ctx.fillRect(0, 0, w, h)
@@ -154,7 +166,8 @@ const EditorPanel: React.FC<EditorPanelProps> = ({ onBack }) => {
     }
 
     const now = Date.now()
-    for (const flash of flashCells) {
+    flashCellsRef.current = flashCellsRef.current.filter(f => now - f.timestamp < 150)
+    for (const flash of flashCellsRef.current) {
       const elapsed = now - flash.timestamp
       if (elapsed < 150) {
         const alpha = 1 - elapsed / 150
@@ -171,25 +184,111 @@ const EditorPanel: React.FC<EditorPanelProps> = ({ onBack }) => {
       ctx.lineWidth = 2
       ctx.strokeRect(dragPos.x * cs, dragPos.y * cs, cs, cs)
     }
-  }, [grid, dragPos, isDragging, cellSize, flashCells])
+  }, [grid, dragPos, isDragging, cellSize])
+
+  useEffect(() => {
+    let animId: number
+    let running = true
+
+    const animateFlash = () => {
+      if (!running) return
+      const canvas = canvasRef.current
+      if (!canvas) return
+
+      if (flashCellsRef.current.length > 0) {
+        const ctx = canvas.getContext('2d')
+        if (ctx) {
+          const cs = Math.round(BASE_CELL_SIZE * zoom)
+          const w = GRID_SIZE * cs
+          const h = GRID_SIZE * cs
+
+          ctx.clearRect(0, 0, w, h)
+          ctx.fillStyle = '#0B0E17'
+          ctx.fillRect(0, 0, w, h)
+
+          for (let y = 0; y < GRID_SIZE; y++) {
+            for (let x = 0; x < GRID_SIZE; x++) {
+              const tile = grid[y][x]
+              const px = x * cs
+              const py = y * cs
+
+              let color = '#1F2937'
+              switch (tile) {
+                case 'path': color = '#4B5563'; break
+                case 'wall': color = '#1F2937'; break
+                case 'entangled': color = '#F59E0B'; break
+                case 'trap': color = '#EF4444'; break
+                case 'observer': color = '#10B981'; break
+                case 'start': color = '#3B82F6'; break
+                case 'exit': color = '#8B5CF6'; break
+              }
+
+              ctx.fillStyle = color
+              ctx.fillRect(px + 1, py + 1, cs - 2, cs - 2)
+              ctx.strokeStyle = '#374151'
+              ctx.lineWidth = 1
+              ctx.strokeRect(px, py, cs, cs)
+
+              if (tile === 'start') {
+                ctx.fillStyle = '#fff'
+                ctx.font = `bold ${Math.max(10, Math.round(cs * 0.35))}px sans-serif`
+                ctx.textAlign = 'center'
+                ctx.textBaseline = 'middle'
+                ctx.fillText('S', px + cs / 2, py + cs / 2)
+              }
+              if (tile === 'exit') {
+                ctx.fillStyle = '#fff'
+                ctx.font = `bold ${Math.max(10, Math.round(cs * 0.35))}px sans-serif`
+                ctx.textAlign = 'center'
+                ctx.textBaseline = 'middle'
+                ctx.fillText('E', px + cs / 2, py + cs / 2)
+              }
+            }
+          }
+
+          const now = Date.now()
+          flashCellsRef.current = flashCellsRef.current.filter(f => now - f.timestamp < 150)
+          for (const flash of flashCellsRef.current) {
+            const elapsed = now - flash.timestamp
+            const alpha = 1 - elapsed / 150
+            const px = flash.x * cs
+            const py = flash.y * cs
+            ctx.strokeStyle = `rgba(255, 255, 255, ${alpha})`
+            ctx.lineWidth = 2
+            ctx.strokeRect(px + 1, py + 1, cs - 2, cs - 2)
+          }
+        }
+      }
+
+      animId = requestAnimationFrame(animateFlash)
+    }
+
+    animId = requestAnimationFrame(animateFlash)
+
+    return () => {
+      running = false
+      cancelAnimationFrame(animId)
+    }
+  }, [grid, zoom])
 
   const getGridPos = useCallback(
     (e: React.MouseEvent<HTMLCanvasElement>): { x: number; y: number } | null => {
       const canvas = canvasRef.current
       if (!canvas) return null
 
+      const cs = cellSizeRef.current
       const rect = canvas.getBoundingClientRect()
       const scaleX = canvas.width / rect.width
       const scaleY = canvas.height / rect.height
-      const x = Math.floor(((e.clientX - rect.left) * scaleX) / cellSize)
-      const y = Math.floor(((e.clientY - rect.top) * scaleY) / cellSize)
+      const x = Math.floor(((e.clientX - rect.left) * scaleX) / cs)
+      const y = Math.floor(((e.clientY - rect.top) * scaleY) / cs)
 
       if (x >= 0 && x < GRID_SIZE && y >= 0 && y < GRID_SIZE) {
         return { x, y }
       }
       return null
     },
-    [cellSize]
+    []
   )
 
   const paintCell = useCallback(
@@ -224,7 +323,7 @@ const EditorPanel: React.FC<EditorPanelProps> = ({ onBack }) => {
         return newGrid
       })
 
-      setFlashCells(prev => [...prev, { x, y, timestamp: Date.now() }])
+      flashCellsRef.current.push({ x, y, timestamp: Date.now() })
     },
     [selectedTool]
   )
@@ -333,8 +432,7 @@ const EditorPanel: React.FC<EditorPanelProps> = ({ onBack }) => {
       </div>
 
       <div style={styles.mainContent}>
-        <div style={styles.toolbarBorder}>
-          <div style={styles.toolbar}>
+        <div style={styles.toolbar}>
             <h3 style={styles.toolbarTitle}>工具栏</h3>
             <div style={styles.toolGrid}>
               {TOOLS.map(tool => (
@@ -435,7 +533,6 @@ const EditorPanel: React.FC<EditorPanelProps> = ({ onBack }) => {
                 style={styles.zoomSlider}
               />
             </div>
-          </div>
         </div>
 
         <div style={styles.canvasWrapper}>
@@ -508,18 +605,14 @@ const styles: Record<string, React.CSSProperties> = {
     justifyContent: 'center',
     alignItems: 'flex-start',
   },
-  toolbarBorder: {
-    borderRadius: '9px',
-    background: 'linear-gradient(135deg, #6366F1, #7C3AED)',
-    padding: '1px',
-    width: '216px',
-  },
   toolbar: {
-    width: '100%',
+    width: '200px',
     padding: '16px',
     borderRadius: '8px',
     background: 'rgba(15, 23, 42, 0.8)',
     backdropFilter: 'blur(10px)',
+    border: '1px solid',
+    borderImage: 'linear-gradient(135deg, #6366F1, #7C3AED) 1',
     display: 'flex',
     flexDirection: 'column',
     gap: '12px',
