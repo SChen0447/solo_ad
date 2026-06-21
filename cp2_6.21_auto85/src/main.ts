@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { Block } from './block';
-import { UIController, Dimension, DIMENSION_LABELS } from './ui';
+import { UIController, Dimension, DIMENSION_LABELS, DIMENSION_COLORS } from './ui';
 
 const GRID_SIZE = 10;
 const SPACING = 1.1;
@@ -63,12 +63,14 @@ class CityHeatmapApp {
   private raycaster: THREE.Raycaster;
   private mouse: THREE.Vector2;
   private hoveredBlock: Block | null = null;
+  private selectedBlock: Block | null = null;
   private currentDimension: Dimension = 'population';
   private currentHour: number = 12;
   private isPlaying: boolean = false;
   private playTimer: ReturnType<typeof setInterval> | null = null;
 
   private isDragging: boolean = false;
+  private dragStartPos: { x: number; y: number } = { x: 0, y: 0 };
   private previousMousePosition: { x: number; y: number } = { x: 0, y: 0 };
   private cameraTheta: number = Math.PI / 4;
   private cameraPhi: number = Math.PI / 4;
@@ -115,6 +117,8 @@ class CityHeatmapApp {
     this.createBlocks();
     this.setupEventListeners();
     this.applyDataToBlocks();
+    this.updateLegendStats();
+    this.updateSelectedBlockInfo();
 
     this.animate(performance.now());
   }
@@ -171,6 +175,7 @@ class CityHeatmapApp {
 
     canvas.addEventListener('mousedown', (e) => {
       this.isDragging = true;
+      this.dragStartPos = { x: e.clientX, y: e.clientY };
       this.previousMousePosition = { x: e.clientX, y: e.clientY };
     });
 
@@ -191,7 +196,14 @@ class CityHeatmapApp {
       }
     });
 
-    canvas.addEventListener('mouseup', () => {
+    canvas.addEventListener('mouseup', (e) => {
+      if (this.isDragging && this.dragStartPos) {
+        const dx = e.clientX - this.dragStartPos.x;
+        const dy = e.clientY - this.dragStartPos.y;
+        if (Math.sqrt(dx * dx + dy * dy) < 5) {
+          this.handleBlockClick();
+        }
+      }
       this.isDragging = false;
     });
 
@@ -257,11 +269,15 @@ class CityHeatmapApp {
   private handleDimensionChange(dim: Dimension): void {
     this.currentDimension = dim;
     this.applyDataToBlocks();
+    this.updateLegendStats();
+    this.updateSelectedBlockInfo();
   }
 
   private handleTimeChange(hour: number): void {
     this.currentHour = hour;
     this.applyDataToBlocks();
+    this.updateLegendStats();
+    this.updateSelectedBlockInfo();
   }
 
   private handlePlayToggle(): void {
@@ -279,6 +295,8 @@ class CityHeatmapApp {
       this.currentHour = (this.currentHour + 1) % 24;
       this.ui.setTime(this.currentHour);
       this.applyDataToBlocks();
+      this.updateLegendStats();
+      this.updateSelectedBlockInfo();
     }, PLAY_INTERVAL);
   }
 
@@ -320,6 +338,60 @@ class CityHeatmapApp {
       block.setData(value, now);
       block.updateLabel(value);
     });
+  }
+
+  private updateLegendStats(): void {
+    const dim = this.currentDimension;
+    const hour = this.currentHour;
+    const values: number[] = [];
+    for (let i = 0; i < this.blockData.length; i++) {
+      values.push(this.blockData[i][dim][hour]);
+    }
+    values.sort((a, b) => a - b);
+    const min = values[0];
+    const max = values[values.length - 1];
+    const median = values[Math.floor(values.length / 2)];
+    this.ui.updateLegendValues(min, median, max);
+  }
+
+  private handleBlockClick(): void {
+    this.raycaster.setFromCamera(this.mouse, this.camera);
+    const meshes = this.blocks.map((b) => b.mesh);
+    const intersects = this.raycaster.intersectObjects(meshes, false);
+
+    if (intersects.length > 0) {
+      const hitMesh = intersects[0].object as THREE.Mesh;
+      const blockIdx = hitMesh.userData.blockIndex;
+      if (blockIdx !== undefined) {
+        this.selectedBlock = this.blocks[blockIdx];
+        this.updateSelectedBlockInfo();
+      }
+    } else {
+      this.selectedBlock = null;
+      this.ui.clearSelectedBlockInfo();
+    }
+  }
+
+  private updateSelectedBlockInfo(): void {
+    if (!this.selectedBlock) return;
+    const block = this.selectedBlock;
+    const hour = this.currentHour;
+    const dim = this.currentDimension;
+    const data = this.blockData[block.index];
+    const value = data[dim][hour];
+    const percentile = this.computePercentile(block.index);
+    const allValues: Record<Dimension, number> = {
+      population: data.population[hour],
+      traffic: data.traffic[hour],
+      greenery: data.greenery[hour],
+    };
+    this.ui.updateSelectedBlockInfo(
+      `${block.row}-${block.col}`,
+      value,
+      percentile,
+      dim,
+      allValues
+    );
   }
 
   private computePercentile(blockIndex: number): number {
@@ -378,16 +450,8 @@ class CityHeatmapApp {
         <div style="margin-bottom:3px;">${DIMENSION_LABELS[this.currentDimension]}: <strong>${value.toFixed(1)}</strong></div>
         <div>全城百分位: <strong>${percentile.toFixed(1)}%</strong></div>
       `;
-
-      this.ui.updateInfoArea(
-        `${row}-${col}`,
-        value,
-        percentile,
-        this.currentDimension
-      );
     } else {
       this.tooltip.style.display = 'none';
-      this.ui.clearInfoArea();
     }
 
     this.hoveredBlock = newHovered;

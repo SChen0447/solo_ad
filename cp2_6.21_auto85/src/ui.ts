@@ -6,6 +6,12 @@ export const DIMENSION_LABELS: Record<Dimension, string> = {
   greenery: '绿化率',
 };
 
+export const DIMENSION_COLORS: Record<Dimension, string> = {
+  population: '#FF4500',
+  traffic: '#1E90FF',
+  greenery: '#22C55E',
+};
+
 export interface UICallbacks {
   onDimensionChange: (dim: Dimension) => void;
   onTimeChange: (hour: number) => void;
@@ -22,6 +28,8 @@ export class UIController {
   private isPlaying: boolean = false;
   private infoArea!: HTMLElement;
   private currentDimension: Dimension = 'population';
+  private legendScaleSpans: HTMLSpanElement[] = [];
+  private legendContainer: HTMLElement | null = null;
 
   constructor(panelId: string, callbacks: UICallbacks) {
     this.panel = document.getElementById(panelId)!;
@@ -57,8 +65,8 @@ export class UIController {
 
     this.infoArea = document.createElement('div');
     this.infoArea.style.cssText =
-      'flex:1; min-height:120px; background:#1F2937; border-radius:8px; padding:12px; font-size:13px; color:#9CA3AF; transition:background 0.2s;';
-    this.infoArea.textContent = '将鼠标悬停在街区上查看详情';
+      'flex:1; min-height:160px; background:#111827; border-radius:8px; padding:12px; font-size:14px; color:#9CA3AF; transition:opacity 0.3s;';
+    this.infoArea.innerHTML = '<div style="color:#6B7280; font-size:13px;">点击街区查看详细信息</div>';
     this.panel.appendChild(this.infoArea);
   }
 
@@ -145,7 +153,8 @@ export class UIController {
 
   private createColorLegend(): HTMLElement {
     const container = document.createElement('div');
-    container.style.cssText = 'display:flex; flex-direction:column; gap:4px; padding:0 8px;';
+    container.style.cssText = 'display:flex; flex-direction:column; gap:4px; padding:0 8px; transition:opacity 0.3s;';
+    this.legendContainer = container;
 
     const barWrapper = document.createElement('div');
     barWrapper.style.cssText = 'position:relative; height:16px;';
@@ -153,38 +162,52 @@ export class UIController {
     const bar = document.createElement('div');
     bar.style.cssText =
       'height:16px; border-radius:4px; background:linear-gradient(to right, #1E90FF, #FFD700, #FF4500); position:relative;';
-    barWrapper.appendChild(bar);
 
     const tickMarks = document.createElement('div');
     tickMarks.style.cssText =
       'position:absolute; top:0; left:0; right:0; bottom:0; pointer-events:none;';
-    [0, 0.33, 0.66, 1].forEach((pos) => {
+    [0, 0.5, 1].forEach((pos) => {
       const tick = document.createElement('div');
       tick.style.cssText = `position:absolute; left:${pos * 100}%; top:0; height:100%; border-left:1px solid rgba(255,255,255,0.2);`;
       tickMarks.appendChild(tick);
     });
     bar.appendChild(tickMarks);
+    barWrapper.appendChild(bar);
     container.appendChild(barWrapper);
 
     const scaleRow = document.createElement('div');
     scaleRow.style.cssText =
-      'display:flex; justify-content:space-between; font-size:10px; color:#9CA3AF; padding:0 0px; position:relative;';
+      'display:flex; justify-content:space-between; font-size:10px; color:#9CA3AF; position:relative;';
 
-    const values = [0.0, 1.0, 2.0, 3.0];
-    values.forEach((v, i) => {
+    this.legendScaleSpans = [];
+    const positions = [0, 0.5, 1];
+    positions.forEach((pos, i) => {
       const span = document.createElement('span');
-      span.textContent = v.toFixed(1);
+      span.textContent = '0.0';
       span.style.cssText =
         i === 0
           ? ''
-          : i === values.length - 1
+          : i === positions.length - 1
             ? ''
-            : 'position:absolute; left:' + (i / (values.length - 1)) * 100 + '%; transform:translateX(-50%);';
+            : 'position:absolute; left:50%; transform:translateX(-50%);';
+      span.style.transition = 'opacity 0.3s';
+      this.legendScaleSpans.push(span);
       scaleRow.appendChild(span);
     });
     container.appendChild(scaleRow);
 
     return container;
+  }
+
+  updateLegendValues(min: number, median: number, max: number): void {
+    if (!this.legendContainer) return;
+    this.legendContainer.style.opacity = '0.3';
+    setTimeout(() => {
+      this.legendScaleSpans[0].textContent = min.toFixed(1);
+      this.legendScaleSpans[1].textContent = median.toFixed(1);
+      this.legendScaleSpans[2].textContent = max.toFixed(1);
+      this.legendContainer!.style.opacity = '1';
+    }, 150);
   }
 
   private createTimeControls(): HTMLElement {
@@ -252,18 +275,60 @@ export class UIController {
     return this.currentDimension;
   }
 
-  updateInfoArea(blockId: string, value: number, percentile: number, dimension: Dimension): void {
-    this.infoArea.innerHTML = `
-      <div style="margin-bottom:8px; font-weight:600; color:#F9FAFB;">街区 #${blockId}</div>
-      <div style="margin-bottom:4px;">维度: ${DIMENSION_LABELS[dimension]}</div>
-      <div style="margin-bottom:4px;">数值: <span style="color:#FFD700; font-weight:600;">${value.toFixed(1)}</span></div>
-      <div>全城百分位: <span style="color:#1E90FF; font-weight:600;">${percentile.toFixed(1)}%</span></div>
-    `;
-    this.infoArea.style.background = '#1F2937';
+  updateSelectedBlockInfo(
+    blockId: string,
+    value: number,
+    percentile: number,
+    dimension: Dimension,
+    allValues: Record<Dimension, number>
+  ): void {
+    const dims: Dimension[] = ['population', 'traffic', 'greenery'];
+    const barChartsHtml = dims
+      .map((d) => {
+        const val = allValues[d];
+        const pct = Math.max(0, Math.min(100, val * 100));
+        const color = DIMENSION_COLORS[d];
+        const isActive = d === dimension;
+        const labelColor = isActive ? '#F9FAFB' : '#9CA3AF';
+        const fontWeight = isActive ? '600' : '400';
+        return `
+          <div style="display:flex; align-items:center; gap:8px; margin-bottom:6px;">
+            <span style="width:56px; font-size:12px; color:${labelColor}; font-weight:${fontWeight}; white-space:nowrap;">${DIMENSION_LABELS[d]}</span>
+            <div style="flex:1; height:10px; background:#1F2937; border-radius:3px; overflow:hidden;">
+              <div style="width:${pct}%; height:100%; background:${color}; border-radius:3px; transition:width 0.5s ease;"></div>
+            </div>
+            <span style="width:32px; text-align:right; font-size:12px; color:${labelColor}; font-weight:${fontWeight};">${val.toFixed(1)}</span>
+          </div>
+        `;
+      })
+      .join('');
+
+    this.infoArea.style.opacity = '0.3';
+    setTimeout(() => {
+      this.infoArea.innerHTML = `
+        <div style="font-weight:600; color:#F9FAFB; font-size:15px; margin-bottom:10px;">街区 #${blockId}</div>
+        <div style="margin-bottom:4px;">
+          ${DIMENSION_LABELS[dimension]}:
+          <span style="color:#FFD700; font-weight:600;">${value.toFixed(1)}</span>
+        </div>
+        <div style="margin-bottom:12px;">
+          全城百分位:
+          <span style="color:#1E90FF; font-weight:600;">${percentile.toFixed(1)}%</span>
+        </div>
+        <div style="border-top:1px solid #1F2937; padding-top:10px;">
+          <div style="font-size:12px; color:#6B7280; margin-bottom:8px;">各维度对比</div>
+          ${barChartsHtml}
+        </div>
+      `;
+      this.infoArea.style.opacity = '1';
+    }, 150);
   }
 
-  clearInfoArea(): void {
-    this.infoArea.innerHTML = '将鼠标悬停在街区上查看详情';
-    this.infoArea.style.color = '#9CA3AF';
+  clearSelectedBlockInfo(): void {
+    this.infoArea.style.opacity = '0.3';
+    setTimeout(() => {
+      this.infoArea.innerHTML = '<div style="color:#6B7280; font-size:13px;">点击街区查看详细信息</div>';
+      this.infoArea.style.opacity = '1';
+    }, 150);
   }
 }
