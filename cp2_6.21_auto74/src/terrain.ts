@@ -97,17 +97,13 @@ export function createTerrain(): TerrainResult {
   }
 
   function updateCaustics(time: number, intensity: number): void {
-    causticsGroup.children.forEach((child) => {
+    causticsGroup.children.forEach((child, index) => {
       const data = child.userData;
       const t = time * CAUSTIC_SPEED;
       child.position.x = data.baseX + Math.sin(t * data.speedX + data.phaseX) * 2.0;
       child.position.z = data.baseZ + Math.cos(t * data.speedZ + data.phaseZ) * 2.0;
-      const opacityWave = Math.sin(time * 1.5 + data.phaseX) * 0.5 + 0.5;
-      (child as THREE.Mesh).material.opacity = THREE.MathUtils.lerp(
-        CAUSTIC_MIN_OPACITY,
-        CAUSTIC_MAX_OPACITY,
-        opacityWave,
-      ) * intensity;
+      const opacity = 0.4 + 0.4 * (Math.sin(time * 2 + index) * 0.5 + 0.5);
+      (child as THREE.Mesh).material.opacity = opacity * intensity;
     });
     causticsGroup.visible = intensity > 0.01;
   }

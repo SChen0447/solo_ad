@@ -6,12 +6,12 @@ const FISH_SWAY_AMPLITUDE = 0.1;
 const FISH_SWAY_FREQUENCY = 2;
 const FISH_COLOR_START = new THREE.Color(0xFFA500);
 const FISH_COLOR_END = new THREE.Color(0xFF6347);
-const BOIDS_SEPARATION_DIST = 1.5;
+const BOIDS_SEPARATION_DIST = 3;
 const BOIDS_ALIGNMENT_DIST = 3;
 const BOIDS_COHESION_DIST = 3;
-const BOIDS_SEPARATION_WEIGHT = 1.5;
+const BOIDS_SEPARATION_WEIGHT = 2.0;
 const BOIDS_ALIGNMENT_WEIGHT = 1.0;
-const BOIDS_COHESION_WEIGHT = 1.0;
+const BOIDS_COHESION_WEIGHT = 1.5;
 const TURTLE_COLOR = 0x2E8B57;
 const TURTLE_LIMB_AMPLITUDE = 0.2;
 const TURTLE_LIMB_PERIOD = 1.5;
@@ -119,7 +119,7 @@ export class FishSchool {
       }
 
       const boidsForce = this.computeBoids(agent);
-      agent.velocity.add(boidsForce.multiplyScalar(delta));
+      agent.velocity.add(boidsForce.multiplyScalar(delta * 2));
       if (agent.velocity.length() > this.maxSpeed) {
         agent.velocity.normalize().multiplyScalar(this.maxSpeed);
       }
@@ -236,40 +236,28 @@ export class Turtle {
 
   constructor(getHeightAt: (x: number, z: number) => number) {
     this.group = new THREE.Group();
-    const shellGeometry = new THREE.SphereGeometry(0.4, 12, 10);
-    const shellMaterial = new THREE.MeshPhongMaterial({ color: TURTLE_COLOR });
-    const shell = new THREE.Mesh(shellGeometry, shellMaterial);
-    shell.scale.set(1, 0.6, 1.2);
-    this.group.add(shell);
-
-    const headGeometry = new THREE.SphereGeometry(0.15, 8, 6);
-    const headMaterial = new THREE.MeshPhongMaterial({ color: 0x3CB371 });
-    const head = new THREE.Mesh(headGeometry, headMaterial);
-    head.position.set(0, 0, 0.55);
-    this.group.add(head);
+    const bodyGeometry = new THREE.SphereGeometry(0.4, 12, 10);
+    const bodyMaterial = new THREE.MeshPhongMaterial({ color: TURTLE_COLOR });
+    const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
+    body.scale.set(1, 0.6, 1.4);
+    this.group.add(body);
 
     const limbPositions = [
-      { x: 0.3, z: 0.25, side: 1, phase: 0 },
-      { x: -0.3, z: 0.25, side: -1, phase: Math.PI },
-      { x: 0.3, z: -0.2, side: 1, phase: Math.PI },
-      { x: -0.3, z: -0.2, side: -1, phase: 0 },
+      { x: 0.32, z: 0.28, side: 1, phase: 0 },
+      { x: -0.32, z: 0.28, side: -1, phase: Math.PI },
+      { x: 0.32, z: -0.25, side: 1, phase: Math.PI },
+      { x: -0.32, z: -0.25, side: -1, phase: 0 },
     ];
 
     for (const lp of limbPositions) {
-      const limbGeom = new THREE.SphereGeometry(0.1, 6, 4);
+      const limbGeom = new THREE.SphereGeometry(0.12, 8, 6);
       const limbMat = new THREE.MeshPhongMaterial({ color: 0x3CB371 });
       const limb = new THREE.Mesh(limbGeom, limbMat);
-      limb.scale.set(0.8, 0.5, 1.5);
-      limb.position.set(lp.x, -0.1, lp.z);
+      limb.scale.set(0.7, 0.5, 1.6);
+      limb.position.set(lp.x, -0.12, lp.z);
       this.group.add(limb);
       this.limbs.push({ mesh: limb, side: lp.side, phase: lp.phase });
     }
-
-    const tailGeom = new THREE.SphereGeometry(0.06, 6, 4);
-    const tailMat = new THREE.MeshPhongMaterial({ color: 0x3CB371 });
-    const tail = new THREE.Mesh(tailGeom, tailMat);
-    tail.position.set(0, 0, -0.5);
-    this.group.add(tail);
 
     const x = (Math.random() - 0.5) * GRID_HALF * 1.2;
     const z = (Math.random() - 0.5) * GRID_HALF * 1.2;

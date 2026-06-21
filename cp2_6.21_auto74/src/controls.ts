@@ -109,10 +109,14 @@ export class ControlPanel {
     const btn = document.createElement('button');
     btn.textContent = '重置视角';
     btn.style.cssText = `
-      width: 180px; height: 40px; border: none; border-radius: 20px;
+      box-sizing: border-box; flex-shrink: 0;
+      width: 180px; height: 40px; padding: 0;
+      border: none; border-radius: 20px;
       background: linear-gradient(135deg, #6366F1, #A855F7);
       color: white; font-size: 14px; font-weight: 500; cursor: pointer;
       align-self: center; transition: transform 0.2s ease;
+      line-height: 40px; display: inline-flex;
+      align-items: center; justify-content: center;
     `;
     btn.addEventListener('mouseenter', () => { btn.style.transform = 'scale(1.05)'; });
     btn.addEventListener('mouseleave', () => { btn.style.transform = 'scale(1)'; });
@@ -124,10 +128,14 @@ export class ControlPanel {
     const btn = document.createElement('button');
     btn.textContent = '生成随机生物';
     btn.style.cssText = `
-      width: 180px; height: 40px; border: none; border-radius: 20px;
+      box-sizing: border-box; flex-shrink: 0;
+      width: 180px; height: 40px; padding: 0;
+      border: none; border-radius: 20px;
       background: linear-gradient(135deg, #6366F1, #A855F7);
       color: white; font-size: 14px; font-weight: 500; cursor: pointer;
       align-self: center; transition: transform 0.2s ease;
+      line-height: 40px; display: inline-flex;
+      align-items: center; justify-content: center;
     `;
     btn.addEventListener('mouseenter', () => { btn.style.transform = 'scale(1.05)'; });
     btn.addEventListener('mouseleave', () => { btn.style.transform = 'scale(1)'; });
