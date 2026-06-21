@@ -14,6 +14,13 @@ interface Particle {
   size: number;
   color: THREE.Color;
   trail: THREE.Vector3[];
+  glowIndex: number;
+}
+
+interface Connection {
+  i: number;
+  j: number;
+  startTime: number;
 }
 
 let particles: Particle[] = [];
@@ -25,6 +32,8 @@ let params: ParticleSystemParams = {
   glowIntensity: 1.0
 };
 
+const MAX_TRAIL_LENGTH = 100;
+
 let points: THREE.Points;
 let pointsGeometry: THREE.BufferGeometry;
 let trailLine: THREE.LineSegments;
@@ -32,10 +41,14 @@ let trailGeometry: THREE.BufferGeometry;
 let connectionLine: THREE.LineSegments;
 let connectionGeometry: THREE.BufferGeometry;
 let glowSprites: THREE.Sprite[] = [];
+let glowSpriteMap: Map<number, number> = new Map();
 
-let connectionData: Map<string, { startTime: number; opacity: number }> = new Map();
+let activeConnections: Connection[] = [];
 const connectionLifetime: number = 0.2;
 const connectionDistance: number = 0.3;
+const CONNECTION_DISTANCE_SQ = connectionDistance * connectionDistance;
+
+const SPATIAL_CELL_SIZE = 0.5;
 
 const defaultParams: ParticleSystemParams = {
   particleCount: 3000,
@@ -72,14 +85,88 @@ function createGlowTexture(): THREE.Texture {
   canvas.height = 128;
   const ctx = canvas.getContext('2d')!;
   const gradient = ctx.createRadialGradient(64, 64, 0, 64, 64, 64);
-  gradient.addColorStop(0, 'rgba(150, 100, 255, 1)');
-  gradient.addColorStop(0.2, 'rgba(100, 80, 200, 0.6)');
-  gradient.addColorStop(0.5, 'rgba(80, 60, 180, 0.2)');
-  gradient.addColorStop(1, 'rgba(60, 40, 150, 0)');
+  gradient.addColorStop(0, 'rgba(180, 140, 255, 1)');
+  gradient.addColorStop(0.15, 'rgba(140, 100, 230, 0.8)');
+  gradient.addColorStop(0.35, 'rgba(100, 70, 200, 0.4)');
+  gradient.addColorStop(0.6, 'rgba(70, 50, 170, 0.15)');
+  gradient.addColorStop(1, 'rgba(50, 30, 140, 0)');
   ctx.fillStyle = gradient;
   ctx.fillRect(0, 0, 128, 128);
   const texture = new THREE.CanvasTexture(canvas);
   return texture;
+}
+
+function rebuildTrailGeometry(): void {
+  if (trailGeometry) {
+    trailGeometry.dispose();
+  }
+  
+  const maxTrailSegments = params.particleCount * (MAX_TRAIL_LENGTH - 1);
+  const trailPositions = new Float32Array(maxTrailSegments * 2 * 3);
+  const trailColors = new Float32Array(maxTrailSegments * 2 * 3);
+  
+  trailGeometry = new THREE.BufferGeometry();
+  trailGeometry.setAttribute('position', new THREE.BufferAttribute(trailPositions, 3));
+  trailGeometry.setAttribute('color', new THREE.BufferAttribute(trailColors, 3));
+  
+  if (trailLine) {
+    trailLine.geometry = trailGeometry;
+  }
+}
+
+function rebuildConnectionGeometry(): void {
+  if (connectionGeometry) {
+    connectionGeometry.dispose();
+  }
+  
+  const maxConnections = params.particleCount * 6;
+  const connectionPositions = new Float32Array(maxConnections * 2 * 3);
+  const connectionColors = new Float32Array(maxConnections * 2 * 3);
+  
+  connectionGeometry = new THREE.BufferGeometry();
+  connectionGeometry.setAttribute('position', new THREE.BufferAttribute(connectionPositions, 3));
+  connectionGeometry.setAttribute('color', new THREE.BufferAttribute(connectionColors, 3));
+  
+  if (connectionLine) {
+    connectionLine.geometry = connectionGeometry;
+  }
+}
+
+function disposeGlowSprites(): void {
+  for (const sprite of glowSprites) {
+    (sprite.material as THREE.Material).dispose();
+    scene.remove(sprite);
+  }
+  glowSprites = [];
+  glowSpriteMap.clear();
+}
+
+function createGlowForAllParticles(glowTexture: THREE.Texture): void {
+  disposeGlowSprites();
+  
+  for (let i = 0; i < particles.length; i++) {
+    const spriteMaterial = new THREE.SpriteMaterial({
+      map: glowTexture,
+      color: new THREE.Color().setRGB(
+        0.6 * params.glowIntensity,
+        0.4 * params.glowIntensity,
+        1.0 * params.glowIntensity
+      ),
+      transparent: true,
+      opacity: 0.6,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false
+    });
+    const sprite = new THREE.Sprite(spriteMaterial);
+    const glowRadius = 0.15;
+    sprite.scale.set(glowRadius * 2, glowRadius * 2, 1.0);
+    sprite.position.copy(particles[i].position);
+    sprite.visible = true;
+    glowSprites.push(sprite);
+    scene.add(sprite);
+    glowSpriteMap.set(i, i);
+    particles[i].glowIndex = i;
+  }
 }
 
 export function createParticles(sceneRef: THREE.Scene, initialParams?: Partial<ParticleSystemParams>): void {
@@ -87,7 +174,6 @@ export function createParticles(sceneRef: THREE.Scene, initialParams?: Partial<P
   params = { ...defaultParams, ...initialParams };
   
   particles = [];
-  glowSprites = [];
   
   const glowTexture = createGlowTexture();
   
@@ -100,8 +186,6 @@ export function createParticles(sceneRef: THREE.Scene, initialParams?: Partial<P
     
     const size = 0.03 + Math.random() * 0.07;
     const color = new THREE.Color();
-    const hue = 30 + Math.random() * 150;
-    hslToRgb(hue, 0.9, 0.6, color);
     getColorFromHeight(pos.y, color);
     
     const trail: THREE.Vector3[] = [];
@@ -114,7 +198,8 @@ export function createParticles(sceneRef: THREE.Scene, initialParams?: Partial<P
       velocity: new THREE.Vector3(),
       size,
       color,
-      trail
+      trail,
+      glowIndex: -1
     });
   }
   
@@ -151,13 +236,7 @@ export function createParticles(sceneRef: THREE.Scene, initialParams?: Partial<P
   points = new THREE.Points(pointsGeometry, pointsMaterial);
   scene.add(points);
   
-  const maxTrailSegments = params.particleCount * (params.trailLength - 1);
-  const trailPositions = new Float32Array(maxTrailSegments * 2 * 3);
-  const trailColors = new Float32Array(maxTrailSegments * 2 * 3);
-  
-  trailGeometry = new THREE.BufferGeometry();
-  trailGeometry.setAttribute('position', new THREE.BufferAttribute(trailPositions, 3));
-  trailGeometry.setAttribute('color', new THREE.BufferAttribute(trailColors, 3));
+  rebuildTrailGeometry();
   
   const trailMaterial = new THREE.LineBasicMaterial({
     vertexColors: true,
@@ -171,13 +250,7 @@ export function createParticles(sceneRef: THREE.Scene, initialParams?: Partial<P
   trailLine = new THREE.LineSegments(trailGeometry, trailMaterial);
   scene.add(trailLine);
   
-  const maxConnections = params.particleCount * 4;
-  const connectionPositions = new Float32Array(maxConnections * 2 * 3);
-  const connectionColors = new Float32Array(maxConnections * 2 * 3);
-  
-  connectionGeometry = new THREE.BufferGeometry();
-  connectionGeometry.setAttribute('position', new THREE.BufferAttribute(connectionPositions, 3));
-  connectionGeometry.setAttribute('color', new THREE.BufferAttribute(connectionColors, 3));
+  rebuildConnectionGeometry();
   
   const connectionMaterial = new THREE.LineBasicMaterial({
     vertexColors: true,
@@ -191,105 +264,133 @@ export function createParticles(sceneRef: THREE.Scene, initialParams?: Partial<P
   connectionLine = new THREE.LineSegments(connectionGeometry, connectionMaterial);
   scene.add(connectionLine);
   
-  for (let i = 0; i < Math.min(params.particleCount, 500); i++) {
-    const spriteMaterial = new THREE.SpriteMaterial({
-      map: glowTexture,
-      color: new THREE.Color(0.6, 0.4, 1.0),
-      transparent: true,
-      opacity: 0.3 * params.glowIntensity,
-      blending: THREE.AdditiveBlending,
-      depthWrite: false
-    });
-    const sprite = new THREE.Sprite(spriteMaterial);
-    sprite.scale.set(0.3, 0.3, 1.0);
-    sprite.position.copy(particles[i].position);
-    sprite.visible = true;
-    glowSprites.push(sprite);
-    scene.add(sprite);
+  createGlowForAllParticles(glowTexture);
+}
+
+type SpatialGrid = Map<string, number[]>;
+
+function buildSpatialGrid(): SpatialGrid {
+  const grid: SpatialGrid = new Map();
+  const cellSize = SPATIAL_CELL_SIZE;
+  
+  for (let i = 0; i < particles.length; i++) {
+    const p = particles[i];
+    const gx = Math.floor(p.position.x / cellSize);
+    const gy = Math.floor(p.position.y / cellSize);
+    const gz = Math.floor(p.position.z / cellSize);
+    const key = gx + '_' + gy + '_' + gz;
+    
+    let cell = grid.get(key);
+    if (!cell) {
+      cell = [];
+      grid.set(key, cell);
+    }
+    cell.push(i);
   }
+  
+  return grid;
+}
+
+function getNeighborCells(gx: number, gy: number, gz: number, grid: SpatialGrid): number[][] {
+  const result: number[][] = [];
+  for (let dx = -1; dx <= 1; dx++) {
+    for (let dy = -1; dy <= 1; dy++) {
+      for (let dz = -1; dz <= 1; dz++) {
+        const key = (gx + dx) + '_' + (gy + dy) + '_' + (gz + dz);
+        const cell = grid.get(key);
+        if (cell && cell.length > 0) {
+          result.push(cell);
+        }
+      }
+    }
+  }
+  return result;
+}
+
+function distanceSquared(a: THREE.Vector3, b: THREE.Vector3): number {
+  const dx = a.x - b.x;
+  const dy = a.y - b.y;
+  const dz = a.z - b.z;
+  return dx * dx + dy * dy + dz * dz;
 }
 
 function updateConnectionLines(): void {
   const now = performance.now() / 1000;
-  const positions = connectionGeometry.attributes.position.array as Float32Array;
-  const colors = connectionGeometry.attributes.color.array as Float32Array;
   
-  const newConnections: Map<string, { startTime: number; opacity: number }> = new Map();
-  
-  let segIdx = 0;
-  const maxSegs = Math.floor(positions.length / 6);
-  
-  const gridSize = 2;
-  const grid: Map<string, number[]> = new Map();
-  
-  for (let i = 0; i < particles.length; i++) {
-    const p = particles[i];
-    const gx = Math.floor(p.position.x / gridSize);
-    const gy = Math.floor(p.position.y / gridSize);
-    const gz = Math.floor(p.position.z / gridSize);
-    const key = `${gx},${gy},${gz}`;
-    if (!grid.has(key)) grid.set(key, []);
-    grid.get(key)!.push(i);
+  const stillAlive: Connection[] = [];
+  for (const conn of activeConnections) {
+    if (now - conn.startTime < connectionLifetime) {
+      stillAlive.push(conn);
+    }
   }
   
-  const checked = new Set<string>();
+  const existingSet = new Set<string>();
+  for (const conn of stillAlive) {
+    existingSet.add(conn.i < conn.j ? conn.i + '-' + conn.j : conn.j + '-' + conn.i);
+  }
+  
+  const grid = buildSpatialGrid();
+  const cellSize = SPATIAL_CELL_SIZE;
   
   for (let i = 0; i < particles.length; i++) {
-    if (segIdx >= maxSegs) break;
-    
     const p1 = particles[i];
-    const gx = Math.floor(p1.position.x / gridSize);
-    const gy = Math.floor(p1.position.y / gridSize);
-    const gz = Math.floor(p1.position.z / gridSize);
+    const gx = Math.floor(p1.position.x / cellSize);
+    const gy = Math.floor(p1.position.y / cellSize);
+    const gz = Math.floor(p1.position.z / cellSize);
     
-    for (let dx = -1; dx <= 1; dx++) {
-      for (let dy = -1; dy <= 1; dy++) {
-        for (let dz = -1; dz <= 1; dz++) {
-          const key = `${gx + dx},${gy + dy},${gz + dz}`;
-          const cell = grid.get(key);
-          if (!cell) continue;
-          
-          for (const j of cell) {
-            if (j <= i) continue;
-            const pairKey = i < j ? `${i}-${j}` : `${j}-${i}`;
-            if (checked.has(pairKey)) continue;
-            checked.add(pairKey);
-            
-            const p2 = particles[j];
-            const dist = p1.position.distanceTo(p2.position);
-            
-            if (dist < connectionDistance) {
-              const existing = connectionData.get(pairKey);
-              const entry = existing || { startTime: now, opacity: 0.4 };
-              if (!existing) {
-                entry.startTime = now;
-              }
-              newConnections.set(pairKey, entry);
-              
-              positions[segIdx * 6] = p1.position.x;
-              positions[segIdx * 6 + 1] = p1.position.y;
-              positions[segIdx * 6 + 2] = p1.position.z;
-              positions[segIdx * 6 + 3] = p2.position.x;
-              positions[segIdx * 6 + 4] = p2.position.y;
-              positions[segIdx * 6 + 5] = p2.position.z;
-              
-              const age = now - entry.startTime;
-              const lifeRatio = 1 - Math.min(1, age / connectionLifetime);
-              const colorIntensity = lifeRatio;
-              
-              colors[segIdx * 6] = colorIntensity;
-              colors[segIdx * 6 + 1] = colorIntensity;
-              colors[segIdx * 6 + 2] = colorIntensity;
-              colors[segIdx * 6 + 3] = colorIntensity;
-              colors[segIdx * 6 + 4] = colorIntensity;
-              colors[segIdx * 6 + 5] = colorIntensity;
-              
-              segIdx++;
-            }
-          }
+    const neighborCells = getNeighborCells(gx, gy, gz, grid);
+    
+    for (const cell of neighborCells) {
+      for (const j of cell) {
+        if (j <= i) continue;
+        
+        const pairKey = i < j ? i + '-' + j : j + '-' + i;
+        if (existingSet.has(pairKey)) continue;
+        
+        const p2 = particles[j];
+        const distSq = distanceSquared(p1.position, p2.position);
+        
+        if (distSq < CONNECTION_DISTANCE_SQ) {
+          stillAlive.push({ i, j, startTime: now });
+          existingSet.add(pairKey);
         }
       }
     }
+  }
+  
+  activeConnections = stillAlive;
+  
+  const positions = connectionGeometry.attributes.position.array as Float32Array;
+  const colors = connectionGeometry.attributes.color.array as Float32Array;
+  const maxSegs = Math.floor(positions.length / 6);
+  
+  let segIdx = 0;
+  for (const conn of activeConnections) {
+    if (segIdx >= maxSegs) break;
+    
+    const p1 = particles[conn.i];
+    const p2 = particles[conn.j];
+    const age = now - conn.startTime;
+    const lifeRatio = 1 - Math.min(1, age / connectionLifetime);
+    
+    positions[segIdx * 6] = p1.position.x;
+    positions[segIdx * 6 + 1] = p1.position.y;
+    positions[segIdx * 6 + 2] = p1.position.z;
+    positions[segIdx * 6 + 3] = p2.position.x;
+    positions[segIdx * 6 + 4] = p2.position.y;
+    positions[segIdx * 6 + 5] = p2.position.z;
+    
+    const cR = lifeRatio;
+    const cG = lifeRatio;
+    const cB = lifeRatio;
+    colors[segIdx * 6] = cR;
+    colors[segIdx * 6 + 1] = cG;
+    colors[segIdx * 6 + 2] = cB;
+    colors[segIdx * 6 + 3] = cR;
+    colors[segIdx * 6 + 4] = cG;
+    colors[segIdx * 6 + 5] = cB;
+    
+    segIdx++;
   }
   
   for (let i = segIdx * 6; i < positions.length; i++) {
@@ -297,7 +398,6 @@ function updateConnectionLines(): void {
     colors[i] = 0;
   }
   
-  connectionData = newConnections;
   connectionGeometry.attributes.position.needsUpdate = true;
   connectionGeometry.attributes.color.needsUpdate = true;
   connectionGeometry.setDrawRange(0, segIdx * 2);
@@ -314,8 +414,9 @@ function updateTrails(): void {
   for (let i = 0; i < particles.length && segIdx < maxSegs; i++) {
     const p = particles[i];
     const trail = p.trail;
+    const actualTrailLen = Math.min(trail.length, trailLen);
     
-    for (let j = 0; j < trailLen - 1 && segIdx < maxSegs; j++) {
+    for (let j = 0; j < actualTrailLen - 1 && segIdx < maxSegs; j++) {
       const t1 = trail[j];
       const t2 = trail[j + 1];
       
@@ -326,8 +427,8 @@ function updateTrails(): void {
       positions[segIdx * 6 + 4] = t2.y;
       positions[segIdx * 6 + 5] = t2.z;
       
-      const alpha1 = j / trailLen;
-      const alpha2 = (j + 1) / trailLen;
+      const alpha1 = 1 - j / actualTrailLen;
+      const alpha2 = 1 - (j + 1) / actualTrailLen;
       
       colors[segIdx * 6] = p.color.r * alpha1;
       colors[segIdx * 6 + 1] = p.color.g * alpha1;
@@ -350,13 +451,13 @@ function updateTrails(): void {
   trailGeometry.setDrawRange(0, segIdx * 2);
 }
 
+const tmpVel = new THREE.Vector3();
+
 export function updateParticles(deltaTime: number): void {
   updateFlow(deltaTime);
   
   const positions = pointsGeometry.attributes.position.array as Float32Array;
   const colors = pointsGeometry.attributes.color.array as Float32Array;
-  
-  const tmpVel = new THREE.Vector3();
   
   for (let i = 0; i < particles.length; i++) {
     const p = particles[i];
@@ -382,11 +483,19 @@ export function updateParticles(deltaTime: number): void {
     colors[i * 3 + 1] = p.color.g;
     colors[i * 3 + 2] = p.color.b;
     
-    if (p.trail.length > 0) {
+    if (params.trailLength > 0) {
       p.trail.unshift(p.position.clone());
-      if (p.trail.length > params.trailLength) {
+      if (p.trail.length > MAX_TRAIL_LENGTH) {
         p.trail.pop();
       }
+      while (p.trail.length > params.trailLength) {
+        p.trail.pop();
+      }
+    }
+    
+    const glowIdx = p.glowIndex;
+    if (glowIdx >= 0 && glowIdx < glowSprites.length) {
+      glowSprites[glowIdx].position.copy(p.position);
     }
   }
   
@@ -395,10 +504,6 @@ export function updateParticles(deltaTime: number): void {
   
   updateTrails();
   updateConnectionLines();
-  
-  for (let i = 0; i < glowSprites.length && i < particles.length; i++) {
-    glowSprites[i].position.copy(particles[i].position);
-  }
 }
 
 export function setSpeedMultiplier(value: number): void {
@@ -406,22 +511,43 @@ export function setSpeedMultiplier(value: number): void {
 }
 
 export function setTrailLength(value: number): void {
-  params.trailLength = Math.max(0, Math.floor(value));
+  const newTrailLength = Math.max(0, Math.min(MAX_TRAIL_LENGTH, Math.floor(value)));
+  const oldTrailLength = params.trailLength;
+  params.trailLength = newTrailLength;
   
-  for (const p of particles) {
-    while (p.trail.length < params.trailLength) {
-      p.trail.push(p.position.clone());
+  if (newTrailLength > oldTrailLength) {
+    for (const p of particles) {
+      while (p.trail.length < newTrailLength) {
+        p.trail.push(p.position.clone());
+      }
     }
-    while (p.trail.length > params.trailLength) {
-      p.trail.pop();
+  } else {
+    for (const p of particles) {
+      while (p.trail.length > newTrailLength) {
+        p.trail.pop();
+      }
     }
   }
+  
+  updateTrails();
 }
 
 export function setGlowIntensity(value: number): void {
   params.glowIntensity = value;
+  const clampedValue = Math.max(0, value);
+  
+  const baseR = 0.6;
+  const baseG = 0.4;
+  const baseB = 1.0;
+  
   for (const sprite of glowSprites) {
-    (sprite.material as THREE.SpriteMaterial).opacity = 0.3 * value;
+    const mat = sprite.material as THREE.SpriteMaterial;
+    const intensity = Math.min(2.0, clampedValue);
+    mat.color.setRGB(
+      Math.min(1.0, baseR * intensity),
+      Math.min(1.0, baseG * intensity),
+      Math.min(1.0, baseB * intensity)
+    );
   }
 }
 
@@ -445,10 +571,6 @@ export function disposeParticles(): void {
     (connectionLine.material as THREE.Material).dispose();
     scene.remove(connectionLine);
   }
-  for (const sprite of glowSprites) {
-    (sprite.material as THREE.Material).dispose();
-    scene.remove(sprite);
-  }
-  glowSprites = [];
+  disposeGlowSprites();
   particles = [];
 }

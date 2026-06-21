@@ -11,6 +11,10 @@ let transitionActive: boolean = false;
 const tmpVel1 = new THREE.Vector3();
 const tmpVel2 = new THREE.Vector3();
 
+function easeInOutCubic(t: number): number {
+  return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+}
+
 function laminarField(pos: THREE.Vector3, out: THREE.Vector3): void {
   const speed = 2;
   out.set(
@@ -52,16 +56,6 @@ function turbulenceField(pos: THREE.Vector3, out: THREE.Vector3): void {
   out.set(vx, vy, vz).multiplyScalar(1.2);
 }
 
-export function computeVelocity(position: THREE.Vector3, out: THREE.Vector3): void {
-  if (transitionActive && transitionProgress < 1) {
-    computeVelocityForMode(currentMode, position, tmpVel1);
-    computeVelocityForMode(targetMode, position, tmpVel2);
-    out.lerpVectors(tmpVel1, tmpVel2, transitionProgress);
-  } else {
-    computeVelocityForMode(currentMode, position, out);
-  }
-}
-
 function computeVelocityForMode(mode: FlowMode, pos: THREE.Vector3, out: THREE.Vector3): void {
   switch (mode) {
     case 'laminar':
@@ -76,11 +70,35 @@ function computeVelocityForMode(mode: FlowMode, pos: THREE.Vector3, out: THREE.V
   }
 }
 
+export function computeVelocity(position: THREE.Vector3, out: THREE.Vector3): void {
+  if (transitionActive && transitionProgress < 1) {
+    computeVelocityForMode(currentMode, position, tmpVel1);
+    computeVelocityForMode(targetMode, position, tmpVel2);
+    
+    const easedProgress = easeInOutCubic(transitionProgress);
+    out.lerpVectors(tmpVel1, tmpVel2, easedProgress);
+  } else {
+    computeVelocityForMode(currentMode, position, out);
+  }
+}
+
 export function switchMode(mode: FlowMode): void {
-  if (mode === currentMode && !transitionActive) return;
-  targetMode = mode;
-  transitionProgress = 0;
-  transitionActive = true;
+  if (transitionActive) {
+    if (mode === targetMode) return;
+    
+    const easedProgress = easeInOutCubic(transitionProgress);
+    if (easedProgress > 0.5) {
+      currentMode = targetMode;
+    }
+    targetMode = mode;
+    transitionProgress = 0;
+    transitionActive = true;
+  } else {
+    if (mode === currentMode) return;
+    targetMode = mode;
+    transitionProgress = 0;
+    transitionActive = true;
+  }
 }
 
 export function updateFlow(deltaTime: number): void {
@@ -96,4 +114,8 @@ export function updateFlow(deltaTime: number): void {
 
 export function getCurrentMode(): FlowMode {
   return transitionActive ? targetMode : currentMode;
+}
+
+export function getTransitionProgress(): number {
+  return transitionActive ? easeInOutCubic(transitionProgress) : 1;
 }

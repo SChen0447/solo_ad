@@ -11,6 +11,8 @@ let gridHelper: THREE.GridHelper;
 
 let autoRotateEnabled = true;
 let userInteracting = false;
+let orbitDragging = false;
+let orbitDamping = false;
 const autoRotateSpeed = 0.01;
 let lastInteractionTime = 0;
 const interactionResumeDelay = 2000;
@@ -53,6 +55,7 @@ function init(): void {
   controls.update();
 
   setupInteractionListeners();
+  setupOrbitControlsListeners();
 
   gridHelper = new THREE.GridHelper(20, 20, 0x404080, 0x303060);
   gridHelper.material.transparent = true;
@@ -93,25 +96,62 @@ function createRadialGradientTexture(): THREE.Texture {
   return texture;
 }
 
+function markInteraction(): void {
+  userInteracting = true;
+  autoRotateEnabled = false;
+  lastInteractionTime = performance.now();
+}
+
+function endInteraction(): void {
+  userInteracting = false;
+  lastInteractionTime = performance.now();
+}
+
 function setupInteractionListeners(): void {
   const dom = renderer.domElement;
 
-  const onInteractionStart = () => {
-    userInteracting = true;
-    autoRotateEnabled = false;
-    lastInteractionTime = performance.now();
-  };
+  dom.addEventListener('mousedown', () => {
+    markInteraction();
+  });
 
-  const onInteractionEnd = () => {
-    userInteracting = false;
-    lastInteractionTime = performance.now();
-  };
+  dom.addEventListener('touchstart', () => {
+    markInteraction();
+  }, { passive: true });
 
-  dom.addEventListener('mousedown', onInteractionStart);
-  dom.addEventListener('touchstart', onInteractionStart, { passive: true });
-  document.addEventListener('mouseup', onInteractionEnd);
-  document.addEventListener('touchend', onInteractionEnd);
-  dom.addEventListener('wheel', onInteractionStart, { passive: true });
+  document.addEventListener('mouseup', () => {
+    endInteraction();
+  });
+
+  document.addEventListener('touchend', () => {
+    endInteraction();
+  });
+
+  dom.addEventListener('wheel', () => {
+    markInteraction();
+  }, { passive: true });
+
+  dom.addEventListener('contextmenu', (e) => {
+    e.preventDefault();
+  });
+}
+
+function setupOrbitControlsListeners(): void {
+  controls.addEventListener('start', () => {
+    orbitDragging = true;
+    orbitDamping = true;
+    markInteraction();
+  });
+
+  controls.addEventListener('change', () => {
+    if (orbitDragging) {
+      markInteraction();
+    }
+  });
+
+  controls.addEventListener('end', () => {
+    orbitDragging = false;
+    endInteraction();
+  });
 }
 
 function resetCamera(): void {
@@ -121,6 +161,8 @@ function resetCamera(): void {
   resetStartTime = performance.now();
   resetStartPos.copy(camera.position);
   resetStartTarget.copy(controls.target);
+  orbitDragging = false;
+  orbitDamping = false;
 }
 
 function updateResetCamera(_deltaMs: number): void {
@@ -137,6 +179,7 @@ function updateResetCamera(_deltaMs: number): void {
 
   if (t >= 1) {
     resettingCamera = false;
+    orbitDamping = false;
   }
 }
 
@@ -147,26 +190,30 @@ function easeInOutCubic(t: number): number {
 function updateAutoRotate(delta: number): void {
   if (resettingCamera) return;
   
-  if (!userInteracting && !autoRotateEnabled) {
+  if (orbitDragging || userInteracting) {
+    return;
+  }
+
+  if (!autoRotateEnabled) {
     const now = performance.now();
     if (now - lastInteractionTime > interactionResumeDelay) {
       autoRotateEnabled = true;
+    } else {
+      return;
     }
   }
 
-  if (autoRotateEnabled && !userInteracting) {
-    const angle = autoRotateSpeed * delta;
-    const radius = camera.position.distanceTo(controls.target);
-    const currentAngle = Math.atan2(
-      camera.position.x - controls.target.x,
-      camera.position.z - controls.target.z
-    );
-    const newAngle = currentAngle + angle;
-    
-    camera.position.x = controls.target.x + Math.sin(newAngle) * radius;
-    camera.position.z = controls.target.z + Math.cos(newAngle) * radius;
-    camera.lookAt(controls.target);
-  }
+  const angle = autoRotateSpeed * delta;
+  const radius = camera.position.distanceTo(controls.target);
+  const currentAngle = Math.atan2(
+    camera.position.x - controls.target.x,
+    camera.position.z - controls.target.z
+  );
+  const newAngle = currentAngle + angle;
+  
+  camera.position.x = controls.target.x + Math.sin(newAngle) * radius;
+  camera.position.z = controls.target.z + Math.cos(newAngle) * radius;
+  camera.lookAt(controls.target);
 }
 
 let lastTime = performance.now();
