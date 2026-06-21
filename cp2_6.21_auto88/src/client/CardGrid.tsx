@@ -354,14 +354,18 @@ export default function CardGrid({
         }
         .search-filter-bar {
           display: flex;
-          justify-content: center;
+          justify-content: space-between;
           align-items: center;
           gap: 16px;
-          margin-bottom: 12px;
+          margin-bottom: 16px;
+          max-width: 900px;
+          margin-left: auto;
+          margin-right: auto;
         }
         .search-input-wrapper {
           position: relative;
-          width: 300px;
+          flex: 0 0 auto;
+          width: 320px;
         }
         .search-icon {
           position: absolute;
@@ -369,27 +373,26 @@ export default function CardGrid({
           top: 50%;
           transform: translateY(-50%);
           font-size: 14px;
-          opacity: 0.6;
+          opacity: 0.7;
           pointer-events: none;
         }
         .search-input {
           width: 100%;
-          height: 42px;
+          height: 40px;
           padding: 0 40px 0 40px;
           border-radius: 8px;
-          border: 1px solid #475569;
-          background: #1E293B;
-          color: #E5E7EB;
+          border: 1px solid transparent;
+          background: #334155;
+          color: #FFFFFF;
           font-size: 14px;
-          transition: border-color 0.2s ease, box-shadow 0.2s ease;
+          transition: border-color 0.2s ease;
         }
         .search-input::placeholder {
-          color: #64748B;
+          color: #9CA3AF;
         }
         .search-input:focus {
           outline: none;
           border-color: #F59E0B;
-          box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.15);
         }
         .clear-search {
           position: absolute;
@@ -400,7 +403,7 @@ export default function CardGrid({
           height: 22px;
           border-radius: 50%;
           background: #475569;
-          color: #E5E7EB;
+          color: #FFFFFF;
           font-size: 12px;
           display: flex;
           align-items: center;
@@ -413,12 +416,12 @@ export default function CardGrid({
         }
         .rarity-filter {
           width: 180px;
-          height: 42px;
+          height: 40px;
           padding: 0 14px;
           border-radius: 8px;
-          border: 1px solid #475569;
-          background: #1E293B;
-          color: #E5E7EB;
+          border: 1px solid transparent;
+          background: #334155;
+          color: #FFFFFF;
           font-size: 14px;
           cursor: pointer;
           transition: border-color 0.2s ease;
@@ -429,7 +432,7 @@ export default function CardGrid({
         }
         .rarity-filter option {
           background: #1E293B;
-          color: #E5E7EB;
+          color: #FFFFFF;
         }
         .filter-info {
           text-align: center;
