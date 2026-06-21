@@ -71,21 +71,6 @@ const WaveformAnnotator: React.FC<WaveformAnnotatorProps> = ({
   }, [scrollLeft]);
 
   useEffect(() => {
-    if (zoom > 1 && duration > 0) {
-      const targetX = (currentTime / duration) * canvasWidth;
-      const viewportWidth = baseWidth;
-      const halfViewport = viewportWidth / 2;
-
-      let newScrollLeft = targetX - halfViewport;
-      newScrollLeft = clamp(newScrollLeft, 0, canvasWidth - viewportWidth);
-
-      if (Math.abs(newScrollLeft - scrollLeft) > 10) {
-        setScrollLeft(newScrollLeft);
-      }
-    }
-  }, [currentTime, zoom, duration, canvasWidth, baseWidth, scrollLeft]);
-
-  useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas || !audioBuffer || canvasWidth === 0) return;
 
@@ -295,43 +280,30 @@ const WaveformAnnotator: React.FC<WaveformAnnotatorProps> = ({
     const markers: { time: number; label: string }[] = [];
     if (duration <= 0) return markers;
 
-    let interval = 10;
-    if (duration > 60) interval = 30;
-    if (duration > 180) interval = 60;
-    if (duration > 600) interval = 120;
-    if (zoom > 2) interval = Math.max(5, Math.floor(interval / zoom));
+    const minPixelSpacing = 60;
+    const baseSecondsPerPixel = duration / baseWidth;
+    const secondsPerPixel = baseSecondsPerPixel / zoom;
+    const minIntervalSeconds = secondsPerPixel * minPixelSpacing;
 
-    for (let t = 0; t <= duration; t += interval) {
+    const niceIntervals = [
+      0.1, 0.2, 0.25, 0.5, 1, 2, 5, 10, 15, 20, 30, 60, 120, 180, 300, 600,
+    ];
+    let interval = niceIntervals[niceIntervals.length - 1];
+    for (const candidate of niceIntervals) {
+      if (candidate >= minIntervalSeconds) {
+        interval = candidate;
+        break;
+      }
+    }
+
+    for (let t = 0; t <= duration + interval * 0.001; t += interval) {
       markers.push({ time: t, label: formatTime(t) });
     }
     return markers;
-  }, [duration, zoom]);
+  }, [duration, zoom, baseWidth]);
 
   return (
     <div style={styles.container} ref={containerRef}>
-      <div style={styles.zoomControls}>
-        <span style={styles.zoomLabel}>🔍 缩放</span>
-        <input
-          type="range"
-          min="1"
-          max="5"
-          step="0.1"
-          value={zoom}
-          onChange={handleZoomChange}
-          style={styles.zoomSlider}
-        />
-        <span style={styles.zoomValue}>{zoom.toFixed(1)}x</span>
-        {zoom > 1 && (
-          <button
-            onClick={() => setZoom(1)}
-            style={styles.resetZoomBtn}
-            title="重置缩放"
-          >
-            重置
-          </button>
-        )}
-      </div>
-
       <div
         ref={scrollContainerRef}
         onScroll={handleScroll}
@@ -436,6 +408,32 @@ const WaveformAnnotator: React.FC<WaveformAnnotatorProps> = ({
         </div>
       </div>
 
+      <div style={styles.zoomControls}>
+        <span style={styles.zoomLabel}>🔍 缩放</span>
+        <input
+          type="range"
+          min="1"
+          max="5"
+          step="0.5"
+          value={zoom}
+          onChange={handleZoomChange}
+          style={styles.zoomSlider}
+        />
+        <span style={styles.zoomValue}>{zoom.toFixed(1)}x</span>
+        {zoom > 1 && (
+          <button
+            onClick={() => {
+              setZoom(1);
+              setScrollLeft(0);
+            }}
+            style={styles.resetZoomBtn}
+            title="重置缩放"
+          >
+            重置
+          </button>
+        )}
+      </div>
+
       <div style={styles.timeRuler}>
         {timeMarkers.map((marker) => (
           <div
@@ -455,18 +453,13 @@ const WaveformAnnotator: React.FC<WaveformAnnotatorProps> = ({
       <div
         style={{
           ...styles.notesContainer,
-          overflowX: zoom > 1 ? 'auto' : 'hidden',
-        }}
-        onScroll={(e) => {
-          if (zoom > 1) {
-            scrollContainerRef.current?.scrollTo({ left: e.currentTarget.scrollLeft });
-          }
+          overflowX: 'hidden',
         }}
       >
         <div
           style={{
             ...styles.notesInner,
-            width: canvasWidth,
+            width: '100%',
             minWidth: '100%',
             position: 'relative',
           }}
@@ -519,7 +512,8 @@ const styles: Record<string, React.CSSProperties> = {
     alignItems: 'center',
     gap: '12px',
     padding: '8px 12px',
-    marginBottom: '12px',
+    marginTop: '12px',
+    marginBottom: '8px',
     backgroundColor: 'var(--bg-secondary)',
     borderRadius: '6px',
   },
