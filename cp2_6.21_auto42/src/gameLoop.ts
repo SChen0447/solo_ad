@@ -35,6 +35,9 @@ export class GameLoop {
   private frameTime: number = 1 / 60;
   private accumulator: number = 0;
 
+  private onKeyDownHandler: (e: KeyboardEvent) => void;
+  private onKeyUpHandler: (e: KeyboardEvent) => void;
+
   constructor(
     scene: THREE.Scene,
     player: Player,
@@ -48,11 +51,7 @@ export class GameLoop {
     this.timeRewind = timeRewind;
     this.gameRenderer = gameRenderer;
 
-    this.setupInput();
-  }
-
-  private setupInput(): void {
-    window.addEventListener('keydown', (e) => {
+    this.onKeyDownHandler = (e: KeyboardEvent) => {
       this.keys.add(e.code);
 
       if (e.code === 'KeyR' && !e.repeat) {
@@ -71,11 +70,18 @@ export class GameLoop {
       if (e.code === 'KeyR' && e.repeat) {
         e.preventDefault();
       }
-    });
+    };
 
-    window.addEventListener('keyup', (e) => {
+    this.onKeyUpHandler = (e: KeyboardEvent) => {
       this.keys.delete(e.code);
-    });
+    };
+
+    this.setupInput();
+  }
+
+  private setupInput(): void {
+    window.addEventListener('keydown', this.onKeyDownHandler);
+    window.addEventListener('keyup', this.onKeyUpHandler);
   }
 
   public start(): void {
@@ -342,7 +348,8 @@ export class GameLoop {
 
   public dispose(): void {
     this.stop();
-    window.removeEventListener('keydown', () => {});
-    window.removeEventListener('keyup', () => {});
+    window.removeEventListener('keydown', this.onKeyDownHandler);
+    window.removeEventListener('keyup', this.onKeyUpHandler);
+    this.keys.clear();
   }
 }

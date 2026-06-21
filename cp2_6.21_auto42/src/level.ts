@@ -389,7 +389,7 @@ export class Level {
     scene.add(this.goalMesh);
   }
 
-  private createBoundary(scene: THREE.Scene): void {
+  public createBoundary(scene: THREE.Scene): void {
     const points = [];
     points.push(new THREE.Vector3(this.bounds.minX, this.bounds.minY, 0));
     points.push(new THREE.Vector3(this.bounds.maxX, this.bounds.minY, 0));
