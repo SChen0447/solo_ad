@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>虚拟乐器博物馆</title>
+  <link rel="stylesheet" href="/src/style.css" />
+</head>
+<body>
+  <div id="app">
+    <canvas id="scene-canvas"></canvas>
+    
+    <nav class="navbar">
+      <div class="navbar-logo">虚拟乐器博物馆</div>
+      <div class="navbar-actions">
+        <button id="reset-view-btn" class="nav-btn">重置视角</button>
+        <button id="fullscreen-btn" class="nav-btn">全屏</button>
+      </div>
+    </nav>
+    
+    <div id="info-panel" class="info-panel hidden">
+      <div class="info-panel-content">
+        <button class="close-btn" id="close-panel-btn">&times;</button>
+        <h2 class="instrument-name" id="instrument-name">-</h2>
+        <div class="instrument-meta">
+          <span class="meta-item" id="instrument-era">-</span>
+          <span class="meta-divider">|</span>
+          <span class="meta-item" id="instrument-origin">-</span>
+        </div>
+        <p class="instrument-desc" id="instrument-desc">-</p>
+        <div class="play-section">
+          <button id="play-btn" class="play-btn">
+            <span class="play-icon">▶</span>
+            <span class="play-text">播放音色</span>
+          </button>
+          <div class="play-status" id="play-status">
+            <div class="status-bar"><div class="status-bar-fill"></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <div class="drag-handle" id="drag-handle"></div>
+  </div>
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
