@@ -302,6 +302,11 @@ body {
   gap: 12px;
 }
 
+.avatar-container {
+  position: relative;
+  display: inline-block;
+}
+
 .member-avatar {
   width: 40px;
   height: 40px;
@@ -314,6 +319,17 @@ body {
   font-weight: 700;
   background-color: var(--bg-card);
   color: var(--text-primary);
+}
+
+.level-badge {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 1px solid white;
+  box-sizing: content-box;
 }
 
 .member-details {
@@ -790,12 +806,37 @@ body {
   border: 1px solid #D0D0D0;
   border-radius: var(--border-radius-sm);
   font-size: 14px;
-  transition: border-color var(--transition-fast);
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
 }
 
 .form-group input:focus {
   outline: none;
-  border-color: var(--accent-primary);
+  border-color: #6F4E37;
+  box-shadow: 0 0 0 3px rgba(111, 78, 55, 0.1);
+}
+
+.input-wrapper {
+  position: relative;
+}
+
+.input-icon {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 15px;
+  pointer-events: none;
+}
+
+.input-with-icon {
+  padding-left: 38px !important;
+  width: 100%;
+}
+
+.input-with-icon:focus {
+  outline: none;
+  border-color: #6F4E37;
+  box-shadow: 0 0 0 3px rgba(111, 78, 55, 0.1);
 }
 
 .form-error {
@@ -805,19 +846,22 @@ body {
 }
 
 .submit-btn {
+  width: 80%;
+  margin: 0 auto;
   padding: 12px;
-  background-color: var(--accent-primary);
+  background-color: #6F4E37;
   color: white;
   border: none;
-  border-radius: var(--border-radius-sm);
+  border-radius: 8px;
   font-size: 16px;
   font-weight: 600;
   cursor: pointer;
   transition: background-color var(--transition-fast);
+  display: block;
 }
 
 .submit-btn:hover:not(:disabled) {
-  background-color: var(--accent-hover);
+  background-color: #5A3D2B;
 }
 
 .submit-btn:disabled {

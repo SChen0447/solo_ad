@@ -55,24 +55,32 @@ function LoginModal({ onClose, onLogin }: LoginModalProps) {
           {isRegister && (
             <div className="form-group">
               <label>昵称</label>
-              <input
-                type="text"
-                value={nickname}
-                onChange={e => setNickname(e.target.value)}
-                placeholder="请输入昵称"
-                required
-              />
+              <div className="input-wrapper">
+                <span className="input-icon">👤</span>
+                <input
+                  type="text"
+                  value={nickname}
+                  onChange={e => setNickname(e.target.value)}
+                  placeholder="请输入昵称"
+                  className="input-with-icon"
+                  required
+                />
+              </div>
             </div>
           )}
           <div className="form-group">
             <label>邮箱</label>
-            <input
-              type="email"
-              value={email}
-              onChange={e => setEmail(e.target.value)}
-              placeholder="请输入邮箱"
-              required
-            />
+            <div className="input-wrapper">
+              <span className="input-icon">✉️</span>
+              <input
+                type="email"
+                value={email}
+                onChange={e => setEmail(e.target.value)}
+                placeholder="请输入邮箱"
+                className="input-with-icon"
+                required
+              />
+            </div>
           </div>
           {error && <div className="form-error">{error}</div>}
           <button

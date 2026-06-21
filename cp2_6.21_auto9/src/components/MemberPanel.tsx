@@ -33,11 +33,17 @@ function MemberPanel({ member, onLogout }: MemberPanelProps) {
   return (
     <div className="member-panel">
       <div className="member-info">
-        <div
-          className="member-avatar"
-          style={{ borderColor: levelColor }}
-        >
-          {firstLetter}
+        <div className="avatar-container">
+          <div
+            className="member-avatar"
+            style={{ borderColor: levelColor }}
+          >
+            {firstLetter}
+          </div>
+          <span
+            className="level-badge"
+            style={{ backgroundColor: levelColor }}
+          />
         </div>
         <div className="member-details">
           <div className="member-name">{member.nickname}</div>
