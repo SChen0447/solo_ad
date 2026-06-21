@@ -20,10 +20,10 @@ interface CanvasAreaProps {
 type DragMode =
   | { type: 'none' }
   | { type: 'move'; startX: number; startY: number; originals: { id: string; x: number; y: number }[] }
-  | { type: 'resize'; id: string; startX: number; startY: number; origX: number; origY: number; origW: number; origH: number }
-  | { type: 'ruler-h'; startY: number }
-  | { type: 'ruler-v'; startX: number }
-  | { type: 'guideline'; id: string; startPos: number; orientation: 'horizontal' | 'vertical' };
+  | { type: 'resize'; id: string; startX: number; startY: number; origW: number; origH: number }
+  | { type: 'ruler-h' }
+  | { type: 'ruler-v' }
+  | { type: 'guideline'; id: string; orientation: 'horizontal' | 'vertical' };
 
 const SNAP_DISTANCE = 5;
 const RULER_SIZE = 24;
@@ -46,28 +46,32 @@ export const CanvasArea: React.FC<CanvasAreaProps> = ({
   const containerRef = useRef<HTMLDivElement>(null);
   const [dragMode, setDragMode] = useState<DragMode>({ type: 'none' });
   const [rotationDisplay, setRotationDisplay] = useState<{ id: string; angle: number } | null>(null);
-  const rotationTimerRef = useRef<number | null>(null);
+  const rotationTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const paper = PAPER_SIZES[paperSize];
+  const elementsRef = useRef(elements);
+  elementsRef.current = elements;
+  const selectedIdsRef = useRef(selectedIds);
+  selectedIdsRef.current = selectedIds;
 
   const showRotation = useCallback((id: string, angle: number) => {
     setRotationDisplay({ id, angle });
     if (rotationTimerRef.current) {
-      window.clearTimeout(rotationTimerRef.current);
+      clearTimeout(rotationTimerRef.current);
     }
-    rotationTimerRef.current = window.setTimeout(() => {
+    rotationTimerRef.current = setTimeout(() => {
       setRotationDisplay(null);
     }, 500);
   }, []);
 
-  const getRelativePos = useCallback((clientX: number, clientY: number) => {
-    const el = canvasRef.current;
-    if (!el) return { x: 0, y: 0 };
-    const rect = el.getBoundingClientRect();
-    return {
-      x: clientX - rect.left,
-      y: clientY - rect.top,
-    };
-  }, [canvasRef]);
+  const getRelativePos = useCallback(
+    (clientX: number, clientY: number) => {
+      const el = canvasRef.current;
+      if (!el) return { x: 0, y: 0 };
+      const rect = el.getBoundingClientRect();
+      return { x: clientX - rect.left, y: clientY - rect.top };
+    },
+    [canvasRef]
+  );
 
   const snapToGuidelines = useCallback(
     (x: number, y: number, w: number, h: number) => {
@@ -89,28 +93,32 @@ export const CanvasArea: React.FC<CanvasAreaProps> = ({
     [guidelines]
   );
 
-  const handleMouseDown = useCallback(
+  const handleElementMouseDown = useCallback(
     (e: React.MouseEvent, el: CanvasElement) => {
       e.stopPropagation();
       const additive = e.shiftKey;
-      const isSelected = selectedIds.includes(el.id);
-      if (!additive && !isSelected) {
-        onSelectElement(el.id, false);
-      } else if (additive) {
+      const isAlreadySelected = selectedIds.includes(el.id);
+
+      if (additive) {
         onSelectElement(el.id, true);
-        return;
+      } else if (!isAlreadySelected) {
+        onSelectElement(el.id, false);
       }
-      const ids = selectedIds.includes(el.id) ? selectedIds : [el.id];
+
+      const ids = additive
+        ? selectedIds.includes(el.id)
+          ? selectedIds
+          : [...selectedIds, el.id]
+        : isAlreadySelected
+        ? selectedIds
+        : [el.id];
+
       const pos = getRelativePos(e.clientX, e.clientY);
       const originals = elements
         .filter((e2) => ids.includes(e2.id))
         .map((e2) => ({ id: e2.id, x: e2.x, y: e2.y }));
-      setDragMode({
-        type: 'move',
-        startX: pos.x,
-        startY: pos.y,
-        originals,
-      });
+
+      setDragMode({ type: 'move', startX: pos.x, startY: pos.y, originals });
     },
     [selectedIds, onSelectElement, getRelativePos, elements]
   );
@@ -125,8 +133,6 @@ export const CanvasArea: React.FC<CanvasAreaProps> = ({
         id: el.id,
         startX: pos.x,
         startY: pos.y,
-        origX: el.x,
-        origY: el.y,
         origW: el.width,
         origH: el.height,
       });
@@ -136,21 +142,28 @@ export const CanvasArea: React.FC<CanvasAreaProps> = ({
 
   const handleCanvasMouseDown = useCallback(
     (e: React.MouseEvent) => {
-      if (e.target === e.currentTarget || (e.target as HTMLElement).dataset.canvasBg === 'true') {
+      const target = e.target as HTMLElement;
+      if (target === e.currentTarget || target.dataset.canvasBg === 'true') {
         onClearSelection();
       }
     },
     [onClearSelection]
   );
 
-  const handleWheel = useCallback(
-    (e: React.WheelEvent) => {
-      if (!e.ctrlKey || selectedIds.length === 0) return;
+  useEffect(() => {
+    const canvasEl = canvasRef.current;
+    if (!canvasEl) return;
+
+    const handleWheel = (e: WheelEvent) => {
+      if (!e.ctrlKey) return;
       e.preventDefault();
+      const ids = selectedIdsRef.current;
+      if (ids.length === 0) return;
       const delta = e.deltaY > 0 ? 15 : -15;
+      const els = elementsRef.current;
       const updates: { id: string; changes: Partial<CanvasElement> }[] = [];
-      for (const id of selectedIds) {
-        const el = elements.find((x) => x.id === id);
+      for (const id of ids) {
+        const el = els.find((x) => x.id === id);
         if (el) {
           const newRot = ((el.rotation + delta) % 360 + 360) % 360;
           updates.push({ id, changes: { rotation: newRot } });
@@ -160,9 +173,11 @@ export const CanvasArea: React.FC<CanvasAreaProps> = ({
       if (updates.length > 0) {
         onUpdateElements(updates);
       }
-    },
-    [selectedIds, elements, onUpdateElements, showRotation]
-  );
+    };
+
+    canvasEl.addEventListener('wheel', handleWheel, { passive: false });
+    return () => canvasEl.removeEventListener('wheel', handleWheel);
+  }, [canvasRef, onUpdateElements, showRotation]);
 
   const handleMouseMove = useCallback(
     (e: MouseEvent) => {
@@ -192,22 +207,23 @@ export const CanvasArea: React.FC<CanvasAreaProps> = ({
       } else if (dragMode.type === 'ruler-h') {
         const pos = getRelativePos(e.clientX, e.clientY);
         if (pos.y > 0 && pos.y < paper.height) {
-          const id = 'g' + Date.now();
-          onAddGuideline({ id, orientation: 'horizontal', position: pos.y });
-          setDragMode({ type: 'guideline', id, startPos: pos.y, orientation: 'horizontal' });
+          const id = 'gh' + Date.now();
+          onAddGuideline({ id, orientation: 'horizontal', position: Math.round(pos.y) });
+          setDragMode({ type: 'guideline', id, orientation: 'horizontal' });
         }
       } else if (dragMode.type === 'ruler-v') {
         const pos = getRelativePos(e.clientX, e.clientY);
         if (pos.x > 0 && pos.x < paper.width) {
-          const id = 'g' + Date.now();
-          onAddGuideline({ id, orientation: 'vertical', position: pos.x });
-          setDragMode({ type: 'guideline', id, startPos: pos.x, orientation: 'vertical' });
+          const id = 'gv' + Date.now();
+          onAddGuideline({ id, orientation: 'vertical', position: Math.round(pos.x) });
+          setDragMode({ type: 'guideline', id, orientation: 'vertical' });
         }
       } else if (dragMode.type === 'guideline') {
         const pos = getRelativePos(e.clientX, e.clientY);
-        const newPos = dragMode.orientation === 'horizontal'
-          ? Math.max(0, Math.min(paper.height, pos.y))
-          : Math.max(0, Math.min(paper.width, pos.x));
+        const newPos =
+          dragMode.orientation === 'horizontal'
+            ? Math.max(0, Math.min(paper.height, Math.round(pos.y)))
+            : Math.max(0, Math.min(paper.width, Math.round(pos.x)));
         onUpdateGuideline(dragMode.id, newPos);
       }
     },
@@ -240,7 +256,7 @@ export const CanvasArea: React.FC<CanvasAreaProps> = ({
   }, [dragMode, handleMouseMove, handleMouseUp]);
 
   const renderRulerTicks = (length: number, isHorizontal: boolean) => {
-    const ticks = [];
+    const ticks: React.ReactNode[] = [];
     for (let i = 0; i <= length; i += 10) {
       const isMajor = i % 50 === 0;
       const size = isMajor ? 10 : 5;
@@ -251,22 +267,23 @@ export const CanvasArea: React.FC<CanvasAreaProps> = ({
           style={{
             position: 'absolute',
             ...(isHorizontal
-              ? { left: i, top: isMajor ? 6 : 11, width: 1, height: size, background: color }
-              : { top: i, left: isMajor ? 6 : 11, height: 1, width: size, background: color }),
+              ? { left: i, top: isMajor ? 4 : 11, width: 1, height: size, background: color }
+              : { top: i, left: isMajor ? 4 : 11, height: 1, width: size, background: color }),
           }}
         />
       );
       if (isMajor && i > 0) {
         ticks.push(
           <div
-            key={'label' + i}
+            key={'l' + i}
             style={{
               position: 'absolute',
               fontSize: 9,
               color: '#6B7280',
+              lineHeight: '10px',
               ...(isHorizontal
-                ? { left: i + 2, top: 2 }
-                : { top: i + 1, left: 2, writingMode: 'vertical-rl' as const, transform: 'rotate(180deg)' }),
+                ? { left: i + 2, top: 1 }
+                : { top: i + 2, left: 1, writingMode: 'vertical-rl' as const, transform: 'rotate(180deg)' }),
               pointerEvents: 'none',
               userSelect: 'none',
             }}
@@ -288,7 +305,7 @@ export const CanvasArea: React.FC<CanvasAreaProps> = ({
       width: el.width,
       height: el.height,
       transform: `rotate(${el.rotation}deg)`,
-      backgroundColor: el.type !== 'line' ? (el.style.backgroundColor || 'transparent') : 'transparent',
+      backgroundColor: el.type !== 'line' ? el.style.backgroundColor || 'transparent' : 'transparent',
       borderWidth: el.style.borderWidth,
       borderColor: el.style.borderColor,
       borderStyle: el.type === 'line' ? 'none' : el.style.borderStyle,
@@ -301,24 +318,21 @@ export const CanvasArea: React.FC<CanvasAreaProps> = ({
     };
 
     if (el.type === 'line') {
-      style.backgroundImage = `linear-gradient(to right, ${el.style.borderColor}, ${el.style.borderColor})`;
+      const lineColor = el.style.borderColor;
+      if (el.style.borderStyle === 'dashed') {
+        style.backgroundImage = `repeating-linear-gradient(to right, ${lineColor} 0 10px, transparent 10px 16px)`;
+      } else if (el.style.borderStyle === 'dotted') {
+        style.backgroundImage = `repeating-linear-gradient(to right, ${lineColor} 0 3px, transparent 3px 7px)`;
+      } else {
+        style.backgroundImage = `linear-gradient(to right, ${lineColor}, ${lineColor})`;
+      }
       style.backgroundSize = `100% ${Math.max(el.height, 2)}px`;
       style.backgroundPosition = 'center';
       style.backgroundRepeat = 'no-repeat';
-      if (el.style.borderStyle === 'dashed') {
-        style.backgroundImage = `repeating-linear-gradient(to right, ${el.style.borderColor} 0 10px, transparent 10px 16px)`;
-      } else if (el.style.borderStyle === 'dotted') {
-        style.backgroundImage = `repeating-linear-gradient(to right, ${el.style.borderColor} 0 3px, transparent 3px 7px)`;
-      }
     }
 
     return (
-      <div
-        key={el.id}
-        style={style}
-        onMouseDown={(e) => handleMouseDown(e, el)}
-        onWheel={handleWheel}
-      >
+      <div key={el.id} style={style} onMouseDown={(e) => handleElementMouseDown(e, el)}>
         {(el.type === 'text' || el.type === 'date') && (
           <div
             style={{
@@ -330,6 +344,7 @@ export const CanvasArea: React.FC<CanvasAreaProps> = ({
               whiteSpace: 'pre-wrap',
               wordBreak: 'break-word',
               userSelect: 'none',
+              pointerEvents: 'none',
             }}
           >
             {(el.style as TextStyle).content}
@@ -350,6 +365,7 @@ export const CanvasArea: React.FC<CanvasAreaProps> = ({
                 borderRadius: 2,
                 cursor: 'nwse-resize',
                 boxSizing: 'border-box',
+                zIndex: 10,
               }}
             />
             {rotationDisplay?.id === el.id && (
@@ -366,8 +382,7 @@ export const CanvasArea: React.FC<CanvasAreaProps> = ({
                   fontSize: 12,
                   fontWeight: 600,
                   pointerEvents: 'none',
-                  opacity: rotationDisplay ? 1 : 0,
-                  transition: 'opacity 0.3s',
+                  animation: 'rotationFadeOut 0.5s ease-out forwards',
                 }}
               >
                 {rotationDisplay.angle}°
@@ -390,6 +405,12 @@ export const CanvasArea: React.FC<CanvasAreaProps> = ({
         padding: 40,
       }}
     >
+      <style>{`
+        @keyframes rotationFadeOut {
+          0%, 60% { opacity: 1; }
+          100% { opacity: 0; }
+        }
+      `}</style>
       <div style={{ position: 'relative', display: 'inline-block' }}>
         <div
           style={{
@@ -403,10 +424,11 @@ export const CanvasArea: React.FC<CanvasAreaProps> = ({
             borderRight: '1px solid #E5E7EB',
             cursor: 'ns-resize',
             overflow: 'hidden',
+            userSelect: 'none',
           }}
           onMouseDown={(e) => {
             e.preventDefault();
-            setDragMode({ type: 'ruler-h', startY: e.clientY });
+            setDragMode({ type: 'ruler-h' });
           }}
         >
           {renderRulerTicks(paper.width, true)}
@@ -423,14 +445,27 @@ export const CanvasArea: React.FC<CanvasAreaProps> = ({
             borderBottom: '1px solid #E5E7EB',
             cursor: 'ew-resize',
             overflow: 'hidden',
+            userSelect: 'none',
           }}
           onMouseDown={(e) => {
             e.preventDefault();
-            setDragMode({ type: 'ruler-v', startX: e.clientX });
+            setDragMode({ type: 'ruler-v' });
           }}
         >
           {renderRulerTicks(paper.height, false)}
         </div>
+        <div
+          style={{
+            position: 'absolute',
+            left: 0,
+            top: 0,
+            width: RULER_SIZE,
+            height: RULER_SIZE,
+            background: '#F9FAFB',
+            borderRight: '1px solid #E5E7EB',
+            borderBottom: '1px solid #E5E7EB',
+          }}
+        />
         <div
           ref={canvasRef}
           data-canvas-bg="true"
@@ -472,7 +507,7 @@ export const CanvasArea: React.FC<CanvasAreaProps> = ({
               }}
               onMouseDown={(e) => {
                 e.stopPropagation();
-                setDragMode({ type: 'guideline', id: g.id, startPos: g.position, orientation: g.orientation });
+                setDragMode({ type: 'guideline', id: g.id, orientation: g.orientation });
               }}
               onDoubleClick={() => onRemoveGuideline(g.id)}
             />

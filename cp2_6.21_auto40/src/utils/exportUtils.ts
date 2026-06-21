@@ -1,33 +1,31 @@
-import { CanvasElement, PaperSize, PAPER_MM, TextStyle } from '../types';
+import { CanvasElement, PaperSize, PAPER_SIZES, PAPER_MM, TextStyle } from '../types';
 
 const DPI = 300;
-const MM_PER_INCH = 25.4;
-
-export function mmToPx(mm: number): number {
-  return Math.round((mm * DPI) / MM_PER_INCH);
-}
+const SCREEN_DPI = 96;
+const DPI_SCALE = DPI / SCREEN_DPI;
 
 export async function exportToPNG(
   elements: CanvasElement[],
   paperSize: PaperSize
 ): Promise<Blob> {
   const paper = PAPER_MM[paperSize];
-  const width = mmToPx(paper.width);
-  const height = mmToPx(paper.height);
+  const widthPx = Math.round((paper.width / 25.4) * DPI);
+  const heightPx = Math.round((paper.height / 25.4) * DPI);
 
   const canvas = document.createElement('canvas');
-  canvas.width = width;
-  canvas.height = height;
+  canvas.width = widthPx;
+  canvas.height = heightPx;
   const ctx = canvas.getContext('2d');
-  if (!ctx) {
-    throw new Error('无法获取Canvas上下文');
-  }
+  if (!ctx) throw new Error('无法获取Canvas上下文');
 
   ctx.fillStyle = '#FFFFFF';
-  ctx.fillRect(0, 0, width, height);
+  ctx.fillRect(0, 0, widthPx, heightPx);
 
-  const scaleX = width / (paperSize === 'A5' ? 420 : paperSize === 'A6' ? 297 : 354);
-  const scaleY = height / (paperSize === 'A5' ? 594 : paperSize === 'A6' ? 420 : 500);
+  const workspaceW = PAPER_SIZES[paperSize].width;
+  const workspaceH = PAPER_SIZES[paperSize].height;
+  const scaleX = widthPx / workspaceW;
+  const scaleY = heightPx / workspaceH;
+  const scale = Math.min(scaleX, scaleY);
 
   for (const el of elements) {
     ctx.save();
@@ -42,7 +40,7 @@ export async function exportToPNG(
     const y = el.y * scaleY;
     const w = el.width * scaleX;
     const h = el.height * scaleY;
-    const r = Math.min(el.style.borderRadius * Math.min(scaleX, scaleY), Math.min(w, h) / 2);
+    const r = Math.min(el.style.borderRadius * scale, Math.min(w, h) / 2);
 
     ctx.beginPath();
     if (r > 0) {
@@ -67,11 +65,11 @@ export async function exportToPNG(
 
     if (el.style.borderWidth > 0 && el.style.borderColor) {
       ctx.strokeStyle = el.style.borderColor;
-      ctx.lineWidth = el.style.borderWidth * Math.min(scaleX, scaleY);
+      ctx.lineWidth = el.style.borderWidth * scale;
       if (el.style.borderStyle === 'dashed') {
-        ctx.setLineDash([8 * Math.min(scaleX, scaleY), 4 * Math.min(scaleX, scaleY)]);
+        ctx.setLineDash([8 * scale, 4 * scale]);
       } else if (el.style.borderStyle === 'dotted') {
-        ctx.setLineDash([2 * Math.min(scaleX, scaleY), 3 * Math.min(scaleX, scaleY)]);
+        ctx.setLineDash([2 * scale, 3 * scale]);
       }
       ctx.stroke();
       ctx.setLineDash([]);
@@ -79,18 +77,18 @@ export async function exportToPNG(
 
     if (el.type === 'text' || el.type === 'date') {
       const textStyle = el.style as TextStyle;
-      const fontSize = textStyle.fontSize * Math.min(scaleX, scaleY);
+      const fontSize = textStyle.fontSize * scale;
       ctx.fillStyle = textStyle.fontColor;
       ctx.font = `${fontSize}px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`;
       ctx.textBaseline = 'top';
-      const letterSpacing = textStyle.letterSpacing * Math.min(scaleX, scaleY);
+      const letterSpacing = textStyle.letterSpacing * scale;
       const lines = textStyle.content.split('\n');
       lines.forEach((line, i) => {
         if (letterSpacing !== 0) {
-          let currentX = x + 8 * scaleX;
+          let curX = x + 8 * scaleX;
           for (const ch of line) {
-            ctx.fillText(ch, currentX, y + 8 * scaleY + i * fontSize * 1.4);
-            currentX += ctx.measureText(ch).width + letterSpacing;
+            ctx.fillText(ch, curX, y + 8 * scaleY + i * fontSize * 1.4);
+            curX += ctx.measureText(ch).width + letterSpacing;
           }
         } else {
           ctx.fillText(line, x + 8 * scaleX, y + 8 * scaleY + i * fontSize * 1.4);
@@ -100,14 +98,14 @@ export async function exportToPNG(
 
     if (el.type === 'line') {
       ctx.strokeStyle = el.style.borderColor;
-      ctx.lineWidth = Math.max(h, 2 * Math.min(scaleX, scaleY));
+      ctx.lineWidth = Math.max(el.height * scaleY, 2 * scale);
       ctx.beginPath();
       ctx.moveTo(x, y + h / 2);
       ctx.lineTo(x + w, y + h / 2);
       if (el.style.borderStyle === 'dashed') {
-        ctx.setLineDash([10 * Math.min(scaleX, scaleY), 6 * Math.min(scaleX, scaleY)]);
+        ctx.setLineDash([10 * scale, 6 * scale]);
       } else if (el.style.borderStyle === 'dotted') {
-        ctx.setLineDash([3 * Math.min(scaleX, scaleY), 4 * Math.min(scaleX, scaleY)]);
+        ctx.setLineDash([3 * scale, 4 * scale]);
       }
       ctx.stroke();
       ctx.setLineDash([]);
@@ -155,25 +153,25 @@ export async function generateThumbnail(
   ctx.fillStyle = '#FFFFFF';
   ctx.fillRect(0, 0, TW, TH);
 
-  const baseW = paperSize === 'A5' ? 420 : paperSize === 'A6' ? 297 : 354;
-  const baseH = paperSize === 'A5' ? 594 : paperSize === 'A6' ? 420 : 500;
-  const scale = Math.min(TW / baseW, TH / baseH);
-  const offsetX = (TW - baseW * scale) / 2;
-  const offsetY = (TH - baseH * scale) / 2;
+  const workspaceW = PAPER_SIZES[paperSize].width;
+  const workspaceH = PAPER_SIZES[paperSize].height;
+  const thumbScale = Math.min(TW / workspaceW, TH / workspaceH);
+  const offsetX = (TW - workspaceW * thumbScale) / 2;
+  const offsetY = (TH - workspaceH * thumbScale) / 2;
 
   for (const el of elements) {
     ctx.save();
-    const cx = offsetX + (el.x + el.width / 2) * scale;
-    const cy = offsetY + (el.y + el.height / 2) * scale;
+    const cx = offsetX + (el.x + el.width / 2) * thumbScale;
+    const cy = offsetY + (el.y + el.height / 2) * thumbScale;
     ctx.translate(cx, cy);
     ctx.rotate((el.rotation * Math.PI) / 180);
     ctx.translate(-cx, -cy);
 
-    const x = offsetX + el.x * scale;
-    const y = offsetY + el.y * scale;
-    const w = el.width * scale;
-    const h = el.height * scale;
-    const r = Math.min(el.style.borderRadius * scale, Math.min(w, h) / 2);
+    const x = offsetX + el.x * thumbScale;
+    const y = offsetY + el.y * thumbScale;
+    const w = el.width * thumbScale;
+    const h = el.height * thumbScale;
+    const r = Math.min(el.style.borderRadius * thumbScale, Math.min(w, h) / 2);
 
     ctx.beginPath();
     if (r > 0) {
@@ -197,14 +195,14 @@ export async function generateThumbnail(
     }
     if (el.style.borderWidth > 0 && el.style.borderColor) {
       ctx.strokeStyle = el.style.borderColor;
-      ctx.lineWidth = Math.max(1, el.style.borderWidth * scale);
+      ctx.lineWidth = Math.max(1, el.style.borderWidth * thumbScale);
       ctx.stroke();
     }
 
     if ((el.type === 'text' || el.type === 'date') && w > 10 && h > 10) {
       const textStyle = el.style as TextStyle;
       ctx.fillStyle = textStyle.fontColor;
-      const fontSize = Math.max(8, textStyle.fontSize * scale);
+      const fontSize = Math.max(8, textStyle.fontSize * thumbScale);
       ctx.font = `${fontSize}px sans-serif`;
       ctx.textBaseline = 'top';
       ctx.fillText(textStyle.content.substring(0, 20), x + 4, y + 4);
