@@ -1,5 +1,16 @@
 import * as THREE from 'three';
-import { randomRange, randomLifecycle, getFlameColor, getFlameRadius, COLOR_SCHEMES, ColorScheme } from './utils';
+import {
+  randomRange,
+  randomLifecycle,
+  averageLifetime,
+  getFlameColor,
+  getFlameRadius,
+  COLOR_SCHEMES,
+  ColorScheme,
+  BASE_RADIUS,
+  TOP_RADIUS,
+  FLAME_HEIGHT,
+} from './utils';
 
 export interface FlameParams {
   particleCount: number;
@@ -32,35 +43,11 @@ interface Particle {
   active: boolean;
 }
 
-const vertexShader = `
-attribute float aSize;
-attribute float aOpacity;
-varying vec3 vColor;
-varying float vOpacity;
-void main() {
-  vColor = color;
-  vOpacity = aOpacity;
-  vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
-  gl_PointSize = aSize * (300.0 / -mvPosition.z);
-  gl_Position = projectionMatrix * mvPosition;
-}
-`;
-
-const fragmentShader = `
-uniform sampler2D uTexture;
-varying vec3 vColor;
-varying float vOpacity;
-void main() {
-  vec4 texColor = texture2D(uTexture, gl_PointCoord);
-  gl_FragColor = vec4(vColor * texColor.rgb, texColor.a * vOpacity);
-}
-`;
-
 export class Flame {
   private params: FlameParams;
   private particles: Particle[];
   private geometry: THREE.BufferGeometry;
-  private material: THREE.ShaderMaterial;
+  private material: THREE.PointsMaterial;
   private points: THREE.Points;
   private positions: Float32Array;
   private colors: Float32Array;
@@ -73,7 +60,7 @@ export class Flame {
   private defaultTexture: THREE.Texture;
   private circleTexture: THREE.Texture;
   private usingCircleTexture: boolean = false;
-  private nextEmitIndex: number = 0;
+  private emitCursor: number = 0;
 
   constructor(scene: THREE.Scene) {
     this.params = { ...DEFAULT_PARAMS };
@@ -93,17 +80,49 @@ export class Flame {
     this.geometry.setAttribute('aSize', new THREE.BufferAttribute(this.sizes, 1));
     this.geometry.setAttribute('aOpacity', new THREE.BufferAttribute(this.opacities, 1));
 
-    this.material = new THREE.ShaderMaterial({
-      vertexShader,
-      fragmentShader,
-      uniforms: {
-        uTexture: { value: this.defaultTexture },
-      },
+    this.material = new THREE.PointsMaterial({
+      size: this.params.particleSize,
       vertexColors: true,
       transparent: true,
       depthWrite: false,
       blending: THREE.AdditiveBlending,
+      sizeAttenuation: true,
+      map: this.defaultTexture,
     });
+
+    const mat = this.material as THREE.PointsMaterial & {
+      onBeforeCompile: (shader: any) => void;
+    };
+    mat.onBeforeCompile = (shader: any) => {
+      shader.vertexShader = shader.vertexShader
+        .replace(
+          '#include <common>',
+          `#include <common>
+attribute float aSize;
+attribute float aOpacity;
+varying float vOpacity;`
+        )
+        .replace(
+          'gl_PointSize = size;',
+          'gl_PointSize = aSize * (300.0 / -mvPosition.z);'
+        )
+        .replace(
+          '#include <color_vertex>',
+          `#include <color_vertex>
+vOpacity = aOpacity;`
+        );
+
+      shader.fragmentShader = shader.fragmentShader
+        .replace(
+          '#include <common>',
+          `#include <common>
+varying float vOpacity;`
+        )
+        .replace(
+          'gl_FragColor = vec4( outgoingLight, diffuseColor.a );',
+          'gl_FragColor = vec4( outgoingLight, diffuseColor.a * vOpacity );'
+        );
+    };
 
     this.points = new THREE.Points(this.geometry, this.material);
     this.points.frustumCulled = false;
@@ -128,17 +147,24 @@ export class Flame {
 
   private initializeParticles(): void {
     this.particles = [];
+    const safeWidth = Math.max(0.01, this.params.flameWidth);
+
     for (let i = 0; i < this.params.particleCount; i++) {
       const p = this.createParticle();
+
       p.age = Math.random() * p.maxLife;
       p.life = p.age / p.maxLife;
+
       const yAtAge = p.position.y + p.velocity.y * p.age;
-      const r = getFlameRadius(yAtAge, this.params.flameWidth) * Math.sqrt(Math.random());
+      const rAtHeight = getFlameRadius(yAtAge, safeWidth);
+      const r = rAtHeight * Math.sqrt(Math.random());
       const angle = Math.random() * Math.PI * 2;
+
       p.position.set(Math.cos(angle) * r, yAtAge, Math.sin(angle) * r);
+
       this.particles.push(p);
     }
-    this.nextEmitIndex = 0;
+    this.emitCursor = 0;
   }
 
   private createDefaultTexture(): THREE.Texture {
@@ -177,8 +203,10 @@ export class Flame {
   }
 
   private createParticle(): Particle {
+    const safeWidth = Math.max(0.01, this.params.flameWidth);
     const angle = Math.random() * Math.PI * 2;
-    const radius = Math.sqrt(Math.random()) * this.params.flameWidth;
+    const baseR = BASE_RADIUS * safeWidth;
+    const radius = Math.sqrt(Math.random()) * baseR;
     const x = Math.cos(angle) * radius;
     const z = Math.sin(angle) * radius;
     const y = randomRange(-1, 0);
@@ -202,8 +230,10 @@ export class Flame {
   }
 
   private resetParticle(p: Particle): void {
+    const safeWidth = Math.max(0.01, this.params.flameWidth);
     const angle = Math.random() * Math.PI * 2;
-    const radius = Math.sqrt(Math.random()) * this.params.flameWidth;
+    const baseR = BASE_RADIUS * safeWidth;
+    const radius = Math.sqrt(Math.random()) * baseR;
     p.position.set(
       Math.cos(angle) * radius,
       randomRange(-1, 0),
@@ -225,11 +255,16 @@ export class Flame {
   }
 
   private emitBatch(count: number): void {
-    let emitted = 0;
+    if (count <= 0) return;
     const total = this.particles.length;
-    for (let tries = 0; tries < total * 2 && emitted < count; tries++) {
-      const idx = this.nextEmitIndex % total;
-      this.nextEmitIndex = (this.nextEmitIndex + 1) % total;
+    let emitted = 0;
+    let scans = 0;
+    const maxScans = total;
+
+    while (emitted < count && scans < maxScans) {
+      const idx = this.emitCursor % total;
+      this.emitCursor = (this.emitCursor + 1) % total;
+      scans++;
       if (!this.particles[idx].active) {
         this.resetParticle(this.particles[idx]);
         emitted++;
@@ -238,11 +273,12 @@ export class Flame {
   }
 
   private getBatchSize(): number {
-    const avgLifetime = 4.5;
-    return Math.max(1, Math.ceil(this.params.particleCount * this.params.emitInterval / avgLifetime));
+    const avgLife = averageLifetime();
+    return Math.max(1, Math.ceil(this.params.particleCount * this.params.emitInterval / avgLife));
   }
 
   update(delta: number): void {
+    const safeWidth = Math.max(0.01, this.params.flameWidth);
     this.emitTimer += delta;
 
     while (this.emitTimer >= this.params.emitInterval) {
@@ -268,7 +304,7 @@ export class Flame {
       }
 
       p.age += delta;
-      p.life = p.age / p.maxLife;
+      p.life = Math.min(1.0, p.age / p.maxLife);
 
       if (p.life >= 1.0) {
         p.active = false;
@@ -287,7 +323,7 @@ export class Flame {
       p.position.y += p.velocity.y * delta;
       p.position.z += p.velocity.z * delta;
 
-      const maxR = getFlameRadius(p.position.y, this.params.flameWidth);
+      const maxR = getFlameRadius(p.position.y, safeWidth);
       const dist = Math.sqrt(p.position.x * p.position.x + p.position.z * p.position.z);
       if (dist > maxR && dist > 0.0001) {
         const pull = (dist - maxR) * 3.0;
@@ -301,9 +337,10 @@ export class Flame {
         const dz = p.position.z - this.mouseWorld.z;
         const distToMouse = Math.sqrt(dx * dx + dy * dy + dz * dz);
         if (distToMouse < 1.5 && distToMouse > 0.0001) {
-          p.position.x += (dx / distToMouse) * 0.02;
-          p.position.y += (dy / distToMouse) * 0.02;
-          p.position.z += (dz / distToMouse) * 0.02;
+          const invDist = 1.0 / distToMouse;
+          p.position.x += dx * invDist * 0.02;
+          p.position.y += dy * invDist * 0.02;
+          p.position.z += dz * invDist * 0.02;
         }
       }
 
@@ -314,12 +351,14 @@ export class Flame {
       }
       p.size = Math.max(0, p.size);
 
-      const remainingLife = p.maxLife - p.age;
-      if (remainingLife < 1.0) {
-        p.opacity = Math.max(0, remainingLife);
+      const fadeRatio = Math.min(1.0, 1.0 / p.maxLife);
+      const fadeStart = 1.0 - fadeRatio;
+      if (p.life >= fadeStart) {
+        p.opacity = 1.0 - Math.min(1.0, (p.life - fadeStart) / Math.max(0.0001, fadeRatio));
       } else {
         p.opacity = 1.0;
       }
+      p.opacity = Math.max(0, Math.min(1, p.opacity));
 
       const color = getFlameColor(p.life, scheme);
       this.positions[i * 3] = p.position.x;
@@ -332,24 +371,30 @@ export class Flame {
       this.opacities[i] = p.opacity;
     }
 
-    const posAttr = this.geometry.getAttribute('position') as THREE.BufferAttribute;
-    posAttr.needsUpdate = true;
-    const colAttr = this.geometry.getAttribute('color') as THREE.BufferAttribute;
-    colAttr.needsUpdate = true;
-    const sizeAttr = this.geometry.getAttribute('aSize') as THREE.BufferAttribute;
-    sizeAttr.needsUpdate = true;
-    const opaAttr = this.geometry.getAttribute('aOpacity') as THREE.BufferAttribute;
-    opaAttr.needsUpdate = true;
+    (this.geometry.getAttribute('position') as THREE.BufferAttribute).needsUpdate = true;
+    (this.geometry.getAttribute('color') as THREE.BufferAttribute).needsUpdate = true;
+    (this.geometry.getAttribute('aSize') as THREE.BufferAttribute).needsUpdate = true;
+    (this.geometry.getAttribute('aOpacity') as THREE.BufferAttribute).needsUpdate = true;
 
     this.updateTextureForCount();
   }
 
   private updateTextureForCount(): void {
-    if (this.params.particleCount > 2000 && !this.usingCircleTexture) {
-      this.material.uniforms.uTexture.value = this.circleTexture;
+    const shouldUseCircle = this.params.particleCount > 2000;
+
+    if (shouldUseCircle && !this.usingCircleTexture) {
+      this.material.map = this.circleTexture;
+      if (this.material.map) {
+        this.material.map.needsUpdate = true;
+      }
+      this.material.needsUpdate = true;
       this.usingCircleTexture = true;
-    } else if (this.params.particleCount <= 2000 && this.usingCircleTexture) {
-      this.material.uniforms.uTexture.value = this.defaultTexture;
+    } else if (!shouldUseCircle && this.usingCircleTexture) {
+      this.material.map = this.defaultTexture;
+      if (this.material.map) {
+        this.material.map.needsUpdate = true;
+      }
+      this.material.needsUpdate = true;
       this.usingCircleTexture = false;
     }
   }
@@ -367,6 +412,10 @@ export class Flame {
       this.rebuildParticles(params.particleCount);
     }
 
+    if (params.particleSize !== undefined) {
+      this.material.size = params.particleSize;
+    }
+
     if (params.colorScheme !== undefined) {
       const scheme = COLOR_SCHEMES[params.colorScheme];
       if (scheme) {
@@ -375,8 +424,9 @@ export class Flame {
     }
 
     if (params.flameWidth !== undefined) {
+      const safeWidth = Math.max(0.01, params.flameWidth);
       this.glowMesh.geometry.dispose();
-      this.glowMesh.geometry = new THREE.CircleGeometry(params.flameWidth * 1.33, 64);
+      this.glowMesh.geometry = new THREE.CircleGeometry(BASE_RADIUS * safeWidth * 1.33, 64);
     }
 
     this.updateTextureForCount();
@@ -406,7 +456,7 @@ export class Flame {
         this.particles.push(p);
       }
     }
-    this.nextEmitIndex = 0;
+    this.emitCursor = 0;
     this.updateTextureForCount();
   }
 

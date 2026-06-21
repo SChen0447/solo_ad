@@ -1,11 +1,21 @@
 import * as THREE from 'three';
 
+export const MIN_LIFETIME = 3;
+export const MAX_LIFETIME = 6;
+export const BASE_RADIUS = 1.5;
+export const TOP_RADIUS = 0.5;
+export const FLAME_HEIGHT = 7;
+
 export function randomRange(min: number, max: number): number {
   return min + Math.random() * (max - min);
 }
 
 export function randomLifecycle(): number {
-  return randomRange(3, 6);
+  return randomRange(MIN_LIFETIME, MAX_LIFETIME);
+}
+
+export function averageLifetime(): number {
+  return (MIN_LIFETIME + MAX_LIFETIME) / 2;
 }
 
 export interface ColorScheme {
@@ -42,9 +52,9 @@ export function getFlameColor(lifeRatio: number, scheme: ColorScheme): THREE.Col
   return color;
 }
 
-export function getFlameRadius(y: number, baseWidth: number): number {
-  const flameHeight = 7;
-  const t = Math.max(0, Math.min(1, (y + 1) / flameHeight));
-  const topRatio = 0.5 / 1.5;
-  return baseWidth * (1 - t * (1 - topRatio));
+export function getFlameRadius(y: number, flameWidth: number): number {
+  const safeWidth = Math.max(0.01, flameWidth);
+  const t = Math.max(0, Math.min(1, (y + 1) / FLAME_HEIGHT));
+  const r = BASE_RADIUS + (TOP_RADIUS - BASE_RADIUS) * t;
+  return r * safeWidth;
 }

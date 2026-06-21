@@ -1,7 +1,8 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { GUI } from 'dat.gui';
-import { Flame, DEFAULT_PARAMS, FlameParams } from './flame';
+import { Flame, DEFAULT_PARAMS } from './flame';
+import { FLAME_HEIGHT, getFlameRadius } from './utils';
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x000000);
@@ -117,14 +118,14 @@ function updateMouseHover(event: MouseEvent): void {
     origin.z + dir.z * tClosest
   );
 
-  if (closestPoint.y < -1.5 || closestPoint.y > 8) {
+  if (closestPoint.y < -1 || closestPoint.y > -1 + FLAME_HEIGHT) {
     flame.setMouseWorld(null);
     return;
   }
 
   const horizDist = Math.sqrt(closestPoint.x * closestPoint.x + closestPoint.z * closestPoint.z);
-  const baseWidth = flame.getParams().flameWidth;
-  const maxR = baseWidth * (1 - Math.max(0, Math.min(1, (closestPoint.y + 1) / 7)) * (1 - 0.5 / 1.5));
+  const flameParams = flame.getParams();
+  const maxR = getFlameRadius(closestPoint.y, flameParams.flameWidth);
   const threshold = Math.max(1.5, maxR + 0.5);
 
   if (horizDist < threshold) {
