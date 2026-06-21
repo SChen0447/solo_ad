@@ -1,0 +1,19 @@
+{
+  "name": "2d-combat-system",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build"
+  },
+  "dependencies": {
+    "phaser": "^3.80.1",
+    "uuid": "^9.0.1"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.5",
+    "vite": "^5.2.0",
+    "@types/uuid": "^9.0.8"
+  }
+}
