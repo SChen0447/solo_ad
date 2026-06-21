@@ -14,7 +14,7 @@ interface CanvasAreaProps {
   onAddGuideline: (g: GuideLine) => void;
   onRemoveGuideline: (id: string) => void;
   onUpdateGuideline: (id: string, position: number) => void;
-  canvasRef: React.RefObject<HTMLDivElement | null>;
+  canvasRef: React.RefObject<HTMLDivElement>;
 }
 
 type DragMode =
@@ -45,8 +45,9 @@ export const CanvasArea: React.FC<CanvasAreaProps> = ({
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [dragMode, setDragMode] = useState<DragMode>({ type: 'none' });
-  const [rotationDisplay, setRotationDisplay] = useState<{ id: string; angle: number } | null>(null);
+  const [rotationDisplay, setRotationDisplay] = useState<{ id: string; angle: number; key: number } | null>(null);
   const rotationTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const rotationKeyRef = useRef(0);
   const paper = PAPER_SIZES[paperSize];
   const elementsRef = useRef(elements);
   elementsRef.current = elements;
@@ -54,7 +55,8 @@ export const CanvasArea: React.FC<CanvasAreaProps> = ({
   selectedIdsRef.current = selectedIds;
 
   const showRotation = useCallback((id: string, angle: number) => {
-    setRotationDisplay({ id, angle });
+    rotationKeyRef.current += 1;
+    setRotationDisplay({ id, angle, key: rotationKeyRef.current });
     if (rotationTimerRef.current) {
       clearTimeout(rotationTimerRef.current);
     }
@@ -99,23 +101,31 @@ export const CanvasArea: React.FC<CanvasAreaProps> = ({
       const additive = e.shiftKey;
       const isAlreadySelected = selectedIds.includes(el.id);
 
+      let effectiveIds: string[];
       if (additive) {
+        if (isAlreadySelected) {
+          effectiveIds = selectedIds.filter((id) => id !== el.id);
+        } else {
+          effectiveIds = [...selectedIds, el.id];
+        }
         onSelectElement(el.id, true);
-      } else if (!isAlreadySelected) {
-        onSelectElement(el.id, false);
+      } else {
+        if (isAlreadySelected) {
+          effectiveIds = selectedIds;
+        } else {
+          effectiveIds = [el.id];
+          onSelectElement(el.id, false);
+        }
       }
 
-      const ids = additive
-        ? selectedIds.includes(el.id)
-          ? selectedIds
-          : [...selectedIds, el.id]
-        : isAlreadySelected
-        ? selectedIds
-        : [el.id];
+      if (effectiveIds.length === 0) {
+        setDragMode({ type: 'none' });
+        return;
+      }
 
       const pos = getRelativePos(e.clientX, e.clientY);
       const originals = elements
-        .filter((e2) => ids.includes(e2.id))
+        .filter((e2) => effectiveIds.includes(e2.id))
         .map((e2) => ({ id: e2.id, x: e2.x, y: e2.y }));
 
       setDragMode({ type: 'move', startX: pos.x, startY: pos.y, originals });
@@ -370,6 +380,7 @@ export const CanvasArea: React.FC<CanvasAreaProps> = ({
             />
             {rotationDisplay?.id === el.id && (
               <div
+                key={rotationDisplay.key}
                 style={{
                   position: 'absolute',
                   left: '50%',
@@ -382,7 +393,10 @@ export const CanvasArea: React.FC<CanvasAreaProps> = ({
                   fontSize: 12,
                   fontWeight: 600,
                   pointerEvents: 'none',
+                  opacity: 0,
                   animation: 'rotationFadeOut 0.5s ease-out forwards',
+                  whiteSpace: 'nowrap',
+                  zIndex: 20,
                 }}
               >
                 {rotationDisplay.angle}°

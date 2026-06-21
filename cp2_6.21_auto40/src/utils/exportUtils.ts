@@ -1,16 +1,15 @@
 import { CanvasElement, PaperSize, PAPER_SIZES, PAPER_MM, TextStyle } from '../types';
 
-const DPI = 300;
-const SCREEN_DPI = 96;
-const DPI_SCALE = DPI / SCREEN_DPI;
+const EXPORT_DPI = 300;
+const MM_PER_INCH = 25.4;
 
 export async function exportToPNG(
   elements: CanvasElement[],
   paperSize: PaperSize
 ): Promise<Blob> {
-  const paper = PAPER_MM[paperSize];
-  const widthPx = Math.round((paper.width / 25.4) * DPI);
-  const heightPx = Math.round((paper.height / 25.4) * DPI);
+  const paperMm = PAPER_MM[paperSize];
+  const widthPx = Math.round((paperMm.width / MM_PER_INCH) * EXPORT_DPI);
+  const heightPx = Math.round((paperMm.height / MM_PER_INCH) * EXPORT_DPI);
 
   const canvas = document.createElement('canvas');
   canvas.width = widthPx;
@@ -21,10 +20,9 @@ export async function exportToPNG(
   ctx.fillStyle = '#FFFFFF';
   ctx.fillRect(0, 0, widthPx, heightPx);
 
-  const workspaceW = PAPER_SIZES[paperSize].width;
-  const workspaceH = PAPER_SIZES[paperSize].height;
-  const scaleX = widthPx / workspaceW;
-  const scaleY = heightPx / workspaceH;
+  const workspace = PAPER_SIZES[paperSize];
+  const scaleX = widthPx / workspace.width;
+  const scaleY = heightPx / workspace.height;
   const scale = Math.min(scaleX, scaleY);
 
   for (const el of elements) {
