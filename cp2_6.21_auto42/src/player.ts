@@ -58,8 +58,9 @@ export class Player {
     this.vx = 0;
     this.vy = 0;
 
-    this.gravity = (2 * this.jumpHeight) / (this.jumpDuration * this.jumpDuration);
-    this.jumpVelocity = this.gravity * this.jumpDuration;
+    const timeToPeak = this.jumpDuration / 2;
+    this.gravity = (2 * this.jumpHeight) / (timeToPeak * timeToPeak);
+    this.jumpVelocity = this.gravity * timeToPeak;
 
     this.mesh = new THREE.Group();
     this.mesh.position.set(x, y, 0);
@@ -232,11 +233,8 @@ export class Player {
         return false;
       }
 
-      const fadeStart = afterimage.duration * 0.5;
-      if (elapsed > fadeStart) {
-        const fadeProgress = (elapsed - fadeStart) / (afterimage.duration - fadeStart);
-        (afterimage.mesh.material as THREE.MeshBasicMaterial).opacity = 0.3 * (1 - fadeProgress);
-      }
+      const fadeProgress = elapsed / afterimage.duration;
+      (afterimage.mesh.material as THREE.MeshBasicMaterial).opacity = 0.3 * (1 - fadeProgress);
 
       return true;
     });

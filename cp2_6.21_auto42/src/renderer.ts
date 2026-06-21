@@ -46,7 +46,7 @@ export class GameRenderer {
       color: 0x4A90D9,
       transparent: true,
       opacity: 0,
-      blending: THREE.MultiplyBlending,
+      blending: THREE.NormalBlending,
       depthTest: false,
       depthWrite: false
     });
@@ -276,7 +276,8 @@ export class GameRenderer {
 
   public updateTint(progress: number): void {
     if (this.tintOverlay) {
-      (this.tintOverlay.material as THREE.MeshBasicMaterial).opacity = progress * 0.5;
+      (this.tintOverlay.material as THREE.MeshBasicMaterial).opacity = progress * 0.4;
+      (this.tintOverlay.material as THREE.MeshBasicMaterial).color.setHex(0x4A90D9);
     }
   }
 

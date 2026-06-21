@@ -160,13 +160,12 @@ export class Platform {
         this.standTime += dt;
 
         if (this.standTime >= this.disappearDelay) {
-          this.startFlashing();
-        } else if (this.standTime >= this.disappearDelay - 0.9) {
           this.flashTimer += dt;
+
           if (this.flashTimer >= 0.15) {
             this.flashTimer = 0;
-            this.flashVisible = !this.flashVisible;
             this.flashCount++;
+            this.flashVisible = !this.flashVisible;
             this.updateFlashVisual();
 
             if (this.flashCount >= 6) {
@@ -175,7 +174,9 @@ export class Platform {
           }
         }
       } else {
-        this.standTime = Math.max(0, this.standTime - dt * 0.5);
+        if (this.standTime < this.disappearDelay) {
+          this.standTime = Math.max(0, this.standTime - dt * 0.5);
+        }
       }
     }
 
