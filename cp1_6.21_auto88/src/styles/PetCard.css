@@ -1,0 +1,138 @@
+.pet-card {
+  position: relative;
+  min-width: 280px;
+  padding: 20px;
+  cursor: pointer;
+  overflow: hidden;
+  transition: all var(--transition-normal);
+  border: 1px solid var(--border-color);
+}
+
+.pet-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 0 20px rgba(124, 132, 217, 0.3), var(--shadow-lg);
+  border-color: var(--primary-light);
+}
+
+.pet-card-icon {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  font-size: 32px;
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.7);
+  border-radius: 50%;
+  box-shadow: var(--shadow-sm);
+}
+
+.pet-card-content {
+  margin-left: 60px;
+}
+
+.pet-card-name {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 6px;
+}
+
+.pet-card-info {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+
+.pet-card-breed {
+  font-weight: 500;
+}
+
+.pet-card-dot {
+  color: var(--text-light);
+}
+
+.pet-card-weight {
+  color: var(--text-light);
+}
+
+.pet-card-age {
+  font-size: 13px;
+  color: var(--text-light);
+  margin-bottom: 4px;
+}
+
+.pet-card-allergies {
+  font-size: 12px;
+  color: var(--error-color);
+  background-color: rgba(239, 83, 80, 0.1);
+  padding: 2px 8px;
+  border-radius: 8px;
+  display: inline-block;
+}
+
+.pet-card-records {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(10px);
+  padding: 16px;
+  transform: translateY(100%);
+  opacity: 0;
+  transition: all var(--transition-normal);
+  border-top: 1px solid var(--border-color);
+}
+
+.pet-card-records.show {
+  transform: translateY(0);
+  opacity: 1;
+}
+
+.pet-card-records-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 8px;
+}
+
+.pet-card-records-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.pet-card-record-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 0;
+  font-size: 12px;
+  border-bottom: 1px dashed var(--border-color);
+}
+
+.pet-card-record-item:last-child {
+  border-bottom: none;
+}
+
+.pet-card-record-date {
+  color: var(--text-light);
+}
+
+.pet-card-record-service {
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.pet-card-no-records {
+  font-size: 12px;
+  color: var(--text-light);
+  text-align: center;
+  padding: 8px 0;
+}
