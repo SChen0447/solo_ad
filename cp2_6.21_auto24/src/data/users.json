@@ -1,0 +1,93 @@
+[
+  {
+    "id": "u1",
+    "name": "林小书",
+    "avatar": "https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=avatar%20young%20woman%20reading%20book&image_size=square_hd",
+    "borrowedBooks": [
+      { "bookId": "b2", "borrowDate": "2026-06-18", "dueDate": "2026-07-02" },
+      { "bookId": "b6", "borrowDate": "2026-06-15", "dueDate": "2026-06-29" }
+    ],
+    "notes": [
+      { "id": "n1", "bookId": "b1", "rating": 5, "content": "魔幻现实主义的巅峰之作，马尔克斯用布恩迪亚家族的兴衰串起了拉丁美洲的百年历史，每一页都让人沉醉其中。", "date": "2026-06-12", "comments": [
+        { "userId": "u2", "content": "同感！读完久久不能释怀", "date": "2026-06-13" }
+      ]},
+      { "id": "n2", "bookId": "b11", "rating": 4, "content": "余华的笔触太冷峻了，福贵的一生让人心疼到窒息，但也让人看到了生命最本真的韧性。", "date": "2026-06-05", "comments": [] }
+    ],
+    "badges": ["gold_7day", "green_10books", "blue_share"]
+  },
+  {
+    "id": "u2",
+    "name": "张阅微",
+    "avatar": "https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=avatar%20man%20with%20glasses%20reading&image_size=square_hd",
+    "borrowedBooks": [
+      { "bookId": "b15", "borrowDate": "2026-06-16", "dueDate": "2026-06-30" }
+    ],
+    "notes": [
+      { "id": "n3", "bookId": "b3", "rating": 5, "content": "三体让我重新理解了宇宙的浩瀚和人类的渺小，黑暗森林法则简直是天才的构思，读完久久不能平静。", "date": "2026-06-08", "comments": [
+        { "userId": "u3", "content": "第二部更精彩！", "date": "2026-06-09" },
+        { "userId": "u1", "content": "同意，大刘太牛了", "date": "2026-06-09" }
+      ]},
+      { "id": "n4", "bookId": "b8", "rating": 4, "content": "围城不愧是经典，方鸿渐的困境至今看来依然让人感同身受，钱钟书的幽默真是绝了。", "date": "2026-06-01", "comments": [
+        { "userId": "u4", "content": "城里的人想出去，城外的人想进来", "date": "2026-06-02" }
+      ]},
+      { "id": "n5", "bookId": "b9", "rating": 5, "content": "1984的预言正在一步步变成现实，老大哥在看着你，每一次重读都有新的恐惧和警醒。", "date": "2026-06-14", "comments": [] }
+    ],
+    "badges": ["gold_7day", "green_10books"]
+  },
+  {
+    "id": "u3",
+    "name": "王书语",
+    "avatar": "https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=avatar%20young%20woman%20with%20bun%20hair&image_size=square_hd",
+    "borrowedBooks": [
+      { "bookId": "b12", "borrowDate": "2026-06-17", "dueDate": "2026-07-01" },
+      { "bookId": "b4", "borrowDate": "2026-06-19", "dueDate": "2026-06-24" }
+    ],
+    "notes": [
+      { "id": "n6", "bookId": "b5", "rating": 3, "content": "村上的文字一如既往地孤独而优美，但这个故事让我感到有些压抑，或许这就是青春的底色。", "date": "2026-05-30", "comments": [
+        { "userId": "u5", "content": "村上春树的书都有这种感觉", "date": "2026-05-31" }
+      ]},
+      { "id": "n7", "bookId": "b13", "rating": 5, "content": "东野圭吾的温情之作！每封信都让人泪目，人与人之间的连接原来可以如此美好而治愈。", "date": "2026-06-10", "comments": [
+        { "userId": "u1", "content": "看哭了😭", "date": "2026-06-11" }
+      ]},
+      { "id": "n8", "bookId": "b17", "rating": 4, "content": "理想与现实的永恒冲突，毛姆笔下的斯特里克兰德让人又敬又畏，追逐月亮的勇气令人动容。", "date": "2026-06-06", "comments": [] }
+    ],
+    "badges": ["gold_7day"]
+  },
+  {
+    "id": "u4",
+    "name": "李墨轩",
+    "avatar": "https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=avatar%20middle-aged%20man%20scholar&image_size=square_hd",
+    "borrowedBooks": [],
+    "notes": [
+      { "id": "n9", "bookId": "b7", "rating": 4, "content": "CSAPP是每个程序员都该读的书，深入浅出地讲解了计算机系统的方方面面，不愧是经典教材。", "date": "2026-06-03", "comments": [
+        { "userId": "u2", "content": "确实，值得一读再读", "date": "2026-06-04" }
+      ]},
+      { "id": "n10", "bookId": "b14", "rating": 3, "content": "算法导论很全面但确实很枯燥，适合当工具书查阅，通读的话需要很大的毅力。", "date": "2026-05-20", "comments": [] },
+      { "id": "n11", "bookId": "b16", "rating": 5, "content": "卡尼曼的这本书改变了我对思考方式的认知，系统1和系统2的框架太精妙了，强烈推荐给所有人。", "date": "2026-06-11", "comments": [
+        { "userId": "u3", "content": "对决策帮助很大！", "date": "2026-06-12" }
+      ]},
+      { "id": "n12", "bookId": "b19", "rating": 4, "content": "Python入门的最佳选择，项目实战部分非常有用，跟着做一遍就能上手写代码了。", "date": "2026-06-09", "comments": [] }
+    ],
+    "badges": ["green_10books", "blue_share"]
+  },
+  {
+    "id": "u5",
+    "name": "陈书雅",
+    "avatar": "https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=avatar%20girl%20with%20long%20hair%20smiling&image_size=square_hd",
+    "borrowedBooks": [
+      { "bookId": "b9", "borrowDate": "2026-06-20", "dueDate": "2026-06-23" },
+      { "bookId": "b18", "borrowDate": "2026-06-20", "dueDate": "2026-07-04" }
+    ],
+    "notes": [
+      { "id": "n13", "bookId": "b4", "rating": 5, "content": "小王子永远是大人最该读的童话，每一次重读都会发现新的感动，重要的东西眼睛是看不见的。", "date": "2026-06-07", "comments": [
+        { "userId": "u1", "content": "用心去看才能看清", "date": "2026-06-08" },
+        { "userId": "u3", "content": "最爱这本书❤️", "date": "2026-06-08" }
+      ]},
+      { "id": "n14", "bookId": "b20", "rating": 4, "content": "马尔克斯的爱情史诗，跨越半个世纪的等待让人动容，虽然节奏有些缓慢但值得耐心读完。", "date": "2026-06-13", "comments": [] },
+      { "id": "n15", "bookId": "b12", "rating": 5, "content": "人类简史打开了全新的视角，认知革命、农业革命、科学革命，赫拉利的叙事能力令人叹服。", "date": "2026-06-04", "comments": [
+        { "userId": "u4", "content": "后续的未来简史也很棒", "date": "2026-06-05" }
+      ]}
+    ],
+    "badges": ["gold_7day", "blue_share"]
+  }
+]
