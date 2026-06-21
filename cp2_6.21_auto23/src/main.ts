@@ -41,6 +41,10 @@ class App {
   private autoOptimized: boolean = false;
   private performanceWarningTimeout: number | null = null;
   private panelHidden: boolean = false;
+  private wasLeftPinching: boolean = false;
+  private wasRightPinching: boolean = false;
+  private wasBothPinching: boolean = false;
+  private bothPinchFadeTimer: number | null = null;
 
   constructor() {
     this.scene = new THREE.Scene();
@@ -266,6 +270,70 @@ class App {
         rightIconEl.classList.remove('switching');
       }, 150);
     }
+
+    const isLeftPinching = leftGesture === 'pinch';
+    const isRightPinching = rightGesture === 'pinch';
+    const isBothPinching = isLeftPinching && isRightPinching;
+
+    const leftDotEl = document.getElementById('left-dot');
+    const rightDotEl = document.getElementById('right-dot');
+    const bothHintEl = document.getElementById('both-pinch-hint');
+
+    if (isLeftPinching && !this.wasLeftPinching) {
+      leftIconEl.classList.remove('pulse-left');
+      void leftIconEl.offsetWidth;
+      leftIconEl.classList.add('pulse-left');
+
+      leftGestureEl.classList.add('pinch-highlight');
+      window.setTimeout(() => {
+        leftGestureEl.classList.remove('pinch-highlight');
+      }, 200);
+
+      if (leftDotEl) {
+        leftDotEl.classList.remove('blinking');
+        void leftDotEl.offsetWidth;
+        leftDotEl.classList.add('blinking');
+      }
+    }
+
+    if (isRightPinching && !this.wasRightPinching) {
+      rightIconEl.classList.remove('pulse-right');
+      void rightIconEl.offsetWidth;
+      rightIconEl.classList.add('pulse-right');
+
+      rightGestureEl.classList.add('pinch-highlight');
+      window.setTimeout(() => {
+        rightGestureEl.classList.remove('pinch-highlight');
+      }, 200);
+
+      if (rightDotEl) {
+        rightDotEl.classList.remove('blinking');
+        void rightDotEl.offsetWidth;
+        rightDotEl.classList.add('blinking');
+      }
+    }
+
+    if (bothHintEl) {
+      if (isBothPinching && !this.wasBothPinching) {
+        if (this.bothPinchFadeTimer) {
+          window.clearTimeout(this.bothPinchFadeTimer);
+          this.bothPinchFadeTimer = null;
+        }
+        bothHintEl.classList.remove('fading');
+        bothHintEl.classList.add('visible');
+      } else if (!isBothPinching && this.wasBothPinching) {
+        bothHintEl.classList.remove('visible');
+        bothHintEl.classList.add('fading');
+        this.bothPinchFadeTimer = window.setTimeout(() => {
+          bothHintEl.classList.remove('fading');
+          this.bothPinchFadeTimer = null;
+        }, 500);
+      }
+    }
+
+    this.wasLeftPinching = isLeftPinching;
+    this.wasRightPinching = isRightPinching;
+    this.wasBothPinching = isBothPinching;
   }
 
   private checkPerformanceOptimization(hands: HandData[]): void {

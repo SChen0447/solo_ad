@@ -97,6 +97,7 @@
     }
 
     #gesture-status-bar {
+      position: relative;
       position: fixed;
       bottom: 30px;
       left: 50%;
@@ -145,6 +146,98 @@
     .hand-icon.switching {
       transform: rotate(20deg) scale(1.2);
       opacity: 0.5;
+    }
+
+    .hand-icon.pulse-left,
+    .hand-icon.pulse-right {
+      animation: pinchPulse 0.3s ease-in-out;
+    }
+
+    @keyframes pinchPulse {
+      0%   { transform: scale(1.0); }
+      50%  { transform: scale(0.85); }
+      100% { transform: scale(1.0); }
+    }
+
+    .gesture-text.left.pinch-highlight {
+      color: #FF6B6B !important;
+      transition: color 0.2s ease;
+    }
+
+    .gesture-text.right.pinch-highlight {
+      color: #6B8BFF !important;
+      transition: color 0.2s ease;
+    }
+
+    .status-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.3);
+      display: inline-block;
+      flex-shrink: 0;
+      transition: background-color 0.2s ease;
+    }
+
+    .status-dot.blinking {
+      animation: dotBlink 0.6s ease-in-out 2;
+    }
+
+    @keyframes dotBlink {
+      0%, 100% {
+        background: rgba(255, 255, 255, 0.3);
+        box-shadow: none;
+      }
+      50% {
+        background: #4ADE80;
+        box-shadow: 0 0 8px rgba(74, 222, 128, 0.8);
+      }
+    }
+
+    .both-pinch-hint {
+      position: absolute;
+      left: 50%;
+      top: -28px;
+      transform: translateX(-50%);
+      font-size: 16px;
+      color: #FFD700;
+      font-weight: 600;
+      white-space: nowrap;
+      opacity: 0;
+      pointer-events: none;
+      text-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
+      transition: opacity 0.3s ease;
+    }
+
+    .both-pinch-hint.visible {
+      opacity: 1;
+      animation: hintFadeIn 0.3s ease forwards;
+    }
+
+    .both-pinch-hint.fading {
+      animation: hintFadeOut 0.5s ease forwards;
+    }
+
+    @keyframes hintFadeIn {
+      from {
+        opacity: 0;
+        transform: translateX(-50%) translateY(8px);
+      }
+      to {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0);
+      }
+    }
+
+    @keyframes hintFadeOut {
+      from {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0);
+      }
+      to {
+        opacity: 0;
+        transform: translateX(-50%) translateY(-8px);
+      }
     }
 
     .icon-separator {
@@ -396,13 +489,16 @@
     </div>
 
     <div id="gesture-status-bar">
+      <span class="status-dot" id="left-dot"></span>
       <span class="gesture-text left" id="left-gesture">等待...</span>
       <span class="gesture-icons">
         <span class="hand-icon" id="left-icon">✋</span>
+        <span class="both-pinch-hint" id="both-pinch-hint">双手捏合</span>
         <span class="icon-separator">-</span>
         <span class="hand-icon" id="right-icon">✋</span>
       </span>
       <span class="gesture-text right" id="right-gesture">等待...</span>
+      <span class="status-dot" id="right-dot"></span>
     </div>
 
     <button id="panel-toggle">≣</button>
