@@ -1,0 +1,70 @@
+*,
+*::before,
+*::after {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html {
+  font-size: 16px;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  background: #1F2937;
+  color: #F3F4F6;
+  min-height: 100vh;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+input,
+select,
+textarea,
+button {
+  font-family: inherit;
+  font-size: inherit;
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #1F2937;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #4B5563;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #6B7280;
+}
+
+@media (max-width: 768px) {
+  .dashboard-stats-row {
+    grid-template-columns: 1fr !important;
+  }
+  .dashboard-main-grid {
+    grid-template-columns: 1fr !important;
+  }
+  .dashboard-header {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+  }
+  .dashboard-header-right {
+    width: 100% !important;
+    flex-direction: column !important;
+  }
+  .dashboard-search {
+    width: 100% !important;
+    min-width: 0 !important;
+  }
+}
