@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import AssignmentModal from '../components/AssignmentModal';
 import { api } from '../services/api';
-import type { Course, Attachment } from '../types';
+import type { Course, Assignment } from '../types';
 
 const CourseDetail = () => {
   const { id } = useParams<{ id: string }>();
@@ -11,6 +11,7 @@ const CourseDetail = () => {
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedLesson, setSelectedLesson] = useState<{ id: number; title: string } | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchCourse = async () => {
@@ -20,6 +21,9 @@ const CourseDetail = () => {
         setCourse(data);
       } catch (error) {
         console.error('Failed to fetch course:', error);
+        if (error instanceof Error) {
+          alert(error.message);
+        }
       } finally {
         setLoading(false);
       }
@@ -27,22 +31,9 @@ const CourseDetail = () => {
     fetchCourse();
   }, [id]);
 
-  const handleSubmitAssignment = async (content: string, attachments: Attachment[]) => {
-    if (!selectedLesson || !id) return;
-    
-    try {
-      await api.submitAssignment({
-        courseId: id,
-        lessonId: selectedLesson.id,
-        lessonTitle: selectedLesson.title,
-        content,
-        attachments
-      });
-      alert('作业提交成功！');
-    } catch (error) {
-      console.error('Failed to submit assignment:', error);
-      alert('提交失败，请重试');
-    }
+  const handleSubmitSuccess = (assignment: Assignment) => {
+    setSuccessMessage('作业提交成功！');
+    setTimeout(() => setSuccessMessage(null), 3000);
   };
 
   const openSubmitModal = (lessonId: number, lessonTitle: string) => {
@@ -174,14 +165,40 @@ const CourseDetail = () => {
         </div>
       </div>
 
+      {successMessage && (
+        <div style={successToastStyle}>
+          <span style={{ marginRight: '8px' }}>✅</span>
+          {successMessage}
+        </div>
+      )}
+
       <AssignmentModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        onSubmit={handleSubmitAssignment}
+        onSubmitSuccess={handleSubmitSuccess}
         lessonTitle={selectedLesson?.title || ''}
+        courseId={id || ''}
+        lessonId={selectedLesson?.id || 0}
       />
     </div>
   );
+};
+
+const successToastStyle: React.CSSProperties = {
+  position: 'fixed',
+  bottom: '100px',
+  left: '50%',
+  transform: 'translateX(-50%)',
+  padding: '12px 20px',
+  backgroundColor: '#D1FAE5',
+  color: '#065F46',
+  borderRadius: '8px',
+  fontSize: '14px',
+  boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+  zIndex: 2000,
+  animation: 'slideInBottom 0.3s ease',
+  display: 'flex',
+  alignItems: 'center'
 };
 
 const pageStyle: React.CSSProperties = {
@@ -427,6 +444,10 @@ const submitBtnStyle: React.CSSProperties = {
 
 const styleSheet = document.createElement('style');
 styleSheet.textContent = `
+  @keyframes slideInBottom {
+    from { opacity: 0; transform: translateX(-50%) translateY(20px); }
+    to { opacity: 1; transform: translateX(-50%) translateY(0); }
+  }
   @media (max-width: 768px) {
     div[style*="heroStyle"] {
       flex-direction: column !important;

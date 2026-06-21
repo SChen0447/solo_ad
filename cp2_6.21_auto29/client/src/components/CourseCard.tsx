@@ -16,6 +16,12 @@ const CourseCard = ({ course }: CourseCardProps) => {
   const circumference = 2 * Math.PI * 16;
   const strokeDashoffset = circumference - (course.progress / 100) * circumference;
 
+  const circleStyle = useMemo(() => ({
+    stroke: progressColor,
+    strokeDashoffset: strokeDashoffset,
+    transition: 'stroke-dashoffset 0.5s ease, stroke 0.3s ease'
+  }), [progressColor, strokeDashoffset]);
+
   return (
     <Link to={`/course/${course.id}`} style={cardStyle}>
       <div style={coverStyle}>
@@ -32,7 +38,7 @@ const CourseCard = ({ course }: CourseCardProps) => {
             <span style={progressLabelStyle}>完成进度</span>
             <span style={progressValueStyle}>{course.progress}%</span>
           </div>
-          <svg width="36" height="36" style={progressRingStyle}>
+          <svg width="36" height="36" style={progressRingStyle} viewBox="0 0 36 36">
             <circle
               cx="18"
               cy="18"
@@ -46,13 +52,14 @@ const CourseCard = ({ course }: CourseCardProps) => {
               cy="18"
               r="16"
               fill="none"
-              stroke={progressColor}
               strokeWidth="4"
               strokeLinecap="round"
               strokeDasharray={circumference}
-              strokeDashoffset={strokeDashoffset}
-              transform="rotate(-90 18 18)"
-              style={{ transition: 'stroke-dashoffset 0.5s ease, stroke 0.3s ease' }}
+              style={{
+                ...circleStyle,
+                transform: 'rotate(-90deg)',
+                transformOrigin: '18px 18px'
+              }}
             />
             <text
               x="18"

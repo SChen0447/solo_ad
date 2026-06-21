@@ -4,10 +4,11 @@ import type { Notification } from '../types';
 interface NotificationBubbleProps {
   notification: Notification | null;
   onClose: () => void;
+  onAutoClose?: () => void;
   onClick: () => void;
 }
 
-const NotificationBubble = ({ notification, onClose, onClick }: NotificationBubbleProps) => {
+const NotificationBubble = ({ notification, onClose, onAutoClose, onClick }: NotificationBubbleProps) => {
   const [isVisible, setIsVisible] = useState(false);
   const [isFadingOut, setIsFadingOut] = useState(false);
 
@@ -20,13 +21,14 @@ const NotificationBubble = ({ notification, onClose, onClick }: NotificationBubb
         setIsFadingOut(true);
         setTimeout(() => {
           setIsVisible(false);
+          onAutoClose?.();
           onClose();
         }, 300);
       }, 3000);
 
       return () => clearTimeout(timer);
     }
-  }, [notification, onClose]);
+  }, [notification, onClose, onAutoClose]);
 
   if (!notification || !isVisible) return null;
 
