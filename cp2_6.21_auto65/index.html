@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>塔防路线规划与单位攻防模拟</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      background-color: #1F2937;
+      color: #D1D5DB;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    .app-container {
+      display: flex;
+      flex-direction: row;
+      align-items: flex-start;
+      justify-content: center;
+      gap: 12px;
+      width: 100%;
+      max-width: 1200px;
+    }
+
+    .game-canvas-wrapper {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    #gameCanvas {
+      border: 2px solid #374151;
+      border-radius: 8px;
+      background-color: #1F2937;
+      display: block;
+      cursor: pointer;
+    }
+
+    .control-panel {
+      width: 260px;
+      background-color: #111827;
+      border-radius: 8px;
+      padding: 20px;
+      margin: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    }
+
+    .panel-section {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .wave-title {
+      font-size: 24px;
+      font-weight: bold;
+      color: #F9FAFB;
+    }
+
+    .info-text {
+      font-size: 14px;
+      color: #9CA3AF;
+    }
+
+    .score-text {
+      font-size: 18px;
+      font-weight: 600;
+      color: #34D399;
+    }
+
+    .action-btn {
+      width: 120px;
+      height: 40px;
+      border: none;
+      border-radius: 8px;
+      background-color: #3B82F6;
+      color: white;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
+    }
+
+    .action-btn:hover {
+      background-color: #2563EB;
+      transform: scale(1.05);
+    }
+
+    .action-btn:disabled {
+      background-color: #4B5563;
+      cursor: not-allowed;
+      transform: none;
+      box-shadow: none;
+    }
+
+    .tower-menu {
+      background-color: #FFFFFF;
+      border-radius: 8px;
+      padding: 16px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+      display: none;
+      flex-direction: column;
+      gap: 10px;
+      position: fixed;
+      z-index: 100;
+    }
+
+    .tower-menu.active {
+      display: flex;
+    }
+
+    .tower-menu-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: #1F2937;
+      margin-bottom: 4px;
+    }
+
+    .tower-menu-btn {
+      padding: 8px 16px;
+      border: none;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .upgrade-btn {
+      background-color: #F59E0B;
+      color: white;
+    }
+
+    .upgrade-btn:hover:not(:disabled) {
+      background-color: #D97706;
+    }
+
+    .upgrade-btn:disabled {
+      background-color: #9CA3AF;
+      cursor: not-allowed;
+    }
+
+    .sell-btn {
+      background-color: #EF4444;
+      color: white;
+    }
+
+    .sell-btn:hover {
+      background-color: #DC2626;
+    }
+
+    .game-over-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(0, 0, 0, 0.7);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 200;
+      opacity: 0;
+    }
+
+    .game-over-overlay.active {
+      display: flex;
+      animation: fadeIn 0.5s ease forwards;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 0.7; }
+    }
+
+    .game-over-text {
+      font-size: 48px;
+      font-weight: bold;
+      color: #EF4444;
+      text-shadow: 0 4px 12px rgba(239, 68, 68, 0.5);
+      animation: bounceIn 0.6s ease;
+    }
+
+    @keyframes bounceIn {
+      0% { transform: scale(0.3); opacity: 0; }
+      50% { transform: scale(1.1); }
+      70% { transform: scale(0.95); }
+      100% { transform: scale(1); opacity: 1; }
+    }
+
+    .divider {
+      height: 1px;
+      background-color: #374151;
+      border: none;
+    }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      font-size: 13px;
+    }
+
+    .stats-label {
+      color: #9CA3AF;
+    }
+
+    .stats-value {
+      color: #D1D5DB;
+      text-align: right;
+    }
+
+    @media (max-width: 1200px) {
+      .app-container {
+        flex-direction: column;
+        align-items: center;
+      }
+
+      .control-panel {
+        width: 900px;
+        height: 160px;
+        flex-direction: row;
+        padding: 16px;
+        margin: 12px 0 0 0;
+      }
+
+      .panel-section {
+        flex: 1;
+        flex-direction: column;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app-container">
+    <div class="game-canvas-wrapper">
+      <canvas id="gameCanvas" width="900" height="600"></canvas>
+    </div>
+    <div class="control-panel" id="controlPanel">
+      <div class="panel-section">
+        <div class="wave-title" id="waveTitle">第 1 波</div>
+        <div class="info-text" id="remainingText">剩余单位: 5</div>
+        <div class="score-text" id="scoreText">得分: 0</div>
+        <hr class="divider" />
+        <div class="stats-grid">
+          <span class="stats-label">到达终点:</span>
+          <span class="stats-value" id="leakedText">0 / 3</span>
+          <span class="stats-label">已击杀:</span>
+          <span class="stats-value" id="killedText">0</span>
+        </div>
+      </div>
+      <div class="panel-section">
+        <button class="action-btn" id="nextWaveBtn">下一波</button>
+        <button class="action-btn" id="resetBtn" style="background-color: #6B7280;">重置游戏</button>
+      </div>
+      <div class="panel-section">
+        <div class="info-text" style="font-size: 12px;">
+          💡 点击空白格子放置炮塔<br/>
+          💡 点击已有炮塔升级/出售
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="tower-menu" id="towerMenu">
+    <div class="tower-menu-title" id="towerMenuTitle">炮塔 Lv.1</div>
+    <button class="tower-menu-btn upgrade-btn" id="upgradeBtn">升级 (50分)</button>
+    <button class="tower-menu-btn sell-btn" id="sellBtn">出售 (+30分)</button>
+  </div>
+
+  <div class="game-over-overlay" id="gameOverOverlay">
+    <div class="game-over-text">游戏结束</div>
+  </div>
+
+  <script type="module" src="/src/GameEngine.ts"></script>
+</body>
+</html>
