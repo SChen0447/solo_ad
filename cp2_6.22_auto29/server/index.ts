@@ -70,7 +70,6 @@ app.post('/api/ideas', (req, res) => {
 });
 
 app.get('/api/ideas', (_req, res) => {
-  updatePriorities();
   res.json(ideas);
 });
 
@@ -79,6 +78,10 @@ app.post('/api/ideas/:id/vote', (req, res) => {
   const { userName } = req.body;
   if (!userName) {
     res.status(400).json({ error: '用户名必填' });
+    return;
+  }
+  if (!users.includes(userName)) {
+    res.status(400).json({ error: '无效的用户' });
     return;
   }
   let userVote = userVotes.find((uv) => uv.userName === userName);
@@ -98,11 +101,10 @@ app.post('/api/ideas/:id/vote', (req, res) => {
   idea.voteCount += 1;
   idea.priority = getPriority(idea.voteCount);
   userVote.votesUsed += 1;
-  res.json({ idea, votesRemaining: 5 - userVote.votesUsed });
+  res.json({ idea, votesRemaining: 5 - userVote.votesUsed, votesUsed: userVote.votesUsed });
 });
 
 app.get('/api/ideas/ranked', (_req, res) => {
-  updatePriorities();
   const sorted = [...ideas].sort((a, b) => b.voteCount - a.voteCount);
   res.json(sorted);
 });

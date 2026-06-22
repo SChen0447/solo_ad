@@ -30,12 +30,19 @@ const navItems: { key: Page; label: string }[] = [
 
 export default function App() {
   const [page, setPage] = useState<Page>('create');
-  const [currentUser, setCurrentUser] = useState('Alice');
-  const [users, setUsers] = useState<string[]>(['Alice', 'Bob', 'Charlie', 'Diana', 'Ethan']);
+  const [currentUser, setCurrentUser] = useState('');
+  const [users, setUsers] = useState<string[]>([]);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
   useEffect(() => {
-    getUsers().then(setUsers).catch(() => {});
+    getUsers()
+      .then((data) => {
+        setUsers(data);
+        if (data.length > 0 && !currentUser) {
+          setCurrentUser(data[0]);
+        }
+      })
+      .catch(() => {});
   }, []);
 
   const showToast = (message: string, type: 'success' | 'error') => {

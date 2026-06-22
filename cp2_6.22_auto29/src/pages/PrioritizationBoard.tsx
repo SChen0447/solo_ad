@@ -78,17 +78,20 @@ export default function PrioritizationBoard() {
   const handleDrop = async (e: React.DragEvent, targetPriority: 'high' | 'medium' | 'low') => {
     e.preventDefault();
     setDropTarget(null);
-    if (!draggedIdea || draggedIdea.priority === targetPriority) {
+    if (!draggedIdea) {
+      setIsDragging(false);
+      setDraggedIdea(null);
+      return;
+    }
+    if (draggedIdea.priority === targetPriority) {
       setIsDragging(false);
       setDraggedIdea(null);
       return;
     }
     try {
-      await updatePriority(draggedIdea.id, targetPriority);
+      const updatedIdea = await updatePriority(draggedIdea.id, targetPriority);
       setIdeas((prev) =>
-        prev.map((idea) =>
-          idea.id === draggedIdea.id ? { ...idea, priority: targetPriority } : idea
-        )
+        prev.map((idea) => (idea.id === draggedIdea.id ? updatedIdea : idea))
       );
       showToast(`已移至${targetPriority === 'high' ? '高' : targetPriority === 'medium' ? '中' : '低'}优先级`, 'success');
     } catch {
