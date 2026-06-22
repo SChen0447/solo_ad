@@ -44,25 +44,54 @@ import OrderBoard from './components/OrderBoard';
 import MergeView from './components/MergeView';
 import CartPanel from './components/CartPanel';
 import QtyPickerModal from './components/QtyPickerModal';
+import AnimatedNumber from './components/AnimatedNumber';
 
 const API_BASE = '/api';
 
 const App = () => {
-  /* ───── 全局状态 ───── */
+  /* ───── 全局状态（数据流向：← fetch API → 向下props冒泡给子组件） ─────
+   *
+   *  State ← 数据源                    → 消费方（子组件 props）
+   *  ────────────────────────────────────────────────────────────────────────
+   *  users     ← GET /api/users          → 顶部用户下拉切换
+   *  currentUser ← 用户选择              → 购物车隔离 / 订单过滤 / 提交订单
+   *  products  ← GET /api/products       → ProductList 展示 / CartPanel 单价
+   *  orders    ← GET /api/orders?userId  → OrderBoard 历史订单
+   *  mergedOrders ← GET /api/merged-orders → MergeView 聚合展示 + 取货标记
+   *  cart      ← 前端内存（setCart）     → CartPanel 显示 / 修改 / 移除
+   *  stats     ← GET /api/stats          → 底部 AnimatedNumber 统计栏
+   *  pickupFilter ← 本地 UI 交互         → MergeView 过滤显示
+   *  isAdmin   ← 本地 checkbox           → 显示新增商品表单 + 库存调整
+   *  selectedProduct ← ProductList 点击  → 控制 QtyPickerModal 显示/隐藏
+   *  adminForm ← 本地受控表单            → POST /api/products 新增商品
+   *  statsKey  ← fetchAll() 自增         → footer key 重挂载 + fadeIn 动画
+   */
   const [users, setUsers] = useState<User[]>([]);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
   const [mergedOrders, setMergedOrders] = useState<MergedOrderItem[]>([]);
-  const [cart, setCart] = useState<CartItem[]>([]);                   // 当前用户的未提交购物车
+  const [cart, setCart] = useState<CartItem[]>([]);
   const [stats, setStats] = useState<Stats>({ totalOrders: 0, totalProducts: 0, totalAmount: 0, pickedRate: 0 });
-  const [pickupFilter, setPickupFilter] = useState<PickupFilter>('all'); // 合并视图过滤
+  const [pickupFilter, setPickupFilter] = useState<PickupFilter>('all');
   const [isAdmin, setIsAdmin] = useState(false);
-  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null); // 数量浮层绑定
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [adminForm, setAdminForm] = useState({ name: '', price: '', stock: '', category: '水果' });
-  const [statsKey, setStatsKey] = useState(0);                      // 强制重新触发统计动画
+  const [statsKey, setStatsKey] = useState(0);
 
-  /* ───── 拉取所有数据 ───── */
+  /* ───── 拉取所有数据（并发 5 个 API → 更新全部 state） ─────
+   *
+   *  调用链：
+   *    useEffect 挂载 / currentUser 变化 → fetchAll()
+   *    submitOrder / cancelOrder / markPicked 等写操作成功后 → fetchAll() 刷新
+   *
+   *  并发请求：
+   *    GET /api/users          → setUsers()
+   *    GET /api/products       → setProducts()
+   *    GET /api/orders?uid=x   → setOrders()（仅当已选用户）
+   *    GET /api/merged-orders  → setMergedOrders()
+   *    GET /api/stats          → setStats() + statsKey++ 触发统计栏重挂载动画
+   */
   const fetchAll = useCallback(async () => {
     try {
       const [u, p, o, m, s] = await Promise.all([
@@ -77,7 +106,7 @@ const App = () => {
       setOrders(o);
       setMergedOrders(m);
       setStats(s);
-      setStatsKey((k) => k + 1); // 触发淡入动画
+      setStatsKey((k) => k + 1);
       if (!currentUser && u.length > 0) setCurrentUser(u[0]);
     } catch (e) {
       console.error('[fetchAll] error:', e);
@@ -88,6 +117,9 @@ const App = () => {
     fetchAll();
   }, [fetchAll]);
 
+  /* 用户切换 effect：拉取该用户的历史订单
+   *  数据流：顶部 <select> onChange → setCurrentUser → 触发本 effect
+   *       → GET /api/orders?userId=xxx → setOrders → OrderBoard 重新渲染 */
   useEffect(() => {
     if (currentUser) {
       fetch(`${API_BASE}/orders?userId=${currentUser.id}`)
@@ -96,9 +128,17 @@ const App = () => {
     }
   }, [currentUser]);
 
-  /* ───── 购物车操作 ───── */
+  /* ───── 购物车操作（全部为前端内存 state，未提交到后端） ─────
+   *
+   *  完整数据流：QtyPickerModal → addToCart → setCart
+   *                ↕ (双向)
+   *              CartPanel  → onUpdateQty / onRemove / onSubmit
+   *                                  ↓
+   *                          setCart（修改） / POST /api/orders（提交）
+   */
 
-  // QtyPickerModal 确认按钮调用 → 加入购物车（仅前端状态，不提交）
+  // QtyPickerModal 确认按钮 → 加入购物车（已存在则累加数量，上限为库存）
+  // 触发点：用户点击商品卡片 → 弹浮层 → 点击"加入购物车"
   const addToCart = (product: Product, qty: number) => {
     setCart((prev) => {
       const found = prev.find((c) => c.productId === product.id);
@@ -120,21 +160,27 @@ const App = () => {
     setSelectedProduct(null);
   };
 
-  // CartPanel 修改数量 → 直接更新 cart state
+  // CartPanel 修改数量 → 若 qty ≤ 0 则过滤移除，否则 clamp 到 [1, stock]
+  // 数据流向：CartPanel 减号/输入 → onUpdateQty → setCart → 触发 re-render
   const updateCartQty = (productId: string, qty: number) => {
     setCart((prev) =>
-      prev.map((c) =>
-        c.productId === productId ? { ...c, quantity: Math.max(1, Math.min(qty, c.stock)) } : c,
-      ),
+      prev
+        .map((c) =>
+          c.productId === productId
+            ? { ...c, quantity: Math.min(Math.max(0, qty), c.stock) } // 先允许 0
+            : c,
+        )
+        .filter((c) => c.quantity > 0), // 数量为 0 的商品自动移除
     );
   };
 
-  // CartPanel 移除商品 → 从 cart 中过滤掉
+  // CartPanel 移除商品（×按钮）→ 从 cart 中过滤掉
   const removeFromCart = (productId: string) => {
     setCart((prev) => prev.filter((c) => c.productId !== productId));
   };
 
-  // CartPanel 提交订单按钮 → POST /api/orders → 清空购物车 → 刷新数据
+  // CartPanel 提交订单 → 购物车 → 后端生成 Order 记录
+  // 数据流：CartPanel 📦 按钮 → POST /api/orders → setCart([]) → fetchAll() 刷新
   const submitOrder = async () => {
     if (!currentUser || cart.length === 0) return;
     await fetch(`${API_BASE}/orders`, {
@@ -150,13 +196,15 @@ const App = () => {
     fetchAll();
   };
 
-  /* ───── 订单操作 ───── */
+  /* ───── 订单操作（OrderBoard 组件冒泡上来的回调） ───── */
 
+  // 取消订单 → 软删除（status='cancelled'）→ 刷新
   const cancelOrder = async (orderId: string) => {
     await fetch(`${API_BASE}/orders/${orderId}`, { method: 'DELETE' });
     fetchAll();
   };
 
+  // 修改订单项数量 → PUT 更新 → 刷新
   const modifyOrder = async (orderId: string, items: { productId: string; quantity: number }[]) => {
     await fetch(`${API_BASE}/orders/${orderId}`, {
       method: 'PUT',
@@ -166,8 +214,14 @@ const App = () => {
     fetchAll();
   };
 
-  /* ───── 取货操作（MergeView 按用户粒度标记） ───── */
-
+  /* ───── 取货操作（MergeView 按用户粒度标记） ─────
+   *
+   *  数据流：
+   *    MergeView 每行"标记取货"按钮 → onClick → markPicked(pid, uid, !isPicked)
+   *      → POST /api/pickup { productId, userId, picked }
+   *        → 后端更新 pickups Map + pickupTimes Map（记录 ISO 时间戳）
+   *          → fetchAll() 刷新 mergedOrders → MergeView 重新渲染（opacity 0.5 + ✓ + 时间戳）
+   */
   const markPicked = async (productId: string, userId: string, picked: boolean) => {
     await fetch(`${API_BASE}/pickup`, {
       method: 'POST',
@@ -177,8 +231,9 @@ const App = () => {
     fetchAll();
   };
 
-  /* ───── 商品管理（管理员） ───── */
+  /* ───── 商品管理（管理员模式 isAdmin=true 时生效） ───── */
 
+  // 新增商品 → POST /api/products → 清空表单 → 刷新
   const addProduct = async () => {
     if (!adminForm.name || !adminForm.price || !adminForm.stock) return;
     await fetch(`${API_BASE}/products`, {
@@ -195,6 +250,8 @@ const App = () => {
     fetchAll();
   };
 
+  // 调整商品库存 → PUT /api/products/:id → 刷新
+  // 触发点：ProductList 管理员模式下的 📝 库存输入框 onChange
   const updateStock = async (productId: string, stock: number) => {
     await fetch(`${API_BASE}/products/${productId}`, {
       method: 'PUT',
@@ -351,26 +408,40 @@ const App = () => {
         </aside>
       </main>
 
-      {/* ─── 底部统计栏：4 项指标 + 取货进度条，变化时 0.3s 淡入 ─── */}
+      {/* ─── 底部统计栏：4 项指标 + 取货进度条 ─── */}
+      {/* 数据流向：
+          GET /api/stats → stats state → AnimatedNumber 逐帧递增（0.3s easeOutCubic）
+                              ↘ progress-fill width 过渡（0.6s ease-out） */}
       <footer className="stats-bar" key={statsKey}>
         <div className="stat-card fade-in">
           <div className="stat-label">总订单数</div>
-          <div className="stat-value">{stats.totalOrders}</div>
+          <div className="stat-value">
+            <AnimatedNumber value={stats.totalOrders} duration={300} />
+          </div>
         </div>
         <div className="stat-card fade-in">
           <div className="stat-label">商品种类</div>
-          <div className="stat-value">{stats.totalProducts}</div>
+          <div className="stat-value">
+            <AnimatedNumber value={stats.totalProducts} duration={300} />
+          </div>
         </div>
         <div className="stat-card fade-in">
           <div className="stat-label">总金额</div>
-          <div className="stat-value">¥{stats.totalAmount.toFixed(2)}</div>
+          <div className="stat-value">
+            <AnimatedNumber value={stats.totalAmount} prefix="¥" decimals={2} duration={300} />
+          </div>
         </div>
         <div className="stat-card stat-progress fade-in">
-          <div className="stat-label">取货完成 {Math.round(stats.pickedRate * 100)}%</div>
+          <div className="stat-label">
+            取货完成 <AnimatedNumber value={Math.round(stats.pickedRate * 100)} suffix="%" duration={300} />
+          </div>
           <div className="progress-bar">
             <div
               className="progress-fill"
-              style={{ width: `${stats.pickedRate * 100}%` }}
+              style={{
+                width: `${stats.pickedRate * 100}%`,
+                transition: 'width 0.6s cubic-bezier(0.16, 1, 0.3, 1)',
+              }}
             />
           </div>
         </div>

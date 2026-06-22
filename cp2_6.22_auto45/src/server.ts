@@ -364,9 +364,9 @@ app.get('/api/stats', (_req, res) => {
 });
 
 // =====================================================
-//  启动监听
+//  启动监听（使用3001端口，避免系统其他服务占用3000）
 // =====================================================
-const PORT = 3000;
+const PORT = 4321;
 app.listen(PORT, () => {
   console.log(`✅ [社区团购后端] 已启动 http://localhost:${PORT}`);
   console.log(`   预置商品: ${products.size} 种  |  预设用户: ${users.length} 人`);

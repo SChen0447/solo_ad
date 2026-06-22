@@ -120,16 +120,12 @@ const MergeView = ({ mergedOrders, onMarkPicked, filter }: Props) => {
                         </span>
                       </td>
 
-                      {/* 取货时间戳 */}
-                      <td className="merge-time-col" title={ub.pickedAt || '未取货'}>
+                      {/* 取货时间戳 — ISO 8601 格式（精确到毫秒） */}
+                      <td className="merge-time-col" title={ub.pickedAt ? new Date(ub.pickedAt).toISOString() : '未取货'}>
                         {ub.pickedAt
-                          ? new Date(ub.pickedAt).toLocaleString('zh-CN', {
-                              month: '2-digit',
-                              day: '2-digit',
-                              hour: '2-digit',
-                              minute: '2-digit',
-                              second: '2-digit',
-                            })
+                          ? <span style={{ fontFamily: 'Menlo, Consolas, monospace', fontSize: 10, color: '#6B7280' }}>
+                              {new Date(ub.pickedAt).toISOString()}
+                            </span>
                           : <span style={{ color: '#D1D5DB' }}>— 未取 —</span>}
                       </td>
 

@@ -51,7 +51,8 @@ const CartPanel = ({ cartItems, onUpdateQty, onRemove, onSubmit }: Props) => {
                   <div className="cart-item-actions">
                     <button
                       className="qty-btn-sm"
-                      onClick={() => onUpdateQty(c.productId, Math.max(1, c.quantity - 1))}
+                      onClick={() => onUpdateQty(c.productId, c.quantity - 1)}
+                      title="减少1件（减到0自动移除）"
                     >
                       −
                     </button>
