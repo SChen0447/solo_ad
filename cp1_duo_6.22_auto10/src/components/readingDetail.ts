@@ -65,9 +65,27 @@ export function renderReadingDetail(
     const progress = book.totalPages > 0 ? Math.min(100, Math.round((currentPage / book.totalPages) * 100)) : 0;
     const sortedRecords = sortRecordsByDate(book.records);
     const sortedNotes = [...book.notes].sort((a, b) => b.createdAt - a.createdAt);
-    const coverContent = book.coverUrl
-      ? `<img src="${book.coverUrl}" alt="${book.title}" onerror="this.style.display='none';this.parentElement.innerHTML='${book.title.charAt(0)}';">`
-      : book.title.charAt(0);
+
+    const initial = book.title.charAt(0) || '📖';
+    const safeTitle = book.title.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+    const placeholderHTML = `
+      <div class="book-cover-placeholder">
+        <span class="placeholder-icon">📖</span>
+        <span class="placeholder-initial">${initial}</span>
+        <span class="placeholder-title">${safeTitle}</span>
+      </div>
+    `;
+    const coverOnError = `
+      if (!this.dataset.failed) {
+        this.dataset.failed = '1';
+        this.style.display = 'none';
+        var ph = this.nextElementSibling;
+        if (ph) ph.style.display = 'flex';
+      }
+    `.replace(/\s+/g, ' ').trim();
+    const coverContent = book.coverUrl && book.coverUrl.trim()
+      ? `<img src="${book.coverUrl}" alt="${safeTitle}" onerror="${coverOnError}" />${placeholderHTML.replace(`class="book-cover-placeholder"`, `class="book-cover-placeholder" style="display:none;"`)}`
+      : placeholderHTML;
 
     const html = `
       <div class="page-header" style="display:flex;align-items:center;justify-content:space-between;">

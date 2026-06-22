@@ -34,17 +34,48 @@ export function renderBookShelf(root: HTMLElement, onNavigate: (route: string) =
     return `<span class="status-badge ${m.cls}">${m.text}</span>`;
   }
 
+  function renderCoverHTML(book: Book): string {
+    const initial = book.title.charAt(0) || '📖';
+    const safeTitle = book.title.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+    const placeholderHTML = `
+      <div class="book-cover-placeholder" style="display:flex;">
+        <span class="placeholder-icon">📖</span>
+        <span class="placeholder-initial">${initial}</span>
+        <span class="placeholder-title">${safeTitle}</span>
+      </div>
+    `;
+
+    if (!book.coverUrl || book.coverUrl.trim() === '') {
+      return placeholderHTML;
+    }
+
+    const onErrorHandler = `
+      if (!this.dataset.failed) {
+        this.dataset.failed = '1';
+        this.style.display = 'none';
+        var ph = this.nextElementSibling;
+        if (ph) ph.style.display = 'flex';
+      }
+    `.replace(/\s+/g, ' ').trim();
+
+    return `
+      <img src="${book.coverUrl}" alt="${safeTitle}" onerror="${onErrorHandler}" />
+      <div class="book-cover-placeholder" style="display:none;">
+        <span class="placeholder-icon">📖</span>
+        <span class="placeholder-initial">${initial}</span>
+        <span class="placeholder-title">${safeTitle}</span>
+      </div>
+    `;
+  }
+
   function renderBookCard(book: Book): string {
     const currentPage = getBookCurrentPage(book);
     const totalRead = getBookTotalPagesRead(book);
     const progress = book.totalPages > 0 ? Math.min(100, Math.round((currentPage / book.totalPages) * 100)) : 0;
-    const coverContent = book.coverUrl
-      ? `<img src="${book.coverUrl}" alt="${book.title}" onerror="this.style.display='none';this.parentElement.innerHTML='${book.title.charAt(0)}';">`
-      : book.title.charAt(0);
 
     return `
       <div class="book-card" data-book-id="${book.id}">
-        <div class="book-cover">${coverContent}</div>
+        <div class="book-cover">${renderCoverHTML(book)}</div>
         <div class="book-title">${book.title}</div>
         <div class="book-author">${book.author}</div>
         <div class="book-progress">
