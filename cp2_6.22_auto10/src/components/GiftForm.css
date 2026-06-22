@@ -25,6 +25,21 @@
   animation: slideDown 0.3s ease-out;
 }
 
+.success-banner.fading {
+  animation: fadeOut 0.3s ease-out forwards;
+}
+
+@keyframes fadeOut {
+  0% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+}
+
 .success-icon {
   display: inline-flex;
   align-items: center;
@@ -102,30 +117,46 @@
 }
 
 .input-with-prefix {
-  position: relative;
   display: flex;
-  align-items: center;
+  align-items: stretch;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  overflow: hidden;
+  background: white;
+  transition: border-color 0.2s ease;
 }
 
-.input-with-prefix input {
-  width: 100%;
-  padding-left: 32px;
+.input-with-prefix:focus-within {
+  border-color: #d4a373;
 }
 
-.input-with-prefix .error + input,
-.input-with-prefix input.error {
+.input-with-prefix:has(input.error) {
   border-color: #ef4444;
 }
 
 .input-prefix {
-  position: absolute;
-  left: 12px;
-  top: 50%;
-  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 12px;
+  background: #f9fafb;
   color: #9ca3af;
   font-size: 14px;
   font-weight: 500;
-  pointer-events: none;
+  border-right: 1px solid #e5e7eb;
+  flex-shrink: 0;
+}
+
+.input-with-prefix input {
+  flex: 1;
+  border: none;
+  border-radius: 0;
+  padding: 10px 12px;
+  outline: none;
+}
+
+.input-with-prefix input:focus {
+  box-shadow: none;
 }
 
 .photo-preview-wrapper {
@@ -151,8 +182,11 @@
 }
 
 .photo-preview-failed {
-  padding: 24px;
-  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px;
   background: white;
   border-radius: 6px;
 }
@@ -160,6 +194,28 @@
 .photo-preview-failed span {
   color: #ef4444;
   font-size: 13px;
+}
+
+.clear-photo-btn {
+  padding: 6px 14px;
+  background: #fef2f2;
+  color: #ef4444;
+  border: 1px solid #fecaca;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.clear-photo-btn:hover {
+  background: #fee2e2;
+  border-color: #ef4444;
+}
+
+.clear-photo-btn:active {
+  transform: scale(0.97);
 }
 
 .error-text {
@@ -241,6 +297,16 @@
   }
 
   .reset-btn {
+    width: 100%;
+  }
+
+  .photo-preview-failed {
+    flex-direction: column;
+    align-items: stretch;
+    text-align: center;
+  }
+
+  .clear-photo-btn {
     width: 100%;
   }
 }

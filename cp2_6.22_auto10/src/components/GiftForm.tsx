@@ -1,4 +1,4 @@
-import React, { useState, useCallback, memo, useMemo } from 'react';
+import React, { useState, useCallback, memo, useMemo, useRef } from 'react';
 import type { CreateGiftDto, GiftCategory, FormErrors } from '../types';
 import './GiftForm.css';
 
@@ -27,7 +27,10 @@ const GiftForm: React.FC<GiftFormProps> = ({ onSubmit }) => {
   const [errors, setErrors] = useState<FormErrors>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
+  const [successFading, setSuccessFading] = useState(false);
   const [photoPreviewError, setPhotoPreviewError] = useState(false);
+  const successTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const fadeTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   const isPhotoUrlValid = useMemo(() => {
     if (!formData.photoUrl.trim()) return false;
@@ -72,6 +75,23 @@ const GiftForm: React.FC<GiftFormProps> = ({ onSubmit }) => {
     return Object.keys(newErrors).length === 0;
   }, [formData]);
 
+  const clearTimers = useCallback(() => {
+    if (successTimerRef.current) {
+      clearTimeout(successTimerRef.current);
+      successTimerRef.current = null;
+    }
+    if (fadeTimerRef.current) {
+      clearTimeout(fadeTimerRef.current);
+      fadeTimerRef.current = null;
+    }
+  }, []);
+
+  const resetFormToInitial = useCallback(() => {
+    setFormData({ ...initialFormData });
+    setErrors({});
+    setPhotoPreviewError(false);
+  }, []);
+
   const handleChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
       const { name, value } = e.target;
@@ -89,26 +109,44 @@ const GiftForm: React.FC<GiftFormProps> = ({ onSubmit }) => {
     [errors]
   );
 
-  const handleReset = useCallback(() => {
-    setFormData(initialFormData);
-    setErrors({});
+  const handleReset = useCallback(
+    (e?: React.FormEvent) => {
+      if (e) e.preventDefault();
+      clearTimers();
+      setShowSuccess(false);
+      setSuccessFading(false);
+      resetFormToInitial();
+    },
+    [clearTimers, resetFormToInitial]
+  );
+
+  const handleClearPhotoUrl = useCallback(() => {
+    setFormData((prev) => ({ ...prev, photoUrl: '' }));
     setPhotoPreviewError(false);
-  }, []);
+    if (errors.photoUrl) {
+      setErrors((prev) => ({ ...prev, photoUrl: undefined }));
+    }
+  }, [errors.photoUrl]);
 
   const handleSubmit = useCallback(
     async (e: React.FormEvent) => {
       e.preventDefault();
       if (!validate()) return;
 
+      clearTimers();
       setIsSubmitting(true);
       try {
         await onSubmit(formData);
         setShowSuccess(true);
-        setTimeout(() => {
-          setShowSuccess(false);
-          setFormData(initialFormData);
-          setErrors({});
-          setPhotoPreviewError(false);
+        setSuccessFading(false);
+
+        successTimerRef.current = setTimeout(() => {
+          setSuccessFading(true);
+          fadeTimerRef.current = setTimeout(() => {
+            setShowSuccess(false);
+            setSuccessFading(false);
+            resetFormToInitial();
+          }, 300);
         }, 2000);
       } catch (err) {
         if (err instanceof Error) {
@@ -118,7 +156,7 @@ const GiftForm: React.FC<GiftFormProps> = ({ onSubmit }) => {
         setIsSubmitting(false);
       }
     },
-    [formData, validate, onSubmit]
+    [formData, validate, onSubmit, clearTimers, resetFormToInitial]
   );
 
   const handlePhotoLoadError = useCallback(() => {
@@ -130,7 +168,7 @@ const GiftForm: React.FC<GiftFormProps> = ({ onSubmit }) => {
       <h2 className="form-title">登记礼物</h2>
 
       {showSuccess && (
-        <div className="success-banner">
+        <div className={`success-banner ${successFading ? 'fading' : ''}`}>
           <span className="success-icon">✓</span>
           <span>礼物登记成功！</span>
         </div>
@@ -146,7 +184,7 @@ const GiftForm: React.FC<GiftFormProps> = ({ onSubmit }) => {
             value={formData.name}
             onChange={handleChange}
             className={errors.name ? 'error' : ''}
-            placeholder="请输入礼物名称，如：手绘明信片"
+            placeholder="请输入礼物名称"
           />
           {errors.name && <span className="error-text">{errors.name}</span>}
         </div>
@@ -160,7 +198,7 @@ const GiftForm: React.FC<GiftFormProps> = ({ onSubmit }) => {
             value={formData.owner}
             onChange={handleChange}
             className={errors.owner ? 'error' : ''}
-            placeholder="请输入您的昵称，如：小明"
+            placeholder="请输入您的昵称"
           />
           {errors.owner && <span className="error-text">{errors.owner}</span>}
         </div>
@@ -175,7 +213,7 @@ const GiftForm: React.FC<GiftFormProps> = ({ onSubmit }) => {
           value={formData.photoUrl}
           onChange={handleChange}
           className={errors.photoUrl ? 'error' : ''}
-          placeholder="请输入图片链接地址，如：https://example.com/photo.jpg"
+          placeholder="请输入图片链接地址"
         />
         {errors.photoUrl && <span className="error-text">{errors.photoUrl}</span>}
 
@@ -185,6 +223,13 @@ const GiftForm: React.FC<GiftFormProps> = ({ onSubmit }) => {
             {photoPreviewError ? (
               <div className="photo-preview-failed">
                 <span>⚠️ 图片无法加载，请检查链接是否正确</span>
+                <button
+                  type="button"
+                  className="clear-photo-btn"
+                  onClick={handleClearPhotoUrl}
+                >
+                  清除
+                </button>
               </div>
             ) : (
               <img
@@ -227,7 +272,7 @@ const GiftForm: React.FC<GiftFormProps> = ({ onSubmit }) => {
             value={formData.city}
             onChange={handleChange}
             className={errors.city ? 'error' : ''}
-            placeholder="请输入所在城市，如：北京"
+            placeholder="请输入所在城市"
           />
           {errors.city && <span className="error-text">{errors.city}</span>}
         </div>
