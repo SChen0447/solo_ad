@@ -1,7 +1,7 @@
 /**
  * EquipmentGrid - 设备库存展示模块
  *
- * 职责：展示舞台设备清单，管理设备借用与归还状态
+ * 职责：展示舞台设备清单，管理设备借用与归还状态，支持搜索过滤
  *
  * 调用链路 & 数据流向：
  *   页面加载：
@@ -10,6 +10,11 @@
  *         → 后端返回设备列表 (server/index.ts /api/equipment)
  *           → App 组件保存到 equipment state
  *             → 通过 props 传入本组件 → 渲染网格
+ *
+ *   搜索过滤：
+ *     用户输入搜索关键词
+ *       → 本组件本地过滤 equipment props
+ *         → 仅渲染匹配的设备卡片（纯前端逻辑，不涉及后端请求）
  *
  *   借用设备：
  *     用户点击"借用"按钮
@@ -29,7 +34,7 @@
  * 调用方依赖：apiClient.equipment.{getAll, borrow, returnItem}
  */
 
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import { apiClient, Equipment } from '@/api/apiClient';
 
 interface EquipmentGridProps {
@@ -40,6 +45,7 @@ interface EquipmentGridProps {
 const EquipmentGrid: React.FC<EquipmentGridProps> = ({ equipment, onEquipmentChange }) => {
   const [loadingId, setLoadingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
     if (error) {
@@ -47,6 +53,14 @@ const EquipmentGrid: React.FC<EquipmentGridProps> = ({ equipment, onEquipmentCha
       return () => clearTimeout(timer);
     }
   }, [error]);
+
+  const filteredEquipment = useMemo(() => {
+    if (!searchQuery.trim()) return equipment;
+    const query = searchQuery.trim().toLowerCase();
+    return equipment.filter((item) =>
+      item.name.toLowerCase().includes(query)
+    );
+  }, [equipment, searchQuery]);
 
   const handleBorrow = useCallback(async (id: string) => {
     if (loadingId) return;
@@ -82,6 +96,30 @@ const EquipmentGrid: React.FC<EquipmentGridProps> = ({ equipment, onEquipmentCha
         <h2 style={{ color: '#C084FC', fontSize: '24px', fontWeight: 700, margin: 0 }}>
           🎸 设备库存
         </h2>
+        <span className="equipment-count-hint">
+          {filteredEquipment.length === equipment.length
+            ? `${equipment.length} 件设备`
+            : `${filteredEquipment.length} / ${equipment.length} 件`}
+        </span>
+      </div>
+
+      <div className="search-bar">
+        <span className="search-icon">🔍</span>
+        <input
+          type="text"
+          placeholder="搜索设备名称..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="search-input"
+        />
+        {searchQuery && (
+          <button
+            className="search-clear"
+            onClick={() => setSearchQuery('')}
+          >
+            ✕
+          </button>
+        )}
       </div>
 
       {error && (
@@ -91,7 +129,7 @@ const EquipmentGrid: React.FC<EquipmentGridProps> = ({ equipment, onEquipmentCha
       )}
 
       <div className="equipment-grid">
-        {equipment.map((item) => {
+        {filteredEquipment.map((item) => {
           const isAvailable = item.available > 0;
           const isAllBorrowed = item.available === 0;
           const isLoading = loadingId === item.id;
@@ -150,6 +188,11 @@ const EquipmentGrid: React.FC<EquipmentGridProps> = ({ equipment, onEquipmentCha
             </div>
           );
         })}
+        {filteredEquipment.length === 0 && searchQuery && (
+          <div className="no-results">
+            未找到与 "{searchQuery}" 匹配的设备
+          </div>
+        )}
       </div>
 
       <style>{`
@@ -160,7 +203,61 @@ const EquipmentGrid: React.FC<EquipmentGridProps> = ({ equipment, onEquipmentCha
           display: flex;
           justify-content: space-between;
           align-items: center;
+          margin-bottom: 16px;
+        }
+        .equipment-count-hint {
+          font-size: 13px;
+          color: #9CA3AF;
+        }
+        .search-bar {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          background: rgba(30, 27, 75, 0.5);
+          border: 1px solid rgba(99, 102, 241, 0.2);
+          border-radius: 10px;
+          padding: 0 14px;
           margin-bottom: 20px;
+          transition: border-color 0.2s, box-shadow 0.2s;
+        }
+        .search-bar:focus-within {
+          border-color: #6366F1;
+          box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.12);
+        }
+        .search-icon {
+          font-size: 16px;
+          flex-shrink: 0;
+          opacity: 0.5;
+        }
+        .search-input {
+          flex: 1;
+          background: transparent;
+          border: none;
+          padding: 10px 0;
+          color: #E5E7EB;
+          font-size: 14px;
+          outline: none;
+        }
+        .search-input::placeholder {
+          color: #6B7280;
+        }
+        .search-clear {
+          width: 24px;
+          height: 24px;
+          border: none;
+          background: rgba(107, 114, 128, 0.2);
+          color: #9CA3AF;
+          border-radius: 4px;
+          cursor: pointer;
+          font-size: 12px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          transition: all 0.2s;
+        }
+        .search-clear:hover {
+          background: rgba(107, 114, 128, 0.4);
+          color: #E5E7EB;
         }
         .error-toast {
           background: rgba(239, 68, 68, 0.15);
@@ -192,6 +289,13 @@ const EquipmentGrid: React.FC<EquipmentGridProps> = ({ equipment, onEquipmentCha
             grid-template-columns: repeat(2, 1fr);
             gap: 12px;
           }
+        }
+        .no-results {
+          grid-column: 1 / -1;
+          text-align: center;
+          padding: 40px 20px;
+          color: #6B7280;
+          font-size: 15px;
         }
         .equipment-card {
           width: 240px;

@@ -18,9 +18,10 @@
  *           → 返回最新投票结果
  *             → 本组件更新 voteSession → 渲染最新条形图
  *
- *   结果轮询：
- *     每30秒自动调用 apiClient.vote.getCurrent()
- *       → 获取最新投票结果 → 更新条形图
+ *   结果轮询（可配置间隔）：
+ *     默认每30秒，用户可通过设置面板调整
+ *       → 自动调用 apiClient.vote.getCurrent()
+ *         → 获取最新投票结果 → 更新条形图
  *
  * 被调用方：App.tsx (通过 props 传入 tracks 曲目列表)
  * 调用方依赖：apiClient.vote.{getCurrent, start, cast, end}
@@ -34,7 +35,11 @@ interface VotePanelProps {
 }
 
 const VOTER_ID_KEY = 'live_music_voter_id';
+const POLL_KEY = 'live_music_poll_interval';
 const COOLDOWN_SECONDS = 30;
+const DEFAULT_POLL_INTERVAL = 30;
+const MIN_POLL_INTERVAL = 5;
+const MAX_POLL_INTERVAL = 120;
 
 function getVoterId(): string {
   let id = localStorage.getItem(VOTER_ID_KEY);
@@ -43,6 +48,17 @@ function getVoterId(): string {
     localStorage.setItem(VOTER_ID_KEY, id);
   }
   return id;
+}
+
+function getStoredPollInterval(): number {
+  const stored = localStorage.getItem(POLL_KEY);
+  if (stored) {
+    const val = parseInt(stored, 10);
+    if (!isNaN(val) && val >= MIN_POLL_INTERVAL && val <= MAX_POLL_INTERVAL) {
+      return val;
+    }
+  }
+  return DEFAULT_POLL_INTERVAL;
 }
 
 const VotePanel: React.FC<VotePanelProps> = ({ tracks }) => {
@@ -55,6 +71,8 @@ const VotePanel: React.FC<VotePanelProps> = ({ tracks }) => {
   const [cooldown, setCooldown] = useState(0);
   const [pollError, setPollError] = useState<string | null>(null);
   const [voteError, setVoteError] = useState<string | null>(null);
+  const [pollInterval, setPollInterval] = useState(getStoredPollInterval);
+  const [showPollSettings, setShowPollSettings] = useState(false);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const cooldownRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const voterIdRef = useRef(getVoterId());
@@ -75,7 +93,8 @@ const VotePanel: React.FC<VotePanelProps> = ({ tracks }) => {
 
   useEffect(() => {
     if (voteSession?.active) {
-      pollRef.current = setInterval(fetchCurrentVote, 30000);
+      if (pollRef.current) clearInterval(pollRef.current);
+      pollRef.current = setInterval(fetchCurrentVote, pollInterval * 1000);
       return () => {
         if (pollRef.current) clearInterval(pollRef.current);
       };
@@ -83,7 +102,7 @@ const VotePanel: React.FC<VotePanelProps> = ({ tracks }) => {
     return () => {
       if (pollRef.current) clearInterval(pollRef.current);
     };
-  }, [voteSession?.active, fetchCurrentVote]);
+  }, [voteSession?.active, pollInterval, fetchCurrentVote]);
 
   useEffect(() => {
     if (cooldown > 0) {
@@ -111,6 +130,12 @@ const VotePanel: React.FC<VotePanelProps> = ({ tracks }) => {
       return () => clearTimeout(timer);
     }
   }, [voteError]);
+
+  const handlePollIntervalChange = useCallback((value: number) => {
+    const clamped = Math.max(MIN_POLL_INTERVAL, Math.min(MAX_POLL_INTERVAL, value));
+    setPollInterval(clamped);
+    localStorage.setItem(POLL_KEY, String(clamped));
+  }, []);
 
   const handleStartVote = useCallback(async () => {
     if (!voteTitle.trim() || selectedCandidates.length === 0) return;
@@ -180,21 +205,60 @@ const VotePanel: React.FC<VotePanelProps> = ({ tracks }) => {
         <h2 style={{ color: '#C084FC', fontSize: '24px', fontWeight: 700, margin: 0 }}>
           🗳️ 返场投票
         </h2>
-        {!voteSession?.active && (
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
           <button
-            className="btn-primary ripple"
-            onClick={() => setShowStartForm(!showStartForm)}
-            disabled={loading}
+            className="btn-settings ripple"
+            onClick={() => setShowPollSettings(!showPollSettings)}
+            title="轮询设置"
           >
-            {showStartForm ? '取消' : '发起投票'}
+            ⚙️
           </button>
-        )}
-        {voteSession?.active && (
-          <button className="btn-end ripple" onClick={handleEndVote} disabled={loading}>
-            结束投票
-          </button>
-        )}
+          {!voteSession?.active && (
+            <button
+              className="btn-primary ripple"
+              onClick={() => setShowStartForm(!showStartForm)}
+              disabled={loading}
+            >
+              {showStartForm ? '取消' : '发起投票'}
+            </button>
+          )}
+          {voteSession?.active && (
+            <button className="btn-end ripple" onClick={handleEndVote} disabled={loading}>
+              结束投票
+            </button>
+          )}
+        </div>
       </div>
+
+      {showPollSettings && (
+        <div className="poll-settings">
+          <div className="poll-settings-header">
+            <span style={{ color: '#E5E7EB', fontSize: '14px', fontWeight: 600 }}>轮询间隔设置</span>
+            <button className="btn-close-settings" onClick={() => setShowPollSettings(false)}>✕</button>
+          </div>
+          <div className="poll-settings-body">
+            <span style={{ color: '#9CA3AF', fontSize: '13px' }}>
+              投票结果自动刷新间隔（秒）
+            </span>
+            <div className="poll-slider-row">
+              <span className="slider-label">{MIN_POLL_INTERVAL}s</span>
+              <input
+                type="range"
+                min={MIN_POLL_INTERVAL}
+                max={MAX_POLL_INTERVAL}
+                step={5}
+                value={pollInterval}
+                onChange={(e) => handlePollIntervalChange(Number(e.target.value))}
+                className="poll-slider"
+              />
+              <span className="slider-label">{MAX_POLL_INTERVAL}s</span>
+            </div>
+            <div className="poll-interval-value">
+              当前: <strong>{pollInterval}s</strong>
+            </div>
+          </div>
+        </div>
+      )}
 
       {(voteError || pollError) && (
         <div className="error-toast">
@@ -222,7 +286,7 @@ const VotePanel: React.FC<VotePanelProps> = ({ tracks }) => {
                   onClick={() => toggleCandidate(track.id)}
                 >
                   <div className="candidate-check">
-                  {selectedCandidates.includes(track.id) ? '✓' : ''}
+                    {selectedCandidates.includes(track.id) ? '✓' : ''}
                   </div>
                   <span style={{ color: '#E5E7EB', fontSize: '14px' }}>{track.name}</span>
                   <span style={{ color: '#6B7280', fontSize: '12px' }}>{track.artist}</span>
@@ -246,9 +310,14 @@ const VotePanel: React.FC<VotePanelProps> = ({ tracks }) => {
             <h3 style={{ color: '#E5E7EB', fontSize: '18px', margin: 0 }}>
               {voteSession.title}
             </h3>
-            <span className={`vote-status ${voteSession.active ? 'active' : 'ended'}`}>
-              {voteSession.active ? '进行中' : '已结束'}
-            </span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span className="poll-badge">
+                每{pollInterval}s刷新
+              </span>
+              <span className={`vote-status ${voteSession.active ? 'active' : 'ended'}`}>
+                {voteSession.active ? '进行中' : '已结束'}
+              </span>
+            </div>
           </div>
 
           <div className="vote-candidates">
@@ -290,8 +359,8 @@ const VotePanel: React.FC<VotePanelProps> = ({ tracks }) => {
                     </button>
                   )}
                   {!voteSession.active && (
-                      <div style={{ width: 120, textAlign: 'center' }} />
-                    )}
+                    <div style={{ width: 120, textAlign: 'center' }} />
+                  )}
                 </div>
               );
             })}
@@ -319,6 +388,117 @@ const VotePanel: React.FC<VotePanelProps> = ({ tracks }) => {
           justify-content: space-between;
           align-items: center;
           margin-bottom: 20px;
+        }
+        .btn-settings {
+          width: 36px;
+          height: 36px;
+          border-radius: 8px;
+          border: 1px solid rgba(99, 102, 241, 0.3);
+          background: transparent;
+          font-size: 16px;
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          transition: all 0.2s;
+          color: #9CA3AF;
+        }
+        .btn-settings:hover {
+          border-color: #6366F1;
+          color: #6366F1;
+          background: rgba(99, 102, 241, 0.08);
+        }
+        .poll-settings {
+          background: rgba(99, 102, 241, 0.08);
+          border: 1px solid rgba(99, 102, 241, 0.25);
+          border-radius: 12px;
+          padding: 16px;
+          margin-bottom: 16px;
+          animation: slideDown 0.2s ease;
+        }
+        .poll-settings-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-bottom: 12px;
+        }
+        .btn-close-settings {
+          width: 24px;
+          height: 24px;
+          border: none;
+          background: transparent;
+          color: #9CA3AF;
+          cursor: pointer;
+          font-size: 14px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          border-radius: 4px;
+        }
+        .btn-close-settings:hover {
+          color: #EF4444;
+          background: rgba(239, 68, 68, 0.1);
+        }
+        .poll-settings-body {
+          display: flex;
+          flex-direction: column;
+          gap: 10px;
+        }
+        .poll-slider-row {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+        }
+        .slider-label {
+          font-size: 12px;
+          color: #6B7280;
+          min-width: 28px;
+          text-align: center;
+        }
+        .poll-slider {
+          flex: 1;
+          -webkit-appearance: none;
+          appearance: none;
+          height: 6px;
+          background: rgba(99, 102, 241, 0.2);
+          border-radius: 3px;
+          outline: none;
+        }
+        .poll-slider::-webkit-slider-thumb {
+          -webkit-appearance: none;
+          appearance: none;
+          width: 18px;
+          height: 18px;
+          border-radius: 50%;
+          background: #6366F1;
+          cursor: pointer;
+          border: 2px solid #1E1B4B;
+          box-shadow: 0 2px 8px rgba(99, 102, 241, 0.4);
+        }
+        .poll-slider::-moz-range-thumb {
+          width: 18px;
+          height: 18px;
+          border-radius: 50%;
+          background: #6366F1;
+          cursor: pointer;
+          border: 2px solid #1E1B4B;
+        }
+        .poll-interval-value {
+          text-align: center;
+          color: #9CA3AF;
+          font-size: 14px;
+        }
+        .poll-interval-value strong {
+          color: #6366F1;
+          font-size: 18px;
+          font-weight: 700;
+        }
+        .poll-badge {
+          font-size: 11px;
+          padding: 2px 8px;
+          border-radius: 6px;
+          background: rgba(99, 102, 241, 0.12);
+          color: #9CA3AF;
         }
         .error-toast {
           background: rgba(239, 68, 68, 0.15);
@@ -398,6 +578,8 @@ const VotePanel: React.FC<VotePanelProps> = ({ tracks }) => {
           justify-content: space-between;
           align-items: center;
           margin-bottom: 24px;
+          flex-wrap: wrap;
+          gap: 8px;
         }
         .vote-status {
           font-size: 13px;

@@ -13,6 +13,12 @@
  *               → 本组件调用 onTracksChange 更新父组件状态
  *                 → React 重新渲染 UI
  *
+ * 拖拽排序数据流：
+ *   拖拽开始 → 记录 dragIndex
+ *     → 拖拽经过其他项 → 实时计算新位置 → 本地预排序渲染
+ *       → 松开释放 → handleDrop 调用 apiClient.playlist.reorder
+ *         → 后端持久化排序 → 返回最新列表 → 更新 state
+ *
  * 被调用方：App.tsx (通过 props 传入 tracks 和 onTracksChange)
  * 调用方依赖：apiClient.playlist.{getAll, add, remove, reorder}
  */
@@ -34,7 +40,7 @@ const PlaylistManager: React.FC<PlaylistManagerProps> = ({ tracks, onTracksChang
   const [isReordering, setIsReordering] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
-  const dragItemRef = useRef<HTMLDivElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (error) {
@@ -42,6 +48,18 @@ const PlaylistManager: React.FC<PlaylistManagerProps> = ({ tracks, onTracksChang
       return () => clearTimeout(timer);
     }
   }, [error]);
+
+  const getDisplayTracks = useCallback(() => {
+    if (dragIndex !== null && dragOverIndex !== null && dragIndex !== dragOverIndex) {
+      const reordered = [...tracks];
+      const [moved] = reordered.splice(dragIndex, 1);
+      reordered.splice(dragOverIndex, 0, moved);
+      return reordered;
+    }
+    return tracks;
+  }, [tracks, dragIndex, dragOverIndex]);
+
+  const displayTracks = getDisplayTracks();
 
   const handleAdd = useCallback(async () => {
     if (!formData.name.trim() || !formData.artist.trim() || !formData.duration.trim()) return;
@@ -72,30 +90,43 @@ const PlaylistManager: React.FC<PlaylistManagerProps> = ({ tracks, onTracksChang
     }
   }, [onTracksChange]);
 
-  const handleDragStart = useCallback((index: number) => {
+  const handleDragStart = useCallback((e: React.DragEvent, index: number) => {
     setDragIndex(index);
+    setDragOverIndex(index);
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', String(index));
+    const target = e.currentTarget as HTMLElement;
+    requestAnimationFrame(() => {
+      target.style.opacity = '0.4';
+    });
   }, []);
 
   const handleDragOver = useCallback((e: React.DragEvent, index: number) => {
     e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
     if (dragIndex !== null && dragIndex !== index) {
       setDragOverIndex(index);
     }
   }, [dragIndex]);
 
+  const handleDragLeave = useCallback(() => {
+  }, []);
+
   const handleDrop = useCallback(async (e: React.DragEvent, dropIndex: number) => {
     e.preventDefault();
+    const target = e.currentTarget as HTMLElement;
+    target.style.opacity = '';
     if (dragIndex === null || dragIndex === dropIndex || isReordering) {
       setDragIndex(null);
       setDragOverIndex(null);
       return;
     }
-    setIsReordering(true);
-    setError(null);
     const newTracks = [...tracks];
     const [moved] = newTracks.splice(dragIndex, 1);
     newTracks.splice(dropIndex, 0, moved);
     const orderedIds = newTracks.map((t) => t.id);
+    setIsReordering(true);
+    setError(null);
     try {
       const updated = await apiClient.playlist.reorder(orderedIds);
       onTracksChange(updated);
@@ -108,7 +139,9 @@ const PlaylistManager: React.FC<PlaylistManagerProps> = ({ tracks, onTracksChang
     }
   }, [dragIndex, tracks, isReordering, onTracksChange]);
 
-  const handleDragEnd = useCallback(() => {
+  const handleDragEnd = useCallback((e: React.DragEvent) => {
+    const target = e.currentTarget as HTMLElement;
+    target.style.opacity = '';
     setDragIndex(null);
     setDragOverIndex(null);
   }, []);
@@ -119,13 +152,16 @@ const PlaylistManager: React.FC<PlaylistManagerProps> = ({ tracks, onTracksChang
         <h2 style={{ color: '#C084FC', fontSize: '24px', fontWeight: 700, margin: 0 }}>
           🎵 曲目编排
         </h2>
-        <button
-          className="btn-primary ripple"
-          onClick={() => setShowForm(!showForm)}
-          disabled={adding}
-        >
-          {showForm ? '取消' : '+ 添加曲目'}
-        </button>
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+          <span className="track-count-hint">{tracks.length} 首曲目</span>
+          <button
+            className="btn-primary ripple"
+            onClick={() => setShowForm(!showForm)}
+            disabled={adding}
+          >
+            {showForm ? '取消' : '+ 添加曲目'}
+          </button>
+        </div>
       </div>
 
       {error && (
@@ -172,44 +208,58 @@ const PlaylistManager: React.FC<PlaylistManagerProps> = ({ tracks, onTracksChang
 
       {isReordering && (
         <div className="reorder-hint">
-          ⏳ 正在更新排序...
+          ⏳ 正在同步排序到服务器...
         </div>
       )}
 
-      <div className="playlist-list">
-        {tracks.map((track, index) => (
-          <div
-            key={track.id}
-            ref={index === dragIndex ? dragItemRef : undefined}
-            className={`playlist-item ${deletingId === track.id ? 'deleting' : ''} ${dragIndex === index ? 'dragging' : ''} ${dragOverIndex === index && dragIndex !== index ? 'drag-over' : ''} ${isReordering ? 'reordering' : ''}`}
-            style={{
-              opacity: dragIndex === index ? 0.6 : 1,
-              transform: deletingId === track.id ? 'translateX(-100%)' : undefined,
-            }}
-            draggable={!isReordering && !deletingId}
-            onDragStart={() => handleDragStart(index)}
-            onDragOver={(e) => handleDragOver(e, index)}
-            onDrop={(e) => handleDrop(e, index)}
-            onDragEnd={handleDragEnd}
-          >
-            <span className="track-index">{index + 1}</span>
-            <div className="track-info">
-              <span className="track-name">{track.name}</span>
-              <span className="track-artist">{track.artist}</span>
-              {track.note && <span className="track-note">{track.note}</span>}
+      {dragIndex !== null && (
+        <div className="drag-hint">
+          ↕ 拖拽中 — 松开鼠标完成排序
+        </div>
+      )}
+
+      <div className="playlist-list" ref={listRef}>
+        {displayTracks.map((track, displayIndex) => {
+          const isDeleting = deletingId === track.id;
+          const isDragging = dragIndex !== null && displayIndex === dragOverIndex && displayIndex !== dragIndex;
+          const isDragSource = dragIndex !== null && displayIndex === dragIndex;
+          const isDropTarget = dragOverIndex === displayIndex && dragIndex !== null && dragIndex !== displayIndex;
+          return (
+            <div
+              key={track.id}
+              className={`playlist-item ${isDeleting ? 'deleting' : ''} ${isDragSource ? 'drag-source' : ''} ${isDropTarget ? 'drop-target' : ''} ${isReordering ? 'reordering' : ''}`}
+              style={{
+                transform: isDeleting ? 'translateX(-100%)' : undefined,
+              }}
+              draggable={!isReordering && !deletingId}
+              onDragStart={(e) => handleDragStart(e, displayIndex)}
+              onDragOver={(e) => handleDragOver(e, displayIndex)}
+              onDragLeave={handleDragLeave}
+              onDrop={(e) => handleDrop(e, displayIndex)}
+              onDragEnd={handleDragEnd}
+            >
+              <div className="drag-handle" title="拖拽排序">
+                <span className="drag-handle-icon">⠿</span>
+              </div>
+              <span className="track-index">{displayIndex + 1}</span>
+              <div className="track-info">
+                <span className="track-name">{track.name}</span>
+                <span className="track-artist">{track.artist}</span>
+                {track.note && <span className="track-note">{track.note}</span>}
+              </div>
+              <div className="track-actions">
+                <span className="track-duration">{track.duration}</span>
+                <button
+                  className="btn-delete ripple"
+                  onClick={() => handleDelete(track.id)}
+                  disabled={deletingId === track.id}
+                >
+                  ✕
+                </button>
+              </div>
             </div>
-            <div className="track-actions">
-              <span className="track-duration">{track.duration}</span>
-              <button
-                className="btn-delete ripple"
-                onClick={() => handleDelete(track.id)}
-                disabled={deletingId === track.id}
-              >
-                ✕
-              </button>
-            </div>
-          </div>
-        ))}
+          );
+        })}
         {tracks.length === 0 && (
           <div className="empty-state">
             还没有曲目，点击上方按钮添加
@@ -226,6 +276,10 @@ const PlaylistManager: React.FC<PlaylistManagerProps> = ({ tracks, onTracksChang
           justify-content: space-between;
           align-items: center;
           margin-bottom: 20px;
+        }
+        .track-count-hint {
+          font-size: 13px;
+          color: #9CA3AF;
         }
         .error-toast {
           background: rgba(239, 68, 68, 0.15);
@@ -249,6 +303,20 @@ const PlaylistManager: React.FC<PlaylistManagerProps> = ({ tracks, onTracksChang
           padding: 8px;
           background: rgba(99, 102, 241, 0.1);
           border-radius: 6px;
+        }
+        .drag-hint {
+          color: #C084FC;
+          font-size: 13px;
+          margin-bottom: 8px;
+          text-align: center;
+          padding: 6px;
+          background: rgba(192, 132, 252, 0.08);
+          border-radius: 6px;
+          animation: fadeIn 0.2s ease;
+        }
+        @keyframes fadeIn {
+          from { opacity: 0; }
+          to { opacity: 1; }
         }
         .playlist-form {
           background: rgba(99, 102, 241, 0.08);
@@ -298,41 +366,82 @@ const PlaylistManager: React.FC<PlaylistManagerProps> = ({ tracks, onTracksChang
           background: rgba(30, 27, 75, 0.5);
           border: 1px solid rgba(99, 102, 241, 0.15);
           border-radius: 10px;
-          padding: 0 16px;
+          padding: 0 16px 0 0;
           cursor: grab;
-          transition: transform 0.3s ease, opacity 0.15s, box-shadow 0.2s, margin 0.2s;
+          transition: transform 0.25s cubic-bezier(0.2, 0, 0, 1),
+                      opacity 0.15s,
+                      box-shadow 0.2s,
+                      border-color 0.2s,
+                      background 0.2s;
           user-select: none;
+          position: relative;
         }
         .playlist-item.reordering {
           cursor: not-allowed;
         }
         .playlist-item:hover {
-          transform: translateY(-4px);
-          box-shadow: 0 6px 20px rgba(0,0,0,0.3);
+          transform: translateY(-2px);
+          box-shadow: 0 4px 16px rgba(0,0,0,0.25);
         }
         .playlist-item.reordering:hover {
           transform: none;
           box-shadow: none;
         }
-        .playlist-item.dragging {
-          cursor: grabbing;
-          transform: scale(1.02);
-          box-shadow: 0 8px 25px rgba(99, 102, 241, 0.3);
-          opacity: 0.6;
+        .playlist-item.drag-source {
+          opacity: 0.4;
+          border-style: dashed;
+          border-color: rgba(99, 102, 241, 0.4);
         }
-        .playlist-item.drag-over {
-          border-top: 2px solid #6366F1;
+        .playlist-item.drop-target {
+          border-color: #6366F1;
+          background: rgba(99, 102, 241, 0.08);
+          box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.25), 0 4px 16px rgba(99,102,241,0.15);
+        }
+        .playlist-item.drop-target::before {
+          content: '';
+          position: absolute;
+          left: 0;
+          top: 0;
+          bottom: 0;
+          width: 3px;
+          background: #6366F1;
+          border-radius: 10px 0 0 10px;
         }
         .playlist-item.deleting {
           transition: transform 0.3s ease-out, opacity 0.3s ease-out;
           transform: translateX(-100%);
           opacity: 0;
         }
+        .drag-handle {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          width: 36px;
+          height: 56px;
+          flex-shrink: 0;
+          cursor: grab;
+          opacity: 0.4;
+          transition: opacity 0.2s, color 0.2s;
+        }
+        .playlist-item:hover .drag-handle {
+          opacity: 0.7;
+        }
+        .playlist-item.drop-target .drag-handle {
+          color: #6366F1;
+          opacity: 1;
+        }
+        .drag-handle-icon {
+          font-size: 18px;
+          line-height: 1;
+          color: inherit;
+          letter-spacing: -1px;
+        }
         .track-index {
           font-size: 16px;
           color: #6B7280;
-          min-width: 32px;
+          min-width: 28px;
           font-weight: 600;
+          text-align: center;
         }
         .track-info {
           flex: 1;
@@ -340,6 +449,7 @@ const PlaylistManager: React.FC<PlaylistManagerProps> = ({ tracks, onTracksChang
           align-items: center;
           gap: 12px;
           overflow: hidden;
+          padding-left: 8px;
         }
         .track-name {
           font-size: 18px;
@@ -366,6 +476,7 @@ const PlaylistManager: React.FC<PlaylistManagerProps> = ({ tracks, onTracksChang
           display: flex;
           align-items: center;
           gap: 12px;
+          padding-left: 8px;
         }
         .track-duration {
           font-size: 14px;
