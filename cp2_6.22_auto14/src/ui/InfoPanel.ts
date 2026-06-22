@@ -79,14 +79,15 @@ export class InfoPanel {
       itemEnter.append('div').html((d) => {
         const nProps = ELEMENT_PROPERTIES[d.atom.element];
         const bondType =
-          d.bond.type === 'single' ? '单键' : d.bond.type === 'double' ? '双键' : '三键';
+          (d.bond.type ?? 'single') === 'single' ? '单键' :
+          (d.bond.type ?? 'single') === 'double' ? '双键' : '三键';
         const length = getBondLength(atom, d.atom).toFixed(2);
         return `
           <div style="color: #88CCFF; margin-bottom: 4px;">
             ${nProps.name} ${d.atom.element} (原子 #${d.atom.id})
           </div>
           <div>键类型: ${bondType}</div>
-          <div>键长: <span class="bond-length" style="color: #00FF88; font-weight: bold;">${length} Å</span></div>
+          <div>键长: <span class="bond-length">${length} Å</span></div>
         `;
       });
     }
@@ -104,7 +105,8 @@ export class InfoPanel {
     const p1 = ELEMENT_PROPERTIES[atom1.element];
     const p2 = ELEMENT_PROPERTIES[atom2.element];
     const bondType =
-      bond.type === 'single' ? '单键' : bond.type === 'double' ? '双键' : '三键';
+      (bond.type ?? 'single') === 'single' ? '单键' :
+      (bond.type ?? 'single') === 'double' ? '双键' : '三键';
     const length = getBondLength(atom1, atom2).toFixed(2);
 
     this.content.html('');
@@ -122,7 +124,7 @@ export class InfoPanel {
       .attr('class', 'info-row')
       .html(`
         <span class="info-label">键长</span>
-        <span class="info-value bond-length" style="color: #00FF88; font-weight: bold;">${length} Å</span>
+        <span class="info-value bond-length">${length} Å</span>
       `);
 
     this.content

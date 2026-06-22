@@ -3,6 +3,7 @@ import {
   MoleculeData,
   AtomData,
   BondData,
+  BondType,
   ELEMENT_PROPERTIES,
   getBondLength
 } from './MoleculeData';
@@ -26,21 +27,23 @@ export interface MoleculeMesh {
 }
 
 const BOND_RADIUS = 0.08;
-const BOND_COLORS: Record<'single' | 'double' | 'triple', number> = {
+const BOND_COLORS: Record<BondType, number> = {
   single: 0xFFFFFF,
   double: 0x00BFFF,
   triple: 0xFF6B6B
 };
-const BOND_OPACITY: Record<'single' | 'double' | 'triple', number> = {
+const BOND_OPACITY: Record<BondType, number> = {
   single: 0.8,
   double: 0.9,
   triple: 0.95
 };
-const BOND_COUNT: Record<'single' | 'double' | 'triple', number> = {
+const BOND_COUNT: Record<BondType, number> = {
   single: 1,
   double: 2,
   triple: 3
 };
+const DEFAULT_BOND_TYPE: BondType = 'single';
+const BOND_GAP_BASE = 0.05;
 
 function createAtomMesh(atom: AtomData): THREE.Mesh {
   const props = ELEMENT_PROPERTIES[atom.element];
@@ -59,7 +62,8 @@ function createAtomMesh(atom: AtomData): THREE.Mesh {
 function createBondMeshes(
   bond: BondData,
   atom1: AtomData,
-  atom2: AtomData
+  atom2: AtomData,
+  scaleFactor: number = 1
 ): THREE.Mesh[] {
   const meshes: THREE.Mesh[] = [];
   const start = new THREE.Vector3(atom1.x, atom1.y, atom1.z);
@@ -68,12 +72,12 @@ function createBondMeshes(
   const length = direction.length();
   const mid = new THREE.Vector3().addVectors(start, end).multiplyScalar(0.5);
 
-  const bondType = bond.type;
+  const bondType: BondType = bond.type ?? DEFAULT_BOND_TYPE;
   const color = BOND_COLORS[bondType];
   const opacity = BOND_OPACITY[bondType];
   const numCylinders = BOND_COUNT[bondType];
 
-  const offset = 0.05;
+  const bondGap = BOND_GAP_BASE * scaleFactor;
   const perp1 = new THREE.Vector3();
   const perp2 = new THREE.Vector3();
 
@@ -99,12 +103,12 @@ function createBondMeshes(
     let offsetVec = new THREE.Vector3(0, 0, 0);
     if (bondType === 'double') {
       const sign = i === 0 ? -1 : 1;
-      offsetVec = perp1.clone().multiplyScalar(offset * sign);
+      offsetVec = perp1.clone().multiplyScalar(bondGap * sign);
     } else if (bondType === 'triple') {
       if (i === 0) {
-        offsetVec = perp1.clone().multiplyScalar(-offset);
+        offsetVec = perp1.clone().multiplyScalar(-bondGap);
       } else if (i === 2) {
-        offsetVec = perp1.clone().multiplyScalar(offset);
+        offsetVec = perp1.clone().multiplyScalar(bondGap);
       }
     }
 
@@ -120,7 +124,7 @@ function createBondMeshes(
   return meshes;
 }
 
-export function buildMoleculeMesh(data: MoleculeData): MoleculeMesh {
+export function buildMoleculeMesh(data: MoleculeData, scaleFactor: number = 1): MoleculeMesh {
   const group = new THREE.Group();
   const atoms: MoleculeMesh['atoms'] = [];
   const bonds: MoleculeMesh['bonds'] = [];
@@ -143,7 +147,7 @@ export function buildMoleculeMesh(data: MoleculeData): MoleculeMesh {
   data.bonds.forEach(bond => {
     const a1 = atomMap.get(bond.atom1)!;
     const a2 = atomMap.get(bond.atom2)!;
-    const meshes = createBondMeshes(bond, a1, a2);
+    const meshes = createBondMeshes(bond, a1, a2, scaleFactor);
     const originalColors = meshes.map(m =>
       new THREE.Color((m.material as THREE.MeshStandardMaterial).color)
     );

@@ -6,11 +6,14 @@ export interface AtomData {
   z: number;
 }
 
+export type BondType = 'single' | 'double' | 'triple';
+
 export interface BondData {
   atom1: number;
   atom2: number;
   order: 1 | 2 | 3;
-  type: 'single' | 'double' | 'triple';
+  /** 化学键类型，默认为 'single' */
+  type?: BondType;
 }
 
 export interface MoleculeData {

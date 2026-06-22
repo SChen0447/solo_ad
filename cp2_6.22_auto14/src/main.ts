@@ -310,15 +310,19 @@ class MoleculeViewerApp {
       return;
     }
 
-    if (this.currentMolecule) {
-      await animateTransition(this.currentMolecule.group, 'out', 600);
-      this.scene.remove(this.currentMolecule.group);
-      this.disposeMolecule(this.currentMolecule);
-    }
+    const oldMolecule = this.currentMolecule;
 
     const newMolecule = buildMoleculeMesh(data);
     this.centerMolecule(newMolecule);
     newMolecule.group.scale.setScalar(0.5);
+    newMolecule.group.rotation.y = Math.PI * 2;
+    newMolecule.group.traverse((obj) => {
+      if (obj instanceof THREE.Mesh && obj.material) {
+        const mat = obj.material as THREE.MeshStandardMaterial;
+        mat.transparent = true;
+        mat.opacity = 0;
+      }
+    });
     this.scene.add(newMolecule.group);
 
     this.currentMolecule = newMolecule;
@@ -331,7 +335,19 @@ class MoleculeViewerApp {
     this.infoPanel.showEmpty();
     this.forceGraph.update(data);
 
-    await animateTransition(newMolecule.group, 'in', 600);
+    const transitions: Promise<void>[] = [];
+    transitions.push(animateTransition(newMolecule.group, 'in', 600));
+    if (oldMolecule) {
+      transitions.push(animateTransition(oldMolecule.group, 'out', 600));
+    }
+
+    await Promise.all(transitions);
+
+    if (oldMolecule) {
+      this.scene.remove(oldMolecule.group);
+      this.disposeMolecule(oldMolecule);
+    }
+
     this.isTransitioning = false;
   }
 
