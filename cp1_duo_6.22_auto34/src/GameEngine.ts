@@ -2,6 +2,8 @@ export type Side = 'attacker' | 'defender';
 export type UnitType = 'infantry' | 'archer' | 'catapult' | 'knight' | 'trebuchet';
 export type ActionType = 'move' | 'attack' | 'deploy';
 export type CellKind = 'ground' | 'wall' | 'gate' | 'attackerZone' | 'defenderZone';
+export type Phase = 'deploy' | 'battle' | 'ended';
+export type DeployStep = 'attackerDeploy' | 'defenderDeploy';
 
 export interface Position {
   x: number;
@@ -54,6 +56,8 @@ export interface DeployAnimation {
   fromEdge: 'left' | 'right';
 }
 
+export type DeployPool = Record<UnitType, number>;
+
 export interface GameState {
   gridRows: number;
   gridCols: number;
@@ -63,9 +67,13 @@ export interface GameState {
   turn: number;
   maxTurns: number;
   currentSide: Side;
-  phase: 'deploy' | 'battle' | 'ended';
+  phase: Phase;
+  deployStep: DeployStep;
   units: Unit[];
   selectedUnitId: string | null;
+  selectedDeployType: UnitType | null;
+  attackerPool: DeployPool;
+  defenderPool: DeployPool;
   logs: BattleLog[];
   winner: Side | 'draw' | null;
   winReason: string | null;
@@ -87,6 +95,25 @@ export const GATE_POSITIONS: Position[] = [
 ];
 export const GATE_MAX_HP = 500;
 export const MAX_TURNS = 15;
+
+export const ATTACKER_DEPLOY_COLS = 5;
+export const DEFENDER_DEPLOY_START_COL = GRID_COLS - 5;
+
+export const INITIAL_ATTACKER_POOL: DeployPool = {
+  infantry: 2,
+  archer: 2,
+  catapult: 2,
+  knight: 0,
+  trebuchet: 0,
+};
+
+export const INITIAL_DEFENDER_POOL: DeployPool = {
+  infantry: 0,
+  archer: 2,
+  catapult: 0,
+  knight: 2,
+  trebuchet: 2,
+};
 
 export const UNIT_CONFIGS: Record<UnitType, {
   name: string;
@@ -141,6 +168,19 @@ export function isPassable(x: number, y: number, units: Unit[]): boolean {
   return true;
 }
 
+export function isInDeployZone(side: Side, x: number, y: number): boolean {
+  if (WALL_ROWS.includes(y)) return false;
+  if (side === 'attacker') {
+    return x >= 0 && x < ATTACKER_DEPLOY_COLS;
+  } else {
+    return x >= DEFENDER_DEPLOY_START_COL && x < GRID_COLS;
+  }
+}
+
+export function getTotalDeployRemaining(pool: DeployPool): number {
+  return Object.values(pool).reduce((a, b) => a + b, 0);
+}
+
 export function createInitialState(): GameState {
   unitIdCounter = 1;
   logIdCounter = 1;
@@ -154,10 +194,14 @@ export function createInitialState(): GameState {
     turn: 1,
     maxTurns: MAX_TURNS,
     currentSide: 'attacker',
-    phase: 'battle',
-    units: createInitialUnits(),
+    phase: 'deploy',
+    deployStep: 'attackerDeploy',
+    units: [],
     selectedUnitId: null,
-    logs: [createInitialLog()],
+    selectedDeployType: null,
+    attackerPool: { ...INITIAL_ATTACKER_POOL },
+    defenderPool: { ...INITIAL_DEFENDER_POOL },
+    logs: [createDeployStartLog()],
     winner: null,
     winReason: null,
     projectiles: [],
@@ -168,81 +212,18 @@ export function createInitialState(): GameState {
   };
 }
 
-function createInitialUnits(): Unit[] {
-  const units: Unit[] = [];
-  const now = Date.now();
-
-  const attackerPlacements: { type: UnitType; x: number; y: number }[] = [
-    { type: 'infantry', x: 0, y: 1 },
-    { type: 'infantry', x: 0, y: 3 },
-    { type: 'infantry', x: 0, y: 6 },
-    { type: 'infantry', x: 0, y: 8 },
-    { type: 'archer', x: 1, y: 2 },
-    { type: 'archer', x: 1, y: 7 },
-    { type: 'catapult', x: 2, y: 4 },
-    { type: 'catapult', x: 2, y: 5 },
-  ];
-
-  attackerPlacements.forEach(p => {
-    const cfg = UNIT_CONFIGS[p.type];
-    units.push({
-      id: nextUnitId(),
-      type: p.type,
-      side: 'attacker',
-      position: { x: p.x, y: p.y },
-      hp: cfg.hp,
-      maxHp: cfg.hp,
-      attack: cfg.attack,
-      range: cfg.range,
-      movedThisTurn: false,
-      attackedThisTurn: false,
-      justDeployed: false,
-    });
-  });
-
-  const defenderPlacements: { type: UnitType; x: number; y: number }[] = [
-    { type: 'knight', x: 11, y: 1 },
-    { type: 'knight', x: 11, y: 8 },
-    { type: 'archer', x: 10, y: 3 },
-    { type: 'archer', x: 10, y: 6 },
-    { type: 'archer', x: 9, y: 2 },
-    { type: 'archer', x: 9, y: 7 },
-    { type: 'trebuchet', x: 11, y: 3 },
-    { type: 'trebuchet', x: 11, y: 6 },
-  ];
-
-  defenderPlacements.forEach(p => {
-    const cfg = UNIT_CONFIGS[p.type];
-    units.push({
-      id: nextUnitId(),
-      type: p.type,
-      side: 'defender',
-      position: { x: p.x, y: p.y },
-      hp: cfg.hp,
-      maxHp: cfg.hp,
-      attack: cfg.attack,
-      range: cfg.range,
-      movedThisTurn: false,
-      attackedThisTurn: false,
-      justDeployed: false,
-    });
-  });
-
-  return units;
-}
-
-function createInitialLog(): BattleLog {
+function createDeployStartLog(): BattleLog {
   return {
     id: nextLogId(),
-    turn: 1,
+    turn: 0,
     timestamp: Date.now(),
     unitName: '系统',
     side: 'attacker',
     actionType: 'deploy',
-    from: undefined,
-    to: undefined,
   };
 }
+
+function createInitialUnits(): Unit[] { return []; }
 
 function addLog(
   state: GameState,
@@ -257,6 +238,109 @@ function addLog(
   if (state.logs.length > 50) {
     state.logs.pop();
   }
+}
+
+export function selectDeployType(state: GameState, type: UnitType | null): GameState {
+  const newState = { ...state };
+  newState.selectedDeployType = type;
+  return newState;
+}
+
+export function tryDeployUnit(state: GameState, type: UnitType, x: number, y: number): GameState {
+  if (state.phase !== 'deploy') return state;
+
+  const side: Side = state.deployStep === 'attackerDeploy' ? 'attacker' : 'defender';
+  const cfg = UNIT_CONFIGS[type];
+
+  if (cfg.allowedSide !== side && cfg.allowedSide !== 'both') return state;
+
+  const pool = side === 'attacker' ? state.attackerPool : state.defenderPool;
+  if (!pool[type] || pool[type] <= 0) return state;
+
+  if (!isInDeployZone(side, x, y)) return state;
+
+  const newState = cloneState(state);
+  const targetPool = side === 'attacker' ? newState.attackerPool : newState.defenderPool;
+  if (targetPool[type] <= 0) return state;
+
+  if (newState.units.some(u => u.position.x === x && u.position.y === y)) return state;
+
+  const unitId = nextUnitId();
+  newState.units.push({
+    id: unitId,
+    type,
+    side,
+    position: { x, y },
+    hp: cfg.hp,
+    maxHp: cfg.hp,
+    attack: cfg.attack,
+    range: cfg.range,
+    movedThisTurn: false,
+    attackedThisTurn: false,
+    justDeployed: true,
+  });
+
+  targetPool[type] -= 1;
+  newState.selectedDeployType = null;
+
+  newState.deployAnimations.push({
+    unitId,
+    startTime: Date.now(),
+    fromEdge: side === 'attacker' ? 'left' : 'right',
+  });
+
+  addLog(newState, {
+    unitName: cfg.name,
+    side,
+    actionType: 'deploy',
+    to: { x, y },
+  });
+
+  return newState;
+}
+
+export function confirmDeploy(state: GameState): GameState {
+  if (state.phase !== 'deploy') return state;
+  const newState = cloneState(state);
+
+  if (newState.deployStep === 'attackerDeploy') {
+    const remaining = getTotalDeployRemaining(newState.attackerPool);
+    if (remaining > 0) return state;
+    newState.deployStep = 'defenderDeploy';
+    newState.selectedDeployType = null;
+    addLog(newState, {
+      unitName: '系统',
+      side: 'defender',
+      actionType: 'deploy',
+    });
+  } else {
+    const remaining = getTotalDeployRemaining(newState.defenderPool);
+    if (remaining > 0) return state;
+    newState.phase = 'battle';
+    newState.currentSide = 'attacker';
+    newState.selectedDeployType = null;
+    addLog(newState, {
+      unitName: '系统',
+      side: 'attacker',
+      actionType: 'deploy',
+    });
+  }
+
+  updateMorale(newState);
+  return newState;
+}
+
+export function clearAndRestartDeploy(state: GameState, side: Side): GameState {
+  if (state.phase !== 'deploy') return state;
+  const newState = cloneState(state);
+  newState.units = newState.units.filter(u => u.side !== side);
+  if (side === 'attacker') {
+    newState.attackerPool = { ...INITIAL_ATTACKER_POOL };
+  } else {
+    newState.defenderPool = { ...INITIAL_DEFENDER_POOL };
+  }
+  newState.selectedDeployType = null;
+  return newState;
 }
 
 export function getUnitAt(state: GameState, x: number, y: number): Unit | null {
@@ -381,13 +465,14 @@ function calculateDamage(baseAttack: number, distance: number, maxRange: number)
 function updateMorale(state: GameState): void {
   const attackerUnits = state.units.filter(u => u.side === 'attacker' && u.hp > 0);
   const defenderUnits = state.units.filter(u => u.side === 'defender' && u.hp > 0);
-  const attackerInitial = 8;
-  const defenderInitial = 8;
-  state.attackerMorale = Math.max(0, Math.round((attackerUnits.length / attackerInitial) * 100));
-  state.defenderMorale = Math.max(0, Math.round((defenderUnits.length / defenderInitial) * 100));
+  const attackerInitial = Object.values(INITIAL_ATTACKER_POOL).reduce((a, b) => a + b, 0);
+  const defenderInitial = Object.values(INITIAL_DEFENDER_POOL).reduce((a, b) => a + b, 0);
+  state.attackerMorale = Math.max(0, Math.round((attackerUnits.length / Math.max(1, attackerInitial)) * 100));
+  state.defenderMorale = Math.max(0, Math.round((defenderUnits.length / Math.max(1, defenderInitial)) * 100));
 }
 
 function checkWinCondition(state: GameState): void {
+  if (state.phase !== 'battle') return;
   if (state.gateHp <= 0) {
     state.winner = 'attacker';
     state.winReason = '攻方击破城门，大获全胜！';
@@ -395,15 +480,13 @@ function checkWinCondition(state: GameState): void {
     return;
   }
   const attackerUnits = state.units.filter(u => u.side === 'attacker' && u.hp > 0);
-  if (attackerUnits.length === 0 || attackerUnits.length < 3) {
-    if (state.turn >= 15 || attackerUnits.length === 0) {
-      state.winner = 'defender';
-      state.winReason = '守方击退来犯之敌，城堡屹立不倒！';
-      state.phase = 'ended';
-      return;
-    }
+  if (attackerUnits.length === 0) {
+    state.winner = 'defender';
+    state.winReason = '守方全歼来犯之敌，城堡屹立不倒！';
+    state.phase = 'ended';
+    return;
   }
-  if (state.turn > state.maxTurns) {
+  if (state.turn > state.maxTurns || (state.turn >= 15 && attackerUnits.length < 3)) {
     state.winner = 'defender';
     state.winReason = '回合耗尽，守方成功守卫城堡！';
     state.phase = 'ended';
@@ -412,6 +495,7 @@ function checkWinCondition(state: GameState): void {
 
 export function endTurn(state: GameState): GameState {
   const newState = cloneState(state);
+  if (newState.phase !== 'battle') return state;
   if (newState.phase === 'ended') return state;
 
   if (newState.currentSide === 'attacker') {
@@ -439,6 +523,7 @@ export function endTurn(state: GameState): GameState {
 }
 
 export function getMovableTiles(state: GameState, unitId: string): Position[] {
+  if (state.phase !== 'battle') return [];
   const unit = state.units.find(u => u.id === unitId);
   if (!unit || unit.hp <= 0) return [];
   if (unit.side !== state.currentSide) return [];
@@ -463,6 +548,7 @@ export function getMovableTiles(state: GameState, unitId: string): Position[] {
 }
 
 export function getAttackableTiles(state: GameState, unitId: string): Position[] {
+  if (state.phase !== 'battle') return [];
   const unit = state.units.find(u => u.id === unitId);
   if (!unit || unit.hp <= 0) return [];
   if (unit.side !== state.currentSide) return [];
@@ -505,6 +591,8 @@ export function cloneState(state: GameState): GameState {
     })),
     deployAnimations: state.deployAnimations.map(d => ({ ...d })),
     wallRows: [...state.wallRows],
+    attackerPool: { ...state.attackerPool },
+    defenderPool: { ...state.defenderPool },
   };
 }
 

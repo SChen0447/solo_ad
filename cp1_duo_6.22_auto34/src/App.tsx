@@ -10,6 +10,12 @@ import {
   updateAnimations,
   getMovableTiles,
   getAttackableTiles,
+  selectDeployType,
+  tryDeployUnit,
+  confirmDeploy,
+  clearAndRestartDeploy,
+  UnitType,
+  Side,
 } from './GameEngine';
 import { UnitRenderer } from './UnitRenderer';
 import { UIPanel } from './UIPanel';
@@ -24,7 +30,7 @@ const App: React.FC = () => {
       const delta = t - lastFrameRef.current;
       lastFrameRef.current = t;
       setState(prev => {
-        if (prev.projectiles.length === 0 && prev.hitAnimations.length === 0) {
+        if (prev.projectiles.length === 0 && prev.hitAnimations.length === 0 && prev.deployAnimations.length === 0) {
           return prev;
         }
         return updateAnimations(prev, delta);
@@ -37,6 +43,7 @@ const App: React.FC = () => {
 
   const handleUnitClick = useCallback((unitId: string) => {
     setState(prev => {
+      if (prev.phase === 'deploy') return prev;
       const unit = prev.units.find(u => u.id === unitId);
       if (!unit || unit.hp <= 0) return prev;
 
@@ -59,37 +66,43 @@ const App: React.FC = () => {
 
   const handleCellClick = useCallback((x: number, y: number) => {
     setState(prev => {
+      if (prev.phase === 'deploy') {
+      if (prev.selectedDeployType) {
+        return tryDeployUnit(prev, prev.selectedDeployType, x, y);
+      }
+      return prev;
+    }
+
       if (!prev.selectedUnitId) {
+        const selectedUnit = prev.units.find(u => u.id === prev.selectedUnitId);
+        if (!selectedUnit || selectedUnit.hp <= 0) {
+          return selectUnit(prev, null);
+        }
+
+        const movables = getMovableTiles(prev, prev.selectedUnitId);
+        const canMove = movables.some(p => p.x === x && p.y === y);
+        if (canMove) {
+          return tryMoveUnit(prev, prev.selectedUnitId, x, y);
+        }
+
+        const attackables = getAttackableTiles(prev, prev.selectedUnitId);
+        const canAttack = attackables.some(p => p.x === x && p.y === y);
+        if (canAttack) {
+          return tryAttackUnit(prev, prev.selectedUnitId, x, y);
+        }
+
+        const unitAtCell = getUnitAt(prev, x, y);
+        if (unitAtCell && unitAtCell.side === prev.currentSide) {
+          return selectUnit(prev, unitAtCell.id);
+        }
+        return selectUnit(prev, null);
+      } else {
         const unit = getUnitAt(prev, x, y);
         if (unit && unit.side === prev.currentSide) {
           return selectUnit(prev, unit.id);
         }
-        return prev;
       }
-
-      const selectedUnit = prev.units.find(u => u.id === prev.selectedUnitId);
-      if (!selectedUnit || selectedUnit.hp <= 0) {
-        return selectUnit(prev, null);
-      }
-
-      const movables = getMovableTiles(prev, prev.selectedUnitId);
-      const canMove = movables.some(p => p.x === x && p.y === y);
-      if (canMove) {
-        return tryMoveUnit(prev, prev.selectedUnitId, x, y);
-      }
-
-      const attackables = getAttackableTiles(prev, prev.selectedUnitId);
-      const canAttack = attackables.some(p => p.x === x && p.y === y);
-      if (canAttack) {
-        return tryAttackUnit(prev, prev.selectedUnitId, x, y);
-      }
-
-      const unitAtCell = getUnitAt(prev, x, y);
-      if (unitAtCell && unitAtCell.side === prev.currentSide) {
-        return selectUnit(prev, unitAtCell.id);
-      }
-
-      return selectUnit(prev, null);
+      return prev;
     });
   }, []);
 
@@ -99,6 +112,18 @@ const App: React.FC = () => {
 
   const handleRestart = useCallback(() => {
     setState(createInitialState());
+  }, []);
+
+  const handleSelectDeployType = useCallback((type: UnitType | null) => {
+    setState(prev => selectDeployType(prev, type));
+  }, []);
+
+  const handleConfirmDeploy = useCallback(() => {
+    setState(prev => confirmDeploy(prev));
+  }, []);
+
+  const handleClearDeploy = useCallback((side: Side) => {
+    setState(prev => clearAndRestartDeploy(prev, side));
   }, []);
 
   return (
@@ -137,12 +162,15 @@ const App: React.FC = () => {
           onCellClick={handleCellClick}
           onUnitClick={handleUnitClick}
         />
-        <StatusBar state={state} />
+        {state.phase !== 'deploy' && <StatusBar state={state} />}
       </div>
       <UIPanel
         state={state}
         onEndTurn={handleEndTurn}
         onRestart={handleRestart}
+        onSelectDeployType={handleSelectDeployType}
+        onConfirmDeploy={handleConfirmDeploy}
+        onClearDeploy={handleClearDeploy}
       />
     </div>
   );
@@ -150,18 +178,27 @@ const App: React.FC = () => {
 
 const OperationHint: React.FC<{ state: GameState }> = ({ state }) => {
   const selectedUnit = state.units.find(u => u.id === state.selectedUnitId);
-  let hint = '💡 点击己方单位选择，然后点击绿色格子移动或红色格子攻击';
+  let hint = '';
   let hintColor = '#5c3a21';
 
-  if (state.phase === 'ended') {
+  if (state.phase === 'deploy') {
+    const deployingSide: Side = state.deployStep === 'attackerDeploy' ? 'attacker' : 'defender';
+    if (state.selectedDeployType) {
+      hint = `📍 已选择【${getUnitName(state.selectedDeployType)}】——点击${deployingSide === 'attacker' ? '左侧红色' : '右侧蓝色'}高亮区域的空格放置单位`;
+    } else {
+      hint = deployingSide === 'attacker'
+        ? '📜 部署阶段：请先在右侧选择要部署的兵种（步兵/弓箭手/投石车各2个）'
+        : '📜 部署阶段：请先在右侧选择要部署的兵种（骑士/弓箭手/投石机各2个）';
+    }
+    hintColor = deployingSide === 'attacker' ? '#922b21' : '#1f618d';
+  } else if (state.phase === 'ended') {
     hint = state.winner === 'attacker' ? '🏆 攻方已攻破城门，战斗结束！' : '🛡️ 守方成功守卫城堡，战斗结束！';
     hintColor = state.winner === 'attacker' ? '#922b21' : '#1f618d';
   } else if (selectedUnit) {
-    const name = selectedUnit.type;
     const canMove = !selectedUnit.movedThisTurn;
     const canAttack = !selectedUnit.attackedThisTurn;
     if (canMove && canAttack) {
-      hint = `🎯 已选中单位：可移动或攻击`;
+      hint = `🎯 已选中单位：可移动或攻击';
     } else if (canMove) {
       hint = `👣 已选中单位：仅可移动`;
     } else if (canAttack) {
@@ -170,6 +207,8 @@ const OperationHint: React.FC<{ state: GameState }> = ({ state }) => {
       hint = `⏸️ 本回合已行动完毕，选择其他单位或结束回合`;
     }
     hintColor = selectedUnit.side === 'attacker' ? '#8b2020' : '#204080';
+  } else {
+    hint = '💡 点击己方单位选择，然后点击绿色格子移动或红色格子攻击';
   }
 
   return (
@@ -182,13 +221,28 @@ const OperationHint: React.FC<{ state: GameState }> = ({ state }) => {
       fontWeight: 'bold',
       fontSize: 14,
       boxShadow: '0 2px 8px rgba(0,0,0,0.15), inset 0 1px 0 rgba(255,255,255,0.4)',
-      maxWidth: 650,
+      maxWidth: 680,
       textAlign: 'center',
+      minHeight: 44,
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
     }}>
       {hint}
     </div>
   );
 };
+
+function getUnitName(type: UnitType): string {
+  const map: Record<UnitType, string> = {
+    infantry: '步兵⚔️',
+    archer: '弓箭手🏹',
+    catapult: '投石车🪨',
+    knight: '骑士🛡️',
+    trebuchet: '投石机💥',
+  };
+  return map[type] || type;
+}
 
 const StatusBar: React.FC<{ state: GameState }> = ({ state }) => {
   const selectedUnit = state.units.find(u => u.id === state.selectedUnitId);
@@ -229,22 +283,22 @@ const StatusBar: React.FC<{ state: GameState }> = ({ state }) => {
 };
 
 const getUnitLabel = (unit: { type: string; side: string }) => {
-  const labels: Record<string, string> = {
-    infantry: '步兵',
-    archer: '弓箭手',
-    catapult: '投石车',
-    knight: '骑士',
-    trebuchet: '投石机',
-  };
-  const icons: Record<string, string> = {
-    infantry: '⚔️',
-    archer: '🏹',
-    catapult: '🪨',
-    knight: '🛡️',
-    trebuchet: '💥',
-  };
-  return `${icons[unit.type] || '❓'} ${labels[unit.type] || unit.type}(${unit.side === 'attacker' ? '攻' : '守'})`;
+  return `${getUnitIcon(unit.type)} ${getUnitShortName(unit.type)}(${unit.side === 'attacker' ? '攻' : '守'})`;
 };
+
+function getUnitIcon(type: string): string {
+  const map: Record<string, string> = {
+    infantry: '⚔️', archer: '🏹', catapult: '🪨', knight: '🛡️', trebuchet: '💥',
+  };
+  return map[type] || '❓';
+}
+
+function getUnitShortName(type: string): string {
+  const map: Record<string, string> = {
+    infantry: '步兵', archer: '弓箭手', catapult: '投石车', knight: '骑士', trebuchet: '投石机',
+  };
+  return map[type] || type;
+}
 
 const StatusItem: React.FC<{ label: string; value: string; color: string }> = ({ label, value, color }) => (
   <div style={{
