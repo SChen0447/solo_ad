@@ -14,8 +14,10 @@ const CATEGORY_COLORS: Record<string, string> = {
   neutral: '#757575',
 };
 
-const MIN_FONT = 12;
-const MAX_FONT = 50;
+const MIN_FONT_SIZE = 12;
+const MAX_FONT_SIZE = 50;
+const SCALE_MIN = 0.5;
+const SCALE_MAX = 2;
 
 interface WordLayout {
   text: string;
@@ -27,14 +29,41 @@ interface WordLayout {
   category: string;
 }
 
+function clampFontSize(size: number): number {
+  return Math.max(MIN_FONT_SIZE, Math.min(MAX_FONT_SIZE, size));
+}
+
+function clampScale(s: number): number {
+  return Math.max(SCALE_MIN, Math.min(SCALE_MAX, s));
+}
+
 export default function WordCloud({ keywords, selectedWords, onWordSelect }: WordCloudProps) {
   const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const zoomRef = useRef<d3.ZoomBehavior<SVGSVGElement, unknown> | null>(null);
   const [tooltip, setTooltip] = useState<{ word: string; count: number; x: number; y: number } | null>(null);
   const [scale, setScale] = useState(1);
   const [rotation, setRotation] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
-  const dragStartRef = useRef({ x: 0, rotation: 0 });
+  const dragStateRef = useRef<{
+    mode: 'rotate' | null;
+    startX: number;
+    startY: number;
+    startRotation: number;
+    centerX: number;
+    centerY: number;
+    startAngle: number;
+  }>({
+    mode: null,
+    startX: 0,
+    startY: 0,
+    startRotation: 0,
+    centerX: 0,
+    centerY: 0,
+    startAngle: 0,
+  });
+  const scaleRef = useRef(1);
+  const rotationRef = useRef(0);
   const [fadeIn, setFadeIn] = useState(false);
 
   useEffect(() => {
@@ -46,22 +75,50 @@ export default function WordCloud({ keywords, selectedWords, onWordSelect }: Wor
     return () => clearTimeout(timer);
   }, [keywords]);
 
+  const updateGroupTransform = useCallback(() => {
+    if (!svgRef.current) return;
+    const g = svgRef.current.querySelector('.word-group') as SVGGElement | null;
+    if (!g) return;
+    const rect = svgRef.current.getBoundingClientRect();
+    const cx = rect.width / 2;
+    const cy = rect.height / 2;
+    const s = scaleRef.current;
+    const r = rotationRef.current;
+    g.setAttribute('transform', `translate(${cx}, ${cy}) scale(${s}) rotate(${r}) translate(${-cx}, ${-cy})`);
+  }, []);
+
+  useEffect(() => {
+    scaleRef.current = scale;
+    updateGroupTransform();
+  }, [scale, updateGroupTransform]);
+
+  useEffect(() => {
+    rotationRef.current = rotation;
+    updateGroupTransform();
+  }, [rotation, updateGroupTransform]);
+
   useEffect(() => {
     if (!svgRef.current || keywords.length === 0) return;
 
     const svg = d3.select(svgRef.current);
     svg.selectAll('g.word-group').remove();
+    svg.selectAll('g.zoom-layer').remove();
 
     const rect = svgRef.current.getBoundingClientRect();
     const width = rect.width || 400;
     const height = rect.height || 300;
 
+    const zoomLayer = svg.append('g').attr('class', 'zoom-layer');
+    const g = zoomLayer.append('g').attr('class', 'word-group');
+
     const maxFreq = Math.max(...keywords.map(k => k.frequency), 1);
     const minFreq = Math.min(...keywords.map(k => k.frequency));
+    const freqRange = Math.max(1, maxFreq - minFreq);
 
     const layouts: WordLayout[] = keywords.map((k, i) => {
-      const t = maxFreq === minFreq ? 0.5 : (k.frequency - minFreq) / (maxFreq - minFreq);
-      const size = MIN_FONT + t * (MAX_FONT - MIN_FONT);
+      const t = (k.frequency - minFreq) / freqRange;
+      const rawSize = MIN_FONT_SIZE + t * (MAX_FONT_SIZE - MIN_FONT_SIZE);
+      const size = clampFontSize(rawSize);
       const angle = (i % 5 - 2) * 12;
       return {
         text: k.word,
@@ -83,15 +140,16 @@ export default function WordCloud({ keywords, selectedWords, onWordSelect }: Wor
       let bestY = centerY;
       let found = false;
 
-      for (let ring = 0; ring < 50 && !found; ring++) {
-        const steps = Math.max(8, ring * 6);
+      for (let ring = 0; ring < 60 && !found; ring++) {
+        const steps = Math.max(12, ring * 8);
         for (let step = 0; step < steps && !found; step++) {
           const angle = (step / steps) * Math.PI * 2;
-          const radius = ring * (MAX_FONT * 0.6);
+          const radius = ring * (MAX_FONT_SIZE * 0.55);
           const x = centerX + Math.cos(angle) * radius;
           const y = centerY + Math.sin(angle) * radius;
 
-          if (x < word.size || x > width - word.size || y < word.size || y > height - word.size) {
+          if (x < word.size * 1.2 || x > width - word.size * 1.2 ||
+              y < word.size * 1.2 || y > height - word.size * 1.2) {
             continue;
           }
 
@@ -99,7 +157,7 @@ export default function WordCloud({ keywords, selectedWords, onWordSelect }: Wor
           for (const p of placed) {
             const dx = x - p.x;
             const dy = y - p.y;
-            const minDist = (word.size + p.size) * 0.5;
+            const minDist = (word.size + p.size) * 0.6;
             if (dx * dx + dy * dy < minDist * minDist) {
               overlap = true;
               break;
@@ -119,8 +177,6 @@ export default function WordCloud({ keywords, selectedWords, onWordSelect }: Wor
       placed.push(word);
     }
 
-    const g = svg.append('g').attr('class', 'word-group');
-
     g.selectAll('text')
       .data(placed)
       .enter()
@@ -134,12 +190,13 @@ export default function WordCloud({ keywords, selectedWords, onWordSelect }: Wor
       .attr('fill', d => CATEGORY_COLORS[d.category] || '#757575')
       .attr('transform', d => `rotate(${d.rotation}, ${d.x}, ${d.y})`)
       .attr('cursor', 'pointer')
+      .attr('class', 'word-text')
       .text(d => d.text)
       .style('opacity', d => {
         if (selectedWords.length === 0) return 1;
         return selectedWords.includes(d.text) ? 1 : 0.3;
       })
-      .style('transition', 'opacity 0.15s')
+      .style('transition', 'opacity 100ms ease-out')
       .on('click', function (_event, d) {
         onWordSelect(d.text);
       })
@@ -160,36 +217,92 @@ export default function WordCloud({ keywords, selectedWords, onWordSelect }: Wor
         setTooltip(null);
       });
 
-  }, [keywords, selectedWords, onWordSelect]);
+    const zoom = d3.zoom<SVGSVGElement, unknown>()
+      .scaleExtent([SCALE_MIN, SCALE_MAX])
+      .on('zoom', (event) => {
+        setScale(clampScale(event.transform.k));
+      });
+    zoomRef.current = zoom;
+    svg.call(zoom);
+
+    svg.on('mousedown.rotate', null);
+    svg.on('mousedown.drag', null);
+
+    updateGroupTransform();
+
+  }, [keywords, onWordSelect, updateGroupTransform]);
 
   useEffect(() => {
     if (!svgRef.current) return;
-    const g = svgRef.current.querySelector('.word-group');
-    if (g) {
-      (g as SVGGElement).setAttribute('transform', `rotate(${rotation}) scale(${scale})`);
-    }
-  }, [scale, rotation]);
+    const texts = svgRef.current.querySelectorAll('text.word-text');
+    texts.forEach((el) => {
+      const d = (el as SVGTextElement).textContent || '';
+      let opacity = '1';
+      if (selectedWords.length > 0) {
+        opacity = selectedWords.includes(d) ? '1' : '0.3';
+      }
+      (el as SVGTextElement).style.opacity = opacity;
+    });
+  }, [selectedWords]);
 
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
-    if ((e.target as SVGElement).tagName === 'text') return;
+    const target = e.target as SVGElement;
+    if (target.classList && target.classList.contains('word-text')) return;
+    if (target.tagName === 'text') return;
+
+    if (!svgRef.current) return;
+    const rect = svgRef.current.getBoundingClientRect();
+    const startX = e.clientX;
+    const startY = e.clientY;
+    const cx = rect.width / 2;
+    const cy = rect.height / 2;
+    const relX = startX - rect.left - cx;
+    const relY = startY - rect.top - cy;
+    const startAngle = Math.atan2(relY, relX) * (180 / Math.PI);
+
     setIsDragging(true);
-    dragStartRef.current = { x: e.clientX, rotation };
+    dragStateRef.current = {
+      mode: 'rotate',
+      startX,
+      startY,
+      startRotation: rotation,
+      centerX: cx,
+      centerY: cy,
+      startAngle,
+    };
   }, [rotation]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
-    if (!isDragging) return;
-    const dx = e.clientX - dragStartRef.current.x;
-    setRotation(dragStartRef.current.rotation + dx * 0.3);
+    if (!isDragging || dragStateRef.current.mode !== 'rotate') return;
+    if (!svgRef.current) return;
+
+    const rect = svgRef.current.getBoundingClientRect();
+    const curX = e.clientX;
+    const curY = e.clientY;
+    const relX = curX - rect.left - dragStateRef.current.centerX;
+    const relY = curY - rect.top - dragStateRef.current.centerY;
+    const curAngle = Math.atan2(relY, relX) * (180 / Math.PI);
+
+    let deltaAngle = curAngle - dragStateRef.current.startAngle;
+    if (deltaAngle > 180) deltaAngle -= 360;
+    if (deltaAngle < -180) deltaAngle += 360;
+
+    const dxHorizontal = curX - dragStateRef.current.startX;
+    const useHorizontal = Math.abs(relX) < 30 && Math.abs(relY) < 30;
+    const finalDelta = useHorizontal ? dxHorizontal * 0.4 : deltaAngle;
+
+    setRotation(dragStateRef.current.startRotation + finalDelta);
   }, [isDragging]);
 
   const handleMouseUp = useCallback(() => {
     setIsDragging(false);
+    dragStateRef.current.mode = null;
   }, []);
 
   const handleWheel = useCallback((e: React.WheelEvent) => {
     e.preventDefault();
-    const delta = e.deltaY > 0 ? -0.05 : 0.05;
-    setScale(prev => Math.min(2, Math.max(0.5, prev + delta)));
+    const delta = e.deltaY > 0 ? -0.08 : 0.08;
+    setScale(prev => clampScale(prev + delta));
   }, []);
 
   const resetTransform = useCallback(() => {
@@ -204,6 +317,7 @@ export default function WordCloud({ keywords, selectedWords, onWordSelect }: Wor
         <div style={styles.controls}>
           <button onClick={resetTransform} style={styles.resetBtn}>重置</button>
           <span style={styles.scaleLabel}>{(scale * 100).toFixed(0)}%</span>
+          <span style={styles.rotLabel}>{rotation.toFixed(0)}°</span>
         </div>
       </div>
 
@@ -232,24 +346,42 @@ export default function WordCloud({ keywords, selectedWords, onWordSelect }: Wor
         )}
 
         {tooltip && (
-          <div style={{ ...styles.tooltip, left: tooltip.x, top: tooltip.y - 40 }}>
+          <div style={{ ...styles.tooltip, left: tooltip.x, top: tooltip.y - 44 }}>
             <strong>{tooltip.word}</strong> · 出现 {tooltip.count} 次
           </div>
         )}
       </div>
 
       <div style={styles.zoomBar}>
-        <button onClick={() => setScale(p => Math.max(0.5, p - 0.1))} style={styles.zoomBtn}>−</button>
+        <button
+          onClick={() => setScale(p => clampScale(p - 0.1))}
+          disabled={scale <= SCALE_MIN}
+          style={{
+            ...styles.zoomBtn,
+            opacity: scale <= SCALE_MIN ? 0.4 : 1,
+          }}
+        >−</button>
         <input
           type="range"
-          min="0.5"
-          max="2"
+          min={SCALE_MIN}
+          max={SCALE_MAX}
           step="0.05"
           value={scale}
-          onChange={e => setScale(parseFloat(e.target.value))}
+          onChange={e => setScale(clampScale(parseFloat(e.target.value)))}
           style={styles.zoomSlider}
         />
-        <button onClick={() => setScale(p => Math.min(2, p + 0.1))} style={styles.zoomBtn}>+</button>
+        <button
+          onClick={() => setScale(p => clampScale(p + 0.1))}
+          disabled={scale >= SCALE_MAX}
+          style={{
+            ...styles.zoomBtn,
+            opacity: scale >= SCALE_MAX ? 0.4 : 1,
+          }}
+        >+</button>
+      </div>
+
+      <div style={styles.hintBar}>
+        <span style={styles.hintText}>提示：拖拽旋转 · 滚轮缩放 · 悬停查看详情</span>
       </div>
 
       <div style={styles.legend}>
@@ -300,6 +432,12 @@ const styles: Record<string, React.CSSProperties> = {
   scaleLabel: {
     fontSize: 11,
     color: '#9e9e9e',
+    minWidth: 34,
+    textAlign: 'right',
+  },
+  rotLabel: {
+    fontSize: 11,
+    color: '#bdbdbd',
     minWidth: 36,
     textAlign: 'right',
   },
@@ -321,7 +459,7 @@ const styles: Record<string, React.CSSProperties> = {
   tooltip: {
     position: 'absolute',
     padding: '6px 12px',
-    backgroundColor: 'rgba(26, 35, 126, 0.9)',
+    backgroundColor: 'rgba(26, 35, 126, 0.92)',
     color: '#fff',
     fontSize: 12,
     borderRadius: 6,
@@ -329,12 +467,13 @@ const styles: Record<string, React.CSSProperties> = {
     whiteSpace: 'nowrap',
     zIndex: 10,
     transform: 'translateX(-50%)',
+    boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
   },
   zoomBar: {
     display: 'flex',
     alignItems: 'center',
     gap: 8,
-    padding: '8px 20px',
+    padding: '8px 20px 4px',
   },
   zoomBtn: {
     width: 28,
@@ -353,6 +492,14 @@ const styles: Record<string, React.CSSProperties> = {
     flex: 1,
     accentColor: '#1a237e',
     height: 4,
+  },
+  hintBar: {
+    padding: '0 20px 4px',
+    textAlign: 'center',
+  },
+  hintText: {
+    fontSize: 10,
+    color: '#c0c0c0',
   },
   legend: {
     display: 'flex',

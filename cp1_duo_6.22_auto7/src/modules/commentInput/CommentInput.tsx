@@ -129,11 +129,15 @@ export default function CommentInput({ comments, onCommentsChange, onAnalyze, ha
         {sorted.map(c => (
           <div key={c.id} style={styles.card}>
             <div style={styles.cardHeader}>
-              <div>{renderStars(c.rating)}</div>
-              <span style={styles.cardDate}>{c.date}</span>
+              <div style={styles.cardHeaderLeft}>
+                <div>{renderStars(c.rating)}</div>
+              </div>
               <button onClick={() => handleDelete(c.id)} style={styles.deleteBtn}>×</button>
             </div>
             <p style={styles.cardContent}>{c.content}</p>
+            <div style={styles.cardFooter}>
+              <span style={styles.cardDate}>📅 {c.date}</span>
+            </div>
           </div>
         ))}
         {comments.length === 0 && (
@@ -245,13 +249,27 @@ const styles: Record<string, React.CSSProperties> = {
   cardHeader: {
     display: 'flex',
     alignItems: 'center',
+    justifyContent: 'space-between',
     gap: 8,
     marginBottom: 6,
   },
+  cardHeaderLeft: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 8,
+  },
+  cardFooter: {
+    marginTop: 6,
+    paddingTop: 6,
+    borderTop: '1px dashed #eeeeee',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
   cardDate: {
     fontSize: 11,
-    color: '#bdbdbd',
-    flex: 1,
+    color: '#9e9e9e',
+    letterSpacing: 0.3,
   },
   deleteBtn: {
     background: 'none',
