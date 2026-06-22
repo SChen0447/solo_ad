@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { readingTracker, Book, ReadingSession } from './ReadingTracker';
+import React, { useState, useEffect, useMemo } from 'react';
+import api, { Book } from './api';
 
 interface BooksPageProps {
   refreshKey: number;
@@ -14,12 +14,13 @@ interface ReadingModalProps {
 const PAGE_SIZE = 20;
 
 const ReadingModal: React.FC<ReadingModalProps> = ({ book, onClose, onComplete }) => {
-  const [mode, setMode] = useState<'start' | 'end'>('start');
+  const [mode, setMode] = useState<'start' | 'end' | 'manual'>('start');
   const [startTime, setStartTime] = useState('');
   const [endTime, setEndTime] = useState('');
   const [pagesRead, setPagesRead] = useState('');
-  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [sessionStart, setSessionStart] = useState<number | null>(null);
   const [elapsedTime, setElapsedTime] = useState(0);
+  const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     const now = new Date();
@@ -28,42 +29,53 @@ const ReadingModal: React.FC<ReadingModalProps> = ({ book, onClose, onComplete }
   }, []);
 
   useEffect(() => {
-    if (mode === 'end' && sessionId) {
+    if (mode === 'end' && sessionStart) {
       const now = new Date();
       const localNow = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
       setEndTime(localNow);
     }
-  }, [mode, sessionId]);
+  }, [mode, sessionStart]);
 
   useEffect(() => {
-    if (mode === 'end' && startTime) {
+    if (mode === 'end' && sessionStart) {
       const interval = setInterval(() => {
-        const start = new Date(startTime).getTime();
-        setElapsedTime(Math.floor((Date.now() - start) / 1000));
+        setElapsedTime(Math.floor((Date.now() - sessionStart) / 1000));
       }, 1000);
       return () => clearInterval(interval);
     }
-  }, [mode, startTime]);
+  }, [mode, sessionStart]);
 
   const handleStart = () => {
     const start = new Date(startTime).getTime();
-    const sid = readingTracker.startReadingSession(book.id);
-    setSessionId(sid);
+    setSessionStart(start);
     setMode('end');
   };
 
-  const handleEnd = () => {
-    if (!sessionId) return;
+  const handleEnd = async () => {
+    if (!sessionStart) return;
     const pages = parseInt(pagesRead);
     if (isNaN(pages) || pages <= 0) {
       alert('请输入有效的阅读页数');
       return;
     }
-    readingTracker.endReadingSession(sessionId, pages);
-    onComplete();
+    setSubmitting(true);
+    try {
+      const end = Date.now();
+      await api.addReadingSession({
+        bookId: book.id,
+        startTime: sessionStart,
+        endTime: end,
+        pagesRead: pages,
+      });
+      onComplete();
+    } catch (err) {
+      alert('保存失败：' + (err as Error).message);
+    } finally {
+      setSubmitting(false);
+    }
   };
 
-  const handleManualSubmit = () => {
+  const handleManualSubmit = async () => {
     if (!startTime || !endTime) {
       alert('请填写起止时间');
       return;
@@ -79,8 +91,20 @@ const ReadingModal: React.FC<ReadingModalProps> = ({ book, onClose, onComplete }
       alert('请输入有效的阅读页数');
       return;
     }
-    readingTracker.addReadingSession(book.id, start, end, pages);
-    onComplete();
+    setSubmitting(true);
+    try {
+      await api.addReadingSession({
+        bookId: book.id,
+        startTime: start,
+        endTime: end,
+        pagesRead: pages,
+      });
+      onComplete();
+    } catch (err) {
+      alert('保存失败：' + (err as Error).message);
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const formatDuration = (seconds: number) => {
@@ -91,40 +115,34 @@ const ReadingModal: React.FC<ReadingModalProps> = ({ book, onClose, onComplete }
   };
 
   return (
-    <div style={modalStyles.overlay} onClick={onClose}>
+    <div className="modal-overlay" onClick={onClose}>
       <div style={modalStyles.modal} onClick={(e) => e.stopPropagation()}>
         <div style={modalStyles.header}>
           <h3 style={modalStyles.title}>记录阅读 - {book.title}</h3>
-          <button style={modalStyles.closeBtn} onClick={onClose}>✕</button>
+          <button className="modal-close-btn" onClick={onClose}>✕</button>
         </div>
 
         <div style={modalStyles.body}>
           <div style={modalStyles.modeToggle}>
             <button
-              style={{
-                ...modalStyles.modeBtn,
-                ...(mode === 'start' ? modalStyles.modeBtnActive : {})
-              }}
+              className={`mode-btn ${mode !== 'manual' ? 'mode-btn-active' : ''}`}
               onClick={() => {
-                if (!sessionId) setMode('start');
+                if (!sessionStart) setMode('start');
               }}
-              disabled={!!sessionId}
+              disabled={!!sessionStart || submitting}
             >
               ⏱️ 即时记录
             </button>
             <button
-              style={{
-                ...modalStyles.modeBtn,
-                ...(mode === 'manual' ? modalStyles.modeBtnActive : {})
-              }}
-              onClick={() => !sessionId && setMode('manual')}
-              disabled={!!sessionId}
+              className={`mode-btn ${mode === 'manual' ? 'mode-btn-active' : ''}`}
+              onClick={() => !sessionStart && !submitting && setMode('manual')}
+              disabled={!!sessionStart || submitting}
             >
               📝 手动填写
             </button>
           </div>
 
-          {mode === 'start' && (
+          {mode !== 'manual' && (
             <>
               <div style={modalStyles.formGroup}>
                 <label style={modalStyles.label}>开始时间</label>
@@ -132,13 +150,13 @@ const ReadingModal: React.FC<ReadingModalProps> = ({ book, onClose, onComplete }
                   type="datetime-local"
                   value={startTime}
                   onChange={(e) => setStartTime(e.target.value)}
-                  style={modalStyles.input}
-                  disabled={!!sessionId}
+                  className="modal-input"
+                  disabled={!!sessionStart || submitting}
                 />
               </div>
 
-              {!sessionId ? (
-                <button style={modalStyles.primaryBtn} onClick={handleStart}>
+              {!sessionStart ? (
+                <button className="primary-btn" onClick={handleStart} disabled={submitting}>
                   🚀 开始阅读
                 </button>
               ) : (
@@ -149,29 +167,20 @@ const ReadingModal: React.FC<ReadingModalProps> = ({ book, onClose, onComplete }
                   </div>
 
                   <div style={modalStyles.formGroup}>
-                    <label style={modalStyles.label}>结束时间</label>
-                    <input
-                      type="datetime-local"
-                      value={endTime}
-                      onChange={(e) => setEndTime(e.target.value)}
-                      style={modalStyles.input}
-                    />
-                  </div>
-
-                  <div style={modalStyles.formGroup}>
                     <label style={modalStyles.label}>本次阅读页数</label>
                     <input
                       type="number"
                       min="1"
                       value={pagesRead}
                       onChange={(e) => setPagesRead(e.target.value)}
-                      style={modalStyles.input}
+                      className="modal-input"
                       placeholder={`最大 ${book.totalPages - book.readPages} 页`}
+                      disabled={submitting}
                     />
                   </div>
 
-                  <button style={modalStyles.primaryBtn} onClick={handleEnd}>
-                    ✅ 完成阅读
+                  <button className="primary-btn" onClick={handleEnd} disabled={submitting}>
+                    {submitting ? '保存中...' : '✅ 完成阅读'}
                   </button>
                 </>
               )}
@@ -186,7 +195,8 @@ const ReadingModal: React.FC<ReadingModalProps> = ({ book, onClose, onComplete }
                   type="datetime-local"
                   value={startTime}
                   onChange={(e) => setStartTime(e.target.value)}
-                  style={modalStyles.input}
+                  className="modal-input"
+                  disabled={submitting}
                 />
               </div>
               <div style={modalStyles.formGroup}>
@@ -195,7 +205,8 @@ const ReadingModal: React.FC<ReadingModalProps> = ({ book, onClose, onComplete }
                   type="datetime-local"
                   value={endTime}
                   onChange={(e) => setEndTime(e.target.value)}
-                  style={modalStyles.input}
+                  className="modal-input"
+                  disabled={submitting}
                 />
               </div>
               <div style={modalStyles.formGroup}>
@@ -205,12 +216,13 @@ const ReadingModal: React.FC<ReadingModalProps> = ({ book, onClose, onComplete }
                   min="1"
                   value={pagesRead}
                   onChange={(e) => setPagesRead(e.target.value)}
-                  style={modalStyles.input}
+                  className="modal-input"
                   placeholder={`最大 ${book.totalPages - book.readPages} 页`}
+                  disabled={submitting}
                 />
               </div>
-              <button style={modalStyles.primaryBtn} onClick={handleManualSubmit}>
-                💾 保存记录
+              <button className="primary-btn" onClick={handleManualSubmit} disabled={submitting}>
+                {submitting ? '保存中...' : '💾 保存记录'}
               </button>
             </>
           )}
@@ -228,8 +240,9 @@ const AddBookModal: React.FC<{
   const [author, setAuthor] = useState('');
   const [totalPages, setTotalPages] = useState('');
   const [tagsInput, setTagsInput] = useState('');
+  const [submitting, setSubmitting] = useState(false);
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!title.trim()) {
       alert('请输入书名');
       return;
@@ -244,16 +257,28 @@ const AddBookModal: React.FC<{
       return;
     }
     const tags = tagsInput.split(/[,，]/).map(t => t.trim()).filter(t => t);
-    readingTracker.addBook(title.trim(), author.trim(), pages, tags);
-    onAdd();
+    setSubmitting(true);
+    try {
+      await api.addBook({
+        title: title.trim(),
+        author: author.trim(),
+        totalPages: pages,
+        tags,
+      });
+      onAdd();
+    } catch (err) {
+      alert('添加失败：' + (err as Error).message);
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
-    <div style={modalStyles.overlay} onClick={onClose}>
+    <div className="modal-overlay" onClick={onClose}>
       <div style={modalStyles.modal} onClick={(e) => e.stopPropagation()}>
         <div style={modalStyles.header}>
           <h3 style={modalStyles.title}>添加新书</h3>
-          <button style={modalStyles.closeBtn} onClick={onClose}>✕</button>
+          <button className="modal-close-btn" onClick={onClose}>✕</button>
         </div>
         <div style={modalStyles.body}>
           <div style={modalStyles.formGroup}>
@@ -262,8 +287,9 @@ const AddBookModal: React.FC<{
               type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              style={modalStyles.input}
+              className="modal-input"
               placeholder="请输入书名"
+              disabled={submitting}
             />
           </div>
           <div style={modalStyles.formGroup}>
@@ -272,8 +298,9 @@ const AddBookModal: React.FC<{
               type="text"
               value={author}
               onChange={(e) => setAuthor(e.target.value)}
-              style={modalStyles.input}
+              className="modal-input"
               placeholder="请输入作者"
+              disabled={submitting}
             />
           </div>
           <div style={modalStyles.formGroup}>
@@ -283,8 +310,9 @@ const AddBookModal: React.FC<{
               min="1"
               value={totalPages}
               onChange={(e) => setTotalPages(e.target.value)}
-              style={modalStyles.input}
+              className="modal-input"
               placeholder="请输入总页数"
+              disabled={submitting}
             />
           </div>
           <div style={modalStyles.formGroup}>
@@ -293,12 +321,13 @@ const AddBookModal: React.FC<{
               type="text"
               value={tagsInput}
               onChange={(e) => setTagsInput(e.target.value)}
-              style={modalStyles.input}
+              className="modal-input"
               placeholder="如：小说, 科幻, 经典"
+              disabled={submitting}
             />
           </div>
-          <button style={modalStyles.primaryBtn} onClick={handleSubmit}>
-            ➕ 添加书籍
+          <button className="primary-btn" onClick={handleSubmit} disabled={submitting}>
+            {submitting ? '添加中...' : '➕ 添加书籍'}
           </button>
         </div>
       </div>
@@ -311,35 +340,31 @@ const BookCard: React.FC<{
   onRead: (book: Book) => void;
   onDelete: (id: string) => void;
 }> = ({ book, onRead, onDelete }) => {
-  const [hovered, setHovered] = useState(false);
   const progress = book.totalPages > 0 ? (book.readPages / book.totalPages) * 100 : 0;
 
   const statusConfig = {
     unread: { label: '未读', color: '#a0a0c0' },
     reading: { label: '进行中', color: '#e94560' },
     completed: { label: '已完成', color: '#2ecc71' },
-  };
+  } as const;
 
   const formatTime = (seconds: number) => {
     const h = Math.floor(seconds / 3600);
     const m = Math.floor((seconds % 3600) / 60);
-    if (h > 0) return `${h}小时${m > 0 ? ` ${Math.round(m)}分钟` : '';
-    return `${Math.round(m)}分钟';
+    if (h > 0) return `${h}小时${m > 0 ? ` ${Math.round(m)}分钟` : ''}`;
+    return `${Math.round(m)}分钟`;
   };
 
   return (
-    <div
-      style={{
-        ...bookCardStyles.card,
-        ...(hovered ? bookCardStyles.cardHover : {}),
-      }}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-    >
+    <div className="book-card">
       <div style={bookCardStyles.header}>
         <div style={bookCardStyles.titleRow}>
           <h3 style={bookCardStyles.title}>{book.title}</h3>
-          <span style={{ ...bookCardStyles.statusBadge, backgroundColor: statusConfig[book.status].color + '20', color: statusConfig[book.status].color }}>
+          <span style={{
+            ...bookCardStyles.statusBadge,
+            backgroundColor: statusConfig[book.status].color + '20',
+            color: statusConfig[book.status].color,
+          }}>
             {statusConfig[book.status].label}
           </span>
         </div>
@@ -382,23 +407,21 @@ const BookCard: React.FC<{
 
       <div style={bookCardStyles.actions}>
         <button
-          style={{ ...bookCardStyles.readBtn,
-            ...(book.status === 'completed' ? { opacity: 0.5, cursor: 'not-allowed' } : {}
-          }}
+          className="read-btn"
           onClick={() => book.status !== 'completed' && onRead(book)}
           disabled={book.status === 'completed'}
         >
           📖 {book.status === 'reading' ? '继续阅读' : '开始阅读'}
         </button>
         <button
-          style={bookCardStyles.deleteBtn}
+          className="delete-btn"
           onClick={() => {
-            if (confirm(`确定删除《${book.title}》吗？相关阅读记录也会被删除。')) {
+            if (confirm(`确定删除《${book.title}》吗？相关阅读记录也会被删除。`)) {
               onDelete(book.id);
             }
           }}
         >
-            🗑️ 删除
+          🗑️ 删除
         </button>
       </div>
     </div>
@@ -414,36 +437,44 @@ const BooksPage: React.FC<BooksPageProps> = ({ refreshKey }) => {
   const [readingBook, setReadingBook] = useState<Book | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [listKey, setListKey] = useState(0);
-  const listRef = useRef<HTMLDivElement>(null);
+  const [loading, setLoading] = useState(false);
 
-  const loadData = () => {
-    const filtered = readingTracker.filterBooks(selectedTags, statusFilter);
-    setBooks(filtered);
-    setAllTags(readingTracker.getAllTags());
-    setCurrentPage(1);
-    setListKey(k => k + 1);
+  const loadData = async () => {
+    setLoading(true);
+    try {
+      const [filteredBooks, tags] = await Promise.all([
+        api.getBooks(selectedTags, statusFilter),
+        api.getAllTags(),
+      ]);
+      setBooks(filteredBooks);
+      setAllTags(tags);
+      setCurrentPage(1);
+      setListKey(k => k + 1);
+    } catch (err) {
+      console.error('加载数据失败:', err);
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
     loadData();
-  }, [refreshKey, selectedTags, statusFilter]);
+  }, [refreshKey]);
 
-  const filteredBooks = useMemo(() => {
-    let result = books;
-    if (statusFilter && statusFilter !== 'all') {
-      result = result.filter(b => b.status === statusFilter);
-    }
-    if (selectedTags.length > 0) {
-      result = result.filter(b => selectedTags.some(t => b.tags.includes(t)));
-    }
-    return result;
-  }, [books, statusFilter, selectedTags]);
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      loadData();
+    }, 0);
+    return () => clearTimeout(timer);
+  }, [selectedTags, statusFilter]);
 
-  const totalPages = Math.ceil(filteredBooks.length / PAGE_SIZE);
-  const displayedBooks = filteredBooks.slice(
-    (currentPage - 1) * PAGE_SIZE,
-    currentPage * PAGE_SIZE
-  );
+  const totalPages = Math.ceil(books.length / PAGE_SIZE);
+  const displayedBooks = useMemo(() => {
+    return books.slice(
+      (currentPage - 1) * PAGE_SIZE,
+      currentPage * PAGE_SIZE
+    );
+  }, [books, currentPage]);
 
   const toggleTag = (tag: string) => {
     setSelectedTags(prev =>
@@ -452,14 +483,22 @@ const BooksPage: React.FC<BooksPageProps> = ({ refreshKey }) => {
   };
 
   const stats = useMemo(() => {
-    const all = readingTracker.getBooks();
     return {
-      total: all.length,
-      unread: all.filter(b => b.status === 'unread').length,
-      reading: all.filter(b => b.status === 'reading').length,
-      completed: all.filter(b => b.status === 'completed').length,
+      total: books.length,
+      unread: books.filter(b => b.status === 'unread').length,
+      reading: books.filter(b => b.status === 'reading').length,
+      completed: books.filter(b => b.status === 'completed').length,
     };
-  }, [refreshKey, books.length]);
+  }, [books]);
+
+  const handleDelete = async (id: string) => {
+    try {
+      await api.deleteBook(id);
+      loadData();
+    } catch (err) {
+      alert('删除失败：' + (err as Error).message);
+    }
+  };
 
   return (
     <div style={styles.container}>
@@ -468,7 +507,7 @@ const BooksPage: React.FC<BooksPageProps> = ({ refreshKey }) => {
           <h1 style={styles.pageTitle}>书籍管理</h1>
           <p style={styles.pageSubtitle}>共 {stats.total} 本书籍 · 进行中 {stats.reading} · 已完成 {stats.completed}</p>
         </div>
-        <button style={styles.addBtn} onClick={() => setShowAddModal(true)}>
+        <button className="add-btn" onClick={() => setShowAddModal(true)}>
           ➕ 添加新书
         </button>
       </div>
@@ -484,10 +523,7 @@ const BooksPage: React.FC<BooksPageProps> = ({ refreshKey }) => {
           ].map(opt => (
             <button
               key={opt.value}
-              style={{
-                ...styles.filterChip,
-                ...(statusFilter === opt.value ? styles.filterChipActive : {}),
-              }}
+              className={`filter-chip ${statusFilter === opt.value ? 'filter-chip-active' : ''}`}
               onClick={() => setStatusFilter(opt.value)}
             >
               {opt.label}
@@ -501,10 +537,7 @@ const BooksPage: React.FC<BooksPageProps> = ({ refreshKey }) => {
             {allTags.map(tag => (
               <button
                 key={tag}
-                style={{
-                  ...styles.filterChip,
-                  ...(selectedTags.includes(tag) ? styles.filterChipActive : {}),
-                }}
+                className={`filter-chip ${selectedTags.includes(tag) ? 'filter-chip-active' : ''}`}
                 onClick={() => toggleTag(tag)}
               >
                 {tag}
@@ -512,7 +545,7 @@ const BooksPage: React.FC<BooksPageProps> = ({ refreshKey }) => {
             ))}
             {selectedTags.length > 0 && (
               <button
-                style={styles.filterClearBtn}
+                className="filter-clear-btn"
                 onClick={() => setSelectedTags([])}
               >
                 清除
@@ -522,38 +555,41 @@ const BooksPage: React.FC<BooksPageProps> = ({ refreshKey }) => {
         )}
       </div>
 
-      <div
-        ref={listRef}
-        style={styles.booksGrid}
-        key={listKey}
-        className="fade-in"
-      >
-        {displayedBooks.length > 0 ? (
-          displayedBooks.map(book => (
-            <BookCard
-              key={book.id}
-              book={book}
-              onRead={(b) => setReadingBook(b)}
-              onDelete={(id) => {
-                readingTracker.deleteBook(id);
-                loadData();
-              }}
-            />
-          ))
-        ) : (
-          <div style={styles.emptyState}>
-          <div style={styles.emptyIcon}>📚</div>
-          <p style={styles.emptyText}>暂无书籍，点击右上角添加你的第一本书</p>
+      {loading ? (
+        <div style={styles.loadingState}>
+          <div style={styles.loadingIcon}>⏳</div>
+          <p style={styles.loadingText}>加载中...</p>
         </div>
-        )}
-      </div>
+      ) : (
+        <div
+          style={styles.booksGrid}
+          key={listKey}
+          className="fade-in"
+        >
+          {displayedBooks.length > 0 ? (
+            displayedBooks.map(book => (
+              <BookCard
+                key={book.id}
+                book={book}
+                onRead={(b) => setReadingBook(b)}
+                onDelete={handleDelete}
+              />
+            ))
+          ) : (
+            <div style={styles.emptyState}>
+              <div style={styles.emptyIcon}>📚</div>
+              <p style={styles.emptyText}>暂无书籍，点击右上角添加你的第一本书</p>
+            </div>
+          )}
+        </div>
+      )}
 
       {totalPages > 1 && (
         <div style={styles.pagination}>
           <button
-            style={styles.pageBtn}
+            className="page-btn"
             disabled={currentPage === 1}
-            onClick={() => setCurrentPage(p => Math.max(1, p - 1)}
+            onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
           >
             ← 上一页
           </button>
@@ -561,7 +597,7 @@ const BooksPage: React.FC<BooksPageProps> = ({ refreshKey }) => {
             第 {currentPage} / {totalPages} 页
           </span>
           <button
-            style={styles.pageBtn}
+            className="page-btn"
             disabled={currentPage === totalPages}
             onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
           >
@@ -616,16 +652,6 @@ const styles: Record<string, React.CSSProperties> = {
     color: '#a0a0c0',
     fontSize: '14px',
   },
-  addBtn: {
-    padding: '12px 24px',
-    backgroundColor: '#e94560',
-    border: 'none',
-    borderRadius: '8px',
-    color: '#ffffff',
-    fontSize: '15px',
-    fontWeight: 600,
-    transition: 'all 0.15s ease',
-  },
   filtersSection: {
     backgroundColor: '#1a1a2e',
     border: '1px solid #2a2a4e',
@@ -648,35 +674,24 @@ const styles: Record<string, React.CSSProperties> = {
     marginRight: '4px',
     minWidth: '48px',
   },
-  filterChip: {
-    padding: '6px 14px',
-    backgroundColor: 'transparent',
-    border: '1px solid #2a2a4e',
-    borderRadius: '20px',
-    color: '#a0a0c0',
-    fontSize: '13px',
-    transition: 'all 0.15s ease',
-  },
-  filterChipActive: {
-    backgroundColor: '#e94560',
-    borderColor: '#e94560',
-    color: '#ffffff',
-  },
-  filterClearBtn: {
-    padding: '6px 14px',
-    backgroundColor: 'transparent',
-    border: '1px solid #4a4a6e',
-    borderRadius: '20px',
-    color: '#e0e0e0',
-    fontSize: '13px',
-    marginLeft: '8px',
-    transition: 'all 0.15s ease',
-  },
   booksGrid: {
     display: 'grid',
     gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
     gap: '20px',
     marginBottom: '24px',
+  },
+  loadingState: {
+    gridColumn: '1 / -1',
+    textAlign: 'center',
+    padding: '60px 20px',
+  },
+  loadingIcon: {
+    fontSize: '48px',
+    marginBottom: '12px',
+  },
+  loadingText: {
+    color: '#a0a0c0',
+    fontSize: '16px',
   },
   emptyState: {
     gridColumn: '1 / -1',
@@ -698,15 +713,6 @@ const styles: Record<string, React.CSSProperties> = {
     gap: '16px',
     padding: '20px 0',
   },
-  pageBtn: {
-    padding: '10px 20px',
-    backgroundColor: '#1a1a2e',
-    border: '1px solid #2a2a4e',
-    borderRadius: '8px',
-    color: '#e0e0e0',
-    fontSize: '14px',
-    transition: 'all 0.15s ease',
-  },
   pageInfo: {
     color: '#a0a0c0',
     fontSize: '14px',
@@ -714,20 +720,6 @@ const styles: Record<string, React.CSSProperties> = {
 };
 
 const bookCardStyles: Record<string, React.CSSProperties> = {
-  card: {
-    backgroundColor: '#1a1a2e',
-    border: '1px solid #2a2a4e',
-    borderRadius: '12px',
-    padding: '20px',
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '14px',
-    transition: 'all 0.2s ease',
-  },
-  cardHover: {
-    borderColor: '#4a4a6e',
-    boxShadow: '0 4px 20px rgba(0, 0, 0, 0.3)',
-  },
   header: {
     marginBottom: '4px',
   },
@@ -811,39 +803,9 @@ const bookCardStyles: Record<string, React.CSSProperties> = {
     gap: '10px',
     marginTop: '4px',
   },
-  readBtn: {
-    flex: 1,
-    padding: '10px 16px',
-    backgroundColor: '#e94560',
-    border: 'none',
-    borderRadius: '8px',
-    color: '#ffffff',
-    fontSize: '14px',
-    fontWeight: 600,
-    transition: 'all 0.15s ease',
-  },
-  deleteBtn: {
-    padding: '10px 16px',
-    backgroundColor: 'transparent',
-    border: '1px solid #2a2a4e',
-    borderRadius: '8px',
-    color: '#a0a0c0',
-    fontSize: '14px',
-    transition: 'all 0.15s ease',
-  },
 };
 
 const modalStyles: Record<string, React.CSSProperties> = {
-  overlay: {
-    position: 'fixed',
-    inset: 0,
-    backgroundColor: 'rgba(0,0,0,0.7)',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    zIndex: 1000,
-    padding: '20px',
-  },
   modal: {
     backgroundColor: '#1a1a2e',
     border: '1px solid #2a2a4e',
@@ -865,15 +827,6 @@ const modalStyles: Record<string, React.CSSProperties> = {
     fontWeight: 600,
     color: '#e0e0e0',
   },
-  closeBtn: {
-    backgroundColor: 'transparent',
-    border: 'none',
-    color: '#a0a0c0',
-    fontSize: '18px',
-    padding: '4px 8px',
-    borderRadius: '4px',
-    cursor: 'pointer',
-  },
   body: {
     padding: '24px',
     display: 'flex',
@@ -890,45 +843,10 @@ const modalStyles: Record<string, React.CSSProperties> = {
     fontSize: '13px',
     fontWeight: 500,
   },
-  input: {
-    padding: '10px 14px',
-    backgroundColor: '#0f0f23',
-    border: '1px solid #2a2a4e',
-    borderRadius: '8px',
-    color: '#e0e0e0',
-    fontSize: '14px',
-    outline: 'none',
-  },
-  primaryBtn: {
-    padding: '12px 20px',
-    backgroundColor: '#e94560',
-    border: 'none',
-    borderRadius: '8px',
-    color: '#ffffff',
-    fontSize: '15px',
-    fontWeight: 600,
-    transition: 'all 0.15s ease',
-    marginTop: '8px',
-  },
   modeToggle: {
     display: 'flex',
     gap: '8px',
     marginBottom: '8px',
-  },
-  modeBtn: {
-    flex: 1,
-    padding: '10px 16px',
-    backgroundColor: 'transparent',
-    border: '1px solid #2a2a4e',
-    borderRadius: '8px',
-    color: '#a0a0c0',
-    fontSize: '13px',
-    transition: 'all 0.15s ease',
-  },
-  modeBtnActive: {
-    backgroundColor: '#e94560',
-    borderColor: '#e94560',
-    color: '#ffffff',
   },
   timerDisplay: {
     textAlign: 'center',

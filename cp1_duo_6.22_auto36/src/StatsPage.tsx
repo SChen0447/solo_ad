@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { readingTracker, DailyReading } from './ReadingTracker';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import api, { Stats, DailyReading } from './api';
 
 interface StatsPageProps {
   refreshKey: number;
@@ -9,15 +9,22 @@ const AnimatedNumber: React.FC<{
   value: number;
   duration?: number;
   formatter?: (n: number) => string;
-}> = ({ value, duration = 300, formatter = (n) => Math.round(n).toString() }) => {
+}> = ({ value, duration = 300, formatter }) => {
   const [displayValue, setDisplayValue] = useState(value);
   const prevValue = useRef(value);
+  const animationRef = useRef<number | null>(null);
+
+  const defaultFormatter = useCallback((n: number) => Math.round(n).toString(), []);
+  const formatFn = formatter || defaultFormatter;
 
   useEffect(() => {
     const startValue = prevValue.current;
     const endValue = value;
     const startTime = performance.now();
-    let animationFrame: number;
+
+    if (animationRef.current) {
+      cancelAnimationFrame(animationRef.current);
+    }
 
     const animate = (now: number) => {
       const elapsed = now - startTime;
@@ -26,17 +33,21 @@ const AnimatedNumber: React.FC<{
       const currentValue = startValue + (endValue - startValue) * easeProgress;
       setDisplayValue(currentValue);
       if (progress < 1) {
-        animationFrame = requestAnimationFrame(animate);
+        animationRef.current = requestAnimationFrame(animate);
       } else {
         prevValue.current = endValue;
       }
     };
 
-    animationFrame = requestAnimationFrame(animate);
-    return () => cancelAnimationFrame(animationFrame);
+    animationRef.current = requestAnimationFrame(animate);
+    return () => {
+      if (animationRef.current) {
+        cancelAnimationFrame(animationRef.current);
+      }
+    };
   }, [value, duration]);
 
-  return <>{formatter(displayValue)}</>;
+  return <>{formatFn(displayValue)}</>;
 };
 
 const StatCard: React.FC<{
@@ -46,12 +57,8 @@ const StatCard: React.FC<{
   icon: string;
   formatter?: (n: number) => string;
 }> = ({ title, value, suffix, icon, formatter }) => {
-  const gradientStyle: React.CSSProperties = {
-    background: 'radial-gradient(circle at 30% 30%, #1a1a2e 0%, #16213e 100%)',
-  };
-
   return (
-    <div style={{ ...statCardStyles.card, ...gradientStyle }}>
+    <div className="stat-card">
       <div style={statCardStyles.iconWrap}>{icon}</div>
       <div style={statCardStyles.content}>
         <p style={statCardStyles.title}>{title}</p>
@@ -88,7 +95,7 @@ const ReadingChart: React.FC<{ data: DailyReading[] }> = ({ data }) => {
     const handleResize = () => {
       if (containerRef.current) {
         const rect = containerRef.current.getBoundingClientRect();
-        setCanvasSize({ width: rect.width, height: 320 });
+        setCanvasSize({ width: Math.max(rect.width, 300), height: 320 });
       }
     };
     handleResize();
@@ -96,28 +103,32 @@ const ReadingChart: React.FC<{ data: DailyReading[] }> = ({ data }) => {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  useEffect(() => {
+  const drawChart = useCallback(() => {
     const canvas = canvasRef.current;
-    if (!canvas) return;
+    if (!canvas || data.length === 0) return;
 
     const dpr = window.devicePixelRatio || 1;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    canvas.width = canvasSize.width * dpr;
-    canvas.height = canvasSize.height * dpr;
-    ctx.scale(dpr, dpr);
-
     const padding = { top: 40, right: 24, bottom: 50, left: 56 };
     const chartWidth = canvasSize.width - padding.left - padding.right;
     const chartHeight = canvasSize.height - padding.top - padding.bottom;
 
+    canvas.width = canvasSize.width * dpr;
+    canvas.height = canvasSize.height * dpr;
+    ctx.scale(dpr, dpr);
+
     ctx.clearRect(0, 0, canvasSize.width, canvasSize.height);
 
     ctx.fillStyle = '#1a1a2e';
-    ctx.beginPath();
-    ctx.roundRect(0, 0, canvasSize.width, canvasSize.height, 12);
-    ctx.fill();
+    if (typeof ctx.roundRect === 'function') {
+      ctx.beginPath();
+      ctx.roundRect(0, 0, canvasSize.width, canvasSize.height, 12);
+      ctx.fill();
+    } else {
+      ctx.fillRect(0, 0, canvasSize.width, canvasSize.height);
+    }
 
     ctx.strokeStyle = '#2a2a4e';
     ctx.lineWidth = 0.5;
@@ -167,16 +178,24 @@ const ReadingChart: React.FC<{ data: DailyReading[] }> = ({ data }) => {
       });
 
       ctx.fillStyle = color;
-      ctx.beginPath();
-      ctx.roundRect(x, y, barWidth, height, 3);
-      ctx.fill();
+      if (typeof ctx.roundRect === 'function') {
+        ctx.beginPath();
+        ctx.roundRect(x, y, barWidth, height, 3);
+        ctx.fill();
+      } else {
+        ctx.fillRect(x, y, barWidth, height);
+      }
 
       if (hoveredIndex === index) {
         ctx.strokeStyle = '#e94560';
         ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.roundRect(x - 1, y - 1, barWidth + 2, height + 2, 4);
-        ctx.stroke();
+        if (typeof ctx.roundRect === 'function') {
+          ctx.beginPath();
+          ctx.roundRect(x - 1, y - 1, barWidth + 2, height + 2, 4);
+          ctx.stroke();
+        } else {
+          ctx.strokeRect(x - 1, y - 1, barWidth + 2, height + 2);
+        }
       }
     });
 
@@ -195,6 +214,15 @@ const ReadingChart: React.FC<{ data: DailyReading[] }> = ({ data }) => {
       }
     });
   }, [data, canvasSize, hoveredIndex]);
+
+  useEffect(() => {
+    const startTime = performance.now();
+    drawChart();
+    const elapsed = performance.now() - startTime;
+    if (elapsed > 50) {
+      console.warn(`Canvas 渲染耗时: ${elapsed.toFixed(2)}ms，超过50ms阈值`);
+    }
+  }, [drawChart]);
 
   const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
@@ -229,11 +257,11 @@ const ReadingChart: React.FC<{ data: DailyReading[] }> = ({ data }) => {
     const h = Math.floor(seconds / 3600);
     const m = Math.floor((seconds % 3600) / 60);
     if (h > 0) return `${h}小时${m > 0 ? ` ${Math.round(m)}分钟` : ''}`;
-    return `${Math.round(m)}分钟';
+    return `${Math.round(m)}分钟`;
   };
 
   return (
-    <div ref={containerRef} style={chartStyles.container}>
+    <div ref={containerRef} className="chart-container">
       <div style={chartStyles.header}>
         <h3 style={chartStyles.title}>过去30天阅读时长</h3>
         <div style={chartStyles.legend}>
@@ -292,22 +320,37 @@ const ReadingChart: React.FC<{ data: DailyReading[] }> = ({ data }) => {
 };
 
 const StatsPage: React.FC<StatsPageProps> = ({ refreshKey }) => {
-  const [stats, setStats] = useState({
+  const [stats, setStats] = useState<Stats>({
     weeklyReadingTime: 0,
     monthlyPagesRead: 0,
     currentlyReadingCount: 0,
   });
   const [dailyReadings, setDailyReadings] = useState<DailyReading[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    setStats(readingTracker.getStats());
-    setDailyReadings(readingTracker.getLast30DaysReadings());
+    const loadData = async () => {
+      setLoading(true);
+      try {
+        const [s, d] = await Promise.all([
+          api.getStats(),
+          api.getDailyReadings(),
+        ]);
+        setStats(s);
+        setDailyReadings(d);
+      } catch (err) {
+        console.error('加载统计数据失败:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadData();
   }, [refreshKey]);
 
-  const formatHours = (seconds: number): string => {
+  const formatHours = useCallback((seconds: number): string => {
     const hours = seconds / 3600;
     return hours.toFixed(1);
-  };
+  }, []);
 
   const totalReadingTime = useMemo(() => {
     return dailyReadings.reduce((acc, d) => acc + d.duration, 0);
@@ -316,6 +359,15 @@ const StatsPage: React.FC<StatsPageProps> = ({ refreshKey }) => {
   const activeDays = useMemo(() => {
     return dailyReadings.filter(d => d.duration > 0).length;
   }, [dailyReadings]);
+
+  if (loading) {
+    return (
+      <div style={styles.loadingState}>
+        <div style={styles.loadingIcon}>⏳</div>
+        <p style={styles.loadingText}>加载统计数据中...</p>
+      </div>
+    );
+  }
 
   return (
     <div style={styles.container}>
@@ -347,31 +399,33 @@ const StatsPage: React.FC<StatsPageProps> = ({ refreshKey }) => {
       </div>
 
       <div style={styles.smallStatsRow}>
-        <div style={styles.smallStatCard}>
+        <div className="small-stat-card">
           <span style={styles.smallStatIcon}>📅</span>
           <div>
             <p style={styles.smallStatValue}>{activeDays}</p>
             <p style={styles.smallStatLabel}>30天活跃天数</p>
           </div>
         </div>
-        <div style={styles.smallStatCard}>
+        <div className="small-stat-card">
           <span style={styles.smallStatIcon}>🎯</span>
           <div>
             <p style={styles.smallStatValue}>{((activeDays / 30) * 100).toFixed(0)}%</p>
             <p style={styles.smallStatLabel}>30天阅读率</p>
           </div>
         </div>
-        <div style={styles.smallStatCard}>
+        <div className="small-stat-card">
           <span style={styles.smallStatIcon}>💪</span>
           <div>
             <p style={styles.smallStatValue}>{formatHours(totalReadingTime)}h</p>
             <p style={styles.smallStatLabel}>30天总时长</p>
           </div>
         </div>
-        <div style={styles.smallStatCard}>
+        <div className="small-stat-card">
           <span style={styles.smallStatIcon}>📖</span>
           <div>
-            <p style={styles.smallStatValue}>{dailyReadings.reduce((acc, d) => acc + d.books.length, 0)}</p>
+            <p style={styles.smallStatValue}>
+              {dailyReadings.reduce((acc, d) => acc + d.books.length, 0)}
+            </p>
             <p style={styles.smallStatLabel}>30天阅读书籍次</p>
           </div>
         </div>
@@ -412,16 +466,6 @@ const styles: Record<string, React.CSSProperties> = {
     gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
     gap: '16px',
   },
-  smallStatCard: {
-    backgroundColor: '#1a1a2e',
-    border: '1px solid #2a2a4e',
-    borderRadius: '12px',
-    padding: '16px 20px',
-    display: 'flex',
-    alignItems: 'center',
-    gap: '14px',
-    transition: 'all 0.2s ease',
-  },
   smallStatIcon: {
     fontSize: '28px',
   },
@@ -435,18 +479,21 @@ const styles: Record<string, React.CSSProperties> = {
     color: '#a0a0c0',
     marginTop: '2px',
   },
+  loadingState: {
+    textAlign: 'center',
+    padding: '100px 20px',
+  },
+  loadingIcon: {
+    fontSize: '48px',
+    marginBottom: '12px',
+  },
+  loadingText: {
+    color: '#a0a0c0',
+    fontSize: '16px',
+  },
 };
 
 const statCardStyles: Record<string, React.CSSProperties> = {
-  card: {
-    borderRadius: '12px',
-    padding: '24px',
-    border: '1px solid #2a2a4e',
-    display: 'flex',
-    alignItems: 'center',
-    gap: '20px',
-    transition: 'all 0.2s ease',
-  },
   iconWrap: {
     width: '56px',
     height: '56px',
@@ -486,14 +533,6 @@ const statCardStyles: Record<string, React.CSSProperties> = {
 };
 
 const chartStyles: Record<string, React.CSSProperties> = {
-  container: {
-    backgroundColor: '#1a1a2e',
-    border: '1px solid #2a2a4e',
-    borderRadius: '12px',
-    padding: '24px',
-    position: 'relative',
-    transition: 'all 0.2s ease',
-  },
   header: {
     display: 'flex',
     justifyContent: 'space-between',
@@ -527,6 +566,7 @@ const chartStyles: Record<string, React.CSSProperties> = {
     width: '100%',
     height: '320px',
     cursor: 'crosshair',
+    display: 'block',
   },
   tooltip: {
     position: 'fixed',
