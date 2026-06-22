@@ -7,11 +7,14 @@ import { perfTester } from '../utils/performance';
 interface FlowerSprite {
   container: Phaser.GameObjects.Container;
   graphics: Phaser.GameObjects.Graphics;
+  shadow: Phaser.GameObjects.Graphics;
+  hoverGlow: Phaser.GameObjects.Graphics;
   flower: FlowerData;
   originalX: number;
   originalY: number;
   isDragging: boolean;
   dragStartTime: number;
+  floatTween: Phaser.Tweens.Tween | null;
 }
 
 interface TreeNode {
@@ -236,6 +239,14 @@ export class GameScene extends Phaser.Scene {
     container.setSize(size * 1.2, size * 1.2);
     container.setInteractive({ useHandCursor: true, pixelPerfect: false });
     
+    const hoverGlow = this.add.graphics();
+    const glowColor = this.getFlowerColorHex(flower.color);
+    hoverGlow.lineStyle(3, glowColor, 0);
+    hoverGlow.strokeCircle(0, 0, size * 0.7);
+    hoverGlow.fillStyle(glowColor, 0);
+    hoverGlow.fillCircle(0, 0, size * 0.65);
+    container.add(hoverGlow);
+    
     const shadow = this.add.graphics();
     shadow.fillStyle(0x000000, 0);
     shadow.fillEllipse(0, size * 0.5, size * 0.6, size * 0.15);
@@ -245,14 +256,37 @@ export class GameScene extends Phaser.Scene {
     drawFlower(graphics, 0, 0, size, flower);
     container.add(graphics);
     
+    const floatAmount = Phaser.Math.Between(20, 30) / 10;
+    const floatDuration = Phaser.Math.Between(1500, 2000);
+    const floatDelay = Phaser.Math.Between(0, 500);
+    
+    const floatTween = this.tweens.addCounter({
+      from: 0,
+      to: 1,
+      duration: floatDuration,
+      delay: floatDelay,
+      yoyo: true,
+      repeat: -1,
+      ease: 'Sine.easeInOut',
+      onUpdate: (tween) => {
+        const t = tween.getValue() ?? 0;
+        const offsetY = (t - 0.5) * 2 * floatAmount;
+        graphics.y = offsetY;
+        shadow.y = -offsetY;
+      }
+    });
+    
     const flowerSprite: FlowerSprite = {
       container,
       graphics,
+      shadow,
+      hoverGlow,
       flower,
       originalX: x,
       originalY: y,
       isDragging: false,
-      dragStartTime: 0
+      dragStartTime: 0,
+      floatTween
     };
     
     container.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
@@ -266,6 +300,22 @@ export class GameScene extends Phaser.Scene {
         duration: 200,
         ease: 'Power2.Out'
       });
+      
+      this.tweens.add({
+        targets: hoverGlow,
+        alpha: { from: 0, to: 1 },
+        duration: 200,
+        ease: 'Power2.Out',
+        onUpdate: (tween) => {
+          const progress = tween.progress;
+          hoverGlow.clear();
+          hoverGlow.lineStyle(3, glowColor, progress * 0.5);
+          hoverGlow.strokeCircle(0, 0, size * 0.7);
+          hoverGlow.fillStyle(glowColor, progress * 0.15);
+          hoverGlow.fillCircle(0, 0, size * 0.65);
+        }
+      });
+      
       shadow.fillStyle(0x000000, 0.2);
       shadow.clear();
       shadow.fillEllipse(0, size * 0.55, size * 0.7, size * 0.2);
@@ -279,6 +329,29 @@ export class GameScene extends Phaser.Scene {
           duration: 200,
           ease: 'Power2.Out'
         });
+        
+        this.tweens.add({
+          targets: hoverGlow,
+          alpha: { from: 1, to: 0 },
+          duration: 200,
+          ease: 'Power2.Out',
+          onUpdate: (tween) => {
+            const progress = 1 - tween.progress;
+            hoverGlow.clear();
+            hoverGlow.lineStyle(3, glowColor, progress * 0.5);
+            hoverGlow.strokeCircle(0, 0, size * 0.7);
+            hoverGlow.fillStyle(glowColor, progress * 0.15);
+            hoverGlow.fillCircle(0, 0, size * 0.65);
+          },
+          onComplete: () => {
+            hoverGlow.clear();
+            hoverGlow.lineStyle(3, glowColor, 0);
+            hoverGlow.strokeCircle(0, 0, size * 0.7);
+            hoverGlow.fillStyle(glowColor, 0);
+            hoverGlow.fillCircle(0, 0, size * 0.65);
+          }
+        });
+        
         shadow.fillStyle(0x000000, 0);
         shadow.clear();
         shadow.fillEllipse(0, size * 0.5, size * 0.6, size * 0.15);
@@ -412,6 +485,10 @@ export class GameScene extends Phaser.Scene {
     }
     
     this.potContainer = this.add.container(potX, potY);
+    
+    const dashedRing = this.add.graphics();
+    this.drawDashedCircle(dashedRing, 0, -5, 90, 0xcccccc, 0.3, 5, 4);
+    this.potContainer.add(dashedRing);
     
     const potBg = this.add.graphics();
     potBg.fillStyle(0xffffff, 0.9);
@@ -1041,6 +1118,32 @@ export class GameScene extends Phaser.Scene {
           this.propertyPanel = null;
         }
       });
+    }
+  }
+
+  private drawDashedCircle(
+    graphics: Phaser.GameObjects.Graphics,
+    cx: number,
+    cy: number,
+    radius: number,
+    color: number,
+    alpha: number,
+    dashSize: number,
+    gapSize: number
+  ): void {
+    graphics.lineStyle(2, color, alpha);
+    
+    const circumference = 2 * Math.PI * radius;
+    const totalStep = dashSize + gapSize;
+    const segments = Math.ceil(circumference / totalStep);
+    
+    for (let i = 0; i < segments; i++) {
+      const startAngle = (i * totalStep) / radius;
+      const endAngle = startAngle + dashSize / radius;
+      
+      graphics.beginPath();
+      graphics.arc(cx, cy, radius, startAngle, endAngle, false);
+      graphics.strokePath();
     }
   }
 
