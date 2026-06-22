@@ -65,6 +65,13 @@ export class SkylineEffect {
   private isTransitioning: boolean = false;
 
   private starParticles: THREE.Points | null = null;
+  private starBaseBrightness: Float32Array | null = null;
+  private starPhases: Float32Array | null = null;
+  private starFrequencies: Float32Array | null = null;
+  private starTargetOpacity: number = 0.4;
+  private starStartOpacity: number = 0;
+  private starColorAttribute: THREE.BufferAttribute | null = null;
+  private lastStarUpdate: number = 0;
 
   constructor(scene: THREE.Scene, camera: THREE.PerspectiveCamera) {
     this.scene = scene;
@@ -133,35 +140,51 @@ export class SkylineEffect {
   }
 
   private setupStars(): void {
-    const starCount = 1000;
+    const starCount = 2000;
     const positions = new Float32Array(starCount * 3);
     const colors = new Float32Array(starCount * 3);
+
+    this.starBaseBrightness = new Float32Array(starCount);
+    this.starPhases = new Float32Array(starCount);
+    this.starFrequencies = new Float32Array(starCount);
 
     for (let i = 0; i < starCount; i++) {
       const theta = Math.random() * Math.PI * 2;
       const phi = Math.acos(2 * Math.random() - 1);
-      const radius = 900;
+      const radius = 900 + Math.random() * 100;
 
       positions[i * 3] = radius * Math.sin(phi) * Math.cos(theta);
       positions[i * 3 + 1] = Math.abs(radius * Math.cos(phi)) + 50;
       positions[i * 3 + 2] = radius * Math.sin(phi) * Math.sin(theta);
 
-      const brightness = 0.5 + Math.random() * 0.5;
+      const brightness = 0.3 + Math.random() * 0.7;
+      this.starBaseBrightness[i] = brightness;
       colors[i * 3] = brightness;
       colors[i * 3 + 1] = brightness;
       colors[i * 3 + 2] = brightness;
+
+      this.starPhases[i] = Math.random() * Math.PI * 2;
+      this.starFrequencies[i] = 0.2 + Math.random() * 0.8;
     }
 
     const starGeo = new THREE.BufferGeometry();
     starGeo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-    starGeo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+    this.starColorAttribute = new THREE.BufferAttribute(colors, 3);
+    starGeo.setAttribute('color', this.starColorAttribute);
+
+    const sizes = new Float32Array(starCount);
+    for (let i = 0; i < starCount; i++) {
+      sizes[i] = 1.0 + Math.random() * 1.5;
+    }
+    starGeo.setAttribute('size', new THREE.BufferAttribute(sizes, 1));
 
     const starMat = new THREE.PointsMaterial({
-      size: 1.5,
+      size: 2.0,
       vertexColors: true,
       transparent: true,
       opacity: 0,
-      depthWrite: false
+      depthWrite: false,
+      sizeAttenuation: true
     });
 
     this.starParticles = new THREE.Points(starGeo, starMat);
@@ -201,6 +224,11 @@ export class SkylineEffect {
       sunIntensity: sky.sunIntensity
     };
 
+    this.starStartOpacity = this.starParticles
+      ? (this.starParticles.material as THREE.PointsMaterial).opacity
+      : 0;
+    this.starTargetOpacity = theme === 'cyberpunk' ? 0.9 : theme === 'sunset' ? 0.5 : 0.25;
+
     this.transitionStart = performance.now();
     this.isTransitioning = true;
     this.currentTheme = theme;
@@ -236,7 +264,7 @@ export class SkylineEffect {
 
     if (this.starParticles) {
       const mat = this.starParticles.material as THREE.PointsMaterial;
-      mat.opacity = theme === 'cyberpunk' ? 0.8 : theme === 'sunset' ? 0.4 : 0.2;
+      mat.opacity = theme === 'cyberpunk' ? 0.9 : theme === 'sunset' ? 0.5 : 0.25;
     }
   }
 
@@ -282,13 +310,35 @@ export class SkylineEffect {
 
       if (this.starParticles) {
         const mat = this.starParticles.material as THREE.PointsMaterial;
-        const targetOpacity = this.currentTheme === 'cyberpunk' ? 0.8 : this.currentTheme === 'sunset' ? 0.4 : 0.2;
-        const startOpacity = this.currentTheme === 'cyberpunk' ? (this.startColors.top.r < 0.2 ? 0.8 : 0.4) : 0.2;
-        mat.opacity = startOpacity + (targetOpacity - startOpacity) * eased;
+        mat.opacity = this.starStartOpacity + (this.starTargetOpacity - this.starStartOpacity) * eased;
       }
 
       if (t >= 1) {
         this.isTransitioning = false;
+      }
+    }
+
+    if (time - this.lastStarUpdate >= 32) {
+      this.lastStarUpdate = time;
+      if (this.starParticles && this.starColorAttribute && this.starBaseBrightness &&
+          this.starPhases && this.starFrequencies) {
+        const t = time * 0.001;
+        const colors = this.starColorAttribute.array as Float32Array;
+        const starCount = colors.length / 3;
+
+        for (let i = 0; i < starCount; i++) {
+          const base = this.starBaseBrightness[i];
+          const freq = this.starFrequencies[i];
+          const phase = this.starPhases[i];
+          const twinkle = 0.75 + 0.25 * Math.sin(t * freq + phase);
+          const brightness = base * twinkle;
+
+          colors[i * 3] = brightness;
+          colors[i * 3 + 1] = brightness;
+          colors[i * 3 + 2] = brightness;
+        }
+
+        this.starColorAttribute.needsUpdate = true;
       }
     }
 

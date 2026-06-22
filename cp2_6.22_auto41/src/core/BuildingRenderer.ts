@@ -133,27 +133,39 @@ const THEME_STYLES: Record<ColorTheme, {
   windowGlow: number;
   edgeColor: THREE.Color;
   edgeOpacity: number;
+  roofLightColor: THREE.Color;
+  roofLightMinIntensity: number;
+  roofLightMaxIntensity: number;
 }> = {
   sunset: {
     windowOn: new THREE.Color(0xffcc66),
     windowOff: new THREE.Color(0x2a2a3a),
     windowGlow: 0.8,
     edgeColor: new THREE.Color(0xff8844),
-    edgeOpacity: 0.6
+    edgeOpacity: 0.6,
+    roofLightColor: new THREE.Color(0xffeedd),
+    roofLightMinIntensity: 0.3,
+    roofLightMaxIntensity: 1.0
   },
   cyberpunk: {
     windowOn: new THREE.Color(0x88ffff),
     windowOff: new THREE.Color(0x1a0a2a),
     windowGlow: 1.2,
     edgeColor: new THREE.Color(0xaa44ff),
-    edgeOpacity: 0.8
+    edgeOpacity: 0.8,
+    roofLightColor: new THREE.Color(0xffff88),
+    roofLightMinIntensity: 0.2,
+    roofLightMaxIntensity: 1.2
   },
   ice: {
     windowOn: new THREE.Color(0xbbeeff),
     windowOff: new THREE.Color(0x3a4a5a),
     windowGlow: 0.5,
     edgeColor: new THREE.Color(0x88ccff),
-    edgeOpacity: 0.5
+    edgeOpacity: 0.5,
+    roofLightColor: new THREE.Color(0xffffff),
+    roofLightMinIntensity: 0.4,
+    roofLightMaxIntensity: 0.9
   }
 };
 
@@ -171,6 +183,12 @@ export class BuildingRenderer {
 
   private buildingMaterial: THREE.ShaderMaterial | null = null;
   private edgeMaterial: THREE.LineBasicMaterial | null = null;
+
+  private roofLightsMesh: THREE.InstancedMesh | null = null;
+  private roofLightMaterial: THREE.MeshBasicMaterial | null = null;
+  private roofLightData: { frequency: number; phase: number; baseIntensity: number; offsetX: number; offsetZ: number }[] = [];
+  private startRoofLightColor: THREE.Color | null = null;
+  private targetRoofLightColor: THREE.Color | null = null;
 
   private dummy: THREE.Object3D;
   private buildingData: Building[] = [];
@@ -258,6 +276,10 @@ export class BuildingRenderer {
       color: initStyle.edgeColor.clone(),
       transparent: true,
       opacity: initStyle.edgeOpacity
+    });
+
+    this.roofLightMaterial = new THREE.MeshBasicMaterial({
+      color: initStyle.roofLightColor.clone()
     });
 
     this.ambientLight = new THREE.AmbientLight(0x404050, 0.6);
@@ -468,11 +490,16 @@ export class BuildingRenderer {
     this.startWindowOn = currentStyle.windowOn.clone();
     this.startWindowOff = currentStyle.windowOff.clone();
     this.startWindowGlow = currentStyle.windowGlow;
+    this.startRoofLightColor = currentStyle.roofLightColor.clone();
+    this.targetRoofLightColor = newStyle.roofLightColor.clone();
 
     if (this.buildingMaterial) {
       this.buildingMaterial.uniforms.themeWindowOn.value = currentStyle.windowOn.clone();
       this.buildingMaterial.uniforms.themeWindowOff.value = currentStyle.windowOff.clone();
       this.buildingMaterial.uniforms.themeWindowGlow.value = currentStyle.windowGlow;
+    }
+    if (this.roofLightMaterial) {
+      this.roofLightMaterial.color = currentStyle.roofLightColor.clone();
     }
 
     this.themeTransitionStart = performance.now();
@@ -525,6 +552,11 @@ export class BuildingRenderer {
       this.scene.remove(this.buildingEdges);
       this.buildingEdges.geometry.dispose();
       this.buildingEdges = null;
+    }
+    if (this.roofLightsMesh) {
+      this.scene.remove(this.roofLightsMesh);
+      this.roofLightsMesh.geometry.dispose();
+      this.roofLightsMesh = null;
     }
 
     if (buildings.length === 0) return;
@@ -584,6 +616,7 @@ export class BuildingRenderer {
     this.scene.add(this.buildingsMesh);
 
     this.setupBuildingEdges(buildings);
+    this.setupRoofLights(buildings);
 
     this.animationState = {
       progress: 0,
@@ -615,6 +648,44 @@ export class BuildingRenderer {
 
     this.buildingEdges.instanceMatrix.needsUpdate = true;
     this.scene.add(this.buildingEdges);
+  }
+
+  private setupRoofLights(buildings: Building[]): void {
+    this.roofLightData = [];
+    const lightCount = buildings.length;
+
+    const lightGeo = new THREE.BoxGeometry(1.5, 1.5, 1.5);
+    this.roofLightsMesh = new THREE.InstancedMesh(lightGeo, this.roofLightMaterial!, lightCount);
+
+    for (let i = 0; i < buildings.length; i++) {
+      const b = buildings[i];
+      const seed = hash2(b.id, b.id * 7.77);
+      const seed2 = hash2(b.id + 1000, b.z * 3.33);
+
+      const numLights = 1 + Math.floor(seed * 3);
+      const frequency = 0.5 + seed * 2.5;
+      const phase = seed2 * Math.PI * 2;
+      const baseIntensity = 0.7 + seed * 0.3;
+
+      const offsetX = (seed - 0.5) * b.width * 0.6;
+      const offsetZ = (seed2 - 0.5) * b.depth * 0.6;
+
+      this.roofLightData.push({
+        frequency,
+        phase,
+        baseIntensity,
+        offsetX,
+        offsetZ
+      });
+
+      this.dummy.position.set(b.x + offsetX, b.height + 1, b.z + offsetZ);
+      this.dummy.scale.set(1, 1, 1);
+      this.dummy.updateMatrix();
+      this.roofLightsMesh.setMatrixAt(i, this.dummy.matrix);
+    }
+
+    this.roofLightsMesh.instanceMatrix.needsUpdate = true;
+    this.scene.add(this.roofLightsMesh);
   }
 
   private updateCameraPosition(): void {
@@ -674,7 +745,8 @@ export class BuildingRenderer {
       }
 
       if (this.buildingMaterial && this.startEdgeColor && this.targetEdgeColor &&
-          this.startWindowOn && this.startWindowOff) {
+          this.startWindowOn && this.startWindowOff &&
+          this.startRoofLightColor && this.targetRoofLightColor) {
         const targetStyle = THEME_STYLES[this.currentTheme];
 
         const mat = this.buildingMaterial;
@@ -685,6 +757,10 @@ export class BuildingRenderer {
         if (this.edgeMaterial) {
           this.edgeMaterial.color.lerpColors(this.startEdgeColor, this.targetEdgeColor, eased);
           this.edgeMaterial.opacity = this.startEdgeOpacity + (targetStyle.edgeOpacity - this.startEdgeOpacity) * eased;
+        }
+
+        if (this.roofLightMaterial) {
+          this.roofLightMaterial.color.lerpColors(this.startRoofLightColor, this.targetRoofLightColor, eased);
         }
       }
 
@@ -699,6 +775,9 @@ export class BuildingRenderer {
         if (this.edgeMaterial && this.targetEdgeColor) {
           this.edgeMaterial.color.copy(this.targetEdgeColor);
           this.edgeMaterial.opacity = targetStyle.edgeOpacity;
+        }
+        if (this.roofLightMaterial && this.targetRoofLightColor) {
+          this.roofLightMaterial.color.copy(this.targetRoofLightColor);
         }
       }
     }
@@ -718,10 +797,21 @@ export class BuildingRenderer {
         if (this.buildingEdges) {
           this.buildingEdges.setMatrixAt(i, this.dummy.matrix);
         }
+
+        if (this.roofLightsMesh && i < this.roofLightData.length) {
+          const rd = this.roofLightData[i];
+          this.dummy.position.set(b.x + rd.offsetX, h + 1, b.z + rd.offsetZ);
+          this.dummy.scale.set(1, 1, 1);
+          this.dummy.updateMatrix();
+          this.roofLightsMesh.setMatrixAt(i, this.dummy.matrix);
+        }
       }
       this.buildingsMesh.instanceMatrix.needsUpdate = true;
       if (this.buildingEdges) {
         this.buildingEdges.instanceMatrix.needsUpdate = true;
+      }
+      if (this.roofLightsMesh) {
+        this.roofLightsMesh.instanceMatrix.needsUpdate = true;
       }
 
       if (t >= 1) {
@@ -735,6 +825,26 @@ export class BuildingRenderer {
       const phase = (light as any).phase;
       const base = (light as any).baseIntensity;
       light.intensity = base * (0.3 + 0.7 * (0.5 + 0.5 * Math.sin(this.lightAnimationTime * freq + phase)));
+    }
+
+    if (this.roofLightsMesh && this.roofLightMaterial) {
+      const style = THEME_STYLES[this.currentTheme];
+      for (let i = 0; i < this.roofLightData.length; i++) {
+        const rd = this.roofLightData[i];
+        const brightness = style.roofLightMinIntensity +
+          (style.roofLightMaxIntensity - style.roofLightMinIntensity) *
+          (0.5 + 0.5 * Math.sin(this.lightAnimationTime * rd.frequency + rd.phase));
+        this.dummy.position.set(
+          this.buildingData[i].x + rd.offsetX,
+          this.buildingData[i].height + 1,
+          this.buildingData[i].z + rd.offsetZ
+        );
+        const s = 0.5 + brightness * 0.8;
+        this.dummy.scale.set(s, s, s);
+        this.dummy.updateMatrix();
+        this.roofLightsMesh.setMatrixAt(i, this.dummy.matrix);
+      }
+      this.roofLightsMesh.instanceMatrix.needsUpdate = true;
     }
 
     this.updateCameraPosition();
