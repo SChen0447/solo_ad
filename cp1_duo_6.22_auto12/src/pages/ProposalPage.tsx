@@ -246,6 +246,41 @@ const ProposalPreview: React.FC<{
         onTransitionEnd={onFlipEnd}
       >
         <div className="preview-card-front">
+          <div className="preview-pdf-toolbar">
+            <div className="preview-pdf-title">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                <polyline points="14 2 14 8 20 8" />
+              </svg>
+              <span>{title || '项目报价单'}.pdf</span>
+            </div>
+            <div className="preview-pdf-actions">
+              <button className="preview-pdf-icon-btn" title="打印">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="6 9 6 2 18 2 18 9" />
+                  <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
+                  <rect x="6" y="14" width="12" height="8" />
+                </svg>
+              </button>
+              <button className="preview-pdf-icon-btn" title="下载">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                  <polyline points="7 10 12 15 17 10" />
+                  <line x1="12" y1="15" x2="12" y2="3" />
+                </svg>
+              </button>
+              <button className="preview-pdf-icon-btn" title="分享">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="18" cy="5" r="3" />
+                  <circle cx="6" cy="12" r="3" />
+                  <circle cx="18" cy="19" r="3" />
+                  <line x1="8.59" y1="13.51" x2="15.42" y2="17.49" />
+                  <line x1="15.41" y1="6.51" x2="8.59" y2="10.49" />
+                </svg>
+              </button>
+            </div>
+          </div>
+
           <div className="preview-header">
             <h2 className="preview-title">{title || '项目报价单'}</h2>
             <p className="preview-subtitle">QUOTATION · 专业服务报价</p>
@@ -263,7 +298,8 @@ const ProposalPreview: React.FC<{
                   {companyEmail || '公司邮箱'}
                 </div>
               </div>
-              <div className="preview-info-block" style={{ textAlign: 'right' }}>
+              <div className="preview-info-divider" />
+              <div className="preview-info-block preview-info-right">
                 <div className="preview-info-label">客户信息</div>
                 <div className="preview-info-name">{clientName || '客户姓名'}</div>
                 <div className="preview-info-detail">
@@ -310,10 +346,12 @@ const ProposalPreview: React.FC<{
               </tbody>
             </table>
 
-            <div className="preview-total-box">
-              <span className="preview-total-label">报价总计</span>
+            <div className="preview-total-row">
+              <span className="preview-total-label">总计：</span>
               <span className="preview-total-value">{formatCurrency(total)}</span>
             </div>
+
+            <div className="preview-watermark">Proposal Manager</div>
           </div>
           <div className="preview-footer">
             感谢您的信任与支持 · 本报价单有效期30天 · 如有疑问请随时联系
