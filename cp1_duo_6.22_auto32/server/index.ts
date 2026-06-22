@@ -12,13 +12,21 @@ app.use(express.json());
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
-    origin: 'http://localhost:5173',
+    origin: [/http:\/\/localhost:\d+$/, /http:\/\/127\.0\.0\.1:\d+$/],
     methods: ['GET', 'POST'],
   },
 });
 
-const USERNAMES = ['小熊猫', '独角兽', '北极星', '彩虹糖', '小海豚', '萤火虫', '云之君', '咖啡豆', '小蜜蜂', '月亮船'];
-const COLORS = ['#ff4757', '#ffa502', '#2ed573', '#1e90ff', '#a55eea', '#ff6b81', '#00d2d3', '#54a0ff', '#5f27cd', '#ff9ff3', '#ff6348', '#48dbfb'];
+const USERNAMES = [
+  '小熊猫', '独角兽', '北极星', '彩虹糖', '小海豚',
+  '萤火虫', '云之君', '咖啡豆', '小蜜蜂', '月亮船',
+  '星辰', '蓝鲸', '火烈鸟', '雪狐', '紫蝶',
+];
+const COLORS = [
+  '#ff4757', '#ffa502', '#2ed573', '#1e90ff', '#a55eea',
+  '#ff6b81', '#00d2d3', '#54a0ff', '#5f27cd', '#ff9ff3',
+  '#ff6348', '#48dbfb',
+];
 
 let elements: WhiteboardElement[] = [];
 const users: Map<string, User> = new Map();
@@ -41,6 +49,8 @@ io.on('connection', (socket) => {
     cursor: { x: 0, y: 0 },
   };
   users.set(userId, user);
+
+  console.log(`User connected: ${user.name} (${userId})`);
 
   socket.emit('init', {
     user,
@@ -65,9 +75,9 @@ io.on('connection', (socket) => {
   });
 
   socket.on('draw:continue', (data: { id: string; point: Point }) => {
-    const el = elements.find((e) => e.id === data.id) as any;
+    const el = elements.find((e) => e.id === data.id);
     if (el && el.type === 'path') {
-      el.points.push(data.point);
+      (el as any).points.push(data.point);
     }
     socket.broadcast.emit('draw:continue', data);
   });
@@ -114,9 +124,14 @@ io.on('connection', (socket) => {
   });
 
   socket.on('disconnect', () => {
+    console.log(`User disconnected: ${userId}`);
     users.delete(userId);
     socket.broadcast.emit('user:leave', { userId });
   });
+});
+
+app.get('/health', (_req, res) => {
+  res.json({ status: 'ok', users: users.size, elements: elements.length, snapshots: snapshots.length });
 });
 
 const PORT = 3001;
