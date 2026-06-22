@@ -3,12 +3,12 @@ import { Image, ChevronLeft, ChevronRight, X, Sparkles } from 'lucide-react';
 import { useAppStore } from '../store';
 import type { Photo } from '../types';
 
-function useLazyLoad(): [React.RefObject<HTMLDivElement | null>, boolean] {
-  const ref = useRef<HTMLDivElement | null>(null);
+function useLazyLoad(): [React.RefCallback<HTMLDivElement>, boolean] {
   const [isVisible, setIsVisible] = useState(false);
+  const elRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
-    const el = ref.current;
+    const el = elRef.current;
     if (!el) return;
 
     const observer = new IntersectionObserver(
@@ -25,9 +25,25 @@ function useLazyLoad(): [React.RefObject<HTMLDivElement | null>, boolean] {
 
     observer.observe(el);
     return () => observer.disconnect();
-  }, []);
+  }, [isVisible]);
 
-  return [ref, isVisible];
+  const callbackRef = useCallback((node: HTMLDivElement | null) => {
+    elRef.current = node;
+    if (node && !isVisible) {
+      const observer = new IntersectionObserver(
+        ([entry]) => {
+          if (entry.isIntersecting) {
+            setTimeout(() => setIsVisible(true), 100);
+            observer.unobserve(node);
+          }
+        },
+        { rootMargin: '200px', threshold: 0.01 }
+      );
+      observer.observe(node);
+    }
+  }, [isVisible]);
+
+  return [callbackRef, isVisible];
 }
 
 function PhotoCard({ photo, onClick }: { photo: Photo; onClick: () => void }) {
@@ -257,7 +273,6 @@ function FullscreenViewer({
             transition:
               'transform 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94), opacity 0.4s ease-out',
             userSelect: 'none',
-            WebkitUserDrag: 'none',
             pointerEvents: 'none',
           }}
           onLoad={() => setImageLoaded(true)}

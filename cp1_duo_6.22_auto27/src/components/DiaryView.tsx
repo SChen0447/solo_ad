@@ -1,7 +1,17 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { Plus, Trash2, Bold, Italic, ImageIcon, MapPin, Clock } from 'lucide-react';
+import { Plus, Trash2, Bold, Italic, ImageIcon, MapPin, Clock, Minus, ListChecks, CheckSquare } from 'lucide-react';
 import { useAppStore } from '../store';
 import type { DiaryEntry, Spot } from '../types';
+
+function parseTodoProgress(html: string): { total: number; done: number } | null {
+  if (!html) return null;
+  const checkboxRegex = /class="todo-check"/g;
+  const checkedRegex = /class="todo-check todo-checked"/g;
+  const total = (html.match(checkboxRegex) || []).length;
+  if (total === 0) return null;
+  const done = (html.match(checkedRegex) || []).length;
+  return { total, done };
+}
 
 interface DiaryItemProps {
   diary: DiaryEntry;
@@ -16,6 +26,8 @@ const DiaryItem = React.memo(function DiaryItem({ diary, isSelected, onSelect, o
     const pad = (n: number) => String(n).padStart(2, '0');
     return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
   }, [diary.createdAt]);
+
+  const todoProgress = useMemo(() => parseTodoProgress(diary.content), [diary.content]);
 
   return (
     <div
@@ -56,6 +68,25 @@ const DiaryItem = React.memo(function DiaryItem({ diary, isSelected, onSelect, o
             <MapPin size={11} />
             <span>{diary.lat.toFixed(4)}, {diary.lng.toFixed(4)}</span>
           </div>
+          {todoProgress && (
+            <div
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 4,
+                marginTop: 6,
+                padding: '2px 8px',
+                borderRadius: 10,
+                fontSize: 11,
+                fontWeight: 500,
+                background: todoProgress.done === todoProgress.total ? 'rgba(46, 204, 113, 0.15)' : 'rgba(52, 152, 219, 0.12)',
+                color: todoProgress.done === todoProgress.total ? '#27ae60' : '#3498db',
+              }}
+            >
+              <CheckSquare size={10} />
+              {todoProgress.done}/{todoProgress.total} 已完成
+            </div>
+          )}
         </div>
         <button
           onClick={(e) => { e.stopPropagation(); onDelete(diary.id); }}
@@ -206,6 +237,68 @@ export default function DiaryView() {
     input.click();
   }, [uploadImage, handleContentChange]);
 
+  const handleInsertHr = useCallback(() => {
+    const editor = editorRef.current;
+    if (!editor) return;
+    editor.focus();
+    document.execCommand(
+      'insertHTML',
+      false,
+      '<hr style="border:none;border-top:2px solid #e8dcc8;margin:12px 0;" />'
+    );
+    handleContentChange();
+  }, [handleContentChange]);
+
+  const handleInsertTodo = useCallback(() => {
+    const editor = editorRef.current;
+    if (!editor) return;
+    editor.focus();
+    const todoHtml =
+      '<div class="todo-item" style="display:flex;align-items:flex-start;gap:8px;padding:4px 0;">' +
+        '<span class="todo-check" contenteditable="false" style="' +
+          'display:inline-flex;align-items:center;justify-content:center;' +
+          'width:18px;height:18px;min-width:18px;border:2px solid #bdc3c7;border-radius:4px;' +
+          'cursor:pointer;margin-top:3px;font-size:11px;color:transparent;' +
+          'transition:all 0.2s;' +
+        '" onclick="this.classList.toggle(\'todo-checked\');this.style.background=this.classList.contains(\'todo-checked\')?\'#3498db\':\'transparent\';this.style.borderColor=this.classList.contains(\'todo-checked\')?\'#3498db\':\'#bdc3c7\';this.style.color=this.classList.contains(\'todo-checked\')?\'white\':\'transparent\';">&#10003;</span>' +
+        '<span style="flex:1;line-height:1.6;">待办事项</span>' +
+      '</div>';
+    document.execCommand('insertHTML', false, todoHtml);
+    handleContentChange();
+  }, [handleContentChange]);
+
+  const handleEditorClick = useCallback(
+    (e: React.MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (target.classList.contains('todo-check')) {
+        e.preventDefault();
+        e.stopPropagation();
+        const isChecked = target.classList.contains('todo-checked');
+        if (isChecked) {
+          target.classList.remove('todo-checked');
+          target.style.background = 'transparent';
+          target.style.borderColor = '#bdc3c7';
+          target.style.color = 'transparent';
+        } else {
+          target.classList.add('todo-checked');
+          target.style.background = '#3498db';
+          target.style.borderColor = '#3498db';
+          target.style.color = 'white';
+        }
+        const todoItem = target.closest('.todo-item');
+        if (todoItem) {
+          const textSpan = todoItem.querySelector('span:last-child') as HTMLSpanElement | null;
+          if (textSpan) {
+            textSpan.style.textDecoration = isChecked ? 'none' : 'line-through';
+            textSpan.style.color = isChecked ? '#2c3e50' : '#95a5a6';
+          }
+        }
+        setTimeout(() => handleContentChange(), 50);
+      }
+    },
+    [handleContentChange]
+  );
+
   const handleCreateDiary = useCallback(async (spot: Spot) => {
     if (!state.currentTripId) return;
     await createDiary(state.currentTripId, {
@@ -239,6 +332,46 @@ export default function DiaryView() {
           .diary-layout { flex-direction: column !important; }
           .diary-left { width: 100% !important; min-width: unset !important; max-height: 40vh; border-right: none !important; border-bottom: 1px solid #e8dcc8; }
           .diary-right { width: 100% !important; }
+        }
+        .diary-editor hr {
+          border: none;
+          border-top: 2px solid #e8dcc8;
+          margin: 12px 0;
+        }
+        .diary-editor .todo-item {
+          display: flex;
+          align-items: flex-start;
+          gap: 8px;
+          padding: 4px 0;
+        }
+        .diary-editor .todo-check {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          width: 18px;
+          height: 18px;
+          min-width: 18px;
+          border: 2px solid #bdc3c7;
+          border-radius: 4px;
+          cursor: pointer;
+          margin-top: 3px;
+          font-size: 11px;
+          color: transparent;
+          transition: all 0.2s;
+          background: transparent;
+          line-height: 1;
+        }
+        .diary-editor .todo-check:hover {
+          border-color: #3498db;
+        }
+        .diary-editor .todo-check.todo-checked {
+          background: #3498db;
+          border-color: #3498db;
+          color: white;
+        }
+        .diary-editor .todo-item.todo-done > span:last-child {
+          text-decoration: line-through;
+          color: #95a5a6;
         }
       `}</style>
       <div
@@ -382,6 +515,7 @@ export default function DiaryView() {
                 background: 'white',
                 borderRadius: 8,
                 boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
+                flexWrap: 'wrap' as const,
               }}
             >
               <button onClick={handleBold} style={toolbarBtnStyle} title="加粗">
@@ -390,6 +524,14 @@ export default function DiaryView() {
               <button onClick={handleItalic} style={toolbarBtnStyle} title="斜体">
                 <Italic size={14} />
               </button>
+              <div style={{ width: 1, background: '#e8dcc8', margin: '0 2px' }} />
+              <button onClick={handleInsertHr} style={toolbarBtnStyle} title="插入分隔线">
+                <Minus size={14} />
+              </button>
+              <button onClick={handleInsertTodo} style={toolbarBtnStyle} title="插入待办事项">
+                <ListChecks size={14} />
+              </button>
+              <div style={{ width: 1, background: '#e8dcc8', margin: '0 2px' }} />
               <button onClick={handleInsertImage} style={toolbarBtnStyle} title="插入图片">
                 <ImageIcon size={14} />
               </button>
@@ -399,6 +541,8 @@ export default function DiaryView() {
               ref={editorRef}
               contentEditable
               onInput={handleContentChange}
+              onClick={handleEditorClick}
+              className="diary-editor"
               style={{
                 flex: 1,
                 background: 'white',
