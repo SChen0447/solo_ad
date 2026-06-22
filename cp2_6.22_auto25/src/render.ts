@@ -7,6 +7,7 @@ import { createInteraction, updateInteraction, InteractionState } from './intera
 
 const FPS_ELEMENT = document.getElementById('fps-counter')!;
 const PERF_ELEMENT = document.getElementById('perf-mode')!;
+const TWINKLE_ELEMENT = document.getElementById('twinkle-status')!;
 
 let scene: THREE.Scene;
 let camera: THREE.PerspectiveCamera;
@@ -53,6 +54,12 @@ function init(): void {
   composer.addPass(bloomPass);
 
   interaction = createInteraction(camera, renderer.domElement);
+  interaction.onTwinkleToggle = (enabled: boolean) => {
+    TWINKLE_ELEMENT.textContent = `Twinkle: ${enabled ? 'ON' : 'OFF'}`;
+    if (!enabled) {
+      resetTwinkleColors();
+    }
+  };
 
   galaxy = createGalaxy(DEFAULT_CONFIG);
   scene.add(galaxy.group);
@@ -98,6 +105,77 @@ function switchToPerformanceMode(): void {
   scene.add(galaxy.group);
 }
 
+function updateTwinkle(time: number): void {
+  if (!interaction.twinkleEnabled) return;
+
+  const coreColorAttr = galaxy.corePoints.geometry.getAttribute('color') as THREE.BufferAttribute;
+  const coreColors = coreColorAttr.array as Float32Array;
+  const coreBase = galaxy.coreTwinkle.baseColors;
+  const corePhases = galaxy.coreTwinkle.phases;
+  const coreFreqs = galaxy.coreTwinkle.frequencies;
+  const coreAmps = galaxy.coreTwinkle.amplitudes;
+
+  for (let i = 0; i < coreBase.length / 3; i++) {
+    const phase = corePhases[i];
+    const freq = coreFreqs[i];
+    const amp = coreAmps[i];
+    const twinkle = 1.0 + amp * Math.sin(2 * Math.PI * freq * time + phase);
+
+    const idx = i * 3;
+    coreColors[idx] = coreBase[idx] * twinkle;
+    coreColors[idx + 1] = coreBase[idx + 1] * twinkle;
+    coreColors[idx + 2] = coreBase[idx + 2] * twinkle;
+  }
+  coreColorAttr.needsUpdate = true;
+
+  const armColorAttr = galaxy.armPoints.geometry.getAttribute('color') as THREE.BufferAttribute;
+  const armColors = armColorAttr.array as Float32Array;
+  const armBase = galaxy.armTwinkle.baseColors;
+  const armPhases = galaxy.armTwinkle.phases;
+  const armFreqs = galaxy.armTwinkle.frequencies;
+  const armAmps = galaxy.armTwinkle.amplitudes;
+  const armMask = galaxy.armTwinkle.mask;
+
+  for (let i = 0; i < armBase.length / 3; i++) {
+    if (!armMask[i]) {
+      const idx = i * 3;
+      armColors[idx] = armBase[idx];
+      armColors[idx + 1] = armBase[idx + 1];
+      armColors[idx + 2] = armBase[idx + 2];
+      continue;
+    }
+
+    const phase = armPhases[i];
+    const freq = armFreqs[i];
+    const amp = armAmps[i];
+    const twinkle = 1.0 + amp * Math.sin(2 * Math.PI * freq * time + phase);
+
+    const idx = i * 3;
+    armColors[idx] = armBase[idx] * twinkle;
+    armColors[idx + 1] = armBase[idx + 1] * twinkle;
+    armColors[idx + 2] = armBase[idx + 2] * twinkle;
+  }
+  armColorAttr.needsUpdate = true;
+}
+
+function resetTwinkleColors(): void {
+  const coreColorAttr = galaxy.corePoints.geometry.getAttribute('color') as THREE.BufferAttribute;
+  const coreColors = coreColorAttr.array as Float32Array;
+  const coreBase = galaxy.coreTwinkle.baseColors;
+  for (let i = 0; i < coreBase.length; i++) {
+    coreColors[i] = coreBase[i];
+  }
+  coreColorAttr.needsUpdate = true;
+
+  const armColorAttr = galaxy.armPoints.geometry.getAttribute('color') as THREE.BufferAttribute;
+  const armColors = armColorAttr.array as Float32Array;
+  const armBase = galaxy.armTwinkle.baseColors;
+  for (let i = 0; i < armBase.length; i++) {
+    armColors[i] = armBase[i];
+  }
+  armColorAttr.needsUpdate = true;
+}
+
 let frameCount = 0;
 let fpsTime = 0;
 
@@ -109,6 +187,7 @@ function animate(): void {
 
   galaxy.update(delta);
   updateInteraction(interaction, delta);
+  updateTwinkle(elapsed);
 
   composer.render();
 

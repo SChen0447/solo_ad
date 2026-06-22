@@ -43,11 +43,23 @@
       user-select: none;
       display: none;
     }
+    #twinkle-status {
+      position: fixed;
+      top: 50px;
+      right: 10px;
+      font-size: 12px;
+      color: #00BFFF;
+      font-family: monospace;
+      z-index: 100;
+      pointer-events: none;
+      user-select: none;
+    }
   </style>
 </head>
 <body>
   <div id="fps-counter">FPS: --</div>
   <div id="perf-mode">Performance Mode</div>
+  <div id="twinkle-status">Twinkle: ON</div>
   <script type="module" src="/src/render.ts"></script>
 </body>
 </html>

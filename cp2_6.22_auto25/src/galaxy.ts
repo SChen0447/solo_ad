@@ -204,6 +204,23 @@ export interface GalaxyGroup {
   group: THREE.Group;
   galaxyGroup: THREE.Group;
   bgStars: THREE.Points;
+  corePoints: THREE.Points;
+  armPoints: THREE.Points;
+  coreTwinkle: {
+    baseSizes: Float32Array;
+    phases: Float32Array;
+    frequencies: Float32Array;
+    amplitudes: Float32Array;
+    baseColors: Float32Array;
+  };
+  armTwinkle: {
+    baseSizes: Float32Array;
+    phases: Float32Array;
+    frequencies: Float32Array;
+    amplitudes: Float32Array;
+    baseColors: Float32Array;
+    mask: Uint8Array;
+  };
   update: (delta: number) => void;
 }
 
@@ -213,9 +230,17 @@ export function createGalaxy(config: GalaxyConfig = DEFAULT_CONFIG): GalaxyGroup
 
   const corePositions = computeCorePositions(config.coreParticleCount, config.coreRadius);
   const coreColors = computeCoreColors(config.coreParticleCount, config.coreRadius, corePositions);
+  const coreTwinklePhases = new Float32Array(config.coreParticleCount);
+  const coreTwinkleFreqs = new Float32Array(config.coreParticleCount);
+  const coreTwinkleAmps = new Float32Array(config.coreParticleCount);
+  for (let i = 0; i < config.coreParticleCount; i++) {
+    coreTwinklePhases[i] = Math.random() * Math.PI * 2;
+    coreTwinkleFreqs[i] = 0.5 + Math.random() * 1.5;
+    coreTwinkleAmps[i] = 0.3 + Math.random() * 0.2;
+  }
   const coreGeom = new THREE.BufferGeometry();
   coreGeom.setAttribute('position', new THREE.BufferAttribute(corePositions, 3));
-  coreGeom.setAttribute('color', new THREE.BufferAttribute(coreColors, 3));
+  coreGeom.setAttribute('color', new THREE.BufferAttribute(new Float32Array(coreColors), 3));
   const coreMat = new THREE.PointsMaterial({
     size: 0.08,
     vertexColors: true,
@@ -243,9 +268,29 @@ export function createGalaxy(config: GalaxyConfig = DEFAULT_CONFIG): GalaxyGroup
     config.armLength
   );
   const armSizes = computeArmSizes(config.armCount, config.armParticleCount);
+  const armTotal = config.armCount * config.armParticleCount;
+  const armTwinklePhases = new Float32Array(armTotal);
+  const armTwinkleFreqs = new Float32Array(armTotal);
+  const armTwinkleAmps = new Float32Array(armTotal);
+  const armTwinkleMask = new Uint8Array(armTotal);
+  for (let i = 0; i < armTotal; i++) {
+    const colorT = Math.random();
+    const twinkleChance = (1.0 - colorT) * 0.6;
+    if (Math.random() < twinkleChance) {
+      armTwinkleMask[i] = 1;
+      armTwinklePhases[i] = Math.random() * Math.PI * 2;
+      armTwinkleFreqs[i] = 0.3 + Math.random() * 0.7;
+      armTwinkleAmps[i] = 0.2;
+    } else {
+      armTwinkleMask[i] = 0;
+      armTwinklePhases[i] = 0;
+      armTwinkleFreqs[i] = 0;
+      armTwinkleAmps[i] = 0;
+    }
+  }
   const armGeom = new THREE.BufferGeometry();
   armGeom.setAttribute('position', new THREE.BufferAttribute(armPositions, 3));
-  armGeom.setAttribute('color', new THREE.BufferAttribute(armColors, 3));
+  armGeom.setAttribute('color', new THREE.BufferAttribute(new Float32Array(armColors), 3));
   armGeom.setAttribute('size', new THREE.BufferAttribute(armSizes, 1));
   const armMat = new THREE.PointsMaterial({
     size: 0.1,
@@ -312,6 +357,23 @@ export function createGalaxy(config: GalaxyConfig = DEFAULT_CONFIG): GalaxyGroup
     group,
     galaxyGroup,
     bgStars,
+    corePoints,
+    armPoints,
+    coreTwinkle: {
+      baseSizes: new Float32Array(config.coreParticleCount).fill(0.08),
+      phases: coreTwinklePhases,
+      frequencies: coreTwinkleFreqs,
+      amplitudes: coreTwinkleAmps,
+      baseColors: coreColors,
+    },
+    armTwinkle: {
+      baseSizes: armSizes,
+      phases: armTwinklePhases,
+      frequencies: armTwinkleFreqs,
+      amplitudes: armTwinkleAmps,
+      baseColors: armColors,
+      mask: armTwinkleMask,
+    },
     update(delta: number) {
       galaxyGroup.rotation.y += config.rotationSpeed * delta;
       bgStars.rotation.y += config.bgStarRotationSpeed * delta;

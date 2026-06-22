@@ -11,6 +11,8 @@ export interface InteractionState {
   resetStartTarget: THREE.Vector3;
   initialPosition: THREE.Vector3;
   initialTarget: THREE.Vector3;
+  twinkleEnabled: boolean;
+  onTwinkleToggle?: (enabled: boolean) => void;
 }
 
 export function createInteraction(
@@ -40,6 +42,7 @@ export function createInteraction(
     resetStartTarget: new THREE.Vector3(),
     initialPosition,
     initialTarget,
+    twinkleEnabled: true,
   };
 
   domElement.addEventListener('wheel', (e: WheelEvent) => {
@@ -60,6 +63,12 @@ export function createInteraction(
         state.resetProgress = 0;
         state.resetStartPosition.copy(camera.position);
         state.resetStartTarget.copy(controls.target);
+      }
+    }
+    if (e.key === 'f' || e.key === 'F') {
+      state.twinkleEnabled = !state.twinkleEnabled;
+      if (state.onTwinkleToggle) {
+        state.onTwinkleToggle(state.twinkleEnabled);
       }
     }
   });
