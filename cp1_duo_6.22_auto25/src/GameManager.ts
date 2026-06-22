@@ -204,23 +204,34 @@ export class GameManager {
     const count = 5 + Math.floor(Math.random() * 3);
     const types: ResourceType[] = ['mine', 'herb', 'spring'];
     const usedPositions = new Set<string>();
+    const placed: { x: number; y: number }[] = [];
     usedPositions.add(`${this.playerBase.gridX},${this.playerBase.gridY}`);
     usedPositions.add(`${this.aiBase.gridX},${this.aiBase.gridY}`);
+    placed.push({ x: this.playerBase.gridX, y: this.playerBase.gridY });
+    placed.push({ x: this.aiBase.gridX, y: this.aiBase.gridY });
+    const MIN_DISTANCE = 3;
 
-    for (let i = 0; i < count; i++) {
+    for (let attempts = 0; attempts < count; attempts++) {
       let gx: number, gy: number;
+      let safeCount = 0;
       do {
         gx = 3 + Math.floor(Math.random() * (GRID_COLS - 6));
         gy = 1 + Math.floor(Math.random() * (GRID_ROWS - 2));
-      } while (usedPositions.has(`${gx},${gy}`));
+        safeCount++;
+        if (safeCount > 500) break;
+      } while (
+        usedPositions.has(`${gx},${gy}`) ||
+        placed.some(p => Math.abs(p.x - gx) + Math.abs(p.y - gy) < MIN_DISTANCE)
+      );
       usedPositions.add(`${gx},${gy}`);
+      placed.push({ x: gx, y: gy });
 
-      const type = types[i % 3];
+      const type = types[attempts % 3];
       const baseYield = 2 + Math.floor(Math.random() * 4);
       const guardianPower = 15 + Math.floor(Math.random() * 25);
 
       const node = new ResourceNode({
-        id: i,
+        id: attempts,
         type,
         gridX: gx,
         gridY: gy,
@@ -276,12 +287,17 @@ export class GameManager {
     }
   }
 
-  private bfsPath(startX: number, startY: number, endX: number, endY: number): { x: number; y: number }[] {
+  private bfsPath(
+    startX: number, startY: number,
+    endX: number, endY: number,
+    obstacles: Set<string>
+  ): { x: number; y: number }[] {
     if (startX === endX && startY === endY) return [{ x: startX, y: startY }];
 
     const visited = new Set<string>();
     const queue: { x: number; y: number; path: { x: number; y: number }[] }[] = [];
     const key = (x: number, y: number) => `${x},${y}`;
+    const endKey = key(endX, endY);
 
     visited.add(key(startX, startY));
     queue.push({ x: startX, y: startY, path: [{ x: startX, y: startY }] });
@@ -301,6 +317,7 @@ export class GameManager {
 
         if (nx < 0 || nx >= GRID_COLS || ny < 0 || ny >= GRID_ROWS) continue;
         if (visited.has(nk)) continue;
+        if (nk !== endKey && obstacles.has(nk)) continue;
 
         const newPath = [...current.path, { x: nx, y: ny }];
         if (nx === endX && ny === endY) return newPath;
@@ -380,7 +397,13 @@ export class GameManager {
     const node = this.resourceNodes.find(n => n.id === targetNodeId);
     if (!node) return false;
 
-    const path = this.bfsPath(this.playerBase.gridX, this.playerBase.gridY, node.gridX, node.gridY);
+    const path = this.bfsPath(
+      this.playerBase.gridX, this.playerBase.gridY,
+      node.gridX, node.gridY,
+      this.gridOccupied
+    );
+    if (path.length <= 1) return false;
+
     disciple.status = 'marching';
     disciple.targetNodeId = targetNodeId;
     disciple.path = path;
@@ -390,7 +413,7 @@ export class GameManager {
     disciple.pixelY = this.playerBase.gridY * CELL_SIZE + CELL_SIZE / 2;
 
     this.emitter.emit('disciple-dispatched', {
-      disciple,
+      disciple: { ...disciple, path },
       path,
       targetNode: node.getInfo(),
     });
@@ -407,7 +430,13 @@ export class GameManager {
     const node = this.resourceNodes.find(n => n.id === targetNodeId);
     if (!node) return false;
 
-    const path = this.bfsPath(this.aiBase.gridX, this.aiBase.gridY, node.gridX, node.gridY);
+    const path = this.bfsPath(
+      this.aiBase.gridX, this.aiBase.gridY,
+      node.gridX, node.gridY,
+      this.gridOccupied
+    );
+    if (path.length <= 1) return false;
+
     disciple.status = 'marching';
     disciple.targetNodeId = targetNodeId;
     disciple.path = path;
@@ -417,7 +446,7 @@ export class GameManager {
     disciple.pixelY = this.aiBase.gridY * CELL_SIZE + CELL_SIZE / 2;
 
     this.emitter.emit('ai-disciple-dispatched', {
-      disciple,
+      disciple: { ...disciple, path },
       path,
       targetNode: node.getInfo(),
     });
@@ -478,12 +507,21 @@ export class GameManager {
       ? this.getEffectivePower(disciple)
       : disciple.basePower;
 
-    const defenseBonus = node.owner === 'player' ? this.getDefenseBonus('player') : 0;
+    const defenseFaction = node.owner;
+    let defenseBonus = 0;
+    if (defenseFaction === 'player') {
+      defenseBonus = this.getDefenseBonus('player');
+    }
     const result: BattleResult = node.battle(attackPower, disciple.faction, defenseBonus);
 
     this.emitter.emit('battle-start', {
       disciple: { id: disciple.id, name: disciple.name, faction: disciple.faction },
       node: node.getInfo(),
+    });
+
+    this.emitter.emit('battle-visual', {
+      x: node.x,
+      y: node.y,
     });
 
     this.emitter.emit('battle-result', {
@@ -497,6 +535,8 @@ export class GameManager {
         nodeId: node.id,
         newOwner: disciple.faction,
         contestCount: node.contestCount,
+        x: node.x,
+        y: node.y,
       });
     } else {
       disciple.status = 'resting';
@@ -649,6 +689,12 @@ export class GameManager {
           case 'herb': this.playerResources.herb += amount; break;
           case 'spring': this.playerResources.spring += amount; break;
         }
+        this.emitter.emit('resource-collected', {
+          type: node.type,
+          amount,
+          x: node.x,
+          y: node.y,
+        });
       } else if (node.owner === 'ai') {
         switch (node.type) {
           case 'mine': this.aiResources.ore += node.baseYield; break;
