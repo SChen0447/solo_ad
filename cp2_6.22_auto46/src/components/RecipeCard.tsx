@@ -64,14 +64,14 @@ function RecipeCard({
               onClick={handleEdit}
               title="编辑"
             >
-              ✎
+              <span className="action-btn-icon">✎</span>
             </button>
             <button
               className="action-btn delete"
               onClick={handleDelete}
               title="删除"
             >
-              ✕
+              <span className="action-btn-icon">✕</span>
             </button>
           </div>
         </div>
@@ -81,8 +81,14 @@ function RecipeCard({
             {cuisineNames[recipe.cuisine]}
           </span>
           {recipe.assignee && (
-            <span style={{ marginLeft: '8px', fontSize: '12px' }}>
-              👤 {recipe.assignee}
+            <span style={{ marginLeft: '8px', display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '12px' }}>
+              <span
+                className="recipe-card-avatar"
+                style={{ background: avatarColor }}
+              >
+                {avatarText}
+              </span>
+              {recipe.assignee}
             </span>
           )}
         </div>

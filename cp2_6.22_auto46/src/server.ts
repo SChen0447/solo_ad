@@ -1,7 +1,85 @@
 import express from 'express'
 import cors from 'cors'
+import fs from 'fs'
+import path from 'path'
+import { fileURLToPath } from 'url'
 import { v4 as uuidv4 } from 'uuid'
 import type { Recipe, Step, ShoppingItem, CuisineType, Ingredient } from './types'
+
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = path.dirname(__filename)
+
+const REQUIRED_FILES = [
+  'package.json',
+  'vite.config.js',
+  'tsconfig.json',
+  'index.html',
+  'src/types.ts',
+  'src/main.tsx',
+  'src/App.tsx',
+  'src/server.ts',
+  'src/styles.css',
+  'src/components/RecipeCard.tsx',
+  'src/components/ShoppingList.tsx',
+  'src/components/ProgressPanel.tsx'
+]
+
+function validateEnvironment(): { valid: boolean; errors: string[]; warnings: string[] } {
+  const errors: string[] = []
+  const warnings: string[] = []
+  const projectRoot = path.resolve(__dirname, '..')
+
+  for (const file of REQUIRED_FILES) {
+    const filePath = path.join(projectRoot, file)
+    if (!fs.existsSync(filePath)) {
+      errors.push(`Missing required file: ${file}`)
+    }
+  }
+
+  const srcDir = path.join(projectRoot, 'src')
+  if (!fs.existsSync(srcDir)) {
+    errors.push('Missing src/ directory')
+  }
+
+  const componentsDir = path.join(projectRoot, 'src', 'components')
+  if (!fs.existsSync(componentsDir)) {
+    errors.push('Missing src/components/ directory')
+  }
+
+  const nodeModules = path.join(projectRoot, 'node_modules')
+  if (!fs.existsSync(nodeModules)) {
+    warnings.push('node_modules/ not found - run npm install first')
+  }
+
+  const packageJsonPath = path.join(projectRoot, 'package.json')
+  if (fs.existsSync(packageJsonPath)) {
+    try {
+      const pkg = JSON.parse(fs.readFileSync(packageJsonPath, 'utf-8'))
+      const requiredDeps = ['react', 'react-dom', 'express', 'cors', 'uuid']
+      for (const dep of requiredDeps) {
+        if (!pkg.dependencies?.[dep] && !pkg.devDependencies?.[dep]) {
+          warnings.push(`Missing dependency: ${dep}`)
+        }
+      }
+    } catch {
+      errors.push('package.json is not valid JSON')
+    }
+  }
+
+  return { valid: errors.length === 0, errors, warnings }
+}
+
+const envCheck = validateEnvironment()
+if (!envCheck.valid) {
+  console.error('❌ Environment validation failed:')
+  envCheck.errors.forEach(e => console.error(`  - ${e}`))
+  process.exit(1)
+}
+if (envCheck.warnings.length > 0) {
+  console.warn('⚠️  Environment warnings:')
+  envCheck.warnings.forEach(w => console.warn(`  - ${w}`))
+}
+console.log('✅ Environment validation passed')
 
 const app = express()
 const PORT = 3001
@@ -179,7 +257,7 @@ const generateTestData = (recipeCount: number, avgIngredientsPerRecipe: number) 
 
 initSampleData()
 
-app.get('/api/recipes', (req, res) => {
+app.get('/api/recipes', (_req, res) => {
   const recipes = Array.from(recipeMap.values()).map(recipeWithMapsToRecipe)
   res.json(recipes)
 })
@@ -319,7 +397,7 @@ app.put('/api/recipes/:id/assignee', (req, res) => {
   res.json(recipeWithMapsToRecipe(recipe))
 })
 
-app.get('/api/shopping-list', (req, res) => {
+app.get('/api/shopping-list', (_req, res) => {
   if (!shoppingListDirty && shoppingListCache) {
     return res.json(shoppingListCache)
   }
@@ -398,7 +476,7 @@ app.post('/api/test/benchmark-create', (req, res) => {
   })
 })
 
-app.post('/api/test/reset', (req, res) => {
+app.post('/api/test/reset', (_req, res) => {
   recipeMap.clear()
   purchasedItems.clear()
   invalidateShoppingCache()
@@ -406,7 +484,7 @@ app.post('/api/test/reset', (req, res) => {
   res.json({ success: true, recipeCount: recipeMap.size })
 })
 
-app.get('/api/test/stats', (req, res) => {
+app.get('/api/test/stats', (_req, res) => {
   let totalIngredients = 0
   let totalSteps = 0
   for (const recipe of recipeMap.values()) {

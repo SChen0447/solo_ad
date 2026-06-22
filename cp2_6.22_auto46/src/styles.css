@@ -166,6 +166,18 @@ body {
   line-height: 1;
   padding: 0;
   transition: background-color 0.2s ease-out;
+  box-sizing: border-box;
+}
+
+.action-btn-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  line-height: 1;
+  font-size: 14px;
+  pointer-events: none;
 }
 
 .action-btn:hover {
@@ -181,6 +193,20 @@ body {
   font-size: 13px;
   color: #6B7280;
   margin-bottom: 8px;
+}
+
+.recipe-card-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  color: white;
+  font-size: 10px;
+  font-weight: 600;
+  flex-shrink: 0;
+  line-height: 1;
 }
 
 .recipe-card-ingredients {
@@ -556,8 +582,9 @@ body {
 .floating-tip-header {
   display: flex;
   justify-content: space-between;
-  align-items: flex-start;
+  align-items: center;
   margin-bottom: 8px;
+  gap: 12px;
 }
 
 .floating-tip-title {
@@ -571,6 +598,8 @@ body {
   height: 28px;
   min-width: 28px;
   min-height: 28px;
+  max-width: 28px;
+  max-height: 28px;
   border-radius: 50%;
   border: none;
   background: #F3F4F6;
@@ -581,6 +610,7 @@ body {
   font-size: 14px;
   line-height: 1;
   padding: 0;
+  box-sizing: border-box;
   flex-shrink: 0;
   transition: background-color 0.2s ease-out;
 }

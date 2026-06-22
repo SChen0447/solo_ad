@@ -4,6 +4,8 @@ import RecipeCard from './components/RecipeCard'
 import ShoppingList from './components/ShoppingList'
 import ProgressPanel from './components/ProgressPanel'
 
+const API_BASE = import.meta.env.DEV ? 'http://localhost:3001' : ''
+
 const AVATAR_COLORS = [
   '#F87171', '#FB923C', '#FBBF24', '#A3E635',
   '#34D399', '#22D3EE', '#818CF8', '#F472B6'
@@ -21,7 +23,7 @@ function App() {
 
   const fetchRecipes = useCallback(async () => {
     try {
-      const res = await fetch('/api/recipes')
+      const res = await fetch(`${API_BASE}/api/recipes`)
       const data = await res.json()
       setRecipes(data)
     } catch (error) {
@@ -31,7 +33,7 @@ function App() {
 
   const fetchShoppingList = useCallback(async () => {
     try {
-      const res = await fetch('/api/shopping-list')
+      const res = await fetch(`${API_BASE}/api/shopping-list`)
       const data = await res.json()
       setShoppingList(data)
     } catch (error) {
@@ -74,7 +76,7 @@ function App() {
 
   const handleStepComplete = useCallback(async (recipeId: string, stepId: string, completed: boolean) => {
     try {
-      const res = await fetch(`/api/recipes/${recipeId}/steps/${stepId}`, {
+      const res = await fetch(`${API_BASE}/api/recipes/${recipeId}/steps/${stepId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ completed, actualTime: completed ? 10 : undefined })
@@ -97,7 +99,7 @@ function App() {
 
   const handleDeleteRecipe = useCallback(async (recipeId: string) => {
     try {
-      await fetch(`/api/recipes/${recipeId}`, {
+      await fetch(`${API_BASE}/api/recipes/${recipeId}`, {
         method: 'DELETE'
       })
       await fetchRecipes()
@@ -111,14 +113,14 @@ function App() {
   const handleSaveRecipe = useCallback(async (recipeData: Partial<Recipe>) => {
     try {
       if (editingRecipe) {
-        await fetch(`/api/recipes/${editingRecipe.id}`, {
+        await fetch(`${API_BASE}/api/recipes/${editingRecipe.id}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(recipeData)
         })
         showToast('食谱已更新')
       } else {
-        await fetch('/api/recipes', {
+        await fetch(`${API_BASE}/api/recipes`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(recipeData)
@@ -136,7 +138,7 @@ function App() {
 
   const handleTogglePurchase = useCallback(async (itemId: string, purchased: boolean) => {
     try {
-      await fetch(`/api/shopping-list/${itemId}/purchase`, {
+      await fetch(`${API_BASE}/api/shopping-list/${itemId}/purchase`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ purchased })
@@ -163,7 +165,7 @@ function App() {
 
   const handleUpdateAssignee = useCallback(async (recipeId: string, assignee: string) => {
     try {
-      await fetch(`/api/recipes/${recipeId}/assignee`, {
+      await fetch(`${API_BASE}/api/recipes/${recipeId}/assignee`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ assignee })
