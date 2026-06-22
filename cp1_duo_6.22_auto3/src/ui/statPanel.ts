@@ -8,28 +8,34 @@ export interface StatsData {
 }
 
 export class StatsPanel {
-  private renderer: CSS2DRenderer
-  private panelElement: HTMLElement
-  private fpsElement: HTMLElement
-  private verticesElement: HTMLElement
-  private drawCallsElement: HTMLElement
-  private cssObject: CSS2DObject
+  private css2dRenderer: CSS2DRenderer
+  private panelDiv: HTMLElement
+  private fpsSpan: HTMLElement
+  private verticesSpan: HTMLElement
+  private drawCallsSpan: HTMLElement
+  private blinkTimerId: number | null = null
+  private isWarning: boolean = false
+  private blinkVisible: boolean = true
   private frameCount: number = 0
-  private lastTime: number = 0
-  private fps: number = 0
+  private lastFpsTime: number = 0
+  private currentFps: number = 0
 
-  constructor(camera: THREE.PerspectiveCamera) {
-    this.renderer = new CSS2DRenderer()
-    this.renderer.setSize(window.innerWidth, window.innerHeight)
-    this.renderer.domElement.style.position = 'absolute'
-    this.renderer.domElement.style.top = '0'
-    this.renderer.domElement.style.left = '0'
-    this.renderer.domElement.style.pointerEvents = 'none'
-    this.renderer.domElement.style.zIndex = '100'
-    document.getElementById('app')!.appendChild(this.renderer.domElement)
+  constructor(scene: THREE.Scene) {
+    this.css2dRenderer = new CSS2DRenderer()
+    this.css2dRenderer.setSize(window.innerWidth, window.innerHeight)
+    this.css2dRenderer.domElement.style.position = 'absolute'
+    this.css2dRenderer.domElement.style.top = '0'
+    this.css2dRenderer.domElement.style.left = '0'
+    this.css2dRenderer.domElement.style.pointerEvents = 'none'
+    this.css2dRenderer.domElement.style.zIndex = '100'
+    document.getElementById('app')!.appendChild(this.css2dRenderer.domElement)
 
-    this.panelElement = document.createElement('div')
-    this.panelElement.style.cssText = `
+    this.panelDiv = document.createElement('div')
+    this.panelDiv.id = 'stats-hud'
+    this.panelDiv.style.cssText = `
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
       background: rgba(0, 0, 0, 0.6);
       backdrop-filter: blur(10px);
       -webkit-backdrop-filter: blur(10px);
@@ -41,105 +47,95 @@ export class StatsPanel {
       font-size: 12px;
       line-height: 1.6;
       min-width: 160px;
-      transition: background-color 0.3s;
       user-select: none;
+      z-index: 200;
+      pointer-events: none;
     `
 
-    const fpsRow = document.createElement('div')
-    fpsRow.style.cssText = 'display: flex; justify-content: space-between; gap: 20px;'
-    const fpsLabel = document.createElement('span')
-    fpsLabel.style.opacity = '0.8'
-    fpsLabel.textContent = 'FPS'
-    this.fpsElement = document.createElement('span')
-    this.fpsElement.style.fontWeight = 'bold'
-    this.fpsElement.textContent = '--'
-    fpsRow.appendChild(fpsLabel)
-    fpsRow.appendChild(this.fpsElement)
+    const fpsRow = this.createRow('FPS')
+    this.fpsSpan = fpsRow.value
+    const vertRow = this.createRow('顶点数')
+    this.verticesSpan = vertRow.value
+    const drawRow = this.createRow('绘制调用')
+    this.drawCallsSpan = drawRow.value
 
-    const vertRow = document.createElement('div')
-    vertRow.style.cssText = 'display: flex; justify-content: space-between; gap: 20px;'
-    const vertLabel = document.createElement('span')
-    vertLabel.style.opacity = '0.8'
-    vertLabel.textContent = '顶点数'
-    this.verticesElement = document.createElement('span')
-    this.verticesElement.style.fontWeight = 'bold'
-    this.verticesElement.textContent = '--'
-    vertRow.appendChild(vertLabel)
-    vertRow.appendChild(this.verticesElement)
+    this.panelDiv.appendChild(fpsRow.row)
+    this.panelDiv.appendChild(vertRow.row)
+    this.panelDiv.appendChild(drawRow.row)
 
-    const drawRow = document.createElement('div')
-    drawRow.style.cssText = 'display: flex; justify-content: space-between; gap: 20px;'
-    const drawLabel = document.createElement('span')
-    drawLabel.style.opacity = '0.8'
-    drawLabel.textContent = '绘制调用'
-    this.drawCallsElement = document.createElement('span')
-    this.drawCallsElement.style.fontWeight = 'bold'
-    this.drawCallsElement.textContent = '--'
-    drawRow.appendChild(drawLabel)
-    drawRow.appendChild(this.drawCallsElement)
+    const css2dObj = new CSS2DObject(this.panelDiv)
+    css2dObj.position.set(0, 0, 0)
+    scene.add(css2dObj)
 
-    this.panelElement.appendChild(fpsRow)
-    this.panelElement.appendChild(vertRow)
-    this.panelElement.appendChild(drawRow)
-
-    this.cssObject = new CSS2DObject(this.panelElement)
-    this.cssObject.position.set(0, 0, -5)
-    camera.add(this.cssObject)
-
-    this.addWarningStyle()
+    this.lastFpsTime = performance.now()
   }
 
-  private addWarningStyle(): void {
-    const style = document.createElement('style')
-    style.textContent = `
-      @keyframes statsBlink {
-        0%, 100% { background: rgba(255, 0, 0, 0.6); }
-        50% { background: rgba(255, 0, 0, 0.3); }
-      }
-      .stats-warning {
-        animation: statsBlink 0.5s infinite !important;
-      }
-    `
-    document.head.appendChild(style)
+  private createRow(label: string): { row: HTMLElement; value: HTMLElement } {
+    const row = document.createElement('div')
+    row.style.cssText = 'display: flex; justify-content: space-between; gap: 20px;'
+    const lbl = document.createElement('span')
+    lbl.style.opacity = '0.8'
+    lbl.textContent = label
+    const val = document.createElement('span')
+    val.style.fontWeight = 'bold'
+    val.textContent = '--'
+    row.appendChild(lbl)
+    row.appendChild(val)
+    return { row, value: val }
   }
 
-  getRenderer(): CSS2DRenderer {
-    return this.renderer
+  getCSS2DRenderer(): CSS2DRenderer {
+    return this.css2dRenderer
   }
 
-  getCSSObject(): CSS2DObject {
-    return this.cssObject
+  tickFPS(): number {
+    this.frameCount++
+    const now = performance.now()
+    const elapsed = now - this.lastFpsTime
+    if (elapsed >= 1000) {
+      this.currentFps = (this.frameCount * 1000) / elapsed
+      this.frameCount = 0
+      this.lastFpsTime = now
+    }
+    return this.currentFps
   }
 
   update(stats: StatsData): void {
-    this.fpsElement.textContent = stats.fps.toFixed(0)
-    this.verticesElement.textContent = this.formatNumber(stats.vertices)
-    this.drawCallsElement.textContent = stats.drawCalls.toString()
+    this.fpsSpan.textContent = stats.fps.toFixed(0)
+    this.verticesSpan.textContent = this.formatNumber(stats.vertices)
+    this.drawCallsSpan.textContent = stats.drawCalls.toString()
 
-    if (stats.fps < 30) {
-      this.panelElement.classList.add('stats-warning')
-      this.panelElement.style.background = 'rgba(255, 0, 0, 0.6)'
-    } else {
-      this.panelElement.classList.remove('stats-warning')
-      this.panelElement.style.background = 'rgba(0, 0, 0, 0.6)'
+    if (stats.fps < 30 && !this.isWarning) {
+      this.isWarning = true
+      this.blinkVisible = true
+      this.startBlink()
+    } else if (stats.fps >= 30 && this.isWarning) {
+      this.isWarning = false
+      this.stopBlink()
+      this.panelDiv.style.background = 'rgba(0, 0, 0, 0.6)'
+      this.panelDiv.style.opacity = '1'
     }
   }
 
-  calculateFPS(): number {
-    const now = performance.now()
-    this.frameCount++
+  private startBlink(): void {
+    this.stopBlink()
+    this.blinkTimerId = window.setInterval(() => {
+      this.blinkVisible = !this.blinkVisible
+      this.panelDiv.style.background = this.blinkVisible
+        ? 'rgba(255, 0, 0, 0.6)'
+        : 'rgba(255, 0, 0, 0.3)'
+    }, 250)
+  }
 
-    if (now - this.lastTime >= 1000) {
-      this.fps = (this.frameCount * 1000) / (now - this.lastTime)
-      this.frameCount = 0
-      this.lastTime = now
+  private stopBlink(): void {
+    if (this.blinkTimerId !== null) {
+      clearInterval(this.blinkTimerId)
+      this.blinkTimerId = null
     }
-
-    return this.fps
   }
 
   onResize(): void {
-    this.renderer.setSize(window.innerWidth, window.innerHeight)
+    this.css2dRenderer.setSize(window.innerWidth, window.innerHeight)
   }
 
   private formatNumber(num: number): string {

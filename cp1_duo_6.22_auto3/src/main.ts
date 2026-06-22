@@ -32,6 +32,8 @@ class TerrainEditor {
   private tourPath: THREE.Vector3[] = []
   private tourLookPath: THREE.Vector3[] = []
   private loadingOverlay: HTMLElement
+  private menuToggle: HTMLElement
+  private controlsContainer: HTMLElement
 
   constructor() {
     this.scene = new THREE.Scene()
@@ -84,7 +86,7 @@ class TerrainEditor {
     const hemiLight = new THREE.HemisphereLight(0x87ceeb, 0x3d5c3d, 0.3)
     this.scene.add(hemiLight)
 
-    this.statsPanel = new StatsPanel(this.camera)
+    this.statsPanel = new StatsPanel(this.scene)
     this.hoverTooltip = createHoverTooltip()
     this.highlightGrid = createHighlightGrid()
     this.scene.add(this.highlightGrid.mesh)
@@ -93,6 +95,8 @@ class TerrainEditor {
     this.mouse = new THREE.Vector2()
 
     this.loadingOverlay = document.getElementById('loading-overlay')!
+    this.menuToggle = document.getElementById('menu-toggle')!
+    this.controlsContainer = document.getElementById('controls-container')!
 
     this.controlParams = {
       terrainWidth: 20,
@@ -133,10 +137,18 @@ class TerrainEditor {
     window.addEventListener('mousemove', (e) => this.onMouseMove(e))
     window.addEventListener('mouseleave', () => this.onMouseLeave())
 
-    const menuToggle = document.getElementById('menu-toggle')!
-    const controlsContainer = document.getElementById('controls-container')!
-    menuToggle.addEventListener('click', () => {
-      controlsContainer.classList.toggle('open')
+    this.menuToggle.addEventListener('click', () => {
+      this.controlsContainer.classList.toggle('open')
+    })
+
+    document.addEventListener('click', (e) => {
+      const target = e.target as HTMLElement
+      if (window.innerWidth <= 768
+        && this.controlsContainer.classList.contains('open')
+        && !this.controlsContainer.contains(target)
+        && !this.menuToggle.contains(target)) {
+        this.controlsContainer.classList.remove('open')
+      }
     })
   }
 
@@ -246,53 +258,40 @@ class TerrainEditor {
   }
 
   private generateTourPath(): void {
+    if (!this.terrainData) return
+
     const width = this.controlParams.terrainWidth
     const depth = this.controlParams.terrainDepth
     const halfWidth = width / 2
     const halfDepth = depth / 2
 
-    const points: THREE.Vector3[] = []
+    const pathPoints: THREE.Vector3[] = []
     const lookPoints: THREE.Vector3[] = []
 
-    const corners = [
-      { x: -halfWidth * 0.8, z: -halfDepth * 0.8 },
-      { x: halfWidth * 0.8, z: -halfDepth * 0.8 },
-      { x: halfWidth * 0.8, z: halfDepth * 0.8 },
-      { x: -halfWidth * 0.8, z: halfDepth * 0.8 }
+    const keyPositions = [
+      { x: -halfWidth * 0.7, z: -halfDepth * 0.7 },
+      { x: 0, z: -halfDepth * 0.8 },
+      { x: halfWidth * 0.7, z: -halfDepth * 0.7 },
+      { x: halfWidth * 0.8, z: 0 },
+      { x: halfWidth * 0.7, z: halfDepth * 0.7 },
+      { x: 0, z: halfDepth * 0.8 },
+      { x: -halfWidth * 0.7, z: halfDepth * 0.7 },
+      { x: -halfWidth * 0.8, z: 0 }
     ]
 
-    for (let i = 0; i < 4; i++) {
-      const corner = corners[i]
-      const height = this.terrainData ? getHeightAt(corner.x, corner.z, this.terrainData) : 2
-      points.push(new THREE.Vector3(corner.x, height + 6 + Math.random() * 3, corner.z))
-      lookPoints.push(new THREE.Vector3(0, height, 0))
+    for (const kp of keyPositions) {
+      const terrainHeight = getHeightAt(kp.x, kp.z, this.terrainData)
+      const cameraHeight = terrainHeight + 6 + this.controlParams.heightScale * 0.5
+      pathPoints.push(new THREE.Vector3(kp.x, cameraHeight, kp.z))
+
+      const lookX = kp.x * 0.2
+      const lookZ = kp.z * 0.2
+      const lookY = getHeightAt(lookX, lookZ, this.terrainData)
+      lookPoints.push(new THREE.Vector3(lookX, lookY, lookZ))
     }
 
-    const midPoints = [
-      { x: 0, z: -halfDepth * 0.6 },
-      { x: halfWidth * 0.6, z: 0 },
-      { x: 0, z: halfDepth * 0.6 },
-      { x: -halfWidth * 0.6, z: 0 }
-    ]
-
-    for (let i = 0; i < 4; i++) {
-      const mp = midPoints[i]
-      const height = this.terrainData ? getHeightAt(mp.x, mp.z, this.terrainData) : 2
-      points.push(new THREE.Vector3(mp.x, height + 8 + Math.random() * 2, mp.z))
-      lookPoints.push(new THREE.Vector3(mp.x * 0.3, height * 0.5, mp.z * 0.3))
-    }
-
-    const reordered: THREE.Vector3[] = []
-    const reorderedLook: THREE.Vector3[] = []
-    for (let i = 0; i < 4; i++) {
-      reordered.push(points[i])
-      reordered.push(points[4 + ((i + 1) % 4)])
-      reorderedLook.push(lookPoints[i])
-      reorderedLook.push(lookPoints[4 + ((i + 1) % 4)])
-    }
-
-    this.tourPath = reordered
-    this.tourLookPath = reorderedLook
+    this.tourPath = pathPoints
+    this.tourLookPath = lookPoints
   }
 
   private toggleTour(enabled: boolean): void {
@@ -305,6 +304,8 @@ class TerrainEditor {
 
   private startTour(): void {
     if (this.tourPath.length < 2) return
+
+    this.generateTourPath()
 
     this.isTourRunning = true
     this.tourStartTime = performance.now()
@@ -458,9 +459,9 @@ class TerrainEditor {
     }
 
     this.renderer.render(this.scene, this.camera)
-    this.statsPanel.getRenderer().render(this.scene, this.camera)
+    this.statsPanel.getCSS2DRenderer().render(this.scene, this.camera)
 
-    const fps = this.statsPanel.calculateFPS()
+    const fps = this.statsPanel.tickFPS()
 
     this.statsPanel.update({
       fps,

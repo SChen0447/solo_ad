@@ -46,18 +46,25 @@ function createTreeGeometry(): { geometry: THREE.BufferGeometry; material: THREE
 
   const mergedGeometry = mergeGeometries([trunkGeometry, crownGeometry])
 
-  const trunkColor = new THREE.Color(0x5c4033)
-  const crownColor = new THREE.Color(0x228b22)
-
   const positionCount = mergedGeometry.attributes.position.count
   const colors = new Float32Array(positionCount * 3)
 
   for (let i = 0; i < positionCount; i++) {
     const y = mergedGeometry.attributes.position.getY(i)
-    const color = y < trunkHeight ? trunkColor : crownColor
-    colors[i * 3] = color.r
-    colors[i * 3 + 1] = color.g
-    colors[i * 3 + 2] = color.b
+    if (y < trunkHeight) {
+      const trunkColor = new THREE.Color(0x5c4033)
+      colors[i * 3] = trunkColor.r
+      colors[i * 3 + 1] = trunkColor.g
+      colors[i * 3 + 2] = trunkColor.b
+    } else {
+      const t = (y - trunkHeight) / crownHeight
+      const darkGreen = new THREE.Color(0x1a6b1a)
+      const lightGreen = new THREE.Color(0x44aa44)
+      const color = darkGreen.clone().lerp(lightGreen, t)
+      colors[i * 3] = color.r
+      colors[i * 3 + 1] = color.g
+      colors[i * 3 + 2] = color.b
+    }
   }
 
   mergedGeometry.setAttribute('color', new THREE.BufferAttribute(colors, 3))
@@ -178,12 +185,16 @@ export function decorateTerrain(
   terrainData: TerrainData,
   params: DecoratorParams
 ): DecorationObjects {
-  const { width, depth } = terrainData
+  const { width, depth, heightScale } = terrainData
   const { treeDensity, houseCount, seed } = params
 
   const random = new SeededRandom(seed)
   const halfWidth = width / 2
   const halfDepth = depth / 2
+
+  const heightThreshold = heightScale * 0.15
+  const treeSlopeThreshold = 0.3
+  const houseSlopeThreshold = 0.1
 
   const { geometry: treeGeometry, material: treeMaterial } = createTreeGeometry()
 
@@ -193,6 +204,7 @@ export function decorateTerrain(
   trees.receiveShadow = true
 
   const dummy = new THREE.Object3D()
+  const treeColor = new THREE.Color()
   let treeIndex = 0
 
   const gridSize = 0.8
@@ -206,10 +218,13 @@ export function decorateTerrain(
       const x = -halfWidth + (col + random.next()) * gridSize
       const z = -halfDepth + (row + random.next()) * gridSize
 
+      if (x <= -halfWidth + 0.5 || x >= halfWidth - 0.5 || z <= -halfDepth + 0.5 || z >= halfDepth - 0.5) continue
+
       const height = getHeightAt(x, z, terrainData)
       const slope = getSlopeAt(x, z, terrainData)
 
-      if (height < 0.3 || slope > 0.3) continue
+      if (height < heightThreshold) continue
+      if (slope > treeSlopeThreshold) continue
 
       const scale = random.range(0.6, 1.4)
       const rotationY = random.range(0, Math.PI * 2)
@@ -220,19 +235,25 @@ export function decorateTerrain(
       dummy.updateMatrix()
 
       trees.setMatrixAt(treeIndex, dummy.matrix)
+
+      const greenVariation = random.range(0.3, 1.0)
+      treeColor.setRGB(greenVariation * 0.2, greenVariation, greenVariation * 0.15)
+      trees.setColorAt(treeIndex, treeColor)
+
       treeIndex++
     }
   }
 
   trees.count = treeIndex
   trees.instanceMatrix.needsUpdate = true
+  if (trees.instanceColor) trees.instanceColor.needsUpdate = true
 
   const houses = new THREE.Group()
   const placedHouses = Math.min(houseCount, 10)
   let attempts = 0
   let housesPlaced = 0
 
-  while (housesPlaced < placedHouses && attempts < 200) {
+  while (housesPlaced < placedHouses && attempts < 300) {
     attempts++
 
     const x = random.range(-halfWidth + 2, halfWidth - 2)
@@ -241,24 +262,27 @@ export function decorateTerrain(
     const height = getHeightAt(x, z, terrainData)
     const slope = getSlopeAt(x, z, terrainData)
 
-    if (height < 0.3 || slope > 0.1) continue
+    if (height < heightThreshold) continue
+    if (slope > houseSlopeThreshold) continue
+
+    let tooClose = false
+    for (const child of houses.children) {
+      const dist2D = Math.sqrt(
+        (child.position.x - x) * (child.position.x - x) +
+        (child.position.z - z) * (child.position.z - z)
+      )
+      if (dist2D < 3) {
+        tooClose = true
+        break
+      }
+    }
+    if (tooClose) continue
 
     const house = createHouseGroup()
     const scale = random.range(0.8, 1.2)
     house.scale.set(scale, scale, scale)
     house.position.set(x, height, z)
     house.rotation.y = random.range(0, Math.PI * 2)
-
-    let tooClose = false
-    for (const child of houses.children) {
-      const dist = house.position.distanceTo(child.position)
-      if (dist < 3) {
-        tooClose = true
-        break
-      }
-    }
-
-    if (tooClose) continue
 
     houses.add(house)
     housesPlaced++
