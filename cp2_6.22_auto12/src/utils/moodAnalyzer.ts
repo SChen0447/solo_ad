@@ -164,6 +164,45 @@ function calculateMoodLevel(text: string): number {
   return Math.max(0, Math.min(100, score));
 }
 
+const moodLabels = [
+  { minLevel: 0, maxLevel: 15, label: '极度低落' },
+  { minLevel: 15, maxLevel: 30, label: '低落' },
+  { minLevel: 30, maxLevel: 45, label: '焦虑' },
+  { minLevel: 45, maxLevel: 55, label: '平静' },
+  { minLevel: 55, maxLevel: 70, label: '放松' },
+  { minLevel: 70, maxLevel: 85, label: '愉悦' },
+  { minLevel: 85, maxLevel: 100, label: '非常开心' },
+];
+
+export function getMoodLabel(moodLevel: number): string {
+  for (const range of moodLabels) {
+    if (moodLevel >= range.minLevel && moodLevel < range.maxLevel) {
+      return range.label;
+    }
+  }
+  return moodLevel >= 85 ? '非常开心' : '极度低落';
+}
+
+function increaseSaturation(hexColor: string, percent: number = 10): string {
+  const hex = hexColor.replace('#', '');
+  const r = parseInt(hex.substring(0, 2), 16);
+  const g = parseInt(hex.substring(2, 4), 16);
+  const b = parseInt(hex.substring(4, 6), 16);
+  
+  const gray = (r + g + b) / 3;
+  const factor = 1 + percent / 100;
+  
+  const newR = Math.min(255, Math.max(0, Math.round(gray + (r - gray) * factor)));
+  const newG = Math.min(255, Math.max(0, Math.round(gray + (g - gray) * factor)));
+  const newB = Math.min(255, Math.max(0, Math.round(gray + (b - gray) * factor)));
+  
+  return `#${newR.toString(16).padStart(2, '0')}${newG.toString(16).padStart(2, '0')}${newB.toString(16).padStart(2, '0')}`;
+}
+
+export function getMoodHoverColor(color: string): string {
+  return increaseSaturation(color, 10);
+}
+
 export function analyzeMood(text: string): MoodAnalysisResult {
   const startTime = performance.now();
   

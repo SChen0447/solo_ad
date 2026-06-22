@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { DiaryEntry, ViewMode } from '../types';
 import { getRecentDays, formatDateKey, formatDateDisplay } from '../utils/calendarHelper';
+import { getMoodLabel, getMoodHoverColor } from '../utils/moodAnalyzer';
 import './MoodBar.css';
 
 interface MoodBarProps {
@@ -18,20 +19,24 @@ export default function MoodBar({ entries }: MoodBarProps) {
   const moodData = recentDays.map(date => {
     const dateStr = formatDateKey(date);
     const diary = diaryMap.get(dateStr);
+    const moodLabel = diary ? getMoodLabel(diary.moodLevel) : '';
+    const baseColor = diary?.moodColor || '#e5e7eb';
     return {
       date: dateStr,
       displayDate: formatDateDisplay(date),
       shortDate: `${date.getMonth() + 1}/${date.getDate()}`,
       hasMood: !!diary,
-      color: diary?.moodColor || '#e5e7eb',
+      color: baseColor,
+      hoverColor: getMoodHoverColor(baseColor),
       keywords: diary?.keywords || [],
       moodLevel: diary?.moodLevel ?? 50,
+      moodLabel,
     };
   });
 
   const renderCurve = () => {
     const blockWidth = 40;
-    const gap = 4;
+    const gap = 6;
     const totalWidth = 7 * blockWidth + 6 * gap;
     const curveHeight = 60;
     const svgHeight = 100;
@@ -145,6 +150,7 @@ export default function MoodBar({ entries }: MoodBarProps) {
               {hoveredIndex === index && day.hasMood && (
                 <div className="mood-tooltip">
                   <div className="tooltip-date">{day.displayDate}</div>
+                  <div className="tooltip-mood-label">{day.moodLabel}</div>
                   {day.keywords.length > 0 && (
                     <div className="tooltip-keywords">
                       {day.keywords.slice(0, 3).join(' · ')}
@@ -154,7 +160,9 @@ export default function MoodBar({ entries }: MoodBarProps) {
               )}
               <div
                 className="mood-block-color"
-                style={{ backgroundColor: day.color }}
+                style={{
+                  backgroundColor: hoveredIndex === index && day.hasMood ? day.hoverColor : day.color,
+                }}
               />
               <div className="mood-block-date">{day.shortDate}</div>
             </div>
