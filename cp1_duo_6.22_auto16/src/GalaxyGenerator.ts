@@ -3,6 +3,7 @@ import * as THREE from 'three';
 export interface StarData {
   mesh: THREE.Mesh;
   glowMesh: THREE.Mesh;
+  trailMesh: THREE.Mesh;
   baseSize: number;
   twinkleFrequency1: number;
   twinkleFrequency2: number;
@@ -10,13 +11,22 @@ export interface StarData {
   twinkleAmplitude2: number;
   noiseOffset: number;
   phaseOffset: number;
+  lastScreenPosition: THREE.Vector2;
+  trailOpacity: number;
+}
+
+export interface CameraMotion {
+  velocity: THREE.Vector3;
+  angularSpeed: number;
 }
 
 export class GalaxyGenerator {
   private scene: THREE.Scene;
   private starCount: number;
   private stars: StarData[] = [];
+  private dustParticles: THREE.Mesh[] = [];
   private galaxyRadius: number = 500;
+  private trailTexture: THREE.CanvasTexture | null = null;
 
   constructor(scene: THREE.Scene, starCount: number = 1500) {
     this.scene = scene;
@@ -58,6 +68,27 @@ export class GalaxyGenerator {
     
     ctx.fillStyle = gradient;
     ctx.fillRect(0, 0, 128, 128);
+    
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.needsUpdate = true;
+    return texture;
+  }
+
+  private createTrailTexture(): THREE.CanvasTexture {
+    const canvas = document.createElement('canvas');
+    canvas.width = 256;
+    canvas.height = 64;
+    const ctx = canvas.getContext('2d')!;
+    
+    const gradient = ctx.createLinearGradient(0, 32, 256, 32);
+    gradient.addColorStop(0, 'rgba(255, 255, 255, 0)');
+    gradient.addColorStop(0.3, 'rgba(255, 255, 255, 0.1)');
+    gradient.addColorStop(0.6, 'rgba(255, 255, 255, 0.25)');
+    gradient.addColorStop(0.85, 'rgba(255, 255, 255, 0.15)');
+    gradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
+    
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, 256, 64);
     
     const texture = new THREE.CanvasTexture(canvas);
     texture.needsUpdate = true;
@@ -173,6 +204,7 @@ export class GalaxyGenerator {
   generate(): StarData[] {
     const starTexture = this.createStarTexture();
     const glowTexture = this.createGlowTexture();
+    this.trailTexture = this.createTrailTexture();
     
     for (let i = 0; i < this.starCount; i++) {
       const position = this.getSpiralPosition(i, this.starCount);
@@ -205,25 +237,78 @@ export class GalaxyGenerator {
       const glow = new THREE.Mesh(glowGeometry, glowMaterial);
       glow.position.copy(position);
       
+      const trailLength = baseSize * 8;
+      const trailGeometry = new THREE.PlaneGeometry(trailLength, baseSize * 0.5);
+      const trailMaterial = new THREE.MeshBasicMaterial({
+        color: color,
+        map: this.trailTexture,
+        transparent: true,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending,
+        opacity: 0
+      });
+      const trail = new THREE.Mesh(trailGeometry, trailMaterial);
+      trail.position.copy(position);
+      
       this.scene.add(star);
       this.scene.add(glow);
+      this.scene.add(trail);
       
       this.stars.push({
         mesh: star,
         glowMesh: glow,
+        trailMesh: trail,
         baseSize,
         twinkleFrequency1: 0.5 + Math.random() * 2.0,
         twinkleFrequency2: 1.5 + Math.random() * 3.0,
         twinkleAmplitude1: 0.08 + Math.random() * 0.12,
         twinkleAmplitude2: 0.03 + Math.random() * 0.07,
         noiseOffset: Math.random() * 1000,
-        phaseOffset: Math.random() * Math.PI * 2
+        phaseOffset: Math.random() * Math.PI * 2,
+        lastScreenPosition: new THREE.Vector2(),
+        trailOpacity: 0
       });
     }
     
+    this.createDustParticles();
     this.createNebulaLayers();
     
     return this.stars;
+  }
+
+  private createDustParticles(): void {
+    const dustCount = 500;
+    const dustTexture = this.createStarTexture();
+    
+    for (let i = 0; i < dustCount; i++) {
+      const distance = this.galaxyRadius * (0.8 + Math.random() * 0.5);
+      const angle = Math.random() * Math.PI * 2;
+      const height = (Math.random() - 0.5) * 100;
+      
+      const x = Math.cos(angle) * distance;
+      const y = height;
+      const z = Math.sin(angle) * distance;
+      
+      const size = 0.1 + Math.random() * 0.2;
+      
+      const geometry = new THREE.PlaneGeometry(size, size);
+      const material = new THREE.MeshBasicMaterial({
+        color: new THREE.Color(0xd0d8e8),
+        map: dustTexture,
+        transparent: true,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending,
+        opacity: 0.15 + Math.random() * 0.2
+      });
+      
+      const dust = new THREE.Mesh(geometry, material);
+      dust.position.set(x, y, z);
+      dust.userData.driftSpeed = 0.0001 + Math.random() * 0.0002;
+      dust.userData.driftAngle = Math.random() * Math.PI * 2;
+      
+      this.scene.add(dust);
+      this.dustParticles.push(dust);
+    }
   }
 
   private createNebulaLayers(): void {
@@ -277,7 +362,10 @@ export class GalaxyGenerator {
     }
   }
 
-  updateStars(time: number, camera: THREE.Camera): void {
+  updateStars(time: number, camera: THREE.Camera, cameraMotion: CameraMotion, deltaTime: number): void {
+    const angularSpeed = cameraMotion.angularSpeed;
+    const trailIntensity = Math.min(1, angularSpeed * 8);
+    
     for (const star of this.stars) {
       const sine1 = Math.sin(time * star.twinkleFrequency1 + star.phaseOffset);
       const sine2 = Math.sin(time * star.twinkleFrequency2 + star.phaseOffset * 1.5);
@@ -292,17 +380,56 @@ export class GalaxyGenerator {
         sine2 * star.twinkleAmplitude2 +
         noiseVal * 0.05;
       
-      const scale = 1 + twinkle;
+      const smoothTwinkle = (Math.sin(twinkle * Math.PI) + 1) / 2;
+      const finalTwinkle = -0.2 + smoothTwinkle * 0.4;
+      
+      const scale = 1 + finalTwinkle;
       
       star.mesh.scale.setScalar(scale);
       star.glowMesh.scale.setScalar(scale);
       
-      const opacity = 0.7 + twinkle * 0.5;
-      (star.mesh.material as THREE.MeshBasicMaterial).opacity = Math.min(1, Math.max(0.3, opacity));
-      (star.glowMesh.material as THREE.MeshBasicMaterial).opacity = Math.min(0.8, Math.max(0.2, opacity * 0.5));
+      const baseOpacity = 0.75;
+      const twinkleOpacity = baseOpacity + Math.sin(time * star.twinkleFrequency1 * 0.5 + star.phaseOffset) * 0.15;
+      (star.mesh.material as THREE.MeshBasicMaterial).opacity = Math.min(1, Math.max(0.4, twinkleOpacity));
+      (star.glowMesh.material as THREE.MeshBasicMaterial).opacity = Math.min(0.7, Math.max(0.25, twinkleOpacity * 0.6));
       
       star.mesh.lookAt(camera.position);
       star.glowMesh.lookAt(camera.position);
+      
+      const starScreenPos = star.mesh.position.clone().project(camera);
+      const currentScreenPos = new THREE.Vector2(starScreenPos.x, starScreenPos.y);
+      
+      const screenDelta = currentScreenPos.clone().sub(star.lastScreenPosition);
+      const screenSpeed = screenDelta.length();
+      
+      const targetTrailOpacity = Math.min(0.4, (screenSpeed * 3 + trailIntensity * 0.5) * star.baseSize * 0.3);
+      star.trailOpacity += (targetTrailOpacity - star.trailOpacity) * 0.1;
+      
+      const trailMat = star.trailMesh.material as THREE.MeshBasicMaterial;
+      trailMat.opacity = star.trailOpacity;
+      
+      if (screenDelta.length() > 0.0001) {
+        const angle = Math.atan2(screenDelta.y, screenDelta.x);
+        star.trailMesh.lookAt(camera.position);
+        star.trailMesh.rotateZ(angle);
+      } else {
+        star.trailMesh.lookAt(camera.position);
+      }
+      
+      star.trailMesh.position.copy(star.mesh.position);
+      star.lastScreenPosition.copy(currentScreenPos);
+    }
+    
+    for (const dust of this.dustParticles) {
+      dust.position.x += Math.cos(dust.userData.driftAngle) * dust.userData.driftSpeed * deltaTime * 60;
+      dust.position.z += Math.sin(dust.userData.driftAngle) * dust.userData.driftSpeed * deltaTime * 60;
+      dust.position.y += Math.sin(time * 0.5 + dust.userData.driftAngle) * 0.001 * deltaTime * 60;
+      
+      dust.lookAt(camera.position);
+      
+      const dustMat = dust.material as THREE.MeshBasicMaterial;
+      const flicker = Math.sin(time * 2 + dust.userData.driftAngle * 10) * 0.05;
+      dustMat.opacity = Math.max(0.1, 0.2 + flicker);
     }
     
     this.scene.children.forEach(child => {

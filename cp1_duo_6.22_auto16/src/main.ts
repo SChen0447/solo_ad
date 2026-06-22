@@ -37,6 +37,10 @@ class StarExplorer {
   private lastFrameTime: number = 0;
   private fps: number = 60;
   private readonly FPS_SMOOTHING: number = 0.9;
+  private lastTheta: number = Math.PI / 4;
+  private lastPhi: number = Math.PI / 3;
+  private lastRadius: number = 150;
+  private cameraVelocity: THREE.Vector3 = new THREE.Vector3();
 
   private animationId: number | null = null;
 
@@ -247,14 +251,27 @@ class StarExplorer {
     this.updateZoomAnimation(currentTime);
     this.updateCameraPosition();
     
+    const thetaDelta = Math.abs(this.theta - this.lastTheta);
+    const phiDelta = Math.abs(this.phi - this.lastPhi);
+    const radiusDelta = Math.abs(this.radius - this.lastRadius);
+    const angularSpeed = (thetaDelta + phiDelta + radiusDelta * 0.002) / deltaTime;
+    
+    this.lastTheta = this.theta;
+    this.lastPhi = this.phi;
+    this.lastRadius = this.radius;
+    
     const time = currentTime * 0.001;
-    this.galaxyGenerator.updateStars(time, this.camera);
+    this.galaxyGenerator.updateStars(time, this.camera, {
+      velocity: this.cameraVelocity,
+      angularSpeed: angularSpeed
+    }, deltaTime);
     
     this.hud.update(
       { x: this.camera.position.x, y: this.camera.position.y, z: this.camera.position.z },
       this.galaxyGenerator.getStarCount(),
       this.fps,
-      deltaTime
+      deltaTime,
+      this.theta
     );
     
     this.renderer.render(this.scene, this.camera);
