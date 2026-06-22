@@ -189,19 +189,47 @@ function easeOutBounce(t: number): number {
   }
 }
 
-function dampedSine(elapsed: number, maxTime: number = 800): number {
-  const t = elapsed / maxTime;
-  if (t >= 1) return 0;
-  const decay = Math.exp(-t * 6);
-  const oscillation = Math.sin(t * Math.PI * 2 * 2);
-  return -oscillation * decay * 12 * (1 - t);
+function easeOutElastic(t: number): number {
+  const c4 = (2 * Math.PI) / 3;
+  return t === 0 ? 0 : t === 1 ? 1 : Math.pow(2, -10 * t) * Math.sin((t * 10 - 0.75) * c4) + 1;
+}
+
+function springBounceScale(elapsed: number, duration: number = 400): { scaleX: number; scaleY: number; offsetY: number } {
+  const t = Math.min(1, elapsed / duration);
+
+  if (t < 0.2) {
+    const t1 = t / 0.2;
+    const squash = easeOutBounce(t1);
+    return {
+      scaleX: 1.3 - squash * 0.3,
+      scaleY: 0.7 + squash * 0.3,
+      offsetY: (1 - squash) * 15
+    };
+  }
+
+  if (t < 0.5) {
+    const t2 = (t - 0.2) / 0.3;
+    const stretch = easeOutElastic(t2);
+    return {
+      scaleX: 1 - stretch * 0.15,
+      scaleY: 1 + stretch * 0.25,
+      offsetY: -stretch * 10
+    };
+  }
+
+  const t3 = (t - 0.5) / 0.5;
+  const settle = easeOutBounce(t3);
+  return {
+    scaleX: 0.85 + settle * 0.15,
+    scaleY: 1.25 - settle * 0.25,
+    offsetY: -10 + settle * 10
+  };
 }
 
 export class Renderer {
   private ctx: CanvasRenderingContext2D;
   private spriteCanvas: HTMLCanvasElement;
   private spriteCtx: CanvasRenderingContext2D;
-  private animTime: number = 0;
 
   constructor(canvas: HTMLCanvasElement) {
     this.ctx = canvas.getContext('2d')!;
@@ -212,7 +240,6 @@ export class Renderer {
   }
 
   render(pet: Pet, now: number): void {
-    this.animTime = now;
     this.clearScreen();
     this.drawPetArea(pet, now);
     this.drawNotifications(pet, now);
@@ -282,85 +309,116 @@ export class Renderer {
     const petAreaX = 85;
     const petAreaW = CANVAS_W - petAreaX - 10;
     const bubbleX = petAreaX + petAreaW / 2;
+    const baseY = 55;
 
     pet.notifications.forEach((notif) => {
       const elapsed = now - notif.startTime;
-      if (elapsed > notif.duration + 500) return;
+      const totalDuration = notif.duration + 500;
+      if (elapsed > totalDuration) return;
+
+      const isEntering = elapsed < 400;
+      const isExiting = elapsed > notif.duration;
 
       let opacity = 1;
-      if (elapsed < 200) {
-        opacity = elapsed / 200;
-      } else if (elapsed > notif.duration) {
-        opacity = 1 - (elapsed - notif.duration) / 500;
+      let scaleX = 1;
+      let scaleY = 1;
+      let offsetY = 0;
+
+      if (isEntering) {
+        const spring = springBounceScale(elapsed, 400);
+        scaleX = spring.scaleX;
+        scaleY = spring.scaleY;
+        offsetY = spring.offsetY;
+        opacity = Math.min(1, elapsed / 100);
+      } else if (isExiting) {
+        const exitT = (elapsed - notif.duration) / 500;
+        opacity = 1 - exitT;
+        scaleX = 1 - exitT * 0.3;
+        scaleY = 1 - exitT * 0.3;
+        offsetY = -exitT * 10;
       }
-      opacity = Math.max(0, Math.min(1, opacity));
 
-      const bounceY = dampedSine(elapsed, 800);
-
-      const baseY = 55 + bounceY;
+      const y = baseY + offsetY;
       const text = notif.text;
 
-      const tScale = elapsed < 600 ? easeOutBounce(Math.min(1, elapsed / 600)) : 1;
-      const scale = 0.8 + tScale * 0.2;
-
       this.ctx.save();
-      this.ctx.globalAlpha = opacity;
+      this.ctx.globalAlpha = Math.max(0, opacity);
       this.ctx.font = '8px "Press Start 2P", monospace';
       this.ctx.textAlign = 'center';
       this.ctx.textBaseline = 'middle';
 
       const metrics = this.ctx.measureText(text);
-      const tw = Math.max(70, metrics.width + 16);
-      const th = 22;
+      const tw = Math.max(72, metrics.width + 20);
+      const th = 24;
 
-      this.ctx.translate(bubbleX, baseY);
-      this.ctx.scale(scale, scale);
+      this.ctx.translate(bubbleX, y);
+      this.ctx.scale(scaleX, scaleY);
 
-      this.ctx.fillStyle = '#FFFFFF';
-      this.roundRect(-tw / 2, -th / 2, tw, th, 3);
-      this.ctx.fill();
-
-      this.ctx.strokeStyle = '#306230';
-      this.ctx.lineWidth = 2;
-      this.roundRect(-tw / 2, -th / 2, tw, th, 3);
-      this.ctx.stroke();
-
-      this.ctx.fillStyle = '#FFFFFF';
-      this.ctx.fillRect(-tw / 2 + 2, -th / 2 + 2, tw - 4, 3);
-      this.ctx.fillRect(-tw / 2 + 2, -th / 2 + 2, 3, th - 4);
+      this.drawPixelBubble(-tw / 2, -th / 2, tw, th);
 
       this.ctx.fillStyle = '#306230';
       this.ctx.fillText(text, 0, 0);
-
-      this.ctx.beginPath();
-      this.ctx.moveTo(-6, th / 2);
-      this.ctx.lineTo(0, th / 2 + 8);
-      this.ctx.lineTo(6, th / 2);
-      this.ctx.fillStyle = '#FFFFFF';
-      this.ctx.fill();
-      this.ctx.strokeStyle = '#306230';
-      this.ctx.lineWidth = 2;
-      this.ctx.stroke();
 
       this.ctx.restore();
     });
   }
 
-  private roundRect(
-    x: number, y: number,
-    w: number, h: number,
-    r: number
-  ): void {
-    this.ctx.beginPath();
-    this.ctx.moveTo(x + r, y);
-    this.ctx.lineTo(x + w - r, y);
-    this.ctx.arcTo(x + w, y, x + w, y + r, r);
-    this.ctx.lineTo(x + w, y + h - r);
-    this.ctx.arcTo(x + w, y + h, x + w - r, y + h, r);
-    this.ctx.lineTo(x + r, y + h);
-    this.ctx.arcTo(x, y + h, x, y + h - r, r);
-    this.ctx.lineTo(x, y + r);
-    this.ctx.arcTo(x, y, x + r, y, r);
-    this.ctx.closePath();
+  private drawPixelBubble(x: number, y: number, w: number, h: number): void {
+    const ctx = this.ctx;
+    const borderColor = '#306230';
+    const bgColor = '#F5F5DC';
+    const bgDark = '#E8E8C0';
+    const hlColor = '#FFFFFF';
+    const shColor = '#C0C0A0';
+
+    ctx.fillStyle = bgColor;
+    ctx.fillRect(x + 2, y + 2, w - 4, h - 4);
+
+    ctx.fillStyle = hlColor;
+    ctx.fillRect(x + 2, y + 2, w - 4, 2);
+    ctx.fillRect(x + 2, y + 2, 2, h - 4);
+
+    ctx.fillStyle = shColor;
+    ctx.fillRect(x + 2, y + h - 4, w - 4, 2);
+    ctx.fillRect(x + w - 4, y + 2, 2, h - 4);
+
+    ctx.fillStyle = borderColor;
+    for (let i = 2; i < w - 2; i++) {
+      ctx.fillRect(x + i, y, 1, 1);
+      ctx.fillRect(x + i, y + h - 1, 1, 1);
+    }
+    for (let i = 2; i < h - 2; i++) {
+      ctx.fillRect(x, y + i, 1, 1);
+      ctx.fillRect(x + w - 1, y + i, 1, 1);
+    }
+
+    ctx.fillStyle = borderColor;
+    ctx.fillRect(x + 1, y + 1, 1, 1);
+    ctx.fillRect(x + w - 2, y + 1, 1, 1);
+    ctx.fillRect(x + 1, y + h - 2, 1, 1);
+    ctx.fillRect(x + w - 2, y + h - 2, 1, 1);
+
+    const tailW = 12;
+    const tailH = 8;
+    const tailX = x + w / 2 - tailW / 2;
+    const tailY = y + h - 1;
+
+    ctx.fillStyle = bgColor;
+    ctx.fillRect(tailX + 3, tailY, tailW - 6, 2);
+    ctx.fillRect(tailX + 5, tailY + 2, tailW - 10, 2);
+    ctx.fillRect(tailX + tailW / 2 - 1, tailY + 4, 2, tailH - 4);
+
+    ctx.fillStyle = borderColor;
+    ctx.fillRect(tailX + 2, tailY, 1, 1);
+    ctx.fillRect(tailX + tailW - 3, tailY, 1, 1);
+    ctx.fillRect(tailX + 4, tailY + 2, 1, 1);
+    ctx.fillRect(tailX + tailW - 5, tailY + 2, 1, 1);
+    ctx.fillRect(tailX + tailW / 2 - 2, tailY + 4, 1, 2);
+    ctx.fillRect(tailX + tailW / 2 + 1, tailY + 4, 1, 2);
+    ctx.fillRect(tailX + tailW / 2 - 1, tailY + 6, 1, tailH - 6);
+    ctx.fillRect(tailX + tailW / 2, tailY + tailH - 1, 1, 1);
+
+    ctx.fillStyle = bgDark;
+    ctx.fillRect(tailX + 3, tailY + 1, tailW - 6, 1);
   }
 }
