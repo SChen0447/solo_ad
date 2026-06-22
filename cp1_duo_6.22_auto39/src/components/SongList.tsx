@@ -49,10 +49,10 @@ const SongList: React.FC<SongListProps> = ({
   onSelectSong,
   onAddSong 
 }) => {
-  const [, dispatch] = useReducer(reducer, { selectedId: selectedSongId });
+  const [state, dispatch] = useReducer(reducer, { selectedId: selectedSongId });
 
   const handleSongClick = (songId: string) => {
-    if (selectedSongId === songId) {
+    if (state.selectedId === songId) {
       dispatch({ type: 'DESELECT' });
     } else {
       dispatch({ type: 'SELECT', payload: songId });
@@ -77,16 +77,16 @@ const SongList: React.FC<SongListProps> = ({
     };
   }, [songs, selectedSongId]);
 
-  const isCompactView = !selectedSongId;
+  const isShowcaseView = selectedSongId !== null;
 
   return (
     <div className="song-list-container">
-      {isCompactView ? (
+      {!isShowcaseView ? (
         <div className="song-grid">
           {songs.map(song => (
             <div
               key={song.id}
-              className="song-card compact"
+              className="song-card song-card-grid"
               onClick={() => handleSongClick(song.id)}
             >
               <div className="song-card-content">
@@ -106,32 +106,41 @@ const SongList: React.FC<SongListProps> = ({
         </div>
       ) : (
         <div className="song-showcase">
-          <div className="side-column left">
-            {leftSongs.slice(-3).map((song, index) => (
-              <div
-                key={song.id}
-                className="song-card thumbnail"
-                style={{ 
-                  opacity: 0.3 + (index / leftSongs.slice(-3).length) * 0.3,
-                  transform: `scale(${0.6 + (index / leftSongs.slice(-3).length) * 0.15})`,
-                }}
-                onClick={() => handleSongClick(song.id)}
-              >
-                <h4 className="song-name-small">{song.name}</h4>
-                <p className="song-bpm-small">{song.bpm} BPM</p>
-              </div>
-            ))}
+          <div className="side-stack side-stack-left">
+            {leftSongs.slice(-4).map((song, index) => {
+              const totalLeft = Math.min(leftSongs.length, 4);
+              const positionFromEnd = totalLeft - 1 - index;
+              const scale = 0.55 + positionFromEnd * 0.1;
+              const opacity = 0.2 + positionFromEnd * 0.12;
+              const translateX = -positionFromEnd * 15;
+              
+              return (
+                <div
+                  key={song.id}
+                  className="song-card song-card-thumbnail"
+                  style={{
+                    '--scale': scale,
+                    '--opacity': opacity,
+                    '--translate-x': `${translateX}px`,
+                  } as React.CSSProperties}
+                  onClick={() => handleSongClick(song.id)}
+                >
+                  <h4 className="song-name-small">{song.name}</h4>
+                  <p className="song-bpm-small">{song.bpm} BPM</p>
+                </div>
+              );
+            })}
           </div>
 
-          <div className="center-column">
+          <div className="center-card-wrapper">
             {selectedSong && (
               <div 
-                className="song-card selected"
+                className="song-card song-card-selected"
                 onClick={() => handleSongClick(selectedSong.id)}
               >
                 <div className="pulse-ring"></div>
-                <div className="pulse-ring delay"></div>
-                <div className="song-card-content large">
+                <div className="pulse-ring pulse-ring-delay"></div>
+                <div className="song-card-content song-card-content-large">
                   <h2 className="song-name-large">{selectedSong.name}</h2>
                   <p className="song-artist-large">{selectedSong.artist}</p>
                   <div className="song-meta-large">
@@ -152,21 +161,28 @@ const SongList: React.FC<SongListProps> = ({
             )}
           </div>
 
-          <div className="side-column right">
-            {rightSongs.slice(0, 3).map((song, index) => (
-              <div
-                key={song.id}
-                className="song-card thumbnail"
-                style={{ 
-                  opacity: 0.6 - (index / rightSongs.slice(0, 3).length) * 0.3,
-                  transform: `scale(${0.75 - (index / rightSongs.slice(0, 3).length) * 0.15})`,
-                }}
-                onClick={() => handleSongClick(song.id)}
-              >
-                <h4 className="song-name-small">{song.name}</h4>
-                <p className="song-bpm-small">{song.bpm} BPM</p>
-              </div>
-            ))}
+          <div className="side-stack side-stack-right">
+            {rightSongs.slice(0, 4).map((song, index) => {
+              const scale = 0.85 - index * 0.1;
+              const opacity = 0.6 - index * 0.12;
+              const translateX = index * 15;
+              
+              return (
+                <div
+                  key={song.id}
+                  className="song-card song-card-thumbnail"
+                  style={{
+                    '--scale': scale,
+                    '--opacity': opacity,
+                    '--translate-x': `${translateX}px`,
+                  } as React.CSSProperties}
+                  onClick={() => handleSongClick(song.id)}
+                >
+                  <h4 className="song-name-small">{song.name}</h4>
+                  <p className="song-bpm-small">{song.bpm} BPM</p>
+                </div>
+              );
+            })}
           </div>
         </div>
       )}

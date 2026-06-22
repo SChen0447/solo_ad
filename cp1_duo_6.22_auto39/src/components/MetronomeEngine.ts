@@ -4,7 +4,7 @@ export type MetronomeEvent = 'start' | 'stop' | 'beat';
 
 export class MetronomeEngine {
   private audioContext: AudioContext | null = null;
-  private gainNode: GainNode | null = null;
+  private masterGainNode: GainNode | null = null;
   private analyserNode: AnalyserNode | null = null;
   private bpm: number;
   private volume: number;
@@ -13,9 +13,13 @@ export class MetronomeEngine {
   private nextNoteTime: number = 0;
   private currentBeat: number = 0;
   private schedulerTimer: number | null = null;
-  private eventListeners: Map<MetronomeEvent, Set<() => void>> = new Map();
+  private eventListeners: Map<MetronomeEvent, Set<(time: number) => void>> = new Map();
+  
   private readonly lookahead: number = 25;
   private readonly scheduleAheadTime: number = 0.1;
+  private readonly noteLength: number = 0.05;
+  private readonly accentFreq: number = 1000;
+  private readonly normalFreq: number = 800;
 
   constructor(bpm: number = 120, volume: number = 50, mode: BeatMode = 'quarter') {
     this.bpm = bpm;
@@ -28,76 +32,82 @@ export class MetronomeEngine {
     
     this.audioContext = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
     
-    this.gainNode = this.audioContext.createGain();
-    this.gainNode.gain.value = this.volume / 100;
-    this.gainNode.connect(this.audioContext.destination);
+    this.masterGainNode = this.audioContext.createGain();
+    this.masterGainNode.gain.value = this.volume / 100;
+    this.masterGainNode.connect(this.audioContext.destination);
     
     this.analyserNode = this.audioContext.createAnalyser();
     this.analyserNode.fftSize = 64;
-    this.gainNode.connect(this.analyserNode);
+    this.masterGainNode.connect(this.analyserNode);
+  }
+
+  private secondsPerSubdivision(): number {
+    const secondsPerBeat = 60.0 / this.bpm;
+    const subdivisions = this.mode === 'quarter' ? 1 : 2;
+    return secondsPerBeat / subdivisions;
   }
 
   private nextNote(): void {
-    const secondsPerBeat = 60.0 / this.bpm;
-    const subdivisions = this.mode === 'quarter' ? 1 : 2;
-    this.nextNoteTime += secondsPerBeat / subdivisions;
+    this.nextNoteTime += this.secondsPerSubdivision();
     this.currentBeat++;
+    const subdivisions = this.mode === 'quarter' ? 1 : 2;
     if (this.currentBeat >= subdivisions * 4) {
       this.currentBeat = 0;
     }
   }
 
-  private scheduleNote(time: number): void {
-    if (!this.audioContext || !this.gainNode) return;
+  private scheduleNote(time: number, isAccent: boolean): void {
+    if (!this.audioContext || !this.masterGainNode) return;
 
     const osc = this.audioContext.createOscillator();
     const noteGain = this.audioContext.createGain();
 
-    const isAccent = this.currentBeat % (this.mode === 'quarter' ? 1 : 2) === 0;
-    const freq = isAccent ? 1000 : 800;
-
-    osc.frequency.value = freq;
+    osc.frequency.value = isAccent ? this.accentFreq : this.normalFreq;
     osc.type = 'sine';
 
-    noteGain.gain.value = 0;
     noteGain.gain.setValueAtTime(0, time);
-    noteGain.gain.linearRampToValueAtTime(this.volume / 100 * 0.5, time + 0.001);
-    noteGain.gain.exponentialRampToValueAtTime(0.001, time + 0.05);
+    noteGain.gain.linearRampToValueAtTime(0.5, time + 0.001);
+    noteGain.gain.exponentialRampToValueAtTime(0.001, time + this.noteLength);
 
     osc.connect(noteGain);
-    noteGain.connect(this.gainNode);
+    noteGain.connect(this.masterGainNode);
 
     osc.start(time);
-    osc.stop(time + 0.05);
+    osc.stop(time + this.noteLength);
 
-    this.emit('beat');
+    this.emit('beat', time);
   }
 
-  private scheduler(): void {
-    while (this.nextNoteTime < (this.audioContext?.currentTime || 0) + this.scheduleAheadTime) {
-      this.scheduleNote(this.nextNoteTime);
+  private scheduler = (): void => {
+    if (!this.audioContext || !this.isPlaying) return;
+
+    while (this.nextNoteTime < this.audioContext.currentTime + this.scheduleAheadTime) {
+      const subdivisions = this.mode === 'quarter' ? 1 : 2;
+      const isAccent = this.currentBeat % subdivisions === 0 && this.currentBeat % (subdivisions * 4) === 0;
+      this.scheduleNote(this.nextNoteTime, isAccent);
       this.nextNote();
     }
-  }
+  };
 
   start(): void {
     if (this.isPlaying) return;
 
     this.initAudioContext();
     
-    if (this.audioContext?.state === 'suspended') {
+    if (!this.audioContext) return;
+
+    if (this.audioContext.state === 'suspended') {
       this.audioContext.resume();
     }
 
     this.isPlaying = true;
     this.currentBeat = 0;
-    this.nextNoteTime = this.audioContext?.currentTime || 0;
+    this.nextNoteTime = this.audioContext.currentTime + 0.05;
 
-    this.schedulerTimer = window.setInterval(() => {
-      this.scheduler();
-    }, this.lookahead);
+    this.schedulerTimer = window.setInterval(this.scheduler, this.lookahead);
 
-    this.emit('start');
+    this.scheduler();
+    this.emit('start', this.audioContext.currentTime);
   }
 
   stop(): void {
@@ -110,7 +120,9 @@ export class MetronomeEngine {
       this.schedulerTimer = null;
     }
 
-    this.emit('stop');
+    if (this.audioContext) {
+      this.emit('stop', this.audioContext.currentTime);
+    }
   }
 
   setBPM(bpm: number): void {
@@ -123,8 +135,8 @@ export class MetronomeEngine {
 
   setVolume(volume: number): void {
     this.volume = Math.max(0, Math.min(100, volume));
-    if (this.gainNode) {
-      this.gainNode.gain.value = this.volume / 100;
+    if (this.masterGainNode && this.audioContext) {
+      this.masterGainNode.gain.setTargetAtTime(this.volume / 100, this.audioContext.currentTime, 0.01);
     }
   }
 
@@ -152,7 +164,11 @@ export class MetronomeEngine {
     return this.audioContext;
   }
 
-  on(event: MetronomeEvent, callback: () => void): () => void {
+  getCurrentTime(): number {
+    return this.audioContext?.currentTime || 0;
+  }
+
+  on(event: MetronomeEvent, callback: (time: number) => void): () => void {
     if (!this.eventListeners.has(event)) {
       this.eventListeners.set(event, new Set());
     }
@@ -163,9 +179,9 @@ export class MetronomeEngine {
     };
   }
 
-  private emit(event: MetronomeEvent): void {
+  private emit(event: MetronomeEvent, time: number): void {
     this.eventListeners.get(event)?.forEach(callback => {
-      callback();
+      callback(time);
     });
   }
 

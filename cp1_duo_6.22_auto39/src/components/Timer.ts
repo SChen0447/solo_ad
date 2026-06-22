@@ -12,15 +12,19 @@ export function useTimer() {
   const accumulatedRef = useRef<number>(0);
   const currentSongStartTimeRef = useRef<number | null>(null);
   const currentSongAccumulatedRef = useRef<number>(0);
-  const intervalRef = useRef<number | null>(null);
+  const animationFrameRef = useRef<number | null>(null);
   
   const [totalDuration, setTotalDuration] = useState<number>(0);
   const [currentSongDuration, setCurrentSongDuration] = useState<number>(0);
   const [isRunning, setIsRunning] = useState<boolean>(false);
   const [records, setRecords] = useState<Map<string, RehearsalRecord>>(new Map());
 
+  const getNow = useCallback((): number => {
+    return performance.now();
+  }, []);
+
   const updateTime = useCallback(() => {
-    const now = Date.now();
+    const now = getNow();
     
     if (startTimeRef.current !== null) {
       const elapsed = (now - startTimeRef.current) / 1000;
@@ -33,27 +37,30 @@ export function useTimer() {
       const total = currentSongAccumulatedRef.current + elapsed;
       setCurrentSongDuration(total);
     }
-  }, []);
+  }, [getNow]);
+
+  const tick = useCallback(() => {
+    updateTime();
+    animationFrameRef.current = requestAnimationFrame(tick);
+  }, [updateTime]);
 
   const start = useCallback(() => {
     if (isRunning) return;
     
-    const now = Date.now();
+    const now = getNow();
     startTimeRef.current = now;
     currentSongStartTimeRef.current = now;
     setIsRunning(true);
     
-    intervalRef.current = window.setInterval(() => {
-      updateTime();
-    }, 1000);
+    animationFrameRef.current = requestAnimationFrame(tick);
     
     updateTime();
-  }, [isRunning, updateTime]);
+  }, [isRunning, getNow, tick, updateTime]);
 
   const stop = useCallback(() => {
     if (!isRunning) return;
     
-    const now = Date.now();
+    const now = getNow();
     
     if (startTimeRef.current !== null) {
       accumulatedRef.current += (now - startTimeRef.current) / 1000;
@@ -65,14 +72,14 @@ export function useTimer() {
       currentSongStartTimeRef.current = null;
     }
     
-    if (intervalRef.current) {
-      clearInterval(intervalRef.current);
-      intervalRef.current = null;
+    if (animationFrameRef.current) {
+      cancelAnimationFrame(animationFrameRef.current);
+      animationFrameRef.current = null;
     }
     
     setIsRunning(false);
     updateTime();
-  }, [isRunning, updateTime]);
+  }, [isRunning, getNow, updateTime]);
 
   const reset = useCallback(() => {
     stop();
@@ -84,7 +91,7 @@ export function useTimer() {
   }, [stop]);
 
   const switchSong = useCallback((songId: string, songName: string) => {
-    const now = Date.now();
+    const now = getNow();
     
     if (currentSongStartTimeRef.current !== null) {
       currentSongAccumulatedRef.current += (now - currentSongStartTimeRef.current) / 1000;
@@ -114,30 +121,30 @@ export function useTimer() {
       currentSongStartTimeRef.current = now;
     }
     setCurrentSongDuration(0);
-  }, [isRunning]);
+  }, [isRunning, getNow]);
 
   useEffect(() => {
     return () => {
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
       }
     };
   }, []);
 
   const getRecordsArray = useCallback((): RehearsalRecord[] => {
-    const now = Date.now();
+    const now = getNow();
     const result: RehearsalRecord[] = [];
     
     records.forEach((record, songId) => {
-      let totalDuration = record.totalDuration;
+      let recordTotalDuration = record.totalDuration;
       if (isRunning && currentSongStartTimeRef.current !== null && songId === record.songId) {
-        totalDuration += (now - currentSongStartTimeRef.current) / 1000;
+        recordTotalDuration += (now - currentSongStartTimeRef.current) / 1000;
       }
-      result.push({ ...record, totalDuration });
+      result.push({ ...record, totalDuration: recordTotalDuration });
     });
     
     return result;
-  }, [records, isRunning]);
+  }, [records, isRunning, getNow]);
 
   const formatTime = (seconds: number): string => {
     const mins = Math.floor(seconds / 60);
