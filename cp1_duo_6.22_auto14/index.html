@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>基因花园</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background-color: #e0f2e9;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+    }
+    #game-container {
+      width: 100%;
+      height: 100%;
+      position: relative;
+    }
+    #game-container canvas {
+      display: block;
+    }
+    .achievement-panel {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+      background: rgba(224, 242, 233, 0.4);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+    }
+    .achievement-panel.show {
+      display: flex;
+    }
+    .achievement-content {
+      background: rgba(255, 255, 255, 0.85);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border-radius: 20px;
+      padding: 30px;
+      max-width: 500px;
+      width: 90%;
+      max-height: 80vh;
+      overflow-y: auto;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.5);
+    }
+    .achievement-title {
+      font-size: 24px;
+      color: #2d5016;
+      margin-bottom: 20px;
+      text-align: center;
+    }
+    .achievement-close {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.9);
+      border: none;
+      font-size: 20px;
+      cursor: pointer;
+      color: #666;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+      transition: all 0.2s;
+    }
+    .achievement-close:hover {
+      background: #fff;
+      transform: scale(1.1);
+    }
+    .achievement-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 15px;
+    }
+    @media (max-width: 768px) {
+      .achievement-grid {
+        grid-template-columns: repeat(2, 1fr);
+      }
+    }
+    .achievement-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 15px;
+      border-radius: 12px;
+      background: rgba(255, 255, 255, 0.6);
+      transition: all 0.3s;
+    }
+    .achievement-item.unlocked {
+      background: rgba(144, 238, 144, 0.3);
+    }
+    .achievement-icon {
+      width: 50px;
+      height: 50px;
+      border-radius: 50%;
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 24px;
+    }
+    .achievement-item.locked .achievement-icon {
+      background: #ccc;
+      filter: grayscale(1);
+      opacity: 0.5;
+    }
+    .achievement-name {
+      font-size: 12px;
+      color: #333;
+      text-align: center;
+    }
+    .achievement-item.locked .achievement-name {
+      color: #999;
+    }
+    .confirm-dialog {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 200;
+      background: rgba(0, 0, 0, 0.4);
+      backdrop-filter: blur(5px);
+      -webkit-backdrop-filter: blur(5px);
+    }
+    .confirm-dialog.show {
+      display: flex;
+    }
+    .confirm-content {
+      background: #fff;
+      border-radius: 16px;
+      padding: 30px;
+      text-align: center;
+      max-width: 360px;
+      width: 90%;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+    }
+    .confirm-title {
+      font-size: 18px;
+      color: #333;
+      margin-bottom: 15px;
+    }
+    .confirm-message {
+      font-size: 14px;
+      color: #666;
+      margin-bottom: 25px;
+    }
+    .confirm-buttons {
+      display: flex;
+      gap: 12px;
+      justify-content: center;
+    }
+    .confirm-btn {
+      padding: 10px 24px;
+      border-radius: 8px;
+      border: none;
+      cursor: pointer;
+      font-size: 14px;
+      transition: all 0.2s;
+    }
+    .confirm-btn.cancel {
+      background: #f0f0f0;
+      color: #666;
+    }
+    .confirm-btn.cancel:hover {
+      background: #e0e0e0;
+    }
+    .confirm-btn.ok {
+      background: #e74c3c;
+      color: #fff;
+    }
+    .confirm-btn.ok:hover {
+      background: #c0392b;
+    }
+  </style>
+</head>
+<body>
+  <div id="game-container"></div>
+
+  <div class="achievement-panel" id="achievementPanel">
+    <button class="achievement-close" id="achievementClose">&times;</button>
+    <div class="achievement-content">
+      <h2 class="achievement-title">🏆 成就收藏</h2>
+      <div class="achievement-grid" id="achievementGrid"></div>
+    </div>
+  </div>
+
+  <div class="confirm-dialog" id="confirmDialog">
+    <div class="confirm-content">
+      <h3 class="confirm-title">确认重置</h3>
+      <p class="confirm-message">确定要重置所有进度吗？此操作不可撤销。</p>
+      <div class="confirm-buttons">
+        <button class="confirm-btn cancel" id="confirmCancel">取消</button>
+        <button class="confirm-btn ok" id="confirmOk">确认重置</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
