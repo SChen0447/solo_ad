@@ -6,6 +6,8 @@ const store = useTaskStore()
 const editingTaskId = ref<string | null>(null)
 const dragOverColumn = ref<TaskStatus | null>(null)
 const showCreateModal = ref(false)
+const draggingTaskId = ref<string | null>(null)
+const justPlacedTaskId = ref<string | null>(null)
 
 const newTask = ref({
   title: '',
@@ -42,6 +44,11 @@ function onDragStart(e: DragEvent, taskId: string) {
     e.dataTransfer.effectAllowed = 'move'
     e.dataTransfer.setData('text/task-id', taskId)
   }
+  draggingTaskId.value = taskId
+}
+
+function onDragEnd() {
+  draggingTaskId.value = null
 }
 
 function onDragOver(e: DragEvent, status: TaskStatus) {
@@ -50,8 +57,13 @@ function onDragOver(e: DragEvent, status: TaskStatus) {
   dragOverColumn.value = status
 }
 
-function onDragLeave() {
-  dragOverColumn.value = null
+function onDragLeave(e: DragEvent, status: TaskStatus) {
+  const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
+  const x = e.clientX
+  const y = e.clientY
+  if (x < rect.left || x > rect.right || y < rect.top || y > rect.bottom) {
+    dragOverColumn.value = null
+  }
 }
 
 function onDrop(e: DragEvent, status: TaskStatus) {
@@ -60,9 +72,15 @@ function onDrop(e: DragEvent, status: TaskStatus) {
   const taskId = e.dataTransfer?.getData('text/task-id')
   if (!taskId) return
   const success = store.moveTask(taskId, status)
-  if (!success) {
+  if (success) {
+    justPlacedTaskId.value = taskId
+    setTimeout(() => {
+      justPlacedTaskId.value = null
+    }, 150)
+  } else {
     store.pushNotification('该成员同时进行中的任务已达上限（3个）', 'warning')
   }
+  draggingTaskId.value = null
 }
 
 function saveTask(taskId: string, patch: Partial<Task>) {
@@ -109,21 +127,27 @@ function handleCreateTask() {
         class="kanban-column"
         :class="{ 'drag-over': dragOverColumn === col.key }"
         @dragover="onDragOver($event, col.key)"
-        @dragleave="onDragLeave"
+        @dragleave="onDragLeave($event, col.key)"
         @drop="onDrop($event, col.key)"
       >
         <div class="column-header">
           <span class="column-title">{{ col.label }}</span>
           <span class="column-count">{{ getTasksByStatus(col.key).length }}</span>
         </div>
+        <div v-if="dragOverColumn === col.key && draggingTaskId" class="column-highlight"></div>
 
         <div class="column-body">
           <div
             v-for="task in getTasksByStatus(col.key)"
             :key="task.id"
             class="task-card"
+            :class="{
+              'is-dragging': draggingTaskId === task.id,
+              'just-placed': justPlacedTaskId === task.id
+            }"
             draggable="true"
             @dragstart="onDragStart($event, task.id)"
+            @dragend="onDragEnd"
           >
             <template v-if="editingTaskId === task.id">
               <div class="edit-form">
@@ -249,17 +273,39 @@ function handleCreateTask() {
 }
 
 .kanban-column {
+  position: relative;
   background: rgba(255, 255, 255, 0.03);
   border: 1px solid rgba(255, 255, 255, 0.06);
   border-radius: 12px;
   padding: 16px;
   min-height: 400px;
   transition: all 200ms ease;
+  overflow: hidden;
 }
 
 .kanban-column.drag-over {
   background: rgba(233, 69, 96, 0.08);
   border-color: rgba(233, 69, 96, 0.4);
+}
+
+.column-highlight {
+  position: absolute;
+  inset: 0;
+  background: rgba(99, 102, 241, 0.12);
+  border: 2px dashed rgba(99, 102, 241, 0.5);
+  border-radius: 12px;
+  pointer-events: none;
+  animation: pulse 1.5s ease-in-out infinite;
+  z-index: 1;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 0.6;
+  }
+  50% {
+    opacity: 1;
+  }
 }
 
 .column-header {
@@ -269,6 +315,8 @@ function handleCreateTask() {
   margin-bottom: 16px;
   padding-bottom: 12px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  position: relative;
+  z-index: 2;
 }
 
 .column-title {
@@ -291,6 +339,8 @@ function handleCreateTask() {
   display: flex;
   flex-direction: column;
   gap: 12px;
+  position: relative;
+  z-index: 2;
 }
 
 .task-card {
@@ -299,11 +349,13 @@ function handleCreateTask() {
   border-radius: 12px;
   padding: 14px;
   cursor: grab;
-  transition: transform 200ms ease, box-shadow 200ms ease;
+  transition: transform 200ms ease, box-shadow 200ms ease, opacity 200ms ease;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+  position: relative;
+  z-index: 2;
 }
 
-.task-card:hover {
+.task-card:hover:not(.is-dragging) {
   transform: scale(1.02);
   box-shadow: 0 8px 30px rgba(233, 69, 96, 0.15);
   border-color: rgba(233, 69, 96, 0.25);
@@ -311,6 +363,25 @@ function handleCreateTask() {
 
 .task-card:active {
   cursor: grabbing;
+}
+
+.task-card.is-dragging {
+  opacity: 0.8;
+  transform: scale(0.95);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+}
+
+.task-card.just-placed {
+  animation: popIn 150ms ease-out;
+}
+
+@keyframes popIn {
+  0% {
+    transform: scale(0.95);
+  }
+  100% {
+    transform: scale(1);
+  }
 }
 
 .card-top {

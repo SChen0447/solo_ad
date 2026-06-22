@@ -213,7 +213,13 @@ onUnmounted(() => {
 .chart-canvas {
   width: 100%;
   height: 320px;
-  aspect-ratio: 16 / 9;
+}
+
+@media (max-width: 1024px) {
+  .chart-canvas {
+    height: auto;
+    aspect-ratio: 16 / 9;
+  }
 }
 
 .custom-legend {
@@ -229,4 +235,34 @@ onUnmounted(() => {
   gap: 8px;
   padding: 6px 14px;
   background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 12px;
+  cursor: pointer;
+  transition: opacity 300ms ease, background 200ms ease;
+}
+
+.legend-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.legend-btn.inactive {
+  opacity: 0.3;
+}
+
+.legend-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+}
+
+.legend-dot.bar {
+  background: linear-gradient(180deg, #e94560, rgba(233, 69, 96, 0.3));
+}
+
+.legend-dot.line {
+  background: #a78bfa;
+  border-radius: 50%;
+}
+</style>
