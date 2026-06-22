@@ -20,7 +20,6 @@ const marketManager = new MarketManager();
 const uiController = new UIController(app, marketManager);
 
 let gamePaused = false;
-let lastTime = performance.now();
 
 function handleVisibilityChange(): void {
   if (document.hidden) {
@@ -29,7 +28,6 @@ function handleVisibilityChange(): void {
   } else {
     gamePaused = false;
     marketManager.setPaused(false);
-    lastTime = performance.now();
   }
 }
 
@@ -41,8 +39,6 @@ app.ticker.add((delta) => {
   }
 
   const currentTime = performance.now();
-  lastTime = currentTime;
-
   marketManager.update(currentTime);
   uiController.update(delta);
 });

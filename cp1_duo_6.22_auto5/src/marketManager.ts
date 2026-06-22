@@ -41,12 +41,6 @@ export class MarketManager {
   private initializePriceStates(): void {
     for (const commodity of COMMODITIES) {
       const initialPrice = commodity.basePrice;
-      const initialCandle: KlineCandle = {
-        open: initialPrice,
-        close: initialPrice,
-        high: initialPrice,
-        low: initialPrice,
-      };
       this.priceStates.set(commodity.id, {
         commodityId: commodity.id,
         currentPrice: initialPrice,
@@ -199,10 +193,9 @@ export class MarketManager {
       const state = this.priceStates.get(commodity.id);
       if (!state) continue;
 
-      const sineValue = calculateSinePrice(commodity, elapsedMs);
+      const priceDelta = calculateSinePrice(commodity, elapsedMs) - commodity.basePrice;
       const previousPrice = state.currentPrice;
-      const baseDiff = sineValue - commodity.basePrice;
-      const newPrice = clampPrice(commodity, commodity.basePrice + baseDiff * 0.1);
+      const newPrice = clampPrice(commodity, commodity.basePrice + priceDelta);
 
       this.updatePriceState(commodity, state, previousPrice, newPrice);
     }
@@ -214,7 +207,8 @@ export class MarketManager {
       if (!state) continue;
 
       if (state.currentCandle) {
-        state.history.push({ ...state.currentCandle });
+        const completedCandle: KlineCandle = { ...state.currentCandle };
+        state.history.push(completedCandle);
         if (state.history.length > MAX_HISTORY_POINTS) {
           state.history.shift();
         }

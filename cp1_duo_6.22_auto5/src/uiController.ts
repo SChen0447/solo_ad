@@ -641,23 +641,10 @@ export class UIController {
 
   private triggerFlash(type: 'up' | 'down'): void {
     this.flashColor = type === 'up' ? 0x00ff00 : 0xff0000;
+    this.flashStartTime = performance.now();
+    this.isFlashing = true;
     this.flashAlpha = 0.5;
-
-    const startTime = performance.now();
-    const duration = 500;
-
-    const animate = () => {
-      const elapsed = performance.now() - startTime;
-      if (elapsed < duration) {
-        this.flashAlpha = 0.5 * (1 - elapsed / duration);
-        this.updateFlashOverlay();
-        requestAnimationFrame(animate);
-      } else {
-        this.flashAlpha = 0;
-        this.updateFlashOverlay();
-      }
-    };
-    requestAnimationFrame(animate);
+    this.updateFlashOverlay();
   }
 
   private updateFlashOverlay(): void {
@@ -695,48 +682,66 @@ export class UIController {
     const colors = ['#ff4444', '#f5deb3', '#888888', '#d8bfd8', '#ff8c00'];
 
     states.forEach((state, idx) => {
-      if (state.history.length < 2) return;
+      if (state.history.length < 1) return;
 
       let minPrice = Infinity;
       let maxPrice = -Infinity;
-      for (const p of state.history) {
-        minPrice = Math.min(minPrice, p);
-        maxPrice = Math.max(maxPrice, p);
+      for (const candle of state.history) {
+        minPrice = Math.min(minPrice, candle.low);
+        maxPrice = Math.max(maxPrice, candle.high);
+      }
+      if (state.currentCandle) {
+        minPrice = Math.min(minPrice, state.currentCandle.low);
+        maxPrice = Math.max(maxPrice, state.currentCandle.high);
       }
       if (minPrice === maxPrice) {
         minPrice -= 1;
         maxPrice += 1;
       }
 
-      ctx.strokeStyle = colors[idx % colors.length];
-      ctx.lineWidth = 2;
-      ctx.beginPath();
+      const color = colors[idx % colors.length];
+      const candleWidth = Math.max(3, (width / 30) * 0.6);
+      const candleSpacing = width / 30;
 
-      const pointCount = state.history.length;
-      for (let i = 0; i < pointCount; i++) {
-        const x = (width / (30 - 1)) * i;
-        const normalized = (state.history[i] - minPrice) / (maxPrice - minPrice);
-        const y = height - normalized * (height - 10) - 5;
-
-        if (i === 0) {
-          ctx.moveTo(x, y);
-        } else {
-          ctx.lineTo(x, y);
-        }
+      const allCandles: KlineCandle[] = [...state.history];
+      if (state.currentCandle) {
+        allCandles.push(state.currentCandle);
       }
-      ctx.stroke();
 
-      if (state.history.length > 0) {
-        const lastIdx = state.history.length - 1;
-        const x = (width / (30 - 1)) * lastIdx;
-        const normalized = (state.history[lastIdx] - minPrice) / (maxPrice - minPrice);
-        const y = height - normalized * (height - 10) - 5;
+      allCandles.forEach((candle, i) => {
+        if (i >= 30) return;
 
-        ctx.fillStyle = colors[idx % colors.length];
+        const x = i * candleSpacing + candleSpacing / 2;
+
+        const normalize = (price: number): number => {
+          return height - ((price - minPrice) / (maxPrice - minPrice)) * (height - 10) - 5;
+        };
+
+        const yHigh = normalize(candle.high);
+        const yLow = normalize(candle.low);
+        const yOpen = normalize(candle.open);
+        const yClose = normalize(candle.close);
+
+        const isUp = candle.close >= candle.open;
+
+        ctx.strokeStyle = isUp ? '#00ff00' : '#ff0000';
+        ctx.lineWidth = 1;
         ctx.beginPath();
-        ctx.arc(x, y, 3, 0, Math.PI * 2);
-        ctx.fill();
-      }
+        ctx.moveTo(x, yHigh);
+        ctx.lineTo(x, yLow);
+        ctx.stroke();
+
+        const rectTop = Math.min(yOpen, yClose);
+        const rectBottom = Math.max(yOpen, yClose);
+        const rectHeight = Math.max(1, rectBottom - rectTop);
+
+        ctx.fillStyle = isUp ? '#00ff00' : '#ff0000';
+        ctx.fillRect(x - candleWidth / 2, rectTop, candleWidth, rectHeight);
+
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 1;
+        ctx.strokeRect(x - candleWidth / 2, rectTop, candleWidth, rectHeight);
+      });
     });
 
     this.klineSprite.texture.update();
@@ -747,13 +752,26 @@ export class UIController {
   }
 
   private handleResize(): void {
+    const oldIsSmallScreen = this.isSmallScreen;
     this.screenWidth = window.innerWidth;
     this.screenHeight = window.innerHeight;
     this.isSmallScreen = this.screenWidth < 1024;
 
     this.app.renderer.resize(this.screenWidth, this.screenHeight);
 
-    this.redrawLayout();
+    if (oldIsSmallScreen !== this.isSmallScreen || this.commodityRows.size === 0) {
+      this.redrawLayout();
+    } else {
+      this.updateRowResponsiveness();
+      this.walletDisplay.x = this.screenWidth - 220;
+      this.commodityListContainer.x = this.isSmallScreen ? 10 : 20;
+      this.messageText.x = this.screenWidth / 2;
+      if (!this.isSmallScreen) {
+        this.klineContainer.x = 20;
+        this.klineContainer.y = this.screenHeight - 180;
+        this.drawKline();
+      }
+    }
   }
 
   private redrawLayout(): void {
@@ -785,8 +803,35 @@ export class UIController {
   }
 
   public update(_deltaTime: number): void {
-    if (this.flashAlpha > 0) {
+    if (this.isFlashing) {
+      const elapsed = performance.now() - this.flashStartTime;
+      if (elapsed < this.flashDuration) {
+        this.flashAlpha = 0.5 * (1 - elapsed / this.flashDuration);
+      } else {
+        this.flashAlpha = 0;
+        this.isFlashing = false;
+      }
       this.updateFlashOverlay();
+    }
+  }
+
+  private updateRowResponsiveness(): void {
+    const isSmall = this.isSmallScreen;
+    for (const row of this.commodityRows.values()) {
+      row.trendArrow.visible = !isSmall;
+      row.quantityText.visible = !isSmall;
+      row.priceText.x = isSmall ? 140 : 160;
+      row.quantityText.x = isSmall ? 210 : 280;
+
+      const rowWidth = this.getRowWidth();
+      row.bg.clear();
+      row.bg.beginFill(CARD_COLOR);
+      row.bg.lineStyle(2, CARD_BORDER_COLOR);
+      row.bg.drawRoundedRect(0, 0, rowWidth, ROW_HEIGHT, 4);
+      row.bg.endFill();
+
+      row.buyButton.x = rowWidth - 150;
+      row.sellButton.x = rowWidth - 75;
     }
   }
 }
