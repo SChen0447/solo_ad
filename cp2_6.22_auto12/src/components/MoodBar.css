@@ -1,0 +1,196 @@
+.mood-bar-container {
+  background: #f9fafb;
+  border-radius: 16px;
+  padding: 20px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.mood-bar-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.mood-bar-title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: #374151;
+}
+
+.view-toggle {
+  display: flex;
+  gap: 4px;
+  background: #e5e7eb;
+  padding: 3px;
+  border-radius: 20px;
+}
+
+.toggle-btn {
+  padding: 6px 14px;
+  border: none;
+  background: transparent;
+  font-size: 13px;
+  font-weight: 500;
+  color: #6b7280;
+  cursor: pointer;
+  border-radius: 16px;
+  transition: all 0.3s ease-out;
+  font-family: inherit;
+}
+
+.toggle-btn.active {
+  background: white;
+  color: #6366f1;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.mood-bar-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.curve-container {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  margin-bottom: 8px;
+}
+
+.mood-curve-svg {
+  overflow: visible;
+}
+
+.curve-path {
+  stroke-dasharray: 1000;
+  stroke-dashoffset: 1000;
+  animation: drawCurve 1.5s ease-out forwards;
+}
+
+@keyframes drawCurve {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+.curve-point {
+  opacity: 0;
+  animation: pointFadeIn 0.3s ease-out forwards;
+}
+
+@keyframes pointFadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.mood-blocks {
+  display: flex;
+  gap: 4px;
+  justify-content: center;
+  align-items: flex-end;
+}
+
+.mood-block {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.mood-block-color {
+  width: 40px;
+  height: 80px;
+  border-radius: 8px;
+  transition: all 0.3s ease-out;
+}
+
+.mood-block.has-mood .mood-block-color:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
+}
+
+.mood-block.empty .mood-block-color {
+  background: #e5e7eb !important;
+  opacity: 0.5;
+}
+
+.mood-block-date {
+  font-size: 12px;
+  color: #9ca3af;
+  font-weight: 500;
+}
+
+.mood-tooltip {
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  background: white;
+  padding: 10px 12px;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  white-space: nowrap;
+  z-index: 10;
+  margin-bottom: 8px;
+  opacity: 0;
+  animation: tooltipFadeIn 0.2s ease-out forwards;
+}
+
+.mood-tooltip::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 6px solid transparent;
+  border-top-color: white;
+}
+
+@keyframes tooltipFadeIn {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+}
+
+.tooltip-date {
+  font-size: 13px;
+  font-weight: 600;
+  color: #374151;
+  margin-bottom: 4px;
+}
+
+.tooltip-keywords {
+  font-size: 12px;
+  color: #6b7280;
+}
+
+@media (max-width: 480px) {
+  .mood-bar-container {
+    padding: 16px;
+  }
+  
+  .mood-block-color {
+    width: 32px;
+    height: 60px;
+  }
+  
+  .mood-blocks {
+    gap: 3px;
+  }
+}

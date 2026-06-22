@@ -1,0 +1,119 @@
+.diary-input-container {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 24px;
+  background: #ffffff;
+  border-radius: 16px;
+  border: 2px solid #e5e7eb;
+}
+
+.diary-input-title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: #374151;
+}
+
+.textarea-wrapper {
+  position: relative;
+  transition: all 0.3s ease-out;
+}
+
+.textarea-wrapper.shake {
+  animation: shake 0.4s ease-in-out;
+}
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-4px); }
+  40% { transform: translateX(4px); }
+  60% { transform: translateX(-4px); }
+  80% { transform: translateX(4px); }
+}
+
+.diary-textarea {
+  width: 100%;
+  min-height: 160px;
+  padding: 16px;
+  font-size: 16px;
+  line-height: 1.6;
+  color: #374151;
+  border: 2px solid #e5e7eb;
+  border-radius: 12px;
+  outline: none;
+  resize: none;
+  font-family: inherit;
+  transition: all 0.3s ease-out;
+  box-sizing: border-box;
+}
+
+.diary-textarea:focus {
+  border-color: #6366f1;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+}
+
+.diary-textarea.warning {
+  color: #eab308;
+  font-size: 1.02em;
+  transform: scale(1.02);
+  transform-origin: top left;
+}
+
+.diary-textarea.error {
+  border-color: #ef4444;
+}
+
+.char-count {
+  position: absolute;
+  bottom: 12px;
+  right: 16px;
+  font-size: 13px;
+  color: #9ca3af;
+  transition: all 0.3s ease-out;
+}
+
+.char-count.warning {
+  color: #eab308;
+  font-weight: 600;
+}
+
+.char-count.error {
+  color: #ef4444;
+  font-weight: 600;
+}
+
+.save-button {
+  width: 160px;
+  height: 48px;
+  border: none;
+  border-radius: 20px;
+  background: linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%);
+  color: white;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease-out;
+  align-self: flex-end;
+  font-family: inherit;
+}
+
+.save-button:hover:not(:disabled) {
+  transform: translateX(3px);
+  box-shadow: 0 4px 20px rgba(99, 102, 241, 0.5);
+}
+
+.save-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+@media (max-width: 480px) {
+  .diary-input-container {
+    padding: 16px;
+  }
+  
+  .save-button {
+    width: 100%;
+  }
+}

@@ -1,0 +1,136 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+  background: #f3f4f6;
+  color: #374151;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.app-container {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  padding: 24px;
+  max-width: 1400px;
+  margin: 0 auto;
+  gap: 24px;
+}
+
+.app-header {
+  text-align: center;
+  margin-bottom: 8px;
+}
+
+.app-title {
+  font-size: 28px;
+  font-weight: 700;
+  color: #1f2937;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+
+.title-icon {
+  font-size: 32px;
+}
+
+.app-subtitle {
+  font-size: 14px;
+  color: #9ca3af;
+  margin-top: 4px;
+}
+
+.main-content {
+  display: grid;
+  grid-template-columns: 280px 1fr 320px;
+  gap: 24px;
+  flex: 1;
+  min-height: 0;
+}
+
+.left-panel {
+  display: flex;
+  flex-direction: column;
+}
+
+.center-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.right-panel {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.app-footer {
+  margin-top: auto;
+}
+
+@media (max-width: 1024px) {
+  .main-content {
+    grid-template-columns: 240px 1fr 280px;
+    gap: 16px;
+  }
+}
+
+@media (max-width: 768px) {
+  .app-container {
+    padding: 16px;
+    gap: 16px;
+  }
+  
+  .main-content {
+    grid-template-columns: 1fr 1fr;
+    grid-template-areas:
+      "left center"
+      "right right";
+  }
+  
+  .left-panel {
+    grid-area: left;
+  }
+  
+  .center-panel {
+    grid-area: center;
+  }
+  
+  .right-panel {
+    grid-area: right;
+    max-height: 400px;
+  }
+}
+
+@media (max-width: 480px) {
+  .app-container {
+    padding: 12px;
+    gap: 12px;
+  }
+  
+  .app-title {
+    font-size: 22px;
+  }
+  
+  .main-content {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "left"
+      "center"
+      "right";
+    gap: 12px;
+  }
+  
+  .right-panel {
+    max-height: none;
+  }
+}
