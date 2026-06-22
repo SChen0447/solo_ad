@@ -12,13 +12,12 @@ export default function PlaylistGenerator({ onPlayEpisode }: PlaylistGeneratorPr
   const [candidates, setCandidates] = useState<Episode[]>([]);
   const [totalDuration, setTotalDuration] = useState(0);
   const [isGenerating, setIsGenerating] = useState(false);
-  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
-  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
 
   const maxDurationSeconds = duration * 60;
   const remainingDuration = Math.max(0, maxDurationSeconds - totalDuration);
   const usagePercent = maxDurationSeconds > 0 ? Math.min(100, (totalDuration / maxDurationSeconds) * 100) : 0;
   const isOverLimit = totalDuration > maxDurationSeconds;
+  const overLimitMinutes = Math.ceil((totalDuration - maxDurationSeconds) / 60);
 
   const handleGenerate = async () => {
     if (isGenerating) return;
@@ -44,45 +43,8 @@ export default function PlaylistGenerator({ onPlayEpisode }: PlaylistGeneratorPr
     return `${hours}小时${remainMins}分`;
   };
 
-  const handleDragStart = (e: React.DragEvent, index: number) => {
-    setDraggedIndex(index);
-    e.dataTransfer.effectAllowed = 'move';
-    e.dataTransfer.setData('text/plain', String(index));
-  };
-
-  const handleDragEnd = () => {
-    setDraggedIndex(null);
-    setDragOverIndex(null);
-  };
-
-  const handleDragOver = (e: React.DragEvent, index: number) => {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = 'move';
-    if (index !== draggedIndex) {
-      setDragOverIndex(index);
-    }
-  };
-
-  const handleDragLeave = () => {
-    setDragOverIndex(null);
-  };
-
-  const handleDrop = (e: React.DragEvent, dropIndex: number) => {
-    e.preventDefault();
-    if (draggedIndex === null || draggedIndex === dropIndex) {
-      setDraggedIndex(null);
-      setDragOverIndex(null);
-      return;
-    }
-    const newPlaylist = [...playlist];
-    const [draggedItem] = newPlaylist.splice(draggedIndex, 1);
-    newPlaylist.splice(dropIndex, 0, draggedItem);
-    setPlaylist(newPlaylist);
-    setDraggedIndex(null);
-    setDragOverIndex(null);
-  };
-
   const handleAddCandidate = (episode: Episode) => {
+    if (isOverLimit) return;
     setCandidates((prev) => prev.filter((ep) => ep.id !== episode.id));
     setPlaylist((prev) => [...prev, episode]);
     setTotalDuration((prev) => prev + episode.duration);
@@ -122,79 +84,76 @@ export default function PlaylistGenerator({ onPlayEpisode }: PlaylistGeneratorPr
     showRemove?: boolean;
     showAdd?: boolean;
     isInPlaylist?: boolean;
-  }) => (
-    <div
-      className={`playlist-card ${isInPlaylist && draggedIndex === index ? 'dragging' : ''} ${isInPlaylist && dragOverIndex === index ? 'drag-over' : ''} ${showAdd ? 'candidate-card' : ''}`}
-      draggable={isInPlaylist}
-      onDragStart={isInPlaylist ? (e) => handleDragStart(e, index!) : undefined}
-      onDragEnd={isInPlaylist ? handleDragEnd : undefined}
-      onDragOver={isInPlaylist ? (e) => handleDragOver(e, index!) : undefined}
-      onDragLeave={isInPlaylist ? handleDragLeave : undefined}
-      onDrop={isInPlaylist ? (e) => handleDrop(e, index!) : undefined}
-      style={{
-        transition: draggedIndex !== null && isInPlaylist
-          ? 'transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)'
-          : 'all 0.2s ease',
-      }}
-    >
-      {showRemove && (
-        <button
-          className="card-action-btn remove-btn"
-          onClick={() => handleRemoveFromPlaylist(index!)}
-          title="从列表移除"
-        >
-          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-            <line x1="18" y1="6" x2="6" y2="18"></line>
-            <line x1="6" y1="6" x2="18" y2="18"></line>
-          </svg>
-        </button>
-      )}
+  }) => {
+    const isAddDisabled = showAdd && isOverLimit;
 
-      {showAdd && (
-        <button
-          className="card-action-btn add-btn"
-          onClick={() => handleAddCandidate(episode)}
-          title="添加到播放列表"
-        >
-          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-            <line x1="12" y1="5" x2="12" y2="19"></line>
-            <line x1="5" y1="12" x2="19" y2="12"></line>
-          </svg>
-        </button>
-      )}
+    return (
+      <div
+        className={`playlist-card ${showAdd ? 'candidate-card' : ''}`}
+        style={{
+          transition: 'all 0.2s ease',
+        }}
+      >
+        {showRemove && (
+          <button
+            className="card-action-btn remove-btn"
+            onClick={() => handleRemoveFromPlaylist(index!)}
+            title="从列表移除"
+          >
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+          </button>
+        )}
 
-      {isInPlaylist && (
-        <div className="card-index-badge">{(index ?? 0) + 1}</div>
-      )}
+        {showAdd && (
+          <button
+            className={`card-action-btn add-btn ${isAddDisabled ? 'disabled' : ''}`}
+            onClick={() => !isAddDisabled && handleAddCandidate(episode)}
+            title={isAddDisabled ? '已超时长限制，无法添加' : '添加到播放列表'}
+            disabled={isAddDisabled}
+          >
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="12" y1="5" x2="12" y2="19"></line>
+              <line x1="5" y1="12" x2="19" y2="12"></line>
+            </svg>
+          </button>
+        )}
 
-      <img
-        src={episode.coverUrl}
-        alt={episode.title}
-        className="playlist-card-cover"
-      />
-      <h3 className="playlist-card-title">{episode.title}</h3>
-      <div className="playlist-card-meta">
-        <span>{formatDuration(episode.duration)}</span>
-        <span className="playlist-card-rating">⭐ {episode.rating.toFixed(1)}</span>
-      </div>
-      {episode.podcastTitle && (
-        <p className="playlist-card-podcast">{episode.podcastTitle}</p>
-      )}
-      <div className="playlist-card-overlay">
-        <div
-          className="play-btn-icon"
-          onClick={(e) => {
-            e.stopPropagation();
-            onPlayEpisode?.(episode);
-          }}
-        >
-          <svg viewBox="0 0 24 24">
-            <path d="M8 5v14l11-7z" />
-          </svg>
+        {isInPlaylist && (
+          <div className="card-index-badge">{(index ?? 0) + 1}</div>
+        )}
+
+        <img
+          src={episode.coverUrl}
+          alt={episode.title}
+          className="playlist-card-cover"
+        />
+        <h3 className="playlist-card-title">{episode.title}</h3>
+        <div className="playlist-card-meta">
+          <span>{formatDuration(episode.duration)}</span>
+          <span className="playlist-card-rating">⭐ {episode.rating.toFixed(1)}</span>
+        </div>
+        {episode.podcastTitle && (
+          <p className="playlist-card-podcast">{episode.podcastTitle}</p>
+        )}
+        <div className="playlist-card-overlay">
+          <div
+            className="play-btn-icon"
+            onClick={(e) => {
+              e.stopPropagation();
+              onPlayEpisode?.(episode);
+            }}
+          >
+            <svg viewBox="0 0 24 24">
+              <path d="M8 5v14l11-7z" />
+            </svg>
+          </div>
         </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   return (
     <div className="playlist-generator">
@@ -249,7 +208,14 @@ export default function PlaylistGenerator({ onPlayEpisode }: PlaylistGeneratorPr
                   <span className="progress-value">{formatDuration(maxDurationSeconds)}</span>
                 </span>
               </div>
-              <div className="progress-percent">{usagePercent.toFixed(0)}%</div>
+              <div className="progress-right">
+                <div className="progress-percent">{usagePercent.toFixed(0)}%</div>
+                {isOverLimit && (
+                  <div className="over-limit-warning">
+                    ⚠️ 已超出限制 {overLimitMinutes} 分钟
+                  </div>
+                )}
+              </div>
             </div>
             <div className="playlist-progress-bar">
               <div
@@ -277,7 +243,7 @@ export default function PlaylistGenerator({ onPlayEpisode }: PlaylistGeneratorPr
                   <h3 className="section-title">当前播放列表</h3>
                   <span className="section-count">{playlist.length} 期</span>
                 </div>
-                <p className="section-hint">拖拽卡片调整顺序，点击 × 移除节目</p>
+                <p className="section-hint">点击 × 移除节目，可从候选池重新添加</p>
               </div>
               {playlist.length === 0 ? (
                 <div className="section-empty">
@@ -286,7 +252,7 @@ export default function PlaylistGenerator({ onPlayEpisode }: PlaylistGeneratorPr
                     <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
                   </svg>
                   <p>播放列表为空</p>
-                  <span>从下方候选池中添加节目</span>
+                  <span>从右侧候选池中添加节目</span>
                 </div>
               ) : (
                 <div className="playlist-cards">
@@ -308,9 +274,15 @@ export default function PlaylistGenerator({ onPlayEpisode }: PlaylistGeneratorPr
                 <div className="section-title-row">
                   <span className="section-icon candidates-icon">✨</span>
                   <h3 className="section-title">候选节目池</h3>
-                  <span className="section-count">{candidates.length} 期可用</span>
+                  <span className={`section-count ${isOverLimit ? 'disabled' : ''}`}>
+                    {candidates.length} 期可用
+                  </span>
                 </div>
-                <p className="section-hint">点击 + 将节目添加到播放列表末尾</p>
+                <p className={`section-hint ${isOverLimit ? 'danger' : ''}`}>
+                  {isOverLimit
+                    ? '⚠️ 已超时长限制，无法继续添加'
+                    : '点击 + 将节目添加到播放列表末尾'}
+                </p>
               </div>
               {candidates.length === 0 ? (
                 <div className="section-empty">

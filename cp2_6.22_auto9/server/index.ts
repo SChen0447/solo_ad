@@ -134,8 +134,10 @@ app.post('/api/playlist/generate', (req, res) => {
     for (const episode of podcast.episodes) {
       const progress = progressData[episode.id];
       const isCompleted = progress?.status === 'completed';
+      const hasStarted = progress && progress.currentTime > 0;
 
       if (!includeCompleted && isCompleted) continue;
+      if (!includeCompleted && hasStarted) continue;
 
       allEpisodes.push({
         ...episode,
