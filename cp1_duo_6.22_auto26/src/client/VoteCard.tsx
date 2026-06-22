@@ -108,22 +108,23 @@ export default function VoteCard({
           const isHovered = hoveredId === opt.id;
           const percentage = totalVotes > 0 ? (opt.voteCount / totalVotes) * 100 : 0;
           const color = getOptionColor(idx, options.length);
-          const disabled = isClosed || hasVoted;
+          const canInteract = !isClosed && !hasVoted;
           const isOtherOption = hasVoted && !isSelected;
+          const fullyDisabled = !canInteract && !isSelected;
 
           return (
-            <div key={opt.id}>
+            <div key={opt.id} style={{ pointerEvents: isOtherOption ? 'none' : 'auto' }}>
               <button
-                onClick={() => !disabled && onVote(opt.id)}
-                onMouseEnter={() => !disabled && setHoveredId(opt.id)}
-                onMouseLeave={() => setHoveredId(null)}
-                disabled={disabled}
+                onClick={canInteract ? () => onVote(opt.id) : undefined}
+                onMouseEnter={canInteract ? () => setHoveredId(opt.id) : undefined}
+                onMouseLeave={canInteract ? () => setHoveredId(null) : undefined}
+                disabled={!canInteract}
                 style={{
                   width: '100%',
                   padding: '14px 16px',
                   backgroundColor: isSelected
                     ? '#BB86FC'
-                    : isHovered && !disabled
+                    : isHovered && canInteract
                     ? 'rgba(187, 134, 252, 0.15)'
                     : 'rgba(255, 255, 255, 0.04)',
                   border: isSelected
@@ -132,13 +133,14 @@ export default function VoteCard({
                     ? '2px solid rgba(255, 255, 255, 0.03)'
                     : '2px solid rgba(255, 255, 255, 0.08)',
                   borderRadius: 12,
-                  cursor: disabled ? 'not-allowed' : 'pointer',
+                  cursor: canInteract ? 'pointer' : isSelected ? 'default' : 'not-allowed',
                   position: 'relative',
                   overflow: 'hidden',
-                  transform: isHovered && !disabled ? 'scale(1.05)' : 'scale(1)',
+                  transform: isHovered && canInteract ? 'scale(1.05)' : 'scale(1)',
                   transition: 'all 0.2s ease-out',
-                  opacity: isOtherOption ? 0.45 : disabled && !isSelected ? 0.6 : 1,
+                  opacity: isOtherOption ? 0.45 : fullyDisabled ? 0.6 : 1,
                   filter: isOtherOption ? 'grayscale(30%)' : 'none',
+                  pointerEvents: isOtherOption ? 'none' : 'auto',
                 }}
               >
                 {(hasVoted || totalVotes > 0) && (

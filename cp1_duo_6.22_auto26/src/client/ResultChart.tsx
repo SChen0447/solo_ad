@@ -27,19 +27,24 @@ function easeOut(t: number): number {
   return 1 - Math.pow(1 - t, 3);
 }
 
-export default function ResultChart({ options, totalVotes }: ResultChartProps) {
+export default function ResultChart({ options }: ResultChartProps) {
   const pieCanvasRef = useRef<HTMLCanvasElement>(null);
   const barCanvasRef = useRef<HTMLCanvasElement>(null);
   const animationRef = useRef<number | null>(null);
-  const displayDataRef = useRef<number[]>(options.map(() => 0));
-  const targetDataRef = useRef<number[]>(options.map(() => 0));
-  const startDataRef = useRef<number[]>(options.map(() => 0));
-  const animationStateRef = useRef<{ startTime: number; duration: number }>({
-    startTime: 0,
-    duration: 300,
-  });
+  const displayDataRef = useRef<number[]>([]);
+  const targetDataRef = useRef<number[]>([]);
+  const startDataRef = useRef<number[]>([]);
+  const animatingRef = useRef(false);
+  const pieCtxRef = useRef<CanvasRenderingContext2D | null>(null);
+  const barCtxRef = useRef<CanvasRenderingContext2D | null>(null);
+  const pieSizeRef = useRef(280);
+  const barSizeRef = useRef({ width: 400, height: 200 });
+  const optionsRef = useRef<VoteOption[]>(options);
+  const animationStartRef = useRef(0);
+  const animationDurationRef = useRef(300);
+  const initializedRef = useRef(false);
 
-  const drawPieChart = (ctx: CanvasRenderingContext2D, data: number[], size: number) => {
+  const drawPieChart = (ctx: CanvasRenderingContext2D, data: number[], size: number, currentOptions: VoteOption[]) => {
     const cx = size / 2;
     const cy = size / 2;
     const radius = Math.min(cx, cy) - 20;
@@ -68,7 +73,7 @@ export default function ResultChart({ options, totalVotes }: ResultChartProps) {
         if (count <= 0) return;
         const sliceAngle = (count / currentTotal) * Math.PI * 2;
         const endAngle = startAngle + sliceAngle;
-        const color = getOptionColor(idx, options.length);
+        const color = getOptionColor(idx, currentOptions.length);
 
         ctx.beginPath();
         ctx.moveTo(cx, cy);
@@ -111,7 +116,7 @@ export default function ResultChart({ options, totalVotes }: ResultChartProps) {
     }
   };
 
-  const drawBarChart = (ctx: CanvasRenderingContext2D, data: number[], width: number, height: number) => {
+  const drawBarChart = (ctx: CanvasRenderingContext2D, data: number[], width: number, height: number, currentOptions: VoteOption[]) => {
     const padding = { top: 20, right: 10, bottom: 40, left: 30 };
     const chartWidth = width - padding.left - padding.right;
     const chartHeight = height - padding.top - padding.bottom;
@@ -137,16 +142,16 @@ export default function ResultChart({ options, totalVotes }: ResultChartProps) {
       ctx.fillText(String(value), padding.left - 6, y);
     }
 
-    const barCount = options.length;
+    const barCount = currentOptions.length;
     const barGroupWidth = chartWidth / barCount;
     const barWidth = Math.min(barGroupWidth * 0.6, 36);
 
-    options.forEach((opt, idx) => {
+    currentOptions.forEach((opt, idx) => {
       const value = data[idx] ?? 0;
       const barHeight = (value / currentMax) * chartHeight;
       const x = padding.left + barGroupWidth * idx + (barGroupWidth - barWidth) / 2;
       const y = padding.top + chartHeight - barHeight;
-      const color = getOptionColor(idx, options.length);
+      const color = getOptionColor(idx, currentOptions.length);
 
       const gradient = ctx.createLinearGradient(x, y, x, y + barHeight);
       gradient.addColorStop(0, color);
@@ -181,74 +186,112 @@ export default function ResultChart({ options, totalVotes }: ResultChartProps) {
     });
   };
 
+  const runAnimation = (now: number) => {
+    if (!pieCtxRef.current || !barCtxRef.current) return;
+
+    const elapsed = now - animationStartRef.current;
+    const t = Math.min(elapsed / animationDurationRef.current, 1);
+    const eased = easeOut(t);
+
+    const target = targetDataRef.current;
+    const start = startDataRef.current;
+    const current = target.map((val, i) => lerp(start[i] ?? 0, val, eased));
+    displayDataRef.current = current;
+
+    drawPieChart(pieCtxRef.current, current, pieSizeRef.current, optionsRef.current);
+    drawBarChart(barCtxRef.current, current, barSizeRef.current.width, barSizeRef.current.height, optionsRef.current);
+
+    if (t < 1) {
+      animationRef.current = requestAnimationFrame(runAnimation);
+    } else {
+      animatingRef.current = false;
+      animationRef.current = null;
+    }
+  };
+
+  const cancelRunningAnimation = () => {
+    if (animationRef.current !== null) {
+      cancelAnimationFrame(animationRef.current);
+      animationRef.current = null;
+    }
+    animatingRef.current = false;
+  };
+
   useEffect(() => {
+    optionsRef.current = options;
+
     const pieCanvas = pieCanvasRef.current;
     const barCanvas = barCanvasRef.current;
     if (!pieCanvas || !barCanvas) return;
 
-    const pieCtx = pieCanvas.getContext('2d');
-    const barCtx = barCanvas.getContext('2d');
-    if (!pieCtx || !barCtx) return;
+    if (!initializedRef.current) {
+      const pieCtx = pieCanvas.getContext('2d');
+      const barCtx = barCanvas.getContext('2d');
+      if (!pieCtx || !barCtx) return;
 
-    const dpr = window.devicePixelRatio || 1;
-    const pieSize = 280;
-    const barWidth = 400;
-    const barHeight = 200;
+      const dpr = window.devicePixelRatio || 1;
+      const pieSize = 280;
+      const barWidth = 400;
+      const barHeight = 200;
 
-    pieCanvas.width = pieSize * dpr;
-    pieCanvas.height = pieSize * dpr;
-    pieCanvas.style.width = `${pieSize}px`;
-    pieCanvas.style.height = `${pieSize}px`;
-    pieCtx.scale(dpr, dpr);
+      pieCanvas.width = pieSize * dpr;
+      pieCanvas.height = pieSize * dpr;
+      pieCanvas.style.width = `${pieSize}px`;
+      pieCanvas.style.height = `${pieSize}px`;
+      pieCtx.scale(dpr, dpr);
 
-    barCanvas.width = barWidth * dpr;
-    barCanvas.height = barHeight * dpr;
-    barCanvas.style.width = `${barWidth}px`;
-    barCanvas.style.height = `${barHeight}px`;
-    barCtx.scale(dpr, dpr);
+      barCanvas.width = barWidth * dpr;
+      barCanvas.height = barHeight * dpr;
+      barCanvas.style.width = `${barWidth}px`;
+      barCanvas.style.height = `${barHeight}px`;
+      barCtx.scale(dpr, dpr);
 
-    const newTargetData = options.map(o => o.voteCount);
-    const currentDisplayData = displayDataRef.current;
+      pieCtxRef.current = pieCtx;
+      barCtxRef.current = barCtx;
+      pieSizeRef.current = pieSize;
+      barSizeRef.current = { width: barWidth, height: barHeight };
 
-    startDataRef.current = currentDisplayData.length === newTargetData.length
-      ? [...currentDisplayData]
-      : newTargetData.map(() => 0);
-    targetDataRef.current = [...newTargetData];
-    animationStateRef.current = {
-      startTime: performance.now(),
-      duration: 300,
-    };
-
-    if (animationRef.current) {
-      cancelAnimationFrame(animationRef.current);
+      displayDataRef.current = options.map(() => 0);
+      initializedRef.current = true;
     }
 
-    const animate = (now: number) => {
-      const { startTime, duration } = animationStateRef.current;
-      const elapsed = now - startTime;
-      const t = Math.min(elapsed / duration, 1);
-      const eased = easeOut(t);
+    cancelRunningAnimation();
 
-      const current = targetDataRef.current.map((target, i) =>
-        lerp(startDataRef.current[i] ?? 0, target, eased)
-      );
-      displayDataRef.current = current;
+    const newTargetData = options.map(o => o.voteCount);
+    const optionCount = options.length;
 
-      drawPieChart(pieCtx, current, pieSize);
-      drawBarChart(barCtx, current, barWidth, barHeight);
-
-      if (t < 1) {
-        animationRef.current = requestAnimationFrame(animate);
+    const prevDisplay = displayDataRef.current;
+    let newStartData: number[];
+    if (prevDisplay.length === optionCount) {
+      newStartData = [...prevDisplay];
+    } else {
+      newStartData = new Array(optionCount).fill(0);
+      if (prevDisplay.length > 0) {
+        for (let i = 0; i < Math.min(prevDisplay.length, optionCount); i++) {
+          newStartData[i] = prevDisplay[i];
+        }
       }
-    };
+    }
 
-    animationRef.current = requestAnimationFrame(animate);
-
-    return () => {
-      if (animationRef.current) {
-        cancelAnimationFrame(animationRef.current);
+    const noChange = newTargetData.every((v, i) => Math.abs(v - (newStartData[i] ?? 0)) < 0.001);
+    if (noChange) {
+      if (pieCtxRef.current && barCtxRef.current) {
+        drawPieChart(pieCtxRef.current, newTargetData, pieSizeRef.current, options);
+        drawBarChart(barCtxRef.current, newTargetData, barSizeRef.current.width, barSizeRef.current.height, options);
       }
-    };
+      displayDataRef.current = [...newTargetData];
+      return;
+    }
+
+    startDataRef.current = newStartData;
+    targetDataRef.current = [...newTargetData];
+    animationStartRef.current = performance.now();
+    animationDurationRef.current = 300;
+    animatingRef.current = true;
+
+    animationRef.current = requestAnimationFrame(runAnimation);
+
+    return cancelRunningAnimation;
   }, [options]);
 
   return (

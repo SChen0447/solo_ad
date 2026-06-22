@@ -55,6 +55,7 @@ export default function App() {
   const [isLoading, setIsLoading] = useState(false);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [copiedCode, setCopiedCode] = useState(false);
+  const copyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const socketRef = useRef<Socket | null>(null);
   const voterIdRef = useRef(getVoterId());
@@ -120,14 +121,16 @@ export default function App() {
       setCreateError('请输入投票标题');
       return;
     }
-    const validOptions = newOptions.filter(o => o.trim());
+    let validOptions = newOptions.filter(o => o.trim());
+    if (validOptions.length > 8) {
+      validOptions = validOptions.slice(0, 8);
+    }
     if (validOptions.length < 2) {
       setCreateError('至少需要2个有效选项');
       return;
     }
-    if (validOptions.length > 8) {
-      setCreateError('最多只能有8个选项');
-      return;
+    if (newOptions.length > 8) {
+      setNewOptions(validOptions);
     }
 
     setIsLoading(true);
@@ -190,8 +193,14 @@ export default function App() {
   };
 
   const addOption = () => {
-    if (newOptions.length < 8) {
-      setNewOptions([...newOptions, '']);
+    if (newOptions.length >= 8) return;
+    setNewOptions(prev => prev.length >= 8 ? prev : [...prev, '']);
+  };
+
+  const handleOptionPaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
+    if (newOptions.length >= 8) {
+      e.preventDefault();
+      return;
     }
   };
 
@@ -210,34 +219,38 @@ export default function App() {
   const handleOptionKeyDown = (e: React.KeyboardEvent<HTMLInputElement>, idx: number) => {
     if (e.key === 'Enter') {
       e.preventDefault();
-      if (newOptions[idx].trim() && newOptions.length < 8) {
-        addOption();
-        setTimeout(() => {
-          const inputs = document.querySelectorAll('.option-input');
-          const nextInput = inputs[idx + 1] as HTMLInputElement;
-          if (nextInput) nextInput.focus();
-        }, 50);
-      }
+      if (newOptions.length >= 8) return;
+      const trimmed = newOptions[idx].trim();
+      if (!trimmed) return;
+      addOption();
+      setTimeout(() => {
+        const inputs = document.querySelectorAll('.option-input');
+        const nextInput = inputs[idx + 1] as HTMLInputElement;
+        if (nextInput) nextInput.focus();
+      }, 50);
     }
   };
 
-  const copyCode = async () => {
+  const copyCode = async (e?: React.MouseEvent) => {
+    if (e) {
+      e.stopPropagation();
+    }
     if (!currentPoll) return;
     try {
       await navigator.clipboard.writeText(currentPoll.code);
-      setCopiedCode(true);
-      setTimeout(() => setCopiedCode(false), 2000);
     } catch {
-      // fallback
       const textarea = document.createElement('textarea');
       textarea.value = currentPoll.code;
       document.body.appendChild(textarea);
       textarea.select();
       document.execCommand('copy');
       document.body.removeChild(textarea);
-      setCopiedCode(true);
-      setTimeout(() => setCopiedCode(false), 2000);
     }
+    setCopiedCode(true);
+    if (copyTimerRef.current) {
+      clearTimeout(copyTimerRef.current);
+    }
+    copyTimerRef.current = setTimeout(() => setCopiedCode(false), 5000);
   };
 
   const validateJoinCode = (code: string): boolean => {
@@ -418,44 +431,52 @@ export default function App() {
                   已添加 {newOptions.length}/8 个选项
                 </span>
               </div>
-              {newOptions.map((opt, idx) => (
+              {newOptions.map((opt, idx) => {
+                const isInputDisabled = newOptions.length >= 8;
+                return (
                 <div key={idx} style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
                   <input
                     type="text"
                     value={opt}
-                    onChange={(e) => updateOption(idx, e.target.value)}
-                    onKeyDown={(e) => handleOptionKeyDown(e, idx)}
+                    onChange={(e) => !isInputDisabled && updateOption(idx, e.target.value)}
+                    onKeyDown={(e) => !isInputDisabled && handleOptionKeyDown(e, idx)}
+                    onPaste={handleOptionPaste}
+                    disabled={isInputDisabled}
                     placeholder={`选项 ${idx + 1}${idx === newOptions.length - 1 && newOptions.length < 8 ? '（回车快速添加）' : ''}`}
                     className="option-input"
                     style={{
                       flex: 1,
                       padding: '6px 10px',
-                      backgroundColor: '#2A2A2A',
+                      backgroundColor: isInputDisabled ? '#252525' : '#2A2A2A',
                       border: '1px solid #3A3A3A',
                       borderRadius: 6,
-                      color: '#FFF',
+                      color: isInputDisabled ? '#666' : '#FFF',
                       fontSize: 12,
                       outline: 'none',
+                      cursor: isInputDisabled ? 'not-allowed' : 'text',
                     }}
                   />
                   {newOptions.length > 2 && (
                     <button
-                      onClick={() => removeOption(idx)}
+                      onClick={() => !isInputDisabled && removeOption(idx)}
+                      disabled={isInputDisabled}
                       style={{
                         padding: '0 10px',
                         backgroundColor: 'transparent',
-                        color: '#FF5252',
-                        border: '1px solid rgba(255,82,82,0.3)',
+                        color: isInputDisabled ? '#666' : '#FF5252',
+                        border: `1px solid ${isInputDisabled ? 'rgba(100,100,100,0.3)' : 'rgba(255,82,82,0.3)'}`,
                         borderRadius: 6,
-                        cursor: 'pointer',
+                        cursor: isInputDisabled ? 'not-allowed' : 'pointer',
                         fontSize: 14,
+                        opacity: isInputDisabled ? 0.5 : 1,
                       }}
                     >
                       ×
                     </button>
                   )}
                 </div>
-              ))}
+                );
+              })}
               <button
                 onClick={addOption}
                 disabled={newOptions.length >= 8}
@@ -622,36 +643,74 @@ export default function App() {
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
                     <div
-                      onClick={copyCode}
                       style={{
                         display: 'flex',
                         alignItems: 'center',
-                        gap: 8,
-                        padding: '4px 12px',
+                        gap: 0,
                         backgroundColor: 'rgba(187, 134, 252, 0.2)',
-                        color: '#BB86FC',
-                        borderRadius: 6,
-                        fontSize: 13,
-                        fontFamily: 'monospace',
-                        letterSpacing: 2,
-                        fontWeight: 600,
-                        cursor: 'pointer',
+                        borderRadius: 8,
                         border: '1px solid rgba(187, 134, 252, 0.3)',
-                        transition: 'all 0.2s',
+                        overflow: 'hidden',
                       }}
-                      title="点击复制投票码"
                     >
-                      投票码: {currentPoll.code}
-                      <span style={{
-                        fontSize: 11,
-                        fontFamily: 'sans-serif',
-                        letterSpacing: 'normal',
-                        fontWeight: 500,
-                        color: copiedCode ? '#4CAF50' : 'rgba(187, 134, 252, 0.6)',
-                      }}>
-                        {copiedCode ? '✓ 已复制' : '📋 复制'}
-                      </span>
+                      <div
+                        style={{
+                          padding: '6px 12px',
+                          color: '#BB86FC',
+                          fontSize: 13,
+                          fontFamily: 'monospace',
+                          letterSpacing: 2,
+                          fontWeight: 600,
+                          userSelect: 'all',
+                          cursor: 'text',
+                        }}
+                        title="投票码"
+                      >
+                        投票码: {currentPoll.code}
+                      </div>
+                      <button
+                        onClick={copyCode}
+                        style={{
+                          padding: '6px 14px',
+                          backgroundColor: copiedCode
+                            ? 'rgba(76, 175, 80, 0.3)'
+                            : 'rgba(187, 134, 252, 0.3)',
+                          color: copiedCode ? '#4CAF50' : '#BB86FC',
+                          border: 'none',
+                          borderLeft: '1px solid rgba(187, 134, 252, 0.3)',
+                          cursor: 'pointer',
+                          fontSize: 13,
+                          fontWeight: 600,
+                          transition: 'all 0.2s',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 6,
+                        }}
+                        title={copiedCode ? '已复制' : '复制投票码'}
+                      >
+                        <span style={{ fontSize: 15, lineHeight: 1 }}>
+                          {copiedCode ? '✓' : '📋'}
+                        </span>
+                        <span style={{ fontSize: 11 }}>
+                          {copiedCode ? '已复制' : '复制'}
+                        </span>
+                      </button>
                     </div>
+                    {copiedCode && (
+                      <span
+                        style={{
+                          fontSize: 12,
+                          color: '#4CAF50',
+                          fontWeight: 500,
+                          padding: '4px 10px',
+                          backgroundColor: 'rgba(76, 175, 80, 0.15)',
+                          borderRadius: 6,
+                          border: '1px solid rgba(76, 175, 80, 0.3)',
+                        }}
+                      >
+                        ✓ 已复制到剪贴板（5秒后消失）
+                      </span>
+                    )}
                     <span style={{ fontSize: 13, color: '#888' }}>
                       👥 {currentPoll.totalVotes} 人参与
                     </span>
