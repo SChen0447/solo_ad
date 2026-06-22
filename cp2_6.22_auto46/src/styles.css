@@ -162,7 +162,9 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 14px;
+  font-size: 16px;
+  line-height: 1;
+  padding: 0;
   transition: background-color 0.2s ease-out;
 }
 
@@ -407,6 +409,12 @@ body {
   height: 48px;
   border-bottom: 1px solid #E5E7EB;
   font-size: 14px;
+  text-align: left;
+}
+
+.shopping-table td:first-child {
+  width: 40px;
+  text-align: center;
 }
 
 .shopping-table td:last-child {
@@ -561,6 +569,8 @@ body {
 .floating-tip-close {
   width: 28px;
   height: 28px;
+  min-width: 28px;
+  min-height: 28px;
   border-radius: 50%;
   border: none;
   background: #F3F4F6;
@@ -569,6 +579,9 @@ body {
   align-items: center;
   justify-content: center;
   font-size: 14px;
+  line-height: 1;
+  padding: 0;
+  flex-shrink: 0;
   transition: background-color 0.2s ease-out;
 }
 
@@ -625,9 +638,14 @@ body {
   padding: 6px 10px;
   border: 1px solid #E5E7EB;
   border-radius: 6px;
-  font-size: 14px;
+  font-size: 16px;
   outline: none;
   transition: border-color 0.2s ease-out;
+}
+
+.assignee-input::placeholder {
+  font-size: 16px;
+  color: #9CA3AF;
 }
 
 .assignee-input:focus {
