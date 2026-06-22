@@ -1,6 +1,7 @@
 import React, { useState, useCallback } from 'react';
 import { Subtitle, IN_EFFECTS, OUT_EFFECTS, InEffectType, OutEffectType } from '../types';
 import { eventBus } from '../utils/eventBus';
+import { Timeline } from './Timeline';
 
 interface SubtitleEditorProps {
   subtitles: Subtitle[];
@@ -57,6 +58,10 @@ export const SubtitleEditor: React.FC<SubtitleEditorProps> = ({
     eventBus.emit('subtitle:update', { id, updates });
   }, [subtitles, onSubtitlesChange]);
 
+  const handleTimelineUpdate = useCallback((id: string, updates: Partial<Subtitle>) => {
+    handleUpdate(id, updates);
+  }, [handleUpdate]);
+
   const handleDragStart = (e: React.DragEvent, index: number) => {
     setDraggedIndex(index);
     e.dataTransfer.effectAllowed = 'move';
@@ -101,6 +106,13 @@ export const SubtitleEditor: React.FC<SubtitleEditorProps> = ({
 
   return (
     <div className="section">
+      <Timeline
+        subtitles={subtitles}
+        onSubtitleUpdate={handleTimelineUpdate}
+        selectedSubtitleId={selectedSubtitleId}
+        onSelectSubtitle={onSelectSubtitle}
+      />
+
       <h2 className="section-title">
         <span>📝</span>
         字幕列表
@@ -118,7 +130,7 @@ export const SubtitleEditor: React.FC<SubtitleEditorProps> = ({
           {subtitles.map((subtitle, index) => (
             <div
               key={subtitle.id}
-              className={`subtitle-card ${draggedIndex === index ? 'dragging' : ''} ${dragOverIndex === index ? 'drag-over' : ''}`}
+              className={`subtitle-card ${draggedIndex === index ? 'dragging' : ''} ${dragOverIndex === index ? 'drag-over' : ''} ${selectedSubtitleId === subtitle.id ? 'is-selected' : ''}`}
               draggable
               onDragStart={(e) => handleDragStart(e, index)}
               onDragOver={(e) => handleDragOver(e, index)}
@@ -126,6 +138,9 @@ export const SubtitleEditor: React.FC<SubtitleEditorProps> = ({
               onDrop={(e) => handleDrop(e, index)}
               onDragEnd={handleDragEnd}
               onClick={() => onSelectSubtitle(subtitle.id)}
+              style={{
+                borderColor: selectedSubtitleId === subtitle.id ? 'var(--accent-primary)' : undefined,
+              }}
             >
               <div className="subtitle-header">
                 <span className="drag-handle">⋮⋮</span>

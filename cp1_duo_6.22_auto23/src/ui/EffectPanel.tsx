@@ -21,9 +21,16 @@ export const EffectPanel: React.FC<EffectPanelProps> = ({
   onPreview,
   onPause,
 }) => {
-  const handleAnimationDurationChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleInDurationChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = parseFloat(e.target.value);
-    const newConfig = { ...effectConfig, animationDuration: value };
+    const newConfig = { ...effectConfig, inAnimationDuration: value };
+    onEffectConfigChange(newConfig);
+    eventBus.emit('effect:update', newConfig);
+  };
+
+  const handleOutDurationChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = parseFloat(e.target.value);
+    const newConfig = { ...effectConfig, outAnimationDuration: value };
     onEffectConfigChange(newConfig);
     eventBus.emit('effect:update', newConfig);
   };
@@ -52,18 +59,33 @@ export const EffectPanel: React.FC<EffectPanelProps> = ({
       </h2>
 
       <div className="section">
-        <div className="slider-container">
+        <div className="slider-container" style={{ marginBottom: '16px' }}>
           <div className="slider-header">
-            <label>动画时长</label>
-            <span className="slider-value">{effectConfig.animationDuration.toFixed(1)}秒</span>
+            <label>🎬 入场动画时长</label>
+            <span className="slider-value">{effectConfig.inAnimationDuration.toFixed(1)}秒</span>
           </div>
           <input
             type="range"
             min="0.5"
             max="3"
             step="0.1"
-            value={effectConfig.animationDuration}
-            onChange={handleAnimationDurationChange}
+            value={effectConfig.inAnimationDuration}
+            onChange={handleInDurationChange}
+          />
+        </div>
+
+        <div className="slider-container">
+          <div className="slider-header">
+            <label>🎞 出场动画时长</label>
+            <span className="slider-value">{effectConfig.outAnimationDuration.toFixed(1)}秒</span>
+          </div>
+          <input
+            type="range"
+            min="0.5"
+            max="3"
+            step="0.1"
+            value={effectConfig.outAnimationDuration}
+            onChange={handleOutDurationChange}
           />
         </div>
       </div>

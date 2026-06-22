@@ -1,1 +1,1 @@
-{"root":["./src/main.tsx","./src/vite-env.d.ts","./src/engine/effectprocessor.ts","./src/engine/subtitlerenderer.ts","./src/types/index.ts","./src/ui/app.tsx","./src/ui/effectpanel.tsx","./src/ui/subtitleeditor.tsx","./src/utils/eventbus.ts"],"version":"5.8.3"}
+{"root":["./src/main.tsx","./src/vite-env.d.ts","./src/engine/effectprocessor.ts","./src/engine/subtitlerenderer.ts","./src/types/index.ts","./src/ui/app.tsx","./src/ui/effectpanel.tsx","./src/ui/subtitleeditor.tsx","./src/ui/timeline.tsx","./src/utils/eventbus.ts"],"version":"5.8.3"}

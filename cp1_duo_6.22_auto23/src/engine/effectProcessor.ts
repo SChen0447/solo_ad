@@ -6,7 +6,7 @@ const easeInCubic = (t: number): number => t * t * t;
 export class EffectProcessor {
   private config: EffectConfig;
 
-  constructor(config: EffectConfig = { animationDuration: 1 }) {
+  constructor(config: EffectConfig = { inAnimationDuration: 1, outAnimationDuration: 1 }) {
     this.config = config;
   }
 
@@ -20,7 +20,7 @@ export class EffectProcessor {
     canvasHeight: number
   ): TransformMatrix {
     const { startTime, duration } = subtitle;
-    const { animationDuration } = this.config;
+    const { inAnimationDuration, outAnimationDuration } = this.config;
     const endTime = startTime + duration;
 
     let matrix: TransformMatrix = {
@@ -39,8 +39,8 @@ export class EffectProcessor {
       return { ...matrix, opacity: 0 };
     }
 
-    const inEndTime = startTime + Math.min(animationDuration, duration / 2);
-    const outStartTime = endTime - Math.min(animationDuration, duration / 2);
+    const inEndTime = startTime + Math.min(inAnimationDuration, duration / 2);
+    const outStartTime = endTime - Math.min(outAnimationDuration, duration / 2);
 
     if (currentTime >= startTime && currentTime < inEndTime) {
       const progress = (currentTime - startTime) / (inEndTime - startTime);

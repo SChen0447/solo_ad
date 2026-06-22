@@ -61,7 +61,8 @@ const defaultSubtitles: Subtitle[] = [
 ];
 
 const defaultEffectConfig: EffectConfig = {
-  animationDuration: 1,
+  inAnimationDuration: 1,
+  outAnimationDuration: 1,
 };
 
 interface SavedState {
@@ -95,13 +96,18 @@ export const App: React.FC = () => {
     const saved = localStorage.getItem(STORAGE_KEY);
     if (saved) {
       try {
-        const parsed: SavedState = JSON.parse(saved);
+        const parsed: SavedState & { effectConfig?: EffectConfig & { animationDuration?: number } } = JSON.parse(saved);
         if (parsed.subtitles && parsed.subtitles.length > 0) {
           setSubtitles(parsed.subtitles);
           setSelectedSubtitleId(parsed.subtitles[0]?.id || null);
         }
         if (parsed.effectConfig) {
-          setEffectConfig(parsed.effectConfig);
+          const config = parsed.effectConfig;
+          const migratedConfig: EffectConfig = {
+            inAnimationDuration: config.inAnimationDuration ?? config.animationDuration ?? 1,
+            outAnimationDuration: config.outAnimationDuration ?? config.animationDuration ?? 1,
+          };
+          setEffectConfig(migratedConfig);
         }
       } catch (e) {
         console.error('Failed to load saved state:', e);

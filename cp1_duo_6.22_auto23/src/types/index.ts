@@ -14,7 +14,8 @@ export interface Subtitle {
 }
 
 export interface EffectConfig {
-  animationDuration: number;
+  inAnimationDuration: number;
+  outAnimationDuration: number;
 }
 
 export interface TransformMatrix {
@@ -75,4 +76,17 @@ export const OUT_EFFECTS: { value: OutEffectType; label: string }[] = [
   { value: 'fadeOut', label: '淡出' },
   { value: 'slideUpOut', label: '向顶部滑出' },
   { value: 'scaleOut', label: '缩小消失' },
+];
+
+export const TIMELINE_MAX_DURATION = 30;
+
+export const SUBTITLE_COLORS = [
+  '#e94560',
+  '#4ecca3',
+  '#f39c12',
+  '#9b59b6',
+  '#3498db',
+  '#1abc9c',
+  '#e74c3c',
+  '#f1c40f',
 ];
