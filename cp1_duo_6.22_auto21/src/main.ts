@@ -23,13 +23,14 @@ class MoleculeViewerApp {
   private hoveredAtom: AtomMesh | null = null;
   private selectedAtom: AtomMesh | null = null;
   private clock: THREE.Clock;
-  private stars: THREE.Points | null = null;
+  private starsScene: THREE.Scene;
+  private starsCamera: THREE.PerspectiveCamera;
+  private currentMoleculeData: MoleculeData | null = null;
 
   private settings = {
     autoRotate: false,
     rotateSpeed: 0.5,
     showBonds: true,
-    showLabels: false,
     atomScale: 1.0,
     backgroundColor: '#0a0a1a',
     loadFile: () => this.triggerFileInput(),
@@ -51,6 +52,15 @@ class MoleculeViewerApp {
     this.scene.background = new THREE.Color(BG_COLOR);
     this.scene.fog = new THREE.FogExp2(BG_COLOR, 0.002);
 
+    this.starsScene = new THREE.Scene();
+    this.starsCamera = new THREE.PerspectiveCamera(
+      60,
+      window.innerWidth / window.innerHeight,
+      0.1,
+      2000
+    );
+    this.starsCamera.position.z = 1;
+
     this.camera = new THREE.PerspectiveCamera(
       60,
       window.innerWidth / window.innerHeight,
@@ -69,6 +79,7 @@ class MoleculeViewerApp {
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 1.2;
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
+    this.renderer.autoClear = false;
     this.container.appendChild(this.renderer.domElement);
 
     this.controlsWrapper = new OrbitControlsWrapper(this.camera, this.renderer.domElement);
@@ -78,8 +89,7 @@ class MoleculeViewerApp {
     this.infoPanel = new InfoPanel(this.container);
 
     this.raycaster = new THREE.Raycaster();
-    this.raycaster.params.Points.threshold = 0.5;
-    this.mouse = new THREE.Vector2();
+    this.mouse = new THREE.Vector2(-999, -999);
 
     this.clock = new THREE.Clock();
 
@@ -152,8 +162,8 @@ class MoleculeViewerApp {
       sizeAttenuation: true
     });
 
-    this.stars = new THREE.Points(starsGeometry, starsMaterial);
-    this.scene.add(this.stars);
+    const stars = new THREE.Points(starsGeometry, starsMaterial);
+    this.starsScene.add(stars);
   }
 
   private setupGUI(): void {
@@ -183,9 +193,12 @@ class MoleculeViewerApp {
     viewFolder.add(this.settings, 'atomScale', 0.3, 2.5, 0.05).name('原子大小').onChange((v: number) => {
       for (const mesh of this.atomRenderer.atomMeshes) {
         const radius = this.atomRenderer.getElementRadius(mesh.userData.atomData.element);
-        mesh.scale.setScalar(radius * v);
+        mesh.userData.originalScale = radius * v;
+        if (!mesh.userData.isHighlighted) {
+          mesh.scale.setScalar(radius * v);
+        }
         if (mesh.userData.glowMesh) {
-          mesh.userData.glowMesh.scale.setScalar(radius * v * 1.4);
+          mesh.userData.glowMesh.scale.setScalar(1.5);
         }
       }
     });
@@ -212,19 +225,31 @@ class MoleculeViewerApp {
   private setupEventListeners(): void {
     window.addEventListener('resize', () => this.onResize());
     this.renderer.domElement.addEventListener('mousemove', (e) => this.onMouseMove(e));
-    this.renderer.domElement.addEventListener('click', (e) => this.onClick(e));
     this.renderer.domElement.addEventListener('mouseleave', () => this.onMouseLeave());
   }
 
   private onResize(): void {
-    this.camera.aspect = window.innerWidth / window.innerHeight;
+    const width = window.innerWidth;
+    const height = window.innerHeight;
+    this.camera.aspect = width / height;
     this.camera.updateProjectionMatrix();
-    this.renderer.setSize(window.innerWidth, window.innerHeight);
+    this.starsCamera.aspect = width / height;
+    this.starsCamera.updateProjectionMatrix();
+    this.renderer.setSize(width, height);
+    this.atomRenderer.onResize(width, height);
   }
 
   private onMouseMove(event: MouseEvent): void {
     this.mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
     this.mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+  }
+
+  private onMouseLeave(): void {
+    this.mouse.set(-999, -999);
+  }
+
+  private performRaycast(): void {
+    if (this.mouse.x < -1 || this.mouse.x > 1) return;
 
     this.raycaster.setFromCamera(this.mouse, this.camera);
     const intersects = this.raycaster.intersectObjects(this.atomRenderer.atomMeshes, false);
@@ -238,42 +263,23 @@ class MoleculeViewerApp {
       if (this.hoveredAtom && this.hoveredAtom !== this.selectedAtom) {
         this.atomRenderer.unhighlightAtom(this.hoveredAtom);
       }
-      if (newHovered && newHovered !== this.selectedAtom) {
+      if (newHovered) {
         this.atomRenderer.highlightAtom(newHovered);
       }
       this.hoveredAtom = newHovered;
+
+      if (newHovered) {
+        this.infoPanel.updateAtomPositions(this.atomRenderer.atomMeshes);
+        this.infoPanel.update(newHovered);
+      } else {
+        if (this.selectedAtom) {
+          this.infoPanel.update(this.selectedAtom);
+        } else {
+          this.infoPanel.update(null);
+        }
+      }
+
       this.renderer.domElement.style.cursor = newHovered ? 'pointer' : 'grab';
-    }
-  }
-
-  private onMouseLeave(): void {
-    if (this.hoveredAtom && this.hoveredAtom !== this.selectedAtom) {
-      this.atomRenderer.unhighlightAtom(this.hoveredAtom);
-    }
-    this.hoveredAtom = null;
-    this.renderer.domElement.style.cursor = 'grab';
-  }
-
-  private onClick(event: MouseEvent): void {
-    if (this.controlsWrapper.isUserInteracting) return;
-
-    this.mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
-    this.mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
-
-    this.raycaster.setFromCamera(this.mouse, this.camera);
-    const intersects = this.raycaster.intersectObjects(this.atomRenderer.atomMeshes, false);
-
-    if (this.selectedAtom) {
-      this.atomRenderer.unhighlightAtom(this.selectedAtom);
-    }
-
-    if (intersects.length > 0) {
-      this.selectedAtom = intersects[0].object as AtomMesh;
-      this.atomRenderer.highlightAtom(this.selectedAtom);
-      this.infoPanel.update(this.selectedAtom, this.bondRenderer);
-    } else {
-      this.selectedAtom = null;
-      this.infoPanel.update(null, this.bondRenderer);
     }
   }
 
@@ -421,10 +427,13 @@ NO_CHARGES
       this.atomRenderer.unhighlightAtom(this.hoveredAtom);
       this.hoveredAtom = null;
     }
-    this.infoPanel.update(null, this.bondRenderer);
+    this.infoPanel.update(null);
+
+    this.currentMoleculeData = moleculeData;
+    this.infoPanel.setMoleculeData(moleculeData);
 
     this.bondRenderer.clear();
-    const atomMeshes = this.atomRenderer.render(moleculeData);
+    const atomMeshes = this.atomRenderer.render(moleculeData, this.settings.atomScale);
     this.bondRenderer.render(moleculeData, atomMeshes);
 
     const center = new THREE.Vector3();
@@ -444,14 +453,18 @@ NO_CHARGES
     requestAnimationFrame(this.animate);
 
     const delta = this.clock.getDelta();
+    const deltaMs = delta * 1000;
 
-    if (this.stars) {
-      this.stars.rotation.y += delta * 0.01;
-    }
+    this.controlsWrapper.update(deltaMs);
 
-    this.controlsWrapper.update(delta);
-    this.atomRenderer.updateLabels(this.camera, this.renderer);
+    this.performRaycast();
+
+    this.renderer.clear();
+    this.renderer.render(this.starsScene, this.starsCamera);
+    this.renderer.clearDepth();
     this.renderer.render(this.scene, this.camera);
+
+    this.atomRenderer.updateLabels(this.camera);
   };
 }
 

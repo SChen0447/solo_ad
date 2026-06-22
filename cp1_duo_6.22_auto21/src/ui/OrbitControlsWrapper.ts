@@ -5,18 +5,16 @@ export class OrbitControlsWrapper {
   public controls: OrbitControls;
   public autoRotate: boolean = false;
   public autoRotateSpeed: number = 0.5;
-  private targetRotation: number = 0;
   private camera: THREE.PerspectiveCamera;
-  private domElement: HTMLElement;
-  public isUserInteracting: boolean = false;
   private lastInteractionTime: number = 0;
+  private interactionPauseDuration: number = 500;
+  private isDragging: boolean = false;
 
   constructor(
     camera: THREE.PerspectiveCamera,
     domElement: HTMLElement
   ) {
     this.camera = camera;
-    this.domElement = domElement;
     this.controls = new OrbitControls(camera, domElement);
     this.configureControls();
   }
@@ -39,18 +37,25 @@ export class OrbitControlsWrapper {
     this.controls.screenSpacePanning = false;
 
     this.controls.addEventListener('start', () => {
-      this.isUserInteracting = true;
-      this.lastInteractionTime = Date.now();
+      this.isDragging = true;
+      this.lastInteractionTime = performance.now();
     });
 
     this.controls.addEventListener('end', () => {
-      this.lastInteractionTime = Date.now();
-      setTimeout(() => {
-        if (Date.now() - this.lastInteractionTime >= 500) {
-          this.isUserInteracting = false;
-        }
-      }, 500);
+      this.isDragging = false;
+      this.lastInteractionTime = performance.now();
     });
+
+    this.controls.addEventListener('change', () => {
+      if (this.isDragging) {
+        this.lastInteractionTime = performance.now();
+      }
+    });
+  }
+
+  public get isUserInteracting(): boolean {
+    if (this.isDragging) return true;
+    return (performance.now() - this.lastInteractionTime) < this.interactionPauseDuration;
   }
 
   public setTarget(target: THREE.Vector3): void {
@@ -66,10 +71,11 @@ export class OrbitControlsWrapper {
     this.autoRotateSpeed = speed;
   }
 
-  public update(deltaTime: number): void {
+  public update(deltaTimeMs: number): void {
     if (this.autoRotate && !this.isUserInteracting) {
-      const radiansPerFrame = (this.autoRotateSpeed * Math.PI) / 180;
-      this.targetRotation += radiansPerFrame;
+      const deltaTimeSec = deltaTimeMs / 1000;
+      const radiansPerSec = (this.autoRotateSpeed * Math.PI) / 180 * 60;
+      const radiansThisFrame = radiansPerSec * deltaTimeSec;
 
       const spherical = new THREE.Spherical();
       const offset = new THREE.Vector3();
@@ -82,7 +88,7 @@ export class OrbitControlsWrapper {
       offset.copy(this.camera.position).sub(this.controls.target);
       offset.applyQuaternion(quaternion);
       spherical.setFromVector3(offset);
-      spherical.theta += radiansPerFrame;
+      spherical.theta += radiansThisFrame;
 
       offset.setFromSpherical(spherical);
       offset.applyQuaternion(quaternionInverse);

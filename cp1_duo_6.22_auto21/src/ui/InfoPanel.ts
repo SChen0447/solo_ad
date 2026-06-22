@@ -1,11 +1,6 @@
 import * as THREE from 'three';
+import type { AtomData, MoleculeData } from '../parser/MoleculeParser';
 import type { AtomMesh } from '../renderer/AtomRenderer';
-import type { BondRenderer } from '../renderer/BondRenderer';
-
-export interface SelectedInfo {
-  atom: AtomMesh;
-  position: THREE.Vector3;
-}
 
 export class InfoPanel {
   private container: HTMLElement;
@@ -16,7 +11,10 @@ export class InfoPanel {
   private bondAnglesEl: HTMLDivElement;
   private noSelectionEl: HTMLDivElement;
   private contentWrapper: HTMLDivElement;
-  private currentAtom: AtomMesh | null = null;
+
+  private moleculeData: MoleculeData | null = null;
+  private adjacency: Map<number, number[]> = new Map();
+  private atomPositionMap: Map<number, { element: string; pos: THREE.Vector3 }> = new Map();
 
   constructor(container: HTMLElement) {
     this.container = container;
@@ -30,6 +28,39 @@ export class InfoPanel {
 
     this.setupStyles();
     this.buildDOM();
+  }
+
+  public setMoleculeData(data: MoleculeData): void {
+    this.moleculeData = data;
+    this.buildAdjacency();
+  }
+
+  private buildAdjacency(): void {
+    this.adjacency.clear();
+    if (!this.moleculeData) return;
+
+    for (const atom of this.moleculeData.atoms) {
+      this.adjacency.set(atom.id, []);
+    }
+
+    for (const bond of this.moleculeData.bonds) {
+      const neighbors1 = this.adjacency.get(bond.atom1);
+      const neighbors2 = this.adjacency.get(bond.atom2);
+      if (neighbors1) neighbors1.push(bond.atom2);
+      if (neighbors2) neighbors2.push(bond.atom1);
+    }
+  }
+
+  public updateAtomPositions(atomMeshes: AtomMesh[]): void {
+    this.atomPositionMap.clear();
+    for (const mesh of atomMeshes) {
+      const worldPos = new THREE.Vector3();
+      mesh.getWorldPosition(worldPos);
+      this.atomPositionMap.set(mesh.userData.atomData.id, {
+        element: mesh.userData.atomData.element,
+        pos: worldPos
+      });
+    }
   }
 
   private setupStyles(): void {
@@ -73,33 +104,15 @@ export class InfoPanel {
       text-align: center;
       padding: 20px 0;
     `;
-    this.noSelectionEl.textContent = '点击原子查看详细信息';
+    this.noSelectionEl.textContent = '悬停原子查看详细信息';
 
     this.contentWrapper.style.cssText = `
       display: none;
     `;
 
-    const sectionHeader = (text: string) => `
-      <div style="color: #7aa2ff; font-weight: 600; margin-top: 14px; margin-bottom: 8px; font-size: 12px; text-transform: uppercase; letter-spacing: 1px;">${text}</div>
-    `;
-
-    this.coordinatesEl.innerHTML = sectionHeader('原子坐标');
-    this.coordinatesEl.style.cssText += `
-      background: rgba(0, 0, 0, 0.2);
-      padding: 10px 12px;
-      border-radius: 8px;
-      margin-top: 4px;
-    `;
-
-    this.bondLengthsEl.innerHTML = sectionHeader('键长信息');
-    this.bondLengthsEl.style.cssText += `
-      margin-top: 4px;
-    `;
-
-    this.bondAnglesEl.innerHTML = sectionHeader('键角信息');
-    this.bondAnglesEl.style.cssText += `
-      margin-top: 4px;
-    `;
+    this.coordinatesEl.innerHTML = `<div style="color: #7aa2ff; font-weight: 600; margin-top: 14px; margin-bottom: 8px; font-size: 12px; text-transform: uppercase; letter-spacing: 1px;">原子坐标</div>`;
+    this.bondLengthsEl.innerHTML = `<div style="color: #7aa2ff; font-weight: 600; margin-top: 14px; margin-bottom: 8px; font-size: 12px; text-transform: uppercase; letter-spacing: 1px;">键长信息</div>`;
+    this.bondAnglesEl.innerHTML = `<div style="color: #7aa2ff; font-weight: 600; margin-top: 14px; margin-bottom: 8px; font-size: 12px; text-transform: uppercase; letter-spacing: 1px;">键角信息</div>`;
   }
 
   private buildDOM(): void {
@@ -122,30 +135,34 @@ export class InfoPanel {
     this.container.appendChild(this.panel);
   }
 
-  public update(atom: AtomMesh | null, bondRenderer: BondRenderer): void {
+  public update(atom: AtomMesh | null): void {
     if (!atom) {
-      this.currentAtom = null;
       this.noSelectionEl.style.display = 'block';
       this.contentWrapper.style.display = 'none';
       return;
     }
 
-    this.currentAtom = atom;
     this.noSelectionEl.style.display = 'none';
     this.contentWrapper.style.display = 'block';
 
     const atomData = atom.userData.atomData;
-    const worldPos = new THREE.Vector3();
-    atom.getWorldPosition(worldPos);
+    const posInfo = this.atomPositionMap.get(atomData.id);
 
-    this.updateCoordinates(atomData, worldPos);
-    this.updateBondLengths(atomData.id, bondRenderer);
-    this.updateBondAngles(atomData.id, bondRenderer);
+    this.updateCoordinates(atomData, posInfo?.pos ?? new THREE.Vector3(atomData.x, atomData.y, atomData.z));
+    this.updateBondLengths(atomData.id);
+    this.updateBondAngles(atomData.id);
   }
 
-  private updateCoordinates(atomData: { id: number; element: string }, pos: THREE.Vector3): void {
+  private updateCoordinates(atomData: AtomData, pos: THREE.Vector3): void {
     const header = this.coordinatesEl.querySelector('div')!;
-    const rows = `
+    const data = document.createElement('div');
+    data.style.cssText = `
+      background: rgba(0, 0, 0, 0.2);
+      padding: 10px 12px;
+      border-radius: 8px;
+      margin-top: 4px;
+    `;
+    data.innerHTML = `
       <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
         <span style="color: rgba(255,255,255,0.6);">元素:</span>
         <span style="color: #ffd166; font-weight: 600;">${atomData.element} (编号 ${atomData.id})</span>
@@ -165,31 +182,18 @@ export class InfoPanel {
     `;
     this.coordinatesEl.innerHTML = '';
     this.coordinatesEl.appendChild(header);
-    const data = document.createElement('div');
-    data.style.cssText = `
-      background: rgba(0, 0, 0, 0.2);
-      padding: 10px 12px;
-      border-radius: 8px;
-      margin-top: 4px;
-    `;
-    data.innerHTML = rows;
     this.coordinatesEl.appendChild(data);
   }
 
-  private updateBondLengths(atomId: number, bondRenderer: BondRenderer): void {
+  private updateBondLengths(atomId: number): void {
     const header = this.bondLengthsEl.querySelector('div')!;
-    const bondLengths = bondRenderer.getBondLengthsByAtomId(atomId);
-    const atomMap = new Map<number, string>();
-
-    for (const bondInfo of bondRenderer.bondMeshes) {
-      atomMap.set(bondInfo.atom1Mesh.userData.atomData.id, bondInfo.atom1Mesh.userData.atomData.element);
-      atomMap.set(bondInfo.atom2Mesh.userData.atomData.id, bondInfo.atom2Mesh.userData.atomData.element);
-    }
-
     this.bondLengthsEl.innerHTML = '';
     this.bondLengthsEl.appendChild(header);
 
-    if (bondLengths.size === 0) {
+    const neighbors = this.adjacency.get(atomId) ?? [];
+    const centralInfo = this.atomPositionMap.get(atomId);
+
+    if (neighbors.length === 0 || !centralInfo) {
       const empty = document.createElement('div');
       empty.style.color = 'rgba(255,255,255,0.4)';
       empty.style.fontStyle = 'italic';
@@ -208,28 +212,36 @@ export class InfoPanel {
       overflow-y: auto;
     `;
 
-    bondLengths.forEach((length, otherId) => {
-      const element = atomMap.get(otherId) ?? '?';
+    const seen = new Set<number>();
+    for (const neighborId of neighbors) {
+      if (seen.has(neighborId)) continue;
+      seen.add(neighborId);
+
+      const neighborInfo = this.atomPositionMap.get(neighborId);
+      if (!neighborInfo) continue;
+
+      const bondLength = centralInfo.pos.distanceTo(neighborInfo.pos);
       const row = document.createElement('div');
       row.style.cssText = 'display: flex; justify-content: space-between; margin-bottom: 3px;';
       row.innerHTML = `
-        <span style="color: #a8e6cf;">${atomMap.get(atomId) ?? '?'}—${element} (${otherId})</span>
-        <span>${length.toFixed(3)} Å</span>
+        <span style="color: #a8e6cf;">${centralInfo.element}—${neighborInfo.element} (${neighborId})</span>
+        <span>${bondLength.toFixed(3)} Å</span>
       `;
       container.appendChild(row);
-    });
+    }
 
     this.bondLengthsEl.appendChild(container);
   }
 
-  private updateBondAngles(atomId: number, bondRenderer: BondRenderer): void {
+  private updateBondAngles(atomId: number): void {
     const header = this.bondAnglesEl.querySelector('div')!;
-    const connectedIds = bondRenderer.getConnectedAtomIds(atomId);
-
     this.bondAnglesEl.innerHTML = '';
     this.bondAnglesEl.appendChild(header);
 
-    if (connectedIds.length < 2) {
+    const neighbors = this.adjacency.get(atomId) ?? [];
+    const centralInfo = this.atomPositionMap.get(atomId);
+
+    if (neighbors.length < 2 || !centralInfo) {
       const empty = document.createElement('div');
       empty.style.color = 'rgba(255,255,255,0.4)';
       empty.style.fontStyle = 'italic';
@@ -237,30 +249,6 @@ export class InfoPanel {
       this.bondAnglesEl.appendChild(empty);
       return;
     }
-
-    const atomMap = new Map<number, { element: string; pos: THREE.Vector3 }>();
-    const centralPos = new THREE.Vector3();
-
-    for (const bondInfo of bondRenderer.bondMeshes) {
-      const a1 = bondInfo.atom1Mesh;
-      const a2 = bondInfo.atom2Mesh;
-      const p1 = new THREE.Vector3();
-      const p2 = new THREE.Vector3();
-      a1.getWorldPosition(p1);
-      a2.getWorldPosition(p2);
-      atomMap.set(a1.userData.atomData.id, { element: a1.userData.atomData.element, pos: p1 });
-      atomMap.set(a2.userData.atomData.id, { element: a2.userData.atomData.element, pos: p2 });
-
-      if (a1.userData.atomData.id === atomId) {
-        centralPos.copy(p1);
-      }
-      if (a2.userData.atomData.id === atomId) {
-        centralPos.copy(p2);
-      }
-    }
-
-    const centralInfo = atomMap.get(atomId);
-    if (!centralInfo) return;
 
     const container = document.createElement('div');
     container.style.cssText = `
@@ -272,16 +260,19 @@ export class InfoPanel {
       overflow-y: auto;
     `;
 
-    for (let i = 0; i < connectedIds.length; i++) {
-      for (let j = i + 1; j < connectedIds.length; j++) {
-        const id1 = connectedIds[i];
-        const id2 = connectedIds[j];
-        const info1 = atomMap.get(id1);
-        const info2 = atomMap.get(id2);
+    for (let i = 0; i < neighbors.length; i++) {
+      for (let j = i + 1; j < neighbors.length; j++) {
+        const id1 = neighbors[i];
+        const id2 = neighbors[j];
+        const info1 = this.atomPositionMap.get(id1);
+        const info2 = this.atomPositionMap.get(id2);
         if (!info1 || !info2) continue;
 
-        const v1 = new THREE.Vector3().subVectors(info1.pos, centralPos);
-        const v2 = new THREE.Vector3().subVectors(info2.pos, centralPos);
+        const v1 = new THREE.Vector3().subVectors(info1.pos, centralInfo.pos);
+        const v2 = new THREE.Vector3().subVectors(info2.pos, centralInfo.pos);
+
+        if (v1.lengthSq() < 1e-10 || v2.lengthSq() < 1e-10) continue;
+
         const angle = v1.angleTo(v2) * (180 / Math.PI);
 
         const row = document.createElement('div');

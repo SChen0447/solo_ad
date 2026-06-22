@@ -1,12 +1,14 @@
 import * as THREE from 'three';
+import { CSS2DRenderer, CSS2DObject } from 'three/examples/jsm/renderers/CSS2DRenderer.js';
 import type { AtomData, MoleculeData } from '../parser/MoleculeParser';
 
 export interface AtomMesh extends THREE.Mesh {
   userData: {
     atomData: AtomData;
     originalColor: THREE.Color;
+    originalScale: number;
     glowMesh: THREE.Mesh | null;
-    label: HTMLDivElement | null;
+    labelObject: CSS2DObject | null;
     isHighlighted: boolean;
   };
 }
@@ -49,13 +51,14 @@ const ATOM_RADII: Record<string, number> = {
 
 const DEFAULT_COLOR = 0xff1493;
 const DEFAULT_RADIUS = 1.0;
+const HIGHLIGHT_SCALE_FACTOR = 1.35;
 
 export class AtomRenderer {
   private scene: THREE.Scene;
   private container: HTMLElement;
   public atomMeshes: AtomMesh[] = [];
   public group: THREE.Group;
-  private labelContainer: HTMLDivElement | null = null;
+  public css2dRenderer: CSS2DRenderer;
 
   constructor(scene: THREE.Scene, container: HTMLElement) {
     this.scene = scene;
@@ -63,19 +66,14 @@ export class AtomRenderer {
     this.group = new THREE.Group();
     this.group.name = 'molecule-atoms';
     this.scene.add(this.group);
-    this.createLabelContainer();
-  }
 
-  private createLabelContainer(): void {
-    this.labelContainer = document.createElement('div');
-    this.labelContainer.style.position = 'absolute';
-    this.labelContainer.style.top = '0';
-    this.labelContainer.style.left = '0';
-    this.labelContainer.style.width = '100%';
-    this.labelContainer.style.height = '100%';
-    this.labelContainer.style.pointerEvents = 'none';
-    this.labelContainer.style.zIndex = '10';
-    this.container.appendChild(this.labelContainer);
+    this.css2dRenderer = new CSS2DRenderer();
+    this.css2dRenderer.setSize(window.innerWidth, window.innerHeight);
+    this.css2dRenderer.domElement.style.position = 'absolute';
+    this.css2dRenderer.domElement.style.top = '0';
+    this.css2dRenderer.domElement.style.left = '0';
+    this.css2dRenderer.domElement.style.pointerEvents = 'none';
+    this.container.appendChild(this.css2dRenderer.domElement);
   }
 
   public getElementColor(element: string): number {
@@ -86,13 +84,13 @@ export class AtomRenderer {
     return ATOM_RADII[element] ?? DEFAULT_RADIUS;
   }
 
-  public render(moleculeData: MoleculeData): AtomMesh[] {
+  public render(moleculeData: MoleculeData, atomScale: number = 1.0): AtomMesh[] {
     this.clear();
 
     const geometryCache = new Map<number, THREE.SphereGeometry>();
 
     for (const atom of moleculeData.atoms) {
-      const radius = this.getElementRadius(atom.element);
+      const radius = this.getElementRadius(atom.element) * atomScale;
       const segments = atom.element === 'H' ? 16 : 24;
 
       let geometry = geometryCache.get(segments);
@@ -127,16 +125,19 @@ export class AtomRenderer {
         depthWrite: false
       });
       const glowMesh = new THREE.Mesh(geometry, glowMaterial);
-      glowMesh.scale.setScalar(radius * 1.4);
+      glowMesh.scale.setScalar(1.5);
       mesh.add(glowMesh);
 
-      const label = this.createLabel(atom.element, atom.id);
+      const labelObject = this.createLabel(atom.element, atom.id);
+      mesh.add(labelObject);
+      labelObject.visible = false;
 
       mesh.userData = {
         atomData: atom,
         originalColor: color.clone(),
+        originalScale: radius,
         glowMesh: glowMesh,
-        label: label,
+        labelObject: labelObject,
         isHighlighted: false
       };
 
@@ -148,11 +149,10 @@ export class AtomRenderer {
     return this.atomMeshes;
   }
 
-  private createLabel(element: string, id: number): HTMLDivElement {
-    const label = document.createElement('div');
-    label.textContent = `${element} ${id}`;
-    label.style.cssText = `
-      position: absolute;
+  private createLabel(element: string, id: number): CSS2DObject {
+    const div = document.createElement('div');
+    div.textContent = `${element} ${id}`;
+    div.style.cssText = `
       padding: 4px 10px;
       background: rgba(255, 255, 255, 0.92);
       color: #1a1a2e;
@@ -160,39 +160,20 @@ export class AtomRenderer {
       font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
       font-size: 12px;
       font-weight: 600;
-      pointer-events: none;
-      transform: translate(-50%, -120%);
       white-space: nowrap;
-      opacity: 0;
-      transition: opacity 0.15s ease;
       box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
       border: 1px solid rgba(255, 255, 255, 0.5);
+      pointer-events: none;
+      transform: translateY(-140%);
     `;
-    label.dataset.labelType = 'atom';
-    this.labelContainer?.appendChild(label);
-    return label;
+
+    const labelObject = new CSS2DObject(div);
+    labelObject.position.set(0, 0, 0);
+    return labelObject;
   }
 
-  public updateLabels(camera: THREE.PerspectiveCamera, renderer: THREE.WebGLRenderer): void {
-    const rect = renderer.domElement.getBoundingClientRect();
-
-    for (const atomMesh of this.atomMeshes) {
-      if (!atomMesh.userData.label) continue;
-
-      const worldPos = new THREE.Vector3();
-      atomMesh.getWorldPosition(worldPos);
-      const screenPos = worldPos.project(camera);
-
-      const x = (screenPos.x * 0.5 + 0.5) * rect.width;
-      const y = (-screenPos.y * 0.5 + 0.5) * rect.height;
-
-      atomMesh.userData.label.style.left = `${x}px`;
-      atomMesh.userData.label.style.top = `${y}px`;
-
-      if (screenPos.z > 1 || screenPos.z < -1) {
-        atomMesh.userData.label.style.opacity = '0';
-      }
-    }
+  public updateLabels(camera: THREE.PerspectiveCamera): void {
+    this.css2dRenderer.render(this.scene, camera);
   }
 
   public highlightAtom(atomMesh: AtomMesh): void {
@@ -200,16 +181,20 @@ export class AtomRenderer {
     atomMesh.userData.isHighlighted = true;
 
     const material = atomMesh.material as THREE.MeshPhysicalMaterial;
-    material.emissiveIntensity = 1.5;
-    material.emissive = atomMesh.userData.originalColor.clone().multiplyScalar(0.8);
+    material.emissiveIntensity = 2.0;
+    material.emissive = atomMesh.userData.originalColor.clone();
+
+    const targetScale = atomMesh.userData.originalScale * HIGHLIGHT_SCALE_FACTOR;
+    atomMesh.scale.setScalar(targetScale);
 
     if (atomMesh.userData.glowMesh) {
       const glowMat = atomMesh.userData.glowMesh.material as THREE.MeshBasicMaterial;
-      glowMat.opacity = 0.35;
+      glowMat.opacity = 0.45;
+      atomMesh.userData.glowMesh.scale.setScalar(1.6);
     }
 
-    if (atomMesh.userData.label) {
-      atomMesh.userData.label.style.opacity = '1';
+    if (atomMesh.userData.labelObject) {
+      atomMesh.userData.labelObject.visible = true;
     }
   }
 
@@ -221,13 +206,16 @@ export class AtomRenderer {
     material.emissiveIntensity = 0.6;
     material.emissive = atomMesh.userData.originalColor.clone().multiplyScalar(0.15);
 
+    atomMesh.scale.setScalar(atomMesh.userData.originalScale);
+
     if (atomMesh.userData.glowMesh) {
       const glowMat = atomMesh.userData.glowMesh.material as THREE.MeshBasicMaterial;
       glowMat.opacity = 0.0;
+      atomMesh.userData.glowMesh.scale.setScalar(1.5);
     }
 
-    if (atomMesh.userData.label) {
-      atomMesh.userData.label.style.opacity = '0';
+    if (atomMesh.userData.labelObject) {
+      atomMesh.userData.labelObject.visible = false;
     }
   }
 
@@ -260,19 +248,23 @@ export class AtomRenderer {
 
   public clear(): void {
     for (const mesh of this.atomMeshes) {
-      if (mesh.userData.label) {
-        mesh.userData.label.remove();
-      }
       mesh.geometry.dispose();
       (mesh.material as THREE.Material).dispose();
       if (mesh.userData.glowMesh) {
         mesh.userData.glowMesh.geometry.dispose();
         (mesh.userData.glowMesh.material as THREE.Material).dispose();
       }
+      if (mesh.userData.labelObject) {
+        mesh.remove(mesh.userData.labelObject);
+      }
     }
     while (this.group.children.length > 0) {
       this.group.remove(this.group.children[0]);
     }
     this.atomMeshes = [];
+  }
+
+  public onResize(width: number, height: number): void {
+    this.css2dRenderer.setSize(width, height);
   }
 }
