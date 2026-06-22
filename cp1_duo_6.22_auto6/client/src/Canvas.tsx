@@ -24,6 +24,14 @@ const NOTE_H = 140;
 const MIN_SCALE = 0.2;
 const MAX_SCALE = 3;
 
+const PRESET_COLORS = [
+  { name: '霓虹蓝', value: '#00e5ff' },
+  { name: '青色', value: '#18ffff' },
+  { name: '紫色', value: '#7c4dff' },
+  { name: '橙色', value: '#ffab40' },
+  { name: '粉色', value: '#ff4081' },
+];
+
 const Canvas: React.FC<CanvasProps> = ({
   notes,
   connections,
@@ -54,8 +62,11 @@ const Canvas: React.FC<CanvasProps> = ({
   const [mouseWorld, setMouseWorld] = useState({ x: 0, y: 0 });
   const [activeSnapshotIdx, setActiveSnapshotIdx] = useState(-1);
   const [isReplaying, setIsReplaying] = useState(false);
+  const [colorPickerForNoteId, setColorPickerForNoteId] = useState<string | null>(null);
 
   const notePositionsRef = useRef<Map<string, { x: number; y: number }>>(new Map());
+  const noteColorRefs = useRef<Map<string, { border: HTMLDivElement | null; bar: HTMLDivElement | null }>>(new Map());
+  const prevColorsRef = useRef<Map<string, string>>(new Map());
 
   const screenToWorld = useCallback(
     (sx: number, sy: number) => {
@@ -74,6 +85,16 @@ const Canvas: React.FC<CanvasProps> = ({
       notePositionsRef.current.set(n.id, { x: n.x, y: n.y });
     });
   }, [notes]);
+
+  useEffect(() => {
+    const handleDocClick = () => {
+      if (colorPickerForNoteId) {
+        setColorPickerForNoteId(null);
+      }
+    };
+    document.addEventListener('click', handleDocClick);
+    return () => document.removeEventListener('click', handleDocClick);
+  }, [colorPickerForNoteId]);
 
   const handleWheel = useCallback(
     (e: React.WheelEvent) => {
@@ -191,6 +212,57 @@ const Canvas: React.FC<CanvasProps> = ({
     setEditingNoteId(null);
     setEditText('');
   }, [editingNoteId, editText, onUpdateNote]);
+
+  const handleNoteColorChange = useCallback(
+    (noteId: string, newColor: string) => {
+      const note = notes.find((n) => n.id === noteId);
+      if (!note) return;
+
+      const prevColor = note.color;
+      prevColorsRef.current.set(noteId, prevColor);
+
+      onUpdateNote({ id: noteId, color: newColor });
+      setColorPickerForNoteId(null);
+
+      requestAnimationFrame(() => {
+        const refs = noteColorRefs.current.get(noteId);
+        if (refs) {
+          const gsapTargets = [];
+          if (refs.border) gsapTargets.push(refs.border);
+          if (refs.bar) gsapTargets.push(refs.bar);
+
+          if (gsapTargets.length > 0) {
+            gsap.fromTo(
+              gsapTargets,
+              {
+                borderColor: prevColor,
+                background: `linear-gradient(90deg, ${prevColor}, ${prevColor}88)`,
+              },
+              {
+                borderColor: newColor,
+                background: `linear-gradient(90deg, ${newColor}, ${newColor}88)`,
+                duration: 0.3,
+                ease: 'power2.out',
+              }
+            );
+
+            if (refs.bar) {
+              gsap.fromTo(
+                refs.bar,
+                { background: `linear-gradient(90deg, ${prevColor}, ${prevColor}88)` },
+                {
+                  background: `linear-gradient(90deg, ${newColor}, ${newColor}88)`,
+                  duration: 0.3,
+                  ease: 'power2.out',
+                }
+              );
+            }
+          }
+        }
+      });
+    },
+    [notes, onUpdateNote]
+  );
 
   const handleConnectStart = useCallback((noteId: string) => {
     setConnectingFromId(noteId);
@@ -365,11 +437,11 @@ const Canvas: React.FC<CanvasProps> = ({
             background: `rgba(20, 30, 50, 0.65)`,
             backdropFilter: 'blur(16px)',
             WebkitBackdropFilter: 'blur(16px)',
-            border: `1.5px solid ${isSelected ? '#00e5ff' : isHovered ? 'rgba(0, 229, 255, 0.5)' : 'rgba(0, 229, 255, 0.15)'}`,
+            border: `1.5px solid ${isSelected ? note.color : isHovered ? note.color + 'aa' : note.color + '44'}`,
             borderRadius: 12,
             boxShadow: isSelected
-              ? '0 0 20px rgba(0, 229, 255, 0.3), 0 4px 16px rgba(0,0,0,0.3)'
-              : '0 4px 16px rgba(0,0,0,0.3)',
+              ? '0 0 20px ' + note.color + '4d, 0 4px 16px rgba(0,0,0,0.3)'
+              : `0 4px 16px rgba(0,0,0,0.3)`,
             padding: '12px',
             cursor: isDragging ? 'grabbing' : 'grab',
             userSelect: 'none',
@@ -388,6 +460,8 @@ const Canvas: React.FC<CanvasProps> = ({
             borderRadius: '12px 12px 0 0',
           };
 
+          const isColorPickerOpen = colorPickerForNoteId === note.id;
+
           const textStyle: React.CSSProperties = {
             color: '#e0e8f0',
             fontSize: 13,
@@ -405,8 +479,18 @@ const Canvas: React.FC<CanvasProps> = ({
               onMouseDown={(e) => handleNoteMouseDown(e, note.id)}
               onMouseEnter={() => setHoveredNoteId(note.id)}
               onMouseLeave={() => setHoveredNoteId(null)}
+              ref={(el) => {
+                const current = noteColorRefs.current.get(note.id) || { border: null, bar: null };
+                noteColorRefs.current.set(note.id, { ...current, border: el });
+              }}
             >
-              <div style={colorBarStyle} />
+              <div
+                style={colorBarStyle}
+                ref={(el) => {
+                  const current = noteColorRefs.current.get(note.id) || { border: null, bar: null };
+                  noteColorRefs.current.set(note.id, { ...current, bar: el });
+                }}
+              />
               {isEditing ? (
                 <textarea
                   autoFocus
@@ -438,15 +522,16 @@ const Canvas: React.FC<CanvasProps> = ({
               )}
 
               {isHovered && !isEditing && (
-                <div
-                  style={{
-                    position: 'absolute',
-                    top: 6,
-                    right: 6,
-                    display: 'flex',
-                    gap: 4,
-                  }}
-                >
+                <>
+                  <div
+                    style={{
+                      position: 'absolute',
+                      top: 6,
+                      right: 6,
+                      display: 'flex',
+                      gap: 4,
+                    }}
+                  >
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
@@ -468,6 +553,29 @@ const Canvas: React.FC<CanvasProps> = ({
                     title="编辑"
                   >
                     ✎
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      e.nativeEvent.stopImmediatePropagation();
+                      setColorPickerForNoteId(isColorPickerOpen ? null : note.id);
+                    }}
+                    style={{
+                      width: 22,
+                      height: 22,
+                      borderRadius: 6,
+                      border: '1px solid ' + note.color + '80',
+                      background: note.color + '20',
+                      color: note.color,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: 11,
+                    }}
+                    title="标签颜色"
+                  >
+                    ◐
                   </button>
                   <button
                     onClick={(e) => {
@@ -514,6 +622,54 @@ const Canvas: React.FC<CanvasProps> = ({
                     ✕
                   </button>
                 </div>
+                {isColorPickerOpen && (
+                  <div
+                    onClick={(e) => e.stopPropagation()}
+                    onMouseDown={(e) => e.stopPropagation()}
+                    style={{
+                      position: 'absolute',
+                      top: 32,
+                      right: 6,
+                      background: 'rgba(12, 18, 32, 0.95)',
+                      backdropFilter: 'blur(12px)',
+                      border: '1px solid rgba(0, 229, 255, 0.2)',
+                      borderRadius: 10,
+                      padding: '8px',
+                      display: 'flex',
+                      gap: 6,
+                      zIndex: 1000,
+                      boxShadow: '0 4px 20px rgba(0,0,0,0.4)',
+                    }}
+                  >
+                    {PRESET_COLORS.map((colorOption) => (
+                      <button
+                        key={colorOption.value}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleNoteColorChange(note.id, colorOption.value);
+                        }}
+                        title={colorOption.name}
+                        style={{
+                          width: 24,
+                          height: 24,
+                          borderRadius: 6,
+                          border: '2px solid ' + (note.color === colorOption.value ? colorOption.value : 'transparent'),
+                          background: colorOption.value,
+                          cursor: 'pointer',
+                          transition: 'transform 0.15s, border-color 0.2s',
+                          boxShadow: '0 2px 8px ' + colorOption.value + '40',
+                        }}
+                        onMouseEnter={(e) => {
+                          (e.currentTarget as HTMLButtonElement).style.transform = 'scale(1.15)';
+                        }}
+                        onMouseLeave={(e) => {
+                          (e.currentTarget as HTMLButtonElement).style.transform = 'scale(1)';
+                        }}
+                      />
+                    ))}
+                  </div>
+                )}
+                </>
               )}
             </div>
           );
