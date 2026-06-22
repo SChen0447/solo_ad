@@ -1,5 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  Legend,
+  Cell,
+  LabelList,
+} from 'recharts';
 import { Question, ScoreResult } from '../types';
 
 interface AnswerSheetProps {
@@ -27,9 +38,50 @@ const AnswerSheet: React.FC<AnswerSheetProps> = ({
   const [submitting, setSubmitting] = useState(false);
   const [fadeIn, setFadeIn] = useState(true);
 
+  const getStorageKey = () => {
+    if (questions.length === 0) return 'quizforge_answers';
+    const ids = questions.map((q) => q.id).join('|');
+    return `quizforge_answers_${ids.length}_${ids.slice(0, 50)}`;
+  };
+
+  const loadSavedAnswers = () => {
+    if (readonly) return;
+    try {
+      const key = getStorageKey();
+      const saved = localStorage.getItem(key);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        setAnswers(parsed);
+      }
+    } catch (e) {
+      console.error('Failed to load saved answers:', e);
+    }
+  };
+
+  const saveAnswersToStorage = (newAnswers: Record<string, string | string[] | null>) => {
+    if (readonly) return;
+    try {
+      const key = getStorageKey();
+      localStorage.setItem(key, JSON.stringify(newAnswers));
+    } catch (e) {
+      console.error('Failed to save answers:', e);
+    }
+  };
+
+  const clearSavedAnswers = () => {
+    try {
+      const key = getStorageKey();
+      localStorage.removeItem(key);
+    } catch (e) {
+      console.error('Failed to clear saved answers:', e);
+    }
+  };
+
   useEffect(() => {
     if (initialAnswers) {
       setAnswers(initialAnswers);
+    } else if (!readonly && questions.length > 0) {
+      loadSavedAnswers();
     }
     if (initialScoreResult) {
       setScoreResult(initialScoreResult);
@@ -38,9 +90,17 @@ const AnswerSheet: React.FC<AnswerSheetProps> = ({
 
   useEffect(() => {
     setCurrentIndex(0);
-    setAnswers({});
+    if (!initialAnswers && !readonly) {
+      loadSavedAnswers();
+    }
     setScoreResult(null);
   }, [questions]);
+
+  useEffect(() => {
+    if (!readonly && Object.keys(answers).length > 0) {
+      saveAnswersToStorage(answers);
+    }
+  }, [answers]);
 
   const currentQuestion = questions[currentIndex];
 
@@ -106,6 +166,7 @@ const AnswerSheet: React.FC<AnswerSheetProps> = ({
           knowledgeStats: data.knowledgeStats,
         };
         setScoreResult(result);
+        clearSavedAnswers();
         onSubmit(questions, answers, result);
       } else {
         alert(data.error || '评分失败');
@@ -185,18 +246,79 @@ const AnswerSheet: React.FC<AnswerSheetProps> = ({
 
         {chartData.length > 0 && (
           <div className="card">
-            <h3 className="card-title">📈 知识点正确率</h3>
+            <h3 className="card-title">📈 知识点正确率分析</h3>
             <div className="chart-container">
-              <ResponsiveContainer width="100%" height={250}>
-                <BarChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#e0e7ff" />
-                  <XAxis dataKey="name" tick={{ fontSize: 12 }} />
-                  <YAxis domain={[0, 100]} tick={{ fontSize: 12 }} />
+              <ResponsiveContainer width="100%" height={300}>
+                <BarChart
+                  data={chartData}
+                  margin={{ top: 30, right: 40, left: 20, bottom: 20 }}
+                  barCategoryGap="20%"
+                >
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e0e7ff" vertical={false} />
+                  <XAxis
+                    dataKey="name"
+                    tick={{ fontSize: 12, fill: '#64748b' }}
+                    axisLine={{ stroke: '#cbd5e1' }}
+                    tickLine={false}
+                  />
+                  <YAxis
+                    domain={[0, 100]}
+                    tick={{ fontSize: 12, fill: '#64748b' }}
+                    axisLine={{ stroke: '#cbd5e1' }}
+                    tickLine={false}
+                    tickFormatter={(value) => `${value}%`}
+                  />
                   <Tooltip
                     formatter={(value: number) => [`${value}%`, '正确率']}
-                    contentStyle={{ borderRadius: '8px' }}
+                    contentStyle={{
+                      borderRadius: '12px',
+                      border: '1px solid #e2e8f0',
+                      boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                      padding: '12px 16px',
+                    }}
+                    labelStyle={{ fontWeight: 600, color: '#1e293b' }}
+                    cursor={{ fill: 'rgba(37, 99, 235, 0.08)' }}
                   />
-                  <Bar dataKey="正确率" fill="#2563eb" radius={[4, 4, 0, 0]} animationDuration={800} />
+                  <Legend
+                    wrapperStyle={{ paddingTop: '10px' }}
+                    iconType="rect"
+                  />
+                  <Bar
+                    dataKey="正确率"
+                    name="知识点正确率"
+                    fill="#2563eb"
+                    radius={[8, 8, 0, 0]}
+                    animationDuration={1000}
+                    animationEasing="ease-out"
+                    maxBarSize={60}
+                    onMouseEnter={(data, index, e) => {
+                      if (e && e.currentTarget) {
+                        e.currentTarget.style.transform = 'translateY(-2px)';
+                        e.currentTarget.style.transition = 'transform 0.2s ease';
+                      }
+                    }}
+                    onMouseLeave={(data, index, e) => {
+                      if (e && e.currentTarget) {
+                        e.currentTarget.style.transform = 'translateY(0)';
+                      }
+                    }}
+                  >
+                    <LabelList
+                      dataKey="正确率"
+                      position="top"
+                      formatter={(value: number) => `${value}%`}
+                      style={{ fontSize: 12, fill: '#64748b', fontWeight: 500 }}
+                    />
+                    {chartData.map((entry, index) => {
+                      const color =
+                        entry.正确率 >= 80
+                          ? '#10b981'
+                          : entry.正确率 >= 60
+                          ? '#f59e0b'
+                          : '#ef4444';
+                      return <Cell key={`cell-${index}`} fill={color} />;
+                    })}
+                  </Bar>
                 </BarChart>
               </ResponsiveContainer>
             </div>

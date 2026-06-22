@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Question } from '../types';
 
 const QuestionBank: React.FC = () => {
@@ -7,6 +7,10 @@ const QuestionBank: React.FC = () => {
   const [filterKnowledge, setFilterKnowledge] = useState<string>('');
   const [filterDifficulty, setFilterDifficulty] = useState<string>('');
   const [knowledges, setKnowledges] = useState<string[]>([]);
+  const [uploading, setUploading] = useState(false);
+  const [uploadResult, setUploadResult] = useState<{ count: number; total: number } | null>(null);
+  const [dragOver, setDragOver] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     fetchQuestions();
@@ -37,6 +41,53 @@ const QuestionBank: React.FC = () => {
       }
     } catch (e) {
       console.error('Failed to fetch knowledges:', e);
+    }
+  };
+
+  const handleFileUpload = async (file: File) => {
+    if (!file) return;
+
+    setUploading(true);
+    setUploadResult(null);
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+      const res = await fetch('/api/import', {
+        method: 'POST',
+        body: formData,
+      });
+      const data = await res.json();
+      if (data.success) {
+        setUploadResult({ count: data.count, total: data.total });
+        fetchQuestions();
+        fetchKnowledges();
+      } else {
+        alert(data.error || '导入失败');
+      }
+    } catch (e) {
+      alert('导入失败，请检查服务器连接');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      handleFileUpload(file);
+    }
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setDragOver(false);
+    const file = e.dataTransfer.files?.[0];
+    if (file && file.name.endsWith('.csv')) {
+      handleFileUpload(file);
+    } else {
+      alert('请上传CSV文件');
     }
   };
 
@@ -95,7 +146,43 @@ const QuestionBank: React.FC = () => {
       </div>
 
       <div className="card">
-        <h3 className="card-title">🔍 筛选题目</h3>
+        <h3 className="card-title">� 导入题库</h3>
+        <div
+          className={`upload-area ${dragOver ? 'drag-over' : ''}`}
+          onDragOver={(e) => {
+            e.preventDefault();
+            setDragOver(true);
+          }}
+          onDragLeave={() => setDragOver(false)}
+          onDrop={handleDrop}
+          onClick={() => fileInputRef.current?.click()}
+        >
+          {uploading ? (
+            <p>上传中...</p>
+          ) : (
+            <>
+              <p className="upload-icon">📄</p>
+              <p>拖拽CSV文件到此处，或点击选择文件</p>
+              <p className="upload-hint">格式：题目,选项A,选项B,选项C,选项D,正确答案,知识点,难度</p>
+            </>
+          )}
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".csv"
+            onChange={handleFileChange}
+            style={{ display: 'none' }}
+          />
+        </div>
+        {uploadResult && (
+          <div className="upload-result success">
+            ✅ 成功导入 {uploadResult.count} 道题，当前题库共 {uploadResult.total} 道题
+          </div>
+        )}
+      </div>
+
+      <div className="card">
+        <h3 className="card-title">�🔍 筛选题目</h3>
         <div className="filter-row">
           <div className="filter-item">
             <label>知识点：</label>

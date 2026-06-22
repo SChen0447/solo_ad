@@ -41,7 +41,11 @@ const HistoryPanel: React.FC<HistoryPanelProps> = ({ records, onViewRecord }) =>
         ) : (
           <div className="history-list">
             {records.map((record) => (
-              <div key={record.id} className="history-item">
+              <div
+                key={record.id}
+                className="history-item clickable"
+                onClick={() => onViewRecord(record)}
+              >
                 <div className="history-info">
                   <h4 className="history-title">{record.title}</h4>
                   <p className="history-date">{formatDate(record.createdAt)}</p>
@@ -52,6 +56,11 @@ const HistoryPanel: React.FC<HistoryPanelProps> = ({ records, onViewRecord }) =>
                         <span>•</span>
                         <span className={`history-score score-${getScoreColor(record.scoreResult.totalScore)}`}>
                           {record.scoreResult.totalScore} 分
+                        </span>
+                        <span>•</span>
+                        <span>
+                          正确 {record.scoreResult.details.filter((d) => d.isCorrect).length} /{' '}
+                          {record.scoreResult.details.length}
                         </span>
                       </>
                     )}
@@ -68,9 +77,12 @@ const HistoryPanel: React.FC<HistoryPanelProps> = ({ records, onViewRecord }) =>
                 </div>
                 <button
                   className="btn btn-outline"
-                  onClick={() => onViewRecord(record)}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onViewRecord(record);
+                  }}
                 >
-                  查看详情 →
+                  查看答卷 →
                 </button>
               </div>
             ))}

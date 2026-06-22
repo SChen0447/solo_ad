@@ -7,7 +7,7 @@
   --card-bg: #ffffff;
   --text-primary: #1e293b;
   --text-secondary: #64748b;
-  --text-muted: #94a3b8;
+  --text-muted: lab(66.48% -0.73 -12.6);
   --border-color: #e2e8f0;
   --success-color: #10b981;
   --success-bg: #d1fae5;
@@ -1054,6 +1054,19 @@ button:disabled {
   border-color: var(--primary-light);
   background: var(--secondary-bg);
   transform: translateX(4px);
+}
+
+.history-item.clickable {
+  cursor: pointer;
+}
+
+.history-item.clickable:hover {
+  box-shadow: var(--shadow-md);
+  transform: translateX(4px) translateY(-1px);
+}
+
+.history-item.clickable:active {
+  transform: translateX(2px) translateY(0);
 }
 
 .history-info {

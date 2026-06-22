@@ -43,7 +43,12 @@ const questionStore: QuestionStore = {
     let filtered = [...this.questions];
 
     if (knowledges && knowledges.length > 0) {
-      filtered = filtered.filter((q) => knowledges.includes(q.knowledge));
+      const normalizedKnowledges = knowledges.map((k) => k.trim());
+      filtered = filtered.filter((q) => {
+        return normalizedKnowledges.some(
+          (k) => k.toLowerCase() === q.knowledge.trim().toLowerCase()
+        );
+      });
     }
 
     if (difficulties && difficulties.length > 0) {
