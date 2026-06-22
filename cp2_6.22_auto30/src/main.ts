@@ -21,11 +21,14 @@ const state = {
   sceneManager: null as SceneManager | null,
   history: [] as HistoryRecord[],
   isAnimating: false,
+  collapsedCategories: {} as Record<MaterialCategory, boolean>,
 };
 
 const dom = {
   canvas: null as HTMLCanvasElement | null,
   thumbLists: {} as Record<MaterialCategory, HTMLDivElement | null>,
+  categorySections: {} as Record<MaterialCategory, HTMLElement | null>,
+  collapsedPreviews: {} as Record<MaterialCategory, HTMLElement | null>,
   saveBtn: null as HTMLButtonElement | null,
   randomBtn: null as HTMLButtonElement | null,
   historyList: null as HTMLDivElement | null,
@@ -41,6 +44,7 @@ function init(): void {
   buildThumbnails();
   bindEvents();
   updateSelectedState();
+  updateAllCollapsedPreviews();
   updateHistoryUI();
 }
 
@@ -55,6 +59,14 @@ function cacheDom(): void {
   (['floor', 'wall', 'curtain'] as MaterialCategory[]).forEach((cat) => {
     const el = document.querySelector(`.thumb-list[data-category="${cat}"]`);
     dom.thumbLists[cat] = el as HTMLDivElement | null;
+
+    const section = document.querySelector(`.category-section[data-category="${cat}"]`);
+    dom.categorySections[cat] = section as HTMLElement | null;
+
+    const preview = document.querySelector(`[data-collapsed-preview="${cat}"]`);
+    dom.collapsedPreviews[cat] = preview as HTMLElement | null;
+
+    state.collapsedCategories[cat] = false;
   });
 }
 
@@ -99,6 +111,14 @@ function bindEvents(): void {
   document.addEventListener('click', (e) => {
     const target = e.target as HTMLElement;
 
+    const toggleBtn = target.closest('.category-toggle') as HTMLElement | null;
+    if (toggleBtn) {
+      e.stopPropagation();
+      const cat = toggleBtn.dataset.toggle as MaterialCategory;
+      if (cat) toggleCategory(cat);
+      return;
+    }
+
     const thumbEl = target.closest('.thumb') as HTMLElement | null;
     if (thumbEl) {
       e.stopPropagation();
@@ -106,6 +126,16 @@ function bindEvents(): void {
       const id = thumbEl.dataset.id as string;
       if (cat && id && !state.isAnimating) {
         handleSelect(cat, id);
+      }
+      return;
+    }
+
+    const collapsedPreview = target.closest('.collapsed-preview') as HTMLElement | null;
+    if (collapsedPreview) {
+      e.stopPropagation();
+      const cat = collapsedPreview.dataset.collapsedPreview as MaterialCategory;
+      if (cat && state.collapsedCategories[cat]) {
+        toggleCategory(cat);
       }
       return;
     }
@@ -171,6 +201,61 @@ function updateSelectedState(): void {
       htmlEl.classList.add('selected');
     } else {
       htmlEl.classList.remove('selected');
+    }
+  });
+
+  updateAllCollapsedPreviews();
+}
+
+function toggleCategory(cat: MaterialCategory): void {
+  state.collapsedCategories[cat] = !state.collapsedCategories[cat];
+  const section = dom.categorySections[cat];
+  if (section) {
+    section.classList.toggle('collapsed', state.collapsedCategories[cat]);
+  }
+  updateCollapsedPreview(cat);
+}
+
+function updateCollapsedPreview(cat: MaterialCategory): void {
+  const preview = dom.collapsedPreviews[cat];
+  if (!preview) return;
+
+  if (!state.collapsedCategories[cat]) {
+    preview.innerHTML = '';
+    return;
+  }
+
+  const mat = getMaterialById(cat, state.selection[cat]);
+  if (!mat) return;
+
+  preview.innerHTML = '';
+
+  const thumbDiv = document.createElement('div');
+  thumbDiv.className = 'collapsed-preview-thumb';
+
+  const canvas = document.createElement('canvas');
+  const size = 60;
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext('2d')!;
+  drawMaterialThumbnail(ctx, mat, size, size);
+  thumbDiv.appendChild(canvas);
+
+  const nameSpan = document.createElement('span');
+  nameSpan.className = 'collapsed-preview-name';
+  nameSpan.textContent = mat.name;
+
+  preview.appendChild(thumbDiv);
+  preview.appendChild(nameSpan);
+
+  preview.style.cursor = 'pointer';
+  preview.title = `点击展开${cat === 'floor' ? '地板' : cat === 'wall' ? '墙面' : '窗帘'}列表`;
+}
+
+function updateAllCollapsedPreviews(): void {
+  (['floor', 'wall', 'curtain'] as MaterialCategory[]).forEach((cat) => {
+    if (state.collapsedCategories[cat]) {
+      updateCollapsedPreview(cat);
     }
   });
 }
