@@ -289,7 +289,6 @@ body {
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
   animation: fadeInUp 0.4s ease backwards;
   position: relative;
-  will-change: transform, box-shadow;
 }
 
 .plant-card:hover {
@@ -886,13 +885,40 @@ body {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 12px 0;
+  padding: 12px 12px;
+  margin: 0 -4px;
   border-bottom: 1px solid #F3F4F6;
   font-size: 14px;
+  border-radius: 8px;
+  transition: background-color 0.2s ease;
 }
 
 .history-item:last-child {
   border-bottom: none;
+}
+
+.history-item.pending {
+  background-color: #FEF2F2;
+  border: 1px solid #FECACA;
+  border-bottom: 1px solid #FECACA;
+  margin-bottom: 4px;
+}
+
+.history-status {
+  font-size: 13px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+
+.history-status.completed {
+  color: #10B981;
+  background-color: #ECFDF5;
+}
+
+.history-status.pending {
+  color: #EF4444;
+  background-color: #FEF2F2;
 }
 
 .history-date {

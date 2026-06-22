@@ -1,6 +1,7 @@
 import { useMemo } from 'react'
 import type { Plant, Task } from '@/types'
 import { useApp } from '@/context/AppContext'
+import { formatDateCN } from '@/utils/format'
 
 interface Props {
   plant: Plant
@@ -11,6 +12,17 @@ const categoryLabels: Record<Plant['category'], string> = {
   leaf: '叶菜类',
   fruit: '果实类',
   root: '根茎类',
+}
+
+const typeLabels: Record<Task['type'], string> = {
+  water: '浇水',
+  fertilize: '施肥',
+  harvest: '收获',
+}
+
+const statusLabels: Record<'completed' | 'pending', string> = {
+  completed: '已完成',
+  pending: '待处理',
 }
 
 function addDays(dateStr: string, days: number): string {
@@ -66,12 +78,6 @@ function generateTasks(plan: {
   return tasks
 }
 
-const typeLabels: Record<Task['type'], string> = {
-  water: '浇水',
-  fertilize: '施肥',
-  harvest: '收获',
-}
-
 export default function PlantDetail({ plant, onBack }: Props) {
   const { plans, records } = useApp()
 
@@ -87,7 +93,9 @@ export default function PlantDetail({ plant, onBack }: Props) {
 
   const plantRecords = useMemo(() => {
     const planIds = relatedPlans.map((p) => p.id)
-    return records.filter((r) => planIds.includes(r.planId)).sort((a, b) => b.date.localeCompare(a.date))
+    return records
+      .filter((r) => planIds.includes(r.planId))
+      .sort((a, b) => b.date.localeCompare(a.date))
   }, [relatedPlans, records])
 
   return (
@@ -149,7 +157,11 @@ export default function PlantDetail({ plant, onBack }: Props) {
         ) : (
           <div className="timeline">
             {plantRecords.map((r, idx) => (
-              <div key={r.id} className="timeline-item" style={{ animationDelay: `${idx * 0.05}s` }}>
+              <div
+                key={r.id}
+                className="timeline-item"
+                style={{ animationDelay: `${idx * 0.05}s` }}
+              >
                 <div className="timeline-card">
                   {r.photoUrl && (
                     <img
@@ -162,7 +174,7 @@ export default function PlantDetail({ plant, onBack }: Props) {
                     />
                   )}
                   <div className="timeline-content">
-                    <div className="timeline-date">{r.date}</div>
+                    <div className="timeline-date">{formatDateCN(r.date)}</div>
                     <div className="timeline-metrics">
                       {r.height != null && (
                         <span className="timeline-metric">
@@ -193,16 +205,19 @@ export default function PlantDetail({ plant, onBack }: Props) {
           </div>
         ) : (
           <div className="history-list">
-            {allReminders.map((r) => (
-              <div key={r.id} className="history-item">
-                <span className="history-date">{r.date}</span>
-                <span style={{ flex: 1, paddingLeft: 16 }}>{r.plantName}</span>
-                <span className={`history-type ${r.type}`}>{typeLabels[r.type]}</span>
-                <span style={{ marginLeft: 12, fontSize: 13, color: r.completed ? '#10B981' : '#EF4444' }}>
-                  {r.completed ? '✓ 已完成' : '○ 未完成'}
-                </span>
-              </div>
-            ))}
+            {allReminders.map((r) => {
+              const status: 'completed' | 'pending' = r.completed ? 'completed' : 'pending'
+              return (
+                <div key={r.id} className={`history-item ${status}`}>
+                  <span className="history-date">{formatDateCN(r.date)}</span>
+                  <span style={{ flex: 1, paddingLeft: 16 }}>{r.plantName}</span>
+                  <span className={`history-type ${r.type}`}>{typeLabels[r.type]}</span>
+                  <span className={`history-status ${status}`}>
+                    {r.completed ? `✓ ${statusLabels.completed}` : `○ ${statusLabels.pending}`}
+                  </span>
+                </div>
+              )
+            })}
           </div>
         )}
       </div>

@@ -9,6 +9,7 @@ import {
   ResponsiveContainer,
 } from 'recharts'
 import type { GrowthRecord, PlantingPlan } from '@/types'
+import { formatDateCN, formatDateShort } from '@/utils/format'
 
 interface Props {
   records: GrowthRecord[]
@@ -61,7 +62,7 @@ export default function GrowthTimeline({ records, plan }: Props) {
     const recent = heightRecords.filter((r) => new Date(r.date) >= sevenDaysAgo)
     const data = recent.length >= 2 ? recent : heightRecords.slice(-7)
     return data.map((r) => ({
-      date: r.date.slice(5),
+      date: formatDateShort(r.date),
       height: r.height,
     }))
   }, [records])
@@ -130,7 +131,7 @@ export default function GrowthTimeline({ records, plan }: Props) {
                     />
                   )}
                   <div className="timeline-content">
-                    <div className="timeline-date">{record.date}</div>
+                    <div className="timeline-date">{formatDateCN(record.date)}</div>
                     <div className="timeline-metrics">
                       {record.height != null && (
                         <span className="timeline-metric">
