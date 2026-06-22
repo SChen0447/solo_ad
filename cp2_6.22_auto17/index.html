@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>星系漫游 - Galaxy Explorer</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background-color: #000011;
+    }
+
+    #canvas-container {
+      width: 100%;
+      height: 100%;
+      cursor: crosshair;
+    }
+
+    #fps-counter {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      font-family: monospace;
+      font-size: 14px;
+      color: #00FF00;
+      z-index: 100;
+      text-shadow: 0 0 5px #00FF00;
+      user-select: none;
+    }
+
+    #performance-mode {
+      position: fixed;
+      top: 45px;
+      right: 20px;
+      font-family: monospace;
+      font-size: 12px;
+      color: #FFAA00;
+      z-index: 100;
+      text-shadow: 0 0 5px #FFAA00;
+      user-select: none;
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <div id="canvas-container"></div>
+  <div id="fps-counter">FPS: --</div>
+  <div id="performance-mode">性能模式已启用</div>
+  <script type="module" src="/src/render.ts"></script>
+</body>
+</html>
