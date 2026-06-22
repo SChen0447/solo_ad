@@ -3,6 +3,7 @@ import { IngredientCategory } from './types';
 interface Props {
   category: IngredientCategory;
   size?: number;
+  color?: string;
 }
 
 const iconPaths: Record<IngredientCategory, JSX.Element> = {
@@ -227,7 +228,11 @@ const iconPaths: Record<IngredientCategory, JSX.Element> = {
   ),
 };
 
-export default function CategoryIcon({ category, size = 20 }: Props) {
+export default function CategoryIcon({ category, size = 20, color }: Props) {
+  const style: React.CSSProperties = {
+    flexShrink: 0,
+    ...(color ? { color } : {}),
+  };
   return (
     <svg
       width={size}
@@ -235,7 +240,7 @@ export default function CategoryIcon({ category, size = 20 }: Props) {
       viewBox="0 0 24 24"
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
-      style={{ flexShrink: 0 }}
+      style={style}
     >
       {iconPaths[category]}
     </svg>

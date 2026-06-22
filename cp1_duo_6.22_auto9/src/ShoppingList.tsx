@@ -16,6 +16,9 @@ interface Props {
 const STORAGE_KEY = 'recipe_collab_shopping_list';
 const CONFETTI_COLORS = ['#E8833A', '#D2691E', '#8B4513', '#FFB74D', '#FFCC80'];
 
+const INPUT_PADDING_X = 28;
+const INPUT_BORDER_X = 2;
+
 function parseQuantity(q: string): number {
   const n = parseFloat(q);
   return isNaN(n) ? 0 : n;
@@ -41,16 +44,21 @@ function AutoExpandInput({
 }) {
   const measureRef = useRef<HTMLSpanElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const wrapperRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (measureRef.current && inputRef.current) {
-      const width = measureRef.current.offsetWidth;
-      inputRef.current.style.width = `${Math.max(120, width + 30)}px`;
+    if (measureRef.current && inputRef.current && wrapperRef.current) {
+      const textWidth = measureRef.current.offsetWidth;
+      const extraWidth = INPUT_PADDING_X + INPUT_BORDER_X;
+      const maxWidth = wrapperRef.current.clientWidth;
+      const computedWidth = textWidth + extraWidth;
+      const finalWidth = Math.max(120, Math.min(computedWidth, maxWidth));
+      inputRef.current.style.width = `${finalWidth}px`;
     }
   }, [value]);
 
   return (
-    <div className="auto-expand-input-wrapper">
+    <div className="auto-expand-input-wrapper" ref={wrapperRef}>
       <span ref={measureRef} className="auto-expand-input-measure">
         {value || placeholder}
       </span>
@@ -78,9 +86,10 @@ function AnimatedCheckbox({
   return (
     <label className="shopping-item-checkbox">
       <input type="checkbox" checked={checked} onChange={onChange} />
-      <span className="checkbox-custom">
+      <span className={`checkbox-custom ${checked ? 'is-checked' : ''}`}>
         <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
           <polyline
+            className="checkbox-checkmark"
             points="5,12 10,17 19,7"
             fill="none"
             stroke="white"
@@ -94,16 +103,48 @@ function AnimatedCheckbox({
   );
 }
 
-function Confetti({ count = 12 }: { count?: number }) {
-  const pieces = useMemo(() => {
-    return Array.from({ length: count }, (_, i) => ({
-      id: i,
+interface ConfettiPiece {
+  id: string;
+  left: number;
+  delay: number;
+  color: string;
+  size: number;
+}
+
+function Confetti({ count = 12, onComplete }: { count?: number; onComplete?: () => void }) {
+  const [pieces, setPieces] = useState<ConfettiPiece[]>([]);
+  const completedRef = useRef(false);
+  const timersRef = useRef<number[]>([]);
+
+  useEffect(() => {
+    const newPieces: ConfettiPiece[] = Array.from({ length: count }, () => ({
+      id: uuidv4(),
       left: Math.random() * 100,
       delay: Math.random() * 500,
       color: CONFETTI_COLORS[Math.floor(Math.random() * CONFETTI_COLORS.length)],
       size: 6 + Math.random() * 4,
     }));
-  }, [count]);
+    setPieces(newPieces);
+    completedRef.current = false;
+
+    const maxDelay = Math.max(...newPieces.map((p) => p.delay));
+    const totalDuration = maxDelay + 1500 + 100;
+
+    const cleanupTimer = window.setTimeout(() => {
+      if (!completedRef.current) {
+        completedRef.current = true;
+        setPieces([]);
+        onComplete?.();
+      }
+    }, totalDuration);
+
+    timersRef.current.push(cleanupTimer);
+
+    return () => {
+      timersRef.current.forEach((t) => clearTimeout(t));
+      timersRef.current = [];
+    };
+  }, [count, onComplete]);
 
   return (
     <div className="all-complete-confetti">
@@ -283,6 +324,10 @@ export default function ShoppingList({ recipes }: Props) {
     });
   }, []);
 
+  const handleConfettiComplete = useCallback(() => {
+    /* confetti cleanup handled internally */
+  }, []);
+
   return (
     <div className="page-fade shopping-container">
       <div className="page-header">
@@ -306,7 +351,7 @@ export default function ShoppingList({ recipes }: Props) {
         <div className="all-complete-banner" key={bannerKey}>
           <span className="all-complete-icon">🎉</span>
           <span className="all-complete-text">太棒了！所有物品都已准备齐全</span>
-          <Confetti count={15} />
+          <Confetti count={15} onComplete={handleConfettiComplete} />
         </div>
       )}
 
@@ -354,7 +399,7 @@ export default function ShoppingList({ recipes }: Props) {
                   <span className="category-icon-wrapper">
                     <CategoryIcon category={cat} size={20} />
                   </span>
-                  {CATEGORY_LABELS[cat]}
+                  <span className="category-title-text">{CATEGORY_LABELS[cat]}</span>
                   <span style={{ fontSize: 12, fontWeight: 400, color: 'var(--color-text-muted)' }}>
                     ({items.length})
                   </span>
