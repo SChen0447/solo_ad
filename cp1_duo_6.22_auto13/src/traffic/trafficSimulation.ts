@@ -50,6 +50,9 @@ export class TrafficSimulation {
   private frameTimes: number[] = [];
   private lastFpsUpdate: number = 0;
   private currentFps: number = 60;
+  private degradationApplied: boolean = false;
+  private originalBaseVehicleCount: number = 150;
+  private consecutiveLowFpsFrames: number = 0;
 
   private vehicleColors: number[] = [
     0xe74c3c, 0x3498db, 0x2ecc71, 0xf39c12, 0x9b59b6,
@@ -62,6 +65,7 @@ export class TrafficSimulation {
   constructor(scene: THREE.Scene, roadNetwork: RoadNetwork) {
     this.scene = scene;
     this.roadNetwork = roadNetwork;
+    this.originalBaseVehicleCount = this.config.baseVehicleCount;
     this.initVehiclePool();
     this.initInstancedMesh();
     this.initDensityData();
@@ -168,6 +172,7 @@ export class TrafficSimulation {
     }
 
     this.manageVehiclePopulation(deltaTime);
+    this.updateDynamicSpatialGridSize();
     this.updateVehicles(deltaTime);
     this.updateSpatialGrid();
     this.updateInstancedMesh();
@@ -522,7 +527,7 @@ export class TrafficSimulation {
     let endAngle = 0;
 
     if (vehicle.turnType === 'left') {
-      vehicle.stopTimer = this.config.leftTurnWaitTime;
+      vehicle.stopTimer = -1;
 
       switch (vehicle.direction) {
         case 'east':
@@ -605,21 +610,50 @@ export class TrafficSimulation {
 
     vehicle.turnStartAngle = startAngle;
     vehicle.turnEndAngle = endAngle;
-    vehicle.speed = vehicle.maxSpeed * 0.4;
+
+    if (vehicle.turnType === 'left') {
+      vehicle.speed = vehicle.speed;
+    } else {
+      vehicle.speed = vehicle.maxSpeed * 0.4;
+    }
   }
 
   private updateTurningVehicle(vehicle: Vehicle, deltaTime: number): void {
-    if (vehicle.stopTimer > 0) {
-      vehicle.stopTimer -= deltaTime;
-      vehicle.speed = 0;
-      return;
+    if (vehicle.turnType === 'left') {
+      if (vehicle.stopTimer === -1) {
+        vehicle.speed = Math.max(0, vehicle.speed - vehicle.deceleration * 1.5 * deltaTime);
+
+        if (vehicle.speed <= 0.05) {
+          vehicle.speed = 0;
+          vehicle.stopTimer = this.config.leftTurnWaitTime;
+        }
+        return;
+      }
+
+      if (vehicle.stopTimer > 0) {
+        vehicle.stopTimer -= deltaTime;
+        vehicle.speed = 0;
+        return;
+      }
+
+      if (vehicle.speed < vehicle.maxSpeed * 0.3) {
+        vehicle.speed = Math.min(
+          vehicle.maxSpeed * 0.3,
+          vehicle.speed + vehicle.acceleration * 0.5 * deltaTime
+        );
+      }
+    } else {
+      vehicle.speed = vehicle.maxSpeed * 0.4;
     }
 
-    vehicle.speed = vehicle.maxSpeed * 0.4;
     const turnSpeed = vehicle.speed / vehicle.turnRadius;
 
     const angleDiff = vehicle.turnEndAngle - vehicle.turnStartAngle;
     const totalAngle = Math.abs(angleDiff);
+    if (totalAngle < 0.001) {
+      this.finishTurn(vehicle);
+      return;
+    }
     const progressDelta = (turnSpeed * deltaTime) / totalAngle;
 
     if (angleDiff < 0) {
@@ -743,6 +777,26 @@ export class TrafficSimulation {
   private checkAndInitiateTurn(vehicle: Vehicle, segment: any): void {
   }
 
+  private updateDynamicSpatialGridSize(): void {
+    const vehicleCount = this.activeVehicleCount;
+
+    if (vehicleCount < 200) {
+      this.spatialGrid.cellSize = 30;
+    } else if (vehicleCount < 500) {
+      this.spatialGrid.cellSize = 20;
+    } else if (vehicleCount < 800) {
+      this.spatialGrid.cellSize = 15;
+    } else {
+      this.spatialGrid.cellSize = 10;
+    }
+
+    if (this.performanceMode === 'low') {
+      this.spatialGrid.cellSize = Math.max(this.spatialGrid.cellSize, 40);
+    } else if (this.performanceMode === 'medium') {
+      this.spatialGrid.cellSize = Math.max(this.spatialGrid.cellSize, 25);
+    }
+  }
+
   private updateSpatialGrid(): void {
     this.spatialGrid.cells.clear();
     this.spatialGrid.vehicleIndices.clear();
@@ -863,18 +917,40 @@ export class TrafficSimulation {
   private adjustPerformanceMode(): void {
     const fps = this.currentFps;
 
-    if (fps < 25 && this.performanceMode === 'high') {
+    if (fps < 30) {
+      this.consecutiveLowFpsFrames++;
+    } else {
+      this.consecutiveLowFpsFrames = Math.max(0, this.consecutiveLowFpsFrames - 1);
+    }
+
+    if (this.consecutiveLowFpsFrames >= 3 && this.performanceMode === 'high') {
       this.performanceMode = 'medium';
-      this.config.baseVehicleCount = Math.floor(this.config.baseVehicleCount * 0.7);
-    } else if (fps < 20 && this.performanceMode === 'medium') {
+      this.degradationApplied = true;
+      this.config.baseVehicleCount = Math.floor(this.originalBaseVehicleCount * 0.7);
+      this.config.vehicleSpawnInterval = 0.5;
+      this.densityUpdateTimer = 0;
+      console.warn('[TrafficSim] Performance degraded to MEDIUM: reducing vehicle count and spawn rate');
+    } else if (this.consecutiveLowFpsFrames >= 3 && this.performanceMode === 'medium') {
       this.performanceMode = 'low';
-      this.config.baseVehicleCount = Math.floor(this.config.baseVehicleCount * 0.5);
+      this.degradationApplied = true;
+      this.config.baseVehicleCount = Math.floor(this.originalBaseVehicleCount * 0.4);
+      this.config.vehicleSpawnInterval = 0.8;
+      this.densityUpdateTimer = 0;
+      console.warn('[TrafficSim] Performance degraded to LOW: significantly reducing vehicles');
     } else if (fps > 50 && this.performanceMode === 'low') {
       this.performanceMode = 'medium';
-      this.config.baseVehicleCount = Math.floor(this.config.baseVehicleCount * 1.5);
+      this.degradationApplied = true;
+      this.config.baseVehicleCount = Math.floor(this.originalBaseVehicleCount * 0.7);
+      this.config.vehicleSpawnInterval = 0.5;
+      this.consecutiveLowFpsFrames = 0;
+      console.info('[TrafficSim] Performance recovered to MEDIUM');
     } else if (fps > 55 && this.performanceMode === 'medium') {
       this.performanceMode = 'high';
-      this.config.baseVehicleCount = Math.min(150, Math.floor(this.config.baseVehicleCount * 1.3));
+      this.degradationApplied = false;
+      this.config.baseVehicleCount = this.originalBaseVehicleCount;
+      this.config.vehicleSpawnInterval = 0.3;
+      this.consecutiveLowFpsFrames = 0;
+      console.info('[TrafficSim] Performance recovered to HIGH');
     }
 
     this.updateTargetVehicleCount();

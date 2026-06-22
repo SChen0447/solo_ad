@@ -336,9 +336,9 @@ export class RoadNetwork {
     if (!intersection || !meshes) return;
 
     const setLightColor = (lightGroup: THREE.Object3D, color: LightColor) => {
-      const children = lightGroup.children.filter(
-        (c) => c instanceof THREE.Mesh && c.geometry instanceof THREE.SphereGeometry
-      );
+      const children = lightGroup.children
+        .filter((c) => c instanceof THREE.Mesh && c.geometry instanceof THREE.SphereGeometry)
+        .sort((a, b) => (b as THREE.Mesh).position.y - (a as THREE.Mesh).position.y);
       children.forEach((child, index) => {
         const mesh = child as THREE.Mesh;
         const mat = mesh.material as THREE.MeshBasicMaterial;
@@ -499,6 +499,14 @@ export class RoadNetwork {
     intersection.phaseTimer = 0;
     intersection.currentPhase = 'eastWestStraight';
     this.updateLightColors(intersection);
+    this.updateLightVisuals(intersection.id);
+  }
+
+  forceRefreshAllLights(): void {
+    this.intersections.forEach((intersection) => {
+      this.updateLightColors(intersection);
+      this.updateLightVisuals(intersection.id);
+    });
   }
 
   onPhaseChange(callback: (intersectionId: string, phase: TrafficLightPhase) => void): void {

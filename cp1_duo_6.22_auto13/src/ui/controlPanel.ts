@@ -31,6 +31,9 @@ export class ControlPanel {
   private mobileDrawer: HTMLElement | null = null;
   private mobileDrawerToggle: HTMLElement | null = null;
   private isDrawerOpen: boolean = false;
+  private drawerTouchStartY: number = 0;
+  private drawerCurrentTranslateY: number = 0;
+  private drawerIsDragging: boolean = false;
 
   private onTimeChangeCallbacks: Array<(hour: number) => void> = [];
   private onIntersectionSelectCallbacks: Array<(id: string | null) => void> = [];
@@ -207,21 +210,21 @@ export class ControlPanel {
     intersectionFolder
       .add(this.settings, 'eastWestGreenDuration', 2, 20, 1)
       .name('东西绿灯(秒)')
-      .onFinishChange((value: number) => {
+      .onChange((value: number) => {
         this.updateIntersectionConfig('eastWestGreenDuration', value);
       });
 
     intersectionFolder
       .add(this.settings, 'northSouthGreenDuration', 2, 20, 1)
       .name('南北绿灯(秒)')
-      .onFinishChange((value: number) => {
+      .onChange((value: number) => {
         this.updateIntersectionConfig('northSouthGreenDuration', value);
       });
 
     intersectionFolder
       .add(this.settings, 'leftTurnGreenDuration', 1, 15, 1)
       .name('左转绿灯(秒)')
-      .onFinishChange((value: number) => {
+      .onChange((value: number) => {
         this.updateIntersectionConfig('leftTurnGreenDuration', value);
       });
 
@@ -266,7 +269,7 @@ export class ControlPanel {
       [key]: value,
     } as Partial<IntersectionConfig>);
 
-    this.roadNetwork.resetIntersectionPhase(intersectionId);
+    this.roadNetwork.forceRefreshAllLights();
 
     if (this.onIntersectionSelectCallbacks.length > 0) {
       this.onIntersectionSelectCallbacks.forEach((cb) => cb(intersectionId));
@@ -377,6 +380,40 @@ export class ControlPanel {
           this.toggleMobileDrawer();
         });
       }
+
+      this.mobileDrawer.addEventListener('touchstart', (e: TouchEvent) => {
+        if (!this.isDrawerOpen) return;
+        this.drawerTouchStartY = e.touches[0].clientY;
+        this.drawerCurrentTranslateY = 0;
+        this.drawerIsDragging = true;
+      }, { passive: true });
+
+      this.mobileDrawer.addEventListener('touchmove', (e: TouchEvent) => {
+        if (!this.drawerIsDragging) return;
+        const currentY = e.touches[0].clientY;
+        const deltaY = currentY - this.drawerTouchStartY;
+
+        if (deltaY > 0) {
+          this.drawerCurrentTranslateY = deltaY;
+          this.mobileDrawer!.style.transform = `translateY(${deltaY}px)`;
+          this.mobileDrawer!.style.transition = 'none';
+        }
+      }, { passive: true });
+
+      this.mobileDrawer.addEventListener('touchend', () => {
+        if (!this.drawerIsDragging) return;
+        this.drawerIsDragging = false;
+
+        this.mobileDrawer!.style.transition = 'transform 0.3s ease';
+
+        if (this.drawerCurrentTranslateY > 80) {
+          this.closeMobileDrawer();
+        } else {
+          this.mobileDrawer!.style.transform = 'translateY(0)';
+        }
+
+        this.drawerCurrentTranslateY = 0;
+      });
     }
   }
 
@@ -475,7 +512,13 @@ export class ControlPanel {
     this.isDrawerOpen = !this.isDrawerOpen;
 
     if (this.mobileDrawer) {
+      this.mobileDrawer.style.transition = 'transform 0.3s ease';
       this.mobileDrawer.classList.toggle('open', this.isDrawerOpen);
+      if (!this.isDrawerOpen) {
+        this.mobileDrawer.style.transform = 'translateY(100%)';
+      } else {
+        this.mobileDrawer.style.transform = 'translateY(0)';
+      }
     }
 
     if (this.mobileDrawerToggle) {
@@ -564,7 +607,17 @@ export class ControlPanel {
 
   closeMobileDrawer(): void {
     if (this.isDrawerOpen) {
-      this.toggleMobileDrawer();
+      this.isDrawerOpen = false;
+
+      if (this.mobileDrawer) {
+        this.mobileDrawer.style.transition = 'transform 0.3s ease';
+        this.mobileDrawer.style.transform = 'translateY(100%)';
+        this.mobileDrawer.classList.remove('open');
+      }
+
+      if (this.mobileDrawerToggle) {
+        this.mobileDrawerToggle.textContent = '控制面板';
+      }
     }
   }
 }

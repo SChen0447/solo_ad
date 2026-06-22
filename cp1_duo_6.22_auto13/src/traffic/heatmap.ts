@@ -23,6 +23,9 @@ export class HeatmapRenderer {
   private updateTimes: number[] = [];
   private lastUpdateDuration: number = 0;
   private updateOverrunCount: number = 0;
+  private skipNextUpdates: number = 0;
+  private degradationLevel: number = 0;
+  private consecutiveOverruns: number = 0;
 
   private shaderMaterial: THREE.ShaderMaterial | null = null;
 
@@ -151,12 +154,22 @@ export class HeatmapRenderer {
   }
 
   private updateHeatmapData(): void {
+    if (this.skipNextUpdates > 0) {
+      this.skipNextUpdates--;
+      return;
+    }
+
     const startTime = performance.now();
+    const budgetMs = this.config.maxUpdateTime;
 
     try {
-      this.densityData.forEach((data) => {
+      let updatedCount = 0;
+      const step = this.degradationLevel === 0 ? 1 : this.degradationLevel === 1 ? 2 : 3;
+
+      for (let idx = 0; idx < this.densityData.length; idx += step) {
+        const data = this.densityData[idx];
         const mesh = this.heatmapMeshes.get(data.segmentId);
-        if (!mesh) return;
+        if (!mesh) continue;
 
         const densityAttribute = mesh.geometry.getAttribute('density') as THREE.BufferAttribute;
         const densities = densityAttribute.array as Float32Array;
@@ -167,7 +180,17 @@ export class HeatmapRenderer {
         }
 
         densityAttribute.needsUpdate = true;
-      });
+        updatedCount++;
+
+        const elapsed = performance.now() - startTime;
+        if (elapsed > budgetMs * 0.8) {
+          const remaining = this.densityData.length - idx - step;
+          if (remaining > 0) {
+            this.skipNextUpdates = Math.max(1, Math.ceil(remaining / step / 4));
+          }
+          break;
+        }
+      }
 
       const endTime = performance.now();
       this.lastUpdateDuration = endTime - startTime;
@@ -177,12 +200,17 @@ export class HeatmapRenderer {
         this.updateTimes.shift();
       }
 
-      if (this.lastUpdateDuration > this.config.maxUpdateTime) {
+      if (this.lastUpdateDuration > budgetMs) {
         this.updateOverrunCount++;
-        this.adjustUpdateInterval();
+        this.consecutiveOverruns++;
+        this.applyDegradation();
+      } else {
+        this.consecutiveOverruns = 0;
+        this.recoverFromDegradation();
       }
     } catch (error) {
       console.error('Heatmap update error:', error);
+      this.skipNextUpdates = 3;
     }
   }
 
@@ -197,13 +225,35 @@ export class HeatmapRenderer {
     return Math.max(0, Math.min(1, baseDensity + noise));
   }
 
-  private adjustUpdateInterval(): void {
-    const avgUpdateTime = this.updateTimes.reduce((a, b) => a + b, 0) / this.updateTimes.length;
+  private applyDegradation(): void {
+    if (this.consecutiveOverruns >= 3 && this.degradationLevel < 2) {
+      this.degradationLevel++;
+      this.consecutiveOverruns = 0;
 
-    if (avgUpdateTime > this.config.maxUpdateTime * 0.8) {
-      this.config.updateInterval = Math.min(0.5, this.config.updateInterval * 1.2);
-    } else if (avgUpdateTime < this.config.maxUpdateTime * 0.3 && this.config.updateInterval > 0.05) {
-      this.config.updateInterval = Math.max(0.05, this.config.updateInterval * 0.9);
+      if (this.degradationLevel === 1) {
+        this.config.updateInterval = 0.2;
+      } else if (this.degradationLevel === 2) {
+        this.config.updateInterval = 0.5;
+      }
+    }
+  }
+
+  private recoverFromDegradation(): void {
+    if (this.degradationLevel > 0) {
+      const avgTime = this.updateTimes.length > 0
+        ? this.updateTimes.reduce((a, b) => a + b, 0) / this.updateTimes.length
+        : 0;
+
+      if (avgTime < this.config.maxUpdateTime * 0.3) {
+        this.degradationLevel--;
+        this.consecutiveOverruns = 0;
+
+        if (this.degradationLevel === 0) {
+          this.config.updateInterval = 0.1;
+        } else if (this.degradationLevel === 1) {
+          this.config.updateInterval = 0.2;
+        }
+      }
     }
   }
 
