@@ -88,10 +88,13 @@
 
 .postcard-card.locked .postcard-image {
   filter: blur(15px) brightness(0.9);
+  -webkit-filter: blur(15px) brightness(0.9);
+  transition: filter 1s ease, -webkit-filter 1s ease;
 }
 
 .postcard-card.unlocked .postcard-image {
   filter: blur(0) brightness(1);
+  -webkit-filter: blur(0) brightness(1);
   animation: fadeIn 1s ease;
 }
 
@@ -141,12 +144,8 @@
 .countdown-number {
   font-size: 2.5rem;
   font-weight: bold;
-  background: linear-gradient(90deg, #FFD700, #FF8C00, #FFD700);
-  background-size: 200% 100%;
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-  animation: gradient-shift 2s ease infinite;
+  color: #FFD700;
+  animation: countdown-color 2s ease-in-out infinite;
   font-family: 'Georgia', serif;
 }
 

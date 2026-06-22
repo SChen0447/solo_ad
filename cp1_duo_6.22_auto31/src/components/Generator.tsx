@@ -18,12 +18,16 @@ const Generator: React.FC = () => {
     const file = e.target.files?.[0]
     if (!file) return
 
+    setImageError('')
+    
     if (file.size > 2 * 1024 * 1024) {
       setImageError('图片大小不能超过2MB')
+      if (fileInputRef.current) {
+        fileInputRef.current.value = ''
+      }
       return
     }
 
-    setImageError('')
     const reader = new FileReader()
     reader.onload = (event) => {
       setImageUrl(event.target?.result as string)
@@ -56,7 +60,10 @@ const Generator: React.FC = () => {
 
     setIsLoading(true)
     try {
-      const postcard = await api.createPostcard(imageUrl, unlockDate, message)
+      const [postcard] = await Promise.all([
+        api.createPostcard(imageUrl, unlockDate, message),
+        new Promise(resolve => setTimeout(resolve, 1000))
+      ])
       navigate(`/postcard/${postcard.id}`)
     } catch (error) {
       setFormError('保存失败，请重试')

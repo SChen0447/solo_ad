@@ -10,6 +10,7 @@ interface AppContextType {
   loadPostcard: (id: string) => Promise<void>
   addMessage: (nickname: string, content: string) => Promise<void>
   refreshMessages: () => Promise<void>
+  syncMessages: () => Promise<boolean>
   setIsUnlocked: (unlocked: boolean) => void
   visitorId: string
 }
@@ -61,6 +62,29 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     setMessages(msgs)
   }, [postcard])
 
+  const syncMessages = useCallback(async (): Promise<boolean> => {
+    if (!postcard) return false
+    const msgs = await api.getMessages(postcard.id)
+    
+    let hasNewMessages = false
+    setMessages(prev => {
+      const existingIds = new Set(prev.map(m => m.id))
+      const newMessages = msgs.filter(m => !existingIds.has(m.id))
+      
+      if (newMessages.length === 0) {
+        return prev
+      }
+      
+      hasNewMessages = true
+      const allMessages = [...prev, ...newMessages].sort(
+        (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+      )
+      return allMessages
+    })
+    
+    return hasNewMessages
+  }, [postcard])
+
   return (
     <AppContext.Provider
       value={{
@@ -71,6 +95,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         loadPostcard,
         addMessage,
         refreshMessages,
+        syncMessages,
         setIsUnlocked,
         visitorId
       }}
