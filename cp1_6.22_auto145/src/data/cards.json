@@ -1,0 +1,782 @@
+[
+  {
+    "id": "0",
+    "name": "愚者",
+    "type": "major",
+    "upright": "新的开始、冒险精神、天真无邪、无限可能",
+    "reversed": "鲁莽行事、缺乏方向、犹豫不决、盲目乐观",
+    "keywords": ["新起点", "自由", "冒险", "天真"],
+    "zodiac": "Aries",
+    "image": "https://via.placeholder.com/220x340/2d1b69/ffffff?text=The+Fool"
+  },
+  {
+    "id": "1",
+    "name": "魔术师",
+    "type": "major",
+    "upright": "创造力、意志力、沟通能力、技巧娴熟",
+    "reversed": "操控他人、欺骗、才能浪费、缺乏行动",
+    "keywords": ["创造", "意志", "技巧", "沟通"],
+    "zodiac": "Mercury",
+    "image": "https://via.placeholder.com/220x340/2d1b69/ffffff?text=The+Magician"
+  },
+  {
+    "id": "2",
+    "name": "女祭司",
+    "type": "major",
+    "upright": "直觉敏锐、内在智慧、神秘、潜意识",
+    "reversed": "忽视直觉、秘密、表面化、缺乏内在声音",
+    "keywords": ["直觉", "智慧", "神秘", "潜意识"],
+    "zodiac": "Moon",
+    "image": "https://via.placeholder.com/220x340/2d1b69/ffffff?text=The+High+Priestess"
+  },
+  {
+    "id": "3",
+    "name": "女皇",
+    "type": "major",
+    "upright": "丰饶、母性、自然之美、感官享受",
+    "reversed": "依赖、过度保护、创造力枯竭、忽视自我",
+    "keywords": ["丰饶", "母性", "自然", "滋养"],
+    "zodiac": "Venus",
+    "image": "https://via.placeholder.com/220x340/2d1b69/ffffff?text=The+Empress"
+  },
+  {
+    "id": "4",
+    "name": "皇帝",
+    "type": "major",
+    "upright": "权威、领导力、秩序、稳定结构",
+    "reversed": "专制、控制欲、僵化、缺乏纪律",
+    "keywords": ["权威", "秩序", "领导", "稳定"],
+    "zodiac": "Aries",
+    "image": "https://via.placeholder.com/220x340/2d1b69/ffffff?text=The+Emperor"
+  },
+  {
+    "id": "5",
+    "name": "教皇",
+    "type": "major",
+    "upright": "传统信仰、精神指引、教育、道德规范",
+    "reversed": "打破常规、非传统、束缚、盲从权威",
+    "keywords": ["信仰", "指引", "传统", "教育"],
+    "zodiac": "Taurus",
+    "image": "https://via.placeholder.com/220x340/2d1b69/ffffff?text=The+Hierophant"
+  },
+  {
+    "id": "6",
+    "name": "恋人",
+    "type": "major",
+    "upright": "爱情、和谐、选择、价值观契合",
+    "reversed": "关系失衡、内心冲突、错误选择、不和谐",
+    "keywords": ["爱情", "选择", "和谐", "结合"],
+    "zodiac": "Gemini",
+    "image": "https://via.placeholder.com/220x340/2d1b69/ffffff?text=The+Lovers"
+  },
+  {
+    "id": "7",
+    "name": "战车",
+    "type": "major",
+    "upright": "胜利、意志坚定、克服障碍、掌控方向",
+    "reversed": "失去控制、攻击性、方向迷失、挫败",
+    "keywords": ["胜利", "意志", "决心", "掌控"],
+    "zodiac": "Cancer",
+    "image": "https://via.placeholder.com/220x340/2d1b69/ffffff?text=The+Chariot"
+  },
+  {
+    "id": "8",
+    "name": "力量",
+    "type": "major",
+    "upright": "内在力量、勇气、耐心、温柔坚定",
+    "reversed": "自我怀疑、软弱、缺乏勇气、内心脆弱",
+    "keywords": ["勇气", "耐心", "内在力量", "坚定"],
+    "zodiac": "Leo",
+    "image": "https://via.placeholder.com/220x340/2d1b69/ffffff?text=Strength"
+  },
+  {
+    "id": "9",
+    "name": "隐者",
+    "type": "major",
+    "upright": "内省反思、独处求智、寻求真理、精神追求",
+    "reversed": "孤立封闭、逃避现实、偏执、拒绝指引",
+    "keywords": ["内省", "独处", "智慧", "探索"],
+    "zodiac": "Virgo",
+    "image": "https://via.placeholder.com/220x340/2d1b69/ffffff?text=The+Hermit"
+  },
+  {
+    "id": "10",
+    "name": "命运之轮",
+    "type": "major",
+    "upright": "命运转折、机遇降临、因果循环、变化",
+    "reversed": "厄运、抗拒改变、失控、逆境",
+    "keywords": ["命运", "转变", "机遇", "循环"],
+    "zodiac": "Jupiter",
+    "image": "https://via.placeholder.com/220x340/2d1b69/ffffff?text=Wheel+of+Fortune"
+  },
+  {
+    "id": "11",
+    "name": "正义",
+    "type": "major",
+    "upright": "公正、真相、因果报应、理性判断",
+    "reversed": "不公、偏见、逃避责任、不诚实",
+    "keywords": ["公正", "真相", "因果", "平衡"],
+    "zodiac": "Libra",
+    "image": "https://via.placeholder.com/220x340/2d1b69/ffffff?text=Justice"
+  },
+  {
+    "id": "12",
+    "name": "倒吊人",
+    "type": "major",
+    "upright": "牺牲奉献、全新视角、等待、放下执念",
+    "reversed": "无谓牺牲、拖延、固执、拒绝改变视角",
+    "keywords": ["牺牲", "等待", "换位", "放下"],
+    "zodiac": "Neptune",
+    "image": "https://via.placeholder.com/220x340/2d1b69/ffffff?text=The+Hanged+Man"
+  },
+  {
+    "id": "13",
+    "name": "死神",
+    "type": "major",
+    "upright": "终结与重生、蜕变、放下过去、深层转变",
+    "reversed": "抗拒改变、停滞不前、恐惧未知、无法释怀",
+    "keywords": ["转变", "重生", "终结", "蜕变"],
+    "zodiac": "Scorpio",
+    "image": "https://via.placeholder.com/220x340/2d1b69/ffffff?text=Death"
+  },
+  {
+    "id": "14",
+    "name": "节制",
+    "type": "major",
+    "upright": "平衡调和、耐心、中庸之道、融合",
+    "reversed": "失衡、过度放纵、缺乏耐心、冲突",
+    "keywords": ["平衡", "调和", "耐心", "适度"],
+    "zodiac": "Sagittarius",
+    "image": "https://via.placeholder.com/220x340/2d1b69/ffffff?text=Temperance"
+  },
+  {
+    "id": "15",
+    "name": "恶魔",
+    "type": "major",
+    "upright": "束缚、欲望、物质执念、阴暗面",
+    "reversed": "挣脱束缚、觉醒、重获自由、面对阴影",
+    "keywords": ["束缚", "欲望", "执念", "诱惑"],
+    "zodiac": "Capricorn",
+    "image": "https://via.placeholder.com/220x340/2d1b69/ffffff?text=The+Devil"
+  },
+  {
+    "id": "16",
+    "name": "高塔",
+    "type": "major",
+    "upright": "突变、崩塌、真相揭露、破旧立新",
+    "reversed": "逃避灾难、恐惧改变、缓慢衰退、抗拒变革",
+    "keywords": ["突变", "崩塌", "觉醒", "重建"],
+    "zodiac": "Mars",
+    "image": "https://via.placeholder.com/220x340/2d1b69/ffffff?text=The+Tower"
+  },
+  {
+    "id": "17",
+    "name": "星星",
+    "type": "major",
+    "upright": "希望、灵感、宁静、精神指引",
+    "reversed": "失去信心、绝望、脱离现实、迷失方向",
+    "keywords": ["希望", "灵感", "宁静", "指引"],
+    "zodiac": "Aquarius",
+    "image": "https://via.placeholder.com/220x340/2d1b69/ffffff?text=The+Star"
+  },
+  {
+    "id": "18",
+    "name": "月亮",
+    "type": "major",
+    "upright": "幻觉、恐惧、潜意识、不确定性",
+    "reversed": "走出迷雾、释放恐惧、真相显现、克服不安",
+    "keywords": ["幻觉", "恐惧", "直觉", "迷雾"],
+    "zodiac": "Pisces",
+    "image": "https://via.placeholder.com/220x340/2d1b69/ffffff?text=The+Moon"
+  },
+  {
+    "id": "19",
+    "name": "太阳",
+    "type": "major",
+    "upright": "成功、快乐、活力、光明",
+    "reversed": "暂时受挫、自信不足、乐观消退、内在喜悦受阻",
+    "keywords": ["成功", "快乐", "活力", "光明"],
+    "zodiac": "Sun",
+    "image": "https://via.placeholder.com/220x340/2d1b69/ffffff?text=The+Sun"
+  },
+  {
+    "id": "20",
+    "name": "审判",
+    "type": "major",
+    "upright": "觉醒、重生、反思、召唤",
+    "reversed": "自我怀疑、拒绝反省、逃避召唤、无法释怀",
+    "keywords": ["觉醒", "重生", "反思", "召唤"],
+    "zodiac": "Pluto",
+    "image": "https://via.placeholder.com/220x340/2d1b69/ffffff?text=Judgement"
+  },
+  {
+    "id": "21",
+    "name": "世界",
+    "type": "major",
+    "upright": "圆满完成、成就、整合、新循环",
+    "reversed": "未完成、缺乏闭合、半途而废、缺失感",
+    "keywords": ["圆满", "成就", "整合", "完成"],
+    "zodiac": "Saturn",
+    "image": "https://via.placeholder.com/220x340/2d1b69/ffffff?text=The+World"
+  },
+  {
+    "id": "22",
+    "name": "权杖首牌",
+    "type": "minor",
+    "suit": "权杖",
+    "upright": "灵感迸发、新的激情、创造力的开端",
+    "reversed": "灵感受阻、缺乏方向、热情消退",
+    "keywords": ["灵感", "激情", "新开始", "创造"],
+    "image": "https://via.placeholder.com/220x340/2d1b69/ffffff?text=Ace+of+Wands"
+  },
+  {
+    "id": "23",
+    "name": "权杖二",
+    "type": "minor",
+    "suit": "权杖",
+    "upright": "规划未来、抉择、探索可能",
+    "reversed": "犹豫不决、害怕未知、缺乏规划",
+    "keywords": ["规划", "抉择", "探索", "远见"],
+    "image": "https://via.placeholder.com/220x340/2d1b69/ffffff?text=Two+of+Wands"
+  },
+  {
+    "id": "24",
+    "name": "权杖三",
+    "type": "minor",
+    "suit": "权杖",
+    "upright": "扩张、远见卓识、合作进展",
+    "reversed": "阻碍、延迟、缺乏远见、计划受阻",
+    "keywords": ["扩张", "远见", "合作", "进展"],
+    "image": "https://via.placeholder.com/220x340/2d1b69/ffffff?text=Three+of+Wands"
+  },
+  {
+    "id": "25",
+    "name": "权杖四",
+    "type": "minor",
+    "suit": "权杖",
+    "upright": "庆祝、稳定、归属感、和谐家园",
+    "reversed": "不稳定、缺乏支持、庆祝延迟",
+    "keywords": ["庆祝", "稳定", "归属", "和谐"],
+    "image": "https://via.placeholder.com/220x340/2d1b69/ffffff?text=Four+of+Wands"
+  },
+  {
+    "id": "26",
+    "name": "权杖五",
+    "type": "minor",
+    "suit": "权杖",
+    "upright": "竞争、冲突、多元观点、挑战",
+    "reversed": "避免冲突、寻求和解、内部分歧",
+    "keywords": ["竞争", "冲突", "挑战", "争辩"],
+    "image": "https://via.placeholder.com/220x340/2d1b69/ffffff?text=Five+of+Wands"
+  },
+  {
+    "id": "27",
+    "name": "权杖六",
+    "type": "minor",
+    "suit": "权杖",
+    "upright": "胜利、认可、荣誉、领导力",
+    "reversed": "失败、缺乏认可、自负、骄傲跌落",
+    "keywords": ["胜利", "认可", "荣誉", "凯旋"],
+    "image": "https://via.placeholder.com/220x340/2d1b69/ffffff?text=Six+of+Wands"
+  },
+  {
+    "id": "28",
+    "name": "权杖七",
+    "type": "minor",
+    "suit": "权杖",
+    "upright": "坚守立场、抵御挑战、防御",
+    "reversed": "屈服、放弃立场、不堪重负",
+    "keywords": ["坚守", "防御", "挑战", "立场"],
+    "image": "https://via.placeholder.com/220x340/2d1b69/ffffff?text=Seven+of+Wands"
+  },
+  {
+    "id": "29",
+    "name": "权杖八",
+    "type": "minor",
+    "suit": "权杖",
+    "upright": "迅速行动、进展加速、消息传来",
+    "reversed": "延迟、缺乏方向、节奏紊乱",
+    "keywords": ["速度", "行动", "进展", "消息"],
+    "image": "https://via.placeholder.com/220x340/2d1b69/ffffff?text=Eight+of+Wands"
+  },
+  {
+    "id": "30",
+    "name": "权杖九",
+    "type": "minor",
+    "suit": "权杖",
+    "upright": "坚韧不拔、顽强抵抗、接近胜利",
+    "reversed": "疲惫不堪、放弃抵抗、信心动摇",
+    "keywords": ["坚韧", "抵抗", "毅力", "坚持"],
+    "image": "https://via.placeholder.com/220x340/2d1b69/ffffff?text=Nine+of+Wands"
+  },
+  {
+    "id": "31",
+    "name": "权杖十",
+    "type": "minor",
+    "suit": "权杖",
+    "upright": "重担、压力、承担责任、努力负重",
+    "reversed": "释放负担、委派他人、崩溃边缘",
+    "keywords": ["重担", "压力", "责任", "承担"],
+    "image": "https://via.placeholder.com/220x340/2d1b69/ffffff?text=Ten+of+Wands"
+  },
+  {
+    "id": "32",
+    "name": "权杖侍从",
+    "type": "minor",
+    "suit": "权杖",
+    "upright": "探索热情、好奇发现、灵感激发",
+    "reversed": "缺乏方向、热情消退、三分钟热度",
+    "keywords": ["好奇", "探索", "热情", "发现"],
+    "image": "https://via.placeholder.com/220x340/2d1b69/ffffff?text=Page+of+Wands"
+  },
+  {
+    "id": "33",
+    "name": "权杖骑士",
+    "type": "minor",
+    "suit": "权杖",
+    "upright": "精力充沛、行动迅速、冒险精神",
+    "reversed": "冲动鲁莽、精力分散、虎头蛇尾",
+    "keywords": ["行动", "冒险", "激情", "勇敢"],
+    "image": "https://via.placeholder.com/220x340/2d1b69/ffffff?text=Knight+of+Wands"
+  },
+  {
+    "id": "34",
+    "name": "权杖王后",
+    "type": "minor",
+    "suit": "权杖",
+    "upright": "自信魅力、热情洋溢、独立坚定",
+    "reversed": "嫉妒、不自信、控制欲、缺乏活力",
+    "keywords": ["自信", "魅力", "热情", "独立"],
+    "image": "https://via.placeholder.com/220x340/2d1b69/ffffff?text=Queen+of+Wands"
+  },
+  {
+    "id": "35",
+    "name": "权杖国王",
+    "type": "minor",
+    "suit": "权杖",
+    "upright": "远见领导、魅力权威、大胆果断",
+    "reversed": "专制独断、鲁莽、缺乏远见",
+    "keywords": ["领导", "远见", "果断", "威严"],
+    "image": "https://via.placeholder.com/220x340/2d1b69/ffffff?text=King+of+Wands"
+  },
+  {
+    "id": "36",
+    "name": "圣杯首牌",
+    "type": "minor",
+    "suit": "圣杯",
+    "upright": "爱的开始、情感溢满、灵性开启",
+    "reversed": "情感封闭、爱的缺失、心灵干涸",
+    "keywords": ["爱", "情感", "直觉", "新关系"],
+    "image": "https://via.placeholder.com/220x340/2d1b69/ffffff?text=Ace+of+Cups"
+  },
+  {
+    "id": "37",
+    "name": "圣杯二",
+    "type": "minor",
+    "suit": "圣杯",
+    "upright": "相互吸引、和谐伙伴、情感连结",
+    "reversed": "关系失衡、疏远、缺乏沟通",
+    "keywords": ["连结", "和谐", "伴侣", "吸引"],
+    "image": "https://via.placeholder.com/220x340/2d1b69/ffffff?text=Two+of+Cups"
+  },
+  {
+    "id": "38",
+    "name": "圣杯三",
+    "type": "minor",
+    "suit": "圣杯",
+    "upright": "欢聚庆祝、友谊、社群、快乐",
+    "reversed": "过度放纵、社交孤立、友谊破裂",
+    "keywords": ["欢聚", "友谊", "庆祝", "社群"],
+    "image": "https://via.placeholder.com/220x340/2d1b69/ffffff?text=Three+of+Cups"
+  },
+  {
+    "id": "39",
+    "name": "圣杯四",
+    "type": "minor",
+    "suit": "圣杯",
+    "upright": "漠不关心、不满现状、沉思冥想",
+    "reversed": "打破冷漠、重新关注、走出倦怠",
+    "keywords": ["冷漠", "不满", "冥想", "倦怠"],
+    "image": "https://via.placeholder.com/220x340/2d1b69/ffffff?text=Four+of+Cups"
+  },
+  {
+    "id": "40",
+    "name": "圣杯五",
+    "type": "minor",
+    "suit": "圣杯",
+    "upright": "悲伤失落、关注失去、哀悼",
+    "reversed": "接受现实、走出悲伤、寻找希望",
+    "keywords": ["悲伤", "失落", "遗憾", "哀悼"],
+    "image": "https://via.placeholder.com/220x340/2d1b69/ffffff?text=Five+of+Cups"
+  },
+  {
+    "id": "41",
+    "name": "圣杯六",
+    "type": "minor",
+    "suit": "圣杯",
+    "upright": "怀旧回忆、童年、纯真、温情",
+    "reversed": "沉溺过去、无法前行、固执守旧",
+    "keywords": ["怀旧", "回忆", "纯真", "温情"],
+    "image": "https://via.placeholder.com/220x340/2d1b69/ffffff?text=Six+of+Cups"
+  },
+  {
+    "id": "42",
+    "name": "圣杯七",
+    "type": "minor",
+    "suit": "圣杯",
+    "upright": "幻想、选择众多、迷茫、不切实际",
+    "reversed": "做出选择、回归现实、专注目标",
+    "keywords": ["幻想", "选择", "迷茫", "幻象"],
+    "image": "https://via.placeholder.com/220x340/2d1b69/ffffff?text=Seven+of+Cups"
+  },
+  {
+    "id": "43",
+    "name": "圣杯八",
+    "type": "minor",
+    "suit": "圣杯",
+    "upright": "离开追寻、放弃已知、精神探索",
+    "reversed": "恐惧改变、停滞不前、逃避放弃",
+    "keywords": ["离开", "追寻", "放弃", "探索"],
+    "image": "https://via.placeholder.com/220x340/2d1b69/ffffff?text=Eight+of+Cups"
+  },
+  {
+    "id": "44",
+    "name": "圣杯九",
+    "type": "minor",
+    "suit": "圣杯",
+    "upright": "满足愿望、幸福美满、心想事成",
+    "reversed": "不满、贪心、内心空虚、愿望落空",
+    "keywords": ["满足", "幸福", "愿望", "丰盛"],
+    "image": "https://via.placeholder.com/220x340/2d1b69/ffffff?text=Nine+of+Cups"
+  },
+  {
+    "id": "45",
+    "name": "圣杯十",
+    "type": "minor",
+    "suit": "圣杯",
+    "upright": "家庭幸福、和谐圆满、情感丰收",
+    "reversed": "家庭矛盾、不和、表面和谐",
+    "keywords": ["家庭", "幸福", "圆满", "和谐"],
+    "image": "https://via.placeholder.com/220x340/2d1b69/ffffff?text=Ten+of+Cups"
+  },
+  {
+    "id": "46",
+    "name": "圣杯侍从",
+    "type": "minor",
+    "suit": "圣杯",
+    "upright": "敏感细腻、创意灵感、情感萌芽",
+    "reversed": "情绪不稳、不成熟、逃避现实",
+    "keywords": ["敏感", "创意", "直觉", "梦幻"],
+    "image": "https://via.placeholder.com/220x340/2d1b69/ffffff?text=Page+of+Cups"
+  },
+  {
+    "id": "47",
+    "name": "圣杯骑士",
+    "type": "minor",
+    "suit": "圣杯",
+    "upright": "浪漫温柔、理想主义、情感行动",
+    "reversed": "不切实际、情感泛滥、逃避承诺",
+    "keywords": ["浪漫", "温柔", "理想", "追求"],
+    "image": "https://via.placeholder.com/220x340/2d1b69/ffffff?text=Knight+of+Cups"
+  },
+  {
+    "id": "48",
+    "name": "圣杯王后",
+    "type": "minor",
+    "suit": "圣杯",
+    "upright": "慈悲温柔、直觉敏锐、情感智慧",
+    "reversed": "情绪依赖、过度敏感、缺乏界限",
+    "keywords": ["慈悲", "温柔", "直觉", "包容"],
+    "image": "https://via.placeholder.com/220x340/2d1b69/ffffff?text=Queen+of+Cups"
+  },
+  {
+    "id": "49",
+    "name": "圣杯国王",
+    "type": "minor",
+    "suit": "圣杯",
+    "upright": "情感成熟、外交智慧、温和有力",
+    "reversed": "情绪操纵、逃避现实、缺乏自制",
+    "keywords": ["成熟", "智慧", "外交", "包容"],
+    "image": "https://via.placeholder.com/220x340/2d1b69/ffffff?text=King+of+Cups"
+  },
+  {
+    "id": "50",
+    "name": "宝剑首牌",
+    "type": "minor",
+    "suit": "宝剑",
+    "upright": "真理突破、心智清明、新的思路",
+    "reversed": "思维混乱、真相扭曲、判断失误",
+    "keywords": ["真理", "清明", "突破", "决断"],
+    "image": "https://via.placeholder.com/220x340/2d1b69/ffffff?text=Ace+of+Swords"
+  },
+  {
+    "id": "51",
+    "name": "宝剑二",
+    "type": "minor",
+    "suit": "宝剑",
+    "upright": "艰难抉择、僵局、内心矛盾",
+    "reversed": "做出决定、打破僵局、信息曝光",
+    "keywords": ["抉择", "僵局", "矛盾", "平衡"],
+    "image": "https://via.placeholder.com/220x340/2d1b69/ffffff?text=Two+of+Swords"
+  },
+  {
+    "id": "52",
+    "name": "宝剑三",
+    "type": "minor",
+    "suit": "宝剑",
+    "upright": "心碎痛苦、悲伤分离、情感创伤",
+    "reversed": "疗愈伤痛、释放悲伤、走出低谷",
+    "keywords": ["心碎", "悲伤", "分离", "痛苦"],
+    "image": "https://via.placeholder.com/220x340/2d1b69/ffffff?text=Three+of+Swords"
+  },
+  {
+    "id": "53",
+    "name": "宝剑四",
+    "type": "minor",
+    "suit": "宝剑",
+    "upright": "休息恢复、冥想疗愈、静养",
+    "reversed": "疲惫恢复中、急躁行动、缺乏休息",
+    "keywords": ["休息", "恢复", "冥想", "静养"],
+    "image": "https://via.placeholder.com/220x340/2d1b69/ffffff?text=Four+of+Swords"
+  },
+  {
+    "id": "54",
+    "name": "宝剑五",
+    "type": "minor",
+    "suit": "宝剑",
+    "upright": "冲突争斗、不正当胜利、敌意",
+    "reversed": "和解可能、反思冲突、放下怨恨",
+    "keywords": ["冲突", "争斗", "敌意", "损人"],
+    "image": "https://via.placeholder.com/220x340/2d1b69/ffffff?text=Five+of+Swords"
+  },
+  {
+    "id": "55",
+    "name": "宝剑六",
+    "type": "minor",
+    "suit": "宝剑",
+    "upright": "过渡转变、远离困扰、平稳前行",
+    "reversed": "困于原地、不愿改变、航行受阻",
+    "keywords": ["过渡", "转变", "前行", "过渡期"],
+    "image": "https://via.placeholder.com/220x340/2d1b69/ffffff?text=Six+of+Swords"
+  },
+  {
+    "id": "56",
+    "name": "宝剑七",
+    "type": "minor",
+    "suit": "宝剑",
+    "upright": "策略谋略、欺骗隐瞒、走捷径",
+    "reversed": "坦白面对、放弃欺骗、重新审视",
+    "keywords": ["策略", "隐瞒", "取巧", "警惕"],
+    "image": "https://via.placeholder.com/220x340/2d1b69/ffffff?text=Seven+of+Swords"
+  },
+  {
+    "id": "57",
+    "name": "宝剑八",
+    "type": "minor",
+    "suit": "宝剑",
+    "upright": "束缚困境、自我限制、受害者心态",
+    "reversed": "释放自我、突破束缚、改变视角",
+    "keywords": ["束缚", "困境", "限制", "恐惧"],
+    "image": "https://via.placeholder.com/220x340/2d1b69/ffffff?text=Eight+of+Swords"
+  },
+  {
+    "id": "58",
+    "name": "宝剑九",
+    "type": "minor",
+    "suit": "宝剑",
+    "upright": "焦虑噩梦、担忧恐惧、内心折磨",
+    "reversed": "缓解焦虑、面对恐惧、走出阴影",
+    "keywords": ["焦虑", "噩梦", "担忧", "恐惧"],
+    "image": "https://via.placeholder.com/220x340/2d1b69/ffffff?text=Nine+of+Swords"
+  },
+  {
+    "id": "59",
+    "name": "宝剑十",
+    "type": "minor",
+    "suit": "宝剑",
+    "upright": "彻底终结、触底反弹、最深的痛苦",
+    "reversed": "缓慢恢复、避免崩溃、拒绝面对",
+    "keywords": ["终结", "触底", "痛苦", "重生"],
+    "image": "https://via.placeholder.com/220x340/2d1b69/ffffff?text=Ten+of+Swords"
+  },
+  {
+    "id": "60",
+    "name": "宝剑侍从",
+    "type": "minor",
+    "suit": "宝剑",
+    "upright": "好奇求知、敏锐观察、思维活跃",
+    "reversed": "误解信息、多嘴多舌、缺乏思考",
+    "keywords": ["好奇", "观察", "思维", "警觉"],
+    "image": "https://via.placeholder.com/220x340/2d1b69/ffffff?text=Page+of+Swords"
+  },
+  {
+    "id": "61",
+    "name": "宝剑骑士",
+    "type": "minor",
+    "suit": "宝剑",
+    "upright": "果断行动、逻辑清晰、直言不讳",
+    "reversed": "冲动无谋、言语伤人、缺乏策略",
+    "keywords": ["果断", "逻辑", "直接", "行动"],
+    "image": "https://via.placeholder.com/220x340/2d1b69/ffffff?text=Knight+of+Swords"
+  },
+  {
+    "id": "62",
+    "name": "宝剑王后",
+    "type": "minor",
+    "suit": "宝剑",
+    "upright": "独立理性、敏锐洞察、清晰判断",
+    "reversed": "冷漠苛刻、过度批判、心怀怨恨",
+    "keywords": ["独立", "理性", "洞察", "判断"],
+    "image": "https://via.placeholder.com/220x340/2d1b69/ffffff?text=Queen+of+Swords"
+  },
+  {
+    "id": "63",
+    "name": "宝剑国王",
+    "type": "minor",
+    "suit": "宝剑",
+    "upright": "理性权威、公正决断、智识卓越",
+    "reversed": "冷酷无情、独断专行、滥用权力",
+    "keywords": ["理性", "权威", "公正", "智识"],
+    "image": "https://via.placeholder.com/220x340/2d1b69/ffffff?text=King+of+Swords"
+  },
+  {
+    "id": "64",
+    "name": "星币首牌",
+    "type": "minor",
+    "suit": "星币",
+    "upright": "新财务机会、丰盛开端、实质基础",
+    "reversed": "错失机会、财务困难、根基不稳",
+    "keywords": ["机会", "丰盛", "基础", "物质"],
+    "image": "https://via.placeholder.com/220x340/2d1b69/ffffff?text=Ace+of+Pentacles"
+  },
+  {
+    "id": "65",
+    "name": "星币二",
+    "type": "minor",
+    "suit": "星币",
+    "upright": "灵活应变、平衡多项事务、调整",
+    "reversed": "失衡失控、资源分散、顾此失彼",
+    "keywords": ["平衡", "调整", "灵活", "适应"],
+    "image": "https://via.placeholder.com/220x340/2d1b69/ffffff?text=Two+of+Pentacles"
+  },
+  {
+    "id": "66",
+    "name": "星币三",
+    "type": "minor",
+    "suit": "星币",
+    "upright": "团队合作、技能提升、建设性工作",
+    "reversed": "缺乏协作、质量低劣、技能不足",
+    "keywords": ["团队", "技能", "建设", "合作"],
+    "image": "https://via.placeholder.com/220x340/2d1b69/ffffff?text=Three+of+Pentacles"
+  },
+  {
+    "id": "67",
+    "name": "星币四",
+    "type": "minor",
+    "suit": "星币",
+    "upright": "安全稳定、节俭守财、控制欲",
+    "reversed": "过度吝啬、物质执念、恐惧失去",
+    "keywords": ["安全", "节俭", "守财", "控制"],
+    "image": "https://via.placeholder.com/220x340/2d1b69/ffffff?text=Four+of+Pentacles"
+  },
+  {
+    "id": "68",
+    "name": "星币五",
+    "type": "minor",
+    "suit": "星币",
+    "upright": "财务困难、物质匮乏、孤立无援",
+    "reversed": "走出困境、精神富足、接受帮助",
+    "keywords": ["困难", "匮乏", "孤立", "困境"],
+    "image": "https://via.placeholder.com/220x340/2d1b69/ffffff?text=Five+of+Pentacles"
+  },
+  {
+    "id": "69",
+    "name": "星币六",
+    "type": "minor",
+    "suit": "星币",
+    "upright": "慷慨施予、慈善、资源分享",
+    "reversed": "自私吝啬、债务缠身、不平等",
+    "keywords": ["慷慨", "分享", "慈善", "平衡"],
+    "image": "https://via.placeholder.com/220x340/2d1b69/ffffff?text=Six+of+Pentacles"
+  },
+  {
+    "id": "70",
+    "name": "星币七",
+    "type": "minor",
+    "suit": "星币",
+    "upright": "耐心等待、评估收获、投资回报",
+    "reversed": "急躁不安、投资失利、方向错误",
+    "keywords": ["耐心", "评估", "投资", "等待"],
+    "image": "https://via.placeholder.com/220x340/2d1b69/ffffff?text=Seven+of+Pentacles"
+  },
+  {
+    "id": "71",
+    "name": "星币八",
+    "type": "minor",
+    "suit": "星币",
+    "upright": "专注精进、匠人精神、勤勉练习",
+    "reversed": "缺乏专注、追求完美、技能停滞",
+    "keywords": ["精进", "专注", "匠人", "勤勉"],
+    "image": "https://via.placeholder.com/220x340/2d1b69/ffffff?text=Eight+of+Pentacles"
+  },
+  {
+    "id": "72",
+    "name": "星币九",
+    "type": "minor",
+    "suit": "星币",
+    "upright": "物质丰盛、优雅独立、享受成果",
+    "reversed": "过度依赖、财务损失、缺乏自律",
+    "keywords": ["丰盛", "独立", "优雅", "成果"],
+    "image": "https://via.placeholder.com/220x340/2d1b69/ffffff?text=Nine+of+Pentacles"
+  },
+  {
+    "id": "73",
+    "name": "星币十",
+    "type": "minor",
+    "suit": "星币",
+    "upright": "家族财富、世代传承、物质稳定",
+    "reversed": "家族纠纷、财务不稳、传承断裂",
+    "keywords": ["传承", "家族", "财富", "稳定"],
+    "image": "https://via.placeholder.com/220x340/2d1b69/ffffff?text=Ten+of+Pentacles"
+  },
+  {
+    "id": "74",
+    "name": "星币侍从",
+    "type": "minor",
+    "suit": "星币",
+    "upright": "勤奋学习、务实目标、稳步前进",
+    "reversed": "缺乏方向、学业懒散、好高骛远",
+    "keywords": ["勤奋", "务实", "学习", "目标"],
+    "image": "https://via.placeholder.com/220x340/2d1b69/ffffff?text=Page+of+Pentacles"
+  },
+  {
+    "id": "75",
+    "name": "星币骑士",
+    "type": "minor",
+    "suit": "星币",
+    "upright": "踏实可靠、勤奋努力、稳健务实",
+    "reversed": "懒惰拖延、固执守旧、缺乏进取",
+    "keywords": ["踏实", "勤奋", "可靠", "稳健"],
+    "image": "https://via.placeholder.com/220x340/2d1b69/ffffff?text=Knight+of+Pentacles"
+  },
+  {
+    "id": "76",
+    "name": "星币王后",
+    "type": "minor",
+    "suit": "星币",
+    "upright": "务实贤惠、富足安稳、善于理财",
+    "reversed": "过度物质、缺乏安全感、工作与生活失衡",
+    "keywords": ["务实", "贤惠", "富足", "安稳"],
+    "image": "https://via.placeholder.com/220x340/2d1b69/ffffff?text=Queen+of+Pentacles"
+  },
+  {
+    "id": "77",
+    "name": "星币国王",
+    "type": "minor",
+    "suit": "星币",
+    "upright": "财富成功、商业头脑、安全保障",
+    "reversed": "贪婪自私、财务失控、过度保守",
+    "keywords": ["财富", "成功", "商业", "安全"],
+    "image": "https://via.placeholder.com/220x340/2d1b69/ffffff?text=King+of+Pentacles"
+  }
+]
