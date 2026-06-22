@@ -14,11 +14,13 @@ function useLazyLoad(): [React.RefObject<HTMLDivElement | null>, boolean] {
     const observer = new IntersectionObserver(
       ([entry]) => {
         if (entry.isIntersecting) {
-          setIsVisible(true);
+          setTimeout(() => {
+            setIsVisible(true);
+          }, 100);
           observer.unobserve(el);
         }
       },
-      { rootMargin: '200px' }
+      { rootMargin: '200px', threshold: 0.01 }
     );
 
     observer.observe(el);
@@ -30,6 +32,7 @@ function useLazyLoad(): [React.RefObject<HTMLDivElement | null>, boolean] {
 
 function PhotoCard({ photo, onClick }: { photo: Photo; onClick: () => void }) {
   const [ref, isVisible] = useLazyLoad();
+  const [loaded, setLoaded] = useState(false);
 
   return (
     <div
@@ -42,34 +45,43 @@ function PhotoCard({ photo, onClick }: { photo: Photo; onClick: () => void }) {
         boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
         overflow: 'hidden',
         cursor: 'pointer',
-        transition: 'transform 0.3s, box-shadow 0.3s',
+        transition: 'transform 0.3s ease, box-shadow 0.3s ease',
       }}
-      onMouseEnter={(e) => {
-        e.currentTarget.style.transform = 'translateY(-2px)';
-        e.currentTarget.style.boxShadow = '0 6px 16px rgba(0,0,0,0.15)';
-      }}
-      onMouseLeave={(e) => {
-        e.currentTarget.style.transform = 'translateY(0)';
-        e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.1)';
-      }}
+      className="card"
       onClick={onClick}
     >
       {isVisible ? (
-        <img
-          src={photo.url}
-          alt=""
-          style={{
-            width: '100%',
-            display: 'block',
-          }}
-          loading="lazy"
-        />
+        <div style={{ position: 'relative', width: '100%' }}>
+          {!loaded && (
+            <div
+              style={{
+                width: '100%',
+                aspectRatio: '1.5',
+                backgroundColor: '#f0f0f0',
+                animation: 'pulse 1.5s ease-in-out infinite',
+              }}
+            />
+          )}
+          <img
+            src={photo.url}
+            alt=""
+            style={{
+              width: '100%',
+              display: 'block',
+              opacity: loaded ? 1 : 0,
+              transition: 'opacity 0.3s ease',
+            }}
+            loading="lazy"
+            onLoad={() => setLoaded(true)}
+            draggable={false}
+          />
+        </div>
       ) : (
         <div
           style={{
             width: '100%',
-            height: 200,
-            backgroundColor: '#e0e0e0',
+            aspectRatio: '1.5',
+            backgroundColor: '#f0f0f0',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -102,14 +114,33 @@ function FullscreenViewer({
   onClose: () => void;
 }) {
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
+  const [isZooming, setIsZooming] = useState(false);
+  const [imageLoaded, setImageLoaded] = useState(false);
+  const touchStartX = useRef<number | null>(null);
+  const touchCurrentX = useRef<number | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   const goPrev = useCallback(() => {
-    setCurrentIndex((i) => (i > 0 ? i - 1 : i));
-  }, []);
+    if (currentIndex > 0) {
+      setIsZooming(true);
+      setImageLoaded(false);
+      setTimeout(() => {
+        setCurrentIndex((i) => i - 1);
+        setIsZooming(false);
+      }, 150);
+    }
+  }, [currentIndex]);
 
   const goNext = useCallback(() => {
-    setCurrentIndex((i) => (i < photos.length - 1 ? i + 1 : i));
-  }, [photos.length]);
+    if (currentIndex < photos.length - 1) {
+      setIsZooming(true);
+      setImageLoaded(false);
+      setTimeout(() => {
+        setCurrentIndex((i) => i + 1);
+        setIsZooming(false);
+      }, 150);
+    }
+  }, [currentIndex, photos.length]);
 
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
@@ -118,40 +149,121 @@ function FullscreenViewer({
       if (e.key === 'ArrowRight') goNext();
     }
     window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    document.body.style.overflow = 'hidden';
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      document.body.style.overflow = '';
+    };
   }, [onClose, goPrev, goNext]);
 
+  const handleTouchStart = (e: React.TouchEvent) => {
+    touchStartX.current = e.touches[0].clientX;
+    touchCurrentX.current = e.touches[0].clientX;
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    touchCurrentX.current = e.touches[0].clientX;
+  };
+
+  const handleTouchEnd = () => {
+    if (touchStartX.current !== null && touchCurrentX.current !== null) {
+      const diff = touchCurrentX.current - touchStartX.current;
+      if (Math.abs(diff) > 50) {
+        if (diff > 0) {
+          goPrev();
+        } else {
+          goNext();
+        }
+      }
+    }
+    touchStartX.current = null;
+    touchCurrentX.current = null;
+  };
+
   const photo = photos[currentIndex];
+  const slideOffset =
+    touchCurrentX.current !== null && touchStartX.current !== null
+      ? touchCurrentX.current - touchStartX.current
+      : 0;
 
   return (
     <div
+      ref={containerRef}
       style={{
         position: 'fixed',
         top: 0,
         left: 0,
         right: 0,
         bottom: 0,
-        backgroundColor: 'rgba(0,0,0,0.85)',
+        backgroundColor: 'rgba(0,0,0,0.5)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
         zIndex: 1000,
+        transition: 'background-color 0.3s ease',
       }}
       onClick={onClose}
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
     >
-      <img
-        key={photo.id}
-        src={photo.url}
-        alt=""
+      <div
         style={{
+          position: 'relative',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
           maxWidth: '90vw',
           maxHeight: '90vh',
-          objectFit: 'contain',
-          borderRadius: 4,
-          animation: 'zoomIn 0.4s ease-out',
+          transform: `translateX(${slideOffset * 0.3}px)`,
+          transition: isZooming ? 'none' : 'transform 0.1s ease-out',
         }}
         onClick={(e) => e.stopPropagation()}
-      />
+      >
+        {!imageLoaded && (
+          <div
+            style={{
+              position: 'absolute',
+              width: 200,
+              height: 200,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <div
+              style={{
+                width: 40,
+                height: 40,
+                border: '3px solid rgba(255,255,255,0.3)',
+                borderTopColor: 'white',
+                borderRadius: '50%',
+                animation: 'spin 0.8s linear infinite',
+              }}
+            />
+          </div>
+        )}
+        <img
+          key={photo.id}
+          src={photo.url}
+          alt=""
+          style={{
+            maxWidth: '90vw',
+            maxHeight: '90vh',
+            objectFit: 'contain',
+            borderRadius: 4,
+            opacity: isZooming ? 0 : imageLoaded ? 1 : 0,
+            transform: isZooming ? 'scale(0.85)' : 'scale(1)',
+            transition:
+              'transform 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94), opacity 0.4s ease-out',
+            userSelect: 'none',
+            WebkitUserDrag: 'none',
+            pointerEvents: 'none',
+          }}
+          onLoad={() => setImageLoaded(true)}
+          draggable={false}
+        />
+      </div>
 
       <button
         onClick={(e) => {
@@ -205,13 +317,15 @@ function FullscreenViewer({
             justifyContent: 'center',
             cursor: 'pointer',
             color: '#fff',
-            transition: 'background 0.2s',
+            transition: 'background 0.2s, transform 0.2s',
           }}
           onMouseEnter={(e) => {
             e.currentTarget.style.background = 'rgba(255,255,255,0.3)';
+            e.currentTarget.style.transform = 'translateY(-50%) translateX(-2px)';
           }}
           onMouseLeave={(e) => {
             e.currentTarget.style.background = 'rgba(255,255,255,0.15)';
+            e.currentTarget.style.transform = 'translateY(-50%)';
           }}
         >
           <ChevronLeft size={28} />
@@ -239,13 +353,15 @@ function FullscreenViewer({
             justifyContent: 'center',
             cursor: 'pointer',
             color: '#fff',
-            transition: 'background 0.2s',
+            transition: 'background 0.2s, transform 0.2s',
           }}
           onMouseEnter={(e) => {
             e.currentTarget.style.background = 'rgba(255,255,255,0.3)';
+            e.currentTarget.style.transform = 'translateY(-50%) translateX(2px)';
           }}
           onMouseLeave={(e) => {
             e.currentTarget.style.background = 'rgba(255,255,255,0.15)';
+            e.currentTarget.style.transform = 'translateY(-50%)';
           }}
         >
           <ChevronRight size={28} />
@@ -258,8 +374,11 @@ function FullscreenViewer({
           bottom: 20,
           left: '50%',
           transform: 'translateX(-50%)',
-          color: 'rgba(255,255,255,0.7)',
+          color: 'rgba(255,255,255,0.8)',
           fontSize: 14,
+          backgroundColor: 'rgba(0,0,0,0.3)',
+          padding: '6px 16px',
+          borderRadius: 16,
         }}
         onClick={(e) => e.stopPropagation()}
       >
@@ -301,12 +420,22 @@ export default function AlbumView() {
     <>
       <style>{`
         @keyframes pulse {
-          0%, 100% { opacity: 1; }
-          50% { opacity: 0.5; }
+          0%, 100% { opacity: 0.6; }
+          50% { opacity: 0.3; }
         }
-        @keyframes zoomIn {
-          from { transform: scale(0.8); opacity: 0; }
-          to { transform: scale(1); opacity: 1; }
+        @keyframes spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+        @media (max-width: 767px) {
+          .waterfall {
+            column-count: 2 !important;
+          }
+        }
+        @media (max-width: 479px) {
+          .waterfall {
+            column-count: 1 !important;
+          }
         }
       `}</style>
 
@@ -316,6 +445,7 @@ export default function AlbumView() {
           backgroundColor: '#faf3e0',
           minHeight: '100vh',
           color: '#2c3e50',
+          boxSizing: 'border-box',
         }}
       >
         <div
@@ -324,6 +454,8 @@ export default function AlbumView() {
             alignItems: 'center',
             justifyContent: 'space-between',
             marginBottom: 24,
+            flexWrap: 'wrap',
+            gap: 12,
           }}
         >
           <h2
@@ -349,23 +481,27 @@ export default function AlbumView() {
               alignItems: 'center',
               gap: 8,
               padding: '10px 20px',
-              backgroundColor: generating || !state.currentTripId ? '#bdc3c7' : '#3498db',
+              backgroundColor:
+                generating || !state.currentTripId ? '#bdc3c7' : '#3498db',
               color: '#fff',
               border: 'none',
               borderRadius: 8,
               fontSize: 15,
               fontWeight: 500,
-              cursor: generating || !state.currentTripId ? 'not-allowed' : 'pointer',
-              transition: 'background 0.2s',
+              cursor:
+                generating || !state.currentTripId ? 'not-allowed' : 'pointer',
+              transition: 'background 0.2s, transform 0.2s',
             }}
             onMouseEnter={(e) => {
               if (!generating && state.currentTripId) {
                 e.currentTarget.style.backgroundColor = '#2980b9';
+                e.currentTarget.style.transform = 'translateY(-1px)';
               }
             }}
             onMouseLeave={(e) => {
               if (!generating && state.currentTripId) {
                 e.currentTarget.style.backgroundColor = '#3498db';
+                e.currentTarget.style.transform = 'translateY(0)';
               }
             }}
           >
@@ -408,8 +544,9 @@ export default function AlbumView() {
                   {date}
                 </h3>
                 <div
+                  className="waterfall"
                   style={{
-                    columnCount: 3,
+                    columnCount: 4,
                     columnGap: 16,
                   }}
                 >
@@ -417,7 +554,10 @@ export default function AlbumView() {
                     <PhotoCard
                       key={photo.id}
                       photo={photo}
-                      onClick={() => setViewerIndex(photos.indexOf(photo))}
+                      onClick={() => {
+                        const idx = photos.findIndex((p) => p.id === photo.id);
+                        setViewerIndex(idx >= 0 ? idx : 0);
+                      }}
                     />
                   ))}
                 </div>

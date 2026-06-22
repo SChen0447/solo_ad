@@ -92,10 +92,12 @@ export default function DiaryView() {
   } = useAppStore();
 
   const [showSpotPicker, setShowSpotPicker] = useState(false);
-  const [fadeIn, setFadeIn] = useState(false);
+  const [contentKey, setContentKey] = useState(0);
+  const [isFading, setIsFading] = useState(false);
   const editorRef = useRef<HTMLDivElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const currentDiaryIdRef = useRef<string | null>(null);
+  const fadeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const currentTrip = useMemo(
     () => state.trips.find((t) => t.id === state.currentTripId),
@@ -125,12 +127,21 @@ export default function DiaryView() {
 
   useEffect(() => {
     if (currentDiaryIdRef.current !== state.currentDiaryId) {
-      currentDiaryIdRef.current = state.currentDiaryId;
-      setFadeIn(false);
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => setFadeIn(true));
-      });
+      if (fadeTimeoutRef.current) {
+        clearTimeout(fadeTimeoutRef.current);
+      }
+      setIsFading(true);
+      fadeTimeoutRef.current = setTimeout(() => {
+        currentDiaryIdRef.current = state.currentDiaryId;
+        setContentKey((k) => k + 1);
+        setIsFading(false);
+      }, 100);
     }
+    return () => {
+      if (fadeTimeoutRef.current) {
+        clearTimeout(fadeTimeoutRef.current);
+      }
+    };
   }, [state.currentDiaryId]);
 
   useEffect(() => {
@@ -343,12 +354,13 @@ export default function DiaryView() {
       >
         {currentDiary ? (
           <div
+            key={contentKey}
             style={{
               flex: 1,
               display: 'flex',
               flexDirection: 'column',
-              opacity: fadeIn ? 1 : 0,
-              transition: 'opacity 0.3s ease',
+              opacity: isFading ? 0 : 1,
+              transition: 'opacity 0.3s ease-in-out',
             }}
           >
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
