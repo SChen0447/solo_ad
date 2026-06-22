@@ -1,10 +1,22 @@
-import { Pet } from './pet';
+import { Pet, PetAttributes } from './pet';
 import { Renderer } from './renderer';
 import { initUI } from './ui';
 
 const STATE_MACHINE_INTERVAL = 1000;
 const RENDER_FPS = 24;
 const RENDER_INTERVAL = 1000 / RENDER_FPS;
+
+function valueToColor(value: number): string {
+  if (value <= 20) return '#FF0000';
+  if (value >= 80) return '#00FF00';
+  const t = (value - 20) / 60;
+  const r = Math.round(255 - t * 255);
+  const g = Math.round(t * 255);
+  const b = 0;
+  return `rgb(${r},${g},${b})`;
+}
+
+const ATTR_KEYS: (keyof PetAttributes)[] = ['hunger', 'happiness', 'energy', 'health'];
 
 const canvas = document.getElementById('screen') as HTMLCanvasElement;
 if (!canvas) {
@@ -24,7 +36,18 @@ pet.onStateChange((_state, label, opacity) => {
 });
 
 pet.onAttributeChange((attrs) => {
-  renderer.updateAttributes(attrs);
+  ATTR_KEYS.forEach((key) => {
+    const value = attrs[key];
+    const bar = document.querySelector<HTMLElement>(`[data-stat="${key}"]`);
+    const valSpan = document.querySelector<HTMLElement>(`[data-stat-value="${key}"]`);
+    if (bar) {
+      bar.style.width = `${value}%`;
+      bar.style.backgroundColor = valueToColor(value);
+    }
+    if (valSpan) {
+      valSpan.textContent = String(Math.round(value));
+    }
+  });
 });
 
 pet.onNotification(() => {});
@@ -58,4 +81,5 @@ function gameLoop(now: number): void {
 }
 
 lastFadeUpdate = performance.now();
+lastStateTick = performance.now();
 requestAnimationFrame(gameLoop);

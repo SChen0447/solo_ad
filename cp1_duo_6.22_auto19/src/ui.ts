@@ -13,6 +13,16 @@ const BUTTONS: ButtonConfig[] = [
   { id: 'heal', label: '治疗', action: (pet) => pet.heal() }
 ];
 
+function triggerRelease(btn: HTMLButtonElement, action: () => void): void {
+  if (!btn.classList.contains('pressed')) return;
+  btn.classList.remove('pressed');
+  btn.classList.add('releasing');
+  action();
+  setTimeout(() => {
+    btn.classList.remove('releasing');
+  }, 200);
+}
+
 export function initUI(pet: Pet): void {
   const panel = document.getElementById('button-panel');
   if (!panel) return;
@@ -23,28 +33,35 @@ export function initUI(pet: Pet): void {
     btn.className = 'pet-btn';
     btn.textContent = label;
 
-    btn.addEventListener('mousedown', () => {
-      btn.style.transform = 'translateY(2px)';
+    btn.addEventListener('mousedown', (e) => {
+      e.preventDefault();
+      btn.classList.add('pressed');
+      btn.classList.remove('releasing');
     });
 
     btn.addEventListener('mouseup', () => {
-      btn.style.transform = '';
-      action(pet);
+      triggerRelease(btn, () => action(pet));
     });
 
     btn.addEventListener('mouseleave', () => {
-      btn.style.transform = '';
+      if (btn.classList.contains('pressed')) {
+        btn.classList.remove('pressed');
+      }
     });
 
     btn.addEventListener('touchstart', (e) => {
       e.preventDefault();
-      btn.style.transform = 'translateY(2px)';
+      btn.classList.add('pressed');
+      btn.classList.remove('releasing');
     }, { passive: false });
 
     btn.addEventListener('touchend', (e) => {
       e.preventDefault();
-      btn.style.transform = '';
-      action(pet);
+      triggerRelease(btn, () => action(pet));
+    });
+
+    btn.addEventListener('touchcancel', () => {
+      btn.classList.remove('pressed');
     });
 
     panel.appendChild(btn);

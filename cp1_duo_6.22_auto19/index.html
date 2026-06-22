@@ -51,13 +51,70 @@
       position: relative;
     }
 
+    #canvas-wrapper {
+      position: relative;
+      width: 100%;
+      aspect-ratio: 320 / 288;
+    }
+
     #screen {
       display: block;
       width: 100%;
+      height: 100%;
       image-rendering: pixelated;
       image-rendering: crisp-edges;
       border: 2px solid #333;
       background: #9BBC0F;
+    }
+
+    #stats-panel {
+      position: absolute;
+      top: 5%;
+      left: 6%;
+      display: flex;
+      flex-direction: column;
+      gap: 9%;
+      z-index: 10;
+      pointer-events: none;
+      width: 26%;
+    }
+
+    .stat-item {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      margin-bottom: 10%;
+    }
+
+    .stat-label {
+      font-family: 'Press Start 2P', monospace;
+      font-size: 8px;
+      color: #306230;
+    }
+
+    .stat-bar-container {
+      width: 100%;
+      height: 12px;
+      background: #0F380F;
+      border: 1px solid #306230;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .stat-bar-fill {
+      height: 100%;
+      width: 70%;
+      transition: width 0.5s ease-in-out, background-color 0.5s ease-in-out;
+      background-color: #00AA00;
+    }
+
+    .stat-value {
+      position: absolute;
+      right: -34px;
+      top: -1px;
+      font-family: 'Press Start 2P', monospace;
+      font-size: 8px;
+      color: #306230;
     }
 
     #state-label {
@@ -80,32 +137,59 @@
       font-family: 'Press Start 2P', monospace;
       font-size: 9px;
       padding: 10px 14px;
-      border: 2px solid #555;
+      border: none;
       border-radius: 6px;
       cursor: pointer;
       color: #222;
-      background: linear-gradient(180deg, #C8C8A0 0%, #A0A078 100%);
+      position: relative;
+      background: linear-gradient(180deg, #E8E8C8 0%, #B8B888 60%, #989868 100%);
       box-shadow:
-        2px 2px 0 #555,
-        -1px -1px 0 #DDD8B8,
-        inset 1px 1px 0 #DDD8B8,
-        inset -1px -1px 0 #777758;
-      transition: transform 0.1s ease, box-shadow 0.1s ease;
+        0 4px 0 #555,
+        0 5px 0 #333,
+        0 6px 2px rgba(0, 0, 0, 0.4),
+        inset 0 1px 0 #FFF,
+        inset 0 -1px 0 #777758,
+        inset 1px 0 0 #FFF8D0,
+        inset -1px 0 0 #777758;
+      border-top: 2px solid #FFF8D0;
+      border-left: 2px solid #FFF8D0;
+      border-right: 2px solid #777758;
+      border-bottom: 2px solid #555;
+      transition: transform 0.15s cubic-bezier(0.34, 1.56, 0.64, 1),
+                  box-shadow 0.15s ease,
+                  margin-top 0.15s ease;
       user-select: none;
       -webkit-user-select: none;
+      outline: none;
     }
 
     .pet-btn:hover {
       transform: scale(1.1);
     }
 
-    .pet-btn:active {
+    .pet-btn:active,
+    .pet-btn.pressed {
       transform: translateY(2px);
       box-shadow:
-        0px 0px 0 #555,
-        -1px -1px 0 #DDD8B8,
-        inset 1px 1px 0 #777758,
-        inset -1px -1px 0 #DDD8B8;
+        0 2px 0 #555,
+        0 3px 0 #333,
+        0 4px 2px rgba(0, 0, 0, 0.4),
+        inset 0 2px 4px rgba(0, 0, 0, 0.3),
+        inset 0 1px 0 #777758;
+      border-top-color: #777758;
+      border-left-color: #777758;
+      margin-top: 2px;
+    }
+
+    @keyframes btnReleaseBounce {
+      0% { transform: translateY(2px) scale(1); }
+      50% { transform: translateY(-2px) scale(1.05); }
+      75% { transform: translateY(0) scale(1.02); }
+      100% { transform: translateY(0) scale(1); }
+    }
+
+    .pet-btn.releasing {
+      animation: btnReleaseBounce 0.2s ease-out;
     }
 
     @media (max-width: 768px) and (min-width: 320px) {
@@ -128,7 +212,39 @@
 <body>
   <div id="console">
     <div id="screen-bezel">
-      <canvas id="screen" width="320" height="288"></canvas>
+      <div id="canvas-wrapper">
+        <canvas id="screen" width="320" height="288"></canvas>
+        <div id="stats-panel">
+          <div class="stat-item">
+            <div class="stat-label">饱食</div>
+            <div class="stat-bar-container">
+              <div class="stat-bar-fill" data-stat="hunger"></div>
+              <span class="stat-value" data-stat-value="hunger">70</span>
+            </div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-label">快乐</div>
+            <div class="stat-bar-container">
+              <div class="stat-bar-fill" data-stat="happiness"></div>
+              <span class="stat-value" data-stat-value="happiness">70</span>
+            </div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-label">精力</div>
+            <div class="stat-bar-container">
+              <div class="stat-bar-fill" data-stat="energy"></div>
+              <span class="stat-value" data-stat-value="energy">70</span>
+            </div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-label">健康</div>
+            <div class="stat-bar-container">
+              <div class="stat-bar-fill" data-stat="health"></div>
+              <span class="stat-value" data-stat-value="health">70</span>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
     <div id="state-label">状态: 站立中...</div>
     <div id="button-panel"></div>
