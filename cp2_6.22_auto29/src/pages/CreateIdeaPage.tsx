@@ -24,6 +24,8 @@ export default function CreateIdeaPage() {
 
   const descRemaining = 200 - description.length;
   const descWarning = descRemaining <= 40;
+  const titleRemaining = 30 - title.length;
+  const titleWarning = titleRemaining <= 6;
 
   const validate = (): boolean => {
     const newErrors: Record<string, string> = {};
@@ -120,7 +122,7 @@ export default function CreateIdeaPage() {
       >
         <div style={{ marginBottom: 18 }}>
           <label style={{ display: 'block', fontSize: 14, fontWeight: 600, color: '#374151', marginBottom: 6 }}>
-            标题 <span style={{ fontSize: 12, color: '#9CA3AF' }}>({title.length}/30)</span>
+            标题 <span style={{ fontSize: 12, color: titleWarning ? '#EF4444' : '#9CA3AF' }}>(剩余 {titleRemaining} 字)</span>
           </label>
           <input
             type="text"
