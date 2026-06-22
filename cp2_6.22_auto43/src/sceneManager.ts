@@ -7,15 +7,13 @@ export class SceneManager {
   private pointLight!: THREE.PointLight;
   private ground!: THREE.Mesh;
   private glowLight!: THREE.PointLight;
-  private glowSprite: THREE.Sprite | null = null;
+  private glowMesh!: THREE.Mesh;
+  private glowMaterial!: THREE.ShaderMaterial;
   private currentGlowColor: THREE.Color;
   private targetGlowColor: THREE.Color;
   private glowColorTransition: number = 0;
   private glowColorDuration: number = 0.6;
   private isGlowAnimating: boolean = false;
-  private glowSpriteCanvas: HTMLCanvasElement | null = null;
-  private glowSpriteCtx: CanvasRenderingContext2D | null = null;
-  private glowSpriteTexture: THREE.CanvasTexture | null = null;
 
   constructor() {
     this.scene = new THREE.Scene();
@@ -26,6 +24,7 @@ export class SceneManager {
     this.setupBackground();
     this.setupLights();
     this.setupGround();
+    this.setupGlowMesh();
   }
 
   private setupBackground(): void {
@@ -91,57 +90,55 @@ export class SceneManager {
     this.ground.position.y = -0.5;
     this.ground.receiveShadow = true;
     this.scene.add(this.ground);
-
-    this.createGlowTexture();
   }
 
-  private createGlowTexture(): void {
-    this.glowSpriteCanvas = document.createElement('canvas');
-    this.glowSpriteCanvas.width = 512;
-    this.glowSpriteCanvas.height = 512;
-    this.glowSpriteCtx = this.glowSpriteCanvas.getContext('2d')!;
+  private setupGlowMesh(): void {
+    const glowGeo = new THREE.PlaneGeometry(6, 3);
+    this.glowMaterial = new THREE.ShaderMaterial({
+      uniforms: {
+        uGlowColor: { value: this.currentGlowColor.clone() },
+        uOpacity: { value: 0.5 },
+        uTime: { value: 0.0 }
+      },
+      vertexShader: `
+        varying vec2 vUv;
+        void main() {
+          vUv = uv;
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        }
+      `,
+      fragmentShader: `
+        uniform vec3 uGlowColor;
+        uniform float uOpacity;
+        uniform float uTime;
+        varying vec2 vUv;
 
-    this.updateGlowSpriteColor(this.currentGlowColor);
+        void main() {
+          vec2 center = vec2(0.5);
+          float dist = distance(vUv, center);
 
-    this.glowSpriteTexture = new THREE.CanvasTexture(this.glowSpriteCanvas);
-    this.glowSprite = new THREE.Sprite(
-      new THREE.SpriteMaterial({
-        map: this.glowSpriteTexture,
-        transparent: true,
-        opacity: 0.5,
-        blending: THREE.AdditiveBlending,
-        depthWrite: false
-      })
-    );
-    this.glowSprite.scale.set(6, 3, 1);
-    this.glowSprite.position.set(0, -0.48, 0);
-    this.glowSprite.rotation.x = -Math.PI / 2;
-    this.scene.add(this.glowSprite);
-  }
+          float innerRadius = 0.0;
+          float outerRadius = 0.45;
 
-  private updateGlowSpriteColor(color: THREE.Color): void {
-    if (!this.glowSpriteCtx || !this.glowSpriteCanvas) return;
+          float alpha = 1.0 - smoothstep(innerRadius, outerRadius, dist);
+          alpha *= uOpacity;
 
-    const ctx = this.glowSpriteCtx;
-    const w = this.glowSpriteCanvas.width;
-    const h = this.glowSpriteCanvas.height;
+          alpha *= 0.5 + 0.05 * sin(uTime * 0.5);
 
-    ctx.clearRect(0, 0, w, h);
+          gl_FragColor = vec4(uGlowColor, alpha);
+        }
+      `,
+      transparent: true,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+      side: THREE.DoubleSide
+    });
 
-    const r = Math.round(color.r * 255);
-    const g = Math.round(color.g * 255);
-    const b = Math.round(color.b * 255);
-
-    const gradient = ctx.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, 200);
-    gradient.addColorStop(0, `rgba(${r}, ${g}, ${b}, 0.5)`);
-    gradient.addColorStop(0.5, `rgba(${r}, ${g}, ${b}, 0.2)`);
-    gradient.addColorStop(1, `rgba(${r}, ${g}, ${b}, 0)`);
-    ctx.fillStyle = gradient;
-    ctx.fillRect(0, 0, w, h);
-
-    if (this.glowSpriteTexture) {
-      this.glowSpriteTexture.needsUpdate = true;
-    }
+    this.glowMesh = new THREE.Mesh(glowGeo, this.glowMaterial);
+    this.glowMesh.rotation.x = -Math.PI / 2;
+    this.glowMesh.position.y = -0.48;
+    this.glowMesh.renderOrder = -1;
+    this.scene.add(this.glowMesh);
   }
 
   public getScene(): THREE.Scene {
@@ -160,7 +157,7 @@ export class SceneManager {
     this.currentGlowColor.setHex(color);
     this.targetGlowColor.setHex(color);
     this.glowLight.color.setHex(color);
-    this.updateGlowSpriteColor(this.currentGlowColor);
+    this.glowMaterial.uniforms.uGlowColor.value.copy(this.currentGlowColor);
     this.isGlowAnimating = false;
   }
 
@@ -185,9 +182,7 @@ export class SceneManager {
       const b = this.currentGlowColor.b + (this.targetGlowColor.b - this.currentGlowColor.b) * easedT;
 
       this.glowLight.color.setRGB(r, g, b);
-      
-      const tempColor = new THREE.Color(r, g, b);
-      this.updateGlowSpriteColor(tempColor);
+      this.glowMaterial.uniforms.uGlowColor.value.setRGB(r, g, b);
 
       if (t >= 1) {
         this.currentGlowColor.copy(this.targetGlowColor);
@@ -197,6 +192,7 @@ export class SceneManager {
 
     const time = Date.now() * 0.001;
     this.glowLight.intensity = 2.0 + Math.sin(time * 0.5) * 0.2;
+    this.glowMaterial.uniforms.uTime.value = time;
   }
 
   private easeInOut(t: number): number {

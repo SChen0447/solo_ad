@@ -11,7 +11,7 @@ export class Magnifier {
   private magnifierQuad: THREE.Mesh | null = null;
   private magnifierMaterial: THREE.ShaderMaterial | null = null;
 
-  private isActive: boolean = false;
+  private active: boolean = false;
   private mouseX: number = 0;
   private mouseY: number = 0;
   private smoothMouseX: number = 0;
@@ -59,7 +59,8 @@ export class Magnifier {
         uResolution: { value: new THREE.Vector2(this.width, this.height) },
         uActive: { value: 0.0 },
         uBorderWidth: { value: 2.0 },
-        uBorderColor: { value: new THREE.Color(0xffffff) }
+        uBorderColor: { value: new THREE.Color(0xffffff) },
+        uTexelSize: { value: new THREE.Vector2(1.0 / this.width, 1.0 / this.height) }
       },
       vertexShader: `
         varying vec2 vUv;
@@ -77,45 +78,85 @@ export class Magnifier {
         uniform float uActive;
         uniform float uBorderWidth;
         uniform vec3 uBorderColor;
+        uniform vec2 uTexelSize;
         varying vec2 vUv;
+
+        vec2 clampUv(vec2 uv) {
+          return clamp(uv, vec2(0.0), vec2(1.0));
+        }
+
+        vec4 textureBilinear(sampler2D tex, vec2 uv) {
+          vec2 clampedUv = clampUv(uv);
+          vec2 texelCoord = clampedUv / uTexelSize - vec2(0.5);
+          vec2 f = fract(texelCoord);
+          vec2 tc0 = (floor(texelCoord) + vec2(0.5)) * uTexelSize;
+          vec2 tc1 = tc0 + uTexelSize;
+
+          tc0 = clampUv(tc0);
+          tc1 = clampUv(tc1);
+
+          vec4 s00 = texture2D(tex, tc0);
+          vec4 s10 = texture2D(tex, vec2(tc1.x, tc0.y));
+          vec4 s01 = texture2D(tex, vec2(tc0.x, tc1.y));
+          vec4 s11 = texture2D(tex, tc1);
+
+          vec4 mixLow = mix(s00, s10, f.x);
+          vec4 mixHigh = mix(s01, s11, f.x);
+          return mix(mixLow, mixHigh, f.y);
+        }
+
+        vec4 sampleMagnified(vec2 pixelUv, vec2 centerPixel) {
+          vec2 dir = pixelUv - centerPixel;
+          vec2 magnifiedPixel = centerPixel + dir / uMagnification;
+          vec2 magnifiedUv = magnifiedPixel / uResolution;
+
+          float halfRadiusPixels = uRadius / uMagnification;
+          vec2 marginPixels = vec2(halfRadiusPixels);
+          vec2 minBound = (centerPixel - marginPixels) / uResolution;
+          vec2 maxBound = (centerPixel + marginPixels) / uResolution;
+
+          if (magnifiedUv.x < minBound.x || magnifiedUv.x > maxBound.x ||
+              magnifiedUv.y < minBound.y || magnifiedUv.y > maxBound.y) {
+            magnifiedUv = clampUv(magnifiedUv);
+            return texture2D(uTexture, magnifiedUv);
+          }
+
+          return textureBilinear(uTexture, magnifiedUv);
+        }
 
         void main() {
           vec2 uv = vUv;
           vec2 pixelUv = uv * uResolution;
           vec2 centerPixel = uCenter * uResolution;
-          
+
           float dist = distance(pixelUv, centerPixel);
-          
+
           if (uActive < 0.5) {
             gl_FragColor = texture2D(uTexture, uv);
             return;
           }
-          
+
           if (dist < uRadius) {
-            vec2 dir = pixelUv - centerPixel;
-            vec2 magnifiedPixel = centerPixel + dir / uMagnification;
-            vec2 magnifiedUv = magnifiedPixel / uResolution;
-            
-            vec4 magnifiedColor = texture2D(uTexture, magnifiedUv);
-            
+            vec4 magnifiedColor = sampleMagnified(pixelUv, centerPixel);
+
             float edgeDist = uRadius - dist;
-            float edgeSoftness = 2.0;
+            float edgeSoftness = 1.5;
             float edgeAlpha = 1.0;
             if (edgeDist < edgeSoftness) {
               edgeAlpha = edgeDist / edgeSoftness;
             }
-            
+
             float borderFactor = 0.0;
             if (dist > uRadius - uBorderWidth) {
               borderFactor = (dist - (uRadius - uBorderWidth)) / uBorderWidth;
               borderFactor = 1.0 - borderFactor;
               borderFactor = smoothstep(0.0, 1.0, borderFactor);
             }
-            
+
             vec3 finalColor = mix(magnifiedColor.rgb, uBorderColor, borderFactor);
             float finalAlpha = mix(magnifiedColor.a, 1.0, borderFactor);
             finalAlpha *= edgeAlpha;
-            
+
             gl_FragColor = vec4(finalColor, finalAlpha);
           } else {
             gl_FragColor = texture2D(uTexture, uv);
@@ -133,23 +174,23 @@ export class Magnifier {
   }
 
   public activate(): void {
-    if (this.isActive) return;
-    this.isActive = true;
+    if (this.active) return;
+    this.active = true;
     if (this.magnifierMaterial) {
       this.magnifierMaterial.uniforms.uActive.value = 1.0;
     }
   }
 
   public deactivate(): void {
-    if (!this.isActive) return;
-    this.isActive = false;
+    if (!this.active) return;
+    this.active = false;
     if (this.magnifierMaterial) {
       this.magnifierMaterial.uniforms.uActive.value = 0.0;
     }
   }
 
   public isMagnifierActive(): boolean {
-    return this.isActive;
+    return this.active;
   }
 
   public updateMousePosition(x: number, y: number): void {
@@ -165,6 +206,7 @@ export class Magnifier {
 
     if (this.magnifierMaterial) {
       this.magnifierMaterial.uniforms.uResolution.value.set(this.width, this.height);
+      this.magnifierMaterial.uniforms.uTexelSize.value.set(1.0 / this.width, 1.0 / this.height);
     }
   }
 
