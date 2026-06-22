@@ -36,6 +36,7 @@ const App: React.FC = () => {
   const [selectedEnemyId, setSelectedEnemyId] = useState<string | null>(null);
   const [selectedPointIndex, setSelectedPointIndex] = useState<number | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [previewEnemyId, setPreviewEnemyId] = useState<string | null>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
 
   const handleSelectEnemy = useCallback((id: string | null) => {
@@ -136,6 +137,12 @@ const App: React.FC = () => {
     setIsPlaying((prev) => !prev);
   }, []);
 
+  const handleTogglePreview = useCallback((id: string) => {
+    setPreviewEnemyId((prev) => (prev === id ? null : id));
+    setSelectedEnemyId(id);
+    setSelectedPointIndex(null);
+  }, []);
+
   const handleReset = useCallback(() => {
     setIsPlaying(false);
     setEnemyConfigs((prev) => [...prev]);
@@ -209,6 +216,7 @@ const App: React.FC = () => {
           onMovePoint={handleMovePoint}
           onAddPoint={handleAddPoint}
           isPlaying={isPlaying}
+          previewEnemyId={previewEnemyId}
         />
       </div>
       <ConfigPanel
@@ -228,6 +236,8 @@ const App: React.FC = () => {
         onReset={handleReset}
         onExport={handleExport}
         onImport={handleImport}
+        previewEnemyId={previewEnemyId}
+        onTogglePreview={handleTogglePreview}
       />
     </div>
   );

@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { EnemyConfig, BulletPattern, BulletColor, PathPoint } from './EnemyEngine';
+import { EnemyConfig, BulletPattern, BulletColor, PathPoint, COLOR_MAP } from './EnemyEngine';
 
 interface ConfigPanelProps {
   enemyConfigs: EnemyConfig[];
@@ -18,6 +18,8 @@ interface ConfigPanelProps {
   onReset: () => void;
   onExport: () => void;
   onImport: (json: string) => void;
+  previewEnemyId: string | null;
+  onTogglePreview: (id: string) => void;
 }
 
 const bulletPatterns: { value: BulletPattern; label: string }[] = [
@@ -308,6 +310,8 @@ const ConfigPanel: React.FC<ConfigPanelProps> = ({
   onReset,
   onExport,
   onImport,
+  previewEnemyId,
+  onTogglePreview,
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({});
@@ -432,100 +436,146 @@ const ConfigPanel: React.FC<ConfigPanelProps> = ({
                 </Button>
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                {enemyConfigs.map((config, index) => (
-                  <div
-                    key={config.id}
-                    onClick={() => onSelectEnemy(config.id === selectedEnemyId ? null : config.id)}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '10px',
-                      padding: '10px 12px',
-                      backgroundColor: config.id === selectedEnemyId ? 'rgba(88, 166, 255, 0.1)' : '#21262d',
-                      border: `1px solid ${config.id === selectedEnemyId ? '#58a6ff' : '#30363d'}`,
-                      borderRadius: '8px',
-                      cursor: 'pointer',
-                      transition: 'all 0.2s ease',
-                    }}
-                  >
+                {enemyConfigs.map((config, index) => {
+                  const isPreviewed = previewEnemyId === config.id;
+                  const bulletColor = COLOR_MAP[config.bulletConfig.color];
+                  return (
                     <div
+                      key={config.id}
+                      onClick={() => onSelectEnemy(config.id === selectedEnemyId ? null : config.id)}
                       style={{
-                        width: '12px',
-                        height: '12px',
-                        borderRadius: '50%',
-                        backgroundColor: enemyColors[index % enemyColors.length],
-                        flexShrink: 0,
+                        display: 'flex',
+                        alignItems: 'stretch',
+                        borderRadius: '8px',
+                        overflow: 'hidden',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s ease',
+                        backgroundColor: config.id === selectedEnemyId ? 'rgba(88, 166, 255, 0.1)' : '#21262d',
+                        border: `1px solid ${isPreviewed ? '#58a6ff' : config.id === selectedEnemyId ? '#58a6ff' : '#30363d'}`,
+                        boxShadow: isPreviewed ? '0 0 0 1px rgba(88, 166, 255, 0.5), 0 0 12px rgba(88, 166, 255, 0.2)' : 'none',
                       }}
-                    />
-                    <span style={{ color: '#c9d1d9', fontSize: '13px', flex: 1 }}>敌机 {index + 1}</span>
-                    <label style={{ position: 'relative', cursor: 'pointer' }}>
-                      <input
-                        type="checkbox"
-                        checked={config.active}
-                        onChange={(e) => {
-                          e.stopPropagation();
-                          onUpdateEnemy(config.id, { active: e.target.checked });
-                        }}
-                        onClick={(e) => e.stopPropagation()}
+                    >
+                      <div
                         style={{
-                          position: 'absolute',
-                          opacity: 0,
-                          cursor: 'pointer',
-                          width: '100%',
-                          height: '100%',
+                          width: '3px',
+                          backgroundColor: bulletColor,
+                          flexShrink: 0,
                         }}
                       />
                       <div
                         style={{
-                          width: '36px',
-                          height: '20px',
-                          backgroundColor: config.active ? '#58a6ff' : '#30363d',
-                          borderRadius: '10px',
-                          position: 'relative',
-                          transition: 'background-color 0.2s ease',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '10px',
+                          padding: '10px 12px',
+                          flex: 1,
                         }}
                       >
                         <div
                           style={{
-                            position: 'absolute',
-                            top: '2px',
-                            left: config.active ? '18px' : '2px',
-                            width: '16px',
-                            height: '16px',
-                            backgroundColor: '#ffffff',
+                            width: '12px',
+                            height: '12px',
                             borderRadius: '50%',
-                            transition: 'left 0.2s ease',
+                            backgroundColor: enemyColors[index % enemyColors.length],
+                            flexShrink: 0,
                           }}
                         />
+                        <span style={{ color: '#c9d1d9', fontSize: '13px', flex: 1 }}>敌机 {index + 1}</span>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onTogglePreview(config.id);
+                          }}
+                          title={isPreviewed ? '取消单独预览' : '单独预览'}
+                          style={{
+                            background: 'none',
+                            border: 'none',
+                            color: isPreviewed ? '#58a6ff' : '#8b949e',
+                            cursor: 'pointer',
+                            fontSize: '15px',
+                            padding: '2px 4px',
+                            lineHeight: 1,
+                            transition: 'color 0.2s ease',
+                          }}
+                          onMouseEnter={(e) => {
+                            (e.target as HTMLElement).style.color = isPreviewed ? '#79b8ff' : '#c9d1d9';
+                          }}
+                          onMouseLeave={(e) => {
+                            (e.target as HTMLElement).style.color = isPreviewed ? '#58a6ff' : '#8b949e';
+                          }}
+                        >
+                          {isPreviewed ? '◉' : '◎'}
+                        </button>
+                        <label style={{ position: 'relative', cursor: 'pointer' }}>
+                          <input
+                            type="checkbox"
+                            checked={config.active}
+                            onChange={(e) => {
+                              e.stopPropagation();
+                              onUpdateEnemy(config.id, { active: e.target.checked });
+                            }}
+                            onClick={(e) => e.stopPropagation()}
+                            style={{
+                              position: 'absolute',
+                              opacity: 0,
+                              cursor: 'pointer',
+                              width: '100%',
+                              height: '100%',
+                            }}
+                          />
+                          <div
+                            style={{
+                              width: '36px',
+                              height: '20px',
+                              backgroundColor: config.active ? '#58a6ff' : '#30363d',
+                              borderRadius: '10px',
+                              position: 'relative',
+                              transition: 'background-color 0.2s ease',
+                            }}
+                          >
+                            <div
+                              style={{
+                                position: 'absolute',
+                                top: '2px',
+                                left: config.active ? '18px' : '2px',
+                                width: '16px',
+                                height: '16px',
+                                backgroundColor: '#ffffff',
+                                borderRadius: '50%',
+                                transition: 'left 0.2s ease',
+                              }}
+                            />
+                          </div>
+                        </label>
+                        {enemyConfigs.length > 1 && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onDeleteEnemy(config.id);
+                            }}
+                            style={{
+                              background: 'none',
+                              border: 'none',
+                              color: '#484f58',
+                              cursor: 'pointer',
+                              fontSize: '16px',
+                              padding: '2px 4px',
+                              transition: 'color 0.2s ease',
+                            }}
+                            onMouseEnter={(e) => {
+                              (e.target as HTMLElement).style.color = '#f85149';
+                            }}
+                            onMouseLeave={(e) => {
+                              (e.target as HTMLElement).style.color = '#484f58';
+                            }}
+                          >
+                            ×
+                          </button>
+                        )}
                       </div>
-                    </label>
-                    {enemyConfigs.length > 1 && (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onDeleteEnemy(config.id);
-                        }}
-                        style={{
-                          background: 'none',
-                          border: 'none',
-                          color: '#484f58',
-                          cursor: 'pointer',
-                          fontSize: '16px',
-                          padding: '2px 4px',
-                          transition: 'color 0.2s ease',
-                        }}
-                        onMouseEnter={(e) => {
-                          (e.target as HTMLElement).style.color = '#f85149';
-                        }}
-                        onMouseLeave={(e) => {
-                          (e.target as HTMLElement).style.color = '#484f58';
-                        }}
-                      >
-                        ×
-                      </button>
-                    )}
-                  </div>
-                ))}
+                    </div>
+                  );
+                })}
               </div>
             </div>
           )}
