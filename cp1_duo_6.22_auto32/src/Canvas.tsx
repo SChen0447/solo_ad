@@ -20,6 +20,10 @@ interface CanvasProps {
   restoring: boolean;
 }
 
+const GRID_SIZE = 20;
+const GRID_COLOR = '#d0d0d0';
+const GRID_BG = '#e8e8e8';
+
 const Canvas: React.FC<CanvasProps> = ({
   elements, setElements, users, currentUser,
   tool, color, size,
@@ -41,29 +45,22 @@ const Canvas: React.FC<CanvasProps> = ({
   const [lineFrom, setLineFrom] = useState<string | null>(null);
   const [lineHover, setLineHover] = useState<string | null>(null);
 
-  const [cursorPositions, setCursorPositions] = useState<Record<string, Point>>({});
+  const editAreaRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
-  const editAreaRef = useRef<HTMLDivElement>(null);
   const rafRef = useRef<number>(0);
-  const pendingRenderRef = useRef(false);
+  const lastCursorMoveRef = useRef<number>(0);
 
-  useEffect(() => {
-    const updated: Record<string, Point> = {};
-    users.forEach((u) => {
-      if (u.id !== currentUser?.id) {
-        updated[u.id] = u.cursor;
-      }
-    });
-    setCursorPositions(updated);
-  }, [users, currentUser]);
+  const remoteUsers = users.filter((u) => u.id !== currentUser?.id);
+  const stickies = elements.filter((e) => e.type === 'sticky') as StickyNote[];
 
   const getCanvasPoint = useCallback((e: React.MouseEvent | MouseEvent): Point => {
     const canvas = canvasRef.current;
     if (!canvas) return { x: 0, y: 0 };
     const rect = canvas.getBoundingClientRect();
+    const dpr = window.devicePixelRatio || 1;
     return {
-      x: (e.clientX - rect.left) * (canvas.width / rect.width),
-      y: (e.clientY - rect.top) * (canvas.height / rect.height),
+      x: (e.clientX - rect.left) * (canvas.width / rect.width) / dpr,
+      y: (e.clientY - rect.top) * (canvas.height / rect.height) / dpr,
     };
   }, []);
 
@@ -78,9 +75,6 @@ const Canvas: React.FC<CanvasProps> = ({
     canvas.height = h * dpr;
     canvas.style.width = w + 'px';
     canvas.style.height = h + 'px';
-    const ctx = canvas.getContext('2d');
-    if (ctx) ctx.scale(dpr, dpr);
-    pendingRenderRef.current = true;
   }, []);
 
   useEffect(() => {
@@ -90,22 +84,27 @@ const Canvas: React.FC<CanvasProps> = ({
   }, [resizeCanvas]);
 
   const drawGrid = useCallback((ctx: CanvasRenderingContext2D, w: number, h: number) => {
-    ctx.fillStyle = '#e8e8e8';
+    ctx.fillStyle = GRID_BG;
     ctx.fillRect(0, 0, w, h);
-    ctx.strokeStyle = '#d0d0d0';
+
+    ctx.strokeStyle = GRID_COLOR;
     ctx.lineWidth = 1;
-    for (let x = 0; x <= w; x += 20) {
+    ctx.globalAlpha = 0.6;
+
+    for (let x = 0; x <= w; x += GRID_SIZE) {
       ctx.beginPath();
       ctx.moveTo(x + 0.5, 0);
       ctx.lineTo(x + 0.5, h);
       ctx.stroke();
     }
-    for (let y = 0; y <= h; y += 20) {
+    for (let y = 0; y <= h; y += GRID_SIZE) {
       ctx.beginPath();
       ctx.moveTo(0, y + 0.5);
       ctx.lineTo(w, y + 0.5);
       ctx.stroke();
     }
+
+    ctx.globalAlpha = 1;
   }, []);
 
   const drawPath = useCallback((ctx: CanvasRenderingContext2D, path: DrawPath) => {
@@ -115,38 +114,51 @@ const Canvas: React.FC<CanvasProps> = ({
     ctx.lineWidth = path.size;
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
-    ctx.globalCompositeOperation = path.color === '#e8e8e8' ? 'destination-out' : 'source-over';
-    if (path.color === '#e8e8e8') {
+
+    if (path.color === GRID_BG) {
+      ctx.globalCompositeOperation = 'destination-out';
       ctx.lineWidth = path.size * 2;
-    }
-    ctx.beginPath();
-    ctx.moveTo(path.points[0].x, path.points[0].y);
-    if (path.points.length === 1) {
-      ctx.lineTo(path.points[0].x + 0.1, path.points[0].y + 0.1);
     } else {
-      for (let i = 1; i < path.points.length; i++) {
-        ctx.lineTo(path.points[i].x, path.points[i].y);
-      }
+      ctx.globalCompositeOperation = 'source-over';
     }
-    ctx.stroke();
+
+    if (path.points.length === 1) {
+      const p = path.points[0];
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, path.size / 2, 0, Math.PI * 2);
+      ctx.fillStyle = path.color;
+      ctx.fill();
+    } else {
+      ctx.beginPath();
+      ctx.moveTo(path.points[0].x, path.points[0].y);
+      for (let i = 1; i < path.points.length; i++) {
+        const xc = (path.points[i].x + path.points[i - 1].x) / 2;
+        const yc = (path.points[i].y + path.points[i - 1].y) / 2;
+        ctx.quadraticCurveTo(path.points[i - 1].x, path.points[i - 1].y, xc, yc);
+      }
+      ctx.stroke();
+    }
     ctx.restore();
   }, []);
 
   const drawLineBetweenStickies = useCallback((ctx: CanvasRenderingContext2D, line: ConnectionLine) => {
-    const from = elements.find((e) => e.id === line.fromId) as StickyNote | undefined;
-    const to = elements.find((e) => e.id === line.toId) as StickyNote | undefined;
+    const from = stickies.find((s) => s.id === line.fromId);
+    const to = stickies.find((s) => s.id === line.toId);
     if (!from || !to) return;
     ctx.save();
     ctx.strokeStyle = line.color;
     ctx.lineWidth = 2;
     ctx.setLineDash([6, 4]);
+
     const p1 = { x: from.x + from.width / 2, y: from.y + from.height / 2 };
     const p2 = { x: to.x + to.width / 2, y: to.y + to.height / 2 };
+
     ctx.beginPath();
     ctx.moveTo(p1.x, p1.y);
     ctx.lineTo(p2.x, p2.y);
     ctx.stroke();
     ctx.setLineDash([]);
+
     const angle = Math.atan2(p2.y - p1.y, p2.x - p1.x);
     ctx.fillStyle = line.color;
     ctx.beginPath();
@@ -156,7 +168,7 @@ const Canvas: React.FC<CanvasProps> = ({
     ctx.closePath();
     ctx.fill();
     ctx.restore();
-  }, [elements]);
+  }, [stickies]);
 
   const render = useCallback(() => {
     const canvas = canvasRef.current;
@@ -165,12 +177,12 @@ const Canvas: React.FC<CanvasProps> = ({
     if (!ctx) return;
     const container = containerRef.current;
     if (!container) return;
+    const dpr = window.devicePixelRatio || 1;
     const w = container.clientWidth;
     const h = container.clientHeight;
 
     ctx.save();
     ctx.setTransform(1, 0, 0, 1, 0, 0);
-    const dpr = window.devicePixelRatio || 1;
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.scale(dpr, dpr);
 
@@ -186,41 +198,35 @@ const Canvas: React.FC<CanvasProps> = ({
   }, [elements, drawGrid, drawPath, drawLineBetweenStickies]);
 
   useEffect(() => {
-    if (pendingRenderRef.current || true) {
-      pendingRenderRef.current = false;
-      cancelAnimationFrame(rafRef.current);
-      rafRef.current = requestAnimationFrame(render);
-    }
+    rafRef.current = requestAnimationFrame(render);
     return () => cancelAnimationFrame(rafRef.current);
   }, [render]);
 
   useEffect(() => {
-    if (restoring) {
+    if (restoring && containerRef.current) {
       const container = containerRef.current;
-      if (container) {
-        container.style.transition = 'opacity 0.5s ease';
-        container.style.opacity = '0';
-        requestAnimationFrame(() => {
-          requestAnimationFrame(() => {
-            container.style.opacity = '1';
-          });
-        });
-        setTimeout(() => {
-          container.style.transition = '';
-        }, 520);
-      }
+      container.style.transition = 'opacity 0.5s ease-in-out';
+      container.style.opacity = '0';
+
+      setTimeout(() => {
+        container.style.opacity = '1';
+      }, 20);
+
+      setTimeout(() => {
+        container.style.transition = '';
+      }, 520);
     }
   }, [restoring]);
 
   const findStickyAt = useCallback((point: Point): StickyNote | null => {
-    const stickies = [...elements.filter((e) => e.type === 'sticky') as StickyNote[]].reverse();
-    for (const s of stickies) {
+    for (let i = stickies.length - 1; i >= 0; i--) {
+      const s = stickies[i];
       if (point.x >= s.x && point.x <= s.x + s.width && point.y >= s.y && point.y <= s.y + s.height) {
         return s;
       }
     }
     return null;
-  }, [elements]);
+  }, [stickies]);
 
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     if (editingId) return;
@@ -232,8 +238,8 @@ const Canvas: React.FC<CanvasProps> = ({
         id: uuidv4(),
         type: 'path',
         points: [point],
-        color: tool === 'eraser' ? '#e8e8e8' : color,
-        size: tool === 'eraser' ? size * 2 : size,
+        color: tool === 'eraser' ? GRID_BG : color,
+        size: size,
         userId: currentUser?.id || '',
       };
       currentPathIdRef.current = path.id;
@@ -287,7 +293,12 @@ const Canvas: React.FC<CanvasProps> = ({
 
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
     const point = getCanvasPoint(e);
-    onCursorMove(point);
+
+    const now = Date.now();
+    if (now - lastCursorMoveRef.current > 30) {
+      onCursorMove(point);
+      lastCursorMoveRef.current = now;
+    }
 
     if (isDrawingRef.current && currentPathIdRef.current) {
       setElements((prev) =>
@@ -374,31 +385,53 @@ const Canvas: React.FC<CanvasProps> = ({
     e.stopPropagation();
     setEditingId(s.id);
     setTimeout(() => {
-      if (editAreaRef.current) {
-        editAreaRef.current.focus();
+      const editEl = editAreaRefs.current[s.id];
+      if (editEl) {
+        editEl.focus();
+        const range = document.createRange();
+        range.selectNodeContents(editEl);
+        const sel = window.getSelection();
+        if (sel) {
+          sel.removeAllRanges();
+          sel.addRange(range);
+        }
       }
     }, 50);
   }, []);
 
   const handleEditBlur = useCallback((stickyId: string) => {
-    if (editAreaRef.current) {
-      const content = editAreaRef.current.innerHTML;
-      onElementUpdate(stickyId, { content } as Partial<StickyNote>);
-      setElements((prev) =>
-        prev.map((el) => {
-          if (el.id === stickyId && el.type === 'sticky') {
-            return { ...el, content } as StickyNote;
-          }
-          return el;
-        })
-      );
+    const editEl = editAreaRefs.current[stickyId];
+    if (editEl) {
+      const content = editEl.innerHTML;
+      if (content === '<br>' || content === '') {
+        onElementUpdate(stickyId, { content: '' } as Partial<StickyNote>);
+        setElements((prev) =>
+          prev.map((el) => {
+            if (el.id === stickyId && el.type === 'sticky') {
+              return { ...el, content: '' } as StickyNote;
+            }
+            return el;
+          })
+        );
+      } else {
+        onElementUpdate(stickyId, { content } as Partial<StickyNote>);
+        setElements((prev) =>
+          prev.map((el) => {
+            if (el.id === stickyId && el.type === 'sticky') {
+              return { ...el, content } as StickyNote;
+            }
+            return el;
+          })
+        );
+      }
     }
     setEditingId(null);
   }, [onElementUpdate, setElements]);
 
-  const handleRichTextCommand = useCallback((command: string) => {
-    document.execCommand(command, false);
-    editAreaRef.current?.focus();
+  const execCommand = useCallback((command: string, stickyId: string) => {
+    document.execCommand(command, false, null);
+    const editEl = editAreaRefs.current[stickyId];
+    if (editEl) editEl.focus();
   }, []);
 
   const handleResizeHandleMouseDown = useCallback((e: React.MouseEvent, s: StickyNote) => {
@@ -414,10 +447,6 @@ const Canvas: React.FC<CanvasProps> = ({
     setSelectedId(null);
     setEditingId(null);
   }, [onElementRemove, setElements]);
-
-  const remoteUsers = users.filter((u) => u.id !== currentUser?.id);
-
-  const stickies = elements.filter((e) => e.type === 'sticky') as StickyNote[];
 
   return (
     <div
@@ -439,23 +468,25 @@ const Canvas: React.FC<CanvasProps> = ({
         const isEditing = editingId === s.id;
         const isLineSource = lineFrom === s.id;
         const isLineTarget = lineHover === s.id;
+        const author = users.find((u) => u.id === s.userId);
 
         return (
           <div
             key={s.id}
+            className="sticky-note"
             style={{
               position: 'absolute',
               left: s.x,
               top: s.y,
               width: s.width,
               height: s.height,
-              background: s.color + '22',
+              background: s.color + '18',
               border: `2px solid ${s.color}`,
-              borderRadius: 8,
+              borderRadius: 10,
               padding: 0,
               boxShadow: isSelected
-                ? `0 4px 16px rgba(0,0,0,0.25), 0 0 0 1px ${s.color}`
-                : '0 2px 6px rgba(0,0,0,0.1)',
+                ? `0 6px 20px rgba(0,0,0,0.25), 0 0 0 3px ${s.color}44`
+                : '0 2px 8px rgba(0,0,0,0.1)',
               boxSizing: 'border-box',
               outline: isLineSource
                 ? '3px dashed #ff4757'
@@ -463,156 +494,222 @@ const Canvas: React.FC<CanvasProps> = ({
                 ? '3px dashed #2ed573'
                 : 'none',
               outlineOffset: '2px',
-              transition: 'box-shadow 0.2s, outline 0.2s',
-              zIndex: isEditing ? 50 : isSelected ? 40 : 10,
+              transition: 'box-shadow 0.2s ease, outline 0.15s ease',
+              zIndex: isEditing ? 60 : isSelected ? 50 : 10,
               display: 'flex',
               flexDirection: 'column',
+              backdropFilter: 'blur(2px)',
             }}
             onMouseDown={(e) => handleStickyMouseDown(e, s)}
             onDoubleClick={(e) => handleStickyDoubleClick(e, s)}
           >
             <div style={{
               display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-              padding: '4px 8px', borderBottom: `1px solid ${s.color}44`,
-              background: s.color + '11', borderRadius: '6px 6px 0 0',
-              flexShrink: 0,
+              padding: '5px 10px', borderBottom: `1px solid ${s.color}33`,
+              background: s.color + '14', borderRadius: '8px 8px 0 0',
+              flexShrink: 0, cursor: 'move',
             }}>
-              <div style={{
-                width: 8, height: 8, borderRadius: '50%', background: s.color,
-              }} />
-              <span style={{ fontSize: 10, color: '#888', maxWidth: 80, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {users.find((u) => u.id === s.userId)?.name || ''}
-              </span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <div style={{
+                  width: 8, height: 8, borderRadius: '50%', background: s.color,
+                  boxShadow: '0 0 4px ' + s.color + 'aa',
+                }} />
+                <span style={{
+                  fontSize: 10, color: '#888', maxWidth: 100,
+                  overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                }}>
+                  {author?.name || '匿名用户'}
+                </span>
+              </div>
               {isSelected && !isEditing && (
                 <button
                   onMouseDown={(e) => e.stopPropagation()}
                   onClick={(e) => { e.stopPropagation(); handleDeleteSticky(s.id); }}
                   style={{
                     background: '#ff4757', border: 'none', color: '#fff',
-                    borderRadius: 4, cursor: 'pointer', fontSize: 10,
-                    padding: '1px 6px', lineHeight: '16px',
+                    borderRadius: 5, cursor: 'pointer', fontSize: 11,
+                    padding: '2px 7px', lineHeight: 1.4, fontWeight: 600,
+                    transition: 'transform 0.1s',
                   }}
+                  onMouseEnter={(e) => { e.currentTarget.style.transform = 'scale(1.1)'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.transform = 'scale(1)'; }}
+                  title="删除便签"
                 >✕</button>
               )}
-              {!isSelected && !isEditing && <div style={{ width: 22 }} />}
+              {!isSelected && !isEditing && <div style={{ width: 26 }} />}
             </div>
 
             {isEditing && (
-              <div style={{ display: 'flex', gap: 2, padding: '3px 6px', borderBottom: `1px solid ${s.color}33`, flexShrink: 0 }}>
+              <div style={{
+                display: 'flex', gap: 3, padding: '4px 8px',
+                borderBottom: `1px solid ${s.color}22`,
+                flexShrink: 0, background: s.color + '0a',
+              }}>
                 {[
-                  { cmd: 'bold', icon: 'B', style: { fontWeight: 'bold' } },
-                  { cmd: 'italic', icon: 'I', style: { fontStyle: 'italic' } },
-                  { cmd: 'insertUnorderedList', icon: '•', style: {} },
+                  { cmd: 'bold', label: 'B', title: '加粗 (Ctrl+B)', style: { fontWeight: 'bold' } },
+                  { cmd: 'italic', label: 'I', title: '斜体 (Ctrl+I)', style: { fontStyle: 'italic' } },
+                  { cmd: 'insertUnorderedList', label: '•', title: '列表', style: {} },
                 ].map((b) => (
                   <button
                     key={b.cmd}
-                    onMouseDown={(e) => { e.preventDefault(); handleRichTextCommand(b.cmd); }}
+                    title={b.title}
+                    onMouseDown={(e) => { e.preventDefault(); execCommand(b.cmd, s.id); }}
                     style={{
-                      width: 24, height: 24, borderRadius: 4,
-                      background: 'rgba(112,111,211,0.15)', border: 'none',
+                      width: 26, height: 24, borderRadius: 5,
+                      background: s.color + '22', border: 'none',
                       color: '#2c2c54', cursor: 'pointer', fontSize: 12,
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      transition: 'background 0.15s',
                       ...b.style,
                     }}
-                  >{b.icon}</button>
+                    onMouseEnter={(e) => { e.currentTarget.style.background = s.color + '44'; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.background = s.color + '22'; }}
+                  >{b.label}</button>
                 ))}
               </div>
             )}
 
-            <div style={{ flex: 1, overflow: 'auto', padding: '6px 8px', minHeight: 0 }}>
+            <div style={{ flex: 1, overflow: 'auto', padding: '8px 10px', minHeight: 0 }}>
               {isEditing ? (
                 <div
-                  ref={editAreaRef}
+                  ref={(el) => { editAreaRefs.current[s.id] = el; }}
                   contentEditable
                   suppressContentEditableWarning
                   onBlur={() => handleEditBlur(s.id)}
                   dangerouslySetInnerHTML={{ __html: s.content || '' }}
                   style={{
                     outline: 'none', fontSize: 13, color: '#2c2c54',
-                    lineHeight: 1.5, wordBreak: 'break-word',
-                    minHeight: 30,
+                    lineHeight: 1.6, wordBreak: 'break-word',
+                    minHeight: 40,
                   }}
                 />
               ) : (
                 <div
                   style={{
                     fontSize: 13, color: '#2c2c54', wordBreak: 'break-word',
-                    lineHeight: 1.5, overflow: 'hidden',
+                    lineHeight: 1.6, overflow: 'hidden',
                   }}
-                  dangerouslySetInnerHTML={{ __html: s.content || '<span style="color:#aaa">双击编辑...</span>' }}
+                  dangerouslySetInnerHTML={{
+                    __html: s.content
+                      ? s.content
+                      : '<span style="color:#aaa;font-size:12px">双击编辑内容...</span>'
+                  }}
                 />
               )}
             </div>
 
             {isSelected && !isEditing && (
               <div
+                className="resize-handle"
                 style={{
                   position: 'absolute', right: -6, bottom: -6,
-                  width: 14, height: 14, background: s.color,
-                  cursor: 'se-resize', borderRadius: 3,
+                  width: 16, height: 16, background: s.color,
+                  cursor: 'se-resize', borderRadius: 4,
                   border: '2px solid #fff',
-                  boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
+                  boxShadow: '0 2px 6px rgba(0,0,0,0.25)',
+                  transition: 'transform 0.15s',
                 }}
                 onMouseDown={(e) => handleResizeHandleMouseDown(e, s)}
+                onMouseEnter={(e) => { e.currentTarget.style.transform = 'scale(1.2)'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.transform = 'scale(1)'; }}
               />
             )}
           </div>
         );
       })}
 
-      {remoteUsers.map((u) => {
-        const pos = cursorPositions[u.id] || u.cursor;
-        return (
-          <div
-            key={u.id}
-            className="remote-cursor"
+      {remoteUsers.map((u) => (
+        <div
+          key={u.id}
+          className="remote-cursor"
+          style={{
+            position: 'absolute',
+            left: u.cursor.x,
+            top: u.cursor.y,
+            pointerEvents: 'none',
+            zIndex: 250,
+            transition: 'left 0.08s cubic-bezier(0.25, 0.46, 0.45, 0.94), top 0.08s cubic-bezier(0.25, 0.46, 0.45, 0.94)',
+            willChange: 'left, top',
+          }}
+        >
+          <svg
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill={u.color}
             style={{
-              position: 'absolute',
-              left: pos.x,
-              top: pos.y,
-              pointerEvents: 'none',
-              zIndex: 200,
-              transition: 'left 0.06s linear, top 0.06s linear',
-              willChange: 'left, top',
+              display: 'block',
+              filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.35))',
             }}
           >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill={u.color} style={{ display: 'block', filter: 'drop-shadow(0 1px 1px rgba(0,0,0,0.3))' }}>
-              <path d="M3 3l7.07 16.97 2.51-7.39 7.39-2.51L3 3z" stroke="#fff" strokeWidth="1" />
-            </svg>
-            <div style={{
-              marginTop: -2, marginLeft: 14,
-              background: u.color, color: '#fff',
-              padding: '2px 8px', borderRadius: 10,
-              fontSize: 10, fontWeight: 500,
-              whiteSpace: 'nowrap',
-              boxShadow: '0 1px 4px rgba(0,0,0,0.25)',
-              maxWidth: 120, overflow: 'hidden', textOverflow: 'ellipsis',
-            }}>{u.name}</div>
+            <path d="M3 3l7.07 16.97 2.51-7.39 7.39-2.51L3 3z" stroke="#fff" strokeWidth="1.5" />
+          </svg>
+          <div style={{
+            marginTop: -2, marginLeft: 16,
+            background: u.color, color: '#fff',
+            padding: '3px 9px', borderRadius: 12,
+            fontSize: 11, fontWeight: 600,
+            whiteSpace: 'nowrap',
+            boxShadow: '0 2px 6px rgba(0,0,0,0.3)',
+            maxWidth: 140,
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            letterSpacing: 0.3,
+          }}>
+            {u.name}
           </div>
-        );
-      })}
+        </div>
+      ))}
 
       {lineFrom && (
         <div style={{
-          position: 'absolute', bottom: 16, left: '50%', transform: 'translateX(-50%)',
-          background: '#2c2c54', color: '#f7f1e3', padding: '8px 16px', borderRadius: 20,
-          fontSize: 13, boxShadow: '0 2px 8px rgba(0,0,0,0.25)', zIndex: 300,
-          display: 'flex', alignItems: 'center', gap: 8,
+          position: 'absolute', bottom: 20, left: '50%',
+          transform: 'translateX(-50%)',
+          background: 'linear-gradient(135deg, #2c2c54, #40407a)',
+          color: '#f7f1e3', padding: '10px 18px', borderRadius: 24,
+          fontSize: 13, boxShadow: '0 4px 16px rgba(0,0,0,0.3)',
+          zIndex: 300,
+          display: 'flex', alignItems: 'center', gap: 10,
+          fontWeight: 500,
         }}>
-          <span>点击目标便签完成连线</span>
+          <span>🎯 点击目标便签完成连线</span>
           <button
             onClick={(e) => { e.stopPropagation(); setLineFrom(null); }}
             style={{
               background: '#ff4757', border: 'none', color: '#fff',
-              padding: '3px 10px', borderRadius: 10, cursor: 'pointer', fontSize: 12,
+              padding: '4px 12px', borderRadius: 16, cursor: 'pointer',
+              fontSize: 12, fontWeight: 600,
+              transition: 'transform 0.15s',
             }}
+            onMouseEnter={(e) => { e.currentTarget.style.transform = 'scale(1.05)'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.transform = 'scale(1)'; }}
           >取消</button>
         </div>
       )}
 
       <style>{`
         .canvas-container canvas {
-          image-rendering: auto;
+          image-rendering: crisp-edges;
+        }
+        .sticky-note ul {
+          margin: 4px 0;
+          padding-left: 20px;
+        }
+        .sticky-note li {
+          margin: 2px 0;
+        }
+        .sticky-note strong {
+          font-weight: 700;
+        }
+        .sticky-note em {
+          font-style: italic;
+        }
+        .remote-cursor {
+          animation: cursorPulse 2s ease-in-out infinite;
+        }
+        @keyframes cursorPulse {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0.95; }
         }
       `}</style>
     </div>

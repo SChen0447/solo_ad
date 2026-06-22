@@ -331,103 +331,154 @@ const App: React.FC = () => {
         </div>
 
         {historyPanel && (
-          <div style={{
+          <div className="history-panel" style={{
             width: '20%',
-            minWidth: 260,
+            minWidth: 280,
             background: '#f7f1e3',
             borderLeft: '1px solid #d1ccc0',
             display: 'flex',
             flexDirection: 'column',
             overflow: 'hidden',
             transition: 'width 0.3s ease',
+            borderRadius: '0 0 0 0',
           }}>
             <div style={{
-              padding: '14px 18px',
+              padding: '16px 20px',
               borderBottom: '1px solid #d1ccc0',
-              background: 'linear-gradient(135deg, #f7f1e3, #efe6d0)',
-              borderRadius: '0 0 12px 12px',
+              background: 'linear-gradient(135deg, #f7f1e3 0%, #efe6d0 100%)',
+              position: 'relative',
             }}>
-              <h3 style={{ color: '#2c2c54', fontSize: 15, marginBottom: 4, fontWeight: 600 }}>
+              <h3 style={{ color: '#2c2c54', fontSize: 16, marginBottom: 4, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 8 }}>
                 📋 版本历史
               </h3>
-              <p style={{ color: '#706fd3', fontSize: 11, opacity: 0.85 }}>
-                共 {snapshots.length} 个版本 · 每30秒自动保存
+              <p style={{ color: '#706fd3', fontSize: 12, opacity: 0.85, fontWeight: 500 }}>
+                共 <strong>{snapshots.length}</strong> 个版本 · 每30秒自动保存
               </p>
             </div>
 
-            <div style={{ flex: 1, overflowY: 'auto', padding: 8 }}>
+            <div style={{ flex: 1, overflowY: 'auto', padding: '12px 10px 12px 16px' }}>
               {snapshots.length === 0 && (
                 <div style={{
-                  padding: 32, textAlign: 'center', color: '#999', fontSize: 13,
+                  padding: '40px 20px', textAlign: 'center', color: '#999', fontSize: 13,
                 }}>
-                  <div style={{ fontSize: 32, marginBottom: 8 }}>📂</div>
-                  暂无历史版本
-                  <br />
-                  <span style={{ fontSize: 11, color: '#bbb' }}>
-                    点击工具栏 💾 手动保存
-                  </span>
+                  <div style={{ fontSize: 40, marginBottom: 12 }}>📂</div>
+                  <div style={{ fontWeight: 500, marginBottom: 4 }}>暂无历史版本</div>
+                  <div style={{ fontSize: 11, color: '#bbb', marginTop: 8 }}>
+                    点击工具栏 💾 手动保存版本
+                  </div>
                 </div>
               )}
 
-              {[...snapshots].reverse().map((snap, idx) => {
-                const isAuto = snap.label === '自动保存';
-                const prevSnap = snapshots[snapshots.length - idx - 2];
-                const showDate = !prevSnap || formatDate(prevSnap.timestamp) !== formatDate(snap.timestamp);
+              <div style={{ position: 'relative' }}>
+                {snapshots.length > 0 && (
+                  <div style={{
+                    position: 'absolute',
+                    left: 9,
+                    top: 8,
+                    bottom: 8,
+                    width: 2,
+                    background: 'linear-gradient(to bottom, #d1ccc0 0%, #e0d8c8 100%)',
+                    borderRadius: 2,
+                  }} />
+                )}
 
-                return (
-                  <React.Fragment key={snap.id}>
-                    {showDate && (
-                      <div style={{
-                        fontSize: 11, color: '#706fd3', fontWeight: 600,
-                        padding: '8px 10px 4px', marginTop: idx === 0 ? 0 : 8,
-                      }}>
-                        {formatDate(snap.timestamp)}
-                      </div>
-                    )}
-                    <div
-                      className="snapshot-item"
-                      onClick={() => handleRestoreSnapshot(snap.id)}
-                      style={{
-                        padding: '10px 12px',
-                        marginBottom: 4,
-                        borderRadius: 12,
-                        background: 'transparent',
-                        cursor: 'pointer',
-                        position: 'relative',
-                        borderLeft: `3px solid ${isAuto ? '#ffa502' : '#706fd3'}`,
-                        transition: 'background 0.15s',
-                      }}
-                    >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-                        <span style={{
-                          fontSize: 9, padding: '1px 7px', borderRadius: 8,
-                          background: isAuto ? '#ffa502' : '#706fd3',
-                          color: '#fff', fontWeight: 600, letterSpacing: 0.5,
+                {[...snapshots].reverse().map((snap, idx) => {
+                  const isAuto = snap.label === '自动保存';
+                  const prevSnap = snapshots[snapshots.length - idx - 2];
+                  const showDate = !prevSnap || formatDate(prevSnap.timestamp) !== formatDate(snap.timestamp);
+                  const dotColor = isAuto ? '#ffa502' : '#706fd3';
+
+                  return (
+                    <React.Fragment key={snap.id}>
+                      {showDate && (
+                        <div style={{
+                          fontSize: 11, color: '#706fd3', fontWeight: 700,
+                          padding: '12px 4px 6px 26px',
+                          position: 'relative',
                         }}>
-                          {isAuto ? '自动' : '手动'}
-                        </span>
-                        <span style={{ color: '#2c2c54', fontSize: 12, fontWeight: 600 }}>
-                          {formatTime(snap.timestamp)}
-                        </span>
+                          {formatDate(snap.timestamp)}
+                        </div>
+                      )}
+                      <div
+                        className="snapshot-item"
+                        onClick={() => handleRestoreSnapshot(snap.id)}
+                        style={{
+                          padding: '10px 12px 10px 28px',
+                          marginBottom: 6,
+                          borderRadius: 12,
+                          background: 'transparent',
+                          cursor: 'pointer',
+                          position: 'relative',
+                          transition: 'all 0.2s ease',
+                          borderLeft: '3px solid transparent',
+                          marginLeft: 2,
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.background = '#d1ccc0';
+                          e.currentTarget.style.borderLeftColor = dotColor;
+                          e.currentTarget.style.transform = 'translateX(2px)';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.background = 'transparent';
+                          e.currentTarget.style.borderLeftColor = 'transparent';
+                          e.currentTarget.style.transform = 'translateX(0)';
+                        }}
+                      >
+                        <div
+                          style={{
+                            position: 'absolute',
+                            left: -17,
+                            top: '50%',
+                            transform: 'translateY(-50%)',
+                            width: 12,
+                            height: 12,
+                            borderRadius: '50%',
+                            background: dotColor,
+                            border: '2px solid #f7f1e3',
+                            boxShadow: `0 0 0 1px ${dotColor}44, 0 1px 3px rgba(0,0,0,0.15)`,
+                            zIndex: 1,
+                            transition: 'all 0.2s ease',
+                          }}
+                          className="snapshot-dot"
+                        />
+
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 5 }}>
+                          <span style={{
+                            fontSize: 10, padding: '2px 8px', borderRadius: 10,
+                            background: isAuto ? 'linear-gradient(135deg, #ffa502, #ff8c00)' : 'linear-gradient(135deg, #706fd3, #5f5fcd)',
+                            color: '#fff', fontWeight: 700, letterSpacing: 0.5,
+                            textTransform: 'uppercase',
+                            boxShadow: isAuto ? '0 2px 4px rgba(255,165,2,0.3)' : '0 2px 4px rgba(112,111,211,0.3)',
+                          }}>
+                            {isAuto ? 'AUTO' : 'MANUAL'}
+                          </span>
+                          <span style={{ color: '#2c2c54', fontSize: 14, fontWeight: 700 }}>
+                            {formatTime(snap.timestamp)}
+                          </span>
+                        </div>
+                        <div style={{ color: '#777', fontSize: 11, display: 'flex', gap: 12, fontWeight: 500 }}>
+                          <span>📝 {snap.elements.filter((e) => e.type === 'sticky').length} 便签</span>
+                          <span>✏️ {snap.elements.filter((e) => e.type === 'path').length} 笔画</span>
+                          <span>🔗 {snap.elements.filter((e) => e.type === 'line').length} 连线</span>
+                        </div>
                       </div>
-                      <div style={{ color: '#888', fontSize: 11, display: 'flex', gap: 10 }}>
-                        <span>📝 {snap.elements.filter((e) => e.type === 'sticky').length}</span>
-                        <span>✏️ {snap.elements.filter((e) => e.type === 'path').length}</span>
-                        <span>🔗 {snap.elements.filter((e) => e.type === 'line').length}</span>
-                      </div>
-                    </div>
-                  </React.Fragment>
-                );
-              })}
+                    </React.Fragment>
+                  );
+                })}
+              </div>
             </div>
 
             <div style={{
-              padding: '10px 14px',
+              padding: '12px 16px',
               borderTop: '1px solid #d1ccc0',
-              background: '#efe6d0',
+              background: 'linear-gradient(135deg, #efe6d0, #e8dfc8)',
             }}>
-              <div style={{ fontSize: 10, color: '#888', textAlign: 'center' }}>
-                点击版本可恢复白板至该状态
+              <div style={{
+                fontSize: 10, color: '#888', textAlign: 'center',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4,
+              }}>
+                <span style={{ fontSize: 14 }}>💡</span>
+                <span>点击版本即可恢复白板至该状态</span>
               </div>
             </div>
           </div>
