@@ -126,16 +126,59 @@ export class CityGenerator {
     const density = Math.max(0.2, Math.min(1.0, params.density));
     const heightVariation = Math.max(0.5, Math.min(2.0, params.heightVariation));
 
-    const buildingCount = this.randomInt(
-      Math.floor(150 * density),
-      Math.floor(300 * density)
-    );
+    const minCount = Math.max(30, Math.floor(150 * density));
+    const maxCount = Math.max(minCount + 30, Math.floor(300 * density));
+    const buildingCount = this.randomInt(minCount, maxCount);
 
-    const gridSize = 20;
-    const gridCells = new Set<string>();
+    const gridSize = 10;
+    const gridCols = Math.ceil(400 / gridSize);
+    const gridRows = Math.ceil(400 / gridSize);
+    const gridOccupied: boolean[][] = [];
+    for (let i = 0; i < gridCols; i++) {
+      gridOccupied[i] = [];
+      for (let j = 0; j < gridRows; j++) {
+        gridOccupied[i][j] = false;
+      }
+    }
+
+    const checkGridOccupied = (
+      startX: number,
+      startZ: number,
+      endX: number,
+      endZ: number
+    ): boolean => {
+      const sx = Math.max(0, Math.floor(startX / gridSize));
+      const sz = Math.max(0, Math.floor(startZ / gridSize));
+      const ex = Math.min(gridCols - 1, Math.floor(endX / gridSize));
+      const ez = Math.min(gridRows - 1, Math.floor(endZ / gridSize));
+      for (let i = sx; i <= ex; i++) {
+        for (let j = sz; j <= ez; j++) {
+          if (gridOccupied[i][j]) return true;
+        }
+      }
+      return false;
+    };
+
+    const markGridOccupied = (
+      startX: number,
+      startZ: number,
+      endX: number,
+      endZ: number
+    ): void => {
+      const sx = Math.max(0, Math.floor(startX / gridSize));
+      const sz = Math.max(0, Math.floor(startZ / gridSize));
+      const ex = Math.min(gridCols - 1, Math.floor(endX / gridSize));
+      const ez = Math.min(gridRows - 1, Math.floor(endZ / gridSize));
+      for (let i = sx; i <= ex; i++) {
+        for (let j = sz; j <= ez; j++) {
+          gridOccupied[i][j] = true;
+        }
+      }
+    };
 
     let attempts = 0;
-    const maxAttempts = buildingCount * 10;
+    const maxAttempts = buildingCount * 50;
+    const margin = 2;
 
     while (buildings.length < buildingCount && attempts < maxAttempts) {
       attempts++;
@@ -149,11 +192,14 @@ export class CityGenerator {
       const maxHeight = this.lerp(40, 80, heightVariation - 0.5);
       const height = this.randomRange(minHeight, maxHeight);
 
-      const gridX = Math.floor((x + width / 2) / gridSize);
-      const gridZ = Math.floor((z + depth / 2) / gridSize);
-      const gridKey = `${gridX},${gridZ}`;
-
-      if (gridCells.has(gridKey)) {
+      if (
+        checkGridOccupied(
+          x - margin,
+          z - margin,
+          x + width + margin,
+          z + depth + margin
+        )
+      ) {
         continue;
       }
 
@@ -166,11 +212,18 @@ export class CityGenerator {
         color: this.getColor(params.theme),
       };
 
-      if (this.checkOverlap(building, buildings)) {
+      const expandedBuilding = {
+        ...building,
+        x: building.x - margin,
+        z: building.z - margin,
+        width: building.width + 2 * margin,
+        depth: building.depth + 2 * margin,
+      };
+      if (this.checkOverlap(expandedBuilding, buildings)) {
         continue;
       }
 
-      gridCells.add(gridKey);
+      markGridOccupied(x, z, x + width, z + depth);
       buildings.push(building);
     }
 
