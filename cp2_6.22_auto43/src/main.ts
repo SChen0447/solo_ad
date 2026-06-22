@@ -10,8 +10,8 @@ class App {
   private camera: THREE.PerspectiveCamera;
   private sceneManager: SceneManager;
   private modelLoader: ModelLoader;
-  private controlPanel: ControlPanel;
-  private magnifier: Magnifier;
+  private controlPanel!: ControlPanel;
+  private magnifier!: Magnifier;
 
   private isDragging: boolean = false;
   private previousMouse: { x: number; y: number } = { x: 0, y: 0 };
@@ -33,6 +33,11 @@ class App {
   private navTitle: HTMLElement;
   private prevBtn: HTMLElement;
   private nextBtn: HTMLElement;
+
+  private fpsCounter: HTMLElement | null = null;
+  private frameCount: number = 0;
+  private fpsTime: number = 0;
+  private currentFps: number = 0;
 
   constructor() {
     this.container = document.getElementById('canvas-container')!;
@@ -65,9 +70,27 @@ class App {
     this.prevBtn = document.getElementById('prevBtn')!;
     this.nextBtn = document.getElementById('nextBtn')!;
 
+    this.setupFpsCounter();
     this.setupEventListeners();
     this.loadInitialModel();
     this.animate();
+  }
+
+  private setupFpsCounter(): void {
+    this.fpsCounter = document.createElement('div');
+    this.fpsCounter.style.position = 'absolute';
+    this.fpsCounter.style.top = '16px';
+    this.fpsCounter.style.right = '16px';
+    this.fpsCounter.style.color = '#9CA3AF';
+    this.fpsCounter.style.fontSize = '12px';
+    this.fpsCounter.style.fontFamily = 'monospace';
+    this.fpsCounter.style.zIndex = '25';
+    this.fpsCounter.style.background = 'rgba(26, 26, 46, 0.85)';
+    this.fpsCounter.style.padding = '6px 10px';
+    this.fpsCounter.style.borderRadius = '6px';
+    this.fpsCounter.style.backdropFilter = 'blur(10px)';
+    this.fpsCounter.textContent = 'FPS: 60';
+    document.getElementById('app')?.appendChild(this.fpsCounter);
   }
 
   private setupEventListeners(): void {
@@ -105,9 +128,9 @@ class App {
     });
   }
 
-  private loadInitialModel(): void {
+  private async loadInitialModel(): Promise<void> {
     const model = this.models[this.currentModelIndex];
-    this.modelLoader.loadModel(model.type);
+    await this.modelLoader.loadModel(model.type);
     this.sceneManager.setGlowColor(model.color);
     this.navTitle.textContent = model.name;
   }
@@ -193,6 +216,17 @@ class App {
 
     const delta = this.clock.getDelta();
 
+    this.frameCount++;
+    this.fpsTime += delta;
+    if (this.fpsTime >= 1.0) {
+      this.currentFps = Math.round(this.frameCount / this.fpsTime);
+      if (this.fpsCounter) {
+        this.fpsCounter.textContent = `FPS: ${this.currentFps}`;
+      }
+      this.frameCount = 0;
+      this.fpsTime = 0;
+    }
+
     this.currentRotation.x += (this.targetRotation.x - this.currentRotation.x) * this.dampingFactor;
     this.currentRotation.y += (this.targetRotation.y - this.currentRotation.y) * this.dampingFactor;
     this.currentZoom += (this.targetZoom - this.currentZoom) * this.zoomInterpolation;
@@ -211,7 +245,7 @@ class App {
     this.sceneManager.update(delta);
     this.magnifier.update(delta);
 
-    if (this.magnifier.isActive()) {
+    if (this.magnifier.isMagnifierActive()) {
       this.magnifier.render();
     } else {
       this.renderer.render(this.sceneManager.getScene(), this.camera);

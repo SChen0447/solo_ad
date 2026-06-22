@@ -2,16 +2,20 @@ import * as THREE from 'three';
 
 export class SceneManager {
   private scene: THREE.Scene;
-  private ambientLight: THREE.AmbientLight;
-  private directionalLight: THREE.DirectionalLight;
-  private pointLight: THREE.PointLight;
-  private ground: THREE.Mesh;
-  private glowLight: THREE.PointLight;
+  private ambientLight!: THREE.AmbientLight;
+  private directionalLight!: THREE.DirectionalLight;
+  private pointLight!: THREE.PointLight;
+  private ground!: THREE.Mesh;
+  private glowLight!: THREE.PointLight;
+  private glowSprite: THREE.Sprite | null = null;
   private currentGlowColor: THREE.Color;
   private targetGlowColor: THREE.Color;
   private glowColorTransition: number = 0;
   private glowColorDuration: number = 0.6;
   private isGlowAnimating: boolean = false;
+  private glowSpriteCanvas: HTMLCanvasElement | null = null;
+  private glowSpriteCtx: CanvasRenderingContext2D | null = null;
+  private glowSpriteTexture: THREE.CanvasTexture | null = null;
 
   constructor() {
     this.scene = new THREE.Scene();
@@ -92,33 +96,52 @@ export class SceneManager {
   }
 
   private createGlowTexture(): void {
-    const glowCanvas = document.createElement('canvas');
-    glowCanvas.width = 512;
-    glowCanvas.height = 512;
-    const ctx = glowCanvas.getContext('2d')!;
+    this.glowSpriteCanvas = document.createElement('canvas');
+    this.glowSpriteCanvas.width = 512;
+    this.glowSpriteCanvas.height = 512;
+    this.glowSpriteCtx = this.glowSpriteCanvas.getContext('2d')!;
 
-    ctx.clearRect(0, 0, 512, 512);
-    const gradient = ctx.createRadialGradient(256, 256, 0, 256, 256, 200);
-    gradient.addColorStop(0, 'rgba(74, 144, 217, 0.5)');
-    gradient.addColorStop(0.5, 'rgba(74, 144, 217, 0.2)');
-    gradient.addColorStop(1, 'rgba(74, 144, 217, 0)');
-    ctx.fillStyle = gradient;
-    ctx.fillRect(0, 0, 512, 512);
+    this.updateGlowSpriteColor(this.currentGlowColor);
 
-    const glowTexture = new THREE.CanvasTexture(glowCanvas);
-    const glowSprite = new THREE.Sprite(
+    this.glowSpriteTexture = new THREE.CanvasTexture(this.glowSpriteCanvas);
+    this.glowSprite = new THREE.Sprite(
       new THREE.SpriteMaterial({
-        map: glowTexture,
+        map: this.glowSpriteTexture,
         transparent: true,
         opacity: 0.5,
         blending: THREE.AdditiveBlending,
         depthWrite: false
       })
     );
-    glowSprite.scale.set(6, 3, 1);
-    glowSprite.position.set(0, -0.48, 0);
-    glowSprite.rotation.x = -Math.PI / 2;
-    this.scene.add(glowSprite);
+    this.glowSprite.scale.set(6, 3, 1);
+    this.glowSprite.position.set(0, -0.48, 0);
+    this.glowSprite.rotation.x = -Math.PI / 2;
+    this.scene.add(this.glowSprite);
+  }
+
+  private updateGlowSpriteColor(color: THREE.Color): void {
+    if (!this.glowSpriteCtx || !this.glowSpriteCanvas) return;
+
+    const ctx = this.glowSpriteCtx;
+    const w = this.glowSpriteCanvas.width;
+    const h = this.glowSpriteCanvas.height;
+
+    ctx.clearRect(0, 0, w, h);
+
+    const r = Math.round(color.r * 255);
+    const g = Math.round(color.g * 255);
+    const b = Math.round(color.b * 255);
+
+    const gradient = ctx.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, 200);
+    gradient.addColorStop(0, `rgba(${r}, ${g}, ${b}, 0.5)`);
+    gradient.addColorStop(0.5, `rgba(${r}, ${g}, ${b}, 0.2)`);
+    gradient.addColorStop(1, `rgba(${r}, ${g}, ${b}, 0)`);
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, w, h);
+
+    if (this.glowSpriteTexture) {
+      this.glowSpriteTexture.needsUpdate = true;
+    }
   }
 
   public getScene(): THREE.Scene {
@@ -137,10 +160,14 @@ export class SceneManager {
     this.currentGlowColor.setHex(color);
     this.targetGlowColor.setHex(color);
     this.glowLight.color.setHex(color);
+    this.updateGlowSpriteColor(this.currentGlowColor);
     this.isGlowAnimating = false;
   }
 
   public animateGlowColor(targetColor: number, duration: number): void {
+    if (this.isGlowAnimating) {
+      this.currentGlowColor.copy(this.glowLight.color);
+    }
     this.targetGlowColor.setHex(targetColor);
     this.glowColorDuration = duration;
     this.glowColorTransition = 0;
@@ -158,6 +185,9 @@ export class SceneManager {
       const b = this.currentGlowColor.b + (this.targetGlowColor.b - this.currentGlowColor.b) * easedT;
 
       this.glowLight.color.setRGB(r, g, b);
+      
+      const tempColor = new THREE.Color(r, g, b);
+      this.updateGlowSpriteColor(tempColor);
 
       if (t >= 1) {
         this.currentGlowColor.copy(this.targetGlowColor);
