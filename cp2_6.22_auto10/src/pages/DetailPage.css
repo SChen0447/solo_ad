@@ -1,0 +1,343 @@
+.detail-page {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+.back-btn {
+  background: none;
+  border: none;
+  color: #6b7280;
+  font-size: 14px;
+  cursor: pointer;
+  padding: 8px 0;
+  margin-bottom: 16px;
+}
+
+.back-btn:hover {
+  color: #374151;
+}
+
+.detail-content {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.gift-detail-card {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+@media (min-width: 768px) {
+  .gift-detail-card {
+    flex-direction: row;
+  }
+}
+
+.gift-detail-image {
+  width: 100%;
+  max-height: 400px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f9fafb;
+}
+
+@media (min-width: 768px) {
+  .gift-detail-image {
+    width: 400px;
+    min-width: 400px;
+  }
+}
+
+.gift-detail-image img {
+  max-width: 100%;
+  max-height: 400px;
+  object-fit: contain;
+  border-radius: 8px;
+}
+
+.gift-detail-info {
+  flex: 1;
+  padding: 24px;
+}
+
+.gift-detail-name {
+  font-size: 24px;
+  font-weight: 600;
+  color: #374151;
+  margin: 0 0 12px 0;
+}
+
+.gift-detail-tags {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 20px;
+}
+
+.status-tag {
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 500;
+  color: white;
+}
+
+.status-available {
+  background: #10b981;
+}
+
+.status-matched {
+  background: #3b82f6;
+}
+
+.status-in_transit {
+  background: #f59e0b;
+}
+
+.status-exchanged {
+  background: #8b5cf6;
+}
+
+.category-tag {
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  background: #f3f4f6;
+  color: #6b7280;
+}
+
+.gift-detail-meta {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.meta-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.meta-label {
+  font-size: 12px;
+  color: #9ca3af;
+}
+
+.meta-value {
+  font-size: 14px;
+  color: #374151;
+  font-weight: 500;
+}
+
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.logistics-section,
+.exchange-history-section {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  padding: 24px;
+}
+
+.logistics-section h2,
+.exchange-history-section h2 {
+  font-size: 18px;
+  font-weight: 600;
+  color: #374151;
+  margin: 0;
+}
+
+.add-logistics-btn {
+  padding: 8px 16px;
+  background: linear-gradient(135deg, #d4a373 0%, #a67c52 100%);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: transform 0.15s ease;
+}
+
+.add-logistics-btn:active {
+  transform: scale(0.95);
+}
+
+.logistics-form {
+  margin-bottom: 24px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.logistics-form .form-row {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.logistics-form .form-group {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.logistics-form label {
+  font-size: 13px;
+  font-weight: 500;
+  color: #374151;
+  margin-bottom: 6px;
+}
+
+.logistics-form input {
+  padding: 10px 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  font-size: 14px;
+  outline: none;
+}
+
+.logistics-form input:focus {
+  border-color: #d4a373;
+}
+
+.logistics-form .submit-btn {
+  width: 100%;
+  padding: 10px 20px;
+  background: linear-gradient(135deg, #d4a373 0%, #a67c52 100%);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  cursor: pointer;
+  margin-top: 16px;
+}
+
+.error-text {
+  color: #ef4444;
+  font-size: 12px;
+  margin-top: 4px;
+}
+
+.timeline {
+  position: relative;
+  padding-left: 28px;
+}
+
+.timeline-item {
+  position: relative;
+  padding-bottom: 24px;
+}
+
+.timeline-item:last-child {
+  padding-bottom: 0;
+}
+
+.timeline-node-wrapper {
+  position: absolute;
+  left: -28px;
+  top: 2px;
+  bottom: 0;
+  width: 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.timeline-node {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  z-index: 1;
+}
+
+.timeline-node.completed {
+  background: #10b981;
+}
+
+.timeline-node.current {
+  background: #3b82f6;
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.4);
+  }
+  70% {
+    box-shadow: 0 0 0 8px rgba(59, 130, 246, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(59, 130, 246, 0);
+  }
+}
+
+.timeline-line {
+  flex: 1;
+  width: 2px;
+  background: #e5e7eb;
+  margin-top: 4px;
+}
+
+.timeline-content {
+  padding-left: 12px;
+}
+
+.timeline-time {
+  font-size: 12px;
+  color: #9ca3af;
+  margin-bottom: 4px;
+}
+
+.timeline-status {
+  font-size: 14px;
+  font-weight: 500;
+  color: #374151;
+  margin-bottom: 4px;
+}
+
+.timeline-info {
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.empty-state {
+  text-align: center;
+  padding: 40px;
+  color: #9ca3af;
+  font-size: 14px;
+}
+
+.loading {
+  text-align: center;
+  padding: 60px;
+  color: #6b7280;
+}
+
+.not-found {
+  text-align: center;
+  padding: 60px;
+  color: #ef4444;
+  font-size: 18px;
+}
+
+@media (max-width: 768px) {
+  .gift-detail-meta {
+    grid-template-columns: 1fr;
+  }
+
+  .logistics-form .form-row {
+    flex-direction: column;
+    gap: 16px;
+  }
+}
