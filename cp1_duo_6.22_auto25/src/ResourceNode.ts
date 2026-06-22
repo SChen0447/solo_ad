@@ -1,13 +1,24 @@
-import { Container, Graphics, Text } from 'pixi.js';
+import { Container, Graphics, Text, TextStyle } from 'pixi.js';
 
 export type ResourceType = 'mine' | 'herb' | 'spring';
 export type OwnerType = 'player' | 'ai' | 'neutral';
+
+export interface BattleRound {
+  round: number;
+  attackerHit: boolean;
+  attackerDamage: number;
+  defenderHpAfter: number;
+  defenderHit: boolean;
+  defenderDamage: number;
+  attackerHpAfter: number;
+}
 
 export interface BattleResult {
   attackerWon: boolean;
   attackerRemainingHp: number;
   defenderRemainingHp: number;
   rounds: number;
+  log: BattleRound[];
 }
 
 export interface ResourceNodeData {
@@ -39,6 +50,22 @@ const OWNER_COLORS: Record<OwnerType, number> = {
   neutral: 0x888888,
 };
 
+const NAME_STYLE: TextStyle = new TextStyle({
+  fontSize: 11,
+  fill: 0xf5f0e8,
+  fontFamily: 'serif',
+  fontWeight: 'bold',
+  dropShadow: true,
+  dropShadowColor: 0x000000,
+  dropShadowDistance: 1,
+});
+
+const YIELD_STYLE = (color: number): TextStyle => new TextStyle({
+  fontSize: 9,
+  fill: color,
+  fontFamily: 'serif',
+});
+
 export class ResourceNode extends Container {
   public id: number;
   public type: ResourceType;
@@ -50,10 +77,11 @@ export class ResourceNode extends Container {
   public contestCount: number;
 
   private icon: Graphics;
-  private ownerMarker: Graphics;
+  private ownerRing: Graphics;
   private nameLabel: Text;
   private yieldLabel: Text;
-  private contestEffect: Graphics | null = null;
+  private contestGlow: Graphics | null = null;
+  private pulsePhase: number = 0;
 
   constructor(data: ResourceNodeData) {
     super();
@@ -68,28 +96,20 @@ export class ResourceNode extends Container {
     this.contestCount = data.contestCount;
 
     this.icon = new Graphics();
-    this.ownerMarker = new Graphics();
-    this.nameLabel = new Text(RESOURCE_NAMES[this.type], {
-      fontSize: 10,
-      fill: 0xf5f0e8,
-      fontFamily: 'serif',
-    });
+    this.ownerRing = new Graphics();
+    this.nameLabel = new Text(RESOURCE_NAMES[this.type], NAME_STYLE);
     this.nameLabel.anchor.set(0.5, 0);
-    this.nameLabel.y = 14;
+    this.nameLabel.y = 16;
 
-    this.yieldLabel = new Text(`+${this.baseYield}`, {
-      fontSize: 9,
-      fill: RESOURCE_COLORS[this.type],
-      fontFamily: 'serif',
-    });
+    this.yieldLabel = new Text(`+${this.baseYield}/s`, YIELD_STYLE(RESOURCE_COLORS[this.type]));
     this.yieldLabel.anchor.set(0.5, 0);
-    this.yieldLabel.y = 24;
+    this.yieldLabel.y = 28;
 
     this.drawIcon();
-    this.drawOwnerMarker();
+    this.drawOwnerRing();
 
     this.addChild(this.icon);
-    this.addChild(this.ownerMarker);
+    this.addChild(this.ownerRing);
     this.addChild(this.nameLabel);
     this.addChild(this.yieldLabel);
 
@@ -99,93 +119,140 @@ export class ResourceNode extends Container {
 
   private drawIcon(): void {
     this.icon.clear();
-    const color = RESOURCE_COLORS[this.type];
+    const c = RESOURCE_COLORS[this.type];
 
     switch (this.type) {
       case 'mine':
-        this.icon.beginFill(color);
-        this.icon.drawPolygon([0, -14, -11, 8, 11, 8]);
+        this.icon.beginFill(c);
+        this.icon.drawPolygon([0, -15, -12, 9, 12, 9]);
         this.icon.endFill();
-        this.icon.beginFill(color, 0.5);
-        this.icon.drawPolygon([0, -8, -6, 4, 6, 4]);
+        this.icon.beginFill(c, 0.4);
+        this.icon.drawPolygon([0, -9, -7, 5, 7, 5]);
+        this.icon.endFill();
+        this.icon.beginFill(0xffffff, 0.2);
+        this.icon.drawPolygon([-2, -12, -6, 5, 2, 5]);
         this.icon.endFill();
         break;
       case 'herb':
-        this.icon.beginFill(color);
-        this.icon.moveTo(0, -14);
-        this.icon.bezierCurveTo(-12, -8, -10, 6, 0, 10);
-        this.icon.bezierCurveTo(10, 6, 12, -8, 0, -14);
+        this.icon.beginFill(c);
+        this.icon.moveTo(0, -15);
+        this.icon.bezierCurveTo(-14, -9, -12, 5, 0, 12);
+        this.icon.bezierCurveTo(12, 5, 14, -9, 0, -15);
         this.icon.endFill();
         this.icon.beginFill(0x2e7d32);
-        this.icon.moveTo(0, -6);
-        this.icon.lineTo(0, 8);
+        this.icon.drawRect(-1, -5, 2, 14);
+        this.icon.endFill();
+        this.icon.beginFill(0x388e3c);
+        this.icon.moveTo(-1, -2);
+        this.icon.bezierCurveTo(-8, -6, -6, 2, -1, 0);
+        this.icon.endFill();
+        this.icon.beginFill(0x388e3c);
+        this.icon.moveTo(1, 0);
+        this.icon.bezierCurveTo(6, -4, 7, 4, 1, 2);
         this.icon.endFill();
         break;
       case 'spring':
-        this.icon.beginFill(color);
-        this.icon.moveTo(0, -14);
-        this.icon.bezierCurveTo(-10, -4, -9, 6, 0, 10);
-        this.icon.bezierCurveTo(9, 6, 10, -4, 0, -14);
+        this.icon.beginFill(c);
+        this.icon.moveTo(0, -15);
+        this.icon.bezierCurveTo(-11, -5, -10, 7, 0, 12);
+        this.icon.bezierCurveTo(10, 7, 11, -5, 0, -15);
         this.icon.endFill();
-        this.icon.beginFill(0x90caf9, 0.5);
-        this.icon.drawEllipse(-2, -2, 4, 6);
+        this.icon.beginFill(0x90caf9, 0.6);
+        this.icon.drawEllipse(-2, -3, 5, 7);
+        this.icon.endFill();
+        this.icon.beginFill(0xbbdefb, 0.3);
+        this.icon.drawEllipse(-3, -5, 3, 4);
         this.icon.endFill();
         break;
     }
   }
 
-  private drawOwnerMarker(): void {
-    this.ownerMarker.clear();
+  private drawOwnerRing(): void {
+    this.ownerRing.clear();
     if (this.owner !== 'neutral') {
-      const color = OWNER_COLORS[this.owner];
-      this.ownerMarker.lineStyle(2, color);
-      this.ownerMarker.drawCircle(0, 0, 18);
+      const c = OWNER_COLORS[this.owner];
+      this.ownerRing.lineStyle(2.5, c, 0.9);
+      this.ownerRing.drawCircle(0, 0, 20);
+      this.ownerRing.lineStyle(1, c, 0.3);
+      this.ownerRing.drawCircle(0, 0, 23);
     }
   }
 
   occupy(newOwner: OwnerType, newGuardianPower: number): void {
-    const previousOwner = this.owner;
+    const prev = this.owner;
     this.owner = newOwner;
     this.guardianPower = newGuardianPower;
-    if (previousOwner !== 'neutral' && previousOwner !== newOwner) {
+    if (prev !== 'neutral' && prev !== newOwner) {
       this.contestCount++;
     }
-    this.drawOwnerMarker();
+    this.drawOwnerRing();
     if (this.contestCount > 3) {
-      this.drawContestEffect();
+      this.showContestGlow();
     }
   }
 
-  private drawContestEffect(): void {
-    if (this.contestEffect) {
-      this.contestEffect.destroy();
+  private showContestGlow(): void {
+    if (this.contestGlow) {
+      this.removeChild(this.contestGlow);
+      this.contestGlow.destroy();
     }
-    this.contestEffect = new Graphics();
-    this.contestEffect.beginFill(0xff0000, 0.3);
-    this.contestEffect.drawCircle(0, 0, 22);
-    this.contestEffect.endFill();
-    this.addChildAt(this.contestEffect, 0);
+    this.contestGlow = new Graphics();
+    this.contestGlow.beginFill(0xff0000, 0.2);
+    this.contestGlow.drawCircle(0, 0, 26);
+    this.contestGlow.endFill();
+    this.addChildAt(this.contestGlow, 0);
   }
 
-  resetGuardian(power: number): void {
-    this.guardianPower = power;
+  updatePulse(dt: number): void {
+    this.pulsePhase += dt * 2;
+    if (this.contestGlow) {
+      const alpha = 0.15 + 0.1 * Math.sin(this.pulsePhase);
+      this.contestGlow.alpha = alpha;
+    }
   }
 
-  battle(attackerPower: number, attackerFaction: 'player' | 'ai'): BattleResult {
-    let attackerHp = attackerPower * 3;
-    let defenderHp = this.guardianPower * 3;
+  battle(attackerPower: number, attackerFaction: 'player' | 'ai', defenseBonus: number = 0): BattleResult {
+    const attackerMaxHp = attackerPower * 3;
+    const defenderMaxHp = this.guardianPower * 3;
+    let attackerHp = attackerMaxHp;
+    let defenderHp = defenderMaxHp;
+    const log: BattleRound[] = [];
     let rounds = 0;
 
     while (attackerHp > 0 && defenderHp > 0 && rounds < 30) {
       rounds++;
-      if (Math.random() < 0.7 + Math.random() * 0.2) {
-        const dmg = attackerPower * (0.8 + Math.random() * 0.4);
-        defenderHp -= dmg;
+      const round: BattleRound = {
+        round: rounds,
+        attackerHit: false,
+        attackerDamage: 0,
+        defenderHpAfter: defenderHp,
+        defenderHit: false,
+        defenderDamage: 0,
+        attackerHpAfter: attackerHp,
+      };
+
+      const attackerHitChance = 0.7 + Math.random() * 0.2;
+      if (Math.random() < attackerHitChance) {
+        round.attackerHit = true;
+        const multiplier = 0.8 + Math.random() * 0.4;
+        round.attackerDamage = Math.round(attackerPower * multiplier);
+        defenderHp -= round.attackerDamage;
       }
-      if (defenderHp > 0 && Math.random() < 0.7 + Math.random() * 0.2) {
-        const dmg = this.guardianPower * (0.8 + Math.random() * 0.4);
-        attackerHp -= dmg;
+      round.defenderHpAfter = Math.max(0, Math.round(defenderHp));
+
+      if (defenderHp > 0) {
+        const defenderHitChance = 0.7 + Math.random() * 0.2;
+        const effectiveDefPower = this.guardianPower * (1 + defenseBonus);
+        if (Math.random() < defenderHitChance) {
+          round.defenderHit = true;
+          const multiplier = 0.8 + Math.random() * 0.4;
+          round.defenderDamage = Math.round(effectiveDefPower * multiplier);
+          attackerHp -= round.defenderDamage;
+        }
       }
+      round.attackerHpAfter = Math.max(0, Math.round(attackerHp));
+
+      log.push(round);
     }
 
     const attackerWon = defenderHp <= 0;
@@ -199,6 +266,7 @@ export class ResourceNode extends Container {
       attackerRemainingHp: Math.max(0, Math.round(attackerHp)),
       defenderRemainingHp: Math.max(0, Math.round(defenderHp)),
       rounds,
+      log,
     };
   }
 
