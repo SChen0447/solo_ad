@@ -1,7 +1,7 @@
 import * as PIXI from 'pixi.js';
 import {
   Commodity,
-  CommodityPriceState,
+  KlineCandle,
   getCommodityById,
 } from './commodityData';
 import { MarketManager, TradeResult } from './marketManager';
@@ -67,6 +67,9 @@ export class UIController {
   private audioContext: AudioContext | null = null;
   private flashAlpha: number = 0;
   private flashColor: number = 0xff0000;
+  private flashStartTime: number = 0;
+  private flashDuration: number = 300;
+  private isFlashing: boolean = false;
   private isSmallScreen: boolean = false;
   private screenWidth: number = 0;
   private screenHeight: number = 0;
@@ -122,38 +125,44 @@ export class UIController {
       this.audioContext.resume();
     }
 
+    const now = this.audioContext.currentTime;
     const oscillator = this.audioContext.createOscillator();
     const gainNode = this.audioContext.createGain();
 
     oscillator.connect(gainNode);
     gainNode.connect(this.audioContext.destination);
 
+    let freq = 440;
+    let waveType: OscillatorType = 'square';
+
     switch (type) {
       case 'click':
-        oscillator.type = 'square';
-        oscillator.frequency.setValueAtTime(440, this.audioContext.currentTime);
-        gainNode.gain.setValueAtTime(0.1, this.audioContext.currentTime);
+        freq = 440;
+        waveType = 'square';
         break;
       case 'up':
-        oscillator.type = 'triangle';
-        oscillator.frequency.setValueAtTime(660, this.audioContext.currentTime);
-        gainNode.gain.setValueAtTime(0.1, this.audioContext.currentTime);
+        freq = 660;
+        waveType = 'triangle';
         break;
       case 'down':
-        oscillator.type = 'triangle';
-        oscillator.frequency.setValueAtTime(220, this.audioContext.currentTime);
-        gainNode.gain.setValueAtTime(0.1, this.audioContext.currentTime);
+        freq = 220;
+        waveType = 'triangle';
         break;
       case 'error':
-        oscillator.type = 'square';
-        oscillator.frequency.setValueAtTime(100, this.audioContext.currentTime);
-        gainNode.gain.setValueAtTime(0.1, this.audioContext.currentTime);
+        freq = 100;
+        waveType = 'square';
         break;
     }
 
-    gainNode.gain.exponentialRampToValueAtTime(0.001, this.audioContext.currentTime + 0.2);
-    oscillator.start(this.audioContext.currentTime);
-    oscillator.stop(this.audioContext.currentTime + 0.2);
+    oscillator.type = waveType;
+    oscillator.frequency.setValueAtTime(freq, now);
+
+    gainNode.gain.setValueAtTime(0, now);
+    gainNode.gain.linearRampToValueAtTime(0.1, now + 0.01);
+    gainNode.gain.linearRampToValueAtTime(0, now + 0.2);
+
+    oscillator.start(now);
+    oscillator.stop(now + 0.2);
   }
 
   private createPixelText(text: string, fontSize: number): PIXI.Text {
@@ -259,18 +268,20 @@ export class UIController {
     container.addChild(nameText);
 
     const priceText = this.createPixelText('0', 18);
-    priceText.x = 160;
+    priceText.x = this.isSmallScreen ? 140 : 160;
     priceText.y = ROW_HEIGHT / 2 - priceText.height / 2;
     container.addChild(priceText);
 
     const trendArrow = new PIXI.Graphics();
     trendArrow.x = 240;
     trendArrow.y = ROW_HEIGHT / 2;
+    trendArrow.visible = !this.isSmallScreen;
     container.addChild(trendArrow);
 
     const quantityText = this.createPixelText('x0', 14);
-    quantityText.x = 280;
+    quantityText.x = this.isSmallScreen ? 210 : 280;
     quantityText.y = ROW_HEIGHT / 2 - quantityText.height / 2;
+    quantityText.visible = !this.isSmallScreen;
     container.addChild(quantityText);
 
     const buyButton = this.createTradeButton('买', GREEN_COLOR, true);
@@ -396,7 +407,6 @@ export class UIController {
 
   private setupButtonEvents(row: CommodityRow, buttonType: 'buy' | 'sell'): void {
     const button = buttonType === 'buy' ? row.buyButton : row.sellButton;
-    const bg = buttonType === 'buy' ? row.buyButtonBg : row.sellButtonBg;
 
     button.on('pointerover', () => {
       const state = buttonType === 'buy' ? row.buyState : row.sellState;

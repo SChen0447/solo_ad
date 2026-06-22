@@ -1,6 +1,7 @@
 import {
   Commodity,
   CommodityPriceState,
+  KlineCandle,
   COMMODITIES,
   calculateSinePrice,
   clampPrice,
@@ -40,12 +41,24 @@ export class MarketManager {
   private initializePriceStates(): void {
     for (const commodity of COMMODITIES) {
       const initialPrice = commodity.basePrice;
+      const initialCandle: KlineCandle = {
+        open: initialPrice,
+        close: initialPrice,
+        high: initialPrice,
+        low: initialPrice,
+      };
       this.priceStates.set(commodity.id, {
         commodityId: commodity.id,
         currentPrice: initialPrice,
         previousPrice: initialPrice,
         trend: 'flat',
-        history: [initialPrice],
+        history: [],
+        currentCandle: {
+          open: initialPrice,
+          close: initialPrice,
+          high: initialPrice,
+          low: initialPrice,
+        },
       });
     }
   }
@@ -123,6 +136,12 @@ export class MarketManager {
     state.previousPrice = previousPrice;
     state.currentPrice = clampPrice(commodity, newPrice);
 
+    if (state.currentCandle) {
+      state.currentCandle.close = state.currentPrice;
+      state.currentCandle.high = Math.max(state.currentCandle.high, state.currentPrice);
+      state.currentCandle.low = Math.min(state.currentCandle.low, state.currentPrice);
+    }
+
     if (newPrice > previousPrice + 0.01) {
       state.trend = 'up';
     } else if (newPrice < previousPrice - 0.01) {
@@ -194,10 +213,19 @@ export class MarketManager {
       const state = this.priceStates.get(commodity.id);
       if (!state) continue;
 
-      state.history.push(state.currentPrice);
-      if (state.history.length > MAX_HISTORY_POINTS) {
-        state.history.shift();
+      if (state.currentCandle) {
+        state.history.push({ ...state.currentCandle });
+        if (state.history.length > MAX_HISTORY_POINTS) {
+          state.history.shift();
+        }
       }
+
+      state.currentCandle = {
+        open: state.currentPrice,
+        close: state.currentPrice,
+        high: state.currentPrice,
+        low: state.currentPrice,
+      };
     }
   }
 }

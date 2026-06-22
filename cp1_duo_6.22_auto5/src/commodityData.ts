@@ -11,12 +11,20 @@ export interface Commodity {
   sinFrequency: number;
 }
 
+export interface KlineCandle {
+  open: number;
+  close: number;
+  high: number;
+  low: number;
+}
+
 export interface CommodityPriceState {
   commodityId: string;
   currentPrice: number;
   previousPrice: number;
   trend: 'up' | 'down' | 'flat';
-  history: number[];
+  history: KlineCandle[];
+  currentCandle: KlineCandle | null;
 }
 
 export const COMMODITIES: Commodity[] = [
