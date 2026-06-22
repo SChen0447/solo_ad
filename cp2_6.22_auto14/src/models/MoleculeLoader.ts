@@ -26,15 +26,20 @@ export interface MoleculeMesh {
 }
 
 const BOND_RADIUS = 0.08;
-const BOND_COLORS = {
-  1: 0xFFFFFF,
-  2: 0x00BFFF,
-  3: 0xFF6B6B
+const BOND_COLORS: Record<'single' | 'double' | 'triple', number> = {
+  single: 0xFFFFFF,
+  double: 0x00BFFF,
+  triple: 0xFF6B6B
 };
-const BOND_OPACITY = {
-  1: 0.8,
-  2: 0.9,
-  3: 0.95
+const BOND_OPACITY: Record<'single' | 'double' | 'triple', number> = {
+  single: 0.8,
+  double: 0.9,
+  triple: 0.95
+};
+const BOND_COUNT: Record<'single' | 'double' | 'triple', number> = {
+  single: 1,
+  double: 2,
+  triple: 3
 };
 
 function createAtomMesh(atom: AtomData): THREE.Mesh {
@@ -63,8 +68,10 @@ function createBondMeshes(
   const length = direction.length();
   const mid = new THREE.Vector3().addVectors(start, end).multiplyScalar(0.5);
 
-  const color = BOND_COLORS[bond.order];
-  const opacity = BOND_OPACITY[bond.order];
+  const bondType = bond.type;
+  const color = BOND_COLORS[bondType];
+  const opacity = BOND_OPACITY[bondType];
+  const numCylinders = BOND_COUNT[bondType];
 
   const offset = 0.05;
   const perp1 = new THREE.Vector3();
@@ -78,7 +85,7 @@ function createBondMeshes(
   perp1.cross(direction).normalize();
   perp2.crossVectors(direction, perp1).normalize();
 
-  for (let i = 0; i < bond.order; i++) {
+  for (let i = 0; i < numCylinders; i++) {
     const geometry = new THREE.CylinderGeometry(BOND_RADIUS, BOND_RADIUS, length, 16);
     const material = new THREE.MeshStandardMaterial({
       color,
@@ -90,10 +97,10 @@ function createBondMeshes(
     const mesh = new THREE.Mesh(geometry, material);
 
     let offsetVec = new THREE.Vector3(0, 0, 0);
-    if (bond.order === 2) {
+    if (bondType === 'double') {
       const sign = i === 0 ? -1 : 1;
       offsetVec = perp1.clone().multiplyScalar(offset * sign);
-    } else if (bond.order === 3) {
+    } else if (bondType === 'triple') {
       if (i === 0) {
         offsetVec = perp1.clone().multiplyScalar(-offset);
       } else if (i === 2) {
@@ -163,10 +170,10 @@ export function animateTransition(
     const startTime = performance.now();
     const startOpacity = direction === 'in' ? 0 : 1;
     const endOpacity = direction === 'in' ? 1 : 0;
-    const startScale = direction === 'in' ? 0.3 : 1;
-    const endScale = direction === 'in' ? 1 : 0.3;
-    const startRotation = direction === 'in' ? Math.PI * 0.5 : 0;
-    const endRotation = direction === 'in' ? 0 : -Math.PI * 0.5;
+    const startScale = direction === 'in' ? 0.5 : 1;
+    const endScale = direction === 'in' ? 1 : 0.5;
+    const startRotation = direction === 'in' ? Math.PI * 2 : 0;
+    const endRotation = direction === 'in' ? 0 : 0;
 
     function easeInOut(t: number): number {
       return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;

@@ -10,6 +10,7 @@ export interface BondData {
   atom1: number;
   atom2: number;
   order: 1 | 2 | 3;
+  type: 'single' | 'double' | 'triple';
 }
 
 export interface MoleculeData {
@@ -28,7 +29,8 @@ export const ELEMENT_PROPERTIES: Record<string, {
   C: { color: 0x808080, radius: 0.4, mass: 12.01, name: '碳' },
   N: { color: 0x3050F8, radius: 0.35, mass: 14.01, name: '氮' },
   O: { color: 0xFF0D0D, radius: 0.3, mass: 16.00, name: '氧' },
-  H: { color: 0xFFFFFF, radius: 0.25, mass: 1.008, name: '氢' }
+  H: { color: 0xFFFFFF, radius: 0.25, mass: 1.008, name: '氢' },
+  S: { color: 0xFFFF00, radius: 0.38, mass: 32.07, name: '硫' }
 };
 
 export const MOLECULES: Record<string, MoleculeData> = {
@@ -61,34 +63,34 @@ export const MOLECULES: Record<string, MoleculeData> = {
       { id: 22, element: 'H', x: 2.034, y: -2.989, z: -2.687 }
     ],
     bonds: [
-      { atom1: 0, atom2: 1, order: 1 },
-      { atom1: 0, atom2: 4, order: 1 },
-      { atom1: 0, atom2: 10, order: 1 },
-      { atom1: 1, atom2: 2, order: 1 },
-      { atom1: 1, atom2: 9, order: 2 },
-      { atom1: 2, atom2: 3, order: 1 },
-      { atom1: 2, atom2: 8, order: 2 },
-      { atom1: 2, atom2: 12, order: 1 },
-      { atom1: 3, atom2: 4, order: 1 },
-      { atom1: 3, atom2: 6, order: 1 },
-      { atom1: 4, atom2: 7, order: 2 },
-      { atom1: 5, atom2: 1, order: 1 },
-      { atom1: 5, atom2: 4, order: 1 },
-      { atom1: 5, atom2: 11, order: 1 },
-      { atom1: 6, atom2: 12, order: 2 },
-      { atom1: 6, atom2: 13, order: 1 },
-      { atom1: 7, atom2: 14, order: 1 },
-      { atom1: 7, atom2: 15, order: 1 },
-      { atom1: 7, atom2: 16, order: 1 },
-      { atom1: 10, atom2: 14, order: 1 },
-      { atom1: 10, atom2: 15, order: 1 },
-      { atom1: 10, atom2: 16, order: 1 },
-      { atom1: 11, atom2: 17, order: 1 },
-      { atom1: 11, atom2: 18, order: 1 },
-      { atom1: 11, atom2: 19, order: 1 },
-      { atom1: 13, atom2: 20, order: 1 },
-      { atom1: 13, atom2: 21, order: 1 },
-      { atom1: 13, atom2: 22, order: 1 }
+      { atom1: 0, atom2: 1, order: 1, type: 'single' },
+      { atom1: 0, atom2: 4, order: 1, type: 'single' },
+      { atom1: 0, atom2: 10, order: 1, type: 'single' },
+      { atom1: 1, atom2: 2, order: 1, type: 'single' },
+      { atom1: 1, atom2: 9, order: 2, type: 'double' },
+      { atom1: 2, atom2: 3, order: 1, type: 'single' },
+      { atom1: 2, atom2: 8, order: 2, type: 'double' },
+      { atom1: 2, atom2: 12, order: 1, type: 'single' },
+      { atom1: 3, atom2: 4, order: 1, type: 'single' },
+      { atom1: 3, atom2: 6, order: 1, type: 'single' },
+      { atom1: 4, atom2: 7, order: 2, type: 'double' },
+      { atom1: 5, atom2: 1, order: 1, type: 'single' },
+      { atom1: 5, atom2: 4, order: 1, type: 'single' },
+      { atom1: 5, atom2: 11, order: 1, type: 'single' },
+      { atom1: 6, atom2: 12, order: 2, type: 'double' },
+      { atom1: 6, atom2: 13, order: 1, type: 'single' },
+      { atom1: 7, atom2: 14, order: 1, type: 'single' },
+      { atom1: 7, atom2: 15, order: 1, type: 'single' },
+      { atom1: 7, atom2: 16, order: 1, type: 'single' },
+      { atom1: 10, atom2: 14, order: 1, type: 'single' },
+      { atom1: 10, atom2: 15, order: 1, type: 'single' },
+      { atom1: 10, atom2: 16, order: 1, type: 'single' },
+      { atom1: 11, atom2: 17, order: 1, type: 'single' },
+      { atom1: 11, atom2: 18, order: 1, type: 'single' },
+      { atom1: 11, atom2: 19, order: 1, type: 'single' },
+      { atom1: 13, atom2: 20, order: 1, type: 'single' },
+      { atom1: 13, atom2: 21, order: 1, type: 'single' },
+      { atom1: 13, atom2: 22, order: 1, type: 'single' }
     ]
   },
   salicylic_acid: {
@@ -113,22 +115,22 @@ export const MOLECULES: Record<string, MoleculeData> = {
       { id: 15, element: 'H', x: 4.297, y: 0.984, z: -0.825 }
     ],
     bonds: [
-      { atom1: 0, atom2: 1, order: 2 },
-      { atom1: 0, atom2: 5, order: 1 },
-      { atom1: 0, atom2: 7, order: 1 },
-      { atom1: 1, atom2: 2, order: 1 },
-      { atom1: 1, atom2: 11, order: 1 },
-      { atom1: 2, atom2: 3, order: 2 },
-      { atom1: 2, atom2: 6, order: 1 },
-      { atom1: 3, atom2: 4, order: 1 },
-      { atom1: 3, atom2: 12, order: 1 },
-      { atom1: 4, atom2: 5, order: 2 },
-      { atom1: 4, atom2: 8, order: 1 },
-      { atom1: 5, atom2: 14, order: 1 },
-      { atom1: 6, atom2: 9, order: 2 },
-      { atom1: 6, atom2: 10, order: 1 },
-      { atom1: 7, atom2: 13, order: 1 },
-      { atom1: 10, atom2: 15, order: 1 }
+      { atom1: 0, atom2: 1, order: 2, type: 'double' },
+      { atom1: 0, atom2: 5, order: 1, type: 'single' },
+      { atom1: 0, atom2: 7, order: 1, type: 'single' },
+      { atom1: 1, atom2: 2, order: 1, type: 'single' },
+      { atom1: 1, atom2: 11, order: 1, type: 'single' },
+      { atom1: 2, atom2: 3, order: 2, type: 'double' },
+      { atom1: 2, atom2: 6, order: 1, type: 'single' },
+      { atom1: 3, atom2: 4, order: 1, type: 'single' },
+      { atom1: 3, atom2: 12, order: 1, type: 'single' },
+      { atom1: 4, atom2: 5, order: 2, type: 'double' },
+      { atom1: 4, atom2: 8, order: 1, type: 'single' },
+      { atom1: 5, atom2: 14, order: 1, type: 'single' },
+      { atom1: 6, atom2: 9, order: 2, type: 'double' },
+      { atom1: 6, atom2: 10, order: 1, type: 'single' },
+      { atom1: 7, atom2: 13, order: 1, type: 'single' },
+      { atom1: 10, atom2: 15, order: 1, type: 'single' }
     ]
   },
   aspirin: {
@@ -158,27 +160,27 @@ export const MOLECULES: Record<string, MoleculeData> = {
       { id: 20, element: 'H', x: -0.494, y: -2.677, z: 1.067 }
     ],
     bonds: [
-      { atom1: 0, atom2: 1, order: 2 },
-      { atom1: 0, atom2: 5, order: 1 },
-      { atom1: 0, atom2: 7, order: 1 },
-      { atom1: 1, atom2: 2, order: 1 },
-      { atom1: 1, atom2: 13, order: 1 },
-      { atom1: 2, atom2: 3, order: 2 },
-      { atom1: 2, atom2: 6, order: 1 },
-      { atom1: 3, atom2: 4, order: 1 },
-      { atom1: 3, atom2: 14, order: 1 },
-      { atom1: 4, atom2: 5, order: 2 },
-      { atom1: 4, atom2: 8, order: 1 },
-      { atom1: 5, atom2: 15, order: 1 },
-      { atom1: 6, atom2: 9, order: 2 },
-      { atom1: 6, atom2: 10, order: 1 },
-      { atom1: 7, atom2: 11, order: 2 },
-      { atom1: 7, atom2: 12, order: 1 },
-      { atom1: 10, atom2: 16, order: 1 },
-      { atom1: 12, atom2: 17, order: 1 },
-      { atom1: 12, atom2: 18, order: 1 },
-      { atom1: 12, atom2: 19, order: 1 },
-      { atom1: 12, atom2: 20, order: 1 }
+      { atom1: 0, atom2: 1, order: 2, type: 'double' },
+      { atom1: 0, atom2: 5, order: 1, type: 'single' },
+      { atom1: 0, atom2: 7, order: 1, type: 'single' },
+      { atom1: 1, atom2: 2, order: 1, type: 'single' },
+      { atom1: 1, atom2: 13, order: 1, type: 'single' },
+      { atom1: 2, atom2: 3, order: 2, type: 'double' },
+      { atom1: 2, atom2: 6, order: 1, type: 'single' },
+      { atom1: 3, atom2: 4, order: 1, type: 'single' },
+      { atom1: 3, atom2: 14, order: 1, type: 'single' },
+      { atom1: 4, atom2: 5, order: 2, type: 'double' },
+      { atom1: 4, atom2: 8, order: 1, type: 'single' },
+      { atom1: 5, atom2: 15, order: 1, type: 'single' },
+      { atom1: 6, atom2: 9, order: 2, type: 'double' },
+      { atom1: 6, atom2: 10, order: 1, type: 'single' },
+      { atom1: 7, atom2: 11, order: 2, type: 'double' },
+      { atom1: 7, atom2: 12, order: 1, type: 'single' },
+      { atom1: 10, atom2: 16, order: 1, type: 'single' },
+      { atom1: 12, atom2: 17, order: 1, type: 'single' },
+      { atom1: 12, atom2: 18, order: 1, type: 'single' },
+      { atom1: 12, atom2: 19, order: 1, type: 'single' },
+      { atom1: 12, atom2: 20, order: 1, type: 'single' }
     ]
   }
 };

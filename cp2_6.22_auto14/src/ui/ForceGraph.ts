@@ -21,6 +21,26 @@ interface GraphLink {
   bond: BondData;
 }
 
+const BOND_LINK_COLORS: Record<'single' | 'double' | 'triple', string> = {
+  single: '#AAAAAA',
+  double: '#00BFFF',
+  triple: '#FF6B6B'
+};
+
+const BOND_LINK_WIDTH: Record<'single' | 'double' | 'triple', number> = {
+  single: 2,
+  double: 4,
+  triple: 6
+};
+
+const ELEMENT_NODE_COLORS: Record<string, string> = {
+  C: '#808080',
+  N: '#3050F8',
+  O: '#FF0D0D',
+  H: '#FFFFFF',
+  S: '#FFFF00'
+};
+
 export class ForceGraph {
   private container: HTMLElement;
   private svg: d3.Selection<SVGSVGElement, unknown, null, undefined>;
@@ -75,13 +95,9 @@ export class ForceGraph {
       .data(links)
       .enter()
       .append('line')
-      .attr('stroke', (d) => {
-        if (d.bond.order === 1) return '#AAAAAA';
-        if (d.bond.order === 2) return '#00BFFF';
-        return '#FF6B6B';
-      })
+      .attr('stroke', (d) => BOND_LINK_COLORS[d.bond.type])
       .attr('stroke-opacity', 0.7)
-      .attr('stroke-width', (d) => d.bond.order * 2);
+      .attr('stroke-width', (d) => BOND_LINK_WIDTH[d.bond.type]);
 
     const nodeSelection = nodeGroup
       .selectAll('circle')
@@ -93,8 +109,8 @@ export class ForceGraph {
         return props.radius * 18 + 3;
       })
       .attr('fill', (d) => {
-        const props = ELEMENT_PROPERTIES[d.atom.element];
-        return `#${props.color.toString(16).padStart(6, '0')}`;
+        const color = ELEMENT_NODE_COLORS[d.atom.element] || '#808080';
+        return color;
       })
       .attr('stroke', '#FFFFFF')
       .attr('stroke-width', 1.5)
@@ -117,8 +133,8 @@ export class ForceGraph {
           .attr('stroke-width', 1.5);
         if (event.buttons === 0) {
           const sel = d3.select(this);
-          const props = ELEMENT_PROPERTIES[d.atom.element];
-          sel.attr('fill', `#${props.color.toString(16).padStart(6, '0')}`);
+          const color = ELEMENT_NODE_COLORS[d.atom.element] || '#808080';
+          sel.attr('fill', color);
         }
       })
       .on('click', function (_event: MouseEvent, d: GraphNode) {

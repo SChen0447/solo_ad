@@ -311,14 +311,14 @@ class MoleculeViewerApp {
     }
 
     if (this.currentMolecule) {
-      await animateTransition(this.currentMolecule.group, 'out', 300);
+      await animateTransition(this.currentMolecule.group, 'out', 600);
       this.scene.remove(this.currentMolecule.group);
       this.disposeMolecule(this.currentMolecule);
     }
 
     const newMolecule = buildMoleculeMesh(data);
     this.centerMolecule(newMolecule);
-    newMolecule.group.scale.setScalar(0.3);
+    newMolecule.group.scale.setScalar(0.5);
     this.scene.add(newMolecule.group);
 
     this.currentMolecule = newMolecule;
