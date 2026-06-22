@@ -105,6 +105,21 @@ function switchToPerformanceMode(): void {
   scene.add(galaxy.group);
 }
 
+function updateCoreSizePulse(time: number): void {
+  const sizeAttr = galaxy.corePoints.geometry.getAttribute('size') as THREE.BufferAttribute;
+  const sizes = sizeAttr.array as Float32Array;
+  const baseSizes = galaxy.coreSizePulse.baseSizes;
+  const phases = galaxy.coreSizePulse.phases;
+  const freqs = galaxy.coreSizePulse.frequencies;
+  const amps = galaxy.coreSizePulse.amplitudes;
+
+  for (let i = 0; i < baseSizes.length; i++) {
+    const pulse = Math.sin(2 * Math.PI * freqs[i] * time + phases[i]);
+    sizes[i] = baseSizes[i] + amps[i] * pulse;
+  }
+  sizeAttr.needsUpdate = true;
+}
+
 function updateTwinkle(time: number): void {
   if (!interaction.twinkleEnabled) return;
 
@@ -187,6 +202,7 @@ function animate(): void {
 
   galaxy.update(delta);
   updateInteraction(interaction, delta);
+  updateCoreSizePulse(elapsed);
   updateTwinkle(elapsed);
 
   composer.render();

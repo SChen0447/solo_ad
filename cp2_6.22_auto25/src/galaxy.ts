@@ -44,9 +44,32 @@ export const DEFAULT_CONFIG: GalaxyConfig = {
 
 const COLOR_CORE_START = new THREE.Color(0xffd700);
 const COLOR_CORE_END = new THREE.Color(0xff8c00);
-const COLOR_ARM_START = new THREE.Color(0x87ceeb);
+const COLOR_ARM_START = new THREE.Color(0xff69b4);
+const COLOR_ARM_MID = new THREE.Color(0x87ceeb);
 const COLOR_ARM_END = new THREE.Color(0x4b0082);
 const COLOR_DUST = new THREE.Color(0x2f4f4f);
+
+const coreVertexShader = `
+  attribute float size;
+  varying vec3 vColor;
+  void main() {
+    vColor = color;
+    vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+    gl_PointSize = size * (300.0 / -mvPosition.z);
+    gl_Position = projectionMatrix * mvPosition;
+  }
+`;
+
+const coreFragmentShader = `
+  varying vec3 vColor;
+  void main() {
+    vec2 center = gl_PointCoord - vec2(0.5);
+    float dist = length(center);
+    if (dist > 0.5) discard;
+    float alpha = 1.0 - smoothstep(0.0, 0.5, dist);
+    gl_FragColor = vec4(vColor, alpha);
+  }
+`;
 
 function computeCorePositions(count: number, radius: number): Float32Array {
   const positions = new Float32Array(count * 3);
@@ -121,8 +144,15 @@ function computeArmColors(
   for (let arm = 0; arm < armCount; arm++) {
     for (let i = 0; i < particlesPerArm; i++) {
       const t = Math.random();
-      tmp.copy(COLOR_ARM_START);
-      tmp.lerp(COLOR_ARM_END, t);
+      if (t < 0.5) {
+        const localT = t / 0.5;
+        tmp.copy(COLOR_ARM_START);
+        tmp.lerp(COLOR_ARM_MID, localT);
+      } else {
+        const localT = (t - 0.5) / 0.5;
+        tmp.copy(COLOR_ARM_MID);
+        tmp.lerp(COLOR_ARM_END, localT);
+      }
       colors[idx++] = tmp.r;
       colors[idx++] = tmp.g;
       colors[idx++] = tmp.b;
@@ -200,12 +230,36 @@ function computeBgStarPositions(count: number, radius: number): Float32Array {
   return positions;
 }
 
+function computeBgStarColors(count: number): Float32Array {
+  const colors = new Float32Array(count * 3);
+  const tmp = new THREE.Color(0xffffff);
+  for (let i = 0; i < count; i++) {
+    tmp.setHex(0xffffff);
+    const hueShift = (Math.random() - 0.5) * 0.1;
+    const hsl = { h: 0, s: 0, l: 1.0 };
+    tmp.getHSL(hsl);
+    hsl.h = (hsl.h + hueShift + 1.0) % 1.0;
+    hsl.s = 0.15 + Math.random() * 0.1;
+    tmp.setHSL(hsl.h, hsl.s, hsl.l);
+    colors[i * 3] = tmp.r;
+    colors[i * 3 + 1] = tmp.g;
+    colors[i * 3 + 2] = tmp.b;
+  }
+  return colors;
+}
+
 export interface GalaxyGroup {
   group: THREE.Group;
   galaxyGroup: THREE.Group;
   bgStars: THREE.Points;
   corePoints: THREE.Points;
   armPoints: THREE.Points;
+  coreSizePulse: {
+    baseSizes: Float32Array;
+    phases: Float32Array;
+    frequencies: Float32Array;
+    amplitudes: Float32Array;
+  };
   coreTwinkle: {
     baseSizes: Float32Array;
     phases: Float32Array;
@@ -230,10 +284,18 @@ export function createGalaxy(config: GalaxyConfig = DEFAULT_CONFIG): GalaxyGroup
 
   const corePositions = computeCorePositions(config.coreParticleCount, config.coreRadius);
   const coreColors = computeCoreColors(config.coreParticleCount, config.coreRadius, corePositions);
+  const coreBaseSizes = new Float32Array(config.coreParticleCount);
+  const coreSizePhases = new Float32Array(config.coreParticleCount);
+  const coreSizeFreqs = new Float32Array(config.coreParticleCount);
+  const coreSizeAmps = new Float32Array(config.coreParticleCount);
   const coreTwinklePhases = new Float32Array(config.coreParticleCount);
   const coreTwinkleFreqs = new Float32Array(config.coreParticleCount);
   const coreTwinkleAmps = new Float32Array(config.coreParticleCount);
   for (let i = 0; i < config.coreParticleCount; i++) {
+    coreBaseSizes[i] = 0.08;
+    coreSizePhases[i] = Math.random() * Math.PI * 2;
+    coreSizeFreqs[i] = 0.5;
+    coreSizeAmps[i] = 0.02;
     coreTwinklePhases[i] = Math.random() * Math.PI * 2;
     coreTwinkleFreqs[i] = 0.5 + Math.random() * 1.5;
     coreTwinkleAmps[i] = 0.3 + Math.random() * 0.2;
@@ -241,14 +303,15 @@ export function createGalaxy(config: GalaxyConfig = DEFAULT_CONFIG): GalaxyGroup
   const coreGeom = new THREE.BufferGeometry();
   coreGeom.setAttribute('position', new THREE.BufferAttribute(corePositions, 3));
   coreGeom.setAttribute('color', new THREE.BufferAttribute(new Float32Array(coreColors), 3));
-  const coreMat = new THREE.PointsMaterial({
-    size: 0.08,
+  coreGeom.setAttribute('size', new THREE.BufferAttribute(new Float32Array(coreBaseSizes), 1));
+  const coreMat = new THREE.ShaderMaterial({
+    uniforms: {},
     vertexColors: true,
     transparent: true,
-    opacity: 0.9,
-    sizeAttenuation: true,
     depthWrite: false,
     blending: THREE.AdditiveBlending,
+    vertexShader: coreVertexShader,
+    fragmentShader: coreFragmentShader,
   });
   const corePoints = new THREE.Points(coreGeom, coreMat);
   galaxyGroup.add(corePoints);
@@ -340,11 +403,13 @@ export function createGalaxy(config: GalaxyConfig = DEFAULT_CONFIG): GalaxyGroup
   group.add(galaxyGroup);
 
   const bgPositions = computeBgStarPositions(config.bgStarCount, config.bgStarRadius);
+  const bgColors = computeBgStarColors(config.bgStarCount);
   const bgGeom = new THREE.BufferGeometry();
   bgGeom.setAttribute('position', new THREE.BufferAttribute(bgPositions, 3));
+  bgGeom.setAttribute('color', new THREE.BufferAttribute(bgColors, 3));
   const bgMat = new THREE.PointsMaterial({
     size: 0.02,
-    color: 0xffffff,
+    vertexColors: true,
     transparent: true,
     opacity: 0.8,
     sizeAttenuation: true,
@@ -359,6 +424,12 @@ export function createGalaxy(config: GalaxyConfig = DEFAULT_CONFIG): GalaxyGroup
     bgStars,
     corePoints,
     armPoints,
+    coreSizePulse: {
+      baseSizes: coreBaseSizes,
+      phases: coreSizePhases,
+      frequencies: coreSizeFreqs,
+      amplitudes: coreSizeAmps,
+    },
     coreTwinkle: {
       baseSizes: new Float32Array(config.coreParticleCount).fill(0.08),
       phases: coreTwinklePhases,
