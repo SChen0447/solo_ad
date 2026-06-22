@@ -76,6 +76,11 @@ export class InfoPanel {
   }
 
   private show(plate: PlateData, center: { x: number; y: number } | null): void {
+    if (!center) {
+      this.hide();
+      return;
+    }
+
     const isNewPlate = this.currentPlateId !== plate.id;
     if (isNewPlate) {
       this.nameEl.textContent = plate.nameCN;
@@ -89,15 +94,8 @@ export class InfoPanel {
     this.panel.style.display = 'block';
     this.visible = true;
 
-    let targetLeft: number;
-    let targetTop: number;
-
-    if (center) {
-      targetLeft = center.x;
-      targetTop = center.y;
-    } else {
-      return;
-    }
+    const targetLeft = center.x;
+    const targetTop = center.y;
 
     const rect = this.panel.getBoundingClientRect();
     const panelWidth = rect.width || 180;

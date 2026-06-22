@@ -38,6 +38,15 @@ export class PlateRenderer {
   private flowTextureCtx: CanvasRenderingContext2D;
   private currentTime: number = -250;
   private isPlaying: boolean = false;
+  private glowFrameCounter: number = 0;
+  private static readonly GLOW_UPDATE_INTERVAL: number = 3;
+  private sharedGlowMat1: THREE.LineBasicMaterial | null = null;
+  private sharedGlowMat2: THREE.LineBasicMaterial | null = null;
+  private lastGlowPulse1: number = 0;
+  private lastGlowPulse2: number = 0;
+  private lastGlowBase: number = 0;
+  private lastGlowScale1: number = 1;
+  private lastGlowScale2: number = 1;
 
   constructor(scene: THREE.Scene) {
     this.scene = scene;
@@ -154,22 +163,26 @@ export class PlateRenderer {
     const boundaryLine = new THREE.Line(boundaryGeometry, boundaryMaterial);
 
     const glowGeom1 = this.createBoundaryGeometry(vertices, 0.018);
-    const glowMat1 = new THREE.LineBasicMaterial({
-      color: new THREE.Color(plate.color),
-      transparent: true,
-      opacity: 0.35,
-      linewidth: 1,
-    });
-    const glowLine1 = new THREE.Line(glowGeom1, glowMat1);
+    if (!this.sharedGlowMat1) {
+      this.sharedGlowMat1 = new THREE.LineBasicMaterial({
+        color: 0xffffff,
+        transparent: true,
+        opacity: 0.35,
+        linewidth: 1,
+      });
+    }
+    const glowLine1 = new THREE.Line(glowGeom1, this.sharedGlowMat1);
 
     const glowGeom2 = this.createBoundaryGeometry(vertices, 0.016);
-    const glowMat2 = new THREE.LineBasicMaterial({
-      color: new THREE.Color(plate.color).multiplyScalar(1.8),
-      transparent: true,
-      opacity: 0.2,
-      linewidth: 1,
-    });
-    const glowLine2 = new THREE.Line(glowGeom2, glowMat2);
+    if (!this.sharedGlowMat2) {
+      this.sharedGlowMat2 = new THREE.LineBasicMaterial({
+        color: 0xffffff,
+        transparent: true,
+        opacity: 0.2,
+        linewidth: 1,
+      });
+    }
+    const glowLine2 = new THREE.Line(glowGeom2, this.sharedGlowMat2);
 
     const gridLines = this.createGridLines(vertices);
 
@@ -303,11 +316,13 @@ export class PlateRenderer {
       return;
     }
 
+    const canvasAngle = -angle;
+
     const gradient = ctx.createLinearGradient(
-      size / 2 - Math.cos(angle) * size,
-      size / 2 - Math.sin(angle) * size,
-      size / 2 + Math.cos(angle) * size,
-      size / 2 + Math.sin(angle) * size
+      size / 2 - Math.cos(canvasAngle) * size,
+      size / 2 - Math.sin(canvasAngle) * size,
+      size / 2 + Math.cos(canvasAngle) * size,
+      size / 2 + Math.sin(canvasAngle) * size
     );
 
     const alpha = 0.08 + 0.12 * intensity;
@@ -330,9 +345,9 @@ export class PlateRenderer {
     for (let i = -8; i <= 8; i++) {
       const d = i * stripeSpacing + offset;
       ctx.fillStyle = `rgba(180,220,255,${(0.05 + 0.08 * intensity) * (1 - Math.abs(i) / 10)})`;
-      ctx.rotate(-angle);
+      ctx.rotate(canvasAngle);
       ctx.fillRect(-size, d - stripeWidth / 2, size * 2, stripeWidth / 3);
-      ctx.rotate(angle);
+      ctx.rotate(-canvasAngle);
     }
 
     ctx.restore();
@@ -440,29 +455,57 @@ export class PlateRenderer {
 
       this.updateFlowTexture(group.velocity.angle, group.velocity.speed, time);
       this.flowTexture.offset.x = (time * 0.3 * Math.cos(group.velocity.angle)) % 1;
-      this.flowTexture.offset.y = (time * 0.3 * Math.sin(group.velocity.angle)) % 1;
+      this.flowTexture.offset.y = (-time * 0.3 * Math.sin(group.velocity.angle)) % 1;
     });
   }
 
   updateBoundaryGlow(time: number): void {
+    this.glowFrameCounter++;
+    if (this.glowFrameCounter % PlateRenderer.GLOW_UPDATE_INTERVAL !== 0) {
+      return;
+    }
+
+    const pulse1 = 0.25 + 0.15 * Math.sin(time * 1.8);
+    const pulse2 = 0.12 + 0.08 * Math.sin(time * 2.2 + 0.5);
+    const baseVal = 0.6 + 0.4 * Math.abs(Math.sin(time * 1.5));
+    const scale1 = 1 + 0.05 * Math.sin(time * 1.2);
+    const scale2 = 1 + 0.1 * Math.sin(time * 0.9 + 1);
+
+    let maxSpeed = 0;
     this.plateGroups.forEach((group) => {
-      const baseMat = group.boundaryLine.material as THREE.LineBasicMaterial;
-      baseMat.opacity = 0.6 + 0.4 * Math.abs(Math.sin(time * 1.5));
-
-      const glowMat1 = group.glowLine1.material as THREE.LineBasicMaterial;
-      const pulse1 = 0.25 + 0.15 * Math.sin(time * 1.8);
-      glowMat1.opacity = pulse1 + Math.min(0.3, group.velocity.speed * 0.4);
-
-      const glowMat2 = group.glowLine2.material as THREE.LineBasicMaterial;
-      const pulse2 = 0.12 + 0.08 * Math.sin(time * 2.2 + 0.5);
-      glowMat2.opacity = pulse2 + Math.min(0.25, group.velocity.speed * 0.3);
-
-      const scale1 = 1 + 0.05 * Math.sin(time * 1.2);
-      group.glowLine1.scale.set(scale1, scale1, 1);
-
-      const scale2 = 1 + 0.1 * Math.sin(time * 0.9 + 1);
-      group.glowLine2.scale.set(scale2, scale2, 1);
+      if (group.velocity.speed > maxSpeed) maxSpeed = group.velocity.speed;
     });
+
+    const glowOpacity1 = pulse1 + Math.min(0.3, maxSpeed * 0.4);
+    const glowOpacity2 = pulse2 + Math.min(0.25, maxSpeed * 0.3);
+
+    if (this.sharedGlowMat1) {
+      this.sharedGlowMat1.opacity = glowOpacity1;
+    }
+    if (this.sharedGlowMat2) {
+      this.sharedGlowMat2.opacity = glowOpacity2;
+    }
+
+    const scaleChanged = Math.abs(scale1 - this.lastGlowScale1) > 0.001 ||
+                         Math.abs(scale2 - this.lastGlowScale2) > 0.001;
+
+    if (scaleChanged) {
+      this.plateGroups.forEach((group) => {
+        group.glowLine1.scale.set(scale1, scale1, 1);
+        group.glowLine2.scale.set(scale2, scale2, 1);
+      });
+      this.lastGlowScale1 = scale1;
+      this.lastGlowScale2 = scale2;
+    }
+
+    const baseMatChanged = Math.abs(baseVal - this.lastGlowBase) > 0.01;
+    if (baseMatChanged) {
+      this.plateGroups.forEach((group) => {
+        const baseMat = group.boundaryLine.material as THREE.LineBasicMaterial;
+        baseMat.opacity = baseVal;
+      });
+      this.lastGlowBase = baseVal;
+    }
   }
 
   setHoverCallback(
@@ -477,6 +520,10 @@ export class PlateRenderer {
 
     const v = new THREE.Vector3(group.center.x, group.center.y, 0.05);
     const projected = v.project(camera);
+
+    if (projected.z < -1 || projected.z > 1) return null;
+    if (projected.x < -1.2 || projected.x > 1.2 || projected.y < -1.2 || projected.y > 1.2) return null;
+
     return {
       x: (projected.x * 0.5 + 0.5) * width,
       y: (-projected.y * 0.5 + 0.5) * height,

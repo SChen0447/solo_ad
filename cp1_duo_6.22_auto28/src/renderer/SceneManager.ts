@@ -12,6 +12,7 @@ export class SceneManager {
   stars!: THREE.Points;
   private clock: THREE.Clock;
   private animationId: number = 0;
+  private cameraAnimationId: number = 0;
   private onPeriodChange: ((period: { nameCN: string; timeAgo: string }) => void) | null = null;
 
   constructor(container: HTMLElement) {
@@ -122,6 +123,9 @@ export class SceneManager {
   }
 
   setPresetView(view: 'front' | 'side' | 'top'): void {
+    this.cameraAnimationId++;
+    const currentAnimId = this.cameraAnimationId;
+
     const duration = 1500;
     const startPos = this.camera.position.clone();
     const startTarget = this.controls.target.clone();
@@ -142,6 +146,8 @@ export class SceneManager {
 
     const startTime = performance.now();
     const animateCamera = (now: number) => {
+      if (currentAnimId !== this.cameraAnimationId) return;
+
       const elapsed = now - startTime;
       const t = Math.min(elapsed / duration, 1);
       const ease = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;

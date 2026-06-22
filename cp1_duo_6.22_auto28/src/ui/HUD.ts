@@ -8,6 +8,9 @@ export class HUD {
   private viewBtnContainer: HTMLElement;
   private progressBarEl: HTMLElement;
   private progressFillEl: HTMLElement;
+  private progressPeriodEl: HTMLElement;
+  private timelineController: TimelineController;
+  private lastPeriodName: string = '';
 
   constructor(timelineController: TimelineController, sceneManager: SceneManager) {
     this.container = document.createElement('div');
@@ -20,6 +23,7 @@ export class HUD {
       <div class="hud-progress-wrap">
         <div class="hud-progress-label">
           <span>盘古大陆</span>
+          <span class="hud-progress-period" id="hud-progress-period"></span>
           <span>现代</span>
         </div>
         <div class="hud-progress-bar" id="hud-progress-bar">
@@ -58,6 +62,8 @@ export class HUD {
     this.timeAgoEl = document.getElementById('hud-time')!;
     this.progressBarEl = document.getElementById('hud-progress-bar')!;
     this.progressFillEl = document.getElementById('hud-progress-fill')!;
+    this.progressPeriodEl = document.getElementById('hud-progress-period')!;
+    this.timelineController = timelineController;
 
     timelineController.onTimeUpdate(() => {
       this.updateDisplay(timelineController);
@@ -78,6 +84,11 @@ export class HUD {
     const period = timelineController.getCurrentPeriod();
     this.periodEl.textContent = period.nameCN;
     this.timeAgoEl.textContent = period.timeAgo;
+
+    if (period.nameCN !== this.lastPeriodName) {
+      this.progressPeriodEl.textContent = period.nameCN;
+      this.lastPeriodName = period.nameCN;
+    }
 
     const progress = timelineController.getProgress();
     const pct = progress * 100;
@@ -145,6 +156,15 @@ export class HUD {
         color: rgba(224,230,255,0.4);
         letter-spacing: 1px;
         font-family: 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+      }
+
+      .hud-progress-period {
+        font-size: 10px;
+        color: rgba(180,200,255,0.8);
+        font-weight: 600;
+        letter-spacing: 1px;
+        text-shadow: 0 0 6px rgba(106,143,255,0.4);
+        transition: opacity 0.3s ease;
       }
 
       .hud-progress-bar {
