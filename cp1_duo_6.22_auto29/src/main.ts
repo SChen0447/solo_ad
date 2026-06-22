@@ -121,15 +121,16 @@ class ModelViewerApp {
   private setupEventListeners(): void {
     window.addEventListener('resize', () => this.onWindowResize());
 
-    this.canvas.addEventListener('mousedown', (e) => this.onMouseDown(e));
-    this.canvas.addEventListener('mousemove', (e) => this.onMouseMove(e));
-    this.canvas.addEventListener('mouseup', (e) => this.onMouseUp(e));
-    this.canvas.addEventListener('click', (e) => this.onClick(e));
-    this.canvas.addEventListener('dblclick', (e) => this.onDoubleClick(e));
+    this.canvas.addEventListener('mousedown', (e) => this.onMouseDown(e), true);
+    this.canvas.addEventListener('mousemove', (e) => this.onMouseMove(e), true);
+    this.canvas.addEventListener('mouseup', (e) => this.onMouseUp(e), true);
+    this.canvas.addEventListener('click', (e) => this.onClick(e), true);
+    this.canvas.addEventListener('dblclick', (e) => this.onDoubleClick(e), true);
+    this.canvas.addEventListener('contextmenu', (e) => e.preventDefault());
 
-    this.canvas.addEventListener('touchstart', (e) => this.onTouchStart(e), { passive: false });
-    this.canvas.addEventListener('touchmove', (e) => this.onTouchMove(e), { passive: false });
-    this.canvas.addEventListener('touchend', (e) => this.onTouchEnd(e), { passive: false });
+    this.canvas.addEventListener('touchstart', (e) => this.onTouchStart(e), { passive: false, capture: true });
+    this.canvas.addEventListener('touchmove', (e) => this.onTouchMove(e), { passive: false, capture: true });
+    this.canvas.addEventListener('touchend', (e) => this.onTouchEnd(e), { passive: false, capture: true });
 
     this.controls.addEventListener('start', () => {
       if (this.autoRotate) {
@@ -140,22 +141,27 @@ class ModelViewerApp {
   }
 
   private onMouseDown(event: MouseEvent): void {
+    if (event.button !== 0) return;
+
     this.isMouseDown = true;
     this.mouseDownTime = performance.now();
     this.mouseDownPosition = { x: event.clientX, y: event.clientY };
 
-    if (event.button === 0) {
-      const isDragging = this.annotationSystem.startDrag(event, this.canvas);
-      if (isDragging) {
-        this.isDraggingAnnotation = true;
-        this.controls.enabled = false;
-      }
+    const isDragging = this.annotationSystem.startDrag(event, this.canvas);
+    if (isDragging) {
+      this.isDraggingAnnotation = true;
+      this.controls.enabled = false;
+      event.stopPropagation();
+      event.preventDefault();
+      this.canvas.style.cursor = 'grabbing';
     }
   }
 
   private onMouseMove(event: MouseEvent): void {
     if (this.isDraggingAnnotation) {
       this.annotationSystem.handleDrag(event, this.canvas);
+      event.stopPropagation();
+      event.preventDefault();
     }
   }
 
@@ -166,6 +172,9 @@ class ModelViewerApp {
       this.annotationSystem.endDrag();
       this.isDraggingAnnotation = false;
       this.controls.enabled = true;
+      this.canvas.style.cursor = 'default';
+      event.stopPropagation();
+      event.preventDefault();
     }
   }
 

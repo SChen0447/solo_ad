@@ -7,4 +7,8 @@ export default defineConfig({
       protocol: 'ws',
     },
   },
+  esbuild: {
+    target: 'es2020',
+  },
 });
+

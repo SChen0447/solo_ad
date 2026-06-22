@@ -360,6 +360,21 @@ export class AnnotationSystem {
 
     this.raycaster.setFromCamera(mouse, this.camera);
 
+    if (this.modelMeshes.length > 0) {
+      const intersects = this.raycaster.intersectObjects(this.modelMeshes, true);
+      if (intersects.length > 0) {
+        const point = intersects[0].point;
+        this.dragAnnotation.marker.position.copy(point);
+        this.updateLabelPosition(this.dragAnnotation);
+        this.dragAnnotation.data.position = {
+          x: point.x,
+          y: point.y,
+          z: point.z,
+        };
+        return;
+      }
+    }
+
     const planeNormal = new THREE.Vector3();
     this.camera.getWorldDirection(planeNormal);
     planeNormal.negate();

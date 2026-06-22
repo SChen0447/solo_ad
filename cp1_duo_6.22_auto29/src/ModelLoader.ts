@@ -79,7 +79,7 @@ export class ModelLoader {
     model: THREE.Group,
     camera: THREE.PerspectiveCamera,
     targetViewportHeightRatio: number = 0.8
-  ): { center: THREE.Vector3; scale: number; boundingBox: THREE.Box3 } {
+  ): { center: THREE.Vector3; scale: number; boundingBox: THREE.Box3; fitDistance: number } {
     const box = new THREE.Box3().setFromObject(model);
     const center = box.getCenter(new THREE.Vector3());
     const size = box.getSize(new THREE.Vector3());
@@ -88,10 +88,11 @@ export class ModelLoader {
 
     const maxDim = Math.max(size.x, size.y, size.z);
     const fov = (camera.fov * Math.PI) / 180;
-    const distance = camera.position.length();
-    const visibleHeight = 2 * Math.tan(fov / 2) * distance;
-    const targetHeight = visibleHeight * targetViewportHeightRatio;
-    const scale = targetHeight / maxDim;
+
+    const fitDistance = (maxDim / 2) / Math.tan(fov / 2) / targetViewportHeightRatio;
+
+    const currentDistance = camera.position.length();
+    const scale = currentDistance / fitDistance;
 
     model.scale.setScalar(scale);
 
@@ -103,6 +104,39 @@ export class ModelLoader {
       center: new THREE.Vector3(0, 0, 0),
       scale,
       boundingBox: newBox,
+      fitDistance,
+    };
+  }
+
+  fitCameraToModel(
+    model: THREE.Group,
+    camera: THREE.PerspectiveCamera,
+    controlsTarget: THREE.Vector3,
+    targetViewportHeightRatio: number = 0.8
+  ): { cameraPosition: THREE.Vector3; target: THREE.Vector3 } {
+    const box = new THREE.Box3().setFromObject(model);
+    const center = box.getCenter(new THREE.Vector3());
+    const size = box.getSize(new THREE.Vector3());
+
+    const maxDim = Math.max(size.x, size.y, size.z);
+    const fov = (camera.fov * Math.PI) / 180;
+
+    const fitDistance = (maxDim / 2) / Math.tan(fov / 2) / targetViewportHeightRatio;
+
+    const angle = (45 * Math.PI) / 180;
+    const x = Math.sin(angle) * fitDistance;
+    const y = Math.sin(angle) * fitDistance;
+    const z = Math.cos(angle) * fitDistance;
+
+    const cameraPosition = new THREE.Vector3(
+      center.x + x,
+      center.y + y,
+      center.z + z
+    );
+
+    return {
+      cameraPosition,
+      target: center.clone(),
     };
   }
 
