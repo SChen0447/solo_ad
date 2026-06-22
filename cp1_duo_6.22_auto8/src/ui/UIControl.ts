@@ -73,7 +73,7 @@ export class UIControl {
   }
 
   private setupControls(): void {
-    const roomFolder = this.gui.addFolder('房间设置');
+    const roomFolder = this.gui.addFolder('🏠 房间设置');
     const floorColorOptions: Record<string, string> = {};
     FLOOR_COLORS.forEach(c => {
       floorColorOptions[c.name] = c.value;
@@ -86,7 +86,7 @@ export class UIControl {
         this.callbacks.onFloorColorChange(value);
       });
 
-    const sofaFolder = this.gui.addFolder('沙发定制');
+    const sofaFolder = this.gui.addFolder('🛋️ 沙发定制');
 
     const cushionColorOptions: Record<string, string> = {};
     CUSHION_COLORS.forEach(c => {
@@ -119,10 +119,13 @@ export class UIControl {
         this.callbacks.onGlossinessChange(value);
       });
 
+    sofaFolder.open();
+    roomFolder.open();
+
     const resetController = this.gui.add(
       { reset: () => this.handleReset() },
       'reset'
-    ).name('重置配置');
+    ).name('↺ 重置配置');
 
     const resetDom = resetController.domElement as HTMLElement;
     if (resetDom.classList) {
@@ -157,7 +160,7 @@ export class UIControl {
     const targetFrameColor = FRAME_COLORS[0].value;
     const targetGlossiness = 0.5;
 
-    const duration = 500;
+    const duration = 1000;
     const startTime = performance.now();
 
     const hexToRgb = (hex: string): { r: number; g: number; b: number } => {

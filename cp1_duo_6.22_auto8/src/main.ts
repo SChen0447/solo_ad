@@ -124,18 +124,18 @@ class App {
   }
 
   private setupCamera(): void {
-    const distance = 7;
-    const angle = Math.PI / 4;
-    const heightAngle = Math.PI / 4;
+    const distance = 5.8;
+    const angle = Math.PI / 3.8;
+    const heightAngle = Math.PI / 4.5;
 
     this.camera.position.set(
       distance * Math.sin(angle) * Math.cos(heightAngle),
-      distance * Math.sin(heightAngle),
+      distance * Math.sin(heightAngle) + 0.3,
       distance * Math.cos(angle) * Math.cos(heightAngle)
     );
 
-    this.camera.lookAt(0, 1, 0);
-    this.controls.target.set(0, 1, 0);
+    this.camera.lookAt(0, 1.0, 0.1);
+    this.controls.target.set(0, 1.0, 0.1);
     this.controls.update();
   }
 

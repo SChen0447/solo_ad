@@ -92,68 +92,129 @@ export class Room {
   private createWindows(): THREE.Group {
     const windows = new THREE.Group();
 
-    const windowFrameMaterial = new THREE.MeshStandardMaterial({
+    const frameMaterial = new THREE.MeshStandardMaterial({
       color: '#ffffff',
+      roughness: 0.4,
+      metalness: 0.6
+    });
+
+    const windowGlassMaterial = new THREE.MeshPhysicalMaterial({
+      color: '#a8d4e6',
+      roughness: 0.05,
+      metalness: 0.0,
+      transparent: true,
+      opacity: 0.35,
+      transmission: 0.9,
+      thickness: 0.5,
+      ior: 1.45,
+      envMapIntensity: 1.0
+    });
+
+    const windowSillMaterial = new THREE.MeshStandardMaterial({
+      color: '#f0f0f0',
       roughness: 0.3,
       metalness: 0.5
     });
 
-    const windowGlassMaterial = new THREE.MeshStandardMaterial({
-      color: '#87ceeb',
-      roughness: 0.1,
-      metalness: 0.1,
-      transparent: true,
-      opacity: 0.4
-    });
-
     const windowWidth = 2.5;
     const windowHeight = 2;
-    const frameThickness = 0.1;
+    const outerFrameThickness = 0.15;
+    const innerMullionThickness = 0.08;
+    const glassThickness = 0.02;
 
     const createWindow = (x: number, y: number, z: number, rotY: number) => {
       const windowGroup = new THREE.Group();
 
-      const glass = new THREE.Mesh(
-        new THREE.PlaneGeometry(windowWidth, windowHeight),
-        windowGlassMaterial
-      );
-      windowGroup.add(glass);
+      const glassGroup = new THREE.Group();
 
-      const topFrame = new THREE.Mesh(
-        new THREE.BoxGeometry(windowWidth + frameThickness * 2, frameThickness, frameThickness),
-        windowFrameMaterial
+      const outerTop = new THREE.Mesh(
+        new THREE.BoxGeometry(windowWidth + outerFrameThickness * 2, outerFrameThickness, outerFrameThickness),
+        frameMaterial
       );
-      topFrame.position.y = windowHeight / 2;
-      windowGroup.add(topFrame);
+      outerTop.position.y = windowHeight / 2 + outerFrameThickness / 2;
+      outerTop.castShadow = true;
+      glassGroup.add(outerTop);
 
-      const bottomFrame = new THREE.Mesh(
-        new THREE.BoxGeometry(windowWidth + frameThickness * 2, frameThickness, frameThickness),
-        windowFrameMaterial
+      const outerBottom = new THREE.Mesh(
+        new THREE.BoxGeometry(windowWidth + outerFrameThickness * 2, outerFrameThickness, outerFrameThickness),
+        frameMaterial
       );
-      bottomFrame.position.y = -windowHeight / 2;
-      windowGroup.add(bottomFrame);
+      outerBottom.position.y = -windowHeight / 2 - outerFrameThickness / 2;
+      outerBottom.castShadow = true;
+      glassGroup.add(outerBottom);
 
-      const leftFrame = new THREE.Mesh(
-        new THREE.BoxGeometry(frameThickness, windowHeight, frameThickness),
-        windowFrameMaterial
+      const outerLeft = new THREE.Mesh(
+        new THREE.BoxGeometry(outerFrameThickness, windowHeight + outerFrameThickness * 2, outerFrameThickness),
+        frameMaterial
       );
-      leftFrame.position.x = -windowWidth / 2;
-      windowGroup.add(leftFrame);
+      outerLeft.position.x = -windowWidth / 2 - outerFrameThickness / 2;
+      outerLeft.castShadow = true;
+      glassGroup.add(outerLeft);
 
-      const rightFrame = new THREE.Mesh(
-        new THREE.BoxGeometry(frameThickness, windowHeight, frameThickness),
-        windowFrameMaterial
+      const outerRight = new THREE.Mesh(
+        new THREE.BoxGeometry(outerFrameThickness, windowHeight + outerFrameThickness * 2, outerFrameThickness),
+        frameMaterial
       );
-      rightFrame.position.x = windowWidth / 2;
-      windowGroup.add(rightFrame);
+      outerRight.position.x = windowWidth / 2 + outerFrameThickness / 2;
+      outerRight.castShadow = true;
+      glassGroup.add(outerRight);
+
+      const mullionV = new THREE.Mesh(
+        new THREE.BoxGeometry(innerMullionThickness, windowHeight, outerFrameThickness),
+        frameMaterial
+      );
+      mullionV.position.x = 0;
+      mullionV.position.z = outerFrameThickness / 2 - 0.01;
+      mullionV.castShadow = true;
+      glassGroup.add(mullionV);
+
+      const mullionH = new THREE.Mesh(
+        new THREE.BoxGeometry(windowWidth, innerMullionThickness, outerFrameThickness),
+        frameMaterial
+      );
+      mullionH.position.y = 0;
+      mullionH.position.z = outerFrameThickness / 2 - 0.01;
+      mullionH.castShadow = true;
+      glassGroup.add(mullionH);
+
+      for (let quadrant = 0; quadrant < 4; quadrant++) {
+        const quadX = quadrant % 2 === 0 ? -windowWidth / 4 : windowWidth / 4;
+        const quadY = quadrant < 2 ? windowHeight / 4 : -windowHeight / 4;
+
+        const glassPane = new THREE.Mesh(
+          new THREE.BoxGeometry(windowWidth / 2 - innerMullionThickness, windowHeight / 2 - innerMullionThickness, glassThickness),
+          windowGlassMaterial
+        );
+        glassPane.position.set(quadX, quadY, 0);
+        glassGroup.add(glassPane);
+      }
+
+      const sill = new THREE.Mesh(
+        new THREE.BoxGeometry(windowWidth + outerFrameThickness * 2 + 0.2, 0.1, 0.4),
+        windowSillMaterial
+      );
+      sill.position.set(0, -windowHeight / 2 - outerFrameThickness - 0.05, 0.2);
+      sill.castShadow = true;
+      sill.receiveShadow = true;
+      windowGroup.add(sill);
+
+      const sillFront = new THREE.Mesh(
+        new THREE.BoxGeometry(windowWidth + outerFrameThickness * 2 + 0.2, 0.05, 0.05),
+        frameMaterial
+      );
+      sillFront.position.set(0, -windowHeight / 2 - outerFrameThickness - 0.125, 0.425);
+      sillFront.castShadow = true;
+      windowGroup.add(sillFront);
+
+      windowGroup.add(glassGroup);
 
       windowGroup.position.set(x, y, z);
       windowGroup.rotation.y = rotY;
       return windowGroup;
     };
 
-    windows.add(createWindow(-2.5, 3.5, -4.95, 0));
-    windows.add(createWindow(2.5, 3.5, -4.95, 0));
+    windows.add(createWindow(-2.5, 3.5, -4.9, 0));
+    windows.add(createWindow(2.5, 3.5, -4.9, 0));
 
     return windows;
   }
