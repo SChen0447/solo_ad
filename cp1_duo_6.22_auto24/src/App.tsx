@@ -16,6 +16,7 @@ const App: React.FC = () => {
   const [playbackSpeed, setPlaybackSpeed] = useState(1);
   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
   const [deletingNoteIds, setDeletingNoteIds] = useState<Set<string>>(new Set());
+  const [metronomeEnabled, setMetronomeEnabled] = useState(true);
 
   const engineRef = useRef<PlaybackEngine>(new PlaybackEngine());
   const pauseOffsetRef = useRef(0);
@@ -125,6 +126,14 @@ const App: React.FC = () => {
     setSelectedDuration(duration);
   }, []);
 
+  const handleMetronomeToggle = useCallback(() => {
+    setMetronomeEnabled(prev => {
+      const next = !prev;
+      engineRef.current.setMetronomeEnabled(next);
+      return next;
+    });
+  }, []);
+
   return (
     <div className="app-container">
       <SheetCanvas
@@ -132,6 +141,7 @@ const App: React.FC = () => {
         selectedDuration={selectedDuration}
         playbackTime={playbackTime}
         isPlaying={isPlaying}
+        metronomeEnabled={metronomeEnabled}
         onAddNote={handleAddNote}
         onMoveNote={handleMoveNote}
         onSelectNote={handleSelectNote}
@@ -142,6 +152,8 @@ const App: React.FC = () => {
         onDurationChange={handleDurationChange}
         isPlaying={isPlaying}
         playbackSpeed={playbackSpeed}
+        metronomeEnabled={metronomeEnabled}
+        onMetronomeToggle={handleMetronomeToggle}
         onPlay={handlePlay}
         onPause={handlePause}
         onStop={handleStop}

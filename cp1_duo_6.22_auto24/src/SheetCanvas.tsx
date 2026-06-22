@@ -19,6 +19,7 @@ interface SheetCanvasProps {
   selectedDuration: NoteDuration;
   playbackTime: number;
   isPlaying: boolean;
+  metronomeEnabled: boolean;
   onAddNote: (pitch: number, startTime: number, duration: number) => void;
   onMoveNote: (id: string, pitch: number, startTime: number) => void;
   onSelectNote: (id: string | null) => void;
@@ -51,7 +52,7 @@ function xToTime(x: number, canvasWidth: number): number {
   return Math.max(0, Math.min(TOTAL_BEATS - TIME_GRID, time));
 }
 
-function drawStaff(ctx: CanvasRenderingContext2D, width: number, height: number) {
+function drawStaff(ctx: CanvasRenderingContext2D, width: number, height: number, metronomeEnabled: boolean) {
   ctx.strokeStyle = '#e94560';
   ctx.lineWidth = 1.5;
 
@@ -88,6 +89,17 @@ function drawStaff(ctx: CanvasRenderingContext2D, width: number, height: number)
   ctx.moveTo(width - 40, STAFF_TOP_MARGIN);
   ctx.lineTo(width - 40, STAFF_TOP_MARGIN + STAFF_LINE_SPACING * 4);
   ctx.stroke();
+
+  if (metronomeEnabled) {
+    ctx.fillStyle = 'rgba(233, 69, 96, 0.3)';
+    const dotY = STAFF_TOP_MARGIN - 8;
+    for (let m = 0; m <= 4; m++) {
+      const x = STAFF_LEFT_MARGIN + ((width - STAFF_LEFT_MARGIN - 40) * m) / 4;
+      ctx.beginPath();
+      ctx.arc(x, dotY, 4, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
 }
 
 function drawLedgerLines(ctx: CanvasRenderingContext2D, pitch: number, x: number, width: number) {
@@ -197,6 +209,7 @@ const SheetCanvas: React.FC<SheetCanvasProps> = ({
   selectedDuration,
   playbackTime,
   isPlaying,
+  metronomeEnabled,
   onAddNote,
   onMoveNote,
   onSelectNote,
@@ -283,7 +296,7 @@ const SheetCanvas: React.FC<SheetCanvasProps> = ({
     ctx.fillStyle = 'rgba(22, 33, 62, 0.3)';
     ctx.fillRect(0, 0, displayWidth, displayHeight);
 
-    drawStaff(ctx, displayWidth, displayHeight);
+    drawStaff(ctx, displayWidth, displayHeight, metronomeEnabled);
 
     const now = performance.now();
     const animatingIds: string[] = [];
@@ -334,7 +347,7 @@ const SheetCanvas: React.FC<SheetCanvasProps> = ({
     }
 
     animFrameRef.current = requestAnimationFrame(render);
-  }, [canvasSize, notes, playbackTime, isPlaying, deletingNoteIds]);
+  }, [canvasSize, notes, playbackTime, isPlaying, metronomeEnabled, deletingNoteIds]);
 
   useEffect(() => {
     animFrameRef.current = requestAnimationFrame(render);

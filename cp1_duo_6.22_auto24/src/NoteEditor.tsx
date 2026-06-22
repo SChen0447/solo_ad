@@ -6,6 +6,8 @@ interface NoteEditorProps {
   onDurationChange: (duration: NoteDuration) => void;
   isPlaying: boolean;
   playbackSpeed: number;
+  metronomeEnabled: boolean;
+  onMetronomeToggle: () => void;
   onPlay: () => void;
   onPause: () => void;
   onStop: () => void;
@@ -102,6 +104,8 @@ const NoteEditor: React.FC<NoteEditorProps> = ({
   onDurationChange,
   isPlaying,
   playbackSpeed,
+  metronomeEnabled,
+  onMetronomeToggle,
   onPlay,
   onPause,
   onStop,
@@ -151,6 +155,16 @@ const NoteEditor: React.FC<NoteEditorProps> = ({
                 </button>
               ))}
             </div>
+          </div>
+          <div>
+            <h3 style={{ fontSize: '11px', marginBottom: '8px' }}>节拍器</h3>
+            <button
+              className={`speed-btn ${metronomeEnabled ? 'active' : ''}`}
+              onClick={onMetronomeToggle}
+              style={{ width: '100%' }}
+            >
+              {metronomeEnabled ? '🔔 已开启' : '🔕 已关闭'}
+            </button>
           </div>
         </div>
       </div>

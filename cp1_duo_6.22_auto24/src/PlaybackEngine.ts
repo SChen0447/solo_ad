@@ -30,6 +30,12 @@ export interface PlaybackState {
   speed: number;
 }
 
+const BEATS_PER_MEASURE = 4;
+const TOTAL_MEASURES = 4;
+const METRONOME_FREQUENCY = 2000;
+const METRONOME_DURATION = 0.05;
+const METRONOME_VOLUME = 0.18;
+
 export class PlaybackEngine {
   private audioCtx: AudioContext | null = null;
   private scheduledNodes: OscillatorNode[] = [];
@@ -45,6 +51,7 @@ export class PlaybackEngine {
   private currentNotes: Note[] = [];
   private playedNoteIds: Set<string> = new Set();
   private activeNoteIds: Set<string> = new Set();
+  private metronomeEnabled: boolean = true;
 
   private ensureContext() {
     if (!this.audioCtx) {
@@ -82,6 +89,9 @@ export class PlaybackEngine {
     this.playStartTime = ctx.currentTime - startOffset / speed;
 
     this.scheduleAllNotes();
+    if (this.metronomeEnabled) {
+      this.scheduleMetronome();
+    }
     this.startProgressLoop();
   }
 
@@ -133,6 +143,55 @@ export class PlaybackEngine {
         };
       } catch {
         // ignore scheduling errors
+      }
+    }
+  }
+
+  private scheduleMetronome() {
+    const ctx = this.audioCtx!;
+    const beatDuration = 60 / 120;
+
+    for (let m = 0; m <= TOTAL_MEASURES; m++) {
+      const measureBeat = m * BEATS_PER_MEASURE;
+      const clickStartSec = measureBeat * beatDuration / this.speed;
+      const clickDelay = Math.max(0, clickStartSec - this.playOffset / this.speed);
+
+      if (clickDelay < 0 || clickDelay > (TOTAL_MEASURES * BEATS_PER_MEASURE * beatDuration / this.speed)) {
+        continue;
+      }
+
+      const actualStart = ctx.currentTime + clickDelay;
+      const actualDuration = METRONOME_DURATION;
+
+      try {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+
+        osc.type = 'square';
+        osc.frequency.value = METRONOME_FREQUENCY;
+
+        const attackTime = 0.002;
+        const releaseTime = 0.005;
+
+        gain.gain.setValueAtTime(0, actualStart);
+        gain.gain.linearRampToValueAtTime(METRONOME_VOLUME, actualStart + attackTime);
+        gain.gain.setValueAtTime(METRONOME_VOLUME, actualStart + actualDuration - releaseTime);
+        gain.gain.linearRampToValueAtTime(0, actualStart + actualDuration);
+
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+
+        osc.start(actualStart);
+        osc.stop(actualStart + actualDuration + 0.005);
+
+        this.scheduledNodes.push(osc);
+
+        osc.onended = () => {
+          const idx = this.scheduledNodes.indexOf(osc);
+          if (idx > -1) this.scheduledNodes.splice(idx, 1);
+        };
+      } catch {
+        // ignore
       }
     }
   }
@@ -243,5 +302,13 @@ export class PlaybackEngine {
 
   getIsPlaying(): boolean {
     return this.isPlaying;
+  }
+
+  setMetronomeEnabled(enabled: boolean) {
+    this.metronomeEnabled = enabled;
+  }
+
+  getMetronomeEnabled(): boolean {
+    return this.metronomeEnabled;
   }
 }
