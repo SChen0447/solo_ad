@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>星系碰撞可视化模拟器</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background-color: #0a0a2e;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      color: #ffffff;
+    }
+    #app {
+      width: 100vw;
+      height: 100vh;
+      position: relative;
+    }
+    #control-panel {
+      position: absolute;
+      bottom: 24px;
+      right: 24px;
+      width: 320px;
+      padding: 20px;
+      border-radius: 16px;
+      background: rgba(255, 255, 255, 0.1);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+      z-index: 10;
+    }
+    #control-panel h2 {
+      font-size: 16px;
+      font-weight: 600;
+      margin-bottom: 16px;
+      color: #a5b4fc;
+      letter-spacing: 0.5px;
+    }
+    .control-group {
+      margin-bottom: 16px;
+    }
+    .control-label {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+      font-size: 13px;
+      color: #c7d2fe;
+    }
+    .control-value {
+      font-weight: 600;
+      color: #818cf8;
+    }
+    input[type="range"] {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 100%;
+      height: 8px;
+      border-radius: 4px;
+      background: linear-gradient(90deg, #312e81, #7c3aed, #c026d3);
+      outline: none;
+      cursor: pointer;
+    }
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: #ffffff;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4), 0 0 12px rgba(139, 92, 246, 0.6);
+      cursor: pointer;
+      transition: transform 0.15s ease, box-shadow 0.15s ease;
+    }
+    input[type="range"]::-webkit-slider-thumb:hover {
+      transform: scale(1.1);
+      box-shadow: 0 2px 12px rgba(0, 0, 0, 0.5), 0 0 16px rgba(139, 92, 246, 0.8);
+    }
+    input[type="range"]::-moz-range-thumb {
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: #ffffff;
+      border: none;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4), 0 0 12px rgba(139, 92, 246, 0.6);
+      cursor: pointer;
+      transition: transform 0.15s ease, box-shadow 0.15s ease;
+    }
+    input[type="range"]::-moz-range-thumb:hover {
+      transform: scale(1.1);
+      box-shadow: 0 2px 12px rgba(0, 0, 0, 0.5), 0 0 16px rgba(139, 92, 246, 0.8);
+    }
+    #pause-btn {
+      width: 100%;
+      padding: 12px 20px;
+      margin-top: 8px;
+      border: none;
+      border-radius: 10px;
+      font-size: 14px;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+      color: #ffffff;
+      background: linear-gradient(135deg, #6366f1, #8b5cf6);
+      cursor: pointer;
+      transition: all 0.2s ease;
+      box-shadow: 0 4px 14px rgba(99, 102, 241, 0.4);
+    }
+    #pause-btn:hover {
+      background: linear-gradient(135deg, #4f46e5, #7c3aed);
+      box-shadow: 0 6px 20px rgba(99, 102, 241, 0.5);
+      transform: translateY(-1px);
+    }
+    #pause-btn:active {
+      transform: translateY(1px);
+      box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.3), 0 2px 8px rgba(99, 102, 241, 0.3);
+    }
+    #pause-btn.paused {
+      background: linear-gradient(135deg, #059669, #10b981);
+      box-shadow: 0 4px 14px rgba(16, 185, 129, 0.4);
+    }
+    #pause-btn.paused:hover {
+      background: linear-gradient(135deg, #047857, #059669);
+      box-shadow: 0 6px 20px rgba(16, 185, 129, 0.5);
+    }
+    #density-label {
+      position: absolute;
+      top: 24px;
+      left: 24px;
+      padding: 12px 18px;
+      border-radius: 10px;
+      background: rgba(255, 255, 255, 0.1);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      font-size: 13px;
+      color: #c7d2fe;
+      z-index: 10;
+      display: none;
+    }
+    #density-label .value {
+      color: #f472b6;
+      font-weight: 600;
+      margin-left: 6px;
+    }
+    #instructions {
+      position: absolute;
+      top: 24px;
+      right: 24px;
+      padding: 12px 18px;
+      border-radius: 10px;
+      background: rgba(255, 255, 255, 0.1);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      font-size: 12px;
+      color: #a5b4fc;
+      z-index: 10;
+      line-height: 1.8;
+    }
+    #instructions strong {
+      color: #c7d2fe;
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <div id="instructions">
+      <strong>操作说明：</strong><br/>
+      🖱️ 左键拖拽：旋转视角<br/>
+      🖱️ 右键拖拽：平移视角<br/>
+      🖱️ 滚轮：缩放<br/>
+      🖱️ 悬停：显示粒子密度<br/>
+      ⌨️ 空格：暂停 / 恢复
+    </div>
+    <div id="density-label">
+      粒子密度：<span class="value" id="density-value">0</span> / 区域
+    </div>
+    <div id="control-panel">
+      <h2>🌌 控制面板</h2>
+      <div class="control-group">
+        <div class="control-label">
+          <span>引力常数 G</span>
+          <span class="control-value" id="g-value">0.10</span>
+        </div>
+        <input type="range" id="g-slider" min="0.01" max="0.5" step="0.01" value="0.1" />
+      </div>
+      <div class="control-group">
+        <div class="control-label">
+          <span>初始距离</span>
+          <span class="control-value" id="dist-value">12.0</span>
+        </div>
+        <input type="range" id="dist-slider" min="5" max="20" step="0.5" value="12" />
+      </div>
+      <button id="pause-btn">⏸ 暂停模拟</button>
+    </div>
+  </div>
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
