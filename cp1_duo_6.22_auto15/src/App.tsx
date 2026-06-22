@@ -52,11 +52,11 @@ export default function App() {
     setTimeout(() => setToast(null), 2000)
   }, [])
 
-  const loadData = useCallback(async () => {
-    setLoading(true)
+  const loadData = useCallback(async (showLoading = true) => {
+    if (showLoading) setLoading(true)
     try {
       const [c, t] = await Promise.all([
-        fetchCards(debouncedSearch, activeTag),
+        fetchCards(debouncedSearch),
         fetchTags(),
       ])
       setCards(c)
@@ -66,16 +66,31 @@ export default function App() {
     } finally {
       setLoading(false)
     }
-  }, [debouncedSearch, activeTag, showToast])
+  }, [debouncedSearch, showToast])
+
+  const isInitialLoad = useRef(true)
 
   useEffect(() => {
-    loadData()
+    if (isInitialLoad.current) {
+      loadData(true)
+      isInitialLoad.current = false
+    } else {
+      loadData(false)
+    }
   }, [loadData])
 
   const dueCount = useMemo(() => {
     const now = Date.now()
     return cards.filter(c => c.nextReviewAt <= now).length
   }, [cards])
+
+  const filteredCards = useMemo(() => {
+    if (!activeTag) return cards
+    const keyword = activeTag.toLowerCase()
+    return cards.filter(c =>
+      c.tags.some(tag => tag.toLowerCase().includes(keyword))
+    )
+  }, [cards, activeTag])
 
   const handleNewCard = () => {
     setEditingCard(null)
@@ -194,7 +209,7 @@ export default function App() {
               onStartReview={() => setView('review')}
             />
             <CardList
-              cards={cards}
+              cards={filteredCards}
               onEditCard={handleEditCard}
               onDeleteCard={handleDeleteCard}
               loading={loading}

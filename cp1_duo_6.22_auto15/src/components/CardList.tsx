@@ -1,10 +1,22 @@
-import { Card, formatDate, renderMarkdownSimple } from '../api'
+import { Card, formatDate } from '../api'
 
 interface Props {
   cards: Card[]
   onEditCard: (card: Card) => void
   onDeleteCard: (id: string) => void
   loading: boolean
+}
+
+function stripMarkdown(text: string): string {
+  return text
+    .replace(/^#{1,6}\s+/gm, '')
+    .replace(/\*\*\*(.*?)\*\*\*/g, '$1')
+    .replace(/\*\*(.*?)\*\*/g, '$1')
+    .replace(/\*(.*?)\*/g, '$1')
+    .replace(/`([^`]+)`/g, '$1')
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+    .replace(/\n+/g, ' ')
+    .trim()
 }
 
 function CardItem({
@@ -19,7 +31,10 @@ function CardItem({
   onDelete: () => void
 }) {
   const isDue = card.nextReviewAt <= Date.now()
-  const previewHtml = renderMarkdownSimple(card.content.slice(0, 200) + (card.content.length > 200 ? '...' : ''))
+  const plainContent = stripMarkdown(card.content)
+  const summary = plainContent.length > 50
+    ? plainContent.slice(0, 50) + '…'
+    : plainContent
 
   return (
     <div
@@ -31,10 +46,7 @@ function CardItem({
       <div className="card-header">
         <h3 className="card-title" title={card.title}>{card.title}</h3>
       </div>
-      <div
-        className="card-content-preview"
-        dangerouslySetInnerHTML={{ __html: previewHtml }}
-      />
+      {summary && <p className="card-summary">{summary}</p>}
       <div className="card-footer">
         <div className="card-tags">
           {card.tags.map((tag, i) => (

@@ -462,6 +462,19 @@ html, body {
   line-height: 1.6;
 }
 
+.card-summary {
+  flex: 1;
+  overflow: hidden;
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.6;
+  margin: 0;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
 .card-content-preview :global(h1),
 .card-content-preview h1,
 .card-content-preview h2,
