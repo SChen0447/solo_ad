@@ -41,6 +41,13 @@ export class ClayEditor {
   private lastFrameTime = 0;
   private frameCount = 0;
   private fps = 60;
+  private currentMouseX = 0;
+  private currentMouseY = 0;
+  private currentSpeed = 0;
+  private rippleFadeStart = 0;
+  private rippleWasActive = false;
+  private isHovering = false;
+  private hoverStartTime = 0;
 
   constructor(container: HTMLElement) {
     this.canvas = document.createElement('canvas');
@@ -94,17 +101,29 @@ export class ClayEditor {
       this.lastMouseX = pos.x;
       this.lastMouseY = pos.y;
       this.lastMoveTime = performance.now();
+      this.currentMouseX = pos.x;
+      this.currentMouseY = pos.y;
+      this.currentSpeed = 0;
     };
 
     const onMove = (e: MouseEvent | TouchEvent) => {
+      const pos = getMousePos(e);
+      this.currentMouseX = pos.x;
+      this.currentMouseY = pos.y;
+
+      if (!this.isHovering) {
+        this.isHovering = true;
+        this.hoverStartTime = performance.now();
+      }
+
       if (!this.isDragging) return;
       e.preventDefault();
-      const pos = getMousePos(e);
       const now = performance.now();
       const dt = Math.max(1, now - this.lastMoveTime);
       const dx = pos.x - this.lastMouseX;
       const dy = pos.y - this.lastMouseY;
       const speed = Math.sqrt(dx * dx + dy * dy) / dt;
+      this.currentSpeed = speed;
       this.applyDeformation(pos.x, pos.y, speed);
       this.lastMouseX = pos.x;
       this.lastMouseY = pos.y;
@@ -114,7 +133,12 @@ export class ClayEditor {
     };
 
     const onUp = () => {
+      if (this.isDragging) {
+        this.rippleFadeStart = performance.now();
+        this.rippleWasActive = true;
+      }
       this.isDragging = false;
+      this.currentSpeed = 0;
       this.notifyDataChange();
     };
 
@@ -124,6 +148,10 @@ export class ClayEditor {
     this.canvas.addEventListener('touchstart', onDown, { passive: false });
     this.canvas.addEventListener('touchmove', onMove, { passive: false });
     this.canvas.addEventListener('touchend', onUp);
+
+    this.canvas.addEventListener('mouseleave', () => {
+      this.isHovering = false;
+    });
   }
 
   private applyDeformation(mouseX: number, mouseY: number, speed: number): void {
@@ -192,7 +220,9 @@ export class ClayEditor {
     this.drawBody(ctx, centerX);
     this.drawHighlight(ctx, centerX);
     this.drawEdgeLines(ctx, centerX);
+    this.drawRipple(ctx);
     ctx.restore();
+    this.drawToolIndicator(ctx);
   }
 
   private drawBody(ctx: CanvasRenderingContext2D, centerX: number): void {
@@ -306,6 +336,154 @@ export class ClayEditor {
     }
     ctx.closePath();
     ctx.stroke();
+  }
+
+  private drawRipple(ctx: CanvasRenderingContext2D): void {
+    const now = performance.now();
+    let alpha = 0;
+    let radius = 0;
+    const speedFactor = Math.min(1, this.currentSpeed * 3);
+
+    if (this.isDragging && speedFactor > 0.02) {
+      alpha = 0.15 + speedFactor * 0.35;
+      radius = this.brushRadius * 0.6 + speedFactor * this.brushRadius * 1.2;
+      this.rippleWasActive = true;
+    } else if (this.rippleWasActive && this.rippleFadeStart > 0) {
+      const fadeElapsed = now - this.rippleFadeStart;
+      const fadeDuration = 200;
+      if (fadeElapsed < fadeDuration) {
+        const fadeT = 1 - fadeElapsed / fadeDuration;
+        alpha = fadeT * 0.3;
+        radius = (this.brushRadius * 0.6 + this.brushRadius * 1.2) + fadeElapsed * 0.15;
+      } else {
+        this.rippleWasActive = false;
+        this.rippleFadeStart = 0;
+        return;
+      }
+    } else {
+      return;
+    }
+
+    if (alpha <= 0.01 || radius <= 1) return;
+
+    const x = this.currentMouseX;
+    const y = this.currentMouseY;
+    const safeRadius = Math.max(1, radius);
+
+    const rippleGrad = ctx.createRadialGradient(x, y, 0, x, y, safeRadius);
+    rippleGrad.addColorStop(0, `rgba(255, 255, 255, ${alpha * 0.6})`);
+    rippleGrad.addColorStop(0.3, `rgba(255, 255, 255, ${alpha * 0.35})`);
+    rippleGrad.addColorStop(0.6, `rgba(255, 255, 255, ${alpha * 0.15})`);
+    rippleGrad.addColorStop(0.85, `rgba(255, 255, 255, ${alpha * 0.05})`);
+    rippleGrad.addColorStop(1, `rgba(255, 255, 255, 0)`);
+
+    ctx.fillStyle = rippleGrad;
+    ctx.beginPath();
+    ctx.arc(x, y, safeRadius, 0, Math.PI * 2);
+    ctx.fill();
+
+    if (this.isDragging && speedFactor > 0.05) {
+      const ringAlpha = alpha * 0.5;
+      ctx.strokeStyle = `rgba(255, 255, 255, ${ringAlpha})`;
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.arc(x, y, safeRadius * 0.7, 0, Math.PI * 2);
+      ctx.stroke();
+
+      if (speedFactor > 0.3) {
+        const outerRingAlpha = alpha * 0.25;
+        ctx.strokeStyle = `rgba(255, 255, 255, ${outerRingAlpha})`;
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.arc(x, y, safeRadius, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+    }
+  }
+
+  private drawToolIndicator(ctx: CanvasRenderingContext2D): void {
+    const now = performance.now();
+    const hoverElapsed = this.isHovering ? now - this.hoverStartTime : 0;
+    const indicatorVisible = this.isHovering && hoverElapsed > 300;
+    if (!indicatorVisible && !this.isDragging) return;
+
+    let alpha: number;
+    if (this.isDragging) {
+      alpha = 0.85;
+    } else if (indicatorVisible) {
+      const fadeIn = Math.min(1, (hoverElapsed - 300) / 200);
+      alpha = fadeIn * 0.75;
+    } else {
+      return;
+    }
+
+    const isPinch = this.toolMode === 'pinch';
+    const icon = isPinch ? '✋' : '👐';
+    const label = isPinch ? '挤压' : '拉伸';
+    const accentColor = isPinch ? 'rgba(212, 139, 76,' : 'rgba(90, 158, 111,';
+
+    const padding = 10;
+    const iconSize = 16;
+    const fontSize = 13;
+    const barWidth = 30;
+    const barHeight = 4;
+    const totalWidth = iconSize + 6 + fontSize * 2.2 + 8 + barWidth + padding * 2;
+    const totalHeight = iconSize + padding * 2 + barHeight + 6;
+    const x = 14;
+    const y = CANVAS_HEIGHT - totalHeight - 14;
+
+    ctx.save();
+    ctx.globalAlpha = alpha;
+
+    const cornerRadius = 10;
+    ctx.fillStyle = `rgba(60, 40, 25, 0.55)`;
+    ctx.beginPath();
+    ctx.moveTo(x + cornerRadius, y);
+    ctx.lineTo(x + totalWidth - cornerRadius, y);
+    ctx.quadraticCurveTo(x + totalWidth, y, x + totalWidth, y + cornerRadius);
+    ctx.lineTo(x + totalWidth, y + totalHeight - cornerRadius);
+    ctx.quadraticCurveTo(x + totalWidth, y + totalHeight, x + totalWidth - cornerRadius, y + totalHeight);
+    ctx.lineTo(x + cornerRadius, y + totalHeight);
+    ctx.quadraticCurveTo(x, y + totalHeight, x, y + totalHeight - cornerRadius);
+    ctx.lineTo(x, y + cornerRadius);
+    ctx.quadraticCurveTo(x, y, x + cornerRadius, y);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.strokeStyle = `${accentColor}0.4)`;
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    ctx.font = `${iconSize}px sans-serif`;
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = '#fff';
+    ctx.fillText(icon, x + padding, y + padding + iconSize / 2 - 3);
+
+    ctx.font = `600 ${fontSize}px "PingFang SC", "Microsoft YaHei", sans-serif`;
+    ctx.fillStyle = '#fff';
+    ctx.fillText(label, x + padding + iconSize + 6, y + padding + iconSize / 2 - 3);
+
+    const barX = x + padding + iconSize + 6 + fontSize * 2.2 + 2;
+    const barY = y + padding + iconSize / 2 - barHeight / 2 - 3;
+    const safeBarW = Math.max(1, barWidth);
+    const safeBarH = Math.max(1, barHeight);
+
+    ctx.fillStyle = 'rgba(255,255,255,0.2)';
+    ctx.beginPath();
+    ctx.roundRect(barX, barY, safeBarW, safeBarH, 2);
+    ctx.fill();
+
+    const speedFill = Math.min(1, this.currentSpeed * 3);
+    const fillW = Math.max(1, safeBarW * speedFill);
+    const fillGrad = ctx.createLinearGradient(barX, 0, barX + safeBarW, 0);
+    fillGrad.addColorStop(0, `${accentColor}0.9)`);
+    fillGrad.addColorStop(1, `${accentColor}0.5)`);
+    ctx.fillStyle = fillGrad;
+    ctx.beginPath();
+    ctx.roundRect(barX, barY, fillW, safeBarH, 2);
+    ctx.fill();
+
+    ctx.restore();
   }
 
   private animate = (): void => {
