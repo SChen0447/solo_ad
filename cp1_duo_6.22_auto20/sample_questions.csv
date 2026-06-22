@@ -1,0 +1,31 @@
+题目,选项A,选项B,选项C,选项D,正确答案,知识点,难度
+JavaScript中哪个方法可以将字符串转换为整数?,parseInt(),parseFloat(),toString(),valueOf(),A,JavaScript基础,简单
+以下哪个不是JavaScript的基本数据类型?,string,number,array,boolean,C,JavaScript基础,简单
+CSS中用于设置元素背景颜色的属性是?,color,background-color,font-color,bg-color,B,CSS基础,简单
+React中用于管理组件状态的Hook是?,useEffect,useState,useContext,useRef,B,React基础,简单
+以下哪个是正确的HTML5 DOCTYPE声明?,<!DOCTYPE html>,<DOCTYPE html>,<?DOCTYPE html>,<html !doctype>,A,HTML基础,简单
+HTTP状态码404表示什么?,服务器错误,未授权,页面未找到,请求成功,C,计算机网络,中等
+以下哪个不是React生命周期方法?,componentDidMount,componentWillUnmount,useState,componentDidUpdate,C,React基础,中等
+Promise的三种状态不包括以下哪个?,pending,fulfilled,rejected,completed,D,JavaScript进阶,中等
+CSS Flexbox中用于设置主轴对齐方式的属性是?,align-items,justify-content,flex-direction,flex-wrap,B,CSS进阶,中等
+TypeScript中用于定义接口的关键字是?,type,interface,class,struct,B,TypeScript基础,中等
+以下哪个不是HTTP请求方法?,GET,POST,PUT,SEND,D,计算机网络,中等
+React中useEffect的依赖数组为空数组时表示?,每次渲染都执行,仅在挂载时执行,仅在卸载时执行,永不执行,B,React进阶,中等
+闭包的主要用途不包括以下哪个?,封装私有变量,延长变量生命周期,提高代码执行速度,实现模块化,C,JavaScript进阶,困难
+以下哪个是React高阶组件(HOC)的正确描述?,接收组件并返回新组件的函数,一个特殊的DOM元素,只能用于类组件,必须以use开头命名,A,React进阶,困难
+CSS中BFC(块级格式化上下文)的触发条件不包括?,overflow: hidden,display: inline,position: absolute,float: left,B,CSS进阶,困难
+TypeScript中联合类型使用哪个符号表示?,&,|,!,?,B,TypeScript进阶,中等
+以下哪种排序算法的平均时间复杂度是O(n log n)?,冒泡排序,选择排序,快速排序,插入排序,C,数据结构与算法,困难
+请填写JavaScript中用于声明常量的关键字:,const,JavaScript基础,简单
+React中用于性能优化、缓存计算结果的Hook是______,useMemo,React进阶,中等
+请填写HTTP协议默认的端口号:______,80,计算机网络,简单
+CSS中设置元素透明度的属性是______,opacity,CSS基础,简单
+TypeScript中用于类型断言的关键字是______,as,TypeScript基础,中等
+Node.js中用于创建HTTP服务器的核心模块是______,http,Node.js基础,中等
+Git中用于查看提交历史的命令是______,git log,Git版本控制,简单
+请填写ES6中用于解构赋值的符号,用英文逗号分隔左右两侧的符号:,[]和{},JavaScript进阶,困难
+Vue.js中用于双向数据绑定的指令是______,v-model,Vue.js基础,简单
+以下哪个不是前端构建工具?,Webpack,Vite,Gulp,Express,D,前端工程化,中等
+SSR(服务端渲染)的主要优势不包括?,更好的SEO,更快的首屏加载,更简单的开发,更好的用户体验,C,前端工程化,困难
+请填写HTML中用于定义元数据的标签:______,meta,HTML基础,简单
+JavaScript中______方法可以将数组转换为字符串,用逗号分隔,join,JavaScript基础,中等
