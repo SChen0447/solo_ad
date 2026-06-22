@@ -24,6 +24,11 @@ function ProductManager({ products, onProductsChange, delay = 0 }: ProductManage
   })
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState('')
+  const [imageErrors, setImageErrors] = useState<Set<string>>(new Set())
+
+  const handleImageError = (productId: string) => {
+    setImageErrors(prev => new Set(prev).add(productId))
+  }
 
   const filteredProducts = useMemo(() => {
     let result = [...products]
@@ -82,6 +87,11 @@ function ProductManager({ products, onProductsChange, delay = 0 }: ProductManage
     if (!confirm('确定要删除这个商品吗？')) return
     try {
       await productApi.delete(id)
+      setImageErrors(prev => {
+        const next = new Set(prev)
+        next.delete(id)
+        return next
+      })
       onProductsChange()
     } catch (err) {
       console.error('删除商品失败:', err)
@@ -117,6 +127,11 @@ function ProductManager({ products, onProductsChange, delay = 0 }: ProductManage
           description: formData.description,
           imageUrl: formData.imageUrl,
         })
+        setImageErrors(prev => {
+          const next = new Set(prev)
+          next.delete(editingProduct.id)
+          return next
+        })
       } else {
         await productApi.create({
           name: formData.name,
@@ -149,19 +164,21 @@ function ProductManager({ products, onProductsChange, delay = 0 }: ProductManage
       </div>
 
       <div style={toolbarStyle}>
-        <div style={searchBoxStyle}>
+        <div className="search-box" style={searchBoxStyle}>
           <span style={{ color: '#9CA3AF' }}>🔍</span>
           <input
             type="text"
             placeholder="搜索商品名称..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
+            className="search-input"
             style={searchInputStyle}
           />
         </div>
         <select
           value={sortType}
           onChange={(e) => setSortType(e.target.value as SortType)}
+          className="sort-select"
           style={sortSelectStyle}
         >
           <option value="default">默认排序</option>
@@ -178,34 +195,43 @@ function ProductManager({ products, onProductsChange, delay = 0 }: ProductManage
             key={product.id}
             className="product-card"
           >
-            <img
-              src={product.imageUrl}
-              alt={product.name}
-              style={cardImageStyle}
-            />
-            <div style={cardContentStyle}>
+            <div className="product-card-image-wrapper">
+              {imageErrors.has(product.id) ? (
+                <div className="product-card-image-placeholder">
+                  <span className="product-card-image-placeholder-icon">🖼️</span>
+                  <span className="product-card-image-placeholder-text">图片加载失败</span>
+                </div>
+              ) : (
+                <img
+                  src={product.imageUrl}
+                  alt={product.name}
+                  className="product-card-image"
+                  onError={() => handleImageError(product.id)}
+                />
+              )}
+            </div>
+            <div className="product-card-content">
               <h3 style={cardTitleStyle} title={product.name}>{product.name}</h3>
               <div style={cardPriceStyle}>¥{product.price}</div>
               <div style={cardStockStyle}>库存: {product.stock} 件</div>
-              <div style={cardActionsStyle}>
+            </div>
+            <div className="product-card-footer">
+              <div className="product-card-actions">
                 <button
-                  style={editButtonStyle}
+                  className="product-card-action-btn edit"
                   onClick={() => handleEditClick(product)}
                 >
                   编辑
                 </button>
                 <button
-                  style={deleteButtonStyle}
+                  className="product-card-action-btn delete"
                   onClick={() => handleDeleteClick(product.id)}
                 >
                   删除
                 </button>
               </div>
               <button
-                style={{
-                  ...quickOrderButtonStyle,
-                  ...(product.stock <= 0 ? quickOrderButtonDisabledStyle : {}),
-                }}
+                className="product-card-quick-order-btn"
                 onClick={() => handleQuickOrder(product)}
                 disabled={product.stock <= 0}
               >
@@ -355,71 +381,17 @@ const toolbarStyle: React.CSSProperties = {
 const searchBoxStyle: React.CSSProperties = {
   flex: 1,
   minWidth: '240px',
-  display: 'flex',
-  alignItems: 'center',
-  gap: '12px',
-  padding: '12px 16px',
-  background: '#FFFFFF',
-  borderRadius: '12px',
-  border: '1px solid #E5E7EB',
   boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)',
 }
 
-const searchInputStyle: React.CSSProperties = {
-  flex: 1,
-  border: 'none',
-  fontSize: '14px',
-  color: '#1F2937',
-  background: 'transparent',
-}
+const searchInputStyle: React.CSSProperties = {}
 
 const sortSelectStyle: React.CSSProperties = {
-  padding: '12px 16px',
-  background: '#FFFFFF',
-  borderRadius: '12px',
-  border: '1px solid #E5E7EB',
-  fontSize: '14px',
-  color: '#1F2937',
-  cursor: 'pointer',
   boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)',
 }
 
 const gridStyle: React.CSSProperties = {
   gap: '24px',
-}
-
-const gridStyleWrapper: React.CSSProperties = {}
-
-const cardStyle: React.CSSProperties = {
-  width: '100%',
-  maxWidth: '240px',
-  height: '340px',
-  background: '#FFFFFF',
-  borderRadius: '16px',
-  border: '1px solid #E5E7EB',
-  boxShadow: '0 4px 8px rgba(0, 0, 0, 0.06)',
-  overflow: 'hidden',
-  transition: 'all 0.3s ease-out',
-  cursor: 'default',
-  justifySelf: 'center',
-  display: 'flex',
-  flexDirection: 'column',
-}
-
-const cardImageStyle: React.CSSProperties = {
-  width: '100%',
-  height: '160px',
-  objectFit: 'cover',
-  borderTopLeftRadius: '16px',
-  borderTopRightRadius: '16px',
-}
-
-const cardContentStyle: React.CSSProperties = {
-  padding: '16px',
-  flex: 1,
-  display: 'flex',
-  flexDirection: 'column',
-  gap: '8px',
 }
 
 const cardTitleStyle: React.CSSProperties = {
@@ -440,51 +412,6 @@ const cardPriceStyle: React.CSSProperties = {
 const cardStockStyle: React.CSSProperties = {
   fontSize: '14px',
   color: '#6B7280',
-}
-
-const cardActionsStyle: React.CSSProperties = {
-  display: 'flex',
-  gap: '8px',
-  marginTop: 'auto',
-}
-
-const editButtonStyle: React.CSSProperties = {
-  flex: 1,
-  padding: '8px',
-  background: '#EFF6FF',
-  color: '#3B82F6',
-  fontSize: '12px',
-  fontWeight: 600,
-  borderRadius: '8px',
-  transition: 'all 0.2s ease-out',
-}
-
-const deleteButtonStyle: React.CSSProperties = {
-  flex: 1,
-  padding: '8px',
-  background: '#FEF2F2',
-  color: '#EF4444',
-  fontSize: '12px',
-  fontWeight: 600,
-  borderRadius: '8px',
-  transition: 'all 0.2s ease-out',
-}
-
-const quickOrderButtonStyle: React.CSSProperties = {
-  width: '100%',
-  padding: '10px',
-  background: 'linear-gradient(135deg, #10B981 0%, #34D399 100%)',
-  color: '#FFFFFF',
-  fontSize: '12px',
-  fontWeight: 600,
-  borderRadius: '8px',
-  transition: 'all 0.2s ease-out',
-  marginTop: '8px',
-}
-
-const quickOrderButtonDisabledStyle: React.CSSProperties = {
-  background: '#D1D5DB',
-  cursor: 'not-allowed',
 }
 
 const emptyStateStyle: React.CSSProperties = {
