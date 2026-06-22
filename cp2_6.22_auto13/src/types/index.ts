@@ -3,6 +3,15 @@ export interface Position {
   y: number;
 }
 
+export type DecorationType = 'pillar' | 'rubble' | 'chest';
+
+export interface Decoration {
+  type: DecorationType;
+  x: number;
+  y: number;
+  size: number;
+}
+
 export interface Room {
   id: string;
   gridX: number;
@@ -14,6 +23,7 @@ export interface Room {
   wallColor: string;
   floorColor: string;
   connections: string[];
+  decorations: Decoration[];
 }
 
 export interface DungeonData {

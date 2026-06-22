@@ -1,4 +1,4 @@
-import type { DungeonData, Room, Corridor, Position } from '../types';
+import type { DungeonData, Room, Corridor, Position, Decoration, DecorationType } from '../types';
 
 const GRID_SIZE = 5;
 const ROOM_WIDTH = 140;
@@ -150,6 +150,77 @@ function generateCorridors(rooms: Room[], connections: Map<string, string[]>): C
   return corridors;
 }
 
+function generateDecorations(
+  room: Room,
+  connections: string[],
+  allRooms: Room[],
+  random: () => number
+): Decoration[] {
+  const decorations: Decoration[] = [];
+  const corridorOpenings: Position[] = [];
+
+  for (const connId of connections) {
+    const connRoom = allRooms.find(r => r.id === connId);
+    if (!connRoom) continue;
+    if (connRoom.gridX === room.gridX) {
+      const isAbove = connRoom.gridY < room.gridY;
+      corridorOpenings.push({
+        x: room.x + room.width / 2,
+        y: isAbove ? room.y : room.y + room.height
+      });
+    } else {
+      const isLeft = connRoom.gridX < room.gridX;
+      corridorOpenings.push({
+        x: isLeft ? room.x : room.x + room.width,
+        y: room.y + room.height / 2
+      });
+    }
+  }
+
+  const count = Math.floor(random() * 4) + 1;
+  const types: DecorationType[] = ['pillar', 'rubble', 'chest'];
+  const margin = 18;
+
+  for (let i = 0; i < count; i++) {
+    let attempts = 0;
+    while (attempts < 10) {
+      const dx = room.x + margin + random() * (room.width - margin * 2);
+      const dy = room.y + margin + random() * (room.height - margin * 2);
+
+      let tooClose = false;
+      for (const opening of corridorOpenings) {
+        const ddx = dx - opening.x;
+        const ddy = dy - opening.y;
+        if (Math.sqrt(ddx * ddx + ddy * ddy) < 25) {
+          tooClose = true;
+          break;
+        }
+      }
+      for (const existing of decorations) {
+        const ddx = dx - existing.x;
+        const ddy = dy - existing.y;
+        if (Math.sqrt(ddx * ddx + ddy * ddy) < 20) {
+          tooClose = true;
+          break;
+        }
+      }
+
+      if (!tooClose) {
+        decorations.push({
+          type: types[Math.floor(random() * types.length)],
+          x: dx,
+          y: dy,
+          size: 6 + random() * 4
+        });
+        break;
+      }
+      attempts++;
+    }
+  }
+
+  return decorations;
+}
+
 export function generateDungeon(seed: number = Date.now()): DungeonData {
   const startTime = performance.now();
   
@@ -176,9 +247,19 @@ export function generateDungeon(seed: number = Date.now()): DungeonData {
         height: ROOM_HEIGHT,
         wallColor,
         floorColor: FLOOR_COLOR,
-        connections: connections.get(id) || []
+        connections: connections.get(id) || [],
+        decorations: []
       });
     }
+  }
+  
+  for (const room of rooms) {
+    room.decorations = generateDecorations(
+      room,
+      room.connections,
+      rooms,
+      random
+    );
   }
   
   const corridors = generateCorridors(rooms, connections);
