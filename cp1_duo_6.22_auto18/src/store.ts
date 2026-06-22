@@ -53,6 +53,8 @@ interface ILyricStore {
   resynth: () => void;
   exportProject: () => IProject;
   importProject: (project: IProject, mode: ImportMode) => void;
+  downloadProject: () => void;
+  uploadProject: (file: File, mode: ImportMode) => Promise<void>;
 }
 
 export const useLyricStore = create<ILyricStore>((set, get) => ({
@@ -138,15 +140,28 @@ export const useLyricStore = create<ILyricStore>((set, get) => ({
     if (idx === -1) return;
 
     const currentWord = allWords[idx];
-    const prevWord = idx > 0 ? allWords[idx - 1] : null;
-    const nextWord = idx < allWords.length - 1 ? allWords[idx + 1] : null;
 
-    const prevEnd = prevWord ? prevWord.startTime + prevWord.duration : 0;
+    let prevEnd = 0;
+    if (idx > 0) {
+      const prevWord = allWords[idx - 1];
+      prevEnd = prevWord.startTime + prevWord.duration;
+    }
+
+    for (const line of state.lines) {
+      const wordIdxInLine = line.words.findIndex((w) => w.id === wordId);
+      if (wordIdxInLine > 0) {
+        const inlinePrev = line.words[wordIdxInLine - 1];
+        const inlinePrevEnd = inlinePrev.startTime + inlinePrev.duration;
+        prevEnd = Math.max(prevEnd, inlinePrevEnd);
+      }
+    }
+
     const adjustedNewStart = Math.max(prevEnd, newTimeMs);
     const oldStart = currentWord.startTime;
     const delta = adjustedNewStart - oldStart;
 
     const newStart = adjustedNewStart;
+    const nextWord = idx < allWords.length - 1 ? allWords[idx + 1] : null;
     const oldNextStart = nextWord ? nextWord.startTime : oldStart + currentWord.duration + 100;
     const oldInterval = Math.max(1, oldNextStart - oldStart);
     const newInterval = Math.max(1, oldNextStart + delta - newStart);
@@ -164,8 +179,20 @@ export const useLyricStore = create<ILyricStore>((set, get) => ({
             const localOffset = w.startTime - oldStart;
             const newLocalOffset = localOffset * ratio;
             const deltaDiff = newLocalOffset - localOffset;
-            const newW = { ...w, startTime: w.startTime + delta + deltaDiff };
-            return newW;
+            const candidateTime = w.startTime + delta + deltaDiff;
+            let prevWordOfW: ILyricWord | null = null;
+            for (const l of s.lines) {
+              const wIdx = l.words.findIndex((x) => x.id === w.id);
+              if (wIdx > 0) {
+                prevWordOfW = l.words[wIdx - 1];
+              }
+            }
+            let minStartTime = 0;
+            if (prevWordOfW) {
+              minStartTime = prevWordOfW.startTime + prevWordOfW.duration;
+            }
+            const newStartTime = Math.max(minStartTime, candidateTime);
+            return { ...w, startTime: newStartTime };
           }
           return w;
         }),
@@ -317,6 +344,35 @@ export const useLyricStore = create<ILyricStore>((set, get) => ({
       });
     }
     setTimeout(() => get().resynth(), 0);
+  },
+
+  downloadProject: () => {
+    const s = get();
+    const project: IProject = {
+      version: '1.0.0',
+      metadata: s.metadata,
+      lines: s.lines,
+      synthPresets: s.synthPresets,
+    };
+    const json = JSON.stringify(project, null, 2);
+    const blob = new Blob([json], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${s.metadata.title || 'lyricforge-project'}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  },
+
+  uploadProject: async (file: File, mode: ImportMode) => {
+    const text = await file.text();
+    const project: IProject = JSON.parse(text);
+    if (!project || !Array.isArray(project.lines)) {
+      throw new Error('无效的项目文件');
+    }
+    get().importProject(project, mode);
   },
 }));
 

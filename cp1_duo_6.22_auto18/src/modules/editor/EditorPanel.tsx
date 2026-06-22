@@ -7,7 +7,7 @@ import {
   parseTimestamp,
   ImportMode,
 } from '../../store';
-import { ILyricWord, IProject } from '../shared/types';
+import { ILyricWord } from '../shared/types';
 import { audioEngine } from '../audio/AudioEngine';
 import { synthEngine } from '../audio/SynthEngine';
 
@@ -242,8 +242,8 @@ export const EditorPanel: React.FC = () => {
   const selectedLineId = useLyricStore((s) => s.selectedLineId);
   const addLine = useLyricStore((s) => s.addLine);
   const insertTimestampAtCurrentPosition = useLyricStore((s) => s.insertTimestampAtCurrentPosition);
-  const exportProject = useLyricStore((s) => s.exportProject);
-  const importProject = useLyricStore((s) => s.importProject);
+  const downloadProject = useLyricStore((s) => s.downloadProject);
+  const uploadProject = useLyricStore((s) => s.uploadProject);
   const metadata = useLyricStore((s) => s.metadata);
   const setMetadata = useLyricStore((s) => s.setMetadata);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -255,30 +255,14 @@ export const EditorPanel: React.FC = () => {
     return unsub;
   }, []);
 
-  const handleExport = () => {
-    const project = exportProject();
-    const json = JSON.stringify(project, null, 2);
-    const blob = new Blob([json], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${metadata.title || 'project'}.lyricforge.json`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-  };
-
   const handleImportFile = async (file: File) => {
     try {
-      const text = await file.text();
-      const project: IProject = JSON.parse(text);
       const mode: ImportMode = window.confirm(
-        '点击确定覆盖当前项目，点击取消追加到尾部。'
+        '点击「确定」覆盖当前项目，点击「取消」追加到尾部。'
       )
         ? 'overwrite'
         : 'append';
-      importProject(project, mode);
+      await uploadProject(file, mode);
     } catch (err) {
       alert('导入失败：无效的项目文件');
       console.error(err);
@@ -330,7 +314,7 @@ export const EditorPanel: React.FC = () => {
             <button className="lf-btn lf-btn--ghost" onClick={() => addLine()}>
               + 添加段落
             </button>
-            <button className="lf-btn lf-btn--ghost" onClick={handleExport}>
+            <button className="lf-btn lf-btn--ghost" onClick={() => downloadProject()}>
               导出项目
             </button>
             <button

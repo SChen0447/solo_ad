@@ -128,6 +128,14 @@ body,
 .lf-btn--sm {
   padding: 4px 10px;
   font-size: 12px;
+  line-height: 1.2;
+}
+
+.lf-step-btn {
+  min-width: 28px;
+  padding: 3px 8px;
+  font-weight: 700;
+  text-align: center;
 }
 
 .lf-btn--lg {
@@ -529,11 +537,77 @@ body,
     padding: 10px 16px;
     background: var(--bg-editor);
     border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    flex-wrap: wrap;
+    gap: 6px;
   }
   .lf-app-header h1 {
     margin: 0;
     font-size: 16px;
     color: var(--accent);
     font-weight: 700;
+  }
+
+  .lf-editor-toolbar {
+    flex-direction: column;
+    align-items: stretch !important;
+    gap: 8px;
+  }
+
+  .lf-meta {
+    gap: 6px;
+  }
+
+  .lf-toolbar-actions {
+    gap: 6px;
+    justify-content: flex-start;
+  }
+
+  .lf-toolbar-actions .lf-btn {
+    padding: 6px 10px;
+    font-size: 12px;
+    flex: 1 1 auto;
+    min-width: auto;
+  }
+
+  .lf-current-time {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .lf-line-header {
+    flex-direction: column;
+    align-items: stretch !important;
+    gap: 6px;
+  }
+
+  .lf-line-actions {
+    flex-wrap: wrap;
+  }
+
+  .lf-word {
+    min-width: 100%;
+  }
+
+  .lf-preview-controls {
+    gap: 6px;
+  }
+
+  .lf-slider-group {
+    flex: 1 1 100%;
+    flex-wrap: wrap;
+  }
+
+  .lf-waveform {
+    height: 140px;
+  }
+
+  .lf-btn {
+    padding: 6px 10px;
+    font-size: 12px;
+  }
+
+  .lf-btn--lg {
+    padding: 10px 16px;
+    font-size: 14px;
   }
 }

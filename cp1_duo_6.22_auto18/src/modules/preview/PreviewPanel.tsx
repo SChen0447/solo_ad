@@ -17,6 +17,27 @@ const WaveformCanvas: React.FC<WaveformCanvasProps> = ({ zoom, scrollLeft, setSc
   const rafRef = useRef<number | null>(null);
   const draggingRef = useRef<{ startX: number; wasPlaying: boolean } | null>(null);
   const lastScrollRef = useRef(0);
+  const resizeObserverRef = useRef<ResizeObserver | null>(null);
+
+  useEffect(() => {
+    const container = containerRef.current;
+    if (container && 'ResizeObserver' in window) {
+      resizeObserverRef.current = new ResizeObserver(() => {
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+        const dpr = window.devicePixelRatio || 1;
+        const rect = container.getBoundingClientRect();
+        canvas.width = Math.floor(rect.width * dpr);
+        canvas.height = Math.floor(rect.height * dpr);
+        canvas.style.width = `${rect.width}px`;
+        canvas.style.height = `${rect.height}px`;
+      });
+      resizeObserverRef.current.observe(container);
+    }
+    return () => {
+      resizeObserverRef.current?.disconnect();
+    };
+  }, []);
 
   const getViewRange = () => {
     const duration = audioEngine.getDuration() || 1;
@@ -207,6 +228,12 @@ export const PreviewPanel: React.FC = () => {
         </div>
         <div className="lf-slider-group">
           <label>缩放</label>
+          <button
+            className="lf-btn lf-btn--sm lf-btn--ghost lf-step-btn"
+            onClick={() => setZoom((z) => Math.max(1, z - 0.5))}
+          >
+            −
+          </button>
           <input
             type="range"
             min={1}
@@ -215,7 +242,19 @@ export const PreviewPanel: React.FC = () => {
             value={zoom}
             onChange={(e) => setZoom(parseFloat(e.target.value))}
           />
+          <button
+            className="lf-btn lf-btn--sm lf-btn--ghost lf-step-btn"
+            onClick={() => setZoom((z) => Math.min(10, z + 0.5))}
+          >
+            +
+          </button>
           <span>{zoom.toFixed(1)}x</span>
+          <button
+            className="lf-btn lf-btn--sm lf-btn--ghost lf-step-btn"
+            onClick={() => setZoom(1)}
+          >
+            1x
+          </button>
         </div>
       </div>
       <div className="lf-presets">

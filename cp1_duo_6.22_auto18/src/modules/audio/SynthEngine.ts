@@ -30,12 +30,18 @@ export const DEFAULT_PRESETS: ISynthPreset[] = [
 
 const SAMPLE_RATE = 44100;
 const BUFFER_SIZE = 2048;
+const SILENCE_EPSILON = 1e-6;
 
 export class SynthEngine {
   private wordBuffers: Map<string, AudioBuffer> = new Map();
   private presets: Map<string, ISynthPreset> = new Map();
   private dirtyWords: Set<string> = new Set();
-  private scheduledUpdate: number | null = null;
+  private scheduledFullUpdate: number | null = null;
+  private masterMixedArray: Float32Array | null = null;
+  private wordScaleFactors: Map<string, number> = new Map();
+  private lastNormalization: number = 1;
+  private lastGlobalNormalizeGain: number = 1;
+  private currentLinesSnapshot: ILyricLine[] = [];
 
   constructor() {
     DEFAULT_PRESETS.forEach((p) => this.presets.set(p.id, p));
@@ -190,22 +196,92 @@ export class SynthEngine {
     const startTime = performance.now();
     this.markWordDirty(word.id);
     const ctx = audioEngine.getContext();
+
     this.getOrCreateWordBuffer(word, ctx);
     this.dirtyWords.delete(word.id);
-    this.scheduleFullBufferUpdate(allLines);
+
+    if (this.masterMixedArray && this.masterMixedArray.length > 0) {
+      this.updateWordInPlace(word, allLines, ctx);
+    } else {
+      this.scheduleFullBufferUpdate(allLines);
+    }
+
     const elapsed = performance.now() - startTime;
-    if (elapsed < 50) {
-      // Good, under budget
+    if (elapsed >= 50) {
+      console.warn(`Local update exceeded 50ms budget: ${elapsed.toFixed(1)}ms`);
+    }
+  }
+
+  private updateWordInPlace(
+    word: ILyricWord,
+    allLines: ILyricLine[],
+    ctx: AudioContext
+  ): void {
+    if (!this.masterMixedArray) return;
+
+    const allWords = this.getAllWords(allLines);
+    const startSample = Math.floor((word.startTime / 1000) * SAMPLE_RATE);
+    const wordBuf = this.getOrCreateWordBuffer(word, ctx);
+    const wData = wordBuf.getChannelData(0);
+    const totalSamples = this.masterMixedArray.length;
+
+    let oldScale = this.wordScaleFactors.get(word.id) ?? 0;
+    const newScale = this.computeWordScale(word, ctx, allWords, totalSamples);
+    this.wordScaleFactors.set(word.id, newScale);
+
+    const endSample = Math.min(startSample + wData.length, totalSamples);
+
+    for (let i = 0; i < endSample - startSample; i++) {
+      this.masterMixedArray[startSample + i] -= wData[i] * oldScale;
+      this.masterMixedArray[startSample + i] += wData[i] * newScale;
+    }
+
+    this.reapplyPeakNormalizationIfNeeded(startSample, endSample);
+
+    const audioBuffer = ctx.createBuffer(1, totalSamples, SAMPLE_RATE);
+    audioBuffer.getChannelData(0).set(this.masterMixedArray);
+    audioEngine.setAudioBuffer(audioBuffer);
+  }
+
+  private computeWordScale(
+    word: ILyricWord,
+    ctx: AudioContext,
+    allWords: ILyricWord[],
+    totalSamples: number
+  ): number {
+    const normalization = Math.max(SILENCE_EPSILON, this.lastNormalization);
+    const voiceCount = this.presets.size;
+    const globalScale = Math.min(1, 0.9 / Math.sqrt(voiceCount));
+    return (1 / normalization) * globalScale;
+  }
+
+  private reapplyPeakNormalizationIfNeeded(start: number, end: number): void {
+    if (!this.masterMixedArray) return;
+    let localPeak = 0;
+    const scanStep = Math.max(1, Math.floor((end - start) / 512));
+    for (let i = start; i < end; i += scanStep) {
+      const v = Math.abs(this.masterMixedArray[i]);
+      if (v > localPeak) localPeak = v;
+    }
+    if (localPeak > 0.95) {
+      const correctedGain = Math.min(1, 0.9 / Math.max(SILENCE_EPSILON, localPeak));
+      const adjustment = correctedGain / Math.max(SILENCE_EPSILON, this.lastGlobalNormalizeGain);
+      if (adjustment < 0.99) {
+        for (let i = 0; i < this.masterMixedArray.length; i++) {
+          this.masterMixedArray[i] *= adjustment;
+        }
+        this.lastGlobalNormalizeGain = correctedGain;
+      }
     }
   }
 
   private scheduleFullBufferUpdate(lines: ILyricLine[]): void {
-    if (this.scheduledUpdate !== null) {
-      clearTimeout(this.scheduledUpdate);
+    if (this.scheduledFullUpdate !== null) {
+      clearTimeout(this.scheduledFullUpdate);
     }
-    this.scheduledUpdate = window.setTimeout(() => {
+    this.scheduledFullUpdate = window.setTimeout(() => {
       this.renderFullBuffer(lines);
-      this.scheduledUpdate = null;
+      this.scheduledFullUpdate = null;
     }, 16);
   }
 
@@ -224,15 +300,13 @@ export class SynthEngine {
 
   private computeMaxAmplitude(
     words: ILyricWord[],
-    ctx: AudioContext,
-    totalSamples: number
+    ctx: AudioContext
   ): number {
-    let maxAmp = 0.0001;
+    let maxAmp = SILENCE_EPSILON;
     const voiceCount = this.presets.size;
     for (let w = 0; w < words.length; w++) {
       const word = words[w];
       const buf = this.getOrCreateWordBuffer(word, ctx);
-      const startSample = Math.floor((word.startTime / 1000) * SAMPLE_RATE);
       const wData = buf.getChannelData(0);
       const windowStep = Math.max(1, Math.floor(wData.length / 64));
       for (let i = 0; i < wData.length; i += windowStep) {
@@ -240,47 +314,71 @@ export class SynthEngine {
         if (sample > maxAmp) maxAmp = sample;
       }
     }
-    return Math.max(1, maxAmp * Math.sqrt(voiceCount) * 1.2);
+    const raw = maxAmp * Math.sqrt(voiceCount) * 1.2;
+    return Math.max(SILENCE_EPSILON, raw);
   }
 
   renderFullBuffer(lines: ILyricLine[]): AudioBuffer | null {
     const ctx = audioEngine.getContext();
     const words = this.getAllWords(lines);
+    this.currentLinesSnapshot = lines.map((l) => ({ ...l, words: [...l.words] }));
+
     if (words.length === 0) {
       const emptyBuf = ctx.createBuffer(1, SAMPLE_RATE * 2, SAMPLE_RATE);
       audioEngine.setAudioBuffer(emptyBuf);
+      this.masterMixedArray = emptyBuf.getChannelData(0);
+      this.wordScaleFactors.clear();
+      this.lastNormalization = 1;
+      this.lastGlobalNormalizeGain = 1;
       return emptyBuf;
     }
+
     const totalMs = this.computeTotalDuration(lines) + 200;
     const totalSamples = Math.max(SAMPLE_RATE, Math.floor((totalMs / 1000) * SAMPLE_RATE));
     const mixed = new Float32Array(totalSamples);
-    const normalization = this.computeMaxAmplitude(words, ctx, totalSamples);
+
+    const maxAmp = this.computeMaxAmplitude(words, ctx);
+    const normalization = Math.max(SILENCE_EPSILON, maxAmp);
+    this.lastNormalization = normalization;
+
     const voiceCount = this.presets.size;
     const scale = (1 / normalization) * Math.min(1, 0.9 / Math.sqrt(voiceCount));
 
+    this.wordScaleFactors.clear();
     for (let w = 0; w < words.length; w++) {
       const word = words[w];
       const buf = this.getOrCreateWordBuffer(word, ctx);
       const wData = buf.getChannelData(0);
       const startSample = Math.floor((word.startTime / 1000) * SAMPLE_RATE);
       const endSample = Math.min(startSample + wData.length, totalSamples);
+
+      this.wordScaleFactors.set(word.id, scale);
+
       for (let i = 0; i < endSample - startSample; i++) {
         mixed[startSample + i] += wData[i] * scale;
       }
     }
 
-    let peak = 0.0001;
+    let peak = SILENCE_EPSILON;
     const peakWindow = Math.max(1, Math.floor(totalSamples / 4096));
     for (let i = 0; i < totalSamples; i += peakWindow) {
       const v = Math.abs(mixed[i]);
       if (v > peak) peak = v;
     }
+
+    this.lastGlobalNormalizeGain = 1;
     if (peak > 0.95) {
-      const normalizeGain = 0.9 / peak;
+      const normalizeGain = 0.9 / Math.max(SILENCE_EPSILON, peak);
+      this.lastGlobalNormalizeGain = normalizeGain;
       for (let i = 0; i < totalSamples; i++) {
         mixed[i] *= normalizeGain;
       }
+      for (const [wid, s] of this.wordScaleFactors.entries()) {
+        this.wordScaleFactors.set(wid, s * normalizeGain);
+      }
     }
+
+    this.masterMixedArray = mixed;
 
     const audioBuffer = ctx.createBuffer(1, totalSamples, SAMPLE_RATE);
     audioBuffer.getChannelData(0).set(mixed);
