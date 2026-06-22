@@ -28,6 +28,7 @@ function SalesDashboard({ products, orders, delay = 0 }: SalesDashboardProps) {
   })
   const [salesTrend, setSalesTrend] = useState<SalesTrendItem[]>([])
   const [isLoaded, setIsLoaded] = useState(false)
+  const [animationKey, setAnimationKey] = useState(0)
 
   useEffect(() => {
     const fetchData = async () => {
@@ -38,6 +39,7 @@ function SalesDashboard({ products, orders, delay = 0 }: SalesDashboardProps) {
         ])
         setSummary(summaryData)
         setSalesTrend(trendData)
+        setAnimationKey(prev => prev + 1)
       } catch (error) {
         console.error('获取统计数据失败:', error)
       } finally {
@@ -129,13 +131,13 @@ function SalesDashboard({ products, orders, delay = 0 }: SalesDashboardProps) {
                     <div style={{ fontSize: '11px', opacity: 0.8 }}>{item.orders} 笔订单</div>
                   </div>
                   <div
+                    key={`${animationKey}-${item.date}`}
+                    className="chart-bar animate"
                     style={{
                       ...barStyle,
                       height: `${heightPercent}%`,
                       background: 'linear-gradient(180deg, #A855F7 0%, #6366F1 100%)',
-                      animation: isLoaded
-                        ? `growUp 0.6s ease-out ${0.5 + index * 0.08}s both`
-                        : 'none',
+                      animationDelay: `${0.5 + index * 0.08}s`,
                     }}
                   />
                   <div style={barLabelStyle}>

@@ -172,19 +172,11 @@ function ProductManager({ products, onProductsChange, delay = 0 }: ProductManage
         </select>
       </div>
 
-      <div style={gridStyle}>
+      <div className="product-grid" style={gridStyle}>
         {filteredProducts.map((product, index) => (
           <div
             key={product.id}
-            style={cardStyle}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.transform = 'translateY(-8px)'
-              e.currentTarget.style.boxShadow = '0 12px 24px rgba(0, 0, 0, 0.12)'
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.transform = 'translateY(0)'
-              e.currentTarget.style.boxShadow = '0 4px 8px rgba(0, 0, 0, 0.06)'
-            }}
+            className="product-card"
           >
             <img
               src={product.imageUrl}
@@ -393,10 +385,10 @@ const sortSelectStyle: React.CSSProperties = {
 }
 
 const gridStyle: React.CSSProperties = {
-  display: 'grid',
-  gridTemplateColumns: 'repeat(4, 1fr)',
   gap: '24px',
 }
+
+const gridStyleWrapper: React.CSSProperties = {}
 
 const cardStyle: React.CSSProperties = {
   width: '100%',

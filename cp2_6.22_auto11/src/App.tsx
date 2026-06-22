@@ -46,6 +46,14 @@ function App() {
   }, [fetchProducts, fetchOrders])
 
   useEffect(() => {
+    const interval = setInterval(() => {
+      fetchProducts()
+      fetchOrders()
+    }, 5000)
+    return () => clearInterval(interval)
+  }, [fetchProducts, fetchOrders])
+
+  useEffect(() => {
     const checkMobile = () => {
       setIsMobile(window.innerWidth < 768)
     }
@@ -90,8 +98,8 @@ function App() {
 
   if (isMobile) {
     return (
-      <div style={{ minHeight: '100vh', background: '#F9FAFB', display: 'flex', flexDirection: 'column' }}>
-        <nav style={mobileNavStyle}>
+      <div className="mobile-container" style={{ minHeight: '100vh', background: '#F9FAFB', display: 'flex', flexDirection: 'column' }}>
+        <nav className="mobile-nav" style={mobileNavStyle}>
           {navItems.map((item) => (
             <button
               key={item.key}
@@ -106,7 +114,7 @@ function App() {
             </button>
           ))}
         </nav>
-        <main style={{ flex: 1, padding: '24px', overflowY: 'auto' }}>
+        <main className="mobile-main" style={{ flex: 1, padding: '24px', overflowY: 'auto' }}>
           {renderContent()}
         </main>
       </div>
@@ -114,29 +122,30 @@ function App() {
   }
 
   return (
-    <div style={{ display: 'flex', minHeight: '100vh' }}>
-      <aside style={sidebarStyle}>
-        <div style={sidebarHeaderStyle}>
+    <div className="app-container" style={{ display: 'flex', minHeight: '100vh' }}>
+      <aside className="sidebar" style={sidebarStyle}>
+        <div className="sidebar-header" style={sidebarHeaderStyle}>
           <span style={{ fontSize: '28px' }}>🎪</span>
           <h1 style={sidebarTitleStyle}>创意市集</h1>
         </div>
-        <nav style={sidebarNavStyle}>
+        <nav className="sidebar-nav" style={sidebarNavStyle}>
           {navItems.map((item) => (
             <button
               key={item.key}
+              className="nav-item"
               onClick={() => setActiveTab(item.key)}
               style={{
                 ...navItemStyle,
                 ...(activeTab === item.key ? navItemActiveStyle : {}),
               }}
               onMouseEnter={(e) => {
-                if (activeTab !== item.key) {
+                if (activeTab !== item.key && !isMobile) {
                   e.currentTarget.style.background = '#4B5563'
                   e.currentTarget.style.transform = 'translateX(4px)'
                 }
               }}
               onMouseLeave={(e) => {
-                if (activeTab !== item.key) {
+                if (activeTab !== item.key && !isMobile) {
                   e.currentTarget.style.background = 'transparent'
                   e.currentTarget.style.transform = 'translateX(0)'
                 }
@@ -148,7 +157,7 @@ function App() {
           ))}
         </nav>
       </aside>
-      <main style={mainContentStyle}>
+      <main className="main-content" style={mainContentStyle}>
         {renderContent()}
       </main>
     </div>

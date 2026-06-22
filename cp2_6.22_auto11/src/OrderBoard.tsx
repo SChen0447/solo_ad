@@ -319,6 +319,7 @@ const statusBadgeStyle: React.CSSProperties = {
   borderRadius: '20px',
   cursor: 'pointer',
   border: 'none',
+  transition: 'background-color 0.4s ease, transform 0.2s ease, color 0.4s ease',
 }
 
 const emptyStateStyle: React.CSSProperties = {
