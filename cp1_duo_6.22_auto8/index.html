@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>家居配置器</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background-color: #222;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+
+    #app {
+      width: 100%;
+      height: 100%;
+    }
+
+    #info-bubble {
+      position: absolute;
+      padding: 10px 14px;
+      background: rgba(255, 255, 255, 0.95);
+      color: #333;
+      font-size: 13px;
+      border-radius: 8px;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.3s ease;
+      z-index: 1000;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+      white-space: nowrap;
+    }
+
+    #info-bubble.visible {
+      opacity: 1;
+    }
+
+    #info-bubble .bubble-title {
+      font-weight: 600;
+      margin-bottom: 4px;
+      color: #222;
+    }
+
+    #info-bubble .bubble-rgb {
+      color: #666;
+      font-size: 12px;
+    }
+
+    .css2d-label {
+      position: relative;
+      pointer-events: none;
+      user-select: none;
+      z-index: 100;
+    }
+
+    .css2d-label .label-box {
+      position: absolute;
+      left: 0;
+      bottom: 0;
+      transform: translate(15px, calc(-100% - 12px));
+      padding: 10px 14px;
+      background: rgba(255, 255, 255, 0.96);
+      color: #333;
+      font-size: 13px;
+      border-radius: 8px;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+      white-space: nowrap;
+      opacity: 0;
+      transition: opacity 0.3s ease;
+    }
+
+    .css2d-label.visible .label-box {
+      opacity: 1;
+    }
+
+    .css2d-label .label-box::after {
+      content: '';
+      position: absolute;
+      bottom: -6px;
+      left: -6px;
+      width: 12px;
+      height: 12px;
+      background: rgba(255, 255, 255, 0.96);
+      transform: rotate(45deg);
+      border-radius: 2px;
+    }
+
+    .css2d-label .label-title {
+      font-weight: 600;
+      margin-bottom: 4px;
+      color: #222;
+    }
+
+    .css2d-label .label-rgb {
+      color: #666;
+      font-size: 12px;
+    }
+
+    .lil-gui {
+      --background-color: rgba(30, 30, 30, 0.7);
+      --widget-color: rgba(60, 60, 60, 0.8);
+      --focus-color: rgba(100, 100, 100, 0.9);
+      --hover-color: rgba(80, 80, 80, 0.9);
+      --font-size: 12px;
+      --input-font-size: 12px;
+      --title-background-color: rgba(40, 40, 40, 0.85);
+      --title-text-color: #fff;
+      --text-color: #fff;
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+    }
+
+    .lil-gui .title {
+      font-weight: 600;
+    }
+
+    .lil-gui .controller {
+      transition: background-color 0.2s ease;
+    }
+
+    .lil-gui .controller:hover {
+      background-color: rgba(100, 100, 100, 0.3);
+    }
+
+    .lil-gui button {
+      transition: all 0.2s ease;
+    }
+
+    .lil-gui button:hover {
+      transform: scale(1.05);
+      filter: brightness(1.2);
+    }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+  <div id="info-bubble">
+    <div class="bubble-title"></div>
+    <div class="bubble-rgb"></div>
+  </div>
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
