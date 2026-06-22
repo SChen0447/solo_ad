@@ -30,6 +30,12 @@ export default function CardEditor({ card, onSave, onDelete, onBack }: Props) {
     }
     setLastSaved(null)
     initialLoad.current = true
+    return () => {
+      if (saveTimer.current) {
+        clearTimeout(saveTimer.current)
+        saveTimer.current = null
+      }
+    }
   }, [card])
 
   const parseTags = (input: string): string[] => {
@@ -72,12 +78,19 @@ export default function CardEditor({ card, onSave, onDelete, onBack }: Props) {
       initialLoad.current = false
       return
     }
-    if (saveTimer.current) clearTimeout(saveTimer.current)
+    if (saveTimer.current) {
+      clearTimeout(saveTimer.current)
+      saveTimer.current = null
+    }
     saveTimer.current = setTimeout(() => {
+      saveTimer.current = null
       doSave()
-    }, 800)
+    }, 600)
     return () => {
-      if (saveTimer.current) clearTimeout(saveTimer.current)
+      if (saveTimer.current) {
+        clearTimeout(saveTimer.current)
+        saveTimer.current = null
+      }
     }
   }, [title, content, tagsInput, doSave])
 

@@ -35,7 +35,7 @@ function calculateNextReview(card: Card, grade: ReviewGrade): Partial<Card> {
 
   if (quality < 3) {
     repetitions = 0
-    interval = 0
+    interval = 1
   } else {
     if (repetitions === 0) {
       interval = 1

@@ -1,7 +1,8 @@
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import CardList from './components/CardList'
 import CardEditor from './components/CardEditor'
 import ReviewPanel from './components/ReviewPanel'
+import Sidebar from './components/Sidebar'
 import {
   Card,
   TagInfo,
@@ -17,9 +18,19 @@ import {
 
 function useDebounced<T>(value: T, delay: number): T {
   const [debounced, setDebounced] = useState(value)
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   useEffect(() => {
-    const t = setTimeout(() => setDebounced(value), delay)
-    return () => clearTimeout(t)
+    if (timerRef.current) {
+      clearTimeout(timerRef.current)
+      timerRef.current = null
+    }
+    timerRef.current = setTimeout(() => setDebounced(value), delay)
+    return () => {
+      if (timerRef.current) {
+        clearTimeout(timerRef.current)
+        timerRef.current = null
+      }
+    }
   }, [value, delay])
   return debounced
 }
@@ -173,17 +184,22 @@ export default function App() {
 
       <main className="app-main">
         {view === 'list' && (
-          <CardList
-            cards={cards}
-            tags={tags}
-            activeTag={activeTag}
-            onTagClick={t => setActiveTag(activeTag === t ? undefined : t)}
-            onEditCard={handleEditCard}
-            onDeleteCard={handleDeleteCard}
-            onStartReview={() => setView('review')}
-            dueCount={dueCount}
-            loading={loading}
-          />
+          <div className="card-list-layout">
+            <Sidebar
+              tags={tags}
+              activeTag={activeTag}
+              totalCards={cards.length}
+              dueCount={dueCount}
+              onTagClick={t => setActiveTag(activeTag === t ? undefined : t)}
+              onStartReview={() => setView('review')}
+            />
+            <CardList
+              cards={cards}
+              onEditCard={handleEditCard}
+              onDeleteCard={handleDeleteCard}
+              loading={loading}
+            />
+          </div>
         )}
         {view === 'editor' && (
           <CardEditor
