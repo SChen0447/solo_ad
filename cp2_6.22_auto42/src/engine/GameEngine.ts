@@ -1,5 +1,22 @@
+/**
+ * 核心游戏引擎模块
+ * 
+ * 职责: 管理游戏阶段、回合流程、英雄护甲与生命值、状态通知
+ * 
+ * 调用关系:
+ * - 依赖: types.ts, CardDeckManager.ts, BattleResolver.ts
+ * - 被调用: UIRenderer (用户操作)、main.ts (订阅状态)、AIPlayer (AI决策)
+ * - 调用: CardDeckManager (抽牌/打牌)、BattleResolver (战斗计算)
+ * 
+ * 数据流向:
+ * UIRenderer 用户动作 → GameEngine → CardDeckManager/BattleResolver
+ *                                          ↓
+ *                        状态更新 → notifyListeners → UIRenderer重新渲染
+ * AI回合: GameEngine → AIPlayer.takeTurn() → playCard() → BattleResolver → 状态更新
+ */
+
 import { CardDeckManager } from './CardDeckManager';
-import { BattleResolver, HeroState, BattleResult } from './BattleResolver';
+import { BattleResolver, HeroState } from './BattleResolver';
 import { CardInstance, Card, CARD_POOL } from './types';
 
 export type GamePhase = 'deck_building' | 'battle' | 'game_over';
@@ -33,9 +50,9 @@ export interface BattleLogEntry {
   details: string;
 }
 
-export interface GameEngineListener {
-  onStateChange(state: GameState): void;
-}
+export type GameEngineListener = 
+  | ((state: GameState) => void)
+  | { onStateChange(state: GameState): void };
 
 const INITIAL_HAND_SIZE: number = 4;
 const DRAW_PER_TURN: number = 1;
@@ -84,7 +101,14 @@ export class GameEngine {
   }
 
   private notifyListeners(): void {
-    this.listeners.forEach(l => l.onStateChange({ ...this.state }));
+    const stateCopy = { ...this.state };
+    this.listeners.forEach(l => {
+      if (typeof l === 'function') {
+        l(stateCopy);
+      } else {
+        l.onStateChange(stateCopy);
+      }
+    });
   }
 
   public getState(): GameState {

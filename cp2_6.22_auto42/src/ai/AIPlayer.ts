@@ -1,3 +1,21 @@
+/**
+ * AI决策模块
+ * 
+ * 职责: AI在自身回合根据手牌的费用与对手状态选择最优卡牌
+ * 策略: 先出费用最接近可用法力上限且对对手造成最高伤害的牌
+ * 
+ * 调用关系:
+ * - 依赖: GameEngine (获取游戏状态)、types.ts (卡牌类型)
+ * - 被调用: main.ts (当轮到AI回合时)
+ * - 调用: GameEngine.playCard() (打出选择的卡牌)
+ * 
+ * 数据流向:
+ * GameEngine (AI回合开始) → main.ts → AIPlayer.takeTurn()
+ *   ↓ 评估手牌 selectBestCard()
+ *   ↓ 计算卡牌分数 calculateCardScore()
+ * 选择最优卡牌 → GameEngine.playCard() → 战斗结算 → 状态更新
+ */
+
 import { GameEngine, GameState } from '../engine/GameEngine';
 import { CardInstance, CardEffectType } from '../engine/types';
 

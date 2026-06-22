@@ -1,5 +1,22 @@
-import { GameEngine, GameState, GamePhase } from '../engine/GameEngine';
-import { Card, RARITY_COLORS, RARITY_NAMES, CardInstance } from '../engine/types';
+/**
+ * UI渲染模块
+ * 
+ * 职责: 将游戏状态渲染为Canvas画面，响应鼠标点击事件，显示各类UI面板
+ * 
+ * 调用关系:
+ * - 依赖: GameEngine (订阅状态、调用引擎方法)、types.ts (卡牌类型)
+ * - 被调用: main.ts (初始化)
+ * - 调用: GameEngine (selectCard、playSelectedCard、endPlayerTurn等)
+ * 
+ * 数据流向:
+ * GameEngine.subscribe → 状态变更检测 hasStateChanged → scheduleRender → render()
+ * 用户鼠标事件 → handleCanvasClick → GameEngine方法调用 → 状态更新
+ * 
+ * 性能优化: 使用状态变更检测，仅在状态真正变化时才重新渲染
+ */
+
+import { GameEngine, GameState } from '../engine/GameEngine';
+import { Card, RARITY_COLORS, RARITY_NAMES } from '../engine/types';
 
 const COLORS = {
   bg: '#0F172A',
@@ -38,7 +55,7 @@ interface DeckBuildUIState {
 
 interface BattleUIState {
   hoveredHandCardId: string | null;
-  rafId: number | null;
+  buttonHovered: boolean;
 }
 
 export class UIRenderer {
@@ -49,7 +66,7 @@ export class UIRenderer {
   private state: GameState;
   private deckBuildUI: DeckBuildUIState;
   private battleUI: BattleUIState;
-  private needsRender: boolean = true;
+  private lastState: GameState | null = null;
   private width: number = 0;
   private height: number = 0;
   private logContainer: HTMLDivElement | null = null;
@@ -58,7 +75,10 @@ export class UIRenderer {
   private overlayContainer: HTMLDivElement | null = null;
   private detailOverlay: HTMLDivElement | null = null;
   private endGameOverlay: HTMLDivElement | null = null;
+  private playButton: HTMLDivElement | null = null;
   private unsubscribe: (() => void) | null = null;
+  private animationFrameId: number | null = null;
+  private renderPending: boolean = false;
 
   constructor(engine: GameEngine, container: HTMLElement) {
     this.engine = engine;
@@ -72,7 +92,7 @@ export class UIRenderer {
     };
     this.battleUI = {
       hoveredHandCardId: null,
-      rafId: null
+      buttonHovered: false
     };
 
     this.init();
@@ -87,20 +107,62 @@ export class UIRenderer {
     this.container.style.overflow = 'hidden';
     this.container.style.minWidth = '1024px';
 
-    this.unsubscribe = this.engine.subscribe((state) => {
+    this.unsubscribe = this.engine.subscribe((state: GameState) => {
+      const stateChanged = this.hasStateChanged(this.state, state);
       this.state = state;
-      this.needsRender = true;
-      this.updateUI();
+      if (stateChanged) {
+        this.scheduleRender();
+        this.updateUI();
+      }
     });
 
     this.setupResize();
-    this.renderLoop();
+    this.scheduleRender();
+  }
+
+  private hasStateChanged(oldState: GameState, newState: GameState): boolean {
+    if (!this.lastState) {
+      this.lastState = { ...newState };
+      return true;
+    }
+    const keys = Object.keys(newState) as (keyof GameState)[];
+    for (const key of keys) {
+      if (key === 'playerHand' || key === 'aiHand' || key === 'battleLog') {
+        if (JSON.stringify(oldState[key]) !== JSON.stringify(newState[key])) {
+          this.lastState = { ...newState };
+          return true;
+        }
+      } else if (key === 'playerHero' || key === 'aiHero') {
+        if (oldState[key].health !== newState[key].health ||
+            oldState[key].armor !== newState[key].armor) {
+          this.lastState = { ...newState };
+          return true;
+        }
+      } else if (oldState[key] !== newState[key]) {
+        this.lastState = { ...newState };
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private scheduleRender(): void {
+    this.renderPending = true;
+    if (this.animationFrameId === null) {
+      this.animationFrameId = requestAnimationFrame(() => {
+        if (this.renderPending) {
+          this.render();
+          this.renderPending = false;
+        }
+        this.animationFrameId = null;
+      });
+    }
   }
 
   private setupResize(): void {
     window.addEventListener('resize', () => {
       this.resize();
-      this.needsRender = true;
+      this.scheduleRender();
     });
     this.resize();
   }
@@ -112,15 +174,10 @@ export class UIRenderer {
       this.canvas.width = this.width - LOG_PANEL_WIDTH;
       this.canvas.height = this.height;
     }
-  }
-
-  private renderLoop = (): void => {
-    if (this.needsRender) {
-      this.render();
-      this.needsRender = false;
+    if (this.deckBuildContainer) {
+      this.deckBuildContainer.style.width = `${this.width - LOG_PANEL_WIDTH}px`;
     }
-    this.battleUI.rafId = requestAnimationFrame(this.renderLoop);
-  };
+  }
 
   private render(): void {
     if (this.state.phase === 'deck_building') {
@@ -235,7 +292,7 @@ export class UIRenderer {
     selectedHeader.style.marginBottom = '8px';
     selectedHeader.addEventListener('click', () => {
       this.deckBuildUI.expanded = !this.deckBuildUI.expanded;
-      this.needsRender = true;
+      this.scheduleRender();
     });
 
     const selectedTitle = document.createElement('h2');
@@ -330,11 +387,12 @@ export class UIRenderer {
       el.style.transform = 'translateY(0)';
       el.style.boxShadow = 'none';
     });
-    el.addEventListener('click', () => {
-      this.handleCardClick(card);
+    el.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.showCardDetail(card);
     });
     el.addEventListener('dblclick', () => {
-      this.showCardDetail(card);
+      this.handleCardDoubleClick(card);
     });
 
     const costRow = document.createElement('div');
@@ -446,14 +504,14 @@ export class UIRenderer {
     return '👤';
   }
 
-  private handleCardClick(card: Card): void {
+  private handleCardDoubleClick(card: Card): void {
     const idx = this.deckBuildUI.selectedCardIds.indexOf(card.id);
     if (idx >= 0) {
       this.deckBuildUI.selectedCardIds.splice(idx, 1);
     } else if (this.deckBuildUI.selectedCardIds.length < 15) {
       this.deckBuildUI.selectedCardIds.push(card.id);
     }
-    this.needsRender = true;
+    this.scheduleRender();
   }
 
   private showCardDetail(card: Card): void {
@@ -470,6 +528,16 @@ export class UIRenderer {
     this.detailOverlay.style.display = 'flex';
     this.detailOverlay.style.flexDirection = 'column';
     this.detailOverlay.style.gap = '16px';
+    this.detailOverlay.style.animation = 'fadeIn 0.3s ease-out';
+
+    const style = document.createElement('style');
+    style.textContent = `
+      @keyframes fadeIn {
+        from { opacity: 0; transform: scale(0.9); }
+        to { opacity: 1; transform: scale(1); }
+      }
+    `;
+    this.detailOverlay.appendChild(style);
 
     const header = document.createElement('div');
     header.style.display = 'flex';
@@ -493,6 +561,15 @@ export class UIRenderer {
     closeBtn.style.color = COLORS.white;
     closeBtn.style.cursor = 'pointer';
     closeBtn.style.fontSize = '14px';
+    closeBtn.style.transition = 'all 0.2s ease-out';
+    closeBtn.addEventListener('mouseenter', () => {
+      closeBtn.style.transform = 'scale(1.1)';
+      closeBtn.style.backgroundColor = COLORS.danger;
+    });
+    closeBtn.addEventListener('mouseleave', () => {
+      closeBtn.style.transform = 'scale(1)';
+      closeBtn.style.backgroundColor = COLORS.textDim;
+    });
     closeBtn.addEventListener('click', () => this.hideDetail());
     header.appendChild(closeBtn);
 
@@ -543,6 +620,37 @@ export class UIRenderer {
     descContent.style.backgroundColor = '#F3F4F6';
     descContent.style.borderRadius = '8px';
     this.detailOverlay.appendChild(descContent);
+
+    const actionBtn = document.createElement('button');
+    const isInDeck = this.deckBuildUI.selectedCardIds.includes(card.id);
+    const canAdd = this.deckBuildUI.selectedCardIds.length < 15 || isInDeck;
+    actionBtn.textContent = isInDeck ? '从套牌中移除' : '添加到套牌';
+    actionBtn.style.width = '100%';
+    actionBtn.style.height = '44px';
+    actionBtn.style.borderRadius = '22px';
+    actionBtn.style.backgroundColor = isInDeck ? COLORS.danger : COLORS.primary;
+    actionBtn.style.color = COLORS.white;
+    actionBtn.style.fontSize = '14px';
+    actionBtn.style.fontWeight = 'bold';
+    actionBtn.style.border = 'none';
+    actionBtn.style.cursor = canAdd ? 'pointer' : 'not-allowed';
+    actionBtn.style.opacity = canAdd ? '1' : '0.5';
+    actionBtn.style.transition = 'all 0.2s ease-out';
+    if (canAdd) {
+      actionBtn.addEventListener('mouseenter', () => {
+        actionBtn.style.transform = 'translateX(5px)';
+        actionBtn.style.boxShadow = `0 0 20px ${isInDeck ? COLORS.danger : COLORS.primary}80`;
+      });
+      actionBtn.addEventListener('mouseleave', () => {
+        actionBtn.style.transform = 'translateX(0)';
+        actionBtn.style.boxShadow = 'none';
+      });
+      actionBtn.addEventListener('click', () => {
+        this.handleCardDoubleClick(card);
+        this.hideDetail();
+      });
+    }
+    this.detailOverlay.appendChild(actionBtn);
 
     this.overlayContainer.appendChild(this.detailOverlay);
     this.overlayContainer.addEventListener('click', (e) => {
@@ -662,6 +770,7 @@ export class UIRenderer {
     this.logList.style.display = 'flex';
     this.logList.style.flexDirection = 'column';
     this.logList.style.gap = '4px';
+    this.logList.style.scrollBehavior = 'smooth';
     this.logContainer.appendChild(this.logList);
 
     this.updateLogPanel();
@@ -673,12 +782,17 @@ export class UIRenderer {
 
     for (const entry of this.state.battleLog) {
       const item = document.createElement('div');
+      item.style.height = '32px';
       item.style.minHeight = '32px';
       item.style.padding = '6px 10px';
+      item.style.boxSizing = 'border-box';
       item.style.backgroundColor = entry.actor === 'player' ? '#1E3A5F30' : entry.actor === 'ai' ? '#5F1E3A30' : '#33415530';
       item.style.borderRadius = '6px';
       item.style.fontSize = '12px';
       item.style.lineHeight = '1.4';
+      item.style.display = 'flex';
+      item.style.flexDirection = 'column';
+      item.style.justifyContent = 'center';
 
       const top = document.createElement('div');
       top.style.display = 'flex';
@@ -701,6 +815,9 @@ export class UIRenderer {
 
       const bottom = document.createElement('div');
       bottom.style.marginTop = '2px';
+      bottom.style.whiteSpace = 'nowrap';
+      bottom.style.overflow = 'hidden';
+      bottom.style.textOverflow = 'ellipsis';
 
       const action = document.createElement('span');
       action.style.color = COLORS.accent;
@@ -717,7 +834,11 @@ export class UIRenderer {
       this.logList.appendChild(item);
     }
 
-    this.logList.scrollTop = this.logList.scrollHeight;
+    setTimeout(() => {
+      if (this.logList) {
+        this.logList.scrollTop = this.logList.scrollHeight;
+      }
+    }, 0);
   }
 
   private startBattle(): void {
@@ -730,6 +851,7 @@ export class UIRenderer {
       this.createBattleUI();
     }
     this.updateBattleUI();
+    this.updatePlayButton();
   }
 
   private createBattleUI(): void {
@@ -746,15 +868,82 @@ export class UIRenderer {
 
     this.ctx = this.canvas.getContext('2d');
 
+    this.playButton = document.createElement('div');
+    this.playButton.style.position = 'absolute';
+    this.playButton.style.width = '200px';
+    this.playButton.style.height = '60px';
+    this.playButton.style.borderRadius = '30px';
+    this.playButton.style.background = `linear-gradient(135deg, ${COLORS.purpleGradient1}, ${COLORS.purpleGradient2})`;
+    this.playButton.style.display = 'flex';
+    this.playButton.style.alignItems = 'center';
+    this.playButton.style.justifyContent = 'center';
+    this.playButton.style.color = COLORS.white;
+    this.playButton.style.fontSize = '20px';
+    this.playButton.style.fontWeight = 'bold';
+    this.playButton.style.cursor = 'pointer';
+    this.playButton.style.transition = 'all 0.2s ease-out';
+    this.playButton.style.zIndex = '20';
+    this.playButton.style.userSelect = 'none';
+    this.playButton.textContent = '出牌';
+
+    this.playButton.addEventListener('mouseenter', () => {
+      this.battleUI.buttonHovered = true;
+      if (this.state.currentTurn === 'player') {
+        this.playButton!.style.transform = 'translateX(5px)';
+        this.playButton!.style.boxShadow = `0 0 30px ${COLORS.purple}80`;
+      }
+    });
+    this.playButton.addEventListener('mouseleave', () => {
+      this.battleUI.buttonHovered = false;
+      this.playButton!.style.transform = 'translateX(0)';
+      this.playButton!.style.boxShadow = 'none';
+    });
+    this.playButton.addEventListener('click', () => {
+      if (this.state.phase !== 'battle' || this.state.currentTurn !== 'player') return;
+      if (this.state.selectedCardId) {
+        this.engine.playSelectedCard();
+      } else {
+        this.engine.endPlayerTurn();
+      }
+    });
+
+    this.container.appendChild(this.playButton);
+    this.updatePlayButtonPosition();
+
     this.canvas.addEventListener('click', this.handleCanvasClick);
     this.canvas.addEventListener('mousemove', this.handleCanvasMouseMove);
     this.canvas.addEventListener('mouseleave', () => {
       this.battleUI.hoveredHandCardId = null;
-      this.needsRender = true;
+      this.scheduleRender();
     });
 
     this.createLogPanel();
     this.createOverlayContainer();
+  }
+
+  private updatePlayButtonPosition(): void {
+    if (!this.playButton || !this.canvas) return;
+    const x = this.canvas.width / 2 - 100;
+    const y = this.canvas.height - HAND_AREA_HEIGHT - 80;
+    this.playButton.style.left = `${x}px`;
+    this.playButton.style.top = `${y}px`;
+  }
+
+  private updatePlayButton(): void {
+    if (!this.playButton) return;
+    const hasSelection = !!this.state.selectedCardId;
+    const isPlayerTurn = this.state.currentTurn === 'player' && this.state.phase === 'battle';
+
+    this.playButton.textContent = hasSelection ? '出牌' : '结束回合';
+    this.playButton.style.opacity = isPlayerTurn ? '1' : '0.5';
+    this.playButton.style.cursor = isPlayerTurn ? 'pointer' : 'not-allowed';
+    this.playButton.style.pointerEvents = isPlayerTurn ? 'auto' : 'none';
+
+    if (hasSelection && isPlayerTurn) {
+      this.playButton.style.border = `2px solid ${COLORS.accent}`;
+    } else {
+      this.playButton.style.border = '2px solid #A78BFA';
+    }
   }
 
   private handleCanvasClick = (e: MouseEvent): void => {
@@ -782,17 +971,6 @@ export class UIRenderer {
         return;
       }
     }
-
-    const btnX = this.canvas!.width / 2 - 100;
-    const btnY = this.canvas!.height - HAND_AREA_HEIGHT - 80;
-    if (x >= btnX && x <= btnX + 200 && y >= btnY && y <= btnY + 60) {
-      if (this.state.selectedCardId) {
-        this.engine.playSelectedCard();
-      } else {
-        this.engine.endPlayerTurn();
-      }
-      return;
-    }
   };
 
   private handleCanvasMouseMove = (e: MouseEvent): void => {
@@ -818,7 +996,7 @@ export class UIRenderer {
 
     if (foundId !== this.battleUI.hoveredHandCardId) {
       this.battleUI.hoveredHandCardId = foundId;
-      this.needsRender = true;
+      this.scheduleRender();
     }
   };
 
@@ -839,9 +1017,9 @@ export class UIRenderer {
     this.drawDeckInfo(ctx, w - 120, 40, this.state.aiDeckSize, 'AI牌库');
     this.drawDeckInfo(ctx, w - 120, h - HAND_AREA_HEIGHT - 60, this.state.playerDeckSize, '玩家牌库');
     this.drawHandCards(ctx, w, h);
-    this.drawPlayButton(ctx, w, h);
     this.drawTurnIndicator(ctx, w, h);
 
+    this.updatePlayButtonPosition();
     this.updateLogPanel();
 
     if (this.state.phase === 'game_over') {
@@ -931,17 +1109,20 @@ export class UIRenderer {
   }
 
   private drawManaCrystals(ctx: CanvasRenderingContext2D, current: number, max: number, x: number, y: number): void {
+    const crystalSize = 40;
+    const spacing = 8;
+
     for (let i = 0; i < max; i++) {
-      const cx = x + i * 48;
+      const cx = x + i * (crystalSize + spacing) + crystalSize / 2;
       const cy = y;
       const used = i >= current;
 
       ctx.beginPath();
-      ctx.arc(cx, cy, 18, 0, Math.PI * 2);
+      ctx.arc(cx, cy, crystalSize / 2, 0, Math.PI * 2);
       if (used) {
         ctx.fillStyle = COLORS.primary;
       } else {
-        const grad = ctx.createRadialGradient(cx, cy, 2, cx, cy, 18);
+        const grad = ctx.createRadialGradient(cx, cy, 4, cx, cy, crystalSize / 2);
         grad.addColorStop(0, '#FDE68A');
         grad.addColorStop(1, COLORS.accent);
         ctx.fillStyle = grad;
@@ -964,7 +1145,7 @@ export class UIRenderer {
     ctx.fillStyle = COLORS.textDim;
     ctx.font = '12px sans-serif';
     ctx.textAlign = 'left';
-    ctx.fillText(`法力 ${current}/${max}`, x, y + 36);
+    ctx.fillText(`法力 ${current}/${max}`, x, y + crystalSize / 2 + 20);
   }
 
   private drawDeckInfo(ctx: CanvasRenderingContext2D, x: number, y: number, count: number, label: string): void {
@@ -1112,45 +1293,6 @@ export class UIRenderer {
     ctx.fillText(String(card.health), w - 28, h - 26);
   }
 
-  private drawPlayButton(ctx: CanvasRenderingContext2D, w: number, h: number): void {
-    const btnW = 200;
-    const btnH = 60;
-    const x = w / 2 - btnW / 2;
-    const y = h - HAND_AREA_HEIGHT - 80;
-    const isPlayerTurn = this.state.currentTurn === 'player';
-    const hasSelection = !!this.state.selectedCardId;
-
-    const label = hasSelection ? '出牌' : '结束回合';
-
-    ctx.save();
-    if (!isPlayerTurn) {
-      ctx.globalAlpha = 0.5;
-    }
-
-    const grad = ctx.createLinearGradient(x, y, x + btnW, y + btnH);
-    grad.addColorStop(0, COLORS.purpleGradient1);
-    grad.addColorStop(1, COLORS.purpleGradient2);
-    ctx.fillStyle = grad;
-    this.roundRect(ctx, x, y, btnW, btnH, 30);
-    ctx.fill();
-
-    ctx.shadowColor = COLORS.purple + '80';
-    ctx.shadowBlur = 15;
-    ctx.strokeStyle = hasSelection ? COLORS.accent : '#A78BFA';
-    ctx.lineWidth = 2;
-    this.roundRect(ctx, x, y, btnW, btnH, 30);
-    ctx.stroke();
-    ctx.shadowBlur = 0;
-
-    ctx.fillStyle = COLORS.white;
-    ctx.font = 'bold 20px sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(label, w / 2, y + btnH / 2);
-
-    ctx.restore();
-  }
-
   private drawTurnIndicator(ctx: CanvasRenderingContext2D, w: number, h: number): void {
     if (this.state.phase !== 'battle') return;
     const text = this.state.currentTurn === 'player' ? '玩家回合' : 'AI回合';
@@ -1241,6 +1383,7 @@ export class UIRenderer {
       this.deckBuildUI.selectedCardIds = [];
       this.engine.resetGame();
       this.cleanupBattleUI();
+      this.hideDetail();
     });
     this.endGameOverlay.appendChild(btn);
 
@@ -1276,12 +1419,17 @@ export class UIRenderer {
       this.canvas = null;
       this.ctx = null;
     }
+    if (this.playButton) {
+      this.playButton.remove();
+      this.playButton = null;
+    }
     this.endGameOverlay = null;
   }
 
   public destroy(): void {
-    if (this.battleUI.rafId) {
-      cancelAnimationFrame(this.battleUI.rafId);
+    if (this.animationFrameId !== null) {
+      cancelAnimationFrame(this.animationFrameId);
+      this.animationFrameId = null;
     }
     if (this.unsubscribe) {
       this.unsubscribe();

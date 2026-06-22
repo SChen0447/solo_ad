@@ -1,3 +1,27 @@
+/**
+ * 卡牌对战系统 - 核心类型定义
+ * 
+ * 文件调用关系与数据流向:
+ * 
+ * 1. types.ts (本文件) - 基础类型定义
+ *    ↓ 被依赖
+ * 2. CardDeckManager.ts - 牌组管理 (依赖types.ts)
+ *    ↓ 调用: 抽牌/洗牌
+ * 3. BattleResolver.ts - 战斗结算 (依赖types.ts)
+ *    ↓ 调用: 伤害计算
+ * 4. GameEngine.ts - 核心引擎 (依赖types.ts + CardDeckManager + BattleResolver)
+ *    ↑↓ 双向数据流
+ * 5. AIPlayer.ts - AI决策 (依赖GameEngine)
+ *    ↓ 调用: playCard
+ * 6. UIRenderer.ts - UI渲染 (依赖GameEngine + types.ts)
+ *    ↑↓ 用户交互 ↔ 状态更新
+ * 7. main.ts - 入口 (整合GameEngine + AIPlayer + UIRenderer)
+ * 
+ * 数据流向:
+ * 用户点击 → UIRenderer → GameEngine → CardDeckManager/BattleResolver → 状态更新 → UIRenderer 重新渲染
+ * AI回合 → GameEngine → AIPlayer决策 → GameEngine.playCard → BattleResolver计算 → 状态更新 → UIRenderer
+ */
+
 export type Rarity = 'common' | 'rare' | 'epic' | 'legendary';
 
 export type CardEffectType = 'damage' | 'heal' | 'armor' | 'draw';

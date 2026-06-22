@@ -1,4 +1,19 @@
-import { CardInstance, CardEffect, CardEffectType } from './types';
+/**
+ * 战斗结算模块
+ * 
+ * 职责: 计算卡牌对战伤害，考虑护甲减伤与卡牌效果
+ * 
+ * 调用关系:
+ * - 被依赖: types.ts (卡牌类型定义)
+ * - 被调用: GameEngine (通过resolveCardPlay方法)
+ * 
+ * 数据流向:
+ * GameEngine → resolveCardPlay(card, attacker, attackerState, defenderState)
+ *   ↓ 计算伤害、治疗、护甲效果
+ * 返回 BattleResult + 新的攻防双方状态 → GameEngine更新状态
+ */
+
+import { CardInstance, CardEffectType } from './types';
 
 export interface HeroState {
   health: number;
@@ -87,7 +102,6 @@ export class BattleResolver {
     }
 
     const newHealth: number = Math.max(0, target.health - remainingDamage);
-    const actualDamageDealt: number = damage - (target.health - newHealth) > 0 ? (damage - (target.health - newHealth) === armorAbsorbed ? target.health - newHealth : damage) : target.health - newHealth;
 
     return {
       newState: { ...target, health: newHealth, armor: newArmor },

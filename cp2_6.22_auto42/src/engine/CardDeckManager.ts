@@ -1,3 +1,18 @@
+/**
+ * 牌组管理模块
+ * 
+ * 职责: 管理牌组、抽牌、洗牌、弃牌逻辑
+ * 
+ * 调用关系:
+ * - 被依赖: types.ts (卡牌类型定义)
+ * - 被调用: GameEngine (通过buildDeck、drawCard、playCard方法)
+ * 
+ * 数据流向:
+ * GameEngine → buildDeck(selectedCardIds) → 初始化牌组
+ * GameEngine → drawCard() → 返回抽到的卡牌对象
+ * GameEngine → playCard(instanceId) → 打出卡牌并移入弃牌堆
+ */
+
 import { Card, CardInstance, CARD_POOL } from './types';
 
 export class CardDeckManager {
