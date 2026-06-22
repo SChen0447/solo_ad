@@ -5,23 +5,36 @@ const TILE_SIZE = 48;
 const MAZE_SIZE = 10;
 const VISION_RANGE = 1;
 const MOVE_DURATION = 50;
-const MOVE_COOLDOWN = 60;
+
+function lerpColor(color1: number, color2: number, t: number): number {
+  const r1 = (color1 >> 16) & 0xff;
+  const g1 = (color1 >> 8) & 0xff;
+  const b1 = color1 & 0xff;
+  const r2 = (color2 >> 16) & 0xff;
+  const g2 = (color2 >> 8) & 0xff;
+  const b2 = color2 & 0xff;
+  const r = Math.round(r1 + (r2 - r1) * t);
+  const g = Math.round(g1 + (g2 - g1) * t);
+  const b = Math.round(b1 + (b2 - b1) * t);
+  return (r << 16) | (g << 8) | b;
+}
+
+const COLOR_HIGH = 0x39ff14;
+const COLOR_MID = 0xffdd00;
+const COLOR_LOW = 0xff2200;
 
 function getHpColor(percent: number): number {
   const clamped = Math.max(0, Math.min(1, percent));
-  let r: number, g: number, b: number;
-  if (clamped >= 0.5) {
-    const t = (clamped - 0.5) * 2;
-    r = Math.round(255 * (1 - t));
-    g = 255;
-    b = 0;
+  if (clamped >= 0.6) {
+    const t = (clamped - 0.6) / 0.4;
+    return lerpColor(COLOR_MID, COLOR_HIGH, t);
+  } else if (clamped >= 0.3) {
+    const t = (clamped - 0.3) / 0.3;
+    return lerpColor(COLOR_LOW, COLOR_MID, t);
   } else {
-    const t = clamped * 2;
-    r = 255;
-    g = Math.round(255 * t);
-    b = 0;
+    const t = clamped / 0.3;
+    return lerpColor(0x8b0000, COLOR_LOW, t);
   }
-  return (r << 16) | (g << 8) | b;
 }
 
 interface PlayerState {
@@ -65,7 +78,8 @@ export class GameScene extends Phaser.Scene {
     s: Phaser.Input.Keyboard.Key;
     d: Phaser.Input.Keyboard.Key;
   };
-  private lastMoveTime = 0;
+  private moveRepeatTimer: Phaser.Time.TimerEvent | null = null;
+  private currentMoveDir: { dx: number; dy: number } | null = null;
   private particleTexture: Phaser.Textures.CanvasTexture | null = null;
   private floorParticles: Phaser.GameObjects.Particles.ParticleEmitter | null = null;
   private mazeContainer!: Phaser.GameObjects.Container;
@@ -135,6 +149,16 @@ export class GameScene extends Phaser.Scene {
       s: Phaser.Input.Keyboard.Key;
       d: Phaser.Input.Keyboard.Key;
     };
+
+    this.keys.w.on('down', () => this.handleMoveStart(0, -1));
+    this.keys.s.on('down', () => this.handleMoveStart(0, 1));
+    this.keys.a.on('down', () => this.handleMoveStart(-1, 0));
+    this.keys.d.on('down', () => this.handleMoveStart(1, 0));
+
+    this.keys.w.on('up', () => this.handleMoveEnd(0, -1));
+    this.keys.s.on('up', () => this.handleMoveEnd(0, 1));
+    this.keys.a.on('up', () => this.handleMoveEnd(-1, 0));
+    this.keys.d.on('up', () => this.handleMoveEnd(1, 0));
 
     this.createFloorParticles();
     this.createUI();
@@ -424,22 +448,39 @@ export class GameScene extends Phaser.Scene {
     this.atkText.setText(`攻击力: ${this.player.attack}`);
   }
 
-  update(time: number): void {
-    if (this.inBattle || this.player.isMoving) return;
+  update(): void {
+  }
 
-    if (time - this.lastMoveTime < MOVE_COOLDOWN) return;
+  private handleMoveStart(dx: number, dy: number): void {
+    if (this.inBattle) return;
 
-    let dx = 0;
-    let dy = 0;
+    this.currentMoveDir = { dx, dy };
+    this.tryMove(dx, dy);
 
-    if (this.keys.w.isDown) dy = -1;
-    else if (this.keys.s.isDown) dy = 1;
-    else if (this.keys.a.isDown) dx = -1;
-    else if (this.keys.d.isDown) dx = 1;
+    if (!this.moveRepeatTimer) {
+      this.moveRepeatTimer = this.time.addEvent({
+        delay: MOVE_DURATION,
+        loop: true,
+        callback: () => {
+          if (this.currentMoveDir && !this.player.isMoving && !this.inBattle) {
+            this.tryMove(this.currentMoveDir.dx, this.currentMoveDir.dy);
+          }
+        }
+      });
+    }
+  }
 
-    if (dx !== 0 || dy !== 0) {
-      this.tryMove(dx, dy);
-      this.lastMoveTime = time;
+  private handleMoveEnd(dx: number, dy: number): void {
+    if (
+      this.currentMoveDir &&
+      this.currentMoveDir.dx === dx &&
+      this.currentMoveDir.dy === dy
+    ) {
+      this.currentMoveDir = null;
+      if (this.moveRepeatTimer) {
+        this.moveRepeatTimer.remove();
+        this.moveRepeatTimer = null;
+      }
     }
   }
 

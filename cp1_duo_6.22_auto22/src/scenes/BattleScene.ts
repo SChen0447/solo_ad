@@ -2,21 +2,35 @@ import Phaser from 'phaser';
 
 const TURN_TIME_LIMIT = 2000;
 
+function lerpColor(color1: number, color2: number, t: number): number {
+  const r1 = (color1 >> 16) & 0xff;
+  const g1 = (color1 >> 8) & 0xff;
+  const b1 = color1 & 0xff;
+  const r2 = (color2 >> 16) & 0xff;
+  const g2 = (color2 >> 8) & 0xff;
+  const b2 = color2 & 0xff;
+  const r = Math.round(r1 + (r2 - r1) * t);
+  const g = Math.round(g1 + (g2 - g1) * t);
+  const b = Math.round(b1 + (b2 - b1) * t);
+  return (r << 16) | (g << 8) | b;
+}
+
+const COLOR_HIGH = 0x39ff14;
+const COLOR_MID = 0xffdd00;
+const COLOR_LOW = 0xff2200;
+
 function getHpColor(percent: number): number {
   const clamped = Math.max(0, Math.min(1, percent));
-  let r: number, g: number, b: number;
-  if (clamped >= 0.5) {
-    const t = (clamped - 0.5) * 2;
-    r = Math.round(255 * (1 - t));
-    g = 255;
-    b = 0;
+  if (clamped >= 0.6) {
+    const t = (clamped - 0.6) / 0.4;
+    return lerpColor(COLOR_MID, COLOR_HIGH, t);
+  } else if (clamped >= 0.3) {
+    const t = (clamped - 0.3) / 0.3;
+    return lerpColor(COLOR_LOW, COLOR_MID, t);
   } else {
-    const t = clamped * 2;
-    r = 255;
-    g = Math.round(255 * t);
-    b = 0;
+    const t = clamped / 0.3;
+    return lerpColor(0x8b0000, COLOR_LOW, t);
   }
-  return (r << 16) | (g << 8) | b;
 }
 
 interface BattleData {
