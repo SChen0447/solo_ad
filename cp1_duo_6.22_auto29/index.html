@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ModelViewer - 3D模型查看与批注</title>
+  <link rel="stylesheet" href="/src/style.css" />
+</head>
+<body>
+  <div id="app">
+    <canvas id="three-canvas"></canvas>
+
+    <div id="loading-overlay" class="loading-overlay hidden">
+      <div class="loading-content">
+        <div class="loading-text">加载模型中... <span id="loading-percent">0%</span></div>
+        <div class="progress-bar-container">
+          <div id="progress-bar" class="progress-bar"></div>
+        </div>
+      </div>
+    </div>
+
+    <div id="tool-panel" class="tool-panel">
+      <div class="panel-title">工具栏</div>
+      <label class="toggle-switch">
+        <input type="checkbox" id="auto-rotate-toggle" />
+        <span class="toggle-slider"></span>
+        <span class="toggle-label">自动旋转</span>
+      </label>
+      <button id="reset-view-btn" class="panel-btn">重置视角</button>
+      <button id="screenshot-btn" class="panel-btn">截屏</button>
+      <button id="export-json-btn" class="panel-btn">导出批注</button>
+      <button id="upload-btn" class="panel-btn primary">上传模型</button>
+      <input type="file" id="file-input" accept=".glb,.gltf" hidden />
+    </div>
+
+    <div id="model-info" class="model-info">
+      <div class="info-title">模型信息</div>
+      <div id="info-content" class="info-content">
+        <div>尚未加载模型</div>
+        <div class="hint">点击"上传模型"开始</div>
+      </div>
+    </div>
+
+    <div id="sidebar-toggle" class="sidebar-toggle hidden">
+      <span></span>
+      <span></span>
+      <span></span>
+    </div>
+
+    <div id="sidebar" class="sidebar">
+      <div class="sidebar-header">
+        <h3>批注列表</h3>
+        <span id="annotation-count" class="annotation-count">0</span>
+      </div>
+      <div id="annotation-list" class="annotation-list">
+        <div class="empty-state">暂无批注</div>
+        <div class="empty-hint">点击模型表面添加批注</div>
+      </div>
+    </div>
+
+    <div id="annotation-input-modal" class="annotation-input-modal hidden">
+      <div class="modal-content">
+        <h3>添加批注</h3>
+        <textarea id="annotation-text" placeholder="请输入批注内容..."></textarea>
+        <div class="modal-actions">
+          <button id="cancel-annotation-btn" class="panel-btn">取消</button>
+          <button id="confirm-annotation-btn" class="panel-btn primary">确认</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
