@@ -1,0 +1,257 @@
+.inventory-board-page {
+  width: 100%;
+}
+
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.page-title {
+  font-size: 28px;
+  font-weight: 600;
+  color: #F8FAFC;
+  margin-bottom: 8px;
+}
+
+.page-subtitle {
+  font-size: 14px;
+  color: #CBD5E1;
+}
+
+.status-legend {
+  display: flex;
+  gap: 20px;
+  background-color: #1E293B;
+  padding: 12px 20px;
+  border-radius: 8px;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: #CBD5E1;
+}
+
+.legend-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+.inventory-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, 200px);
+  gap: 20px;
+}
+
+.inventory-card {
+  width: 200px;
+  height: 260px;
+  background-color: #1E293B;
+  border-radius: 12px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, background-color 0.3s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.inventory-card:hover:not(.out-of-stock) {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+}
+
+.inventory-card.out-of-stock {
+  filter: grayscale(0.5);
+}
+
+.out-of-stock-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(209, 213, 219, 0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+  pointer-events: none;
+}
+
+.out-of-stock-overlay span {
+  font-size: 18px;
+  font-weight: 700;
+  color: #6B7280;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+}
+
+.card-header {
+  margin-bottom: 16px;
+}
+
+.item-name {
+  font-size: 16px;
+  font-weight: 600;
+  color: #F8FAFC;
+  margin-bottom: 4px;
+}
+
+.item-price {
+  font-size: 13px;
+  color: #94A3B8;
+}
+
+.text-gray {
+  color: #6B7280 !important;
+}
+
+.card-stats {
+  flex: 1;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.stat-item {
+  flex: 1;
+  text-align: center;
+  padding: 12px 4px;
+  background-color: rgba(15, 23, 42, 0.5);
+  border-radius: 8px;
+}
+
+.stat-value {
+  font-size: 24px;
+  font-weight: 700;
+  color: #F8FAFC;
+  margin-bottom: 4px;
+}
+
+.stat-value.rented {
+  color: #F59E0B;
+}
+
+.stat-value.available {
+  color: #22C55E;
+}
+
+.stat-label {
+  font-size: 11px;
+  color: #64748B;
+}
+
+.card-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-top: 12px;
+  border-top: 1px solid #334155;
+}
+
+.status-indicator {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.status-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+}
+
+.status-text {
+  font-size: 12px;
+  font-weight: 500;
+  color: #CBD5E1;
+}
+
+.maintenance-badge {
+  padding: 3px 8px;
+  background-color: rgba(234, 179, 8, 0.2);
+  color: #EAB308;
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: 4px;
+}
+
+.skeleton {
+  pointer-events: none;
+}
+
+.skeleton-line {
+  background-color: #334155;
+  border-radius: 4px;
+}
+
+.skeleton-title {
+  height: 20px;
+  width: 60%;
+  margin-bottom: 20px;
+}
+
+.skeleton-stats {
+  flex: 1;
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.skeleton-stat {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 4px;
+  background-color: rgba(15, 23, 42, 0.5);
+  border-radius: 8px;
+}
+
+.skeleton-stat-num {
+  height: 28px;
+  width: 40px;
+}
+
+.skeleton-stat-label {
+  height: 12px;
+  width: 30px;
+}
+
+.skeleton-bottom {
+  height: 16px;
+  width: 40%;
+}
+
+@media (max-width: 768px) {
+  .inventory-grid {
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  }
+
+  .inventory-card {
+    width: 100%;
+    height: auto;
+    min-height: 220px;
+  }
+
+  .page-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .status-legend {
+    justify-content: center;
+  }
+}

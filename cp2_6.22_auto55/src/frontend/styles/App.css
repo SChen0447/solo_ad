@@ -1,0 +1,132 @@
+.app-container {
+  display: flex;
+  min-height: 100vh;
+  position: relative;
+}
+
+.hamburger-btn {
+  display: none;
+  position: fixed;
+  top: 16px;
+  left: 16px;
+  z-index: 1001;
+  width: 40px;
+  height: 40px;
+  border: none;
+  border-radius: 8px;
+  background-color: #1E293B;
+  color: #F8FAFC;
+  font-size: 20px;
+  cursor: pointer;
+}
+
+.sidebar {
+  width: 260px;
+  background-color: #1E293B;
+  padding: 24px 0;
+  flex-shrink: 0;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  overflow-y: auto;
+}
+
+.sidebar-header {
+  padding: 0 20px 24px;
+  border-bottom: 1px solid #334155;
+  margin-bottom: 16px;
+}
+
+.sidebar-header h2 {
+  font-size: 18px;
+  color: #F8FAFC;
+  font-weight: 600;
+}
+
+.menu-list {
+  list-style: none;
+  padding: 0 12px;
+}
+
+.menu-list li {
+  margin-bottom: 4px;
+}
+
+.menu-item {
+  width: 100%;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 16px;
+  border: none;
+  background: transparent;
+  color: #CBD5E1;
+  font-size: 14px;
+  cursor: pointer;
+  border-radius: 8px;
+  transition: background-color 0.2s ease;
+  position: relative;
+}
+
+.menu-item:hover {
+  background-color: #334155;
+  color: #F8FAFC;
+}
+
+.menu-item.active {
+  background-color: rgba(59, 130, 246, 0.1);
+  color: #F8FAFC;
+  font-weight: bold;
+}
+
+.menu-item.active::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 4px;
+  height: 24px;
+  background-color: #3B82F6;
+  border-radius: 0 4px 4px 0;
+}
+
+.menu-icon {
+  font-size: 18px;
+}
+
+.menu-label {
+  flex: 1;
+  text-align: left;
+}
+
+.main-content {
+  flex: 1;
+  background-color: #0F172A;
+  padding: 32px;
+  overflow-x: hidden;
+}
+
+@media (max-width: 768px) {
+  .hamburger-btn {
+    display: block;
+  }
+
+  .sidebar {
+    position: fixed;
+    left: -260px;
+    top: 0;
+    z-index: 1000;
+    transition: left 0.3s ease;
+  }
+
+  .sidebar.open {
+    left: 0;
+  }
+
+  .main-content {
+    padding: 64px 16px 16px;
+    width: 100%;
+  }
+}
