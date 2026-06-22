@@ -957,12 +957,31 @@ export class UIRenderer {
     const cardW = CARD_WIDTH;
     const totalWidth = handCards.length * cardW + (handCards.length - 1) * 10;
     const startX = (this.canvas!.width - totalWidth) / 2;
-    const cardY = this.canvas!.height - HAND_AREA_HEIGHT + 10;
+    const baseCardY = this.canvas!.height - HAND_AREA_HEIGHT + 10;
 
     for (let i = 0; i < handCards.length; i++) {
+      const card = handCards[i];
       const cx = startX + i * (cardW + 10);
-      if (x >= cx && x <= cx + cardW && y >= cardY && y <= cardY + CARD_HEIGHT) {
-        const card = handCards[i];
+      const isSelected = card.instanceId === this.state.selectedCardId;
+      const isHovered = card.instanceId === this.battleUI.hoveredHandCardId;
+      const isPlayerTurn = this.state.currentTurn === 'player';
+
+      let offsetY = 0;
+      let scale = 1;
+      if (isSelected) {
+        offsetY = -25;
+        scale = 1.08;
+      } else if (isHovered && isPlayerTurn) {
+        offsetY = -15;
+        scale = 1.05;
+      }
+
+      const scaledW = cardW * scale;
+      const scaledH = CARD_HEIGHT * scale;
+      const cardX = cx + (cardW - scaledW) / 2;
+      const cardY = baseCardY + offsetY + (CARD_HEIGHT - scaledH) / 2;
+
+      if (x >= cardX && x <= cardX + scaledW && y >= cardY && y <= cardY + scaledH) {
         if (this.state.selectedCardId === card.instanceId) {
           this.engine.selectCard(null);
         } else {
@@ -984,12 +1003,32 @@ export class UIRenderer {
     const cardW = CARD_WIDTH;
     const totalWidth = handCards.length * cardW + (handCards.length - 1) * 10;
     const startX = (this.canvas.width - totalWidth) / 2;
-    const cardY = this.canvas.height - HAND_AREA_HEIGHT + 10;
+    const baseCardY = this.canvas.height - HAND_AREA_HEIGHT + 10;
+    const isPlayerTurn = this.state.currentTurn === 'player';
 
     for (let i = 0; i < handCards.length; i++) {
+      const card = handCards[i];
       const cx = startX + i * (cardW + 10);
-      if (x >= cx && x <= cx + cardW && y >= cardY && y <= cardY + CARD_HEIGHT) {
-        foundId = handCards[i].instanceId;
+      const isSelected = card.instanceId === this.state.selectedCardId;
+      const isHovered = card.instanceId === this.battleUI.hoveredHandCardId;
+
+      let offsetY = 0;
+      let scale = 1;
+      if (isSelected) {
+        offsetY = -25;
+        scale = 1.08;
+      } else if (isHovered && isPlayerTurn) {
+        offsetY = -15;
+        scale = 1.05;
+      }
+
+      const scaledW = cardW * scale;
+      const scaledH = CARD_HEIGHT * scale;
+      const cardX = cx + (cardW - scaledW) / 2;
+      const cardY = baseCardY + offsetY + (CARD_HEIGHT - scaledH) / 2;
+
+      if (x >= cardX && x <= cardX + scaledW && y >= cardY && y <= cardY + scaledH) {
+        foundId = card.instanceId;
         break;
       }
     }
@@ -1188,11 +1227,11 @@ export class UIRenderer {
       let offsetY = 0;
       let scale = 1;
       if (isSelected) {
-        offsetY = -20;
-        scale = 1.05;
+        offsetY = -25;
+        scale = 1.08;
       } else if (isHovered && isPlayerTurn) {
-        offsetY = -10;
-        scale = 1.03;
+        offsetY = -15;
+        scale = 1.05;
       }
 
       ctx.save();
@@ -1200,17 +1239,36 @@ export class UIRenderer {
       ctx.scale(scale, scale);
       ctx.translate(-cardW / 2, -CARD_HEIGHT / 2);
 
-      this.drawBattleCard(ctx, card.card, cardW, CARD_HEIGHT, !canAfford || !isPlayerTurn, isSelected);
+      this.drawBattleCard(ctx, card.card, cardW, CARD_HEIGHT, !canAfford || !isPlayerTurn, isSelected, isHovered);
+
+      if ((isHovered || isSelected) && isPlayerTurn) {
+        this.drawCardTooltip(ctx, card.card, cardW, CARD_HEIGHT);
+      }
 
       ctx.restore();
     }
   }
 
-  private drawBattleCard(ctx: CanvasRenderingContext2D, card: Card, w: number, h: number, disabled: boolean, selected: boolean): void {
+  private drawBattleCard(ctx: CanvasRenderingContext2D, card: Card, w: number, h: number, disabled: boolean, selected: boolean, hovered: boolean = false): void {
+    if (selected) {
+      ctx.save();
+      ctx.shadowColor = COLORS.accent;
+      ctx.shadowBlur = 25;
+      ctx.shadowOffsetX = 0;
+      ctx.shadowOffsetY = 0;
+    } else if (hovered) {
+      ctx.save();
+      ctx.shadowColor = RARITY_COLORS[card.rarity];
+      ctx.shadowBlur = 20;
+      ctx.shadowOffsetX = 0;
+      ctx.shadowOffsetY = -5;
+    }
+
     this.roundRect(ctx, 0, 0, w, h, CARD_RADIUS);
 
     if (disabled) {
       ctx.fillStyle = '#374151';
+      ctx.globalAlpha = 0.5;
     } else {
       const grad = ctx.createLinearGradient(0, 0, w, h);
       grad.addColorStop(0, '#1E293B');
@@ -1218,10 +1276,25 @@ export class UIRenderer {
       ctx.fillStyle = grad;
     }
     ctx.fill();
+    ctx.globalAlpha = 1;
 
-    ctx.strokeStyle = RARITY_COLORS[card.rarity];
-    ctx.lineWidth = selected ? 4 : 2;
+    if (selected) {
+      ctx.shadowBlur = 0;
+      ctx.strokeStyle = COLORS.accent;
+      ctx.lineWidth = 5;
+    } else if (hovered) {
+      ctx.shadowBlur = 0;
+      ctx.strokeStyle = '#FFFFFF';
+      ctx.lineWidth = 4;
+    } else {
+      ctx.strokeStyle = RARITY_COLORS[card.rarity];
+      ctx.lineWidth = 2;
+    }
     ctx.stroke();
+
+    if (selected || hovered) {
+      ctx.restore();
+    }
 
     ctx.beginPath();
     ctx.arc(22, 22, 18, 0, Math.PI * 2);
@@ -1291,6 +1364,45 @@ export class UIRenderer {
     ctx.fill();
     ctx.fillStyle = COLORS.white;
     ctx.fillText(String(card.health), w - 28, h - 26);
+  }
+
+  private drawCardTooltip(ctx: CanvasRenderingContext2D, card: Card, cardW: number, cardH: number): void {
+    const tooltipW = cardW + 20;
+    const tooltipH = 40;
+    const tooltipX = -10;
+    const tooltipY = cardH + 5;
+
+    ctx.save();
+
+    const bgGrad = ctx.createLinearGradient(tooltipX, tooltipY, tooltipX, tooltipY + tooltipH);
+    bgGrad.addColorStop(0, '#1E293B');
+    bgGrad.addColorStop(1, '#0F172A');
+    ctx.fillStyle = bgGrad;
+    this.roundRect(ctx, tooltipX, tooltipY, tooltipW, tooltipH, 8);
+    ctx.fill();
+
+    ctx.strokeStyle = COLORS.accent;
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    ctx.fillStyle = COLORS.white;
+    ctx.font = 'bold 13px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+
+    const midX = tooltipX + tooltipW / 2;
+    const midY = tooltipY + tooltipH / 2;
+
+    ctx.fillStyle = COLORS.accent;
+    ctx.fillText(`💎 ${card.cost}`, midX - 50, midY);
+
+    ctx.fillStyle = COLORS.health;
+    ctx.fillText(`⚔ ${card.attack}`, midX, midY);
+
+    ctx.fillStyle = COLORS.success;
+    ctx.fillText(`❤ ${card.health}`, midX + 50, midY);
+
+    ctx.restore();
   }
 
   private drawTurnIndicator(ctx: CanvasRenderingContext2D, w: number, h: number): void {
