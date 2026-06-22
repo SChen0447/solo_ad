@@ -42,18 +42,65 @@ export default function VoteCard({
         backgroundColor: 'rgba(30, 30, 30, 0.8)',
         backdropFilter: 'blur(12px)',
         borderRadius: 16,
-        border: '1px solid rgba(255, 255, 255, 0.06)',
-        boxShadow: '0 4px 24px rgba(0, 0, 0, 0.3)',
+        border: hasVoted
+          ? '1px solid rgba(76, 175, 80, 0.3)'
+          : isClosed
+          ? '1px solid rgba(255, 82, 82, 0.3)'
+          : '1px solid rgba(255, 255, 255, 0.06)',
+        boxShadow: hasVoted
+          ? '0 4px 24px rgba(76, 175, 80, 0.15)'
+          : '0 4px 24px rgba(0, 0, 0, 0.3)',
+        transition: 'all 0.3s ease-out',
       }}
     >
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-        <h3 style={{ fontSize: 16, fontWeight: 600, color: '#FFF' }}>
-          {hasVoted ? '✅ 投票完成' : isClosed ? '🔒 投票已关闭' : '🗳️ 选择你的选项'}
-        </h3>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <h3 style={{ fontSize: 16, fontWeight: 600, color: '#FFF' }}>
+            {hasVoted ? '✅ 投票完成' : isClosed ? '🔒 投票已关闭' : '🗳️ 选择你的选项'}
+          </h3>
+        </div>
         {hasVoted && !isClosed && (
-          <span style={{ fontSize: 12, color: '#888' }}>已记录你的选择</span>
+          <span style={{
+            fontSize: 11,
+            color: '#4CAF50',
+            backgroundColor: 'rgba(76, 175, 80, 0.15)',
+            padding: '4px 10px',
+            borderRadius: 6,
+            fontWeight: 600,
+            border: '1px solid rgba(76, 175, 80, 0.3)',
+          }}>
+            ✓ 你的选择已记录
+          </span>
         )}
       </div>
+
+      {hasVoted && (
+        <div
+          style={{
+            padding: '10px 14px',
+            backgroundColor: 'rgba(76, 175, 80, 0.1)',
+            border: '1px solid rgba(76, 175, 80, 0.2)',
+            borderRadius: 10,
+            marginBottom: 16,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 10,
+          }}
+        >
+          <span style={{ fontSize: 16 }}>👤</span>
+          <div>
+            <p style={{ fontSize: 12, color: '#4CAF50', fontWeight: 500, marginBottom: 2 }}>
+              你已成功投票
+            </p>
+            <p style={{ fontSize: 11, color: '#888' }}>
+              你选择了：
+              <span style={{ color: '#BB86FC', fontWeight: 600, marginLeft: 4 }}>
+                {options.find(o => o.id === votedOptionId)?.text}
+              </span>
+            </p>
+          </div>
+        </div>
+      )}
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         {options.map((opt, idx) => {
@@ -62,12 +109,13 @@ export default function VoteCard({
           const percentage = totalVotes > 0 ? (opt.voteCount / totalVotes) * 100 : 0;
           const color = getOptionColor(idx, options.length);
           const disabled = isClosed || hasVoted;
+          const isOtherOption = hasVoted && !isSelected;
 
           return (
             <div key={opt.id}>
               <button
                 onClick={() => !disabled && onVote(opt.id)}
-                onMouseEnter={() => setHoveredId(opt.id)}
+                onMouseEnter={() => !disabled && setHoveredId(opt.id)}
                 onMouseLeave={() => setHoveredId(null)}
                 disabled={disabled}
                 style={{
@@ -80,6 +128,8 @@ export default function VoteCard({
                     : 'rgba(255, 255, 255, 0.04)',
                   border: isSelected
                     ? '2px solid #BB86FC'
+                    : isOtherOption
+                    ? '2px solid rgba(255, 255, 255, 0.03)'
                     : '2px solid rgba(255, 255, 255, 0.08)',
                   borderRadius: 12,
                   cursor: disabled ? 'not-allowed' : 'pointer',
@@ -87,7 +137,8 @@ export default function VoteCard({
                   overflow: 'hidden',
                   transform: isHovered && !disabled ? 'scale(1.05)' : 'scale(1)',
                   transition: 'all 0.2s ease-out',
-                  opacity: disabled && !isSelected ? 0.6 : 1,
+                  opacity: isOtherOption ? 0.45 : disabled && !isSelected ? 0.6 : 1,
+                  filter: isOtherOption ? 'grayscale(30%)' : 'none',
                 }}
               >
                 {(hasVoted || totalVotes > 0) && (
@@ -124,17 +175,24 @@ export default function VoteCard({
                         borderRadius: '50%',
                         backgroundColor: color,
                         flexShrink: 0,
+                        boxShadow: isSelected ? `0 0 10px ${color}` : 'none',
+                        transition: 'box-shadow 0.3s',
                       }}
                     />
                     <span
                       style={{
                         fontSize: 14,
-                        fontWeight: 500,
+                        fontWeight: isSelected ? 600 : 500,
                         color: isSelected ? '#121212' : '#FFF',
                         textAlign: 'left',
                       }}
                     >
                       {opt.text}
+                      {isSelected && (
+                        <span style={{ marginLeft: 6, fontSize: 11, opacity: 0.8 }}>
+                          （你的选择）
+                        </span>
+                      )}
                     </span>
                     {isSelected && (
                       <span
@@ -142,13 +200,14 @@ export default function VoteCard({
                           display: 'inline-flex',
                           alignItems: 'center',
                           justifyContent: 'center',
-                          width: 18,
-                          height: 18,
+                          width: 22,
+                          height: 22,
                           borderRadius: '50%',
                           backgroundColor: '#121212',
-                          color: '#BB86FC',
+                          color: '#4CAF50',
                           fontSize: 12,
                           fontWeight: 700,
+                          boxShadow: '0 2px 8px rgba(0, 0, 0, 0.3)',
                         }}
                       >
                         ✓
@@ -174,8 +233,10 @@ export default function VoteCard({
                         color: isSelected ? '#121212' : '#AAA',
                         fontWeight: 600,
                         backgroundColor: isSelected ? 'rgba(18, 18, 18, 0.15)' : 'rgba(255, 255, 255, 0.08)',
-                        padding: '2px 8px',
+                        padding: '2px 10px',
                         borderRadius: 6,
+                        minWidth: 42,
+                        textAlign: 'center',
                       }}
                     >
                       {opt.voteCount} 票

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
 
 interface VoteOption {
   id: string;
@@ -31,57 +31,15 @@ export default function ResultChart({ options, totalVotes }: ResultChartProps) {
   const pieCanvasRef = useRef<HTMLCanvasElement>(null);
   const barCanvasRef = useRef<HTMLCanvasElement>(null);
   const animationRef = useRef<number | null>(null);
-  const prevDataRef = useRef<number[]>([]);
-  const [displayData, setDisplayData] = useState<number[]>(options.map(() => 0));
+  const displayDataRef = useRef<number[]>(options.map(() => 0));
+  const targetDataRef = useRef<number[]>(options.map(() => 0));
+  const startDataRef = useRef<number[]>(options.map(() => 0));
+  const animationStateRef = useRef<{ startTime: number; duration: number }>({
+    startTime: 0,
+    duration: 300,
+  });
 
-  useEffect(() => {
-    const targetData = options.map(o => o.voteCount);
-    const startData = prevDataRef.current.length === targetData.length ? [...prevDataRef.current] : targetData.map(() => 0);
-    prevDataRef.current = [...targetData];
-
-    const startTime = performance.now();
-    const duration = 300;
-
-    const animate = (now: number) => {
-      const elapsed = now - startTime;
-      const t = Math.min(elapsed / duration, 1);
-      const eased = easeOut(t);
-
-      const current = targetData.map((target, i) => lerp(startData[i] ?? 0, target, eased));
-      setDisplayData(current);
-
-      if (t < 1) {
-        animationRef.current = requestAnimationFrame(animate);
-      }
-    };
-
-    if (animationRef.current) {
-      cancelAnimationFrame(animationRef.current);
-    }
-    animationRef.current = requestAnimationFrame(animate);
-
-    return () => {
-      if (animationRef.current) {
-        cancelAnimationFrame(animationRef.current);
-      }
-    };
-  }, [options]);
-
-  useEffect(() => {
-    const canvas = pieCanvasRef.current;
-    if (!canvas) return;
-
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    const dpr = window.devicePixelRatio || 1;
-    const size = 280;
-    canvas.width = size * dpr;
-    canvas.height = size * dpr;
-    canvas.style.width = `${size}px`;
-    canvas.style.height = `${size}px`;
-    ctx.scale(dpr, dpr);
-
+  const drawPieChart = (ctx: CanvasRenderingContext2D, data: number[], size: number) => {
     const cx = size / 2;
     const cy = size / 2;
     const radius = Math.min(cx, cy) - 20;
@@ -89,7 +47,7 @@ export default function ResultChart({ options, totalVotes }: ResultChartProps) {
 
     ctx.clearRect(0, 0, size, size);
 
-    const currentTotal = displayData.reduce((a, b) => a + b, 0);
+    const currentTotal = data.reduce((a, b) => a + b, 0);
 
     if (currentTotal === 0) {
       ctx.beginPath();
@@ -101,11 +59,12 @@ export default function ResultChart({ options, totalVotes }: ResultChartProps) {
       ctx.fillStyle = '#666';
       ctx.font = '14px sans-serif';
       ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
       ctx.fillText('暂无投票', cx, cy);
     } else {
       let startAngle = -Math.PI / 2;
 
-      displayData.forEach((count, idx) => {
+      data.forEach((count, idx) => {
         if (count <= 0) return;
         const sliceAngle = (count / currentTotal) * Math.PI * 2;
         const endAngle = startAngle + sliceAngle;
@@ -150,31 +109,16 @@ export default function ResultChart({ options, totalVotes }: ResultChartProps) {
       ctx.font = '12px sans-serif';
       ctx.fillText('总票数', cx, cy + 16);
     }
-  }, [displayData, options]);
+  };
 
-  useEffect(() => {
-    const canvas = barCanvasRef.current;
-    if (!canvas) return;
-
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    const dpr = window.devicePixelRatio || 1;
-    const width = 400;
-    const height = 200;
-    canvas.width = width * dpr;
-    canvas.height = height * dpr;
-    canvas.style.width = `${width}px`;
-    canvas.style.height = `${height}px`;
-    ctx.scale(dpr, dpr);
-
-    ctx.clearRect(0, 0, width, height);
-
+  const drawBarChart = (ctx: CanvasRenderingContext2D, data: number[], width: number, height: number) => {
     const padding = { top: 20, right: 10, bottom: 40, left: 30 };
     const chartWidth = width - padding.left - padding.right;
     const chartHeight = height - padding.top - padding.bottom;
 
-    const currentMax = Math.max(...displayData, 1);
+    ctx.clearRect(0, 0, width, height);
+
+    const currentMax = Math.max(...data, 1);
 
     ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
     ctx.lineWidth = 1;
@@ -198,7 +142,7 @@ export default function ResultChart({ options, totalVotes }: ResultChartProps) {
     const barWidth = Math.min(barGroupWidth * 0.6, 36);
 
     options.forEach((opt, idx) => {
-      const value = displayData[idx] ?? 0;
+      const value = data[idx] ?? 0;
       const barHeight = (value / currentMax) * chartHeight;
       const x = padding.left + barGroupWidth * idx + (barGroupWidth - barWidth) / 2;
       const y = padding.top + chartHeight - barHeight;
@@ -220,7 +164,7 @@ export default function ResultChart({ options, totalVotes }: ResultChartProps) {
       ctx.quadraticCurveTo(x, y, x + r, y);
       ctx.fill();
 
-      if (value > 0) {
+      if (value > 0.5) {
         ctx.fillStyle = '#FFF';
         ctx.font = 'bold 11px sans-serif';
         ctx.textAlign = 'center';
@@ -235,7 +179,77 @@ export default function ResultChart({ options, totalVotes }: ResultChartProps) {
       const label = opt.text.length > 6 ? opt.text.slice(0, 5) + '…' : opt.text;
       ctx.fillText(label, x + barWidth / 2, padding.top + chartHeight + 6);
     });
-  }, [displayData, options]);
+  };
+
+  useEffect(() => {
+    const pieCanvas = pieCanvasRef.current;
+    const barCanvas = barCanvasRef.current;
+    if (!pieCanvas || !barCanvas) return;
+
+    const pieCtx = pieCanvas.getContext('2d');
+    const barCtx = barCanvas.getContext('2d');
+    if (!pieCtx || !barCtx) return;
+
+    const dpr = window.devicePixelRatio || 1;
+    const pieSize = 280;
+    const barWidth = 400;
+    const barHeight = 200;
+
+    pieCanvas.width = pieSize * dpr;
+    pieCanvas.height = pieSize * dpr;
+    pieCanvas.style.width = `${pieSize}px`;
+    pieCanvas.style.height = `${pieSize}px`;
+    pieCtx.scale(dpr, dpr);
+
+    barCanvas.width = barWidth * dpr;
+    barCanvas.height = barHeight * dpr;
+    barCanvas.style.width = `${barWidth}px`;
+    barCanvas.style.height = `${barHeight}px`;
+    barCtx.scale(dpr, dpr);
+
+    const newTargetData = options.map(o => o.voteCount);
+    const currentDisplayData = displayDataRef.current;
+
+    startDataRef.current = currentDisplayData.length === newTargetData.length
+      ? [...currentDisplayData]
+      : newTargetData.map(() => 0);
+    targetDataRef.current = [...newTargetData];
+    animationStateRef.current = {
+      startTime: performance.now(),
+      duration: 300,
+    };
+
+    if (animationRef.current) {
+      cancelAnimationFrame(animationRef.current);
+    }
+
+    const animate = (now: number) => {
+      const { startTime, duration } = animationStateRef.current;
+      const elapsed = now - startTime;
+      const t = Math.min(elapsed / duration, 1);
+      const eased = easeOut(t);
+
+      const current = targetDataRef.current.map((target, i) =>
+        lerp(startDataRef.current[i] ?? 0, target, eased)
+      );
+      displayDataRef.current = current;
+
+      drawPieChart(pieCtx, current, pieSize);
+      drawBarChart(barCtx, current, barWidth, barHeight);
+
+      if (t < 1) {
+        animationRef.current = requestAnimationFrame(animate);
+      }
+    };
+
+    animationRef.current = requestAnimationFrame(animate);
+
+    return () => {
+      if (animationRef.current) {
+        cancelAnimationFrame(animationRef.current);
+      }
+    };
+  }, [options]);
 
   return (
     <div

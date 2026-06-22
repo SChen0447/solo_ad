@@ -54,6 +54,7 @@ export default function App() {
   const [createError, setCreateError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [showCreateForm, setShowCreateForm] = useState(false);
+  const [copiedCode, setCopiedCode] = useState(false);
 
   const socketRef = useRef<Socket | null>(null);
   const voterIdRef = useRef(getVoterId());
@@ -204,6 +205,39 @@ export default function App() {
     const next = [...newOptions];
     next[idx] = value;
     setNewOptions(next);
+  };
+
+  const handleOptionKeyDown = (e: React.KeyboardEvent<HTMLInputElement>, idx: number) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      if (newOptions[idx].trim() && newOptions.length < 8) {
+        addOption();
+        setTimeout(() => {
+          const inputs = document.querySelectorAll('.option-input');
+          const nextInput = inputs[idx + 1] as HTMLInputElement;
+          if (nextInput) nextInput.focus();
+        }, 50);
+      }
+    }
+  };
+
+  const copyCode = async () => {
+    if (!currentPoll) return;
+    try {
+      await navigator.clipboard.writeText(currentPoll.code);
+      setCopiedCode(true);
+      setTimeout(() => setCopiedCode(false), 2000);
+    } catch {
+      // fallback
+      const textarea = document.createElement('textarea');
+      textarea.value = currentPoll.code;
+      document.body.appendChild(textarea);
+      textarea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textarea);
+      setCopiedCode(true);
+      setTimeout(() => setCopiedCode(false), 2000);
+    }
   };
 
   const validateJoinCode = (code: string): boolean => {
@@ -371,16 +405,28 @@ export default function App() {
                 }}
               />
 
-              <label style={{ fontSize: 12, color: '#AAA', display: 'block', marginBottom: 6 }}>
-                选项 ({newOptions.length}/8)
-              </label>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                <label style={{ fontSize: 12, color: '#AAA' }}>
+                  选项
+                </label>
+                <span style={{
+                  fontSize: 11,
+                  color: newOptions.length >= 8 ? '#FF5252' : '#BB86FC',
+                  fontWeight: 600,
+                  fontFamily: 'monospace',
+                }}>
+                  已添加 {newOptions.length}/8 个选项
+                </span>
+              </div>
               {newOptions.map((opt, idx) => (
                 <div key={idx} style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
                   <input
                     type="text"
                     value={opt}
                     onChange={(e) => updateOption(idx, e.target.value)}
-                    placeholder={`选项 ${idx + 1}`}
+                    onKeyDown={(e) => handleOptionKeyDown(e, idx)}
+                    placeholder={`选项 ${idx + 1}${idx === newOptions.length - 1 && newOptions.length < 8 ? '（回车快速添加）' : ''}`}
+                    className="option-input"
                     style={{
                       flex: 1,
                       padding: '6px 10px',
@@ -410,24 +456,25 @@ export default function App() {
                   )}
                 </div>
               ))}
-              {newOptions.length < 8 && (
-                <button
-                  onClick={addOption}
-                  style={{
-                    width: '100%',
-                    padding: '6px',
-                    backgroundColor: 'transparent',
-                    color: '#888',
-                    border: '1px dashed #3A3A3A',
-                    borderRadius: 6,
-                    cursor: 'pointer',
-                    fontSize: 12,
-                    marginBottom: 10,
-                  }}
-                >
-                  + 添加选项
-                </button>
-              )}
+              <button
+                onClick={addOption}
+                disabled={newOptions.length >= 8}
+                style={{
+                  width: '100%',
+                  padding: '6px',
+                  backgroundColor: newOptions.length >= 8 ? 'rgba(255, 82, 82, 0.1)' : 'transparent',
+                  color: newOptions.length >= 8 ? '#FF5252' : '#888',
+                  border: newOptions.length >= 8 ? '1px solid rgba(255, 82, 82, 0.3)' : '1px dashed #3A3A3A',
+                  borderRadius: 6,
+                  cursor: newOptions.length >= 8 ? 'not-allowed' : 'pointer',
+                  fontSize: 12,
+                  marginBottom: 10,
+                  opacity: newOptions.length >= 8 ? 0.6 : 1,
+                  transition: 'all 0.2s',
+                }}
+              >
+                {newOptions.length >= 8 ? '✕ 已达最大选项数' : '+ 添加选项'}
+              </button>
 
               {createError && (
                 <p style={{ fontSize: 11, color: '#FF5252', marginBottom: 8 }}>{createError}</p>
@@ -573,19 +620,38 @@ export default function App() {
                       </span>
                     )}
                   </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-                    <span style={{
-                      padding: '4px 12px',
-                      backgroundColor: 'rgba(187, 134, 252, 0.2)',
-                      color: '#BB86FC',
-                      borderRadius: 6,
-                      fontSize: 13,
-                      fontFamily: 'monospace',
-                      letterSpacing: 2,
-                      fontWeight: 600,
-                    }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                    <div
+                      onClick={copyCode}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 8,
+                        padding: '4px 12px',
+                        backgroundColor: 'rgba(187, 134, 252, 0.2)',
+                        color: '#BB86FC',
+                        borderRadius: 6,
+                        fontSize: 13,
+                        fontFamily: 'monospace',
+                        letterSpacing: 2,
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                        border: '1px solid rgba(187, 134, 252, 0.3)',
+                        transition: 'all 0.2s',
+                      }}
+                      title="点击复制投票码"
+                    >
                       投票码: {currentPoll.code}
-                    </span>
+                      <span style={{
+                        fontSize: 11,
+                        fontFamily: 'sans-serif',
+                        letterSpacing: 'normal',
+                        fontWeight: 500,
+                        color: copiedCode ? '#4CAF50' : 'rgba(187, 134, 252, 0.6)',
+                      }}>
+                        {copiedCode ? '✓ 已复制' : '📋 复制'}
+                      </span>
+                    </div>
                     <span style={{ fontSize: 13, color: '#888' }}>
                       👥 {currentPoll.totalVotes} 人参与
                     </span>
