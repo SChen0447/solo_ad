@@ -19,22 +19,22 @@ scene.add(particleEngine.particles);
 
 const clock = new THREE.Clock();
 let frameCount = 0;
-let fpsAccumulator = 0;
-let lastFpsUpdateTime = performance.now();
+let fpsTimeAccumulator = 0;
+let lastFpsDisplayTime = performance.now();
 let currentFps = 0;
-let fpsProtectionCooldown = 0;
-const FPS_PROTECTION_INTERVAL = 5000;
+let fpsProtectionCooldownMs = 0;
+const FPS_PROTECTION_INTERVAL_MS = 5000;
+const FPS_UPDATE_INTERVAL_MS = 1000;
 
 function animate(): void {
   const deltaTime = Math.min(clock.getDelta(), 0.1);
-  const elapsedTime = clock.elapsedTime;
 
   frameCount++;
-  fpsAccumulator += deltaTime;
+  fpsTimeAccumulator += deltaTime;
   const now = performance.now();
 
-  if (now - lastFpsUpdateTime >= 1000) {
-    currentFps = Math.round(frameCount / fpsAccumulator);
+  if (now - lastFpsDisplayTime >= FPS_UPDATE_INTERVAL_MS) {
+    currentFps = Math.round(frameCount / fpsTimeAccumulator);
     if (fpsValueEl) {
       fpsValueEl.textContent = String(currentFps);
       fpsValueEl.style.color = currentFps >= 45 ? '#4caf50' : currentFps >= 30 ? '#ffc107' : '#f44336';
@@ -43,18 +43,19 @@ function animate(): void {
       particleCountEl.textContent = `粒子: ${particleEngine.getActiveCount()}`;
     }
     frameCount = 0;
-    fpsAccumulator = 0;
-    lastFpsUpdateTime = now;
+    fpsTimeAccumulator = 0;
+    lastFpsDisplayTime = now;
 
-    if (currentFps < 30 && fpsProtectionCooldown <= 0 && particleEngine.getActiveCount() > 2000) {
+    if (currentFps < 30 && fpsProtectionCooldownMs <= 0 && particleEngine.getActiveCount() > 2000) {
       particleEngine.reduceParticleCount(0.8);
-      fpsProtectionCooldown = FPS_PROTECTION_INTERVAL;
+      fpsProtectionCooldownMs = FPS_PROTECTION_INTERVAL_MS;
       console.warn(`[FPS监控] FPS=${currentFps} < 30，已自动减少粒子数量至 ${particleEngine.getActiveCount()}`);
     }
   }
 
-  if (fpsProtectionCooldown > 0) {
-    fpsProtectionCooldown -= 1000;
+  if (fpsProtectionCooldownMs > 0) {
+    fpsProtectionCooldownMs -= deltaTime * 1000;
+    if (fpsProtectionCooldownMs < 0) fpsProtectionCooldownMs = 0;
   }
 
   particleEngine.update(deltaTime, physicsParams);

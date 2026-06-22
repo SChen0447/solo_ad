@@ -47,6 +47,8 @@ export class ParticleEngine {
 
   public maxParticles: number;
   public activeCount: number;
+  private pendingReductionFactor: number = 0;
+  private pendingReductionFlag: boolean = false;
 
   private positions!: Float32Array;
   private velocities!: Float32Array;
@@ -62,13 +64,18 @@ export class ParticleEngine {
   private alphaAttribute!: THREE.BufferAttribute;
 
   private readonly SPAWN_RANGE = 50;
-  private readonly FADE_DURATION = 0.5;
+  private readonly FADE_OUT_DURATION = 0.5;
+  private readonly FADE_IN_DURATION = 0.5;
   private readonly MIN_LIFETIME = 3;
   private readonly MAX_LIFETIME = 8;
 
-  private readonly BLUE = new THREE.Color(0x3366ff);
-  private readonly PURPLE = new THREE.Color(0x9933ff);
-  private readonly RED = new THREE.Color(0xff3366);
+  private readonly COLOR_STOPS = [
+    { t: 0.0, color: new THREE.Color(0x3366ff) },
+    { t: 0.35, color: new THREE.Color(0x6644ff) },
+    { t: 0.5, color: new THREE.Color(0x9933ff) },
+    { t: 0.65, color: new THREE.Color(0xcc2299) },
+    { t: 1.0, color: new THREE.Color(0xff3366) }
+  ];
   private readonly MAX_DIST = 50 * Math.sqrt(3);
 
   constructor(count: number = 5000) {
@@ -139,7 +146,7 @@ export class ParticleEngine {
     this.updateParticleColor(index);
 
     this.sizes[index] = 0.3 + Math.random() * 0.9;
-    this.alphas[index] = 1.0;
+    this.alphas[index] = 0.0;
 
     this.maxLifetimes[index] = this.MIN_LIFETIME + Math.random() * (this.MAX_LIFETIME - this.MIN_LIFETIME);
     this.birthTimes[index] = currentTime;
@@ -151,23 +158,33 @@ export class ParticleEngine {
     const y = this.positions[i3 + 1];
     const z = this.positions[i3 + 2];
     const dist = Math.sqrt(x * x + y * y + z * z);
-    const t = Math.min(dist / this.MAX_DIST, 1);
+    let t = Math.min(dist / this.MAX_DIST, 1);
+    t = Math.pow(t, 0.6);
 
-    const color = this.colors;
-    if (t < 0.5) {
-      const s = t * 2;
-      color[i3] = this.BLUE.r + (this.PURPLE.r - this.BLUE.r) * s;
-      color[i3 + 1] = this.BLUE.g + (this.PURPLE.g - this.BLUE.g) * s;
-      color[i3 + 2] = this.BLUE.b + (this.PURPLE.b - this.BLUE.b) * s;
-    } else {
-      const s = (t - 0.5) * 2;
-      color[i3] = this.PURPLE.r + (this.RED.r - this.PURPLE.r) * s;
-      color[i3 + 1] = this.PURPLE.g + (this.RED.g - this.PURPLE.g) * s;
-      color[i3 + 2] = this.PURPLE.b + (this.RED.b - this.PURPLE.b) * s;
+    const stops = this.COLOR_STOPS;
+    let segIdx = 0;
+    for (let s = 0; s < stops.length - 1; s++) {
+      if (t >= stops[s].t && t <= stops[s + 1].t) {
+        segIdx = s;
+        break;
+      }
+      if (s === stops.length - 2) {
+        segIdx = s;
+      }
     }
+
+    const from = stops[segIdx];
+    const to = stops[segIdx + 1];
+    const segT = (to.t - from.t) > 0 ? (t - from.t) / (to.t - from.t) : 0;
+
+    this.colors[i3] = from.color.r + (to.color.r - from.color.r) * segT;
+    this.colors[i3 + 1] = from.color.g + (to.color.g - from.color.g) * segT;
+    this.colors[i3 + 2] = from.color.b + (to.color.b - from.color.b) * segT;
   }
 
   public update(deltaTime: number, params: PhysicsParams): void {
+    this.applyPendingReduction();
+
     const now = performance.now() / 1000;
     const { gravity, vortexStrength, repulsionRadius } = params;
     const dt = deltaTime * 60;
@@ -190,7 +207,13 @@ export class ParticleEngine {
         continue;
       }
 
-      alphas[i] = remaining < this.FADE_DURATION ? remaining / this.FADE_DURATION : 1.0;
+      if (age < this.FADE_IN_DURATION) {
+        alphas[i] = age / this.FADE_IN_DURATION;
+      } else if (remaining < this.FADE_OUT_DURATION) {
+        alphas[i] = remaining / this.FADE_OUT_DURATION;
+      } else {
+        alphas[i] = 1.0;
+      }
 
       const px = pos[i3];
       const py = pos[i3 + 1];
@@ -228,12 +251,14 @@ export class ParticleEngine {
       }
 
       if (repulsionRadius > 0 && distFromCenter < repulsionRadius) {
-        const repulseStrength = (1 - distFromCenter / repulsionRadius) * 0.05;
+        const normalizedDist = distFromCenter / repulsionRadius;
+        const attenuation = (1 - normalizedDist);
+        const repulseStrength = attenuation * attenuation * 0.08;
         if (distSq > 0.0001) {
           const invDist = 1.0 / distFromCenter;
-          ax += px * invDist * repulseStrength;
-          ay += py * invDist * repulseStrength;
-          az += pz * invDist * repulseStrength;
+          ax += px * invDist * repulseStrength * distFromCenter;
+          ay += py * invDist * repulseStrength * distFromCenter;
+          az += pz * invDist * repulseStrength * distFromCenter;
         }
       }
 
@@ -270,13 +295,20 @@ export class ParticleEngine {
     this.alphaAttribute.needsUpdate = true;
   }
 
-  public reduceParticleCount(factor: number = 0.8): boolean {
-    const newCount = Math.max(2000, Math.floor(this.activeCount * factor));
-    if (newCount >= this.activeCount) return false;
+  public reduceParticleCount(factor: number = 0.8): void {
+    this.pendingReductionFactor = factor;
+    this.pendingReductionFlag = true;
+  }
+
+  private applyPendingReduction(): void {
+    if (!this.pendingReductionFlag) return;
+    this.pendingReductionFlag = false;
+
+    const newCount = Math.max(2000, Math.floor(this.activeCount * this.pendingReductionFactor));
+    if (newCount >= this.activeCount) return;
     this.activeCount = newCount;
     this.geometry.setDrawRange(0, this.activeCount);
     console.warn(`[ParticleEngine] 粒子数量已减少至 ${this.activeCount}（FPS过低保护）`);
-    return true;
   }
 
   public getActiveCount(): number {
