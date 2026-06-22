@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { Routes, Route } from 'react-router-dom';
 import ExhibitCard from './components/ExhibitCard';
 import ExhibitDetail from './components/ExhibitDetail';
@@ -44,11 +44,11 @@ function App() {
     }
   }
 
-  function refreshExhibit(updated: Exhibit) {
+  const refreshExhibit = useCallback((updated: Exhibit) => {
     setExhibits((prev) =>
       prev.map((e) => (e.id === updated.id ? { ...e, ...updated } : e))
     );
-  }
+  }, []);
 
   const filteredExhibits = useMemo(() => {
     if (!debouncedSearch.trim()) return exhibits;
@@ -127,12 +127,14 @@ function App() {
   const columnsStyle: React.CSSProperties = {
     columnWidth: '280px',
     columnGap: '20px',
+    width: '100%',
   };
 
   const cardWrapStyle: React.CSSProperties = {
     display: 'inline-block',
     width: '100%',
     marginBottom: '20px',
+    breakInside: 'avoid',
     animation: 'cardFadeIn 0.5s ease-out forwards',
     opacity: 0,
   };
@@ -148,10 +150,23 @@ function App() {
         transform: translateY(0);
       }
     }
+    .waterfall-columns {
+      column-width: 280px;
+      column-gap: 20px;
+    }
+    .waterfall-columns > div {
+      break-inside: avoid;
+      -webkit-column-break-inside: avoid;
+      page-break-inside: avoid;
+      display: inline-block;
+      width: 100%;
+      margin-bottom: 20px;
+    }
     @media (max-width: 768px) {
       .waterfall-columns {
         column-count: 2 !important;
         column-width: auto !important;
+        column-gap: 12px;
       }
     }
   `;

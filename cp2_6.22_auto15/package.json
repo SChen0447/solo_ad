@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "concurrently \"npm:dev:server\" \"npm:dev:client\"",
-    "dev:server": "ts-node server/index.ts",
+    "dev:server": "ts-node --project tsconfig.server.json server/index.ts",
     "dev:client": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview"

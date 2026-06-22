@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { memo, useState, useMemo, useCallback } from 'react';
 import { Exhibit, interact } from '../utils/api';
 
 interface Props {
@@ -15,13 +15,22 @@ const LIGHT_COLORS = [
   '#EDE9FE', '#F3E8FF', '#FCE7F3', '#FCE7F3', '#FBCFE8',
 ];
 
-function randomLightColor(seed: string) {
+const ASPECT_RATIOS = ['4 / 3', '3 / 4', '1 / 1', '5 / 4', '4 / 5', '16 / 10'];
+
+function seededRandom(seed: string, mod: number) {
   let hash = 0;
   for (let i = 0; i < seed.length; i++) {
     hash = seed.charCodeAt(i) + ((hash << 5) - hash);
   }
-  const idx = Math.abs(hash) % LIGHT_COLORS.length;
-  return LIGHT_COLORS[idx];
+  return Math.abs(hash) % mod;
+}
+
+function randomLightColor(seed: string) {
+  return LIGHT_COLORS[seededRandom(seed, LIGHT_COLORS.length)];
+}
+
+function randomAspectRatio(seed: string) {
+  return ASPECT_RATIOS[seededRandom(seed, ASPECT_RATIOS.length)];
 }
 
 function EyeIcon() {
@@ -59,14 +68,15 @@ function QRIcon() {
   );
 }
 
-export default function ExhibitCard({ exhibit, onRefresh, onOpenDetail, onOpenQR }: Props) {
+function ExhibitCardImpl({ exhibit, onRefresh, onOpenDetail, onOpenQR }: Props) {
   const [liked, setLiked] = useState(false);
   const [likeAnimating, setLikeAnimating] = useState(false);
   const [imgError, setImgError] = useState(false);
 
   const placeholderBg = useMemo(() => randomLightColor(exhibit.id), [exhibit.id]);
+  const aspectRatio = useMemo(() => randomAspectRatio(exhibit.id), [exhibit.id]);
 
-  async function handleQRClick(e: React.MouseEvent) {
+  const handleQRClick = useCallback(async (e: React.MouseEvent) => {
     e.stopPropagation();
     try {
       const result = await interact(exhibit.id, 'scan');
@@ -75,20 +85,20 @@ export default function ExhibitCard({ exhibit, onRefresh, onOpenDetail, onOpenQR
       console.error('扫码记录失败:', err);
     }
     onOpenQR();
-  }
+  }, [exhibit, onRefresh, onOpenQR]);
 
-  async function handleLikeClick(e: React.MouseEvent) {
+  const handleLikeClick = useCallback(async (e: React.MouseEvent) => {
     e.stopPropagation();
     setLikeAnimating(true);
     setTimeout(() => setLikeAnimating(false), 300);
     try {
       const result = await interact(exhibit.id, liked ? 'unlike' : 'like');
-      setLiked(!liked);
+      setLiked((prev) => !prev);
       onRefresh({ ...exhibit, likeCount: result.likeCount });
     } catch (err) {
       console.error('点赞失败:', err);
     }
-  }
+  }, [exhibit, liked, onRefresh]);
 
   const displayLikeCount = liked ? exhibit.likeCount + 1 : exhibit.likeCount;
 
@@ -124,6 +134,7 @@ export default function ExhibitCard({ exhibit, onRefresh, onOpenDetail, onOpenQR
     width: '100%',
     position: 'relative',
     overflow: 'hidden',
+    aspectRatio,
   };
 
   const bodyStyle: React.CSSProperties = {
@@ -187,10 +198,8 @@ export default function ExhibitCard({ exhibit, onRefresh, onOpenDetail, onOpenQR
     alignItems: 'center',
     justifyContent: 'center',
     color: liked ? '#EF4444' : '#6B7280',
-    transition: 'border-color 0.2s ease, color 0.2s ease',
+    transition: 'border-color 0.2s ease, color 0.2s ease, transform 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55)',
     transform: likeAnimating ? 'scale(1.2)' : 'scale(1)',
-    transitionTimingFunction: 'cubic-bezier(0.68, -0.55, 0.265, 1.55)',
-    transitionDuration: '0.3s',
   };
 
   const likeCountWrapStyle: React.CSSProperties = {
@@ -236,7 +245,7 @@ export default function ExhibitCard({ exhibit, onRefresh, onOpenDetail, onOpenQR
           <img
             src={exhibit.imageUrl}
             alt={exhibit.name}
-            style={{ width: '100%', display: 'block', objectFit: 'cover' }}
+            style={{ width: '100%', height: '100%', display: 'block', objectFit: 'cover' }}
             loading="lazy"
             onError={() => setImgError(true)}
           />
@@ -244,7 +253,7 @@ export default function ExhibitCard({ exhibit, onRefresh, onOpenDetail, onOpenQR
           <div
             style={{
               width: '100%',
-              aspectRatio: '4 / 3',
+              height: '100%',
               backgroundColor: placeholderBg,
               display: 'flex',
               alignItems: 'center',
@@ -283,3 +292,15 @@ export default function ExhibitCard({ exhibit, onRefresh, onOpenDetail, onOpenQR
     </div>
   );
 }
+
+export default memo(ExhibitCardImpl, (prev, next) => {
+  return (
+    prev.exhibit.id === next.exhibit.id &&
+    prev.exhibit.scanCount === next.exhibit.scanCount &&
+    prev.exhibit.likeCount === next.exhibit.likeCount &&
+    prev.exhibit.name === next.exhibit.name &&
+    prev.exhibit.author === next.exhibit.author &&
+    prev.exhibit.description === next.exhibit.description &&
+    prev.exhibit.imageUrl === next.exhibit.imageUrl
+  );
+});
