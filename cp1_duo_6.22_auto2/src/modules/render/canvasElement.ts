@@ -1,5 +1,6 @@
-import type { KeyframeProperties } from '../timeline/keyframe'
-import { Keyframe } from '../timeline/keyframe'
+import type { KeyframeProperties, PropertyValueDict } from '../timeline/keyframe'
+import { Keyframe, interpolateProperty, PROPERTY_KEYS, mergeProperties } from '../timeline/keyframe'
+import type { EasingType } from '../timeline/keyframe'
 
 export type ElementType = 'rectangle' | 'circle' | 'text'
 
@@ -15,13 +16,7 @@ export interface ElementStyle {
   fontFamily?: string
 }
 
-export interface InitialState {
-  x: number
-  y: number
-  rotation: number
-  scale: number
-  opacity: number
-}
+export interface InitialState extends KeyframeProperties {}
 
 export class CanvasElement {
   id: string
@@ -88,22 +83,12 @@ export class CanvasElement {
 
     if (frame <= sortedKeyframes[0].frame) {
       const kf = sortedKeyframes[0]
-      if (kf.properties.x !== undefined) result.x = kf.properties.x
-      if (kf.properties.y !== undefined) result.y = kf.properties.y
-      if (kf.properties.rotation !== undefined) result.rotation = kf.properties.rotation
-      if (kf.properties.scale !== undefined) result.scale = kf.properties.scale
-      if (kf.properties.opacity !== undefined) result.opacity = kf.properties.opacity
-      return result
+      return mergeProperties(result, kf.properties)
     }
 
     if (frame >= sortedKeyframes[sortedKeyframes.length - 1].frame) {
       const kf = sortedKeyframes[sortedKeyframes.length - 1]
-      if (kf.properties.x !== undefined) result.x = kf.properties.x
-      if (kf.properties.y !== undefined) result.y = kf.properties.y
-      if (kf.properties.rotation !== undefined) result.rotation = kf.properties.rotation
-      if (kf.properties.scale !== undefined) result.scale = kf.properties.scale
-      if (kf.properties.opacity !== undefined) result.opacity = kf.properties.opacity
-      return result
+      return mergeProperties(result, kf.properties)
     }
 
     let startKf: Keyframe | null = null
@@ -121,50 +106,24 @@ export class CanvasElement {
       const frameSpan = endKf.frame - startKf.frame
       const t = frameSpan > 0 ? (frame - startKf.frame) / frameSpan : 0
 
-      const props: (keyof KeyframeProperties)[] = ['x', 'y', 'rotation', 'scale', 'opacity']
-
-      for (const prop of props) {
+      for (const prop of PROPERTY_KEYS) {
         const startVal = startKf.properties[prop] ?? this.initialState[prop]
         const endVal = endKf.properties[prop] ?? this.initialState[prop]
-        const easedValue = this.easeValue(startVal, endVal, t, endKf.easing)
-        ;(result as Record<string, number>)[prop] = easedValue
+        ;(result as Record<string, number>)[prop] = interpolateProperty(
+          startVal,
+          endVal,
+          t,
+          endKf.easing as EasingType,
+          endKf.customEasingFn ?? undefined
+        )
       }
     }
 
     return result
   }
 
-  private easeValue(start: number, end: number, t: number, easing: string): number {
-    let easedT = t
-    switch (easing) {
-      case 'linear':
-        easedT = t
-        break
-      case 'easeIn':
-      case 'easeInQuad':
-        easedT = t * t
-        break
-      case 'easeOut':
-      case 'easeOutQuad':
-        easedT = 1 - (1 - t) * (1 - t)
-        break
-      case 'easeInOut':
-      case 'easeInOutQuad':
-        easedT = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2
-        break
-      case 'easeInCubic':
-        easedT = t * t * t
-        break
-      case 'easeOutCubic':
-        easedT = 1 - Math.pow(1 - t, 3)
-        break
-      case 'easeInOutCubic':
-        easedT = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2
-        break
-      default:
-        easedT = t
-    }
-    return start + (end - start) * easedT
+  getPropertyValueDict(frame: number): PropertyValueDict {
+    return this.getInterpolatedProperties(frame)
   }
 
   clone(): CanvasElement {

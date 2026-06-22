@@ -134,13 +134,9 @@
           :value="selectedKeyframe.easing"
           @change="onEasingChange"
         >
-          <option value="linear">线性 (Linear)</option>
-          <option value="easeIn">缓入 (Ease In)</option>
-          <option value="easeOut">缓出 (Ease Out)</option>
-          <option value="easeInOut">缓入缓出 (Ease In Out)</option>
-          <option value="easeInCubic">三次缓入</option>
-          <option value="easeOutCubic">三次缓出</option>
-          <option value="easeInOutCubic">三次缓入缓出</option>
+          <option v-for="easing in EASING_LIST" :key="easing.value" :value="easing.value">
+            {{ easing.label }}
+          </option>
         </select>
       </div>
 
@@ -327,13 +323,20 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref, onUnmounted } from 'vue'
 import { timelineManager } from '@/modules/timeline/timelineManager'
+import { EASING_LIST } from '@/modules/timeline/keyframe'
 import type { KeyframeProperties } from '@/modules/timeline/keyframe'
 import type { EasingType } from '@/modules/timeline/keyframe'
 import type { ElementType } from '@/modules/render/canvasElement'
 
 const state = timelineManager.getStateSnapshot()
+
+const pendingKeyframeUpdates = ref<Partial<KeyframeProperties>>({})
+const pendingInitialStateUpdates = ref<Partial<KeyframeProperties>>({})
+let rafId: number | null = null
+let lastUpdateTime = 0
+const MAX_DELAY = 50
 
 const selectedElement = computed(() => {
   if (!state.selectedElementId.value) return null
@@ -361,20 +364,60 @@ const keyframeProps = computed(() => {
   return selectedKeyframe.value.properties
 })
 
+function scheduleUpdates() {
+  if (rafId !== null) return
+
+  rafId = requestAnimationFrame((timestamp) => {
+    const elapsed = timestamp - lastUpdateTime
+
+    if (elapsed >= MAX_DELAY || Object.keys(pendingKeyframeUpdates.value).length > 0 || Object.keys(pendingInitialStateUpdates.value).length > 0) {
+      flushPendingUpdates()
+      lastUpdateTime = timestamp
+    }
+
+    rafId = null
+
+    if (Object.keys(pendingKeyframeUpdates.value).length > 0 || Object.keys(pendingInitialStateUpdates.value).length > 0) {
+      scheduleUpdates()
+    }
+  })
+}
+
+function flushPendingUpdates() {
+  if (Object.keys(pendingKeyframeUpdates.value).length > 0) {
+    if (
+      state.selectedKeyframeElementId.value &&
+      state.selectedKeyframeFrame.value !== null
+    ) {
+      timelineManager.updateKeyframeProperties(
+        state.selectedKeyframeElementId.value,
+        state.selectedKeyframeFrame.value,
+        { ...pendingKeyframeUpdates.value }
+      )
+    }
+    pendingKeyframeUpdates.value = {}
+  }
+
+  if (Object.keys(pendingInitialStateUpdates.value).length > 0) {
+    if (selectedElement.value) {
+      for (const key of Object.keys(pendingInitialStateUpdates.value) as (keyof KeyframeProperties)[]) {
+        const value = pendingInitialStateUpdates.value[key]
+        if (value !== undefined) {
+          ;(selectedElement.value.initialState as Record<string, number>)[key] = value
+        }
+      }
+      timelineManager.markDirty()
+    }
+    pendingInitialStateUpdates.value = {}
+  }
+}
+
 function onPropertyChange(prop: keyof KeyframeProperties, event: Event) {
   const target = event.target as HTMLInputElement
   const value = parseFloat(target.value)
 
-  if (
-    state.selectedKeyframeElementId.value &&
-    state.selectedKeyframeFrame.value !== null
-  ) {
-    timelineManager.updateKeyframeProperties(
-      state.selectedKeyframeElementId.value,
-      state.selectedKeyframeFrame.value,
-      { [prop]: value }
-    )
-  }
+  pendingKeyframeUpdates.value[prop] = value
+  scheduleUpdates()
 }
 
 function onPropertyInputChange(prop: keyof KeyframeProperties, event: Event) {
@@ -385,6 +428,11 @@ function onPropertyInputChange(prop: keyof KeyframeProperties, event: Event) {
     state.selectedKeyframeElementId.value &&
     state.selectedKeyframeFrame.value !== null
   ) {
+    if (rafId !== null) {
+      cancelAnimationFrame(rafId)
+      rafId = null
+    }
+    pendingKeyframeUpdates.value = {}
     timelineManager.updateKeyframeProperties(
       state.selectedKeyframeElementId.value,
       state.selectedKeyframeFrame.value,
@@ -448,9 +496,8 @@ function onInitialStateChange(prop: keyof KeyframeProperties, event: Event) {
   const target = event.target as HTMLInputElement
   const value = parseFloat(target.value)
 
-  if (selectedElement.value) {
-    ;(selectedElement.value.initialState as Record<string, number>)[prop] = value
-  }
+  pendingInitialStateUpdates.value[prop] = value
+  scheduleUpdates()
 }
 
 function onInitialStateInputChange(prop: keyof KeyframeProperties, event: Event) {
@@ -458,7 +505,13 @@ function onInitialStateInputChange(prop: keyof KeyframeProperties, event: Event)
   const value = parseFloat(target.value)
 
   if (selectedElement.value) {
+    if (rafId !== null) {
+      cancelAnimationFrame(rafId)
+      rafId = null
+    }
+    pendingInitialStateUpdates.value = {}
     ;(selectedElement.value.initialState as Record<string, number>)[prop] = value
+    timelineManager.markDirty()
   }
 }
 
@@ -468,6 +521,7 @@ function onStyleChange(prop: string, event: Event) {
 
   if (selectedElement.value) {
     ;(selectedElement.value.style as Record<string, number>)[prop] = value
+    timelineManager.markDirty()
   }
 }
 
@@ -477,6 +531,7 @@ function onStyleColorChange(prop: string, event: Event) {
 
   if (selectedElement.value) {
     ;(selectedElement.value.style as Record<string, string>)[prop] = value
+    timelineManager.markDirty()
   }
 }
 
@@ -514,6 +569,12 @@ function getElementTypeName(type: ElementType): string {
   }
   return names[type] || type
 }
+
+onUnmounted(() => {
+  if (rafId !== null) {
+    cancelAnimationFrame(rafId)
+  }
+})
 </script>
 
 <style scoped>

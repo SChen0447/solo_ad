@@ -454,15 +454,50 @@ onUnmounted(() => {
 .keyframe-diamond.selected .diamond-shape {
   background: linear-gradient(135deg, #00ffff 0%, #ff00ff 100%);
   box-shadow: 0 0 16px rgba(0, 255, 255, 0.9), 0 0 32px rgba(255, 0, 255, 0.5);
-  animation: pulse-glow 1.5s ease-in-out infinite;
+  animation: pulse-glow 1.2s ease-in-out infinite, diamond-pulse 1.2s ease-in-out infinite;
 }
 
 @keyframes pulse-glow {
   0%, 100% {
-    box-shadow: 0 0 12px rgba(0, 255, 255, 0.8), 0 0 24px rgba(255, 0, 255, 0.4);
+    box-shadow: 
+      0 0 8px rgba(0, 255, 255, 0.6),
+      0 0 16px rgba(0, 255, 255, 0.4),
+      0 0 24px rgba(255, 0, 255, 0.3),
+      0 0 32px rgba(255, 0, 255, 0.2);
+    filter: brightness(1);
+  }
+  25% {
+    box-shadow: 
+      0 0 12px rgba(0, 255, 255, 0.8),
+      0 0 20px rgba(0, 255, 255, 0.6),
+      0 0 28px rgba(255, 0, 255, 0.4),
+      0 0 36px rgba(255, 0, 255, 0.3);
+    filter: brightness(1.1);
   }
   50% {
-    box-shadow: 0 0 20px rgba(0, 255, 255, 1), 0 0 40px rgba(255, 0, 255, 0.7);
+    box-shadow: 
+      0 0 16px rgba(0, 255, 255, 1),
+      0 0 28px rgba(0, 255, 255, 0.8),
+      0 0 40px rgba(255, 0, 255, 0.6),
+      0 0 48px rgba(255, 0, 255, 0.4);
+    filter: brightness(1.3);
+  }
+  75% {
+    box-shadow: 
+      0 0 12px rgba(0, 255, 255, 0.8),
+      0 0 20px rgba(0, 255, 255, 0.6),
+      0 0 28px rgba(255, 0, 255, 0.4),
+      0 0 36px rgba(255, 0, 255, 0.3);
+    filter: brightness(1.1);
+  }
+}
+
+@keyframes diamond-pulse {
+  0%, 100% {
+    transform: rotate(45deg) scale(1);
+  }
+  50% {
+    transform: rotate(45deg) scale(1.15);
   }
 }
 
