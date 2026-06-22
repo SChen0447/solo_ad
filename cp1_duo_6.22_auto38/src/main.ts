@@ -22,6 +22,10 @@ class GalaxyApp {
   private mouseNDC: THREE.Vector2 = new THREE.Vector2()
   private isMouseOver: boolean = false
 
+  private rafId: number = 0
+  private lastRenderTime: number = 0
+  private renderFrameInterval: number = 1000 / 60
+
   constructor() {
     this.container = document.getElementById('app')!
     this.pauseBtn = document.getElementById('pause-btn') as HTMLButtonElement
@@ -76,7 +80,8 @@ class GalaxyApp {
     this.bindEvents()
     this.updateGuiLabels()
 
-    this.animate()
+    this.lastRenderTime = performance.now()
+    this.startRenderLoop()
   }
 
   private addStars(): void {
@@ -234,25 +239,41 @@ class GalaxyApp {
     this.distValue.textContent = d.toFixed(1)
   }
 
-  private animate = (): void => {
-    requestAnimationFrame(this.animate)
+  private startRenderLoop(): void {
+    const loop = (): void => {
+      this.rafId = requestAnimationFrame(loop)
 
-    const delta = this.clock.getDelta()
-    this.controls.update()
+      const now = performance.now()
+      const elapsed = now - this.lastRenderTime
 
-    this.simulator.update(delta)
+      if (elapsed >= this.renderFrameInterval) {
+        this.lastRenderTime = now - (elapsed % this.renderFrameInterval)
 
-    if (this.isMouseOver) {
-      const density = this.simulator.updateHeatmap(
-        this.camera,
-        this.mouseNDC.x,
-        this.mouseNDC.y
-      )
-      this.densityValue.textContent = density.toString()
-      this.densityLabel.style.display = 'block'
+        const delta = this.clock.getDelta()
+        this.controls.update()
+        this.simulator.update(delta)
+
+        if (this.isMouseOver) {
+          const density = this.simulator.updateHeatmap(
+            this.camera,
+            this.mouseNDC.x,
+            this.mouseNDC.y
+          )
+          this.densityValue.textContent = density.toString()
+          this.densityLabel.style.display = 'block'
+        }
+
+        this.renderer.render(this.scene, this.camera)
+      }
     }
 
-    this.renderer.render(this.scene, this.camera)
+    this.rafId = requestAnimationFrame(loop)
+  }
+
+  public dispose(): void {
+    if (this.rafId) cancelAnimationFrame(this.rafId)
+    this.simulator.dispose()
+    this.renderer.dispose()
   }
 }
 

@@ -17,14 +17,25 @@ export class Simulator {
   private heatmapTexture: THREE.CanvasTexture | null = null
   private heatmapMesh: THREE.Mesh | null = null
   private heatmapMaterial: THREE.MeshBasicMaterial | null = null
-  private lastFrameTime: number = 0
   private frameAccumulator: number = 0
   private simFps: number = 30
   private simInterval: number = 1 / 30
   private lowQualityMode: boolean = false
+  private currentParticleCount: number = 0
 
-  private tempVec: THREE.Vector3 = new THREE.Vector3()
-  private forceVec: THREE.Vector3 = new THREE.Vector3()
+  private backBufferPositions1: Float32Array | null = null
+  private backBufferPositions2: Float32Array | null = null
+  private backBufferVelocities1: Float32Array | null = null
+  private backBufferVelocities2: Float32Array | null = null
+
+  private raycaster: THREE.Raycaster = new THREE.Raycaster()
+  private mouseNDC: THREE.Vector2 = new THREE.Vector2()
+
+  private MAX_FORCE: number = 5.0
+  private MIN_DISTANCE: number = 0.15
+  private MAX_SPEED: number = 8.0
+  private SAMPLE_STEP_LOCAL: number = 25
+  private SAMPLE_STEP_REMOTE: number = 12
 
   constructor(scene: THREE.Scene) {
     this.scene = scene
@@ -34,7 +45,6 @@ export class Simulator {
     this.heatmapCanvas.height = 256
 
     this.initGalaxies()
-    this.checkPerformanceLevel()
   }
 
   public initGalaxies(distance?: number): void {
@@ -56,7 +66,7 @@ export class Simulator {
       5000,
       new THREE.Vector3(-d / 2, 0, 0),
       0,
-      0
+      0.0
     )
 
     this.galaxy2 = new Galaxy(
@@ -75,22 +85,29 @@ export class Simulator {
     this.scene.add(this.galaxy1.points)
     this.scene.add(this.galaxy2.points)
 
-    this.allParticles = 10000
+    this.currentParticleCount = this.galaxy1.particleCount + this.galaxy2.particleCount
+    this.allParticles = this.currentParticleCount
+
+    this.backBufferPositions1 = new Float32Array(this.galaxy1.data.positions)
+    this.backBufferPositions2 = new Float32Array(this.galaxy2.data.positions)
+    this.backBufferVelocities1 = new Float32Array(this.galaxy1.data.velocities)
+    this.backBufferVelocities2 = new Float32Array(this.galaxy2.data.velocities)
+
     this.checkPerformanceLevel()
     this.applyPerformanceMode()
   }
 
   private checkPerformanceLevel(): void {
-    this.lowQualityMode = this.allParticles > 8000
+    this.lowQualityMode = this.currentParticleCount > 8000
   }
 
   private applyPerformanceMode(): void {
     if (this.lowQualityMode) {
-      this.galaxy1.material.size = 0.025
-      this.galaxy2.material.size = 0.025
+      this.galaxy1.setBaseSize(0.5)
+      this.galaxy2.setBaseSize(0.5)
     } else {
-      this.galaxy1.material.size = 0.05
-      this.galaxy2.material.size = 0.05
+      this.galaxy1.setBaseSize(1.0)
+      this.galaxy2.setBaseSize(1.0)
     }
   }
 
@@ -100,16 +117,16 @@ export class Simulator {
 
   public pause(): void {
     this.isPaused = true
-    this.galaxy1.setOpacity(0.5)
-    this.galaxy2.setOpacity(0.5)
+    this.galaxy1.setOpacity(0.45)
+    this.galaxy2.setOpacity(0.45)
     this.showOrbitPredictions()
     if (this.onPauseChange) this.onPauseChange(true)
   }
 
   public resume(): void {
     this.isPaused = false
-    this.galaxy1.setOpacity(0.9)
-    this.galaxy2.setOpacity(0.9)
+    this.galaxy1.setOpacity(1.0)
+    this.galaxy2.setOpacity(1.0)
     this.removeOrbitLines()
     if (this.onPauseChange) this.onPauseChange(false)
   }
@@ -122,168 +139,181 @@ export class Simulator {
     }
   }
 
-  private computeAcceleration(
-    positions: Float32Array,
-    galaxyIdx: number,
-    particleIdx: number,
-    targetForce: THREE.Vector3
+  private computeGravityForceOnParticle(
+    px: number, py: number, pz: number,
+    outForce: Float32Array
   ): void {
-    targetForce.set(0, 0, 0)
-    const px = positions[particleIdx * 3]
-    const py = positions[particleIdx * 3 + 1]
-    const pz = positions[particleIdx * 3 + 2]
+    outForce[0] = 0
+    outForce[1] = 0
+    outForce[2] = 0
 
-    const allGalaxies = [this.galaxy1, this.galaxy2]
+    const G = this.gravityConstant
+    const MIN_D2 = this.MIN_DISTANCE * this.MIN_DISTANCE
+    const MAX_F = this.MAX_FORCE
 
-    for (let gi = 0; gi < 2; gi++) {
-      const gal = allGalaxies[gi]
-      const gpos = gal.data.positions
-      const sampleStep = gi === galaxyIdx ? 20 : 10
-
-      for (let j = 0; j < gal.particleCount; j += sampleStep) {
+    const processGalaxy = (galPos: Float32Array, count: number, sampleStep: number): void => {
+      for (let j = 0; j < count; j += sampleStep) {
         const j3 = j * 3
-        const dx = gpos[j3] - px
-        const dy = gpos[j3 + 1] - py
-        const dz = gpos[j3 + 2] - pz
+        const dx = galPos[j3] - px
+        const dy = galPos[j3 + 1] - py
+        const dz = galPos[j3 + 2] - pz
 
         const distSq = dx * dx + dy * dy + dz * dz
-        const minDist = 0.2
-        if (distSq < minDist * minDist) continue
+
+        if (distSq < MIN_D2) continue
 
         const dist = Math.sqrt(distSq)
-        const forceMag = (this.gravityConstant * sampleStep) / Math.max(distSq, minDist * minDist)
-        const maxForce = 2.0
-        const clampedForce = Math.min(forceMag, maxForce)
 
-        targetForce.x += (dx / dist) * clampedForce
-        targetForce.y += (dy / dist) * clampedForce
-        targetForce.z += (dz / dist) * clampedForce
+        const forceMag = (G * sampleStep) / distSq
+        const clampedForce = Math.min(forceMag, MAX_F)
+
+        const invDist = 1.0 / dist
+        outForce[0] += dx * invDist * clampedForce
+        outForce[1] += dy * invDist * clampedForce
+        outForce[2] += dz * invDist * clampedForce
       }
     }
+
+    processGalaxy(this.galaxy1.data.positions, this.galaxy1.particleCount, this.SAMPLE_STEP_LOCAL)
+    processGalaxy(this.galaxy2.data.positions, this.galaxy2.particleCount, this.SAMPLE_STEP_REMOTE)
   }
 
   private stepSimulation(): void {
+    const dt = this.timeStep
+    const tmpForce = new Float32Array(3)
+
     const galaxies = [this.galaxy1, this.galaxy2]
+    const backBuffers = [
+      { pos: this.backBufferPositions1!, vel: this.backBufferVelocities1! },
+      { pos: this.backBufferPositions2!, vel: this.backBufferVelocities2! }
+    ]
 
     for (let gi = 0; gi < 2; gi++) {
       const gal = galaxies[gi]
-      const pos = gal.data.positions
-      const vel = gal.data.velocities
+      const curPos = gal.data.positions
+      const curVel = gal.data.velocities
+      const dstPos = backBuffers[gi].pos
+      const dstVel = backBuffers[gi].vel
       const count = gal.particleCount
 
       for (let i = 0; i < count; i++) {
         const i3 = i * 3
+        const px = curPos[i3]
+        const py = curPos[i3 + 1]
+        const pz = curPos[i3 + 2]
 
-        this.computeAcceleration(pos, gi, i, this.forceVec)
+        this.computeGravityForceOnParticle(px, py, pz, tmpForce)
 
-        vel[i3] += this.forceVec.x * this.timeStep
-        vel[i3 + 1] += this.forceVec.y * this.timeStep
-        vel[i3 + 2] += this.forceVec.z * this.timeStep
+        const ax = tmpForce[0]
+        const ay = tmpForce[1]
+        const az = tmpForce[2]
 
-        const speedSq = vel[i3] * vel[i3] + vel[i3 + 1] * vel[i3 + 1] + vel[i3 + 2] * vel[i3 + 2]
-        const maxSpeed = 10
-        if (speedSq > maxSpeed * maxSpeed) {
-          const s = maxSpeed / Math.sqrt(speedSq)
-          vel[i3] *= s
-          vel[i3 + 1] *= s
-          vel[i3 + 2] *= s
+        let vx = curVel[i3] + ax * dt
+        let vy = curVel[i3 + 1] + ay * dt
+        let vz = curVel[i3 + 2] + az * dt
+
+        const speedSq = vx * vx + vy * vy + vz * vz
+        if (speedSq > this.MAX_SPEED * this.MAX_SPEED) {
+          const invSpeed = this.MAX_SPEED / Math.sqrt(speedSq)
+          vx *= invSpeed
+          vy *= invSpeed
+          vz *= invSpeed
         }
+
+        dstVel[i3] = vx
+        dstVel[i3 + 1] = vy
+        dstVel[i3 + 2] = vz
+
+        dstPos[i3] = px + vx * dt
+        dstPos[i3 + 1] = py + vy * dt
+        dstPos[i3 + 2] = pz + vz * dt
       }
     }
 
     for (let gi = 0; gi < 2; gi++) {
       const gal = galaxies[gi]
-      const pos = gal.data.positions
-      const vel = gal.data.velocities
-      const count = gal.particleCount
-
-      for (let i = 0; i < count; i++) {
-        const i3 = i * 3
-        pos[i3] += vel[i3] * this.timeStep
-        pos[i3 + 1] += vel[i3 + 1] * this.timeStep
-        pos[i3 + 2] += vel[i3 + 2] * this.timeStep
+      const srcPos = backBuffers[gi].pos
+      const srcVel = backBuffers[gi].vel
+      for (let i = 0; i < gal.particleCount * 3; i++) {
+        gal.data.positions[i] = srcPos[i]
+        gal.data.velocities[i] = srcVel[i]
       }
     }
 
-    this.galaxy1.updatePositionsFromData()
-    this.galaxy2.updatePositionsFromData()
+    this.syncGeometryBuffers()
+  }
+
+  private syncGeometryBuffers(): void {
+    const attr1 = this.galaxy1.positionAttribute
+    const attr2 = this.galaxy2.positionAttribute
+    const arr1 = attr1.array as Float32Array
+    const arr2 = attr2.array as Float32Array
+    const src1 = this.galaxy1.data.positions
+    const src2 = this.galaxy2.data.positions
+
+    for (let i = 0; i < this.galaxy1.particleCount * 3; i++) {
+      arr1[i] = src1[i]
+    }
+    for (let i = 0; i < this.galaxy2.particleCount * 3; i++) {
+      arr2[i] = src2[i]
+    }
+
+    attr1.needsUpdate = true
+    attr2.needsUpdate = true
+    this.galaxy1.geometry.attributes.position.needsUpdate = true
+    this.galaxy2.geometry.attributes.position.needsUpdate = true
   }
 
   private predictOrbitRK4(
-    galaxyIdx: number,
-    particleIdx: number,
+    startPos: Float32Array,
+    startVel: Float32Array,
     duration: number
   ): THREE.Vector3[] {
-    const gal = galaxyIdx === 0 ? this.galaxy1 : this.galaxy2
     const dt = 0.02
-    const steps = Math.ceil(duration / dt)
+    const steps = Math.max(1, Math.ceil(duration / dt))
 
-    const statePos = new Float32Array(3)
-    const stateVel = new Float32Array(3)
-    const i3 = particleIdx * 3
-    statePos[0] = gal.data.positions[i3]
-    statePos[1] = gal.data.positions[i3 + 1]
-    statePos[2] = gal.data.positions[i3 + 2]
-    stateVel[0] = gal.data.velocities[i3]
-    stateVel[1] = gal.data.velocities[i3 + 1]
-    stateVel[2] = gal.data.velocities[i3 + 2]
+    const p = new Float32Array(startPos)
+    const v = new Float32Array(startVel)
 
-    const positions: THREE.Vector3[] = [new THREE.Vector3(statePos[0], statePos[1], statePos[2])]
+    const positions: THREE.Vector3[] = [new THREE.Vector3(p[0], p[1], p[2])]
 
-    const allGals = [this.galaxy1, this.galaxy2]
-    const allPos = [allGals[0].data.positions, allGals[1].data.positions]
-
-    const getAccel = (p: Float32Array, v: Float32Array, gi: number, idx: number): Float32Array => {
+    const getAccel = (pos: Float32Array): Float32Array => {
       const acc = new Float32Array(3)
-      for (let g = 0; g < 2; g++) {
-        const gpos = allPos[g]
-        const sampleStep = g === gi ? 30 : 20
-        for (let j = 0; j < 5000; j += sampleStep) {
-          const j3 = j * 3
-          const dx = gpos[j3] - p[0]
-          const dy = gpos[j3 + 1] - p[1]
-          const dz = gpos[j3 + 2] - p[2]
-          const distSq = dx * dx + dy * dy + dz * dz
-          const minDist = 0.2
-          if (distSq < minDist * minDist) continue
-          const dist = Math.sqrt(distSq)
-          const forceMag = (this.gravityConstant * sampleStep) / Math.max(distSq, minDist * minDist)
-          const clampedForce = Math.min(forceMag, 2.0)
-          acc[0] += (dx / dist) * clampedForce
-          acc[1] += (dy / dist) * clampedForce
-          acc[2] += (dz / dist) * clampedForce
-        }
-      }
+      const tmp = new Float32Array(3)
+      this.computeGravityForceOnParticle(pos[0], pos[1], pos[2], tmp)
+      acc[0] = tmp[0]
+      acc[1] = tmp[1]
+      acc[2] = tmp[2]
       return acc
     }
 
     for (let s = 0; s < steps; s++) {
-      const k1v = getAccel(statePos, stateVel, galaxyIdx, particleIdx)
-      const k1p = new Float32Array([stateVel[0], stateVel[1], stateVel[2]])
+      const k1v = getAccel(p)
+      const k1p = new Float32Array([v[0], v[1], v[2]])
 
-      const p2 = new Float32Array([statePos[0] + k1p[0] * dt / 2, statePos[1] + k1p[1] * dt / 2, statePos[2] + k1p[2] * dt / 2])
-      const v2 = new Float32Array([stateVel[0] + k1v[0] * dt / 2, stateVel[1] + k1v[1] * dt / 2, stateVel[2] + k1v[2] * dt / 2])
-      const k2v = getAccel(p2, v2, galaxyIdx, particleIdx)
+      const p2 = new Float32Array([p[0] + k1p[0] * dt / 2, p[1] + k1p[1] * dt / 2, p[2] + k1p[2] * dt / 2])
+      const v2 = new Float32Array([v[0] + k1v[0] * dt / 2, v[1] + k1v[1] * dt / 2, v[2] + k1v[2] * dt / 2])
+      const k2v = getAccel(p2)
       const k2p = new Float32Array([v2[0], v2[1], v2[2]])
 
-      const p3 = new Float32Array([statePos[0] + k2p[0] * dt / 2, statePos[1] + k2p[1] * dt / 2, statePos[2] + k2p[2] * dt / 2])
-      const v3 = new Float32Array([stateVel[0] + k2v[0] * dt / 2, stateVel[1] + k2v[1] * dt / 2, stateVel[2] + k2v[2] * dt / 2])
-      const k3v = getAccel(p3, v3, galaxyIdx, particleIdx)
+      const p3 = new Float32Array([p[0] + k2p[0] * dt / 2, p[1] + k2p[1] * dt / 2, p[2] + k2p[2] * dt / 2])
+      const v3 = new Float32Array([v[0] + k2v[0] * dt / 2, v[1] + k2v[1] * dt / 2, v[2] + k2v[2] * dt / 2])
+      const k3v = getAccel(p3)
       const k3p = new Float32Array([v3[0], v3[1], v3[2]])
 
-      const p4 = new Float32Array([statePos[0] + k3p[0] * dt, statePos[1] + k3p[1] * dt, statePos[2] + k3p[2] * dt])
-      const v4 = new Float32Array([stateVel[0] + k3v[0] * dt, stateVel[1] + k3v[1] * dt, stateVel[2] + k3v[2] * dt])
-      const k4v = getAccel(p4, v4, galaxyIdx, particleIdx)
+      const p4 = new Float32Array([p[0] + k3p[0] * dt, p[1] + k3p[1] * dt, p[2] + k3p[2] * dt])
+      const v4 = new Float32Array([v[0] + k3v[0] * dt, v[1] + k3v[1] * dt, v[2] + k3v[2] * dt])
+      const k4v = getAccel(p4)
       const k4p = new Float32Array([v4[0], v4[1], v4[2]])
 
-      statePos[0] += (k1p[0] + 2 * k2p[0] + 2 * k3p[0] + k4p[0]) * dt / 6
-      statePos[1] += (k1p[1] + 2 * k2p[1] + 2 * k3p[1] + k4p[1]) * dt / 6
-      statePos[2] += (k1p[2] + 2 * k2p[2] + 2 * k3p[2] + k4p[2]) * dt / 6
-      stateVel[0] += (k1v[0] + 2 * k2v[0] + 2 * k3v[0] + k4v[0]) * dt / 6
-      stateVel[1] += (k1v[1] + 2 * k2v[1] + 2 * k3v[1] + k4v[1]) * dt / 6
-      stateVel[2] += (k1v[2] + 2 * k2v[2] + 2 * k3v[2] + k4v[2]) * dt / 6
+      p[0] += (k1p[0] + 2 * k2p[0] + 2 * k3p[0] + k4p[0]) * dt / 6
+      p[1] += (k1p[1] + 2 * k2p[1] + 2 * k3p[1] + k4p[1]) * dt / 6
+      p[2] += (k1p[2] + 2 * k2p[2] + 2 * k3p[2] + k4p[2]) * dt / 6
+      v[0] += (k1v[0] + 2 * k2v[0] + 2 * k3v[0] + k4v[0]) * dt / 6
+      v[1] += (k1v[1] + 2 * k2v[1] + 2 * k3v[1] + k4v[1]) * dt / 6
+      v[2] += (k1v[2] + 2 * k2v[2] + 2 * k3v[2] + k4v[2]) * dt / 6
 
-      positions.push(new THREE.Vector3(statePos[0], statePos[1], statePos[2]))
+      positions.push(new THREE.Vector3(p[0], p[1], p[2]))
     }
 
     return positions
@@ -293,21 +323,24 @@ export class Simulator {
     this.removeOrbitLines()
     this.orbitLines = new THREE.Group()
 
-    const samples = 60
-    const samplesPerGalaxy = samples / 2
+    const PREDICT_DURATION = 0.5
+    const samplesPerGalaxy = 40
 
     for (let gi = 0; gi < 2; gi++) {
-      for (let s = 0; s < samplesPerGalaxy; s++) {
-        const idx = Math.floor(Math.random() * 5000)
-        const gal = gi === 0 ? this.galaxy1 : this.galaxy2
-        const i3 = idx * 3
-        const vx = gal.data.velocities[i3]
-        const vy = gal.data.velocities[i3 + 1]
-        const vz = gal.data.velocities[i3 + 2]
-        const speed = Math.sqrt(vx * vx + vy * vy + vz * vz)
-        const duration = 0.3 + Math.min(speed * 0.1, 0.3)
+      const gal = gi === 0 ? this.galaxy1 : this.galaxy2
+      const count = gal.particleCount
 
-        const path = this.predictOrbitRK4(gi, idx, duration)
+      for (let s = 0; s < samplesPerGalaxy; s++) {
+        const idx = Math.floor((s / samplesPerGalaxy) * count + Math.random() * (count / samplesPerGalaxy))
+        const safeIdx = Math.min(Math.max(idx, 0), count - 1)
+        const i3 = safeIdx * 3
+
+        const startPos = gal.data.positions.subarray(i3, i3 + 3)
+        const startVel = gal.data.velocities.subarray(i3, i3 + 3)
+
+        const speed = Math.sqrt(startVel[0] * startVel[0] + startVel[1] * startVel[1] + startVel[2] * startVel[2])
+        const durationScale = Math.min(0.3 + speed * 0.1, 1.0)
+        const path = this.predictOrbitRK4(startPos, startVel, PREDICT_DURATION * durationScale)
 
         const positions = new Float32Array(path.length * 3)
         for (let i = 0; i < path.length; i++) {
@@ -323,10 +356,11 @@ export class Simulator {
         const mat = new THREE.LineDashedMaterial({
           color: color,
           transparent: true,
-          opacity: 0.35,
-          dashSize: 0.15,
-          gapSize: 0.1,
-          depthWrite: false
+          opacity: 0.4,
+          dashSize: 0.12,
+          gapSize: 0.08,
+          depthWrite: false,
+          linewidth: 1
         })
 
         const line = new THREE.Line(geom, mat)
@@ -340,11 +374,14 @@ export class Simulator {
 
   private removeOrbitLines(): void {
     if (this.orbitLines) {
-      this.orbitLines.children.forEach(obj => {
+      this.orbitLines.traverse((obj) => {
         if (obj instanceof THREE.Line) {
           obj.geometry.dispose()
-          const mat = obj.material as THREE.LineDashedMaterial
-          mat.dispose()
+          if (Array.isArray(obj.material)) {
+            obj.material.forEach((m) => m.dispose())
+          } else {
+            obj.material.dispose()
+          }
         }
       })
       this.scene.remove(this.orbitLines)
@@ -356,9 +393,9 @@ export class Simulator {
     let count = 0
     const r2 = radius * radius
 
-    const checkGalaxy = (gal: Galaxy) => {
+    const check = (gal: Galaxy): void => {
       const pos = gal.data.positions
-      for (let i = 0; i < gal.particleCount; i++) {
+      for (let i = 0; i < gal.particleCount; i += 3) {
         const i3 = i * 3
         const dx = pos[i3] - worldPoint.x
         const dy = pos[i3 + 1] - worldPoint.y
@@ -367,27 +404,31 @@ export class Simulator {
       }
     }
 
-    checkGalaxy(this.galaxy1)
-    checkGalaxy(this.galaxy2)
+    check(this.galaxy1)
+    check(this.galaxy2)
     return count
   }
 
   public updateHeatmap(camera: THREE.Camera, screenX: number, screenY: number): number {
-    const raycaster = new THREE.Raycaster()
-    const ndc = new THREE.Vector2(screenX, screenY)
-    raycaster.setFromCamera(ndc, camera)
+    this.mouseNDC.set(screenX, screenY)
+    this.raycaster.setFromCamera(this.mouseNDC, camera)
 
-    const planeNormal = new THREE.Vector3()
-    camera.getWorldDirection(planeNormal)
+    const camDir = new THREE.Vector3()
+    camera.getWorldDirection(camDir)
+
     const sceneCenter = new THREE.Vector3(0, 0, 0)
-    const plane = new THREE.Plane().setFromNormalAndCoplanarPoint(planeNormal, sceneCenter)
+    const plane = new THREE.Plane().setFromNormalAndCoplanarPoint(camDir, sceneCenter)
 
     const intersectPoint = new THREE.Vector3()
-    raycaster.ray.intersectPlane(plane, intersectPoint)
+    const hit = this.raycaster.ray.intersectPlane(plane, intersectPoint)
+    if (!hit) {
+      this.removeHeatmap()
+      return 0
+    }
 
     const density = this.computeDensity(intersectPoint, 1.5)
 
-    this.renderHeatmapTexture(intersectPoint, density)
+    this.renderHeatmapTexture(density)
 
     if (!this.heatmapMesh) {
       this.heatmapTexture = new THREE.CanvasTexture(this.heatmapCanvas)
@@ -396,7 +437,7 @@ export class Simulator {
       this.heatmapMaterial = new THREE.MeshBasicMaterial({
         map: this.heatmapTexture,
         transparent: true,
-        opacity: 0.6,
+        opacity: 0.65,
         depthWrite: false,
         side: THREE.DoubleSide,
         blending: THREE.AdditiveBlending
@@ -409,14 +450,15 @@ export class Simulator {
 
     if (this.heatmapMesh && this.heatmapTexture) {
       this.heatmapMesh.position.copy(intersectPoint)
-      this.heatmapMesh.lookAt(camera.position)
+      const lookTarget = intersectPoint.clone().add(camDir)
+      this.heatmapMesh.lookAt(lookTarget)
       this.heatmapTexture.needsUpdate = true
     }
 
     return density
   }
 
-  private renderHeatmapTexture(center: THREE.Vector3, density: number): void {
+  private renderHeatmapTexture(density: number): void {
     const canvas = this.heatmapCanvas
     const ctx = canvas.getContext('2d')!
     const w = canvas.width
@@ -424,28 +466,38 @@ export class Simulator {
 
     ctx.clearRect(0, 0, w, h)
 
-    const maxDensity = 1000
-    const t = Math.min(density / maxDensity, 1)
+    const MAX_DENSITY = 1200
+    const t = Math.min(density / MAX_DENSITY, 1)
 
-    const centerX = w / 2
-    const centerY = h / 2
-    const radius = w / 2
+    const cx = w / 2
+    const cy = h / 2
+    const r = w / 2
 
-    const gradient = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, radius)
+    const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, r)
 
-    const hue = 320 - t * 120
-    const sat = 90
-    const light = 60
+    const hue = 320 - t * 140
+    const sat = 95
+    const light = 62
 
-    gradient.addColorStop(0, `hsla(${hue}, ${sat}%, ${light}%, ${0.8 * t + 0.1})`)
-    gradient.addColorStop(0.4, `hsla(${hue + 30}, ${sat - 10}%, ${light + 10}%, ${0.5 * t + 0.05})`)
-    gradient.addColorStop(0.7, `hsla(${hue + 60}, ${sat - 20}%, ${light}%, ${0.2 * t + 0.02})`)
-    gradient.addColorStop(1, 'hsla(0, 0%, 0%, 0)')
+    grad.addColorStop(0, `hsla(${hue}, ${sat}%, ${light}%, ${0.85 * t + 0.1})`)
+    grad.addColorStop(0.3, `hsla(${hue + 20}, ${sat - 5}%, ${light + 8}%, ${0.55 * t + 0.08})`)
+    grad.addColorStop(0.6, `hsla(${hue + 50}, ${sat - 20}%, ${light}%, ${0.25 * t + 0.04})`)
+    grad.addColorStop(1, 'hsla(0, 0%, 0%, 0)')
 
-    ctx.fillStyle = gradient
+    ctx.fillStyle = grad
     ctx.beginPath()
-    ctx.arc(centerX, centerY, radius, 0, Math.PI * 2)
+    ctx.arc(cx, cy, r, 0, Math.PI * 2)
     ctx.fill()
+
+    if (t > 0.3) {
+      const innerGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, r * 0.5)
+      innerGrad.addColorStop(0, `hsla(${hue - 20}, 100%, 80%, ${0.4 * t})`)
+      innerGrad.addColorStop(1, 'hsla(0, 0%, 0%, 0)')
+      ctx.fillStyle = innerGrad
+      ctx.beginPath()
+      ctx.arc(cx, cy, r * 0.5, 0, Math.PI * 2)
+      ctx.fill()
+    }
   }
 
   public removeHeatmap(): void {
@@ -463,10 +515,10 @@ export class Simulator {
   public update(deltaTime: number): void {
     this.frameAccumulator += deltaTime
 
-    const maxSubSteps = 4
+    const MAX_SUB_STEPS = 5
     let steps = 0
 
-    while (this.frameAccumulator >= this.simInterval && steps < maxSubSteps) {
+    while (this.frameAccumulator >= this.simInterval && steps < MAX_SUB_STEPS) {
       if (!this.isPaused) {
         this.stepSimulation()
       }
