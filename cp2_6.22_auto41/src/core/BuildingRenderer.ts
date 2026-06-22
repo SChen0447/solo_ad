@@ -17,6 +17,146 @@ function easeInOut(t: number): number {
   return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
 }
 
+function hash2(x: number, y: number): number {
+  const n = Math.sin(x * 12.9898 + y * 78.233) * 43758.5453;
+  return n - Math.floor(n);
+}
+
+const WINDOW_SHADER = {
+  vertexShader: `
+    attribute vec3 instanceColor;
+    attribute float windowSeed;
+    attribute float windowDensity;
+    attribute float buildingHeight;
+    
+    varying vec3 vInstanceColor;
+    varying vec3 vNormal;
+    varying vec3 vWorldPosition;
+    varying vec3 vLocalPos;
+    varying float vWindowSeed;
+    varying float vWindowDensity;
+    varying float vBuildingHeight;
+    
+    void main() {
+      vInstanceColor = instanceColor;
+      vNormal = normalMatrix * normal;
+      vLocalPos = position;
+      vWindowSeed = windowSeed;
+      vWindowDensity = windowDensity;
+      vBuildingHeight = buildingHeight;
+      
+      vec4 worldPosition = modelMatrix * instanceMatrix * vec4(position, 1.0);
+      vWorldPosition = worldPosition.xyz;
+      
+      gl_Position = projectionMatrix * viewMatrix * worldPosition;
+    }
+  `,
+  fragmentShader: `
+    uniform float time;
+    uniform vec3 themeWindowOn;
+    uniform vec3 themeWindowOff;
+    uniform float themeWindowGlow;
+    
+    varying vec3 vInstanceColor;
+    varying vec3 vNormal;
+    varying vec3 vWorldPosition;
+    varying vec3 vLocalPos;
+    varying float vWindowSeed;
+    varying float vWindowDensity;
+    varying float vBuildingHeight;
+    
+    float hash(vec2 p) {
+      return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
+    }
+    
+    float windowPattern(vec2 uv, float seed, float density, float height) {
+      float windowSize = mix(0.12, 0.08, clamp(height / 80.0, 0.0, 1.0));
+      float gap = mix(0.08, 0.06, clamp(height / 80.0, 0.0, 1.0));
+      
+      vec2 cell = vec2(windowSize + gap, windowSize + gap);
+      vec2 gridUV = fract(uv / cell + seed * 10.0);
+      vec2 windowUV = gridUV / vec2(windowSize, windowSize) * cell;
+      
+      float inWindow = step(windowUV.x, windowSize) * step(windowUV.y, windowSize);
+      
+      vec2 cellIdx = floor(uv / cell + seed * 10.0);
+      float random = hash(cellIdx + vec2(seed * 100.0, seed * 50.0));
+      
+      float litThreshold = 0.6 - density * 0.3;
+      float isLit = step(random, litThreshold);
+      
+      float flicker = 0.8 + 0.2 * sin(time * 0.5 + hash(cellIdx) * 6.28318);
+      
+      return inWindow * isLit * flicker;
+    }
+    
+    void main() {
+      vec3 baseColor = vInstanceColor;
+      
+      vec3 absNormal = abs(vNormal);
+      float isFront = max(absNormal.x, absNormal.z);
+      float isRoof = step(0.9, absNormal.y);
+      
+      vec2 faceUV;
+      if (absNormal.x > absNormal.z) {
+        faceUV = vLocalPos.yz;
+      } else {
+        faceUV = vLocalPos.xz;
+      }
+      
+      float window = windowPattern(faceUV, vWindowSeed, vWindowDensity, vBuildingHeight);
+      window = window * (1.0 - isRoof);
+      
+      vec3 windowOnColor = themeWindowOn;
+      vec3 windowOffColor = themeWindowOff;
+      
+      vec3 color = mix(baseColor, baseColor * 0.3, window * 0.0);
+      color = mix(color, windowOnColor, window * 0.6);
+      
+      vec3 emissive = windowOnColor * window * themeWindowGlow * 0.8;
+      color += emissive;
+      
+      float roofDarken = mix(1.0, 0.85, isRoof);
+      color *= roofDarken;
+      
+      float fresnel = pow(1.0 - abs(dot(normalize(vNormal), normalize(cameraPosition - vWorldPosition))), 2.0);
+      color += baseColor * fresnel * 0.15;
+      
+      gl_FragColor = vec4(color, 1.0);
+    }
+  `
+};
+
+const THEME_STYLES: Record<ColorTheme, {
+  windowOn: THREE.Color;
+  windowOff: THREE.Color;
+  windowGlow: number;
+  edgeColor: THREE.Color;
+  edgeOpacity: number;
+}> = {
+  sunset: {
+    windowOn: new THREE.Color(0xffcc66),
+    windowOff: new THREE.Color(0x2a2a3a),
+    windowGlow: 0.8,
+    edgeColor: new THREE.Color(0xff8844),
+    edgeOpacity: 0.6
+  },
+  cyberpunk: {
+    windowOn: new THREE.Color(0x88ffff),
+    windowOff: new THREE.Color(0x1a0a2a),
+    windowGlow: 1.2,
+    edgeColor: new THREE.Color(0xaa44ff),
+    edgeOpacity: 0.8
+  },
+  ice: {
+    windowOn: new THREE.Color(0xbbeeff),
+    windowOff: new THREE.Color(0x3a4a5a),
+    windowGlow: 0.5,
+    edgeColor: new THREE.Color(0x88ccff),
+    edgeOpacity: 0.5
+  }
+};
+
 export class BuildingRenderer {
   private scene: THREE.Scene;
   private camera: THREE.PerspectiveCamera;
@@ -24,14 +164,20 @@ export class BuildingRenderer {
   private container: HTMLElement;
 
   private buildingsMesh: THREE.InstancedMesh | null = null;
+  private buildingEdges: THREE.InstancedMesh | null = null;
   private groundMesh: THREE.Mesh | null = null;
   private neonGrid: THREE.LineSegments | null = null;
+  private groundReferenceGrid: THREE.LineSegments | null = null;
+
+  private buildingMaterial: THREE.ShaderMaterial | null = null;
+  private edgeMaterial: THREE.LineBasicMaterial | null = null;
 
   private dummy: THREE.Object3D;
   private buildingData: Building[] = [];
 
   private animationState: AnimationState | null = null;
   private lightAnimationTime: number = 0;
+  private shaderTime: number = 0;
 
   private isDragging: boolean = false;
   private lastMouseX: number = 0;
@@ -56,12 +202,20 @@ export class BuildingRenderer {
   private streetAngleH: number = 0;
 
   private currentTheme: ColorTheme = 'sunset';
+  private previousTheme: ColorTheme = 'sunset';
   private themeTransitionProgress: number = 1;
   private targetThemeColors: { ambient: THREE.Color; ground: THREE.Color; neon: THREE.Color } | null = null;
   private startThemeColors: { ambient: THREE.Color; ground: THREE.Color; neon: THREE.Color } | null = null;
   private themeTransitionStart: number = 0;
   private themeTransitionDuration: number = 800;
   private isThemeTransitioning: boolean = false;
+
+  private targetEdgeColor: THREE.Color | null = null;
+  private startEdgeColor: THREE.Color | null = null;
+  private startWindowOn: THREE.Color | null = null;
+  private startWindowOff: THREE.Color | null = null;
+  private startWindowGlow: number = 0;
+  private startEdgeOpacity: number = 0;
 
   private ambientLight: THREE.AmbientLight;
   private directionalLight: THREE.DirectionalLight;
@@ -87,6 +241,24 @@ export class BuildingRenderer {
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     this.container.appendChild(this.renderer.domElement);
+
+    const initStyle = THEME_STYLES[this.currentTheme];
+    this.buildingMaterial = new THREE.ShaderMaterial({
+      vertexShader: WINDOW_SHADER.vertexShader,
+      fragmentShader: WINDOW_SHADER.fragmentShader,
+      uniforms: {
+        time: { value: 0 },
+        themeWindowOn: { value: initStyle.windowOn.clone() },
+        themeWindowOff: { value: initStyle.windowOff.clone() },
+        themeWindowGlow: { value: initStyle.windowGlow }
+      }
+    });
+
+    this.edgeMaterial = new THREE.LineBasicMaterial({
+      color: initStyle.edgeColor.clone(),
+      transparent: true,
+      opacity: initStyle.edgeOpacity
+    });
 
     this.ambientLight = new THREE.AmbientLight(0x404050, 0.6);
     this.scene.add(this.ambientLight);
@@ -121,7 +293,35 @@ export class BuildingRenderer {
     this.groundMesh.receiveShadow = true;
     this.scene.add(this.groundMesh);
 
+    this.setupReferenceGrid();
     this.setupNeonGrid();
+  }
+
+  private setupReferenceGrid(): void {
+    if (this.groundReferenceGrid) {
+      this.scene.remove(this.groundReferenceGrid);
+      this.groundReferenceGrid.geometry.dispose();
+    }
+
+    const points: THREE.Vector3[] = [];
+    const gridSize = 400;
+    const gridStep = 50;
+
+    for (let i = -gridSize / 2; i <= gridSize / 2; i += gridStep) {
+      points.push(new THREE.Vector3(i, 0.02, -gridSize / 2));
+      points.push(new THREE.Vector3(i, 0.02, gridSize / 2));
+      points.push(new THREE.Vector3(-gridSize / 2, 0.02, i));
+      points.push(new THREE.Vector3(gridSize / 2, 0.02, i));
+    }
+
+    const geometry = new THREE.BufferGeometry().setFromPoints(points);
+    const material = new THREE.LineBasicMaterial({
+      color: 0x666666,
+      transparent: true,
+      opacity: 0.35
+    });
+    this.groundReferenceGrid = new THREE.LineSegments(geometry, material);
+    this.scene.add(this.groundReferenceGrid);
   }
 
   private setupNeonGrid(): void {
@@ -250,12 +450,31 @@ export class BuildingRenderer {
       }
     };
 
+    const currentStyle = THEME_STYLES[this.currentTheme];
+    const newStyle = THEME_STYLES[theme];
+
+    this.previousTheme = this.currentTheme;
+
     this.startThemeColors = {
       ambient: this.ambientLight.color.clone(),
       ground: (this.groundMesh?.material as THREE.MeshStandardMaterial).color.clone(),
       neon: this.neonGrid ? (this.neonGrid.material as THREE.LineBasicMaterial).color.clone() : new THREE.Color()
     };
     this.targetThemeColors = themeConfigs[theme];
+
+    this.startEdgeColor = currentStyle.edgeColor.clone();
+    this.targetEdgeColor = newStyle.edgeColor.clone();
+    this.startEdgeOpacity = currentStyle.edgeOpacity;
+    this.startWindowOn = currentStyle.windowOn.clone();
+    this.startWindowOff = currentStyle.windowOff.clone();
+    this.startWindowGlow = currentStyle.windowGlow;
+
+    if (this.buildingMaterial) {
+      this.buildingMaterial.uniforms.themeWindowOn.value = currentStyle.windowOn.clone();
+      this.buildingMaterial.uniforms.themeWindowOff.value = currentStyle.windowOff.clone();
+      this.buildingMaterial.uniforms.themeWindowGlow.value = currentStyle.windowGlow;
+    }
+
     this.themeTransitionStart = performance.now();
     this.isThemeTransitioning = true;
     this.currentTheme = theme;
@@ -300,31 +519,37 @@ export class BuildingRenderer {
     if (this.buildingsMesh) {
       this.scene.remove(this.buildingsMesh);
       this.buildingsMesh.geometry.dispose();
-      (this.buildingsMesh.material as THREE.Material).dispose();
       this.buildingsMesh = null;
+    }
+    if (this.buildingEdges) {
+      this.scene.remove(this.buildingEdges);
+      this.buildingEdges.geometry.dispose();
+      this.buildingEdges = null;
     }
 
     if (buildings.length === 0) return;
 
-    const geometry = new THREE.BoxGeometry(1, 1, 1);
-    const material = new THREE.MeshStandardMaterial({
-      vertexColors: true,
-      roughness: 0.7,
-      metalness: 0.2
-    });
+    const boxGeo = new THREE.BoxGeometry(1, 1, 1);
 
-    this.buildingsMesh = new THREE.InstancedMesh(geometry, material, buildings.length);
+    const instanceColors = new Float32Array(buildings.length * 3);
+    const windowSeeds = new Float32Array(buildings.length);
+    const windowDensities = new Float32Array(buildings.length);
+    const buildingHeights = new Float32Array(buildings.length);
+
+    this.buildingsMesh = new THREE.InstancedMesh(boxGeo, this.buildingMaterial!, buildings.length);
     this.buildingsMesh.castShadow = true;
     this.buildingsMesh.receiveShadow = true;
-
-    const colors = new Float32Array(buildings.length * 3);
 
     for (let i = 0; i < buildings.length; i++) {
       const b = buildings[i];
       const color = new THREE.Color(b.color);
-      colors[i * 3] = color.r;
-      colors[i * 3 + 1] = color.g;
-      colors[i * 3 + 2] = color.b;
+      instanceColors[i * 3] = color.r;
+      instanceColors[i * 3 + 1] = color.g;
+      instanceColors[i * 3 + 2] = color.b;
+
+      windowSeeds[i] = hash2(b.id, b.x + b.z);
+      windowDensities[i] = Math.min(1.0, b.height / 80.0 + 0.3);
+      buildingHeights[i] = b.height;
 
       this.dummy.position.set(b.x, b.height / 2, b.z);
       this.dummy.scale.set(b.width, b.height, b.depth);
@@ -332,9 +557,33 @@ export class BuildingRenderer {
       this.buildingsMesh.setMatrixAt(i, this.dummy.matrix);
     }
 
-    geometry.setAttribute('color', new THREE.InstancedBufferAttribute(colors, 3));
+    const positionCount = boxGeo.attributes.position.count;
+    const perVertexInstanceColors = new Float32Array(positionCount * 3 * buildings.length);
+    const perVertexWindowSeeds = new Float32Array(positionCount * buildings.length);
+    const perVertexWindowDensities = new Float32Array(positionCount * buildings.length);
+    const perVertexHeights = new Float32Array(positionCount * buildings.length);
+
+    for (let i = 0; i < buildings.length; i++) {
+      for (let j = 0; j < positionCount; j++) {
+        const baseIdx = i * positionCount + j;
+        perVertexInstanceColors[baseIdx * 3] = instanceColors[i * 3];
+        perVertexInstanceColors[baseIdx * 3 + 1] = instanceColors[i * 3 + 1];
+        perVertexInstanceColors[baseIdx * 3 + 2] = instanceColors[i * 3 + 2];
+        perVertexWindowSeeds[baseIdx] = windowSeeds[i];
+        perVertexWindowDensities[baseIdx] = windowDensities[i];
+        perVertexHeights[baseIdx] = buildingHeights[i];
+      }
+    }
+
+    boxGeo.setAttribute('instanceColor', new THREE.BufferAttribute(perVertexInstanceColors, 3));
+    boxGeo.setAttribute('windowSeed', new THREE.BufferAttribute(perVertexWindowSeeds, 1));
+    boxGeo.setAttribute('windowDensity', new THREE.BufferAttribute(perVertexWindowDensities, 1));
+    boxGeo.setAttribute('buildingHeight', new THREE.BufferAttribute(perVertexHeights, 1));
+
     this.buildingsMesh.instanceMatrix.needsUpdate = true;
     this.scene.add(this.buildingsMesh);
+
+    this.setupBuildingEdges(buildings);
 
     this.animationState = {
       progress: 0,
@@ -345,6 +594,27 @@ export class BuildingRenderer {
     if (this.currentTheme === 'cyberpunk') {
       this.createPointLights();
     }
+  }
+
+  private setupBuildingEdges(buildings: Building[]): void {
+    if (this.buildingEdges) {
+      this.scene.remove(this.buildingEdges);
+      this.buildingEdges.geometry.dispose();
+    }
+
+    const edgeGeo = new THREE.EdgesGeometry(new THREE.BoxGeometry(1, 1, 1), 20);
+    this.buildingEdges = new THREE.InstancedMesh(edgeGeo, this.edgeMaterial!, buildings.length);
+
+    for (let i = 0; i < buildings.length; i++) {
+      const b = buildings[i];
+      this.dummy.position.set(b.x, b.height / 2, b.z);
+      this.dummy.scale.set(b.width, b.height, b.depth);
+      this.dummy.updateMatrix();
+      this.buildingEdges.setMatrixAt(i, this.dummy.matrix);
+    }
+
+    this.buildingEdges.instanceMatrix.needsUpdate = true;
+    this.scene.add(this.buildingEdges);
   }
 
   private updateCameraPosition(): void {
@@ -367,6 +637,11 @@ export class BuildingRenderer {
   }
 
   public render(time: number): void {
+    this.shaderTime = time * 0.001;
+    if (this.buildingMaterial) {
+      this.buildingMaterial.uniforms.time.value = this.shaderTime;
+    }
+
     if (this.isZoomLerping) {
       const t = Math.min(1, (time - this.zoomLerpStart) / this.zoomLerpDuration);
       const eased = easeInOut(t);
@@ -398,8 +673,33 @@ export class BuildingRenderer {
         }
       }
 
+      if (this.buildingMaterial && this.startEdgeColor && this.targetEdgeColor &&
+          this.startWindowOn && this.startWindowOff) {
+        const targetStyle = THEME_STYLES[this.currentTheme];
+
+        const mat = this.buildingMaterial;
+        mat.uniforms.themeWindowOn.value.lerpColors(this.startWindowOn, targetStyle.windowOn, eased);
+        mat.uniforms.themeWindowOff.value.lerpColors(this.startWindowOff, targetStyle.windowOff, eased);
+        mat.uniforms.themeWindowGlow.value = this.startWindowGlow + (targetStyle.windowGlow - this.startWindowGlow) * eased;
+
+        if (this.edgeMaterial) {
+          this.edgeMaterial.color.lerpColors(this.startEdgeColor, this.targetEdgeColor, eased);
+          this.edgeMaterial.opacity = this.startEdgeOpacity + (targetStyle.edgeOpacity - this.startEdgeOpacity) * eased;
+        }
+      }
+
       if (t >= 1) {
         this.isThemeTransitioning = false;
+        const targetStyle = THEME_STYLES[this.currentTheme];
+        if (this.buildingMaterial) {
+          this.buildingMaterial.uniforms.themeWindowOn.value.copy(targetStyle.windowOn);
+          this.buildingMaterial.uniforms.themeWindowOff.value.copy(targetStyle.windowOff);
+          this.buildingMaterial.uniforms.themeWindowGlow.value = targetStyle.windowGlow;
+        }
+        if (this.edgeMaterial && this.targetEdgeColor) {
+          this.edgeMaterial.color.copy(this.targetEdgeColor);
+          this.edgeMaterial.opacity = targetStyle.edgeOpacity;
+        }
       }
     }
 
@@ -414,8 +714,15 @@ export class BuildingRenderer {
         this.dummy.scale.set(b.width, h, b.depth);
         this.dummy.updateMatrix();
         this.buildingsMesh.setMatrixAt(i, this.dummy.matrix);
+
+        if (this.buildingEdges) {
+          this.buildingEdges.setMatrixAt(i, this.dummy.matrix);
+        }
       }
       this.buildingsMesh.instanceMatrix.needsUpdate = true;
+      if (this.buildingEdges) {
+        this.buildingEdges.instanceMatrix.needsUpdate = true;
+      }
 
       if (t >= 1) {
         this.animationState = null;
