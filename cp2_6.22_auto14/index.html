@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>三维分子结构浏览器</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #0A0A1A;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      color: white;
+    }
+    #app {
+      width: 100%;
+      height: 100%;
+      position: relative;
+    }
+    #canvas-container {
+      width: 100%;
+      height: 100%;
+      position: absolute;
+      top: 0;
+      left: 0;
+    }
+    #molecule-select {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      width: 200px;
+      height: 40px;
+      border-radius: 8px;
+      background: #1A1A3ECC;
+      color: white;
+      font-size: 16px;
+      border: 1px solid #3A3A5E;
+      padding: 0 12px;
+      cursor: pointer;
+      outline: none;
+      backdrop-filter: blur(8px);
+      animation: fadeIn 0.3s ease-in-out;
+    }
+    #molecule-select:hover {
+      border-color: #5A5A7E;
+    }
+    #molecule-select option {
+      background: #1A1A3E;
+      color: white;
+    }
+    #info-panel {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      width: 280px;
+      background: #1A1A3ECC;
+      border-radius: 12px;
+      padding: 16px;
+      backdrop-filter: blur(8px);
+      border: 1px solid #3A3A5E;
+      animation: fadeIn 0.3s ease-in-out;
+    }
+    #info-panel h3 {
+      font-size: 18px;
+      margin-bottom: 12px;
+      color: #FFD700;
+    }
+    #info-panel .info-row {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 8px;
+      font-family: 'Courier New', monospace;
+      font-size: 13px;
+    }
+    #info-panel .info-label {
+      color: #AAAAAA;
+    }
+    #info-panel .info-value {
+      color: white;
+    }
+    #info-panel .bond-length {
+      color: #00FF88;
+      font-weight: bold;
+    }
+    #info-panel .empty {
+      color: #666;
+      font-style: italic;
+      text-align: center;
+      padding: 20px 0;
+    }
+    #info-panel .neighbor-title {
+      margin-top: 16px;
+      margin-bottom: 8px;
+      font-size: 14px;
+      color: #88CCFF;
+      border-bottom: 1px solid #3A3A5E;
+      padding-bottom: 4px;
+    }
+    #info-panel .neighbor-item {
+      background: #0F0F2F;
+      border-radius: 6px;
+      padding: 8px 10px;
+      margin-bottom: 6px;
+      font-family: 'Courier New', monospace;
+      font-size: 12px;
+    }
+    #force-graph {
+      position: absolute;
+      bottom: 20px;
+      left: 20px;
+      width: 300px;
+      height: 300px;
+      background: #0F0F2FCC;
+      border-radius: 12px;
+      backdrop-filter: blur(8px);
+      border: 1px solid #3A3A5E;
+      animation: fadeIn 0.3s ease-in-out;
+      overflow: hidden;
+    }
+    #tooltip {
+      position: absolute;
+      pointer-events: none;
+      padding: 4px 8px;
+      background: rgba(0, 0, 0, 0.8);
+      color: white;
+      font-size: 14px;
+      font-weight: bold;
+      border-radius: 4px;
+      text-shadow: 1px 1px 2px black, -1px -1px 2px black, 1px -1px 2px black, -1px 1px 2px black;
+      display: none;
+      z-index: 1000;
+      animation: fadeIn 0.2s ease-in-out;
+    }
+    #instructions {
+      position: absolute;
+      bottom: 20px;
+      right: 20px;
+      background: #1A1A3ECC;
+      border-radius: 8px;
+      padding: 12px 16px;
+      font-size: 12px;
+      color: #AAAAAA;
+      backdrop-filter: blur(8px);
+      border: 1px solid #3A3A5E;
+      animation: fadeIn 0.3s ease-in-out;
+    }
+    #instructions kbd {
+      background: #0F0F2F;
+      padding: 2px 6px;
+      border-radius: 3px;
+      border: 1px solid #3A3A5E;
+      color: white;
+      font-family: monospace;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(-5px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <div id="canvas-container"></div>
+    <select id="molecule-select">
+      <option value="caffeine">咖啡因 (Caffeine)</option>
+      <option value="salicylic_acid">水杨酸 (Salicylic Acid)</option>
+      <option value="aspirin">阿司匹林 (Aspirin)</option>
+    </select>
+    <div id="info-panel">
+      <h3>原子信息</h3>
+      <div id="info-content">
+        <div class="empty">点击原子查看详细信息</div>
+      </div>
+    </div>
+    <div id="force-graph"></div>
+    <div id="tooltip"></div>
+    <div id="instructions">
+      <div>🖱️ 左键旋转 | 滚轮缩放 | 右键平移</div>
+      <div>⌨️ <kbd>空格</kbd> 暂停/恢复自转</div>
+    </div>
+  </div>
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
