@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>室内装修材料搭配预览</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      font-family: 'Inter', 'Segoe UI', -apple-system, BlinkMacSystemFont, 'Microsoft YaHei', sans-serif;
+      background: #F1F5F9;
+      color: #1E293B;
+    }
+
+    #app {
+      width: 100%;
+      height: 100%;
+      position: relative;
+    }
+
+    .sidebar {
+      position: fixed;
+      left: 0;
+      top: 0;
+      width: 220px;
+      height: 100vh;
+      background: #1E293B;
+      border-radius: 0 8px 8px 0;
+      padding: 20px 0;
+      z-index: 10;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .sidebar-title {
+      color: #fff;
+      font-size: 16px;
+      font-weight: 600;
+      padding: 0 16px;
+      margin-bottom: 4px;
+    }
+
+    .material-section {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      padding: 0 12px;
+    }
+
+    .material-label {
+      color: #94A3B8;
+      font-size: 12px;
+      font-weight: 500;
+      padding: 0 4px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .material-list {
+      display: flex;
+      gap: 8px;
+      overflow-x: auto;
+      padding: 4px 4px 8px;
+      scrollbar-width: thin;
+      scrollbar-color: #475569 #1E293B;
+    }
+
+    .material-list::-webkit-scrollbar {
+      height: 6px;
+    }
+
+    .material-list::-webkit-scrollbar-track {
+      background: #1E293B;
+      border-radius: 3px;
+    }
+
+    .material-list::-webkit-scrollbar-thumb {
+      background: #475569;
+      border-radius: 3px;
+    }
+
+    .material-thumb {
+      flex-shrink: 0;
+      width: 60px;
+      height: 60px;
+      border-radius: 8px;
+      border: 2px solid transparent;
+      cursor: pointer;
+      transition: all 0.2s ease-out;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .material-thumb:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    }
+
+    .material-thumb.selected {
+      border-color: #38BDF8;
+      box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.3);
+    }
+
+    .scene-container {
+      margin-left: 220px;
+      width: calc(100% - 220px);
+      height: 100vh;
+      position: relative;
+      background: #F1F5F9;
+    }
+
+    #roomCanvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    .save-btn {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      width: 120px;
+      height: 44px;
+      background: linear-gradient(135deg, #0F172A 0%, #1E293B 100%);
+      border: none;
+      border-radius: 22px;
+      color: #fff;
+      font-size: 16px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.25s ease-out;
+      z-index: 5;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+    }
+
+    .save-btn:hover {
+      transform: translateX(4px);
+      background: linear-gradient(135deg, #1E293B 0%, #334155 100%);
+      box-shadow: 0 4px 16px rgba(15, 23, 42, 0.3);
+    }
+
+    .random-btn {
+      position: absolute;
+      left: 240px;
+      bottom: 110px;
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      background: #38BDF8;
+      border: none;
+      color: #fff;
+      font-size: 22px;
+      font-weight: bold;
+      cursor: pointer;
+      transition: all 0.2s ease-out;
+      z-index: 5;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 4px 12px rgba(56, 189, 248, 0.4);
+    }
+
+    .random-btn:hover {
+      transform: scale(1.1) rotate(15deg);
+      box-shadow: 0 6px 20px rgba(56, 189, 248, 0.5);
+    }
+
+    .random-btn:active {
+      transform: scale(0.95);
+    }
+
+    .history-bar {
+      position: fixed;
+      bottom: 0;
+      left: 220px;
+      right: 0;
+      height: 90px;
+      background: rgba(255, 255, 255, 0.95);
+      backdrop-filter: blur(8px);
+      border-top: 1px solid #E2E8F0;
+      display: flex;
+      align-items: center;
+      padding: 0 20px;
+      gap: 12px;
+      overflow-x: auto;
+      z-index: 8;
+    }
+
+    .history-label {
+      flex-shrink: 0;
+      color: #64748B;
+      font-size: 12px;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      padding-right: 8px;
+    }
+
+    .history-card {
+      flex-shrink: 0;
+      width: 120px;
+      height: 80px;
+      border-radius: 8px;
+      border: 2px solid #E2E8F0;
+      overflow: hidden;
+      cursor: pointer;
+      transition: all 0.2s ease-out;
+      position: relative;
+      background: #fff;
+    }
+
+    .history-card:hover {
+      transform: scale(1.05);
+      border-color: #38BDF8;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    }
+
+    .history-card:hover .delete-btn {
+      opacity: 1;
+    }
+
+    .history-card img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
+    .delete-btn {
+      position: absolute;
+      top: 4px;
+      right: 4px;
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: rgba(239, 68, 68, 0.9);
+      color: #fff;
+      font-size: 12px;
+      font-weight: bold;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      opacity: 0;
+      transition: opacity 0.2s ease;
+      border: none;
+      line-height: 1;
+    }
+
+    .delete-btn:hover {
+      background: #EF4444;
+    }
+
+    .empty-history {
+      color: #94A3B8;
+      font-size: 13px;
+      font-style: italic;
+    }
+
+    .fade-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: #F1F5F9;
+      pointer-events: none;
+      opacity: 0;
+      z-index: 2;
+    }
+
+    .fade-overlay.active {
+      animation: fadeInOut 0.3s ease-out;
+    }
+
+    @keyframes fadeInOut {
+      0% { opacity: 0; }
+      50% { opacity: 0.3; }
+      100% { opacity: 0; }
+    }
+
+    @media (max-width: 768px) {
+      .sidebar {
+        top: auto;
+        bottom: 0;
+        left: 0;
+        width: 100%;
+        height: 80px;
+        border-radius: 8px 8px 0 0;
+        flex-direction: row;
+        padding: 8px 12px;
+        gap: 12px;
+        align-items: center;
+      }
+
+      .sidebar-title {
+        display: none;
+      }
+
+      .material-section {
+        flex: 1;
+        padding: 0;
+      }
+
+      .material-label {
+        font-size: 10px;
+      }
+
+      .material-thumb {
+        width: 48px;
+        height: 48px;
+      }
+
+      .scene-container {
+        margin-left: 0;
+        width: 100%;
+        height: calc(100vh - 80px);
+      }
+
+      .history-bar {
+        left: 0;
+        bottom: 80px;
+        height: 70px;
+      }
+
+      .history-card {
+        width: 90px;
+        height: 60px;
+      }
+
+      .random-btn {
+        left: 20px;
+        bottom: 100px;
+      }
+
+      .save-btn {
+        width: 100px;
+        height: 38px;
+        font-size: 14px;
+        top: 12px;
+        right: 12px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <aside class="sidebar">
+      <div class="sidebar-title">🎨 材料搭配</div>
+      
+      <div class="material-section">
+        <span class="material-label">地板</span>
+        <div class="material-list" id="floorList"></div>
+      </div>
+      
+      <div class="material-section">
+        <span class="material-label">墙面</span>
+        <div class="material-list" id="wallList"></div>
+      </div>
+      
+      <div class="material-section">
+        <span class="material-label">窗帘</span>
+        <div class="material-list" id="curtainList"></div>
+      </div>
+    </aside>
+
+    <main class="scene-container">
+      <canvas id="roomCanvas"></canvas>
+      <div class="fade-overlay" id="fadeOverlay"></div>
+      
+      <button class="save-btn" id="saveBtn">
+        <span>💾</span>
+        <span>保存方案</span>
+      </button>
+      
+      <button class="random-btn" id="randomBtn" title="随机搭配">🎲</button>
+    </main>
+
+    <div class="history-bar" id="historyBar">
+      <span class="history-label">历史方案</span>
+      <span class="empty-history" id="emptyHistory">暂无保存的方案</span>
+    </div>
+  </div>
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
