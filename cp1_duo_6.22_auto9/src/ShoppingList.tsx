@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { v4 as uuidv4 } from 'uuid';
+import CategoryIcon from './CategoryIcon';
 import {
   Recipe,
   ShoppingItem,
@@ -13,12 +14,7 @@ interface Props {
 }
 
 const STORAGE_KEY = 'recipe_collab_shopping_list';
-
-interface AggregatedKey {
-  name: string;
-  unit: string;
-  category: IngredientCategory;
-}
+const CONFETTI_COLORS = ['#E8833A', '#D2691E', '#8B4513', '#FFB74D', '#FFCC80'];
 
 function parseQuantity(q: string): number {
   const n = parseFloat(q);
@@ -30,6 +26,102 @@ function formatAggregatedQty(quantities: number[]): string {
   if (sum === 0) return quantities.length > 0 ? '适量' : '';
   if (Number.isInteger(sum)) return sum.toString();
   return sum.toFixed(1).replace(/\.0$/, '');
+}
+
+function AutoExpandInput({
+  value,
+  onChange,
+  placeholder,
+  onKeyDown,
+}: {
+  value: string;
+  onChange: (val: string) => void;
+  placeholder: string;
+  onKeyDown?: (e: React.KeyboardEvent<HTMLInputElement>) => void;
+}) {
+  const measureRef = useRef<HTMLSpanElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (measureRef.current && inputRef.current) {
+      const width = measureRef.current.offsetWidth;
+      inputRef.current.style.width = `${Math.max(120, width + 30)}px`;
+    }
+  }, [value]);
+
+  return (
+    <div className="auto-expand-input-wrapper">
+      <span ref={measureRef} className="auto-expand-input-measure">
+        {value || placeholder}
+      </span>
+      <input
+        ref={inputRef}
+        type="text"
+        className="input auto-expand-input"
+        placeholder={placeholder}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        onKeyDown={onKeyDown}
+        style={{ minWidth: '120px' }}
+      />
+    </div>
+  );
+}
+
+function AnimatedCheckbox({
+  checked,
+  onChange,
+}: {
+  checked: boolean;
+  onChange: () => void;
+}) {
+  return (
+    <label className="shopping-item-checkbox">
+      <input type="checkbox" checked={checked} onChange={onChange} />
+      <span className="checkbox-custom">
+        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <polyline
+            points="5,12 10,17 19,7"
+            fill="none"
+            stroke="white"
+            strokeWidth="3"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
+      </span>
+    </label>
+  );
+}
+
+function Confetti({ count = 12 }: { count?: number }) {
+  const pieces = useMemo(() => {
+    return Array.from({ length: count }, (_, i) => ({
+      id: i,
+      left: Math.random() * 100,
+      delay: Math.random() * 500,
+      color: CONFETTI_COLORS[Math.floor(Math.random() * CONFETTI_COLORS.length)],
+      size: 6 + Math.random() * 4,
+    }));
+  }, [count]);
+
+  return (
+    <div className="all-complete-confetti">
+      {pieces.map((p) => (
+        <span
+          key={p.id}
+          className="confetti-piece"
+          style={{
+            left: `${p.left}%`,
+            backgroundColor: p.color,
+            width: p.size,
+            height: p.size,
+            animationDelay: `${p.delay}ms`,
+          }}
+        />
+      ))}
+    </div>
+  );
 }
 
 export default function ShoppingList({ recipes }: Props) {
@@ -60,6 +152,8 @@ export default function ShoppingList({ recipes }: Props) {
   });
   const [newCustomName, setNewCustomName] = useState('');
   const [newCustomQty, setNewCustomQty] = useState('');
+  const [showCompleteBanner, setShowCompleteBanner] = useState(false);
+  const [bannerKey, setBannerKey] = useState(0);
   const saveTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
@@ -78,18 +172,6 @@ export default function ShoppingList({ recipes }: Props) {
       if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
     };
   }, [customItems, checkedMap]);
-
-  const toggleRecipe = useCallback((id: string) => {
-    setSelectedRecipeIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) {
-        next.delete(id);
-      } else {
-        next.add(id);
-      }
-      return next;
-    });
-  }, []);
 
   const aggregatedItems = useMemo(() => {
     const map = new Map<string, { quantities: number[]; category: IngredientCategory }>();
@@ -115,7 +197,7 @@ export default function ShoppingList({ recipes }: Props) {
 
     const items: ShoppingItem[] = [];
     map.forEach((val, key) => {
-      const [name, unit, category] = key.split('|') as [string, string, IngredientCategory];
+      const [name, unit] = key.split('|') as [string, string, IngredientCategory];
       items.push({
         id: `agg_${key}`,
         name: name.charAt(0).toUpperCase() + name.slice(1),
@@ -147,6 +229,31 @@ export default function ShoppingList({ recipes }: Props) {
     return grouped;
   }, [aggregatedItems]);
 
+  const totalItems = aggregatedItems.length;
+  const checkedItems = aggregatedItems.filter((i) => i.checked).length;
+  const allComplete = totalItems > 0 && checkedItems === totalItems;
+
+  useEffect(() => {
+    if (allComplete) {
+      setShowCompleteBanner(true);
+      setBannerKey((k) => k + 1);
+    } else {
+      setShowCompleteBanner(false);
+    }
+  }, [allComplete]);
+
+  const toggleRecipe = useCallback((id: string) => {
+    setSelectedRecipeIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  }, []);
+
   const toggleChecked = useCallback((id: string) => {
     setCheckedMap((prev) => ({ ...prev, [id]: !prev[id] }));
   }, []);
@@ -176,9 +283,6 @@ export default function ShoppingList({ recipes }: Props) {
     });
   }, []);
 
-  const totalItems = aggregatedItems.length;
-  const checkedItems = aggregatedItems.filter((i) => i.checked).length;
-
   return (
     <div className="page-fade shopping-container">
       <div className="page-header">
@@ -197,6 +301,14 @@ export default function ShoppingList({ recipes }: Props) {
           </button>
         )}
       </div>
+
+      {showCompleteBanner && (
+        <div className="all-complete-banner" key={bannerKey}>
+          <span className="all-complete-icon">🎉</span>
+          <span className="all-complete-text">太棒了！所有物品都已准备齐全</span>
+          <Confetti count={15} />
+        </div>
+      )}
 
       <div className="card">
         <h3 className="section-title" style={{ marginBottom: 16 }}>📋 选择菜谱</h3>
@@ -239,6 +351,9 @@ export default function ShoppingList({ recipes }: Props) {
             return (
               <div key={cat} className="shopping-category">
                 <div className="shopping-category-title">
+                  <span className="category-icon-wrapper">
+                    <CategoryIcon category={cat} size={20} />
+                  </span>
                   {CATEGORY_LABELS[cat]}
                   <span style={{ fontSize: 12, fontWeight: 400, color: 'var(--color-text-muted)' }}>
                     ({items.length})
@@ -250,14 +365,10 @@ export default function ShoppingList({ recipes }: Props) {
                       key={item.id}
                       className={`shopping-item ${item.checked ? 'checked' : ''}`}
                     >
-                      <label className="shopping-item-checkbox">
-                        <input
-                          type="checkbox"
-                          checked={item.checked}
-                          onChange={() => toggleChecked(item.id)}
-                        />
-                        <span className="checkbox-custom"></span>
-                      </label>
+                      <AnimatedCheckbox
+                        checked={item.checked}
+                        onChange={() => toggleChecked(item.id)}
+                      />
                       <div className="shopping-item-content">
                         <span className="shopping-item-text">{item.name}</span>
                         {item.isCustom && (
@@ -293,12 +404,10 @@ export default function ShoppingList({ recipes }: Props) {
                 </div>
                 {cat === 'other' && (
                   <div className="add-custom-item">
-                    <input
-                      type="text"
-                      className="input"
-                      placeholder="添加自定义商品..."
+                    <AutoExpandInput
                       value={newCustomName}
-                      onChange={(e) => setNewCustomName(e.target.value)}
+                      onChange={setNewCustomName}
+                      placeholder="添加自定义商品..."
                       onKeyDown={(e) => {
                         if (e.key === 'Enter') addCustomItem();
                       }}

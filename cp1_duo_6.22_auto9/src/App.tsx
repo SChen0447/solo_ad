@@ -129,7 +129,7 @@ export default function App() {
 
   const deleteRecipe = useCallback((id: string) => {
     if (window.confirm('确定要删除这个菜谱吗？')) {
-      setRecipes((prev) => prev.filter((r) => r.id !== id);
+      setRecipes((prev) => prev.filter((r) => r.id !== id));
       setVersions((prev) => prev.filter((v) => v.recipeId !== id));
     }
   }, []);
@@ -138,9 +138,9 @@ export default function App() {
     (updated: Recipe, saveNote: string) => {
       setRecipes((prev) =>
         prev.map((r) =>
-        r.id === updated.id ? { ...updated, updatedAt: Date.now() } : r
-      )
-    );
+          r.id === updated.id ? { ...updated, updatedAt: Date.now() } : r
+        )
+      );
       const newVersion: RecipeVersion = {
         id: uuidv4(),
         recipeId: updated.id,

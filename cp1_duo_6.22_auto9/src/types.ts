@@ -18,14 +18,14 @@ export type IngredientCategory =
   | 'other';
 
 export const CATEGORY_LABELS: Record<IngredientCategory, string> = {
-  vegetable: '🥬 蔬菜类',
-  meat: '🥩 肉类',
-  seafood: '🐟 海鲜类',
-  dairy: '🥛 乳制品',
-  grain: '🌾 谷物主食',
-  seasoning: '🧂 调料',
-  fruit: '🍎 水果',
-  other: '📦 其他',
+  vegetable: '蔬菜类',
+  meat: '肉类',
+  seafood: '海鲜类',
+  dairy: '乳制品',
+  grain: '谷物主食',
+  seasoning: '调料',
+  fruit: '水果',
+  other: '其他',
 };
 
 export const CATEGORY_ORDER: IngredientCategory[] = [

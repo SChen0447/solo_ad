@@ -91,7 +91,7 @@ export default function VersionCompare({ versions, onRestore, onBack }: Props) {
 
   const swap = useCallback(() => {
     setSelectedA((prevA) => {
-      setSelectedB((prevB) => {
+      setSelectedB(() => {
         setFadeKey((k) => k + 1);
         return prevA;
       });
