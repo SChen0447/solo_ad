@@ -50,6 +50,7 @@ const SliderInput: React.FC<SliderInputProps> = ({ label, value, min, max, step,
   const sliderRef = useRef<HTMLDivElement>(null);
 
   const percentage = ((value - min) / (max - min)) * 100;
+  const displayValue = value.toFixed(step < 1 ? 1 : 0);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     onChange(parseFloat(e.target.value));
@@ -69,10 +70,45 @@ const SliderInput: React.FC<SliderInputProps> = ({ label, value, min, max, step,
             borderRadius: '4px',
           }}
         >
-          {value.toFixed(step < 1 ? 1 : 0)}{unit}
+          {displayValue}{unit}
         </span>
       </div>
-      <div ref={sliderRef} style={{ position: 'relative' }}>
+      <div ref={sliderRef} style={{ position: 'relative', paddingTop: '20px', paddingBottom: '4px' }}>
+        {isDragging && (
+          <div
+            style={{
+              position: 'absolute',
+              top: '0px',
+              left: `calc(${percentage}% - 24px)`,
+              width: '48px',
+              textAlign: 'center',
+              color: '#ffffff',
+              fontSize: '11px',
+              fontFamily: 'monospace',
+              backgroundColor: 'rgba(88, 166, 255, 0.95)',
+              padding: '3px 0',
+              borderRadius: '4px',
+              pointerEvents: 'none',
+              zIndex: 10,
+              boxShadow: '0 2px 8px rgba(0, 0, 0, 0.3)',
+            }}
+          >
+            {displayValue}{unit}
+            <div
+              style={{
+                position: 'absolute',
+                bottom: '-4px',
+                left: '50%',
+                transform: 'translateX(-50%)',
+                width: '0',
+                height: '0',
+                borderLeft: '4px solid transparent',
+                borderRight: '4px solid transparent',
+                borderTop: '4px solid rgba(88, 166, 255, 0.95)',
+              }}
+            />
+          </div>
+        )}
         <div
           style={{
             height: '4px',
@@ -111,6 +147,7 @@ const SliderInput: React.FC<SliderInputProps> = ({ label, value, min, max, step,
             cursor: 'pointer',
             height: '20px',
             margin: 0,
+            zIndex: 5,
           }}
         />
         <div
@@ -126,6 +163,7 @@ const SliderInput: React.FC<SliderInputProps> = ({ label, value, min, max, step,
             boxShadow: isDragging ? '0 0 0 4px rgba(88, 166, 255, 0.3)' : 'none',
             pointerEvents: 'none',
             transition: isDragging ? 'none' : 'left 0.1s ease, box-shadow 0.2s ease',
+            zIndex: 3,
           }}
         />
       </div>
@@ -367,10 +405,10 @@ const ConfigPanel: React.FC<ConfigPanelProps> = ({
               </div>
               <div style={{ display: 'flex', gap: '8px' }}>
                 <Button onClick={onExport} style={{ flex: 1 }}>
-                  ↓ 导出
+                  ↓ 导出JSON
                 </Button>
                 <Button onClick={handleImportClick} style={{ flex: 1 }}>
-                  ↑ 导入
+                  ↑ 导入JSON
                 </Button>
                 <input
                   ref={fileInputRef}

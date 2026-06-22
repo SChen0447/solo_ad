@@ -48,6 +48,8 @@ const EditorCanvas: React.FC<EditorCanvasProps> = ({
   const frameCountRef = useRef(0);
   const fpsTimeRef = useRef(0);
   const timeRef = useRef(0);
+  const deltaTimeRef = useRef(0);
+  const lastFrameTimeRef = useRef<number>(0);
 
   const previewProgressRef = useRef<Map<string, number>>(new Map());
 
@@ -97,8 +99,9 @@ const EditorCanvas: React.FC<EditorCanvasProps> = ({
     return map;
   }, [enemyConfigs, selectedEnemyId]);
 
-  const drawFrame = useCallback((ctx: CanvasRenderingContext2D, time: number) => {
+  const drawFrame = useCallback((ctx: CanvasRenderingContext2D, time: number, deltaTime: number) => {
     const { width, height } = canvasSize;
+    const clampedDt = Math.min(deltaTime, 0.1);
 
     ctx.fillStyle = '#0d1117';
     ctx.fillRect(0, 0, width, height);
@@ -128,8 +131,12 @@ const EditorCanvas: React.FC<EditorCanvasProps> = ({
     }
 
     if (isPlaying) {
-      const result = updateAll(enemies, bulletsRef.current, 1 / 60, width, height, 500);
+      const result = updateAll(enemies, bulletsRef.current, clampedDt, width, height, 500);
       bulletsRef.current = result.bullets;
+    }
+
+    while (bulletsRef.current.length > 500) {
+      bulletsRef.current.shift();
     }
 
     renderAll(ctx, enemies, bulletsRef.current, selectedEnemyId, time, pathSamplesMap);
@@ -212,6 +219,9 @@ const EditorCanvas: React.FC<EditorCanvasProps> = ({
     if (!ctx) return;
 
     const animate = (time: number) => {
+      const dt = lastFrameTimeRef.current > 0 ? (time - lastFrameTimeRef.current) / 1000 : 1 / 60;
+      lastFrameTimeRef.current = time;
+      deltaTimeRef.current = dt;
       timeRef.current = time / 1000;
 
       frameCountRef.current++;
@@ -222,7 +232,7 @@ const EditorCanvas: React.FC<EditorCanvasProps> = ({
         fpsTimeRef.current = time;
       }
 
-      drawFrame(ctx, timeRef.current);
+      drawFrame(ctx, timeRef.current, dt);
       animationRef.current = requestAnimationFrame(animate);
     };
 
