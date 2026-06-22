@@ -23,6 +23,7 @@ export class UIOverlay {
 
   private autoRotateEnabled: boolean = false;
   private sidebarOpen: boolean = true;
+  private highlightedListItemId: string | null = null;
 
   private elements: Record<string, HTMLElement> = {};
 

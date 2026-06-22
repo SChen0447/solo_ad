@@ -191,6 +191,9 @@ class ModelViewerApp {
       const hit = this.annotationSystem.handleClick(event, this.canvas);
       if (hit && this.annotationSystem.hasTemporaryMarker()) {
         this.uiOverlay.showAnnotationInput();
+      } else if (!hit) {
+        this.annotationSystem.clearHighlight();
+        this.uiOverlay.clearListHighlight();
       }
     }
   }

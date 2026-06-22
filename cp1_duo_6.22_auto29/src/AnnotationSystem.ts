@@ -24,7 +24,8 @@ export class AnnotationSystem {
   private isDragging: boolean = false;
   private dragAnnotation: Annotation | null = null;
   private highlightAnimationId: number | null = null;
-  private highlightTime: number = 0;
+  private highlightedAnnotationId: string | null = null;
+  private isHighlightActive: boolean = false;
 
   private onAnnotationListChangeCallback: (() => void) | null = null;
 
@@ -282,38 +283,63 @@ export class AnnotationSystem {
     }
   }
 
-  highlightAnnotation(id: string): void {
-    if (this.highlightAnimationId !== null) {
-      cancelAnimationFrame(this.highlightAnimationId);
-      this.highlightAnimationId = null;
+  highlightAnnotation(id: string): boolean {
+    if (this.isHighlightActive && this.highlightedAnnotationId === id) {
+      this.clearHighlight();
+      return false;
     }
 
+    this.clearHighlight();
+
     const annotation = this.annotations.find((a) => a.data.id === id);
-    if (!annotation) return;
+    if (!annotation) return false;
+
+    this.highlightedAnnotationId = id;
+    this.isHighlightActive = true;
 
     const baseScale = 1;
     const highlightScale = 1.5;
-    const duration = 1500;
     const startTime = performance.now();
 
     const animate = () => {
-      const elapsed = performance.now() - startTime;
-      const progress = elapsed / duration;
-
-      if (progress >= 1) {
+      if (!this.isHighlightActive || this.highlightedAnnotationId !== id) {
         annotation.marker.scale.setScalar(baseScale);
         this.highlightAnimationId = null;
         return;
       }
 
-      const pulse = 0.5 + 0.5 * Math.sin(progress * Math.PI * 6);
-      const scale = baseScale + (highlightScale - baseScale) * pulse * (1 - progress);
+      const elapsed = performance.now() - startTime;
+      const pulseSpeed = 0.004;
+      const pulse = 0.5 + 0.5 * Math.sin(elapsed * pulseSpeed);
+      const scale = baseScale + (highlightScale - baseScale) * pulse;
       annotation.marker.scale.setScalar(scale);
 
       this.highlightAnimationId = requestAnimationFrame(animate);
     };
 
     animate();
+    return true;
+  }
+
+  clearHighlight(): void {
+    if (this.highlightAnimationId !== null) {
+      cancelAnimationFrame(this.highlightAnimationId);
+      this.highlightAnimationId = null;
+    }
+
+    if (this.highlightedAnnotationId) {
+      const annotation = this.annotations.find((a) => a.data.id === this.highlightedAnnotationId);
+      if (annotation) {
+        annotation.marker.scale.setScalar(1);
+      }
+    }
+
+    this.highlightedAnnotationId = null;
+    this.isHighlightActive = false;
+  }
+
+  getHighlightedAnnotationId(): string | null {
+    return this.highlightedAnnotationId;
   }
 
   getSelectedAnnotation(): AnnotationData | null {
