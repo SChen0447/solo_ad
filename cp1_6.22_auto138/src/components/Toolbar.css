@@ -1,0 +1,131 @@
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.toolbar.mobile {
+  width: 100%;
+  overflow-x: auto;
+  flex-wrap: nowrap;
+  padding: 0 8px;
+}
+
+.toolbar-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.toolbar-btn {
+  width: 40px;
+  height: 40px;
+  border: none;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #1e293b;
+  font-size: 16px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.1s ease;
+  flex-shrink: 0;
+}
+
+.toolbar-btn:hover {
+  background: #f1f5f9;
+}
+
+.toolbar-btn.active {
+  background: #3b82f6;
+  color: #ffffff;
+}
+
+.toolbar-btn.save-btn {
+  background: #f59e0b;
+  color: #ffffff;
+}
+
+.toolbar-btn.save-btn:hover {
+  background: #d97706;
+}
+
+.toolbar-btn.back-btn {
+  background: #334155;
+  color: #ffffff;
+}
+
+.toolbar-btn.back-btn:hover {
+  background: #475569;
+}
+
+.board-name {
+  font-size: 16px;
+  font-weight: 600;
+  color: #f1f5f9;
+  margin-left: 8px;
+}
+
+.color-picker {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.color-swatch {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  padding: 0;
+}
+
+.color-swatch:hover {
+  transform: scale(1.1);
+}
+
+.color-swatch.active {
+  border-color: #ffffff;
+  box-shadow: 0 0 0 2px #3b82f6;
+}
+
+.line-width-picker {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.line-width-btn {
+  width: 32px;
+  height: 32px;
+  border: 2px solid transparent;
+  border-radius: 8px;
+  background: #ffffff;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.1s ease;
+  padding: 0;
+}
+
+.line-width-btn:hover {
+  background: #f1f5f9;
+}
+
+.line-width-btn.active {
+  border-color: #3b82f6;
+}
+
+.line-width-preview {
+  background: #1e293b;
+  border-radius: 2px;
+}
+
+.line-width-btn.active .line-width-preview {
+  background: #3b82f6;
+}
