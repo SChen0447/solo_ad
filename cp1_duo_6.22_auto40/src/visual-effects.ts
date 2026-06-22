@@ -1,4 +1,4 @@
-import { computed, type ComputedRef } from 'vue'
+import { ref, onMounted, onUnmounted, computed, type ComputedRef } from 'vue'
 import type { ElementProgress } from './scroll-engine'
 
 export interface TransformMatrix {
@@ -33,29 +33,47 @@ const clamp = (value: number, min: number, max: number): number => {
 }
 
 export function useVisualEffects() {
-  const getMobileOffset = (): number => {
-    if (typeof window === 'undefined') return 50
-    return window.innerWidth < 768 ? 25 : 50
+  const isMobile = ref(false)
+
+  const updateIsMobile = () => {
+    if (typeof window !== 'undefined') {
+      isMobile.value = window.innerWidth < 768
+    }
   }
 
-  const calculateSlideUpAnimation = (progress: number, isMobile: boolean = false): TransformMatrix => {
-    const offset = isMobile ? 25 : 50
+  const handleResize = () => {
+    updateIsMobile()
+  }
+
+  onMounted(() => {
+    updateIsMobile()
+    window.addEventListener('resize', handleResize)
+  })
+
+  onUnmounted(() => {
+    window.removeEventListener('resize', handleResize)
+  })
+
+  const getSlideOffset = (): number => {
+    return isMobile.value ? 25 : 50
+  }
+
+  const calculateSlideUpAnimation = (progress: number): TransformMatrix => {
+    const offset = getSlideOffset()
     let opacity = 0
     let translateY = offset
 
-    if (progress < 0.3) {
-      const t = progress / 0.3
-      const eased = easingFunctions.easeOutCubic(t)
-      opacity = eased
-      translateY = lerp(offset, 0, eased)
+    if (progress < 0.5) {
+      const t = progress / 0.5
+      opacity = easingFunctions.linear(t)
+      translateY = lerp(offset, 0, t)
     } else if (progress < 0.7) {
       opacity = 1
       translateY = 0
     } else if (progress < 1) {
       const t = (progress - 0.7) / 0.3
-      const eased = easingFunctions.easeInOutCubic(t)
-      opacity = lerp(1, 0, eased)
-      translateY = lerp(0, -30, eased)
+      opacity = lerp(1, 0, t)
+      translateY = lerp(0, -30, t)
     } else {
       opacity = 0
       translateY = -30
@@ -73,8 +91,8 @@ export function useVisualEffects() {
   const calculateFadeInAnimation = (progress: number): TransformMatrix => {
     let opacity = 0
 
-    if (progress < 0.4) {
-      const t = progress / 0.4
+    if (progress < 0.5) {
+      const t = progress / 0.5
       opacity = easingFunctions.easeOutCubic(t)
     } else if (progress < 0.7) {
       opacity = 1
@@ -96,11 +114,10 @@ export function useVisualEffects() {
     let opacity = 0
     let scale = 0.8
 
-    if (progress < 0.4) {
-      const t = progress / 0.4
-      const eased = easingFunctions.easeOutCubic(t)
-      opacity = eased
-      scale = lerp(0.8, 1, eased)
+    if (progress < 0.5) {
+      const t = progress / 0.5
+      opacity = easingFunctions.easeOutCubic(t)
+      scale = lerp(0.8, 1, t)
     } else if (progress < 0.7) {
       opacity = 1
       scale = 1
@@ -124,12 +141,11 @@ export function useVisualEffects() {
     let rotate = -15
     let scale = 0.9
 
-    if (progress < 0.4) {
-      const t = progress / 0.4
-      const eased = easingFunctions.easeOutCubic(t)
-      opacity = eased
-      rotate = lerp(-15, 0, eased)
-      scale = lerp(0.9, 1, eased)
+    if (progress < 0.5) {
+      const t = progress / 0.5
+      opacity = easingFunctions.easeOutCubic(t)
+      rotate = lerp(-15, 0, t)
+      scale = lerp(0.9, 1, t)
     } else if (progress < 0.7) {
       opacity = 1
       rotate = 0
@@ -152,33 +168,30 @@ export function useVisualEffects() {
   const calculateParticleAnimation = (progress: number, sceneProgress: number): TransformMatrix => {
     const opacity = lerp(0.1, 0.3, Math.sin(sceneProgress * Math.PI))
     const rotate = sceneProgress * 360
-    const baseScale = 1
-    const pulseScale = Math.sin(sceneProgress * Math.PI * 2) * 0.1 + 1
 
     return {
       opacity: clamp(opacity, 0.1, 0.3),
       translateX: 0,
       translateY: 0,
       rotate,
-      scale: baseScale * pulseScale
+      scale: 1
     }
   }
 
-  const calculateTitleAnimation = (progress: number, isMobile: boolean = false): TransformMatrix => {
-    const offset = isMobile ? 15 : 30
+  const calculateTitleAnimation = (progress: number): TransformMatrix => {
+    const titleOffset = isMobile.value ? 15 : 30
     let opacity = 0
-    let translateY = offset
+    let translateY = titleOffset
 
-    if (progress < 0.3) {
-      const t = progress / 0.3
-      const eased = easingFunctions.easeOutQuart(t)
-      opacity = eased
-      translateY = lerp(offset, 0, eased)
-    } else if (progress < 0.8) {
+    if (progress < 0.5) {
+      const t = progress / 0.5
+      opacity = easingFunctions.easeOutQuart(t)
+      translateY = lerp(titleOffset, 0, t)
+    } else if (progress < 0.7) {
       opacity = 1
       translateY = 0
     } else {
-      const t = (progress - 0.8) / 0.2
+      const t = (progress - 0.7) / 0.3
       opacity = lerp(1, 0, t)
       translateY = lerp(0, -10, t)
     }
@@ -197,15 +210,14 @@ export function useVisualEffects() {
     progressData: ElementProgress | undefined
   ): TransformMatrix => {
     if (!progressData) {
-      return { opacity: 0, translateX: 0, translateY: 0, rotate: 0, scale: 1 }
+      return { opacity: 0, translateX: 0, translateY: getSlideOffset(), rotate: 0, scale: 1 }
     }
 
-    const isMobile = typeof window !== 'undefined' && window.innerWidth < 768
     const { progress, sceneProgress } = progressData
 
     switch (type) {
       case 'slideUp':
-        return calculateSlideUpAnimation(progress, isMobile)
+        return calculateSlideUpAnimation(progress)
       case 'fadeIn':
         return calculateFadeInAnimation(progress)
       case 'scaleIn':
@@ -215,13 +227,13 @@ export function useVisualEffects() {
       case 'particle':
         return calculateParticleAnimation(progress, sceneProgress)
       case 'title':
-        return calculateTitleAnimation(progress, isMobile)
+        return calculateTitleAnimation(progress)
       default:
-        return calculateSlideUpAnimation(progress, isMobile)
+        return calculateSlideUpAnimation(progress)
     }
   }
 
-  const matrixToStyle = (matrix: TransformMatrix, duration: number = 0.4): StyleObject => {
+  const matrixToStyle = (matrix: TransformMatrix): StyleObject => {
     const style: StyleObject = {}
 
     if (matrix.opacity !== undefined) {
@@ -293,6 +305,7 @@ export function useVisualEffects() {
   }
 
   return {
+    isMobile,
     calculateAnimation,
     matrixToStyle,
     interpolateColor,
@@ -304,6 +317,6 @@ export function useVisualEffects() {
     calculateRotateInAnimation,
     calculateParticleAnimation,
     calculateTitleAnimation,
-    getMobileOffset
+    getSlideOffset
   }
 }

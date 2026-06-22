@@ -17,6 +17,8 @@ export interface SceneData {
 
 export const progressKey: InjectionKey<ReturnType<typeof useScrollEngine>> = Symbol('scroll-progress')
 
+const IO_THRESHOLDS: number[] = [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1]
+
 export function useScrollEngine() {
   const progressMap = reactive<Map<string, ElementProgress>>(new Map())
   const activeSceneIndex = ref(0)
@@ -25,8 +27,10 @@ export function useScrollEngine() {
   let rafId: number | null = null
   let lastScrollY = 0
   let scrollTimeout: ReturnType<typeof setTimeout> | null = null
-  let registeredElements: { id: string; element: HTMLElement; sceneId: string }[] = []
+  let registeredElements: { id: string; element: HTMLElement; sceneId: string; lastRatio: number }[] = []
   let registeredScenes: { id: string; element: HTMLElement; index: number }[] = []
+  let intersectionObserver: IntersectionObserver | null = null
+  let pendingElements: Set<string> = new Set()
 
   const clamp = (value: number, min: number, max: number): number => {
     return Math.max(min, Math.min(max, value))
@@ -40,38 +44,35 @@ export function useScrollEngine() {
     const elementBottom = rect.bottom
     const elementHeight = rect.height
 
-    let visibility = 0
+    const visibleTop = Math.max(0, elementTop)
+    const visibleBottom = Math.min(windowHeight, elementBottom)
+    const visibleHeight = visibleBottom - visibleTop
+    const visibility = clamp(visibleHeight / elementHeight, 0, 1)
+
     let progress = 0
 
-    if (elementBottom < 0 || elementTop > windowHeight) {
-      visibility = 0
-      progress = elementTop > windowHeight ? 0 : 1
+    if (elementBottom <= 0) {
+      progress = 1
+    } else if (elementTop >= windowHeight) {
+      progress = 0
     } else {
-      const visibleTop = Math.max(0, elementTop)
-      const visibleBottom = Math.min(windowHeight, elementBottom)
-      const visibleHeight = visibleBottom - visibleTop
-      visibility = clamp(visibleHeight / elementHeight, 0, 1)
+      const enterStart = windowHeight
+      const enterEnd = windowHeight * 0.5
+      const exitStart = windowHeight * 0.5
+      const exitEnd = 0
 
-      const enterPoint = windowHeight * 0.8
-      const centerPoint = windowHeight * 0.5
-      const exitPoint = windowHeight * 0.2
-
-      if (elementBottom > enterPoint && elementTop < enterPoint) {
-        const enterProgress = (enterPoint - elementBottom) / (elementHeight * 0.3)
-        progress = clamp(enterProgress, 0, 0.5)
-      } else if (elementTop <= centerPoint && elementBottom >= centerPoint) {
-        progress = 0.5 + clamp((centerPoint - elementTop) / elementHeight, 0, 0.5) * 0.1
-        progress = clamp(progress, 0.5, 0.6)
-      } else if (elementTop < exitPoint && elementBottom > exitPoint) {
-        const exitProgress = (exitPoint - elementTop) / (elementHeight * 0.3)
-        progress = 0.6 + clamp(exitProgress, 0, 1) * 0.4
-      } else if (elementBottom <= enterPoint && elementTop >= exitPoint) {
-        const centerProgress = (enterPoint - elementBottom) / (enterPoint - exitPoint)
-        progress = 0.5 + clamp(centerProgress, 0, 1) * 0.1
-      } else if (elementBottom < exitPoint) {
-        progress = 1
+      if (elementTop >= enterEnd) {
+        const enterTotal = enterStart - enterEnd
+        const elementEnterPoint = elementBottom
+        const t = (enterStart - elementEnterPoint) / enterTotal
+        progress = clamp(t, 0, 0.5)
+      } else if (elementBottom <= exitStart) {
+        const exitTotal = exitStart - exitEnd
+        const elementExitPoint = elementTop
+        const t = (exitStart - elementExitPoint) / exitTotal
+        progress = clamp(0.5 + t * 0.5, 0.5, 1)
       } else {
-        progress = 0
+        progress = 0.5
       }
     }
 
@@ -98,7 +99,6 @@ export function useScrollEngine() {
   }
 
   const calculateActiveScene = (): number => {
-    const scrollY = window.scrollY
     const windowHeight = window.innerHeight
     let activeIndex = 0
 
@@ -115,12 +115,13 @@ export function useScrollEngine() {
   }
 
   const updateProgress = () => {
-    if (lastScrollY === window.scrollY && rafId !== null) {
+    if (lastScrollY === window.scrollY && pendingElements.size === 0 && rafId !== null) {
       rafId = requestAnimationFrame(updateProgress)
       return
     }
 
     lastScrollY = window.scrollY
+    pendingElements.clear()
 
     registeredElements.forEach(({ id, element }) => {
       const progress = calculateElementProgress(element)
@@ -140,14 +141,53 @@ export function useScrollEngine() {
     rafId = requestAnimationFrame(updateProgress)
   }
 
+  const onIntersectionChange = (entries: IntersectionObserverEntry[]) => {
+    entries.forEach(entry => {
+      const id = entry.target.id
+      const elementData = registeredElements.find(e => e.id === id)
+      if (elementData) {
+        elementData.lastRatio = entry.intersectionRatio
+        pendingElements.add(id)
+      }
+
+      if (rafId === null) {
+        rafId = requestAnimationFrame(updateProgress)
+      }
+    })
+  }
+
+  const createIntersectionObserver = () => {
+    if (typeof window === 'undefined' || !('IntersectionObserver' in window)) {
+      return
+    }
+
+    intersectionObserver = new IntersectionObserver(onIntersectionChange, {
+      root: null,
+      rootMargin: '0px',
+      threshold: IO_THRESHOLDS
+    })
+  }
+
   const registerElement = (id: string, element: HTMLElement, sceneId: string) => {
     if (!registeredElements.find(e => e.id === id)) {
-      registeredElements.push({ id, element, sceneId })
+      registeredElements.push({ id, element, sceneId, lastRatio: 0 })
       progressMap.set(id, { id, progress: 0, visibility: 0, sceneProgress: 0 })
+
+      if (intersectionObserver) {
+        intersectionObserver.observe(element)
+      }
+
+      if (rafId === null) {
+        rafId = requestAnimationFrame(updateProgress)
+      }
     }
   }
 
   const unregisterElement = (id: string) => {
+    const elementData = registeredElements.find(e => e.id === id)
+    if (elementData && intersectionObserver) {
+      intersectionObserver.unobserve(elementData.element)
+    }
     registeredElements = registeredElements.filter(e => e.id !== id)
     progressMap.delete(id)
   }
@@ -156,10 +196,18 @@ export function useScrollEngine() {
     if (!registeredScenes.find(s => s.id === id)) {
       registeredScenes.push({ id, element, index })
       registeredScenes.sort((a, b) => a.index - b.index)
+
+      if (intersectionObserver) {
+        intersectionObserver.observe(element)
+      }
     }
   }
 
   const unregisterScene = (id: string) => {
+    const sceneData = registeredScenes.find(s => s.id === id)
+    if (sceneData && intersectionObserver) {
+      intersectionObserver.unobserve(sceneData.element)
+    }
     registeredScenes = registeredScenes.filter(s => s.id !== id)
   }
 
@@ -181,8 +229,22 @@ export function useScrollEngine() {
   }
 
   const startListening = () => {
+    createIntersectionObserver()
+
     window.addEventListener('scroll', handleScroll, { passive: true })
     window.addEventListener('resize', handleScroll, { passive: true })
+
+    registeredElements.forEach(({ element }) => {
+      if (intersectionObserver) {
+        intersectionObserver.observe(element)
+      }
+    })
+    registeredScenes.forEach(({ element }) => {
+      if (intersectionObserver) {
+        intersectionObserver.observe(element)
+      }
+    })
+
     handleScroll()
   }
 
@@ -195,6 +257,10 @@ export function useScrollEngine() {
     }
     if (scrollTimeout) {
       clearTimeout(scrollTimeout)
+    }
+    if (intersectionObserver) {
+      intersectionObserver.disconnect()
+      intersectionObserver = null
     }
   }
 

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, inject, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, inject } from 'vue'
 import { progressKey, type ScrollEngine } from './scroll-engine'
 import { useVisualEffects, type AnimationType } from './visual-effects'
 
@@ -72,10 +72,6 @@ const setParticleRef = (el: HTMLElement | null, index: number) => {
     particleRefs.value[index] = el
   }
 }
-
-watch(sceneProgress, (newVal) => {
-  console.log(`[Scene ${props.sceneIndex}] Progress: ${newVal.toFixed(2)}`)
-})
 
 onMounted(() => {
   if (sceneRef.value && engine) {
