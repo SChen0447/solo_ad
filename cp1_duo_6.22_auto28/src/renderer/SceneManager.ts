@@ -9,7 +9,7 @@ export class SceneManager {
   renderer: THREE.WebGLRenderer;
   controls: OrbitControls;
   plateRenderer: PlateRenderer;
-  stars: THREE.Points;
+  stars!: THREE.Points;
   private clock: THREE.Clock;
   private animationId: number = 0;
   private onPeriodChange: ((period: { nameCN: string; timeAgo: string }) => void) | null = null;
@@ -122,7 +122,7 @@ export class SceneManager {
   }
 
   setPresetView(view: 'front' | 'side' | 'top'): void {
-    const duration = 800;
+    const duration = 1500;
     const startPos = this.camera.position.clone();
     const startTarget = this.controls.target.clone();
     let endPos: THREE.Vector3;

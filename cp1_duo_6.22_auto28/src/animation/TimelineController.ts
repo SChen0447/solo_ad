@@ -1,6 +1,7 @@
 import { GEOLOGICAL_PERIODS } from '../data/platesData.js';
 
 type TimeUpdateCallback = (time: number) => void;
+type PlayStateCallback = (playing: boolean) => void;
 
 export class TimelineController {
   private currentTime: number = -250;
@@ -10,6 +11,7 @@ export class TimelineController {
   private playInterval: number | null = null;
   private playSpeed: number = 10;
   private callbacks: TimeUpdateCallback[] = [];
+  private playStateCallbacks: PlayStateCallback[] = [];
   private slider: HTMLInputElement | null = null;
   private playBtn: HTMLElement | null = null;
   private tickContainer: HTMLElement | null = null;
@@ -95,6 +97,7 @@ export class TimelineController {
   play(): void {
     this.isPlaying = true;
     this.updatePlayButton();
+    this.emitPlayStateChange();
 
     if (this.currentTime >= this.maxTime) {
       this.currentTime = this.minTime;
@@ -128,6 +131,7 @@ export class TimelineController {
   pause(): void {
     this.isPlaying = false;
     this.updatePlayButton();
+    this.emitPlayStateChange();
     if (this.playInterval) {
       cancelAnimationFrame(this.playInterval);
       this.playInterval = null;
@@ -166,12 +170,32 @@ export class TimelineController {
     }
   }
 
+  private emitPlayStateChange(): void {
+    for (const cb of this.playStateCallbacks) {
+      cb(this.isPlaying);
+    }
+  }
+
   onTimeUpdate(cb: TimeUpdateCallback): void {
     this.callbacks.push(cb);
   }
 
+  onPlayStateChange(cb: PlayStateCallback): void {
+    this.playStateCallbacks.push(cb);
+  }
+
   getCurrentTime(): number {
     return this.currentTime;
+  }
+
+  getIsPlaying(): boolean {
+    return this.isPlaying;
+  }
+
+  getProgress(): number {
+    const range = this.maxTime - this.minTime;
+    if (range === 0) return 0;
+    return (this.currentTime - this.minTime) / range;
   }
 
   getCurrentPeriod(): { nameCN: string; timeAgo: string } {

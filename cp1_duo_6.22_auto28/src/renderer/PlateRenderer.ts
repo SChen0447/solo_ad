@@ -2,14 +2,28 @@ import * as THREE from 'three';
 import type { PlateData } from '../data/platesData.js';
 import { getInterpolatedPlateData } from '../data/platesData.js';
 
+export interface PlateVelocity {
+  speed: number;
+  dx: number;
+  dy: number;
+  angle: number;
+}
+
 interface PlateMeshGroup {
   plateId: string;
   mesh: THREE.Mesh;
   boundaryLine: THREE.Line;
+  glowLine1: THREE.Line;
+  glowLine2: THREE.Line;
   gridLines: THREE.LineSegments;
+  flowMesh: THREE.Mesh;
   arrowGroup: THREE.Group;
   label: THREE.Sprite | null;
   data: PlateData;
+  center: THREE.Vector2;
+  prevCenter: THREE.Vector2;
+  velocity: PlateVelocity;
+  lastUpdateTime: number;
 }
 
 export class PlateRenderer {
@@ -17,12 +31,34 @@ export class PlateRenderer {
   private plateGroups: Map<string, PlateMeshGroup> = new Map();
   private raycaster = new THREE.Raycaster();
   private hoveredPlate: string | null = null;
-  private onHoverCallback: ((plate: PlateData | null, position: { x: number; y: number }) => void) | null = null;
+  private onHoverCallback: ((plate: PlateData | null, position: { x: number; y: number }, center: { x: number; y: number } | null) => void) | null = null;
   private gridTexture: THREE.CanvasTexture;
+  private flowTextureCanvas: HTMLCanvasElement;
+  private flowTexture: THREE.CanvasTexture;
+  private flowTextureCtx: CanvasRenderingContext2D;
+  private currentTime: number = -250;
+  private isPlaying: boolean = false;
 
   constructor(scene: THREE.Scene) {
     this.scene = scene;
     this.gridTexture = this.createGridTexture();
+    const { canvas, ctx, texture } = this.createFlowTexture();
+    this.flowTextureCanvas = canvas;
+    this.flowTextureCtx = ctx;
+    this.flowTexture = texture;
+  }
+
+  setPlayingState(playing: boolean): void {
+    this.isPlaying = playing;
+  }
+
+  getCurrentTime(): number {
+    return this.currentTime;
+  }
+
+  getPlateVelocity(plateId: string): PlateVelocity | null {
+    const g = this.plateGroups.get(plateId);
+    return g ? g.velocity : null;
   }
 
   private createGridTexture(): THREE.CanvasTexture {
@@ -57,6 +93,21 @@ export class PlateRenderer {
     return texture;
   }
 
+  private createFlowTexture(): { canvas: HTMLCanvasElement; ctx: CanvasRenderingContext2D; texture: THREE.CanvasTexture } {
+    const size = 256;
+    const canvas = document.createElement('canvas');
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext('2d')!;
+
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.wrapS = THREE.RepeatWrapping;
+    texture.wrapT = THREE.RepeatWrapping;
+    texture.repeat.set(3, 3);
+
+    return { canvas, ctx, texture };
+  }
+
   createPlates(platesData: PlateData[]): void {
     for (const plate of platesData) {
       this.createPlateMesh(plate);
@@ -81,7 +132,19 @@ export class PlateRenderer {
     const mesh = new THREE.Mesh(geometry, material);
     mesh.userData = { plateId: plate.id };
 
-    const boundaryGeometry = this.createBoundaryGeometry(vertices);
+    const flowGeom = new THREE.ShapeGeometry(shape);
+    const flowMat = new THREE.MeshBasicMaterial({
+      transparent: true,
+      opacity: 0,
+      map: this.flowTexture,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+      side: THREE.DoubleSide,
+    });
+    const flowMesh = new THREE.Mesh(flowGeom, flowMat);
+    flowMesh.position.z = 0.015;
+
+    const boundaryGeometry = this.createBoundaryGeometry(vertices, 0.02);
     const boundaryMaterial = new THREE.LineBasicMaterial({
       color: new THREE.Color(plate.color).multiplyScalar(1.5),
       transparent: true,
@@ -90,22 +153,54 @@ export class PlateRenderer {
     });
     const boundaryLine = new THREE.Line(boundaryGeometry, boundaryMaterial);
 
+    const glowGeom1 = this.createBoundaryGeometry(vertices, 0.018);
+    const glowMat1 = new THREE.LineBasicMaterial({
+      color: new THREE.Color(plate.color),
+      transparent: true,
+      opacity: 0.35,
+      linewidth: 1,
+    });
+    const glowLine1 = new THREE.Line(glowGeom1, glowMat1);
+
+    const glowGeom2 = this.createBoundaryGeometry(vertices, 0.016);
+    const glowMat2 = new THREE.LineBasicMaterial({
+      color: new THREE.Color(plate.color).multiplyScalar(1.8),
+      transparent: true,
+      opacity: 0.2,
+      linewidth: 1,
+    });
+    const glowLine2 = new THREE.Line(glowGeom2, glowMat2);
+
     const gridLines = this.createGridLines(vertices);
 
     const arrowGroup = this.createArrows(vertices, plate.color);
+
+    const cx = vertices.reduce((s, v) => s + v[0], 0) / vertices.length;
+    const cy = vertices.reduce((s, v) => s + v[1], 0) / vertices.length;
+    const center = new THREE.Vector2(cx, cy);
 
     const group: PlateMeshGroup = {
       plateId: plate.id,
       mesh,
       boundaryLine,
+      glowLine1,
+      glowLine2,
       gridLines,
+      flowMesh,
       arrowGroup,
       label: null,
       data: plate,
+      center: center.clone(),
+      prevCenter: center.clone(),
+      velocity: { speed: 0, dx: 0, dy: 0, angle: 0 },
+      lastUpdateTime: -250,
     };
 
     const container = new THREE.Group();
     container.add(mesh);
+    container.add(flowMesh);
+    container.add(glowLine2);
+    container.add(glowLine1);
     container.add(boundaryLine);
     container.add(gridLines);
     container.add(arrowGroup);
@@ -128,11 +223,11 @@ export class PlateRenderer {
     return shape;
   }
 
-  private createBoundaryGeometry(vertices: [number, number][]): THREE.BufferGeometry {
+  private createBoundaryGeometry(vertices: [number, number][], z: number): THREE.BufferGeometry {
     const points: THREE.Vector3[] = [];
     for (let i = 0; i <= vertices.length; i++) {
       const v = vertices[i % vertices.length];
-      points.push(new THREE.Vector3(v[0], v[1], 0.02));
+      points.push(new THREE.Vector3(v[0], v[1], z));
     }
     return new THREE.BufferGeometry().setFromPoints(points);
   }
@@ -197,7 +292,58 @@ export class PlateRenderer {
     return group;
   }
 
+  private updateFlowTexture(angle: number, speed: number, phase: number): void {
+    const ctx = this.flowTextureCtx;
+    const size = 256;
+    ctx.clearRect(0, 0, size, size);
+
+    const intensity = Math.min(1, speed * 0.8);
+    if (intensity < 0.05) {
+      this.flowTexture.needsUpdate = true;
+      return;
+    }
+
+    const gradient = ctx.createLinearGradient(
+      size / 2 - Math.cos(angle) * size,
+      size / 2 - Math.sin(angle) * size,
+      size / 2 + Math.cos(angle) * size,
+      size / 2 + Math.sin(angle) * size
+    );
+
+    const alpha = 0.08 + 0.12 * intensity;
+    gradient.addColorStop(0, `rgba(255,255,255,0)`);
+    gradient.addColorStop(0.3, `rgba(180,220,255,${alpha})`);
+    gradient.addColorStop(0.5, `rgba(200,240,255,${alpha * 1.5})`);
+    gradient.addColorStop(0.7, `rgba(180,220,255,${alpha})`);
+    gradient.addColorStop(1, `rgba(255,255,255,0)`);
+
+    ctx.fillStyle = gradient;
+    ctx.globalCompositeOperation = 'source-over';
+
+    ctx.save();
+    ctx.translate(size / 2, size / 2);
+
+    const stripeWidth = 18;
+    const stripeSpacing = 28;
+    const offset = (phase * 80) % stripeSpacing;
+
+    for (let i = -8; i <= 8; i++) {
+      const d = i * stripeSpacing + offset;
+      ctx.fillStyle = `rgba(180,220,255,${(0.05 + 0.08 * intensity) * (1 - Math.abs(i) / 10)})`;
+      ctx.rotate(-angle);
+      ctx.fillRect(-size, d - stripeWidth / 2, size * 2, stripeWidth / 3);
+      ctx.rotate(angle);
+    }
+
+    ctx.restore();
+
+    this.flowTexture.needsUpdate = true;
+  }
+
   updatePlates(platesData: PlateData[], time: number): void {
+    const dt = Math.abs(time - this.currentTime);
+    this.currentTime = time;
+
     for (const plate of platesData) {
       const group = this.plateGroups.get(plate.id);
       if (!group) continue;
@@ -209,9 +355,21 @@ export class PlateRenderer {
       group.mesh.geometry.dispose();
       group.mesh.geometry = newGeometry;
 
-      const newBoundaryGeom = this.createBoundaryGeometry(vertices);
+      const flowGeom = new THREE.ShapeGeometry(newShape);
+      group.flowMesh.geometry.dispose();
+      group.flowMesh.geometry = flowGeom;
+
+      const newBoundaryGeom = this.createBoundaryGeometry(vertices, 0.02);
       group.boundaryLine.geometry.dispose();
       group.boundaryLine.geometry = newBoundaryGeom;
+
+      const glowGeom1 = this.createBoundaryGeometry(vertices, 0.018);
+      group.glowLine1.geometry.dispose();
+      group.glowLine1.geometry = glowGeom1;
+
+      const glowGeom2 = this.createBoundaryGeometry(vertices, 0.016);
+      group.glowLine2.geometry.dispose();
+      group.glowLine2.geometry = glowGeom2;
 
       const newGridGeom = this.createGridLinesGeometry(vertices);
       group.gridLines.geometry.dispose();
@@ -221,6 +379,27 @@ export class PlateRenderer {
       container.remove(group.arrowGroup);
       group.arrowGroup = this.createArrows(vertices, plate.color);
       container.add(group.arrowGroup);
+
+      group.prevCenter = group.center.clone();
+      const cx = vertices.reduce((s, v) => s + v[0], 0) / vertices.length;
+      const cy = vertices.reduce((s, v) => s + v[1], 0) / vertices.length;
+      group.center.set(cx, cy);
+
+      const dxCenter = cx - group.prevCenter.x;
+      const dyCenter = cy - group.prevCenter.y;
+      const distance = Math.sqrt(dxCenter * dxCenter + dyCenter * dyCenter);
+
+      if (dt > 0.001) {
+        const speedPerMillionYears = distance / dt;
+        const cmPerYear = speedPerMillionYears * 1.0;
+        group.velocity = {
+          speed: Math.abs(cmPerYear),
+          dx: dxCenter,
+          dy: dyCenter,
+          angle: Math.atan2(dyCenter, dxCenter),
+        };
+      }
+      group.lastUpdateTime = time;
     }
   }
 
@@ -250,23 +429,61 @@ export class PlateRenderer {
         const scale = 0.9 + 0.2 * Math.sin(time * 3 + phase);
         mesh.scale.set(scale, scale, 1);
       });
+
+      const flowMat = group.flowMesh.material as THREE.MeshBasicMaterial;
+      if (this.isPlaying) {
+        const targetOpacity = Math.min(0.35, 0.1 + group.velocity.speed * 0.4);
+        flowMat.opacity += (targetOpacity - flowMat.opacity) * 0.1;
+      } else {
+        flowMat.opacity += (0 - flowMat.opacity) * 0.05;
+      }
+
+      this.updateFlowTexture(group.velocity.angle, group.velocity.speed, time);
+      this.flowTexture.offset.x = (time * 0.3 * Math.cos(group.velocity.angle)) % 1;
+      this.flowTexture.offset.y = (time * 0.3 * Math.sin(group.velocity.angle)) % 1;
     });
   }
 
   updateBoundaryGlow(time: number): void {
     this.plateGroups.forEach((group) => {
-      const mat = group.boundaryLine.material as THREE.LineBasicMaterial;
-      mat.opacity = 0.6 + 0.4 * Math.abs(Math.sin(time * 1.5));
+      const baseMat = group.boundaryLine.material as THREE.LineBasicMaterial;
+      baseMat.opacity = 0.6 + 0.4 * Math.abs(Math.sin(time * 1.5));
+
+      const glowMat1 = group.glowLine1.material as THREE.LineBasicMaterial;
+      const pulse1 = 0.25 + 0.15 * Math.sin(time * 1.8);
+      glowMat1.opacity = pulse1 + Math.min(0.3, group.velocity.speed * 0.4);
+
+      const glowMat2 = group.glowLine2.material as THREE.LineBasicMaterial;
+      const pulse2 = 0.12 + 0.08 * Math.sin(time * 2.2 + 0.5);
+      glowMat2.opacity = pulse2 + Math.min(0.25, group.velocity.speed * 0.3);
+
+      const scale1 = 1 + 0.05 * Math.sin(time * 1.2);
+      group.glowLine1.scale.set(scale1, scale1, 1);
+
+      const scale2 = 1 + 0.1 * Math.sin(time * 0.9 + 1);
+      group.glowLine2.scale.set(scale2, scale2, 1);
     });
   }
 
   setHoverCallback(
-    cb: (plate: PlateData | null, position: { x: number; y: number }) => void
+    cb: (plate: PlateData | null, position: { x: number; y: number }, center: { x: number; y: number } | null) => void
   ): void {
     this.onHoverCallback = cb;
   }
 
-  checkHover(mouse: THREE.Vector2, camera: THREE.Camera, screenPos: { x: number; y: number }): void {
+  getPlateCenterWorld(plateId: string, camera: THREE.Camera, width: number, height: number): { x: number; y: number } | null {
+    const group = this.plateGroups.get(plateId);
+    if (!group) return null;
+
+    const v = new THREE.Vector3(group.center.x, group.center.y, 0.05);
+    const projected = v.project(camera);
+    return {
+      x: (projected.x * 0.5 + 0.5) * width,
+      y: (-projected.y * 0.5 + 0.5) * height,
+    };
+  }
+
+  checkHover(mouse: THREE.Vector2, camera: THREE.Camera, screenPos: { x: number; y: number }, width: number, height: number): void {
     this.raycaster.setFromCamera(mouse, camera);
     const meshes: THREE.Mesh[] = [];
     this.plateGroups.forEach((g) => meshes.push(g.mesh));
@@ -302,14 +519,16 @@ export class PlateRenderer {
       if (this.onHoverCallback) {
         if (newHovered) {
           const plate = this.plateGroups.get(newHovered)!.data;
-          this.onHoverCallback(plate, screenPos);
+          const center = this.getPlateCenterWorld(newHovered, camera, width, height);
+          this.onHoverCallback(plate, screenPos, center);
         } else {
-          this.onHoverCallback(null, screenPos);
+          this.onHoverCallback(null, screenPos, null);
         }
       }
     } else if (newHovered && this.onHoverCallback) {
       const plate = this.plateGroups.get(newHovered)!.data;
-      this.onHoverCallback(plate, screenPos);
+      const center = this.getPlateCenterWorld(newHovered, camera, width, height);
+      this.onHoverCallback(plate, screenPos, center);
     }
   }
 

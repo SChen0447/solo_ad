@@ -26,6 +26,10 @@ const hud = new HUD(timelineController, sceneManager);
 
 const infoPanel = new InfoPanel(sceneManager.plateRenderer, sceneManager);
 
+timelineController.onPlayStateChange((playing) => {
+  sceneManager.plateRenderer.setPlayingState(playing);
+});
+
 sceneManager.startRenderLoop();
 
 animationEngine.start();

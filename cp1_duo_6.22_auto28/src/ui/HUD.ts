@@ -6,13 +6,27 @@ export class HUD {
   private timeAgoEl: HTMLElement;
   private container: HTMLElement;
   private viewBtnContainer: HTMLElement;
+  private progressBarEl: HTMLElement;
+  private progressFillEl: HTMLElement;
 
   constructor(timelineController: TimelineController, sceneManager: SceneManager) {
     this.container = document.createElement('div');
     this.container.id = 'hud-container';
     this.container.innerHTML = `
-      <div class="hud-period" id="hud-period">二叠纪末</div>
-      <div class="hud-time" id="hud-time">距今2.50亿年</div>
+      <div class="hud-main">
+        <div class="hud-period" id="hud-period">二叠纪末</div>
+        <div class="hud-time" id="hud-time">距今2.50亿年</div>
+      </div>
+      <div class="hud-progress-wrap">
+        <div class="hud-progress-label">
+          <span>盘古大陆</span>
+          <span>现代</span>
+        </div>
+        <div class="hud-progress-bar" id="hud-progress-bar">
+          <div class="hud-progress-fill" id="hud-progress-fill"></div>
+          <div class="hud-progress-glow" id="hud-progress-glow"></div>
+        </div>
+      </div>
     `;
     document.body.appendChild(this.container);
 
@@ -42,6 +56,8 @@ export class HUD {
 
     this.periodEl = document.getElementById('hud-period')!;
     this.timeAgoEl = document.getElementById('hud-time')!;
+    this.progressBarEl = document.getElementById('hud-progress-bar')!;
+    this.progressFillEl = document.getElementById('hud-progress-fill')!;
 
     timelineController.onTimeUpdate(() => {
       this.updateDisplay(timelineController);
@@ -62,6 +78,15 @@ export class HUD {
     const period = timelineController.getCurrentPeriod();
     this.periodEl.textContent = period.nameCN;
     this.timeAgoEl.textContent = period.timeAgo;
+
+    const progress = timelineController.getProgress();
+    const pct = progress * 100;
+    this.progressFillEl.style.width = `${pct}%`;
+
+    const glow = document.getElementById('hud-progress-glow');
+    if (glow) {
+      glow.style.left = `${pct}%`;
+    }
   }
 
   private applyStyles(): void {
@@ -74,21 +99,30 @@ export class HUD {
         z-index: 90;
         text-align: right;
         pointer-events: none;
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+        gap: 16px;
       }
-      
+
+      .hud-main {
+        text-align: right;
+      }
+
       .hud-period {
         font-size: 36px;
         font-weight: 700;
         color: #e0e6ff;
-        text-shadow: 
+        text-shadow:
           0 0 20px rgba(106,143,255,0.6),
           0 0 40px rgba(106,143,255,0.3),
           0 0 80px rgba(106,143,255,0.1);
         letter-spacing: 4px;
         font-family: 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
         margin-bottom: 4px;
+        line-height: 1.1;
       }
-      
+
       .hud-time {
         font-size: 16px;
         color: rgba(224,230,255,0.7);
@@ -96,7 +130,57 @@ export class HUD {
         letter-spacing: 2px;
         font-family: 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
       }
-      
+
+      .hud-progress-wrap {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        width: 220px;
+      }
+
+      .hud-progress-label {
+        display: flex;
+        justify-content: space-between;
+        font-size: 10px;
+        color: rgba(224,230,255,0.4);
+        letter-spacing: 1px;
+        font-family: 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+      }
+
+      .hud-progress-bar {
+        position: relative;
+        height: 5px;
+        border-radius: 3px;
+        background: linear-gradient(90deg, rgba(28,42,74,0.8), rgba(35, 20, 65, 0.8));
+        overflow: visible;
+        border: 1px solid rgba(224,230,255,0.06);
+      }
+
+      .hud-progress-fill {
+        position: absolute;
+        top: 0;
+        left: 0;
+        height: 100%;
+        border-radius: 3px;
+        background: linear-gradient(90deg, #4a7fff, #7a5cff, #a864ff);
+        box-shadow:
+          0 0 8px rgba(106,143,255,0.6),
+          0 0 16px rgba(155, 89, 255, 0.3);
+        transition: width 0.1s ease;
+      }
+
+      .hud-progress-glow {
+        position: absolute;
+        top: 50%;
+        transform: translate(-50%, -50%);
+        width: 14px;
+        height: 14px;
+        border-radius: 50%;
+        background: radial-gradient(circle, rgba(200,180,255,0.9) 0%, rgba(155,89,255,0.4) 40%, transparent 70%);
+        pointer-events: none;
+        transition: left 0.1s ease;
+      }
+
       #view-buttons {
         position: fixed;
         top: 30px;
@@ -105,7 +189,7 @@ export class HUD {
         gap: 8px;
         z-index: 90;
       }
-      
+
       .view-btn {
         display: flex;
         align-items: center;
@@ -121,17 +205,17 @@ export class HUD {
         transition: transform 0.1s ease, background 0.2s ease, border-color 0.2s ease;
         font-family: 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
       }
-      
+
       .view-btn:hover {
         background: linear-gradient(135deg, rgba(106,143,255,0.25), rgba(74,111,217,0.2));
         border-color: rgba(106,143,255,0.4);
         transform: scale(1.04);
       }
-      
+
       .view-btn:active {
         transform: scale(0.96);
       }
-      
+
       .view-btn svg {
         opacity: 0.7;
       }
