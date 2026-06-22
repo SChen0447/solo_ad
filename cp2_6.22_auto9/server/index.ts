@@ -166,10 +166,14 @@ app.post('/api/playlist/generate', (req, res) => {
     if (currentDuration >= maxDurationSeconds * 0.9) break;
   }
 
+  const playlistIds = new Set(playlist.map((ep) => ep.id));
+  const candidates = sortedEpisodes.filter((ep) => !playlistIds.has(ep.id));
+
   res.json({
     playlist,
     totalDuration: currentDuration,
     episodeCount: playlist.length,
+    candidates,
   });
 });
 

@@ -31,6 +31,7 @@ export interface PlaylistResult {
   playlist: Episode[];
   totalDuration: number;
   episodeCount: number;
+  candidates?: Episode[];
 }
 
 const API_BASE = '/api';

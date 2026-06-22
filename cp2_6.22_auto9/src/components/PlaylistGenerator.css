@@ -18,8 +18,9 @@
 }
 
 .playlist-header {
-  padding: 24px;
+  padding: 20px 24px;
   border-bottom: 1px solid #3A3A4C;
+  flex-shrink: 0;
 }
 
 .playlist-header h2 {
@@ -96,15 +97,80 @@
   transform: none;
 }
 
-.playlist-summary {
-  margin-top: 12px;
-  font-size: 13px;
-  color: #71717A;
+.playlist-progress-section {
+  margin-top: 16px;
+  padding: 16px;
+  background: #1E1E2E;
+  border-radius: 12px;
+  border: 1px solid #3A3A4C;
 }
 
-.playlist-summary span {
-  color: #6366F1;
+.playlist-progress-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.progress-stats {
+  display: flex;
+  gap: 24px;
+  flex-wrap: wrap;
+}
+
+.progress-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.progress-label {
+  font-size: 11px;
+  color: #71717A;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.progress-value {
+  font-size: 14px;
   font-weight: 600;
+  color: #E4E4E7;
+}
+
+.progress-value.primary {
+  color: #6366F1;
+}
+
+.progress-value.success {
+  color: #10B981;
+}
+
+.progress-value.danger {
+  color: #EF4444;
+}
+
+.progress-percent {
+  font-size: 24px;
+  font-weight: 700;
+  color: #6366F1;
+}
+
+.playlist-progress-bar {
+  height: 8px;
+  background: #3A3A4C;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.playlist-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #6366F1, #8B5CF6);
+  border-radius: 4px;
+  transition: width 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.playlist-progress-fill.over-limit {
+  background: linear-gradient(90deg, #EF4444, #F87171);
 }
 
 .playlist-content {
@@ -113,11 +179,116 @@
   padding: 24px;
 }
 
+.two-column-layout {
+  display: flex;
+  gap: 24px;
+  height: 100%;
+}
+
+.playlist-section,
+.candidates-section {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.section-header {
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 2px solid #3A3A4C;
+  flex-shrink: 0;
+}
+
+.section-title-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+
+.section-icon {
+  font-size: 20px;
+}
+
+.section-title {
+  font-size: 17px;
+  font-weight: 600;
+  color: #E4E4E7;
+  margin: 0;
+}
+
+.section-count {
+  padding: 2px 10px;
+  background: #3A3A4C;
+  color: #A1A1AA;
+  font-size: 12px;
+  font-weight: 500;
+  border-radius: 12px;
+}
+
+.section-hint {
+  font-size: 12px;
+  color: #71717A;
+  margin: 0;
+}
+
+.playlist-icon {
+  filter: drop-shadow(0 0 4px rgba(99, 102, 241, 0.3));
+}
+
+.candidates-icon {
+  filter: drop-shadow(0 0 4px rgba(16, 185, 129, 0.3));
+}
+
+.section-empty {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+  text-align: center;
+  border: 2px dashed #3A3A4C;
+  border-radius: 12px;
+}
+
+.section-empty svg {
+  margin-bottom: 16px;
+  opacity: 0.6;
+}
+
+.section-empty p {
+  font-size: 14px;
+  color: #A1A1AA;
+  margin: 0 0 4px 0;
+  font-weight: 500;
+}
+
+.section-empty span {
+  font-size: 12px;
+  color: #71717A;
+}
+
 .playlist-cards {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 16px;
+  gap: 12px;
+  padding-right: 8px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.candidates-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 12px;
+  justify-items: center;
+  padding-right: 8px;
+  overflow-y: auto;
+  flex: 1;
+  align-content: start;
 }
 
 .playlist-card {
@@ -131,15 +302,30 @@
   padding: 20px;
   box-sizing: border-box;
   cursor: grab;
-  transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.2s ease;
+  transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.2s ease, border-color 0.2s ease;
   position: relative;
   user-select: none;
   overflow: hidden;
+  border: 2px solid transparent;
+  flex-shrink: 0;
+}
+
+.playlist-card.candidate-card {
+  cursor: default;
+  background: linear-gradient(180deg, #F3F4F6 0%, #D1D5DB 100%);
+  opacity: 0.92;
 }
 
 .playlist-card:hover {
-  border: 2px solid #6366F1;
+  border-color: #6366F1;
   box-shadow: 0 8px 30px rgba(99, 102, 241, 0.3);
+  transform: translateY(-2px);
+}
+
+.playlist-card.candidate-card:hover {
+  border-color: #10B981;
+  box-shadow: 0 8px 30px rgba(16, 185, 129, 0.25);
+  opacity: 1;
 }
 
 .playlist-card:active {
@@ -147,14 +333,77 @@
 }
 
 .playlist-card.dragging {
-  opacity: 0.8;
+  opacity: 0.7;
   transform: scale(1.05) rotate(2deg);
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
   z-index: 100;
 }
 
 .playlist-card.drag-over {
-  transform: translateY(-8px);
+  transform: translateY(-10px) scale(1.02);
+  border-color: #10B981 !important;
+}
+
+.card-action-btn {
+  position: absolute;
+  top: 10px;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  z-index: 10;
+  opacity: 0;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.playlist-card:hover .card-action-btn {
+  opacity: 1;
+}
+
+.remove-btn {
+  right: 10px;
+  background: #EF4444;
+  color: white;
+}
+
+.remove-btn:hover {
+  background: #DC2626;
+  transform: scale(1.1);
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.4);
+}
+
+.add-btn {
+  right: 10px;
+  background: #10B981;
+  color: white;
+}
+
+.add-btn:hover {
+  background: #059669;
+  transform: scale(1.1);
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
+}
+
+.card-index-badge {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #6366F1, #8B5CF6);
+  color: white;
+  font-size: 13px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 8px rgba(99, 102, 241, 0.3);
 }
 
 .playlist-card-cover {
@@ -259,6 +508,7 @@
   justify-content: center;
   padding: 60px 20px;
   text-align: center;
+  height: 100%;
 }
 
 .empty-playlist svg {
@@ -271,4 +521,28 @@
   color: #71717A;
   font-size: 14px;
   margin: 4px 0;
+}
+
+@media (max-width: 900px) {
+  .two-column-layout {
+    flex-direction: column;
+  }
+
+  .candidates-grid {
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  }
+
+  .playlist-card {
+    width: 220px;
+    height: 300px;
+  }
+
+  .playlist-card-cover {
+    width: 100px;
+    height: 100px;
+  }
+
+  .progress-stats {
+    gap: 16px;
+  }
 }
