@@ -16,7 +16,8 @@ const navItems: { key: Page; icon: string; label: string }[] = [
 ];
 
 async function apiFetch<T>(url: string, options?: RequestInit): Promise<T> {
-  const res = await fetch(`${API_BASE}${url}`, { headers: { 'Content-Type': 'application/json' }, ...options });
+  const { signal, ...rest } = options || {};
+  const res = await fetch(`${API_BASE}${url}`, { headers: { 'Content-Type': 'application/json' }, signal, ...rest });
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 }

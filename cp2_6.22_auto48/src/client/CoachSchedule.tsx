@@ -3,7 +3,7 @@ import { Coach, ScheduleSlot } from '../types';
 import { apiFetch } from './App';
 
 const DAYS = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
-const HALF_HOURS = 24;
+const SLOT_COUNT = 24;
 const START_HOUR = 8;
 
 export default function CoachSchedule() {
@@ -36,10 +36,11 @@ export default function CoachSchedule() {
     load();
   };
 
-  const getSlotLabel = (slot: number) => {
-    const hours = START_HOUR + Math.floor(slot / 2);
-    const mins = slot % 2 === 0 ? '00' : '30';
-    return `${hours.toString().padStart(2, '0')}:${mins}`;
+  const getSlotLabel = (slotIndex: number) => {
+    const totalMinutes = slotIndex * 30;
+    const hours = START_HOUR + Math.floor(totalMinutes / 60);
+    const mins = totalMinutes % 60;
+    return `${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}`;
   };
 
   const getSlotsForDay = (day: number): ScheduleSlot[] => {
@@ -149,13 +150,13 @@ export default function CoachSchedule() {
           <div>
             <label style={{ display: 'block', fontSize: 12, color: '#94A3B8', marginBottom: 4 }}>开始时段</label>
             <select value={formStartSlot} onChange={e => setFormStartSlot(Number(e.target.value))} style={{ padding: '6px 10px', borderRadius: 8, border: '1px solid #334155', background: '#0F172A', color: '#E2E8F0', fontSize: 13 }}>
-              {Array.from({ length: HALF_HOURS }, (_, i) => <option key={i} value={i}>{getSlotLabel(i)}</option>)}
+              {Array.from({ length: SLOT_COUNT }, (_, i) => <option key={i} value={i}>{getSlotLabel(i)}</option>)}
             </select>
           </div>
           <div>
             <label style={{ display: 'block', fontSize: 12, color: '#94A3B8', marginBottom: 4 }}>结束时段</label>
             <select value={formEndSlot} onChange={e => setFormEndSlot(Number(e.target.value))} style={{ padding: '6px 10px', borderRadius: 8, border: '1px solid #334155', background: '#0F172A', color: '#E2E8F0', fontSize: 13 }}>
-              {Array.from({ length: HALF_HOURS }, (_, i) => <option key={i} value={i + 1}>{getSlotLabel(i + 1)}</option>)}
+              {Array.from({ length: SLOT_COUNT + 1 }, (_, i) => <option key={i} value={i}>{getSlotLabel(i)}</option>)}
             </select>
           </div>
           <div>
@@ -181,7 +182,7 @@ export default function CoachSchedule() {
             </tr>
           </thead>
           <tbody>
-            {Array.from({ length: HALF_HOURS }, (_, slotIdx) => (
+            {Array.from({ length: SLOT_COUNT }, (_, slotIdx) => (
               <tr key={slotIdx}>
                 <td style={{ padding: '4px 8px', background: '#0F172A', color: '#64748B', fontSize: 11, textAlign: 'center', borderBottom: '1px solid #1E293B', whiteSpace: 'nowrap' }}>
                   {slotIdx % 2 === 0 ? getSlotLabel(slotIdx) : ''}

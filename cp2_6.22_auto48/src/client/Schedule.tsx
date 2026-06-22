@@ -1,9 +1,72 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, memo } from 'react';
 import { Course, Member as MemberType } from '../types';
 import { apiFetch } from './App';
 
 const DAYS = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
 const TIME_SLOTS = ['08:00-09:30', '09:30-11:00', '11:00-12:30', '12:30-14:00', '14:00-15:30', '15:30-17:00'];
+
+interface ScheduleCellProps {
+  course: Course | undefined;
+  isMorning: boolean;
+  onBook: (courseId: string) => void;
+}
+
+const ScheduleCell = memo(function ScheduleCell({ course, isMorning, onBook }: ScheduleCellProps) {
+  return (
+    <td style={{ padding: 8, borderBottom: '1px solid #334155', borderRight: '1px solid #334155', background: isMorning ? '#F8FAFC0D' : '#E2E8F00D', verticalAlign: 'top' }}>
+      {course ? (
+        <div style={{ position: 'relative', minHeight: 80, aspectRatio: '1.2/1' }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: '#F1F5F9', marginBottom: 4 }}>{course.name}</div>
+          <div style={{ fontSize: 11, color: '#94A3B8', marginBottom: 4 }}>{course.coachName}</div>
+          <div style={{ fontSize: 11, color: '#94A3B8', marginBottom: 8 }}>{course.currentBookings}/{course.maxCapacity}</div>
+          {course.currentBookings >= course.maxCapacity ? (
+            <div style={{ fontSize: 12, color: '#EF4444', textAlign: 'center' }}>满员</div>
+          ) : (
+            <button
+              onClick={() => onBook(course.id)}
+              style={{
+                width: 80,
+                height: 32,
+                borderRadius: 4,
+                border: 'none',
+                background: '#3B82F6',
+                color: '#fff',
+                cursor: 'pointer',
+                fontSize: 12,
+                position: 'absolute',
+                bottom: 0,
+                right: 0,
+                transition: 'all 0.2s',
+              }}
+              onMouseEnter={e => {
+                (e.currentTarget as HTMLButtonElement).style.background = '#2563EB';
+                (e.currentTarget as HTMLButtonElement).style.transform = 'scale(1.05)';
+              }}
+              onMouseLeave={e => {
+                (e.currentTarget as HTMLButtonElement).style.background = '#3B82F6';
+                (e.currentTarget as HTMLButtonElement).style.transform = 'scale(1)';
+              }}
+            >
+              立即预约
+            </button>
+          )}
+        </div>
+      ) : (
+        <div style={{ minHeight: 80, aspectRatio: '1.2/1' }} />
+      )}
+    </td>
+  );
+}, (prev, next) => {
+  if (prev.isMorning !== next.isMorning) return false;
+  if (prev.onBook !== next.onBook) return false;
+  if (!prev.course && !next.course) return true;
+  if (!prev.course || !next.course) return false;
+  return (
+    prev.course.id === next.course.id &&
+    prev.course.currentBookings === next.course.currentBookings &&
+    prev.course.maxCapacity === next.course.maxCapacity
+  );
+});
 
 export default function Schedule() {
   const [courses, setCourses] = useState<Course[]>([]);
@@ -62,54 +125,14 @@ export default function Schedule() {
             {TIME_SLOTS.map((time, slotIdx) => (
               <tr key={slotIdx}>
                 <td style={{ padding: '8px', background: '#1E293B', color: '#94A3B8', fontSize: 12, textAlign: 'center', borderBottom: '1px solid #334155' }}>{time}</td>
-                {DAYS.map((_, dayIdx) => {
-                  const course = getCourseForSlot(dayIdx, slotIdx);
-                  const isMorning = slotIdx < 3;
-                  return (
-                    <td key={dayIdx} style={{ padding: 8, borderBottom: '1px solid #334155', borderRight: '1px solid #334155', background: isMorning ? '#F8FAFC0D' : '#E2E8F00D', verticalAlign: 'top' }}>
-                      {course ? (
-                        <div style={{ position: 'relative', minHeight: 80, aspectRatio: '1.2/1' }}>
-                          <div style={{ fontSize: 13, fontWeight: 600, color: '#F1F5F9', marginBottom: 4 }}>{course.name}</div>
-                          <div style={{ fontSize: 11, color: '#94A3B8', marginBottom: 4 }}>{course.coachName}</div>
-                          <div style={{ fontSize: 11, color: '#94A3B8', marginBottom: 8 }}>{course.currentBookings}/{course.maxCapacity}</div>
-                          {course.currentBookings >= course.maxCapacity ? (
-                            <div style={{ fontSize: 12, color: '#EF4444', textAlign: 'center' }}>满员</div>
-                          ) : (
-                            <button
-                              onClick={() => handleBook(course.id)}
-                              style={{
-                                width: 80,
-                                height: 32,
-                                borderRadius: 4,
-                                border: 'none',
-                                background: '#3B82F6',
-                                color: '#fff',
-                                cursor: 'pointer',
-                                fontSize: 12,
-                                position: 'absolute',
-                                bottom: 0,
-                                right: 0,
-                                transition: 'all 0.2s',
-                              }}
-                              onMouseEnter={e => {
-                                (e.currentTarget as HTMLButtonElement).style.background = '#2563EB';
-                                (e.currentTarget as HTMLButtonElement).style.transform = 'scale(1.05)';
-                              }}
-                              onMouseLeave={e => {
-                                (e.currentTarget as HTMLButtonElement).style.background = '#3B82F6';
-                                (e.currentTarget as HTMLButtonElement).style.transform = 'scale(1)';
-                              }}
-                            >
-                              立即预约
-                            </button>
-                          )}
-                        </div>
-                      ) : (
-                        <div style={{ minHeight: 80, aspectRatio: '1.2/1' }} />
-                      )}
-                    </td>
-                  );
-                })}
+                {DAYS.map((_, dayIdx) => (
+                  <ScheduleCell
+                    key={dayIdx}
+                    course={getCourseForSlot(dayIdx, slotIdx)}
+                    isMorning={slotIdx < 3}
+                    onBook={handleBook}
+                  />
+                ))}
               </tr>
             ))}
           </tbody>

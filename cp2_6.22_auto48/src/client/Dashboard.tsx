@@ -6,12 +6,17 @@ export default function Dashboard() {
   const [stats, setStats] = useState<DashboardStats>({ todayCheckIns: 0, popularCourse: '-', totalMembers: 0, availableCoaches: 0 });
 
   useEffect(() => {
+    const controller = new AbortController();
+    const { signal } = controller;
     const load = () => {
-      apiFetch<DashboardStats>('/dashboard').then(setStats).catch(() => {});
+      apiFetch<DashboardStats>('/dashboard', { signal }).then(setStats).catch(() => {});
     };
     load();
     const interval = setInterval(load, 10000);
-    return () => clearInterval(interval);
+    return () => {
+      controller.abort();
+      clearInterval(interval);
+    };
   }, []);
 
   const cards = [

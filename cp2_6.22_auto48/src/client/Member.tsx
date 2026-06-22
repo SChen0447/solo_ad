@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Member as MemberType } from '../types';
 import { apiFetch } from './App';
 
@@ -8,7 +8,7 @@ export default function Member() {
   const [formName, setFormName] = useState('');
   const [formLevel, setFormLevel] = useState<'普通' | '银卡' | '金卡'>('普通');
   const [formCount, setFormCount] = useState(10);
-  const [shakeId, setShakeId] = useState<string | null>(null);
+  const rowRefs = useRef<Record<string, HTMLTableRowElement | null>>({});
 
   const load = useCallback(() => {
     apiFetch<MemberType[]>('/members').then(setMembers).catch(() => {});
@@ -32,8 +32,13 @@ export default function Member() {
   const handleCheckIn = async (id: string) => {
     try {
       await apiFetch(`/members/${id}/checkin`, { method: 'POST' });
-      setShakeId(id);
-      setTimeout(() => setShakeId(null), 300);
+      const row = rowRefs.current[id];
+      if (row) {
+        row.classList.add('shake-anim');
+        setTimeout(() => {
+          row.classList.remove('shake-anim');
+        }, 300);
+      }
       load();
     } catch { }
   };
@@ -80,11 +85,11 @@ export default function Member() {
             <select
               value={formLevel}
               onChange={e => setFormLevel(e.target.value as any)}
-              style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid #334155', background: '#0F172A', color: '#E2E8F0', fontSize: 14 }}
+              style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid #334155', background: '#0F172A', color: '#E2E8F0', fontSize: 14, appearance: 'none' }}
             >
-              <option value="普通">普通</option>
-              <option value="银卡">银卡</option>
-              <option value="金卡">金卡</option>
+              <option value="普通" style={{ background: '#1E293B', color: '#E2E8F0' }}>普通</option>
+              <option value="银卡" style={{ background: '#1E293B', color: '#E2E8F0' }}>银卡</option>
+              <option value="金卡" style={{ background: '#1E293B', color: '#E2E8F0' }}>金卡</option>
             </select>
           </div>
           <div style={{ marginBottom: 16 }}>
@@ -119,12 +124,13 @@ export default function Member() {
             {members.map((m, i) => (
               <tr
                 key={m.id}
+                ref={el => { rowRefs.current[m.id] = el; }}
                 style={{
                   height: 48,
                   background: i % 2 === 0 ? '#0F172A' : '#1E293B',
                   transition: 'background 0.2s',
-                  animation: shakeId === m.id ? 'shake 0.3s ease' : 'none',
                 }}
+                className=""
                 onMouseEnter={e => { (e.currentTarget as HTMLTableRowElement).style.background = '#334155'; }}
                 onMouseLeave={e => { (e.currentTarget as HTMLTableRowElement).style.background = i % 2 === 0 ? '#0F172A' : '#1E293B'; }}
               >
@@ -168,6 +174,9 @@ export default function Member() {
         </table>
       </div>
       <style>{`
+        .shake-anim {
+          animation: shake 0.3s ease;
+        }
         @keyframes shake {
           0%, 100% { transform: translateX(0); }
           25% { transform: translateX(-4px); }
