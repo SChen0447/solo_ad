@@ -1,3 +1,31 @@
+/**
+ * apiClient - 统一 API 请求封装层
+ *
+ * 职责：作为前端视图层与后端 API 之间的统一通信层，
+ *       封装所有 HTTP 请求逻辑，提供类型安全的接口给各业务模块调用。
+ *
+ * 调用链路 & 数据流向：
+ *   视图层组件 (PlaylistManager / VotePanel / EquipmentGrid)
+ *     ↓ 调用
+ *   apiClient.{module}.{method}()
+ *     ↓ 内部调用
+ *   request<T>() 通用请求函数
+ *     ↓ 发起
+ *   fetch() → 后端 Express API (server/index.ts)
+ *     ↓ 返回
+ *   Promise<json> 数据
+ *     ↓ 传递回
+ *   调用方组件 → 更新 state → 重新渲染 UI
+ *
+ * 模块划分：
+ *   - playlist: 曲目管理相关接口
+ *   - vote: 投票相关接口
+ *   - equipment: 设备库存相关接口
+ *
+ * 被调用方：各业务模块组件
+ * 调用方依赖：浏览器 fetch API、后端 REST 接口
+ */
+
 export interface Track {
   id: string;
   name: string;

@@ -1,4 +1,35 @@
-import React, { useCallback } from 'react';
+/**
+ * EquipmentGrid - 设备库存展示模块
+ *
+ * 职责：展示舞台设备清单，管理设备借用与归还状态
+ *
+ * 调用链路 & 数据流向：
+ *   页面加载：
+ *     App.tsx 初始化
+ *       → 调用 apiClient.equipment.getAll() (apiClient.ts)
+ *         → 后端返回设备列表 (server/index.ts /api/equipment)
+ *           → App 组件保存到 equipment state
+ *             → 通过 props 传入本组件 → 渲染网格
+ *
+ *   借用设备：
+ *     用户点击"借用"按钮
+ *       → 调用 apiClient.equipment.borrow(id) (apiClient.ts)
+ *         → 后端减少可用数量并返回最新列表
+ *           → 本组件调用 onEquipmentChange 更新父组件状态
+ *             → React 重新渲染设备网格
+ *
+ *   归还设备：
+ *     用户点击"归还"按钮
+ *       → 调用 apiClient.equipment.returnItem(id) (apiClient.ts)
+ *         → 后端增加可用数量并返回最新列表
+ *           → 本组件调用 onEquipmentChange 更新父组件状态
+ *             → React 重新渲染设备网格
+ *
+ * 被调用方：App.tsx (通过 props 传入 equipment 和 onEquipmentChange)
+ * 调用方依赖：apiClient.equipment.{getAll, borrow, returnItem}
+ */
+
+import React, { useState, useCallback, useEffect } from 'react';
 import { apiClient, Equipment } from '@/api/apiClient';
 
 interface EquipmentGridProps {
@@ -7,23 +38,43 @@ interface EquipmentGridProps {
 }
 
 const EquipmentGrid: React.FC<EquipmentGridProps> = ({ equipment, onEquipmentChange }) => {
+  const [loadingId, setLoadingId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (error) {
+      const timer = setTimeout(() => setError(null), 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [error]);
+
   const handleBorrow = useCallback(async (id: string) => {
+    if (loadingId) return;
+    setLoadingId(id);
+    setError(null);
     try {
       const updated = await apiClient.equipment.borrow(id);
       onEquipmentChange(updated);
     } catch (e) {
-      console.error(e);
+      setError(e instanceof Error ? e.message : '借用失败');
+    } finally {
+      setLoadingId(null);
     }
-  }, [onEquipmentChange]);
+  }, [loadingId, onEquipmentChange]);
 
   const handleReturn = useCallback(async (id: string) => {
+    if (loadingId) return;
+    setLoadingId(id);
+    setError(null);
     try {
       const updated = await apiClient.equipment.returnItem(id);
       onEquipmentChange(updated);
     } catch (e) {
-      console.error(e);
+      setError(e instanceof Error ? e.message : '归还失败');
+    } finally {
+      setLoadingId(null);
     }
-  }, [onEquipmentChange]);
+  }, [loadingId, onEquipmentChange]);
 
   return (
     <div className="equipment-grid-container">
@@ -33,14 +84,21 @@ const EquipmentGrid: React.FC<EquipmentGridProps> = ({ equipment, onEquipmentCha
         </h2>
       </div>
 
+      {error && (
+        <div className="error-toast">
+          ⚠️ {error}
+        </div>
+      )}
+
       <div className="equipment-grid">
         {equipment.map((item) => {
           const isAvailable = item.available > 0;
           const isAllBorrowed = item.available === 0;
+          const isLoading = loadingId === item.id;
           return (
             <div
               key={item.id}
-              className={`equipment-card ${isAllBorrowed ? 'unavailable' : ''}`}
+              className={`equipment-card ${isAllBorrowed ? 'unavailable' : ''} ${isLoading ? 'loading' : ''}`}
             >
               <div className="equipment-icon">
                 {item.name.includes('吉他') ? '🎸' :
@@ -70,8 +128,9 @@ const EquipmentGrid: React.FC<EquipmentGridProps> = ({ equipment, onEquipmentCha
                   <button
                     className="btn-borrow ripple"
                     onClick={() => handleBorrow(item.id)}
+                    disabled={isLoading}
                   >
-                    借用
+                    {isLoading ? '...' : '借用'}
                   </button>
                 ) : (
                   <button className="btn-borrow-disabled" disabled>
@@ -82,8 +141,9 @@ const EquipmentGrid: React.FC<EquipmentGridProps> = ({ equipment, onEquipmentCha
                   <button
                     className="btn-return ripple"
                     onClick={() => handleReturn(item.id)}
+                    disabled={isLoading}
                   >
-                    归还
+                    {isLoading ? '...' : '归还'}
                   </button>
                 )}
               </div>
@@ -101,6 +161,20 @@ const EquipmentGrid: React.FC<EquipmentGridProps> = ({ equipment, onEquipmentCha
           justify-content: space-between;
           align-items: center;
           margin-bottom: 20px;
+        }
+        .error-toast {
+          background: rgba(239, 68, 68, 0.15);
+          border: 1px solid rgba(239, 68, 68, 0.3);
+          color: #EF4444;
+          padding: 12px 16px;
+          border-radius: 8px;
+          margin-bottom: 16px;
+          font-size: 14px;
+          animation: slideDown 0.3s ease;
+        }
+        @keyframes slideDown {
+          from { opacity: 0; transform: translateY(-10px); }
+          to { opacity: 1; transform: translateY(0); }
         }
         .equipment-grid {
           display: grid;
@@ -140,6 +214,10 @@ const EquipmentGrid: React.FC<EquipmentGridProps> = ({ equipment, onEquipmentCha
         .equipment-card:hover {
           transform: translateY(-4px);
           box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+        }
+        .equipment-card.loading {
+          pointer-events: none;
+          opacity: 0.7;
         }
         .equipment-card.unavailable {
           opacity: 0.5;
@@ -204,6 +282,10 @@ const EquipmentGrid: React.FC<EquipmentGridProps> = ({ equipment, onEquipmentCha
         .btn-borrow:hover {
           background: #059669;
         }
+        .btn-borrow:disabled {
+          opacity: 0.5;
+          cursor: not-allowed;
+        }
         .btn-borrow-disabled {
           flex: 1;
           padding: 6px 0;
@@ -232,6 +314,10 @@ const EquipmentGrid: React.FC<EquipmentGridProps> = ({ equipment, onEquipmentCha
         }
         .btn-return:hover {
           background: rgba(99, 102, 241, 0.1);
+        }
+        .btn-return:disabled {
+          opacity: 0.5;
+          cursor: not-allowed;
         }
       `}</style>
     </div>

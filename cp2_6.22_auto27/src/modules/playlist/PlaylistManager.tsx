@@ -1,4 +1,23 @@
-import React, { useState, useCallback, useRef } from 'react';
+/**
+ * PlaylistManager - 曲目管理模块
+ *
+ * 职责：展示已排曲目列表，支持拖拽排序、添加新曲目、删除曲目
+ *
+ * 调用链路 & 数据流向：
+ *   用户交互 (拖拽/添加/删除)
+ *     → 调用本模块的事件处理函数
+ *       → 调用 apiClient.playlist.* 方法 (apiClient.ts)
+ *         → 向后端 Express 服务器发起 HTTP 请求 (server/index.ts)
+ *           → 后端更新内存数据并返回最新列表
+ *             → apiClient 返回 Promise<json>
+ *               → 本组件调用 onTracksChange 更新父组件状态
+ *                 → React 重新渲染 UI
+ *
+ * 被调用方：App.tsx (通过 props 传入 tracks 和 onTracksChange)
+ * 调用方依赖：apiClient.playlist.{getAll, add, remove, reorder}
+ */
+
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { apiClient, Track } from '@/api/apiClient';
 
 interface PlaylistManagerProps {
@@ -12,17 +31,31 @@ const PlaylistManager: React.FC<PlaylistManagerProps> = ({ tracks, onTracksChang
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [isReordering, setIsReordering] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [adding, setAdding] = useState(false);
   const dragItemRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (error) {
+      const timer = setTimeout(() => setError(null), 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [error]);
 
   const handleAdd = useCallback(async () => {
     if (!formData.name.trim() || !formData.artist.trim() || !formData.duration.trim()) return;
+    setAdding(true);
+    setError(null);
     try {
       const updated = await apiClient.playlist.add(formData);
       onTracksChange(updated);
       setFormData({ name: '', artist: '', duration: '', note: '' });
       setShowForm(false);
     } catch (e) {
-      console.error(e);
+      setError(e instanceof Error ? e.message : '添加失败');
+    } finally {
+      setAdding(false);
     }
   }, [formData, onTracksChange]);
 
@@ -33,7 +66,7 @@ const PlaylistManager: React.FC<PlaylistManagerProps> = ({ tracks, onTracksChang
       const updated = await apiClient.playlist.remove(id);
       onTracksChange(updated);
     } catch (e) {
-      console.error(e);
+      setError(e instanceof Error ? e.message : '删除失败');
     } finally {
       setDeletingId(null);
     }
@@ -45,16 +78,20 @@ const PlaylistManager: React.FC<PlaylistManagerProps> = ({ tracks, onTracksChang
 
   const handleDragOver = useCallback((e: React.DragEvent, index: number) => {
     e.preventDefault();
-    setDragOverIndex(index);
-  }, []);
+    if (dragIndex !== null && dragIndex !== index) {
+      setDragOverIndex(index);
+    }
+  }, [dragIndex]);
 
   const handleDrop = useCallback(async (e: React.DragEvent, dropIndex: number) => {
     e.preventDefault();
-    if (dragIndex === null || dragIndex === dropIndex) {
+    if (dragIndex === null || dragIndex === dropIndex || isReordering) {
       setDragIndex(null);
       setDragOverIndex(null);
       return;
     }
+    setIsReordering(true);
+    setError(null);
     const newTracks = [...tracks];
     const [moved] = newTracks.splice(dragIndex, 1);
     newTracks.splice(dropIndex, 0, moved);
@@ -63,11 +100,13 @@ const PlaylistManager: React.FC<PlaylistManagerProps> = ({ tracks, onTracksChang
       const updated = await apiClient.playlist.reorder(orderedIds);
       onTracksChange(updated);
     } catch (err) {
-      console.error(err);
+      setError(err instanceof Error ? err.message : '排序失败');
+    } finally {
+      setIsReordering(false);
+      setDragIndex(null);
+      setDragOverIndex(null);
     }
-    setDragIndex(null);
-    setDragOverIndex(null);
-  }, [dragIndex, tracks, onTracksChange]);
+  }, [dragIndex, tracks, isReordering, onTracksChange]);
 
   const handleDragEnd = useCallback(() => {
     setDragIndex(null);
@@ -83,10 +122,17 @@ const PlaylistManager: React.FC<PlaylistManagerProps> = ({ tracks, onTracksChang
         <button
           className="btn-primary ripple"
           onClick={() => setShowForm(!showForm)}
+          disabled={adding}
         >
           {showForm ? '取消' : '+ 添加曲目'}
         </button>
       </div>
+
+      {error && (
+        <div className="error-toast">
+          ⚠️ {error}
+        </div>
+      )}
 
       {showForm && (
         <div className="playlist-form">
@@ -118,9 +164,15 @@ const PlaylistManager: React.FC<PlaylistManagerProps> = ({ tracks, onTracksChang
               className="form-input"
             />
           </div>
-          <button className="btn-primary ripple" onClick={handleAdd}>
-            确认添加
+          <button className="btn-primary ripple" onClick={handleAdd} disabled={adding}>
+            {adding ? '添加中...' : '确认添加'}
           </button>
+        </div>
+      )}
+
+      {isReordering && (
+        <div className="reorder-hint">
+          ⏳ 正在更新排序...
         </div>
       )}
 
@@ -129,12 +181,12 @@ const PlaylistManager: React.FC<PlaylistManagerProps> = ({ tracks, onTracksChang
           <div
             key={track.id}
             ref={index === dragIndex ? dragItemRef : undefined}
-            className={`playlist-item ${deletingId === track.id ? 'deleting' : ''} ${dragIndex === index ? 'dragging' : ''} ${dragOverIndex === index && dragIndex !== index ? 'drag-over' : ''}`}
+            className={`playlist-item ${deletingId === track.id ? 'deleting' : ''} ${dragIndex === index ? 'dragging' : ''} ${dragOverIndex === index && dragIndex !== index ? 'drag-over' : ''} ${isReordering ? 'reordering' : ''}`}
             style={{
               opacity: dragIndex === index ? 0.6 : 1,
               transform: deletingId === track.id ? 'translateX(-100%)' : undefined,
             }}
-            draggable
+            draggable={!isReordering && !deletingId}
             onDragStart={() => handleDragStart(index)}
             onDragOver={(e) => handleDragOver(e, index)}
             onDrop={(e) => handleDrop(e, index)}
@@ -151,6 +203,7 @@ const PlaylistManager: React.FC<PlaylistManagerProps> = ({ tracks, onTracksChang
               <button
                 className="btn-delete ripple"
                 onClick={() => handleDelete(track.id)}
+                disabled={deletingId === track.id}
               >
                 ✕
               </button>
@@ -174,6 +227,29 @@ const PlaylistManager: React.FC<PlaylistManagerProps> = ({ tracks, onTracksChang
           align-items: center;
           margin-bottom: 20px;
         }
+        .error-toast {
+          background: rgba(239, 68, 68, 0.15);
+          border: 1px solid rgba(239, 68, 68, 0.3);
+          color: #EF4444;
+          padding: 12px 16px;
+          border-radius: 8px;
+          margin-bottom: 16px;
+          font-size: 14px;
+          animation: slideDown 0.3s ease;
+        }
+        @keyframes slideDown {
+          from { opacity: 0; transform: translateY(-10px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        .reorder-hint {
+          color: #6366F1;
+          font-size: 13px;
+          margin-bottom: 12px;
+          text-align: center;
+          padding: 8px;
+          background: rgba(99, 102, 241, 0.1);
+          border-radius: 6px;
+        }
         .playlist-form {
           background: rgba(99, 102, 241, 0.08);
           border: 1px solid rgba(99, 102, 241, 0.2);
@@ -187,6 +263,11 @@ const PlaylistManager: React.FC<PlaylistManagerProps> = ({ tracks, onTracksChang
         .form-row {
           display: flex;
           gap: 12px;
+        }
+        @media (max-width: 768px) {
+          .form-row {
+            flex-direction: column;
+          }
         }
         .form-input {
           flex: 1;
@@ -222,20 +303,28 @@ const PlaylistManager: React.FC<PlaylistManagerProps> = ({ tracks, onTracksChang
           transition: transform 0.3s ease, opacity 0.15s, box-shadow 0.2s, margin 0.2s;
           user-select: none;
         }
+        .playlist-item.reordering {
+          cursor: not-allowed;
+        }
         .playlist-item:hover {
           transform: translateY(-4px);
           box-shadow: 0 6px 20px rgba(0,0,0,0.3);
+        }
+        .playlist-item.reordering:hover {
+          transform: none;
+          box-shadow: none;
         }
         .playlist-item.dragging {
           cursor: grabbing;
           transform: scale(1.02);
           box-shadow: 0 8px 25px rgba(99, 102, 241, 0.3);
+          opacity: 0.6;
         }
         .playlist-item.drag-over {
           border-top: 2px solid #6366F1;
         }
         .playlist-item.deleting {
-          transition: transform 0.3s ease-out;
+          transition: transform 0.3s ease-out, opacity 0.3s ease-out;
           transform: translateX(-100%);
           opacity: 0;
         }
@@ -254,7 +343,6 @@ const PlaylistManager: React.FC<PlaylistManagerProps> = ({ tracks, onTracksChang
         }
         .track-name {
           font-size: 18px;
-          color: #1F2937;
           color: #E5E7EB;
           font-weight: 500;
           white-space: nowrap;
@@ -300,6 +388,10 @@ const PlaylistManager: React.FC<PlaylistManagerProps> = ({ tracks, onTracksChang
         }
         .btn-delete:hover {
           background: rgba(239, 68, 68, 0.3);
+        }
+        .btn-delete:disabled {
+          opacity: 0.5;
+          cursor: not-allowed;
         }
         .empty-state {
           text-align: center;

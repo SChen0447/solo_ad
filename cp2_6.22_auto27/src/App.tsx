@@ -1,3 +1,39 @@
+/**
+ * App - 应用主入口组件
+ *
+ * 职责：
+ *   - 集成顶部导航栏和三个功能模块
+ *   - 管理全局状态（曲目列表、设备列表）
+ *   - 实现模块间的标签页切换
+ *   - 使用 React.lazy + Suspense 进行代码分割，优化首屏加载
+ *
+ * 调用链路 & 数据流向：
+ *   初始化：
+ *     main.tsx → ReactDOM.render(<App />)
+ *       → App 组件挂载
+ *         → useEffect 中调用 apiClient 获取初始数据
+ *           → tracks / equipment 状态被设置
+ *             → 通过 props 传递给对应子模块组件
+ *
+ *   模块切换：
+ *     用户点击导航标签
+ *       → activeTab 状态变化
+ *         → Suspense + lazy 动态加载对应模块
+ *           → 渲染对应模块视图
+ *
+ *   状态下传：
+ *     App (全局状态持有者)
+ *       ├── tracks → PlaylistManager (onTracksChange 回调更新)
+ *       ├── tracks → VotePanel (仅读取用于候选曲目选择)
+ *       └── equipment → EquipmentGrid (onEquipmentChange 回调更新)
+ *
+ * 被调用方：main.tsx (应用挂载入口)
+ * 调用方依赖：
+ *   - React.lazy / Suspense (代码分割)
+ *   - apiClient.{playlist, equipment}.getAll (初始数据)
+ *   - 三个子模块组件 (懒加载)
+ */
+
 import React, { useState, useEffect, lazy, Suspense } from 'react';
 import { apiClient, Track, Equipment } from '@/api/apiClient';
 
@@ -125,6 +161,8 @@ const App: React.FC = () => {
             overflow-x: auto;
             -webkit-overflow-scrolling: touch;
             scrollbar-width: none;
+            flex: 1;
+            margin-left: 16px;
           }
           .tab-nav::-webkit-scrollbar {
             display: none;
@@ -172,6 +210,17 @@ const App: React.FC = () => {
           margin: 0 auto;
           padding: 32px 24px;
           min-height: calc(100vh - 64px);
+        }
+        @media (max-width: 768px) {
+          .app-content {
+            padding: 20px 16px;
+          }
+          .header-inner {
+            padding: 0 16px;
+          }
+          .logo-text {
+            font-size: 16px;
+          }
         }
         .loading {
           display: flex;

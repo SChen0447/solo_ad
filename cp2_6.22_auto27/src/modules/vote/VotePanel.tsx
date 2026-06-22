@@ -1,3 +1,31 @@
+/**
+ * VotePanel - 返场投票模块
+ *
+ * 职责：发起返场投票、展示投票结果、支持观众投票交互
+ *
+ * 调用链路 & 数据流向：
+ *   发起投票：
+ *     用户选择候选曲目 → 点击"开始投票"
+ *       → 调用 apiClient.vote.start() (apiClient.ts)
+ *         → 后端创建投票会话 (server/index.ts /api/vote/start)
+ *           → 返回 VoteSession 数据
+ *             → 本组件 setState 更新投票信息 → 渲染投票界面
+ *
+ *   观众投票：
+ *     用户点击投票按钮
+ *       → 调用 apiClient.vote.cast() (apiClient.ts)
+ *         → 后端记录投票 (server/index.ts /api/vote/cast)
+ *           → 返回最新投票结果
+ *             → 本组件更新 voteSession → 渲染最新条形图
+ *
+ *   结果轮询：
+ *     每30秒自动调用 apiClient.vote.getCurrent()
+ *       → 获取最新投票结果 → 更新条形图
+ *
+ * 被调用方：App.tsx (通过 props 传入 tracks 曲目列表)
+ * 调用方依赖：apiClient.vote.{getCurrent, start, cast, end}
+ */
+
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { apiClient, Track, VoteSession } from '@/api/apiClient';
 
@@ -6,6 +34,7 @@ interface VotePanelProps {
 }
 
 const VOTER_ID_KEY = 'live_music_voter_id';
+const COOLDOWN_SECONDS = 30;
 
 function getVoterId(): string {
   let id = localStorage.getItem(VOTER_ID_KEY);
@@ -23,15 +52,20 @@ const VotePanel: React.FC<VotePanelProps> = ({ tracks }) => {
   const [selectedCandidates, setSelectedCandidates] = useState<string[]>([]);
   const [hasVoted, setHasVoted] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [cooldown, setCooldown] = useState(0);
+  const [pollError, setPollError] = useState<string | null>(null);
+  const [voteError, setVoteError] = useState<string | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const cooldownRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const voterIdRef = useRef(getVoterId());
 
   const fetchCurrentVote = useCallback(async () => {
     try {
       const session = await apiClient.vote.getCurrent();
       setVoteSession(session);
+      setPollError(null);
     } catch (e) {
-      console.error(e);
+      setPollError(e instanceof Error ? e.message : '获取投票结果失败');
     }
   }, []);
 
@@ -51,9 +85,37 @@ const VotePanel: React.FC<VotePanelProps> = ({ tracks }) => {
     };
   }, [voteSession?.active, fetchCurrentVote]);
 
+  useEffect(() => {
+    if (cooldown > 0) {
+      cooldownRef.current = setInterval(() => {
+        setCooldown((prev) => {
+          if (prev <= 1) {
+            if (cooldownRef.current) clearInterval(cooldownRef.current);
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+      return () => {
+        if (cooldownRef.current) clearInterval(cooldownRef.current);
+      };
+    }
+    return () => {
+      if (cooldownRef.current) clearInterval(cooldownRef.current);
+    };
+  }, [cooldown]);
+
+  useEffect(() => {
+    if (voteError) {
+      const timer = setTimeout(() => setVoteError(null), 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [voteError]);
+
   const handleStartVote = useCallback(async () => {
     if (!voteTitle.trim() || selectedCandidates.length === 0) return;
     setLoading(true);
+    setVoteError(null);
     try {
       const session = await apiClient.vote.start(voteTitle, selectedCandidates);
       setVoteSession(session);
@@ -61,34 +123,38 @@ const VotePanel: React.FC<VotePanelProps> = ({ tracks }) => {
       setVoteTitle('');
       setSelectedCandidates([]);
       setHasVoted(false);
+      setCooldown(0);
     } catch (e) {
-      console.error(e);
+      setVoteError(e instanceof Error ? e.message : '发起投票失败');
     } finally {
       setLoading(false);
     }
   }, [voteTitle, selectedCandidates]);
 
   const handleVote = useCallback(async (trackId: string) => {
-    if (hasVoted) return;
+    if (hasVoted || cooldown > 0) return;
     setLoading(true);
+    setVoteError(null);
     try {
       const session = await apiClient.vote.cast(voterIdRef.current, trackId);
       setVoteSession(session);
       setHasVoted(true);
+      setCooldown(COOLDOWN_SECONDS);
     } catch (e) {
-      console.error(e);
+      setVoteError(e instanceof Error ? e.message : '投票失败');
     } finally {
       setLoading(false);
     }
-  }, [hasVoted]);
+  }, [hasVoted, cooldown]);
 
   const handleEndVote = useCallback(async () => {
     setLoading(true);
+    setVoteError(null);
     try {
       const session = await apiClient.vote.end();
       setVoteSession(session);
     } catch (e) {
-      console.error(e);
+      setVoteError(e instanceof Error ? e.message : '结束投票失败');
     } finally {
       setLoading(false);
     }
@@ -106,6 +172,8 @@ const VotePanel: React.FC<VotePanelProps> = ({ tracks }) => {
     ? Math.max(...voteSession.results.map((r) => r.count), 1)
     : 1;
 
+  const isVoteDisabled = hasVoted || cooldown > 0 || loading;
+
   return (
     <div className="vote-panel">
       <div className="vote-header">
@@ -116,6 +184,7 @@ const VotePanel: React.FC<VotePanelProps> = ({ tracks }) => {
           <button
             className="btn-primary ripple"
             onClick={() => setShowStartForm(!showStartForm)}
+            disabled={loading}
           >
             {showStartForm ? '取消' : '发起投票'}
           </button>
@@ -126,6 +195,12 @@ const VotePanel: React.FC<VotePanelProps> = ({ tracks }) => {
           </button>
         )}
       </div>
+
+      {(voteError || pollError) && (
+        <div className="error-toast">
+          ⚠️ {voteError || pollError}
+        </div>
+      )}
 
       {showStartForm && (
         <div className="vote-start-form">
@@ -147,7 +222,7 @@ const VotePanel: React.FC<VotePanelProps> = ({ tracks }) => {
                   onClick={() => toggleCandidate(track.id)}
                 >
                   <div className="candidate-check">
-                    {selectedCandidates.includes(track.id) ? '✓' : ''}
+                  {selectedCandidates.includes(track.id) ? '✓' : ''}
                   </div>
                   <span style={{ color: '#E5E7EB', fontSize: '14px' }}>{track.name}</span>
                   <span style={{ color: '#6B7280', fontSize: '12px' }}>{track.artist}</span>
@@ -195,7 +270,7 @@ const VotePanel: React.FC<VotePanelProps> = ({ tracks }) => {
                     <span className="vote-count">{result?.count || 0} 票</span>
                     <span className="vote-percentage">{result?.percentage || 0}%</span>
                   </div>
-                  {voteSession.active && !hasVoted && (
+                  {voteSession.active && !isVoteDisabled && (
                     <button
                       className="btn-vote ripple"
                       onClick={() => handleVote(candidate.trackId)}
@@ -204,11 +279,19 @@ const VotePanel: React.FC<VotePanelProps> = ({ tracks }) => {
                       投票
                     </button>
                   )}
-                  {voteSession.active && hasVoted && (
+                  {voteSession.active && cooldown > 0 && (
+                    <button className="btn-cooldown" disabled>
+                      冷却中 {cooldown}s
+                    </button>
+                  )}
+                  {voteSession.active && hasVoted && cooldown === 0 && (
                     <button className="btn-voted" disabled>
                       已投
                     </button>
                   )}
+                  {!voteSession.active && (
+                      <div style={{ width: 120, textAlign: 'center' }} />
+                    )}
                 </div>
               );
             })}
@@ -216,6 +299,7 @@ const VotePanel: React.FC<VotePanelProps> = ({ tracks }) => {
 
           <div className="vote-total">
             总票数: {voteSession.totalVotes}
+            {pollError && <span className="poll-error"> · 连接中断</span>}
           </div>
         </div>
       )}
@@ -235,6 +319,20 @@ const VotePanel: React.FC<VotePanelProps> = ({ tracks }) => {
           justify-content: space-between;
           align-items: center;
           margin-bottom: 20px;
+        }
+        .error-toast {
+          background: rgba(239, 68, 68, 0.15);
+          border: 1px solid rgba(239, 68, 68, 0.3);
+          color: #EF4444;
+          padding: 12px 16px;
+          border-radius: 8px;
+          margin-bottom: 16px;
+          font-size: 14px;
+          animation: slideDown 0.3s ease;
+        }
+        @keyframes slideDown {
+          from { opacity: 0; transform: translateY(-10px); }
+          to { opacity: 1; transform: translateY(0); }
         }
         .vote-start-form {
           background: rgba(99, 102, 241, 0.08);
@@ -325,6 +423,27 @@ const VotePanel: React.FC<VotePanelProps> = ({ tracks }) => {
           align-items: center;
           gap: 16px;
         }
+        @media (max-width: 768px) {
+          .vote-candidate-row {
+            flex-wrap: wrap;
+            gap: 10px;
+          }
+          .vote-candidate-label {
+            min-width: 100%;
+          }
+          .vote-bar-container {
+            order: 3;
+            width: 100%;
+          }
+          .vote-stats {
+            order: 2;
+            min-width: 80px;
+          }
+          .btn-vote, .btn-voted, .btn-cooldown {
+            order: 4;
+            margin-left: auto;
+          }
+        }
         .vote-candidate-label {
           min-width: 120px;
         }
@@ -375,6 +494,7 @@ const VotePanel: React.FC<VotePanelProps> = ({ tracks }) => {
           transition: all 0.2s;
           position: relative;
           overflow: hidden;
+          flex-shrink: 0;
         }
         .btn-vote:hover:not(:disabled) {
           background: #7C3AED;
@@ -383,6 +503,18 @@ const VotePanel: React.FC<VotePanelProps> = ({ tracks }) => {
         .btn-vote:disabled {
           opacity: 0.5;
           cursor: not-allowed;
+        }
+        .btn-cooldown {
+          width: 120px;
+          height: 40px;
+          border-radius: 20px;
+          border: none;
+          background: #9CA3AF;
+          color: white;
+          font-size: 14px;
+          font-weight: 600;
+          cursor: not-allowed;
+          flex-shrink: 0;
         }
         .btn-voted {
           width: 120px;
@@ -394,6 +526,7 @@ const VotePanel: React.FC<VotePanelProps> = ({ tracks }) => {
           font-size: 15px;
           font-weight: 600;
           cursor: not-allowed;
+          flex-shrink: 0;
         }
         .btn-end {
           padding: 8px 20px;
@@ -415,6 +548,10 @@ const VotePanel: React.FC<VotePanelProps> = ({ tracks }) => {
           color: #9CA3AF;
           font-size: 14px;
           text-align: right;
+        }
+        .poll-error {
+          color: #EF4444;
+          margin-left: 8px;
         }
       `}</style>
     </div>
