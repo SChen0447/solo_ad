@@ -1,12 +1,26 @@
 import type { DungeonData, Room, Corridor, Position, Decoration, DecorationType } from '../types';
 
-const GRID_SIZE = 5;
-const ROOM_WIDTH = 140;
-const ROOM_HEIGHT = 100;
-const PADDING = 20;
+const MAP_WIDTH = 780;
+const MAP_HEIGHT = 520;
+const MAP_OFFSET_X = 10;
+const MAP_OFFSET_Y = 60;
+const MIN_ROOM_SIZE = 60;
+const CORRIDOR_WIDTH = 20;
+const MIN_ROOM_COUNT = 6;
+const MAX_ROOM_COUNT = 10;
 const WALL_COLORS = ['#2D2D2D', '#3E2E1E'];
 const FLOOR_COLOR = '#1A1A2E';
 const CORRIDOR_COLOR = '#2A2A40';
+
+interface BSPNode {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  left?: BSPNode;
+  right?: BSPNode;
+  room?: Room;
+}
 
 function seededRandom(seed: number): () => number {
   let s = seed;
@@ -16,170 +30,217 @@ function seededRandom(seed: number): () => number {
   };
 }
 
-function getRoomId(gridX: number, gridY: number): string {
-  return `room_${gridX}_${gridY}`;
+function generateRoomId(index: number): string {
+  return `room_${index}`;
 }
 
-interface RoomNode {
-  id: string;
-  gridX: number;
-  gridY: number;
-  visited: boolean;
-  neighbors: string[];
+function splitNode(node: BSPNode, random: () => number, depth: number = 0): BSPNode {
+  const canSplitH = node.width >= MIN_ROOM_SIZE * 2;
+  const canSplitV = node.height >= MIN_ROOM_SIZE * 2;
+
+  if (!canSplitH && !canSplitV) return node;
+
+  let splitHorizontally: boolean;
+  if (canSplitH && canSplitV) {
+    splitHorizontally = random() > 0.5;
+  } else {
+    splitHorizontally = canSplitV;
+  }
+
+  if (splitHorizontally) {
+    const splitY = node.y + MIN_ROOM_SIZE + Math.floor(random() * (node.height - MIN_ROOM_SIZE * 2));
+    node.left = {
+      x: node.x,
+      y: node.y,
+      width: node.width,
+      height: splitY - node.y
+    };
+    node.right = {
+      x: node.x,
+      y: splitY,
+      width: node.width,
+      height: node.y + node.height - splitY
+    };
+  } else {
+    const splitX = node.x + MIN_ROOM_SIZE + Math.floor(random() * (node.width - MIN_ROOM_SIZE * 2));
+    node.left = {
+      x: node.x,
+      y: node.y,
+      width: splitX - node.x,
+      height: node.height
+    };
+    node.right = {
+      x: splitX,
+      y: node.y,
+      width: node.x + node.width - splitX,
+      height: node.height
+    };
+  }
+
+  node.left = splitNode(node.left, random, depth + 1);
+  node.right = splitNode(node.right, random, depth + 1);
+
+  return node;
 }
 
-function generateMaze(gridSize: number, random: () => number): Map<string, string[]> {
-  const nodes = new Map<string, RoomNode>();
-  
-  for (let y = 0; y < gridSize; y++) {
-    for (let x = 0; x < gridSize; x++) {
-      const id = getRoomId(x, y);
-      const neighbors: string[] = [];
-      if (x > 0) neighbors.push(getRoomId(x - 1, y));
-      if (x < gridSize - 1) neighbors.push(getRoomId(x + 1, y));
-      if (y > 0) neighbors.push(getRoomId(x, y - 1));
-      if (y < gridSize - 1) neighbors.push(getRoomId(x, y + 1));
-      
-      nodes.set(id, {
-        id,
-        gridX: x,
-        gridY: y,
-        visited: false,
-        neighbors
-      });
-    }
+function collectLeafNodes(node: BSPNode): BSPNode[] {
+  if (!node.left && !node.right) {
+    return [node];
   }
-  
-  const connections = new Map<string, string[]>();
-  nodes.forEach(node => connections.set(node.id, []));
-  
-  const startId = getRoomId(Math.floor(gridSize / 2), Math.floor(gridSize / 2));
-  const stack: string[] = [startId];
-  const startNode = nodes.get(startId)!;
-  startNode.visited = true;
-  
-  while (stack.length > 0) {
-    const currentId = stack[stack.length - 1];
-    const current = nodes.get(currentId)!;
-    
-    const unvisitedNeighbors = current.neighbors.filter(n => !nodes.get(n)!.visited);
-    
-    if (unvisitedNeighbors.length === 0) {
-      stack.pop();
-      continue;
-    }
-    
-    const nextId = unvisitedNeighbors[Math.floor(random() * unvisitedNeighbors.length)];
-    const nextNode = nodes.get(nextId)!;
-    
-    connections.get(currentId)!.push(nextId);
-    connections.get(nextId)!.push(currentId);
-    
-    nextNode.visited = true;
-    stack.push(nextId);
-  }
-  
-  const extraConnections = Math.floor(gridSize * gridSize * 0.15);
-  for (let i = 0; i < extraConnections; i++) {
-    const x = Math.floor(random() * gridSize);
-    const y = Math.floor(random() * gridSize);
-    const id = getRoomId(x, y);
-    const node = nodes.get(id)!;
-    
-    const unconnected = node.neighbors.filter(n => !connections.get(id)!.includes(n));
-    if (unconnected.length > 0) {
-      const target = unconnected[Math.floor(random() * unconnected.length)];
-      if (!connections.get(id)!.includes(target)) {
-        connections.get(id)!.push(target);
-        connections.get(target)!.push(id);
-      }
-    }
-  }
-  
-  return connections;
+  const leaves: BSPNode[] = [];
+  if (node.left) leaves.push(...collectLeafNodes(node.left));
+  if (node.right) leaves.push(...collectLeafNodes(node.right));
+  return leaves;
 }
 
-function generateCorridors(rooms: Room[], connections: Map<string, string[]>): Corridor[] {
+function createRoomFromNode(node: BSPNode, random: () => number, index: number): Room {
+  const padding = 8 + Math.floor(random() * 8);
+  const width = node.width - padding * 2 - Math.floor(random() * 20);
+  const height = node.height - padding * 2 - Math.floor(random() * 15);
+  const x = node.x + padding + Math.floor(random() * (node.width - width - padding * 2));
+  const y = node.y + padding + Math.floor(random() * (node.height - height - padding * 2));
+
+  return {
+    id: generateRoomId(index),
+    gridX: Math.floor((x - MAP_OFFSET_X) / 160),
+    gridY: Math.floor((y - MAP_OFFSET_Y) / 120),
+    x,
+    y,
+    width: Math.max(width, MIN_ROOM_SIZE - 20),
+    height: Math.max(height, MIN_ROOM_SIZE - 20),
+    wallColor: WALL_COLORS[Math.floor(random() * WALL_COLORS.length)],
+    floorColor: FLOOR_COLOR,
+    connections: [],
+    decorations: []
+  };
+}
+
+function createLCorridor(from: Room, to: Room, random: () => number): Position[] {
+  const fromCenterX = from.x + from.width / 2;
+  const fromCenterY = from.y + from.height / 2;
+  const toCenterX = to.x + to.width / 2;
+  const toCenterY = to.y + to.height / 2;
+
+  const path: Position[] = [];
+  const goHorizontalFirst = random() > 0.5;
+
+  if (goHorizontalFirst) {
+    const minX = Math.min(fromCenterX, toCenterX);
+    const maxX = Math.max(fromCenterX, toCenterX);
+    for (let px = minX; px <= maxX; px += 10) {
+      path.push({ x: px, y: fromCenterY });
+    }
+    path.push({ x: maxX, y: fromCenterY });
+
+    const minY = Math.min(fromCenterY, toCenterY);
+    const maxY = Math.max(fromCenterY, toCenterY);
+    for (let py = minY; py <= maxY; py += 10) {
+      path.push({ x: toCenterX, y: py });
+    }
+    path.push({ x: toCenterX, y: maxY });
+  } else {
+    const minY = Math.min(fromCenterY, toCenterY);
+    const maxY = Math.max(fromCenterY, toCenterY);
+    for (let py = minY; py <= maxY; py += 10) {
+      path.push({ x: fromCenterX, y: py });
+    }
+    path.push({ x: fromCenterX, y: maxY });
+
+    const minX = Math.min(fromCenterX, toCenterX);
+    const maxX = Math.max(fromCenterX, toCenterX);
+    for (let px = minX; px <= maxX; px += 10) {
+      path.push({ x: px, y: toCenterY });
+    }
+    path.push({ x: maxX, y: toCenterY });
+  }
+
+  return path;
+}
+
+function connectRooms(rooms: Room[], random: () => number): { corridors: Corridor[]; connections: Map<string, string[]> } {
   const corridors: Corridor[] = [];
-  const roomMap = new Map<string, Room>();
-  rooms.forEach(r => roomMap.set(r.id, r));
-  
-  const processed = new Set<string>();
-  
-  rooms.forEach(room => {
-    const roomConnections = connections.get(room.id) || [];
-    roomConnections.forEach(targetId => {
-      const key = [room.id, targetId].sort().join('-');
-      if (processed.has(key)) return;
-      processed.add(key);
-      
-      const target = roomMap.get(targetId);
-      if (!target) return;
-      
-      const path: Position[] = [];
-      
-      const startX = room.x + room.width / 2;
-      const startY = room.y + room.height / 2;
-      const endX = target.x + target.width / 2;
-      const endY = target.y + target.height / 2;
-      
-      if (room.gridX === target.gridX) {
-        const minY = Math.min(startY, endY);
-        const maxY = Math.max(startY, endY);
-        for (let y = minY; y <= maxY; y += 10) {
-          path.push({ x: startX, y });
+  const connections = new Map<string, string[]>();
+  rooms.forEach(r => connections.set(r.id, []));
+
+  const connected = new Set<string>();
+  const toConnect = new Set(rooms.map(r => r.id));
+
+  if (rooms.length > 0) {
+    connected.add(rooms[0].id);
+    toConnect.delete(rooms[0].id);
+  }
+
+  while (toConnect.size > 0) {
+    let bestDist = Infinity;
+    let bestFrom: string | null = null;
+    let bestTo: string | null = null;
+
+    for (const fromId of connected) {
+      const fromRoom = rooms.find(r => r.id === fromId)!;
+      for (const toId of toConnect) {
+        const toRoom = rooms.find(r => r.id === toId)!;
+        const dx = (fromRoom.x + fromRoom.width / 2) - (toRoom.x + toRoom.width / 2);
+        const dy = (fromRoom.y + fromRoom.height / 2) - (toRoom.y + toRoom.height / 2);
+        const dist = Math.sqrt(dx * dx + dy * dy);
+
+        if (dist < bestDist) {
+          bestDist = dist;
+          bestFrom = fromId;
+          bestTo = toId;
         }
-        path.push({ x: startX, y: maxY });
-      } else {
-        const minX = Math.min(startX, endX);
-        const maxX = Math.max(startX, endX);
-        for (let x = minX; x <= maxX; x += 10) {
-          path.push({ x, y: startY });
-        }
-        path.push({ x: maxX, y: startY });
       }
-      
+    }
+
+    if (bestFrom && bestTo) {
+      const fromRoom = rooms.find(r => r.id === bestFrom)!;
+      const toRoom = rooms.find(r => r.id === bestTo)!;
+
+      connections.get(bestFrom)!.push(bestTo);
+      connections.get(bestTo)!.push(bestFrom);
+
       corridors.push({
-        from: room.id,
-        to: targetId,
-        path
+        from: bestFrom,
+        to: bestTo,
+        path: createLCorridor(fromRoom, toRoom, random)
       });
-    });
-  });
-  
-  return corridors;
+
+      connected.add(bestTo);
+      toConnect.delete(bestTo);
+    }
+  }
+
+  const extraConnections = Math.floor(rooms.length * 0.2);
+  for (let i = 0; i < extraConnections; i++) {
+    const fromIdx = Math.floor(random() * rooms.length);
+    const toIdx = Math.floor(random() * rooms.length);
+    if (fromIdx === toIdx) continue;
+
+    const fromId = rooms[fromIdx].id;
+    const toId = rooms[toIdx].id;
+
+    if (!connections.get(fromId)!.includes(toId)) {
+      connections.get(fromId)!.push(toId);
+      connections.get(toId)!.push(fromId);
+
+      corridors.push({
+        from: fromId,
+        to: toId,
+        path: createLCorridor(rooms[fromIdx], rooms[toIdx], random)
+      });
+    }
+  }
+
+  return { corridors, connections };
 }
 
 function generateDecorations(
   room: Room,
-  connections: string[],
-  allRooms: Room[],
   random: () => number
 ): Decoration[] {
   const decorations: Decoration[] = [];
-  const corridorOpenings: Position[] = [];
-
-  for (const connId of connections) {
-    const connRoom = allRooms.find(r => r.id === connId);
-    if (!connRoom) continue;
-    if (connRoom.gridX === room.gridX) {
-      const isAbove = connRoom.gridY < room.gridY;
-      corridorOpenings.push({
-        x: room.x + room.width / 2,
-        y: isAbove ? room.y : room.y + room.height
-      });
-    } else {
-      const isLeft = connRoom.gridX < room.gridX;
-      corridorOpenings.push({
-        x: isLeft ? room.x : room.x + room.width,
-        y: room.y + room.height / 2
-      });
-    }
-  }
-
-  const count = Math.floor(random() * 4) + 1;
+  const count = Math.floor(random() * 3) + 1;
   const types: DecorationType[] = ['pillar', 'rubble', 'chest'];
-  const margin = 18;
+  const margin = 15;
 
   for (let i = 0; i < count; i++) {
     let attempts = 0;
@@ -188,18 +249,10 @@ function generateDecorations(
       const dy = room.y + margin + random() * (room.height - margin * 2);
 
       let tooClose = false;
-      for (const opening of corridorOpenings) {
-        const ddx = dx - opening.x;
-        const ddy = dy - opening.y;
-        if (Math.sqrt(ddx * ddx + ddy * ddy) < 25) {
-          tooClose = true;
-          break;
-        }
-      }
       for (const existing of decorations) {
         const ddx = dx - existing.x;
         const ddy = dy - existing.y;
-        if (Math.sqrt(ddx * ddx + ddy * ddy) < 20) {
+        if (Math.sqrt(ddx * ddx + ddy * ddy) < 18) {
           tooClose = true;
           break;
         }
@@ -210,7 +263,7 @@ function generateDecorations(
           type: types[Math.floor(random() * types.length)],
           x: dx,
           y: dy,
-          size: 6 + random() * 4
+          size: 5 + random() * 4
         });
         break;
       }
@@ -223,56 +276,47 @@ function generateDecorations(
 
 export function generateDungeon(seed: number = Date.now()): DungeonData {
   const startTime = performance.now();
-  
+
   const random = seededRandom(seed);
-  
-  const connections = generateMaze(GRID_SIZE, random);
-  
-  const rooms: Room[] = [];
-  const offsetX = (800 - (GRID_SIZE * (ROOM_WIDTH + PADDING) - PADDING)) / 2;
-  const offsetY = 50 + (600 - 50 - (GRID_SIZE * (ROOM_HEIGHT + PADDING) - PADDING)) / 2;
-  
-  for (let y = 0; y < GRID_SIZE; y++) {
-    for (let x = 0; x < GRID_SIZE; x++) {
-      const id = getRoomId(x, y);
-      const wallColor = WALL_COLORS[Math.floor(random() * WALL_COLORS.length)];
-      
-      rooms.push({
-        id,
-        gridX: x,
-        gridY: y,
-        x: offsetX + x * (ROOM_WIDTH + PADDING),
-        y: offsetY + y * (ROOM_HEIGHT + PADDING),
-        width: ROOM_WIDTH,
-        height: ROOM_HEIGHT,
-        wallColor,
-        floorColor: FLOOR_COLOR,
-        connections: connections.get(id) || [],
-        decorations: []
-      });
-    }
-  }
-  
-  for (const room of rooms) {
-    room.decorations = generateDecorations(
-      room,
-      room.connections,
-      rooms,
-      random
-    );
-  }
-  
-  const corridors = generateCorridors(rooms, connections);
-  
+
+  const root: BSPNode = {
+    x: MAP_OFFSET_X,
+    y: MAP_OFFSET_Y,
+    width: MAP_WIDTH,
+    height: MAP_HEIGHT
+  };
+
+  splitNode(root, random);
+
+  const leafNodes = collectLeafNodes(root);
+
+  const targetCount = MIN_ROOM_COUNT + Math.floor(random() * (MAX_ROOM_COUNT - MIN_ROOM_COUNT + 1));
+  const selectedNodes = leafNodes
+    .sort(() => random() - 0.5)
+    .slice(0, Math.min(targetCount, leafNodes.length));
+
+  const rooms: Room[] = selectedNodes.map((node, index) => {
+    const room = createRoomFromNode(node, random, index);
+    return room;
+  });
+
+  const { corridors, connections } = connectRooms(rooms, random);
+
+  rooms.forEach(room => {
+    room.connections = connections.get(room.id) || [];
+    room.decorations = generateDecorations(room, random);
+  });
+
   const endTime = performance.now();
-  console.log(`Dungeon generation took: ${(endTime - startTime).toFixed(3)}ms`);
-  
+  console.log(`BSP Dungeon generation took: ${(endTime - startTime).toFixed(3)}ms`);
+  console.log(`Rooms: ${rooms.length}, Corridors: ${corridors.length}`);
+
   return {
     rooms,
-    gridSize: GRID_SIZE,
-    roomWidth: ROOM_WIDTH,
-    roomHeight: ROOM_HEIGHT,
-    padding: PADDING,
+    gridSize: 5,
+    roomWidth: MIN_ROOM_SIZE,
+    roomHeight: MIN_ROOM_SIZE,
+    padding: 20,
     corridors
   };
 }
@@ -289,17 +333,17 @@ export function getRoomAtPosition(dungeon: DungeonData, x: number, y: number): R
   return null;
 }
 
-export function isPointInCorridor(dungeon: DungeonData, x: number, y: number, corridorWidth: number = 20): boolean {
+export function isPointInCorridor(dungeon: DungeonData, x: number, y: number, corridorWidth: number = CORRIDOR_WIDTH): boolean {
   for (const corridor of dungeon.corridors) {
     for (let i = 0; i < corridor.path.length - 1; i++) {
       const p1 = corridor.path[i];
       const p2 = corridor.path[i + 1];
-      
+
       const minX = Math.min(p1.x, p2.x) - corridorWidth / 2;
       const maxX = Math.max(p1.x, p2.x) + corridorWidth / 2;
       const minY = Math.min(p1.y, p2.y) - corridorWidth / 2;
       const maxY = Math.max(p1.y, p2.y) + corridorWidth / 2;
-      
+
       if (x >= minX && x <= maxX && y >= minY && y <= maxY) {
         return true;
       }
@@ -319,8 +363,8 @@ export function isWalkable(dungeon: DungeonData, x: number, y: number, radius: n
       return true;
     }
   }
-  
+
   return isPointInCorridor(dungeon, x, y, 16);
 }
 
-export { CORRIDOR_COLOR, FLOOR_COLOR, WALL_COLORS };
+export { CORRIDOR_COLOR, FLOOR_COLOR, WALL_COLORS, CORRIDOR_WIDTH };

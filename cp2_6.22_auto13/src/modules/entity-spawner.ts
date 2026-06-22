@@ -10,15 +10,11 @@ function seededRandom(seed: number): () => number {
 
 export function createPlayer(dungeon: DungeonData, seed: number = Date.now()): Player {
   const random = seededRandom(seed + 1000);
-  
-  const centerIndex = Math.floor(dungeon.gridSize / 2);
-  const startRoom = dungeon.rooms.find(
-    r => r.gridX === centerIndex && r.gridY === centerIndex
-  ) || dungeon.rooms[0];
-  
-  const x = startRoom.x + startRoom.width / 2 + (random() - 0.5) * 20;
-  const y = startRoom.y + startRoom.height / 2 + (random() - 0.5) * 20;
-  
+  const startRoom = dungeon.rooms[0];
+
+  const x = startRoom.x + startRoom.width / 2 + (random() - 0.5) * 10;
+  const y = startRoom.y + startRoom.height / 2 + (random() - 0.5) * 10;
+
   return {
     id: 'player',
     type: 'player',
@@ -36,23 +32,20 @@ export function createPlayer(dungeon: DungeonData, seed: number = Date.now()): P
 
 export function createEnemies(dungeon: DungeonData, seed: number = Date.now()): Enemy[] {
   const random = seededRandom(seed + 2000);
-  
+
   const enemyCount = Math.floor(random() * 3) + 3;
   const enemies: Enemy[] = [];
-  
-  const availableRooms = dungeon.rooms.filter(room => {
-    const centerIndex = Math.floor(dungeon.gridSize / 2);
-    return !(room.gridX === centerIndex && room.gridY === centerIndex);
-  });
-  
+
+  const availableRooms = dungeon.rooms.filter((_, index) => index !== 0);
+
   const shuffledRooms = [...availableRooms].sort(() => random() - 0.5);
-  
+
   for (let i = 0; i < enemyCount && i < shuffledRooms.length; i++) {
     const room = shuffledRooms[i];
     const patrolPath = generatePatrolPath(dungeon, room, random);
-    
+
     const startPos = patrolPath[0];
-    
+
     enemies.push({
       id: `enemy_${i}`,
       type: 'enemy',
@@ -67,62 +60,49 @@ export function createEnemies(dungeon: DungeonData, seed: number = Date.now()): 
       startRoomId: room.id
     });
   }
-  
+
   return enemies;
 }
 
 function generatePatrolPath(dungeon: DungeonData, startRoom: Room, random: () => number): Position[] {
   const pathPoints: Position[] = [];
-  const pointCount = Math.floor(random() * 2) + 2;
-  
-  const centerX = startRoom.x + startRoom.width / 2;
-  const centerY = startRoom.y + startRoom.height / 2;
-  
+  const pointCount = 3 + Math.floor(random() * 2);
+
   pathPoints.push({
-    x: centerX + (random() - 0.5) * (startRoom.width * 0.4),
-    y: centerY + (random() - 0.5) * (startRoom.height * 0.4)
+    x: startRoom.x + startRoom.width / 2,
+    y: startRoom.y + startRoom.height / 2
   });
-  
-  const connectedRoomIds = startRoom.connections;
-  if (connectedRoomIds.length > 0) {
-    const targetRoomId = connectedRoomIds[Math.floor(random() * connectedRoomIds.length)];
-    const targetRoom = dungeon.rooms.find(r => r.id === targetRoomId);
-    
-    if (targetRoom) {
-      const corridorMidpoint = getCorridorMidpoint(startRoom, targetRoom);
-      pathPoints.push(corridorMidpoint);
-      
-      if (pointCount >= 3) {
-        const targetCenterX = targetRoom.x + targetRoom.width / 2;
-        const targetCenterY = targetRoom.y + targetRoom.height / 2;
-        pathPoints.push({
-          x: targetCenterX + (random() - 0.5) * (targetRoom.width * 0.3),
-          y: targetCenterY + (random() - 0.5) * (targetRoom.height * 0.3)
-        });
-      }
+
+  const visitedRooms = new Set<string>([startRoom.id]);
+  let currentRoom = startRoom;
+
+  for (let i = 1; i < pointCount; i++) {
+    const connectedRooms = currentRoom.connections
+      .map(id => dungeon.rooms.find(r => r.id === id))
+      .filter((r): r is Room => r !== undefined);
+
+    let nextRoom: Room | undefined;
+
+    const unvisited = connectedRooms.filter(r => !visitedRooms.has(r.id));
+    if (unvisited.length > 0) {
+      nextRoom = unvisited[Math.floor(random() * unvisited.length)];
+    } else if (connectedRooms.length > 0) {
+      nextRoom = connectedRooms[Math.floor(random() * connectedRooms.length)];
+    } else {
+      nextRoom = dungeon.rooms[Math.floor(random() * dungeon.rooms.length)];
     }
-  } else {
-    for (let i = 1; i < pointCount; i++) {
+
+    if (nextRoom) {
       pathPoints.push({
-        x: centerX + (random() - 0.5) * (startRoom.width * 0.6),
-        y: centerY + (random() - 0.5) * (startRoom.height * 0.6)
+        x: nextRoom.x + nextRoom.width / 2,
+        y: nextRoom.y + nextRoom.height / 2
       });
+      visitedRooms.add(nextRoom.id);
+      currentRoom = nextRoom;
     }
   }
-  
-  return pathPoints;
-}
 
-function getCorridorMidpoint(roomA: Room, roomB: Room): Position {
-  const centerAX = roomA.x + roomA.width / 2;
-  const centerAY = roomA.y + roomA.height / 2;
-  const centerBX = roomB.x + roomB.width / 2;
-  const centerBY = roomB.y + roomB.height / 2;
-  
-  return {
-    x: (centerAX + centerBX) / 2,
-    y: (centerAY + centerBY) / 2
-  };
+  return pathPoints;
 }
 
 export function spawnEntities(dungeon: DungeonData, seed: number = Date.now()): {
@@ -131,6 +111,6 @@ export function spawnEntities(dungeon: DungeonData, seed: number = Date.now()): 
 } {
   const player = createPlayer(dungeon, seed);
   const enemies = createEnemies(dungeon, seed);
-  
+
   return { player, enemies };
 }
