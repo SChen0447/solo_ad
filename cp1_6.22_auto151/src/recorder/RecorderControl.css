@@ -1,0 +1,143 @@
+.recorder-control {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.recorder-control__title {
+  font-size: 14px;
+  font-weight: 500;
+  color: #cbd5e1;
+  letter-spacing: 0.5px;
+}
+
+.recorder-control__buttons {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.recorder-btn {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease-in-out;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  position: relative;
+}
+
+.recorder-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.recorder-btn:not(:disabled):hover {
+  filter: brightness(1.1);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+.recorder-btn:not(:disabled):active {
+  transform: translateY(1px);
+}
+
+.recorder-btn--record {
+  background: #ef4444;
+}
+
+.recorder-btn--record.recorder-btn--active {
+  animation: pulse 1s infinite;
+}
+
+.recorder-btn--stop {
+  background: #64748b;
+}
+
+.recorder-btn--play {
+  background: #22c55e;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3), 0 0 0 0 rgba(239, 68, 68, 0.4);
+  }
+  50% {
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3), 0 0 0 12px rgba(239, 68, 68, 0);
+  }
+}
+
+.recorder-btn__icon {
+  display: block;
+}
+
+.recorder-btn__icon--record {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #fff;
+}
+
+.recorder-btn__icon--stop {
+  width: 16px;
+  height: 16px;
+  border-radius: 2px;
+  background: #fff;
+}
+
+.recorder-btn__icon--square {
+  width: 14px;
+  height: 14px;
+  background: #fff;
+}
+
+.recorder-btn__icon--play {
+  width: 0;
+  height: 0;
+  border-top: 8px solid transparent;
+  border-bottom: 8px solid transparent;
+  border-left: 14px solid #fff;
+  margin-left: 3px;
+}
+
+.recorder-control__status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: 8px;
+}
+
+.status-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+.status-dot--recording {
+  background: #ef4444;
+  animation: blink 1s infinite;
+}
+
+.status-dot--playing {
+  background: #22c55e;
+  animation: blink 0.5s infinite;
+}
+
+@keyframes blink {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.3;
+  }
+}
+
+.status-text {
+  font-size: 13px;
+  color: #94a3b8;
+}
