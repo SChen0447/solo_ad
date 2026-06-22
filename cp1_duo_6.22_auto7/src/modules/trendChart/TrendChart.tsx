@@ -334,7 +334,7 @@ export default function TrendChart({ keywords, selectedWords }: TrendChartProps)
         }}
       >
         {selectedWords.length === 0 ? (
-          <div style={styles.empty}>在词云中点击关键词查看趋势</div>
+          <div style={styles.emptyPlaceholder}>从词云中选择最多5个关键词，查看趋势变化</div>
         ) : (
           <svg ref={svgRef} width="100%" height="100%" />
         )}
@@ -403,6 +403,18 @@ const styles: Record<string, React.CSSProperties> = {
     height: '100%',
     color: '#bdbdbd',
     fontSize: 13,
+  },
+  emptyPlaceholder: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: '100%',
+    width: '100%',
+    textAlign: 'center',
+    color: '#9e9e9e',
+    fontSize: 16,
+    padding: '0 24px',
+    lineHeight: 1.6,
   },
   tooltip: {
     position: 'absolute',

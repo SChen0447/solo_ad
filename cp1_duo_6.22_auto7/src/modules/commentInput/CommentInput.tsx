@@ -9,6 +9,7 @@ interface CommentInputProps {
 }
 
 const MAX_COMMENTS = 50;
+const MAX_CONTENT_LENGTH = 500;
 
 export default function CommentInput({ comments, onCommentsChange, onAnalyze, hasAnalyzed }: CommentInputProps) {
   const [content, setContent] = useState('');
@@ -21,6 +22,7 @@ export default function CommentInput({ comments, onCommentsChange, onAnalyze, ha
   const handleAdd = useCallback(() => {
     if (!content.trim()) return;
     if (comments.length >= MAX_COMMENTS) return;
+    if (content.length > MAX_CONTENT_LENGTH) return;
     const newComment: Comment = {
       id: crypto.randomUUID(),
       content: content.trim(),
@@ -157,19 +159,38 @@ export default function CommentInput({ comments, onCommentsChange, onAnalyze, ha
         </div>
         <textarea
           value={content}
-          onChange={e => setContent(e.target.value)}
+          onChange={e => {
+            const next = e.target.value;
+            if (next.length <= MAX_CONTENT_LENGTH) {
+              setContent(next);
+            }
+          }}
           onPaste={handlePaste}
           placeholder="输入评论内容（支持粘贴多条，每行一条）"
           style={styles.textarea}
           rows={3}
+          maxLength={MAX_CONTENT_LENGTH}
         />
+        <div style={styles.counterRow}>
+          <span style={{
+            ...styles.counterText,
+            color:
+              content.length >= MAX_CONTENT_LENGTH
+                ? '#c62828'
+                : content.length >= MAX_CONTENT_LENGTH * 0.85
+                ? '#ef6c00'
+                : '#bdbdbd',
+          }}>
+            {content.length}/{MAX_CONTENT_LENGTH}
+          </span>
+        </div>
         <div style={styles.btnRow}>
           <button
             onClick={handleAdd}
-            disabled={!content.trim() || comments.length >= MAX_COMMENTS}
+            disabled={!content.trim() || comments.length >= MAX_COMMENTS || content.length > MAX_CONTENT_LENGTH}
             style={{
               ...styles.addBtn,
-              opacity: (!content.trim() || comments.length >= MAX_COMMENTS) ? 0.5 : 1,
+              opacity: (!content.trim() || comments.length >= MAX_COMMENTS || content.length > MAX_CONTENT_LENGTH) ? 0.5 : 1,
             }}
           >
             添加评论
@@ -328,6 +349,16 @@ const styles: Record<string, React.CSSProperties> = {
     outline: 'none',
     fontFamily: "'Noto Sans SC', sans-serif",
     transition: 'border-color 0.15s',
+  },
+  counterRow: {
+    display: 'flex',
+    justifyContent: 'flex-end',
+    marginTop: 6,
+  },
+  counterText: {
+    fontSize: 11,
+    letterSpacing: 0.3,
+    fontWeight: 500,
   },
   btnRow: {
     display: 'flex',

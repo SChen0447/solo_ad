@@ -330,7 +330,7 @@ export default function WordCloud({ keywords, selectedWords, onWordSelect }: Wor
         }}
       >
         {keywords.length === 0 ? (
-          <div style={styles.empty}>点击"开始分析"生成词云</div>
+          <div style={styles.emptyPlaceholder}>输入评论并点击分析，即可生成词云</div>
         ) : (
           <svg
             ref={svgRef}
@@ -455,6 +455,18 @@ const styles: Record<string, React.CSSProperties> = {
     height: '100%',
     color: '#bdbdbd',
     fontSize: 13,
+  },
+  emptyPlaceholder: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: '100%',
+    width: '100%',
+    textAlign: 'center',
+    color: '#9e9e9e',
+    fontSize: 16,
+    padding: '0 24px',
+    lineHeight: 1.6,
   },
   tooltip: {
     position: 'absolute',
