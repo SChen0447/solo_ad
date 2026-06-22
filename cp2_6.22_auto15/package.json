@@ -1,0 +1,36 @@
+{
+  "name": "mini-exhibition-manager",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "concurrently \"npm:dev:server\" \"npm:dev:client\"",
+    "dev:server": "ts-node server/index.ts",
+    "dev:client": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "react": "18.2.0",
+    "react-dom": "18.2.0",
+    "express": "4.18.2",
+    "typescript": "5.3.3",
+    "vite": "5.0.8",
+    "@vitejs/plugin-react": "4.2.0",
+    "cors": "^2.8.5",
+    "uuid": "^9.0.0",
+    "qrcode-svg": "^1.1.0",
+    "recharts": "^2.10.0",
+    "react-router-dom": "^6.20.0"
+  },
+  "devDependencies": {
+    "@types/react": "^18.2.0",
+    "@types/react-dom": "^18.2.0",
+    "@types/express": "^4.17.21",
+    "@types/cors": "^2.8.17",
+    "@types/node": "^20.10.0",
+    "@types/uuid": "^9.0.7",
+    "@types/qrcode-svg": "^1.1.4",
+    "concurrently": "^8.2.2",
+    "ts-node": "^10.9.2"
+  }
+}
