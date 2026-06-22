@@ -25,6 +25,28 @@ interface RoomGeometry {
   vanishY: number;
 }
 
+interface CachedPerspectiveData {
+  hLines: Array<{ x1: number; y: number; x2: number; alpha: number }>;
+  vLines: Array<{ x1: number; y1: number; x2: number; y2: number; alpha: number }>;
+  tileData: Array<{
+    xTL: number; yTop: number; xTR: number;
+    xBL: number; yBottom: number; xBR: number;
+  }>;
+  patternCanvas: HTMLCanvasElement | null;
+  patternSize: number;
+  lastMaterialId: string | null;
+}
+
+interface FloorTileCell {
+  xTL: number;
+  yTop: number;
+  xTR: number;
+  xBL: number;
+  yBottom: number;
+  xBR: number;
+  scale: number;
+}
+
 export class SceneManager {
   private canvas: HTMLCanvasElement;
   private ctx: CanvasRenderingContext2D;
@@ -33,6 +55,9 @@ export class SceneManager {
   private renderFrame: number | null = null;
   private patternCache: Map<string, CanvasPattern> = new Map();
   private dpr: number;
+  private geometryCache: RoomGeometry | null = null;
+  private perspectiveCache: CachedPerspectiveData | null = null;
+  private needsPerspectiveRecalc: boolean = true;
 
   constructor(canvas: HTMLCanvasElement, initialSelection: MaterialSelection) {
     this.canvas = canvas;
@@ -48,6 +73,9 @@ export class SceneManager {
   }
 
   public setSelection(selection: MaterialSelection): void {
+    if (selection.floor !== this.currentSelection.floor) {
+      this.needsPerspectiveRecalc = true;
+    }
     this.currentSelection = { ...selection };
     this.scheduleRender();
   }
@@ -86,6 +114,9 @@ export class SceneManager {
 
     this.ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
     this.patternCache.clear();
+    this.needsPerspectiveRecalc = true;
+    this.geometryCache = null;
+    this.perspectiveCache = null;
   }
 
   private scheduleRender(): void {
@@ -114,7 +145,13 @@ export class SceneManager {
     this.ctx.fillStyle = bgGrad;
     this.ctx.fillRect(0, 0, cssW, cssH);
 
-    const geom = this.computeGeometry(cssW, cssH);
+    if (!this.geometryCache) {
+      this.geometryCache = this.computeGeometry(cssW, cssH);
+    }
+    const geom = this.geometryCache;
+
+    this.ensurePerspectiveCache(geom);
+
     this.drawBackWall(geom);
     this.drawWindowAndCurtains(geom);
     this.drawFloor(geom);
@@ -384,73 +421,40 @@ export class SceneManager {
     this.ctx.restore();
   }
 
-  private drawPerspectiveFloorMaterial(material: Material, geom: RoomGeometry): void {
-    const { vanishX, vanishY, floorLeft, floorRight, floorTop, floorBottom } = geom;
-    const baseW = floorRight - floorLeft;
-    const baseH = floorBottom - floorTop;
-    const patternSize = Math.max(28, baseW * 0.05);
+  private drawPerspectiveFloorMaterial(_material: Material, geom: RoomGeometry): void {
+    if (!this.perspectiveCache || !this.perspectiveCache.patternCanvas) return;
 
-    const offCanvas = document.createElement('canvas');
-    offCanvas.width = patternSize;
-    offCanvas.height = patternSize;
-    const offCtx = offCanvas.getContext('2d')!;
-    drawMaterialThumbnail(offCtx, material, patternSize, patternSize);
+    const { tileData, patternCanvas, patternSize } = this.perspectiveCache;
 
-    const rows = Math.ceil(baseH / patternSize) + 4;
-    for (let row = 0; row < rows; row++) {
-      const tTop = row / rows;
-      const tBottom = (row + 1) / rows;
+    for (let i = 0; i < tileData.length; i++) {
+      const tile = tileData[i];
 
-      const yTop = floorTop + tTop * baseH;
-      const yBottom = floorTop + tBottom * baseH;
+      this.ctx.save();
+      this.ctx.beginPath();
+      this.ctx.moveTo(tile.xTL, tile.yTop);
+      this.ctx.lineTo(tile.xTR, tile.yTop);
+      this.ctx.lineTo(tile.xBR, tile.yBottom);
+      this.ctx.lineTo(tile.xBL, tile.yBottom);
+      this.ctx.closePath();
+      this.ctx.clip();
 
-      const topScale = this.perspectiveScale(tTop);
-      const botScale = this.perspectiveScale(tBottom);
-
-      const rowTopW = baseW * topScale;
-      const rowBotW = baseW * botScale;
-
-      const topLeft = vanishX - (vanishX - floorLeft) * topScale;
-      const botLeft = vanishX - (vanishX - floorLeft) * botScale;
-
-      const cols = Math.ceil(Math.max(rowTopW, rowBotW) / (patternSize * 0.8)) + 2;
-
-      for (let col = 0; col < cols; col++) {
-        const tcL = col / cols;
-        const tcR = (col + 1) / cols;
-
-        const xTL = topLeft + tcL * rowTopW;
-        const xTR = topLeft + tcR * rowTopW;
-        const xBL = botLeft + tcL * rowBotW;
-        const xBR = botLeft + tcR * rowBotW;
-
-        this.ctx.save();
-        this.ctx.beginPath();
-        this.ctx.moveTo(xTL, yTop);
-        this.ctx.lineTo(xTR, yTop);
-        this.ctx.lineTo(xBR, yBottom);
-        this.ctx.lineTo(xBL, yBottom);
-        this.ctx.closePath();
-        this.ctx.clip();
-
-        const cellW = xBR - xBL;
-        const cellH = yBottom - yTop;
-        const dx = (xTL + xBL) / 2 - patternSize / 2;
-        const dy = (yTop + yBottom) / 2 - patternSize / 2;
-        const sx = cellW / patternSize;
-        const sy = cellH / patternSize;
-        this.ctx.drawImage(offCanvas, 0, 0, patternSize, patternSize, dx, dy, patternSize * sx, patternSize * sy);
-        this.ctx.restore();
-      }
+      const cellW = tile.xBR - tile.xBL;
+      const cellH = tile.yBottom - tile.yTop;
+      const dx = (tile.xTL + tile.xBL) / 2 - patternSize / 2;
+      const dy = (tile.yTop + tile.yBottom) / 2 - patternSize / 2;
+      const sx = cellW / patternSize;
+      const sy = cellH / patternSize;
+      this.ctx.drawImage(patternCanvas, 0, 0, patternSize, patternSize, dx, dy, patternSize * sx, patternSize * sy);
+      this.ctx.restore();
     }
 
     this.ctx.save();
     this.ctx.globalAlpha = 0.1;
     this.ctx.fillStyle = '#0F172A';
     this.ctx.beginPath();
-    this.ctx.moveTo(floorLeft, floorTop);
-    this.ctx.lineTo(floorRight, floorTop);
-    this.ctx.lineTo(vanishX, vanishY);
+    this.ctx.moveTo(geom.floorLeft, geom.floorTop);
+    this.ctx.lineTo(geom.floorRight, geom.floorTop);
+    this.ctx.lineTo(geom.vanishX, geom.vanishY);
     this.ctx.closePath();
     this.ctx.fill();
     this.ctx.restore();
@@ -463,36 +467,115 @@ export class SceneManager {
     return near - (near - far) * k;
   }
 
-  private drawFloorGrid(geom: RoomGeometry): void {
+  private ensurePerspectiveCache(geom: RoomGeometry): void {
+    const floorMat = this.getMaterial('floor');
+    const materialId = floorMat.id;
+
+    if (!this.perspectiveCache || this.needsPerspectiveRecalc ||
+        this.perspectiveCache.lastMaterialId !== materialId) {
+      this.perspectiveCache = this.computePerspectiveData(geom, floorMat);
+      this.needsPerspectiveRecalc = false;
+    }
+  }
+
+  private computePerspectiveData(geom: RoomGeometry, floorMat: Material): CachedPerspectiveData {
     const { vanishX, vanishY, floorLeft, floorRight, floorTop, floorBottom } = geom;
+    const baseW = floorRight - floorLeft;
+    const baseH = floorBottom - floorTop;
+    const patternSize = Math.max(28, baseW * 0.05);
+
+    const offCanvas = document.createElement('canvas');
+    offCanvas.width = patternSize;
+    offCanvas.height = patternSize;
+    const offCtx = offCanvas.getContext('2d')!;
+    drawMaterialThumbnail(offCtx, floorMat, patternSize, patternSize);
+
+    const hLines: Array<{ x1: number; y: number; x2: number; alpha: number }> = [];
+    const H_LINES = 14;
+    for (let i = 1; i <= H_LINES; i++) {
+      const t = i / H_LINES;
+      const y = floorTop + t * baseH;
+      const s = this.perspectiveScale(t);
+      const xL = vanishX - (vanishX - floorLeft) * s;
+      const xR = vanishX + (floorRight - vanishX) * s;
+      const alpha = 0.2 + 0.7 * t;
+      hLines.push({ x1: xL, y, x2: xR, alpha });
+    }
+
+    const vLines: Array<{ x1: number; y1: number; x2: number; y2: number; alpha: number }> = [];
+    const V_LINES = 12;
+    for (let i = 0; i <= V_LINES; i++) {
+      const t = i / V_LINES;
+      const bx = floorLeft + t * baseW;
+      const alpha = 0.2 + 0.6 * Math.abs(t - 0.5) * 0.6;
+      vLines.push({ x1: bx, y1: floorBottom, x2: vanishX, y2: vanishY, alpha });
+    }
+
+    const rows = Math.ceil(baseH / patternSize) + 4;
+    const tileData: FloorTileCell[] = [];
+    for (let row = 0; row < rows; row++) {
+      const tTop = row / rows;
+      const tBottom = (row + 1) / rows;
+
+      const yTop = floorTop + tTop * baseH;
+      const yBottom = floorTop + tBottom * baseH;
+
+      const topScale = this.perspectiveScale(tTop);
+      const botScale = this.perspectiveScale(tBottom);
+      const avgScale = (topScale + botScale) / 2;
+
+      const rowTopW = baseW * topScale;
+      const rowBotW = baseW * botScale;
+      const topLeft = vanishX - (vanishX - floorLeft) * topScale;
+      const botLeft = vanishX - (vanishX - floorLeft) * botScale;
+
+      const cols = Math.ceil(Math.max(rowTopW, rowBotW) / (patternSize * 0.8)) + 2;
+      for (let col = 0; col < cols; col++) {
+        const tcL = col / cols;
+        const tcR = (col + 1) / cols;
+        tileData.push({
+          xTL: topLeft + tcL * rowTopW,
+          yTop,
+          xTR: topLeft + tcR * rowTopW,
+          xBL: botLeft + tcL * rowBotW,
+          yBottom,
+          xBR: botLeft + tcR * rowBotW,
+          scale: avgScale,
+        });
+      }
+    }
+
+    return {
+      hLines,
+      vLines,
+      tileData,
+      patternCanvas: offCanvas,
+      patternSize,
+      lastMaterialId: floorMat.id,
+    };
+  }
+
+  private drawFloorGrid(_geom: RoomGeometry): void {
+    if (!this.perspectiveCache) return;
 
     this.ctx.strokeStyle = '#CBD5E1';
     this.ctx.lineWidth = 1;
 
-    const hLines = 14;
-    for (let i = 1; i <= hLines; i++) {
-      const t = i / hLines;
-      const y = floorTop + t * (floorBottom - floorTop);
-      const s = this.perspectiveScale(t);
-      const xL = vanishX - (vanishX - floorLeft) * s;
-      const xR = vanishX + (floorRight - vanishX) * s;
-
-      this.ctx.globalAlpha = 0.2 + 0.7 * t;
+    for (let i = 0; i < this.perspectiveCache.hLines.length; i++) {
+      const line = this.perspectiveCache.hLines[i];
+      this.ctx.globalAlpha = line.alpha;
       this.ctx.beginPath();
-      this.ctx.moveTo(xL, y);
-      this.ctx.lineTo(xR, y);
+      this.ctx.moveTo(line.x1, line.y);
+      this.ctx.lineTo(line.x2, line.y);
       this.ctx.stroke();
     }
 
-    const vLines = 12;
-    for (let i = 0; i <= vLines; i++) {
-      const t = i / vLines;
-      const bx = floorLeft + t * (floorRight - floorLeft);
-
-      this.ctx.globalAlpha = 0.2 + 0.6 * Math.abs(t - 0.5) * 0.6;
+    for (let i = 0; i < this.perspectiveCache.vLines.length; i++) {
+      const line = this.perspectiveCache.vLines[i];
+      this.ctx.globalAlpha = line.alpha;
       this.ctx.beginPath();
-      this.ctx.moveTo(bx, floorBottom);
-      this.ctx.lineTo(vanishX, vanishY);
+      this.ctx.moveTo(line.x1, line.y1);
+      this.ctx.lineTo(line.x2, line.y2);
       this.ctx.stroke();
     }
 
