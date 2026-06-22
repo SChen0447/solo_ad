@@ -74,7 +74,7 @@ export class OrbitControlsWrapper {
   public update(deltaTimeMs: number): void {
     if (this.autoRotate && !this.isUserInteracting) {
       const deltaTimeSec = deltaTimeMs / 1000;
-      const radiansPerSec = (this.autoRotateSpeed * Math.PI) / 180 * 60;
+      const radiansPerSec = (this.autoRotateSpeed * Math.PI) / 180;
       const radiansThisFrame = radiansPerSec * deltaTimeSec;
 
       const spherical = new THREE.Spherical();

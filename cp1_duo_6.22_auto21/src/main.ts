@@ -20,6 +20,8 @@ class MoleculeViewerApp {
   private gui!: GUI;
   private raycaster: THREE.Raycaster;
   private mouse: THREE.Vector2;
+  private prevMouse: THREE.Vector2;
+  private mouseDirty: boolean = false;
   private hoveredAtom: AtomMesh | null = null;
   private selectedAtom: AtomMesh | null = null;
   private clock: THREE.Clock;
@@ -57,9 +59,10 @@ class MoleculeViewerApp {
       60,
       window.innerWidth / window.innerHeight,
       0.1,
-      2000
+      1000
     );
-    this.starsCamera.position.z = 1;
+    this.starsCamera.position.set(0, 0, 0);
+    this.starsCamera.lookAt(0, 0, -1);
 
     this.camera = new THREE.PerspectiveCamera(
       60,
@@ -90,6 +93,8 @@ class MoleculeViewerApp {
 
     this.raycaster = new THREE.Raycaster();
     this.mouse = new THREE.Vector2(-999, -999);
+    this.prevMouse = new THREE.Vector2(-999, -999);
+    this.mouseDirty = false;
 
     this.clock = new THREE.Clock();
 
@@ -240,16 +245,32 @@ class MoleculeViewerApp {
   }
 
   private onMouseMove(event: MouseEvent): void {
-    this.mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
-    this.mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+    const nx = (event.clientX / window.innerWidth) * 2 - 1;
+    const ny = -(event.clientY / window.innerHeight) * 2 + 1;
+    if (Math.abs(nx - this.mouse.x) > 1e-6 || Math.abs(ny - this.mouse.y) > 1e-6) {
+      this.mouse.x = nx;
+      this.mouse.y = ny;
+      this.mouseDirty = true;
+    }
   }
 
   private onMouseLeave(): void {
     this.mouse.set(-999, -999);
+    this.mouseDirty = true;
   }
 
   private performRaycast(): void {
-    if (this.mouse.x < -1 || this.mouse.x > 1) return;
+    if (!this.mouseDirty) return;
+    this.mouseDirty = false;
+
+    if (this.mouse.x < -1 || this.mouse.x > 1) {
+      if (this.hoveredAtom && this.hoveredAtom !== this.selectedAtom) {
+        this.atomRenderer.unhighlightAtom(this.hoveredAtom);
+        this.hoveredAtom = null;
+        this.renderer.domElement.style.cursor = 'grab';
+      }
+      return;
+    }
 
     this.raycaster.setFromCamera(this.mouse, this.camera);
     const intersects = this.raycaster.intersectObjects(this.atomRenderer.atomMeshes, false);

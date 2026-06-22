@@ -34,9 +34,11 @@ const MAX_VALENCE: Record<string, number> = {
 };
 
 const BOND_DISTANCE_TOLERANCE: Record<string, number> = {
-  'H': 0.35, 'C': 0.20, 'N': 0.20, 'O': 0.20, 'F': 0.15,
-  'S': 0.25, 'P': 0.25, 'Cl': 0.20, 'Br': 0.20, 'I': 0.25,
-  'Si': 0.25, 'B': 0.25
+  'H': 0.35, 'He': 0.20, 'Li': 0.30, 'Be': 0.25, 'B': 0.25, 'C': 0.20,
+  'N': 0.15, 'O': 0.15, 'F': 0.15, 'Ne': 0.20, 'Na': 0.30, 'Mg': 0.30,
+  'Al': 0.25, 'Si': 0.25, 'P': 0.25, 'S': 0.20, 'Cl': 0.20, 'Ar': 0.20,
+  'K': 0.35, 'Ca': 0.30, 'Fe': 0.30, 'Cu': 0.30, 'Zn': 0.30, 'Br': 0.20,
+  'I': 0.25
 };
 
 interface BondCandidate {
@@ -332,29 +334,26 @@ export class MoleculeParser {
     target: number,
     atomCount: number
   ): boolean {
+    const maxDepth = Math.min(7, Math.max(4, Math.floor(Math.sqrt(atomCount))));
     const visited = new Uint8Array(atomCount);
-    const queue: number[] = [start];
+    const queue: { node: number; depth: number }[] = [{ node: start, depth: 0 }];
     visited[start] = 1;
-    let depth = 0;
-    const maxDepth = 8;
 
-    while (queue.length > 0 && depth < maxDepth) {
-      const size = queue.length;
-      depth++;
+    let head = 0;
+    while (head < queue.length) {
+      const { node: current, depth } = queue[head++];
 
-      for (let i = 0; i < size; i++) {
-        const current = queue.shift()!;
-        const neighbors = adjacency.get(current);
+      if (depth >= maxDepth) continue;
 
-        if (neighbors) {
-          for (const neighbor of neighbors) {
-            if (neighbor === target && depth >= 3) {
-              return true;
-            }
-            if (!visited[neighbor]) {
-              visited[neighbor] = 1;
-              queue.push(neighbor);
-            }
+      const neighbors = adjacency.get(current);
+      if (neighbors) {
+        for (const neighbor of neighbors) {
+          if (neighbor === target && depth + 1 >= 3) {
+            return true;
+          }
+          if (!visited[neighbor]) {
+            visited[neighbor] = 1;
+            queue.push({ node: neighbor, depth: depth + 1 });
           }
         }
       }

@@ -9,12 +9,15 @@ export class InfoPanel {
   private coordinatesEl: HTMLDivElement;
   private bondLengthsEl: HTMLDivElement;
   private bondAnglesEl: HTMLDivElement;
+  private dihedralAnglesEl: HTMLDivElement;
+  private ringAnglesEl: HTMLDivElement;
   private noSelectionEl: HTMLDivElement;
   private contentWrapper: HTMLDivElement;
 
   private moleculeData: MoleculeData | null = null;
   private adjacency: Map<number, number[]> = new Map();
   private atomPositionMap: Map<number, { element: string; pos: THREE.Vector3 }> = new Map();
+  private rings: number[][] = [];
 
   constructor(container: HTMLElement) {
     this.container = container;
@@ -25,6 +28,8 @@ export class InfoPanel {
     this.coordinatesEl = document.createElement('div');
     this.bondLengthsEl = document.createElement('div');
     this.bondAnglesEl = document.createElement('div');
+    this.dihedralAnglesEl = document.createElement('div');
+    this.ringAnglesEl = document.createElement('div');
 
     this.setupStyles();
     this.buildDOM();
@@ -33,6 +38,7 @@ export class InfoPanel {
   public setMoleculeData(data: MoleculeData): void {
     this.moleculeData = data;
     this.buildAdjacency();
+    this.findRings();
   }
 
   private buildAdjacency(): void {
@@ -43,12 +49,86 @@ export class InfoPanel {
       this.adjacency.set(atom.id, []);
     }
 
+    if (!this.moleculeData.bonds || this.moleculeData.bonds.length === 0) {
+      return;
+    }
+
     for (const bond of this.moleculeData.bonds) {
       const neighbors1 = this.adjacency.get(bond.atom1);
       const neighbors2 = this.adjacency.get(bond.atom2);
-      if (neighbors1) neighbors1.push(bond.atom2);
-      if (neighbors2) neighbors2.push(bond.atom1);
+      if (neighbors1 && !neighbors1.includes(bond.atom2)) {
+        neighbors1.push(bond.atom2);
+      }
+      if (neighbors2 && !neighbors2.includes(bond.atom1)) {
+        neighbors2.push(bond.atom1);
+      }
     }
+  }
+
+  private findRings(): void {
+    this.rings = [];
+    if (!this.moleculeData || this.moleculeData.bonds.length === 0) return;
+
+    const atomIds = this.moleculeData.atoms.map(a => a.id);
+    const visited = new Set<number>();
+    const path: number[] = [];
+
+    const dfs = (current: number, parent: number, depth: number): void => {
+      if (depth > 7) return;
+
+      visited.add(current);
+      path.push(current);
+
+      const neighbors = this.adjacency.get(current) ?? [];
+      for (const neighbor of neighbors) {
+        if (neighbor === parent) continue;
+
+        if (visited.has(neighbor)) {
+          const cycleStart = path.indexOf(neighbor);
+          if (cycleStart >= 0) {
+            const ring = path.slice(cycleStart);
+            if (ring.length >= 3 && ring.length <= 7) {
+              const normalized = this.normalizeRing(ring);
+              const isDuplicate = this.rings.some(
+                r => r.length === normalized.length &&
+                  r.every((v, i) => v === normalized[i])
+              );
+              if (!isDuplicate) {
+                this.rings.push(normalized);
+              }
+            }
+          }
+          continue;
+        }
+
+        dfs(neighbor, current, depth + 1);
+      }
+
+      path.pop();
+      visited.delete(current);
+    };
+
+    for (const atomId of atomIds) {
+      dfs(atomId, -1, 0);
+      visited.clear();
+      path.length = 0;
+    }
+  }
+
+  private normalizeRing(ring: number[]): number[] {
+    const minIndex = ring.indexOf(Math.min(...ring));
+    const rotated = [...ring.slice(minIndex), ...ring.slice(0, minIndex)];
+    const reversed = [...rotated].reverse();
+    const reversedNormalized = [
+      reversed[reversed.length - 1],
+      ...reversed.slice(0, reversed.length - 1)
+    ];
+    let isSmaller = false;
+    for (let i = 0; i < rotated.length; i++) {
+      if (reversedNormalized[i] < rotated[i]) { isSmaller = true; break; }
+      if (reversedNormalized[i] > rotated[i]) { break; }
+    }
+    return isSmaller ? reversedNormalized : rotated;
   }
 
   public updateAtomPositions(atomMeshes: AtomMesh[]): void {
@@ -69,6 +149,8 @@ export class InfoPanel {
       top: 20px;
       right: 20px;
       width: 300px;
+      max-height: calc(100vh - 40px);
+      overflow-y: auto;
       padding: 20px;
       background: rgba(255, 255, 255, 0.08);
       backdrop-filter: blur(10px);
@@ -106,13 +188,17 @@ export class InfoPanel {
     `;
     this.noSelectionEl.textContent = '悬停原子查看详细信息';
 
-    this.contentWrapper.style.cssText = `
-      display: none;
-    `;
+    this.contentWrapper.style.cssText = `display: none;`;
 
-    this.coordinatesEl.innerHTML = `<div style="color: #7aa2ff; font-weight: 600; margin-top: 14px; margin-bottom: 8px; font-size: 12px; text-transform: uppercase; letter-spacing: 1px;">原子坐标</div>`;
-    this.bondLengthsEl.innerHTML = `<div style="color: #7aa2ff; font-weight: 600; margin-top: 14px; margin-bottom: 8px; font-size: 12px; text-transform: uppercase; letter-spacing: 1px;">键长信息</div>`;
-    this.bondAnglesEl.innerHTML = `<div style="color: #7aa2ff; font-weight: 600; margin-top: 14px; margin-bottom: 8px; font-size: 12px; text-transform: uppercase; letter-spacing: 1px;">键角信息</div>`;
+    this.coordinatesEl.innerHTML = this.makeSectionHeader('原子坐标');
+    this.bondLengthsEl.innerHTML = this.makeSectionHeader('键长信息');
+    this.bondAnglesEl.innerHTML = this.makeSectionHeader('键角信息');
+    this.dihedralAnglesEl.innerHTML = this.makeSectionHeader('二面角');
+    this.ringAnglesEl.innerHTML = this.makeSectionHeader('环内角');
+  }
+
+  private makeSectionHeader(text: string): string {
+    return `<div style="color: #7aa2ff; font-weight: 600; margin-top: 14px; margin-bottom: 8px; font-size: 12px; text-transform: uppercase; letter-spacing: 1px;">${text}</div>`;
   }
 
   private buildDOM(): void {
@@ -128,6 +214,8 @@ export class InfoPanel {
     this.contentWrapper.appendChild(this.coordinatesEl);
     this.contentWrapper.appendChild(this.bondLengthsEl);
     this.contentWrapper.appendChild(this.bondAnglesEl);
+    this.contentWrapper.appendChild(this.dihedralAnglesEl);
+    this.contentWrapper.appendChild(this.ringAnglesEl);
 
     this.panel.appendChild(this.titleEl);
     this.panel.appendChild(this.noSelectionEl);
@@ -151,6 +239,8 @@ export class InfoPanel {
     this.updateCoordinates(atomData, posInfo?.pos ?? new THREE.Vector3(atomData.x, atomData.y, atomData.z));
     this.updateBondLengths(atomData.id);
     this.updateBondAngles(atomData.id);
+    this.updateDihedralAngles(atomData.id);
+    this.updateRingAngles(atomData.id);
   }
 
   private updateCoordinates(atomData: AtomData, pos: THREE.Vector3): void {
@@ -195,8 +285,7 @@ export class InfoPanel {
 
     if (neighbors.length === 0 || !centralInfo) {
       const empty = document.createElement('div');
-      empty.style.color = 'rgba(255,255,255,0.4)';
-      empty.style.fontStyle = 'italic';
+      empty.style.cssText = 'color: rgba(255,255,255,0.4); font-style: italic;';
       empty.textContent = '无化学键';
       this.bondLengthsEl.appendChild(empty);
       return;
@@ -208,7 +297,7 @@ export class InfoPanel {
       padding: 10px 12px;
       border-radius: 8px;
       margin-top: 4px;
-      max-height: 120px;
+      max-height: 100px;
       overflow-y: auto;
     `;
 
@@ -243,8 +332,7 @@ export class InfoPanel {
 
     if (neighbors.length < 2 || !centralInfo) {
       const empty = document.createElement('div');
-      empty.style.color = 'rgba(255,255,255,0.4)';
-      empty.style.fontStyle = 'italic';
+      empty.style.cssText = 'color: rgba(255,255,255,0.4); font-style: italic;';
       empty.textContent = '连接原子不足，无法计算键角';
       this.bondAnglesEl.appendChild(empty);
       return;
@@ -256,7 +344,7 @@ export class InfoPanel {
       padding: 10px 12px;
       border-radius: 8px;
       margin-top: 4px;
-      max-height: 120px;
+      max-height: 100px;
       overflow-y: auto;
     `;
 
@@ -286,6 +374,172 @@ export class InfoPanel {
     }
 
     this.bondAnglesEl.appendChild(container);
+  }
+
+  private updateDihedralAngles(atomId: number): void {
+    const header = this.dihedralAnglesEl.querySelector('div')!;
+    this.dihedralAnglesEl.innerHTML = '';
+    this.dihedralAnglesEl.appendChild(header);
+
+    const neighbors = this.adjacency.get(atomId) ?? [];
+    const centralInfo = this.atomPositionMap.get(atomId);
+
+    if (neighbors.length === 0 || !centralInfo) {
+      const empty = document.createElement('div');
+      empty.style.cssText = 'color: rgba(255,255,255,0.4); font-style: italic;';
+      empty.textContent = '无法计算二面角';
+      this.dihedralAnglesEl.appendChild(empty);
+      return;
+    }
+
+    const container = document.createElement('div');
+    container.style.cssText = `
+      background: rgba(0, 0, 0, 0.2);
+      padding: 10px 12px;
+      border-radius: 8px;
+      margin-top: 4px;
+      max-height: 100px;
+      overflow-y: auto;
+    `;
+
+    let hasDihedral = false;
+
+    for (const neighborId of neighbors) {
+      const neighborInfo = this.atomPositionMap.get(neighborId);
+      if (!neighborInfo) continue;
+
+      const neighborNeighbors = this.adjacency.get(neighborId) ?? [];
+      const neighborFurther = neighborNeighbors.filter(id => id !== atomId);
+
+      for (const furtherId of neighborFurther) {
+        const furtherInfo = this.atomPositionMap.get(furtherId);
+        if (!furtherInfo) continue;
+
+        const furtherNeighbors = this.adjacency.get(furtherId) ?? [];
+        const evenFurther = furtherNeighbors.filter(id => id !== neighborId);
+
+        for (const endId of evenFurther) {
+          if (endId === atomId) continue;
+          const endInfo = this.atomPositionMap.get(endId);
+          if (!endInfo) continue;
+
+          const dihedral = this.computeDihedral(
+            centralInfo.pos, neighborInfo.pos, furtherInfo.pos, endInfo.pos
+          );
+
+          if (dihedral === null) continue;
+
+          hasDihedral = true;
+          const row = document.createElement('div');
+          row.style.cssText = 'display: flex; justify-content: space-between; margin-bottom: 3px;';
+          row.innerHTML = `
+            <span style="color: #87ceeb;">${centralInfo.element}(${atomId})-${neighborInfo.element}(${neighborId})-${furtherInfo.element}(${furtherId})-${endInfo.element}(${endId})</span>
+            <span style="color: #98fb98;">${dihedral.toFixed(2)}°</span>
+          `;
+          container.appendChild(row);
+
+          if (container.childElementCount >= 6) break;
+        }
+        if (container.childElementCount >= 6) break;
+      }
+      if (container.childElementCount >= 6) break;
+    }
+
+    if (!hasDihedral) {
+      const empty = document.createElement('div');
+      empty.style.cssText = 'color: rgba(255,255,255,0.4); font-style: italic;';
+      empty.textContent = '无法计算二面角';
+      this.dihedralAnglesEl.appendChild(empty);
+    } else {
+      this.dihedralAnglesEl.appendChild(container);
+    }
+  }
+
+  private computeDihedral(
+    p1: THREE.Vector3, p2: THREE.Vector3, p3: THREE.Vector3, p4: THREE.Vector3
+  ): number | null {
+    const v21 = new THREE.Vector3().subVectors(p1, p2);
+    const v23 = new THREE.Vector3().subVectors(p3, p2);
+    const v34 = new THREE.Vector3().subVectors(p4, p3);
+    const v32 = new THREE.Vector3().subVectors(p2, p3);
+
+    const n1 = new THREE.Vector3().crossVectors(v21, v23);
+    const n2 = new THREE.Vector3().crossVectors(v32, v34);
+
+    if (n1.lengthSq() < 1e-10 || n2.lengthSq() < 1e-10) return null;
+
+    n1.normalize();
+    n2.normalize();
+
+    let cosAngle = n1.dot(n2);
+    cosAngle = Math.max(-1, Math.min(1, cosAngle));
+
+    const angle = Math.acos(cosAngle) * (180 / Math.PI);
+
+    const cross = new THREE.Vector3().crossVectors(n1, n2);
+    const sign = cross.dot(v23) >= 0 ? 1 : -1;
+
+    return sign * angle;
+  }
+
+  private updateRingAngles(atomId: number): void {
+    const header = this.ringAnglesEl.querySelector('div')!;
+    this.ringAnglesEl.innerHTML = '';
+    this.ringAnglesEl.appendChild(header);
+
+    const containingRings = this.rings.filter(ring => ring.includes(atomId));
+
+    if (containingRings.length === 0) {
+      const empty = document.createElement('div');
+      empty.style.cssText = 'color: rgba(255,255,255,0.4); font-style: italic;';
+      empty.textContent = '该原子不在环结构中';
+      this.ringAnglesEl.appendChild(empty);
+      return;
+    }
+
+    const container = document.createElement('div');
+    container.style.cssText = `
+      background: rgba(0, 0, 0, 0.2);
+      padding: 10px 12px;
+      border-radius: 8px;
+      margin-top: 4px;
+      max-height: 120px;
+      overflow-y: auto;
+    `;
+
+    for (const ring of containingRings) {
+      const ringSize = ring.length;
+      const idx = ring.indexOf(atomId);
+      const prevIdx = (idx - 1 + ringSize) % ringSize;
+      const nextIdx = (idx + 1) % ringSize;
+
+      const prevId = ring[prevIdx];
+      const nextId = ring[nextIdx];
+
+      const prevInfo = this.atomPositionMap.get(prevId);
+      const curInfo = this.atomPositionMap.get(atomId);
+      const nextInfo = this.atomPositionMap.get(nextId);
+
+      if (!prevInfo || !curInfo || !nextInfo) continue;
+
+      const v1 = new THREE.Vector3().subVectors(prevInfo.pos, curInfo.pos);
+      const v2 = new THREE.Vector3().subVectors(nextInfo.pos, curInfo.pos);
+
+      if (v1.lengthSq() < 1e-10 || v2.lengthSq() < 1e-10) continue;
+
+      const angle = v1.angleTo(v2) * (180 / Math.PI);
+
+      const ringLabel = `${ringSize}元环`;
+      const row = document.createElement('div');
+      row.style.cssText = 'display: flex; justify-content: space-between; margin-bottom: 3px;';
+      row.innerHTML = `
+        <span style="color: #ffa07a;">${ringLabel} ${prevInfo.element}(${prevId})-${curInfo.element}(${atomId})-${nextInfo.element}(${nextId})</span>
+        <span style="color: #ff69b4;">${angle.toFixed(2)}°</span>
+      `;
+      container.appendChild(row);
+    }
+
+    this.ringAnglesEl.appendChild(container);
   }
 
   public destroy(): void {

@@ -122,13 +122,16 @@ export class AtomRenderer {
         transparent: true,
         opacity: 0.0,
         side: THREE.BackSide,
-        depthWrite: false
+        depthWrite: false,
+        depthTest: false
       });
       const glowMesh = new THREE.Mesh(geometry, glowMaterial);
       glowMesh.scale.setScalar(1.5);
+      glowMesh.renderOrder = -1;
       mesh.add(glowMesh);
 
       const labelObject = this.createLabel(atom.element, atom.id);
+      labelObject.position.set(0, 1.0, 0);
       mesh.add(labelObject);
       labelObject.visible = false;
 
@@ -164,11 +167,12 @@ export class AtomRenderer {
       box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
       border: 1px solid rgba(255, 255, 255, 0.5);
       pointer-events: none;
-      transform: translateY(-140%);
+      transform: translate(-50%, -100%);
+      margin-top: -4px;
     `;
 
     const labelObject = new CSS2DObject(div);
-    labelObject.position.set(0, 0, 0);
+    labelObject.position.set(0, 1.0, 0);
     return labelObject;
   }
 
