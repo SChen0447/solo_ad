@@ -140,11 +140,18 @@ function drawTile(ctx: CanvasRenderingContext2D, grid: Grid, gx: number, gy: num
   if (tile.type === 'resource') {
     const depleted = tile.resourceDepleted;
     const baseColor = depleted ? '#6B7280' : '#FFD700';
-    const heightOffset = depleted ? 15 : 0;
-    const pulse = depleted ? 1 : 1 + Math.sin(time * Math.PI) * 0.1;
+    const scaleY = depleted ? 0.4 : 1.0;
+
+    let pulse = 1.0;
+    if (!depleted) {
+      const pulsePhase = (time % 2) / 2;
+      pulse = 1.0 + Math.sin(pulsePhase * Math.PI * 2) * 0.05 + 0.05;
+    }
+
+    const drawHeight = 14 * scaleY;
 
     ctx.save();
-    ctx.translate(px + TILE_SIZE / 2, py + TILE_SIZE / 2 + heightOffset);
+    ctx.translate(px + TILE_SIZE / 2, py + TILE_SIZE / 2 + 8 + (1 - scaleY) * 7);
     ctx.scale(pulse, pulse);
 
     ctx.fillStyle = depleted ? '#4B5563' : '#B8860B';
@@ -155,11 +162,11 @@ function drawTile(ctx: CanvasRenderingContext2D, grid: Grid, gx: number, gy: num
     ctx.fillStyle = baseColor;
     ctx.beginPath();
     ctx.moveTo(-10, 5);
-    ctx.lineTo(-10, -8);
-    ctx.lineTo(-6, -12);
-    ctx.lineTo(0, -14);
-    ctx.lineTo(6, -12);
-    ctx.lineTo(10, -8);
+    ctx.lineTo(-10, -8 + (1 - scaleY) * 12);
+    ctx.lineTo(-6, -12 + (1 - scaleY) * 12);
+    ctx.lineTo(0, -14 + (1 - scaleY) * 14);
+    ctx.lineTo(6, -12 + (1 - scaleY) * 12);
+    ctx.lineTo(10, -8 + (1 - scaleY) * 12);
     ctx.lineTo(10, 5);
     ctx.closePath();
     ctx.fill();
@@ -174,6 +181,15 @@ function drawTile(ctx: CanvasRenderingContext2D, grid: Grid, gx: number, gy: num
       ctx.lineTo(4, -6);
       ctx.closePath();
       ctx.fill();
+
+      const glowIntensity = 0.3 + Math.sin(pulsePhase * Math.PI * 2) * 0.2;
+      ctx.shadowColor = '#FFD700';
+      ctx.shadowBlur = 10 * glowIntensity;
+      ctx.beginPath();
+      ctx.arc(0, -5, 3, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(255, 255, 200, ${glowIntensity})`;
+      ctx.fill();
+      ctx.shadowBlur = 0;
     }
 
     ctx.restore();
