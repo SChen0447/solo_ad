@@ -1,0 +1,117 @@
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  font-size: 16px;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: #1E1B4B;
+  color: #E5E7EB;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(30, 27, 75, 0.5);
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(99, 102, 241, 0.3);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(99, 102, 241, 0.5);
+}
+
+.btn-primary {
+  padding: 8px 20px;
+  background: linear-gradient(135deg, #6366F1, #8B5CF6);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  position: relative;
+  overflow: hidden;
+}
+
+.btn-primary:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4);
+}
+
+.btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.form-input {
+  flex: 1;
+  background: rgba(30, 27, 75, 0.6);
+  border: 1px solid rgba(99, 102, 241, 0.3);
+  border-radius: 8px;
+  padding: 10px 14px;
+  color: #E5E7EB;
+  font-size: 14px;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.form-input:focus {
+  border-color: #6366F1;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
+}
+
+.form-input::placeholder {
+  color: #6B7280;
+}
+
+.ripple {
+  position: relative;
+  overflow: hidden;
+}
+
+.ripple::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 5px;
+  height: 5px;
+  background: rgba(255, 255, 255, 0.4);
+  opacity: 0;
+  border-radius: 100%;
+  transform: scale(1);
+  transition: transform 0.1s, opacity 0.1s;
+}
+
+.ripple:active::after {
+  transform: scale(40);
+  opacity: 1;
+  transition: 0s;
+}
+
+.empty-state {
+  text-align: center;
+  padding: 60px 20px;
+  color: #6B7280;
+  font-size: 16px;
+}
