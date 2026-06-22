@@ -12,11 +12,41 @@ export class UIPanel {
 
   private playerUnits: number = 0;
   private enemyUnits: number = 0;
-  private playerDPS: number = 0;
-  private enemyDPS: number = 0;
 
-  private healthAnimation: { player: number; enemy: number; playerTarget: number; enemyTarget: number } = {
-    player: 0, enemy: 0, playerTarget: 0, enemyTarget: 0
+  private valueAnimation: {
+    playerHealth: { current: number; target: number };
+    enemyHealth: { current: number; target: number };
+    playerDPS: { current: number; target: number };
+    enemyDPS: { current: number; target: number };
+  } = {
+    playerHealth: { current: 0, target: 0 },
+    enemyHealth: { current: 0, target: 0 },
+    playerDPS: { current: 0, target: 0 },
+    enemyDPS: { current: 0, target: 0 }
+  };
+
+  private pulseAnimations: {
+    playerHealth: { active: boolean; startTime: number };
+    enemyHealth: { active: boolean; startTime: number };
+    playerDPS: { active: boolean; startTime: number };
+    enemyDPS: { active: boolean; startTime: number };
+  } = {
+    playerHealth: { active: false, startTime: 0 },
+    enemyHealth: { active: false, startTime: 0 },
+    playerDPS: { active: false, startTime: 0 },
+    enemyDPS: { active: false, startTime: 0 }
+  };
+
+  private previousValues: {
+    playerHealth: number;
+    enemyHealth: number;
+    playerDPS: number;
+    enemyDPS: number;
+  } = {
+    playerHealth: 0,
+    enemyHealth: 0,
+    playerDPS: 0,
+    enemyDPS: 0
   };
 
   constructor(container: HTMLElement, sceneManager: SceneManager) {
@@ -253,7 +283,7 @@ export class UIPanel {
         <div class="stats-player" style="display: flex; gap: 30px; align-items: center;">
           <div style="text-align: center;">
             <div style="font-size: 11px; color: rgba(74, 158, 255, 0.7); margin-bottom: 4px;">生命值</div>
-            <div id="player-health" style="font-family: 'Orbitron', sans-serif; font-size: 24px; color: #4a9eff; font-weight: 700;">0</div>
+            <div id="player-health" style="font-family: 'Orbitron', sans-serif; font-size: 24px; color: #4a9eff; font-weight: 700; display: inline-block; transform-origin: center center; line-height: 1;">0</div>
           </div>
           <div style="text-align: center;">
             <div style="font-size: 11px; color: rgba(74, 158, 255, 0.7); margin-bottom: 4px;">存活单位</div>
@@ -261,7 +291,7 @@ export class UIPanel {
           </div>
           <div style="text-align: center;">
             <div style="font-size: 11px; color: rgba(74, 158, 255, 0.7); margin-bottom: 4px;">DPS</div>
-            <div id="player-dps" style="font-family: 'Orbitron', sans-serif; font-size: 24px; color: #4a9eff; font-weight: 700;">0</div>
+            <div id="player-dps" style="font-family: 'Orbitron', sans-serif; font-size: 24px; color: #4a9eff; font-weight: 700; display: inline-block; transform-origin: center center; line-height: 1;">0</div>
           </div>
         </div>
       </div>
@@ -271,7 +301,7 @@ export class UIPanel {
       <div class="stats-enemy" style="display: flex; gap: 30px; align-items: center;">
         <div style="text-align: center;">
           <div style="font-size: 11px; color: rgba(255, 74, 74, 0.7); margin-bottom: 4px;">DPS</div>
-          <div id="enemy-dps" style="font-family: 'Orbitron', sans-serif; font-size: 24px; color: #ff4a4a; font-weight: 700;">0</div>
+          <div id="enemy-dps" style="font-family: 'Orbitron', sans-serif; font-size: 24px; color: #ff4a4a; font-weight: 700; display: inline-block; transform-origin: center center; line-height: 1;">0</div>
         </div>
         <div style="text-align: center;">
           <div style="font-size: 11px; color: rgba(255, 74, 74, 0.7); margin-bottom: 4px;">存活单位</div>
@@ -279,7 +309,7 @@ export class UIPanel {
         </div>
         <div style="text-align: center;">
           <div style="font-size: 11px; color: rgba(255, 74, 74, 0.7); margin-bottom: 4px;">生命值</div>
-          <div id="enemy-health" style="font-family: 'Orbitron', sans-serif; font-size: 24px; color: #ff4a4a; font-weight: 700;">0</div>
+          <div id="enemy-health" style="font-family: 'Orbitron', sans-serif; font-size: 24px; color: #ff4a4a; font-weight: 700; display: inline-block; transform-origin: center center; line-height: 1;">0</div>
         </div>
       </div>
     `;
@@ -361,12 +391,29 @@ export class UIPanel {
   }
 
   updateStats(stats: GameStats): void {
-    this.healthAnimation.playerTarget = stats.player.totalHealth;
-    this.healthAnimation.enemyTarget = stats.enemy.totalHealth;
+    const now = performance.now();
+    const newPlayerHealth = stats.player.totalHealth;
+    const newEnemyHealth = stats.enemy.totalHealth;
+    const newPlayerDPS = stats.player.dps;
+    const newEnemyDPS = stats.enemy.dps;
+
+    this.checkAndTriggerPulse('playerHealth', this.previousValues.playerHealth, newPlayerHealth, now);
+    this.checkAndTriggerPulse('enemyHealth', this.previousValues.enemyHealth, newEnemyHealth, now);
+    this.checkAndTriggerPulse('playerDPS', this.previousValues.playerDPS, newPlayerDPS, now);
+    this.checkAndTriggerPulse('enemyDPS', this.previousValues.enemyDPS, newEnemyDPS, now);
+
+    this.previousValues.playerHealth = newPlayerHealth;
+    this.previousValues.enemyHealth = newEnemyHealth;
+    this.previousValues.playerDPS = newPlayerDPS;
+    this.previousValues.enemyDPS = newEnemyDPS;
+
+    this.valueAnimation.playerHealth.target = newPlayerHealth;
+    this.valueAnimation.enemyHealth.target = newEnemyHealth;
+    this.valueAnimation.playerDPS.target = newPlayerDPS;
+    this.valueAnimation.enemyDPS.target = newEnemyDPS;
+
     this.playerUnits = stats.player.aliveUnits;
     this.enemyUnits = stats.enemy.aliveUnits;
-    this.playerDPS = stats.player.dps;
-    this.enemyDPS = stats.enemy.dps;
 
     const selectedCount = this.sceneManager.getSelectedCount();
     const selectedEl = this.leftPanel.querySelector('#selected-count');
@@ -375,12 +422,54 @@ export class UIPanel {
     }
   }
 
+  private checkAndTriggerPulse(
+    key: 'playerHealth' | 'enemyHealth' | 'playerDPS' | 'enemyDPS',
+    oldValue: number,
+    newValue: number,
+    now: number
+  ): void {
+    if (oldValue === 0 && newValue === 0) return;
+    if (oldValue === 0 && newValue > 0) {
+      this.pulseAnimations[key].active = true;
+      this.pulseAnimations[key].startTime = now;
+      return;
+    }
+
+    const changePercent = Math.abs((newValue - oldValue) / oldValue);
+    if (changePercent >= 0.2) {
+      this.pulseAnimations[key].active = true;
+      this.pulseAnimations[key].startTime = now;
+    }
+  }
+
   private animateNumbers(): void {
+    const easeOutCubic = (t: number): number => 1 - Math.pow(1 - t, 3);
     const lerp = (start: number, end: number, t: number) => start + (end - start) * t;
 
     const update = () => {
-      this.healthAnimation.player = lerp(this.healthAnimation.player, this.healthAnimation.playerTarget, 0.1);
-      this.healthAnimation.enemy = lerp(this.healthAnimation.enemy, this.healthAnimation.enemyTarget, 0.1);
+      const now = performance.now();
+      const smoothFactor = 0.15;
+
+      this.valueAnimation.playerHealth.current = lerp(
+        this.valueAnimation.playerHealth.current,
+        this.valueAnimation.playerHealth.target,
+        easeOutCubic(smoothFactor)
+      );
+      this.valueAnimation.enemyHealth.current = lerp(
+        this.valueAnimation.enemyHealth.current,
+        this.valueAnimation.enemyHealth.target,
+        easeOutCubic(smoothFactor)
+      );
+      this.valueAnimation.playerDPS.current = lerp(
+        this.valueAnimation.playerDPS.current,
+        this.valueAnimation.playerDPS.target,
+        easeOutCubic(smoothFactor)
+      );
+      this.valueAnimation.enemyDPS.current = lerp(
+        this.valueAnimation.enemyDPS.current,
+        this.valueAnimation.enemyDPS.target,
+        easeOutCubic(smoothFactor)
+      );
 
       const playerHealthEl = this.topBar.querySelector('#player-health');
       const enemyHealthEl = this.topBar.querySelector('#enemy-health');
@@ -389,17 +478,79 @@ export class UIPanel {
       const playerDpsEl = this.topBar.querySelector('#player-dps');
       const enemyDpsEl = this.topBar.querySelector('#enemy-dps');
 
-      if (playerHealthEl) playerHealthEl.textContent = Math.round(this.healthAnimation.player).toString();
-      if (enemyHealthEl) enemyHealthEl.textContent = Math.round(this.healthAnimation.enemy).toString();
+      if (playerHealthEl) {
+        playerHealthEl.textContent = Math.round(this.valueAnimation.playerHealth.current).toString();
+        this.applyPulseTransform(playerHealthEl, 'playerHealth', now);
+      }
+      if (enemyHealthEl) {
+        enemyHealthEl.textContent = Math.round(this.valueAnimation.enemyHealth.current).toString();
+        this.applyPulseTransform(enemyHealthEl, 'enemyHealth', now);
+      }
+      if (playerDpsEl) {
+        playerDpsEl.textContent = Math.round(this.valueAnimation.playerDPS.current).toString();
+        this.applyPulseTransform(playerDpsEl, 'playerDPS', now);
+      }
+      if (enemyDpsEl) {
+        enemyDpsEl.textContent = Math.round(this.valueAnimation.enemyDPS.current).toString();
+        this.applyPulseTransform(enemyDpsEl, 'enemyDPS', now);
+      }
+
       if (playerUnitsEl) playerUnitsEl.textContent = this.playerUnits.toString();
       if (enemyUnitsEl) enemyUnitsEl.textContent = this.enemyUnits.toString();
-      if (playerDpsEl) playerDpsEl.textContent = Math.round(this.playerDPS).toString();
-      if (enemyDpsEl) enemyDpsEl.textContent = Math.round(this.enemyDPS).toString();
 
       requestAnimationFrame(() => update());
     };
 
     update();
+  }
+
+  private applyPulseTransform(
+    element: Element,
+    key: 'playerHealth' | 'enemyHealth' | 'playerDPS' | 'enemyDPS',
+    now: number
+  ): void {
+    const pulse = this.pulseAnimations[key];
+    if (!pulse.active) {
+      (element as HTMLElement).style.transform = 'scale(1)';
+      return;
+    }
+
+    const pulseDuration = 300;
+    const elapsed = now - pulse.startTime;
+
+    if (elapsed >= pulseDuration) {
+      pulse.active = false;
+      (element as HTMLElement).style.transform = 'scale(1)';
+      return;
+    }
+
+    const progress = elapsed / pulseDuration;
+    const scale = this.calculatePulseScale(progress);
+    (element as HTMLElement).style.transform = `scale(${scale})`;
+    (element as HTMLElement).style.transition = 'none';
+  }
+
+  private calculatePulseScale(progress: number): number {
+    const peakPoint = 0.3;
+    const maxScale = 1.2;
+
+    if (progress <= peakPoint) {
+      const t = progress / peakPoint;
+      return 1 + (maxScale - 1) * easeOutBack(t);
+    } else {
+      const t = (progress - peakPoint) / (1 - peakPoint);
+      return maxScale - (maxScale - 1) * easeOutCubic(t);
+    }
+
+    function easeOutBack(t: number): number {
+      const c1 = 1.70158;
+      const c3 = c1 + 1;
+      return 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2);
+    }
+
+    function easeOutCubic(t: number): number {
+      return 1 - Math.pow(1 - t, 3);
+    }
   }
 
   updateLogs(logs: LogEntry[]): void {
@@ -548,7 +699,27 @@ export class UIPanel {
     }
 
     this.sceneManager.restart();
-    this.healthAnimation = { player: 0, enemy: 0, playerTarget: 0, enemyTarget: 0 };
+
+    this.valueAnimation = {
+      playerHealth: { current: 0, target: 0 },
+      enemyHealth: { current: 0, target: 0 },
+      playerDPS: { current: 0, target: 0 },
+      enemyDPS: { current: 0, target: 0 }
+    };
+
+    this.pulseAnimations = {
+      playerHealth: { active: false, startTime: 0 },
+      enemyHealth: { active: false, startTime: 0 },
+      playerDPS: { active: false, startTime: 0 },
+      enemyDPS: { active: false, startTime: 0 }
+    };
+
+    this.previousValues = {
+      playerHealth: 0,
+      enemyHealth: 0,
+      playerDPS: 0,
+      enemyDPS: 0
+    };
 
     const logContainer = this.rightPanel.querySelector('#log-container');
     if (logContainer) {
