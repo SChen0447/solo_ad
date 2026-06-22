@@ -134,6 +134,10 @@ const App = () => {
     setOptions(prev => prev.map((opt, i) => i === index ? value : opt));
   }, []);
 
+  const handleClearOption = useCallback((index: number) => {
+    setOptions(prev => prev.map((opt, i) => i === index ? '' : opt));
+  }, []);
+
   const handleCreateVote = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
@@ -255,10 +259,17 @@ const App = () => {
                   type="text"
                   id="title"
                   value={title}
-                  onChange={e => setTitle(e.target.value)}
+                  onChange={e => {
+                    if (e.target.value.length <= 50) {
+                      setTitle(e.target.value);
+                    }
+                  }}
                   placeholder="例如：选择下周团建活动"
-                  maxLength={100}
+                  className={`title-input ${title.length >= 50 ? 'input-overlimit' : ''}`}
                 />
+                <div className={`char-counter ${title.length >= 50 ? 'overlimit' : ''}`}>
+                  {title.length}/50
+                </div>
               </div>
 
               <div className="form-group">
@@ -275,7 +286,7 @@ const App = () => {
 
               <div className="form-group">
                 <label>选项 *（2-6个）</label>
-                {options.map((option, index) => (
+                {options.slice(0, 6).map((option, index) => (
                   <div key={index} className="option-input-row">
                     <input
                       type="text"
@@ -284,6 +295,15 @@ const App = () => {
                       placeholder={`选项 ${index + 1}`}
                       maxLength={200}
                     />
+                    <button
+                      type="button"
+                      className="clear-option-btn"
+                      onClick={() => handleClearOption(index)}
+                      title="清空内容"
+                      disabled={!option}
+                    >
+                      ⟲
+                    </button>
                     {options.length > 2 && (
                       <button
                         type="button"
@@ -295,6 +315,11 @@ const App = () => {
                     )}
                   </div>
                 ))}
+                {options.length > 6 && (
+                  <div className="option-warning warning-max">
+                    ⚠ 最多6个选项，已自动隐藏多余项
+                  </div>
+                )}
                 {options.length < 6 && (
                   <button
                     type="button"
@@ -304,6 +329,17 @@ const App = () => {
                     + 添加选项
                   </button>
                 )}
+                {(() => {
+                  const validCount = options.filter(opt => opt.trim().length > 0).length;
+                  if (validCount < 2) {
+                    return (
+                      <div className="option-warning warning-min">
+                        ⚠ 至少需要2个有效选项（当前 {validCount} 个）
+                      </div>
+                    );
+                  }
+                  return null;
+                })()}
               </div>
 
               {error && <div className="error-message">{error}</div>}
@@ -322,7 +358,21 @@ const App = () => {
                 >
                   取消
                 </button>
-                <button type="submit" className="submit-btn">
+                <button
+                  type="submit"
+                  className={`submit-btn ${
+                    options.filter(opt => opt.trim().length > 0).length < 2 ||
+                    !title.trim() ||
+                    title.length >= 50
+                      ? 'disabled'
+                      : ''
+                  }`}
+                  disabled={
+                    options.filter(opt => opt.trim().length > 0).length < 2 ||
+                    !title.trim() ||
+                    title.length >= 50
+                  }
+                >
                   创建投票
                 </button>
               </div>
