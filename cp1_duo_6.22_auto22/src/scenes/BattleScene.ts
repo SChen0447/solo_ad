@@ -1,5 +1,24 @@
 import Phaser from 'phaser';
 
+const TURN_TIME_LIMIT = 2000;
+
+function getHpColor(percent: number): number {
+  const clamped = Math.max(0, Math.min(1, percent));
+  let r: number, g: number, b: number;
+  if (clamped >= 0.5) {
+    const t = (clamped - 0.5) * 2;
+    r = Math.round(255 * (1 - t));
+    g = 255;
+    b = 0;
+  } else {
+    const t = clamped * 2;
+    r = 255;
+    g = Math.round(255 * t);
+    b = 0;
+  }
+  return (r << 16) | (g << 8) | b;
+}
+
 interface BattleData {
   playerHp: number;
   playerMaxHp: number;
@@ -37,6 +56,12 @@ export class BattleScene extends Phaser.Scene {
 
   private fadeOverlay!: Phaser.GameObjects.Rectangle;
 
+  private turnTimer: Phaser.Time.TimerEvent | null = null;
+  private turnTimerBar!: Phaser.GameObjects.Rectangle;
+  private turnTimerBg!: Phaser.GameObjects.Rectangle;
+  private turnTimerText!: Phaser.GameObjects.Text;
+  private turnStartTime = 0;
+
   constructor() {
     super('BattleScene');
   }
@@ -52,6 +77,8 @@ export class BattleScene extends Phaser.Scene {
     this.monsterIndex = data.monsterIndex;
     this.phase = 'player_turn';
     this.playerDefending = false;
+    this.turnTimer = null;
+    this.turnStartTime = 0;
   }
 
   create(): void {
@@ -83,6 +110,7 @@ export class BattleScene extends Phaser.Scene {
     this.createPlayerSprite();
 
     this.createHPBars();
+    this.createTurnTimer();
     this.createActionMenu();
     this.createBattleLog();
 
@@ -363,6 +391,45 @@ export class BattleScene extends Phaser.Scene {
     this.turnIndicator.setStroke('#2a0a3e', 4);
   }
 
+  private createTurnTimer(): void {
+    const { width, height } = this.scale;
+
+    this.turnTimerBg = this.add.rectangle(
+      width / 2,
+      155,
+      300,
+      20,
+      0x1a0528
+    );
+    this.turnTimerBg.setStrokeStyle(2, 0x39ff14);
+
+    this.turnTimerBar = this.add.rectangle(
+      width / 2 - 148,
+      155,
+      296,
+      16,
+      0x39ff14
+    );
+    this.turnTimerBar.setOrigin(0, 0.5);
+
+    this.turnTimerText = this.add.text(
+      width / 2,
+      155,
+      '',
+      {
+        fontFamily: 'monospace',
+        fontSize: '12px',
+        color: '#ffffff',
+        fontStyle: 'bold'
+      }
+    );
+    this.turnTimerText.setOrigin(0.5);
+
+    this.turnTimerBar.setVisible(false);
+    this.turnTimerBg.setVisible(false);
+    this.turnTimerText.setVisible(false);
+  }
+
   private createActionMenu(): void {
     const { width, height } = this.scale;
     const menuX = width / 2;
@@ -465,36 +532,60 @@ export class BattleScene extends Phaser.Scene {
         this.turnIndicator.setText('你的回合');
         this.turnIndicator.setColor('#39ff14');
         this.actionMenu.setVisible(true);
+        this.startTurnTimer();
         break;
       case 'player_attack':
       case 'enemy_turn':
       case 'enemy_attack':
         this.actionMenu.setVisible(false);
+        this.stopTurnTimer();
         break;
       case 'battle_end':
         this.actionMenu.setVisible(false);
+        this.stopTurnTimer();
         break;
     }
+  }
+
+  private startTurnTimer(): void {
+    this.turnStartTime = this.time.now;
+    this.turnTimerBar.setVisible(true);
+    this.turnTimerBg.setVisible(true);
+    this.turnTimerText.setVisible(true);
+    this.turnTimerBar.width = 296;
+    this.turnTimerBar.setFillStyle(0x39ff14);
+
+    if (this.turnTimer) {
+      this.turnTimer.remove();
+    }
+
+    this.turnTimer = this.time.delayedCall(TURN_TIME_LIMIT, () => {
+      if (this.phase === 'player_turn') {
+        this.playerAttackAction();
+      }
+    });
+  }
+
+  private stopTurnTimer(): void {
+    if (this.turnTimer) {
+      this.turnTimer.remove();
+      this.turnTimer = null;
+    }
+    this.turnTimerBar.setVisible(false);
+    this.turnTimerBg.setVisible(false);
+    this.turnTimerText.setVisible(false);
   }
 
   private updateHpBars(): void {
     const playerPercent = Math.max(0, this.playerHp / this.playerMaxHp);
     this.playerHpBar.width = Math.max(0, 194 * playerPercent);
     this.playerHpText.setText(`HP: ${Math.max(0, this.playerHp)}/${this.playerMaxHp}`);
-
-    let playerColor = 0x39ff14;
-    if (playerPercent < 0.3) playerColor = 0xff3333;
-    else if (playerPercent < 0.6) playerColor = 0xffff00;
-    this.playerHpBar.setFillStyle(playerColor);
+    this.playerHpBar.setFillStyle(getHpColor(playerPercent));
 
     const monsterPercent = Math.max(0, this.monsterHp / this.monsterMaxHp);
     this.monsterHpBar.width = Math.max(0, 194 * monsterPercent);
     this.monsterHpText.setText(`HP: ${Math.max(0, this.monsterHp)}/${this.monsterMaxHp}`);
-
-    let monsterColor = 0xff4444;
-    if (monsterPercent < 0.3) monsterColor = 0xff0000;
-    else if (monsterPercent < 0.6) monsterColor = 0xff8800;
-    this.monsterHpBar.setFillStyle(monsterColor);
+    this.monsterHpBar.setFillStyle(getHpColor(monsterPercent));
   }
 
   private playerAttackAction(): void {
@@ -766,5 +857,19 @@ export class BattleScene extends Phaser.Scene {
         }
       });
     });
+  }
+
+  update(): void {
+    if (this.phase === 'player_turn' && this.turnTimerBar.visible) {
+      const elapsed = this.time.now - this.turnStartTime;
+      const remaining = Math.max(0, TURN_TIME_LIMIT - elapsed);
+      const percent = remaining / TURN_TIME_LIMIT;
+
+      this.turnTimerBar.width = Math.max(0, 296 * percent);
+      this.turnTimerBar.setFillStyle(getHpColor(percent));
+
+      const secondsLeft = Math.ceil(remaining / 1000);
+      this.turnTimerText.setText(`${secondsLeft}s`);
+    }
   }
 }

@@ -4,7 +4,25 @@ import { generateMaze, MazeData, CellType } from '../utils/MazeGenerator';
 const TILE_SIZE = 48;
 const MAZE_SIZE = 10;
 const VISION_RANGE = 1;
-const MOVE_DURATION = 150;
+const MOVE_DURATION = 50;
+const MOVE_COOLDOWN = 60;
+
+function getHpColor(percent: number): number {
+  const clamped = Math.max(0, Math.min(1, percent));
+  let r: number, g: number, b: number;
+  if (clamped >= 0.5) {
+    const t = (clamped - 0.5) * 2;
+    r = Math.round(255 * (1 - t));
+    g = 255;
+    b = 0;
+  } else {
+    const t = clamped * 2;
+    r = 255;
+    g = Math.round(255 * t);
+    b = 0;
+  }
+  return (r << 16) | (g << 8) | b;
+}
 
 interface PlayerState {
   x: number;
@@ -400,13 +418,7 @@ export class GameScene extends Phaser.Scene {
     const maxWidth = 194;
     this.hpBar.width = Math.max(0, maxWidth * hpPercent);
 
-    let color = 0x39ff14;
-    if (hpPercent < 0.3) {
-      color = 0xff3333;
-    } else if (hpPercent < 0.6) {
-      color = 0xffff00;
-    }
-    this.hpBar.setFillStyle(color);
+    this.hpBar.setFillStyle(getHpColor(hpPercent));
 
     this.hpText.setText(`HP: ${Math.max(0, this.player.hp)}/${this.player.maxHp}`);
     this.atkText.setText(`攻击力: ${this.player.attack}`);
@@ -415,7 +427,7 @@ export class GameScene extends Phaser.Scene {
   update(time: number): void {
     if (this.inBattle || this.player.isMoving) return;
 
-    if (time - this.lastMoveTime < MOVE_DURATION + 20) return;
+    if (time - this.lastMoveTime < MOVE_COOLDOWN) return;
 
     let dx = 0;
     let dy = 0;
@@ -455,18 +467,15 @@ export class GameScene extends Phaser.Scene {
     const targetX = newX * TILE_SIZE + TILE_SIZE / 2;
     const targetY = newY * TILE_SIZE + TILE_SIZE / 2;
 
-    this.tweens.add({
-      targets: this.playerSprite,
-      x: targetX,
-      y: targetY,
-      duration: MOVE_DURATION,
-      ease: 'Linear',
-      onComplete: () => {
-        this.player.isMoving = false;
-        this.updateFog();
-        this.emitMoveParticles();
-        this.checkCurrentCell();
-      }
+    this.playerSprite.x = targetX;
+    this.playerSprite.y = targetY;
+
+    this.updateFog();
+    this.emitMoveParticles();
+    this.checkCurrentCell();
+
+    this.time.delayedCall(MOVE_DURATION, () => {
+      this.player.isMoving = false;
     });
   }
 

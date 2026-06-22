@@ -22,6 +22,7 @@ export interface MazeData {
   endPos: { x: number; y: number };
   chestPositions: { x: number; y: number }[];
   monsterPositions: { x: number; y: number }[];
+  generationTimeMs: number;
 }
 
 interface Point {
@@ -60,16 +61,16 @@ function heuristic(a: Point, b: Point): number {
   return Math.abs(a.x - b.x) + Math.abs(a.y - b.y);
 }
 
-function getNeighbors(cells: MazeCell[][], point: Point): Point[] {
-  const neighbors: Point[] = [];
-  const dirs = [
-    { x: 0, y: -1 },
-    { x: 1, y: 0 },
-    { x: 0, y: 1 },
-    { x: -1, y: 0 }
-  ];
+const DIRS_4 = [
+  { x: 0, y: -1 },
+  { x: 1, y: 0 },
+  { x: 0, y: 1 },
+  { x: -1, y: 0 }
+];
 
-  for (const dir of dirs) {
+function getWalkableNeighbors(cells: MazeCell[][], point: Point): Point[] {
+  const neighbors: Point[] = [];
+  for (const dir of DIRS_4) {
     const nx = point.x + dir.x;
     const ny = point.y + dir.y;
     if (
@@ -85,11 +86,12 @@ function getNeighbors(cells: MazeCell[][], point: Point): Point[] {
   return neighbors;
 }
 
-function aStar(cells: MazeCell[][], start: Point, end: Point): Point[] | null {
+function aStarSearch(cells: MazeCell[][], start: Point, end: Point): Point[] | null {
   const openSet = new PriorityQueue<Point>();
   const cameFrom: Map<string, Point> = new Map();
   const gScore: Map<string, number> = new Map();
   const fScore: Map<string, number> = new Map();
+  const closedSet: Set<string> = new Set();
 
   const key = (p: Point) => `${p.x},${p.y}`;
 
@@ -99,6 +101,11 @@ function aStar(cells: MazeCell[][], start: Point, end: Point): Point[] | null {
 
   while (!openSet.isEmpty()) {
     const current = openSet.dequeue()!;
+    const ck = key(current);
+
+    if (closedSet.has(ck)) continue;
+    closedSet.add(ck);
+
     if (current.x === end.x && current.y === end.y) {
       const path: Point[] = [current];
       let curr = current;
@@ -109,13 +116,16 @@ function aStar(cells: MazeCell[][], start: Point, end: Point): Point[] | null {
       return path;
     }
 
-    for (const neighbor of getNeighbors(cells, current)) {
-      const tentativeG = (gScore.get(key(current)) ?? Infinity) + 1;
-      if (tentativeG < (gScore.get(key(neighbor)) ?? Infinity)) {
-        cameFrom.set(key(neighbor), current);
-        gScore.set(key(neighbor), tentativeG);
-        fScore.set(key(neighbor), tentativeG + heuristic(neighbor, end));
-        openSet.enqueue(neighbor, fScore.get(key(neighbor))!);
+    for (const neighbor of getWalkableNeighbors(cells, current)) {
+      const nk = key(neighbor);
+      if (closedSet.has(nk)) continue;
+
+      const tentativeG = (gScore.get(ck) ?? Infinity) + 1;
+      if (tentativeG < (gScore.get(nk) ?? Infinity)) {
+        cameFrom.set(nk, current);
+        gScore.set(nk, tentativeG);
+        fScore.set(nk, tentativeG + heuristic(neighbor, end));
+        openSet.enqueue(neighbor, fScore.get(nk)!);
       }
     }
   }
@@ -138,46 +148,174 @@ function createEmptyMaze(width: number, height: number): MazeCell[][] {
   return cells;
 }
 
-function recursiveBacktrack(cells: MazeCell[][], startX: number, startY: number): void {
-  const stack: Point[] = [];
-  cells[startY][startX].type = CellType.FLOOR;
-  cells[startY][startX].visited = true;
-  stack.push({ x: startX, y: startY });
+function buildPathWithAStar(cells: MazeCell[][], start: Point, end: Point): Point[] {
+  const pathCells: Point[] = [];
+  const key = (p: Point) => `${p.x},${p.y}`;
+  const inPath: Set<string> = new Set();
 
-  while (stack.length > 0) {
-    const current = stack[stack.length - 1];
-    const neighbors: Point[] = [];
-    const dirs = [
-      { x: 0, y: -2 },
-      { x: 2, y: 0 },
-      { x: 0, y: 2 },
-      { x: -2, y: 0 }
-    ];
+  const openSet = new PriorityQueue<Point>();
+  const cameFrom: Map<string, Point> = new Map();
+  const gScore: Map<string, number> = new Map();
+  const fScore: Map<string, number> = new Map();
+  const closedSet: Set<string> = new Set();
 
-    for (const dir of dirs) {
-      const nx = current.x + dir.x;
-      const ny = current.y + dir.y;
-      if (
-        nx > 0 &&
-        nx < cells[0].length - 1 &&
-        ny > 0 &&
-        ny < cells.length - 1 &&
-        !cells[ny][nx].visited
-      ) {
+  gScore.set(key(start), 0);
+  fScore.set(key(start), heuristic(start, end));
+  openSet.enqueue(start, fScore.get(key(start))!);
+
+  while (!openSet.isEmpty()) {
+    const current = openSet.dequeue()!;
+    const ck = key(current);
+
+    if (closedSet.has(ck)) continue;
+    closedSet.add(ck);
+
+    if (current.x === end.x && current.y === end.y) {
+      const path: Point[] = [current];
+      let curr = current;
+      while (cameFrom.has(key(curr))) {
+        curr = cameFrom.get(key(curr))!;
+        path.unshift(curr);
+      }
+      return path;
+    }
+
+    const neighbors = getPotentialNeighbors(cells, current);
+    for (const neighbor of neighbors) {
+      const nk = key(neighbor);
+      if (closedSet.has(nk)) continue;
+
+      const tentativeG = (gScore.get(ck) ?? Infinity) + 1;
+      if (tentativeG < (gScore.get(nk) ?? Infinity)) {
+        cameFrom.set(nk, current);
+        gScore.set(nk, tentativeG);
+        fScore.set(nk, tentativeG + heuristic(neighbor, end));
+        openSet.enqueue(neighbor, fScore.get(nk)!);
+      }
+    }
+  }
+
+  return directPathFallback(start, end);
+}
+
+function getPotentialNeighbors(cells: MazeCell[][], point: Point): Point[] {
+  const neighbors: Point[] = [];
+  for (const dir of DIRS_4) {
+    const nx = point.x + dir.x;
+    const ny = point.y + dir.y;
+    if (nx > 0 && nx < cells[0].length - 1 && ny > 0 && ny < cells.length - 1) {
+      if (cells[ny][nx].type !== CellType.WALL) {
+        neighbors.push({ x: nx, y: ny });
+      } else {
         neighbors.push({ x: nx, y: ny });
       }
     }
+  }
+  return neighbors;
+}
 
-    if (neighbors.length > 0) {
-      const next = neighbors[Math.floor(Math.random() * neighbors.length)];
-      const mx = (current.x + next.x) / 2;
-      const my = (current.y + next.y) / 2;
-      cells[my][mx].type = CellType.FLOOR;
-      cells[next.y][next.x].type = CellType.FLOOR;
-      cells[next.y][next.x].visited = true;
-      stack.push(next);
-    } else {
-      stack.pop();
+function directPathFallback(start: Point, end: Point): Point[] {
+  const path: Point[] = [];
+  let cx = start.x;
+  let cy = start.y;
+  path.push({ x: cx, y: cy });
+
+  while (cx !== end.x) {
+    cx += cx < end.x ? 1 : -1;
+    path.push({ x: cx, y: cy });
+  }
+  while (cy !== end.y) {
+    cy += cy < end.y ? 1 : -1;
+    path.push({ x: cx, y: cy });
+  }
+  return path;
+}
+
+function carvePath(cells: MazeCell[][], path: Point[]): void {
+  for (const p of path) {
+    if (cells[p.y][p.x].type === CellType.WALL) {
+      cells[p.y][p.x].type = CellType.FLOOR;
+      cells[p.y][p.x].visited = true;
+    }
+  }
+}
+
+function iterativeBacktrackFill(cells: MazeCell[][]): void {
+  const width = cells[0].length;
+  const height = cells.length;
+  const stack: Point[] = [];
+
+  for (let y = 1; y < height - 1; y += 2) {
+    for (let x = 1; x < width - 1; x += 2) {
+      if (!cells[y][x].visited) {
+        cells[y][x].type = CellType.FLOOR;
+        cells[y][x].visited = true;
+        stack.push({ x, y });
+
+        while (stack.length > 0) {
+          const current = stack[stack.length - 1];
+          const unvisited: Point[] = [];
+          const dirs = [
+            { x: 0, y: -2 },
+            { x: 2, y: 0 },
+            { x: 0, y: 2 },
+            { x: -2, y: 0 }
+          ];
+
+          for (const dir of dirs) {
+            const nx = current.x + dir.x;
+            const ny = current.y + dir.y;
+            if (
+              nx > 0 &&
+              nx < width - 1 &&
+              ny > 0 &&
+              ny < height - 1 &&
+              !cells[ny][nx].visited
+            ) {
+              unvisited.push({ x: nx, y: ny });
+            }
+          }
+
+          if (unvisited.length > 0) {
+            const next = unvisited[Math.floor(Math.random() * unvisited.length)];
+            const mx = (current.x + next.x) / 2;
+            const my = (current.y + next.y) / 2;
+            cells[my][mx].type = CellType.FLOOR;
+            cells[my][mx].visited = true;
+            cells[next.y][next.x].type = CellType.FLOOR;
+            cells[next.y][next.x].visited = true;
+            stack.push(next);
+          } else {
+            stack.pop();
+          }
+        }
+      }
+    }
+  }
+}
+
+function addRandomBranches(cells: MazeCell[][], count: number): void {
+  const width = cells[0].length;
+  const height = cells.length;
+
+  for (let i = 0; i < count; i++) {
+    const x = 1 + Math.floor(Math.random() * (width - 2));
+    const y = 1 + Math.floor(Math.random() * (height - 2));
+
+    if (cells[y][x].type === CellType.WALL) {
+      let hasFloorNeighbor = false;
+      for (const dir of DIRS_4) {
+        const nx = x + dir.x;
+        const ny = y + dir.y;
+        if (nx > 0 && nx < width - 1 && ny > 0 && ny < height - 1 && cells[ny][nx].type !== CellType.WALL) {
+          hasFloorNeighbor = true;
+          break;
+        }
+      }
+      if (hasFloorNeighbor) {
+        cells[y][x].type = CellType.FLOOR;
+        cells[y][x].visited = true;
+      }
     }
   }
 }
@@ -207,34 +345,44 @@ function distance(a: Point, b: Point): number {
   return Math.abs(a.x - b.x) + Math.abs(a.y - b.y);
 }
 
+function validateMaze(cells: MazeCell[][], start: Point, end: Point): boolean {
+  const path = aStarSearch(cells, start, end);
+  return path !== null && path.length > 0;
+}
+
 export function generateMaze(width: number = 10, height: number = 10): MazeData {
-  const cells = createEmptyMaze(width, height);
+  const startTime = performance.now();
 
-  recursiveBacktrack(cells, 1, 1);
-
-  const floorCells = getFloorCells(cells);
-  const shuffled = shuffleArray(floorCells);
-
+  const MAX_RETRIES = 10;
+  let cells: MazeCell[][] = createEmptyMaze(width, height);
   let startPos: Point = { x: 1, y: 1 };
   let endPos: Point = { x: width - 2, y: height - 2 };
+  let pathValid = false;
 
-  let maxDist = 0;
-  for (const a of shuffled.slice(0, 20)) {
-    for (const b of shuffled.slice(0, 20)) {
-      const d = distance(a, b);
-      if (d > maxDist) {
-        const path = aStar(cells, a, b);
-        if (path && path.length > 0) {
-          maxDist = d;
-          startPos = a;
-          endPos = b;
-        }
-      }
-    }
+  for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+    cells = createEmptyMaze(width, height);
+
+    const corePath = buildPathWithAStar(cells, startPos, endPos);
+    carvePath(cells, corePath);
+
+    iterativeBacktrackFill(cells);
+
+    addRandomBranches(cells, Math.floor(width * height * 0.15));
+
+    pathValid = validateMaze(cells, startPos, endPos);
+    if (pathValid) break;
+  }
+
+  if (!pathValid) {
+    const fallbackPath = directPathFallback(startPos, endPos);
+    carvePath(cells, fallbackPath);
   }
 
   cells[startPos.y][startPos.x].type = CellType.START;
   cells[endPos.y][endPos.x].type = CellType.END;
+
+  const floorCells = getFloorCells(cells);
+  const shuffled = shuffleArray(floorCells);
 
   const chestPositions: Point[] = [];
   const monsterPositions: Point[] = [];
@@ -261,6 +409,15 @@ export function generateMaze(width: number = 10, height: number = 10): MazeData 
     monsterPositions.push(pos);
   }
 
+  const endTime = performance.now();
+  const generationTimeMs = endTime - startTime;
+
+  if (generationTimeMs > 500) {
+    console.warn(`[MazeGenerator] 迷宫生成耗时 ${generationTimeMs.toFixed(2)}ms，超过500ms阈值`);
+  } else {
+    console.log(`[MazeGenerator] 迷宫生成耗时 ${generationTimeMs.toFixed(2)}ms`);
+  }
+
   return {
     width,
     height,
@@ -268,7 +425,8 @@ export function generateMaze(width: number = 10, height: number = 10): MazeData 
     startPos,
     endPos,
     chestPositions,
-    monsterPositions
+    monsterPositions,
+    generationTimeMs
   };
 }
 
@@ -277,5 +435,5 @@ export function findPath(
   start: Point,
   end: Point
 ): Point[] | null {
-  return aStar(cells, start, end);
+  return aStarSearch(cells, start, end);
 }
