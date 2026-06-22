@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>集市商人 - Pixel Market Merchant</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background-color: #4A3728;
+      font-family: 'Courier New', monospace;
+      image-rendering: pixelated;
+      image-rendering: -moz-crisp-edges;
+      image-rendering: crisp-edges;
+    }
+
+    #app {
+      width: 100%;
+      height: 100%;
+    }
+
+    canvas {
+      display: block;
+      image-rendering: pixelated;
+      image-rendering: -moz-crisp-edges;
+      image-rendering: crisp-edges;
+    }
+
+    @keyframes pixelShake {
+      0%, 100% { transform: scale(1.2) translate(0, 0); }
+      25% { transform: scale(1.2) translate(-1px, 1px); }
+      50% { transform: scale(1.2) translate(1px, -1px); }
+      75% { transform: scale(1.2) translate(-1px, -1px); }
+    }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
