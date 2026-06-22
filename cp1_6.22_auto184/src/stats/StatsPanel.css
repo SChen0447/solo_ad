@@ -1,0 +1,125 @@
+.stats-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.stats-main {
+  display: grid;
+  grid-template-columns: 1fr 280px;
+  gap: 24px;
+}
+
+.stats-chart-card {
+  background: #ffffff;
+  border-radius: 12px;
+  padding: 24px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.stats-chart-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: #1e293b;
+  margin-bottom: 16px;
+}
+
+.stats-chart-legend {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 12px;
+  font-size: 12px;
+  color: #64748b;
+}
+
+.stats-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.stats-legend-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+.stats-legend-dot.new {
+  background: #6366f1;
+}
+
+.stats-legend-dot.reviewed {
+  background: #10b981;
+}
+
+.stats-chart-canvas {
+  width: 100%;
+  display: block;
+}
+
+.stats-side {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.stats-card {
+  background: #ffffff;
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  text-align: center;
+}
+
+.stats-card-label {
+  font-size: 13px;
+  color: #64748b;
+  margin-bottom: 6px;
+}
+
+.stats-card-value {
+  font-size: 40px;
+  font-weight: 700;
+  color: #1e293b;
+  line-height: 1.1;
+}
+
+.stats-card-value.small {
+  font-size: 28px;
+}
+
+.stats-card-icon {
+  font-size: 22px;
+  margin-right: 4px;
+  vertical-align: middle;
+}
+
+.stats-card-sub {
+  font-size: 12px;
+  color: #94a3b8;
+  margin-top: 4px;
+}
+
+.stats-cards-row {
+  display: none;
+  gap: 16px;
+}
+
+.stats-cards-row .stats-card {
+  flex: 1;
+}
+
+@media (max-width: 768px) {
+  .stats-main {
+    grid-template-columns: 1fr;
+  }
+
+  .stats-side {
+    display: none;
+  }
+
+  .stats-cards-row {
+    display: flex;
+    flex-direction: column;
+  }
+}
