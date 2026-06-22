@@ -14,6 +14,17 @@ const HistoryPanel = () => {
     getAllCards().then((records) => {
       loadHistory(records);
     });
+
+    const handleCardExported = () => {
+      getAllCards().then((records) => {
+        loadHistory(records);
+      });
+    };
+
+    window.addEventListener('card-exported', handleCardExported);
+    return () => {
+      window.removeEventListener('card-exported', handleCardExported);
+    };
   }, [loadHistory]);
 
   const handleDelete = async (id: string) => {

@@ -96,6 +96,8 @@ export async function exportCard(
   };
   await saveCard(record);
 
+  window.dispatchEvent(new CustomEvent('card-exported', { detail: record }));
+
   return;
 }
 
