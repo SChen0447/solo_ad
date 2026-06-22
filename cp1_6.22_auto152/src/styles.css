@@ -1,0 +1,535 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB',
+    'Microsoft YaHei', sans-serif;
+  background-color: #0f172a;
+  color: #ffffff;
+  min-height: 100vh;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.navbar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 60px;
+  background-color: #0f172a;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 32px;
+  z-index: 100;
+  border-bottom: 1px solid #1e293b;
+}
+
+.navbar-title {
+  font-size: 20px;
+  font-weight: bold;
+  color: #3b82f6;
+  cursor: pointer;
+}
+
+.navbar-score {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 16px;
+  color: #facc15;
+  font-weight: bold;
+}
+
+.navbar-score svg {
+  width: 20px;
+  height: 20px;
+}
+
+.page-container {
+  padding-top: 80px;
+  padding-bottom: 40px;
+  min-height: 100vh;
+}
+
+.songs-grid {
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 0 24px;
+  display: grid;
+  grid-template-columns: repeat(4, 240px);
+  gap: 32px;
+  justify-content: center;
+}
+
+.song-card {
+  width: 240px;
+  height: 320px;
+  border-radius: 16px;
+  background: linear-gradient(135deg, #1e3a5f, #0f172a);
+  overflow: hidden;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  position: relative;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+}
+
+.song-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 12px 24px rgba(59, 130, 246, 0.3);
+}
+
+.rank-badge {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background-color: #fbbf24;
+  color: #ffffff;
+  font-weight: bold;
+  font-size: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+}
+
+.song-cover {
+  width: 100%;
+  height: 200px;
+  object-fit: cover;
+}
+
+.song-info {
+  padding: 16px;
+}
+
+.song-title {
+  color: #ffffff;
+  font-size: 18px;
+  font-weight: 600;
+  margin-bottom: 8px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.song-artist {
+  color: #94a3b8;
+  font-size: 14px;
+}
+
+.lyric-page {
+  padding-top: 80px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-height: 100vh;
+}
+
+.song-header {
+  text-align: center;
+  margin-bottom: 24px;
+}
+
+.song-header h2 {
+  font-size: 28px;
+  color: #ffffff;
+  margin-bottom: 8px;
+}
+
+.song-header p {
+  font-size: 16px;
+  color: #94a3b8;
+}
+
+.lyric-container {
+  width: 60%;
+  height: 500px;
+  background: rgba(15, 23, 42, 0.8);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border-radius: 16px;
+  padding: 24px 32px;
+  overflow: hidden;
+  position: relative;
+  border: 1px solid #1e293b;
+}
+
+.lyric-scroll {
+  will-change: transform;
+}
+
+.lyric-line {
+  font-size: 18px;
+  line-height: 2.2;
+  text-align: center;
+  transition: all 0.3s ease;
+  color: #d1d5db;
+}
+
+.lyric-line.neighbor {
+  color: #9ca3af;
+}
+
+.lyric-line.active {
+  color: #facc15;
+  font-weight: bold;
+  font-size: 22px;
+}
+
+.action-button {
+  margin-top: 32px;
+  padding: 14px 36px;
+  font-size: 16px;
+  font-weight: 600;
+  border: none;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #3b82f6, #2563eb);
+  color: #ffffff;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.action-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 16px rgba(59, 130, 246, 0.4);
+}
+
+.action-button.secondary {
+  background: #1e293b;
+  border: 1px solid #475569;
+}
+
+.action-button.secondary:hover {
+  background: #334155;
+}
+
+.back-button {
+  position: absolute;
+  top: 80px;
+  left: 32px;
+  padding: 8px 16px;
+  font-size: 14px;
+  border: 1px solid #475569;
+  border-radius: 6px;
+  background: transparent;
+  color: #94a3b8;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.back-button:hover {
+  border-color: #3b82f6;
+  color: #3b82f6;
+}
+
+.game-page {
+  padding-top: 80px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-height: 100vh;
+  position: relative;
+}
+
+.challenge-container {
+  width: 60%;
+  background: rgba(15, 23, 42, 0.8);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border-radius: 16px;
+  padding: 32px;
+  border: 1px solid #1e293b;
+}
+
+.challenge-line {
+  margin-bottom: 24px;
+  font-size: 18px;
+  line-height: 2;
+  transition: all 0.3s ease;
+}
+
+.challenge-line.correct {
+  color: #22c55e;
+}
+
+.challenge-line.incorrect {
+  color: #ef4444;
+}
+
+.blank-input {
+  width: 80px;
+  padding: 6px 10px;
+  margin: 0 4px;
+  font-size: 16px;
+  border: 2px solid #475569;
+  border-radius: 6px;
+  background: #0f172a;
+  color: #ffffff;
+  outline: none;
+  transition: all 0.3s ease;
+}
+
+.blank-input:focus {
+  border-color: #3b82f6;
+}
+
+.blank-input.correct {
+  border-color: #22c55e;
+  background: rgba(34, 197, 94, 0.1);
+  color: #22c55e;
+}
+
+.blank-input.incorrect {
+  border-color: #ef4444;
+  background: rgba(239, 68, 68, 0.1);
+  color: #ef4444;
+}
+
+.correct-answer {
+  color: #22c55e;
+  font-size: 14px;
+  margin-left: 8px;
+}
+
+.score-display {
+  margin-top: 24px;
+  padding: 24px;
+  text-align: center;
+  background: #1e293b;
+  border-radius: 12px;
+}
+
+.score-label {
+  font-size: 16px;
+  color: #94a3b8;
+  margin-bottom: 8px;
+}
+
+.score-value {
+  font-size: 48px;
+  font-weight: bold;
+  color: #facc15;
+}
+
+.button-group {
+  display: flex;
+  gap: 16px;
+  margin-top: 32px;
+  justify-content: center;
+}
+
+.leaderboard-page {
+  padding-top: 80px;
+  max-width: 800px;
+  margin: 0 auto;
+  padding-left: 24px;
+  padding-right: 24px;
+}
+
+.leaderboard-title {
+  font-size: 28px;
+  color: #ffffff;
+  margin-bottom: 32px;
+  text-align: center;
+}
+
+.total-score-card {
+  background: linear-gradient(135deg, #1e3a5f, #0f172a);
+  border-radius: 16px;
+  padding: 24px;
+  text-align: center;
+  margin-bottom: 32px;
+  border: 1px solid #3b82f6;
+}
+
+.total-score-card h3 {
+  font-size: 16px;
+  color: #94a3b8;
+  margin-bottom: 8px;
+}
+
+.total-score-value {
+  font-size: 48px;
+  font-weight: bold;
+  color: #facc15;
+}
+
+.record-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.record-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  background: #1e293b;
+  border-radius: 12px;
+  transition: all 0.3s ease;
+}
+
+.record-item:hover {
+  background: #334155;
+}
+
+.record-song {
+  font-size: 16px;
+  color: #ffffff;
+  font-weight: 500;
+}
+
+.record-score {
+  font-size: 18px;
+  font-weight: bold;
+  color: #facc15;
+}
+
+.record-time {
+  font-size: 14px;
+  color: #94a3b8;
+  margin-top: 4px;
+}
+
+.empty-state {
+  text-align: center;
+  padding: 60px 20px;
+  color: #94a3b8;
+  font-size: 16px;
+}
+
+.navbar-links {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+}
+
+.navbar-link {
+  color: #94a3b8;
+  font-size: 14px;
+  cursor: pointer;
+  transition: color 0.3s ease;
+}
+
+.navbar-link:hover {
+  color: #3b82f6;
+}
+
+.loading {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 100px;
+  color: #94a3b8;
+  font-size: 16px;
+}
+
+.page-header {
+  max-width: 1120px;
+  margin: 0 auto 24px;
+  padding: 0 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.page-title {
+  font-size: 24px;
+  color: #ffffff;
+}
+
+@media (max-width: 768px) {
+  .navbar {
+    padding: 0 16px;
+  }
+
+  .songs-grid {
+    grid-template-columns: repeat(2, 140px);
+    gap: 16px;
+    padding: 0 12px;
+  }
+
+  .song-card {
+    width: 140px;
+    height: 200px;
+    border-radius: 12px;
+  }
+
+  .song-cover {
+    height: 120px;
+  }
+
+  .song-title {
+    font-size: 14px;
+  }
+
+  .song-artist {
+    font-size: 12px;
+  }
+
+  .rank-badge {
+    width: 32px;
+    height: 32px;
+    font-size: 14px;
+    top: 8px;
+    left: 8px;
+  }
+
+  .lyric-container {
+    width: 95%;
+    height: 400px;
+    padding: 16px;
+  }
+
+  .lyric-line {
+    font-size: 16px;
+    line-height: 2;
+  }
+
+  .lyric-line.active {
+    font-size: 18px;
+  }
+
+  .challenge-container {
+    width: 95%;
+    padding: 20px 16px;
+  }
+
+  .blank-input {
+    width: 60px;
+    font-size: 14px;
+    padding: 4px 8px;
+  }
+
+  .challenge-line {
+    font-size: 15px;
+  }
+
+  .song-header h2 {
+    font-size: 22px;
+  }
+
+  .back-button {
+    left: 16px;
+  }
+
+  .navbar-title {
+    font-size: 16px;
+  }
+
+  .navbar-links {
+    gap: 12px;
+  }
+}
