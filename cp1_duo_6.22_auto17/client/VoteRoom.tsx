@@ -18,8 +18,10 @@ const VoteRoom = ({ vote, onBack, voterId, creatorId, socket }: VoteRoomProps) =
   const [voteError, setVoteError] = useState<string | null>(null);
   const [previousVotes, setPreviousVotes] = useState<Record<string, number>>({});
   const [displayVotes, setDisplayVotes] = useState<Record<string, number>>({});
+  const [pulsingOptions, setPulsingOptions] = useState<Set<string>>(new Set());
 
   const animFrameRef = useRef<number | null>(null);
+  const pulseTimersRef = useRef<Record<string, number>>({});
 
   useEffect(() => {
     const voted = localStorage.getItem(`flashvote_voted_${vote.id}`);
@@ -46,6 +48,7 @@ const VoteRoom = ({ vote, onBack, voterId, creatorId, socket }: VoteRoomProps) =
       if (animFrameRef.current) {
         cancelAnimationFrame(animFrameRef.current);
       }
+      Object.values(pulseTimersRef.current).forEach(timer => clearTimeout(timer));
     };
   }, [vote.id, vote.options, socket]);
 
@@ -62,13 +65,35 @@ const VoteRoom = ({ vote, onBack, voterId, creatorId, socket }: VoteRoomProps) =
     Object.keys(newVotes).forEach(optId => {
       const oldVal = previousVotes[optId] ?? 0;
       const newVal = newVotes[optId];
-      if (oldVal !== newVal) {
+      if (oldVal !== newVal && newVal > oldVal) {
         animateNumber(optId, oldVal, newVal);
+        triggerPulse(optId);
       }
     });
 
     setPreviousVotes(newVotes);
   }, [currentVote]);
+
+  const triggerPulse = useCallback((optId: string) => {
+    if (pulseTimersRef.current[optId]) {
+      clearTimeout(pulseTimersRef.current[optId]);
+    }
+
+    setPulsingOptions(prev => {
+      const updated = new Set(prev);
+      updated.add(optId);
+      return updated;
+    });
+
+    pulseTimersRef.current[optId] = window.setTimeout(() => {
+      setPulsingOptions(prev => {
+        const updated = new Set(prev);
+        updated.delete(optId);
+        return updated;
+      });
+      delete pulseTimersRef.current[optId];
+    }, 800);
+  }, []);
 
   const animateNumber = useCallback((optId: string, from: number, to: number) => {
     const duration = 500;
@@ -176,6 +201,31 @@ const VoteRoom = ({ vote, onBack, voterId, creatorId, socket }: VoteRoomProps) =
     return (votes / totalVotes) * 100;
   };
 
+  const interpolateColor = (color1: { r: number; g: number; b: number }, color2: { r: number; g: number; b: number }, ratio: number) => ({
+    r: Math.round(color1.r + (color2.r - color1.r) * ratio),
+    g: Math.round(color1.g + (color2.g - color1.g) * ratio),
+    b: Math.round(color1.b + (color2.b - color1.b) * ratio)
+  });
+
+  const getBarColor = (percentage: number) => {
+    const colorStart = { r: 74, g: 144, b: 217 };
+    const colorMid = { r: 123, g: 104, b: 238 };
+    const colorEnd = { r: 80, g: 227, b: 194 };
+
+    const ratio = percentage / 100;
+    let finalColor;
+
+    if (ratio < 0.5) {
+      const localRatio = ratio / 0.5;
+      finalColor = interpolateColor(colorStart, colorMid, localRatio);
+    } else {
+      const localRatio = (ratio - 0.5) / 0.5;
+      finalColor = interpolateColor(colorMid, colorEnd, localRatio);
+    }
+
+    return `rgb(${finalColor.r}, ${finalColor.g}, ${finalColor.b})`;
+  };
+
   return (
     <div className="app-container">
       <header className="app-header">
@@ -237,14 +287,8 @@ const VoteRoom = ({ vote, onBack, voterId, creatorId, socket }: VoteRoomProps) =
               const displayVoteCount = displayVotes[option.id] ?? option.votes;
               const isSelected = selectedOption === option.id;
               const isDisabled = hasVoted || currentVote.isClosed;
-
-              const colorStart = { r: 74, g: 144, b: 217 };
-              const colorEnd = { r: 80, g: 227, b: 194 };
-              const ratio = percentage / 100;
-              const r = Math.round(colorStart.r + (colorEnd.r - colorStart.r) * ratio);
-              const g = Math.round(colorStart.g + (colorEnd.g - colorStart.g) * ratio);
-              const b = Math.round(colorStart.b + (colorEnd.b - colorStart.b) * ratio);
-              const barColor = `rgb(${r}, ${g}, ${b})`;
+              const isPulsing = pulsingOptions.has(option.id);
+              const barColor = getBarColor(percentage);
 
               return (
                 <div
@@ -264,12 +308,14 @@ const VoteRoom = ({ vote, onBack, voterId, creatorId, socket }: VoteRoomProps) =
                   </div>
                   <div className="progress-bar-container">
                     <div
-                      className="progress-bar"
+                      className={`progress-bar ${isPulsing ? 'pulsing' : ''}`}
                       style={{
                         width: `${percentage}%`,
                         backgroundColor: barColor
                       }}
-                    />
+                    >
+                      {isPulsing && <div className="pulse-shine" />}
+                    </div>
                   </div>
                 </div>
               );

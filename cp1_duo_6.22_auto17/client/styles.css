@@ -485,13 +485,21 @@ body {
   border-radius: 14px;
   padding: 20px;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.25s ease;
   position: relative;
   overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
 }
 
 .option-card:not(.disabled):hover {
   background: rgba(255, 255, 255, 0.06);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0, 210, 255, 0.15), 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.option-card:not(.disabled):active {
+  transform: translateY(0);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
 }
 
 .option-card.selected {
@@ -580,6 +588,44 @@ body {
   height: 100%;
   border-radius: 5px;
   transition: width 0.5s ease-out, background-color 0.5s ease-out;
+  position: relative;
+  overflow: hidden;
+}
+
+.progress-bar.pulsing {
+  box-shadow: 0 0 12px rgba(255, 255, 255, 0.4), 0 0 20px currentColor;
+}
+
+.pulse-shine {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 40%;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.15) 30%,
+    rgba(255, 255, 255, 0.5) 50%,
+    rgba(255, 255, 255, 0.15) 70%,
+    transparent 100%
+  );
+  animation: shineSweep 0.8s ease-out forwards;
+  pointer-events: none;
+}
+
+@keyframes shineSweep {
+  0% {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  15% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateX(-250%);
+    opacity: 0;
+  }
 }
 
 .number-animate {
