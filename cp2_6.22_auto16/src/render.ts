@@ -8,7 +8,9 @@ import {
   ParticleData,
   ShardData,
   WeaponAnimState,
-  SystemState
+  SystemState,
+  HitEffectData,
+  MuzzleFlashData
 } from './system';
 
 function lerpColor(color1: string, color2: string, t: number): string {
@@ -331,6 +333,85 @@ function drawShards(ctx: CanvasRenderingContext2D, shards: ShardData[]): void {
   }
 }
 
+function getWeaponColor(type: WeaponType): string {
+  switch (type) {
+    case 'energy': return '#00AAFF';
+    case 'missile': return '#FF6600';
+    case 'shotgun': return '#FF3333';
+    default: return '#FFFFFF';
+  }
+}
+
+function drawHitEffects(ctx: CanvasRenderingContext2D, hitEffects: HitEffectData[]): void {
+  for (const h of hitEffects) {
+    const progress = 1 - h.life / h.maxLife;
+    const alpha = 1 - progress;
+    const radius = 10 + progress * 45;
+    const color = getWeaponColor(h.weaponType);
+
+    ctx.save();
+    ctx.globalAlpha = alpha * 0.8;
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 4 * (1 - progress * 0.6);
+    ctx.shadowColor = color;
+    ctx.shadowBlur = 20;
+
+    ctx.beginPath();
+    ctx.arc(h.x, h.y, radius, 0, Math.PI * 2);
+    ctx.stroke();
+
+    ctx.globalAlpha = alpha * 0.3;
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.arc(h.x, h.y, radius * 0.7, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.restore();
+  }
+}
+
+function drawMuzzleFlashes(ctx: CanvasRenderingContext2D, flashes: MuzzleFlashData[]): void {
+  for (const f of flashes) {
+    const progress = 1 - f.life / f.maxLife;
+    const alpha = 1 - progress;
+    const color = getWeaponColor(f.weaponType);
+
+    let baseSize: number;
+    switch (f.weaponType) {
+      case 'energy': baseSize = 18; break;
+      case 'missile': baseSize = 25; break;
+      case 'shotgun': baseSize = 30; break;
+      default: baseSize = 20;
+    }
+    const size = baseSize * (1 - progress * 0.5);
+
+    ctx.save();
+    ctx.translate(f.x, f.y);
+    ctx.rotate(f.angle);
+
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = color;
+    ctx.shadowColor = color;
+    ctx.shadowBlur = 25;
+
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.lineTo(size * 1.2, -size * 0.4);
+    ctx.lineTo(size * 1.5, 0);
+    ctx.lineTo(size * 1.2, size * 0.4);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.globalAlpha = alpha * 0.8;
+    ctx.fillStyle = '#FFFFFF';
+    ctx.beginPath();
+    ctx.arc(size * 0.3, 0, size * 0.35, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.restore();
+  }
+}
+
 const WEAPON_UI_PANEL_X = 15;
 const WEAPON_UI_PANEL_Y = 485;
 const WEAPON_UI_PANEL_W = 300;
@@ -539,13 +620,17 @@ function drawTopHUD(
 
 export function render(
   ctx: CanvasRenderingContext2D,
-  state: SystemState
+  state: SystemState,
+  shakeX: number = 0,
+  shakeY: number = 0
 ): void {
   const {
     projectiles,
     enemies,
     particles,
     shards,
+    hitEffects,
+    muzzleFlashes,
     currentWeapon,
     weapons,
     weaponAnims,
@@ -558,13 +643,21 @@ export function render(
     canvasHeight
   } = state;
 
+  ctx.save();
+  ctx.translate(shakeX, shakeY);
+
   drawBackground(ctx, canvasWidth, canvasHeight);
   drawAimLine(ctx, mechX, mechY, mouseX, mouseY);
   drawEnemies(ctx, enemies, canvasWidth, canvasHeight);
   drawProjectiles(ctx, projectiles);
   drawParticles(ctx, particles);
   drawShards(ctx, shards);
+  drawHitEffects(ctx, hitEffects);
   drawMech(ctx, mechX, mechY, turretAngle);
+  drawMuzzleFlashes(ctx, muzzleFlashes);
+
+  ctx.restore();
+
   drawTopHUD(ctx, currentWeapon, weapons, canvasWidth);
   drawWeaponPanel(ctx, currentWeapon, weapons, weaponAnims);
 }

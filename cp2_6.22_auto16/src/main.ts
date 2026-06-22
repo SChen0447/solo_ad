@@ -4,6 +4,16 @@ import { setupInputHandlers } from './input';
 
 const CANVAS_WIDTH = 800;
 const CANVAS_HEIGHT = 600;
+const SHAKE_DURATION = 0.05;
+const SHAKE_INTENSITY = 4;
+
+interface ScreenShake {
+  time: number;
+  duration: number;
+  intensity: number;
+  x: number;
+  y: number;
+}
 
 function main(): void {
   const canvas = document.getElementById('gameCanvas') as HTMLCanvasElement;
@@ -23,7 +33,19 @@ function main(): void {
 
   const state: SystemState = createSystemState(CANVAS_WIDTH, CANVAS_HEIGHT);
 
-  setupInputHandlers(canvas, state);
+  const shake: ScreenShake = {
+    time: 0,
+    duration: SHAKE_DURATION,
+    intensity: SHAKE_INTENSITY,
+    x: 0,
+    y: 0
+  };
+
+  const triggerShake = (): void => {
+    shake.time = shake.duration;
+  };
+
+  setupInputHandlers(canvas, state, triggerShake);
 
   let lastTime = performance.now();
 
@@ -31,8 +53,20 @@ function main(): void {
     const dt = Math.min((currentTime - lastTime) / 1000, 0.05);
     lastTime = currentTime;
 
+    if (shake.time > 0) {
+      shake.time -= dt;
+      if (shake.time > 0) {
+        const t = shake.time / shake.duration;
+        shake.x = (Math.random() * 2 - 1) * shake.intensity * t;
+        shake.y = (Math.random() * 2 - 1) * shake.intensity * t;
+      } else {
+        shake.x = 0;
+        shake.y = 0;
+      }
+    }
+
     update(state, dt);
-    render(ctx, state);
+    render(ctx, state, shake.x, shake.y);
 
     requestAnimationFrame(gameLoop);
   };

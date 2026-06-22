@@ -63,11 +63,38 @@ export interface WeaponAnimState {
   isHovered: boolean;
 }
 
+export interface HitEffectData {
+  id: number;
+  x: number;
+  y: number;
+  weaponType: WeaponType;
+  life: number;
+  maxLife: number;
+  timestamp: number;
+}
+
+export interface MuzzleFlashData {
+  id: number;
+  x: number;
+  y: number;
+  weaponType: WeaponType;
+  life: number;
+  maxLife: number;
+  angle: number;
+}
+
+let hitEffectIdCounter = 0;
+let muzzleFlashIdCounter = 0;
+function nextHitEffectId(): number { return ++hitEffectIdCounter; }
+function nextMuzzleFlashId(): number { return ++muzzleFlashIdCounter; }
+
 export interface SystemState {
   projectiles: ProjectileData[];
   enemies: EnemyData[];
   particles: ParticleData[];
   shards: ShardData[];
+  hitEffects: HitEffectData[];
+  muzzleFlashes: MuzzleFlashData[];
   currentWeapon: WeaponType;
   weapons: Record<WeaponType, Weapon>;
   weaponAnims: Record<WeaponType, WeaponAnimState>;
@@ -124,6 +151,8 @@ export function createSystemState(canvasWidth: number, canvasHeight: number): Sy
     enemies: [],
     particles: [],
     shards: [],
+    hitEffects: [],
+    muzzleFlashes: [],
     currentWeapon: 'energy',
     weapons,
     weaponAnims,
@@ -149,12 +178,24 @@ export function getMuzzlePosition(state: SystemState): { x: number; y: number } 
   };
 }
 
-export function fireWeapon(state: SystemState): void {
+export function fireWeapon(state: SystemState): boolean {
   const weapon = state.weapons[state.currentWeapon];
-  if (!weapon.canFire()) return;
+  if (!weapon.canFire()) return false;
 
   const muzzle = getMuzzlePosition(state);
   const newProjectiles = weapon.fire(muzzle.x, muzzle.y, state.mouseX, state.mouseY);
+
+  if (newProjectiles.length > 0) {
+    state.muzzleFlashes.push({
+      id: nextMuzzleFlashId(),
+      x: muzzle.x,
+      y: muzzle.y,
+      weaponType: state.currentWeapon,
+      life: 0.1,
+      maxLife: 0.1,
+      angle: state.turretAngle
+    });
+  }
 
   for (const proj of newProjectiles) {
     state.projectiles.push(proj);
@@ -162,6 +203,8 @@ export function fireWeapon(state: SystemState): void {
       state.projectiles.shift();
     }
   }
+
+  return true;
 }
 
 export function switchWeapon(state: SystemState, type: WeaponType): void {
@@ -327,6 +370,16 @@ export function update(state: SystemState, dt: number): void {
         enemy.flashTime = 0.2;
         hit = true;
 
+        state.hitEffects.push({
+          id: nextHitEffectId(),
+          x: proj.x,
+          y: proj.y,
+          weaponType: proj.type,
+          life: 0.3,
+          maxLife: 0.3,
+          timestamp: performance.now()
+        });
+
         if (proj.effectType === 'missile') {
           createExplosion(state, proj.x, proj.y, 30);
         }
@@ -392,6 +445,16 @@ export function update(state: SystemState, dt: number): void {
     s.life -= dt;
     if (s.life <= 0) state.shards.splice(i, 1);
   }
+
+  for (let i = state.hitEffects.length - 1; i >= 0; i--) {
+    state.hitEffects[i].life -= dt;
+    if (state.hitEffects[i].life <= 0) state.hitEffects.splice(i, 1);
+  }
+
+  for (let i = state.muzzleFlashes.length - 1; i >= 0; i--) {
+    state.muzzleFlashes[i].life -= dt;
+    if (state.muzzleFlashes[i].life <= 0) state.muzzleFlashes.splice(i, 1);
+  }
 }
 
 export function getRenderState(state: SystemState) {
@@ -400,6 +463,8 @@ export function getRenderState(state: SystemState) {
     enemies: state.enemies,
     particles: state.particles,
     shards: state.shards,
+    hitEffects: state.hitEffects,
+    muzzleFlashes: state.muzzleFlashes,
     currentWeapon: state.currentWeapon,
     weapons: state.weapons,
     weaponAnims: state.weaponAnims,

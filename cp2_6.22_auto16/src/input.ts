@@ -4,7 +4,8 @@ import { getWeaponPanelRects } from './render';
 
 export function setupInputHandlers(
   canvas: HTMLCanvasElement,
-  state: SystemState
+  state: SystemState,
+  onFireSuccess?: () => void
 ): () => void {
   const getCanvasCoords = (e: MouseEvent): { x: number; y: number } => {
     const rect = canvas.getBoundingClientRect();
@@ -49,7 +50,10 @@ export function setupInputHandlers(
     }
 
     if (!clickedPanel) {
-      fireWeapon(state);
+      const fired = fireWeapon(state);
+      if (fired && onFireSuccess) {
+        onFireSuccess();
+      }
     }
   };
 
