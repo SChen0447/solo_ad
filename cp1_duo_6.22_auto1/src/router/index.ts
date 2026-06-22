@@ -1,7 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import HomePage from '@/pages/HomePage.vue'
 
-// 定义路由配置
 const routes = [
   {
     path: '/',

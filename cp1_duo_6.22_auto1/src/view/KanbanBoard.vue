@@ -1,13 +1,16 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, nextTick } from 'vue'
 import { useTaskStore, type Task, type TaskStatus, type TaskPriority } from '@/data/taskStore'
 
 const store = useTaskStore()
 const editingTaskId = ref<string | null>(null)
-const dragOverColumn = ref<TaskStatus | null>(null)
 const showCreateModal = ref(false)
+
 const draggingTaskId = ref<string | null>(null)
 const justPlacedTaskId = ref<string | null>(null)
+const columnHoverCount = ref<Record<string, number>>({ todo: 0, in_progress: 0, done: 0 })
+
+const isColumnHovered = (status: TaskStatus) => columnHoverCount.value[status] > 0
 
 const newTask = ref({
   title: '',
@@ -45,42 +48,59 @@ function onDragStart(e: DragEvent, taskId: string) {
     e.dataTransfer.setData('text/task-id', taskId)
   }
   draggingTaskId.value = taskId
+  nextTick(() => {
+    const el = e.currentTarget as HTMLElement
+    if (el) {
+      el.style.opacity = '0.8'
+      el.style.transform = 'scale(0.95)'
+    }
+  })
 }
 
-function onDragEnd() {
+function onDragEnd(e: DragEvent) {
+  const el = e.currentTarget as HTMLElement
+  if (el) {
+    el.style.opacity = ''
+    el.style.transform = ''
+  }
   draggingTaskId.value = null
+  columnHoverCount.value = { todo: 0, in_progress: 0, done: 0 }
 }
 
-function onDragOver(e: DragEvent, status: TaskStatus) {
+function onDragEnter(e: DragEvent, status: TaskStatus) {
   e.preventDefault()
-  if (e.dataTransfer) e.dataTransfer.dropEffect = 'move'
-  dragOverColumn.value = status
+  columnHoverCount.value[status] = (columnHoverCount.value[status] ?? 0) + 1
+}
+
+function onDragOver(e: DragEvent) {
+  e.preventDefault()
+  if (e.dataTransfer) {
+    e.dataTransfer.dropEffect = 'move'
+  }
 }
 
 function onDragLeave(e: DragEvent, status: TaskStatus) {
-  const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
-  const x = e.clientX
-  const y = e.clientY
-  if (x < rect.left || x > rect.right || y < rect.top || y > rect.bottom) {
-    dragOverColumn.value = null
+  const count = columnHoverCount.value[status] ?? 0
+  if (count > 0) {
+    columnHoverCount.value[status] = count - 1
   }
 }
 
 function onDrop(e: DragEvent, status: TaskStatus) {
   e.preventDefault()
-  dragOverColumn.value = null
+  columnHoverCount.value[status] = 0
   const taskId = e.dataTransfer?.getData('text/task-id')
   if (!taskId) return
+
   const success = store.moveTask(taskId, status)
   if (success) {
     justPlacedTaskId.value = taskId
     setTimeout(() => {
       justPlacedTaskId.value = null
-    }, 150)
+    }, 200)
   } else {
     store.pushNotification('该成员同时进行中的任务已达上限（3个）', 'warning')
   }
-  draggingTaskId.value = null
 }
 
 function saveTask(taskId: string, patch: Partial<Task>) {
@@ -125,16 +145,18 @@ function handleCreateTask() {
         v-for="col in columns"
         :key="col.key"
         class="kanban-column"
-        :class="{ 'drag-over': dragOverColumn === col.key }"
-        @dragover="onDragOver($event, col.key)"
+        :class="{ 'drag-over': isColumnHovered(col.key) }"
+        @dragenter="onDragEnter($event, col.key)"
+        @dragover="onDragOver($event)"
         @dragleave="onDragLeave($event, col.key)"
         @drop="onDrop($event, col.key)"
       >
+        <div v-if="isColumnHovered(col.key) && draggingTaskId" class="column-highlight"></div>
+
         <div class="column-header">
           <span class="column-title">{{ col.label }}</span>
           <span class="column-count">{{ getTasksByStatus(col.key).length }}</span>
         </div>
-        <div v-if="dragOverColumn === col.key && draggingTaskId" class="column-highlight"></div>
 
         <div class="column-body">
           <div
@@ -147,7 +169,7 @@ function handleCreateTask() {
             }"
             draggable="true"
             @dragstart="onDragStart($event, task.id)"
-            @dragend="onDragEnd"
+            @dragend="onDragEnd($event)"
           >
             <template v-if="editingTaskId === task.id">
               <div class="edit-form">
@@ -279,32 +301,32 @@ function handleCreateTask() {
   border-radius: 12px;
   padding: 16px;
   min-height: 400px;
-  transition: all 200ms ease;
+  transition: background-color 200ms ease, border-color 200ms ease;
   overflow: hidden;
 }
 
 .kanban-column.drag-over {
-  background: rgba(233, 69, 96, 0.08);
-  border-color: rgba(233, 69, 96, 0.4);
+  background: rgba(99, 102, 241, 0.08);
+  border-color: rgba(99, 102, 241, 0.5);
 }
 
 .column-highlight {
   position: absolute;
   inset: 0;
-  background: rgba(99, 102, 241, 0.12);
-  border: 2px dashed rgba(99, 102, 241, 0.5);
+  background: rgba(99, 102, 241, 0.15);
+  border: 2px dashed rgba(99, 102, 241, 0.6);
   border-radius: 12px;
   pointer-events: none;
-  animation: pulse 1.5s ease-in-out infinite;
   z-index: 1;
+  animation: highlightPulse 1.2s ease-in-out infinite;
 }
 
-@keyframes pulse {
+@keyframes highlightPulse {
   0%, 100% {
-    opacity: 0.6;
+    background: rgba(99, 102, 241, 0.1);
   }
   50% {
-    opacity: 1;
+    background: rgba(99, 102, 241, 0.22);
   }
 }
 
@@ -349,13 +371,14 @@ function handleCreateTask() {
   border-radius: 12px;
   padding: 14px;
   cursor: grab;
-  transition: transform 200ms ease, box-shadow 200ms ease, opacity 200ms ease;
+  transition: transform 200ms ease, box-shadow 200ms ease, opacity 200ms ease, border-color 200ms ease;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
   position: relative;
   z-index: 2;
+  will-change: transform, opacity;
 }
 
-.task-card:hover:not(.is-dragging) {
+.task-card:hover:not(.is-dragging):not(.just-placed) {
   transform: scale(1.02);
   box-shadow: 0 8px 30px rgba(233, 69, 96, 0.15);
   border-color: rgba(233, 69, 96, 0.25);
@@ -366,21 +389,26 @@ function handleCreateTask() {
 }
 
 .task-card.is-dragging {
-  opacity: 0.8;
-  transform: scale(0.95);
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+  opacity: 0.8 !important;
+  transform: scale(0.95) !important;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3) !important;
 }
 
 .task-card.just-placed {
-  animation: popIn 150ms ease-out;
+  animation: cardPopIn 150ms ease-out forwards;
 }
 
-@keyframes popIn {
+@keyframes cardPopIn {
   0% {
     transform: scale(0.95);
+    opacity: 0.9;
+  }
+  60% {
+    transform: scale(1.01);
   }
   100% {
     transform: scale(1);
+    opacity: 1;
   }
 }
 
