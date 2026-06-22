@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "concurrently \"npm run server\" \"npm run client\"",
     "server": "tsx src/server.ts",
-    "client": "vite"
+    "client": "vite",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "react": "18.2.0",
