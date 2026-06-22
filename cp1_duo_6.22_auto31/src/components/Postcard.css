@@ -1,0 +1,287 @@
+.postcard-page {
+  min-height: 100vh;
+  padding: 40px 20px;
+  background-color: #F5F0E8;
+  background-image: 
+    radial-gradient(ellipse at 20% 30%, rgba(139, 105, 20, 0.05) 0%, transparent 50%),
+    radial-gradient(ellipse at 80% 70%, rgba(139, 105, 20, 0.05) 0%, transparent 50%);
+  position: relative;
+  overflow-x: hidden;
+}
+
+.postcard-loading {
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.loading-spinner-large {
+  display: inline-block;
+  width: 50px;
+  height: 50px;
+  border: 4px solid rgba(139, 105, 20, 0.2);
+  border-top-color: #8B6914;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+.postcard-not-found {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  color: #8B6914;
+}
+
+.postcard-not-found h2 {
+  font-size: 1.5rem;
+  margin-bottom: 8px;
+}
+
+.confetti-canvas {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 100;
+}
+
+.postcard-wrapper {
+  max-width: 700px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+}
+
+.postcard-card {
+  background: #FFFEF9;
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 
+    0 8px 32px rgba(139, 105, 20, 0.15),
+    0 2px 8px rgba(139, 105, 20, 0.08);
+  background-image: 
+    repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(139, 105, 20, 0.015) 2px,
+      rgba(139, 105, 20, 0.015) 4px
+    );
+  transition: all 1s ease;
+}
+
+.postcard-image {
+  width: 100%;
+  height: 280px;
+  background-size: cover;
+  background-position: center;
+  position: relative;
+  transition: filter 1s ease;
+}
+
+.postcard-card.locked .postcard-image {
+  filter: blur(15px) brightness(0.9);
+}
+
+.postcard-card.unlocked .postcard-image {
+  filter: blur(0) brightness(1);
+  animation: fadeIn 1s ease;
+}
+
+.postcard-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(
+    to bottom,
+    rgba(0, 0, 0, 0) 0%,
+    rgba(0, 0, 0, 0.1) 100%
+  );
+}
+
+.postcard-content {
+  padding: 32px;
+}
+
+.countdown-container {
+  text-align: center;
+}
+
+.countdown-title {
+  font-size: 1.3rem;
+  color: #8B6914;
+  margin-bottom: 24px;
+  font-weight: 500;
+}
+
+.countdown-timer {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 20px;
+}
+
+.countdown-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 60px;
+}
+
+.countdown-number {
+  font-size: 2.5rem;
+  font-weight: bold;
+  background: linear-gradient(90deg, #FFD700, #FF8C00, #FFD700);
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  animation: gradient-shift 2s ease infinite;
+  font-family: 'Georgia', serif;
+}
+
+.countdown-label {
+  font-size: 0.85rem;
+  color: #A08040;
+  margin-top: 4px;
+}
+
+.countdown-separator {
+  font-size: 2rem;
+  color: #B89860;
+  font-weight: bold;
+  margin-bottom: 16px;
+}
+
+.countdown-hint {
+  color: #A08040;
+  font-style: italic;
+  font-size: 0.9rem;
+}
+
+.message-container {
+  animation: fadeIn 1s ease;
+}
+
+.message-title {
+  text-align: center;
+  font-size: 1.4rem;
+  color: #8B6914;
+  margin-bottom: 24px;
+  font-weight: 600;
+}
+
+.message-content {
+  color: #5C4A1F;
+  line-height: 2;
+  font-size: 1rem;
+}
+
+.message-content h1,
+.message-content h2,
+.message-content h3 {
+  color: #8B6914;
+  margin: 16px 0 12px 0;
+  font-weight: 600;
+  opacity: 0;
+  animation: slideDown 0.6s ease forwards;
+}
+
+.message-content h1 { font-size: 1.6rem; }
+.message-content h2 { font-size: 1.3rem; }
+.message-content h3 { font-size: 1.1rem; }
+
+.message-line {
+  opacity: 0;
+  animation: slideDown 0.6s ease forwards;
+  margin-bottom: 8px;
+}
+
+.message-content strong {
+  color: #8B6914;
+  font-weight: 600;
+}
+
+.message-content em {
+  color: #A08040;
+}
+
+.message-content code {
+  background-color: #F5F0E8;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-family: monospace;
+  font-size: 0.9em;
+  color: #8B6914;
+}
+
+@media (max-width: 768px) {
+  .postcard-page {
+    padding: 20px 12px;
+  }
+
+  .postcard-image {
+    height: 200px;
+  }
+
+  .postcard-content {
+    padding: 20px;
+  }
+
+  .countdown-item {
+    min-width: 45px;
+  }
+
+  .countdown-number {
+    font-size: 1.6rem;
+  }
+
+  .countdown-separator {
+    font-size: 1.3rem;
+  }
+
+  .countdown-label {
+    font-size: 0.7rem;
+  }
+
+  .countdown-title {
+    font-size: 1.1rem;
+  }
+
+  .message-title {
+    font-size: 1.2rem;
+  }
+
+  .message-content {
+    font-size: 0.95rem;
+    line-height: 1.8;
+  }
+}
+
+@media (max-width: 480px) {
+  .countdown-item {
+    min-width: 38px;
+  }
+
+  .countdown-number {
+    font-size: 1.3rem;
+  }
+
+  .countdown-separator {
+    font-size: 1rem;
+  }
+
+  .countdown-timer {
+    gap: 4px;
+  }
+}
