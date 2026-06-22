@@ -9,12 +9,32 @@ const MOOD_STYLES: Record<MoodType, { emoji: string; color: string }> = {
   tired: { emoji: '😴', color: '#A78BFA' }
 }
 
-function getDaysUntil(targetDate: string): number {
+function getTimeUntil(targetDate: string): { days: number; hours: number; minutes: number; totalMs: number } {
   const now = new Date()
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
   const target = new Date(targetDate)
-  const targetDay = new Date(target.getFullYear(), target.getMonth(), target.getDate())
-  return Math.ceil((targetDay.getTime() - today.getTime()) / (24 * 60 * 60 * 1000))
+  const targetEndOfDay = new Date(target.getFullYear(), target.getMonth(), target.getDate(), 23, 59, 59, 999)
+  const diff = targetEndOfDay.getTime() - now.getTime()
+  const absDiff = Math.abs(diff)
+  const days = Math.floor(absDiff / (24 * 60 * 60 * 1000))
+  const hours = Math.floor((absDiff % (24 * 60 * 60 * 1000)) / (60 * 60 * 1000))
+  const minutes = Math.floor((absDiff % (60 * 60 * 1000)) / (60 * 1000))
+  return { days, hours, minutes, totalMs: diff }
+}
+
+function formatCountdown(targetDate: string): { text: string; isDue: boolean; isUrgent: boolean } {
+  const { days, hours, minutes, totalMs } = getTimeUntil(targetDate)
+  const isDue = totalMs <= 0
+  if (isDue) {
+    const absDays = days
+    if (absDays === 0) {
+      return { text: '今日到期', isDue: true, isUrgent: true }
+    }
+    return { text: `已逾期 ${absDays} 天`, isDue: true, isUrgent: true }
+  }
+  if (days < 1) {
+    return { text: '不足1天', isDue: false, isUrgent: true }
+  }
+  return { text: `${days}天${hours}小时${minutes}分`, isDue: false, isUrgent: false }
 }
 
 interface CardProps {
@@ -22,10 +42,8 @@ interface CardProps {
 }
 
 function CapsuleCard({ capsule }: CardProps) {
-  const days = getDaysUntil(capsule.targetDate)
-  const isDue = days <= 0
+  const { text: countdownText, isDue, isUrgent } = formatCountdown(capsule.targetDate)
   const mood = MOOD_STYLES[capsule.mood]
-  const displayDays = isDue ? `已逾期 ${Math.abs(days)} 天` : `${days} 天后开启`
 
   return (
     <div style={styles.card} className="capsule-card">
@@ -45,7 +63,14 @@ function CapsuleCard({ capsule }: CardProps) {
             color: mood.color,
             borderColor: mood.color + '40'
           }}>
-            <span style={{ marginRight: 4 }}>{mood.emoji}</span>
+            <span style={{
+              marginRight: 4,
+              display: 'inline-block',
+              animation: 'moodBreath 3s ease-in-out infinite',
+              animationDelay: `${Math.random() * 3}s`
+            }} className="mood-emoji">
+              {mood.emoji}
+            </span>
           </span>
           <span style={styles.cardDate}>
             {new Date(capsule.targetDate).toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' })}
@@ -58,9 +83,10 @@ function CapsuleCard({ capsule }: CardProps) {
         <span style={{
           ...styles.countdown,
           color: isDue ? '#DC2626' : '#7C3AED',
-          animation: isDue ? 'pulse 1s ease-in-out infinite' : 'none'
+          animation: isUrgent ? 'pulse 1s ease-in-out infinite' : 'none',
+          fontSize: isDue ? 18 : 20
         }}>
-          {displayDays}
+          {countdownText}
         </span>
         {capsule.isOpened && (
           <span style={styles.openedBadge}>已阅</span>
@@ -71,12 +97,24 @@ function CapsuleCard({ capsule }: CardProps) {
           0%, 100% { opacity: 1; }
           50% { opacity: 0.6; }
         }
+        @keyframes moodBreath {
+          0% { transform: scale(1); }
+          33% { transform: scale(1.05); }
+          66% { transform: scale(1); }
+          100% { transform: scale(1); }
+        }
         .capsule-card {
           transition: transform 0.25s ease-out, box-shadow 0.25s ease-out;
+          transform-style: preserve-3d;
+          perspective: 1000px;
         }
         .capsule-card:hover {
-          transform: translateY(-6px);
+          transform: translateY(-6px) rotateY(3deg);
           box-shadow: 0 16px 40px rgba(0,0,0,0.4);
+        }
+        .mood-emoji {
+          animation-iteration-count: infinite;
+          animation-delay: var(--mood-delay, 0s);
         }
       `}</style>
     </div>
@@ -96,7 +134,7 @@ export function CapsuleTimeline() {
   }, [])
 
   useEffect(() => {
-    const t = setInterval(() => setTick((x) => x + 1), 60000)
+    const t = setInterval(() => setTick((x) => x + 1), 30000)
     return () => clearInterval(t)
   }, [])
 
