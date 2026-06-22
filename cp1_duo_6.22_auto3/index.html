@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>3D地形沙盘编辑器</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: linear-gradient(180deg, #0a0a2e 0%, #1a1a4e 100%);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+
+    #app {
+      width: 100%;
+      height: 100%;
+      position: relative;
+    }
+
+    canvas {
+      display: block;
+    }
+
+    #controls-container {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      z-index: 100;
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      color: white;
+      padding: 8px;
+    }
+
+    #controls-container .lil-gui {
+      --width: 280px;
+      --name-width: 45%;
+      --background-color: transparent;
+      --widget-color: rgba(255, 255, 255, 0.2);
+      --focus-color: rgba(255, 255, 255, 0.3);
+      --hover-color: rgba(255, 255, 255, 0.15);
+      --font-color: #ffffff;
+      --title-background-color: transparent;
+      --title-font-size: 13px;
+      --font-size: 12px;
+      --padding: 6px;
+      --slider-knob-width: 16px;
+      --widget-height: 20px;
+    }
+
+    #controls-container .lil-gui .slider {
+      border-radius: 10px;
+    }
+
+    #controls-container .lil-gui .slider .knob {
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: #ffffff;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+      top: 50%;
+      transform: translate(-50%, -50%);
+    }
+
+    #stats-panel {
+      position: absolute;
+      bottom: 20px;
+      right: 20px;
+      z-index: 100;
+      background: rgba(0, 0, 0, 0.6);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 8px;
+      padding: 12px 16px;
+      color: #00ff88;
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 12px;
+      line-height: 1.6;
+      min-width: 160px;
+      transition: background-color 0.3s;
+    }
+
+    #stats-panel.warning {
+      background: rgba(255, 0, 0, 0.6);
+      animation: blink 0.5s infinite;
+    }
+
+    @keyframes blink {
+      0%, 100% { background: rgba(255, 0, 0, 0.6); }
+      50% { background: rgba(255, 0, 0, 0.3); }
+    }
+
+    #stats-panel .stat-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 20px;
+    }
+
+    #stats-panel .stat-label {
+      opacity: 0.8;
+    }
+
+    #stats-panel .stat-value {
+      font-weight: bold;
+    }
+
+    #elevation-tooltip {
+      position: absolute;
+      z-index: 1000;
+      background: rgba(0, 0, 0, 0.85);
+      color: #fff;
+      padding: 8px 12px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-family: 'Courier New', Courier, monospace;
+      pointer-events: none;
+      transform: translate(-50%, -130%);
+      white-space: nowrap;
+      display: none;
+      border: 1px solid rgba(255, 255, 0, 0.5);
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
+    }
+
+    #elevation-tooltip::after {
+      content: '';
+      position: absolute;
+      top: 100%;
+      left: 50%;
+      transform: translateX(-50%);
+      border: 6px solid transparent;
+      border-top-color: rgba(0, 0, 0, 0.85);
+    }
+
+    #loading-overlay {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      z-index: 200;
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      gap: 16px;
+      color: white;
+      font-size: 14px;
+    }
+
+    #loading-overlay.active {
+      display: flex;
+    }
+
+    .hourglass {
+      width: 40px;
+      height: 40px;
+      border: 3px solid rgba(255, 255, 255, 0.8);
+      border-radius: 50%;
+      border-top-color: transparent;
+      border-bottom-color: transparent;
+      animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    #menu-toggle {
+      display: none;
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      z-index: 101;
+      width: 44px;
+      height: 44px;
+      border: none;
+      border-radius: 10px;
+      background: rgba(255, 255, 255, 0.15);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      color: white;
+      font-size: 24px;
+      cursor: pointer;
+      display: none;
+      align-items: center;
+      justify-content: center;
+    }
+
+    @media (max-width: 768px) {
+      #menu-toggle {
+        display: flex;
+      }
+
+      #controls-container {
+        top: 70px;
+        left: 20px;
+        display: none;
+      }
+
+      #controls-container.open {
+        display: block;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <button id="menu-toggle" aria-label="菜单">☰</button>
+    <div id="controls-container"></div>
+    <div id="stats-panel">
+      <div class="stat-row">
+        <span class="stat-label">FPS</span>
+        <span class="stat-value" id="stat-fps">--</span>
+      </div>
+      <div class="stat-row">
+        <span class="stat-label">顶点数</span>
+        <span class="stat-value" id="stat-vertices">--</span>
+      </div>
+      <div class="stat-row">
+        <span class="stat-label">绘制调用</span>
+        <span class="stat-value" id="stat-drawcalls">--</span>
+      </div>
+    </div>
+    <div id="elevation-tooltip"></div>
+    <div id="loading-overlay">
+      <div class="hourglass"></div>
+      <span>生成中...</span>
+    </div>
+  </div>
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
