@@ -46,8 +46,18 @@ export class ClayEditor {
   private currentSpeed = 0;
   private rippleFadeStart = 0;
   private rippleWasActive = false;
+  private rippleLastRadius = 0;
+  private rippleLastX = -1;
+  private rippleLastY = -1;
+  private rippleLastAlpha = -1;
+  private cachedRippleGradient: CanvasGradient | null = null;
   private isHovering = false;
   private hoverStartTime = 0;
+  private toolIndicatorFadeStart = 0;
+  private toolIndicatorFadingIn = false;
+  private toolIndicatorVisible = false;
+  private lastRippleRenderTime = 0;
+  private readonly RIPPLE_RENDER_INTERVAL = 16;
 
   constructor(container: HTMLElement) {
     this.canvas = document.createElement('canvas');
@@ -106,15 +116,21 @@ export class ClayEditor {
       this.currentSpeed = 0;
     };
 
-    const onMove = (e: MouseEvent | TouchEvent) => {
-      const pos = getMousePos(e);
-      this.currentMouseX = pos.x;
-      this.currentMouseY = pos.y;
-
+    const onHoverEnter = (x: number, y: number) => {
+      this.currentMouseX = x;
+      this.currentMouseY = y;
       if (!this.isHovering) {
         this.isHovering = true;
         this.hoverStartTime = performance.now();
+        this.toolIndicatorFadeStart = 0;
+        this.toolIndicatorFadingIn = false;
+        this.toolIndicatorVisible = false;
       }
+    };
+
+    const onMove = (e: MouseEvent | TouchEvent) => {
+      const pos = getMousePos(e);
+      onHoverEnter(pos.x, pos.y);
 
       if (!this.isDragging) return;
       e.preventDefault();
@@ -149,8 +165,16 @@ export class ClayEditor {
     this.canvas.addEventListener('touchmove', onMove, { passive: false });
     this.canvas.addEventListener('touchend', onUp);
 
+    this.canvas.addEventListener('mouseenter', (e: MouseEvent) => {
+      const pos = getMousePos(e);
+      onHoverEnter(pos.x, pos.y);
+    });
+
     this.canvas.addEventListener('mouseleave', () => {
       this.isHovering = false;
+      this.toolIndicatorFadeStart = 0;
+      this.toolIndicatorFadingIn = false;
+      this.toolIndicatorVisible = false;
     });
   }
 
@@ -348,19 +372,22 @@ export class ClayEditor {
       alpha = 0.15 + speedFactor * 0.35;
       radius = this.brushRadius * 0.6 + speedFactor * this.brushRadius * 1.2;
       this.rippleWasActive = true;
+      this.rippleLastRadius = radius;
     } else if (this.rippleWasActive && this.rippleFadeStart > 0) {
       const fadeElapsed = now - this.rippleFadeStart;
       const fadeDuration = 200;
       if (fadeElapsed < fadeDuration) {
         const fadeT = 1 - fadeElapsed / fadeDuration;
         alpha = fadeT * 0.3;
-        radius = (this.brushRadius * 0.6 + this.brushRadius * 1.2) + fadeElapsed * 0.15;
+        radius = this.rippleLastRadius;
       } else {
         this.rippleWasActive = false;
         this.rippleFadeStart = 0;
+        this.cachedRippleGradient = null;
         return;
       }
     } else {
+      this.cachedRippleGradient = null;
       return;
     }
 
@@ -369,13 +396,36 @@ export class ClayEditor {
     const x = this.currentMouseX;
     const y = this.currentMouseY;
     const safeRadius = Math.max(1, radius);
+    const roundedAlpha = Math.round(alpha * 100) / 100;
+    const roundedX = Math.round(x);
+    const roundedY = Math.round(y);
+    const roundedRadius = Math.round(safeRadius);
 
-    const rippleGrad = ctx.createRadialGradient(x, y, 0, x, y, safeRadius);
-    rippleGrad.addColorStop(0, `rgba(255, 255, 255, ${alpha * 0.6})`);
-    rippleGrad.addColorStop(0.3, `rgba(255, 255, 255, ${alpha * 0.35})`);
-    rippleGrad.addColorStop(0.6, `rgba(255, 255, 255, ${alpha * 0.15})`);
-    rippleGrad.addColorStop(0.85, `rgba(255, 255, 255, ${alpha * 0.05})`);
-    rippleGrad.addColorStop(1, `rgba(255, 255, 255, 0)`);
+    const needsRebuild = (
+      this.cachedRippleGradient === null ||
+      this.rippleLastX !== roundedX ||
+      this.rippleLastY !== roundedY ||
+      this.rippleLastRadius !== roundedRadius ||
+      this.rippleLastAlpha !== roundedAlpha
+    );
+
+    let rippleGrad: CanvasGradient;
+    if (needsRebuild || now - this.lastRippleRenderTime >= this.RIPPLE_RENDER_INTERVAL) {
+      rippleGrad = ctx.createRadialGradient(roundedX, roundedY, 0, roundedX, roundedY, roundedRadius);
+      rippleGrad.addColorStop(0, `rgba(255, 255, 255, ${(roundedAlpha * 0.6).toFixed(3)})`);
+      rippleGrad.addColorStop(0.3, `rgba(255, 255, 255, ${(roundedAlpha * 0.35).toFixed(3)})`);
+      rippleGrad.addColorStop(0.6, `rgba(255, 255, 255, ${(roundedAlpha * 0.15).toFixed(3)})`);
+      rippleGrad.addColorStop(0.85, `rgba(255, 255, 255, ${(roundedAlpha * 0.05).toFixed(3)})`);
+      rippleGrad.addColorStop(1, `rgba(255, 255, 255, 0)`);
+      this.cachedRippleGradient = rippleGrad;
+      this.rippleLastX = roundedX;
+      this.rippleLastY = roundedY;
+      this.rippleLastRadius = roundedRadius;
+      this.rippleLastAlpha = roundedAlpha;
+      this.lastRippleRenderTime = now;
+    } else {
+      rippleGrad = this.cachedRippleGradient!;
+    }
 
     ctx.fillStyle = rippleGrad;
     ctx.beginPath();
@@ -384,7 +434,7 @@ export class ClayEditor {
 
     if (this.isDragging && speedFactor > 0.05) {
       const ringAlpha = alpha * 0.5;
-      ctx.strokeStyle = `rgba(255, 255, 255, ${ringAlpha})`;
+      ctx.strokeStyle = `rgba(255, 255, 255, ${ringAlpha.toFixed(3)})`;
       ctx.lineWidth = 1.5;
       ctx.beginPath();
       ctx.arc(x, y, safeRadius * 0.7, 0, Math.PI * 2);
@@ -392,7 +442,7 @@ export class ClayEditor {
 
       if (speedFactor > 0.3) {
         const outerRingAlpha = alpha * 0.25;
-        ctx.strokeStyle = `rgba(255, 255, 255, ${outerRingAlpha})`;
+        ctx.strokeStyle = `rgba(255, 255, 255, ${outerRingAlpha.toFixed(3)})`;
         ctx.lineWidth = 1;
         ctx.beginPath();
         ctx.arc(x, y, safeRadius, 0, Math.PI * 2);
@@ -403,85 +453,89 @@ export class ClayEditor {
 
   private drawToolIndicator(ctx: CanvasRenderingContext2D): void {
     const now = performance.now();
-    const hoverElapsed = this.isHovering ? now - this.hoverStartTime : 0;
-    const indicatorVisible = this.isHovering && hoverElapsed > 300;
-    if (!indicatorVisible && !this.isDragging) return;
+
+    if (this.isDragging) {
+      this.toolIndicatorVisible = true;
+      this.toolIndicatorFadeStart = 0;
+      this.toolIndicatorFadingIn = false;
+    } else if (this.isHovering && !this.toolIndicatorVisible && !this.toolIndicatorFadingIn) {
+      if (now - this.hoverStartTime >= 300) {
+        this.toolIndicatorFadingIn = true;
+        this.toolIndicatorFadeStart = now;
+      }
+    }
+
+    if (this.toolIndicatorFadingIn && !this.toolIndicatorVisible) {
+      const fadeElapsed = now - this.toolIndicatorFadeStart;
+      if (fadeElapsed >= 200) {
+        this.toolIndicatorFadingIn = false;
+        this.toolIndicatorVisible = true;
+      }
+    }
+
+    if (!this.toolIndicatorVisible && !this.toolIndicatorFadingIn && !this.isDragging) return;
 
     let alpha: number;
     if (this.isDragging) {
       alpha = 0.85;
-    } else if (indicatorVisible) {
-      const fadeIn = Math.min(1, (hoverElapsed - 300) / 200);
-      alpha = fadeIn * 0.75;
+    } else if (this.toolIndicatorFadingIn) {
+      const fadeElapsed = now - this.toolIndicatorFadeStart;
+      alpha = Math.min(0.75, (fadeElapsed / 200) * 0.75);
     } else {
-      return;
+      alpha = 0.75;
     }
 
     const isPinch = this.toolMode === 'pinch';
-    const icon = isPinch ? '✋' : '👐';
-    const label = isPinch ? '挤压' : '拉伸';
-    const accentColor = isPinch ? 'rgba(212, 139, 76,' : 'rgba(90, 158, 111,';
+    const label = isPinch ? '挤压模式' : '拉伸模式';
+    const accentHex = isPinch ? '#D48B4C' : '#5A9E6F';
+    const accentRgba = isPinch ? 'rgba(212, 139, 76,' : 'rgba(90, 158, 111,';
 
-    const padding = 10;
-    const iconSize = 16;
-    const fontSize = 13;
-    const barWidth = 30;
-    const barHeight = 4;
-    const totalWidth = iconSize + 6 + fontSize * 2.2 + 8 + barWidth + padding * 2;
-    const totalHeight = iconSize + padding * 2 + barHeight + 6;
-    const x = 14;
-    const y = CANVAS_HEIGHT - totalHeight - 14;
+    const fontSize = 12;
+    const paddingX = 12;
+    const paddingY = 8;
+    const labelWidth = ctx.measureText(label).width;
+    const indicatorWidth = labelWidth + paddingX * 2;
+    const indicatorHeight = fontSize + paddingY * 2;
+    const x = 12;
+    const y = 12;
 
     ctx.save();
     ctx.globalAlpha = alpha;
 
-    const cornerRadius = 10;
-    ctx.fillStyle = `rgba(60, 40, 25, 0.55)`;
+    const cornerRadius = 8;
+    ctx.fillStyle = 'rgba(60, 40, 25, 0.55)';
     ctx.beginPath();
     ctx.moveTo(x + cornerRadius, y);
-    ctx.lineTo(x + totalWidth - cornerRadius, y);
-    ctx.quadraticCurveTo(x + totalWidth, y, x + totalWidth, y + cornerRadius);
-    ctx.lineTo(x + totalWidth, y + totalHeight - cornerRadius);
-    ctx.quadraticCurveTo(x + totalWidth, y + totalHeight, x + totalWidth - cornerRadius, y + totalHeight);
-    ctx.lineTo(x + cornerRadius, y + totalHeight);
-    ctx.quadraticCurveTo(x, y + totalHeight, x, y + totalHeight - cornerRadius);
+    ctx.lineTo(x + indicatorWidth - cornerRadius, y);
+    ctx.quadraticCurveTo(x + indicatorWidth, y, x + indicatorWidth, y + cornerRadius);
+    ctx.lineTo(x + indicatorWidth, y + indicatorHeight - cornerRadius);
+    ctx.quadraticCurveTo(x + indicatorWidth, y + indicatorHeight, x + indicatorWidth - cornerRadius, y + indicatorHeight);
+    ctx.lineTo(x + cornerRadius, y + indicatorHeight);
+    ctx.quadraticCurveTo(x, y + indicatorHeight, x, y + indicatorHeight - cornerRadius);
     ctx.lineTo(x, y + cornerRadius);
     ctx.quadraticCurveTo(x, y, x + cornerRadius, y);
     ctx.closePath();
     ctx.fill();
 
-    ctx.strokeStyle = `${accentColor}0.4)`;
+    ctx.strokeStyle = `${accentRgba}0.45)`;
     ctx.lineWidth = 1;
     ctx.stroke();
 
-    ctx.font = `${iconSize}px sans-serif`;
-    ctx.textBaseline = 'middle';
-    ctx.fillStyle = '#fff';
-    ctx.fillText(icon, x + padding, y + padding + iconSize / 2 - 3);
+    const dotSize = 7;
+    const dotX = x + paddingX;
+    const dotY = y + indicatorHeight / 2;
+    const dotGrad = ctx.createRadialGradient(dotX, dotY, 0, dotX, dotY, dotSize);
+    dotGrad.addColorStop(0, accentHex);
+    dotGrad.addColorStop(1, `${accentRgba}0.6)`);
+    ctx.fillStyle = dotGrad;
+    ctx.beginPath();
+    ctx.arc(dotX, dotY, dotSize / 2, 0, Math.PI * 2);
+    ctx.fill();
 
     ctx.font = `600 ${fontSize}px "PingFang SC", "Microsoft YaHei", sans-serif`;
-    ctx.fillStyle = '#fff';
-    ctx.fillText(label, x + padding + iconSize + 6, y + padding + iconSize / 2 - 3);
-
-    const barX = x + padding + iconSize + 6 + fontSize * 2.2 + 2;
-    const barY = y + padding + iconSize / 2 - barHeight / 2 - 3;
-    const safeBarW = Math.max(1, barWidth);
-    const safeBarH = Math.max(1, barHeight);
-
-    ctx.fillStyle = 'rgba(255,255,255,0.2)';
-    ctx.beginPath();
-    ctx.roundRect(barX, barY, safeBarW, safeBarH, 2);
-    ctx.fill();
-
-    const speedFill = Math.min(1, this.currentSpeed * 3);
-    const fillW = Math.max(1, safeBarW * speedFill);
-    const fillGrad = ctx.createLinearGradient(barX, 0, barX + safeBarW, 0);
-    fillGrad.addColorStop(0, `${accentColor}0.9)`);
-    fillGrad.addColorStop(1, `${accentColor}0.5)`);
-    ctx.fillStyle = fillGrad;
-    ctx.beginPath();
-    ctx.roundRect(barX, barY, fillW, safeBarH, 2);
-    ctx.fill();
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = '#ffffff';
+    ctx.fillText(label, x + paddingX + dotSize + 6, dotY);
 
     ctx.restore();
   }
