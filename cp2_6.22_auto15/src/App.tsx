@@ -135,8 +135,6 @@ function App() {
     width: '100%',
     marginBottom: '20px',
     breakInside: 'avoid',
-    animation: 'cardFadeIn 0.5s ease-out forwards',
-    opacity: 0,
   };
 
   const keyframesStyle = `
@@ -220,13 +218,11 @@ function App() {
                   {filteredExhibits.map((exhibit, idx) => (
                     <div
                       key={exhibit.id}
-                      style={{
-                        ...cardWrapStyle,
-                        animationDelay: `${Math.min(idx * 0.05, 0.5)}s`,
-                      }}
+                      style={cardWrapStyle}
                     >
                       <ExhibitCard
                         exhibit={exhibit}
+                        index={idx}
                         onRefresh={refreshExhibit}
                         onOpenDetail={() => setSelectedExhibit(exhibit)}
                         onOpenQR={() => setQrExhibit(exhibit)}

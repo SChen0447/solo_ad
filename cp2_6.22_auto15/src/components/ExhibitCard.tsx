@@ -3,10 +3,14 @@ import { Exhibit, interact } from '../utils/api';
 
 interface Props {
   exhibit: Exhibit;
+  index: number;
   onRefresh: (updated: Exhibit) => void;
   onOpenDetail: () => void;
   onOpenQR: () => void;
 }
+
+const ENTRANCE_DELAY_PER_ITEM = 0.1;
+const MAX_ENTRANCE_DELAY = 1.0;
 
 const LIGHT_COLORS = [
   '#FEE2E2', '#FECACA', '#FED7AA', '#FEF3C7', '#FEF9C3',
@@ -68,13 +72,17 @@ function QRIcon() {
   );
 }
 
-function ExhibitCardImpl({ exhibit, onRefresh, onOpenDetail, onOpenQR }: Props) {
+function ExhibitCardImpl({ exhibit, index, onRefresh, onOpenDetail, onOpenQR }: Props) {
   const [liked, setLiked] = useState(false);
   const [likeAnimating, setLikeAnimating] = useState(false);
   const [imgError, setImgError] = useState(false);
 
   const placeholderBg = useMemo(() => randomLightColor(exhibit.id), [exhibit.id]);
   const aspectRatio = useMemo(() => randomAspectRatio(exhibit.id), [exhibit.id]);
+  const animationDelay = useMemo(
+    () => `${Math.min(index * ENTRANCE_DELAY_PER_ITEM, MAX_ENTRANCE_DELAY)}s`,
+    [index]
+  );
 
   const handleQRClick = useCallback(async (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -110,6 +118,9 @@ function ExhibitCardImpl({ exhibit, onRefresh, onOpenDetail, onOpenQR }: Props) 
     cursor: 'pointer',
     transition: 'transform 0.3s ease-out, box-shadow 0.3s ease-out',
     position: 'relative',
+    animation: 'cardFadeIn 0.5s ease-out forwards',
+    animationDelay,
+    opacity: 0,
   };
 
   const qrBtnStyle: React.CSSProperties = {
@@ -215,9 +226,22 @@ function ExhibitCardImpl({ exhibit, onRefresh, onOpenDetail, onOpenQR }: Props) 
   };
 
   return (
-    <div
-      style={cardStyle}
-      onClick={onOpenDetail}
+    <>
+      <style>{`
+        @keyframes cardFadeIn {
+          from {
+            opacity: 0.2;
+            transform: translateY(40px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+      `}</style>
+      <div
+        style={cardStyle}
+        onClick={onOpenDetail}
       onMouseEnter={(e) => {
         e.currentTarget.style.transform = 'translateY(-10px)';
         e.currentTarget.style.boxShadow = '0 12px 32px rgba(0, 0, 0, 0.15)';
@@ -290,11 +314,13 @@ function ExhibitCardImpl({ exhibit, onRefresh, onOpenDetail, onOpenQR }: Props) 
         </div>
       </div>
     </div>
+    </>
   );
 }
 
 export default memo(ExhibitCardImpl, (prev, next) => {
   return (
+    prev.index === next.index &&
     prev.exhibit.id === next.exhibit.id &&
     prev.exhibit.scanCount === next.exhibit.scanCount &&
     prev.exhibit.likeCount === next.exhibit.likeCount &&
