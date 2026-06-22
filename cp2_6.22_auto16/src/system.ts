@@ -68,9 +68,8 @@ export interface HitEffectData {
   x: number;
   y: number;
   weaponType: WeaponType;
-  life: number;
+  startTime: number;
   maxLife: number;
-  timestamp: number;
 }
 
 export interface MuzzleFlashData {
@@ -78,9 +77,14 @@ export interface MuzzleFlashData {
   x: number;
   y: number;
   weaponType: WeaponType;
-  life: number;
+  startTime: number;
   maxLife: number;
   angle: number;
+}
+
+export interface FireResult {
+  fired: boolean;
+  isPrimary: boolean;
 }
 
 let hitEffectIdCounter = 0;
@@ -178,9 +182,9 @@ export function getMuzzlePosition(state: SystemState): { x: number; y: number } 
   };
 }
 
-export function fireWeapon(state: SystemState): boolean {
+export function fireWeapon(state: SystemState, isPrimary: boolean = true): FireResult {
   const weapon = state.weapons[state.currentWeapon];
-  if (!weapon.canFire()) return false;
+  if (!weapon.canFire()) return { fired: false, isPrimary };
 
   const muzzle = getMuzzlePosition(state);
   const newProjectiles = weapon.fire(muzzle.x, muzzle.y, state.mouseX, state.mouseY);
@@ -191,7 +195,7 @@ export function fireWeapon(state: SystemState): boolean {
       x: muzzle.x,
       y: muzzle.y,
       weaponType: state.currentWeapon,
-      life: 0.1,
+      startTime: performance.now(),
       maxLife: 0.1,
       angle: state.turretAngle
     });
@@ -204,7 +208,7 @@ export function fireWeapon(state: SystemState): boolean {
     }
   }
 
-  return true;
+  return { fired: true, isPrimary };
 }
 
 export function switchWeapon(state: SystemState, type: WeaponType): void {
@@ -375,9 +379,8 @@ export function update(state: SystemState, dt: number): void {
           x: proj.x,
           y: proj.y,
           weaponType: proj.type,
-          life: 0.3,
-          maxLife: 0.3,
-          timestamp: performance.now()
+          startTime: performance.now(),
+          maxLife: 0.3
         });
 
         if (proj.effectType === 'missile') {
@@ -446,14 +449,16 @@ export function update(state: SystemState, dt: number): void {
     if (s.life <= 0) state.shards.splice(i, 1);
   }
 
+  const now = performance.now();
+
   for (let i = state.hitEffects.length - 1; i >= 0; i--) {
-    state.hitEffects[i].life -= dt;
-    if (state.hitEffects[i].life <= 0) state.hitEffects.splice(i, 1);
+    const elapsed = (now - state.hitEffects[i].startTime) / 1000;
+    if (elapsed >= state.hitEffects[i].maxLife) state.hitEffects.splice(i, 1);
   }
 
   for (let i = state.muzzleFlashes.length - 1; i >= 0; i--) {
-    state.muzzleFlashes[i].life -= dt;
-    if (state.muzzleFlashes[i].life <= 0) state.muzzleFlashes.splice(i, 1);
+    const elapsed = (now - state.muzzleFlashes[i].startTime) / 1000;
+    if (elapsed >= state.muzzleFlashes[i].maxLife) state.muzzleFlashes.splice(i, 1);
   }
 }
 

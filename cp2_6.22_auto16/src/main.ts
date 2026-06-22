@@ -11,6 +11,8 @@ interface ScreenShake {
   time: number;
   duration: number;
   intensity: number;
+  dirX: number;
+  dirY: number;
   x: number;
   y: number;
 }
@@ -37,11 +39,16 @@ function main(): void {
     time: 0,
     duration: SHAKE_DURATION,
     intensity: SHAKE_INTENSITY,
+    dirX: 0,
+    dirY: 0,
     x: 0,
     y: 0
   };
 
   const triggerShake = (): void => {
+    const angle = Math.random() * Math.PI * 2;
+    shake.dirX = Math.cos(angle);
+    shake.dirY = Math.sin(angle);
     shake.time = shake.duration;
   };
 
@@ -57,8 +64,8 @@ function main(): void {
       shake.time -= dt;
       if (shake.time > 0) {
         const t = shake.time / shake.duration;
-        shake.x = (Math.random() * 2 - 1) * shake.intensity * t;
-        shake.y = (Math.random() * 2 - 1) * shake.intensity * t;
+        shake.x = shake.dirX * shake.intensity * t;
+        shake.y = shake.dirY * shake.intensity * t;
       } else {
         shake.x = 0;
         shake.y = 0;

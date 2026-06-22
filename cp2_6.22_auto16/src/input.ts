@@ -50,8 +50,8 @@ export function setupInputHandlers(
     }
 
     if (!clickedPanel) {
-      const fired = fireWeapon(state);
-      if (fired && onFireSuccess) {
+      const result = fireWeapon(state, true);
+      if (result.fired && result.isPrimary && onFireSuccess) {
         onFireSuccess();
       }
     }

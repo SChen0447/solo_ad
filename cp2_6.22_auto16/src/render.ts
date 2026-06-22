@@ -338,15 +338,25 @@ function getWeaponColor(type: WeaponType): string {
     case 'energy': return '#00AAFF';
     case 'missile': return '#FF6600';
     case 'shotgun': return '#FF3333';
-    default: return '#FFFFFF';
+    default: {
+      const _exhaustiveCheck: never = type;
+      return _exhaustiveCheck || '#FFFFFF';
+    }
   }
 }
 
+function easeOutCubic(t: number): number {
+  return 1 - Math.pow(1 - t, 3);
+}
+
 function drawHitEffects(ctx: CanvasRenderingContext2D, hitEffects: HitEffectData[]): void {
+  const now = performance.now();
   for (const h of hitEffects) {
-    const progress = 1 - h.life / h.maxLife;
+    const elapsed = (now - h.startTime) / 1000;
+    const progress = Math.min(elapsed / h.maxLife, 1);
+    const easedProgress = easeOutCubic(progress);
     const alpha = 1 - progress;
-    const radius = 10 + progress * 45;
+    const radius = 10 + easedProgress * 45;
     const color = getWeaponColor(h.weaponType);
 
     ctx.save();
@@ -371,8 +381,10 @@ function drawHitEffects(ctx: CanvasRenderingContext2D, hitEffects: HitEffectData
 }
 
 function drawMuzzleFlashes(ctx: CanvasRenderingContext2D, flashes: MuzzleFlashData[]): void {
+  const now = performance.now();
   for (const f of flashes) {
-    const progress = 1 - f.life / f.maxLife;
+    const elapsed = (now - f.startTime) / 1000;
+    const progress = Math.min(elapsed / f.maxLife, 1);
     const alpha = 1 - progress;
     const color = getWeaponColor(f.weaponType);
 
