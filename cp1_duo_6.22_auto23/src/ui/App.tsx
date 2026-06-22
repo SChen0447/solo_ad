@@ -314,6 +314,7 @@ export const App: React.FC = () => {
             onSubtitlesChange={handleSubtitlesChange}
             selectedSubtitleId={selectedSubtitleId}
             onSelectSubtitle={setSelectedSubtitleId}
+            currentPlayTime={renderState.currentTime}
           />
           
           <EffectPanel
