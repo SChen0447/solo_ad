@@ -1,0 +1,222 @@
+import { useState } from 'react';
+
+interface VoteOption {
+  id: string;
+  text: string;
+  voteCount: number;
+  voters?: string[];
+}
+
+interface VoteCardProps {
+  options: VoteOption[];
+  isClosed: boolean;
+  hasVoted: boolean;
+  votedOptionId: string | null;
+  totalVotes: number;
+  onVote: (optionId: string) => void;
+  showVoters: boolean;
+}
+
+function getOptionColor(index: number, total: number): string {
+  const startH = 250;
+  const endH = 280;
+  const h = total <= 1 ? startH : startH + ((endH - startH) * index) / (total - 1);
+  return `hsl(${h}, 80%, 65%)`;
+}
+
+export default function VoteCard({
+  options,
+  isClosed,
+  hasVoted,
+  votedOptionId,
+  totalVotes,
+  onVote,
+  showVoters,
+}: VoteCardProps) {
+  const [hoveredId, setHoveredId] = useState<string | null>(null);
+
+  return (
+    <div
+      style={{
+        padding: 24,
+        backgroundColor: 'rgba(30, 30, 30, 0.8)',
+        backdropFilter: 'blur(12px)',
+        borderRadius: 16,
+        border: '1px solid rgba(255, 255, 255, 0.06)',
+        boxShadow: '0 4px 24px rgba(0, 0, 0, 0.3)',
+      }}
+    >
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+        <h3 style={{ fontSize: 16, fontWeight: 600, color: '#FFF' }}>
+          {hasVoted ? '✅ 投票完成' : isClosed ? '🔒 投票已关闭' : '🗳️ 选择你的选项'}
+        </h3>
+        {hasVoted && !isClosed && (
+          <span style={{ fontSize: 12, color: '#888' }}>已记录你的选择</span>
+        )}
+      </div>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        {options.map((opt, idx) => {
+          const isSelected = votedOptionId === opt.id;
+          const isHovered = hoveredId === opt.id;
+          const percentage = totalVotes > 0 ? (opt.voteCount / totalVotes) * 100 : 0;
+          const color = getOptionColor(idx, options.length);
+          const disabled = isClosed || hasVoted;
+
+          return (
+            <div key={opt.id}>
+              <button
+                onClick={() => !disabled && onVote(opt.id)}
+                onMouseEnter={() => setHoveredId(opt.id)}
+                onMouseLeave={() => setHoveredId(null)}
+                disabled={disabled}
+                style={{
+                  width: '100%',
+                  padding: '14px 16px',
+                  backgroundColor: isSelected
+                    ? '#BB86FC'
+                    : isHovered && !disabled
+                    ? 'rgba(187, 134, 252, 0.15)'
+                    : 'rgba(255, 255, 255, 0.04)',
+                  border: isSelected
+                    ? '2px solid #BB86FC'
+                    : '2px solid rgba(255, 255, 255, 0.08)',
+                  borderRadius: 12,
+                  cursor: disabled ? 'not-allowed' : 'pointer',
+                  position: 'relative',
+                  overflow: 'hidden',
+                  transform: isHovered && !disabled ? 'scale(1.05)' : 'scale(1)',
+                  transition: 'all 0.2s ease-out',
+                  opacity: disabled && !isSelected ? 0.6 : 1,
+                }}
+              >
+                {(hasVoted || totalVotes > 0) && (
+                  <div
+                    style={{
+                      position: 'absolute',
+                      left: 0,
+                      top: 0,
+                      bottom: 0,
+                      width: `${percentage}%`,
+                      backgroundColor: isSelected
+                        ? 'rgba(255, 255, 255, 0.15)'
+                        : `${color}33`,
+                      transition: 'width 0.3s ease-out',
+                      zIndex: 0,
+                    }}
+                  />
+                )}
+
+                <div
+                  style={{
+                    position: 'relative',
+                    zIndex: 1,
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <div
+                      style={{
+                        width: 10,
+                        height: 10,
+                        borderRadius: '50%',
+                        backgroundColor: color,
+                        flexShrink: 0,
+                      }}
+                    />
+                    <span
+                      style={{
+                        fontSize: 14,
+                        fontWeight: 500,
+                        color: isSelected ? '#121212' : '#FFF',
+                        textAlign: 'left',
+                      }}
+                    >
+                      {opt.text}
+                    </span>
+                    {isSelected && (
+                      <span
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          width: 18,
+                          height: 18,
+                          borderRadius: '50%',
+                          backgroundColor: '#121212',
+                          color: '#BB86FC',
+                          fontSize: 12,
+                          fontWeight: 700,
+                        }}
+                      >
+                        ✓
+                      </span>
+                    )}
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    {(hasVoted || totalVotes > 0) && (
+                      <span
+                        style={{
+                          fontSize: 13,
+                          color: isSelected ? 'rgba(18, 18, 18, 0.7)' : '#888',
+                          fontWeight: 500,
+                        }}
+                      >
+                        {percentage.toFixed(0)}%
+                      </span>
+                    )}
+                    <span
+                      style={{
+                        fontSize: 13,
+                        color: isSelected ? '#121212' : '#AAA',
+                        fontWeight: 600,
+                        backgroundColor: isSelected ? 'rgba(18, 18, 18, 0.15)' : 'rgba(255, 255, 255, 0.08)',
+                        padding: '2px 8px',
+                        borderRadius: 6,
+                      }}
+                    >
+                      {opt.voteCount} 票
+                    </span>
+                  </div>
+                </div>
+              </button>
+
+              {showVoters && opt.voters && opt.voters.length > 0 && (
+                <div
+                  style={{
+                    marginTop: 6,
+                    padding: '8px 12px',
+                    backgroundColor: 'rgba(255, 255, 255, 0.03)',
+                    borderRadius: 8,
+                    marginLeft: 8,
+                  }}
+                >
+                  <div style={{ fontSize: 11, color: '#666', marginBottom: 4 }}>投票者：</div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                    {opt.voters.map((v, i) => (
+                      <span
+                        key={i}
+                        style={{
+                          fontSize: 11,
+                          padding: '2px 8px',
+                          backgroundColor: 'rgba(187, 134, 252, 0.15)',
+                          color: '#BB86FC',
+                          borderRadius: 4,
+                        }}
+                      >
+                        {v}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
