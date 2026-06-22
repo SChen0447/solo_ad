@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
+import gsap from 'gsap';
 import type { GroupResult, Snapshot } from './App';
 
 interface SidebarProps {
@@ -21,6 +22,9 @@ const Sidebar: React.FC<SidebarProps> = ({
   onSnapshotReplay,
 }) => {
   const [expandedGroups, setExpandedGroups] = useState<Set<number>>(new Set());
+  const contentRef = useRef<HTMLDivElement>(null);
+  const animationRef = useRef<gsap.core.Tween | null>(null);
+  const wasOpenRef = useRef(open);
 
   const toggleGroup = (idx: number) => {
     setExpandedGroups((prev) => {
@@ -38,6 +42,35 @@ const Sidebar: React.FC<SidebarProps> = ({
     const d = new Date(ts);
     return `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`;
   };
+
+  useEffect(() => {
+    if (wasOpenRef.current === open) return;
+    wasOpenRef.current = open;
+
+    if (contentRef.current) {
+      if (animationRef.current) {
+        animationRef.current.kill();
+      }
+
+      if (open) {
+        const targetHeight = contentRef.current.scrollHeight;
+        gsap.set(contentRef.current, { height: 0, opacity: 0 });
+        animationRef.current = gsap.to(contentRef.current, {
+          height: targetHeight,
+          opacity: 1,
+          duration: 0.45,
+          ease: 'power3.out',
+        });
+      } else {
+        animationRef.current = gsap.to(contentRef.current, {
+          height: 0,
+          opacity: 0,
+          duration: 0.35,
+          ease: 'power2.in',
+        });
+      }
+    }
+  }, [open]);
 
   const sidebarStyle: React.CSSProperties = {
     width: open ? 300 : 48,
@@ -102,12 +135,8 @@ const Sidebar: React.FC<SidebarProps> = ({
   };
 
   const contentStyle: React.CSSProperties = {
-    flex: 1,
     overflowY: 'auto',
     overflowX: 'hidden',
-    padding: open ? '0' : '0',
-    opacity: open ? 1 : 0,
-    transition: 'opacity 0.25s',
     pointerEvents: open ? 'auto' : 'none',
   };
 
@@ -117,7 +146,14 @@ const Sidebar: React.FC<SidebarProps> = ({
         {open ? '▸' : '◂'}
       </div>
 
-      <div style={contentStyle}>
+      <div
+        ref={contentRef}
+        style={{
+          ...contentStyle,
+          height: open ? 'auto' : 0,
+          opacity: open ? 1 : 0,
+        }}
+      >
         <div style={headerStyle}>
           <div style={titleStyle}>智能助手</div>
           <div style={subtitleStyle}>选中便签后点击聚合按钮进行分组</div>

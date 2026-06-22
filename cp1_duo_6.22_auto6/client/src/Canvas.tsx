@@ -63,10 +63,13 @@ const Canvas: React.FC<CanvasProps> = ({
   const [activeSnapshotIdx, setActiveSnapshotIdx] = useState(-1);
   const [isReplaying, setIsReplaying] = useState(false);
   const [colorPickerForNoteId, setColorPickerForNoteId] = useState<string | null>(null);
+  const [sliderDragging, setSliderDragging] = useState(false);
+  const [sliderValue, setSliderValue] = useState(-1);
 
   const notePositionsRef = useRef<Map<string, { x: number; y: number }>>(new Map());
   const noteColorRefs = useRef<Map<string, { border: HTMLDivElement | null; bar: HTMLDivElement | null }>>(new Map());
   const prevColorsRef = useRef<Map<string, string>>(new Map());
+  const elasticRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
 
   const screenToWorld = useCallback(
     (sx: number, sy: number) => {
@@ -142,6 +145,12 @@ const Canvas: React.FC<CanvasProps> = ({
         const ny = world.y - dragOffset.y;
         setDragPos({ x: nx, y: ny });
         onMoveNote(draggingId, nx, ny);
+
+        const dx = nx - elasticRef.current.x;
+        const dy = ny - elasticRef.current.y;
+        const stiffness = 0.35;
+        elasticRef.current.x += dx * stiffness;
+        elasticRef.current.y += dy * stiffness;
       }
     },
     [isPanning, panStart, panOrigin, draggingId, dragOffset, screenToWorld, onMoveNote]
@@ -150,9 +159,26 @@ const Canvas: React.FC<CanvasProps> = ({
   const handleMouseUp = useCallback(() => {
     setIsPanning(false);
     if (draggingId) {
+      const note = notes.find((n) => n.id === draggingId);
+      if (note) {
+        const el = document.querySelector(`[data-note-id="${draggingId}"]`) as HTMLDivElement;
+        if (el) {
+          gsap.fromTo(
+            el,
+            { x: elasticRef.current.x, y: elasticRef.current.y, scale: 1.08 },
+            {
+              x: note.x,
+              y: note.y,
+              scale: 1,
+              duration: 0.6,
+              ease: 'elastic.out(1.2, 0.5)',
+            }
+          );
+        }
+      }
       setDraggingId(null);
     }
-  }, [draggingId]);
+  }, [draggingId, notes]);
 
   const handleDoubleClick = useCallback(
     (e: React.MouseEvent) => {
@@ -190,6 +216,7 @@ const Canvas: React.FC<CanvasProps> = ({
       setDraggingId(noteId);
       setDragOffset({ x: world.x - note.x, y: world.y - note.y });
       setDragPos({ x: note.x, y: note.y });
+      elasticRef.current = { x: note.x, y: note.y };
     },
     [connectingFromId, notes, screenToWorld, onAddConnection, onToggleSelect]
   );
@@ -379,8 +406,9 @@ const Canvas: React.FC<CanvasProps> = ({
         >
           <defs>
             <linearGradient id="connGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-              <stop offset="0%" stopColor="#00e5ff" stopOpacity="0.8" />
-              <stop offset="100%" stopColor="#18ffff" stopOpacity="0.8" />
+              <stop offset="0%" stopColor="#00e5ff" stopOpacity="0.9" />
+              <stop offset="50%" stopColor="#18ffff" stopOpacity="0.85" />
+              <stop offset="100%" stopColor="#00e5ff" stopOpacity="0.9" />
             </linearGradient>
           </defs>
           {connections.map((conn) => {
@@ -393,7 +421,8 @@ const Canvas: React.FC<CanvasProps> = ({
                   fill="none"
                   stroke="url(#connGradient)"
                   strokeWidth={2}
-                  strokeDasharray="8 4"
+                  strokeDasharray="4 3"
+                  strokeLinecap="round"
                   style={{ pointerEvents: 'stroke' }}
                   onClick={() => onDeleteConnection(conn.id)}
                 />
@@ -413,7 +442,8 @@ const Canvas: React.FC<CanvasProps> = ({
                 y2={mouseWorld.y}
                 stroke="#00e5ff"
                 strokeWidth={2}
-                strokeDasharray="4 4"
+                strokeDasharray="4 3"
+                strokeLinecap="round"
                 opacity={0.6}
               />
             );
@@ -425,8 +455,14 @@ const Canvas: React.FC<CanvasProps> = ({
           const isHovered = hoveredNoteId === note.id;
           const isSelected = selectedNoteIds.has(note.id);
           const isEditing = editingNoteId === note.id;
-          const posX = isDragging ? dragPos.x : note.x;
-          const posY = isDragging ? dragPos.y : note.y;
+          const posX = isDragging ? elasticRef.current.x : note.x;
+          const posY = isDragging ? elasticRef.current.y : note.y;
+
+          const dragOffsetX = isDragging ? dragPos.x - elasticRef.current.x : 0;
+          const dragOffsetY = isDragging ? dragPos.y - elasticRef.current.y : 0;
+          const stretchX = 1 + Math.min(Math.abs(dragOffsetX) / 200, 0.15);
+          const stretchY = 1 - Math.min(Math.abs(dragOffsetY) / 200, 0.1);
+          const rotation = isDragging ? dragOffsetX * 0.08 : 0;
 
           const noteStyle: React.CSSProperties = {
             position: 'absolute',
@@ -434,18 +470,20 @@ const Canvas: React.FC<CanvasProps> = ({
             top: posY,
             width: NOTE_W,
             height: NOTE_H,
-            background: `rgba(20, 30, 50, 0.65)`,
-            backdropFilter: 'blur(16px)',
-            WebkitBackdropFilter: 'blur(16px)',
+            background: 'rgba(20, 30, 50, 0.65)',
+            backdropFilter: 'blur(20px)',
+            WebkitBackdropFilter: 'blur(20px)',
             border: `1.5px solid ${isSelected ? note.color : isHovered ? note.color + 'aa' : note.color + '44'}`,
             borderRadius: 12,
             boxShadow: isSelected
-              ? '0 0 20px ' + note.color + '4d, 0 4px 16px rgba(0,0,0,0.3)'
-              : `0 4px 16px rgba(0,0,0,0.3)`,
+              ? '0 0 20px ' + note.color + '4d, 0 0 0 1px rgba(0, 229, 255, 0.3), 0 4px 16px rgba(0,0,0,0.3)'
+              : '0 0 0 1px rgba(0, 229, 255, 0.15), 0 4px 16px rgba(0,0,0,0.3)',
+            transform: isDragging ? `scaleX(${stretchX}) scaleY(${stretchY}) rotate(${rotation}deg)` : 'none',
+            transformOrigin: 'center center',
             padding: '12px',
             cursor: isDragging ? 'grabbing' : 'grab',
             userSelect: 'none',
-            transition: isDragging ? 'none' : 'box-shadow 0.2s, border-color 0.2s',
+            transition: isDragging ? 'none' : 'box-shadow 0.2s, border-color 0.2s, transform 0.1s',
             zIndex: isDragging ? 100 : isSelected ? 50 : 1,
             overflow: 'hidden',
           };
@@ -699,8 +737,27 @@ const Canvas: React.FC<CanvasProps> = ({
           type="range"
           min={-1}
           max={snapshots.length - 1}
-          value={activeSnapshotIdx}
-          onChange={(e) => handleReplaySnapshot(parseInt(e.target.value))}
+          value={sliderDragging ? sliderValue : activeSnapshotIdx}
+          onMouseDown={() => {
+            setSliderDragging(true);
+            setSliderValue(activeSnapshotIdx);
+          }}
+          onMouseUp={() => {
+            setSliderDragging(false);
+            handleReplaySnapshot(sliderValue);
+          }}
+          onTouchStart={() => {
+            setSliderDragging(true);
+            setSliderValue(activeSnapshotIdx);
+          }}
+          onTouchEnd={() => {
+            setSliderDragging(false);
+            handleReplaySnapshot(sliderValue);
+          }}
+          onChange={(e) => {
+            const val = parseInt(e.target.value);
+            setSliderValue(val);
+          }}
           style={{
             flex: 1,
             accentColor: '#00e5ff',
@@ -708,10 +765,14 @@ const Canvas: React.FC<CanvasProps> = ({
             cursor: 'pointer',
           }}
         />
-        <span style={{ fontSize: 11, color: '#8899aa', whiteSpace: 'nowrap', minWidth: 70, textAlign: 'center' }}>
-          {activeSnapshotIdx >= 0 && snapshots[activeSnapshotIdx]
-            ? formatTime(snapshots[activeSnapshotIdx].timestamp)
-            : '当前状态'}
+        <span style={{ fontSize: 11, color: sliderDragging ? '#00e5ff' : '#8899aa', whiteSpace: 'nowrap', minWidth: 70, textAlign: 'center', fontWeight: sliderDragging ? 600 : 400, transition: 'all 0.2s' }}>
+          {sliderDragging
+            ? sliderValue >= 0 && snapshots[sliderValue]
+              ? formatTime(snapshots[sliderValue].timestamp)
+              : '当前状态'
+            : activeSnapshotIdx >= 0 && snapshots[activeSnapshotIdx]
+              ? formatTime(snapshots[activeSnapshotIdx].timestamp)
+              : '当前状态'}
         </span>
         <button
           onClick={() => {
