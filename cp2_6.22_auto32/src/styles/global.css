@@ -289,11 +289,12 @@ body {
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
   animation: fadeInUp 0.4s ease backwards;
   position: relative;
+  will-change: transform, box-shadow;
 }
 
 .plant-card:hover {
   transform: translateY(-6px);
-  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.18);
 }
 
 .plant-card.leaf {

@@ -64,7 +64,8 @@ export default function AddPlantModal({ open, onClose }: Props) {
     delete newErrors[field as keyof FormErrors]
     if (field === 'name' && !value.trim()) newErrors.name = '请输入植物名称'
     if (
-      (field === 'maturityDays' || field === 'waterFrequency' || field === 'fertilizeFrequency') {
+      field === 'maturityDays' || field === 'waterFrequency' || field === 'fertilizeFrequency'
+    ) {
       const n = Number(value)
       if (!value || isNaN(n) || n <= 0) {
         if (field === 'maturityDays') newErrors.maturityDays = '请输入有效的天数（大于0）'
