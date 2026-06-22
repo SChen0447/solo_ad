@@ -42,23 +42,42 @@ const questionStore: QuestionStore = {
   getQuestionsByFilter({ knowledges, difficulties, count }) {
     let filtered = [...this.questions];
 
-    if (knowledges && knowledges.length > 0) {
-      const normalizedKnowledges = knowledges.map((k) => k.trim());
+    const hasKnowledgeFilter =
+      knowledges !== undefined &&
+      knowledges !== null &&
+      Array.isArray(knowledges) &&
+      knowledges.length > 0 &&
+      knowledges.some((k) => k && k.trim() !== '');
+
+    if (hasKnowledgeFilter) {
+      const validKnowledges = knowledges
+        .filter((k) => k && k.trim() !== '')
+        .map((k) => k.trim().toLowerCase());
       filtered = filtered.filter((q) => {
-        return normalizedKnowledges.some(
-          (k) => k.toLowerCase() === q.knowledge.trim().toLowerCase()
-        );
+        return validKnowledges.includes(q.knowledge.trim().toLowerCase());
       });
     }
 
-    if (difficulties && difficulties.length > 0) {
-      filtered = filtered.filter((q) => difficulties.includes(q.difficulty));
+    const hasDifficultyFilter =
+      difficulties !== undefined &&
+      difficulties !== null &&
+      Array.isArray(difficulties) &&
+      difficulties.length > 0;
+
+    if (hasDifficultyFilter) {
+      const validDifficulties = difficulties.filter(
+        (d) => d === 'easy' || d === 'medium' || d === 'hard'
+      );
+      if (validDifficulties.length > 0) {
+        filtered = filtered.filter((q) => validDifficulties.includes(q.difficulty));
+      }
     }
 
     const shuffled = filtered.sort(() => Math.random() - 0.5);
 
-    if (count && count > 0) {
-      return shuffled.slice(0, Math.min(count, shuffled.length));
+    const numCount = typeof count === 'number' ? count : parseInt(String(count), 10);
+    if (!isNaN(numCount) && numCount > 0) {
+      return shuffled.slice(0, Math.min(numCount, shuffled.length));
     }
 
     return shuffled;

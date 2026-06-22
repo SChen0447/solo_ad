@@ -10,7 +10,19 @@ const QuestionBank: React.FC = () => {
   const [uploading, setUploading] = useState(false);
   const [uploadResult, setUploadResult] = useState<{ count: number; total: number } | null>(null);
   const [dragOver, setDragOver] = useState(false);
+  const [dragError, setDragError] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const isValidCsvFile = (file: File): boolean => {
+    if (!file) return false;
+    const isCsvByName = file.name.toLowerCase().endsWith('.csv');
+    const isCsvByType =
+      file.type === 'text/csv' ||
+      file.type === 'application/csv' ||
+      file.type === 'application/vnd.ms-excel' ||
+      file.type === 'text/plain';
+    return isCsvByName || isCsvByType;
+  };
 
   useEffect(() => {
     fetchQuestions();
@@ -46,6 +58,11 @@ const QuestionBank: React.FC = () => {
 
   const handleFileUpload = async (file: File) => {
     if (!file) return;
+
+    if (!isValidCsvFile(file)) {
+      alert(`不支持的文件类型：${file.name}\n请上传CSV格式的题库文件。`);
+      return;
+    }
 
     setUploading(true);
     setUploadResult(null);
@@ -84,10 +101,17 @@ const QuestionBank: React.FC = () => {
     e.preventDefault();
     setDragOver(false);
     const file = e.dataTransfer.files?.[0];
-    if (file && file.name.endsWith('.csv')) {
+    if (!file) {
+      setDragError(false);
+      return;
+    }
+    if (isValidCsvFile(file)) {
+      setDragError(false);
       handleFileUpload(file);
     } else {
-      alert('请上传CSV文件');
+      setDragError(true);
+      alert(`不支持的文件类型：${file.name}\n请上传CSV格式的题库文件。`);
+      setTimeout(() => setDragError(false), 1500);
     }
   };
 
@@ -148,17 +172,32 @@ const QuestionBank: React.FC = () => {
       <div className="card">
         <h3 className="card-title">� 导入题库</h3>
         <div
-          className={`upload-area ${dragOver ? 'drag-over' : ''}`}
+          className={`upload-area ${dragOver ? 'drag-over' : ''} ${dragError ? 'drag-error' : ''}`}
           onDragOver={(e) => {
             e.preventDefault();
+            const file = e.dataTransfer.files?.[0];
+            if (file && !isValidCsvFile(file)) {
+              setDragError(true);
+            } else {
+              setDragError(false);
+            }
             setDragOver(true);
           }}
-          onDragLeave={() => setDragOver(false)}
+          onDragLeave={() => {
+            setDragOver(false);
+            setDragError(false);
+          }}
           onDrop={handleDrop}
           onClick={() => fileInputRef.current?.click()}
         >
           {uploading ? (
             <p>上传中...</p>
+          ) : dragError ? (
+            <>
+              <p className="upload-icon">❌</p>
+              <p style={{ color: '#ef4444', fontWeight: 500 }}>不支持的文件类型</p>
+              <p className="upload-hint">请上传CSV格式的题库文件</p>
+            </>
           ) : (
             <>
               <p className="upload-icon">📄</p>
@@ -182,7 +221,7 @@ const QuestionBank: React.FC = () => {
       </div>
 
       <div className="card">
-        <h3 className="card-title">�🔍 筛选题目</h3>
+        <h3 className="card-title">�� 筛选题目</h3>
         <div className="filter-row">
           <div className="filter-item">
             <label>知识点：</label>

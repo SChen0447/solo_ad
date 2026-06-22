@@ -12,6 +12,7 @@ const App: React.FC = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [quizRecords, setQuizRecords] = useState<QuizRecord[]>([]);
   const [selectedRecord, setSelectedRecord] = useState<QuizRecord | null>(null);
+  const [selectedRecordId, setSelectedRecordId] = useState<string | null>(null);
 
   useEffect(() => {
     const saved = localStorage.getItem('quizforge_records');
@@ -30,6 +31,8 @@ const App: React.FC = () => {
   }, []);
 
   const handleQuizGenerated = (questions: Question[]) => {
+    setSelectedRecord(null);
+    setSelectedRecordId(null);
     setCurrentQuiz(questions);
   };
 
@@ -51,10 +54,23 @@ const App: React.FC = () => {
   };
 
   const handleViewRecord = (record: QuizRecord) => {
+    setSelectedRecordId(record.id);
     setSelectedRecord(record);
     setCurrentQuiz(record.questions);
     setCurrentPage('answer');
   };
+
+  useEffect(() => {
+    if (selectedRecordId && quizRecords.length > 0) {
+      const record = quizRecords.find((r) => r.id === selectedRecordId);
+      if (record) {
+        setSelectedRecord(record);
+        if (currentQuiz.length === 0) {
+          setCurrentQuiz(record.questions);
+        }
+      }
+    }
+  }, [selectedRecordId, quizRecords]);
 
   const navItems = [
     { key: 'bank', label: '题库管理', icon: '📚', roles: ['teacher', 'student'] as UserRole[] },
@@ -79,6 +95,7 @@ const App: React.FC = () => {
             initialAnswers={selectedRecord?.answers}
             initialScoreResult={selectedRecord?.scoreResult}
             readonly={!!selectedRecord}
+            recordId={selectedRecordId}
           />
         );
       case 'history':
@@ -105,6 +122,7 @@ const App: React.FC = () => {
             onClick={() => {
               setUserRole(userRole === 'teacher' ? 'student' : 'teacher');
               setSelectedRecord(null);
+              setSelectedRecordId(null);
             }}
           >
             切换身份
@@ -122,6 +140,7 @@ const App: React.FC = () => {
                 onClick={() => {
                   setCurrentPage(item.key as PageType);
                   setSelectedRecord(null);
+                  setSelectedRecordId(null);
                   setSidebarOpen(false);
                 }}
               >

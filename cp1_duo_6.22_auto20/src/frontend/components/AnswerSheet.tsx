@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   BarChart,
   Bar,
@@ -23,6 +23,7 @@ interface AnswerSheetProps {
   initialAnswers?: Record<string, string | string[] | null>;
   initialScoreResult?: ScoreResult;
   readonly?: boolean;
+  recordId?: string | null;
 }
 
 const AnswerSheet: React.FC<AnswerSheetProps> = ({
@@ -31,14 +32,47 @@ const AnswerSheet: React.FC<AnswerSheetProps> = ({
   initialAnswers,
   initialScoreResult,
   readonly = false,
+  recordId = null,
 }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [answers, setAnswers] = useState<Record<string, string | string[] | null>>({});
   const [scoreResult, setScoreResult] = useState<ScoreResult | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [fadeIn, setFadeIn] = useState(true);
+  const lastSavedAnswersRef = useRef<string>('');
+
+  const areAnswersEqual = useCallback(
+    (
+      a: Record<string, string | string[] | null>,
+      b: Record<string, string | string[] | null>
+    ): boolean => {
+      const keysA = Object.keys(a);
+      const keysB = Object.keys(b);
+      if (keysA.length !== keysB.length) return false;
+      for (const key of keysA) {
+        if (!keysB.includes(key)) return false;
+        const valA = a[key];
+        const valB = b[key];
+        if (Array.isArray(valA) && Array.isArray(valB)) {
+          if (valA.length !== valB.length) return false;
+          const sortedA = [...valA].sort();
+          const sortedB = [...valB].sort();
+          for (let i = 0; i < sortedA.length; i++) {
+            if (sortedA[i] !== sortedB[i]) return false;
+          }
+        } else if (valA !== valB) {
+          return false;
+        }
+      }
+      return true;
+    },
+    []
+  );
 
   const getStorageKey = () => {
+    if (recordId) {
+      return `quizforge_answers_record_${recordId}`;
+    }
     if (questions.length === 0) return 'quizforge_answers';
     const ids = questions.map((q) => q.id).join('|');
     return `quizforge_answers_${ids.length}_${ids.slice(0, 50)}`;
@@ -51,6 +85,7 @@ const AnswerSheet: React.FC<AnswerSheetProps> = ({
       const saved = localStorage.getItem(key);
       if (saved) {
         const parsed = JSON.parse(saved);
+        lastSavedAnswersRef.current = JSON.stringify(parsed);
         setAnswers(parsed);
       }
     } catch (e) {
@@ -61,8 +96,13 @@ const AnswerSheet: React.FC<AnswerSheetProps> = ({
   const saveAnswersToStorage = (newAnswers: Record<string, string | string[] | null>) => {
     if (readonly) return;
     try {
+      const currentSnapshot = JSON.stringify(newAnswers);
+      if (currentSnapshot === lastSavedAnswersRef.current) {
+        return;
+      }
       const key = getStorageKey();
-      localStorage.setItem(key, JSON.stringify(newAnswers));
+      localStorage.setItem(key, currentSnapshot);
+      lastSavedAnswersRef.current = currentSnapshot;
     } catch (e) {
       console.error('Failed to save answers:', e);
     }
@@ -72,6 +112,7 @@ const AnswerSheet: React.FC<AnswerSheetProps> = ({
     try {
       const key = getStorageKey();
       localStorage.removeItem(key);
+      lastSavedAnswersRef.current = '';
     } catch (e) {
       console.error('Failed to clear saved answers:', e);
     }
@@ -244,7 +285,7 @@ const AnswerSheet: React.FC<AnswerSheetProps> = ({
           </div>
         </div>
 
-        {chartData.length > 0 && (
+        {chartData.length > 0 ? (
           <div className="card">
             <h3 className="card-title">📈 知识点正确率分析</h3>
             <div className="chart-container">
@@ -321,6 +362,15 @@ const AnswerSheet: React.FC<AnswerSheetProps> = ({
                   </Bar>
                 </BarChart>
               </ResponsiveContainer>
+            </div>
+          </div>
+        ) : (
+          <div className="card">
+            <h3 className="card-title">📈 知识点正确率分析</h3>
+            <div className="empty-state" style={{ padding: '40px 20px' }}>
+              <p className="empty-icon">📊</p>
+              <p style={{ color: '#64748b', marginBottom: '8px' }}>暂无知识点统计数据</p>
+              <p className="upload-hint">完成答题后将在此展示各知识点的正确率分析</p>
             </div>
           </div>
         )}
