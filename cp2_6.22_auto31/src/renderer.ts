@@ -1,5 +1,5 @@
 import { Grid, TILE_SIZE, GRID_SIZE, MAP_WIDTH, MAP_HEIGHT } from './map';
-import { Tower, Monster, Projectile, TowerType, TOWER_COLORS, PROJECTILE_COLORS } from './entity';
+import { Tower, Monster, Projectile, TowerType, TOWER_COLORS, PROJECTILE_COLORS, Particle } from './entity';
 
 export interface RenderState {
   time: number;
@@ -26,6 +26,7 @@ export function renderGame(
   towers: Map<number, Tower>,
   monsters: Map<number, Monster>,
   projectiles: Map<number, Projectile>,
+  particles: Particle[],
   state: RenderState
 ): void {
   const fullWidth = state.canvasWidth;
@@ -39,6 +40,7 @@ export function renderGame(
   drawTowers(ctx, towers, state);
   drawMonsters(ctx, monsters, state);
   drawProjectiles(ctx, projectiles);
+  drawParticles(ctx, particles);
   drawGoldPanel(ctx, state);
 
   if (state.buildMenu.visible) {
@@ -220,6 +222,26 @@ function drawTower(ctx: CanvasRenderingContext2D, tower: Tower, state: RenderSta
     ctx.setLineDash([]);
   }
 
+  if (tower.pulseRingTimer > 0 && tower.type !== 'collector') {
+    const pulseDuration = 0.15;
+    const t = 1 - tower.pulseRingTimer / pulseDuration;
+    const maxRadius = tower.stats.range * 0.3;
+    const radius = maxRadius * t;
+    const ringAlpha = 0.4 * (1 - t);
+    const ringWidth = 4 + t * 6;
+
+    ctx.strokeStyle = hexToRgba(color, ringAlpha);
+    ctx.lineWidth = ringWidth;
+    ctx.beginPath();
+    ctx.arc(x, tower.y, radius, 0, Math.PI * 2);
+    ctx.stroke();
+
+    ctx.fillStyle = hexToRgba(color, ringAlpha * 0.2);
+    ctx.beginPath();
+    ctx.arc(x, tower.y, radius, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
   ctx.save();
   ctx.globalAlpha = alpha;
 
@@ -370,9 +392,16 @@ function drawMonsters(ctx: CanvasRenderingContext2D, monsters: Map<number, Monst
 function drawMonster(ctx: CanvasRenderingContext2D, monster: Monster): void {
   if (!monster.alive) return;
 
-  const x = monster.x;
-  const y = monster.y;
+  const x = monster.x + monster.renderOffsetX;
+  const y = monster.y + monster.renderOffsetY;
   const radius = 16;
+
+  if (monster.knockbackTimer > 0) {
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+    ctx.beginPath();
+    ctx.arc(x, y, radius + 2, 0, Math.PI * 2);
+    ctx.fill();
+  }
 
   if (monster.slowTimer > 0) {
     ctx.fillStyle = 'rgba(168, 85, 247, 0.3)';
@@ -426,6 +455,24 @@ function drawProjectiles(ctx: CanvasRenderingContext2D, projectiles: Map<number,
   for (const p of projectiles.values()) {
     drawProjectile(ctx, p);
   }
+}
+
+function drawParticles(ctx: CanvasRenderingContext2D, particles: Particle[]): void {
+  for (const p of particles) {
+    if (!p.alive) continue;
+    const alpha = p.getAlpha();
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = p.color;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.size * alpha, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.globalAlpha = alpha * 0.3;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.size * alpha * 1.8, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
 }
 
 function drawProjectile(ctx: CanvasRenderingContext2D, p: Projectile): void {
@@ -891,6 +938,13 @@ function drawUpgradePanel(ctx: CanvasRenderingContext2D, panel: UpgradePanel, to
     ctx.textAlign = 'center';
     ctx.fillText(`升级 (${cost} 金币)`, px + w / 2, btnY + 22);
   }
+}
+
+function hexToRgba(hex: string, alpha: number): string {
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 }
 
 function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number): void {

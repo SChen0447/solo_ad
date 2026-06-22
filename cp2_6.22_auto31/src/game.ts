@@ -6,7 +6,8 @@ import {
   Monster,
   Projectile,
   ProjectileType,
-  TOWER_UPGRADE_COSTS
+  TOWER_UPGRADE_COSTS,
+  PROJECTILE_COLORS
 } from './entity';
 
 export interface GameCallbacks {
@@ -114,6 +115,7 @@ export class Game {
     this.entities.updateTowers(dt);
     this.entities.updateMonsters(dt, this.grid);
     this.entities.updateProjectiles(dt);
+    this.entities.updateParticles(dt);
 
     this.processTowerActions();
     this.processProjectileCollisions();
@@ -252,12 +254,18 @@ export class Game {
     for (const p of Array.from(this.entities.projectiles.values())) {
       if (p.alive) continue;
 
+      const color = PROJECTILE_COLORS[p.type] || '#FFFFFF';
+
       if (p.splashRange && p.splashRange > 0) {
         this.applySplashDamage(p);
+        this.entities.addExplosion(p.targetX, p.targetY, color);
       } else {
         const target = this.entities.monsters.get(p.targetId);
         if (target && target.alive) {
           this.hitMonster(target, p);
+          this.entities.addExplosion(target.x, target.y, color);
+        } else {
+          this.entities.addExplosion(p.targetX, p.targetY, color);
         }
       }
 
@@ -274,12 +282,14 @@ export class Game {
         const falloff = 1 - (dist / p.splashRange!) * 0.5;
         const dmg = Math.max(1, Math.round(p.damage * falloff));
         monster.takeDamage(dmg);
+        monster.applyKnockback(p.targetX, p.targetY, 3);
       }
     }
   }
 
   private hitMonster(monster: Monster, p: Projectile): void {
     monster.takeDamage(p.damage);
+    monster.applyKnockback(p.startX, p.startY, 4);
 
     if (p.slowDuration && p.slowAmount) {
       monster.applySlow(p.slowDuration, p.slowAmount);

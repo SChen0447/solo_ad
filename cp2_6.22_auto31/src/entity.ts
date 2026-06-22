@@ -57,6 +57,7 @@ export class Tower {
   recoilOffset: number = 0;
   upgradeFlashTimer: number = 0;
   particleAngle: number = 0;
+  pulseRingTimer: number = 0;
   target: Monster | null = null;
 
   constructor(id: number, type: TowerType, gridX: number, gridY: number, grid: Grid) {
@@ -111,6 +112,7 @@ export class Tower {
       this.recoilOffset = Math.max(0, this.recoilOffset - dt * 40);
     }
     if (this.upgradeFlashTimer > 0) this.upgradeFlashTimer -= dt;
+    if (this.pulseRingTimer > 0) this.pulseRingTimer -= dt;
     if (this.type === 'magic') {
       this.particleAngle += dt * Math.PI * 2;
     }
@@ -124,6 +126,7 @@ export class Tower {
     this.fireCooldown = 1.0 / this.stats.fireRate;
     this.flashTimer = 0.1;
     this.recoilOffset = 4;
+    this.pulseRingTimer = 0.15;
     this.state = 'firing';
   }
 
@@ -141,6 +144,8 @@ export class Monster {
   id: number;
   x: number;
   y: number;
+  renderOffsetX: number = 0;
+  renderOffsetY: number = 0;
   hp: number;
   maxHp: number;
   baseSpeed: number = 1.5;
@@ -148,6 +153,9 @@ export class Monster {
   pathIndex: number = 0;
   slowTimer: number = 0;
   slowAmount: number = 0;
+  knockbackTimer: number = 0;
+  knockbackDx: number = 0;
+  knockbackDy: number = 0;
   alive: boolean = true;
   reachedBase: boolean = false;
 
@@ -172,8 +180,35 @@ export class Monster {
     this.slowAmount = Math.max(this.slowAmount, amount);
   }
 
+  applyKnockback(fromX: number, fromY: number, distance: number = 4): void {
+    const dx = this.x - fromX;
+    const dy = this.y - fromY;
+    const len = Math.hypot(dx, dy);
+    if (len > 0) {
+      this.knockbackDx = (dx / len) * distance;
+      this.knockbackDy = (dy / len) * distance;
+    } else {
+      this.knockbackDx = 0;
+      this.knockbackDy = -distance;
+    }
+    this.knockbackTimer = 0.1;
+    this.renderOffsetX = this.knockbackDx;
+    this.renderOffsetY = this.knockbackDy;
+  }
+
   update(dt: number, grid: Grid): void {
     if (!this.alive) return;
+
+    if (this.knockbackTimer > 0) {
+      this.knockbackTimer -= dt;
+      const t = this.knockbackTimer / 0.1;
+      this.renderOffsetX = this.knockbackDx * t;
+      this.renderOffsetY = this.knockbackDy * t;
+      if (this.knockbackTimer <= 0) {
+        this.renderOffsetX = 0;
+        this.renderOffsetY = 0;
+      }
+    }
 
     if (this.slowTimer > 0) {
       this.slowTimer -= dt;
@@ -298,13 +333,78 @@ export class Projectile {
   }
 }
 
+export class Particle {
+  id: number;
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  color: string;
+  life: number;
+  maxLife: number;
+  size: number;
+  alive: boolean = true;
+
+  constructor(id: number, x: number, y: number, vx: number, vy: number, color: string, life: number, size: number) {
+    this.id = id;
+    this.x = x;
+    this.y = y;
+    this.vx = vx;
+    this.vy = vy;
+    this.color = color;
+    this.life = life;
+    this.maxLife = life;
+    this.size = size;
+  }
+
+  update(dt: number): void {
+    if (!this.alive) return;
+    this.life -= dt;
+    if (this.life <= 0) {
+      this.alive = false;
+      return;
+    }
+    this.x += this.vx * 60 * dt;
+    this.y += this.vy * 60 * dt;
+    this.vx *= 0.92;
+    this.vy *= 0.92;
+  }
+
+  getAlpha(): number {
+    return Math.max(0, this.life / this.maxLife);
+  }
+}
+
+export function createExplosionParticles(
+  startId: number,
+  x: number,
+  y: number,
+  color: string,
+  count: number = 7,
+  maxDist: number = 35,
+  duration: number = 0.3
+): Particle[] {
+  const particles: Particle[] = [];
+  for (let i = 0; i < count; i++) {
+    const angle = (Math.PI * 2 * i) / count + Math.random() * 0.5;
+    const speed = (maxDist / duration) * (0.6 + Math.random() * 0.4);
+    const vx = Math.cos(angle) * speed / 60;
+    const vy = Math.sin(angle) * speed / 60;
+    const size = 3 + Math.random() * 3;
+    particles.push(new Particle(startId + i, x, y, vx, vy, color, duration, size));
+  }
+  return particles;
+}
+
 export class EntityManager {
   towers: Map<number, Tower> = new Map();
   monsters: Map<number, Monster> = new Map();
   projectiles: Map<number, Projectile> = new Map();
+  particles: Particle[] = [];
   private nextTowerId = 1;
   private nextMonsterId = 1;
   private nextProjectileId = 1;
+  private nextParticleId = 1;
 
   addTower(type: TowerType, gridX: number, gridY: number, grid: Grid): Tower | null {
     if (!grid.isBuildable(gridX, gridY)) return null;
@@ -384,6 +484,18 @@ export class EntityManager {
     }
   }
 
+  addExplosion(x: number, y: number, color: string): void {
+    const particles = createExplosionParticles(this.nextParticleId, x, y, color);
+    this.nextParticleId += particles.length + 1;
+    this.particles.push(...particles);
+  }
+
+  updateParticles(dt: number): void {
+    for (const p of this.particles) {
+      p.update(dt);
+    }
+  }
+
   cleanup(): void {
     for (const monster of this.monsters.values()) {
       if (!monster.alive) this.monsters.delete(monster.id);
@@ -391,14 +503,17 @@ export class EntityManager {
     for (const p of this.projectiles.values()) {
       if (!p.alive) this.projectiles.delete(p.id);
     }
+    this.particles = this.particles.filter(p => p.alive);
   }
 
   clear(): void {
     this.towers.clear();
     this.monsters.clear();
     this.projectiles.clear();
+    this.particles = [];
     this.nextTowerId = 1;
     this.nextMonsterId = 1;
     this.nextProjectileId = 1;
+    this.nextParticleId = 1;
   }
 }
