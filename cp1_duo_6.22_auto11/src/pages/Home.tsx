@@ -1,5 +1,5 @@
-import { useRef, useState, useMemo, useCallback } from 'react';
-import { Download, AlignLeft, AlignCenter, AlignRight, Palette } from 'lucide-react';
+import { useRef, useState, useMemo, useCallback, useEffect } from 'react';
+import { Download, AlignLeft, AlignCenter, AlignRight, Palette, Loader2 } from 'lucide-react';
 import ImageEditor from '@/components/ImageEditor';
 import SubtitleOverlay from '@/components/SubtitleOverlay';
 import TemplateSelector from '@/components/TemplateSelector';
@@ -8,6 +8,10 @@ import RippleButton from '@/components/RippleButton';
 import { useAppStore } from '@/store';
 import { exportCard } from '@/utils/cardExporter';
 import { MOVIE_COLORS, FONT_OPTIONS } from '@/types';
+
+const MIN_FONT_SIZE = 16;
+const MAX_FONT_SIZE = 40;
+const MAX_WORDS = 60;
 
 const Home = () => {
   const subtitleText = useAppStore((s) => s.subtitleText);
@@ -23,15 +27,28 @@ const Home = () => {
 
   const previewRef = useRef<HTMLDivElement>(null);
   const [showColorPicker, setShowColorPicker] = useState(false);
+  const [exportError, setExportError] = useState<string | null>(null);
+  const [styleAnimKey, setStyleAnimKey] = useState(0);
+
+  useEffect(() => {
+    setStyleAnimKey((k) => k + 1);
+  }, [activeTemplate]);
 
   const handleGenerate = useCallback(async () => {
-    if (!previewRef.current || !croppedImageUrl) return;
+    if (!croppedImageUrl) {
+      setExportError('请先上传并裁切图片');
+      return;
+    }
+    if (!subtitleText.trim()) {
+      setExportError('请输入字幕文本');
+      return;
+    }
 
+    setExportError(null);
     setIsExporting(true);
+
     try {
-      await new Promise((resolve) => setTimeout(resolve, 50));
       await exportCard(
-        previewRef.current,
         croppedImageUrl,
         subtitleText,
         subtitleStyle,
@@ -40,22 +57,50 @@ const Home = () => {
       );
     } catch (error) {
       console.error('Export failed:', error);
+      setExportError('导出失败，请重试');
     } finally {
       setIsExporting(false);
     }
-  }, [previewRef, croppedImageUrl, subtitleText, subtitleStyle, activeTemplate, exportFormat, setIsExporting]);
+  }, [
+    croppedImageUrl,
+    subtitleText,
+    subtitleStyle,
+    activeTemplate,
+    exportFormat,
+    setIsExporting,
+  ]);
 
   const wordCount = useMemo(() => {
     const cn = (subtitleText.match(/[\u4e00-\u9fa5]/g) || []).length;
-    const en = subtitleText.split(/\s+/).filter(Boolean).length;
-    return cn + en;
+    const enWords = subtitleText
+      .split(/\s+/)
+      .filter((w) => w.length > 0 && /[a-zA-Z]/.test(w));
+    return cn + enWords.length;
   }, [subtitleText]);
 
+  const handleTextChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const value = e.target.value;
+    const cnCount = (value.match(/[\u4e00-\u9fa5]/g) || []).length;
+    const enCount = value
+      .split(/\s+/)
+      .filter((w) => w.length > 0 && /[a-zA-Z]/.test(w)).length;
+
+    if (cnCount + enCount > MAX_WORDS) {
+      return;
+    }
+    setSubtitleText(value);
+  };
+
+  const handleFontSizeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const size = Math.max(MIN_FONT_SIZE, Math.min(MAX_FONT_SIZE, Number(e.target.value)));
+    setSubtitleStyle({ fontSize: size });
+  };
+
   const shadowOptions = [
-    { value: 'none', label: '无' },
-    { value: 'light', label: '轻' },
-    { value: 'medium', label: '中' },
-    { value: 'heavy', label: '重' },
+    { value: 'none' as const, label: '无' },
+    { value: 'light' as const, label: '轻' },
+    { value: 'medium' as const, label: '中' },
+    { value: 'heavy' as const, label: '重' },
   ] as const;
 
   return (
@@ -80,23 +125,27 @@ const Home = () => {
             </div>
 
             <div
-              className={`bg-cinema-card rounded-xl p-5 panel-inset border border-cinema-border space-y-5 template-transition ${
-                activeTemplate ? 'animate-fade-in' : ''
-              }`}
+              key={styleAnimKey}
+              className="bg-cinema-card rounded-xl p-5 panel-inset border border-cinema-border space-y-5 animate-fade-in"
             >
               <div className="space-y-3">
                 <h3 className="text-cinema-text text-sm font-medium">字幕文本</h3>
                 <textarea
                   value={subtitleText}
-                  onChange={(e) => setSubtitleText(e.target.value.slice(0, 200))}
+                  onChange={handleTextChange}
                   placeholder="输入电影台词，最多60个汉字或单词..."
                   className="w-full h-24 bg-cinema-surface border border-cinema-border rounded-lg p-3
                     text-cinema-text placeholder:text-cinema-muted/50 resize-none
                     focus:outline-none focus:border-cinema-primary focus:ring-1 focus:ring-cinema-primary
                     transition-colors duration-200"
                 />
-                <div className="text-right text-xs text-cinema-muted">
-                  {wordCount} / 60
+                <div className="flex justify-between items-center">
+                  <span className="text-xs text-cinema-muted">
+                    支持换行，多行显示
+                  </span>
+                  <span className={`text-xs ${wordCount >= MAX_WORDS ? 'text-cinema-primary' : 'text-cinema-muted'}`}>
+                    {wordCount} / {MAX_WORDS}
+                  </span>
                 </div>
               </div>
 
@@ -122,12 +171,15 @@ const Home = () => {
                   <label className="text-xs text-cinema-muted font-medium">字号</label>
                   <select
                     value={subtitleStyle.fontSize}
-                    onChange={(e) => setSubtitleStyle({ fontSize: Number(e.target.value) })}
+                    onChange={handleFontSizeChange}
                     className="w-full bg-cinema-surface border border-cinema-border rounded-lg px-3 py-2
                       text-cinema-text text-sm focus:outline-none focus:border-cinema-primary
                       transition-colors"
                   >
-                    {Array.from({ length: 13 }, (_, i) => 16 + i * 2).map((size) => (
+                    {Array.from(
+                      { length: (MAX_FONT_SIZE - MIN_FONT_SIZE) / 2 + 1 },
+                      (_, i) => MIN_FONT_SIZE + i * 2
+                    ).map((size) => (
                       <option key={size} value={size}>
                         {size}px
                       </option>
@@ -139,7 +191,7 @@ const Home = () => {
               <div className="space-y-2">
                 <label className="text-xs text-cinema-muted font-medium flex items-center gap-1.5">
                   <Palette size={14} />
-                  颜色预设
+                  颜色预设（20种电影经典配色）
                 </label>
                 <div className="relative">
                   <button
@@ -158,7 +210,7 @@ const Home = () => {
                     <span className="text-cinema-muted text-xs">{showColorPicker ? '收起' : '展开'}</span>
                   </button>
                   {showColorPicker && (
-                    <div className="absolute z-20 mt-2 w-full bg-cinema-surface border border-cinema-border rounded-lg p-3 grid grid-cols-5 gap-2 shadow-xl">
+                    <div className="absolute z-20 mt-2 w-full bg-cinema-surface border border-cinema-border rounded-lg p-3 grid grid-cols-5 gap-2 shadow-xl animate-fade-in">
                       {MOVIE_COLORS.map((color) => (
                         <button
                           key={color.value}
@@ -244,14 +296,29 @@ const Home = () => {
                   </div>
                 </div>
 
+                {exportError && (
+                  <div className="text-red-400 text-sm px-2 py-1 bg-red-500/10 rounded">
+                    {exportError}
+                  </div>
+                )}
+
                 <RippleButton
                   onClick={handleGenerate}
                   disabled={!croppedImageUrl || !subtitleText.trim() || isExporting}
                   size="lg"
                   className="w-full gap-2"
                 >
-                  <Download size={18} />
-                  {isExporting ? '生成中...' : '生成卡片'}
+                  {isExporting ? (
+                    <>
+                      <Loader2 size={18} className="animate-spin" />
+                      生成中...
+                    </>
+                  ) : (
+                    <>
+                      <Download size={18} />
+                      生成卡片
+                    </>
+                  )}
                 </RippleButton>
               </div>
             </div>

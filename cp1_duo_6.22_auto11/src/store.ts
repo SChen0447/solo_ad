@@ -7,6 +7,12 @@ import {
   MOVIE_TEMPLATES,
 } from '@/types';
 
+const MIN_FONT_SIZE = 16;
+const MAX_FONT_SIZE = 40;
+const MAX_WORDS = 60;
+const VALID_SHADOW = ['none', 'light', 'medium', 'heavy'] as const;
+const VALID_ALIGN = ['left', 'center', 'right'] as const;
+
 interface AppStore {
   imageUrl: string | null;
   croppedImageUrl: string | null;
@@ -31,6 +37,88 @@ interface AppStore {
   loadFromHistory: (record: CardRecord) => void;
 }
 
+function clampStyle(
+  current: SubtitleStyle,
+  input: Partial<SubtitleStyle>
+): SubtitleStyle {
+  const merged = { ...current, ...input };
+
+  if (typeof merged.fontSize === 'number') {
+    merged.fontSize = Math.max(
+      MIN_FONT_SIZE,
+      Math.min(MAX_FONT_SIZE, Math.round(merged.fontSize))
+    );
+  }
+
+  if (
+    typeof merged.shadowLevel === 'string' &&
+    !VALID_SHADOW.includes(merged.shadowLevel as any)
+  ) {
+    merged.shadowLevel = current.shadowLevel;
+  }
+
+  if (
+    typeof merged.textAlign === 'string' &&
+    !VALID_ALIGN.includes(merged.textAlign as any)
+  ) {
+    merged.textAlign = current.textAlign;
+  }
+
+  if (typeof merged.fontColor === 'string' && !merged.fontColor.startsWith('#')) {
+    merged.fontColor = current.fontColor;
+  }
+
+  if (typeof merged.fontFamily === 'string' && merged.fontFamily.trim() === '') {
+    merged.fontFamily = current.fontFamily;
+  }
+
+  return merged;
+}
+
+function countWords(text: string): number {
+  const cn = (text.match(/[\u4e00-\u9fa5]/g) || []).length;
+  const en = text
+    .split(/\s+/)
+    .filter((w) => w.length > 0 && /[a-zA-Z]/.test(w)).length;
+  return cn + en;
+}
+
+function truncateText(text: string, maxWords: number): string {
+  if (countWords(text) <= maxWords) return text;
+
+  const chars = Array.from(text);
+  let result = '';
+  let wordCount = 0;
+  let buffer = '';
+
+  for (const ch of chars) {
+    if (/[\u4e00-\u9fa5]/.test(ch)) {
+      if (wordCount >= maxWords) break;
+      result += ch;
+      wordCount += 1;
+      buffer = '';
+    } else if (/\s/.test(ch)) {
+      if (buffer.length > 0) {
+        if (/[a-zA-Z]/.test(buffer)) {
+          if (wordCount >= maxWords) break;
+          wordCount += 1;
+        }
+        result += buffer;
+        buffer = '';
+      }
+      result += ch;
+    } else {
+      buffer += ch;
+    }
+  }
+
+  if (buffer.length > 0 && wordCount < maxWords) {
+    result += buffer;
+  }
+
+  return result;
+}
+
 export const useAppStore = create<AppStore>((set) => ({
   imageUrl: null,
   croppedImageUrl: null,
@@ -44,10 +132,11 @@ export const useAppStore = create<AppStore>((set) => ({
 
   setImageUrl: (url) => set({ imageUrl: url }),
   setCroppedImageUrl: (url) => set({ croppedImageUrl: url }),
-  setSubtitleText: (text) => set({ subtitleText: text }),
+  setSubtitleText: (text) =>
+    set({ subtitleText: truncateText(text, MAX_WORDS) }),
   setSubtitleStyle: (style) =>
     set((state) => ({
-      subtitleStyle: { ...state.subtitleStyle, ...style },
+      subtitleStyle: clampStyle(state.subtitleStyle, style),
       activeTemplate: null,
     })),
   setActiveTemplate: (name) => {
@@ -59,12 +148,13 @@ export const useAppStore = create<AppStore>((set) => ({
     if (template) {
       set({
         activeTemplate: name,
-        subtitleStyle: { ...template.style },
+        subtitleStyle: clampStyle(DEFAULT_STYLE, template.style),
       });
     }
   },
   setCropArea: (area) => set({ cropArea: area }),
-  setExportFormat: (format) => set({ exportFormat: format }),
+  setExportFormat: (format) =>
+    set({ exportFormat: format === 'jpg' ? 'jpg' : 'png' }),
   setIsExporting: (val) => set({ isExporting: val }),
   addToHistory: (record) =>
     set((state) => {
@@ -79,9 +169,9 @@ export const useAppStore = create<AppStore>((set) => ({
     set({
       imageUrl: record.imageUrl,
       croppedImageUrl: record.croppedImageUrl,
-      subtitleText: record.subtitleText,
-      subtitleStyle: { ...record.subtitleStyle },
+      subtitleText: truncateText(record.subtitleText, MAX_WORDS),
+      subtitleStyle: clampStyle(DEFAULT_STYLE, record.subtitleStyle),
       activeTemplate: record.templateName || null,
-      exportFormat: record.exportFormat,
+      exportFormat: record.exportFormat === 'jpg' ? 'jpg' : 'png',
     }),
 }));

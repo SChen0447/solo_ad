@@ -1,29 +1,29 @@
 import { forwardRef, useImperativeHandle, useRef } from 'react';
 import { useAppStore } from '@/store';
+import { getShadowValue } from '@/utils/cardExporter';
 
-const SHADOW_MAP: Record<string, string> = {
-  none: 'none',
-  light: '1px 1px 3px rgba(0,0,0,0.5)',
-  medium: '2px 2px 6px rgba(0,0,0,0.7)',
-  heavy: '3px 3px 10px rgba(0,0,0,0.9), 0 0 20px rgba(0,0,0,0.5)',
-};
-
-const SubtitleOverlay = forwardRef<HTMLDivElement>((_, ref) => {
+const SubtitleOverlay = forwardRef<HTMLDivElement>((_props, ref) => {
   const containerRef = useRef<HTMLDivElement>(null);
 
-  useImperativeHandle(ref, () => containerRef.current!);
+  useImperativeHandle(ref, () => containerRef.current as HTMLDivElement);
 
   const croppedImageUrl = useAppStore((s) => s.croppedImageUrl);
   const subtitleText = useAppStore((s) => s.subtitleText);
-  const { fontFamily, fontSize, fontColor, shadowLevel, textAlign } =
-    useAppStore((s) => s.subtitleStyle);
+  const activeTemplate = useAppStore((s) => s.activeTemplate);
+  const subtitleStyle = useAppStore((s) => s.subtitleStyle);
+
+  const { fontFamily, fontSize, fontColor, shadowLevel, textAlign } = subtitleStyle;
 
   const textStyle: React.CSSProperties = {
     fontFamily,
-    fontSize,
+    fontSize: `${fontSize}px`,
     color: fontColor,
-    textShadow: SHADOW_MAP[shadowLevel],
+    textShadow: getShadowValue(shadowLevel),
     textAlign,
+    transition: 'all 0.1s ease-out',
+    lineHeight: 1.5,
+    wordBreak: 'break-word',
+    whiteSpace: 'pre-wrap',
   };
 
   if (!croppedImageUrl) {
@@ -33,7 +33,7 @@ const SubtitleOverlay = forwardRef<HTMLDivElement>((_, ref) => {
         ref={containerRef}
         className="flex h-full w-full items-center justify-center rounded-lg bg-cinema-surface border border-cinema-border"
       >
-        <div className="flex flex-col items-center gap-3 text-cinema-muted">
+        <div className="flex flex-col items-center gap-3 text-cinema-muted animate-fade-in">
           <svg
             xmlns="http://www.w3.org/2000/svg"
             className="h-12 w-12 opacity-50"
@@ -55,6 +55,8 @@ const SubtitleOverlay = forwardRef<HTMLDivElement>((_, ref) => {
     );
   }
 
+  const animKey = `${activeTemplate}-${fontFamily}-${fontSize}-${fontColor}-${shadowLevel}-${textAlign}`;
+
   return (
     <div
       id="preview-container"
@@ -64,17 +66,27 @@ const SubtitleOverlay = forwardRef<HTMLDivElement>((_, ref) => {
       <img
         src={croppedImageUrl}
         alt="cropped preview"
-        className="h-full w-full object-contain"
+        className="h-full w-full object-cover select-none"
         draggable={false}
       />
 
       <div
-        className="absolute bottom-0 left-0 right-0 flex items-end justify-center p-4"
-        style={{ height: '20%', background: 'linear-gradient(to top, rgba(0,0,0,0.75), transparent)' }}
+        className="absolute bottom-0 left-0 right-0 flex items-end p-4 md:p-6 animate-fade-in"
+        key={animKey}
+        style={{
+          height: '22%',
+          background:
+            'linear-gradient(to top, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.6) 40%, rgba(0,0,0,0.2) 80%, transparent 100%)',
+          transition: 'background 0.3s ease-in-out',
+        }}
       >
-        {subtitleText && (
-          <span className="w-full leading-relaxed" style={textStyle}>
+        {subtitleText ? (
+          <span className="w-full font-bold px-4" style={textStyle}>
             {subtitleText}
+          </span>
+        ) : (
+          <span className="w-full text-center text-white/30 text-sm italic px-4">
+            在此预览字幕效果
           </span>
         )}
       </div>

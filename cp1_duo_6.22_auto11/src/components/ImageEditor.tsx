@@ -191,7 +191,7 @@ const ImageEditor = () => {
   };
 
   const handleMouseMove = (e: React.MouseEvent) => {
-    if (!dragStart || !isDragging && !isResizing) return;
+    if (!dragStart || (!isDragging && !isResizing)) return;
 
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -200,39 +200,64 @@ const ImageEditor = () => {
 
     if (isResizing && crop) {
       const dx = current.x - dragStart.x;
-      const dy = current.y - dragStart.y;
-      const newWidth = Math.max(50, crop.width + dx);
-      const newHeight = newWidth / ASPECT_RATIO;
+      let newWidth = Math.max(80, crop.width + dx);
+      let newHeight = newWidth / ASPECT_RATIO;
+
+      const maxWidth = canvas.width - crop.x;
+      const maxHeight = canvas.height - crop.y;
+
+      if (newHeight > maxHeight) {
+        newHeight = maxHeight;
+        newWidth = newHeight * ASPECT_RATIO;
+      }
+      if (newWidth > maxWidth) {
+        newWidth = maxWidth;
+        newHeight = newWidth / ASPECT_RATIO;
+      }
 
       setCrop({
         ...crop,
-        width: Math.min(newWidth, canvas.width - crop.x),
-        height: Math.min(newHeight, canvas.height - crop.y),
+        width: newWidth,
+        height: newHeight,
       });
       setDragStart(current);
     } else if (isDragging && crop) {
       if (crop.width === 0 && crop.height === 0) {
-        let dx = current.x - dragStart.x;
-        let dy = current.y - dragStart.y;
+        const rawDx = current.x - dragStart.x;
+        const rawDy = current.y - dragStart.y;
+        const absDx = Math.abs(rawDx);
+        const absDy = Math.abs(rawDy);
 
-        if (Math.abs(dx / dy) > ASPECT_RATIO) {
-          dy = dx / ASPECT_RATIO;
+        let width: number;
+        let height: number;
+
+        if (absDx / ASPECT_RATIO > absDy) {
+          width = absDx;
+          height = width / ASPECT_RATIO;
         } else {
-          dx = dy * ASPECT_RATIO;
+          height = absDy;
+          width = height * ASPECT_RATIO;
         }
 
-        let x = dragStart.x;
-        let y = dragStart.y;
+        let x = rawDx >= 0 ? dragStart.x : dragStart.x - width;
+        let y = rawDy >= 0 ? dragStart.y : dragStart.y - height;
 
-        if (dx < 0) { x = dragStart.x + dx; dx = Math.abs(dx); }
-        if (dy < 0) { y = dragStart.y + dy; dy = Math.abs(dy); }
+        x = Math.max(0, Math.min(x, canvas.width - width));
+        y = Math.max(0, Math.min(y, canvas.height - height));
 
-        x = Math.max(0, Math.min(x, canvas.width - dx));
-        y = Math.max(0, Math.min(y, canvas.height - dy));
-        dx = Math.min(dx, canvas.width - x);
-        dy = Math.min(dy, canvas.height - y);
+        if (x + width > canvas.width) {
+          width = canvas.width - x;
+          height = width / ASPECT_RATIO;
+        }
+        if (y + height > canvas.height) {
+          height = canvas.height - y;
+          width = height * ASPECT_RATIO;
+        }
 
-        setCrop({ x, y, width: dx, height: dy });
+        width = Math.max(0, width);
+        height = Math.max(0, height);
+
+        setCrop({ x, y, width, height });
       } else {
         const dx = current.x - dragStart.x;
         const dy = current.y - dragStart.y;
