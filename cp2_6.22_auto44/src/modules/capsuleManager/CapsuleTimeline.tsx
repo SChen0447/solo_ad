@@ -12,8 +12,7 @@ const MOOD_STYLES: Record<MoodType, { emoji: string; color: string }> = {
 function getTimeUntil(targetDate: string): { days: number; hours: number; minutes: number; totalMs: number } {
   const now = new Date()
   const target = new Date(targetDate)
-  const targetEndOfDay = new Date(target.getFullYear(), target.getMonth(), target.getDate(), 23, 59, 59, 999)
-  const diff = targetEndOfDay.getTime() - now.getTime()
+  const diff = target.getTime() - now.getTime()
   const absDiff = Math.abs(diff)
   const days = Math.floor(absDiff / (24 * 60 * 60 * 1000))
   const hours = Math.floor((absDiff % (24 * 60 * 60 * 1000)) / (60 * 60 * 1000))
@@ -32,16 +31,18 @@ function formatCountdown(targetDate: string): { text: string; isDue: boolean; is
     return { text: `已逾期 ${absDays} 天`, isDue: true, isUrgent: true }
   }
   if (days < 1) {
-    return { text: '不足1天', isDue: false, isUrgent: true }
+    return { text: `${hours}小时${minutes}分钟`, isDue: false, isUrgent: true }
   }
   return { text: `${days}天${hours}小时${minutes}分`, isDue: false, isUrgent: false }
 }
 
 interface CardProps {
   capsule: Capsule
+  tick: number
 }
 
-function CapsuleCard({ capsule }: CardProps) {
+function CapsuleCard({ capsule, tick }: CardProps) {
+  void tick
   const { text: countdownText, isDue, isUrgent } = formatCountdown(capsule.targetDate)
   const mood = MOOD_STYLES[capsule.mood]
 
@@ -99,14 +100,15 @@ function CapsuleCard({ capsule }: CardProps) {
         }
         @keyframes moodBreath {
           0% { transform: scale(1); }
-          33% { transform: scale(1.05); }
-          66% { transform: scale(1); }
+          25% { transform: scale(1.05); }
+          50% { transform: scale(1); }
           100% { transform: scale(1); }
         }
         .capsule-card {
           transition: transform 0.25s ease-out, box-shadow 0.25s ease-out;
           transform-style: preserve-3d;
           perspective: 1000px;
+          transform-origin: center center;
         }
         .capsule-card:hover {
           transform: translateY(-6px) rotateY(3deg);
@@ -123,7 +125,7 @@ function CapsuleCard({ capsule }: CardProps) {
 
 export function CapsuleTimeline() {
   const [capsules, setCapsules] = useState<Capsule[]>([])
-  const [, setTick] = useState(0)
+  const [tick, setTick] = useState(0)
 
   useEffect(() => {
     const unsub = dataStore.subscribe(() => {
@@ -157,13 +159,13 @@ export function CapsuleTimeline() {
       ) : (
         <div style={styles.waterfall}>
           <div style={styles.column}>
-            {columns[0].map((c) => <CapsuleCard key={c.id} capsule={c} />)}
+            {columns[0].map((c) => <CapsuleCard key={c.id} capsule={c} tick={tick} />)}
           </div>
           <div style={styles.column}>
-            {columns[1].map((c) => <CapsuleCard key={c.id} capsule={c} />)}
+            {columns[1].map((c) => <CapsuleCard key={c.id} capsule={c} tick={tick} />)}
           </div>
           <div style={styles.column}>
-            {columns[2].map((c) => <CapsuleCard key={c.id} capsule={c} />)}
+            {columns[2].map((c) => <CapsuleCard key={c.id} capsule={c} tick={tick} />)}
           </div>
         </div>
       )}
