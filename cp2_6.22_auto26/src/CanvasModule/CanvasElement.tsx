@@ -85,19 +85,19 @@ const DeleteButton: React.FC<DeleteButtonProps> = ({ cx, cy, r, visible, onClick
         fill="#EF4444"
       />
       <line
-        x1={cx - r * 0.5}
-        y1={cy - r * 0.5}
-        x2={cx + r * 0.5}
-        y2={cy + r * 0.5}
+        x1={cx - r * 0.45}
+        y1={cy - r * 0.45}
+        x2={cx + r * 0.45}
+        y2={cy + r * 0.45}
         stroke="white"
         strokeWidth={r * 0.33}
         strokeLinecap="round"
       />
       <line
-        x1={cx + r * 0.5}
-        y1={cy - r * 0.5}
-        x2={cx - r * 0.5}
-        y2={cy + r * 0.5}
+        x1={cx + r * 0.45}
+        y1={cy - r * 0.45}
+        x2={cx - r * 0.45}
+        y2={cy + r * 0.45}
         stroke="white"
         strokeWidth={r * 0.33}
         strokeLinecap="round"
@@ -121,6 +121,7 @@ const CanvasElementComponent: React.FC<CanvasElementProps> = ({
   const [animOpacity, setAnimOpacity] = useState(1);
   const textRef = useRef<HTMLTextAreaElement>(null);
   const delAnimRef = useRef<number>(0);
+  const hoverTimeoutRef = useRef<number>(0);
 
   useEffect(() => {
     if (editing && textRef.current) {
@@ -132,6 +133,7 @@ const CanvasElementComponent: React.FC<CanvasElementProps> = ({
   const triggerDeleteAnimation = useCallback(() => {
     if (deleting) return;
     setDeleting(true);
+    setHovered(false);
 
     if (delAnimRef.current) {
       cancelAnimationFrame(delAnimRef.current);
@@ -155,13 +157,32 @@ const CanvasElementComponent: React.FC<CanvasElementProps> = ({
     delAnimRef.current = requestAnimationFrame(step);
   }, [deleting, element.id, onDelete]);
 
+  const handleEnterHitArea = useCallback(() => {
+    if (deleting) return;
+    if (hoverTimeoutRef.current) {
+      clearTimeout(hoverTimeoutRef.current);
+      hoverTimeoutRef.current = 0;
+    }
+    setHovered(true);
+  }, [deleting]);
+
+  const handleLeaveHitArea = useCallback(() => {
+    if (hoverTimeoutRef.current) {
+      clearTimeout(hoverTimeoutRef.current);
+    }
+    hoverTimeoutRef.current = window.setTimeout(() => {
+      setHovered(false);
+    }, 50);
+  }, []);
+
   const handleClick = useCallback(
     (e: React.MouseEvent) => {
       if (deleting) return;
+      if (editing) return;
       e.stopPropagation();
       onSelect(element.id);
     },
-    [deleting, element.id, onSelect]
+    [deleting, editing, element.id, onSelect]
   );
 
   const handleDoubleClick = useCallback(
@@ -200,14 +221,6 @@ const CanvasElementComponent: React.FC<CanvasElementProps> = ({
     [triggerDeleteAnimation]
   );
 
-  const handleMouseEnter = useCallback(() => {
-    if (!deleting) setHovered(true);
-  }, [deleting]);
-
-  const handleMouseLeave = useCallback(() => {
-    setHovered(false);
-  }, []);
-
   const shouldShowDelete = !deleting && (hovered || isSelected);
 
   const transformOriginX = element.x + element.width / 2;
@@ -235,6 +248,13 @@ const CanvasElementComponent: React.FC<CanvasElementProps> = ({
       pathBBoxMaxX = element.x + element.width;
       pathBBoxMaxY = element.y + element.height;
     }
+
+    const hitPadding = 16;
+    const hitX = pathBBoxMinX - hitPadding;
+    const hitY = pathBBoxMinY - hitPadding;
+    const hitW = (pathBBoxMaxX - pathBBoxMinX) + hitPadding * 2;
+    const hitH = (pathBBoxMaxY - pathBBoxMinY) + hitPadding * 2;
+
     const pathCx = pathBBoxMaxX - 8;
     const pathCy = pathBBoxMinY + 8;
     const pathCenterX = (pathBBoxMinX + pathBBoxMaxX) / 2;
@@ -242,10 +262,6 @@ const CanvasElementComponent: React.FC<CanvasElementProps> = ({
 
     return (
       <g
-        onClick={handleClick}
-        onMouseEnter={handleMouseEnter}
-        onMouseLeave={handleMouseLeave}
-        style={{ cursor: 'pointer' }}
         opacity={animOpacity}
         transform={
           animScale !== 1
@@ -253,15 +269,18 @@ const CanvasElementComponent: React.FC<CanvasElementProps> = ({
             : undefined
         }
         pointerEvents={deleting ? 'none' : 'auto'}
+        style={{ cursor: 'pointer' }}
       >
         <rect
-          x={pathBBoxMinX}
-          y={pathBBoxMinY}
-          width={pathBBoxMaxX - pathBBoxMinX}
-          height={pathBBoxMaxY - pathBBoxMinY}
+          x={hitX}
+          y={hitY}
+          width={hitW}
+          height={hitH}
           fill="transparent"
-          opacity={0}
           style={{ pointerEvents: 'fill' }}
+          onMouseEnter={handleEnterHitArea}
+          onMouseLeave={handleLeaveHitArea}
+          onClick={handleClick}
         />
         <path
           d={buildSmoothPath(pathPoints)}
@@ -272,6 +291,7 @@ const CanvasElementComponent: React.FC<CanvasElementProps> = ({
           opacity={element.opacity}
           strokeLinecap="round"
           strokeLinejoin="round"
+          style={{ pointerEvents: 'none' }}
         />
         {isSelected && !deleting && (
           <path
@@ -283,6 +303,7 @@ const CanvasElementComponent: React.FC<CanvasElementProps> = ({
             opacity={0.2}
             strokeLinecap="round"
             strokeLinejoin="round"
+            style={{ pointerEvents: 'none' }}
           />
         )}
         <DeleteButton
@@ -297,13 +318,12 @@ const CanvasElementComponent: React.FC<CanvasElementProps> = ({
   }
 
   if (element.type === 'sticky') {
+    const contentTopPadding = 28;
+    const contentSidePadding = 12;
+    const contentBottomPadding = 12;
+
     return (
       <g
-        onClick={handleClick}
-        onDoubleClick={handleDoubleClick}
-        onMouseEnter={handleMouseEnter}
-        onMouseLeave={handleMouseLeave}
-        style={{ cursor: editing ? 'text' : 'move' }}
         opacity={animOpacity}
         transform={
           animScale !== 1
@@ -311,7 +331,20 @@ const CanvasElementComponent: React.FC<CanvasElementProps> = ({
             : undefined
         }
         pointerEvents={deleting ? 'none' : 'auto'}
+        style={{ cursor: editing ? 'text' : 'move' }}
       >
+        <rect
+          x={element.x - 8}
+          y={element.y - 8}
+          width={element.width + 16}
+          height={element.height + 16}
+          fill="transparent"
+          style={{ pointerEvents: 'fill' }}
+          onMouseEnter={handleEnterHitArea}
+          onMouseLeave={handleLeaveHitArea}
+          onClick={handleClick}
+          onDoubleClick={handleDoubleClick}
+        />
         <rect
           x={element.x}
           y={element.y}
@@ -323,6 +356,7 @@ const CanvasElementComponent: React.FC<CanvasElementProps> = ({
           stroke={element.stroke}
           strokeWidth={element.strokeWidth}
           filter={isSelected ? 'url(#dropShadow)' : undefined}
+          style={{ pointerEvents: 'none' }}
         />
         {isSelected && !deleting && (
           <rect
@@ -336,14 +370,15 @@ const CanvasElementComponent: React.FC<CanvasElementProps> = ({
             stroke="#6366F1"
             strokeWidth={2 / zoom}
             strokeDasharray="4 2"
+            style={{ pointerEvents: 'none' }}
           />
         )}
         {editing ? (
           <foreignObject
-            x={element.x + 12}
-            y={element.y + 12}
-            width={element.width - 24}
-            height={element.height - 24}
+            x={element.x + contentSidePadding}
+            y={element.y + contentTopPadding}
+            width={element.width - contentSidePadding * 2}
+            height={element.height - contentTopPadding - contentBottomPadding}
             style={{ pointerEvents: 'auto' }}
           >
             <textarea
@@ -367,10 +402,10 @@ const CanvasElementComponent: React.FC<CanvasElementProps> = ({
           </foreignObject>
         ) : (
           <foreignObject
-            x={element.x + 12}
-            y={element.y + 12}
-            width={element.width - 24}
-            height={element.height - 24}
+            x={element.x + contentSidePadding}
+            y={element.y + contentTopPadding}
+            width={element.width - contentSidePadding * 2}
+            height={element.height - contentTopPadding - contentBottomPadding}
             style={{ pointerEvents: 'none' }}
           >
             <div
@@ -401,10 +436,6 @@ const CanvasElementComponent: React.FC<CanvasElementProps> = ({
   if (element.type === 'rectangle') {
     return (
       <g
-        onClick={handleClick}
-        onMouseEnter={handleMouseEnter}
-        onMouseLeave={handleMouseLeave}
-        style={{ cursor: 'move' }}
         opacity={animOpacity}
         transform={
           animScale !== 1
@@ -412,7 +443,19 @@ const CanvasElementComponent: React.FC<CanvasElementProps> = ({
             : undefined
         }
         pointerEvents={deleting ? 'none' : 'auto'}
+        style={{ cursor: 'move' }}
       >
+        <rect
+          x={element.x - 8}
+          y={element.y - 8}
+          width={element.width + 16}
+          height={element.height + 16}
+          fill="transparent"
+          style={{ pointerEvents: 'fill' }}
+          onMouseEnter={handleEnterHitArea}
+          onMouseLeave={handleLeaveHitArea}
+          onClick={handleClick}
+        />
         <rect
           x={element.x}
           y={element.y}
@@ -424,6 +467,7 @@ const CanvasElementComponent: React.FC<CanvasElementProps> = ({
           stroke={element.stroke}
           strokeWidth={element.strokeWidth}
           filter={isSelected ? 'url(#dropShadow)' : undefined}
+          style={{ pointerEvents: 'none' }}
         />
         {isSelected && !deleting && (
           <rect
@@ -437,6 +481,7 @@ const CanvasElementComponent: React.FC<CanvasElementProps> = ({
             stroke="#3B82F6"
             strokeWidth={2 / zoom}
             strokeDasharray="4 2"
+            style={{ pointerEvents: 'none' }}
           />
         )}
         <DeleteButton

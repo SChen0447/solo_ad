@@ -1,4 +1,4 @@
-import { useCallback, useRef, useEffect } from 'react';
+import { useCallback, useRef, useEffect, useState } from 'react';
 import { useWhiteboardStore } from '@/store';
 
 interface InteractionState {
@@ -16,24 +16,25 @@ interface InteractionState {
 }
 
 export function useCanvasInteraction(containerRef: React.RefObject<HTMLDivElement | null>) {
-  const {
-    offset,
-    zoom,
-    tool,
-    selectedId,
-    elements,
-    setOffset,
-    setZoom,
-    setTool,
-    setSelectedId,
-    setDragging,
-    addSticky,
-    addRectangle,
-    addPath,
-    moveElement,
-    updateElement,
-    setDrawing,
-  } = useWhiteboardStore();
+  const offset = useWhiteboardStore(s => s.offset);
+  const zoom = useWhiteboardStore(s => s.zoom);
+  const tool = useWhiteboardStore(s => s.tool);
+  const selectedId = useWhiteboardStore(s => s.selectedId);
+  const drawing = useWhiteboardStore(s => s.drawing);
+
+  const setOffset = useWhiteboardStore(s => s.setOffset);
+  const setZoom = useWhiteboardStore(s => s.setZoom);
+  const setTool = useWhiteboardStore(s => s.setTool);
+  const setSelectedId = useWhiteboardStore(s => s.setSelectedId);
+  const setDragging = useWhiteboardStore(s => s.setDragging);
+  const addSticky = useWhiteboardStore(s => s.addSticky);
+  const addRectangle = useWhiteboardStore(s => s.addRectangle);
+  const addPath = useWhiteboardStore(s => s.addPath);
+  const moveElement = useWhiteboardStore(s => s.moveElement);
+  const updateElement = useWhiteboardStore(s => s.updateElement);
+  const setDrawing = useWhiteboardStore(s => s.setDrawing);
+
+  const [drawTick, setTick] = useState(0);
 
   const stateRef = useRef<InteractionState>({
     isPanning: false,
@@ -122,6 +123,7 @@ export function useCanvasInteraction(containerRef: React.RefObject<HTMLDivElemen
 
         if (tool === 'select') {
           const canvasPos = screenToCanvas(e.clientX, e.clientY);
+          const elements = useWhiteboardStore.getState().elements;
           const hitElement = [...elements].reverse().find(el => {
             if (el.type === 'path') return false;
             return (
@@ -160,7 +162,7 @@ export function useCanvasInteraction(containerRef: React.RefObject<HTMLDivElemen
         }
       }
     },
-    [tool, offset, zoom, elements, screenToCanvas, setDragging, setDrawing, setSelectedId, addSticky, addRectangle, setTool]
+    [tool, offset, zoom, screenToCanvas, setDragging, setDrawing, setSelectedId, addSticky, addRectangle, setTool]
   );
 
   const handleMouseMove = useCallback(
@@ -194,6 +196,7 @@ export function useCanvasInteraction(containerRef: React.RefObject<HTMLDivElemen
         const pos = screenToCanvas(e.clientX, e.clientY);
         s.drawingPoints = [...s.drawingPoints, pos];
         s.moved = true;
+        setTick(t => t + 1);
         return;
       }
     },
@@ -205,7 +208,7 @@ export function useCanvasInteraction(containerRef: React.RefObject<HTMLDivElemen
       const s = stateRef.current;
 
       if (s.isDragging && selectedId && s.moved) {
-        const el = elements.find(e => e.id === selectedId);
+        const el = useWhiteboardStore.getState().elements.find(e => e.id === selectedId);
         if (el) {
           updateElement(selectedId, { x: el.x, y: el.y });
         }
@@ -227,7 +230,7 @@ export function useCanvasInteraction(containerRef: React.RefObject<HTMLDivElemen
       };
       setDragging(false);
     },
-    [selectedId, elements, updateElement, addPath, setDrawing]
+    [selectedId, updateElement, addPath, setDrawing]
   );
 
   const handleWheel = useCallback(
@@ -279,16 +282,13 @@ export function useCanvasInteraction(containerRef: React.RefObject<HTMLDivElemen
     [zoom, offset, containerRef, setZoom, setOffset]
   );
 
-  const drawingPoints = useWhiteboardStore(s =>
-    s.drawing ? stateRef.current.drawingPoints : []
-  );
-
   return {
     handleMouseDown,
     handleMouseMove,
     handleMouseUp,
     handleWheel,
     screenToCanvas,
-    drawingPoints: stateRef.current.isDrawing ? stateRef.current.drawingPoints : [],
+    drawingPoints: drawing ? stateRef.current.drawingPoints : [],
+    drawTick,
   };
 }
