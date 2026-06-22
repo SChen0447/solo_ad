@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useCallback, useMemo } from 'react'
 import styled from 'styled-components'
 import type { AnimationConfig, AnimationInstance, AnimationType, EasingType } from '@/types/animation'
 import { ANIMATION_TYPE_LABELS, EASING_OPTIONS, EASING_LABELS } from '@/types/animation'
@@ -220,18 +220,19 @@ const CubicBezierInputs = styled.div`
   gap: 8px;
 `
 
-const BezierInput = styled.input`
+const BezierInput = styled.input<{ $hasError?: boolean }>`
   width: 100%;
   padding: 6px 8px;
   border-radius: 6px;
-  border: 1px solid #E5E7EB;
+  border: 1px solid ${({ $hasError }) => $hasError ? '#EF4444' : '#E5E7EB'};
   font-size: 12px;
   text-align: center;
   font-family: 'JetBrains Mono', 'Consolas', monospace;
   color: #1F2937;
   outline: none;
-  transition: border-color 0.2s;
+  transition: border-color 0.2s, box-shadow 0.2s;
   -moz-appearance: textfield;
+  background: ${({ $hasError }) => $hasError ? '#FEF2F2' : '#FFFFFF'};
 
   &::-webkit-outer-spin-button,
   &::-webkit-inner-spin-button {
@@ -240,8 +241,56 @@ const BezierInput = styled.input`
   }
 
   &:focus {
-    border-color: #8B5CF6;
+    border-color: ${({ $hasError }) => $hasError ? '#EF4444' : '#8B5CF6'};
+    box-shadow: ${({ $hasError }) => $hasError
+      ? '0 0 0 3px rgba(239, 68, 68, 0.1)'
+      : '0 0 0 3px rgba(139, 92, 246, 0.1)'};
   }
+`
+
+const BezierPreview = styled.div`
+  margin-top: 10px;
+  padding: 12px;
+  background: #FFFFFF;
+  border-radius: 8px;
+  border: 1px dashed #D1D5DB;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+`
+
+const PreviewPath = styled.svg`
+  width: 60px;
+  height: 60px;
+  flex-shrink: 0;
+`
+
+const PreviewLabel = styled.span`
+  font-size: 11px;
+  color: #6B7280;
+  font-family: 'JetBrains Mono', 'Consolas', monospace;
+  word-break: break-all;
+`
+
+const ErrorText = styled.span`
+  display: block;
+  margin-top: 8px;
+  font-size: 11px;
+  color: #EF4444;
+  font-weight: 500;
+`
+
+const ValidationBadge = styled.span<{ $valid: boolean }>`
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 10px;
+  font-weight: 500;
+  background: ${({ $valid }) => $valid ? '#D1FAE5' : '#FEE2E2'};
+  color: ${({ $valid }) => $valid ? '#059669' : '#DC2626'};
 `
 
 interface AnimationCardProps {
@@ -250,6 +299,21 @@ interface AnimationCardProps {
   onUpdate: (config: AnimationConfig) => void
   onRemove: () => void
   canRemove: boolean
+}
+
+function validateBezierValue(value: string): { valid: boolean; num?: number; error?: string } {
+  const trimmed = value.trim()
+  if (trimmed === '') {
+    return { valid: false, error: '值不能为空' }
+  }
+  const num = parseFloat(trimmed)
+  if (isNaN(num)) {
+    return { valid: false, error: '请输入有效数字' }
+  }
+  if (num < 0 || num > 1) {
+    return { valid: false, error: '值必须在 0 到 1 之间' }
+  }
+  return { valid: true, num }
 }
 
 export function AnimationCard({
@@ -261,18 +325,102 @@ export function AnimationCard({
 }: AnimationCardProps) {
   const [expanded, setExpanded] = useState(true)
   const { config } = instance
+  const [bezierInputs, setBezierInputs] = useState<string[]>(
+    config.cubicBezier.map(n => n.toString())
+  )
+  const [bezierErrors, setBezierErrors] = useState<(string | null)[]>([null, null, null, null])
+  const [bezierValid, setBezierValid] = useState(true)
 
-  const updateField = <K extends keyof AnimationConfig>(key: K, value: AnimationConfig[K]) => {
+  const updateField = useCallback(<K extends keyof AnimationConfig>(key: K, value: AnimationConfig[K]) => {
     onUpdate({ ...config, [key]: value })
-  }
+  }, [config, onUpdate])
 
-  const handleCubicBezierChange = (idx: number, value: string) => {
-    const num = parseFloat(value)
-    if (isNaN(num)) return
-    const newBezier = [...config.cubicBezier] as [number, number, number, number]
-    newBezier[idx] = Math.max(-1, Math.min(2, num))
-    updateField('cubicBezier', newBezier)
-  }
+  const triggerReplay = useCallback(() => {
+  }, [])
+
+  const handleBezierInputChange = useCallback((idx: number, value: string) => {
+    setBezierInputs(prev => {
+      const newInputs = [...prev]
+      newInputs[idx] = value
+      return newInputs
+    })
+    setBezierErrors(prev => {
+      const newErrors = [...prev]
+      newErrors[idx] = null
+      return newErrors
+    })
+  }, [])
+
+  const validateAndApplyBezier = useCallback((idx: number) => {
+    const result = validateBezierValue(bezierInputs[idx])
+    if (!result.valid) {
+      setBezierErrors(prev => {
+        const newErrors = [...prev]
+        newErrors[idx] = result.error || '无效值'
+        return newErrors
+      })
+      setBezierValid(false)
+      return
+    }
+
+    setBezierErrors(prev => {
+      const newErrors = [...prev]
+      newErrors[idx] = null
+      return newErrors
+    })
+
+    const allValid = bezierInputs.every((input, i) => {
+      if (i === idx) return true
+      const r = validateBezierValue(input)
+      return r.valid
+    })
+
+    if (allValid && result.num !== undefined) {
+      const newBezier = [...config.cubicBezier] as [number, number, number, number]
+      newBezier[idx] = result.num
+      setBezierValid(true)
+      updateField('cubicBezier', newBezier)
+      triggerReplay()
+    }
+  }, [bezierInputs, config.cubicBezier, updateField, triggerReplay])
+
+  const handleBezierBlur = useCallback((idx: number) => {
+    validateAndApplyBezier(idx)
+  }, [validateAndApplyBezier])
+
+  const handleBezierKeyDown = useCallback((idx: number, e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault()
+      validateAndApplyBezier(idx)
+    }
+  }, [validateAndApplyBezier])
+
+  const handleApplyAll = useCallback(() => {
+    const results = bezierInputs.map(input => validateBezierValue(input))
+    const errors = results.map(r => r.valid ? null : (r.error || '无效值'))
+    setBezierErrors(errors)
+
+    const allValid = results.every(r => r.valid)
+    setBezierValid(allValid)
+
+    if (allValid) {
+      const nums = results.map(r => r.num!) as [number, number, number, number]
+      const changed = nums.some((n, i) => Math.abs(n - config.cubicBezier[i]) > 0.001)
+      if (changed) {
+        updateField('cubicBezier', nums)
+        triggerReplay()
+      }
+    }
+  }, [bezierInputs, config.cubicBezier, updateField, triggerReplay])
+
+  const bezierPathD = useMemo(() => {
+    const [x1, y1, x2, y2] = config.cubicBezier
+    const w = 60, h = 60
+    const sy = (v: number) => h - v * h
+    return `M 0 ${sy(0)} C ${x1 * w} ${sy(y1)}, ${x2 * w} ${sy(y2)}, ${w} ${sy(1)}`
+  }, [config.cubicBezier])
+
+  const hasAnyError = bezierErrors.some(e => e !== null)
 
   const animationTypes: AnimationType[] = ['translate', 'rotate', 'scale', 'color', 'bounce']
 
@@ -352,26 +500,80 @@ export function AnimationCard({
 
           {config.easing === 'cubic-bezier' && (
             <CubicBezierGroup>
-              <CubicBezierLabel>
-                cubic-bezier(
-                {config.cubicBezier[0]}, {config.cubicBezier[1]},{' '}
-                {config.cubicBezier[2]}, {config.cubicBezier[3]})
-              </CubicBezierLabel>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                <CubicBezierLabel>
+                  cubic-bezier(
+                  {config.cubicBezier[0].toFixed(2)}, {config.cubicBezier[1].toFixed(2)},{' '}
+                  {config.cubicBezier[2].toFixed(2)}, {config.cubicBezier[3].toFixed(2)})
+                </CubicBezierLabel>
+                <ValidationBadge $valid={bezierValid && !hasAnyError}>
+                  {bezierValid && !hasAnyError ? '✓ 有效' : '✗ 无效'}
+                </ValidationBadge>
+              </div>
               <CubicBezierInputs>
                 {['x1', 'y1', 'x2', 'y2'].map((label, idx) => (
                   <div key={label} style={{ textAlign: 'center' }}>
                     <BezierInput
-                      type="number"
+                      type="text"
+                      inputMode="decimal"
                       step="0.01"
-                      min="-1"
-                      max="2"
-                      value={config.cubicBezier[idx]}
-                      onChange={e => handleCubicBezierChange(idx, e.target.value)}
+                      value={bezierInputs[idx]}
+                      $hasError={bezierErrors[idx] !== null}
+                      onChange={e => handleBezierInputChange(idx, e.target.value)}
+                      onBlur={() => handleBezierBlur(idx)}
+                      onKeyDown={e => handleBezierKeyDown(idx, e)}
+                      placeholder={label}
                     />
                     <div style={{ fontSize: '10px', color: '#9CA3AF', marginTop: '4px' }}>{label}</div>
+                    {bezierErrors[idx] && (
+                      <ErrorText>{bezierErrors[idx]}</ErrorText>
+                    )}
                   </div>
                 ))}
               </CubicBezierInputs>
+              <button
+                type="button"
+                onClick={handleApplyAll}
+                style={{
+                  marginTop: '12px',
+                  width: '100%',
+                  padding: '8px 12px',
+                  borderRadius: '6px',
+                  border: '1px solid #8B5CF6',
+                  background: 'linear-gradient(135deg, rgba(139,92,246,0.1) 0%, rgba(59,130,246,0.1) 100%)',
+                  color: '#8B5CF6',
+                  fontSize: '12px',
+                  fontWeight: 500,
+                  cursor: 'pointer',
+                  transition: 'all 0.2s'
+                }}
+              >
+                应用参数并重播动画
+              </button>
+              <BezierPreview>
+                <PreviewPath viewBox="0 0 60 60" preserveAspectRatio="none">
+                  <line x1="0" y1="60" x2="60" y2="0" stroke="#E5E7EB" strokeWidth="1" strokeDasharray="2,2" />
+                  <path
+                    d={bezierPathD}
+                    fill="none"
+                    stroke="url(#bezierGradient)"
+                    strokeWidth="2.5"
+                    strokeLinecap="round"
+                  />
+                  <defs>
+                    <linearGradient id="bezierGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                      <stop offset="0%" stopColor="#8B5CF6" />
+                      <stop offset="100%" stopColor="#3B82F6" />
+                    </linearGradient>
+                  </defs>
+                  <circle cx="0" cy="60" r="3" fill="#8B5CF6" />
+                  <circle cx="60" cy="0" r="3" fill="#3B82F6" />
+                </PreviewPath>
+                <PreviewLabel>
+                  曲线预览<br/>
+                  调整x1,y1,x2,y2(0-1)
+                </PreviewLabel>
+              </BezierPreview>
             </CubicBezierGroup>
           )}
         </FieldGroup>

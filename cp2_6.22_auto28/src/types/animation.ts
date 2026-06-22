@@ -37,8 +37,8 @@ export const EASING_OPTIONS: EasingType[] = [
 export const EASING_LABELS: Record<EasingType, string> = {
   ease: 'ease',
   linear: 'linear',
-  ease-in: 'ease-in',
-  ease-out: 'ease-out',
+  'ease-in': 'ease-in',
+  'ease-out': 'ease-out',
   'ease-in-out': 'ease-in-out',
   'cubic-bezier': '自定义贝塞尔曲线'
 }

@@ -2,7 +2,7 @@ import styled, { keyframes, css } from 'styled-components'
 import { memo, useMemo } from 'react'
 import type { AnimationConfig, AnimationInstance } from '@/types/animation'
 import { ANIMATION_TYPE_LABELS } from '@/types/animation'
-import { formatEasing, getAnimationName } from '@/utils/cssExporter'
+import { formatEasing } from '@/utils/cssExporter'
 
 const kfTranslate = keyframes`
   0%   { transform: translateX(0); }
@@ -59,9 +59,9 @@ const AnimationStage = styled.div`
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #FFFFFF;
+  background: var(--bg-stage, #FFFFFF);
   border-radius: 12px;
-  border: 1px solid #E5E7EB;
+  border: 1px solid var(--border-color, #E5E7EB);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
   position: relative;
   overflow: hidden;
@@ -71,8 +71,8 @@ const GridBg = styled.div`
   position: absolute;
   inset: 0;
   background-image:
-    linear-gradient(#F3F4F6 1px, transparent 1px),
-    linear-gradient(90deg, #F3F4F6 1px, transparent 1px);
+    linear-gradient(var(--grid-color, #F3F4F6) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid-color, #F3F4F6) 1px, transparent 1px);
   background-size: 20px 20px;
   pointer-events: none;
 `
@@ -82,31 +82,40 @@ interface AnimBoxProps {
   $isPlaying: boolean
   $currentTime: number
   $playKey: number
+  $seekKey: number
 }
 
 const AnimatedBox = styled.div<AnimBoxProps>`
-  width: 120px;
-  height: 120px;
-  min-width: 120px;
-  min-height: 120px;
-  max-width: 120px;
-  max-height: 120px;
+  --box-size: 120px;
+
+  width: var(--box-size);
+  height: var(--box-size);
+  min-width: var(--box-size);
+  min-height: var(--box-size);
+  max-width: var(--box-size);
+  max-height: var(--box-size);
+  box-sizing: border-box;
+  padding: 0;
+  border: none;
+  margin: 0;
   border-radius: 16px;
   background: ${({ $config }) =>
     $config.type === 'color' ? '#8B5CF6' : 'linear-gradient(135deg, #8B5CF6 0%, #3B82F6 100%)'};
   box-shadow: 0 8px 24px rgba(139, 92, 246, 0.3);
+  will-change: transform, background-color;
 
-  ${({ $config, $isPlaying, $currentTime, $playKey }) => {
+  ${({ $config, $isPlaying, $currentTime, $seekKey }) => {
     const kf = getKeyframes($config.type)
     const easing = formatEasing($config)
-    const totalDuration = $config.duration + $config.delay
-    const effectiveDelay = -Math.min($currentTime, totalDuration)
+    const seekDelay = $config.delay > $currentTime
+      ? $config.delay - $currentTime
+      : -($currentTime - $config.delay)
 
     return css`
       animation-name: ${kf};
       animation-duration: ${$config.duration}s;
       animation-timing-function: ${easing};
-      animation-delay: ${$config.delay + effectiveDelay}s;
+      animation-delay: ${seekDelay}s;
       animation-iteration-count: infinite;
       animation-play-state: ${$isPlaying ? 'running' : 'paused'};
       animation-fill-mode: both;
@@ -119,21 +128,24 @@ const InstanceInfo = styled.div`
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 4px;
+  gap: 0.25rem;
   text-align: center;
+  padding: 0 0.5rem;
 `
 
 const InstanceName = styled.div`
-  font-size: 13px;
+  font-size: 0.8125rem;
   font-weight: 600;
-  color: #1F2937;
+  color: var(--text-primary, #1F2937);
 `
 
 const InstanceParams = styled.div`
-  font-size: 12px;
-  color: #6B7280;
+  font-size: 0.75rem;
+  color: var(--text-secondary, #6B7280);
   line-height: 1.5;
   font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
+  word-break: break-all;
+  max-width: 200px;
 `
 
 interface AnimationBoxProps {
@@ -141,6 +153,7 @@ interface AnimationBoxProps {
   isPlaying: boolean
   currentTime: number
   playKey: number
+  seekKey: number
   index: number
 }
 
@@ -149,9 +162,15 @@ export const AnimationBox = memo(function AnimationBox({
   isPlaying,
   currentTime,
   playKey,
+  seekKey,
   index
 }: AnimationBoxProps) {
   const { config } = instance
+
+  const animKey = useMemo(() =>
+    `${playKey}-${seekKey}`,
+    [playKey, seekKey]
+  )
 
   const summaryText = useMemo(() => {
     const type = ANIMATION_TYPE_LABELS[config.type]
@@ -173,11 +192,12 @@ export const AnimationBox = memo(function AnimationBox({
       <AnimationStage>
         <GridBg />
         <AnimatedBox
-          key={playKey}
+          key={animKey}
           $config={config}
           $isPlaying={isPlaying}
           $currentTime={currentTime}
           $playKey={playKey}
+          $seekKey={seekKey}
         />
       </AnimationStage>
       <InstanceInfo>

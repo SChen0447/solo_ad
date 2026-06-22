@@ -62,27 +62,43 @@ export function generateCSS(config: AnimationConfig): string {
 }`
 }
 
+export type HighlightType = 'duration' | 'delay' | 'easing' | 'bezier-number'
+
 export interface HighlightedPart {
   text: string
   isHighlight: boolean
-  type?: 'duration' | 'delay' | 'easing' | 'number'
+  type?: HighlightType
+}
+
+export const HIGHLIGHT_CSS_CLASSES: Record<HighlightType, string> = {
+  duration: 'highlight-duration',
+  delay: 'highlight-delay',
+  easing: 'highlight-easing',
+  'bezier-number': 'highlight-bezier-number'
 }
 
 export function generateHighlightedCSS(config: AnimationConfig): HighlightedPart[] {
   const rawCSS = generateCSS(config)
   const parts: HighlightedPart[] = []
 
-  const durationPattern = new RegExp(`(${config.duration}s)`, 'g')
-  const delayPattern = new RegExp(`(${config.delay}s)`, 'g')
+  const durationStr = `${config.duration.toFixed(1)}s`
+  const delayStr = `${config.delay.toFixed(1)}s`
   const easingValue = formatEasing(config)
 
-  let lastIndex = 0
-  const tokens: Array<{ start: number; end: number; text: string; type: HighlightedPart['type'] }> = []
+  const escapeRegex = (str: string) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 
-  const collectToken = (regex: RegExp, type: HighlightedPart['type']) => {
+  let lastIndex = 0
+  const tokens: Array<{ start: number; end: number; text: string; type: HighlightType }> = []
+
+  const collectToken = (pattern: string, type: HighlightType, excludeInside = false) => {
+    const regex = new RegExp(
+      excludeInside
+        ? `(?<!cubic-bezier\\([^)]*)${escapeRegex(pattern)}`
+        : escapeRegex(pattern),
+      'g'
+    )
     let match: RegExpExecArray | null
-    const re = new RegExp(regex.source, 'g')
-    while ((match = re.exec(rawCSS)) !== null) {
+    while ((match = regex.exec(rawCSS)) !== null) {
       tokens.push({
         start: match.index,
         end: match.index + match[0].length,
@@ -92,38 +108,38 @@ export function generateHighlightedCSS(config: AnimationConfig): HighlightedPart
     }
   }
 
-  collectToken(durationPattern, 'duration')
-  collectToken(delayPattern, 'delay')
+  collectToken(durationStr, 'duration', true)
+  collectToken(delayStr, 'delay', true)
 
   if (easingValue !== 'ease') {
-    const easingRegex = new RegExp(`(${easingValue.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'g')
-    let em: RegExpExecArray | null
-    while ((em = easingRegex.exec(rawCSS)) !== null) {
-      tokens.push({
-        start: em.index,
-        end: em.index + em[0].length,
-        text: em[0],
-        type: 'easing'
-      })
-    }
+    collectToken(easingValue, 'easing', true)
   }
 
-  const cubicBezierNums = rawCSS.matchAll(/cubic-bezier\(([-\d.]+),\s*([-\d.]+),\s*([-\d.]+),\s*([-\d.]+)\)/g)
-  for (const m of cubicBezierNums) {
+  const bezierRegex = /cubic-bezier\(([-\d.]+),\s*([-\d.]+),\s*([-\d.]+),\s*([-\d.]+)\)/g
+  let bezierMatch: RegExpExecArray | null
+  while ((bezierMatch = bezierRegex.exec(rawCSS)) !== null) {
     for (let i = 1; i <= 4; i++) {
-      const offset = m.index! + m[0].indexOf(m[i])
+      const numStr = bezierMatch[i]
+      const offset = bezierMatch.index + bezierMatch[0].indexOf(numStr)
       tokens.push({
         start: offset,
-        end: offset + m[i].length,
-        text: m[i],
-        type: 'number'
+        end: offset + numStr.length,
+        text: numStr,
+        type: 'bezier-number'
       })
     }
   }
 
   tokens.sort((a, b) => a.start - b.start)
 
+  const merged: typeof tokens = []
   for (const t of tokens) {
+    if (merged.length === 0 || t.start >= merged[merged.length - 1].end) {
+      merged.push(t)
+    }
+  }
+
+  for (const t of merged) {
     if (t.start > lastIndex) {
       parts.push({ text: rawCSS.slice(lastIndex, t.start), isHighlight: false })
     }

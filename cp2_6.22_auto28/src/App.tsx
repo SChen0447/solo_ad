@@ -4,8 +4,8 @@ import { AnimationEditor } from './modules/editor/AnimationEditor'
 import { PreviewPanel } from './modules/preview/PreviewPanel'
 import type { AnimationConfig, AnimationInstance, AnimationType } from './types/animation'
 import { createDefaultConfig } from './types/animation'
-import { generateCSS, generateHighlightedCSS } from './utils/cssExporter'
-import type { HighlightedPart } from './utils/cssExporter'
+import { generateCSS, generateHighlightedCSS, HIGHLIGHT_CSS_CLASSES } from './utils/cssExporter'
+import type { HighlightedPart, HighlightType } from './utils/cssExporter'
 
 const AppContainer = styled.div`
   width: 100%;
@@ -85,8 +85,9 @@ const EditorWrapper = styled.div<{ $isOpenMobile: boolean }>`
     border-right: none;
     border-bottom: 1px solid #E5E7EB;
     transform: translateY(${({ $isOpenMobile }) => $isOpenMobile ? '0' : '-100%'});
-    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    box-shadow: ${({ $isOpenMobile }) => $isOpenMobile ? '0 4px 20px rgba(0,0,0,0.1)' : 'none'};
+    transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.3s ease;
+    box-shadow: ${({ $isOpenMobile }) => $isOpenMobile ? '0 8px 32px rgba(0,0,0,0.12), 0 2px 8px rgba(0,0,0,0.08)' : 'none'};
+    z-index: 10;
   }
 `
 
@@ -153,21 +154,66 @@ const CodeBlock = styled.pre`
   margin: 0;
 `
 
-const HL = styled.span<{ $type?: 'duration' | 'delay' | 'easing' | 'number' }>`
+const HL = styled.span<{ $type?: HighlightType }>`
   ${({ $type }) => {
     switch ($type) {
       case 'duration':
-        return 'color: #34D399; font-weight: 600;'
+        return `
+          color: #34D399;
+          font-weight: 600;
+          background: rgba(52, 211, 153, 0.15);
+          padding: 0 4px;
+          border-radius: 4px;
+        `
       case 'delay':
-        return 'color: #FBBF24; font-weight: 600;'
+        return `
+          color: #F59E0B;
+          font-weight: 600;
+          background: rgba(245, 158, 11, 0.15);
+          padding: 0 4px;
+          border-radius: 4px;
+        `
       case 'easing':
-        return 'color: #60A5FA; font-weight: 600;'
-      case 'number':
-        return 'color: #F472B6; font-weight: 600;'
+        return `
+          color: #60A5FA;
+          font-weight: 600;
+          background: rgba(96, 165, 250, 0.15);
+          padding: 0 4px;
+          border-radius: 4px;
+        `
+      case 'bezier-number':
+        return `
+          color: #F472B6;
+          font-weight: 600;
+          background: rgba(244, 114, 182, 0.15);
+          padding: 0 4px;
+          border-radius: 4px;
+        `
       default:
-        return 'color: #A78BFA; font-weight: 600;'
+        return `
+          color: #A78BFA;
+          font-weight: 600;
+          background: rgba(167, 139, 250, 0.15);
+          padding: 0 4px;
+          border-radius: 4px;
+        `
     }
   }}
+`
+
+const MobileOverlay = styled.div<{ $visible: boolean }>`
+  display: none;
+
+  @media (max-width: 900px) {
+    display: ${({ $visible }) => $visible ? 'block' : 'none'};
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 4;
+    opacity: ${({ $visible }) => $visible ? 1 : 0};
+    transition: opacity 0.3s ease;
+    cursor: pointer;
+  }
 `
 
 const Toast = styled.div<{ $visible: boolean }>`
@@ -255,16 +301,32 @@ export default function App() {
     setMobileEditorOpen(prev => !prev)
   }, [])
 
+  const handleCloseMobileEditor = useCallback(() => {
+    setMobileEditorOpen(false)
+  }, [])
+
   return (
     <AppContainer>
       <Header>
         <HeaderTitle>✨ CSS 动画沙盒</HeaderTitle>
-        <MobileToggleBtn onClick={handleToggleMobileEditor} aria-label="切换编辑面板">
-          {mobileEditorOpen ? '✕' : '☰'}
+        <MobileToggleBtn onClick={handleToggleMobileEditor} aria-label={mobileEditorOpen ? '关闭编辑面板' : '打开编辑面板'}>
+          {mobileEditorOpen ? (
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+          ) : (
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="3" y1="6" x2="21" y2="6"></line>
+              <line x1="3" y1="12" x2="21" y2="12"></line>
+              <line x1="3" y1="18" x2="21" y2="18"></line>
+            </svg>
+          )}
         </MobileToggleBtn>
       </Header>
       <MainContent>
-        <EditorWrapper $isOpenMobile={mobileEditorOpen}>
+        <MobileOverlay $visible={mobileEditorOpen} onClick={handleCloseMobileEditor} />
+        <EditorWrapper $isOpenMobile={mobileEditorOpen} className={mobileEditorOpen ? 'editor-drawer open' : 'editor-drawer'}>
           <AnimationEditor
             instances={instances}
             onUpdateConfig={handleUpdateConfig}
@@ -290,7 +352,15 @@ export default function App() {
             <CodeBlock>
               {highlightedCSS.map((part, idx) =>
                 part.isHighlight
-                  ? <HL key={idx} $type={part.type}>{part.text}</HL>
+                  ? (
+                    <HL
+                      key={idx}
+                      $type={part.type}
+                      className={part.type ? HIGHLIGHT_CSS_CLASSES[part.type] : undefined}
+                    >
+                      {part.text}
+                    </HL>
+                  )
                   : <span key={idx}>{part.text}</span>
               )}
             </CodeBlock>
