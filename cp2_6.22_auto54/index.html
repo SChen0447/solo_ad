@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>分子结构可视化与比对分析</title>
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+    <div id="app">
+      <div id="scene-container"></div>
+      <div id="right-panel">
+        <div id="gui-container"></div>
+        <div id="charts-container">
+          <div id="bar-chart-container" class="chart-panel">
+            <h3 class="chart-title">原子差异距离</h3>
+            <svg id="bar-chart"></svg>
+          </div>
+          <div id="gauge-container" class="chart-panel">
+            <h3 class="chart-title">RMSD 均方根偏差</h3>
+            <svg id="gauge-chart"></svg>
+          </div>
+        </div>
+      </div>
+      <div id="panel-handle" class="hidden">
+        <div class="handle-bar"></div>
+        <span>分子分析面板</span>
+      </div>
+      <div id="panel-toggle" class="hidden">☰</div>
+      <div id="atom-info" class="hidden"></div>
+      <div id="loading-indicator" class="hidden">
+        <div class="spinner"></div>
+        <span>加载中...</span>
+      </div>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
