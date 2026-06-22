@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>卡牌对战与AI策略模拟</title>
+  <link rel="stylesheet" href="/src/styles.css">
+</head>
+<body>
+  <div class="app-container">
+    <header class="app-header">
+      <h1>⚔️ 卡牌对战与AI策略模拟</h1>
+      <div class="header-actions">
+        <button id="restartBtn" class="btn btn-primary">重新开始</button>
+      </div>
+    </header>
+    
+    <main class="main-content">
+      <div class="game-area">
+        <canvas id="gameCanvas" width="900" height="600"></canvas>
+      </div>
+      
+      <aside class="log-panel">
+        <h2>对战日志</h2>
+        <div id="logContainer" class="log-container"></div>
+      </aside>
+    </main>
+  </div>
+  
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
